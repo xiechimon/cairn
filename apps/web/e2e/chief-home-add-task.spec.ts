@@ -218,7 +218,7 @@ test('the empty list hides its own add button while the field is open', async ({
   const empty = panel(page).getByTestId('tasks-empty');
   await empty.getByRole('button', { name: '添加任务' }).click();
   await expect(input(page)).toBeFocused();
-  await expect(empty).toHaveCount(0);
+  await expect(empty.getByRole('button')).toHaveCount(0);
   await input(page).fill('Audit the relay probe retries');
   await input(page).press('Enter');
   await expect(upNext(page)).toHaveText(['Audit the relay probe retries']);

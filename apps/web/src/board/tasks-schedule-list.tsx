@@ -17,6 +17,7 @@ import {
 } from '../pages/schedule-summary.js';
 import { scheduleEnded, schedulePauseReason } from '../schedules/schedule-model.js';
 import { type ScheduleCandidate, SchedulePopover } from '../schedules/schedule-popover.js';
+import { TasksEmpty } from './tasks-empty.js';
 import { ScheduleRowMenu } from './tasks-schedule-menu.js';
 
 function byNextRun(a: ScheduleRecord, b: ScheduleRecord): number {
@@ -64,12 +65,7 @@ export function TasksScheduleList({
       onOpenChange={setCreating}
       trigger={
         empty ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            data-testid="schedule-new"
-            title={t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则')}
-          />
+          <Button variant="secondary" size="sm" data-testid="schedule-new" />
         ) : (
           <Button
             variant="ghost"
@@ -170,12 +166,11 @@ export function TasksScheduleList({
       loadingLabel={t('正在加载定时')}
       errorTitle={t('定时没能加载')}
       empty={
-        <div className="flex flex-col items-start gap-3 px-2.5 py-2">
-          <p data-testid="tasks-schedules-empty" className="m-0 text-ui text-content-tertiary">
-            {t('还没有定时任务')}
-          </p>
-          {newSchedule(true)}
-        </div>
+        <TasksEmpty
+          title={t('还没有定时任务')}
+          hint={t('也可以直接告诉 Coordinator 某个任务要多久重跑一次，它会替你写好规则')}
+          action={newSchedule(true)}
+        />
       }
     >
       <div ref={listRef} className="flex flex-col">

@@ -1,7 +1,7 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleCheck, Plus, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import { toast } from 'sonner';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
@@ -25,6 +25,7 @@ import { compactAge, relativeTime, shortDate } from './rel-time.js';
 import { StopAndDoneConfirm } from './stop-and-done-confirm.js';
 import { TaskRowMenu } from './task-row-menu.js';
 import { TasksAddInput } from './tasks-add-input.js';
+import { TasksEmpty } from './tasks-empty.js';
 import { TasksScheduleList } from './tasks-schedule-list.js';
 import {
   ACTIVE_SECTIONS,
@@ -414,21 +415,7 @@ export function TasksPanel({
   ));
   const count = (section: ActiveSection) =>
     groups[section].length + (section === 'needs_input' ? questions.length : 0);
-  const empty =
-    entries.length === 0 && questions.length === 0 && !adding ? (
-      <div
-        data-testid="tasks-empty"
-        className="mt-16 flex flex-col items-center gap-3 px-6 text-center"
-      >
-        <p className="m-0 text-ui text-content-secondary">{t('现在没有任务')}</p>
-        <p className="m-0 text-meta text-content-secondary">
-          {t('跟 Coordinator 说一件事，它会在这里出现。')}
-        </p>
-        <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
-          {t('添加任务')}
-        </Button>
-      </div>
-    ) : null;
+  const nothingAtAll = entries.length === 0 && questions.length === 0;
   const activeCount = ACTIVE_SECTIONS.reduce((sum, section) => sum + count(section), 0);
   const loaded = query === undefined || !query.isPending;
   const openingTab: TasksTab = activeCount === 0 && groups.up_next.length > 0 ? 'next' : 'active';
@@ -436,36 +423,56 @@ export function TasksPanel({
     if (chosenTab === null && loaded) setTab(openingTab);
   }, [chosenTab, loaded, openingTab]);
   const tab = linkedToScheduled ? 'scheduled' : (chosenTab ?? openingTab);
-  const quiet = (text: string) => (
-    <p data-testid="tasks-quiet" className="m-0 px-2.5 py-2 text-ui text-content-tertiary">
-      {text}
-    </p>
+  const addAction = adding ? null : (
+    <Button variant="secondary" size="sm" onClick={() => setAdding(true)}>
+      {t('添加任务')}
+    </Button>
   );
-  const active = (
-    <div className="flex flex-col gap-2">
-      {empty}
-      {empty === null && activeCount === 0 && quiet(t('现在没有进行中的任务'))}
-      {ACTIVE_SECTIONS.map((section) => {
-        const n = count(section);
-        if (n === 0) return null;
-        return (
-          <section
-            key={section}
-            data-testid="tasks-section"
-            data-section={section}
-            className="flex flex-col gap-0.5"
-          >
-            <SectionHeader section={section} count={n} flash={received(section)} />
-            {section === 'needs_input' && questionRows}
-            {groups[section].map(row)}
-          </section>
-        );
-      })}
-    </div>
-  );
-  const listOf = (section: 'up_next' | 'resolved', emptyText: string) =>
+  const tellCoordinator = t('跟 Coordinator 说一件事，它会在这里出现。');
+  const activeEmpty =
+    groups.up_next.length > 0 ? (
+      <TasksEmpty
+        title={t('现在没有进行中的任务')}
+        hint={t('接下来有 {n} 个任务在排队。', { n: groups.up_next.length })}
+        action={
+          <Button variant="secondary" size="sm" onClick={() => setTab('next')}>
+            {t('查看接下来')}
+          </Button>
+        }
+      />
+    ) : (
+      <TasksEmpty
+        title={t(nothingAtAll ? '现在没有任务' : '现在没有进行中的任务')}
+        hint={tellCoordinator}
+        action={addAction}
+      />
+    );
+  const active =
+    activeCount === 0 ? (
+      activeEmpty
+    ) : (
+      <div className="flex flex-col gap-2">
+        {ACTIVE_SECTIONS.map((section) => {
+          const n = count(section);
+          if (n === 0) return null;
+          return (
+            <section
+              key={section}
+              data-testid="tasks-section"
+              data-section={section}
+              className="flex flex-col gap-0.5"
+            >
+              <SectionHeader section={section} count={n} flash={received(section)} />
+              {section === 'needs_input' && questionRows}
+              {groups[section].map(row)}
+            </section>
+          );
+        })}
+      </div>
+    );
+  const listOf = (section: 'up_next' | 'resolved', emptyState: ReactNode) =>
     groups[section].length === 0 ? (
-      quiet(emptyText)
+      emptyState
     ) : (
       <section data-testid="tasks-section" data-section={section} className="flex flex-col gap-0.5">
         <SectionHeader section={section} count={groups[section].length} flash={received(section)} />
@@ -476,8 +483,18 @@ export function TasksPanel({
     tab === 'active'
       ? active
       : tab === 'next'
-        ? listOf('up_next', t('接下来没有安排'))
-        : listOf('resolved', t('还没有完成的任务'));
+        ? listOf(
+            'up_next',
+            <TasksEmpty title={t('接下来没有安排')} hint={tellCoordinator} action={addAction} />,
+          )
+        : listOf(
+            'resolved',
+            <TasksEmpty
+              title={t('还没有完成的任务')}
+              hint={t('任务完成后会出现在这里。')}
+              action={null}
+            />,
+          );
   return (
     <SidePanel label={t('任务')} onDismiss={onClose} phoneTab>
       <SidePanelHead
@@ -562,7 +579,7 @@ export function TasksPanel({
         ) : (
           <QueryBoundary
             query={query}
-            isEmpty={empty !== null}
+            isEmpty={nothingAtAll}
             loadingLabel={t('正在加载任务')}
             skeleton={<TasksSkeleton />}
             errorTitle={t('任务没能加载')}

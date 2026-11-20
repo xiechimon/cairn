@@ -452,64 +452,56 @@ test('the menu offers Mark done on open tasks only and follows the checkbox', as
   await expect(page.getByRole('alertdialog', { name: '停止并标记完成' })).toBeVisible();
 });
 
-test('an empty scheduled tab says so and offers one grey pill that opens the new schedule editor', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=home-c-empty&pane=tasks');
-  await panel(page).getByRole('tab', { name: '定时' }).click();
-  await expect(panel(page).getByTestId('tasks-schedules-empty')).toHaveText('还没有定时任务');
-  await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(0);
-  await expect(panel(page).getByText('也可以直接告诉 Coordinator')).toHaveCount(0);
-  const manage = panel(page).getByRole('button', { name: '新建定时' });
-  await expect(manage).toHaveCount(1);
-  const pill = await manage.evaluate((el) => {
-    const probe = document.createElement('span');
-    probe.style.color = 'var(--secondary)';
-    document.body.append(probe);
-    const secondary = getComputedStyle(probe).color;
-    probe.remove();
-    const cs = getComputedStyle(el);
-    const note = document.querySelector('[data-testid="tasks-schedules-empty"]')!;
-    return {
-      fill: cs.backgroundColor,
-      secondary,
-      height: el.getBoundingClientRect().height,
-      below: el.getBoundingClientRect().top - note.getBoundingClientRect().bottom,
-      left: el.getBoundingClientRect().left - note.getBoundingClientRect().left,
-    };
-  });
-  expect(pill.fill).toBe(pill.secondary);
-  expect(pill.height).toBe(28);
-  expect(pill.below).toBe(12);
-  expect(pill.left).toBe(0);
-  await manage.click();
-  await expect(page.getByTestId('schedule-popover')).toContainText('新建定时');
-});
+const emptyShape = (page: Page) =>
+  panel(page)
+    .getByTestId('tasks-empty')
+    .evaluate((note) => {
+      const list = note.parentElement!.closest('[class*="overflow-y-auto"]')!.getBoundingClientRect();
+      const box = note.getBoundingClientRect();
+      const lines = [...note.querySelectorAll('p')].map((line) => getComputedStyle(line).color);
+      return {
+        align: getComputedStyle(note).textAlign,
+        centred: Math.abs(box.left + box.width / 2 - (list.left + list.width / 2)) <= 1,
+        top: Math.round(box.top - list.top),
+        lines: lines.length,
+        sameInk: new Set(lines).size === 1,
+        buttons: note.querySelectorAll('button').length,
+      };
+    });
 
-test('with no tasks anywhere the panel centres a first-run note whose button opens the add field, and the toggle has no badge', async ({
+test('every empty tab, with or without tasks elsewhere, is the same centred note with at most one action', async ({
   page,
 }) => {
   await page.goto('/app?scenario=home-c-empty&pane=tasks');
   const empty = panel(page).getByTestId('tasks-empty');
-  await expect(empty).toBeVisible();
+  await expect(empty).toContainText('现在没有任务');
   await expect(empty.locator('svg')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveCount(0);
-  await empty.getByRole('button', { name: '添加任务' }).click();
-  await expect(panel(page).getByTestId('tasks-add-input')).toBeFocused();
+  const firstRun = await emptyShape(page);
+  expect(firstRun).toMatchObject({ align: 'center', centred: true, lines: 2, sameInk: true, buttons: 1 });
+  const shapes: Awaited<ReturnType<typeof emptyShape>>[] = [];
+  await page.goto('/app?scenario=home-c-quiet&pane=tasks');
+  await expect(empty).toContainText('现在没有进行中的任务');
+  await expect(empty.getByRole('button', { name: '添加任务' })).toBeVisible();
+  shapes.push(await emptyShape(page));
+  await panel(page).getByRole('tab', { name: /接下来/ }).click();
+  await expect(empty).toContainText('接下来没有安排');
+  await expect(empty.getByRole('button', { name: '添加任务' })).toBeVisible();
+  shapes.push(await emptyShape(page));
+  await panel(page).getByRole('tab', { name: '定时' }).click();
+  await expect(empty).toContainText('还没有定时任务');
+  await expect(empty).toContainText('也可以直接告诉 Coordinator');
+  await expect(empty.getByRole('button', { name: '新建定时' })).toBeVisible();
+  shapes.push(await emptyShape(page));
+  for (const shape of shapes) expect(shape).toEqual(firstRun);
+  await empty.getByRole('button', { name: '新建定时' }).click();
+  await expect(page.getByTestId('schedule-popover')).toContainText('新建定时');
 });
 
-test('once tasks exist, an empty tab is one left-aligned quiet line under the tabs', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=home-c-quiet&pane=tasks');
-  await expect(panel(page).getByTestId('tasks-empty')).toHaveCount(0);
-  const quiet = panel(page).getByTestId('tasks-quiet');
-  await expect(quiet).toHaveText('现在没有进行中的任务');
-  await expect(quiet).toHaveCSS('text-align', 'start');
-  await panel(page).getByRole('tab', { name: /接下来/ }).click();
-  await expect(quiet).toHaveText('接下来没有安排');
-  await panel(page).getByRole('tab', { name: '已完成' }).click();
-  await expect(panel(page).locator('[data-section="resolved"]')).toContainText('Unread dot on threads');
+test('with no tasks anywhere the note button opens the add field', async ({ page }) => {
+  await page.goto('/app?scenario=home-c-empty&pane=tasks');
+  await panel(page).getByTestId('tasks-empty').getByRole('button', { name: '添加任务' }).click();
+  await expect(panel(page).getByTestId('tasks-add-input')).toBeFocused();
 });
 
 const queued = taskEntry({
@@ -538,9 +530,14 @@ test('with nothing in progress the panel opens on Up next once the tasks load, a
   await expect(next).toHaveAttribute('aria-selected', 'true');
   await expect(panel(page).locator('[data-section="up_next"]')).toContainText('Draft the release notes');
   await panel(page).getByRole('tab', { name: '进行中' }).click();
-  await expect(panel(page).getByTestId('tasks-quiet')).toHaveText('现在没有进行中的任务');
+  const empty = panel(page).getByTestId('tasks-empty');
+  await expect(empty).toContainText('现在没有进行中的任务');
+  await expect(empty).toContainText('接下来有 1 个任务在排队。');
   await page.waitForTimeout(1000);
   await expect(panel(page).getByRole('tab', { name: '进行中' })).toHaveAttribute('aria-selected', 'true');
+  await empty.getByRole('button', { name: '查看接下来' }).click();
+  await expect(next).toHaveAttribute('aria-selected', 'true');
+  await expect(panel(page).locator('[data-section="up_next"]')).toContainText('Draft the release notes');
 });
 
 test('with a task in progress the panel still opens on In progress', async ({ page }) => {

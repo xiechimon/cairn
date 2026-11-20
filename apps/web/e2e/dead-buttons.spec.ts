@@ -14,7 +14,7 @@ test('the empty schedules tab has no docs button; its `新建定时` really open
   page,
 }) => {
   await page.goto(EMPTY_SCHEDULES);
-  await expect(page.getByTestId('tasks-schedules-empty')).toBeVisible();
+  await expect(page.getByTestId('tasks-empty')).toBeVisible();
   await expect(page.getByRole('button', { name: '查看文档' })).toHaveCount(0);
   const emptyNew = page.getByTestId('schedule-new');
   await expect(emptyNew).toHaveText('新建定时');

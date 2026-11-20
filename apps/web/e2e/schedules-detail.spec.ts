@@ -366,11 +366,11 @@ test('schedule loading and failed loads never masquerade as an empty list', asyn
   probe.holdLoads();
   await page.goto(SCHEDULES);
   await expect(panel(page).getByTestId('query-loading')).toContainText('Loading schedules');
-  await expect(panel(page).getByTestId('tasks-schedules-empty')).toHaveCount(0);
+  await expect(panel(page).getByTestId('tasks-empty')).toHaveCount(0);
   probe.rejectLoads(true);
   probe.releaseLoads();
   await expect(panel(page).getByTestId('query-error')).toContainText('Schedules could not be loaded');
-  await expect(panel(page).getByTestId('tasks-schedules-empty')).toHaveCount(0);
+  await expect(panel(page).getByTestId('tasks-empty')).toHaveCount(0);
   probe.rejectLoads(false);
   await panel(page).getByTestId('query-error').getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(panel(page).locator('[data-slot="schedule-row"]')).toHaveCount(1);

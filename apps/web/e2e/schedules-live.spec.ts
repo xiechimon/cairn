@@ -18,7 +18,7 @@ test('live face: saving a new schedule from the panel fires POST /api/schedules 
 
   await page.goto('/app?pane=tasks&tab=scheduled');
   const panel = page.getByRole('complementary', { name: '任务' });
-  await expect(panel.getByTestId('tasks-schedules-empty')).toBeVisible();
+  await expect(panel.getByTestId('tasks-empty')).toBeVisible();
   await panel.getByTestId('schedule-new').click();
   const popover = page.getByTestId('schedule-popover');
   await expect(popover).toContainText('新建定时');
