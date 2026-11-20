@@ -234,11 +234,19 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
       expect(outside.signalCode).toBeNull();
       const own = runConfined(
         fixture.policy,
-        'CAIRN_PROBE_SENTINEL=own-child sleep 30 & child=$!; ps -E -ww -o command= -p $child; kill -0 $child && kill -TERM $child && wait $child; echo own-done',
+        [
+          'sleep 30 & child=$!',
+          'ps -o pid= -p $child >/dev/null && echo own-listed',
+          'ps -o command= -p $$ | grep -q sh && echo self-listed',
+          'kill -0 $child && echo own-signalled',
+          'kill -TERM $child; wait $child; test $? -eq 143 && echo own-stopped',
+        ].join('; '),
         fixture.worktree,
       );
-      expect(own.stdout).toContain('own-child');
-      expect(own.stdout).toContain('own-done');
+      for (const marker of ['own-listed', 'self-listed', 'own-signalled', 'own-stopped'])
+        expect(own.stdout, `${marker} in ${JSON.stringify(own.stdout + own.stderr)}`).toContain(
+          marker,
+        );
     } finally {
       outside.kill('SIGKILL');
     }
