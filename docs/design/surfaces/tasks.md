@@ -4,7 +4,7 @@ The right-hand Tasks panel (the `任务` button), the task thread panel it opens
 
 ## Rules
 
-Scope: `apps/web/src/board/tasks-` `apps/web/src/board/task-` `apps/web/src/board/thread-` `apps/web/src/board/use-thread-` `apps/web/src/board/use-tasks-view` `apps/web/src/board/use-mark-done` `apps/web/src/board/use-mark-thread-read` `apps/web/src/board/use-engine-screen` `apps/web/src/board/engine-run` `apps/web/src/board/live-engine-run` `apps/web/src/board/engine-terminal` `apps/web/src/board/work-panel` `apps/web/src/components/thread/` `apps/web/src/detail/` `apps/web/src/schedules/` `apps/web/e2e/detail-` `apps/web/e2e/schedules-` `apps/web/e2e/thread-` `apps/web/e2e/transcript-` `apps/web/e2e/spec-` `apps/web/e2e/escape-` `apps/web/test/tasks-` `apps/web/test/task-` `apps/web/test/thread-` `apps/web/test/transcript-` `apps/web/test/work-trace` `apps/web/test/can-mark-done`
+Scope: `apps/web/src/board/tasks-` `apps/web/src/board/task-` `apps/web/src/board/thread-` `apps/web/src/board/use-thread-` `apps/web/src/board/use-tasks-view` `apps/web/src/board/use-mark-done` `apps/web/src/board/use-mark-thread-read` `apps/web/src/board/engine-run` `apps/web/src/board/live-engine-run` `apps/web/src/board/work-panel` `apps/web/src/components/thread/` `apps/web/src/detail/` `apps/web/src/schedules/` `apps/web/e2e/detail-` `apps/web/e2e/schedules-` `apps/web/e2e/thread-` `apps/web/e2e/transcript-` `apps/web/e2e/spec-` `apps/web/e2e/escape-` `apps/web/test/tasks-` `apps/web/test/task-` `apps/web/test/thread-` `apps/web/test/transcript-` `apps/web/test/work-trace` `apps/web/test/can-mark-done`
 
 | Id | Rule | Check |
 |---|---|---|
