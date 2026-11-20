@@ -130,6 +130,9 @@ describe('seatbelt profile', () => {
       expect(profile, name).toContain(`(subpath "${join(git, name)}")`);
     }
     expect(profile).toContain(`${git.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&')}/(worktrees|modules)`);
+    expect(profile).toContain(
+      `${git.replace(/[\\^$.|?*+()[\]{}]/g, '\\$&')}/(worktrees|modules)(/[^/]+)?$`,
+    );
   });
 });
 
@@ -154,6 +157,27 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
     expect(events.status).not.toBe(0);
     const open = runConfined(fixture.policy, 'open -a TextEdit', fixture.worktree);
     expect(open.status).not.toBe(0);
+  }, 20000);
+
+  test('a confined session cannot restage git worktree or module trees by renaming the container names', () => {
+    const fixture = layout();
+    const git = fixture.policy.gitDirectories[0] as string;
+    mkdirSync(join(git, 'worktrees', 'wt1'), { recursive: true });
+    writeFileSync(join(git, 'worktrees', 'wt1', 'commondir'), '../..');
+    mkdirSync(join(fixture.worktree, 'staged', 'wt1'), { recursive: true });
+    writeFileSync(join(fixture.worktree, 'staged', 'wt1', 'commondir'), 'planted');
+    const open = runConfined(
+      fixture.policy,
+      [
+        `mv '${git}/worktrees' '${git}/orig' && exit 9`,
+        `mv '${fixture.worktree}/staged' '${git}/worktrees' && exit 8`,
+        `ln -s '${fixture.worktree}' '${git}/modules' && exit 7`,
+        `mkdir '${git}/modules' && exit 6`,
+        `test "$(cat '${git}/worktrees/wt1/commondir')" = '../..'`,
+      ].join('; '),
+      fixture.worktree,
+    );
+    expect(open.status).toBe(0);
   }, 20000);
 
   test('without confinement a session reads the owner token and edits the database', () => {

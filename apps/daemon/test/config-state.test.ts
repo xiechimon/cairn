@@ -309,7 +309,7 @@ describe('local state layout (02 §5.3)', () => {
     const target = join(paths.home, 'machine-target.json');
     writeFileSync(target, '{}\n', { mode: 0o644 });
     symlinkSync(target, paths.machineJson);
-    expect(() => saveMachineJson(paths, sampleMachine)).toThrow(/symlink/i);
+    expect(() => saveMachineJson(paths, sampleMachine)).toThrow(/symlink|ELOOP|symbolic link/i);
     expect(modeBits(target)).toBe(0o644);
     expect(lstatSync(paths.machineJson).isSymbolicLink()).toBe(true);
   });

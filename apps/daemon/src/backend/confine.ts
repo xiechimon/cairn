@@ -144,18 +144,29 @@ export function confinementArgs(
   };
   for (const directory of policy.gitDirectories) {
     maskGitDirectory(directory);
-    const nested = [join(directory, 'modules'), join(directory, 'worktrees')];
-    while (nested.length > 0) {
-      const parent = nested.pop();
-      if (parent === undefined || !existsSync(parent)) continue;
+    const pinContainer = (parent: string) => {
+      const stat = lstatSync(parent, { throwIfNoEntry: false });
+      if (stat === undefined) {
+        args.push('--tmpfs', parent, '--remount-ro', parent);
+        return;
+      }
+      if (!stat.isDirectory() || stat.isSymbolicLink()) return;
+      args.push('--ro-bind', parent, parent);
       for (const entry of readdirSync(parent, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
         const path = join(parent, entry.name);
+        args.push('--bind', path, path);
         maskGitDirectory(path);
-        if (contains(join(directory, 'modules'), path)) nested.push(path);
+        if (contains(join(directory, 'modules'), path)) pinContainer(join(path, 'modules'));
       }
-    }
+    };
+    pinContainer(join(directory, 'worktrees'));
+    pinContainer(join(directory, 'modules'));
   }
+  const workspaceGit = canonical(join(policy.workspace, '.git'));
+  const workspaceGitStat = lstatSync(workspaceGit, { throwIfNoEntry: false });
+  if (workspaceGitStat?.isDirectory()) args.push('--bind', workspaceGit, workspaceGit);
+  else if (workspaceGitStat?.isFile()) args.push('--ro-bind', workspaceGit, workspaceGit);
   args.push('--remount-ro', home);
   args.push('--chdir', policy.workspace);
   return args;

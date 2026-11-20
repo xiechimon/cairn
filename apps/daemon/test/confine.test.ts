@@ -125,6 +125,40 @@ test('masks git redirect metadata inside exposed git dirs', () => {
   }
 });
 
+test('pins git metadata container names and the workspace .git node against rename', () => {
+  const policy = fixture();
+  const git = policy.gitDirectories[0] as string;
+  mkdirSync(join(git, 'worktrees', 'wt1'), { recursive: true });
+  mkdirSync(join(git, 'modules', 'sub'), { recursive: true });
+  writeFileSync(join(policy.workspace, '.git'), 'gitdir: git');
+  const args = confinementArgs(policy, 'linux');
+  const bound = (path: string) =>
+    args.some(
+      (arg, index) =>
+        arg === path && (args[index - 1] === '--bind' || args[index - 1] === '--ro-bind'),
+    );
+  for (const path of [
+    join(git, 'worktrees'),
+    join(git, 'modules'),
+    join(git, 'worktrees', 'wt1'),
+    join(git, 'modules', 'sub'),
+    join(policy.workspace, '.git'),
+  ]) {
+    expect(bound(path), path).toBe(true);
+  }
+});
+
+test('masks absent git metadata containers so they cannot be planted', () => {
+  const policy = fixture();
+  const git = policy.gitDirectories[0] as string;
+  const args = confinementArgs(policy, 'linux');
+  const masked = (path: string) =>
+    args.some((arg, index) => arg === path && args[index - 1] === '--tmpfs');
+  for (const path of [join(git, 'worktrees'), join(git, 'modules')]) {
+    expect(masked(path), path).toBe(true);
+  }
+});
+
 test('rejects symlink mount sources before spawning', () => {
   const policy = fixture();
   symlinkSync(policy.workspace, join(policy.home, 'alias'));

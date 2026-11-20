@@ -127,10 +127,14 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
       'sequencer',
     ].map((name) => canonical(join(directory, name))),
   );
-  const protectedGitPatterns = policy.gitDirectories.map((directory) => {
+  const protectedGitPatterns = policy.gitDirectories.flatMap((directory) => {
     const resolved = canonical(directory);
     if (/["\n\r\0]/.test(resolved)) throw new Error('Unsafe seatbelt path');
-    return `(regex #"^${regexEscaped(resolved)}/(worktrees|modules)/(.*/)?(commondir|gitdir|config(\\..*)?|hooks.*|rebase-merge.*|rebase-apply.*|sequencer.*)$")`;
+    const escaped = regexEscaped(resolved);
+    return [
+      `(regex #"^${escaped}/(worktrees|modules)(/[^/]+)?$")`,
+      `(regex #"^${escaped}/(worktrees|modules)/(.*/)?(commondir|gitdir|config(\\..*)?|hooks.*|rebase-merge.*|rebase-apply.*|sequencer.*)$")`,
+    ];
   });
   const workspaceGit = canonical(join(policy.workspace, '.git'));
   const lines = [
