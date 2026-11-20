@@ -247,7 +247,7 @@ function claim(w: World, stepId: string, machineId: string, at: number): void {
     .run();
 }
 
-describe('an offline Runner with waiting tasks raises one Coordinator notice per offline period', () => {
+describe('an offline Runner with waiting tasks keeps one Coordinator status row per machine', () => {
   test('a Runner back within two minutes raises no notice', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
@@ -317,7 +317,7 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     expect(notices(w)[0]?.todos.filter((t) => t.state === 'waiting')).toHaveLength(1);
   });
 
-  test('a return marks waiting tasks started, and a second offline period gets a new notice', async () => {
+  test('a return marks waiting tasks started, and a second offline period rewrites the same row', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     routeOf(w, omarchy);
@@ -338,8 +338,100 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     lastSeen(w, omarchy, t0 + 20_000);
     sweepOfflineRunners(w.s.svc, t0 + 20_000 + RUNNER_OFFLINE_NOTICE_MS + 1_000);
     const all = notices(w);
-    expect(all).toHaveLength(2);
-    expect(all.find((n) => n.id !== recovered?.id)?.todos).toHaveLength(1);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.id).toBe(recovered?.id);
+    expect(all[0]?.lastSeenAt).toBe(t0 + 20_000);
+    expect(all[0]?.backAt).toBeNull();
+    expect(all[0]?.recoveredAt).toBeNull();
+    expect(all[0]?.todos.filter((t) => t.state === 'waiting')).toHaveLength(1);
+  });
+
+  test('flapping keeps one row that always shows the latest state', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    routeOf(w, omarchy);
+    pendingStep(w);
+    const t0 = Date.now();
+    for (let flap = 0; flap < 4; flap += 1) {
+      const down = t0 + flap * 300_000;
+      lastSeen(w, omarchy, down, false);
+      sweepOfflineRunners(w.s.svc, down + RUNNER_OFFLINE_NOTICE_MS + 1_000);
+      lastSeen(w, omarchy, down + RUNNER_OFFLINE_NOTICE_MS + 30_000, true);
+      sweepOfflineRunners(w.s.svc, down + RUNNER_OFFLINE_NOTICE_MS + 60_000);
+      sweepOfflineRunners(w.s.svc, down + 2 * RUNNER_OFFLINE_NOTICE_MS + 60_000);
+    }
+    const all = notices(w);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.kind).toBe('runner_offline');
+    expect(all[0]?.backAt).not.toBeNull();
+    expect(all[0]?.recoveredAt).not.toBeNull();
+  });
+
+  test('a Runner that drops again before the return settles shows offline on the same row', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    routeOf(w, omarchy);
+    pendingStep(w);
+    const t0 = Date.now();
+    lastSeen(w, omarchy, t0 - RUNNER_OFFLINE_NOTICE_MS - 1_000);
+    sweepOfflineRunners(w.s.svc, t0);
+    lastSeen(w, omarchy, t0 + 10_000, true);
+    sweepOfflineRunners(w.s.svc, t0 + 20_000);
+    expect(notices(w)[0]?.backAt).toBe(t0 + 20_000);
+    expect(notices(w)[0]?.recoveredAt).toBeNull();
+
+    lastSeen(w, omarchy, t0 + 30_000);
+    sweepOfflineRunners(w.s.svc, t0 + 30_000 + RUNNER_OFFLINE_NOTICE_MS + 1_000);
+    const all = notices(w);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.backAt).toBeNull();
+    expect(all[0]?.recoveredAt).toBeNull();
+    expect(all[0]?.lastSeenAt).toBe(t0 + 30_000);
+  });
+
+  test('duplicate rows left by per-period ids merge into one on the next sweep', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    routeOf(w, omarchy);
+    pendingStep(w);
+    const t0 = Date.now();
+    lastSeen(w, omarchy, t0 - RUNNER_OFFLINE_NOTICE_MS - 1_000);
+    sweepOfflineRunners(w.s.svc, t0);
+    const [first] = notices(w);
+    expect(first).toBeDefined();
+    const legacy = (at: number): RunnerOfflineContent => ({
+      kind: 'runner_offline',
+      machineId: omarchy,
+      machineName: 'omarchy',
+      lastSeenAt: at,
+      todos: [],
+      alternative: null,
+      backAt: at + 5_000,
+      recoveredAt: at + 10_000,
+    });
+    const threadId = w.s.db
+      .select({ threadId: chiefMessage.threadId })
+      .from(chiefMessage)
+      .all()
+      .find((row) => row.threadId !== null)?.threadId;
+    expect(threadId).toBeDefined();
+    for (const at of [t0 - 500_000, t0 - 400_000]) {
+      w.s.db
+        .insert(chiefMessage)
+        .values({
+          id: `runner-offline-${omarchy}-${at}`,
+          threadId: threadId ?? '',
+          role: 'system',
+          content: JSON.stringify(legacy(at)),
+          createdAt: at,
+        })
+        .run();
+    }
+    expect(notices(w)).toHaveLength(3);
+    sweepOfflineRunners(w.s.svc, t0 + 60_000);
+    const all = notices(w);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.id).toBe(first?.id);
   });
 
   test('another online Runner is offered, and the action routes the task there', async () => {
