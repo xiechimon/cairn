@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join } from 'node:path';
 import { after, test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 const stateRoot = mkdtempSync(join(tmpdir(), 'epic-state-tests-'));
 let stateIndex = 0;
@@ -739,7 +740,7 @@ test('JSON output contains the same decision and the pure decision does not muta
 });
 
 test('import has no CLI effects and the actual CLI guard emits unknown without network', () => {
-  const path = new URL('./epic-done.mjs', import.meta.url).pathname;
+  const path = fileURLToPath(new URL('./epic-done.mjs', import.meta.url));
   const imported = spawnSync(
     process.execPath,
     ['--input-type=module', '-e', `import ${JSON.stringify(path)}`],

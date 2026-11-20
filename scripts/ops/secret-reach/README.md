@@ -126,12 +126,44 @@ assert.ok([403, 404].includes(outside.status));
 NODE
 ```
 
-Keep only the two status lines and their exit status as evidence; never log the token response. Real token authorization and host UID checks remain unverified until these commands run. The Mac work still needs OS-level secret path denies, `allowUnsandboxedCommands: false`, and red/green runs inside and outside `claude -p --permission-mode bypassPermissions`, including Bash, Python and subprocess channels. This change does not edit agent settings.
+Keep only the two status lines and their exit status as evidence; never log the token response. Real token authorization and host UID checks remain unverified until these commands run.
+
+## Mac batch-session sandbox (#2344)
+
+`scripts/ops/secret-reach/batch-sandbox.settings.json` is a standalone Claude Code settings file for **batch** `claude -p` runs on the owner's Mac. Launch batch sessions with:
+
+```sh
+CAIRN_HEAVY_SLOTS_DIR="$HOME/.cache/cairn-heavy-slots" CAIRN_HEAVY_SLOTS=1 \
+  claude -p '<prompt>' --settings scripts/ops/secret-reach/batch-sandbox.settings.json
+```
+
+It enables the Seatbelt sandbox with `failIfUnavailable: true` and `allowUnsandboxedCommands: false` (the `dangerouslyDisableSandbox` retry is refused), denies reads of the cairn secret roots (`~/.cairn`, `~/.config`, `~/Library/Application Support/@cairn`, `~/.local/share/cairn`), the standard credential stores, package-manager token files, shell and REPL histories and `~/Library/pnpm/rc` (the npm token), and re-opens only the runner workspaces, `~/.cairn/{workspaces,plans,tools}` and `~/.config/git` through narrower `allowRead` entries. `permissions.deny` `Read(...)` rules cover the same secrets for the file tools, which run outside the sandbox — a `Read` deny also blocks Write on the same path — and `Edit(...)` rules deny the file tools writes an unsandboxed process would later trust (`**/.claude/**`, `**/CLAUDE*.md`, `**/AGENTS*.md`, `**/.git`, `~/.cache/lane-tmp`). `scripts/ops/secret-reach/batch-sandbox.test.mjs` pins the required shape.
+
+The repository's `.claude/settings.json` deliberately carries no `sandbox` block: project settings apply to every interactive session, and the sandbox would block everyday development (git over the local proxy port, `gh` credentials, Keychain reads).
+
+Inside the sandbox a batch session cannot push or use `gh` (its credentials are denied and the proxy port is unreachable); PR creation, `push` and `push-queue` are the outer launcher script's job, outside the sandbox. It can still run tests, with two caveats:
+
+- The sandbox profile writes `TMPDIR=/tmp/claude` and allows writes only under the launch cwd, `/tmp/claude`, `~/.cache`, the package caches and `~/.cairn/plans`. The shared heavy-slot directory (`getconf DARWIN_USER_TEMP_DIR` on macOS) is *not* writable, so the launcher must point `CAIRN_HEAVY_SLOTS_DIR` at a writable dir — `~/.cache/cairn-heavy-slots` is already covered by `allowWrite`. `scripts/heavy-slots.mjs` keeps its liveness probe socket inside that directory, so no further path needs opening.
+- A private slot directory is a private lease: the batch session's heavy work no longer counts against the shared lane slots. `CAIRN_HEAVY_SLOTS=1` keeps the bypass at one heavy job.
+
+Lane sessions (daemon `claude-code` runtime) are out of scope here; their isolation is tracked separately.
+
+Host acceptance on the owner Mac, from a cairn checkout — every channel must report `no` with 0 bytes (exit 0):
+
+```sh
+claude -p 'run `node scripts/ops/secret-reach/canary.mjs --profile mac \
+    --path ~/.config/cairn/slack-app.env --path ~/.config/cairn/composio.env \
+    --path ~/.config/cairn/telegram.env \
+    --path "$HOME/Library/Application Support/@cairn/desktop/otel.env"` and paste its output' \
+  --settings scripts/ops/secret-reach/batch-sandbox.settings.json
+```
+
+The red control is the same canary run as the owner without a sandbox (exit 1, every ordinary channel `yes`) — there is no in-band way to disable the sandbox: `--settings '{"sandbox":{"enabled":false}}'` does not override `sandbox.enabled` from a `--settings` file, so do not use it as a control. The default `--profile mac` inventory alone proves nothing: every default path is absent on this Mac, so an all-`no` run is expected without any sandbox. Use the four real files above. Evidence and residuals: `docs/verify/2344/`.
 
 ## Offline regression command
 
 ```sh
-node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs
+node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs scripts/ops/secret-reach/batch-sandbox.test.mjs
 ```
 
 Tests use built-ins, temporary fixture files, a generated RSA key, a loopback fake GitHub API, a real temporary Unix socket, an in-memory setup host, real owner-UID permission children, and a fake clock for mint reuse/rate limits. They never read the real App key, run sudo or call GitHub. CI runs the same command next to the other ops fixtures.

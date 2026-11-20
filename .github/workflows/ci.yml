@@ -539,7 +539,7 @@ jobs:
 
       - name: Runner secret isolation fixtures (#2189)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs
+        run: node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs scripts/ops/secret-reach/batch-sandbox.test.mjs
 
       - name: Scoped root runner for ops scripts (#2362)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

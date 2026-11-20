@@ -5,6 +5,7 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { checkContainerHost, parseContainerHostCheck } from './container-host-check.mjs';
 import { checkHost } from './orb-host-check.mjs';
 
@@ -392,7 +393,7 @@ test('the real filesystem and connect checks accept a live 0600 socket and refus
 });
 
 test('CAIRN_ORB_RUNTIME=podman switches the CLI to the container check and nspawn stays the default', () => {
-  const script = new URL('./orb-host-check.mjs', import.meta.url).pathname;
+  const script = fileURLToPath(new URL('./orb-host-check.mjs', import.meta.url));
   const env = { ...process.env, CAIRN_ORB_RUNTIME: 'podman', CAIRN_ORB_IMAGE: '' };
   const podman = spawnSync(process.execPath, [script, '--json'], { encoding: 'utf8', env });
   const record = JSON.parse(podman.stdout);
