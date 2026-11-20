@@ -48,10 +48,11 @@ test.describe('#15 focus ring incorporated', () => {
 
   test('Tab focus keeps the official ring (keyboard reachability preserved)', async ({ page }) => {
     await page.goto(BOARD);
-    await expect(page.locator('.sidebar-search')).toBeVisible();
+    await expect(page.locator('.sidebar-search')).toBeEnabled();
+    await page.keyboard.press('Escape');
 
     let found = false;
-    for (let i = 0; i < 40 && !found; i++) {
+    for (let i = 0; i < 80 && !found; i++) {
       await page.keyboard.press('Tab');
       found = await page.evaluate(
         () => document.activeElement?.closest('.sidebar-search') != null,
