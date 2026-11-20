@@ -138,8 +138,8 @@ export const EN: Record<string, string> = {
   '更新登录或 API Key 之前，这些订阅不会接新任务。':
     'These subscriptions will not take new tasks until you refresh the sign-in or API key.',
   '所有 Antigravity 模型': 'All Antigravity models',
-  '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅（前面 {ahead} 个）':
-    'Queued: the team has no usable Antigravity subscription. Run agy acp --login on your Runner and add an Antigravity subscription under Model routing ({ahead} ahead)',
+  '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅':
+    'Queued: the team has no usable Antigravity subscription. Run agy acp --login on your Runner and add an Antigravity subscription under Model routing',
   Archived: 'Archived',
   Agent: 'Agent',
 
@@ -1106,46 +1106,38 @@ export const EN: Record<string, string> = {
   '处理中...': 'Working on it...',
   '正在连接 {machine}...': 'Connecting to {machine}...',
   '执行中...': 'Running...',
-  '排队中：等 {machine}（前面 {ahead} 个）': 'Queued: waiting for {machine} ({ahead} ahead)',
-  '排队中：等空闲执行机（前面 {ahead} 个）': 'Queued: waiting for a free Runner ({ahead} ahead)',
   // #1251 visible pending reasons (queue blocked face): missing capability =
   // the fix, offline = waiting.
-  '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）':
-    'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed ({ahead} ahead)',
-  '排队中：等 {machine} 上线（前面 {ahead} 个）':
-    'Queued: waiting for {machine} to come online ({ahead} ahead)',
-  '排队中：等执行机上线（前面 {ahead} 个）':
-    'Queued: waiting for a Runner to come online ({ahead} ahead)',
+  '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁':
+    'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed',
   '排队中：还没有 {platform} 执行机 · 需要 {platform}':
     'Queued: no {platform} Runner yet · needs {platform}',
-  '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）':
-    'Queued: waiting for {machine} to come online · needs {platform} ({ahead} ahead)',
-  '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
-    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks ({ahead} ahead)',
-  '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
-    'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
-  '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
-    'Queued: the Runner cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
-  '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）':
-    'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it ({ahead} ahead)',
-  '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
-    'Queued: Claude is rate limited on the Runner; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）':
-    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model routing ({ahead} ahead)',
-  '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由（前面 {ahead} 个）':
-    'Queued: the team has no usable Devin subscription. Run cat ~/.local/share/devin/credentials.toml on a machine signed in to Devin and add the whole output under Model routing ({ahead} ahead)',
-  '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）':
-    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks ({ahead} ahead)',
-  '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）':
-    'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner ({ahead} ahead)',
-  '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）':
-    'Queued: {machine} cannot use the model for this step. Pick another model in work routing ({ahead} ahead)',
-  '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）':
-    'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it ({ahead} ahead)',
-  '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）':
-    'Queued: Claude is rate limited on {machine}; this continues once the limit lifts ({ahead} ahead)',
-  '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）':
-    'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account ({ahead} ahead)',
+  '排队中：执行机的任务沙箱没就绪，接不了任务':
+    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks',
+  '排队中：执行机上没有检测到 {runtime}，装好后重启执行机':
+    'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner',
+  '排队中：执行机用不了这一步的模型——在工作路由里换模型':
+    'Queued: the Runner cannot use the model for this step. Pick another model in work routing',
+  '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了':
+    'Queued: a local project only runs on the Runner that holds it, so this Runner cannot run it',
+  '排队中：执行机上的 Claude 被限流，恢复后自动继续':
+    'Queued: Claude is rate limited on the Runner; this continues once the limit lifts',
+  '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由':
+    'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model routing',
+  '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由':
+    'Queued: the team has no usable Devin subscription. Run cat ~/.local/share/devin/credentials.toml on a machine signed in to Devin and add the whole output under Model routing',
+  '排队中：{machine} 的任务沙箱没就绪，接不了任务':
+    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks',
+  '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机':
+    'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner',
+  '排队中：{machine} 用不了这一步的模型——在工作路由里换模型':
+    'Queued: {machine} cannot use the model for this step. Pick another model in work routing',
+  '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了':
+    'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it',
+  '排队中：{machine} 的 Claude 被限流，恢复后自动继续':
+    'Queued: Claude is rate limited on {machine}; this continues once the limit lifts',
+  '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始':
+    'Queued: the Claude account was switched and this step keeps the old account. Stop it, then continue, to start over on the new account',
   'Coordinator 规则用的服务商「{name}」还没添加':
     'The Coordinator rule uses the provider "{name}", which has not been added',
   'Coordinator 规则用的服务商「{name}」没有 API key':

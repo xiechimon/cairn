@@ -891,8 +891,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               variant="chief"
               label={item.label}
               labelVars={item.labelVars}
-              labelDetail={item.labelDetail}
-              notice={isLiveNotice(item.label, item.labelDetail)}
+              notice={isLiveNotice(item.label)}
               blocked={item.blocked === true}
               blockedActions={<CoordinatorFixLinks kind={item.blockedKind} />}
             />

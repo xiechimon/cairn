@@ -704,7 +704,6 @@ export type ChiefStreamItem =
       label: string;
       tools?: ChiefToolRow[];
       labelVars?: Record<string, string | number>;
-      labelDetail?: { label: string; vars: Record<string, string | number> };
       signalAt?: number;
       blocked?: true;
       blockedKind?: StepQueueBlocked['kind'];

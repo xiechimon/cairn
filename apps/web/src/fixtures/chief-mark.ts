@@ -20,8 +20,8 @@ export const CHIEF_MARK_SCENARIOS: Record<string, FixtureSet> = {
   'chief-mark-offline': withLive({
     kind: 'streaming',
     seconds: 40,
-    label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
-    labelVars: { machine: 'studio-mac', ahead: 0 },
+    label: '排队中：等执行机上线',
+    queueWait: { kind: 'machine-offline', machine: 'studio-mac' },
   }),
   'chief-mark-error': {
     ...chiefThread,

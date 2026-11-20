@@ -46,10 +46,6 @@ export const ANNOUNCE_SETTLE_MS = 600;
 
 const CONNECTION_LOST_LABEL = '连接断开，正在重连…';
 const OUTAGE_LABEL = '等待恢复';
-const MACHINE_OFFLINE_KEYS = new Set([
-  '排队中：等 {machine} 上线（前面 {ahead} 个）',
-  '排队中：等执行机上线（前面 {ahead} 个）',
-]);
 const RESPONDING_KEY = '模型输出中...';
 const QUOTA_WAIT_PREFIX = '等额度';
 const QUEUED_PREFIX = '排队中';
@@ -135,7 +131,8 @@ export function statusMarkView({
       : undefined;
   const tool = chief.runningTool ?? liveTool;
   if (tool != null) return view(toolMarkState(tool));
-  if (live?.kind === 'streaming' && MACHINE_OFFLINE_KEYS.has(live.label)) return view('offline');
+  if (live?.kind === 'streaming' && live.queueWait?.kind === 'machine-offline')
+    return view('offline');
   if (live?.kind === 'streaming' && live.label.startsWith(QUOTA_WAIT_PREFIX))
     return view('offline', QUOTA_WAIT_PREFIX);
   if (live?.kind === 'streaming' && live.label.startsWith(QUEUED_PREFIX))

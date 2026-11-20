@@ -323,31 +323,34 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     return { ...step('pending'), queue };
   }
 
-  test('Q1: pending + queue with machine → queue label names the machine and the steps ahead, no running count', () => {
-    const items = render({
-      steps: [
-        queuedStep({
-          position: 2,
-          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
-        }),
-      ],
-    });
-    expect(tail(items)).toMatchObject({
-      kind: 'streaming',
-      label: '排队中：等 {machine}（前面 {ahead} 个）',
-      labelVars: { machine: 'xmonsMac', ahead: 1 },
-    });
-  });
-
-  test('Q2: pending + queue without pinned machine → waiting-for-free-machine + ahead', () => {
-    const items = render({
-      steps: [queuedStep({ position: 1, waitingFor: null })],
-    });
-    expect(tail(items)).toMatchObject({
-      kind: 'streaming',
-      label: '排队中：等空闲执行机（前面 {ahead} 个）',
-      labelVars: { ahead: 0 },
-    });
+  test.each([
+    ['a named machine with steps ahead', { position: 2, waitingFor: { machineId: 'm1', name: 'xmonsMac' } }],
+    ['any free Runner', { position: 1, waitingFor: null }],
+    [
+      'an offline machine',
+      {
+        position: 1,
+        waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+        blocked: { kind: 'machine-offline' as const, missing: [] },
+      },
+    ],
+    [
+      'an offline machine of a platform',
+      {
+        position: 3,
+        waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+        blocked: { kind: 'machine-offline' as const, missing: [], platform: 'macos' as const },
+      },
+    ],
+  ])('a step waiting for %s shows the ordinary preparing row, never a queue sentence', (_, queue) => {
+    const row = tail(render({ steps: [queuedStep(queue)] })) as {
+      blocked?: boolean;
+      label: string;
+      labelVars?: Record<string, string | number>;
+    };
+    expect(row).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
+    expect(row.blocked).toBeUndefined();
+    expect(translate('zh', EN, row.label, row.labelVars)).not.toMatch(/排队|前面/);
   });
 
   test('Q2b: a refusal with no named machine keeps each locale in its own language', () => {
@@ -369,10 +372,10 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     expect(row.blocked).toBe(true);
     expect(row.blockedKind).toBe('runtime-disabled');
     expect(translate('zh', EN, row.label, row.labelVars)).toBe(
-      '排队中：执行机上没有检测到 codex，装好后重启执行机（前面 0 个）',
+      '排队中：执行机上没有检测到 codex，装好后重启执行机',
     );
     expect(translate('en', EN, row.label, row.labelVars)).toBe(
-      'Queued: the Runner has not detected codex. Install it, then restart the Runner (0 ahead)',
+      'Queued: the Runner has not detected codex. Install it, then restart the Runner',
     );
   });
 
@@ -447,10 +450,7 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
       steps: [pending],
       activity: act(pending.id, 'thinking'),
     });
-    expect(tail(items)).toMatchObject({
-      kind: 'streaming',
-      label: '排队中：等空闲执行机（前面 {ahead} 个）',
-    });
+    expect(tail(items)).toMatchObject({ kind: 'streaming', label: '准备工作区...' });
   });
 
   test('Q5: claimed step → `处理中` (current behavior locked)', () => {
@@ -509,7 +509,12 @@ describe('mapChief queue projection (#1108 Q6)', () => {
     });
   }
 
-  test('Q6: turnQueue with machine → one connecting verb, counts in the detail; when it disappears → `处理中`', () => {
+  test('Q6: turnQueue with machine → one connecting verb and no queue detail; when it disappears → `处理中`', () => {
+    const queuedTail = chiefOfThread({
+      ...THREAD_Q,
+      turnQueue: { position: 3, waitingFor: { machineId: 'm1', name: 'xmonsMac' } },
+    }).stream?.at(-1);
+    expect(queuedTail).not.toHaveProperty('labelDetail');
     expect(
       chiefOfThread({
         ...THREAD_Q,
@@ -522,17 +527,12 @@ describe('mapChief queue projection (#1108 Q6)', () => {
       kind: 'streaming',
       label: '正在连接 {machine}...',
       labelVars: { machine: 'xmonsMac' },
-      labelDetail: {
-        label: '排队中：等 {machine}（前面 {ahead} 个）',
-        vars: { machine: 'xmonsMac', ahead: 2 },
-      },
     });
     expect(
       chiefOfThread({ ...THREAD_Q, turnQueue: { position: 1, waitingFor: null } }).stream?.at(-1),
     ).toMatchObject({
       kind: 'streaming',
       label: '处理中...',
-      labelDetail: { label: '排队中：等空闲执行机（前面 {ahead} 个）', vars: { ahead: 0 } },
     });
 
     expect(chiefOfThread({ ...THREAD_Q }).stream?.at(-1)).toMatchObject({

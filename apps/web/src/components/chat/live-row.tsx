@@ -163,7 +163,6 @@ export interface LiveRowProps {
   variant: 'detail' | 'chief';
   label: string;
   labelVars?: TVars;
-  labelDetail?: { label: string; vars: TVars };
   quiet?: boolean;
   notice?: boolean;
   blocked?: boolean;
@@ -176,7 +175,6 @@ export function LiveRow({
   variant,
   label,
   labelVars,
-  labelDetail,
   quiet = false,
   notice = true,
   blocked = false,
@@ -189,12 +187,7 @@ export function LiveRow({
   const labelCls = 'chat-streaming-label truncate shimmer motion-reduce:shimmer-none';
   const body = (
     <>
-      <span
-        className={labelCls}
-        title={labelDetail !== undefined ? t(labelDetail.label, labelDetail.vars) : undefined}
-      >
-        {t(label, labelVars)}
-      </span>
+      <span className={labelCls}>{t(label, labelVars)}</span>
       {disclosure != null && <TraceChevron open={expanded} />}
     </>
   );
@@ -209,7 +202,7 @@ export function LiveRow({
           <TypingDots label={labelText} />
         </TooltipTrigger>
         <TooltipContent side="top" align="start" sideOffset={6} data-testid="chief-live-notice">
-          {labelDetail !== undefined ? t(labelDetail.label, labelDetail.vars) : labelText}
+          {labelText}
         </TooltipContent>
       </Tooltip>
     );

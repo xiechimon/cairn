@@ -123,21 +123,19 @@ import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
-  'runtime-disabled':
-    '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
-  'model-unavailable':
-    '排队中：{machine} 用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
-  'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了（前面 {ahead} 个）',
-  'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务',
+  'runtime-disabled': '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机',
+  'model-unavailable': '排队中：{machine} 用不了这一步的模型——在工作路由里换模型',
+  'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了',
+  'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
-    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
   'devin-subscription':
-    '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由',
   'antigravity-subscription':
-    '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
   'account-switched':
-    '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始（前面 {ahead} 个）',
+    '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始',
   'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
   'no-computer':
@@ -145,107 +143,72 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable': '排队中：执行机的任务沙箱没就绪，接不了任务（前面 {ahead} 个）',
-  'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机（前面 {ahead} 个）',
-  'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型（前面 {ahead} 个）',
-  'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了（前面 {ahead} 个）',
-  'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续（前面 {ahead} 个）',
+  'sandbox-unavailable': '排队中：执行机的任务沙箱没就绪，接不了任务',
+  'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机',
+  'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型',
+  'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了',
+  'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
-    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
   'devin-subscription':
-    '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由',
   'antigravity-subscription':
-    '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅（前面 {ahead} 个）',
+    '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars: Record<string, string | number>;
-} {
-  const ahead = Math.max(0, queue.position - 1);
+} | null {
   if (queue.hold != null) {
     return {
       label: '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）',
       vars: { time: clockTime(queue.hold.retryAt) },
     };
   }
-  if (queue.blocked?.kind === 'blocked-by') {
-    const titles = queue.blocked.missing;
+  const blocked = queue.blocked;
+  if (blocked === undefined || blocked.kind === 'machine-offline') return null;
+  if (blocked.kind === 'blocked-by') {
+    const titles = blocked.missing;
     if (titles.length === 1) return { label: '等「{title}」', vars: { title: titles[0] ?? '' } };
     if (titles.length > 1) return { label: '等 {n} 个任务', vars: { n: titles.length } };
     return { label: '等前置任务完成。', vars: {} };
   }
-  const platform = queue.blocked?.platform;
-  if (
-    platform !== undefined &&
-    queue.blocked?.kind === 'capability-missing' &&
-    queue.waitingFor == null
-  ) {
-    return {
-      label: '排队中：还没有 {platform} 执行机 · 需要 {platform}',
-      vars: { platform: RUNNER_OS_LABELS[platform] },
-    };
-  }
-  if (
-    platform !== undefined &&
-    queue.blocked?.kind === 'machine-offline' &&
-    queue.waitingFor != null
-  ) {
-    return {
-      label: '排队中：等 {machine} 上线 · 需要 {platform}（前面 {ahead} 个）',
-      vars: { machine: queue.waitingFor.name, platform: RUNNER_OS_LABELS[platform], ahead },
-    };
-  }
-  if (queue.blocked?.kind === 'capability-missing') {
-    return {
-      label:
-        '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁（前面 {ahead} 个）',
-      vars: { missing: queue.blocked.missing.join('、'), ahead },
-    };
-  }
-  const refusalLabels =
-    queue.waitingFor == null ? UNNAMED_RUNNER_REFUSAL_LABELS : RUNNER_REFUSAL_LABELS;
-  const refusal =
-    queue.blocked === undefined
-      ? undefined
-      : (refusalLabels[queue.blocked.kind] ?? RUNNER_REFUSAL_LABELS[queue.blocked.kind]);
-  if (refusal !== undefined) {
-    return {
-      label: refusal,
-      vars: {
-        machine: queue.waitingFor?.name ?? '',
-        runtime: queue.blocked?.missing.join('、') ?? '',
-        name: queue.blocked?.missing.join('、') ?? '',
-        ahead,
-      },
-    };
-  }
-  if (queue.blocked?.kind === 'machine-offline') {
-    return queue.waitingFor != null
+  if (blocked.kind === 'capability-missing') {
+    return blocked.platform !== undefined && queue.waitingFor == null
       ? {
-          label: '排队中：等 {machine} 上线（前面 {ahead} 个）',
-          vars: { machine: queue.waitingFor.name, ahead },
+          label: '排队中：还没有 {platform} 执行机 · 需要 {platform}',
+          vars: { platform: RUNNER_OS_LABELS[blocked.platform] },
         }
-      : { label: '排队中：等执行机上线（前面 {ahead} 个）', vars: { ahead } };
+      : {
+          label: '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁',
+          vars: { missing: blocked.missing.join('、') },
+        };
   }
-  return queue.waitingFor != null
-    ? {
-        label: '排队中：等 {machine}（前面 {ahead} 个）',
-        vars: { machine: queue.waitingFor.name, ahead },
-      }
-    : { label: '排队中：等空闲执行机（前面 {ahead} 个）', vars: { ahead } };
+  const refusal =
+    (queue.waitingFor == null ? UNNAMED_RUNNER_REFUSAL_LABELS[blocked.kind] : undefined) ??
+    RUNNER_REFUSAL_LABELS[blocked.kind];
+  if (refusal === undefined) return null;
+  return {
+    label: refusal,
+    vars: {
+      machine: queue.waitingFor?.name ?? '',
+      runtime: blocked.missing.join('、'),
+      name: blocked.missing.join('、'),
+    },
+  };
 }
 
 function connectingLine(queue: NonNullable<StepRow['queue']>): {
   label: string;
   vars?: Record<string, string | number>;
-  detail?: { label: string; vars: Record<string, string | number> };
+  blocked: boolean;
 } {
-  const full = queueLabel(queue);
-  if (queue.hold != null || queue.blocked != null) return full;
+  const reason = queueLabel(queue);
+  if (reason !== null) return { ...reason, blocked: queue.blocked != null };
   return queue.waitingFor != null
-    ? { label: '正在连接 {machine}...', vars: { machine: queue.waitingFor.name }, detail: full }
-    : { label: '处理中...', detail: full };
+    ? { label: '正在连接 {machine}...', vars: { machine: queue.waitingFor.name }, blocked: false }
+    : { label: '处理中...', blocked: false };
 }
 
 function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
@@ -1109,9 +1072,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         items: shownTodo,
         ...(backgroundRunning > 0 ? { backgroundRunning } : {}),
       });
-    const actLabel = act != null && !stopping ? activityLabel(act) : null;
-    const queued =
-      running.status === 'pending' && running.queue != null ? queueLabel(running.queue) : null;
+    const waiting = running.status === 'pending' && running.queue != null;
+    const actLabel = act != null && !stopping && !waiting ? activityLabel(act) : null;
+    const queued = waiting && running.queue != null ? queueLabel(running.queue) : null;
     const quota =
       running.status === 'waiting_quota' && running.quotaWait != null
         ? quotaWaitLabel(running.quotaWait)
@@ -2245,12 +2208,11 @@ export function mapChief(
         } else {
           chiefStream.push({
             kind: 'streaming',
-            ...(turnQueue.blocked != null
+            ...(queued.blocked && turnQueue.blocked != null
               ? { blocked: true as const, blockedKind: turnQueue.blocked.kind }
               : {}),
             label: queued.label,
             ...(queued.vars !== undefined ? { labelVars: queued.vars } : {}),
-            ...(queued.detail !== undefined ? { labelDetail: queued.detail } : {}),
           });
         }
       } else {
@@ -2357,7 +2319,7 @@ export function mapOrchestrationFeedback(
       const queued = connectingLine(thread.turnQueue);
       items.push({
         kind: 'streaming',
-        ...(thread.turnQueue.blocked != null
+        ...(queued.blocked && thread.turnQueue.blocked != null
           ? { blocked: true as const, blockedKind: thread.turnQueue.blocked.kind }
           : {}),
         label: queued.label,

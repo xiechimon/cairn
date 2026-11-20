@@ -68,7 +68,11 @@ describe('statusMarkView', () => {
       input({
         stream: [
           USER,
-          { kind: 'streaming', label: '排队中：等 {machine} 上线（前面 {ahead} 个）' },
+          {
+            kind: 'streaming',
+            label: '排队中：等执行机上线',
+            queueWait: { kind: 'machine-offline', machine: 'studio-mac' },
+          },
         ],
       }),
     );
