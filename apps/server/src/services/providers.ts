@@ -41,9 +41,15 @@ import {
 } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { enabledAntigravitySubscriptionModels } from './antigravity-subscriptions.js';
+import {
+  enabledAntigravitySubscriptionModels,
+  hasActiveAntigravitySubscription,
+} from './antigravity-subscriptions.js';
 import { enabledClaudeSubscriptionModels } from './claude-subscriptions.js';
-import { enabledDevinSubscriptionModels } from './devin-subscriptions.js';
+import {
+  enabledDevinSubscriptionModels,
+  hasActiveDevinSubscription,
+} from './devin-subscriptions.js';
 import { getModelLiveness } from './model-liveness.js';
 
 export interface ProviderDeps {
@@ -201,13 +207,17 @@ function withKnownThinkingLevels(
 }
 
 export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
+  const provisionable = hasActiveDevinSubscription({ db }, teamId);
   const machines = db
     .select()
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .filter((row) => row.capabilities?.devin?.installed === true);
+    .filter((row) => {
+      const devin = row.capabilities?.devin;
+      return devin?.installed === true || (provisionable && devin !== undefined);
+    });
   const reported = machines.flatMap((row) => row.capabilities?.devin?.models ?? []);
   const merged = withKnownThinkingLevels(
     uniqueModels([...enabledDevinSubscriptionModels({ db }, teamId), ...reported]),
@@ -216,7 +226,7 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
   const models: ModelSourceModel[] = merged.length > 0 ? merged : [...DEFAULT_DEVIN_MODELS];
   return machines.map((row) => ({
     runtime: 'devin' as const,
-    installed: true,
+    installed: row.capabilities?.devin?.installed === true,
     hostname: row.name,
     machineId: row.id,
     models: models.map((model) => ({ ...model })),
@@ -224,13 +234,17 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
 }
 
 export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
+  const provisionable = hasActiveAntigravitySubscription({ db }, teamId);
   const machines = db
     .select()
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .filter((row) => row.capabilities?.antigravity?.installed === true);
+    .filter((row) => {
+      const antigravity = row.capabilities?.antigravity;
+      return antigravity?.installed === true || (provisionable && antigravity !== undefined);
+    });
   const reported = machines.flatMap((row) => row.capabilities?.antigravity?.models ?? []);
   const merged = withKnownThinkingLevels(
     uniqueModels([...enabledAntigravitySubscriptionModels({ db }, teamId), ...reported]),
@@ -242,7 +256,7 @@ export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnve
       : [...DEFAULT_ANTIGRAVITY_MODELS];
   return machines.map((row) => ({
     runtime: 'antigravity' as const,
-    installed: true,
+    installed: row.capabilities?.antigravity?.installed === true,
     hostname: row.name,
     machineId: row.id,
     models,

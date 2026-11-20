@@ -376,8 +376,14 @@ export function createAntigravityManaged(
     return null;
   }
 
+  function cachedInstall(): AntigravityInstall | null {
+    if (cached !== null && !existsSync(cached.binPath)) cached = null;
+    return cached;
+  }
+
   function current(): AntigravityInstall | null {
-    if (cached !== null) return cached;
+    const hit = cachedInstall();
+    if (hit !== null) return hit;
     const local = resolveLocalCandidate();
     if (local !== null) {
       return {
@@ -545,7 +551,7 @@ export function createAntigravityManaged(
           return probed;
         }
       }
-      return cached;
+      return current();
     })().finally(() => {
       pendingProbe = null;
     });

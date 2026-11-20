@@ -3,7 +3,15 @@ import { modelSourcesEnvelopeSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { builtinModelIds } from '../src/coordinator/runtime/provider.js';
 import { createProvider, getModelSources, type ProviderBody } from '../src/services/providers.js';
-import { bootServer, insertMachine, issueApiKey, req, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  insertAntigravitySubscription,
+  insertDevinSubscription,
+  insertMachine,
+  issueApiKey,
+  req,
+  type TestServer,
+} from './helpers.js';
 
 function modelSourcesPath(s: TestServer): string {
   return `/api/teams/${s.team.id}/model-sources`;
@@ -214,6 +222,98 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
     const cc = env.sources.find((src) => src.runtime === 'claude-code');
     expect(cc?.models).toEqual([{ id: 'm-early', name: 'm-early', thinkingLevels: [] }]);
+    s.dispose();
+  });
+});
+
+describe('managed-runtime sources follow the subscription, not a transient install flag', () => {
+  test('devin: a machine that reports installed:false under an active subscription still lists swe-2-high', () => {
+    const s = bootServer();
+    insertDevinSubscription(s);
+    insertMachine(s, {
+      name: 'exec-devin',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        devin: { installed: false },
+      },
+    });
+    const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
+    expect(modelSourcesEnvelopeSchema.safeParse(env).success).toBe(true);
+    const devin = env.sources.find((src) => src.runtime === 'devin');
+    expect(devin).toBeDefined();
+    expect(devin?.installed).toBe(false);
+    expect(devin?.hostname).toBe('exec-devin');
+    const swe2 = devin?.models.find((m) => m.id === 'swe-2-high');
+    expect(swe2).toMatchObject({
+      id: 'swe-2-high',
+      name: 'SWE-2',
+      thinkingLevels: ['medium', 'high', 'max'],
+      thinkingDefault: 'high',
+    });
+    s.dispose();
+  });
+
+  test('devin: installed:false without a subscription keeps the source hidden', () => {
+    const s = bootServer();
+    insertMachine(s, {
+      name: 'exec-devin',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        devin: { installed: false },
+      },
+    });
+    const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
+    expect(env.sources.some((src) => src.runtime === 'devin')).toBe(false);
+    s.dispose();
+  });
+
+  test('devin: a machine whose daemon predates managed devin (no devin block) stays hidden under a subscription', () => {
+    const s = bootServer();
+    insertDevinSubscription(s);
+    insertMachine(s, {
+      name: 'exec-legacy',
+      capabilities: { mcpServers: [], skills: [] },
+    });
+    const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
+    expect(env.sources.some((src) => src.runtime === 'devin')).toBe(false);
+    s.dispose();
+  });
+
+  test('antigravity: a machine that reports installed:false under an active subscription still lists its models', () => {
+    const s = bootServer();
+    insertAntigravitySubscription(s);
+    insertMachine(s, {
+      name: 'exec-ag',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: { installed: false },
+      },
+    });
+    const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
+    expect(modelSourcesEnvelopeSchema.safeParse(env).success).toBe(true);
+    const ag = env.sources.find((src) => src.runtime === 'antigravity');
+    expect(ag).toBeDefined();
+    expect(ag?.installed).toBe(false);
+    expect(ag?.hostname).toBe('exec-ag');
+    expect(ag?.models.length).toBeGreaterThan(0);
+    s.dispose();
+  });
+
+  test('antigravity: installed:false without a subscription keeps the source hidden', () => {
+    const s = bootServer();
+    insertMachine(s, {
+      name: 'exec-ag',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: { installed: false },
+      },
+    });
+    const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
+    expect(env.sources.some((src) => src.runtime === 'antigravity')).toBe(false);
     s.dispose();
   });
 });

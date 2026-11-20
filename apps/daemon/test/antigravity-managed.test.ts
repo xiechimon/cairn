@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DEFAULT_ANTIGRAVITY_MODELS } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
@@ -125,6 +125,36 @@ describe('antigravity managed binary resolution', () => {
       source: 'managed',
       authenticated: false,
     });
+  });
+
+  test('a cached install is dropped once its binary disappears from disk', async () => {
+    const dir = tempDir('ag-stale-');
+    const home = join(dir, 'home');
+    const binDir = join(home, '.local', 'bin');
+    mkdirSync(binDir, { recursive: true });
+    const agy = join(binDir, 'agy');
+    writeFileSync(agy, '#!/bin/sh\nexit 0\n');
+    chmodSync(agy, 0o755);
+
+    const managed = createAntigravityManaged({
+      home,
+      pathEnv: '',
+      platform: 'darwin',
+      arch: 'arm64',
+      fetchImpl: async () => new Response('{}', { status: 500 }),
+      probeBinary: async (binPath, args, source) => ({
+        version: '1.5.10',
+        binPath,
+        args,
+        source,
+        authenticated: true,
+        models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
+      }),
+    });
+
+    expect((await managed.probe())?.binPath).toBe(agy);
+    rmSync(agy, { force: true });
+    expect(managed.current()).toBeNull();
   });
 
   test('downloads .zip from ACP registry and rejects checksum mismatches', async () => {

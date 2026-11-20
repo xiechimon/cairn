@@ -289,6 +289,8 @@ export interface BootOpts {
   readClaudeOauthExpiresAt?: () => number | null;
   presenceIntervalMs?: number;
   presenceTimeoutMs?: number;
+  devinEnsureRetryMs?: number;
+  antigravityEnsureRetryMs?: number;
   capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
   preEnrolled?: { serverUrl: string };
@@ -368,6 +370,12 @@ export function startMachine(opts: BootOpts) {
         : {}),
       ...(opts.presenceTimeoutMs !== undefined
         ? { presenceTimeoutMs: opts.presenceTimeoutMs }
+        : {}),
+      ...(opts.devinEnsureRetryMs !== undefined
+        ? { devinEnsureRetryMs: opts.devinEnsureRetryMs }
+        : {}),
+      ...(opts.antigravityEnsureRetryMs !== undefined
+        ? { antigravityEnsureRetryMs: opts.antigravityEnsureRetryMs }
         : {}),
       claimBackoffBaseMs: 10,
       proxyEnv: {},

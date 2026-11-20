@@ -140,6 +140,7 @@ export const LIVE_SERVER = [
   'token-gate',
   'live-server-',
   'agent-fallback-models',
+  'frequent-model-',
 ];
 const OVERLAY = [
   'menu-keys',

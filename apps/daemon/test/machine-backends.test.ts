@@ -56,6 +56,130 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     await handle.done;
   });
 
+  test('a Devin install that vanishes mid-session is re-ensured on the next beat', async () => {
+    const api = new FakeMachineApi();
+    const presence = api.presence.bind(api);
+    api.presence = async (body): Promise<MachinePresenceResponse> => ({
+      ...(await presence(body)),
+      installDevin: true,
+    });
+    let attempts = 0;
+    let installed = true;
+    const { handle } = await boot({
+      api,
+      presenceIntervalMs: 20,
+      devinManaged: {
+        current: () =>
+          installed
+            ? { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' }
+            : null,
+        ensure: async () => {
+          attempts += 1;
+          installed = true;
+          return { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' };
+        },
+      },
+    });
+    await waitFor(() => api.presenceBodies.length >= 3);
+    const settled = attempts;
+    installed = false;
+    await waitFor(() => attempts === settled + 1);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('an Antigravity install that vanishes mid-session is re-ensured on the next beat', async () => {
+    const api = new FakeMachineApi();
+    let attempts = 0;
+    let installed = true;
+    const { handle } = await boot({
+      api,
+      presenceIntervalMs: 20,
+      antigravityManaged: {
+        current: () =>
+          installed
+            ? {
+                version: 'test',
+                binPath: '/agy',
+                args: [],
+                source: 'managed' as const,
+                authenticated: true,
+                models: [],
+              }
+            : null,
+        ensure: async () => {
+          attempts += 1;
+          installed = true;
+          return {
+            version: 'test',
+            binPath: '/agy',
+            args: [],
+            source: 'managed' as const,
+            authenticated: true,
+            models: [],
+          };
+        },
+        probe: async () => null,
+      },
+    });
+    await waitFor(() => api.presenceBodies.length >= 3);
+    const settled = attempts;
+    installed = false;
+    await waitFor(() => attempts === settled + 1);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a failing Antigravity ensure is not retried on every presence tick', async () => {
+    const api = new FakeMachineApi();
+    let attempts = 0;
+    const { handle } = await boot({
+      api,
+      presenceIntervalMs: 20,
+      antigravityEnsureRetryMs: 10_000,
+      antigravityManaged: {
+        current: () => null,
+        ensure: async () => {
+          attempts += 1;
+          return null;
+        },
+        probe: async () => null,
+      },
+    });
+    await waitFor(() => attempts === 2);
+    await waitFor(() => api.presenceBodies.length >= 5);
+    expect(attempts).toBe(2);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a failing Devin ensure is not retried on every presence send', async () => {
+    const api = new FakeMachineApi();
+    const presence = api.presence.bind(api);
+    api.presence = async (body): Promise<MachinePresenceResponse> => ({
+      ...(await presence(body)),
+      installDevin: true,
+    });
+    let attempts = 0;
+    const { handle } = await boot({
+      api,
+      presenceIntervalMs: 20,
+      devinEnsureRetryMs: 10_000,
+      devinManaged: {
+        current: () => null,
+        ensure: async () => {
+          attempts += 1;
+          return null;
+        },
+      },
+    });
+    await waitFor(() => attempts === 1);
+    await waitFor(() => api.presenceBodies.length >= 5);
+    expect(attempts).toBe(1);
+    await handle.stop();
+    await handle.done;
+  });
+
   test.each(['rejected', 'unavailable'])(
     'a %s Devin install retries only while requested',
     async (failure) => {
@@ -71,6 +195,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
       const { handle } = await boot({
         api,
         presenceIntervalMs: 20,
+        devinEnsureRetryMs: 0,
         devinManaged: {
           current: () => null,
           ensure: async () => {

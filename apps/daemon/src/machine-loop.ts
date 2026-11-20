@@ -113,6 +113,8 @@ export interface MachineLoopOpts {
   claimTimeoutMs?: number;
   presenceIntervalMs?: number;
   presenceTimeoutMs?: number;
+  devinEnsureRetryMs?: number;
+  antigravityEnsureRetryMs?: number;
   computerPresence?: ComputerPresenceSource;
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
@@ -155,6 +157,7 @@ export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): numb
 
 export const PRESENCE_TIMEOUT_MS = 20_000;
 export const GOODBYE_TIMEOUT_MS = 2_000;
+const MANAGED_ENSURE_RETRY_MS = 5 * 60_000;
 export const DISPATCHER_RESET_FAILURE_THRESHOLD = 3;
 
 export const PORT_BASE_ENV = 'CAIRN_PORT_BASE';
@@ -290,7 +293,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const devinManaged =
     opts.devinManaged ?? createDevinManaged({ log: (line) => logger.machine(line) });
   let devinInstalling = false;
-  let devinInstalled = false;
+  let devinEnsured = false;
+  let devinEnsureRetryAt = 0;
   let devinModels = loadDevinModels(paths);
   const antigravityManaged =
     opts.antigravityManaged ?? createAntigravityManaged({ log: (line) => logger.machine(line) });
@@ -595,13 +599,23 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       const response = await client.presence(body, signal);
       folderPins.setPins(response.folderPins ?? []);
       phones.setConsented(response.phones ?? []);
-      if (response.installDevin === true && !devinInstalling && !devinInstalled) {
+      if (
+        response.installDevin === true &&
+        !devinInstalling &&
+        Date.now() >= devinEnsureRetryAt &&
+        (!devinEnsured || devinManaged.current() === null)
+      ) {
         devinInstalling = true;
+        devinEnsureRetryAt = Date.now() + (opts.devinEnsureRetryMs ?? MANAGED_ENSURE_RETRY_MS);
         void devinManaged
           .ensure()
           .then(
             (install) => {
-              devinInstalled = install !== null;
+              devinEnsured = install !== null;
+              if (install !== null) {
+                devinEnsureRetryAt = 0;
+                if (sendPresenceNow !== null) return sendPresenceNow();
+              }
             },
             (error: unknown) => {
               logger.machine(
@@ -1086,11 +1100,27 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     }
   })();
 
+  let antigravityRetryAt = 0;
   const presenceTimer = setInterval(() => {
     const currentAg = antigravityManaged.current();
-    if (currentAg === null || !currentAg.authenticated) {
-      void antigravityManaged.probe().catch(() => {});
-    }
+    if (currentAg === null) {
+      if (Date.now() >= antigravityRetryAt) {
+        antigravityRetryAt =
+          Date.now() + (opts.antigravityEnsureRetryMs ?? MANAGED_ENSURE_RETRY_MS);
+        void antigravityManaged
+          .ensure()
+          .then((install) => {
+            if (install === null) return;
+            antigravityRetryAt = 0;
+            if (sendPresenceNow !== null) return sendPresenceNow();
+          })
+          .catch((error: unknown) => {
+            logger.machine(
+              `antigravity managed ensure failed: ${error instanceof Error ? error.message : String(error)}`,
+            );
+          });
+      }
+    } else if (!currentAg.authenticated) void antigravityManaged.probe().catch(() => {});
     void probeAuthAndRemember()
       .then(() => presenceReporter.send())
       .catch((err: unknown) => {
