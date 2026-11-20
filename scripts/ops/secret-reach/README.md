@@ -130,12 +130,19 @@ Keep only the two status lines and their exit status as evidence; never log the 
 
 ## Mac batch-session sandbox (#2344)
 
-`scripts/ops/secret-reach/batch-sandbox.settings.json` is a standalone Claude Code settings file for **batch** `claude -p` runs on the owner's Mac. Launch batch sessions with:
+`scripts/ops/secret-reach/batch-sandbox.settings.json` is a standalone Claude Code settings file for **batch** `claude -p` runs on the owner's Mac. Launch batch sessions through the launcher, which takes the usual `claude` arguments:
 
 ```sh
-CAIRN_HEAVY_SLOTS_DIR="$HOME/.cache/cairn-heavy-slots" CAIRN_HEAVY_SLOTS=1 \
-  claude -p '<prompt>' --settings scripts/ops/secret-reach/batch-sandbox.settings.json
+node scripts/ops/secret-reach/batch-claude.mjs -p '<prompt>'
 ```
+
+The launcher always passes `--settings scripts/ops/secret-reach/batch-sandbox.settings.json` and refuses a second `--settings` or `--setting-sources` (one could switch the sandbox off). It also starts `claude` with a scrubbed environment, because the sandbox restricts files and not the environment a process inherits:
+
+- It drops every credential-shaped variable before `claude` starts, so neither the session's Bash nor its hooks or MCP servers ever see one. That means any name with a `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `PASSPHRASE`, `CREDENTIAL`, `APIKEY`, `KEY`, `AUTH`, `COOKIE`, `HEADERS`, `PAT` or `BEARER` segment (`GH_TOKEN`, `GITHUB_TOKEN`, `NPM_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `SSH_AUTH_SOCK`, `OTEL_EXPORTER_OTLP_HEADERS`, …), the `CAIRN_GIT_CRED_*` and `GIT_CONFIG_{COUNT,KEY_n,VALUE_n,PARAMETERS}` git credential plumbing, `GIT_ASKPASS`/`SSH_ASKPASS`, and any value that is a URL with a password.
+- `claude`'s own login moves off the environment: `ANTHROPIC_API_KEY` goes to `claude` on a pipe named by `CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR`, and `CLAUDE_CODE_OAUTH_TOKEN` on one named by `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`. `claude` reads the pipe once at start-up and does not pass the descriptor to its Bash. A keychain subscription login needs neither. `ANTHROPIC_AUTH_TOKEN` (gateway bearer) has no descriptor variant and is dropped, so gateway-authenticated batch runs are unsupported.
+- It sets `CAIRN_HEAVY_SLOTS_DIR=~/.cache/cairn-heavy-slots` and `CAIRN_HEAVY_SLOTS=1` unless the caller set them (see the caveats below).
+
+`CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` is deliberately not used for this: it only strips Anthropic and cloud-provider credentials (`GH_TOKEN` survives it), and it forces the permission mode back to `default`, which turns away the file tools in a plain `claude -p` run. `scripts/ops/secret-reach/batch-claude.test.mjs` pins the scrub list and the launch shape.
 
 It enables the Seatbelt sandbox with `failIfUnavailable: true` and `allowUnsandboxedCommands: false` (the `dangerouslyDisableSandbox` retry is refused), denies reads of the cairn secret roots (`~/.cairn`, `~/.config`, `~/Library/Application Support/@cairn`, `~/.local/share/cairn`), the standard credential stores, package-manager token files, shell and REPL histories and `~/Library/pnpm/rc` (the npm token), and re-opens only the runner workspaces, `~/.cairn/{workspaces,plans,tools}` and `~/.config/git` through narrower `allowRead` entries. `permissions.deny` `Read(...)` rules cover the same secrets for the file tools, which run outside the sandbox — a `Read` deny also blocks Write on the same path — and `Edit(...)` rules deny the file tools writes an unsandboxed process would later trust (`**/.claude/**`, `**/CLAUDE*.md`, `**/AGENTS*.md`, `**/.git`, `~/.cache/lane-tmp`). `scripts/ops/secret-reach/batch-sandbox.test.mjs` pins the required shape.
 
@@ -143,19 +150,24 @@ The repository's `.claude/settings.json` deliberately carries no `sandbox` block
 
 Inside the sandbox a batch session cannot push or use `gh` (its credentials are denied and the proxy port is unreachable); PR creation, `push` and `push-queue` are the outer launcher script's job, outside the sandbox. It can still run tests, with two caveats:
 
-- The sandbox profile writes `TMPDIR=/tmp/claude` and allows writes only under the launch cwd, `/tmp/claude`, `~/.cache`, the package caches and `~/.cairn/plans`. The shared heavy-slot directory (`getconf DARWIN_USER_TEMP_DIR` on macOS) is *not* writable, so the launcher must point `CAIRN_HEAVY_SLOTS_DIR` at a writable dir — `~/.cache/cairn-heavy-slots` is already covered by `allowWrite`. `scripts/heavy-slots.mjs` keeps its liveness probe socket inside that directory, so no further path needs opening.
+- The sandbox profile writes `TMPDIR=/tmp/claude` and allows writes only under the launch cwd, `/tmp/claude`, `~/.cache`, the package caches and `~/.cairn/plans`. The shared heavy-slot directory (`getconf DARWIN_USER_TEMP_DIR` on macOS) is *not* writable, so `batch-claude.mjs` points `CAIRN_HEAVY_SLOTS_DIR` at a writable dir — `~/.cache/cairn-heavy-slots` is already covered by `allowWrite`. `scripts/heavy-slots.mjs` keeps its liveness probe socket inside that directory, so no further path needs opening.
 - A private slot directory is a private lease: the batch session's heavy work no longer counts against the shared lane slots. `CAIRN_HEAVY_SLOTS=1` keeps the bypass at one heavy job.
 
-Lane sessions (daemon `claude-code` runtime) are out of scope here; their isolation is tracked separately.
+Lane sessions (daemon `claude-code` runtime) are out of scope here; their credential isolation is tracked in #5393.
 
 Host acceptance on the owner Mac, from a cairn checkout — every channel must report `no` with 0 bytes (exit 0):
 
 ```sh
-claude -p 'run `node scripts/ops/secret-reach/canary.mjs --profile mac \
+node scripts/ops/secret-reach/batch-claude.mjs -p 'run `node scripts/ops/secret-reach/canary.mjs --profile mac \
     --path ~/.config/cairn/slack-app.env --path ~/.config/cairn/composio.env \
     --path ~/.config/cairn/telegram.env \
-    --path "$HOME/Library/Application Support/@cairn/desktop/otel.env"` and paste its output' \
-  --settings scripts/ops/secret-reach/batch-sandbox.settings.json
+    --path "$HOME/Library/Application Support/@cairn/desktop/otel.env"` and paste its output'
+```
+
+Environment acceptance — with `GH_TOKEN`, `GITHUB_TOKEN` and `ANTHROPIC_API_KEY` exported in the launching shell, the session must print none of them:
+
+```sh
+node scripts/ops/secret-reach/batch-claude.mjs -p 'run `env | cut -d= -f1 | sort` and paste its output'
 ```
 
 The red control is the same canary run as the owner without a sandbox (exit 1, every ordinary channel `yes`) — there is no in-band way to disable the sandbox: `--settings '{"sandbox":{"enabled":false}}'` does not override `sandbox.enabled` from a `--settings` file, so do not use it as a control. The default `--profile mac` inventory alone proves nothing: every default path is absent on this Mac, so an all-`no` run is expected without any sandbox. Use the four real files above. Evidence and residuals: `docs/verify/2344/`.
@@ -163,7 +175,7 @@ The red control is the same canary run as the owner without a sandbox (exit 1, e
 ## Offline regression command
 
 ```sh
-node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs scripts/ops/secret-reach/batch-sandbox.test.mjs
+node --test scripts/ops/secret-reach/canary.test.mjs scripts/ops/secret-reach/broker.test.mjs scripts/ops/secret-reach/setup-runner-user.test.mjs scripts/ops/secret-reach/batch-sandbox.test.mjs scripts/ops/secret-reach/batch-claude.test.mjs
 ```
 
 Tests use built-ins, temporary fixture files, a generated RSA key, a loopback fake GitHub API, a real temporary Unix socket, an in-memory setup host, real owner-UID permission children, and a fake clock for mint reuse/rate limits. They never read the real App key, run sudo or call GitHub. CI runs the same command next to the other ops fixtures.

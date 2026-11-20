@@ -51,21 +51,23 @@ development (git over the local proxy port, `gh`, Keychain) for every session.
 
 ## Batch `claude -p` launch points on the owner Mac
 
-No launcher for batch `claude -p` sessions exists inside this repository — everything
-that spawns `claude` here is a lane session (daemon `claude-code` backend via the
-Agent SDK, `apps/daemon/src/engine/claude-tui.ts`), which is out of scope. The batch
-launch points all live outside the repo; each needs `--settings
-<checkout>/scripts/ops/secret-reach/batch-sandbox.settings.json` (absolute path when
-the working directory is not a cairn checkout):
+The repository's batch launcher is `scripts/ops/secret-reach/batch-claude.mjs`
+(#5398): it adds the `--settings` flag and starts `claude` with a scrubbed
+environment. Everything else that spawns `claude` here is a lane session (daemon
+`claude-code` backend via the Agent SDK, `apps/daemon/src/engine/claude-tui.ts`),
+which is out of scope. The batch launch points all live outside the repo; each
+replaces `claude` with `node <checkout>/scripts/ops/secret-reach/batch-claude.mjs`
+(absolute path when the working directory is not a cairn checkout) and keeps its
+other arguments:
 
 - `~/.agents/scripts/skill-probe.sh` (line 6) — the manual skill-probing helper.
 - `~/.claude/scheduled-tasks/` — Claude Desktop scheduled tasks (the weekly retro
-  moved there); the lane could not read this directory, so the owner must add
-  `--settings` to each `claude -p` task inside it.
+  moved there); the lane could not read this directory, so the owner must switch
+  each `claude -p` task inside it to the launcher.
 - Manual `/goal` headless runs — the copy-paste recipe is documented at
   `docs/spec/28-bootstrap-closed-loop-self-authored-self-merged.md` §7.4
   (`claude -p "<…>" --permission-mode auto --max-budget-usd <cap> --output-format
-  stream-json --verbose`). Append the same `--settings` flag when running it.
+  stream-json --verbose`). Run it through the launcher with the same arguments.
 
 Interactive `claude` sessions (the `cc` fish abbreviation, `claude` in a terminal)
 deliberately get no `--settings` and no sandbox — everyday development is unaffected.
@@ -212,10 +214,22 @@ acceptance runs stay owner steps.
   `slot-*.lock`/`queue-*` records: a forged live pid wedges the pool (same-uid
   DoS only — `chmod 0700` blocks other uids), and a probe path that is not a
   socket now degrades to pid liveness instead of crashing every acquirer.
-- The sandboxed process inherits the launcher's environment unscrubbed:
-  `GH_TOKEN`, `ANTHROPIC_API_KEY` and friends exported in the launching shell are
-  visible inside the session. Batch launch points should scrub token env vars;
-  the settings file cannot express it.
+- Environment (closed by #5398): the settings file cannot scrub the environment,
+  so a plain `claude -p --settings …` session still inherits `GH_TOKEN`,
+  `ANTHROPIC_API_KEY` and friends from the launching shell. `batch-claude.mjs`
+  drops credential-shaped variables before `claude` starts and hands `claude` its
+  own API key or OAuth token on a pipe descriptor instead of the environment.
+  Measured with the real `claude` 2.1.329 against a local fake model endpoint,
+  with the Bash tool running `env`: a direct run showed `GH_TOKEN`, `GITHUB_TOKEN`,
+  `NPM_TOKEN` and `ANTHROPIC_API_KEY`; through the launcher none appeared, the
+  model request still carried the key, and `cat <&3` / `cat <&4` in Bash got
+  `bad file descriptor`. That run had the Seatbelt layer swapped out, because a
+  sandboxed lane cannot nest `sandbox-exec` (`sandbox_apply: Operation not
+  permitted`); the environment acceptance command in
+  `scripts/ops/secret-reach/README.md` repeats it under the real sandbox on the
+  host. Residual: credentials under names the pattern does not recognise (for
+  example a `SENTRY_DSN` whose key sits in the URL user part)
+  still pass through, as does any session launched with `claude` directly.
 
 ## Lane sessions
 
