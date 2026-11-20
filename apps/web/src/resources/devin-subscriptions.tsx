@@ -216,7 +216,7 @@ export function AddDevinSubscriptionDialog({
             <p className="m-0 text-meta text-content-tertiary">
               {withCodeSpans(
                 t(
-                  '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴（取 `windsurf_api_key`）。Token 加密保存，保存后无法再查看。',
+                  '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴。保存后无法再查看。',
                 ),
               )}
             </p>

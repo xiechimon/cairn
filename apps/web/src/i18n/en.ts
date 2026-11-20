@@ -62,8 +62,8 @@ export const EN: Record<string, string> = {
   '添加 Claude 订阅': 'Add Claude subscription',
   '在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。':
     'Run `claude setup-token` on your machine, then paste the token below.',
-  'Coordinator 和任务都会用这个订阅，不用再配 API key。Token 加密保存，保存后无法再查看。':
-    'The Coordinator and tasks both use this subscription, so you need no API key. The token is stored encrypted and cannot be viewed after saving.',
+  'Coordinator 和任务都会用这个订阅。保存后无法再查看。':
+    'The Coordinator and tasks both use this subscription. It cannot be viewed after saving.',
   '保存失败，请检查填写内容后重试。':
     'Could not save the connection. Check the fields and try again.',
   '{name}：已过期，Coordinator 和任务都暂时用不了。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。':
@@ -72,8 +72,8 @@ export const EN: Record<string, string> = {
     '{name}: expires in {days## day|# days}. Before then, run `claude setup-token` in a terminal and add the new token under Settings → Model routing.',
   'Devin 订阅': 'Devin subscription',
   '添加 Devin 订阅': 'Add Devin subscription',
-  '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴（取 `windsurf_api_key`）。Token 加密保存，保存后无法再查看。':
-    'Run `cat ~/.local/share/devin/credentials.toml` on a signed-in machine and paste the whole output (the `windsurf_api_key` is picked out). The token is stored encrypted and cannot be viewed after saving.',
+  '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴。保存后无法再查看。':
+    'Run `cat ~/.local/share/devin/credentials.toml` on a signed-in machine and paste the whole output. It cannot be viewed after saving.',
   '也可以粘贴 token': 'Or paste a token',
   '这台 Mac 已登录 Devin。': 'This Mac is signed in to Devin.',
   '从这台 Mac 导入': 'Import from this Mac',
@@ -108,11 +108,11 @@ export const EN: Record<string, string> = {
   '从这台 Mac 接入': 'Connect from this Mac',
   '在这台 Mac 上登录 Antigravity': 'Sign in to Antigravity on this Mac',
   '会打开浏览器完成 Google 账号登录。': 'A browser opens to sign in with your Google account.',
-  '默认使用执行机已登录的 Antigravity（OS 钥匙串）。也可以展开下方粘贴 `GEMINI_API_KEY`。':
-    'Uses the Antigravity sign-in from your Runner OS keychain by default. You can also expand below to paste a `GEMINI_API_KEY`.',
+  '默认使用执行机已登录的 Antigravity，也可以展开下方粘贴 `GEMINI_API_KEY`。':
+    'Uses the Antigravity sign-in on your Runner by default. You can also expand below to paste a `GEMINI_API_KEY`.',
   '也可以粘贴 API Key': 'Or paste an API key',
-  '粘贴 `GEMINI_API_KEY` 或 `.env` 片段。Token 加密保存，保存后无法再查看。':
-    'Paste a `GEMINI_API_KEY` or `.env` snippet. The key is stored encrypted and cannot be viewed after saving.',
+  '粘贴 `GEMINI_API_KEY` 或 `.env` 片段。保存后无法再查看。':
+    'Paste a `GEMINI_API_KEY` or `.env` snippet. It cannot be viewed after saving.',
   '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。':
     'This subscription is no longer signed in. Sign in with Google on your Runner or update the API key, then remove and add it again.',
   '这个订阅已过期。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。':
@@ -347,8 +347,6 @@ export const EN: Record<string, string> = {
   电脑控制: 'Computer control',
   '电脑控制 · {n} 项已关': 'Computer control · {n} off',
   '没能更改电脑控制，请重试': 'Could not change computer control; try again',
-  '关掉后 Coordinator 不会在这台执行机上用对应能力；随时能开回来':
-    'When off, Coordinator will not use that capability on this Runner; you can turn it back on anytime',
   '已关闭，Coordinator 不会用它': 'Off; Coordinator will not use it',
   '默认开启，关掉可以单独禁掉': 'On by default; turn off to disable just this one',
   这台执行机还没报这个能力: 'This Runner has not reported this capability yet',
@@ -380,8 +378,6 @@ export const EN: Record<string, string> = {
   '添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机':
     'Add a provider the Coordinator can use, or a Claude subscription and a Runner with Claude Code',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
-  '因为这是最早添加、Coordinator 能直接用的服务商':
-    'Because it is the earliest added provider the Coordinator can use',
   已保存: 'Saved',
   还没有能用的模型: 'No usable model yet',
   换一个: 'Change',
@@ -699,12 +695,11 @@ export const EN: Record<string, string> = {
   语言: 'Language',
   推送通知: 'Push notifications',
   提醒声音: 'Notification sound',
-  系统通知的提示音: 'The sound system notifications play',
   试听: 'Preview',
   无声: 'Silent',
   在这台设备上接收推送: 'Push on this device',
-  '需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到':
-    'Push immediately when a decision is needed; everything else lands in the twice-daily digest — even on the lock screen',
+  '需要你决定时立即推送，其余进展并入每日两次简报':
+    'Push immediately when a decision is needed; everything else lands in the twice-daily digest',
   // #1031: the switch is a preference; when it's on but the browser permission
   // is denied, the row explains why nothing will actually fire.
   '浏览器已拒绝通知权限，需到站点设置重新允许':
@@ -790,8 +785,7 @@ export const EN: Record<string, string> = {
   '本机 ~/.agents/skills 和 ~/.claude/skills 里没有技能。':
     'No skills in ~/.agents/skills or ~/.claude/skills on this machine.',
   '没有匹配的技能。': 'No matching skills.',
-  '导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。':
-    'Importing copies the skill into Cairn’s own directory; the original is left unchanged.',
+  '导入会复制一份，原目录不变。': 'Importing copies the skill; the original stays unchanged.',
   添加密钥: 'Add secret',
   较早: 'earlier',
   空值: 'Empty',
@@ -815,8 +809,7 @@ export const EN: Record<string, string> = {
   '名称要符合环境变量格式（例如 MY_VAR）': 'Use a name like MY_VAR',
   密钥与环境变量: 'Secrets & env vars',
   批量添加: 'Bulk add',
-  '任务在执行机上运行时会拿到这些密钥和环境变量。项目里的同名条目优先于团队条目。也可以让 Coordinator 添加机密，值不会进入对话。':
-    'Tasks get these secrets and environment variables when they run on a Runner. Project entries override team entries with the same name. The Coordinator can also add secrets without the value entering the conversation.',
+  项目里的同名条目优先于团队条目: 'Project entries override team entries with the same name',
   还没有密钥或环境变量: 'No secrets or environment variables yet',
   '执行机跑任务时会拿到它们。': 'Runners get them when they run tasks.',
   按名称筛选: 'Filter by name',
@@ -828,8 +821,8 @@ export const EN: Record<string, string> = {
   '没能转为机密，请重试。': 'Could not convert it to a secret. Try again.',
   '没能删除，请重试。': 'Could not delete it. Try again.',
   '把 {name} 转为机密？': 'Convert {name} to a secret?',
-  '转为机密后，这里不再显示它的值，也不能再转回环境变量。已经看到过这个值的地方（浏览器、对话、其他系统）不会因此收回。':
-    'Once converted, its value is no longer shown here and it cannot become an env var again. Copies already seen elsewhere (a browser, a conversation, another system) are not recalled.',
+  '转为机密后，这里不再显示它的值，也不能再转回环境变量。已经出现在浏览器、对话或其他系统里的值不会被收回。':
+    'Once converted, its value is no longer shown here and it cannot become an env var again. Copies already in a browser, a conversation or another system are not recalled.',
   '删除后，用到它的任务就拿不到这个值了':
     'Once deleted, tasks that use it no longer get this value',
   '删除 {name}': 'Delete {name}',
@@ -845,8 +838,6 @@ export const EN: Record<string, string> = {
   描述: 'Description',
 
   保险库: 'Vault',
-  '浏览器代填用的网站登录保存在这里。Coordinator 只在你批准的网站上填入用户名和密码，这两个值不会出现在页面或对话里。':
-    'Site logins for browser fill live here. The Coordinator fills the username and password only on sites you approved, and neither value ever appears on a page or in a conversation.',
   网站登录: 'Site logins',
   添加登录: 'Add login',
   添加网站登录: 'Add site login',
@@ -870,8 +861,7 @@ export const EN: Record<string, string> = {
   '加密保存，保存后不再显示，也不会进入对话。':
     'Stored encrypted. It is never shown again and never enters a conversation.',
   网站授权: 'Site authorizations',
-  'Coordinator 第一次在某个网站代填时会请求批准；批准后这个网站在这台执行机上直接代填，撤销后重新请求。':
-    'The Coordinator asks for approval the first time it fills on a site; afterwards it fills directly on that site and Runner, and revoking makes it ask again.',
+  批准过的网站在这台执行机上直接代填: 'Approved sites fill directly on this Runner',
   正在加载网站授权: 'Loading site authorizations',
   网站授权没能加载: 'Site authorizations could not be loaded',
   还没有批准过的网站: 'No approved sites yet',
@@ -1010,8 +1000,7 @@ export const EN: Record<string, string> = {
   跟随全局: 'Follow global',
   '跟随全局（{tier}）': 'Follow global ({tier})',
   '项目未单独设置时，跟随此项': 'Projects without their own setting follow this',
-  '发送、发布等对外动作，会先问过再跑，或完全交给它。':
-    'Send, publish and other external actions ask first — or run entirely on their own.',
+  '比如发送、发布': 'Such as sending or publishing',
   '有人在用时让路（分钟）': 'Yield while someone is active (minutes)',
   '同类任务冷却（分钟）': 'Cooldown between runs (minutes)',
   '每日预算（USD）': 'Daily budget (USD)',
@@ -1032,8 +1021,8 @@ export const EN: Record<string, string> = {
   '花费读不到，先不跑': 'spend unreadable, holding off',
   '转换失败，请重试。': 'Conversion failed. Try again.',
   '转换为 GitHub 形态': 'Convert to GitHub form',
-  '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位；有在飞构建时不可转换。':
-    'After conversion the GitHub repo becomes the single source of truth and the local path becomes an execution accelerator; conversion is blocked while builds are in flight.',
+  '转换后以 GitHub 仓为准；有构建在跑时不能转换':
+    'The GitHub repo becomes the source; not available while a build runs',
   'GitHub 仓库（owner/repo）': 'GitHub repository (owner/repo)',
   'GitHub 仓库格式应为 owner/repo。': 'GitHub repository must be in owner/repo form.',
   转换: 'Convert',
@@ -1300,13 +1289,12 @@ export const EN: Record<string, string> = {
   '手动输入 owner/repo': 'Enter owner/repo manually',
   // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
   // command strings themselves stay untranslated — brand slots via BRAND)
-  '让另一台电脑帮你跑任务。两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':
-    'Let another computer run tasks for you. The two computers connect through Tailscale, and this computer has to stay on and online.',
+  '两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':
+    'The two computers connect through Tailscale; this computer has to stay on and online.',
   '用 Tailscale 连通两台电脑': 'Connect the two computers with Tailscale',
   '在另一台电脑上安装 CLI': 'Install the CLI on the other computer',
   在另一台电脑上启动执行机: 'Start the Runner on the other computer',
-  '之后它在后台常驻运行，关掉终端也没关系。':
-    'It then keeps running in the background, so you can close the terminal.',
+  '之后它在后台运行，可以关掉终端。': 'It then runs in the background; you can close the terminal.',
   在这里批准: 'Approve it here',
   批准: 'Approve',
   批准码: 'Approval code',
@@ -1438,7 +1426,6 @@ export const EN: Record<string, string> = {
   推送分支: 'Push branches',
   创建技能: 'Create skills',
   更新技能: 'Update skills',
-  运行时: 'Runtime',
   '允许该 Agent 通过合并分支进行发布（例如将 develop 合并进 main）。':
     'Let this Agent publish by merging branches (for example develop into main).',
   '允许该 Agent 创建 git tag，这可能触发发布流程。':
@@ -1459,7 +1446,6 @@ export const EN: Record<string, string> = {
   '像 AGENTS.md：本项目的每个对话和 Coordinator 都会读到并遵守。':
     'Like an AGENTS.md: every thread and the Coordinator in this project read and follow it.',
   自动记忆: 'Auto memory',
-  'Coordinator 的长期记忆': "The Coordinator's long-term memory",
   'Coordinator 在这个项目里工作时自己写下的笔记。':
     'Notes the Coordinator writes itself as it works in this project.',
   'Coordinator 还没有记下团队笔记。': 'The Coordinator has not written team notes yet.',
@@ -1875,8 +1861,7 @@ export const EN: Record<string, string> = {
   '{use} 的模型': '{use} model',
   '{use} 的思考强度': '{use} thinking level',
   上下文快满时压缩对话: 'Compacts a conversation when the context is nearly full',
-  '先给 Coordinator 选模型，它才能回答你的消息。':
-    'Pick a model for the Coordinator so it can answer your messages.',
+  '先给 Coordinator 选模型': 'Pick a model for the Coordinator',
   '这个订阅的登录有效。': 'This subscription’s sign-in is valid.',
   'Devin 接受了这个凭据。': 'Devin accepted these credentials.',
   'Antigravity 接受了这个凭据。': 'Antigravity accepted these credentials.',
@@ -1946,18 +1931,14 @@ export const EN: Record<string, string> = {
   不填则沿用规则的执行机: 'Leave empty to keep the rule Runner',
   首选执行机: 'Preferred Runner',
   不固定: 'Any machine',
-  '当前默认：{model} · {provider}（因为团队有 Anthropic API key）':
-    'Current default: {model} · {provider} (the team has an Anthropic API key)',
-  '当前默认：{model} · {provider}（因为这是最早添加、Coordinator 能直接用的服务商）':
-    'Current default: {model} · {provider} (the first provider you added that the Coordinator can use)',
+  '当前默认：{model} · {provider}': 'Current default: {model} · {provider}',
   '当前没有可用的默认：添加一个有 API key 的服务商，或在这里创建规则':
     'No default yet: add a provider with an API key, or create the rule here',
   设为默认执行机: 'Make default Runner',
   已是默认执行机: 'Default Runner',
   '设为默认执行机失败，请重试。': 'Could not change the default Runner. Try again.',
   路由覆盖: 'Route override',
-  '本任务的执行机与执行要求；调度在规则开启后生效。':
-    'Per-task Runner and capability requirements; applied when routing rules are on.',
+  路由规则开启后生效: 'Applies when routing rules are on',
   '要求的 MCP': 'Required MCP',
   '派发时要求执行机已安装这些 MCP 服务器': 'Dispatch requires these MCP servers on the executor',
   路由覆盖已保存: 'Route override saved',
@@ -2340,7 +2321,6 @@ export const EN: Record<string, string> = {
   '连接 {name}': 'Connect {name}',
   '正在连接…': 'Connecting…',
   '添加 MCP 服务器': 'Add MCP server',
-  '任何支持远程 MCP 的服务器都可以加进来。': 'Add any server that speaks remote MCP.',
   用浏览器登录: 'Sign in with browser',
   团队知识库: 'Team wiki',
   标识: 'ID',
@@ -2454,7 +2434,6 @@ export const EN: Record<string, string> = {
   '没能开始登录，稍后再试。': 'Could not start the sign-in. Try again later.',
   应用: 'Apps',
   'Composio API key': 'Composio API key',
-  '已保存，加密存储，不会再显示。': 'Saved, encrypted, and never shown again.',
   '这把 key 没有通过检查，确认完整复制后再保存。':
     'That key failed validation. Copy it in full and save again.',
   '没能移除，稍后重试。': 'Could not remove it. Try again later.',
@@ -2651,14 +2630,10 @@ export const EN: Record<string, string> = {
     'Create one under Basic Information → App-Level Tokens with the connections:write scope.',
   'OAuth & Permissions 里的 Bot User OAuth Token。':
     'The Bot User OAuth Token under OAuth & Permissions.',
-  'Socket Mode 直连，在私聊里和 Coordinator 对话。':
-    'Direct Socket Mode connection — talk to the Coordinator in DMs.',
-  '连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。':
-    'Connect a Telegram bot, WeChat or Slack and talk to the Coordinator from your phone.',
+  'Socket Mode 直连': 'Direct Socket Mode connection',
   待处理: 'Needs attention',
-  '官方 Bot API：按钮和回复都支持。': 'Official Bot API — buttons and replies supported.',
-  '扫码登录，在平时的聊天里和 Coordinator 对话。':
-    'Scan to sign in and talk to the Coordinator in your usual chat.',
+  '官方 Bot API': 'Official Bot API',
+  扫码登录: 'Scan to sign in',
   'Telegram 机器人': 'Telegram bot',
   连接中: 'Connecting',
   不稳定: 'Unstable',
@@ -2703,7 +2678,6 @@ export const EN: Record<string, string> = {
   '连接超时，稍后会自动重试。': 'The connection timed out. It will retry automatically.',
   '连接中断，稍后会自动重试。': 'The connection dropped. It will retry automatically.',
   添加邮箱: 'Add mailbox',
-  '新邮件到达时，Coordinator 会收到通知。': 'The Coordinator is notified when new mail arrives.',
   连接邮箱: 'Connect mailbox',
   邮箱地址: 'Email address',
   授权码: 'Authorization code',
@@ -2720,12 +2694,9 @@ export const EN: Record<string, string> = {
     'Outlook and other overseas mailboxes use an app password; 163, 126 and similar mailboxes generate an authorization code on the web settings IMAP/SMTP page.',
   'QQ 邮箱': 'QQ Mail',
   其他邮箱: 'Other mailbox',
-  '用授权码连接，新邮件会唤醒 Coordinator，回信前先问你。':
-    'Connect with an authorization code. New mail wakes the Coordinator, and it asks you before replying.',
-  '用应用专用密码连接，新邮件会唤醒 Coordinator，回信前先问你。':
-    'Connect with an app password. New mail wakes the Coordinator, and it asks you before replying.',
-  'Outlook、163 等支持 IMAP 的邮箱，填好服务器即可连接。':
-    'Outlook, 163 and other IMAP mailboxes connect once you fill in the servers.',
+  用授权码连接: 'Connect with an authorization code',
+  用应用专用密码连接: 'Connect with an app password',
+  'Outlook、163 等支持 IMAP 的邮箱': 'Outlook, 163 and other IMAP mailboxes',
   '{n} 个邮箱': '{n#1 mailbox|# mailboxes}',
   邮箱: 'Mailbox',
   需要处理: 'Needs attention',
@@ -2748,8 +2719,7 @@ export const EN: Record<string, string> = {
   '仅匹配 {count} 条规则': 'Rules only, {count} set',
   还没有收到新邮件: 'No new mail yet',
   '最近一封 {time}': 'Latest {time}',
-  'Coordinator 回信前总会先给你看一张确认卡。':
-    'The Coordinator always shows you a confirmation card before replying.',
+  回信前先问你: 'Asks you before replying',
   '连接失败，请检查填写的内容。': 'Could not connect. Check what you entered.',
   '添加规则失败，请重试。': 'Could not add the rule. Try again.',
   邮件: 'Mail',
@@ -2757,15 +2727,13 @@ export const EN: Record<string, string> = {
   授权已收回: 'Authorization revoked',
   '没能断开 {name}，稍后重试。': 'Could not disconnect {name}. Try again later.',
   断开: 'Disconnect',
-  'key 已保存，经 Composio 接入的应用都用它授权':
-    'Key saved. Apps connected through Composio authorize with it',
+  'key 已保存': 'Key saved',
   更多应用: 'More apps',
-  'Slack、Google 日历等上千个应用，用你自己的 Composio 账号接入，要另注册':
-    'Slack, Google Calendar and thousands more, through your own Composio account (separate sign-up)',
+  '用你自己的 Composio 账号接入，需另注册': 'Through your own Composio account, separate sign-up',
   '用 Composio 接入更多应用': 'Connect more apps with Composio',
-  'key 已保存，加密存储，不会再显示。': 'Key saved and encrypted. It will not be shown again.',
-  'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。':
-    'Slack, Google Calendar, Todoist and thousands more, handed to the Coordinator through your own Composio account.',
+  'key 已保存，不会再显示。': 'Key saved. It will not be shown again.',
+  '用你自己的 Composio 账号接入 Slack、Google 日历等应用':
+    'Connect Slack, Google Calendar and more through your own Composio account',
   '移除 key': 'Remove key',
   '更换 key': 'Replace key',
   保存并列出应用: 'Save and list apps',

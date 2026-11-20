@@ -400,13 +400,7 @@ export function ImConnectionsPage() {
               <CardGrid>{connections.map(connectionCard)}</CardGrid>
             </SettingsSection>
           )}
-          <SettingsSection
-            title={t('可接入')}
-            description={t(
-              '连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。',
-            )}
-            testId="im-catalog"
-          >
+          <SettingsSection title={t('可接入')} testId="im-catalog">
             <CardGrid>
               <ImCard
                 testId="im-platform-telegram"
@@ -417,7 +411,7 @@ export function ImConnectionsPage() {
                     <StatusChip tone="done">{t('已连接')}</StatusChip>
                   ) : undefined
                 }
-                description={t('官方 Bot API：按钮和回复都支持。')}
+                description={t('官方 Bot API')}
                 action={
                   live ? (
                     <Button
@@ -440,7 +434,7 @@ export function ImConnectionsPage() {
                     <StatusChip tone="done">{t('已连接')}</StatusChip>
                   ) : undefined
                 }
-                description={t('Socket Mode 直连，在私聊里和 Coordinator 对话。')}
+                description={t('Socket Mode 直连')}
                 action={
                   live ? (
                     <Button
@@ -463,7 +457,7 @@ export function ImConnectionsPage() {
                     <StatusChip tone="done">{t('已连接')}</StatusChip>
                   ) : undefined
                 }
-                description={t('扫码登录，在平时的聊天里和 Coordinator 对话。')}
+                description={t('扫码登录')}
                 action={
                   live ? (
                     <Button

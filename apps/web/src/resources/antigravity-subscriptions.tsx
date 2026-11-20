@@ -188,9 +188,7 @@ export function AddAntigravitySubscriptionDialog({
         {!pasteOpen && (
           <p className="m-0 text-meta text-content-tertiary">
             {withCodeSpans(
-              t(
-                '默认使用执行机已登录的 Antigravity（OS 钥匙串）。也可以展开下方粘贴 `GEMINI_API_KEY`。',
-              ),
+              t('默认使用执行机已登录的 Antigravity，也可以展开下方粘贴 `GEMINI_API_KEY`。'),
             )}
           </p>
         )}
@@ -216,9 +214,7 @@ export function AddAntigravitySubscriptionDialog({
         ) : (
           <>
             <p className="m-0 text-meta text-content-tertiary">
-              {withCodeSpans(
-                t('粘贴 `GEMINI_API_KEY` 或 `.env` 片段。Token 加密保存，保存后无法再查看。'),
-              )}
+              {withCodeSpans(t('粘贴 `GEMINI_API_KEY` 或 `.env` 片段。保存后无法再查看。'))}
             </p>
             <FormField label="GEMINI_API_KEY" htmlFor="antigravity-subscription-token">
               <Input

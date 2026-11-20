@@ -199,7 +199,7 @@ export function AccountPage() {
             />
           </SettingsRow>
           {desktopSoundPickable && (
-            <SettingsRow label={t('提醒声音')} hint={t('系统通知的提示音')}>
+            <SettingsRow label={t('提醒声音')}>
               <Select
                 value={notifySound}
                 onValueChange={(next) => {
@@ -242,7 +242,7 @@ export function AccountPage() {
               hint={
                 devicePushFailed
                   ? t('浏览器已拒绝通知权限，需到站点设置重新允许')
-                  : t('需要你决定时立即推送，其余进展并入每日两次简报，锁屏也能收到')
+                  : t('需要你决定时立即推送，其余进展并入每日两次简报')
               }
               hintClassName={devicePushFailed ? 'account-notify-blocked' : undefined}
             >

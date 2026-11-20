@@ -317,9 +317,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
                   onSelectAll={selectAll}
                 />
               )}
-              <p className="text-meta text-content-tertiary">
-                {t('导入会把技能复制到 Cairn 自己的目录，原目录不会被改动。')}
-              </p>
+              <p className="text-meta text-content-tertiary">{t('导入会复制一份，原目录不变。')}</p>
             </>
           ) : (
             <>

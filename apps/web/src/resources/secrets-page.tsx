@@ -143,9 +143,7 @@ export function SecretsPage() {
       fixture={fixture}
     >
       <p className="m-0 mt-2 text-ui text-content-secondary">
-        {t(
-          '任务在执行机上运行时会拿到这些密钥和环境变量。项目里的同名条目优先于团队条目。也可以让 Coordinator 添加机密，值不会进入对话。',
-        )}
+        {t('项目里的同名条目优先于团队条目')}
       </p>
       <QueryBoundary
         query={live ? secretsQ : undefined}
@@ -361,7 +359,7 @@ export function SecretsPage() {
       >
         <p className="m-0 text-ui text-content-secondary">
           {t(
-            '转为机密后，这里不再显示它的值，也不能再转回环境变量。已经看到过这个值的地方（浏览器、对话、其他系统）不会因此收回。',
+            '转为机密后，这里不再显示它的值，也不能再转回环境变量。已经出现在浏览器、对话或其他系统里的值不会被收回。',
           )}
         </p>
       </AlertDialogShell>

@@ -94,6 +94,8 @@ const LAYOUT_KEYFRAME = /(?:^|[{;\s])(?:width|height|top|left|right|bottom|inset
 const HYPE =
   /\b(?:supercharge[sd]?|seamless(?:ly)?|unlock(?:s|ed|ing)?|magic(?:al|ally)?|revolutioni[sz]e[sd]?|game-?changing|effortless(?:ly)?|blazing(?:ly)?|ai-powered|next-gen)\b/i;
 const PICTOGRAPH = /\p{Extended_Pictographic}/u;
+const JUSTIFICATION =
+  /因为|由于|所以|因此|以便|之所以|\b(?:because|so that|in order to|which is why|that is why|that's why)\b/i;
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -137,6 +139,7 @@ function copySignsIn(text: string): string[] {
   if (/[!！]/.test(text)) found.push('exclamation');
   if (PICTOGRAPH.test(text)) found.push('emoji');
   if (HYPE.test(text)) found.push('hype word');
+  if (JUSTIFICATION.test(text)) found.push('justification');
   return found;
 }
 
@@ -250,6 +253,8 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ['emoji', '▶ skill: {n}'],
     ['hype word', 'Supercharge your workflow'],
     ['hype word', 'installs unlock it on the next heartbeat'],
+    ['justification', '当前默认：stub-model · Stub Gateway（因为这是最早添加、Coordinator 能直接用的服务商）'],
+    ['justification', 'Current default: stub-model (because it was the first provider added)'],
   ])('copy %s: %s', (name, text) => {
     expect(copySignsIn(text)).toContain(name);
   });
@@ -310,7 +315,7 @@ describe('unslop signs: the source carries none outside the named exceptions', (
     expect(offenders).toEqual([]);
   });
 
-  test('T4 UI copy has no exclamation, emoji or hype word', () => {
+  test('T4 UI copy has no exclamation, emoji, hype word or justification', () => {
     const offenders = uiStrings
       .map((text) => ({ text, signs: copySignsIn(text) }))
       .filter(({ signs }) => signs.length > 0)

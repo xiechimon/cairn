@@ -120,7 +120,7 @@ Short, checkable rules for any change under `apps/web/src`; name the ids you che
 | T1 | One language per screen: UI strings go through `t()`, no English inside Chinese labels; use the `CONTEXT.md` glossary term for thread, task and agent. | M no Latin word of 4+ letters inside a CJK string unless it is a glossary term |
 | T2 | Copy says what happened and what to do, in the user's words; errors say how to fix, empty states what is missing. | H |
 | T3 | No text node contains a backtick; code renders as `<code>`. | M; G `e2e/design-rules-measure.spec.ts` |
-| T4 | Copy is plain: no exclamation mark, emoji or hype word in UI strings; a one-sentence title ends without a period. | M; G `test/unslop-signs.test.ts` |
+| T4 | Copy is plain: no exclamation mark, emoji or hype word in UI strings; a one-sentence title ends without a period; copy states what is, never why (no `因为`, `所以`, `because`). | M; G `test/unslop-signs.test.ts` |
 | A1 | Click targets are at least 24px on desktop and 44px on touch. | M hit area, also under `pointer: coarse`; `e2e/design-rules-measure.spec.ts` measures the Tasks panel checkbox |
 | A2 | Keyboard focus is visible (`--focus-ring`); `prefers-reduced-motion` respected; animate only `opacity` and `transform` except the named Growth utilities. | M |
 | A3 | axe reports 0 violations at `wcag2a/aa/21aa/22aa` in light and dark. | M `e2e/a11y-axe.spec.ts` |

@@ -141,7 +141,7 @@ export function RouteOverrideDialog({
   return (
     <DialogShell
       title={t('路由覆盖')}
-      subtitle={t('本任务的执行机与执行要求；调度在规则开启后生效。')}
+      subtitle={t('路由规则开启后生效')}
       open={open}
       onClose={onClose}
       size="m"

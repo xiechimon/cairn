@@ -121,11 +121,6 @@ export function VaultPage() {
       }
       fixture={fixture}
     >
-      <p className="m-0 mt-2 text-ui text-content-secondary">
-        {t(
-          '浏览器代填用的网站登录保存在这里。Coordinator 只在你批准的网站上填入用户名和密码，这两个值不会出现在页面或对话里。',
-        )}
-      </p>
       <div className="flex min-w-0 flex-col gap-8 pb-16">
         <section className="flex min-w-0 flex-col">
           <h3 className="m-0 mt-4 text-ui font-semibold text-foreground">{t('网站登录')}</h3>
@@ -239,9 +234,7 @@ export function VaultPage() {
         <section className="flex min-w-0 flex-col">
           <h3 className="m-0 text-ui font-semibold text-foreground">{t('网站授权')}</h3>
           <p className="m-0 mt-1 text-meta text-pretty text-content-tertiary">
-            {t(
-              'Coordinator 第一次在某个网站代填时会请求批准；批准后这个网站在这台执行机上直接代填，撤销后重新请求。',
-            )}
+            {t('批准过的网站在这台执行机上直接代填')}
           </p>
           <QueryBoundary
             query={live ? grantsQ : undefined}

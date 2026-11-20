@@ -139,9 +139,6 @@ export function useComputerGrantsRow(machine: MachineRow): {
       data-testid="computer-grants-drawer"
       className="flex min-w-0 flex-col gap-2 border-t border-border px-4 py-2"
     >
-      <p className="m-0 text-meta text-content-secondary">
-        {t('关掉后 Coordinator 不会在这台执行机上用对应能力；随时能开回来')}
-      </p>
       <ul data-testid="computer-grants" className="m-0 flex list-none flex-col p-0">
         {rows.map(grantRow)}
       </ul>

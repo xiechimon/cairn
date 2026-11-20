@@ -326,7 +326,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
     >
       <div className="flex flex-col gap-4">
         <p className="m-0 text-ui text-content-secondary">
-          {t('让另一台电脑帮你跑任务。两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。')}
+          {t('两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。')}
         </p>
         <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
           <li className={STEP_CLS}>
@@ -351,7 +351,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
                   <span className={STEP_TITLE_CLS}>{t('在另一台电脑上启动执行机')}</span>
                   <CopyCommand command={startCmd} />
                   <p className="m-0 text-meta text-content-tertiary">
-                    {t('之后它在后台常驻运行，关掉终端也没关系。')}
+                    {t('之后它在后台运行，可以关掉终端。')}
                   </p>
                 </div>
               </li>

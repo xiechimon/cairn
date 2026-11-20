@@ -375,7 +375,6 @@ function CustomServerDialog({
   return (
     <DialogShell
       title={t('添加 MCP 服务器')}
-      subtitle={t('任何支持远程 MCP 的服务器都可以加进来。')}
       size="m"
       onClose={onClose}
       footer={

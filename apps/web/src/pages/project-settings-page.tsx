@@ -405,9 +405,7 @@ export function ProjectSettingsPage() {
                   <div className="flex flex-col gap-0.5">
                     <span className="text-ui text-foreground">{t('转换为 GitHub 形态')}</span>
                     <span className={SETTINGS_HINT_CLS}>
-                      {t(
-                        '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位；有在飞构建时不可转换。',
-                      )}
+                      {t('转换后以 GitHub 仓为准；有构建在跑时不能转换')}
                     </span>
                   </div>
                   <Input

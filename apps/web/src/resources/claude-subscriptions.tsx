@@ -49,11 +49,7 @@ export function AddClaudeSubscriptionDialog({
         <p>
           {withCodeSpans(t('在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。'))}
         </p>
-        <p>
-          {t(
-            'Coordinator 和任务都会用这个订阅，不用再配 API key。Token 加密保存，保存后无法再查看。',
-          )}
-        </p>
+        <p>{t('Coordinator 和任务都会用这个订阅。保存后无法再查看。')}</p>
         <FormField label={t('名称')} htmlFor="subscription-label">
           <Input
             className={FORM_CONTROL_CLS}
