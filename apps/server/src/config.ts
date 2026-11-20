@@ -149,8 +149,30 @@ function envFlag(name: string): boolean {
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_TSNET_HOSTNAME = 'cairn';
 
+const GOOS = process.platform === 'win32' ? 'windows' : process.platform;
+const GOARCH = process.arch === 'x64' ? 'amd64' : process.arch;
+
+function bundledTsnetBinaries(): string[] {
+  const sidecar = process.platform === 'win32' ? 'tsnet-sidecar.exe' : 'tsnet-sidecar';
+  const serverDir = resolve(fileURLToPath(import.meta.url), '..');
+  const staged = `tsnet-sidecar-${GOOS}-${GOARCH}`;
+  return [
+    join(serverDir, '..', staged),
+    join(serverDir, staged),
+    join(serverDir, '..', sidecar),
+    join(serverDir, sidecar),
+  ];
+}
+
 function defaultTsnetBinaryPath(home: string): string {
-  return join(home, 'bin', process.platform === 'win32' ? 'tsnet-sidecar.exe' : 'tsnet-sidecar');
+  const fallback = join(
+    home,
+    'bin',
+    process.platform === 'win32' ? 'tsnet-sidecar.exe' : 'tsnet-sidecar',
+  );
+  return (
+    [...bundledTsnetBinaries(), fallback].find((candidate) => existsSync(candidate)) ?? fallback
+  );
 }
 const LOOPBACK_BIND_HOSTS = new Set(['::1', '::ffff:127.0.0.1', 'localhost']);
 const LOOPBACK_IPV4 = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;

@@ -1,5 +1,6 @@
 import { type PairingCodeResponse, pairingLink } from '@cairn/shared';
 import { Smartphone } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
@@ -7,11 +8,13 @@ import {
   useRemoteDevices,
   useRemoteMutations,
   useRemoteRoutes,
+  useSetTailnetAccess,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { EmptyState } from '../components/empty-state.js';
-import { withCodeSpans } from '../components/notice-banner.js';
 import { QrCode } from '../components/qr-code.js';
+import { SettingsCard, SettingsRow } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import {
@@ -109,13 +112,46 @@ export function RemoteAccessPage() {
   const devicesQ = useRemoteDevices(live);
   const grantsQ = usePairingGrants(live);
   const mutations = useRemoteMutations();
+  const setTailnet = useSetTailnetAccess();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
+  const [toggleFailed, setToggleFailed] = useState(false);
+  const [loginCopied, setLoginCopied] = useState(false);
   const routes = routesQ.data?.routes ?? [];
   const candidates =
     routesQ.data === undefined ? [] : pairingCandidates(routes, window.location.origin);
   const pairingBlocked = live && routesQ.data !== undefined && candidates.length === 0;
   const tailnet = routesQ.data?.tailnet;
-  const awaitingTailnetLogin = tailnet?.state === 'needs-login' && tailnet.authUrl !== null;
+  const tailnetOn = tailnet?.enabled === true;
+  const tailnetState = tailnetOn ? tailnet.state : 'off';
+  const tailnetFailed = tailnetOn && (tailnetState === 'failed' || toggleFailed);
+  const loginUrl = tailnetOn && tailnetState === 'needs-login' ? tailnet.authUrl : null;
+  const tailnetAddress =
+    tailnetOn && tailnetState === 'ready' && tailnet.dnsName !== null
+      ? `https://${tailnet.dnsName}`
+      : null;
+  const tailnetHint: ReactNode = (() => {
+    if (!tailnetOn)
+      return toggleFailed
+        ? t('远程访问没有打开，请再试一次')
+        : t('打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑');
+    if (tailnetFailed) {
+      const kind = tailnet?.error;
+      if (kind === 'missing-binary') return t('这个安装没有附带远程访问组件');
+      if (kind === 'auth-off') return t('远程访问需要开启访问认证');
+      return t('远程访问启动失败，请关闭后重新打开');
+    }
+    if (loginUrl !== null) return t('需要登录 Tailscale：用下面的链接或二维码登录，成功后自动开启');
+    if (tailnetAddress !== null)
+      return (
+        <>
+          {t('远程访问已开启')}
+          <br />
+          <span className="font-mono">{tailnetAddress}</span>
+        </>
+      );
+    return t('正在启动远程访问…');
+  })();
+  const awaitingTailnetLogin = loginUrl !== null;
   const devices = devicesQ.data ?? [];
   const grants = grantsQ.data ?? [];
   const startPairing = () =>
@@ -142,10 +178,57 @@ export function RemoteAccessPage() {
         ) : null
       }
     >
+      {(live || routesQ.data !== undefined) && (
+        <SettingsCard className="mt-3">
+          <SettingsRow
+            label={t('远程访问')}
+            hint={tailnetHint}
+            hintClassName={tailnetFailed ? 'text-destructive' : undefined}
+          >
+            <ToggleSwitch
+              checked={tailnetOn}
+              disabled={!live || setTailnet.isPending}
+              aria-label={t('远程访问')}
+              data-testid="remote-access-switch"
+              onCheckedChange={(checked) => {
+                setToggleFailed(false);
+                setTailnet.reset();
+                setTailnet.mutate(checked, { onError: () => setToggleFailed(true) });
+              }}
+            />
+          </SettingsRow>
+          {loginUrl !== null && (
+            <div className="flex flex-col items-center gap-3 px-4 py-4" data-testid="tailnet-login">
+              <QrCode text={loginUrl} label={t('Tailscale 登录二维码')} />
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  className={DIALOG_PRIMARY_BUTTON}
+                  render={<a href={loginUrl} target="_blank" rel="noreferrer" />}
+                >
+                  {t('打开 Tailscale 登录')}
+                </Button>
+                <Button
+                  variant="outline"
+                  className={DIALOG_PRIMARY_BUTTON}
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(loginUrl).then(() => {
+                      setLoginCopied(true);
+                      setTimeout(() => setLoginCopied(false), 2_000);
+                    });
+                  }}
+                >
+                  {loginCopied ? t('已复制') : t('复制链接')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </SettingsCard>
+      )}
       {pairingBlocked && (
         <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
           {t(
-            '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请设置 CAIRN_TSNET=1 后重启，或用局域网或 Tailscale 地址打开本页。',
+            '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
           )}
         </p>
       )}
@@ -162,14 +245,9 @@ export function RemoteAccessPage() {
           icon={Smartphone}
           title={t('手机还连不上这台电脑')}
           description={
-            awaitingTailnetLogin && tailnet?.authUrl
-              ? t('请先登录 Tailscale：{url}', { url: tailnet.authUrl })
-              : t('打开 Tailscale，手机在外面也能连上这台电脑。')
-          }
-          hint={
-            awaitingTailnetLogin && tailnet?.authUrl
-              ? undefined
-              : { text: withCodeSpans(t('打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。')) }
+            awaitingTailnetLogin
+              ? t('请先登录 Tailscale。')
+              : t('打开上面的开关，手机在外面也能连上这台电脑。')
           }
         />
       ) : (

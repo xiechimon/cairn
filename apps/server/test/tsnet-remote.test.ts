@@ -1,5 +1,13 @@
 import { EventEmitter } from 'node:events';
-import { chmodSync, existsSync, mkdirSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { request } from 'node:http';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
@@ -8,7 +16,12 @@ import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { loadConfig, type TsnetSettings } from '../src/config.js';
 import type { SidecarProcess } from '../src/lib/tsnet-sidecar.js';
-import { parseLocalStatus, startTsnetRemote, tsnetPathsOf } from '../src/services/tsnet-remote.js';
+import {
+  createTsnetRemote,
+  parseLocalStatus,
+  startTsnetRemote,
+  tsnetPathsOf,
+} from '../src/services/tsnet-remote.js';
 import { bootServer } from './helpers.js';
 
 const TOKEN = 'tsnet-remote-token-0123456789abcdef';
@@ -639,5 +652,267 @@ describe('failure modes leave the server running with no listener and no process
     expect(remote?.status().state).toBe('failed');
     expect(remote?.status().lastError).toMatch(/socket path/);
     expect(spawner.spawned).toHaveLength(0);
+  });
+});
+
+describe('in-app switch: createTsnetRemote', () => {
+  function controller(
+    home: string,
+    overrides: Partial<Parameters<typeof createTsnetRemote>[0]> = {},
+  ) {
+    const spawner = fakeSpawner();
+    const s = bootServer({ authToken: TOKEN });
+    const recordPath = join(home, 'data', 'tsnet-remote.json');
+    const remote = createTsnetRemote({
+      settings: settings(home, { enabled: false }),
+      enabledAtBoot: null,
+      recordPath,
+      homeDir: home,
+      app: () => s.app,
+      authToken: TOKEN,
+      logger: silentLogger,
+      parentEnv: {},
+      spawnProcess: spawner.spawnProcess,
+      ...overrides,
+    });
+    stoppers.push(() => remote.stop());
+    return { remote, spawner, recordPath, paths: tsnetPathsOf(home), server: s };
+  }
+
+  function record(recordPath: string): { enabled: boolean } | null {
+    return existsSync(recordPath)
+      ? (JSON.parse(readFileSync(recordPath, 'utf8')) as { enabled: boolean })
+      : null;
+  }
+
+  test('off by default: no process, no socket, no record', () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, recordPath, paths } = controller(home);
+    expect(remote.status()).toMatchObject({ enabled: false, state: 'off' });
+    expect(spawner.spawned).toHaveLength(0);
+    expect(existsSync(recordPath)).toBe(false);
+    expect(existsSync(paths.root)).toBe(false);
+  });
+
+  test('turning on spawns the sidecar, opens the socket and persists on', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, recordPath, paths } = controller(home);
+    const status = await remote.setEnabled(true);
+    expect(status).toMatchObject({ enabled: true, state: 'starting', error: null });
+    expect(spawner.spawned).toHaveLength(1);
+    expect(existsSync(paths.socketPath)).toBe(true);
+    expect(record(recordPath)).toEqual({ enabled: true });
+  });
+
+  test('turning off stops the sidecar, removes the socket and persists off', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, recordPath, paths } = controller(home);
+    await remote.setEnabled(true);
+    const status = await remote.setEnabled(false);
+    expect(status).toMatchObject({ enabled: false, state: 'off' });
+    expect(spawner.spawned[0]?.child.written.join('')).toBe('{"cmd":"shutdown"}\n');
+    await vi.waitFor(() => expect(existsSync(paths.socketPath)).toBe(false));
+    expect(record(recordPath)).toEqual({ enabled: false });
+  });
+
+  test('a persisted on choice resumes on the next boot and turns the route on', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const first = controller(home);
+    await first.remote.setEnabled(true);
+    await first.remote.stop();
+    const { remote, spawner } = controller(home);
+    expect(remote.status()).toMatchObject({ enabled: true, state: 'starting' });
+    await remote.resume();
+    expect(spawner.spawned).toHaveLength(1);
+    spawner.spawned[0]?.child.stdout.write(
+      `${JSON.stringify({ type: 'ready', ips: ['100.64.0.2'], dnsName: 'cairn.ts.net' })}\n`,
+    );
+    await vi.waitFor(() =>
+      expect(remote.status()).toMatchObject({
+        enabled: true,
+        state: 'ready',
+        dnsName: 'cairn.ts.net',
+      }),
+    );
+  });
+
+  test('the env boot value overrides the record without rewriting it', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const first = controller(home);
+    await first.remote.setEnabled(true);
+    await first.remote.stop();
+    const { remote, spawner, recordPath } = controller(home, { enabledAtBoot: false });
+    await remote.resume();
+    expect(remote.status()).toMatchObject({ enabled: false, state: 'off' });
+    expect(spawner.spawned).toHaveLength(0);
+    expect(record(recordPath)).toEqual({ enabled: true });
+  });
+
+  test('env on with no record starts on boot like the old CAIRN_TSNET=1 path', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner } = controller(home, {
+      settings: settings(home, { enabled: true }),
+      enabledAtBoot: true,
+    });
+    await remote.resume();
+    expect(remote.status()).toMatchObject({ enabled: true, state: 'starting' });
+    expect(spawner.spawned).toHaveLength(1);
+  });
+
+  test('turning on twice spawns one sidecar; serialized toggles leave exactly one alive', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, paths } = controller(home);
+    await remote.setEnabled(true);
+    await remote.setEnabled(true);
+    expect(spawner.spawned).toHaveLength(1);
+    await Promise.all([
+      remote.setEnabled(false),
+      remote.setEnabled(true),
+      remote.setEnabled(false),
+      remote.setEnabled(true),
+    ]);
+    expect(remote.status().enabled).toBe(true);
+    expect(spawner.spawned).toHaveLength(3);
+    expect(spawner.spawned[0]?.child.written.join('')).toBe('{"cmd":"shutdown"}\n');
+    expect(spawner.spawned[1]?.child.written.join('')).toBe('{"cmd":"shutdown"}\n');
+    expect(existsSync(paths.socketPath)).toBe(true);
+  });
+
+  test('token auth off: turning on reports a safe auth-off failure, no spawn', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, paths } = controller(home, { authToken: null });
+    const status = await remote.setEnabled(true);
+    expect(status).toMatchObject({ enabled: true, state: 'failed', error: 'auth-off' });
+    expect(spawner.spawned).toHaveLength(0);
+    expect(existsSync(paths.socketPath)).toBe(false);
+  });
+
+  test('a missing binary reports a safe missing-binary failure', async () => {
+    const home = freshHome();
+    const { remote, spawner } = controller(home);
+    const status = await remote.setEnabled(true);
+    expect(status).toMatchObject({ enabled: true, state: 'failed', error: 'missing-binary' });
+    expect(JSON.stringify(status)).not.toContain(home);
+    expect(spawner.spawned).toHaveLength(0);
+  });
+
+  test('a login request surfaces the auth URL through status', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner } = controller(home);
+    await remote.setEnabled(true);
+    spawner.spawned[0]?.child.stdout.write(
+      `${JSON.stringify({ type: 'authUrl', url: 'https://login.tailscale.com/a/xyz' })}\n`,
+    );
+    await vi.waitFor(() =>
+      expect(remote.status()).toMatchObject({
+        state: 'needs-login',
+        authUrl: 'https://login.tailscale.com/a/xyz',
+      }),
+    );
+  });
+
+  test('a boot resume racing a runtime toggle serializes: no orphaned sidecar', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner, paths } = controller(home, { enabledAtBoot: true });
+    const [, off] = await Promise.all([remote.resume(), remote.setEnabled(false)]);
+    expect(off.state).toBe('off');
+    expect(spawner.spawned).toHaveLength(1);
+    expect(spawner.spawned[0]?.child.written.join('')).toBe('{"cmd":"shutdown"}\n');
+    await vi.waitFor(() => expect(existsSync(paths.socketPath)).toBe(false));
+  });
+
+  test('a crashed sidecar shows restarting, and a permanent spawn failure shows crashed', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const { remote, spawner } = controller(home);
+    await remote.setEnabled(true);
+    spawner.spawned[0]?.child.emit('exit', 1, null);
+    expect(remote.status().state).toBe('restarting');
+    await vi.waitFor(() => expect(spawner.spawned).toHaveLength(2), { timeout: 5_000 });
+    spawner.spawned[1]?.child.emit('error', new Error('spawn EACCES'));
+    expect(remote.status()).toMatchObject({ state: 'failed', error: 'crashed' });
+    expect(JSON.stringify(remote.status())).not.toContain('/home/');
+  });
+});
+
+describe('POST /api/remote/tailnet', () => {
+  function callTailnet(s: ReturnType<typeof bootServer>, body: unknown, headers = {}) {
+    return Promise.resolve(
+      s.app.request('/api/remote/tailnet', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify(body),
+      }),
+    );
+  }
+  const ownerHeaders = { authorization: `Bearer ${TOKEN}` };
+
+  test('owner turns it on and off at runtime; pairing routes stay untouched', async () => {
+    const home = freshHome();
+    installBinary(home);
+    const spawner = fakeSpawner();
+    const s = bootServer({ authToken: TOKEN });
+    const remote = createTsnetRemote({
+      settings: settings(home, { enabled: false }),
+      enabledAtBoot: null,
+      recordPath: join(home, 'data', 'tsnet-remote.json'),
+      homeDir: home,
+      app: () => s.app,
+      authToken: TOKEN,
+      logger: silentLogger,
+      parentEnv: {},
+      spawnProcess: spawner.spawnProcess,
+    });
+    stoppers.push(() => remote.stop());
+    const wired = bootServer({
+      authToken: TOKEN,
+      remote: { tailnetStatus: () => remote.status(), tailnet: remote },
+    });
+    const on = await callTailnet(wired, { enabled: true }, ownerHeaders);
+    expect(on.status).toBe(200);
+    expect(await on.json()).toMatchObject({ enabled: true, state: 'starting' });
+    expect(spawner.spawned).toHaveLength(1);
+    const off = await callTailnet(wired, { enabled: false }, ownerHeaders);
+    expect(off.status).toBe(200);
+    expect(await off.json()).toMatchObject({ enabled: false, state: 'off' });
+    expect((await callTailnet(wired, { enabled: 'yes' }, ownerHeaders)).status).toBe(400);
+    expect((await wired.app.request('/api/remote/pairing', { method: 'POST' })).status).toBe(401);
+  });
+
+  test('missing and invalid tokens are refused; no controller is a 404', async () => {
+    const s = bootServer({ authToken: TOKEN });
+    expect((await callTailnet(s, { enabled: true })).status).toBe(401);
+    expect((await callTailnet(s, { enabled: true }, { authorization: 'Bearer nope' })).status).toBe(
+      401,
+    );
+    expect((await callTailnet(s, { enabled: true }, ownerHeaders)).status).toBe(404);
+  });
+
+  test('a paired-device token cannot flip the switch', async () => {
+    const s = bootServer({ authToken: TOKEN });
+    const grant = await s.app.request('/api/remote/pairing', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    const { code } = (await grant.json()) as { code: string };
+    const pair = await s.app.request('/api/remote/pair', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code, name: 'phone' }),
+    });
+    const { token } = (await pair.json()) as { token: string };
+    const deviceHeaders = { authorization: `Bearer ${token}` };
+    expect((await callTailnet(s, { enabled: true }, deviceHeaders)).status).toBe(403);
+    expect((await callTailnet(s, { enabled: false }, deviceHeaders)).status).toBe(403);
   });
 });

@@ -1,12 +1,11 @@
 import type { NetworkInterfaceInfo } from 'node:os';
-import type { GitIdentity, TeamRecord, UserRecord } from '@cairn/shared';
+import type { GitIdentity, TailnetAccess, TeamRecord, UserRecord } from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { AccessVerifier } from './lib/cloudflare-access.js';
 import type { FetchLike } from './lib/github.js';
 import type { LoopbackOwner } from './lib/loopback-owner.js';
 import type { KeySecretBox } from './lib/secret-box.js';
-import type { SidecarStatus } from './lib/tsnet-sidecar.js';
 import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { GithubConnectionDeviceAttempt } from './services/github-connection-device.js';
@@ -20,13 +19,15 @@ import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
 import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 import type { TailscaleServe } from './services/tailscale-serve.js';
+import type { TailnetRemote } from './services/tsnet-remote.js';
 import type { XaiDeviceState } from './services/xai-device-login.js';
 
 export interface RemoteAccessContext {
   environmentId: string;
   listenHost: string;
   listenPort: number;
-  tailnetStatus: () => SidecarStatus | null;
+  tailnetStatus: () => TailnetAccess | null;
+  tailnet?: TailnetRemote;
   tailscale?: TailscaleServe;
   networkInterfaces?: () => NodeJS.Dict<NetworkInterfaceInfo[]>;
 }

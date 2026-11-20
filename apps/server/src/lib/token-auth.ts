@@ -23,6 +23,8 @@ export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   if (
     pathname === '/api/remote/pairing' ||
     pathname.startsWith('/api/remote/pairing/') ||
+    pathname === '/api/remote/tailnet' ||
+    (pathname === '/api/remote/tailscale' && !READ_METHODS.has(method.toUpperCase())) ||
     (pathname.startsWith('/api/remote/devices') && !READ_METHODS.has(method.toUpperCase()))
   )
     return true;

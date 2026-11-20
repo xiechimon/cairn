@@ -27,6 +27,19 @@ cpSync(join(serverDir, 'dist'), join(target, 'dist'), {
 cpSync(join(serverDir, 'web'), join(target, 'web'), { recursive: true });
 cpSync(join(serverDir, 'drizzle'), join(target, 'drizzle'), { recursive: true });
 
+const goos = { darwin: 'darwin', linux: 'linux', win32: 'windows' }[process.platform];
+const electronArch = process.env.CAIRN_DESKTOP_ARCH ?? process.arch;
+const goarch = { x64: 'amd64', arm64: 'arm64', amd64: 'amd64' }[electronArch];
+const sidecarName = `tsnet-sidecar-${goos}-${goarch}${goos === 'windows' ? '.exe' : ''}`;
+const sidecarSource = join(serverDir, '..', 'tsnet-sidecar', 'dist', sidecarName);
+if (existsSync(sidecarSource)) {
+  cpSync(sidecarSource, join(target, sidecarName));
+} else {
+  console.warn(
+    `no ${sidecarName} under apps/tsnet-sidecar/dist — the package cannot start remote access`,
+  );
+}
+
 const sqliteDir = dirname(
   createRequire(join(serverDir, 'package.json')).resolve('better-sqlite3/package.json'),
 );

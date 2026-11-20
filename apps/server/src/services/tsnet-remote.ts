@@ -1,6 +1,17 @@
-import { accessSync, chmodSync, constants, lstatSync, mkdirSync, statSync } from 'node:fs';
+import {
+  accessSync,
+  chmodSync,
+  constants,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { request } from 'node:http';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import type { TailnetAccess, TailnetErrorKind } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { TsnetSettings } from '../config.js';
@@ -39,6 +50,135 @@ export interface StartTsnetRemoteInput {
   parentEnv?: NodeJS.ProcessEnv;
   spawnProcess?: SpawnSidecar;
   readLocalStatus?: () => Promise<unknown>;
+}
+
+export interface TailnetRemote {
+  resume(): Promise<void>;
+  status(): TailnetAccess;
+  setEnabled(enabled: boolean): Promise<TailnetAccess>;
+  stop(): Promise<void>;
+}
+
+export interface CreateTsnetRemoteInput extends Omit<StartTsnetRemoteInput, 'app'> {
+  app: () => Hono;
+  enabledAtBoot: boolean | null;
+  recordPath: string;
+}
+
+const tsnetRecordSchema = z.object({ enabled: z.boolean() });
+const RECORD_FILE_MODE = 0o600;
+
+const OFF_STATUS: TailnetAccess = {
+  enabled: false,
+  state: 'off',
+  dnsName: null,
+  ips: [],
+  authUrl: null,
+  error: null,
+};
+
+function readEnabledRecord(recordPath: string): boolean | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(recordPath, 'utf8'));
+  } catch {
+    return null;
+  }
+  const record = tsnetRecordSchema.safeParse(parsed);
+  return record.success ? record.data.enabled : null;
+}
+
+function writeEnabledRecord(recordPath: string, enabled: boolean): void {
+  mkdirSync(dirname(recordPath), { recursive: true, mode: PRIVATE_DIR_MODE });
+  const temp = `${recordPath}.${process.pid}.tmp`;
+  writeFileSync(temp, `${JSON.stringify({ enabled })}\n`, { mode: RECORD_FILE_MODE });
+  renameSync(temp, recordPath);
+}
+
+function setupErrorKind(lastError: string | null): TailnetErrorKind {
+  const message = lastError ?? '';
+  if (/sidecar binary|not executable/.test(message)) return 'missing-binary';
+  if (/access token|CAIRN_AUTH/.test(message)) return 'auth-off';
+  return 'unavailable';
+}
+
+export function createTsnetRemote(input: CreateTsnetRemoteInput): TailnetRemote {
+  let enabled = input.enabledAtBoot ?? readEnabledRecord(input.recordPath) ?? false;
+  let current: TsnetRemote | null = null;
+  let setupError: TailnetErrorKind | null = null;
+  let queue: Promise<unknown> = Promise.resolve();
+
+  const status = (): TailnetAccess => {
+    if (!enabled) return OFF_STATUS;
+    const sidecar = current?.status();
+    if (sidecar === undefined || sidecar.state === 'stopped') {
+      return { ...OFF_STATUS, enabled: true, state: 'starting' };
+    }
+    return {
+      enabled: true,
+      state: sidecar.state,
+      dnsName: sidecar.state === 'ready' ? sidecar.dnsName : null,
+      ips: sidecar.state === 'ready' ? sidecar.ips : [],
+      authUrl: sidecar.state === 'needs-login' ? sidecar.authUrl : null,
+      error:
+        sidecar.state === 'failed'
+          ? (setupError ?? 'crashed')
+          : sidecar.lastError !== null
+            ? 'unavailable'
+            : null,
+    };
+  };
+
+  async function start(): Promise<void> {
+    const previous = current;
+    current = null;
+    setupError = null;
+    await previous?.stop();
+    const started = await startTsnetRemote({
+      ...input,
+      app: input.app(),
+      settings: { ...input.settings, enabled: true },
+    });
+    current = started;
+    const now = started?.status();
+    setupError = now?.state === 'failed' ? setupErrorKind(now.lastError) : null;
+  }
+
+  async function apply(next: boolean): Promise<TailnetAccess> {
+    writeEnabledRecord(input.recordPath, next);
+    enabled = next;
+    if (!next) {
+      const previous = current;
+      current = null;
+      setupError = null;
+      await previous?.stop();
+      return status();
+    }
+    const running = current?.status().state;
+    if (running !== undefined && running !== 'failed' && running !== 'stopped') return status();
+    await start();
+    return status();
+  }
+
+  const enqueue = <T>(task: () => Promise<T>): Promise<T> => {
+    const run = queue.then(task);
+    queue = run.catch(() => {});
+    return run;
+  };
+
+  return {
+    resume: () =>
+      enqueue(async () => {
+        if (enabled) await start();
+      }),
+    status,
+    setEnabled: (next: boolean) => enqueue(() => apply(next)),
+    stop: () =>
+      enqueue(async () => {
+        await current?.stop();
+        current = null;
+      }),
+  };
 }
 
 export function tsnetPathsOf(homeDir: string): TsnetPaths {
@@ -257,22 +397,30 @@ export async function startTsnetRemote(input: StartTsnetRemoteInput): Promise<Ts
     { socket: paths.socketPath, stateDir: paths.stateDir, hostname: settings.hostname },
     'tsnet remote access starting',
   );
-  const running = superviseSidecar({
-    launch: {
-      binaryPath: settings.binaryPath,
-      stateDir: paths.stateDir,
-      socketPath: paths.socketPath,
-      hostname: settings.hostname,
-      controlUrl: settings.controlUrl,
-      uploadLogs: settings.uploadLogs,
-    },
-    parentEnv: input.parentEnv ?? process.env,
-    logger,
-    ...(input.spawnProcess !== undefined ? { spawnProcess: input.spawnProcess } : {}),
-    onStatus: (status) => {
-      if (status.state === 'failed') void listener.close();
-    },
-  });
+  let running: SidecarSupervisor;
+  try {
+    running = superviseSidecar({
+      launch: {
+        binaryPath: settings.binaryPath,
+        stateDir: paths.stateDir,
+        socketPath: paths.socketPath,
+        hostname: settings.hostname,
+        controlUrl: settings.controlUrl,
+        uploadLogs: settings.uploadLogs,
+      },
+      parentEnv: input.parentEnv ?? process.env,
+      logger,
+      ...(input.spawnProcess !== undefined ? { spawnProcess: input.spawnProcess } : {}),
+      onStatus: (status) => {
+        if (status.state === 'failed') void listener.close();
+      },
+    });
+  } catch (error) {
+    await listener.close();
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error({ error: message }, 'tsnet remote access supervisor could not start');
+    return failedRemote(message);
+  }
   supervisor = running;
   return {
     status: running.status,

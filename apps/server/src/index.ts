@@ -67,7 +67,7 @@ import { prepareSkillsHome } from './services/skills-home.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
 import { createTailscaleServe } from './services/tailscale-serve.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
-import { startTsnetRemote, type TsnetRemote } from './services/tsnet-remote.js';
+import { createTsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
 
@@ -169,7 +169,6 @@ const githubFetch = refreshingGithubFetch(
   { db, box: secretBox, oauthClient: config.githubOauth },
   globalThis.fetch,
 );
-let tsnetRemote: TsnetRemote | null = null;
 const environmentId = loadOrCreateEnvironmentId(environmentIdPathOf(config.dataDir));
 const tailscale = createTailscaleServe({
   environmentId,
@@ -196,13 +195,23 @@ const mail = createMailConnector({
   mailDeps: { db, hub, machineHub, user: seeded.user, vapidKeys },
   log: logger,
 });
+const tailnet = createTsnetRemote({
+  settings: config.tsnet,
+  enabledAtBoot: envStr(ENV_VARS.tsnet) === null ? null : config.tsnet.enabled,
+  recordPath: join(config.dataDir, 'tsnet-remote.json'),
+  homeDir: config.homeDir,
+  app: () => app,
+  authToken: config.authToken,
+  logger,
+});
 const app = createApp(
   {
     remote: {
       environmentId,
       listenHost: config.host,
       listenPort: config.port,
-      tailnetStatus: () => tsnetRemote?.status() ?? null,
+      tailnetStatus: () => tailnet.status(),
+      tailnet,
       tailscale,
     },
     db,
@@ -365,15 +374,8 @@ if (config.authToken !== null) {
   });
 }
 
-const tsnetStarting = startTsnetRemote({
-  settings: config.tsnet,
-  homeDir: config.homeDir,
-  app,
-  authToken: config.authToken,
-  logger,
-}).then((started) => {
-  tsnetRemote = started;
-  return started;
+const tailnetReady = tailnet.resume().catch((error: unknown) => {
+  logger.warn({ err: error }, 'tsnet remote access could not be resumed');
 });
 
 const COORDINATOR_CLOSE_MS = 5_000;
@@ -398,7 +400,8 @@ async function shutdown(): Promise<void> {
   await mail.shutdown().catch(() => {});
   setImRuntime(null);
   await drainHttp(shutdownRuntimeOtel);
-  await (await tsnetStarting)?.stop();
+  await tailnetReady;
+  await tailnet.stop();
   close();
   process.exit(0);
 }

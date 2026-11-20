@@ -1,7 +1,6 @@
 import type { NetworkInterfaceInfo } from 'node:os';
-import type { RemoteRoute, RemoteRoutesResponse } from '@cairn/shared';
+import type { RemoteRoute, RemoteRoutesResponse, TailnetAccess } from '@cairn/shared';
 import { isLoopbackHost } from '../config.js';
-import type { SidecarStatus } from './tsnet-sidecar.js';
 
 const WILDCARD_HOSTS = new Set(['0.0.0.0', '::', '']);
 const IPV4_PATTERN = /^\d{1,3}(\.\d{1,3}){3}$/;
@@ -15,7 +14,7 @@ export interface RouteInputs {
   listenHost: string;
   listenPort: number;
   interfaces: InterfaceTable;
-  tailnet: SidecarStatus | null;
+  tailnet: TailnetAccess | null;
 }
 
 function lanAddresses(host: string, interfaces: InterfaceTable): string[] {
@@ -33,7 +32,7 @@ function lanAddresses(host: string, interfaces: InterfaceTable): string[] {
   return [...found].sort();
 }
 
-function tailnetUrl(status: SidecarStatus | null): string | null {
+function tailnetUrl(status: TailnetAccess | null): string | null {
   if (status === null || status.state !== 'ready') return null;
   const name = status.dnsName;
   if (name === null || !DNS_NAME_PATTERN.test(name)) return null;
@@ -55,12 +54,14 @@ export function buildRemoteRoutes(
     routes,
     tailnet:
       status === null
-        ? { state: 'off', dnsName: null, ips: [], authUrl: null }
+        ? { enabled: false, state: 'off', dnsName: null, ips: [], authUrl: null, error: null }
         : {
+            enabled: status.enabled,
             state: status.state,
             dnsName: status.state === 'ready' ? status.dnsName : null,
             ips: status.state === 'ready' ? status.ips : [],
             authUrl: status.state === 'needs-login' ? status.authUrl : null,
+            error: status.state === 'failed' ? status.error : null,
           },
   };
 }

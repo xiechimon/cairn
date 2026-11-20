@@ -27,15 +27,35 @@ export const remoteRouteSchema = z.object({
 });
 export type RemoteRoute = z.infer<typeof remoteRouteSchema>;
 
+export const tailnetErrorKindSchema = z.enum([
+  'missing-binary',
+  'auth-off',
+  'unavailable',
+  'crashed',
+]);
+export type TailnetErrorKind = z.infer<typeof tailnetErrorKindSchema>;
+
+export const tailnetAccessSchema = z.object({
+  enabled: z.boolean(),
+  state: z.enum(['off', 'starting', 'needs-login', 'ready', 'restarting', 'failed', 'stopped']),
+  dnsName: z.string().nullable(),
+  ips: z.array(z.string()),
+  authUrl: z.string().nullable(),
+  error: tailnetErrorKindSchema.nullable(),
+});
+export type TailnetAccess = z.infer<typeof tailnetAccessSchema>;
+
+export const tailnetSetBodySchema = z
+  .object({
+    enabled: z.boolean(),
+  })
+  .strict();
+export type TailnetSetBody = z.infer<typeof tailnetSetBodySchema>;
+
 export const remoteRoutesResponseSchema = z.object({
   environmentId: z.string().min(1),
   routes: z.array(remoteRouteSchema),
-  tailnet: z.object({
-    state: z.enum(['off', 'starting', 'needs-login', 'ready', 'restarting', 'failed', 'stopped']),
-    dnsName: z.string().nullable(),
-    ips: z.array(z.string()),
-    authUrl: z.string().nullable(),
-  }),
+  tailnet: tailnetAccessSchema,
 });
 export type RemoteRoutesResponse = z.infer<typeof remoteRoutesResponseSchema>;
 

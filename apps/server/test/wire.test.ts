@@ -126,6 +126,7 @@ const INFERRED_ROUTES = [
   'GET /api/remote/descriptor',
   'GET /api/remote/tailscale',
   'POST /api/remote/tailscale',
+  'POST /api/remote/tailnet',
   'GET /api/remote/routes',
   'POST /api/auth/bootstrap',
   'POST /api/auth/access',

@@ -11,6 +11,7 @@ import {
   type PairResponse,
   type RemoteRoutesResponse,
   remoteDescriptorSchema,
+  type TailnetAccess,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -18,7 +19,6 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import { pairedDevice, pairingGrant, pushSubscription } from '../src/db/schema.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from '../src/lib/environment-id.js';
 import { listenOnTailnetSocket } from '../src/lib/tailnet-listener.js';
-import type { SidecarStatus } from '../src/lib/tsnet-sidecar.js';
 import { seedLocalMachine } from '../src/services/machines.js';
 import { createPairingBook, pairFromGrant } from '../src/services/paired-devices.js';
 import { bootServer, type TestServer } from './helpers.js';
@@ -50,14 +50,14 @@ function call(
   );
 }
 
-function readyStatus(overrides: Partial<SidecarStatus> = {}): SidecarStatus {
+function readyStatus(overrides: Partial<TailnetAccess> = {}): TailnetAccess {
   return {
+    enabled: true,
     state: 'ready',
     authUrl: null,
     ips: ['100.64.0.7'],
     dnsName: 'cairn-box.tail1234.ts.net',
-    lastError: null,
-    restarts: 0,
+    error: null,
     ...overrides,
   };
 }
@@ -256,10 +256,12 @@ describe('F-R1 routes: listeners, interfaces and tailnet', () => {
     const body = await routesOf({ tailnetStatus: () => readyStatus() });
     expect(body.routes).toEqual([{ kind: 'tailnet', url: 'https://cairn-box.tail1234.ts.net' }]);
     expect(body.tailnet).toEqual({
+      enabled: true,
       state: 'ready',
       dnsName: 'cairn-box.tail1234.ts.net',
       ips: ['100.64.0.7'],
       authUrl: null,
+      error: null,
     });
   });
 
@@ -282,7 +284,7 @@ describe('F-R1 routes: listeners, interfaces and tailnet', () => {
     'F10: a %s sidecar removes the tailnet route and leaks no error text',
     async (state) => {
       const body = await routesOf({
-        tailnetStatus: () => readyStatus({ state, lastError: 'secret path /home/ian/.cairn' }),
+        tailnetStatus: () => readyStatus({ state, error: 'crashed' }),
       });
       expect(body.routes).toEqual([]);
       expect(body.tailnet.dnsName).toBeNull();
@@ -303,6 +305,33 @@ describe('F-R1 routes: listeners, interfaces and tailnet', () => {
     });
     expect(body.routes).toEqual([]);
     expect(body.tailnet.authUrl).toBe('https://login.tailscale.com/a/abc');
+  });
+
+  test('the login URL goes only to the owner: a paired device sees the state without it', async () => {
+    const s = bootServer({
+      authToken: OWNER,
+      remote: {
+        tailnetStatus: () =>
+          readyStatus({
+            state: 'needs-login',
+            authUrl: 'https://login.tailscale.com/a/abc',
+            dnsName: null,
+            ips: [],
+          }),
+      },
+    });
+    const paired = await pairDevice(s);
+    const deviceRes = await call(s, 'GET', '/api/remote/routes', {
+      headers: { authorization: `Bearer ${paired.token}` },
+    });
+    expect(deviceRes.status).toBe(200);
+    const deviceBody = (await deviceRes.json()) as RemoteRoutesResponse;
+    expect(deviceBody.tailnet.state).toBe('needs-login');
+    expect(deviceBody.tailnet.authUrl).toBeNull();
+    const ownerBody = (await (
+      await call(s, 'GET', '/api/remote/routes', { headers: ownerHeaders })
+    ).json()) as RemoteRoutesResponse;
+    expect(ownerBody.tailnet.authUrl).toBe('https://login.tailscale.com/a/abc');
   });
 
   test('an unsafe DNS name from the sidecar is dropped, not echoed', async () => {

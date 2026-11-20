@@ -2167,15 +2167,25 @@ export const EN: Record<string, string> = {
   '手机将连接到 {origin}': 'Your phone will connect to {origin}',
   '生成配对码失败，请重试。': 'Could not create a pairing code. Try again.',
   手机还连不上这台电脑: 'Your phone cannot reach this computer yet',
-  '请先登录 Tailscale：{url}': 'Sign in to Tailscale first: {url}',
-  '打开 Tailscale，手机在外面也能连上这台电脑。':
-    'Turn on Tailscale and your phone can reach this computer from anywhere.',
-  '打开方法：设置 `CAIRN_TSNET=1` 后重启 Cairn。':
-    'To turn it on, set `CAIRN_TSNET=1` and restart Cairn.',
+  '请先登录 Tailscale。': 'Sign in to Tailscale first.',
+  '打开上面的开关，手机在外面也能连上这台电脑。':
+    'Turn on the switch above and your phone can reach this computer from anywhere.',
+  '打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑':
+    'Turn it on and phones and other computers can reach this computer over your Tailscale network.',
+  '远程访问没有打开，请再试一次': 'Remote access did not turn on. Try again.',
+  这个安装没有附带远程访问组件: 'This install does not include the remote access component.',
+  远程访问需要开启访问认证: 'Remote access needs access auth turned on.',
+  '远程访问启动失败，请关闭后重新打开': 'Remote access failed to start. Turn it off and on again.',
+  '需要登录 Tailscale：用下面的链接或二维码登录，成功后自动开启':
+    'Sign in to Tailscale with the link or QR code below. Remote access turns on after sign-in.',
+  远程访问已开启: 'Remote access is on',
+  '正在启动远程访问…': 'Starting remote access…',
+  'Tailscale 登录二维码': 'Tailscale sign-in QR code',
+  '打开 Tailscale 登录': 'Open Tailscale sign-in',
   Tailscale: 'Tailscale',
   局域网: 'Local network',
-  '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请设置 CAIRN_TSNET=1 后重启，或用局域网或 Tailscale 地址打开本页。':
-    'Pairing is off: this page is open on an address that only works on this computer, so a phone would connect to itself. Set CAIRN_TSNET=1 and restart, or open this page through its LAN or Tailscale address.',
+  '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。':
+    'Pairing is off: this page is open on an address that only works on this computer, so a phone would connect to itself. Turn on remote access above, or open this page through its LAN or Tailscale address.',
   当前页面地址: 'This page’s address',
   还没有配对的设备: 'No paired devices yet',
   撤销设备: 'Revoke',

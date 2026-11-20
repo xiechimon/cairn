@@ -92,6 +92,7 @@ import type {
   SkillRecord,
   StartMcpConnectorOAuthBody,
   StepJournalRow,
+  TailnetAccess,
   TailscaleAccess,
   TeamAutonomy,
   TeamMember,
@@ -614,6 +615,7 @@ export const useApiKeys = (teamId: string | undefined, enabled: boolean) =>
   });
 
 const REMOTE_POLL_MS = 10_000;
+const REMOTE_STARTING_POLL_MS = 3_000;
 const DEVICES_POLL_MS = 3_000;
 
 export const useRemoteRoutes = (enabled: boolean) =>
@@ -621,8 +623,47 @@ export const useRemoteRoutes = (enabled: boolean) =>
     queryKey: ['remoteRoutes'],
     queryFn: () => api.get<RemoteRoutesResponse>('/api/remote/routes'),
     enabled,
-    refetchInterval: REMOTE_POLL_MS,
+    refetchInterval: (query) => {
+      const state = query.state.data?.tailnet.state;
+      const transient = state === 'starting' || state === 'restarting' || state === 'needs-login';
+      return transient ? REMOTE_STARTING_POLL_MS : REMOTE_POLL_MS;
+    },
   });
+
+export function useSetTailnetAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.post<TailnetAccess>('/api/remote/tailnet', { enabled }),
+    onMutate: (enabled) => {
+      const previous = queryClient.getQueryData<RemoteRoutesResponse>(['remoteRoutes']);
+      queryClient.setQueryData<RemoteRoutesResponse>(['remoteRoutes'], (old) =>
+        old === undefined
+          ? old
+          : {
+              ...old,
+              tailnet: {
+                enabled,
+                state: enabled ? 'starting' : 'off',
+                dnsName: null,
+                ips: [],
+                authUrl: null,
+                error: null,
+              },
+            },
+      );
+      return { previous };
+    },
+    onError: (_error, _enabled, context) => {
+      if (context?.previous !== undefined)
+        queryClient.setQueryData(['remoteRoutes'], context.previous);
+    },
+    onSuccess: (tailnet) => {
+      queryClient.setQueryData<RemoteRoutesResponse>(['remoteRoutes'], (old) =>
+        old === undefined ? old : { ...old, tailnet },
+      );
+    },
+  });
+}
 
 export const useRemoteDevices = (enabled: boolean) =>
   useQuery({

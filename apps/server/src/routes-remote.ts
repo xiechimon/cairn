@@ -1,5 +1,10 @@
 import { networkInterfaces } from 'node:os';
-import { pairBodySchema, REMOTE_DESCRIPTOR_VERSION, type RemoteDescriptor } from '@cairn/shared';
+import {
+  pairBodySchema,
+  REMOTE_DESCRIPTOR_VERSION,
+  type RemoteDescriptor,
+  tailnetSetBodySchema,
+} from '@cairn/shared';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
@@ -47,14 +52,14 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/remote/routes', (c) => {
     c.header('cache-control', 'no-store');
-    return c.json(
-      buildRemoteRoutes(remote.environmentId, {
-        listenHost: remote.listenHost,
-        listenPort: remote.listenPort,
-        interfaces: (remote.networkInterfaces ?? networkInterfaces)(),
-        tailnet: remote.tailnetStatus(),
-      }),
-    );
+    const routes = buildRemoteRoutes(remote.environmentId, {
+      listenHost: remote.listenHost,
+      listenPort: remote.listenPort,
+      interfaces: (remote.networkInterfaces ?? networkInterfaces)(),
+      tailnet: remote.tailnetStatus(),
+    });
+    if (c.get('ownerIdentity') === undefined) routes.tailnet.authUrl = null;
+    return c.json(routes);
   });
 
   app.get('/api/remote/tailscale', async (c) => {
@@ -67,11 +72,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     requireOwner(c);
     c.header('cache-control', 'no-store');
     if (remote.tailscale === undefined) throw new HttpError(404, 'tailscale access unavailable');
-    try {
-      return c.json(await remote.tailscale.enable());
-    } catch (error) {
-      throw new HttpError(502, error instanceof Error ? error.message : String(error));
-    }
+    return c.json(await remote.tailscale.enable());
   });
 
   app.get('/api/remote/pairing', (c) => {
@@ -93,6 +94,14 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(404, 'pairing code not found');
     }
     return c.body(null, 204);
+  });
+
+  app.post('/api/remote/tailnet', async (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    if (remote.tailnet === undefined) throw new HttpError(404, 'tailnet access unavailable');
+    const body = parseWith(tailnetSetBodySchema, await jsonBody(c), 'body');
+    return c.json(await remote.tailnet.setEnabled(body.enabled));
   });
 
   app.post('/api/remote/pair', async (c) => {
