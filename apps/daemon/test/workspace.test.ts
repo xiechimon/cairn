@@ -134,7 +134,7 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     const first = await ws.prepare(prepareInput(CONV_A));
     await runGit(['remote', 'set-url', 'origin', join(root, 'gone.git')], { cwd: first.cwd });
     const second = await ws.prepare(prepareInput(CONV_B));
-    expect(await gitPrim.remoteUrl(second.baseRepoDir)).toBe(originDir);
+    expect(await gitPrim.originConfigUrl(second.baseRepoDir)).toBe(originDir);
     expect(logger.lines).toContain('[workspace] Repo origin re-pointed to the project clone URL');
   }, 30_000);
 

@@ -146,9 +146,7 @@ export function ProjectSettingsPage() {
   const section: SectionId = asked === 'memory' ? 'memory' : 'general';
   const navTabs = useMediaQuery(NAV_TABS_QUERY);
   const [nameDraft, setNameDraft] = useState<string | null>(null);
-  const [accelDraft, setAccelDraft] = useState<string | null>(null);
   const [convRepo, setConvRepo] = useState('');
-  const [convPathDraft, setConvPathDraft] = useState<string | null>(null);
   const [convError, setConvError] = useState<string | null>(null);
   const [repoDraft, setRepoDraft] = useState<string | null>(null);
   const [repoError, setRepoError] = useState<string | null>(null);
@@ -367,37 +365,6 @@ export function ProjectSettingsPage() {
                   </span>
                 )}
               </SettingsRow>
-              {live && wireProject?.repoKind === 'github' && (
-                <SettingsRow label={t('本机加速路径')}>
-                  <Input
-                    aria-label={t('本机加速路径')}
-                    className={`${ROW_INPUT_CLS} font-mono`}
-                    placeholder={t('绝对路径，留空即清除')}
-                    value={accelDraft ?? wireProject.localPath ?? ''}
-                    onChange={(event) => setAccelDraft(event.target.value)}
-                  />
-                  <Button
-                    className={DIALOG_PRIMARY_BUTTON}
-                    disabled={
-                      mutations.patchProject.isPending ||
-                      (accelDraft ?? wireProject.localPath ?? '') === (wireProject.localPath ?? '')
-                    }
-                    onClick={() => {
-                      if (id === undefined) return;
-                      const next = (accelDraft ?? '').trim();
-                      mutations.patchProject.mutate(
-                        { id, body: { localPath: next === '' ? null : next } },
-                        {
-                          onSuccess: () => setAccelDraft(null),
-                          onError: (error) => toastError(t('保存失败，请重试。'), error),
-                        },
-                      );
-                    }}
-                  >
-                    {t('保存')}
-                  </Button>
-                </SettingsRow>
-              )}
             </SettingsCard>
             {live && wireProject?.repoKind === 'local' && (
               <SettingsCard>
@@ -406,7 +373,9 @@ export function ProjectSettingsPage() {
                     <span className="flex items-center gap-1.5 text-ui text-foreground">
                       {t('转换为 GitHub 形态')}
                       <InfoTip
-                        info={t('转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位。')}
+                        info={t(
+                          '转换后以 GitHub 仓为唯一真值源，任务改从 GitHub 克隆执行，不再使用本机文件夹。',
+                        )}
                       />
                     </span>
                     <span className={SETTINGS_HINT_CLS}>
@@ -423,13 +392,6 @@ export function ProjectSettingsPage() {
                       setConvError(null);
                     }}
                   />
-                  <Input
-                    aria-label={t('本机加速路径')}
-                    className={`${ROW_INPUT_CLS} font-mono`}
-                    placeholder={t('绝对路径，留空即清除')}
-                    value={convPathDraft ?? wireProject.localPath ?? ''}
-                    onChange={(event) => setConvPathDraft(event.target.value)}
-                  />
                   <div className="flex items-center gap-3">
                     <Button
                       className={DIALOG_PRIMARY_BUTTON}
@@ -441,20 +403,17 @@ export function ProjectSettingsPage() {
                           setConvError(t('GitHub 仓库格式应为 owner/repo。'));
                           return;
                         }
-                        const nextPath = (convPathDraft ?? wireProject.localPath ?? '').trim();
                         mutations.patchProject.mutate(
                           {
                             id,
                             body: {
                               repoKind: 'github',
                               githubRepo: repo,
-                              localPath: nextPath === '' ? null : nextPath,
                             },
                           },
                           {
                             onSuccess: () => {
                               setConvRepo('');
-                              setConvPathDraft(null);
                               setConvError(null);
                             },
                             onError: (error) => toastError(t('转换失败，请重试。'), error),

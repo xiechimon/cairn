@@ -1,10 +1,11 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { normalizedRepoRef } from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { beforeEach, describe, expect, test } from 'vitest';
 import { commitEnv, gitPrim, runGit } from '../src/git.js';
 import type { DaemonLogger } from '../src/log.js';
-import { normalizedRepoRef, WorkspaceManager } from '../src/workspace.js';
+import { WorkspaceManager } from '../src/workspace.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const IDENTITY = { name: 'it-agent', email: 'it@cairn.local' };
@@ -50,29 +51,13 @@ async function seedTruth(): Promise<void> {
   await runGit(['push', 'origin', 'main'], { cwd: seedDir });
 }
 
-async function advanceTruth(): Promise<string> {
-  writeFileSync(join(seedDir, 'README.md'), '# v2\n');
-  await runGit(['add', '-A'], { cwd: seedDir });
-  await runGit(['commit', '-m', 'v2'], { cwd: seedDir, env: commitEnv(IDENTITY) });
-  await runGit(['push', 'origin', 'main'], { cwd: seedDir });
-  const r = await runGit(['rev-parse', 'main'], { cwd: truthDir });
-  return r.stdout.trim();
-}
-
-async function makeUserRepo(): Promise<string> {
-  const dir = join(testTempDir('cairn-dual-user-'), 'repo');
-  await runGit(['clone', truthDir, dir]);
-  return dir;
-}
-
-function prepareInput(localPath: string | null) {
+function prepareInput() {
   return {
     projectId: PROJECT_ID,
     conversationId: CONV,
     cloneUrl: truthDir,
     workspacesRoot: root,
     credentials: null,
-    ...(localPath !== null ? { localPath } : {}),
   };
 }
 
@@ -85,7 +70,7 @@ beforeEach(async () => {
   await seedTruth();
 });
 
-describe('normalizedRepoRef (URL shape normalization, #1213)', () => {
+describe('normalizedRepoRef (URL shape normalization)', () => {
   test('N: the four github shapes are one repo; .git suffix and scheme erased', () => {
     const https = normalizedRepoRef('https://github.com/octo/dual.git');
     expect(https).toBe('github.com/octo/dual');
@@ -106,65 +91,9 @@ describe('normalizedRepoRef (URL shape normalization, #1213)', () => {
   });
 });
 
-describe('dual execution-source selection (github-shape localPath acceleration slot, #1213)', () => {
-  test('D1 localPath missing → fall back to GitHub clone + one source-selection log line', async () => {
-    const prepared = await ws.prepare(prepareInput('/definitely/not/here/repo'));
-    expect(prepared.reused).toBe(false);
-    expect(existsSync(join(prepared.cwd, 'README.md'))).toBe(true);
-    expect(logger.lines).toContainEqual(expect.stringMatching(/Repo source: github-clone/));
-    expect(logger.lines.some((l) => l.includes('not found'))).toBe(true);
-  }, 30_000);
-
-  test('D2 origin mismatch → fall back (against mistaken absorption)', async () => {
-    const userRepo = await makeUserRepo();
-    const other = join(testTempDir('cairn-dual-other-'), 'truth.git');
-    await runGit(['init', '--bare', other]);
-    await runGit(['remote', 'set-url', 'origin', other], { cwd: userRepo });
-    const prepared = await ws.prepare(prepareInput(userRepo));
-    expect(existsSync(join(prepared.cwd, 'README.md'))).toBe(true);
-    expect(logger.lines.some((l) => l.includes('origin mismatch'))).toBe(true);
-  }, 30_000);
-
-  test('D3 same repo → local source used: base origin repointed to the truth; HEAD = truth remote tip after fetch', async () => {
-    const userRepo = await makeUserRepo();
-    const v2 = await advanceTruth();
-    const prepared = await ws.prepare(prepareInput(userRepo));
-    expect(logger.lines).toContainEqual(`[workspace] Repo source: local-path ${userRepo}`);
-    const origin = await gitPrim.remoteUrl(prepared.baseRepoDir);
-    expect(origin).toBe(truthDir);
-    expect(
-      (
-        await runGit(['rev-parse', `${repositoryCacheRefPrefix(truthDir)}/heads/main`], {
-          cwd: prepared.baseRepoDir,
-        })
-      ).stdout.trim(),
-    ).toBe(v2);
-    expect(await gitPrim.head(prepared.cwd)).toBe(v2);
-    expect(readFileSync(join(prepared.cwd, 'README.md'), 'utf8')).toBe('# v2\n');
-  }, 30_000);
-
-  test('D4 TOCTOU: the source dies at clone time after the verdict → fallback without crash, base lands as usual', async () => {
-    const userRepo = await makeUserRepo();
-    rmSync(join(userRepo, '.git', 'objects'), { recursive: true, force: true });
-    writeFileSync(join(userRepo, '.git', 'objects'), 'broken');
-    const prepared = await ws.prepare(prepareInput(userRepo));
-    expect(existsSync(join(prepared.cwd, 'README.md'))).toBe(true);
-    expect(logger.lines.some((l) => l.includes('github-clone'))).toBe(true);
-  }, 30_000);
-
-  test("D5 default branch takes the truth remote's HEAD: the local source parked on a topic branch does not drift", async () => {
-    const userRepo = await makeUserRepo();
-    await runGit(['checkout', '-b', 'topic'], { cwd: userRepo });
-    writeFileSync(join(userRepo, 'topic.txt'), 'topic\n');
-    await runGit(['add', '-A'], { cwd: userRepo });
-    await runGit(['commit', '-m', 'topic work'], { cwd: userRepo, env: commitEnv(IDENTITY) });
-    const prepared = await ws.prepare(prepareInput(userRepo));
-    expect(prepared.defaultBranch).toBe('main');
-    expect(existsSync(join(prepared.cwd, 'topic.txt'))).toBe(false);
-  }, 30_000);
-
-  test('D6 localPath absent → straight truth clone, no source-selection log (zero drift)', async () => {
-    const prepared = await ws.prepare(prepareInput(null));
+describe('workspace source for a github-shape project', () => {
+  test('a github project clones straight from the remote', async () => {
+    const prepared = await ws.prepare(prepareInput());
     expect(
       (
         await runGit(['rev-parse', `${repositoryCacheRefPrefix(truthDir)}/heads/main`], {

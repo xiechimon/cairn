@@ -414,12 +414,8 @@ export function projectGithubRepoRetargetedNote(input: { from: string; to: strin
   return `项目的 GitHub 仓库已从「${input.from}」更换为「${input.to}」。`;
 }
 
-export function projectConvertedNote(input: {
-  githubRepo: string;
-  localPath: string | null;
-}): string {
-  const accel = input.localPath !== null ? `，本机加速路径 ${input.localPath}` : '';
-  return `项目形态已从 local 转换为 GitHub（${input.githubRepo}${accel}）。`;
+export function projectConvertedNote(input: { githubRepo: string }): string {
+  return `项目形态已从 local 转换为 GitHub（${input.githubRepo}）。`;
 }
 
 export const CHIEF_MESSAGES_PAGE_LIMIT = 100;

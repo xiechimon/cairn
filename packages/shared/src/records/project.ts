@@ -359,7 +359,6 @@ export const patchProjectBodySchema = z
     maxConcurrent: z.number().int().min(1).max(PROJECT_MAX_CONCURRENT).nullable().optional(),
     repoKind: projectRepoKindSchema.optional(),
     githubRepo: z.string().optional(),
-    localPath: z.string().nullish(),
     icon: projectIconSchema.nullable().optional(),
     color: projectColorSchema.nullable().optional(),
     baseBranch: z

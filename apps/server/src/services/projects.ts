@@ -36,7 +36,6 @@ import {
   type RepoCtx,
   slugifyRepoName,
   uniqueRepoName,
-  validateGithubLocalSlotPath,
   validateLocalRepoPath,
 } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
@@ -154,12 +153,10 @@ export async function createProject(
   } else if (kind === 'local' && input.githubRepo !== undefined) {
     throw new HttpError(400, 'invalid body at githubRepo: not allowed for kind "local"');
   }
-  const localPath =
-    kind === 'local'
-      ? await validateLocalRepoPath(input.localPath)
-      : kind === 'github'
-        ? validateGithubLocalSlotPath(input.localPath)
-        : null;
+  if (kind === 'github' && input.localPath != null && input.localPath.trim() !== '') {
+    throw new HttpError(400, 'invalid body at localPath: not allowed for kind "github"');
+  }
+  const localPath = kind === 'local' ? await validateLocalRepoPath(input.localPath) : null;
   let repoName: string | null = null;
   if (kind === 'hosted') {
     repoName = await uniqueRepoName(ctx, input.teamId, slugifyRepoName(input.name));
@@ -282,7 +279,6 @@ export function deleteProject(
 
 interface ConversionInput {
   githubRepo: string;
-  localPath: string | null | undefined;
 }
 
 interface RetargetInput {
@@ -308,7 +304,6 @@ export async function updateProject(
     body.maxConcurrent !== undefined ||
     body.repoKind !== undefined ||
     body.githubRepo !== undefined ||
-    body.localPath !== undefined ||
     body.baseBranch !== undefined ||
     body.icon !== undefined ||
     body.color !== undefined ||
@@ -316,7 +311,7 @@ export async function updateProject(
   if (!carriesKey) {
     throw new HttpError(
       400,
-      'invalid body: nothing to update (at least one of group/name/splitPolicy/evidenceStore/description/instructions/maxConcurrent/repoKind/githubRepo/localPath/baseBranch/icon/color/modelOverrides)',
+      'invalid body: nothing to update (at least one of group/name/splitPolicy/evidenceStore/description/instructions/maxConcurrent/repoKind/githubRepo/baseBranch/icon/color/modelOverrides)',
     );
   }
 
@@ -349,7 +344,7 @@ export async function updateProject(
         'invalid body at githubRepo: expected "owner/repo" for kind conversion',
       );
     }
-    conversion = { githubRepo: body.githubRepo, localPath: body.localPath };
+    conversion = { githubRepo: body.githubRepo };
   } else if (body.githubRepo !== undefined) {
     if (row.repoKind !== 'github') {
       throw new HttpError(
@@ -363,22 +358,6 @@ export async function updateProject(
     if (body.githubRepo !== row.githubRepo) {
       retarget = { githubRepo: body.githubRepo };
     }
-  }
-
-  let localPath: string | null | undefined;
-  if (conversion !== undefined) {
-    localPath =
-      conversion.localPath === undefined
-        ? row.localPath
-        : validateGithubLocalSlotPath(conversion.localPath);
-  } else if (body.localPath !== undefined) {
-    if (row.repoKind !== 'github') {
-      throw new HttpError(
-        400,
-        'invalid body at localPath: localPath acceleration slot only applies to github projects',
-      );
-    }
-    localPath = validateGithubLocalSlotPath(body.localPath);
   }
 
   if (conversion !== undefined) {
@@ -418,7 +397,7 @@ export async function updateProject(
   const nextSplitPolicy = body.splitPolicy ?? row.splitPolicy;
   const nextRepoKind = conversion !== undefined ? 'github' : row.repoKind;
   const nextGithubRepo = conversion?.githubRepo ?? retarget?.githubRepo ?? row.githubRepo;
-  const nextLocalPath = localPath !== undefined ? localPath : row.localPath;
+  const nextLocalPath = conversion !== undefined ? null : row.localPath;
   const nextDescription = description !== undefined ? description : row.description;
   db.update(project)
     .set({
@@ -450,11 +429,7 @@ export async function updateProject(
 
   const renamed = name !== undefined && name !== row.name;
   if (conversion !== undefined) {
-    insertProjectNote(
-      deps,
-      id,
-      projectConvertedNote({ githubRepo: conversion.githubRepo, localPath: nextLocalPath }),
-    );
+    insertProjectNote(deps, id, projectConvertedNote({ githubRepo: conversion.githubRepo }));
   } else {
     if (retarget !== undefined) {
       insertProjectNote(

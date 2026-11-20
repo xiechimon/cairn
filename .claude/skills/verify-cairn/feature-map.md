@@ -931,9 +931,9 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local path), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
 
-States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.
+States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.
 
 Reach:
 

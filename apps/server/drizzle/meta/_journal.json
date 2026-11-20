@@ -1653,6 +1653,13 @@
       "when": 1795196803915,
       "tag": "0240_drop_action_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 241,
+      "version": "6",
+      "when": 1795197084788,
+      "tag": "0241_drop_github_project_local_path",
+      "breakpoints": true
     }
   ]
 }

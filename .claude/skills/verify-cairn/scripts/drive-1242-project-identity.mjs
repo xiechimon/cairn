@@ -272,7 +272,6 @@ await page.goto(SETTINGS);
 const repoInput = page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' });
 await repoInput.waitFor({ state: 'visible', timeout: 8000 });
 
-await expectValue(page.getByRole('textbox', { name: '本机加速路径' }), LOCAL_REPO);
 await repoInput.fill('octocat/Hello-World');
 await page.getByRole('button', { name: '转换' }).click();
 const toast = page.getByText('转换失败，请重试。');
@@ -301,17 +300,17 @@ const convRow = dbRead((db) =>
   db.prepare('SELECT repoKind, githubRepo, localPath FROM project WHERE id = ?').get(PROJECT_ID),
 );
 check(
-  'E1 local→github 转换落库：repoKind/githubRepo/localPath（local 绑定转加速位）',
+  'E1 local to github conversion stored: repoKind and githubRepo set, localPath cleared',
   convRow?.repoKind === 'github' &&
     convRow?.githubRepo === 'octocat/Hello-World' &&
-    convRow?.localPath === LOCAL_REPO,
+    convRow?.localPath === null,
   JSON.stringify(convRow),
 );
 await page.goto(SETTINGS);
-const accel = page.getByRole('textbox', { name: '本机加速路径' });
-await accel.waitFor({ state: 'visible', timeout: 8000 });
-await expectValue(accel, LOCAL_REPO);
-check('E2 转换后设置页：转换卡卸载、基本信息卡加速位行上线（预填原值）', true);
+const repoAfter = page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' });
+await repoAfter.waitFor({ state: 'visible', timeout: 8000 });
+await expectValue(repoAfter, 'octocat/Hello-World');
+check('E2 settings after conversion: the conversion card is gone and the repo row shows the GitHub repo', true);
 await shot(page, '03-settings-converted.png');
 const convRecord = await getJson(SERVER + '/api/projects?teamId=' + teamId);
 const converted = convRecord.find((p) => p.id === PROJECT_ID);
@@ -334,8 +333,7 @@ const parsedNotes = noteRows.map((r) => ({
   text: JSON.parse(r.content),
 }));
 const RENAME_NOTE = '项目已从「probe-1242-local」改名为「probe-1242-renamed」。';
-const CONVERT_NOTE =
-  '项目形态已从 local 转换为 GitHub（octocat/Hello-World，本机加速路径 ' + LOCAL_REPO + '）。';
+const CONVERT_NOTE = '项目形态已从 local 转换为 GitHub（octocat/Hello-World）。';
 const renameNotes = parsedNotes.filter((n) => n.text === RENAME_NOTE);
 const convertNotes = parsedNotes.filter((n) => n.text === CONVERT_NOTE);
 check(
@@ -354,12 +352,11 @@ await shot(page, '06-transcript-note.png');
 await startBuild(todoIds[2]);
 const claim3 = await claimStep();
 check(
-  'F1 转换后 claim 载荷 repo = {kind:github, cloneUrl, localPath}（clone 臂 + 加速臂）',
+  'F1 claim payload after conversion: repo = {kind:github, cloneUrl} with no local folder',
   JSON.stringify(claim3.claimed?.project?.repo) ===
     JSON.stringify({
       kind: 'github',
       cloneUrl: 'https://github.com/octocat/Hello-World.git',
-      localPath: LOCAL_REPO,
     }),
   JSON.stringify(claim3.claimed?.project?.repo),
 );

@@ -133,7 +133,6 @@ export function projectRepoRef(
 ): {
   kind: 'hosted' | 'github' | 'local';
   cloneUrl: string;
-  localPath?: string;
   baseBranch?: string;
 } | null {
   const base = row?.baseBranch != null ? { baseBranch: row.baseBranch } : {};
@@ -146,7 +145,6 @@ export function projectRepoRef(
       kind: 'github',
       ...base,
       cloneUrl: githubCloneUrl(githubRef),
-      ...(row?.localPath != null ? { localPath: row.localPath } : {}),
     };
   }
   if (row?.repoKind === 'local' && row.localPath !== null) {
@@ -186,19 +184,6 @@ export async function validateLocalRepoPath(rawPath: string | null | undefined):
     );
   }
   return expanded;
-}
-
-export function validateGithubLocalSlotPath(rawPath: string | null | undefined): string | null {
-  const raw = rawPath?.trim() ?? '';
-  if (raw === '') return null;
-  if (!isAbsolute(raw)) {
-    throw new HttpError(
-      400,
-      `invalid body at localPath: expected absolute path, got "${raw}"`,
-      'not_absolute',
-    );
-  }
-  return raw;
 }
 
 export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord {

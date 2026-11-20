@@ -482,16 +482,6 @@ export const gitPrim = {
     return r.code === 0;
   },
 
-  async remoteUrl(dir: string): Promise<string | null> {
-    const r = await runGit(['remote', 'get-url', 'origin'], {
-      cwd: dir,
-      timeoutMs: META_TIMEOUT_MS,
-    });
-    if (r.code !== 0) return null;
-    const url = r.stdout.trim();
-    return url === '' ? null : url;
-  },
-
   async originConfigUrl(dir: string): Promise<string | null> {
     const r = await runGit(['config', '--get', 'remote.origin.url'], {
       cwd: dir,

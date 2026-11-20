@@ -71,9 +71,7 @@ function applyPatch(p: WireProject, body: Record<string, unknown>): WireProject 
   }
   if (body.repoKind !== undefined) next.repoKind = String(body.repoKind);
   if (body.githubRepo !== undefined) next.githubRepo = String(body.githubRepo);
-  if (body.localPath !== undefined) {
-    next.localPath = body.localPath === null ? undefined : String(body.localPath);
-  }
+  if (body.repoKind === 'github') delete next.localPath;
   return next;
 }
 
@@ -141,7 +139,7 @@ test('settings: identity save failure is visible (toast, not silent)', async ({ 
   await expect(toast).toBeVisible();
 });
 
-test('settings: local project shows conversion card; submit carries repoKind/githubRepo/localPath', async ({
+test('settings: local project shows conversion card; submit carries repoKind/githubRepo only', async ({
   page,
 }) => {
   const stub = await stubWorld(page, [localProject()]);
@@ -150,9 +148,6 @@ test('settings: local project shows conversion card; submit carries repoKind/git
   const card = page.getByText('转换为 GitHub 形态', { exact: true });
   await expect(card).toBeVisible();
   const repoInput = page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' });
-  const pathInput = page.getByRole('textbox', { name: '本机加速路径' });
-
-  await expect(pathInput).toHaveValue('/Users/who/code/cairn');
 
   const convert = page.getByRole('button', { name: '转换', exact: true });
   await expect(convert).toBeDisabled();
@@ -171,11 +166,12 @@ test('settings: local project shows conversion card; submit carries repoKind/git
   expect(stub.patches[0]?.body).toEqual({
     repoKind: 'github',
     githubRepo: 'xiechimon/cairn',
-    localPath: '/Users/who/code/cairn',
   });
 
   await expect(page.getByText('转换为 GitHub 形态', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('本机加速路径', { exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'GitHub 仓库（owner/repo）' })).toHaveValue(
+    'xiechimon/cairn',
+  );
 });
 
 test('settings: non-local projects hide the conversion card', async ({ page }) => {

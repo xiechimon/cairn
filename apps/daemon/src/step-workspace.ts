@@ -40,7 +40,6 @@ export async function prepareStepWorkspace(
         baseBranch: repo.baseBranch,
         workspacesRoot: input.workspacesRoot,
         credentials: input.credentials,
-        localPath: repo.kind === 'github' ? (repo.localPath ?? null) : null,
         machineCredentialFallback: repo.kind === 'github',
       });
     const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };

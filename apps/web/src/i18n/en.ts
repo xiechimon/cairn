@@ -990,9 +990,8 @@ export const EN: Record<string, string> = {
   '{branch}（默认）': '{branch} (default)',
   默认分支: 'Default branch',
   读取失败: 'Could not load',
-  // #1213/ADR 0017 双执行源：github 形态项目的 localPath 同机加速位字段。
-  本机加速路径: 'Local acceleration path',
-  '绝对路径，留空即清除': 'Absolute path; empty to clear',
+  '转换后以 GitHub 仓为唯一真值源，任务改从 GitHub 克隆执行，不再使用本机文件夹。':
+    'After conversion the GitHub repo is the single source of truth; tasks run from a GitHub clone and the local folder is no longer used.',
   // #1242 项目身份可变面：设置页名称/描述编辑 + local→github 转换卡。
   更换项目图标: 'Change project icon',
   搜索图标: 'Search icons',
@@ -2779,8 +2778,6 @@ export const EN: Record<string, string> = {
     'Cairn picks out windsurf_api_key; the token is stored encrypted',
   本任务的执行机与执行要求: 'Per-task Runner and capability requirements',
   'Coordinator 的长期记忆': "The Coordinator's long-term memory",
-  '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位。':
-    'After conversion the GitHub repo becomes the single source of truth and the local path becomes an execution accelerator.',
   '经 Composio 接入的应用都用它授权': 'Apps connected through Composio authorize with it',
   'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。':
     'Slack, Google Calendar, Todoist and thousands more, handed to the Coordinator through your own Composio account.',

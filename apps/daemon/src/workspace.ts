@@ -21,7 +21,6 @@ import {
   type GitCredentialSource,
   LOCAL_ERROR_REASON_COPY,
   LocalRepoUnreachableError,
-  normalizedRepoRef,
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
@@ -99,21 +98,6 @@ function readSetupDrift(file: string): PathFingerprints {
 }
 
 const CONV_DIR_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export { normalizedRepoRef } from '@cairn/shared';
-
-async function localSourceUsable(
-  localPath: string,
-  cloneUrl: string,
-): Promise<{ ok: true } | { ok: false; reason: string }> {
-  if (!existsSync(localPath)) return { ok: false, reason: 'not found' };
-  const origin = await gitPrim.remoteUrl(localPath);
-  if (origin === null) return { ok: false, reason: 'no origin remote' };
-  if (normalizedRepoRef(origin) !== normalizedRepoRef(cloneUrl)) {
-    return { ok: false, reason: `origin mismatch (got ${origin})` };
-  }
-  return { ok: true };
-}
 
 export interface WorkspaceManagerOpts {
   logger: DaemonLogger;
@@ -204,41 +188,16 @@ export class WorkspaceManager implements WorktreeOps {
         return source;
       };
       if (!existsSync(join(baseRepoDir, '.git')) && !isBareish(baseRepoDir)) {
-        let fromLocal = false;
+        let fromSeed = false;
         if (seed && existsSync(seed)) {
           await gitPrim.clone(seed, baseRepoDir, null);
           await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
           await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
           await gitPrim.remoteSetHeadAuto(baseRepoDir, input.credentials);
           this.logger.workspace('Repo source: orb seed');
-          fromLocal = true;
+          fromSeed = true;
         }
-        if (!fromLocal && !this.seedRoot && input.localPath != null && input.localPath !== '') {
-          const verdict = await localSourceUsable(input.localPath, cloneUrl);
-          if (verdict.ok) {
-            try {
-              await gitPrim.clone(input.localPath, baseRepoDir, null);
-              await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
-              const fetchSource = await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
-              const setHeadCred = fetchSource === 'machine' ? null : input.credentials;
-              await gitPrim.remoteSetHeadAuto(baseRepoDir, setHeadCred);
-              this.logger.workspace(`Repo source: local-path ${input.localPath}`);
-              fromLocal = true;
-            } catch (err) {
-              rmSync(baseRepoDir, { recursive: true, force: true });
-              this.logger.workspace(
-                `Repo source: github-clone (local-path ${input.localPath} clone failed: ${
-                  err instanceof Error ? err.message : String(err)
-                })`,
-              );
-            }
-          } else {
-            this.logger.workspace(
-              `Repo source: github-clone (local-path ${input.localPath} ${verdict.reason})`,
-            );
-          }
-        }
-        if (!fromLocal) {
+        if (!fromSeed) {
           const label = repoLabel(cloneUrl);
           const defaultBranchGuess = 'main';
           this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
@@ -624,7 +583,7 @@ export function localRepoUnreachableMessage(
     `local 形态项目无法在 Runner「${machineName}」上执行步骤：仓库路径 ${err.repoPath} 在本机不可达（${LOCAL_ERROR_REASON_COPY[err.reason]}）。`,
     'local 形态的仓库真值在登记机的文件系统上（ADR 0016），其它 Runner 看不到该路径——本项目只能在仓库所在 Runner 上运行。',
     '补法（任选其一）：① 把任务的钉选 Runner 改回仓库所在 Runner（或取消钉选，由该 Runner 认领）；',
-    '② 跨机开发请用 GitHub 形态建项目（githubRepo 为真值，同机可加挂 localPath 加速位，ADR 0017）。',
+    '② 跨机开发请用 GitHub 形态建项目（githubRepo 为真值）。',
   ].join('');
 }
 

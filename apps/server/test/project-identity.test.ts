@@ -170,7 +170,7 @@ describe('PATCH /api/projects/{id} -- the name/description write surface (#1242)
     expect(projectRow(id)?.description).toBeNull();
   });
 
-  test('D4 name + description + localPath in one multi-field patch -> each lands in place (github project)', async () => {
+  test('D4 name + description in one multi-field patch -> each lands in place (github project)', async () => {
     const res = await req(s.app, 'POST', '/api/projects', {
       name: 'ident-multi',
       kind: 'github',
@@ -180,12 +180,10 @@ describe('PATCH /api/projects/{id} -- the name/description write surface (#1242)
     const r = await patchProject(s.app, id, {
       name: '改名带描述',
       description: 'desc',
-      localPath: '/Users/who/code/multi',
     });
     expect(r.status).toBe(200);
     expect(r.body.name).toBe('改名带描述');
     expect(r.body.description).toBe('desc');
-    expect(r.body.localPath).toBe('/Users/who/code/multi');
   });
 });
 
@@ -250,7 +248,7 @@ describe('PATCH /api/projects/{id} -- the system-note surface (#1242)', () => {
 });
 
 describe('PATCH /api/projects/{id} -- local->github conversion (#1242)', () => {
-  test('K1 localPath key absent -> the original value kept (the local binding becomes the accelerator) + cloneUrl switched + a note', async () => {
+  test('K1 conversion drops the local folder + cloneUrl switched + a note', async () => {
     const id = 'proj-ident-k1';
     insertLocalProject(id, '/Users/who/code/cairn');
     const t = await createTodoWithBuild(s, id, '转换探针');
@@ -259,53 +257,14 @@ describe('PATCH /api/projects/{id} -- local->github conversion (#1242)', () => {
     expect(r.status).toBe(200);
     expect(r.body.repoKind).toBe('github');
     expect(r.body.githubRepo).toBe('octo/conv');
-    expect(r.body.localPath).toBe('/Users/who/code/cairn');
+    expect(r.body.localPath).toBeUndefined();
     expect(r.body.cloneUrl).toBe('https://github.com/octo/conv.git');
     const row = projectRow(id);
     expect(row?.repoKind).toBe('github');
-    expect(row?.localPath).toBe('/Users/who/code/cairn');
+    expect(row?.localPath).toBeNull();
     const notes = noteRowsFor(s, [t.buildId]);
     expect(notes).toHaveLength(1);
-    expect(notes[0]?.content).toBe(
-      projectConvertedNote({ githubRepo: 'octo/conv', localPath: '/Users/who/code/cairn' }),
-    );
-  });
-
-  test('K2 conversion carrying a localPath string: an absolute path stored; a relative path 400 + not_absolute (both condition gates share one function)', async () => {
-    const id = 'proj-ident-k2';
-    insertLocalProject(id, '/Users/who/code/cairn');
-    const ok = await patchProject(s.app, id, {
-      repoKind: 'github',
-      githubRepo: 'octo/conv',
-      localPath: '/data/mea/cairn',
-    });
-    expect(ok.status).toBe(200);
-    expect(projectRow(id)?.localPath).toBe('/data/mea/cairn');
-  });
-
-  test('K2b a relative path -> 400 + reason not_absolute', async () => {
-    const id = 'proj-ident-k2b';
-    insertLocalProject(id, '/Users/who/code/cairn');
-    const r = await patchProject(s.app, id, {
-      repoKind: 'github',
-      githubRepo: 'octo/conv',
-      localPath: 'relative/x',
-    });
-    expect(r.status).toBe(400);
-    expect(r.body.reason).toBe('not_absolute');
-    expect(projectRow(id)?.repoKind).toBe('local');
-  });
-
-  test('K3 conversion carrying localPath:null -> the accelerator cleared', async () => {
-    const id = 'proj-ident-k3';
-    insertLocalProject(id, '/Users/who/code/cairn');
-    const r = await patchProject(s.app, id, {
-      repoKind: 'github',
-      githubRepo: 'octo/conv',
-      localPath: null,
-    });
-    expect(r.status).toBe(200);
-    expect(projectRow(id)?.localPath).toBeNull();
+    expect(notes[0]?.content).toBe(projectConvertedNote({ githubRepo: 'octo/conv' }));
   });
 
   test('K4 missing githubRepo -> 400; K5 malformed shape -> 400', async () => {
@@ -616,7 +575,7 @@ async function call(
 }
 
 describe('the claim payload repo shape after conversion (#1242)', () => {
-  test('C1 a new step claim after local conversion -> repo {kind:github, cloneUrl, localPath}', async () => {
+  test('C1 a new step claim after local conversion -> repo {kind:github, cloneUrl} with no local folder', async () => {
     const mock = ghMock(REACHABLE);
     const s2 = bootServer({ claimHoldMs: 200, githubFetch: mock.impl });
     claimDisposables.push(() => s2.dispose());
@@ -664,7 +623,6 @@ describe('the claim payload repo shape after conversion (#1242)', () => {
     expect(claimed.project?.repo).toEqual({
       kind: 'github',
       cloneUrl: 'https://github.com/octo/conv.git',
-      localPath: '/Users/who/code/cairn',
     });
   });
 });

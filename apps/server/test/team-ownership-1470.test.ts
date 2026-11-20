@@ -302,7 +302,7 @@ describe('#1470 clone URL: legacy githubRepo goes through the same githubRepoOfP
       repoKind: 'github' as const,
       repoName: null,
       githubRepo,
-      localPath: '/abs/checkout',
+      localPath: null,
     };
   }
 
@@ -314,12 +314,11 @@ describe('#1470 clone URL: legacy githubRepo goes through the same githubRepoOfP
     expect(toProjectRecord(row, 'http://h').githubRepo).toBe(value);
   });
 
-  test('U7 a legal owner/repo: the clone URL and the accelerator unchanged', () => {
+  test('U7 a legal owner/repo: the clone URL', () => {
     const row = githubRow('octo/alpha') as Parameters<typeof projectRepoRef>[0] & object;
     expect(projectRepoRef(row, 'http://h')).toEqual({
       kind: 'github',
       cloneUrl: 'https://github.com/octo/alpha.git',
-      localPath: '/abs/checkout',
     });
     expect(toProjectRecord(row, 'http://h').cloneUrl).toBe('https://github.com/octo/alpha.git');
   });

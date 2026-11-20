@@ -77,7 +77,6 @@
   "project-settings-dead-buttons.spec.ts": 486,
   "project-settings-archive.spec.ts": 5770,
   "project-settings-identity.spec.ts": 1991,
-  "project-settings-local-path.spec.ts": 1606,
   "project-settings-repo.spec.ts": 1582,
   "provider-add-dialog.spec.ts": 9456,
   "provider-oauth.spec.ts": 3484,
