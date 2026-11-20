@@ -746,7 +746,7 @@ export const EN: Record<string, string> = {
   '排序：{option}': 'Sort: {option}',
   排序: 'Sort',
   尚无技能: 'No skills yet',
-  '用「导入」或「新建」添加技能。': 'Add skills with Import or New.',
+  '用「导入」或「新建技能」添加。': 'Add skills with Import or New skill.',
   // XMON-114（spec 13 回摆）技能写面：新建/编辑弹窗与错误态。
   新建技能: 'New skill',
   编辑技能: 'Edit skill',

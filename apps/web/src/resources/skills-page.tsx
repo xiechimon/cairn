@@ -49,6 +49,7 @@ export function SkillsPage() {
   const { live, teamId } = useLiveData();
   const skillsQ = useSkills(teamId, live);
   const rows = live ? mapSkills(skillsQ.data ?? []) : (fixture.resources?.skills ?? []);
+  const empty = (!live || skillsQ.isSuccess) && rows.length === 0;
   const [sort, setSort] = useState<SortKind>('默认');
   const [query, setQuery] = useState('');
   const needle = query.trim().toLowerCase();
@@ -79,7 +80,7 @@ export function SkillsPage() {
             <Download aria-hidden className="size-5 text-content-tertiary" />
             {t('导入')}
           </Button>
-          <ResourceNewButton onClick={openCreate} />
+          {!empty && <ResourceNewButton onClick={openCreate} />}
         </>
       }
       fixture={fixture}

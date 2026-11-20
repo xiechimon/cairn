@@ -17,7 +17,6 @@ const SURFACES = [
   { name: 'settings im', url: '/app/settings/im?scenario=01' },
 ];
 
-const ONE_PRIMARY_OPEN = new Set(['settings skills']);
 const CARD_GRID_OPEN = new Set(['settings apps', 'settings im']);
 
 async function open(page: Page, url: string) {
@@ -85,13 +84,6 @@ for (const surface of SURFACES) {
         .filter((el) => el.closest('[data-slot=dialog-footer],[data-testid=dialog-foot]') === null)
         .map((el) => (el.textContent ?? el.getAttribute('aria-label') ?? '').trim());
     });
-    if (ONE_PRIMARY_OPEN.has(surface.name)) {
-      expect(
-        primaries.length,
-        `V6: ${surface.name} is listed as an open violation in docs/design/audit-2026-11-20.md; once it has one primary, drop it from ONE_PRIMARY_OPEN`,
-      ).toBeGreaterThan(1);
-      return;
-    }
     expect(
       primaries.length,
       `V6: at most one filled primary button per screen, found ${primaries.join(', ')}`,

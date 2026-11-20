@@ -212,7 +212,7 @@ test('client-side preflight: illegal names are refused and quoted descriptions r
   await stubBoot(page);
   const { calls } = await stubSkillStore(page);
   await page.goto(SKILLS);
-  await page.getByRole('button', { name: '新建', exact: true }).click();
+  await page.getByTestId('resource-empty').getByRole('button', { name: '新建技能' }).click();
   const dialog = page.getByRole('dialog', { name: '新建技能' });
 
   await dialog.locator('#dlg-skill-name').fill('bad/name');

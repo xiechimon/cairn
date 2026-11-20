@@ -26,7 +26,7 @@ test('empty state points at Import and New, names no directory, and offers `新�
   await expect(empty.getByRole('heading')).toHaveText('尚无技能');
 
   const desc = empty.locator('p');
-  await expect(desc).toHaveText('用「导入」或「新建」添加技能。');
+  await expect(desc).toHaveText('用「导入」或「新建技能」添加。');
   await expect(empty.getByRole('button', { name: '新建技能' })).toHaveText('新建技能');
 
   await expect(desc).toHaveCount(1);
