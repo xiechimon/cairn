@@ -103,6 +103,17 @@ the `queue-guard` run for the head SHA and waited on `check` forever.
 - A deletion that nobody follows with a push is undone as well, so a lane
   cannot clear a red candidate it dislikes; the `promote` workflow reruns and
   drops it.
+- `push-queue.mjs --wait` automates the competitive entry path: while a
+  candidate is live it rebases the lane's commits onto that candidate (the
+  landed candidate becomes `main`, so a head that contains it fast-forwards
+  over the ref when the window opens), pushes the head to the lane's
+  `preflight/<lane>` ref so the evidence gate is already green, and polls
+  until the candidate resolves. A landing means the lane's stack is exactly
+  its own commits again; a drop moves the lane's commits back onto
+  `origin/main` instead of resurrecting the dropped commits. A red preflight
+  run stops the wait and names the failed contexts. `PUSH_QUEUE_WAIT_MINUTES`
+  (default 120) bounds the wait; `PUSH_QUEUE_POLL_SECONDS` (default 15) the
+  poll cadence.
 - `promote-queue.mjs --enforce` (used by `promote.yml`): the head's `ci` run
   (matched by workflow name, never another run on the same SHA) that ended
   `failure` with a failed or timed out job gets those jobs rerun once
