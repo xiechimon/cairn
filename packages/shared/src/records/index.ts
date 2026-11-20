@@ -32,6 +32,7 @@ export * from './common.js';
 export * from './composio.js';
 export * from './daily-usage.js';
 export * from './deploy-status.js';
+export * from './design.js';
 export * from './document-diff.js';
 export * from './github.js';
 export * from './github-label.js';

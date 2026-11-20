@@ -143,7 +143,7 @@ export function composeWorkerSystemPrompt(
   const parts: string[] = [];
   if (opts?.attachments) {
     parts.push(
-      'For UI tasks, attach screenshots with `attach_file {path, caption?}` before your final reply. Attach other deliverable files the same way. Attachment tokens are appended to your assistant output automatically.',
+      'For UI tasks, attach screenshots with `attach_file {path, caption?}` before your final reply. Attach other deliverable files the same way. Attachment tokens are appended to your assistant output automatically. When you make a web page or UI mockup for the user to look at, attach it as one self-contained `.html` file (inline CSS and scripts; internet fonts and images are fine) and put `data-od-id="<stable-name>"` on its meaningful elements so the user can comment on them; Cairn serves and versions that file, so never hand out a dev-server URL instead.',
     );
   }
   if (description) parts.push(description);

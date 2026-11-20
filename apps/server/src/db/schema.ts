@@ -20,6 +20,10 @@ import type {
   ComputerImage,
   ComputerState,
   ComputerTool,
+  DesignCommentStatus,
+  DesignRect,
+  DesignStyle,
+  DesignViewport,
   DevinSubscriptionModel,
   DocumentDiffFile,
   EvidenceStore,
@@ -1212,13 +1216,94 @@ export const attachment = sqliteTable('attachment', {
   sizeBytes: integer('sizeBytes').notNull(),
   storageKey: text('storageKey').notNull(),
   grantId: text('grantId').notNull(),
-  scope: text('scope').$type<'spec' | 'message' | 'deliverable'>().notNull(),
+  scope: text('scope').$type<'spec' | 'message' | 'deliverable' | 'design'>().notNull(),
   status: text('status')
     .$type<'pending' | 'received' | 'ready' | 'failed'>()
     .notNull()
     .default('pending'),
   createdAt: epochMs('createdAt').notNull(),
 });
+
+export const designVersion = sqliteTable(
+  'design_version',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    todoId: text('todoId')
+      .notNull()
+      .references(() => todo.id, { onDelete: 'cascade' }),
+    fileName: text('fileName').notNull(),
+    seq: integer('seq').notNull(),
+    attachmentId: text('attachmentId').notNull(),
+    sha256: text('sha256'),
+    source: text('source').$type<'agent' | 'restore'>().notNull(),
+    restoredFromVersionId: text('restoredFromVersionId'),
+    createdBy: text('createdBy').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+  },
+  (t) => [uniqueIndex('design_version_page_seq_idx').on(t.todoId, t.fileName, t.seq)],
+);
+
+export const designComment = sqliteTable(
+  'design_comment',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    todoId: text('todoId')
+      .notNull()
+      .references(() => todo.id, { onDelete: 'cascade' }),
+    fileName: text('fileName').notNull(),
+    versionId: text('versionId')
+      .notNull()
+      .references(() => designVersion.id, { onDelete: 'cascade' }),
+    pin: integer('pin').notNull(),
+    elementId: text('elementId').notNull(),
+    selector: text('selector').notNull(),
+    label: text('label').notNull(),
+    text: text('text').notNull(),
+    htmlHint: text('htmlHint').notNull(),
+    position: json<DesignRect>('position').notNull(),
+    viewport: text('viewport').$type<DesignViewport>().notNull(),
+    style: json<DesignStyle | null>('style'),
+    note: text('note').notNull(),
+    markAttachmentId: text('markAttachmentId'),
+    status: text('status').$type<DesignCommentStatus>().notNull(),
+    messageId: text('messageId'),
+    createdBy: text('createdBy').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    updatedAt: epochMs('updatedAt').notNull(),
+  },
+  (t) => [
+    uniqueIndex('design_comment_page_pin_idx').on(t.todoId, t.fileName, t.pin),
+    index('design_comment_status_idx').on(t.todoId, t.status),
+  ],
+);
+
+export const designShare = sqliteTable(
+  'design_share',
+  {
+    id: text('id').primaryKey(),
+    teamId: text('teamId')
+      .notNull()
+      .references(() => team.id),
+    todoId: text('todoId')
+      .notNull()
+      .references(() => todo.id, { onDelete: 'cascade' }),
+    fileName: text('fileName').notNull(),
+    token: text('token').notNull(),
+    createdBy: text('createdBy').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    revokedAt: epochMs('revokedAt'),
+  },
+  (t) => [
+    uniqueIndex('design_share_token_idx').on(t.token),
+    uniqueIndex('design_share_live_idx').on(t.todoId, t.fileName).where(sql`"revokedAt" IS NULL`),
+  ],
+);
 
 export const composerDraft = sqliteTable(
   'composer_draft',

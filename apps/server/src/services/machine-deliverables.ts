@@ -15,6 +15,7 @@ import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-gc.js';
 import { containedAttachmentPath } from './attachments.js';
+import { recordDesignVersion } from './design.js';
 import type { MachineDeps } from './machine-deps.js';
 
 const KIND_EXTS: Record<DeliverableKind, readonly string[]> = {
@@ -182,6 +183,18 @@ export function publishDeliverables(
     skipped: input.manifest.skipped,
   };
   const createdAt = nowMs();
+  for (const r of accepted) {
+    if (r.todoId === null || deliverableKindOf(r.fileName) !== 'page') continue;
+    recordDesignVersion(db, {
+      teamId: r.teamId,
+      todoId: r.todoId,
+      fileName: r.fileName,
+      attachmentId: r.id,
+      sha256: r.sha256,
+      createdBy: r.createdBy,
+      createdAt,
+    });
+  }
   db.insert(message)
     .values({
       id: `${DELIVERABLES_MESSAGE_PREFIX}${input.buildId}`,

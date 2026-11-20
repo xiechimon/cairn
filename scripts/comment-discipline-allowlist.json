@@ -713,5 +713,10 @@
     "path": "apps/web/src/resources/create-provider-dialog.tsx",
     "line": "            {/* biome-ignore lint/a11y/noLabelWithoutControl: Base UI Checkbox.Root renders its hidden native input inside this label at runtime; the static check cannot see through the component. */}",
     "reason": "Same Base UI checkbox quirk note, re-indented when the provider picker gained an inline mode"
+  },
+  {
+    "path": "apps/server/src/vendor-open-design/document-preview.ts",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/daemon/src/document-preview.ts",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
   }
 ]

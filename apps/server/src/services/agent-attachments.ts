@@ -7,6 +7,7 @@ import { attachment, message, type step, type todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { extOf, validateAttachmentUpload, writeAttachmentFile } from './attachments.js';
+import { recordDesignVersion } from './design.js';
 import { type MachineDeps, upsertMessage } from './machine-deps.js';
 
 function attachmentMime(fileName: string, bytes: Buffer): string {
@@ -134,6 +135,15 @@ export function attachWorkerFile(
           createdAt: nowMs(),
         })
         .run();
+      recordDesignVersion(deps.db, {
+        teamId: todoRow.teamId,
+        todoId: todoRow.id,
+        fileName,
+        attachmentId: id,
+        sha256,
+        createdBy: `step:${stepRow.id}`,
+        createdAt: nowMs(),
+      });
       upsertMessage(deps, {
         id: outputId,
         conversationId: stepRow.buildId,

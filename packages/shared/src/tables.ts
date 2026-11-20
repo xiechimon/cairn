@@ -88,6 +88,9 @@ export const DB_TABLES = [
   'external_effect',
   'im_seen_inbound',
   'im_turn_origin',
+  'design_version',
+  'design_comment',
+  'design_share',
 ] as const;
 
 export type DbTable = (typeof DB_TABLES)[number];
@@ -163,4 +166,7 @@ export const INTERNAL_ONLY_TABLES = [
   'external_effect',
   'im_seen_inbound',
   'im_turn_origin',
+  'design_version',
+  'design_comment',
+  'design_share',
 ] as const;

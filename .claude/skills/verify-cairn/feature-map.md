@@ -786,6 +786,25 @@ Reach:
 - Backend design: [docs/research/desktop-mobile-mcp-forms-2026-11-08.md](../../../docs/research/desktop-mobile-mcp-forms-2026-11-08.md)
 - Evidence: `apps/server/test/mcp-face.test.ts`, `integration/test/m4b-mcp-e2e.test.ts`
 
+### design-surface
+
+**Design surface** (partial, centrality 3). Pages a task makes (deliverable pages and attached .html files) become versions served by Cairn under Open Design's sandbox; the design view previews them beside the Coordinator chat with viewports, versions and restore, element comments forwarded to the task, mark-up, export and share through the user's relay.
+
+States: Page with one version, several versions, a restored version, a missing version file; viewports desktop, tablet, phone; comment mode hover and popover, pending chips, sent and resolved comments, a lost anchor; mark-up drawing and saved mark; export menu; share without a relay (HTML download and relay message) and with a relay link.
+
+Reach:
+
+1. `open /app`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: none
+- Verify recipes: [.claude/skills/verify-cairn/features/design-surface.md](features/design-surface.md)
+- Research: [docs/research/open-design-2026-11-20.md](../../../docs/research/open-design-2026-11-20.md)
+- Frontend design: [docs/design/design-surface.md](../../../docs/design/design-surface.md)
+- Backend design: [docs/design/design-surface.md](../../../docs/design/design-surface.md)
+- Evidence: none
+
 ### git-hosting
 
 **Built-in git hosting** (shipped, centrality 3). The server serves git for local projects so machines can fetch and push without GitHub.

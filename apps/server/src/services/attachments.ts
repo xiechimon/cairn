@@ -289,7 +289,7 @@ export interface AttachmentRow {
   mimeType: string;
   sizeBytes: number;
   storageKey: string;
-  scope: 'spec' | 'message' | 'deliverable';
+  scope: 'spec' | 'message' | 'deliverable' | 'design';
   status: 'pending' | 'received' | 'ready' | 'failed';
   createdAt: number;
 }

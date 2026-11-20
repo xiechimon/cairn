@@ -156,6 +156,27 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/todos/{id}/messages',
     note: 'body {content, clientMessageId}; a repeated clientMessageId returns the first response and delivers nothing again; a person messages the thread directly (steer, plan revision or restart by phase) and the Coordinator gets a thread-message row (D65)',
   },
+  {
+    method: 'GET',
+    path: '/api/todos/{id}/design',
+    note: 'design pages of the task: current version, version count, open comments, live share token; shareOrigin is the relay origin or null',
+  },
+  { method: 'GET', path: '/api/todos/{id}/design/{fileName}/versions', note: 'by seq descending' },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/design/versions/{versionId}/restore',
+    note: 'appends a restore version on the old version file',
+  },
+  {
+    method: 'GET',
+    path: '/api/design/versions/{versionId}/page',
+    note: 'the version HTML under the Open Design sandbox CSP; ?print=1 adds allow-modals and print()',
+  },
+  {
+    method: 'GET',
+    path: '/api/attachments/{id}/document-preview',
+    note: 'docx, pptx, xlsx text sections (borrowed from Open Design)',
+  },
   { method: 'POST', path: '/api/projects/{id}/archive', note: 'sets project.archivedAt' },
   { method: 'POST', path: '/api/projects/{id}/unarchive', note: 'clears project.archivedAt' },
   { method: 'GET', path: '/api/builds/{id}' },

@@ -15,11 +15,11 @@
 
 | Item | Count |
 |---|---|
-| Features | 56 |
+| Features | 57 |
 | status shipped | 45 |
-| status partial | 9 |
+| status partial | 10 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 28 |
+| research, frontend design and backend design all present or not applicable | 29 |
 | Research gaps | 13 |
 | Frontend design gaps | 15 |
 | Backend design gaps | 18 |
@@ -68,6 +68,7 @@
 | [Attachments](#attachments) | 3 | shipped | yes | yes | yes |  |
 | [Composer](#composer) | 3 | shipped | gap | yes | gap | B8 |
 | [Coordinator over MCP](#coordinator-mcp) | 3 | shipped | gap | n/a | yes | B11 |
+| [Design surface](#design-surface) | 3 | partial | yes | yes | yes |  |
 | [Built-in git hosting](#git-hosting) | 3 | shipped | gap | n/a | gap | B11 |
 | [GitHub connection and issues](#github) | 3 | shipped | yes | yes | yes |  |
 | [IM connections](#im-connections) | 3 | partial | n/a | yes | yes |  |
@@ -508,6 +509,14 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: **gap**: the t3code comparison of plan §21 is not in the repository
 - Frontend design: n/a: an API for other harnesses with no page
 - Backend design: [docs/research/desktop-mobile-mcp-forms-2026-11-08.md](research/desktop-mobile-mcp-forms-2026-11-08.md)
+
+### design-surface
+
+**Design surface** (partial). Pages a task makes (deliverable pages and attached .html files) become versions served by Cairn under Open Design's sandbox; the design view previews them beside the Coordinator chat with viewports, versions and restore, element comments forwarded to the task, mark-up, export and share through the user's relay.
+
+- Research: [docs/research/open-design-2026-11-20.md](research/open-design-2026-11-20.md)
+- Frontend design: [docs/design/design-surface.md](design/design-surface.md)
+- Backend design: [docs/design/design-surface.md](design/design-surface.md)
 
 ### git-hosting
 

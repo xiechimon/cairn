@@ -6,6 +6,7 @@ import { registerComputerScreenRoutes } from './routes-computer-screen.js';
 import { registerComputerRoutes } from './routes-computers.js';
 import { registerCoreRoutes } from './routes-core.js';
 import { registerDeployRoutes } from './routes-deploy.js';
+import { registerDesignRoutes } from './routes-design.js';
 import { registerDraftRoutes } from './routes-drafts.js';
 import { registerEngineScreenRoutes } from './routes-engine-screen.js';
 import { registerGitHostingRoutes } from './routes-git-hosting.js';
@@ -32,6 +33,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
   registerTodoRoutes(app, ctx);
   registerBuildRoutes(app, ctx);
   registerUploadRoutes(app, ctx);
+  registerDesignRoutes(app, ctx);
   registerDraftRoutes(app, ctx);
   registerChiefRoutes(app, ctx);
   registerMemoryRoutes(app, ctx);

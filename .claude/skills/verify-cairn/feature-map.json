@@ -2007,14 +2007,16 @@
         "server": [
           "apps/server/src/routes-uploads.ts",
           "apps/server/src/services/attachments.ts",
-          "apps/server/src/services/attachment-gc.ts"
+          "apps/server/src/services/attachment-gc.ts",
+          "apps/server/src/vendor-open-design/document-preview.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/uploads/grant",
           "/api/uploads/upload",
-          "/api/attachments/:id"
+          "/api/attachments/:id",
+          "/api/attachments/:id/document-preview"
         ]
       },
       "reach": [
@@ -2041,6 +2043,46 @@
         "apps/web/e2e/chief-files.spec.ts",
         "apps/web/e2e/detail-agent-attachments.spec.ts",
         "apps/server/test/attachments.test.ts"
+      ]
+    },
+    {
+      "id": "design-surface",
+      "name": "Design surface",
+      "summary": "Pages a task makes (deliverable pages and attached .html files) become versions served by Cairn under Open Design's sandbox; the design view previews them beside the Coordinator chat with viewports, versions and restore, element comments forwarded to the task, mark-up, export and share through the user's relay.",
+      "states": "Page with one version, several versions, a restored version, a missing version file; viewports desktop, tablet, phone; comment mode hover and popover, pending chips, sent and resolved comments, a lost anchor; mark-up drawing and saved mark; export menu; share without a relay (HTML download and relay message) and with a relay link.",
+      "centrality": 3,
+      "status": "partial",
+      "code": {
+        "server": [
+          "apps/server/src/routes-design.ts",
+          "apps/server/src/services/design.ts"
+        ],
+        "other": [
+          "packages/shared/src/records/design.ts"
+        ]
+      },
+      "routes": {
+        "server": [
+          "/api/todos/:id/design",
+          "/api/todos/:id/design/:fileName/versions",
+          "/api/todos/:id/design/versions/:versionId/restore",
+          "/api/design/versions/:versionId/page"
+        ]
+      },
+      "reach": [
+        "open /app"
+      ],
+      "verify": [
+        ".claude/skills/verify-cairn/features/design-surface.md"
+      ],
+      "research": [
+        "docs/research/open-design-2026-11-20.md"
+      ],
+      "frontendDesign": [
+        "docs/design/design-surface.md"
+      ],
+      "backendDesign": [
+        "docs/design/design-surface.md"
       ]
     },
     {
