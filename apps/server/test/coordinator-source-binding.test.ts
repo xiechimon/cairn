@@ -45,21 +45,17 @@ describe('Coordinator source bindings', () => {
     ]);
   });
 
-  test('a follow-up turn with an earlier unbound request lists both and creates nothing until messageIds is passed', async () => {
+  test('a follow-up turn cites only its own message; an earlier unbound request stays citable explicitly', async () => {
     const request = message('Summarize 10 AI application developer jobs on BOSS.');
     const followUp = message('The BOSS window is the private browser.');
     const turn = { turnMessageIds: [followUp] };
-    await expect(relay('create_todo', { projectId: H.projectId }, turn)).rejects.toMatchObject({
-      status: 400,
-      message: expect.stringContaining(request),
-    });
-    expect(H.s.db.select().from(todo).all()).toHaveLength(0);
-    await relay('create_todo', { projectId: H.projectId, messageIds: [request, followUp] }, turn);
+    await relay('create_todo', { projectId: H.projectId }, turn);
+    await relay('create_todo', { projectId: H.projectId, messageIds: [request] }, turn);
     const rows = H.s.db.select().from(todo).all();
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.request?.segments.map((segment) => segment.text)).toEqual([
-      'Summarize 10 AI application developer jobs on BOSS.',
-      'The BOSS window is the private browser.',
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => row.request?.segments.map((segment) => segment.source))).toEqual([
+      [{ kind: 'chat', threadId: H.threadId, messageId: followUp, span: 'whole' }],
+      [{ kind: 'chat', threadId: H.threadId, messageId: request, span: 'whole' }],
     ]);
   });
 

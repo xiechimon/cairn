@@ -238,3 +238,11 @@ Owner decision. The default quote of 2026-11-17 once cited an unrelated, already
 - Exactly one candidate: it is cited, as before. A turn with no owner message (a wake turn) keeps the 400.
 - More than one candidate: the call returns 400 listing each candidate as id plus its first 80 characters, and asks for `messageIds`. Nothing is written. The 8000 character trim is removed, since it only applied to several candidates.
 - `messageIds`, `quotes` and `sourceTodoId` are unchanged.
+
+## Amendment, 2026-11-20: the default quote is the turn's own messages
+
+Live incident. A task bound an owner message sent ten hours earlier instead of the message that started the turn. The since-last-task candidate set made the omitted call ambiguous, the refusal listed candidates oldest first, and the daemon cut the tool error at 200 characters — the model saw only the first (stale) id and passed it.
+
+- `create_todo` without `messageIds` now cites exactly `step.ownerMessageIds`, decision 5 as written; the since-last-task candidate scan is deleted. An earlier unbound owner message is still cited by passing `messageIds` explicitly.
+- More than one owner message in the same turn keeps the 400 listing candidates (id plus first 80 characters), now only the turn's own messages. A turn with no owner message (a wake turn) keeps the 400.
+- Relayed tool errors carry the full server message: `relayTool` throws `RelayToolError` (a `MachineApiError` whose message keeps the whole body; the 200-character preview stays for other API errors), and the orb relay client re-wraps `relayTool` failures the same way, so a refusal's candidate list reaches the model intact on every backend.

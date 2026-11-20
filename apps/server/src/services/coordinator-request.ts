@@ -35,12 +35,6 @@ export interface RequestCtx {
   turnMessageIds?: readonly string[];
 }
 
-function sourceIdOf(segment: TaskSegment): string | null {
-  if (segment.source.kind === 'chat') return segment.source.messageId;
-  if (segment.source.kind === 'answer') return segment.source.requestId;
-  return null;
-}
-
 export function refuseInfoCardReplacedByCode(
   db: Db,
   ctx: RequestCtx,
@@ -246,34 +240,20 @@ const CANDIDATE_PREVIEW_CHARS = 80;
 function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
   const turn = ctx.turnMessageIds ?? [];
   if (turn.length === 0) return [];
-  const boundKeys = new Set(
-    db
-      .select({ request: todo.request })
-      .from(todo)
-      .where(and(eq(todo.teamId, ctx.teamId), isNotNull(todo.request)))
-      .all()
-      .flatMap((row) => row.request?.segments ?? [])
-      .map((segment) => sourceIdOf(segment))
-      .filter((id): id is string => id !== null),
-  );
-  const rows = db
+  const turnSet = new Set(turn);
+  const picked = db
     .select()
     .from(chiefMessage)
-    .where(and(eq(chiefMessage.threadId, ctx.threadId), eq(chiefMessage.role, 'user')))
+    .where(
+      and(
+        eq(chiefMessage.threadId, ctx.threadId),
+        eq(chiefMessage.role, 'user'),
+        inArray(chiefMessage.id, [...turnSet]),
+      ),
+    )
     .orderBy(chiefMessage.createdAt, chiefMessage.id)
     .all();
-  const lastBound = rows.findLast((row) => boundKeys.has(row.id));
-  const turnSet = new Set(turn);
-  const picked = rows.filter(
-    (row) =>
-      turnSet.has(row.id) ||
-      (typeof row.content === 'string' &&
-        !boundKeys.has(row.id) &&
-        !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) &&
-        orchestratedTodoIdOf(row.content) === null &&
-        (lastBound === undefined || row.createdAt > lastBound.createdAt)),
-  );
-  const answered = turn.filter((id) => !rows.some((row) => row.id === id));
+  const answered = turn.filter((id) => !picked.some((row) => row.id === id));
   const ids = [...picked.map((row) => row.id), ...answered];
   if (picked.length <= 1) return ids;
   const preview = (id: string) => {
@@ -283,7 +263,7 @@ function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
   };
   throw new HttpError(
     400,
-    `messageIds omitted, but ${picked.length} owner messages since the last task could be this task's request. Nothing was created. Pass messageIds with the ones that state this task's request:\n${picked.map((row) => preview(row.id)).join('\n')}`,
+    `messageIds omitted, but ${ids.length} owner messages in this turn could be this task's request. Nothing was created. Pass messageIds with the ones that state this task's request:\n${ids.map(preview).join('\n')}`,
   );
 }
 

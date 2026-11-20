@@ -127,6 +127,18 @@ test('preserves typed upstream ownership errors', async () => {
   });
 });
 
+test('a relayTool error keeps the full server message across the socket', async () => {
+  const { client, forwarded } = await fixture();
+  const body = `messageIds omitted, but 3 owner messages in this turn could be this task's request:\n${'- m1234567890123456789012: preview words\n'.repeat(10)}`;
+  expect(body.length).toBeGreaterThan(400);
+  forwarded.mockRejectedValue(new MachineApiError(400, body));
+  await expect(client.api.relayTool('step', 'create_todo', {})).rejects.toMatchObject({
+    status: 400,
+    body,
+    message: `machine api 400: ${body}`,
+  });
+});
+
 test('cancels a held tool call over the socket', async () => {
   const { client, forwarded } = await fixture();
   let upstreamSignal: AbortSignal | undefined;

@@ -19,7 +19,7 @@ import {
   normalizeClaudeResetsAt,
 } from '@cairn/shared';
 import { z } from 'zod';
-import { type MachineApi, MachineApiError } from '../machine-client.js';
+import { type MachineApi, MachineApiError, RelayToolError } from '../machine-client.js';
 import { deliverOrbBundle, type OrbLocalDelivery } from './delivery.js';
 import {
   decodeOrbFrame,
@@ -558,7 +558,17 @@ export class RelayMachineApi {
       this.pending.delete(id);
     };
     const response = new Promise<unknown>((resolve, reject) =>
-      this.pending.set(id, { resolve, reject }),
+      this.pending.set(id, {
+        resolve,
+        reject: (error) =>
+          reject(
+            method === 'relayTool' &&
+              error instanceof MachineApiError &&
+              !(error instanceof RelayMachineError)
+              ? new RelayToolError(error.status, error.body)
+              : error,
+          ),
+      }),
     );
     this.send({
       type: 'call',

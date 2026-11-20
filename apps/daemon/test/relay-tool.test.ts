@@ -94,6 +94,16 @@ describe('MachineClient.relayTool (remoteTools relay client half)', () => {
     expect(calls).toHaveLength(1);
   });
 
+  test('a long rejection body reaches the caller intact instead of truncating at 200 chars', async () => {
+    const body = `messageIds omitted, but 3 owner messages in this turn could be this task's request:\n${'- m1234567890123456789012: preview words\n'.repeat(10)}`;
+    expect(body.length).toBeGreaterThan(400);
+    const { fetchImpl } = stubFetch([{ status: 400, body: { error: body } }]);
+    const client = new MachineClient({ serverUrl: 'http://s', getToken: () => 'tok', fetchImpl });
+    await expect(client.relayTool('step-1', 'create_todo', {})).rejects.toMatchObject({
+      message: `machine api 400: ${body}`,
+    });
+  });
+
   test('replaySafe 4xx rejection → also not retried (only 5xx/transient retried)', async () => {
     const { fetchImpl, calls } = stubFetch([{ status: 404, body: { error: 'not found' } }]);
     const client = new MachineClient({ serverUrl: 'http://s', getToken: () => 'tok', fetchImpl });

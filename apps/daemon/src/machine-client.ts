@@ -66,6 +66,14 @@ export class MachineApiError extends Error {
   }
 }
 
+export class RelayToolError extends MachineApiError {
+  constructor(status: number, body: string) {
+    super(status, body);
+    this.message = `machine api ${status}: ${body}`;
+    this.name = 'RelayToolError';
+  }
+}
+
 export function isTransientUploadError(err: unknown): boolean {
   if (err instanceof MachineApiError) return err.status === 404 || err.status >= 500;
   return true;
@@ -393,8 +401,8 @@ export class MachineClient implements MachineApi {
         }
         const msg =
           typeof body?.error === 'string' ? body.error : `${name} failed (HTTP ${res.status})`;
-        if (!replaySafe || res.status < 500) throw new MachineApiError(res.status, msg);
-        lastErr = new MachineApiError(res.status, msg);
+        if (!replaySafe || res.status < 500) throw new RelayToolError(res.status, msg);
+        lastErr = new RelayToolError(res.status, msg);
       } catch (err) {
         if (err instanceof MachineApiError && (!replaySafe || err.status < 500)) throw err;
         lastErr = err;

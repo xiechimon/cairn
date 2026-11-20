@@ -61,25 +61,19 @@ describe('create_todo copies the owner words verbatim', () => {
     expect(split.spec).toBe(created.spec);
   });
 
-  test('omitted messageIds with two unbound owner messages lists them and creates nothing', async () => {
-    const question = ownerMessage('你能看到我的 GitHub 吗？');
+  test('omitted messageIds cite only the message that started the turn', async () => {
+    ownerMessage('你能看到我的 GitHub 吗？');
     const request = ownerMessage('帮我查一下 X 怎么用');
-    const before = H.s.db.select().from(todoTable).all().length;
-    let error: unknown;
-    try {
-      createRequestTodo(
-        toolDeps(),
-        ctx({ turnMessageIds: [request] }),
-        { projectId: H.projectId },
-        { createdBy: H.userId, ownerId: H.userId },
-      );
-    } catch (caught) {
-      error = caught;
-    }
-    expect(error).toMatchObject({ status: 400 });
-    expect((error as Error).message).toContain(question);
-    expect((error as Error).message).toContain(request);
-    expect(H.s.db.select().from(todoTable).all().length).toBe(before);
+    const created = createRequestTodo(
+      toolDeps(),
+      ctx({ turnMessageIds: [request] }),
+      { projectId: H.projectId },
+      { createdBy: H.userId, ownerId: H.userId },
+    );
+    expect(created.spec).toBe('帮我查一下 X 怎么用');
+    expect(row(created.id).request?.segments.map((segment) => segment.source)).toEqual([
+      { kind: 'chat', threadId: H.threadId, messageId: request, span: 'whole' },
+    ]);
   });
 
   test('a spec argument is refused', async () => {
