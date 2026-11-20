@@ -34,7 +34,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
-import { useOpenDesign } from './design/design-route.js';
+import { useOpenDesignAttachment } from './design/design-route.js';
 import {
   type EngineRunView,
   engineCanTakeOver,
@@ -579,7 +579,7 @@ export function SideChat({
   const { t } = useI18n();
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
-  const openDesign = useOpenDesign();
+  const openDesignAttachment = useOpenDesignAttachment(todoId);
   const [searchParams, setSearchParams] = useSearchParams();
   const closeAll = () =>
     setSearchParams(
@@ -652,7 +652,7 @@ export function SideChat({
   }, [onClose, showsSubView]);
 
   return (
-    <OpenDesignPageContext.Provider value={(fileName) => openDesign(todoId, fileName)}>
+    <OpenDesignPageContext.Provider value={openDesignAttachment}>
       <SidePanel
         ref={panelRef}
         label={todo?.title ?? t('任务')}

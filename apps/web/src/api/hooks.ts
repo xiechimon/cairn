@@ -1876,22 +1876,24 @@ export interface DesignPagesResponse {
 const designKey = (todoId: string) => ['design', todoId] as const;
 const designPath = (todoId: string) => `/api/todos/${encodeURIComponent(todoId)}/design`;
 
+export const designPagesQuery = (todoId: string) => ({
+  queryKey: designKey(todoId),
+  queryFn: () => api.get<DesignPagesResponse>(designPath(todoId)),
+});
+
+export const designVersionsQuery = (todoId: string, fileName: string | null) => ({
+  queryKey: [...designKey(todoId), 'versions', fileName],
+  queryFn: () =>
+    api.get<DesignVersionRecord[]>(
+      `${designPath(todoId)}/${encodeURIComponent(fileName ?? '')}/versions`,
+    ),
+});
+
 export const useDesignPages = (todoId: string, enabled: boolean) =>
-  useQuery({
-    queryKey: designKey(todoId),
-    queryFn: () => api.get<DesignPagesResponse>(designPath(todoId)),
-    enabled,
-  });
+  useQuery({ ...designPagesQuery(todoId), enabled });
 
 export const useDesignVersions = (todoId: string, fileName: string | null, enabled: boolean) =>
-  useQuery({
-    queryKey: [...designKey(todoId), 'versions', fileName],
-    queryFn: () =>
-      api.get<DesignVersionRecord[]>(
-        `${designPath(todoId)}/${encodeURIComponent(fileName ?? '')}/versions`,
-      ),
-    enabled: enabled && fileName !== null,
-  });
+  useQuery({ ...designVersionsQuery(todoId, fileName), enabled: enabled && fileName !== null });
 
 export const useDesignPageHtml = (versionId: string | null) =>
   useQuery({

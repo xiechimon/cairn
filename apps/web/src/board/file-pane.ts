@@ -31,9 +31,14 @@ export function fileSetOf(text: string): FileTarget[] {
   return out;
 }
 
-export const OpenDesignPageContext = createContext<((fileName: string) => void) | undefined>(
-  undefined,
-);
+export interface DesignPageTarget {
+  name: string;
+  attachmentId: string;
+}
+
+export const OpenDesignPageContext = createContext<
+  ((target: DesignPageTarget) => void) | undefined
+>(undefined);
 
 export function attachmentUrl(key: string): string {
   return `/api/attachments/${encodeURIComponent(attachmentIdFromKey(key))}`;
@@ -54,13 +59,14 @@ export function withoutFileTarget(params: URLSearchParams): URLSearchParams {
 export function attachmentOpener(
   openers: {
     file: OpenFile | undefined;
-    designPage: ((fileName: string) => void) | undefined;
+    designPage: ((target: DesignPageTarget) => void) | undefined;
   },
   set: readonly FileTarget[],
   name: string,
   key: string,
 ): { onOpen?: () => void } {
   const { file, designPage } = openers;
-  if (designPage !== undefined && isDesignPageName(name)) return { onOpen: () => designPage(name) };
+  if (designPage !== undefined && (isDesignPageName(name) || isDesignPageName(key)))
+    return { onOpen: () => designPage({ name, attachmentId: attachmentIdFromKey(key) }) };
   return file === undefined ? {} : { onOpen: () => file({ name, key }, set) };
 }
