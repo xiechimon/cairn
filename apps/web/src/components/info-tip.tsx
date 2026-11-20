@@ -21,7 +21,7 @@ export function InfoTip({ info, className }: { info: string; className?: string 
           />
         }
       >
-        <Info aria-hidden="true" className="size-3.5" />
+        <Info aria-hidden="true" className="size-4" />
       </TooltipTrigger>
       <TooltipContent side="top" sideOffset={6}>
         {info}

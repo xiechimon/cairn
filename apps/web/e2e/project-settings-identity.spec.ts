@@ -154,7 +154,7 @@ test('settings: local project shows conversion card; submit carries repoKind/git
 
   await expect(pathInput).toHaveValue('/Users/who/code/cairn');
 
-  const convert = page.getByRole('button', { name: '转换' });
+  const convert = page.getByRole('button', { name: '转换', exact: true });
   await expect(convert).toBeDisabled();
 
   await repoInput.fill('no-slash');
