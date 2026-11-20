@@ -481,11 +481,9 @@ function mergedModelOverrides(
   patch: NonNullable<PatchProjectBody['modelOverrides']>,
 ): ProjectModelOverrides | null {
   const next: ProjectModelOverrides = { ...current };
-  for (const use of ['coordinator', 'session'] as const) {
-    const choice = patch[use];
-    if (choice === null) delete next[use];
-    else if (choice !== undefined) next[use] = choice;
-  }
+  const choice = patch.coordinator;
+  if (choice === null) delete next.coordinator;
+  else if (choice !== undefined) next.coordinator = choice;
   return Object.keys(next).length > 0 ? next : null;
 }
 

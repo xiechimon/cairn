@@ -262,7 +262,6 @@ export type ProjectModelChoice = z.infer<typeof projectModelChoiceSchema>;
 
 export const projectModelOverridesSchema = z.object({
   coordinator: projectModelChoiceSchema.optional(),
-  session: projectModelChoiceSchema.optional(),
 });
 export type ProjectModelOverrides = z.infer<typeof projectModelOverridesSchema>;
 export type ProjectModelUse = keyof ProjectModelOverrides;
@@ -354,7 +353,6 @@ export const patchProjectBodySchema = z
     modelOverrides: z
       .object({
         coordinator: projectModelChoiceSchema.nullable().optional(),
-        session: projectModelChoiceSchema.nullable().optional(),
       })
       .strict()
       .optional(),

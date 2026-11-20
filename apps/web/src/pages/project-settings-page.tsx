@@ -1,9 +1,7 @@
 import {
   githubRepoInputToRef,
   type ProjectModelChoice,
-  type ProjectModelUse,
   type ProjectRecord,
-  type RouteUse,
   type TeamRoutingSettings,
 } from '@cairn/shared';
 import { cn } from 'cn';
@@ -77,14 +75,12 @@ function Section({ title, children }: { title?: string; children: ReactNode }) {
   );
 }
 
-function teamModelLabel(
+function coordinatorModelLabel(
   settings: TeamRoutingSettings,
-  use: ProjectModelUse,
   options: readonly ModelOption[],
 ): string | null {
-  const rule = settings.rules.find((r) => r.use === use);
-  const fallback = use === 'session' ? settings.sessionDefault : settings.coordinatorDefault;
-  const modelId = rule?.modelId ?? fallback?.modelId ?? null;
+  const rule = settings.rules.find((r) => r.use === 'coordinator');
+  const modelId = rule?.modelId ?? settings.coordinatorDefault?.modelId ?? null;
   if (modelId === null) return null;
   return options.find((o) => o.modelId === modelId)?.modelName ?? modelId;
 }
@@ -110,40 +106,33 @@ function ProjectModels({
   const options = toModelOptions(
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
-  const save = (use: ProjectModelUse, choice: ProjectModelChoice | null) => {
+  const save = (choice: ProjectModelChoice | null) => {
     if (project === undefined) return;
     if (!live) {
       blockDemoWrite();
       return;
     }
     mutations.patchProject.mutate(
-      { id: project.id, body: { modelOverrides: { [use]: choice } } },
+      { id: project.id, body: { modelOverrides: { coordinator: choice } } },
       { onError: (error) => toastError(t('保存失败，请重试。'), error) },
     );
   };
-  const rows: { use: ProjectModelUse; route: RouteUse; label: string }[] = [
-    { use: 'coordinator', route: 'coordinator', label: 'Coordinator' },
-    { use: 'session', route: 'session', label: t('任务') },
-  ];
   return (
     <SettingsCard className={NARROW_ROWS_CLS}>
-      {rows.map(({ use, route, label }) => (
-        <RuleRow
-          key={use}
-          use={route}
-          label={label}
-          hint={null}
-          testId={`project-model-${use}`}
-          rule={project?.modelOverrides?.[use] ?? null}
-          options={options}
-          followDefault={{
-            label: t('跟随团队默认'),
-            detail: teamModelLabel(settings, use, options),
-            onPick: () => save(use, null),
-          }}
-          onSave={(choice) => save(use, choice)}
-        />
-      ))}
+      <RuleRow
+        use="coordinator"
+        label="Coordinator"
+        hint={null}
+        testId="project-model-coordinator"
+        rule={project?.modelOverrides?.coordinator ?? null}
+        options={options}
+        followDefault={{
+          label: t('跟随团队默认'),
+          detail: coordinatorModelLabel(settings, options),
+          onPick: () => save(null),
+        }}
+        onSave={save}
+      />
     </SettingsCard>
   );
 }

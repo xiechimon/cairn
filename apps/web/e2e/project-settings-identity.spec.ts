@@ -193,6 +193,16 @@ test('settings: non-local projects hide the conversion card', async ({ page }) =
   await expect(page.getByText('转换为 GitHub 形态', { exact: true })).toHaveCount(0);
 });
 
+test('settings: the per-project task model row is gone; only the Coordinator override remains', async ({
+  page,
+}) => {
+  await stubWorld(page, [localProject()]);
+  await page.goto(`/app/project/${LOCAL_PROJECT_ID}/settings`);
+  await expect(page.getByTestId('project-model-coordinator')).toBeVisible();
+  await expect(page.getByTestId('project-model-session')).toHaveCount(0);
+  await expect(page.getByText('跟随团队默认')).toHaveCount(1);
+});
+
 test('settings: the project Coordinator picker lists models of every runtime the Coordinator can run on', async ({
   page,
 }) => {

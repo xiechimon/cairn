@@ -332,9 +332,7 @@ export function routeForStep(
   const stored = storedRouteForStep(db, todoRow, kind);
   if (kind === 'review' || (!isSessionStepKind(kind) && kind !== 'merge')) return stored;
   const base = stored ?? defaultSessionRule(db, todoRow.teamId);
-  const choice =
-    taskModelChoice(todoRow) ??
-    projectModelChoice(db, todoRow.teamId, todoRow.projectId ?? null, 'session');
+  const choice = taskModelChoice(todoRow);
   if (choice === null) return base;
   return { ...(base ?? syntheticRule(todoRow.teamId, 'session', choice)), ...choice };
 }

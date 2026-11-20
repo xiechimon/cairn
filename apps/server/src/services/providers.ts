@@ -486,13 +486,9 @@ function renameProviderReferences(db: Db, teamId: string, from: string, to: stri
       overrides.coordinator?.provider === from
         ? { ...overrides.coordinator, provider: to }
         : overrides.coordinator;
-    const session =
-      overrides.session?.provider === from
-        ? { ...overrides.session, provider: to }
-        : overrides.session;
-    if (coordinator === overrides.coordinator && session === overrides.session) continue;
+    if (coordinator === overrides.coordinator) continue;
     db.update(project)
-      .set({ modelOverrides: { ...overrides, coordinator, session } })
+      .set({ modelOverrides: { ...overrides, coordinator } })
       .where(eq(project.id, row.id))
       .run();
   }

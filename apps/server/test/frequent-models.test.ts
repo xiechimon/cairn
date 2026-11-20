@@ -61,13 +61,14 @@ describe('the Coordinator picks a task model from the frequently used models', (
     });
   });
 
-  test('the task pick wins over the project task model', async () => {
+  test('the project task model field is refused; the task pick still routes', async () => {
     frequent({ provider: 'strong-gw', modelId: 'deep-model' });
-    await req(H.s.app, 'PATCH', `/api/projects/${H.projectId}`, {
+    const refused = await req(H.s.app, 'PATCH', `/api/projects/${H.projectId}`, {
       modelOverrides: {
         session: { provider: 'proj-gw', modelId: 'proj-model', thinkingLevel: null },
       },
     });
+    expect(refused.status).toBe(400);
     const created = (await relay('create_todo', {
       ...ownerTodo('写文档'),
       model: 'deep-model',

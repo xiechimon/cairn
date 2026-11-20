@@ -267,9 +267,7 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
   const { live, teamId } = useLiveData();
   const projectsQ = useProjects(teamId, live);
   const [open, setOpen] = useState(false);
-  const projects = (projectsQ.data ?? []).filter(
-    (p) => p.modelOverrides?.coordinator != null || p.modelOverrides?.session != null,
-  );
+  const projects = (projectsQ.data ?? []).filter((p) => p.modelOverrides?.coordinator != null);
   if (projects.length === 0) return null;
   const nameOf = (choice: RuleModel) => currentOption(choice, options)?.modelName ?? choice.modelId;
   return (
@@ -291,16 +289,10 @@ function ProjectOverrides({ options }: { options: ModelOption[] }) {
       {open && (
         <SettingsCard>
           {projects.map((p) => {
-            const parts = [
-              p.modelOverrides?.coordinator != null
-                ? `Coordinator · ${nameOf(p.modelOverrides.coordinator)}`
-                : null,
-              p.modelOverrides?.session != null
-                ? `${t('任务')} · ${nameOf(p.modelOverrides.session)}`
-                : null,
-            ].filter((part): part is string => part !== null);
+            const choice = p.modelOverrides?.coordinator;
+            if (choice == null) return null;
             return (
-              <SettingsRow key={p.id} label={p.name} hint={parts.join('　')}>
+              <SettingsRow key={p.id} label={p.name} hint={`Coordinator · ${nameOf(choice)}`}>
                 <Link
                   to={`/app/project/${p.id}/settings`}
                   className="text-ui text-foreground underline decoration-content-tertiary underline-offset-4 hover:decoration-current"

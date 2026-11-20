@@ -153,7 +153,6 @@ describe('provider PATCH rename rewrites every stored reference', () => {
       .set({
         modelOverrides: {
           coordinator: { provider: 'relay-old', modelId: 'glm', thinkingLevel: null },
-          session: { provider: 'relay-old', modelId: 'glm-2', thinkingLevel: 'high' },
         },
       })
       .where(eq(projectTable.id, projectId))
@@ -161,7 +160,6 @@ describe('provider PATCH rename rewrites every stored reference', () => {
     updateProvider(deps, s.team.id, pid, { providerId: 'relay-new' });
     expect(s.db.select().from(projectTable).get()?.modelOverrides).toEqual({
       coordinator: { provider: 'relay-new', modelId: 'glm', thinkingLevel: null },
-      session: { provider: 'relay-new', modelId: 'glm-2', thinkingLevel: 'high' },
     });
   });
 

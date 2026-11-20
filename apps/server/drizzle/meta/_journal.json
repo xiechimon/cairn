@@ -1590,6 +1590,13 @@
       "when": 1795142326833,
       "tag": "0231_retry_attempt",
       "breakpoints": true
+    },
+    {
+      "idx": 232,
+      "version": "6",
+      "when": 1795154430652,
+      "tag": "0232_drop_project_session_model_override",
+      "breakpoints": true
     }
   ]
 }

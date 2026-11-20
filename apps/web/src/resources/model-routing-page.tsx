@@ -84,20 +84,12 @@ function RoutingContent() {
   const options = toModelOptions(
     live ? (sourcesQ.data?.sources ?? []) : (fixture.resources?.providerSources ?? []),
   );
-  const projectChoices = (projectsQ.data ?? []).flatMap((project) =>
-    (['coordinator', 'session'] as const).flatMap((use) => {
-      const choice = project.modelOverrides?.[use];
-      return choice == null
-        ? []
-        : [
-            {
-              id: `${project.id}:${use}`,
-              name: `${project.name} · ${use === 'coordinator' ? 'Coordinator' : t('任务')}`,
-              choice,
-            },
-          ];
-    }),
-  );
+  const projectChoices = (projectsQ.data ?? []).flatMap((project) => {
+    const choice = project.modelOverrides?.coordinator;
+    return choice == null
+      ? []
+      : [{ id: `${project.id}:coordinator`, name: `${project.name} · Coordinator`, choice }];
+  });
   const groups = ruleGraphGroups(settings, targets, options, t, projectChoices);
 
   return (
