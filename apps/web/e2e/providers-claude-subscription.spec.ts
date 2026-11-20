@@ -192,3 +192,30 @@ test('a failed upstream model list says why and labels the fallback list', async
   await expect(picker.getByTestId('upstream-group')).toHaveText('上游其他');
   await expect(picker.locator('[data-model-id="claude-fable-5-2"]')).toBeVisible();
 });
+
+test('the owner always sees Verify, Choose from upstream, Test all and each picked model test and remove controls', async ({ page }) => {
+  const ids = ['claude-opus-5-5', 'claude-sonnet-5-5'];
+  const record: ClaudeSubscriptionListEntry = {
+    id: 'subscription-1',
+    kind: 'claude-subscription',
+    label: 'Personal Claude',
+    expiresAt: Date.now() + 300 * 24 * 60 * 60 * 1000,
+    createdAt: Date.now(),
+    models: ids.map((id) => ({ id, name: id })),
+  };
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/claude-subscriptions') return json([record]);
+  });
+  await page.goto('/app/resources/providers');
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail.getByTestId('subscription-verify')).toBeVisible();
+  await expect(detail.getByTestId('subscription-pick-upstream')).toBeVisible();
+  await expect(detail.getByTestId('subscription-test-all')).toBeVisible();
+  await expect(detail.getByTestId('subscription-model')).toHaveCount(ids.length);
+  for (const id of ids) {
+    await expect(detail.getByRole('button', { name: `测试 ${id}` })).toBeVisible();
+    await expect(detail.getByRole('button', { name: `移除 ${id}` })).toBeVisible();
+  }
+});
