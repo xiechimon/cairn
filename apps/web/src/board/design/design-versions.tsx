@@ -58,7 +58,7 @@ export function VersionsMenu({
               data-seq={version.seq}
               data-shown={version.id === shownId || undefined}
               onClick={() => onPick(version)}
-              className="gap-3 py-2 data-shown:bg-(--hover-1)"
+              className="h-auto gap-3 py-2 pointer-coarse:h-auto data-shown:bg-(--hover-1)"
             >
               <span className="flex size-7 flex-none items-center justify-center rounded-full border border-border text-meta tabular-nums text-content-secondary">
                 v{version.seq}
