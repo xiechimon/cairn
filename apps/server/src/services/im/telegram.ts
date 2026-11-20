@@ -4,6 +4,7 @@ import type {
   ImAdapter,
   ImConnectionHandlers,
   ImEnv,
+  ImInboundFile,
   ImInboundMessage,
   ImOutboundMessage,
 } from './types.js';
@@ -11,6 +12,7 @@ import type {
 const TELEGRAM_API = 'https://api.telegram.org';
 const POLL_TIMEOUT_SECONDS = 50;
 const MESSAGE_MAX_CHARS = 4096;
+const FILE_MAX_BYTES = 10 * 1024 * 1024;
 const TOKEN_PATTERN = /^\d+:[A-Za-z0-9_-]{20,}$/;
 const TOKEN_MASK = /^(\d+:)[A-Za-z0-9_-]+$/;
 
@@ -34,6 +36,20 @@ interface TgEntity {
   length: number;
 }
 
+interface TgPhotoSize {
+  file_id: string;
+  width: number;
+  height: number;
+  file_size?: number;
+}
+
+interface TgDocument {
+  file_id: string;
+  file_name?: string;
+  mime_type?: string;
+  file_size?: number;
+}
+
 interface TgMessage {
   message_id: number;
   from?: TgUser;
@@ -42,12 +58,21 @@ interface TgMessage {
   caption?: string;
   entities?: TgEntity[];
   caption_entities?: TgEntity[];
-  photo?: unknown[];
+  photo?: TgPhotoSize[];
+  document?: TgDocument;
+}
+
+interface TgCallbackQuery {
+  id: string;
+  from: TgUser;
+  message?: TgMessage;
+  data?: string;
 }
 
 interface TgUpdate {
   update_id: number;
   message?: TgMessage;
+  callback_query?: TgCallbackQuery;
 }
 
 class TelegramApiError extends Error {
@@ -133,15 +158,69 @@ function mentionsBot(text: string, entities: TgEntity[] | undefined, botUsername
   });
 }
 
-function normalizeMessage(message: TgMessage, botUsername: string): ImInboundMessage | null {
+async function telegramFile(
+  env: ImEnv,
+  token: string,
+  fileId: string,
+  declaredSize: number | undefined,
+): Promise<string | null> {
+  if (declaredSize !== undefined && declaredSize > FILE_MAX_BYTES) return null;
+  let info: { file_path?: string; file_size?: number };
+  try {
+    info = await telegramApi(env, token, 'getFile', { file_id: fileId });
+  } catch {
+    return null;
+  }
+  if (typeof info.file_path !== 'string' || info.file_path === '') return null;
+  if (info.file_size !== undefined && info.file_size > FILE_MAX_BYTES) return null;
+  let res: Response;
+  try {
+    res = await env.fetch(`${TELEGRAM_API}/file/bot${token}/${info.file_path}`);
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+  const bytes = Buffer.from(await res.arrayBuffer());
+  if (bytes.length > FILE_MAX_BYTES) return null;
+  return bytes.toString('base64');
+}
+
+async function normalizeMessage(
+  message: TgMessage,
+  botUsername: string,
+  env: ImEnv,
+  token: string,
+): Promise<ImInboundMessage | null> {
   if (message.from === undefined || message.from.is_bot) return null;
   const text = (message.text ?? message.caption ?? '').trim();
-  if (text === '') return null;
   const entities = message.entities ?? message.caption_entities;
   const group = message.chat.type === 'group' || message.chat.type === 'supergroup';
   if (message.chat.type !== 'private' && !group) return null;
   const mentioned = group ? mentionsBot(text, entities, botUsername) : false;
   if (group && !mentioned) return null;
+  const images: ImInboundFile[] = [];
+  const files: ImInboundFile[] = [];
+  const photo = message.photo?.at(-1);
+  if (photo !== undefined) {
+    images.push({
+      name: `photo-${message.message_id}.jpg`,
+      mimeType: 'image/jpeg',
+      dataBase64: await telegramFile(env, token, photo.file_id, photo.file_size),
+    });
+  }
+  if (message.document !== undefined) {
+    files.push({
+      name: message.document.file_name ?? `file-${message.message_id}`,
+      mimeType: message.document.mime_type ?? null,
+      dataBase64: await telegramFile(
+        env,
+        token,
+        message.document.file_id,
+        message.document.file_size,
+      ),
+    });
+  }
+  if (text === '' && images.length === 0 && files.length === 0) return null;
   return {
     chat: {
       key: String(message.chat.id),
@@ -150,7 +229,8 @@ function normalizeMessage(message: TgMessage, botUsername: string): ImInboundMes
     },
     sender: { id: String(message.from.id), name: senderName(message.from) },
     text,
-    images: [],
+    images,
+    files,
     messageId: String(message.message_id),
     mentioned,
   };
@@ -256,7 +336,7 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               {
                 timeout: POLL_TIMEOUT_SECONDS,
                 ...(offset !== null ? { offset } : {}),
-                allowed_updates: ['message'],
+                allowed_updates: ['message', 'callback_query'],
               },
               abort.signal,
             );
@@ -264,8 +344,33 @@ export function createTelegramAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
             handlers.onStatus('ready');
             for (const update of updates) {
               if (update.message !== undefined) {
-                const inbound = normalizeMessage(update.message, botUsername);
+                const inbound = await normalizeMessage(
+                  update.message,
+                  botUsername,
+                  env,
+                  token,
+                ).catch(() => null);
                 if (inbound !== null) handlers.onMessage(inbound);
+              }
+              const query = update.callback_query;
+              if (query !== undefined && query.message !== undefined && query.data !== undefined) {
+                const group =
+                  query.message.chat.type === 'group' || query.message.chat.type === 'supergroup';
+                handlers.onAction?.({
+                  chat: {
+                    key: String(query.message.chat.id),
+                    kind: group ? 'group' : 'direct',
+                    title: group ? (query.message.chat.title ?? null) : null,
+                  },
+                  sender: { id: String(query.from.id), name: senderName(query.from) },
+                  value: query.data,
+                  messageId: `cq:${query.id}`,
+                });
+              }
+              if (query !== undefined) {
+                void telegramApi(env, token, 'answerCallbackQuery', {
+                  callback_query_id: query.id,
+                }).catch(() => {});
               }
               offset = update.update_id + 1;
             }

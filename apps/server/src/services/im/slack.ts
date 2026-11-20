@@ -11,6 +11,7 @@ import type {
 
 const SLACK_API = 'https://slack.com/api';
 const MESSAGE_MAX_CHARS = 3000;
+const FILE_MAX_BYTES = 10 * 1024 * 1024;
 const APP_TOKEN_PREFIX = 'xapp-';
 const BOT_TOKEN_PREFIX = 'xoxb-';
 const BUTTON_TEXT_MAX_CHARS = 75;
@@ -37,6 +38,14 @@ interface SlackUserInfo {
   };
 }
 
+interface SlackFile {
+  id?: string;
+  name?: string;
+  mimetype?: string;
+  size?: number;
+  url_private_download?: string;
+}
+
 interface SlackEvent {
   type?: string;
   subtype?: string;
@@ -46,13 +55,27 @@ interface SlackEvent {
   bot_id?: string;
   text?: string;
   ts?: string;
+  files?: SlackFile[];
+}
+
+interface SlackAction {
+  action_id?: string;
+  type?: string;
+  value?: string;
 }
 
 interface SlackFrame {
   envelope_id?: string;
   type?: string;
   reason?: string;
-  payload?: { event?: SlackEvent };
+  payload?: {
+    event?: SlackEvent;
+    type?: string;
+    user?: { id?: string };
+    channel?: { id?: string };
+    container?: { channel_id?: string };
+    actions?: SlackAction[];
+  };
 }
 
 type SocketEnd =
@@ -231,14 +254,46 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
         return lookup;
       };
 
+      const slackFile = async (file: SlackFile): Promise<string | null> => {
+        const url = file.url_private_download;
+        if (typeof url !== 'string' || url === '') return null;
+        if (file.size !== undefined && file.size > FILE_MAX_BYTES) return null;
+        let res: Response;
+        try {
+          res = await env.fetch(url, {
+            headers: { authorization: `Bearer ${botToken}` },
+            signal: stopping.signal,
+          });
+        } catch {
+          return null;
+        }
+        if (!res.ok) return null;
+        const bytes = Buffer.from(await res.arrayBuffer());
+        if (bytes.length > FILE_MAX_BYTES) return null;
+        return bytes.toString('base64');
+      };
+
       const deliver = async (event: SlackEvent): Promise<void> => {
         if (event.type !== 'message' || event.channel_type !== 'im') return;
-        if (event.subtype !== undefined || event.user === undefined) return;
+        if (event.user === undefined || event.bot_id !== undefined) return;
+        if (event.subtype !== undefined && event.subtype !== 'file_share') return;
         const channel = event.channel ?? '';
         const ts = event.ts ?? '';
         const text = (event.text ?? '').trim();
-        if (channel === '' || ts === '' || text === '') return;
+        if (channel === '' || ts === '') return;
         if (event.user === botUserId) return;
+        const rawFiles = event.files ?? [];
+        const files =
+          event.subtype === 'file_share' && rawFiles.length > 0
+            ? await Promise.all(
+                rawFiles.map(async (file, index) => ({
+                  name: file.name ?? `slack-file-${index}`,
+                  mimeType: file.mimetype ?? null,
+                  dataBase64: await slackFile(file),
+                })),
+              )
+            : [];
+        if (text === '' && files.length === 0) return;
         const name = await senderName(event.user);
         if (stopped) return;
         handlers.onMessage({
@@ -246,6 +301,7 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
           sender: { id: event.user, name },
           text,
           images: [],
+          files,
           messageId: ts,
           mentioned: false,
         });
@@ -278,6 +334,26 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
               case 'events_api': {
                 const event = frame.payload?.event;
                 if (event !== undefined) void deliver(event).catch(() => undefined);
+                break;
+              }
+              case 'interactive': {
+                const payload = frame.payload;
+                if (payload?.type !== 'block_actions') break;
+                const userId = payload.user?.id;
+                const channelId = payload.channel?.id ?? payload.container?.channel_id;
+                const envelope = frame.envelope_id ?? 'none';
+                if (userId === undefined || channelId === undefined) break;
+                if (userId === botUserId) break;
+                for (const [index, action] of (payload.actions ?? []).entries()) {
+                  if (typeof action.value !== 'string' || action.value === '') continue;
+                  const chatKey = channelId;
+                  handlers.onAction?.({
+                    chat: { key: chatKey, kind: 'direct', title: null },
+                    sender: { id: userId, name: null },
+                    value: action.value,
+                    messageId: `slack-ia:${envelope}:${action.action_id ?? index}`,
+                  });
+                }
                 break;
               }
               case 'disconnect':

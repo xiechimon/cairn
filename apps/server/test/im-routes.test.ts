@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import type { ImPlatform } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { openMemoryDb } from '../src/db/client.js';
@@ -104,6 +107,7 @@ const inbound = (senderId: string): ImInboundMessage => {
     sender: { id: senderId, name: 'Ian' },
     text: 'hello',
     images: [],
+    files: [],
     messageId: `r-${seq}`,
     mentioned: false,
   };
@@ -130,6 +134,8 @@ beforeEach(() => {
     box: createEphemeralSecretBox(),
     user: seeded.user,
     env,
+    attachmentsDir: mkdtempSync(join(tmpdir(), 'im-att-')),
+    reposDir: mkdtempSync(join(tmpdir(), 'im-repos-')),
     adapters,
   });
   setImRuntime(service.runtime);

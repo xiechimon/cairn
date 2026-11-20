@@ -10,7 +10,7 @@ import { extOf, validateAttachmentUpload, writeAttachmentFile } from './attachme
 import { recordDesignVersion } from './design.js';
 import { type MachineDeps, upsertMessage } from './machine-deps.js';
 
-function attachmentMime(fileName: string, bytes: Buffer): string {
+export function attachmentMime(fileName: string, bytes: Buffer): string {
   const ext = extOf(fileName);
   if (isImageAttachmentExt(ext) && !['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
     throw new HttpError(400, 'attach_file image type is not allowed; use PNG, JPEG, GIF, or WebP');

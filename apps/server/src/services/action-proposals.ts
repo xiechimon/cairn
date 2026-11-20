@@ -106,7 +106,7 @@ function requireIntactCard(tx: ProjectTx, row: ProposalRow, digest: string) {
   }
 }
 
-const CARD_ENDINGS: Record<ProposalStatus, string> = {
+export const CARD_ENDINGS: Record<ProposalStatus, string> = {
   pending: '',
   refused: '你选择了不执行，没有执行。',
   executed: '已按你的批准执行。',

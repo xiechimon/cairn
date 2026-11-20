@@ -1,7 +1,22 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { externalEffect, imConnection, imPairingRequest, step } from '../src/db/schema.js';
+import {
+  actionProposal,
+  attachment,
+  chiefMessage,
+  externalEffect,
+  imConnection,
+  imPairingRequest,
+  imTurnOrigin,
+  step,
+} from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
+import { CARD_ENDINGS, proposeAction } from '../src/services/action-proposals.js';
+import {
+  announceQuestion,
+  askQuestionContentOf,
+  createOrGetQuestion,
+} from '../src/services/chief-questions.js';
 import { createImService, type ImService } from '../src/services/im/core.js';
 import { ImSendError } from '../src/services/im/errors.js';
 import { setImRuntime } from '../src/services/im/runtime.js';
@@ -14,7 +29,7 @@ import type {
 } from '../src/services/im/types.js';
 import { upsertChiefRow } from '../src/services/machine-deps.js';
 import { notifyChiefMessage } from '../src/services/notifications.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
 let s: TestServer;
 let service: ImService;
@@ -121,6 +136,7 @@ const inbound = (senderId: string, text = 'hi', chatKey = '777'): ImInboundMessa
     sender: { id: senderId, name: 'Ian' },
     text,
     images: [],
+    files: [],
     messageId: `tg-msg-${messageSeq}`,
     mentioned: false,
   };
@@ -166,6 +182,8 @@ beforeEach(() => {
     box: s.secretBox,
     user: s.user,
     env: env(),
+    attachmentsDir: s.attachmentsDir,
+    reposDir: s.reposDir,
     adapters,
   });
   setImRuntime(service.runtime);
@@ -375,6 +393,8 @@ describe('restart and send queue', () => {
       box: s.secretBox,
       user: s.user,
       env: env(),
+      attachmentsDir: s.attachmentsDir,
+      reposDir: s.reposDir,
       adapters: { telegram: adapter },
     });
     s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
@@ -401,6 +421,8 @@ describe('restart and send queue', () => {
       box: s.secretBox,
       user: s.user,
       env: env(),
+      attachmentsDir: s.attachmentsDir,
+      reposDir: s.reposDir,
       adapters: { telegram: adapter },
     });
     await restarted.resume();
@@ -437,6 +459,8 @@ describe('restart and send queue', () => {
       box: s.secretBox,
       user: s.user,
       env: env(),
+      attachmentsDir: s.attachmentsDir,
+      reposDir: s.reposDir,
       adapters: { telegram: adapter },
     });
     s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
@@ -562,6 +586,237 @@ describe('restart and send queue', () => {
     await vi.waitFor(() => {
       expect(connRow()?.status).toBe('expired');
     });
+  });
+});
+
+describe('cards, actions and attachments', () => {
+  const claimImStep = async (text: string) => {
+    sessions[0]?.handlers.onMessage(inbound('55', text));
+    const stepRow = latestChiefStep();
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, stepRow.id))
+      .run();
+    return stepRow;
+  };
+
+  const tap = (value: string, senderId = '55', messageId = 'cq:1') => {
+    sessions[0]?.handlers.onAction?.({
+      chat: { key: '777', kind: 'direct', title: null },
+      sender: { id: senderId, name: 'Ian' },
+      value,
+      messageId,
+    });
+  };
+
+  const questionCard = async (threadId: string, requestId: string) => {
+    createOrGetQuestion(
+      { db: s.db, hub: s.hub, convHub: s.convHub, user: s.user },
+      {
+        threadId,
+        requestId,
+        questions: [
+          {
+            header: '选择',
+            question: 'Pick one?',
+            options: [{ label: 'A' }, { label: 'B' }],
+          },
+        ],
+        askedFor: [],
+      },
+    );
+    await vi.waitFor(() => expect(sessions[0]?.sent).toHaveLength(1));
+  };
+
+  test('a pending question card reaches the chat with tap buttons', async () => {
+    await connectAndPair('55');
+    const stepRow = await claimImStep('pick something');
+    await questionCard(stepRow.buildId, 'q-1');
+    const sent = sessions[0]?.sent[0];
+    expect(sent?.text).toContain('Pick one?');
+    expect(sent?.buttons).toEqual([
+      [
+        { label: 'A', value: 'imcb:q-1:0' },
+        { label: 'B', value: 'imcb:q-1:1' },
+      ],
+    ]);
+  });
+
+  test('tapping a button answers a parked question and the resumed turn replies in chat', async () => {
+    seedRoute(s, 'coordinator');
+    await connectAndPair('55');
+    const stepRow = await claimImStep('pick something');
+    await questionCard(stepRow.buildId, 'q-2');
+    const card = s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'q-2')).get();
+    const parked = { ...(JSON.parse(card?.content as string) as object), parkedAt: nowMs() };
+    s.db
+      .update(chiefMessage)
+      .set({ content: JSON.stringify(parked) })
+      .where(eq(chiefMessage.id, 'q-2'))
+      .run();
+    s.db.update(step).set({ status: 'done' }).where(eq(step.id, stepRow.id)).run();
+    sessions[0]?.sent.splice(0);
+
+    tap('imcb:q-2:0');
+
+    const answered = askQuestionContentOf(
+      s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'q-2')).get()?.content,
+    );
+    expect(answered?.status).toBe('answered');
+    expect(answered?.answers).toEqual([{ header: '选择', choices: ['A'] }]);
+    const resumed = s.db
+      .select()
+      .from(step)
+      .where(
+        and(eq(step.buildId, stepRow.buildId), eq(step.kind, 'chief'), eq(step.status, 'pending')),
+      )
+      .all();
+    expect(resumed).toHaveLength(1);
+    expect(resumed[0]?.ownerMessageIds).toContain('q-2');
+    expect(
+      s.db
+        .select()
+        .from(imTurnOrigin)
+        .where(eq(imTurnOrigin.stepId, resumed[0]?.id ?? ''))
+        .get()?.chatKey,
+    ).toBe('777');
+
+    s.db
+      .update(step)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(step.id, resumed[0]?.id ?? ''))
+      .run();
+    upsertChiefRow(
+      { db: s.db, convHub: s.convHub },
+      {
+        id: 'asst-a',
+        threadId: stepRow.buildId,
+        role: 'assistant',
+        content: 'went with A',
+        createdAt: nowMs() + 1,
+      },
+    );
+    s.db
+      .update(step)
+      .set({ status: 'done' })
+      .where(eq(step.id, resumed[0]?.id ?? ''))
+      .run();
+    service.runtime.turnFinished(stepById(resumed[0]?.id ?? ''));
+    await vi.waitFor(() =>
+      expect(sessions[0]?.sent.some((msg) => msg.text === 'went with A')).toBe(true),
+    );
+  });
+
+  test('tapping approve on an approval card executes the proposal and unblocks the chat', async () => {
+    await connectAndPair('55');
+    const stepRow = await claimImStep('send the mail');
+    const { proposalId } = proposeAction(s.db, {
+      teamId: s.team.id,
+      actionId: 'connector.gmail.send_message',
+      targetId: 'mailto:ian@example.com',
+      input: { to: 'mailto:ian@example.com', body: 'hi' },
+      threadId: stepRow.buildId,
+      scopeProjectId: null,
+      card: [
+        {
+          header: '发送',
+          question: 'Send this mail?',
+          options: [{ label: '发送' }, { label: '不发' }],
+        },
+      ],
+    });
+    announceQuestion(
+      { db: s.db, hub: s.hub, convHub: s.convHub, user: s.user },
+      stepRow.buildId,
+      `approval-${proposalId}`,
+    );
+    await vi.waitFor(() => expect(sessions[0]?.sent).toHaveLength(1));
+    expect(sessions[0]?.sent[0]?.buttons?.[0]?.[0]?.label).toBe('发送');
+    sessions[0]?.sent.splice(0);
+
+    tap(`imcb:approval-${proposalId}:0`);
+
+    expect(
+      s.db.select().from(actionProposal).where(eq(actionProposal.id, proposalId)).get()?.status,
+    ).toBe('executed');
+    await vi.waitFor(() =>
+      expect(sessions[0]?.sent.some((msg) => msg.text === CARD_ENDINGS.executed)).toBe(true),
+    );
+    const wake = s.db
+      .select()
+      .from(step)
+      .where(eq(step.id, `wake:${proposalId}:${stepRow.buildId}`))
+      .get();
+    expect(wake?.status).toBe('pending');
+    expect(
+      s.db
+        .select()
+        .from(imTurnOrigin)
+        .where(eq(imTurnOrigin.stepId, wake?.id ?? ''))
+        .get()?.senderId,
+    ).toBe('55');
+    const settled = askQuestionContentOf(
+      s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.id, `approval-${proposalId}`))
+        .get()?.content,
+    );
+    expect(settled?.status).toBe('answered');
+  });
+
+  test('a tap from an unpaired sender is ignored', async () => {
+    await connectAndPair('55');
+    const stepRow = await claimImStep('pick something');
+    await questionCard(stepRow.buildId, 'q-3');
+    sessions[0]?.sent.splice(0);
+    tap('imcb:q-3:0', 'stranger');
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const content = askQuestionContentOf(
+      s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'q-3')).get()?.content,
+    );
+    expect(content?.status).toBe('pending');
+    expect(sessions[0]?.sent).toHaveLength(0);
+  });
+
+  test('inbound photos and files are stored and listed for the coordinator', async () => {
+    await connectAndPair('55');
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]).toString('base64');
+    const notes = Buffer.from('ship it\n').toString('base64');
+    sessions[0]?.handlers.onMessage({
+      ...inbound('55', 'see these'),
+      images: [{ name: 'photo.jpg', mimeType: 'image/jpeg', dataBase64: jpeg }],
+      files: [{ name: 'notes.txt', mimeType: 'text/plain', dataBase64: notes }],
+    });
+    const rows = s.db.select().from(attachment).all();
+    expect(rows).toHaveLength(2);
+    const names = rows.map((row) => row.fileName).sort();
+    expect(names).toEqual(['notes.txt', 'photo.jpg']);
+    const stepRow = latestChiefStep();
+    for (const row of rows) {
+      expect(stepRow.prompt).toContain(`attachment=${row.id}`);
+      expect(stepRow.prompt).toContain(row.fileName);
+    }
+    expect(stepRow.prompt).toContain('see these');
+  });
+
+  test('attachments that fail to download are counted, not fatal', async () => {
+    await connectAndPair('55');
+    sessions[0]?.handlers.onMessage({
+      ...inbound('55', ''),
+      images: [
+        { name: 'gone.jpg', mimeType: 'image/jpeg', dataBase64: null },
+        {
+          name: 'bad.jpg',
+          mimeType: 'image/jpeg',
+          dataBase64: Buffer.from('not jpeg').toString('base64'),
+        },
+      ],
+    });
+    expect(s.db.select().from(attachment).all()).toHaveLength(0);
+    const stepRow = latestChiefStep();
+    expect(stepRow.prompt).toContain('2 个附件没有取到');
   });
 });
 

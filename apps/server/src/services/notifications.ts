@@ -213,6 +213,7 @@ export function notifyChiefMessage(
     threadId: string;
     message: string;
     agent: { name: string; avatarUrl: string | null };
+    card?: { requestId: string };
   },
 ): NotificationRecord {
   const thread = deps.db.select().from(chiefThread).where(eq(chiefThread.id, input.threadId)).get();
@@ -225,7 +226,7 @@ export function notifyChiefMessage(
     agent: input.agent,
     snippet: input.message,
   });
-  imNotice(input.threadId, input.message);
+  imNotice(input.threadId, input.message, input.card);
   return record;
 }
 

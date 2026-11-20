@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ImSendError } from '../src/services/im/errors.js';
 import { chunkText, createTelegramAdapter } from '../src/services/im/telegram.js';
-import type { ImEnv, ImInboundMessage } from '../src/services/im/types.js';
+import type { ImEnv, ImInboundAction, ImInboundMessage } from '../src/services/im/types.js';
 
 const TOKEN = '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789';
 const PARK = Symbol('park');
@@ -9,6 +9,7 @@ const PARK = Symbol('park');
 type TelegramReply =
   | { ok: true; result: unknown }
   | { ok: false; error_code: number; description: string; parameters?: { retry_after?: number } }
+  | Uint8Array
   | typeof PARK;
 
 interface FakeTelegram {
@@ -37,6 +38,10 @@ function fakeTelegramEnv(): FakeTelegram {
         });
         const queued = queues.get(method)?.shift();
         if (queued === undefined || queued === PARK) return;
+        if (queued instanceof Uint8Array) {
+          resolve(new Response(queued, { status: 200 }));
+          return;
+        }
         resolve(
           new Response(JSON.stringify(queued), {
             status: 200,
@@ -132,6 +137,115 @@ describe('telegram adapter', () => {
     await session.stop();
   });
 
+  test('routes callback_query data to onAction and acks the query', async () => {
+    tg.queue('getMe', BOT_ME);
+    tg.queue('getUpdates', {
+      ok: true,
+      result: [
+        {
+          update_id: 50,
+          callback_query: {
+            id: 'cbq-9',
+            from: { id: 42, is_bot: false, first_name: 'Ian' },
+            message: { message_id: 7, chat: { id: 777, type: 'private' } },
+            data: 'imcb:q-1:0',
+          },
+        },
+      ],
+    });
+    tg.queue('getUpdates', PARK);
+    tg.queue('answerCallbackQuery', { ok: true, result: true });
+    const actions: ImInboundAction[] = [];
+    const session = await adapter.connect(
+      { botToken: TOKEN },
+      {
+        onMessage: () => {},
+        onAction: (action) => actions.push(action),
+        onStatus: () => {},
+      },
+      tg.env,
+    );
+    await vi.waitFor(() => expect(actions).toHaveLength(1));
+    expect(actions[0]).toEqual({
+      chat: { key: '777', kind: 'direct', title: null },
+      sender: { id: '42', name: 'Ian' },
+      value: 'imcb:q-1:0',
+      messageId: 'cq:cbq-9',
+    });
+    await vi.waitFor(() =>
+      expect(
+        tg.calls.some(
+          (call) =>
+            call.method === 'answerCallbackQuery' && call.body.callback_query_id === 'cbq-9',
+        ),
+      ).toBe(true),
+    );
+    await vi.waitFor(() => {
+      const polls = tg.calls.filter((call) => call.method === 'getUpdates');
+      expect(polls.length).toBeGreaterThanOrEqual(2);
+      expect(polls[1]?.body.offset).toBe(51);
+    });
+    await session.stop();
+  });
+
+  test('downloads photos and documents into the inbound message', async () => {
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]);
+    const pdf = new TextEncoder().encode('%PDF-1.4 fake');
+    tg.queue('getMe', BOT_ME);
+    tg.queue('getUpdates', {
+      ok: true,
+      result: [
+        {
+          update_id: 60,
+          message: {
+            message_id: 600,
+            from: { id: 42, is_bot: false, first_name: 'Ian' },
+            chat: { id: 777, type: 'private' },
+            caption: 'look',
+            photo: [
+              { file_id: 'small', width: 10, height: 10 },
+              { file_id: 'big', width: 90, height: 90, file_size: 8 },
+            ],
+            document: {
+              file_id: 'doc1',
+              file_name: 'report.pdf',
+              mime_type: 'application/pdf',
+              file_size: 5,
+            },
+          },
+        },
+      ],
+    });
+    tg.queue('getUpdates', PARK);
+    tg.queue('getFile', { ok: true, result: { file_path: 'photos/big.jpg', file_size: 8 } });
+    tg.queue('getFile', { ok: true, result: { file_path: 'docs/report.pdf', file_size: 5 } });
+    tg.queue('big.jpg', jpeg);
+    tg.queue('report.pdf', pdf);
+    const inbound: ImInboundMessage[] = [];
+    const session = await adapter.connect(
+      { botToken: TOKEN },
+      { onMessage: (m) => inbound.push(m), onStatus: () => {} },
+      tg.env,
+    );
+    await vi.waitFor(() => expect(inbound).toHaveLength(1));
+    expect(inbound[0]?.text).toBe('look');
+    expect(inbound[0]?.images).toHaveLength(1);
+    expect(inbound[0]?.images[0]).toMatchObject({
+      name: 'photo-600.jpg',
+      mimeType: 'image/jpeg',
+    });
+    expect(Buffer.from(inbound[0]?.images[0]?.dataBase64 ?? '', 'base64')).toEqual(
+      Buffer.from(jpeg),
+    );
+    expect(inbound[0]?.files).toHaveLength(1);
+    expect(inbound[0]?.files[0]).toMatchObject({
+      name: 'report.pdf',
+      mimeType: 'application/pdf',
+    });
+    expect(Buffer.from(inbound[0]?.files[0]?.dataBase64 ?? '', 'base64')).toEqual(Buffer.from(pdf));
+    await session.stop();
+  });
+
   test('gates group messages on a bot mention', async () => {
     tg.queue('getMe', BOT_ME);
     tg.queue('getUpdates', {
@@ -207,6 +321,37 @@ describe('telegram adapter', () => {
     await expect(sending).rejects.toSatisfy(
       (err) => err instanceof ImSendError && err.kind === 'retry' && err.retryAfterMs === 7000,
     );
+    await session.stop();
+  });
+
+  test('send renders buttons as an inline keyboard', async () => {
+    tg.queue('getMe', BOT_ME);
+    tg.queue('getUpdates', PARK);
+    tg.queue('sendMessage', { ok: true, result: { message_id: 1 } });
+    const session = await adapter.connect(
+      { botToken: TOKEN },
+      { onMessage: () => {}, onStatus: () => {} },
+      tg.env,
+    );
+    await session.send({
+      chatKey: '777',
+      text: 'choose',
+      buttons: [
+        [
+          { label: 'Approve', value: 'imcb:q:0' },
+          { label: 'No', value: 'imcb:q:1' },
+        ],
+      ],
+    });
+    const send = tg.calls.find((call) => call.method === 'sendMessage');
+    expect(send?.body.reply_markup).toEqual({
+      inline_keyboard: [
+        [
+          { text: 'Approve', callback_data: 'imcb:q:0' },
+          { text: 'No', callback_data: 'imcb:q:1' },
+        ],
+      ],
+    });
     await session.stop();
   });
 

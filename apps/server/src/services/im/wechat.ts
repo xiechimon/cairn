@@ -3,6 +3,7 @@ import type {
   ImAdapter,
   ImConnectionHandlers,
   ImEnv,
+  ImInboundFile,
   ImInboundMessage,
   ImOutboundMessage,
 } from './types.js';
@@ -282,7 +283,7 @@ export const wechatAdapter: ImAdapter = {
       const contextToken = String(message.context_token ?? '');
       if (contextToken !== '') contextTokens.set(userId, contextToken);
       const texts: string[] = [];
-      const images: unknown[] = [];
+      const images: ImInboundFile[] = [];
       for (const raw of Array.isArray(message.item_list) ? message.item_list : []) {
         const item =
           raw !== null && typeof raw === 'object' ? (raw as IlinkObject) : ({} as IlinkObject);
@@ -292,7 +293,7 @@ export const wechatAdapter: ImAdapter = {
         } else if (type === 3 && objectAt(item, 'voice_item')?.text !== undefined) {
           texts.push(String(objectAt(item, 'voice_item')?.text));
         } else if (type === 2 && objectAt(item, 'image_item') !== undefined) {
-          images.push({ kind: 'image' });
+          images.push({ name: 'image', mimeType: null, dataBase64: null });
         }
       }
       handlers.onMessage({
@@ -300,6 +301,7 @@ export const wechatAdapter: ImAdapter = {
         sender: { id: userId, name: null },
         text: texts.join('\n').trim(),
         images,
+        files: [],
         messageId: String(message.client_id ?? message.message_id ?? ''),
         mentioned: false,
       });

@@ -246,7 +246,8 @@ describe('wechat adapter connect', () => {
       chat: { key: 'u1@im.wechat', kind: 'direct', title: null },
       sender: { id: 'u1@im.wechat', name: null },
       text: 'hello\nspoken words',
-      images: [{ kind: 'image' }],
+      images: [{ name: 'image', mimeType: null, dataBase64: null }],
+      files: [],
       messageId: 'c1',
       mentioned: false,
     });

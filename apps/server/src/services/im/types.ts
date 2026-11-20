@@ -19,13 +19,27 @@ export interface ImEnv {
   connectSocket(url: string, handlers: ImSocketHandlers): ImSocket;
 }
 
+export interface ImInboundFile {
+  name: string;
+  mimeType: string | null;
+  dataBase64: string | null;
+}
+
 export interface ImInboundMessage {
   chat: { key: string; kind: 'direct' | 'group'; title: string | null };
   sender: { id: string; name: string | null };
   text: string;
-  images: unknown[];
+  images: ImInboundFile[];
+  files: ImInboundFile[];
   messageId: string;
   mentioned: boolean;
+}
+
+export interface ImInboundAction {
+  chat: { key: string; kind: 'direct' | 'group'; title: string | null };
+  sender: { id: string; name: string | null };
+  value: string;
+  messageId: string;
 }
 
 export interface ImOutboundMessage {
@@ -37,6 +51,7 @@ export interface ImOutboundMessage {
 
 export interface ImConnectionHandlers {
   onMessage(msg: ImInboundMessage): void;
+  onAction?(action: ImInboundAction): void;
   onStatus(
     status: 'connecting' | 'ready' | 'degraded' | 'expired' | 'error',
     detail?: string,

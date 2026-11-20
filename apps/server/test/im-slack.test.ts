@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { ImSendError } from '../src/services/im/errors.js';
 import { createSlackAdapter } from '../src/services/im/slack.js';
-import type { ImConnectionHandlers, ImEnv, ImInboundMessage } from '../src/services/im/types.js';
+import type {
+  ImConnectionHandlers,
+  ImEnv,
+  ImInboundAction,
+  ImInboundMessage,
+} from '../src/services/im/types.js';
 
 const APP_TOKEN = 'xapp-1-A0123BCDE-456789-abcdef';
 const BOT_TOKEN = 'xoxb-123456789012-abcdefghijkl';
 const PARK = Symbol('park');
 
-type SlackReply = Record<string, unknown> | typeof PARK | { __http: number; retryAfter?: number };
+type SlackReply =
+  | Record<string, unknown>
+  | Uint8Array
+  | typeof PARK
+  | { __http: number; retryAfter?: number };
 
 interface RecordedCall {
   method: string;
@@ -53,6 +62,10 @@ function fakeSlackEnv(): FakeSlack {
         });
         const queued = queues.get(method)?.shift();
         if (queued === undefined || queued === PARK) return;
+        if (queued instanceof Uint8Array) {
+          resolve(new Response(queued, { status: 200 }));
+          return;
+        }
         if (typeof queued === 'object' && '__http' in queued) {
           const http = queued as { __http: number; retryAfter?: number };
           resolve(
@@ -249,22 +262,72 @@ describe('slack adapter', () => {
     await session.stop();
   });
 
-  test('acks interactive envelopes without routing them', async () => {
-    const inbound: ImInboundMessage[] = [];
+  test('routes interactive block_actions to onAction and acks the envelope', async () => {
+    const actions: ImInboundAction[] = [];
     const session = await readySession({
-      onMessage: (msg) => inbound.push(msg),
+      onMessage: () => {},
+      onAction: (action) => actions.push(action),
       onStatus: () => {},
     });
     const socket = slack.sockets[0];
     socket?.receive({
       envelope_id: 'e-int',
       type: 'interactive',
-      payload: { type: 'block_actions', actions: [{ value: 'approve' }] },
+      payload: {
+        type: 'block_actions',
+        user: { id: 'U42' },
+        channel: { id: 'D0DM' },
+        actions: [{ action_id: 'cairn-0-0', type: 'button', value: 'imcb:q-1:1' }],
+      },
     });
-    await vi.waitFor(() =>
-      expect(socket?.sent).toContain(JSON.stringify({ envelope_id: 'e-int' })),
+    await vi.waitFor(() => expect(actions).toHaveLength(1));
+    expect(actions[0]).toEqual({
+      chat: { key: 'D0DM', kind: 'direct', title: null },
+      sender: { id: 'U42', name: null },
+      value: 'imcb:q-1:1',
+      messageId: 'slack-ia:e-int:cairn-0-0',
+    });
+    expect(socket?.sent).toContain(JSON.stringify({ envelope_id: 'e-int' }));
+    await session.stop();
+  });
+
+  test('downloads file_share attachments into the inbound message', async () => {
+    const inbound: ImInboundMessage[] = [];
+    const session = await readySession({
+      onMessage: (msg) => inbound.push(msg),
+      onStatus: () => {},
+    });
+    slack.queue('users.info', {
+      ok: true,
+      user: { name: 'ian', profile: { display_name: 'Ian' } },
+    });
+    slack.queue('report.txt', new TextEncoder().encode('hello file'));
+    slack.sockets[0]?.receive(
+      imEnvelope(
+        'e-file',
+        messageEvent({
+          subtype: 'file_share',
+          text: '',
+          files: [
+            {
+              id: 'F1',
+              name: 'report.txt',
+              mimetype: 'text/plain',
+              size: 10,
+              url_private_download: 'https://files.slack.com/files-pri/T0-F1/report.txt',
+            },
+          ],
+        }),
+      ),
     );
-    expect(inbound).toHaveLength(0);
+    await vi.waitFor(() => expect(inbound).toHaveLength(1));
+    expect(inbound[0]?.files).toHaveLength(1);
+    expect(inbound[0]?.files[0]).toMatchObject({ name: 'report.txt', mimeType: 'text/plain' });
+    expect(Buffer.from(inbound[0]?.files[0]?.dataBase64 ?? '', 'base64').toString()).toBe(
+      'hello file',
+    );
+    const download = slack.calls.find((call) => call.method === 'report.txt');
+    expect(download?.authorization).toBe(`Bearer ${BOT_TOKEN}`);
     await session.stop();
   });
 

@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import { rmSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   ImConnectionRecord,
   ImConnectionStatus,
@@ -7,8 +10,10 @@ import type {
   ImWechatLoginPoll,
   ImWechatLoginStart,
 } from '@cairn/shared';
+import { isAllowedAttachmentExt } from '@cairn/shared';
 import { and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import {
+  attachment,
   chiefMessage,
   coordinatorInput,
   externalEffect,
@@ -22,12 +27,30 @@ import { HttpError } from '../../lib/errors.js';
 import { newRecordId, nowMs } from '../../lib/ids.js';
 import type { KeySecretBox } from '../../lib/secret-box.js';
 import {
+  ALWAYS_CHOICE,
+  APPROVE_CHOICE,
+  answerProposal,
+  CARD_ENDINGS,
+  type Decision,
+  dispatchActionWakes,
+  SEND_CHOICE,
+} from '../action-proposals.js';
+import { attachmentMime } from '../agent-attachments.js';
+import {
+  extOf,
+  isValidFileName,
+  validateAttachmentUpload,
+  writeAttachmentFile,
+} from '../attachments.js';
+import {
+  answerChiefQuestion,
   type ChiefDeps,
   coordinatorThreadRow,
   enqueueChiefStep,
   ensureChief,
   extractText,
 } from '../chief.js';
+import { askQuestionContentOf, proposalIdOfCard, publishQuestion } from '../chief-questions.js';
 import {
   cancelPendingEffects,
   drainEffects,
@@ -41,7 +64,14 @@ import {
 } from '../external-effects.js';
 import { asSendError } from './errors.js';
 import type { ImRuntimeHooks, ImStepRow } from './runtime.js';
-import type { ImAdapter, ImEnv, ImInboundMessage, ImOutboundMessage } from './types.js';
+import type {
+  ImAdapter,
+  ImEnv,
+  ImInboundAction,
+  ImInboundFile,
+  ImInboundMessage,
+  ImOutboundMessage,
+} from './types.js';
 
 type ConnectionRow = typeof imConnection.$inferSelect;
 
@@ -54,6 +84,8 @@ export interface ImServiceDeps extends ChiefDeps {
   box: Pick<KeySecretBox, 'seal' | 'open'>;
   env: ImEnv;
   adapters: Partial<Record<ImPlatform, ImAdapter>>;
+  attachmentsDir: string;
+  reposDir: string;
 }
 
 export interface ImService {
@@ -107,6 +139,24 @@ function imSendConnId(payload: unknown): string | null {
   return typeof connId === 'string' ? connId : null;
 }
 
+function imSendButtons(raw: unknown): { label: string; value: string }[][] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const rows: { label: string; value: string }[][] = [];
+  for (const rawRow of raw) {
+    if (!Array.isArray(rawRow)) return undefined;
+    const row: { label: string; value: string }[] = [];
+    for (const rawButton of rawRow) {
+      if (typeof rawButton !== 'object' || rawButton === null) return undefined;
+      const button = rawButton as Record<string, unknown>;
+      if (typeof button.label !== 'string' || typeof button.value !== 'string') return undefined;
+      row.push({ label: button.label, value: button.value });
+    }
+    if (row.length === 0) return undefined;
+    rows.push(row);
+  }
+  return rows.length === 0 ? undefined : rows;
+}
+
 function imSendPayload(payload: unknown): { connId: string; message: ImOutboundMessage } | null {
   if (typeof payload !== 'object' || payload === null) return null;
   const raw = payload as Record<string, unknown>;
@@ -120,6 +170,7 @@ function imSendPayload(payload: unknown): { connId: string; message: ImOutboundM
       ...(typeof raw.replyToMessageId === 'string'
         ? { replyToMessageId: raw.replyToMessageId }
         : {}),
+      ...(imSendButtons(raw.buttons) !== undefined ? { buttons: imSendButtons(raw.buttons) } : {}),
     },
   };
 }
@@ -232,6 +283,8 @@ export function createImService(deps: ImServiceDeps): ImService {
       stepId?: string;
       claimGeneration?: number;
       dedupe: string;
+      requestId?: string;
+      owned?: string[];
     },
   ): void => {
     const conn = connRow(connId);
@@ -250,12 +303,16 @@ export function createImService(deps: ImServiceDeps): ImService {
         scope?.dedupe ?? '',
         msg.text,
         msg.replyToMessageId ?? '',
+        JSON.stringify(msg.buttons ?? null),
       ),
       payload: {
         connId,
         chatKey: msg.chatKey,
         text: msg.text,
         replyToMessageId: msg.replyToMessageId ?? null,
+        buttons: msg.buttons ?? null,
+        requestId: scope?.requestId ?? null,
+        owned: scope?.owned ?? null,
       },
     });
     if (row.state !== 'pending') return;
@@ -273,12 +330,17 @@ export function createImService(deps: ImServiceDeps): ImService {
     origin: Origin,
     text: string,
     stepRef: { id: string; claimedAt?: number | null },
+    card?: { requestId: string; buttons: { label: string; value: string }[][]; owned: string[] },
   ): void => {
     const trimmed = text.trim();
     if (trimmed === '') return;
     enqueueSend(
       origin.connId,
-      { chatKey: origin.chatKey, text: trimmed },
+      {
+        chatKey: origin.chatKey,
+        text: trimmed,
+        ...(card !== undefined ? { buttons: card.buttons } : {}),
+      },
       {
         kind: 'step',
         id: stepRef.id,
@@ -286,9 +348,11 @@ export function createImService(deps: ImServiceDeps): ImService {
         ...(stepRef.claimedAt !== null && stepRef.claimedAt !== undefined
           ? { claimGeneration: stepRef.claimedAt }
           : {}),
-        dedupe: stepRef.id,
+        dedupe: `${stepRef.id}:${card?.requestId ?? ''}`,
+        ...(card !== undefined ? { requestId: card.requestId, owned: card.owned } : {}),
       },
     );
+    for (const id of card?.owned ?? []) imOwnedMessageIds.add(id);
   };
 
   const originOf = (stepId: string): Origin | undefined => {
@@ -321,10 +385,27 @@ export function createImService(deps: ImServiceDeps): ImService {
     return owners;
   };
 
+  const imOwned = (id: string): boolean => {
+    if (imOwnedMessageIds.has(id)) return true;
+    const found = deps.db
+      .select({ id: externalEffect.id })
+      .from(externalEffect)
+      .where(
+        and(
+          eq(externalEffect.kind, 'im-send'),
+          sql`exists (select 1 from json_each(${externalEffect.payload}, '$.owned') where value = ${id})`,
+        ),
+      )
+      .get();
+    if (found === undefined) return false;
+    imOwnedMessageIds.add(id);
+    return true;
+  };
+
   const turnIsImOnly = (stepId: string): boolean => {
     if (mixed.has(stepId)) return false;
     for (const id of turnOwners(stepId)) {
-      if (!imOwnedMessageIds.has(id)) return false;
+      if (!imOwned(id)) return false;
     }
     return true;
   };
@@ -352,10 +433,94 @@ export function createImService(deps: ImServiceDeps): ImService {
     return null;
   };
 
-  const inboundPrompt = (row: ConnectionRow, msg: ImInboundMessage): string => {
+  const sniffExt = (bytes: Buffer): string | null => {
+    const starts = (hex: string) =>
+      bytes.subarray(0, hex.length / 2).equals(Buffer.from(hex, 'hex'));
+    if (starts('89504e470d0a1a0a')) return 'png';
+    if (starts('ffd8ff')) return 'jpg';
+    const head6 = bytes.subarray(0, 6).toString('latin1');
+    if (head6 === 'GIF87a' || head6 === 'GIF89a') return 'gif';
+    if (
+      bytes.subarray(0, 4).toString('latin1') === 'RIFF' &&
+      bytes.subarray(8, 12).toString('latin1') === 'WEBP'
+    )
+      return 'webp';
+    if (bytes.subarray(0, 5).toString('latin1') === '%PDF-') return 'pdf';
+    try {
+      const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      for (const ch of text) {
+        const code = ch.charCodeAt(0);
+        if (code < 32 && code !== 9 && code !== 10 && code !== 13) return null;
+      }
+      return 'txt';
+    } catch {
+      return null;
+    }
+  };
+
+  const storeInboundFile = (
+    teamId: string,
+    connId: string,
+    file: ImInboundFile,
+    index: number,
+  ): { id: string; name: string } => {
+    const bytes = Buffer.from(file.dataBase64 ?? '', 'base64');
+    const named = isValidFileName(file.name) ? file.name : `im-file-${index}`;
+    const fileName = isAllowedAttachmentExt(extOf(named))
+      ? named
+      : `im-file-${index}.${sniffExt(bytes) ?? 'bin'}`;
+    const mimeType = attachmentMime(fileName, bytes);
+    validateAttachmentUpload(
+      { db: deps.db, teamId },
+      { fileName, mimeType, size: bytes.length, scope: 'message' },
+    );
+    const id = newRecordId();
+    const key = `${teamId}/${id}.${extOf(fileName)}`;
+    writeAttachmentFile(deps.attachmentsDir, key, bytes);
+    try {
+      deps.db
+        .insert(attachment)
+        .values({
+          id,
+          teamId,
+          sha256: createHash('sha256').update(bytes).digest('hex'),
+          createdBy: `im:${connId}`,
+          fileName,
+          mimeType,
+          sizeBytes: bytes.length,
+          storageKey: key,
+          grantId: newRecordId(),
+          scope: 'message',
+          status: 'ready',
+          createdAt: nowMs(),
+        })
+        .run();
+    } catch (error) {
+      rmSync(join(deps.attachmentsDir, key), { force: true });
+      throw error;
+    }
+    return { id, name: fileName };
+  };
+
+  const inboundPrompt = (
+    row: ConnectionRow,
+    msg: ImInboundMessage,
+    stored: { id: string; name: string }[],
+    dropped: number,
+  ): string => {
     const where = msg.chat.kind === 'group' ? `群聊「${msg.chat.title ?? msg.chat.key}」` : '私聊';
     const who = msg.sender.name ?? `sender ${msg.sender.id}`;
-    return `主人通过 ${row.platform} ${where}收到 ${who} 的消息。请直接回复对方，回复会发回同一个聊天。\n\n${msg.text}`;
+    const lines = [
+      `主人通过 ${row.platform} ${where}收到 ${who} 的消息。请直接回复对方，回复会发回同一个聊天。`,
+      '',
+      msg.text === '' ? '（这条消息没有文字，只有下面的附件。）' : msg.text,
+    ];
+    if (stored.length > 0) {
+      lines.push('', '对方发来的附件（用 attachment 工具打开 attachment= 的 id）：');
+      for (const file of stored) lines.push(`- ${file.name} attachment=${file.id}`);
+    }
+    if (dropped > 0) lines.push(`（另有 ${dropped} 个附件没有取到。）`);
+    return lines.join('\n');
   };
 
   const persistPollOffset = (connId: string, row: ConnectionRow): void => {
@@ -457,10 +622,23 @@ export function createImService(deps: ImServiceDeps): ImService {
       recordPairingRequest(row, msg);
       return;
     }
+    const stored: { id: string; name: string }[] = [];
+    let dropped = 0;
+    for (const [index, file] of [...msg.images, ...msg.files].entries()) {
+      if (file.dataBase64 === null) {
+        dropped += 1;
+        continue;
+      }
+      try {
+        stored.push(storeInboundFile(row.teamId, connId, file, index));
+      } catch {
+        dropped += 1;
+      }
+    }
     const chiefRow = ensureChief(deps, row.teamId);
     const threadRow = coordinatorThreadRow(deps, chiefRow);
     const stepId = enqueueChiefStep(deps, threadRow.id, {
-      prompt: inboundPrompt(row, msg),
+      prompt: inboundPrompt(row, msg, stored, dropped),
       trigger: 'wake',
       provenance: `im:${row.platform}:${connId}:${msg.chat.key}`,
       ownerMessageIds: [],
@@ -481,6 +659,160 @@ export function createImService(deps: ImServiceDeps): ImService {
 
   const onStatus = (connId: string, status: ImConnectionStatus, detail?: string): void => {
     markStatus(connId, status, detail ?? null);
+  };
+
+  const imCallback = (value: string): { requestId: string; optionIndex: number } | null => {
+    const m = /^imcb:(.+):(\d+)$/.exec(value);
+    if (m === null) return null;
+    const optionIndex = Number(m[2]);
+    if (!Number.isInteger(optionIndex) || optionIndex < 0) return null;
+    return { requestId: m[1] ?? '', optionIndex };
+  };
+
+  const attachOrigin = (
+    connId: string,
+    action: ImInboundAction,
+    threadId: string,
+    stepId: string,
+  ): void => {
+    deps.db
+      .insert(imTurnOrigin)
+      .values({
+        stepId,
+        connId,
+        chatKey: action.chat.key,
+        senderId: action.sender.id,
+        threadId,
+        createdAt: nowMs(),
+      })
+      .onConflictDoNothing()
+      .run();
+  };
+
+  const cardDecision = (label: string): Decision =>
+    label === APPROVE_CHOICE || label === SEND_CHOICE
+      ? 'allow-once'
+      : label === ALWAYS_CHOICE
+        ? 'always'
+        : 'refuse';
+
+  const answerCard = (connId: string, row: ConnectionRow, action: ImInboundAction): void => {
+    const parsed = imCallback(action.value);
+    if (parsed === null) return;
+    const delivered = deps.db
+      .select({ id: externalEffect.id })
+      .from(externalEffect)
+      .where(
+        and(
+          eq(externalEffect.kind, 'im-send'),
+          sql`json_extract(${externalEffect.payload}, '$.connId') = ${connId}`,
+          sql`json_extract(${externalEffect.payload}, '$.requestId') = ${parsed.requestId}`,
+        ),
+      )
+      .get();
+    if (delivered === undefined) return;
+    const card = deps.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, parsed.requestId))
+      .get();
+    const content = card === undefined ? null : askQuestionContentOf(card.content);
+    if (card === undefined || content === null) return;
+    if (content.status !== 'pending' || content.questions.length !== 1) {
+      enqueueSend(
+        connId,
+        { chatKey: action.chat.key, text: '这条消息已经处理过了。' },
+        {
+          kind: 'imConnection',
+          id: connId,
+          dedupe: `card-stale:${parsed.requestId}:${action.sender.id}`,
+        },
+      );
+      return;
+    }
+    const option = content.questions[0]?.options[parsed.optionIndex];
+    if (option === undefined) return;
+    const chat = { chatKey: action.chat.key };
+    const proposalId = proposalIdOfCard(content);
+    if (proposalId !== null) {
+      try {
+        const result = answerProposal(
+          { ...deps, reposDir: deps.reposDir },
+          {
+            proposalId,
+            teamId: row.teamId,
+            decision: cardDecision(option.label),
+            decidedBy: `im:${action.sender.id}`,
+            viaCard: true,
+          },
+        );
+        enqueueSend(
+          connId,
+          { ...chat, text: CARD_ENDINGS[result.status] || '已处理。' },
+          { kind: 'imConnection', id: connId, dedupe: `card-done:${parsed.requestId}` },
+        );
+      } catch (error) {
+        if (error instanceof HttpError) {
+          enqueueSend(
+            connId,
+            { ...chat, text: '这条审批已经处理过或失效了。' },
+            { kind: 'imConnection', id: connId, dedupe: `card-fail:${parsed.requestId}` },
+          );
+          return;
+        }
+        throw error;
+      } finally {
+        publishQuestion(deps, card.threadId, parsed.requestId);
+        dispatchActionWakes(deps);
+      }
+      const wake = deps.db
+        .select({ id: step.id })
+        .from(step)
+        .where(eq(step.id, `wake:${proposalId}:${card.threadId}`))
+        .get();
+      if (wake !== undefined) attachOrigin(connId, action, card.threadId, wake.id);
+      return;
+    }
+    try {
+      answerChiefQuestion(deps, row.teamId, {
+        threadId: card.threadId,
+        requestId: parsed.requestId,
+        answers: [{ header: content.questions[0]?.header ?? '', choices: [option.label] }],
+      });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        enqueueSend(
+          connId,
+          { ...chat, text: '这条消息已经处理过了。' },
+          { kind: 'imConnection', id: connId, dedupe: `card-fail:${parsed.requestId}` },
+        );
+        return;
+      }
+      throw error;
+    }
+    const resumed = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, card.threadId),
+          eq(step.kind, 'chief'),
+          eq(step.status, 'pending'),
+          sql`exists (select 1 from json_each(${step.ownerMessageIds}) where value = ${parsed.requestId})`,
+        ),
+      )
+      .get();
+    if (resumed !== undefined) attachOrigin(connId, action, card.threadId, resumed.id);
+  };
+
+  const onAction = (connId: string, action: ImInboundAction): void => {
+    const session = live.get(connId);
+    const row = connRow(connId);
+    if (session === undefined || row === undefined) return;
+    persistPollOffset(connId, row);
+    if (!rememberInbound(connId, action.messageId)) return;
+    if (!row.pairedSenders.some((sender) => sender.id === action.sender.id)) return;
+    answerCard(connId, row, action);
   };
 
   const openFields = (row: ConnectionRow): Record<string, string> => {
@@ -517,6 +849,7 @@ export function createImService(deps: ImServiceDeps): ImService {
         fields,
         {
           onMessage: (msg) => onMessage(connId, msg),
+          onAction: (action) => onAction(connId, action),
           onStatus: (status, detail) => onStatus(connId, status, detail),
         },
         deps.env,
@@ -539,7 +872,7 @@ export function createImService(deps: ImServiceDeps): ImService {
 
   const service: ImService = {
     runtime: {
-      notice(threadId: string, text: string): void {
+      notice(threadId: string, text: string, card?: { requestId: string }): void {
         const claimed = deps.db
           .select({ id: step.id })
           .from(step)
@@ -547,10 +880,43 @@ export function createImService(deps: ImServiceDeps): ImService {
             and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
           )
           .all();
+        let cardSend:
+          | {
+              requestId: string;
+              text: string;
+              buttons: { label: string; value: string }[][];
+              owned: string[];
+            }
+          | undefined;
+        if (card !== undefined) {
+          const row = deps.db
+            .select({ content: chiefMessage.content })
+            .from(chiefMessage)
+            .where(and(eq(chiefMessage.id, card.requestId), eq(chiefMessage.threadId, threadId)))
+            .get();
+          const content = row === undefined ? null : askQuestionContentOf(row.content);
+          const question =
+            content !== null && content.status === 'pending' && content.questions.length === 1
+              ? content.questions[0]
+              : undefined;
+          if (question !== undefined && question.options.length > 0) {
+            cardSend = {
+              requestId: card.requestId,
+              text: `${question.question}\n\n${question.options.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}`,
+              buttons: [
+                question.options.map((o, i) => ({
+                  label: o.label,
+                  value: `imcb:${card.requestId}:${i}`,
+                })),
+              ],
+              owned: [card.requestId, ...(content?.askedFor ?? [])],
+            };
+          }
+        }
         for (const row of claimed) {
           const origin = originOf(row.id);
           if (origin !== undefined && turnIsImOnly(row.id)) {
-            sendToOrigin(origin, text, row);
+            sendToOrigin(origin, cardSend?.text ?? text, row, cardSend);
           }
         }
       },

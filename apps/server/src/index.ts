@@ -183,6 +183,8 @@ const im = createImService({
   box: secretBox,
   user: seeded.user,
   env: liveImEnv,
+  attachmentsDir,
+  reposDir,
   adapters: {
     telegram: createTelegramAdapter(),
     wechat: wechatAdapter,

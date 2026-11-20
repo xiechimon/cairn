@@ -3,7 +3,7 @@ import type { step } from '../../db/schema.js';
 export type ImStepRow = typeof step.$inferSelect;
 
 export interface ImRuntimeHooks {
-  notice(threadId: string, text: string): void;
+  notice(threadId: string, text: string, card?: { requestId: string }): void;
   turnFinished(stepRow: ImStepRow): void;
 }
 
@@ -13,8 +13,8 @@ export function setImRuntime(hooks: ImRuntimeHooks | null): void {
   current = hooks;
 }
 
-export function imNotice(threadId: string, text: string): void {
-  current?.notice(threadId, text);
+export function imNotice(threadId: string, text: string, card?: { requestId: string }): void {
+  current?.notice(threadId, text, card);
 }
 
 export function imTurnFinished(stepRow: ImStepRow): void {

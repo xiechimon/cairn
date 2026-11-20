@@ -176,7 +176,7 @@ export function createOrGetQuestion(
   };
   deps.db.transaction(() => {
     writeQuestion(deps.db, input.threadId, input.requestId, content, nowMs());
-    notifyQuestion(deps, input.threadId, input.questions);
+    notifyQuestion(deps, input.threadId, input.questions, input.requestId);
   });
   publishQuestion(deps, input.threadId, input.requestId);
   pushQuestion(deps, input.threadId, input.requestId, input.questions);
@@ -187,6 +187,7 @@ function notifyQuestion(
   deps: ChiefQuestionDeps,
   threadId: string,
   questions: readonly AskUserQuestion[],
+  requestId?: string,
 ): void {
   if (deps.hub === undefined || deps.user === undefined) return;
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
@@ -203,6 +204,7 @@ function notifyQuestion(
       ...(agentRow
         ? { agent: { name: agentRow.displayName, avatarUrl: null } }
         : { agent: { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl } }),
+      ...(requestId !== undefined ? { card: { requestId } } : {}),
     },
   );
 }
@@ -239,7 +241,7 @@ export function announceQuestion(
 ): void {
   const content = readQuestion(deps.db, threadId, requestId);
   if (content === null) return;
-  notifyQuestion(deps, threadId, content.questions);
+  notifyQuestion(deps, threadId, content.questions, requestId);
   publishQuestion(deps, threadId, requestId);
   pushQuestion(deps, threadId, requestId, content.questions);
 }
