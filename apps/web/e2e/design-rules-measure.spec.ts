@@ -17,7 +17,7 @@ const SURFACES = [
   { name: 'settings im', url: '/app/settings/im?scenario=01' },
 ];
 
-const CARD_GRID_OPEN = new Set(['settings apps', 'settings im']);
+const CARD_GRID_ALLOWED = new Set(['settings apps', 'settings im']);
 
 async function open(page: Page, url: string) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -93,6 +93,7 @@ for (const surface of SURFACES) {
   test(`${surface.name}: an object list is rows in one card, not a grid or stack of cards`, async ({
     page,
   }) => {
+    test.skip(CARD_GRID_ALLOWED.has(surface.name), 'V20: the owner keeps the Apps and IM card grids');
     await open(page, surface.url);
     const grids = await page.evaluate(() => {
       const found: string[] = [];
@@ -113,13 +114,6 @@ for (const surface of SURFACES) {
       }
       return found;
     });
-    if (CARD_GRID_OPEN.has(surface.name)) {
-      expect(
-        grids.length,
-        `V20: ${surface.name} is listed as an open violation in docs/design/audit-2026-11-20.md; once its list is rows in one card, drop it from CARD_GRID_OPEN`,
-      ).toBeGreaterThan(0);
-      return;
-    }
     expect(grids, 'V20: no grid or stack of three or more identical cards').toEqual([]);
   });
 
