@@ -159,6 +159,41 @@ test('masks absent git metadata containers so they cannot be planted', () => {
   }
 });
 
+test('pins a .git directory before stacking metadata masks on top of it', () => {
+  const policy = fixture();
+  const git = join(policy.workspace, '.git');
+  policy.gitDirectories = [git];
+  mkdirSync(join(git, 'hooks'), { recursive: true });
+  writeFileSync(join(git, 'config'), 'x');
+  const args = confinementArgs(policy, 'linux');
+  const pinIndex = args.findIndex((arg, index) => arg === git && args[index - 1] === '--bind');
+  const maskIndex = args.findIndex(
+    (arg, index) => arg === join(git, 'config') && args[index - 1] === '--ro-bind',
+  );
+  expect(pinIndex).toBeGreaterThanOrEqual(0);
+  expect(maskIndex).toBeGreaterThan(pinIndex);
+});
+
+test('masks an absent or non-regular .git so a pointer cannot be planted', () => {
+  const policy = fixture();
+  const args = confinementArgs(policy, 'linux');
+  const dotGit = join(policy.workspace, '.git');
+  const index = args.findIndex((arg) => arg === dotGit);
+  expect(args[index - 2]).toBe('--ro-bind');
+  expect(args[index - 1]).toBe('/dev/null');
+});
+
+test('pins a git metadata container that exists as a plain file', () => {
+  const policy = fixture();
+  const git = policy.gitDirectories[0] as string;
+  const worktrees = join(git, 'worktrees');
+  writeFileSync(worktrees, 'x');
+  const args = confinementArgs(policy, 'linux');
+  const index = args.findIndex((arg) => arg === worktrees);
+  expect(args[index - 1]).toBe('--ro-bind');
+  expect(args[index + 1]).toBe(worktrees);
+});
+
 test('rejects symlink mount sources before spawning', () => {
   const policy = fixture();
   symlinkSync(policy.workspace, join(policy.home, 'alias'));

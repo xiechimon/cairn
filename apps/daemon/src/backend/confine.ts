@@ -142,6 +142,12 @@ export function confinementArgs(
       else args.push('--tmpfs', path, '--remount-ro', path);
     }
   };
+  const workspaceGit = canonical(join(policy.workspace, '.git'));
+  const workspaceGitStat = lstatSync(workspaceGit, { throwIfNoEntry: false });
+  if (workspaceGitStat === undefined) args.push('--ro-bind', '/dev/null', workspaceGit);
+  else if (workspaceGitStat.isDirectory()) args.push('--bind', workspaceGit, workspaceGit);
+  else if (workspaceGitStat.isFile()) args.push('--ro-bind', workspaceGit, workspaceGit);
+  else args.push('--ro-bind', '/dev/null', workspaceGit);
   for (const directory of policy.gitDirectories) {
     maskGitDirectory(directory);
     const pinContainer = (parent: string) => {
@@ -150,7 +156,10 @@ export function confinementArgs(
         args.push('--tmpfs', parent, '--remount-ro', parent);
         return;
       }
-      if (!stat.isDirectory() || stat.isSymbolicLink()) return;
+      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+        args.push('--ro-bind', parent, parent);
+        return;
+      }
       args.push('--ro-bind', parent, parent);
       for (const entry of readdirSync(parent, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
@@ -163,10 +172,6 @@ export function confinementArgs(
     pinContainer(join(directory, 'worktrees'));
     pinContainer(join(directory, 'modules'));
   }
-  const workspaceGit = canonical(join(policy.workspace, '.git'));
-  const workspaceGitStat = lstatSync(workspaceGit, { throwIfNoEntry: false });
-  if (workspaceGitStat?.isDirectory()) args.push('--bind', workspaceGit, workspaceGit);
-  else if (workspaceGitStat?.isFile()) args.push('--ro-bind', workspaceGit, workspaceGit);
   args.push('--remount-ro', home);
   args.push('--chdir', policy.workspace);
   return args;
