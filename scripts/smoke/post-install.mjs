@@ -101,6 +101,7 @@ function readOwnerToken(userData) {
 async function api(ctx, method, path, body, token = ctx.token) {
   const res = await fetch(`${ctx.base}${path}`, {
     method,
+    signal: AbortSignal.timeout(30_000),
     headers: {
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
       authorization: `Bearer ${token}`,
@@ -213,6 +214,7 @@ async function uploadAttachment(ctx, fileName, mimeType, bytes) {
   form.set('file', new Blob([bytes], { type: mimeType }), fileName);
   const res = await fetch(`${ctx.base}${grant.uploadUrl}/upload`, {
     method: 'POST',
+    signal: AbortSignal.timeout(30_000),
     headers: { authorization: `Bearer ${ctx.token}`, 'sec-fetch-site': 'same-origin' },
     body: form,
   });
@@ -721,7 +723,10 @@ async function checkRemote(page, ctx) {
 }
 
 async function checkServeApp(_page, ctx) {
-  const res = await fetch(`${ctx.base}/app`, { headers: { 'sec-fetch-site': 'same-origin' } });
+  const res = await fetch(`${ctx.base}/app`, {
+    signal: AbortSignal.timeout(30_000),
+    headers: { 'sec-fetch-site': 'same-origin' },
+  });
   assert.ok(res.ok, `GET /app -> ${res.status}`);
   const body = await res.text();
   assert.ok(body.length > 0, '/app returned an empty body');
@@ -743,7 +748,7 @@ async function waitForServerUp(base, timeoutMs) {
   let lastError = null;
   while (Date.now() < deadline) {
     try {
-      const res = await fetch(`${base}/api/teams`);
+      const res = await fetch(`${base}/api/teams`, { signal: AbortSignal.timeout(10_000) });
       if (res.status < 500) return;
       lastError = new Error(`/api/teams -> ${res.status}`);
     } catch (error) {
@@ -775,6 +780,7 @@ async function connectApp(appPath, prevAppPath) {
     if (!existsSync(prevExecutable)) {
       throw new Error(`no executable at ${prevExecutable}; pass the previous release's Cairn.app`);
     }
+    console.log('booting previous release on the scratch home');
     const prevApp = await launchPackagedApp(prevExecutable, scratch);
     let prevBase;
     try {
@@ -782,17 +788,20 @@ async function connectApp(appPath, prevAppPath) {
       await waitForFile(prevPortFile, SERVER_WAIT_MS, 'previous release server port');
       prevBase = `http://127.0.0.1:${readFileSync(prevPortFile, 'utf8').trim()}`;
       await waitForServerUp(prevBase, SERVER_WAIT_MS);
+      console.log(`previous release server up on ${prevBase}`);
     } finally {
-      await prevApp.close().catch(() => {});
+      await Promise.race([prevApp.close(), delay(30_000)]).catch(() => {});
     }
     const dbPath = join(scratch, 'home', 'server', 'server.db');
     const seeded = seedEveryTable(dbPath);
     seededTables = seeded.seeded;
-    if (seeded.skipped.length > 0) {
-      console.log(`seed: ${seeded.seeded} tables populated; skipped: ${seeded.skipped.join('; ')}`);
-    }
+    console.log(
+      `seed: ${seeded.seeded} tables populated` +
+        (seeded.skipped.length > 0 ? `; skipped: ${seeded.skipped.join('; ')}` : ''),
+    );
     rmSync(join(scratch, 'server-port'), { force: true });
   }
+  console.log('booting the packaged app over the seeded database');
   const electronApp = await launchPackagedApp(executable, scratch);
   const launchedAt = Date.now();
   const portFile = join(scratch, 'server-port');
@@ -931,20 +940,18 @@ async function main() {
           detail: `${error.message} (screenshot: ${shot})`,
         });
       }
+      const last = results[results.length - 1];
+      console.log(`${last.status} ${last.id}${last.detail ? `: ${last.detail}` : ''}`);
     }
   } finally {
     for (const undo of ctx.cleanup.reverse()) await undo().catch(() => {});
     if (ctx.electronApp) {
-      await ctx.electronApp.close().catch(() => {});
+      await Promise.race([ctx.electronApp.close(), delay(30_000)]).catch(() => {});
       if (ctx.scratch) rmSync(ctx.scratch, { recursive: true, force: true });
     }
     if (ctx.browser) await ctx.browser.close().catch(() => {});
   }
-  let failed = 0;
-  for (const result of results) {
-    if (result.status === 'FAIL') failed += 1;
-    console.log(`${result.status} ${result.id}${result.detail ? `: ${result.detail}` : ''}`);
-  }
+  const failed = results.filter((r) => r.status === 'FAIL').length;
   if (failed > 0) {
     console.log(
       `${results.length - failed}/${results.length} checks passed; evidence: ${evidence}`,

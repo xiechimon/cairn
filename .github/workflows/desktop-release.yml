@@ -154,6 +154,7 @@ jobs:
 
       - name: Run the post-install smoke on the packaged arm64 app
         if: matrix.arch == 'arm64'
+        timeout-minutes: 10
         run: |
           node scripts/smoke/post-install.mjs \
             --app "$RUNNER_TEMP/unzipped/Cairn.app" \
