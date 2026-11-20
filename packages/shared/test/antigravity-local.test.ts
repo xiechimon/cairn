@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, test } from 'vitest';
+import { cleanupTestTempDirs, makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   antigravityKeyFromText,
   createAntigravitySubscriptionSchema,
@@ -10,8 +10,8 @@ import {
 } from '../src/index.js';
 import { verifiedManagedBin, verifiedManagedBins } from '../src/node/managed-bin.js';
 
-const tmp = mkdtempSync(join(tmpdir(), 'managed-bin-test-'));
-afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+const tmp = makeTestTempDir('managed-bin-');
+afterAll(() => cleanupTestTempDirs());
 
 function seedVersion(root: string, version: string, marker: Record<string, unknown>, bin: string) {
   const dir = join(root, 'versions', version);
