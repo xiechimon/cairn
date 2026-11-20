@@ -223,6 +223,7 @@ describe('chief envelope; PATCH /chief is gone', () => {
     expect(JSON.stringify(definition('create_todo').parameters)).toContain(
       "the owner's frequently used models",
     );
+    expect(tool('models')).toContain('Only the owner changes');
     expect(tool('create_todo')).toContain(
       'One message about several projects becomes one todo per project',
     );

@@ -19,10 +19,10 @@ import { getCookie, setCookie } from 'hono/cookie';
 import type { AppContext } from './context.js';
 import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
-import { parseWith } from './lib/errors.js';
+import { HttpError, parseWith } from './lib/errors.js';
 import { loopbackOwnerOriginOf } from './lib/loopback-owner.js';
 import { openSseStream } from './lib/sse-headers.js';
-import { isOpenRemotePath, pairedDeviceIdOf } from './lib/token-auth.js';
+import { isOpenRemotePath, pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { patchTeamAutonomy, readTeamAutonomy } from './services/autonomy-gates.js';
 import { readBackupHealth } from './services/backup-status.js';
@@ -42,6 +42,7 @@ import {
   pauseTeamGithubRepos,
   resumeAutonomyPauses,
 } from './services/github-autonomy-brake.js';
+import { isOwner } from './services/instance-owner.js';
 import { getModelRouting } from './services/model-routing.js';
 import {
   listUnreadEntityIds,
@@ -172,6 +173,17 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.put('/api/teams/:id/top-models', async (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
+    const ownerPage =
+      pairedDeviceIdOf(c) === null &&
+      (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
+      isOwner(ctx.db, ctx.user.id) &&
+      sameOriginPageWrite(c);
+    if (!ownerPage) {
+      throw new HttpError(
+        403,
+        'only the owner can change the frequently used models — ask the owner to change the list in Settings > Model',
+      );
+    }
     const body = parseWith(putTopModelsBodySchema, await jsonBody(c), 'body');
     return c.json(writeTopModels(ctx.db, id, body.models));
   });

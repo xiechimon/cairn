@@ -351,7 +351,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'models',
     description:
-      "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName, frequent?}. Read this before setting provider/modelId on a routing rule — only values from this list are valid. Rows with frequent: true are the owner's frequently used models, the only valid values for create_todo model.",
+      "List the model candidates for agents as rows {provider, providerLabel, modelId, modelName, frequent?}. Read this before setting provider/modelId on a routing rule — only values from this list are valid. Rows with frequent: true are the owner's frequently used models, the only valid values for create_todo model. Only the owner changes that list, in Settings > Model — you cannot add, remove or reorder entries; if a task needs a model that is not marked frequent, ask the owner to add it.",
     parameters: obj({}),
     replaySafe: true,
   },
@@ -539,7 +539,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
           'Optional "easy", "standard" or "hard"; routing picks the model by it instead of the text length.',
         ),
         model: str(
-          "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Pick by what the task needs, for example a fast model for small edits and a stronger one for hard work. Any other model is refused. Omit it and the task runs on the team task model, which follows the Coordinator model.",
+          "Optional model for this task, chosen from the owner's frequently used models (the rows marked frequent: true in models): pass its modelId, or provider/modelId when two providers share it. Pick by what the task needs, for example a fast model for small edits and a stronger one for hard work. Any other model is refused. The list itself is owner-only — do not try to change it; if the model you want is not on it, ask the owner to add it in Settings > Model. Omit it and the task runs on the team task model, which follows the Coordinator model.",
         ),
         output: str(
           'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or one of "info", "report", "dataset", "link" (info card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment; pick the kind that names the artifact).',

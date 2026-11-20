@@ -36,7 +36,7 @@ export function frequentModelFor(db: Db, teamId: string, named: string): TopMode
   if (models.length === 0) {
     throw new HttpError(
       400,
-      `model ${named} refused: the owner has no frequently used models. Omit model; the task runs on the team task model.`,
+      `model ${named} refused: the owner has no frequently used models. Omit model; the task runs on the team task model. If it must run on this model, ask the owner to add it in Settings > Model.`,
     );
   }
   const listed = models.map((m) => `${m.provider}/${m.modelId}`).join(', ');
@@ -44,7 +44,7 @@ export function frequentModelFor(db: Db, teamId: string, named: string): TopMode
     400,
     matches.length > 1
       ? `model ${named} is ambiguous; pass provider/modelId, one of: ${listed}`
-      : `model ${named} is not one of the owner's frequently used models: ${listed}. Pick one of them or omit model.`,
+      : `model ${named} is not one of the owner's frequently used models: ${listed}. Pick one of them or omit model. If it must run on ${named}, ask the owner to add it in Settings > Model — do not try to add it yourself.`,
   );
 }
 

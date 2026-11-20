@@ -91,7 +91,7 @@ declare module 'hono' {
   }
 }
 
-function cookieWriteAllowed(c: Context): boolean {
+export function sameOriginPageWrite(c: Context): boolean {
   const site = c.req.header('sec-fetch-site');
   if (site === 'same-origin' || site === 'none') return true;
   if (site !== undefined) return false;
@@ -175,7 +175,7 @@ export function registerTokenAuth(
       if (session !== null) {
         const denied = applySession(c, session);
         if (denied !== null) return denied;
-        if (!READ_METHODS.has(c.req.method.toUpperCase()) && !cookieWriteAllowed(c)) {
+        if (!READ_METHODS.has(c.req.method.toUpperCase()) && !sameOriginPageWrite(c)) {
           return c.json({ error: 'same-origin proof required' }, 403);
         }
         return admit();
