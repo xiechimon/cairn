@@ -597,7 +597,6 @@ test('a carousel never clips the border of a fully visible card at either edge',
   const docs = madePanel(page).getByTestId('made-group').first();
   const scroller = docs.getByTestId('made-carousel');
   const cards = docs.getByTestId('made-card');
-  const count = await cards.count();
   const edges = async () => {
     const frame = await scroller.boundingBox();
     const boxes = await cards.evaluateAll((els) =>
@@ -610,8 +609,10 @@ test('a carousel never clips the border of a fully visible card at either edge',
   };
   const insideFrame = async (index: number) => {
     const { frame, boxes } = await edges();
-    expect(boxes[index].left).toBeGreaterThanOrEqual(frame.x + 1);
-    expect(boxes[index].right).toBeLessThanOrEqual(frame.x + frame.width - 1);
+    const box = boxes.at(index);
+    expect(box).toBeDefined();
+    expect(box!.left).toBeGreaterThanOrEqual(frame.x + 1);
+    expect(box!.right).toBeLessThanOrEqual(frame.x + frame.width - 1);
   };
   await expect(docs.getByTestId('made-carousel-prev')).toHaveCount(0);
   await insideFrame(0);
@@ -630,11 +631,11 @@ test('a carousel never clips the border of a fully visible card at either edge',
   await expect
     .poll(async () => {
       const { frame, boxes } = await edges();
-      return frame.x + frame.width - boxes[count - 1].right;
+      return frame.x + frame.width - (boxes.at(-1)?.right ?? Number.POSITIVE_INFINITY);
     })
     .toBeGreaterThanOrEqual(1);
-  await insideFrame(count - 1);
-  await insideFrame(count - 2);
+  await insideFrame(-1);
+  await insideFrame(-2);
   expect(await scroller.evaluate((el) => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
