@@ -10931,6 +10931,41 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/attachments/{id}/document-preview",
   },
   {
+    "method": "GET",
+    "note": "all statuses, by pin",
+    "path": "/api/todos/{id}/design/{fileName}/comments",
+  },
+  {
+    "method": "POST",
+    "note": "body {versionId, viewport, note, target fields, markAttachmentId?}; inserts an open comment with the next pin",
+    "path": "/api/todos/{id}/design/comments",
+  },
+  {
+    "method": "PATCH",
+    "note": "body {note?} on an open comment, {status: resolved|open} to resolve or reopen; 409 otherwise",
+    "path": "/api/todos/{id}/design/comments/{commentId}",
+  },
+  {
+    "method": "DELETE",
+    "note": "open comments only; 409 once sent",
+    "path": "/api/todos/{id}/design/comments/{commentId}",
+  },
+  {
+    "method": "POST",
+    "note": "body {pngBase64}; stores the baked mark-up PNG as a design-scope attachment",
+    "path": "/api/todos/{id}/design/marks",
+  },
+  {
+    "method": "POST",
+    "note": "returns the live share link through the relay or creates one; 409 relay-missing without a relay",
+    "path": "/api/todos/{id}/design/{fileName}/share",
+  },
+  {
+    "method": "DELETE",
+    "note": "revokes the live link",
+    "path": "/api/todos/{id}/design/{fileName}/share",
+  },
+  {
     "method": "POST",
     "note": "sets project.archivedAt",
     "path": "/api/projects/{id}/archive",
