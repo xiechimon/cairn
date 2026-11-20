@@ -148,9 +148,11 @@ export function ProviderEditorHead({
   return (
     <div className="flex flex-wrap items-center gap-3">
       <ProviderMarkTile Mark={Mark} />
-      <div className="flex min-w-0 flex-auto flex-col">
+      <div className="flex min-w-0 flex-1 basis-0 flex-col">
         <h2 className="m-0 truncate text-card-title font-medium text-foreground">{name}</h2>
-        <span className="text-meta text-content-tertiary">{kind}</span>
+        <span className="truncate text-meta text-content-tertiary" title={kind}>
+          {kind}
+        </span>
       </div>
       {version != null && <code className="text-meta text-content-tertiary">v{version}</code>}
       {aside}

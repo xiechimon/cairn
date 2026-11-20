@@ -514,45 +514,54 @@ export function SubscriptionDetail({
         ].join(' · ')}
         aside={<QuotaHead account={account} now={now} />}
       />
-      <div className="grid grid-cols-1 gap-3 @sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-        <Field label={t('名称')}>
-          {actions.onRename === undefined ? (
-            <span className="flex h-8 items-center truncate text-ui text-foreground">
-              {account.label}
-            </span>
-          ) : (
-            <CommitInput
-              key={`label:${account.label}`}
-              label={t('名称')}
-              value={account.label}
-              className="sm:w-full"
-              onCommit={actions.onRename}
-            />
-          )}
-        </Field>
-        <Field label={t('连通')}>
-          <span className="flex h-8 items-center gap-2">
-            {view.label !== null && (
-              <span data-testid="subscription-status" className={STATUS_CLS}>
-                <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
-                {view.label}
-              </span>
-            )}
-            {actions.onVerify !== undefined && (
-              <Button
-                ref={verifyRef}
-                variant="outline"
-                size="sm"
-                data-testid="subscription-verify"
-                disabled={verifying}
-                onClick={actions.onVerify}
-              >
-                {t('验证')}
-              </Button>
-            )}
+      {actions.onRename === undefined && actions.onVerify === undefined ? (
+        view.label !== null && (
+          <span data-testid="subscription-status" className={STATUS_CLS}>
+            <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
+            {view.label}
           </span>
-        </Field>
-      </div>
+        )
+      ) : (
+        <div className="grid grid-cols-1 gap-3 @sm:grid-cols-[minmax(0,1fr)_auto]">
+          <Field label={t('名称')}>
+            {actions.onRename === undefined ? (
+              <span className="flex h-8 items-center truncate text-ui text-foreground">
+                {account.label}
+              </span>
+            ) : (
+              <CommitInput
+                key={`label:${account.label}`}
+                label={t('名称')}
+                value={account.label}
+                className="sm:w-full"
+                onCommit={actions.onRename}
+              />
+            )}
+          </Field>
+          <Field label={t('连通')}>
+            <span className="flex h-8 items-center gap-2">
+              {view.label !== null && (
+                <span data-testid="subscription-status" className={STATUS_CLS}>
+                  <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
+                  {view.label}
+                </span>
+              )}
+              {actions.onVerify !== undefined && (
+                <Button
+                  ref={verifyRef}
+                  variant="outline"
+                  size="sm"
+                  data-testid="subscription-verify"
+                  disabled={verifying}
+                  onClick={actions.onVerify}
+                >
+                  {t('验证')}
+                </Button>
+              )}
+            </span>
+          </Field>
+        </div>
+      )}
       {view.reason !== null && (
         <p data-testid="subscription-reason" className="-mt-3 m-0 text-meta text-content-tertiary">
           {withCodeSpans(view.reason)}

@@ -123,6 +123,70 @@ for (const surface of SURFACES) {
     expect(grids, 'V20: no grid or stack of three or more identical cards').toEqual([]);
   });
 
+  test(`${surface.name}: no row leaves a blank region beside its content`, async ({ page }) => {
+    await open(page, surface.url);
+    const blanks = await page.evaluate(() => {
+      const contentBoxes = (row: Element) => {
+        const boxes: DOMRect[] = [];
+        const walker = document.createTreeWalker(row, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (node instanceof Text) {
+            if ((node.textContent ?? '').trim() === '') continue;
+            const range = document.createRange();
+            range.selectNodeContents(node);
+            boxes.push(...range.getClientRects());
+          } else if (
+            node instanceof Element &&
+            node.matches('svg,img,input,textarea,button,[role=progressbar],[role=switch]')
+          ) {
+            boxes.push(node.getBoundingClientRect());
+          }
+        }
+        return boxes.filter((b) => b.width > 0 && b.height > 0);
+      };
+      const span = (el: Element) => {
+        const box = el.getBoundingClientRect();
+        const boxes = contentBoxes(el);
+        if (boxes.length === 0 || box.width === 0) return null;
+        const left = Math.min(...boxes.map((b) => b.left)) - box.left;
+        const right = box.right - Math.max(...boxes.map((b) => b.right));
+        return { box, left, right, filled: (box.width - left - right) / box.width };
+      };
+      const found: string[] = [];
+      for (const row of document.querySelectorAll('main *, [role=dialog] *, aside *')) {
+        const parent = row.parentElement;
+        if (parent === null) continue;
+        const flow = getComputedStyle(parent);
+        const stacked =
+          (flow.display.includes('flex') && flow.flexDirection.startsWith('column')) ||
+          flow.display === 'block';
+        if (!stacked) continue;
+        const own = span(row);
+        if (own === null || own.box.width < 360 || own.box.height < 40 || own.box.height > 160) {
+          continue;
+        }
+        if (contentBoxes(row).length < 2) continue;
+        const blank = Math.max(own.left, own.right);
+        if (blank / own.box.width < 0.4) continue;
+        const fullSibling = [...parent.children].some((sibling) => {
+          if (sibling === row) return false;
+          const other = span(sibling);
+          return (
+            other !== null && other.box.width >= own.box.width * 0.9 && other.filled >= 0.8
+          );
+        });
+        if (fullSibling) {
+          found.push(
+            `${row.closest('[data-testid]')?.getAttribute('data-testid') ?? row.tagName}: ${Math.round(blank)}x${Math.round(own.box.height)} blank in ${Math.round(own.box.width)}px row "${(row.textContent ?? '').trim().slice(0, 30)}"`,
+          );
+        }
+      }
+      return found;
+    });
+    expect(blanks, 'V30: a row in a card or panel leaves no blank region of 40% of its width beside its content').toEqual([]);
+  });
+
   test(`${surface.name}: no horizontal scroll at 390px`, async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await open(page, surface.url);
