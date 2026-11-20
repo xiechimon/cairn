@@ -3,7 +3,6 @@ import { homedir, hostname } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import {
   BRAND,
-  CLAUDE_CONFIG_FILE_NAME,
   ENV_VARS,
   WORKSPACE_HOOK_TIMEOUT_MS,
   WORKSPACES_DIR_GUARD_CANON,
@@ -86,9 +85,7 @@ export function loadDaemonConfig(
     foreground: input.foreground ?? false,
     skillsDir,
     mcpConfigPath: resolve(
-      input.mcpConfigPath ??
-        env[ENV_VARS.mcpConfig] ??
-        join(home, 'homes', 'claude', CLAUDE_CONFIG_FILE_NAME),
+      input.mcpConfigPath ?? env[ENV_VARS.mcpConfig] ?? join(home, 'mcp.json'),
     ),
     hookTimeoutMs,
   });

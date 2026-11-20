@@ -81,6 +81,10 @@ describe('importAgentConfig', () => {
         oauthAccount: { email: 'managed@example.com' },
       }),
     );
+    writeFileSync(
+      join(cairn, 'mcp.json'),
+      JSON.stringify({ mcpServers: { gamma: { command: 'gamma-mcp' } } }),
+    );
 
     const report = importAgentConfig({ cairnHome: cairn, realHome: real });
     expect(report?.copied).toContain('claude.json:mcp/alpha');
@@ -89,7 +93,12 @@ describe('importAgentConfig', () => {
     );
     expect(managed.mcpServers.alpha).toEqual({ command: 'npx', args: ['-y', 'alpha-mcp'] });
     expect(managed.mcpServers.beta).toEqual({ url: 'https://managed.example/mcp' });
+    expect(managed.mcpServers.gamma).toBeUndefined();
     expect(managed.oauthAccount).toEqual({ email: 'managed@example.com' });
+    const daemon = JSON.parse(readFileSync(join(cairn, 'mcp.json'), 'utf8'));
+    expect(daemon.mcpServers.alpha).toEqual({ command: 'npx', args: ['-y', 'alpha-mcp'] });
+    expect(daemon.mcpServers.beta).toEqual({ url: 'https://beta.example/mcp' });
+    expect(daemon.mcpServers.gamma).toEqual({ command: 'gamma-mcp' });
   });
 
   test('translates codex mcp_servers with env resolution', () => {

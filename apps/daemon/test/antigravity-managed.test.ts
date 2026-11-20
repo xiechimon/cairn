@@ -85,6 +85,7 @@ describe('antigravity managed binary resolution', () => {
       platform: 'darwin',
       arch: 'arm64',
       registryUrl: 'https://example.invalid/registry.json',
+      archiveHost: 'example.invalid',
       fetchImpl: async (url) => {
         if (String(url).endsWith('registry.json')) {
           return new Response(
@@ -176,6 +177,7 @@ describe('antigravity managed binary resolution', () => {
       platform: 'darwin',
       arch: 'arm64',
       registryUrl: 'https://example.invalid/registry.json',
+      archiveHost: 'example.invalid',
       fetchImpl: async (url) =>
         String(url).endsWith('registry.json')
           ? new Response(
@@ -207,6 +209,7 @@ describe('antigravity managed binary resolution', () => {
       platform: 'darwin',
       arch: 'arm64',
       registryUrl: 'https://example.invalid/registry.json',
+      archiveHost: 'example.invalid',
       fetchImpl: async (url) =>
         String(url).endsWith('registry.json')
           ? new Response(
@@ -291,5 +294,67 @@ describe('antigravity managed binary resolution', () => {
         { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', thinkingLevels: [] },
       ],
     });
+  });
+
+  test('rejects a registry archive hosted off the trusted host or missing sha256', async () => {
+    const dir = tempDir('ag-untrusted-');
+    for (const entry of [
+      {
+        name: 'off-host archive',
+        binary: {
+          archive: 'https://evil.example/ag.tar.gz',
+          cmd: './bin/antigravity-acp',
+          args: ['acp'],
+          sha256: 'a'.repeat(64),
+        },
+      },
+      {
+        name: 'missing sha256',
+        binary: {
+          archive: 'https://example.invalid/ag.tar.gz',
+          cmd: './bin/antigravity-acp',
+          args: ['acp'],
+        },
+      },
+      {
+        name: 'http archive on the trusted host',
+        binary: {
+          archive: 'http://example.invalid/ag.tar.gz',
+          cmd: './bin/antigravity-acp',
+          args: ['acp'],
+          sha256: 'a'.repeat(64),
+        },
+      },
+    ]) {
+      const downloaded: string[] = [];
+      const managed = createAntigravityManaged({
+        root: join(dir, `managed-${entry.name.replaceAll(' ', '-')}`),
+        platform: 'darwin',
+        arch: 'arm64',
+        registryUrl: 'https://example.invalid/registry.json',
+        archiveHost: 'example.invalid',
+        fetchImpl: async (url) => {
+          const u = String(url);
+          if (u.endsWith('registry.json')) {
+            return new Response(
+              JSON.stringify({
+                agents: [
+                  {
+                    id: 'antigravity-acp',
+                    version: '1.5.10',
+                    distribution: { binary: { 'darwin-aarch64': entry.binary } },
+                  },
+                ],
+              }),
+              { status: 200 },
+            );
+          }
+          downloaded.push(u);
+          return new Response('x', { status: 200 });
+        },
+      });
+      expect(await managed.ensure(), entry.name).toBeNull();
+      expect(downloaded, entry.name).toEqual([]);
+    }
   });
 });

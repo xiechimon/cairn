@@ -171,15 +171,6 @@ function migrateRunnerHome(): void {
   } catch (error) {
     console.warn('runner-home claude home migration failed:', error);
   }
-  try {
-    const mcpTarget = join(target, 'homes', 'claude', '.claude.json');
-    if (!existsSync(mcpTarget) && existsSync(join(target, 'mcp.json'))) {
-      mkdirSync(dirname(mcpTarget), { recursive: true });
-      renameSync(join(target, 'mcp.json'), mcpTarget);
-    }
-  } catch (error) {
-    console.warn('runner-home mcp.json migration failed:', error);
-  }
 }
 
 function bundledRoot(name: string): string {

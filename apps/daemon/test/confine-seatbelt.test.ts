@@ -60,6 +60,7 @@ function layout(serverPort?: number): Layout {
     escape: join(root, 'escape'),
     policy: {
       home,
+      daemonHome: runnerHome,
       deniedRoots: [serverHome, runnerHome],
       workspace: worktree,
       gitDirectories: [gitDirectory],
@@ -96,6 +97,29 @@ describe('seatbelt profile', () => {
       'Unsafe confinement cache overlap',
     );
     expect(() => seatbeltProfile({ ...policy, serverPort: 70000 })).toThrow('Invalid server port');
+  });
+
+  test('rejects a non-state writable equal to or inside a denied path', () => {
+    const { policy, root } = layout();
+    const deniedRoot = policy.deniedRoots[0] as string;
+    expect(() => seatbeltProfile({ ...policy, gitDirectories: [deniedRoot] })).toThrow(
+      'Unsafe confinement overlap',
+    );
+    const deniedInner = join(deniedRoot, 'inner');
+    mkdirSync(deniedInner, { recursive: true });
+    expect(() => seatbeltProfile({ ...policy, gitDirectories: [deniedInner] })).toThrow(
+      'Unsafe confinement overlap',
+    );
+    const deniedHomeDir = join(policy.home, '.ssh');
+    expect(() => seatbeltProfile({ ...policy, gitDirectories: [deniedHomeDir] })).toThrow(
+      'Unsafe confinement overlap',
+    );
+    const insideDaemon = join(policy.daemonHome as string, 'repos', 'main.git');
+    mkdirSync(insideDaemon, { recursive: true });
+    expect(() => seatbeltProfile({ ...policy, gitDirectories: [insideDaemon] })).not.toThrow();
+    const state = join(root, 'claude.json');
+    writeFileSync(state, '{}');
+    expect(() => seatbeltProfile({ ...policy, state: [state] })).not.toThrow();
   });
 });
 

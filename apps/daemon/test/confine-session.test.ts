@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -100,6 +100,74 @@ describe('session confiner', () => {
       expect(writable).not.toContain(
         `(subpath "${join(sharedTemp, `claude-${userInfo().uid + 1}`)}")`,
       );
+    }
+  });
+
+  test('a linked worktree re-exposes only a real worktree git dir that points back', () => {
+    const { confine, worktree, root } = fixture();
+    const repo = join(root, 'repo');
+    const gitdir = join(repo, '.git', 'worktrees', 'a');
+    mkdirSync(gitdir, { recursive: true });
+    writeFileSync(join(gitdir, 'gitdir'), `${join(worktree, '.git')}\n`);
+    writeFileSync(join(worktree, '.git'), `gitdir: ${gitdir}\n`);
+    const launch = confine({ cwd: worktree }, 'claude-code', {
+      command: '/bin/true',
+      args: [],
+    });
+    expect(launch.args[1]).toContain(`(subpath "${realpathSync(join(repo, '.git'))}")`);
+  });
+
+  test('a symlinked .git fails closed instead of re-exposing its target', () => {
+    const { confine, runnerHome, root } = fixture();
+    const target = join(runnerHome, 'tools', 'antigravity');
+    mkdirSync(target, { recursive: true });
+    const ws = join(root, 'ws-link');
+    mkdirSync(ws, { recursive: true });
+    symlinkSync(target, join(ws, '.git'));
+    expect(() => confine({ cwd: ws }, 'claude-code', { command: '/bin/true', args: [] })).toThrow(
+      'Unsafe confinement',
+    );
+  });
+
+  test('a crafted .git pointer cannot re-expose denied or arbitrary directories', () => {
+    const { confine, runnerHome, root } = fixture();
+    const target = join(runnerHome, 'tools', 'antigravity');
+    mkdirSync(target, { recursive: true });
+
+    const cases: Array<{ name: string; setup: (dir: string) => void; exposed: string }> = [
+      {
+        name: 'gitdir pointer to a non-worktree path',
+        setup: (dir) => writeFileSync(join(dir, '.git'), `gitdir: ${target}\n`),
+        exposed: join(runnerHome, 'tools'),
+      },
+      {
+        name: 'gitdir pointer into a denied root shaped like a worktree',
+        setup: (dir) => {
+          const fake = join(runnerHome, 'fake', '.git', 'worktrees', 'a');
+          mkdirSync(fake, { recursive: true });
+          writeFileSync(join(fake, 'gitdir'), `${join(dir, '.git')}\n`);
+          writeFileSync(join(dir, '.git'), `gitdir: ${fake}\n`);
+        },
+        exposed: join(runnerHome, 'fake'),
+      },
+      {
+        name: 'worktree-shaped gitdir with no back-pointer',
+        setup: (dir) => {
+          const fake = join(root, 'other', '.git', 'worktrees', 'a');
+          mkdirSync(fake, { recursive: true });
+          writeFileSync(join(dir, '.git'), `gitdir: ${fake}\n`);
+        },
+        exposed: join(root, 'other'),
+      },
+    ];
+
+    for (const [index, entry] of cases.entries()) {
+      const ws = join(root, `ws-${index}`);
+      mkdirSync(ws, { recursive: true });
+      entry.setup(ws);
+      const launch = confine({ cwd: ws }, 'claude-code', { command: '/bin/true', args: [] });
+      const profile = launch.args[1] as string;
+      expect(profile, entry.name).not.toContain(`(subpath "${entry.exposed}`);
     }
   });
 

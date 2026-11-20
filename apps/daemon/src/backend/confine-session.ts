@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
-import { dirname, isAbsolute, join, resolve } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
 import { ANTIGRAVITY_CREDENTIAL_FILES, GEMINI_CREDENTIAL_FILES } from '../agent-config.js';
 import { contains } from './confine.js';
@@ -47,14 +47,27 @@ function systemTempDirectory(): string | null {
   }
 }
 
-function gitDirectoriesOf(workspace: string): string[] {
+function gitDirectoriesOf(workspace: string, deniedRoots: readonly string[]): string[] {
   const dotGit = join(workspace, '.git');
-  if (!existsSync(dotGit)) return [];
+  const stat = lstatSync(dotGit, { throwIfNoEntry: false });
+  if (stat === undefined || stat.isSymbolicLink()) return [];
+  if (stat.isDirectory()) return [realpathSync(dotGit)];
   const text = readGitPointer(dotGit);
-  if (text === null) return [realpathSync(dotGit)];
-  const gitdir = resolve(workspace, text);
-  const common = dirname(dirname(gitdir));
-  return [realpathSync(common)];
+  if (text === null) return [];
+  try {
+    const gitdir = realpathSync(resolve(workspace, text));
+    const common = dirname(dirname(gitdir));
+    if (basename(dirname(gitdir)) !== 'worktrees' || basename(common) !== '.git') return [];
+    const back = readRawPointer(join(gitdir, 'gitdir'));
+    if (back === null || realpathSync(resolve(gitdir, back)) !== realpathSync(dotGit)) {
+      return [];
+    }
+    const resolved = realpathSync(common);
+    if (deniedRoots.some((root) => contains(root, resolved))) return [];
+    return [resolved];
+  } catch {
+    return [];
+  }
 }
 
 function readGitPointer(dotGit: string): string | null {
@@ -62,6 +75,15 @@ function readGitPointer(dotGit: string): string | null {
     const text = readFileSync(dotGit, 'utf8');
     const match = /^gitdir:\s*(.+)$/m.exec(text);
     return match?.[1]?.trim() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readRawPointer(path: string): string | null {
+  try {
+    const text = readFileSync(path, 'utf8').trim();
+    return text === '' ? null : text;
   } catch {
     return null;
   }
@@ -159,9 +181,10 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     if (harnessTemp !== null) mkdirSync(harnessTemp, { recursive: true, mode: 0o700 });
     const policy: SeatbeltPolicy = {
       home,
+      daemonHome: options.daemonHome,
       deniedRoots,
       workspace,
-      gitDirectories: gitDirectoriesOf(workspace),
+      gitDirectories: gitDirectoriesOf(workspace, deniedRoots),
       taskTemp: temp,
       state: [...state, ...explicitState],
       caches: [

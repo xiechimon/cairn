@@ -38,6 +38,7 @@ import { DAEMON_VERSION } from '../version.js';
 const exec = promisify(execFile);
 
 const REGISTRY_URL = 'https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json';
+const ARCHIVE_HOST = 'dl.google.com';
 const LOCK_STALE_MS = 15 * 60_000;
 const FETCH_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -56,10 +57,7 @@ const registryAgentSchema = z.object({
             archive: z.string().url(),
             cmd: z.string(),
             args: z.array(z.string()).optional(),
-            sha256: z
-              .string()
-              .regex(/^[a-f0-9]{64}$/i)
-              .optional(),
+            sha256: z.string().regex(/^[a-f0-9]{64}$/i),
           }),
         )
         .nullish(),
@@ -108,6 +106,7 @@ export interface AntigravityManagedOptions {
   arch?: string;
   fetchImpl?: typeof fetch;
   registryUrl?: string;
+  archiveHost?: string;
   env?: NodeJS.ProcessEnv;
   log?: (message: string) => void;
   probeBinary?: (
@@ -124,6 +123,19 @@ export function antigravityInstallRoot(cairnHome: string): string {
 
 function sha256File(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function unsafeVersion(version: string): boolean {
+  return version === '' || /[/\\]/.test(version) || version.startsWith('.');
+}
+
+function trustedArchive(url: string, host: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname === host;
+  } catch {
+    return false;
+  }
 }
 
 function platformKey(platform: string, arch: string): string | null {
@@ -301,6 +313,7 @@ export function createAntigravityManaged(
   const arch = options.arch ?? process.arch;
   const fetchImpl = options.fetchImpl ?? fetch;
   const registryUrl = options.registryUrl ?? REGISTRY_URL;
+  const archiveHost = options.archiveHost ?? ARCHIVE_HOST;
   const log = options.log ?? (() => {});
   const key = platformKey(platform, arch);
   const probeImpl =
@@ -331,7 +344,7 @@ export function createAntigravityManaged(
       const currentJson = JSON.parse(readFileSync(join(root, 'current.json'), 'utf8')) as {
         version?: unknown;
       };
-      if (typeof currentJson.version === 'string') {
+      if (typeof currentJson.version === 'string' && !unsafeVersion(currentJson.version)) {
         const found = managedInstallFromDir(join(root, 'versions', currentJson.version));
         if (found !== null) return found;
       }
@@ -416,14 +429,17 @@ export function createAntigravityManaged(
     }
     const binRelCandidate = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
     if (
-      /[/\\]/.test(agent.version) ||
-      agent.version.startsWith('.') ||
+      unsafeVersion(agent.version) ||
       binRelCandidate.split('/').includes('..') ||
       binRelCandidate.startsWith('/')
     ) {
       log(
         `antigravity registry entry has an unsafe version or cmd: ${agent.version} ${binary.cmd}`,
       );
+      return null;
+    }
+    if (!trustedArchive(binary.archive, archiveHost)) {
+      log(`antigravity registry archive url is untrusted: ${binary.archive}`);
       return null;
     }
     const versionDir = join(root, 'versions', agent.version);
@@ -450,7 +466,7 @@ export function createAntigravityManaged(
       if (!response.ok) throw new Error(`antigravity download: HTTP ${response.status}`);
       const bytes = Buffer.from(await response.arrayBuffer());
       const archiveSha256 = createHash('sha256').update(bytes).digest('hex');
-      if (binary.sha256 !== undefined && archiveSha256 !== binary.sha256.toLowerCase()) {
+      if (archiveSha256 !== binary.sha256.toLowerCase()) {
         throw new Error('antigravity archive checksum mismatch');
       }
       const isZip = binary.archive.toLowerCase().endsWith('.zip');

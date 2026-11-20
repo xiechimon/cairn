@@ -2,6 +2,7 @@ import {
   chmodSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -56,6 +57,12 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
+function serverBag(source: unknown): Record<string, unknown> {
+  return source !== null && typeof source === 'object' && !Array.isArray(source)
+    ? Object.assign(Object.create(null), source as Record<string, unknown>)
+    : Object.create(null);
+}
+
 function readJsonObject(path: string): Record<string, unknown> | null {
   try {
     const parsed = readJson(path);
@@ -107,7 +114,7 @@ export function importAgentConfig(
     mkdirSync(managedSkills, { recursive: true });
     for (const entry of readdirSync(userSkills)) {
       const dest = join(managedSkills, entry);
-      if (existsSync(dest)) {
+      if (lstatSync(dest, { throwIfNoEntry: false }) !== undefined) {
         report.skipped.push({ item: `skills/${entry}`, reason: 'already present in managed home' });
         continue;
       }
@@ -125,24 +132,31 @@ export function importAgentConfig(
 
   const managedClaudeJsonPath = join(claudeHome, '.claude.json');
   const managedClaudeJson = readJsonObject(managedClaudeJsonPath) ?? {};
-  const managedServers: Record<string, unknown> =
-    managedClaudeJson.mcpServers !== null &&
-    typeof managedClaudeJson.mcpServers === 'object' &&
-    !Array.isArray(managedClaudeJson.mcpServers)
-      ? Object.assign(Object.create(null), managedClaudeJson.mcpServers as Record<string, unknown>)
-      : Object.create(null);
+  const managedServers = serverBag(managedClaudeJson.mcpServers);
+  const daemonMcpPath = join(cairnHome, 'mcp.json');
+  const daemonMcpJson = readJsonObject(daemonMcpPath) ?? {};
+  const daemonServers = serverBag(daemonMcpJson.mcpServers);
   let claudeJsonChanged = false;
+  let daemonMcpChanged = false;
 
   const addServer = (name: string, entry: unknown, source: string): void => {
-    if (Object.hasOwn(managedServers, name)) {
+    const inClaude = Object.hasOwn(managedServers, name);
+    const inDaemon = Object.hasOwn(daemonServers, name);
+    if (inClaude && inDaemon) {
       report.skipped.push({
         item: `${source}:mcp/${name}`,
         reason: 'already present in managed config',
       });
       return;
     }
-    managedServers[name] = entry;
-    claudeJsonChanged = true;
+    if (!inClaude) {
+      managedServers[name] = entry;
+      claudeJsonChanged = true;
+    }
+    if (!inDaemon) {
+      daemonServers[name] = entry;
+      daemonMcpChanged = true;
+    }
     report.copied.push(`${source}:mcp/${name}`);
   };
 
@@ -252,6 +266,18 @@ export function importAgentConfig(
     } catch (error) {
       report.failed.push({
         item: managedClaudeJsonPath,
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  if (daemonMcpChanged) {
+    daemonMcpJson.mcpServers = daemonServers;
+    try {
+      writeJson(daemonMcpPath, daemonMcpJson);
+    } catch (error) {
+      report.failed.push({
+        item: daemonMcpPath,
         reason: error instanceof Error ? error.message : String(error),
       });
     }

@@ -26,6 +26,7 @@ const LAUNCH_SERVICE_DENIALS = [
 
 export interface SeatbeltPolicy {
   home: string;
+  daemonHome?: string;
   deniedRoots: string[];
   workspace: string;
   gitDirectories: string[];
@@ -75,13 +76,27 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     ...policy.caches.map((path) => canonical(path, true)),
   ];
   const everythingDenied = [...deniedDirectories, ...deniedFiles];
-  for (const path of writable) {
-    if (everythingDenied.some((secret) => contains(path, secret) && path !== secret))
-      throw new Error('Unsafe confinement overlap');
-  }
   for (const path of policy.caches.map((value) => canonical(value))) {
     if (everythingDenied.some((secret) => contains(secret, path) || contains(path, secret)))
       throw new Error('Unsafe confinement cache overlap');
+  }
+  const daemonRoot = policy.daemonHome === undefined ? null : canonical(policy.daemonHome);
+  for (const path of writable) {
+    const statePath = state.includes(path);
+    if (
+      everythingDenied.some(
+        (secret) =>
+          contains(path, secret) &&
+          !(path === secret && statePath && !deniedRoots.includes(secret)),
+      )
+    )
+      throw new Error('Unsafe confinement overlap');
+    if (
+      everythingDenied.some((secret) => contains(secret, path)) &&
+      !statePath &&
+      !(daemonRoot !== null && contains(daemonRoot, path))
+    )
+      throw new Error('Unsafe confinement overlap');
   }
   for (const path of state) {
     const own = OWN_STATE_NAMES.some((name) => contains(join(home, name), path));

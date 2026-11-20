@@ -11,7 +11,7 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { BRAND } from '@cairn/shared';
@@ -40,7 +40,10 @@ const registrySchema = z.object({
 
 const npmDistSchema = z.object({
   dist: z.object({
-    tarball: z.string().url(),
+    tarball: z
+      .string()
+      .url()
+      .refine((url) => url.startsWith('https://')),
     shasum: z.string().optional(),
     integrity: z.string().optional(),
   }),
@@ -87,11 +90,15 @@ function markerOf(versionDir: string): InstallMarker | null {
   }
 }
 
+function unsafeVersion(version: string): boolean {
+  return version === '' || /[/\\]/.test(version) || version.startsWith('.');
+}
+
 function parseNpmPackage(spec: string): { name: string; version: string } | null {
   const at = spec.lastIndexOf('@');
   if (at <= 0) return null;
   const version = spec.slice(at + 1);
-  if (version === '' || /[/\\]/.test(version) || version.startsWith('.')) return null;
+  if (unsafeVersion(version)) return null;
   return { name: spec.slice(0, at), version };
 }
 
@@ -137,7 +144,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
       const currentJson = JSON.parse(readFileSync(join(root, 'current.json'), 'utf8')) as {
         version?: unknown;
       };
-      if (typeof currentJson.version === 'string') {
+      if (typeof currentJson.version === 'string' && !unsafeVersion(currentJson.version)) {
         const found = installFor(join(root, 'versions', currentJson.version));
         if (found !== null) return found;
       }
@@ -214,7 +221,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
         log('gemini tarball checksum mismatch');
         return null;
       }
-      const staging = mkdtempSync(join(tmpdir(), 'cairn-gemini-'));
+      const staging = mkdtempSync(join(root, '.staging-'));
       try {
         const tarballPath = join(staging, 'pkg.tgz');
         writeFileSync(tarballPath, bytes);

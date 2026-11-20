@@ -77,6 +77,10 @@ export function confinementArgs(
     ...policy.state,
     ...policy.caches,
   ].map((path) => canonical(path, true));
+  for (const path of policy.caches) {
+    if (denied.some((secret) => contains(secret, path) || contains(path, secret)))
+      throw new Error('Unsafe confinement cache overlap');
+  }
   for (const path of writable) {
     if (
       denied.some(
@@ -92,10 +96,6 @@ export function confinementArgs(
       !policy.state.includes(path)
     )
       throw new Error('Unsafe confinement overlap');
-  }
-  for (const path of policy.caches) {
-    if (denied.some((secret) => contains(secret, path) || contains(path, secret)))
-      throw new Error('Unsafe confinement cache overlap');
   }
   for (const path of policy.state) {
     if (

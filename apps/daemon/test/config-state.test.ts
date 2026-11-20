@@ -130,9 +130,9 @@ describe('loadDaemonConfig (Settings seam precedence)', () => {
     );
   });
 
-  test('mcpConfigPath default = managed claude home .claude.json', () => {
+  test('mcpConfigPath default = cairn home mcp.json', () => {
     const cfg = loadDaemonConfig({}, {});
-    expect(cfg.mcpConfigPath).toBe(join(homedir(), '.cairn', 'homes', 'claude', '.claude.json'));
+    expect(cfg.mcpConfigPath).toBe(join(homedir(), '.cairn', 'mcp.json'));
   });
 
   test('mcpConfigPath env override (CAIRN_MCP_CONFIG)', () => {

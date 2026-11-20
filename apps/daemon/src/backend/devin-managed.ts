@@ -16,11 +16,13 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { z } from 'zod';
+import { ensurePrivateDir } from '../private-fs.js';
 
 const exec = promisify(execFile);
 
 const REGISTRY_URL = 'https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json';
 const MANIFEST_URL = 'https://static.devin.ai/cli/current/manifest.json';
+const ARCHIVE_HOST = 'static.devin.ai';
 const LOCK_STALE_MS = 15 * 60_000;
 const FETCH_TIMEOUT_MS = 15_000;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
@@ -88,6 +90,7 @@ export interface DevinManagedOptions {
   fetchImpl?: typeof fetch;
   registryUrl?: string;
   manifestUrl?: string;
+  archiveHost?: string;
   log?: (message: string) => void;
 }
 
@@ -97,6 +100,19 @@ export function devinInstallRoot(cairnHome: string): string {
 
 function sha256File(path: string): string {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function unsafeVersion(version: string): boolean {
+  return version === '' || /[/\\]/.test(version) || version.startsWith('.');
+}
+
+function trustedArchive(url: string, host: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && parsed.hostname === host;
+  } catch {
+    return false;
+  }
 }
 
 function platformKey(platform: string, arch: string): string | null {
@@ -129,6 +145,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
   const fetchImpl = options.fetchImpl ?? fetch;
   const registryUrl = options.registryUrl ?? REGISTRY_URL;
   const manifestUrl = options.manifestUrl ?? MANIFEST_URL;
+  const archiveHost = options.archiveHost ?? ARCHIVE_HOST;
   const log = options.log ?? (() => {});
   const key = platformKey(platform, arch);
   const home = options.home ?? join(root, 'home');
@@ -143,7 +160,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     } catch {
       return null;
     }
-    mkdirSync(home, { recursive: true });
+    ensurePrivateDir(home);
     return { version: marker.version, binPath, args: marker.args, home };
   }
 
@@ -152,7 +169,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
       const current = JSON.parse(readFileSync(join(root, 'current.json'), 'utf8')) as {
         version?: unknown;
       };
-      if (typeof current.version === 'string') {
+      if (typeof current.version === 'string' && !unsafeVersion(current.version)) {
         const found = installFor(join(root, 'versions', current.version));
         if (found !== null) return found;
       }
@@ -218,8 +235,12 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
       log(`devin manifest has no archive for ${target}`);
       return null;
     }
-    if (/[/\\]/.test(parsed.data.version) || parsed.data.version.startsWith('.')) {
+    if (unsafeVersion(parsed.data.version)) {
       log(`devin manifest has an unsafe version: ${parsed.data.version}`);
+      return null;
+    }
+    if (!trustedArchive(entry.url, archiveHost)) {
+      log(`devin manifest archive url is untrusted: ${entry.url}`);
       return null;
     }
     return {
@@ -248,12 +269,15 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     }
     const binRelPath = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
     if (
-      /[/\\]/.test(agent.version) ||
-      agent.version.startsWith('.') ||
+      unsafeVersion(agent.version) ||
       binRelPath.split('/').includes('..') ||
       binRelPath.startsWith('/')
     ) {
       log(`devin registry entry has an unsafe version or cmd: ${agent.version} ${binary.cmd}`);
+      return null;
+    }
+    if (!trustedArchive(binary.archive, archiveHost)) {
+      log(`devin registry archive url is untrusted: ${binary.archive}`);
       return null;
     }
     return {

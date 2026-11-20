@@ -64,6 +64,7 @@ describe('devin managed install', () => {
     const sha = createHash('sha256').update(bytes).digest('hex');
     const requests: string[] = [];
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -93,6 +94,7 @@ describe('devin managed install', () => {
     const { readFileSync } = await import('node:fs');
     const bytes = new Uint8Array(readFileSync(tarball));
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -113,6 +115,7 @@ describe('devin managed install', () => {
     const { readFileSync } = await import('node:fs');
     const bytes = new Uint8Array(readFileSync(tarball));
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -133,6 +136,7 @@ describe('devin managed install', () => {
     const { readFileSync } = await import('node:fs');
     const bytes = new Uint8Array(readFileSync(tarball));
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -156,6 +160,7 @@ describe('devin managed install', () => {
     const bytes = new Uint8Array(await import('node:fs').then((fs) => fs.readFileSync(tarball)));
     const requests: string[] = [];
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -182,6 +187,7 @@ describe('devin managed install', () => {
     const bytes = new Uint8Array(readFileSync(tarball));
     let downloads = 0;
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -204,6 +210,7 @@ describe('devin managed install', () => {
     const bytes = new Uint8Array(readFileSync(tarball));
     let online = true;
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -226,6 +233,7 @@ describe('devin managed install', () => {
     const { readFileSync, writeFileSync: write } = await import('node:fs');
     const bytes = new Uint8Array(readFileSync(tarball));
     const managed = createDevinManaged({
+      archiveHost: 'x',
       root: join(dir, 'install'),
       platform: 'darwin',
       arch: 'arm64',
@@ -241,5 +249,83 @@ describe('devin managed install', () => {
     write(install!.binPath, 'tampered');
     expect(managed.current()).toBeNull();
     expect(await managed.ensure()).not.toBeNull();
+  });
+
+  test('rejects manifest and registry archives hosted off the trusted host', async () => {
+    const { dir, tarball } = workspace();
+    const { readFileSync } = await import('node:fs');
+    const { createHash } = await import('node:crypto');
+    const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
+    const fetched: string[] = [];
+    const managed = createDevinManaged({
+      archiveHost: 'static.devin.ai',
+      root: join(dir, 'install'),
+      platform: 'darwin',
+      arch: 'arm64',
+      fetchImpl: async (input) => {
+        const url = String(input);
+        fetched.push(url);
+        if (url.includes('manifest.json'))
+          return new Response(manifest('https://evil.example/devin.tgz', sha));
+        if (url.includes('registry.json'))
+          return new Response(registry('https://evil.example/devin.tgz'));
+        return new Response(bytes);
+      },
+    });
+    expect(await managed.ensure()).toBeNull();
+    expect(fetched.some((url) => url.includes('evil.example/devin.tgz'))).toBe(false);
+  });
+
+  test('rejects an http archive url even on the trusted host', async () => {
+    const { dir, tarball } = workspace();
+    const { readFileSync } = await import('node:fs');
+    const { createHash } = await import('node:crypto');
+    const bytes = new Uint8Array(readFileSync(tarball));
+    const sha = createHash('sha256').update(bytes).digest('hex');
+    const managed = createDevinManaged({
+      archiveHost: 'x',
+      root: join(dir, 'install'),
+      platform: 'darwin',
+      arch: 'arm64',
+      fetchImpl: async (input) => {
+        const url = String(input);
+        if (url.includes('manifest.json')) return new Response(manifest('http://x/devin.tgz', sha));
+        if (url.includes('registry.json')) return new Response(registry('http://x/devin.tgz'));
+        return new Response(bytes);
+      },
+    });
+    expect(await managed.ensure()).toBeNull();
+  });
+
+  test('rejects a current.json version that escapes the versions directory', async () => {
+    const { dir } = workspace();
+    const { readFileSync } = await import('node:fs');
+    const { createHash } = await import('node:crypto');
+    const root = join(dir, 'install');
+    const escaped = join(root, 'escaped');
+    mkdirSync(join(escaped, 'bin'), { recursive: true });
+    const bin = join(escaped, 'bin', 'devin');
+    writeFileSync(bin, '#!/bin/sh\n');
+    writeFileSync(
+      join(escaped, '.install-complete'),
+      JSON.stringify({
+        version: 'evil',
+        url: 'https://x/devin.tgz',
+        archiveSha256: '0'.repeat(64),
+        binRelPath: 'bin/devin',
+        binSha256: createHash('sha256').update(readFileSync(bin)).digest('hex'),
+        args: ['acp'],
+        installedAt: 1,
+      }),
+    );
+    writeFileSync(join(root, 'current.json'), JSON.stringify({ version: '../escaped' }));
+    const managed = createDevinManaged({
+      archiveHost: 'x',
+      root,
+      platform: 'darwin',
+      arch: 'arm64',
+    });
+    expect(managed.current()).toBeNull();
   });
 });

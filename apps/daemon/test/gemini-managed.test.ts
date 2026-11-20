@@ -160,6 +160,21 @@ describe('gemini managed install', () => {
     expect(existsSync(join(dir, 'tools', 'versions'))).toBe(false);
   });
 
+  test('rejects a non-https npm tarball url', async () => {
+    const dir = tempDir('gm-http-');
+    const tarball = makeTarball(dir);
+    const fetched: string[] = [];
+    const managed = createGeminiManaged({
+      root: join(dir, 'tools'),
+      fetchImpl: async (url) => {
+        fetched.push(String(url));
+        return fetchFor(tarball, 'http://example.invalid/g.tgz')(url);
+      },
+    });
+    expect(await managed.ensure()).toBeNull();
+    expect(fetched.some((url) => url === 'http://example.invalid/g.tgz')).toBe(false);
+  });
+
   test('a live install lock makes ensure() defer to the holder', async () => {
     const dir = tempDir('gm-lock-');
     mkdirSync(`${join(dir, 'tools')}.lock`, { recursive: true });
