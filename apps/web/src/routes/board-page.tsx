@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   useApiMutations,
@@ -211,6 +211,15 @@ export function BoardPage() {
   useEffect(() => {
     if (setupHome && setupDecision !== undefined) rememberFirstRun(setupDecision);
   }, [setupHome, setupDecision]);
+  const openThreadProjectId =
+    threadId === null ? null : (todos.find((todo) => todo.id === threadId)?.projectId ?? null);
+  const shownProjectId = useRef(homeProjectId);
+  useEffect(() => {
+    const before = shownProjectId.current;
+    shownProjectId.current = homeProjectId;
+    if (before === homeProjectId || homeProjectId === null) return;
+    if (openThreadProjectId !== null && openThreadProjectId !== homeProjectId) closeThread();
+  }, [homeProjectId, openThreadProjectId, closeThread]);
   const homeShown =
     !showSetup &&
     projectLookup !== 'loading' &&

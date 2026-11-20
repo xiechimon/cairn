@@ -54,3 +54,23 @@ test('a task row in a project conversation opens that thread in the side chat be
   await expect(page.getByTestId('side-chat')).toContainText('Push for finished threads');
   await expect(conversation(page)).toBeVisible();
 });
+
+test('switching to another project closes a task that belongs elsewhere, keeps one that belongs there, and Back reopens it', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=home-c&pane=tasks&thread=home-c-working-a');
+  const sideChat = page.getByTestId('side-chat');
+  await expect(sideChat).toContainText('Push for finished threads');
+  await page.getByRole('button', { name: 'Expand sidebar' }).first().click();
+  await projectRow(page, 'cairn').click();
+  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}`));
+  await expect(page).toHaveURL(/thread=home-c-working-a/);
+  await expect(sideChat).toContainText('Push for finished threads');
+  await projectRow(page, 'Credential relay').click();
+  await expect(page).toHaveURL(new RegExp(`project=${CRED_PROJECT_ID}`));
+  await expect(page).not.toHaveURL(/thread=/);
+  await expect(sideChat).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}.*thread=home-c-working-a|thread=home-c-working-a.*project=${PROJECT_ID}`));
+  await expect(sideChat).toContainText('Push for finished threads');
+});
