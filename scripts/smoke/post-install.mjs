@@ -767,6 +767,14 @@ async function launchPackagedApp(executable, userData) {
   });
 }
 
+function procOf(electronApp) {
+  try {
+    return electronApp.process();
+  } catch {
+    return null;
+  }
+}
+
 async function connectApp(appPath, prevAppPath) {
   const scratch = mkdtempSync(join(tmpdir(), 'cairn-smoke-'));
   const executable = join(resolve(appPath), 'Contents', 'MacOS', 'Cairn');
@@ -782,6 +790,7 @@ async function connectApp(appPath, prevAppPath) {
     }
     console.log('booting previous release on the scratch home');
     const prevApp = await launchPackagedApp(prevExecutable, scratch);
+    const prevProc = procOf(prevApp);
     let prevBase;
     try {
       const prevPortFile = join(scratch, 'server-port');
@@ -791,7 +800,7 @@ async function connectApp(appPath, prevAppPath) {
       console.log(`previous release server up on ${prevBase}`);
     } finally {
       await Promise.race([prevApp.close(), delay(30_000)]).catch(() => {});
-      prevApp.process()?.kill('SIGKILL');
+      prevProc?.kill('SIGKILL');
     }
     const dbPath = join(scratch, 'home', 'server', 'server.db');
     const seeded = seedEveryTable(dbPath);
@@ -804,6 +813,7 @@ async function connectApp(appPath, prevAppPath) {
   }
   console.log('booting the packaged app over the seeded database');
   const electronApp = await launchPackagedApp(executable, scratch);
+  const appProc = procOf(electronApp);
   const launchedAt = Date.now();
   const portFile = join(scratch, 'server-port');
   await waitForFile(
@@ -842,6 +852,7 @@ async function connectApp(appPath, prevAppPath) {
     token: readOwnerToken(scratch),
     page,
     electronApp,
+    appProc,
     launchedAt,
     scratch,
     seededTables,
@@ -948,7 +959,7 @@ async function main() {
     for (const undo of ctx.cleanup.reverse()) await undo().catch(() => {});
     if (ctx.electronApp) {
       await Promise.race([ctx.electronApp.close(), delay(30_000)]).catch(() => {});
-      ctx.electronApp.process()?.kill('SIGKILL');
+      ctx.appProc?.kill('SIGKILL');
       if (ctx.scratch) rmSync(ctx.scratch, { recursive: true, force: true });
     }
     if (ctx.browser) await ctx.browser.close().catch(() => {});
@@ -958,15 +969,15 @@ async function main() {
     console.log(
       `${results.length - failed}/${results.length} checks passed; evidence: ${evidence}`,
     );
-    process.exitCode = 1;
-  } else {
-    console.log(`${results.length} checks green`);
+    process.exit(1);
   }
+  console.log(`${results.length} checks green`);
+  process.exit(0);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   main().catch((error) => {
     console.error(`post-install smoke failed to run: ${error.stack ?? error.message}`);
-    process.exitCode = 2;
+    process.exit(2);
   });
 }
