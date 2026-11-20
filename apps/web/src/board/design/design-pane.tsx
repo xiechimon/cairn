@@ -4,7 +4,7 @@ import {
   type DesignViewport,
   designPagePath,
 } from '@cairn/shared';
-import { Code, Ellipsis, FileWarning, Globe, RotateCw } from 'lucide-react';
+import { Code, Ellipsis, FileWarning, Globe, MessagesSquare, RotateCw } from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../../api/client.js';
@@ -394,6 +394,7 @@ function DesignPage({
         <SegmentedTabs
           value={viewport}
           label={t('视口')}
+          className="max-[640px]:hidden"
           onChange={setViewport}
           options={(['desktop', 'tablet', 'mobile'] as const).map((value) => ({
             value,
@@ -443,7 +444,8 @@ function DesignPage({
             className="flex-none gap-1 text-content-secondary"
             onClick={() => setListOpen((open) => !open)}
           >
-            {t('评论')}
+            <MessagesSquare aria-hidden className="size-4 min-[641px]:hidden" />
+            <span className="max-[640px]:sr-only">{t('评论列表')}</span>
             <span className="tabular-nums">{activeComments}</span>
           </Button>
         )}
