@@ -1973,6 +1973,10 @@ export function useDesignMutations(todoId: string, fileName: string) {
       onError: rollback,
       onSettled: refresh,
     }),
+    saveMark: useMutation({
+      mutationFn: (pngBase64: string) =>
+        api.post<{ attachmentId: string }>(`${designPath(todoId)}/marks`, { pngBase64 }),
+    }),
     deleteComment: useMutation({
       mutationFn: (id: string) => api.del<void>(commentPath(id)),
       onMutate: (id) => changeComments((rows) => rows.filter((row) => row.id !== id)),

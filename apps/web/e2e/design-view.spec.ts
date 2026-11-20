@@ -71,6 +71,7 @@ async function openDesign(page: Page, seeded: Comment[] = []) {
     comments: seeded,
     sends: [] as { content: string; designCommentIds?: string[] }[],
     writes: [] as string[],
+    marks: [] as Buffer[],
   };
   const mock = { threads: [THREAD], messages: [] as unknown[], todos: [PAGE_TASK] };
   await mockLive(page, mock, (path, route, json) => {
@@ -87,7 +88,7 @@ async function openDesign(page: Page, seeded: Comment[] = []) {
         fileName: 'pricing.html',
         versionSeq: version?.seq ?? 0,
         pin: Math.max(0, ...state.comments.map((c) => c.pin)) + 1,
-        markAttachmentId: null,
+        markAttachmentId: body.markAttachmentId ?? null,
         status: 'open',
         messageId: null,
         createdAt: Date.now(),
@@ -96,6 +97,19 @@ async function openDesign(page: Page, seeded: Comment[] = []) {
       state.comments = [...state.comments, row];
       state.writes.push(`create ${row.id}`);
       return json(row, 201);
+    }
+    if (path === `${base}/marks` && method === 'POST') {
+      const { pngBase64 } = route.request().postDataJSON() as { pngBase64: string };
+      state.marks.push(Buffer.from(pngBase64, 'base64'));
+      return json({ attachmentId: `att-mark-${state.marks.length}` }, 201);
+    }
+    const markId = /^\/api\/attachments\/att-mark-(\d+)$/.exec(path)?.[1];
+    if (markId !== undefined) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: state.marks[Number(markId) - 1] ?? Buffer.alloc(0),
+      });
     }
     const commentId = /\/design\/comments\/([^/]+)$/.exec(path)?.[1];
     if (commentId !== undefined && method === 'PATCH') {
@@ -316,4 +330,68 @@ test('comments: pick an element, save, edit, delete, send with the next message,
 
   await page.keyboard.press('Escape');
   await expect(pane.getByTestId('design-comment-mode')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('mark-up: draw a box, a stroke and text, undo and redo, then save a PNG mark as a comment', async ({
+  page,
+}) => {
+  const state = await openDesign(page);
+  await expect(page.frameLocator('[data-testid="design-frame"]').getByRole('heading')).toBeVisible();
+  await page.getByTestId('design-mark-mode').click();
+  await expect(page.getByTestId('design-mark-mode')).toHaveAttribute('aria-pressed', 'true');
+  const bar = page.getByTestId('design-mark-bar');
+  await expect(bar).toBeVisible();
+  const layer = page.getByTestId('design-draw-layer');
+  const box = await layer.boundingBox();
+  if (box === null) throw new Error('draw layer has no box');
+  const at = (fx: number, fy: number) => ({ x: box.x + box.width * fx, y: box.y + box.height * fy });
+
+  const drag = async (points: { x: number; y: number }[]) => {
+    const [first, ...rest] = points;
+    if (first === undefined) return;
+    await page.mouse.move(first.x, first.y);
+    await page.mouse.down();
+    for (const point of rest) await page.mouse.move(point.x, point.y, { steps: 4 });
+    await page.mouse.up();
+  };
+  await drag([at(0.1, 0.1), at(0.5, 0.3)]);
+  await expect(page.getByTestId('design-mark-undo')).toBeEnabled();
+  await page.getByTestId('design-mark-note').fill('标题区域太挤');
+  await expect(page.getByTestId('design-mark-save')).toBeEnabled();
+  await page.getByTestId('design-mark-undo').click();
+  await expect(page.getByTestId('design-mark-save')).toBeDisabled();
+  await expect(page.getByTestId('design-mark-redo')).toBeEnabled();
+  await page.getByTestId('design-mark-redo').click();
+  await expect(page.getByTestId('design-mark-save')).toBeEnabled();
+
+  await page.getByTestId('design-mark-tool-pen').click();
+  await drag([at(0.6, 0.6), at(0.7, 0.65), at(0.8, 0.6)]);
+  await page.getByTestId('design-mark-tool-text').click();
+  await page.mouse.click(at(0.2, 0.5).x, at(0.2, 0.5).y);
+  await expect(page.getByTestId('design-draw-text')).toBeFocused();
+  await page.keyboard.type('加大间距');
+  await page.getByTestId('design-mark-save').click();
+
+  await expect(bar).toBeHidden();
+  await expect(page.getByTestId('design-mark-mode')).toHaveAttribute('aria-pressed', 'false');
+  expect(state.marks).toHaveLength(1);
+  expect(state.marks[0]?.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
+  expect(state.writes).toEqual(['create cmt-1']);
+  const created = state.comments[0];
+  expect(created).toMatchObject({
+    markAttachmentId: 'att-mark-1',
+    note: '标题区域太挤',
+    selector: 'body',
+    versionId: 'ver-2',
+  });
+  await expect(page.locator('[data-testid="design-pin"][data-pin="1"]')).toBeVisible();
+  await expect(page.getByTestId('design-comment-chip')).toHaveCount(1);
+  await page.getByTestId('design-comments-toggle').click();
+  const mark = page.getByTestId('design-comment-mark').locator('img');
+  await expect(mark).toBeVisible();
+  await expect.poll(() => mark.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
+
+  await page.getByTestId('design-mark-mode').click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('design-mark-bar')).toBeHidden();
 });

@@ -5,13 +5,16 @@ import { Textarea } from '../../components/ui/textarea.js';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
 import type { Located } from './design-bridge.js';
-import { commentSubject } from './design-composer.js';
 
 const STATUS_LABEL: Record<DesignCommentStatus, string> = {
   open: '未发送',
   sent: '已发给 agent',
   resolved: '已解决',
 };
+
+function markHref(attachmentId: string): string {
+  return `/api/attachments/${encodeURIComponent(attachmentId)}`;
+}
 
 export interface CommentActions {
   edit: (id: string, note: string) => void;
@@ -108,9 +111,27 @@ function CommentRow({
             {comment.note}
           </p>
         )}
+        {comment.markAttachmentId !== null && (
+          <a
+            href={markHref(comment.markAttachmentId)}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid="design-comment-mark"
+            className="block overflow-hidden rounded-(--radius-tile) border border-border"
+          >
+            <img
+              src={markHref(comment.markAttachmentId)}
+              alt={t('标注图 {n}', { n: comment.pin })}
+              className="block max-h-40 w-full object-cover object-top"
+            />
+          </a>
+        )}
         <p className="m-0 truncate text-meta text-content-tertiary">
-          {comment.label}「{commentSubject(comment)}」 · v{comment.versionSeq} ·{' '}
-          {t(STATUS_LABEL[comment.status])}
+          {[
+            comment.text !== '' ? `${comment.label}「${comment.text}」` : comment.label,
+            `v${comment.versionSeq}`,
+            t(STATUS_LABEL[comment.status]),
+          ].join(' · ')}
         </p>
         {located?.state === 'lost' && (
           <p data-testid="design-comment-lost" className="m-0 text-meta text-content-secondary">

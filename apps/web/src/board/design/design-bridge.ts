@@ -69,13 +69,15 @@ export function useCommentBridge({
   );
 
   const locate = useCallback(() => {
-    const items = comments.map((comment) => ({
-      id: comment.id,
-      selector: comment.selector,
-      elementId: comment.elementId,
-      text: comment.text,
-      label: comment.label,
-    }));
+    const items = comments
+      .filter((comment) => comment.markAttachmentId === null)
+      .map((comment) => ({
+        id: comment.id,
+        selector: comment.selector,
+        elementId: comment.elementId,
+        text: comment.text,
+        label: comment.label,
+      }));
     const requestId = crypto.randomUUID();
     requestRef.current = requestId;
     post({ type: COMMENT_BRIDGE_MESSAGES.locate, requestId, items });

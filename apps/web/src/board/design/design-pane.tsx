@@ -36,8 +36,14 @@ import { ChevronDown, Download, X } from '../../icons/index.js';
 import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
 import { FILE_PARAM } from '../file-pane.js';
 import { deliverableHref } from '../made-files.js';
-import { type CommentDraftHandlers, DesignCanvas } from './design-canvas.js';
+import {
+  type CommentDraftHandlers,
+  DesignCanvas,
+  type MarkHandlers,
+  type MarkInput,
+} from './design-canvas.js';
 import type { CommentActions } from './design-comment-list.js';
+import { bakeMarkPng, MarkError, markTarget } from './design-markup.js';
 import { type DesignTarget, pickPage } from './design-route.js';
 import { VersionsMenu, versionLabel } from './design-versions.js';
 import { designSrcdoc } from './srcdoc.js';
@@ -188,13 +194,16 @@ function DesignPage({
     [htmlQ.data],
   );
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const { restore, createComment, patchComment, deleteComment } = useDesignMutations(
+  const { restore, createComment, patchComment, deleteComment, saveMark } = useDesignMutations(
     todoId,
     page.fileName,
   );
   const [commenting, setCommenting] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const stopCommenting = useCallback(() => setCommenting(false), []);
+  const [marking, setMarking] = useState(false);
+  const [markBusy, setMarkBusy] = useState(false);
+  const stopMarking = useCallback(() => setMarking(false), []);
   const commentsQ = useDesignComments(todoId, page.fileName, live);
   const comments = commentsQ.data ?? [];
   const activeComments = comments.filter((comment) => comment.status !== 'resolved').length;
@@ -235,6 +244,44 @@ function DesignPage({
         ? undefined
         : (target, note, done) =>
             createFrom(target, note, (id) => {
+              done();
+              void sendComments([id]);
+            }),
+  };
+  const markFrom = async ({ frame, marks, note }: MarkInput, then: (id: string) => void) => {
+    setMarkBusy(true);
+    try {
+      const pngBase64 = await bakeMarkPng(frame, marks, frame.offsetWidth);
+      const { attachmentId } = await saveMark.mutateAsync(pngBase64);
+      const row = await createComment.mutateAsync({
+        ...markTarget(marks, { width: frame.offsetWidth, height: frame.offsetHeight }, t('标注')),
+        versionId: shown.id,
+        viewport,
+        note,
+        markAttachmentId: attachmentId,
+      });
+      then(row.id);
+    } catch (error) {
+      toastError(
+        error instanceof MarkError
+          ? error.reason === 'snapshot'
+            ? t('页面截图没拍下来，标注没保存')
+            : t('标注图超过 5 MB，没保存')
+          : t('标注没保存上'),
+        error,
+      );
+    } finally {
+      setMarkBusy(false);
+    }
+  };
+  const mark: MarkHandlers = {
+    busy: markBusy,
+    save: (input, done) => void markFrom(input, () => done()),
+    send:
+      sendComments === undefined
+        ? undefined
+        : (input, done) =>
+            void markFrom(input, (id) => {
               done();
               void sendComments([id]);
             }),
@@ -359,9 +406,28 @@ function DesignPage({
             aria-pressed={commenting && canComment}
             disabled={!canComment}
             className="flex-none text-content-secondary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/80"
-            onClick={() => setCommenting((on) => !on)}
+            onClick={() => {
+              setMarking(false);
+              setCommenting((on) => !on);
+            }}
           >
             {t('评论')}
+          </Button>
+        )}
+        {!readOnly && live && (
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="design-mark-mode"
+            aria-pressed={marking && canComment}
+            disabled={!canComment}
+            className="flex-none text-content-secondary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/80"
+            onClick={() => {
+              setCommenting(false);
+              setMarking((on) => !on);
+            }}
+          >
+            {t('标注')}
           </Button>
         )}
         <VersionsMenu
@@ -508,6 +574,9 @@ function DesignPage({
           viewport={viewport}
           commenting={commenting && canComment}
           onStopCommenting={stopCommenting}
+          marking={marking && canComment}
+          onStopMarking={stopMarking}
+          mark={mark}
           comments={comments}
           listOpen={listOpen}
           onListOpen={setListOpen}

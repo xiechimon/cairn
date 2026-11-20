@@ -5,15 +5,34 @@ import type {
 } from '@cairn/shared';
 import { type RefObject, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
+import {
+  DrawLayer,
+  MARK_COLOR,
+  type Mark,
+  useDrawing,
+} from '../../vendor-open-design/draw-overlay.js';
 import { useCommentBridge } from './design-bridge.js';
 import { type CommentActions, CommentList, CommentPin } from './design-comment-list.js';
 import { CommentPopover } from './design-comment-popover.js';
 import { DesignFrame } from './design-frame.js';
+import { MarkBar } from './design-markup.js';
 
 export interface CommentDraftHandlers {
   busy: boolean;
   save: (target: ElementTarget, note: string, done: () => void) => void;
   send: ((target: ElementTarget, note: string, done: () => void) => void) | undefined;
+}
+
+export interface MarkInput {
+  frame: HTMLIFrameElement;
+  marks: readonly Mark[];
+  note: string;
+}
+
+export interface MarkHandlers {
+  busy: boolean;
+  save: (input: MarkInput, done: () => void) => void;
+  send: ((input: MarkInput, done: () => void) => void) | undefined;
 }
 
 export function DesignCanvas({
@@ -23,6 +42,9 @@ export function DesignCanvas({
   viewport,
   commenting,
   onStopCommenting,
+  marking,
+  onStopMarking,
+  mark,
   comments,
   listOpen,
   onListOpen,
@@ -36,6 +58,9 @@ export function DesignCanvas({
   viewport: DesignViewport;
   commenting: boolean;
   onStopCommenting: () => void;
+  marking: boolean;
+  onStopMarking: () => void;
+  mark: MarkHandlers;
   comments: readonly DesignCommentRecord[];
   listOpen: boolean;
   onListOpen: (open: boolean) => void;
@@ -47,6 +72,16 @@ export function DesignCanvas({
   const bridge = useCommentBridge({ frameRef, commenting, comments });
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const { picked, clearPicked } = bridge;
+  const drawing = useDrawing();
+  const { clear } = drawing;
+  useEffect(() => {
+    if (!marking) clear();
+  }, [marking, clear]);
+  const submitMark = (handler: MarkHandlers['save']) => (note: string) => {
+    const frame = frameRef.current;
+    if (frame === null) return;
+    handler({ frame, marks: drawing.marks, note }, onStopMarking);
+  };
   useEffect(() => {
     if (!commenting) clearPicked();
   }, [commenting, clearPicked]);
@@ -59,6 +94,8 @@ export function DesignCanvas({
     return () => window.removeEventListener('keydown', onKey);
   }, [commenting, picked, onStopCommenting]);
   const pins = comments.flatMap((comment) => {
+    if (comment.markAttachmentId !== null)
+      return comment.status !== 'resolved' ? [{ comment, position: comment.position }] : [];
     const where = bridge.located.get(comment.id);
     return comment.status !== 'resolved' && where?.position != null && where.state !== 'lost'
       ? [{ comment, position: where.position }]
@@ -74,6 +111,15 @@ export function DesignCanvas({
         >
           {t('这个页面不支持点选评论')}
         </p>
+      )}
+      {marking && (
+        <MarkBar
+          drawing={drawing}
+          busy={mark.busy}
+          onCancel={onStopMarking}
+          onSave={submitMark(mark.save)}
+          onSend={mark.send === undefined ? undefined : submitMark(mark.send)}
+        />
       )}
       <DesignFrame
         frameRef={frameRef}
@@ -107,6 +153,14 @@ export function DesignCanvas({
                   width: picked.position.width * transform.scale,
                   height: picked.position.height * transform.scale,
                 }}
+              />
+            )}
+            {marking && (
+              <DrawLayer
+                drawing={drawing}
+                color={MARK_COLOR}
+                label={t('标注画布')}
+                textLabel={t('标注文字')}
               />
             )}
             {pins.map(({ comment, position }) => (
