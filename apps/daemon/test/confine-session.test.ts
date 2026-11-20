@@ -1,12 +1,75 @@
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { execFile, execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { userInfo } from 'node:os';
 import { basename, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 import { describe, expect, test } from 'vitest';
 import { createAcpBackend } from '../src/backend/acp.js';
 import { buildClaudeSdkOptions } from '../src/backend/claude-code.js';
 import { createSessionConfiner } from '../src/backend/confine-session.js';
+import { bundledClaudeCodePath } from '../src/claude-code-bin.js';
 import { testTempDir } from './test-temp-dir.js';
+
+const execute = promisify(execFile);
+
+interface FakeModelRequest {
+  stream?: boolean;
+  tools?: { name?: string }[];
+  messages?: { content?: unknown }[];
+}
+
+function fakeModelTurn(request: FakeModelRequest): { stream: boolean; body: string } {
+  const answered = JSON.stringify(request.messages ?? []).includes('"tool_result"');
+  const wantsTool = !answered && (request.tools ?? []).some((tool) => tool.name === 'Bash');
+  const input = { command: 'echo tool-ran > tool-ran.txt', description: 'probe' };
+  const content = wantsTool
+    ? { type: 'tool_use', id: 'toolu_probe', name: 'Bash', input }
+    : { type: 'text', text: 'confined-turn-done' };
+  const stopReason = wantsTool ? 'tool_use' : 'end_turn';
+  const usage = { input_tokens: 1, output_tokens: 1 };
+  const message = {
+    id: 'msg_probe',
+    type: 'message',
+    role: 'assistant',
+    model: 'claude-sonnet-4-5',
+    stop_sequence: null,
+  };
+  if (request.stream !== true)
+    return {
+      stream: false,
+      body: JSON.stringify({ ...message, content: [content], stop_reason: stopReason, usage }),
+    };
+  const events = [
+    { type: 'message_start', message: { ...message, content: [], stop_reason: null, usage } },
+    {
+      type: 'content_block_start',
+      index: 0,
+      content_block: wantsTool ? { ...content, input: {} } : { type: 'text', text: '' },
+    },
+    {
+      type: 'content_block_delta',
+      index: 0,
+      delta: wantsTool
+        ? { type: 'input_json_delta', partial_json: JSON.stringify(input) }
+        : { type: 'text_delta', text: 'confined-turn-done' },
+    },
+    { type: 'content_block_stop', index: 0 },
+    {
+      type: 'message_delta',
+      delta: { stop_reason: stopReason, stop_sequence: null },
+      usage: { output_tokens: 1 },
+    },
+    { type: 'message_stop' },
+  ];
+  return {
+    stream: true,
+    body: events
+      .map((event) => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`)
+      .join(''),
+  };
+}
 
 function fixture() {
   const root = realpathSync(testTempDir('confine-session-'));
@@ -41,6 +104,34 @@ function fixture() {
     confine: confine as NonNullable<typeof confine>,
   };
 }
+
+function callArguments(source: string, start: number): string {
+  let depth = 0;
+  for (let index = start; index < source.length; index++) {
+    const char = source[index];
+    if (char === '(') depth++;
+    if (char === ')' && --depth === 0) return source.slice(start, index + 1);
+  }
+  throw new Error('unbalanced call');
+}
+
+describe('session confiner wiring', () => {
+  test('every harness backend the Runner builds receives the session confiner', () => {
+    const source = readFileSync(
+      fileURLToPath(new URL('../src/machine-loop.ts', import.meta.url)),
+      'utf8',
+    );
+    const calls = [...source.matchAll(/\bcreate(\w+)Backend\(/g)].map((match) => ({
+      backend: match[1],
+      args: callArguments(source, (match.index ?? 0) + match[0].length - 1),
+    }));
+    expect(calls.map((call) => call.backend).sort()).toEqual(
+      ['Acp', 'Acp', 'ClaudeCode', 'Gemini', 'Pi'].sort(),
+    );
+    for (const call of calls)
+      expect(call.args, call.backend).toMatch(/\.\.\.\(confine !== null[^)]*\? \{ confine \}/);
+  });
+});
 
 describe('session confiner', () => {
   test('is absent off macOS', () => {
@@ -276,6 +367,67 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     expect((await run(`cat '${join(skills, 'skill.md')}'`)).out).toContain('skill-body');
     expect((await run(`echo ok > '${join(worktree, 'f')}' && echo done`)).out).toContain('done');
   });
+
+  test('the bundled Claude Code runs a model turn and a Bash tool call under the profile', async () => {
+    const claude = bundledClaudeCodePath();
+    expect(claude).not.toBeNull();
+    const { confine, worktree, root, runnerHome } = fixture();
+    const requests: string[] = [];
+    const endpoint = createServer((request, response) => {
+      let body = '';
+      request.on('data', (chunk: Buffer) => {
+        body += chunk.toString();
+      });
+      request.on('end', () => {
+        requests.push(request.url ?? '');
+        if (!(request.url ?? '').startsWith('/v1/messages') || request.url?.includes('count')) {
+          response.writeHead(404, { 'content-type': 'application/json' });
+          response.end('{"type":"error","error":{"type":"not_found_error","message":"none"}}');
+          return;
+        }
+        const turn = fakeModelTurn(JSON.parse(body) as FakeModelRequest);
+        response.writeHead(200, {
+          'content-type': turn.stream ? 'text/event-stream' : 'application/json',
+        });
+        response.end(turn.body);
+      });
+    });
+    await new Promise<void>((resolve) => endpoint.listen(0, '127.0.0.1', resolve));
+    const address = endpoint.address();
+    const port = typeof address === 'object' && address !== null ? address.port : 0;
+    try {
+      const launch = confine({ cwd: worktree }, 'claude-code', {
+        command: claude as string,
+        args: [
+          '-p',
+          'run the tool',
+          '--model',
+          'claude-sonnet-4-5',
+          '--dangerously-skip-permissions',
+        ],
+      });
+      const result = await execute(launch.command, launch.args, {
+        cwd: worktree,
+        timeout: 90000,
+        encoding: 'utf8',
+        env: {
+          PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+          HOME: join(root, 'user'),
+          TMPDIR: join(root, 'tmp-user', 'T'),
+          CLAUDE_CONFIG_DIR: join(runnerHome, 'claude'),
+          ANTHROPIC_BASE_URL: `http://127.0.0.1:${port}`,
+          ANTHROPIC_API_KEY: 'sk-ant-test',
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1',
+          DISABLE_AUTOUPDATER: '1',
+        },
+      });
+      expect(result.stdout).toContain('confined-turn-done');
+      expect(readFileSync(join(worktree, 'tool-ran.txt'), 'utf8')).toBe('tool-ran\n');
+      expect(requests.length).toBeGreaterThan(1);
+    } finally {
+      endpoint.close();
+    }
+  }, 120000);
 
   test('a sandboxed session can write the report handoff directory and the system temp directory', () => {
     const { root, runnerHome, worktree } = fixture();
