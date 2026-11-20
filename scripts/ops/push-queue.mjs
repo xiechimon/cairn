@@ -15,6 +15,26 @@ export function laneName(host, worktree) {
   return `${host}/${worktree}`.replace(/[^A-Za-z0-9._/-]/g, '-');
 }
 
+export const GREEN_CONTEXTS = ['check', 'pack-smoke', 'e2e-gate'];
+
+export function missingGreenContexts(checkRuns) {
+  const green = new Set(
+    checkRuns
+      .filter((run) => ['success', 'skipped'].includes(run.conclusion))
+      .map((run) => run.name),
+  );
+  return GREEN_CONTEXTS.filter((name) => !green.has(name));
+}
+
+export function preflightEvidence({ shas, pushedTree, treeOf, checkRunsOf }) {
+  for (const sha of shas) {
+    if (treeOf(sha) !== pushedTree) continue;
+    const runs = checkRunsOf(sha) ?? [];
+    if (missingGreenContexts(runs).length === 0) return { ok: true, sha };
+  }
+  return { ok: false };
+}
+
 export function unownedCommits(commits) {
   return commits.filter((commit) => ownerOf(commit.body) === null).map((commit) => commit.sha);
 }
@@ -74,6 +94,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     process.exit(1);
   }
 
+  const preStampSha = git(['rev-parse', 'HEAD']);
   const commits = git(['log', '--reverse', '--format=%H%x1f%B%x1e', 'origin/main..HEAD'])
     .split('\x1e')
     .map((entry) => entry.trim())
@@ -104,6 +125,40 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   if (english.status !== 0) {
     console.error(
       '[push-queue] a commit message or added line has Chinese text, which fails ci; reword it and run again. Nothing was pushed.',
+    );
+    process.exit(1);
+  }
+  const pushedSha = git(['rev-parse', 'HEAD']);
+  let evidence;
+  try {
+    evidence = preflightEvidence({
+      shas: [...new Set([pushedSha, preStampSha])],
+      pushedTree: git(['rev-parse', 'HEAD^{tree}']),
+      treeOf: (sha) => git(['rev-parse', `${sha}^{tree}`]),
+      checkRunsOf: (sha) => {
+        try {
+          return JSON.parse(
+            execFileSync('gh', ['api', `repos/${repo}/commits/${sha}/check-runs?per_page=100`], {
+              encoding: 'utf8',
+            }),
+          ).check_runs;
+        } catch (error) {
+          if (/No commit found|HTTP (404|422)/.test(error.message)) return null;
+          throw error;
+        }
+      },
+    });
+  } catch (error) {
+    console.error(
+      `[push-queue] not pushed: the check-runs lookup failed (${error.message}); retry when the GitHub API answers.`,
+    );
+    process.exit(1);
+  }
+  if (!evidence.ok) {
+    console.error(
+      `[push-queue] not pushed: ${pushedSha.slice(0, 9)} has no green ci evidence for ${GREEN_CONTEXTS.join(' + ')}.\n` +
+        'Run node scripts/ops/preflight.mjs --wait — it pushes HEAD to refs/heads/preflight/<lane> and waits for the ci run.\n' +
+        'A green run on a commit with the same tree also counts; local pnpm prepush stays optional.',
     );
     process.exit(1);
   }

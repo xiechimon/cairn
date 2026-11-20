@@ -3,7 +3,7 @@ name: ci
 # Third-party actions are pinned to full commit SHAs (#1076); the trailing version is Dependabot's anchor.
 on:
   push:
-    branches: [main, 'queue/**']
+    branches: [main, 'queue/**', 'preflight/**']
   pull_request:
 
 concurrency:
@@ -46,7 +46,7 @@ jobs:
           e2e_tier=full
           base_ref=""
           case "$GITHUB_REF" in
-            refs/heads/queue/*)
+            refs/heads/queue/* | refs/heads/preflight/*)
               base_ref=$(git merge-base origin/main HEAD 2>/dev/null || true)
               ;;
             *)
