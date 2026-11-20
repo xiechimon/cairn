@@ -31,6 +31,7 @@ import { runMachine } from './machine-loop.js';
 import { ORB_RELAY_TOKEN_ENV } from './orb/protocol.js';
 import { runOrbServicesEnsure } from './orb/services-runtime.js';
 import { orbAgentHome, runOrbWorker } from './orb/worker.js';
+import { ensurePrivateDir } from './private-fs.js';
 import { claudeConfigHome } from './runtime-homes.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import {
@@ -352,9 +353,12 @@ export function buildProgram(): Command {
         process.exitCode = 1;
         return;
       }
+      const claudeHome = claudeConfigHome(config.home);
+      ensurePrivateDir(config.home);
+      ensurePrivateDir(claudeHome);
       const result = spawnSync(command, ['auth', 'login'], {
         stdio: 'inherit',
-        env: { ...process.env, CLAUDE_CONFIG_DIR: claudeConfigHome(config.home) },
+        env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome },
       });
       if (result.error !== undefined) throw result.error;
       process.exitCode = result.status ?? 1;

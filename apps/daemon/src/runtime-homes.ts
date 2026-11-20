@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readdirSync, renameSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -26,6 +26,7 @@ export function agentConfigImportMarker(cairnHome: string): string {
 
 function moveIfAbsent(from: string, to: string): boolean {
   if (!existsSync(from) || existsSync(to)) return false;
+  if (lstatSync(from).isSymbolicLink()) return false;
   mkdirSync(dirname(to), { recursive: true, mode: 0o700 });
   renameSync(from, to);
   return true;

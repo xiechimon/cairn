@@ -1,10 +1,24 @@
-import { describe, expect, test } from 'vitest';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, test } from 'vitest';
 import {
   antigravityKeyFromText,
   createAntigravitySubscriptionSchema,
   DEFAULT_ANTIGRAVITY_MODELS,
-  managedVersionedBins,
 } from '../src/index.js';
+import { verifiedManagedBin, verifiedManagedBins } from '../src/node/managed-bin.js';
+
+const tmp = mkdtempSync(join(tmpdir(), 'managed-bin-test-'));
+afterAll(() => rmSync(tmp, { recursive: true, force: true }));
+
+function seedVersion(root: string, version: string, marker: Record<string, unknown>, bin: string) {
+  const dir = join(root, 'versions', version);
+  mkdirSync(join(dir, 'bin'), { recursive: true });
+  writeFileSync(join(dir, 'bin', 'tool'), bin, { mode: 0o755 });
+  writeFileSync(join(dir, '.install-complete'), JSON.stringify(marker));
+}
 
 describe('antigravity local helpers and schemas', () => {
   test('parses raw token, env export, and JSON credentials while rejecting junk', () => {
@@ -19,17 +33,27 @@ describe('antigravity local helpers and schemas', () => {
     expect(antigravityKeyFromText('{bad')).toBeNull();
   });
 
-  test('managedVersionedBins sorts newest version first across the bin names', () => {
-    const candidates = managedVersionedBins(
-      '/cairn/tools/antigravity/versions',
-      ['1.0.0', '1.5.10'],
-      ['bin/antigravity-acp', 'bin/agy'],
+  test('verifiedManagedBin requires the install marker and a matching sha256', () => {
+    const root = join(tmp, 'tools', 'demo');
+    const bin = 'binary-bytes';
+    const sha256 = createHash('sha256').update(bin).digest('hex');
+    seedVersion(root, '1.0.0', { binRelPath: 'bin/tool', binSha256: sha256, args: ['acp'] }, bin);
+    seedVersion(
+      root,
+      '2.0.0',
+      { binRelPath: 'bin/tool', binSha256: '0'.repeat(64), args: ['acp'] },
+      bin,
     );
-    expect(candidates).toEqual([
-      '/cairn/tools/antigravity/versions/1.5.10/bin/antigravity-acp',
-      '/cairn/tools/antigravity/versions/1.5.10/bin/agy',
-      '/cairn/tools/antigravity/versions/1.0.0/bin/antigravity-acp',
-      '/cairn/tools/antigravity/versions/1.0.0/bin/agy',
+    mkdirSync(join(root, 'versions', '0.5.0'), { recursive: true });
+
+    expect(verifiedManagedBin(join(root, 'versions', '1.0.0'))).toEqual({
+      command: join(root, 'versions', '1.0.0', 'bin', 'tool'),
+      args: ['acp'],
+    });
+    expect(verifiedManagedBin(join(root, 'versions', '2.0.0'))).toBeNull();
+    expect(verifiedManagedBin(join(root, 'versions', '0.5.0'))).toBeNull();
+    expect(verifiedManagedBins(join(root, 'versions'), ['0.5.0', '2.0.0', '1.0.0'])).toEqual([
+      { command: join(root, 'versions', '1.0.0', 'bin', 'tool'), args: ['acp'] },
     ]);
   });
 

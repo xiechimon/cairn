@@ -196,7 +196,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     extraDeniedRoots: (process.env[ENV_VARS.confineDeniedRoots] ?? '')
       .split(delimiter)
       .filter((path) => path !== ''),
-    readable: [config.skillsDir, paths.teamSkillsCacheDir],
+    readable: [config.skillsDir, paths.teamSkillsCacheDir, join(paths.home, 'tools')],
     handoffDirectories: [paths.plansDir],
     serverUrl: config.serverUrl,
   });

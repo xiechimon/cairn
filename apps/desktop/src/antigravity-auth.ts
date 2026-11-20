@@ -15,8 +15,8 @@ import {
   type AntigravityLoginOutcome,
   antigravityCliDir,
   antigravityKeyFromText,
-  managedVersionedBins,
 } from '@cairn/shared';
+import { verifiedManagedBins } from '@cairn/shared/managed-bin';
 
 const STATUS_TIMEOUT_MS = 4_000;
 const LOGIN_TIMEOUT_MS = 600_000;
@@ -64,10 +64,7 @@ function resolveAntigravityBinary(): ResolvedBinary | null {
   const explicit = process.env.CAIRN_AGY_PATH?.trim();
   const candidates = [
     ...(explicit !== undefined && explicit !== '' ? [explicit] : []),
-    ...managedVersionedBins(managedVersionsRoot(), managedVersions(), [
-      'bin/antigravity-acp',
-      'bin/agy',
-    ]),
+    ...verifiedManagedBins(managedVersionsRoot(), managedVersions()).map((bin) => bin.command),
   ];
   for (const candidate of candidates) {
     if (!isExecutableFile(candidate)) continue;

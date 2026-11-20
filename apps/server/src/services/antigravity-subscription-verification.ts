@@ -3,7 +3,8 @@ import { accessSync, constants, readdirSync, readFileSync, statSync } from 'node
 import { mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import { type AntigravitySubscriptionVerifyResult, managedVersionedBins } from '@cairn/shared';
+import type { AntigravitySubscriptionVerifyResult } from '@cairn/shared';
+import { verifiedManagedBin, verifiedManagedBins } from '@cairn/shared/managed-bin';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MANAGED_ROOT = join(homedir(), '.cairn', 'tools', 'antigravity');
@@ -44,36 +45,22 @@ function managedVersions(): string[] {
 }
 
 function managedMarkerCommand(): { command: string; args: string[] } | null {
-  const dirs: string[] = [];
+  let currentVersion: string | null = null;
   try {
     const current = JSON.parse(readFileSync(join(MANAGED_ROOT, 'current.json'), 'utf8')) as {
       version?: unknown;
     };
-    if (typeof current.version === 'string') {
-      dirs.push(join(MANAGED_ROOT, 'versions', current.version));
-    }
+    if (typeof current.version === 'string') currentVersion = current.version;
   } catch {}
-  for (const version of managedVersions().sort().reverse()) {
-    dirs.push(join(MANAGED_ROOT, 'versions', version));
-  }
-  for (const dir of dirs) {
-    try {
-      const marker = JSON.parse(readFileSync(join(dir, '.install-complete'), 'utf8')) as {
-        binRelPath?: unknown;
-        args?: unknown;
-      };
-      if (typeof marker.binRelPath !== 'string') continue;
-      const binPath = join(dir, marker.binRelPath);
-      accessSync(binPath, constants.X_OK);
-      if (!statSync(binPath).isFile()) continue;
-      const args =
-        Array.isArray(marker.args) && marker.args.every((arg) => typeof arg === 'string')
-          ? marker.args
-          : ['acp'];
-      return { command: binPath, args };
-    } catch {}
-  }
-  return null;
+  const candidates = [
+    ...(currentVersion === null
+      ? []
+      : [verifiedManagedBin(join(MANAGED_ROOT, 'versions', currentVersion))]),
+    ...verifiedManagedBins(join(MANAGED_ROOT, 'versions'), managedVersions()),
+  ];
+  const found = candidates.find((bin) => bin !== null);
+  if (found === undefined || found === null) return null;
+  return { command: found.command, args: found.args.length > 0 ? found.args : ['acp'] };
 }
 
 function resolveAgyBinary(): { command: string; args: string[] } {
@@ -81,10 +68,9 @@ function resolveAgyBinary(): { command: string; args: string[] } {
   const managed = managedMarkerCommand();
   const candidates = [
     ...(explicit !== undefined && explicit.trim() !== '' ? [explicit.trim()] : []),
-    ...managedVersionedBins(join(MANAGED_ROOT, 'versions'), managedVersions(), [
-      'bin/antigravity-acp',
-      'bin/agy',
-    ]),
+    ...verifiedManagedBins(join(MANAGED_ROOT, 'versions'), managedVersions()).map(
+      (bin) => bin.command,
+    ),
     `${homedir()}/.local/bin/agy`,
     '/opt/homebrew/bin/agy',
     '/usr/local/bin/agy',

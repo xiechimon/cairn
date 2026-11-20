@@ -2,6 +2,7 @@ import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -416,7 +417,7 @@ export function createAntigravityManaged(
     const binRelCandidate = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
     if (
       /[/\\]/.test(agent.version) ||
-      agent.version === '..' ||
+      agent.version.startsWith('.') ||
       binRelCandidate.split('/').includes('..') ||
       binRelCandidate.startsWith('/')
     ) {
@@ -475,6 +476,7 @@ export function createAntigravityManaged(
         binPath = join(staging, top, binRelPath);
         if (!existsSync(binPath)) throw new Error('antigravity archive has no binary');
       }
+      if (!lstatSync(binPath).isFile()) throw new Error('antigravity archive binary is not a file');
       const marker: InstallMarker = {
         version: agent.version,
         url: binary.archive,

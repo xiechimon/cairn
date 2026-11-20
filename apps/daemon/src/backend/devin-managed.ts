@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -217,6 +218,10 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
       log(`devin manifest has no archive for ${target}`);
       return null;
     }
+    if (/[/\\]/.test(parsed.data.version) || parsed.data.version.startsWith('.')) {
+      log(`devin manifest has an unsafe version: ${parsed.data.version}`);
+      return null;
+    }
     return {
       version: parsed.data.version,
       archive: entry.url,
@@ -244,7 +249,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     const binRelPath = binary.cmd.replace(/^\.[/\\]/, '').replaceAll('\\', '/');
     if (
       /[/\\]/.test(agent.version) ||
-      agent.version === '..' ||
+      agent.version.startsWith('.') ||
       binRelPath.split('/').includes('..') ||
       binRelPath.startsWith('/')
     ) {
@@ -299,6 +304,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
         binPath = join(staging, top, spec.binRelPath);
         if (!existsSync(binPath)) throw new Error('devin archive has no binary');
       }
+      if (!lstatSync(binPath).isFile()) throw new Error('devin archive binary is not a file');
       const marker: InstallMarker = {
         version: spec.version,
         url: spec.archive,

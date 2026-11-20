@@ -2,12 +2,12 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { accessSync, constants, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import {
-  compareVersions,
   type DevinLocalStatus,
   type DevinLoginOutcome,
   devinCredentialsPath,
   devinKeyFromToml,
 } from '@cairn/shared';
+import { verifiedManagedBins } from '@cairn/shared/managed-bin';
 
 const LOGIN_TIMEOUT_MS = 600_000;
 const LOGIN_POLL_MS = 500;
@@ -32,11 +32,11 @@ function managedVersions(): string[] {
 }
 
 function resolveDevinBinary(): string | null {
-  for (const version of [...managedVersions()].sort((a, b) => compareVersions(b, a))) {
-    const candidate = `${homedir()}/.cairn/tools/devin/versions/${version}/bin/devin`;
+  const root = `${homedir()}/.cairn/tools/devin/versions`;
+  for (const bin of verifiedManagedBins(root, managedVersions())) {
     try {
-      accessSync(candidate, constants.X_OK);
-      return candidate;
+      accessSync(bin.command, constants.X_OK);
+      return bin.command;
     } catch {}
   }
   return null;

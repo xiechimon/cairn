@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -144,6 +144,85 @@ describe('importAgentConfig', () => {
       command: 'npx',
       env: { CONTEXT7_KEY: 'resolved' },
     });
+  });
+
+  test('skill symlinks stay symlinks instead of dereferencing outside files', () => {
+    const { cairn, real } = homes();
+    mkdirSync(join(real, 'outside'), { recursive: true });
+    writeFileSync(join(real, 'outside', 'token'), 'outside-secret\n');
+    mkdirSync(join(real, '.claude', 'skills', 'alpha'), { recursive: true });
+    writeFileSync(join(real, '.claude', 'skills', 'alpha', 'SKILL.md'), 'alpha\n');
+    symlinkSync(join(real, 'outside', 'token'), join(real, '.claude', 'skills', 'alpha', 'leak'));
+
+    const report = importAgentConfig({ cairnHome: cairn, realHome: real });
+    expect(report?.copied).toContain('skills/alpha');
+    const copied = join(cairn, 'homes', 'claude', 'skills', 'alpha', 'leak');
+    expect(lstatSync(copied).isSymbolicLink()).toBe(true);
+    expect(readFileSync(copied, 'utf8')).toBe('outside-secret\n');
+  });
+
+  test('codex env vars skip CAIRN_-prefixed names but still resolve user secrets', () => {
+    const { cairn, real } = homes();
+    mkdirSync(join(real, '.codex'), { recursive: true });
+    writeFileSync(
+      join(real, '.codex', 'config.toml'),
+      [
+        '[mcp_servers.leaky]',
+        'command = "npx"',
+        'env_vars = ["CAIRN_API_KEY", "PLAIN_NAME"]',
+        '',
+        '[mcp_servers.secret]',
+        'url = "https://b.example/mcp"',
+        'bearer_token_env_var = "SECRET_SESSION_TOKEN"',
+        '',
+        '[mcp_servers.cairn_bearer]',
+        'url = "https://c.example/mcp"',
+        'bearer_token_env_var = "CAIRN_AUTH"',
+        '',
+      ].join('\n'),
+    );
+    const report = importAgentConfig({
+      cairnHome: cairn,
+      realHome: real,
+      env: {
+        CAIRN_API_KEY: 'cairn-internal',
+        CAIRN_AUTH: 'cairn-internal',
+        SECRET_SESSION_TOKEN: 'tok',
+        PLAIN_NAME: 'plain',
+      },
+    });
+    expect(report?.skipped).toContainEqual(expect.objectContaining({ item: 'codex:mcp/leaky' }));
+    expect(report?.skipped).toContainEqual(
+      expect.objectContaining({ item: 'codex:mcp/cairn_bearer' }),
+    );
+    const managed = JSON.parse(
+      readFileSync(join(cairn, 'homes', 'claude', '.claude.json'), 'utf8'),
+    );
+    expect(managed.mcpServers.leaky).toBeUndefined();
+    expect(managed.mcpServers.cairn_bearer).toBeUndefined();
+    expect(managed.mcpServers.secret).toEqual({
+      url: 'https://b.example/mcp',
+      headers: { Authorization: 'Bearer tok' },
+    });
+  });
+
+  test('an mcp server named __proto__ cannot pollute the managed config', () => {
+    const { cairn, real } = homes();
+    mkdirSync(real, { recursive: true });
+    writeFileSync(
+      join(real, '.claude.json'),
+      JSON.stringify({
+        mcpServers: { __proto__: { url: 'https://proto.example/mcp' }, alpha: { command: 'npx' } },
+      }),
+    );
+
+    const report = importAgentConfig({ cairnHome: cairn, realHome: real });
+    expect(report?.failed).toEqual([]);
+    const managed = JSON.parse(
+      readFileSync(join(cairn, 'homes', 'claude', '.claude.json'), 'utf8'),
+    );
+    expect(Object.hasOwn(managed.mcpServers, 'alpha')).toBe(true);
+    expect(managed.mcpServers.alpha).toEqual({ command: 'npx' });
   });
 
   test('copies model and non-secret env, skips secret-like keys', () => {

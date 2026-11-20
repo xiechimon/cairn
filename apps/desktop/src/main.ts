@@ -1,5 +1,6 @@
 import {
   existsSync,
+  lstatSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -150,12 +151,25 @@ function migrateRunnerHome(): void {
   for (const entry of entries) {
     const to = join(target, entry);
     try {
-      if (existsSync(to)) continue;
+      if (existsSync(to) || lstatSync(join(legacy, entry)).isSymbolicLink()) continue;
       mkdirSync(target, { recursive: true });
       renameSync(join(legacy, entry), to);
     } catch (error) {
       console.warn(`runner-home migration skipped ${entry}:`, error);
     }
+  }
+  try {
+    const claudeTarget = join(target, 'homes', 'claude');
+    if (
+      existsSync(join(target, 'claude')) &&
+      !existsSync(claudeTarget) &&
+      !lstatSync(join(target, 'claude')).isSymbolicLink()
+    ) {
+      mkdirSync(dirname(claudeTarget), { recursive: true });
+      renameSync(join(target, 'claude'), claudeTarget);
+    }
+  } catch (error) {
+    console.warn('runner-home claude home migration failed:', error);
   }
   try {
     const mcpTarget = join(target, 'homes', 'claude', '.claude.json');

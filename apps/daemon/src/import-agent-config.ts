@@ -112,7 +112,7 @@ export function importAgentConfig(
         continue;
       }
       try {
-        cpSync(join(userSkills, entry), dest, { recursive: true });
+        cpSync(join(userSkills, entry), dest, { recursive: true, verbatimSymlinks: true });
         report.copied.push(`skills/${entry}`);
       } catch (error) {
         report.failed.push({
@@ -125,16 +125,16 @@ export function importAgentConfig(
 
   const managedClaudeJsonPath = join(claudeHome, '.claude.json');
   const managedClaudeJson = readJsonObject(managedClaudeJsonPath) ?? {};
-  const managedServers =
+  const managedServers: Record<string, unknown> =
     managedClaudeJson.mcpServers !== null &&
     typeof managedClaudeJson.mcpServers === 'object' &&
     !Array.isArray(managedClaudeJson.mcpServers)
-      ? { ...(managedClaudeJson.mcpServers as Record<string, unknown>) }
-      : {};
+      ? Object.assign(Object.create(null), managedClaudeJson.mcpServers as Record<string, unknown>)
+      : Object.create(null);
   let claudeJsonChanged = false;
 
   const addServer = (name: string, entry: unknown, source: string): void => {
-    if (managedServers[name] !== undefined) {
+    if (Object.hasOwn(managedServers, name)) {
       report.skipped.push({
         item: `${source}:mcp/${name}`,
         reason: 'already present in managed config',
@@ -189,10 +189,13 @@ export function importAgentConfig(
         let missingVar = false;
         for (const varName of s.env_vars ?? []) {
           const value = env[varName];
-          if (value === undefined) {
+          if (value === undefined || varName.startsWith('CAIRN_')) {
             report.skipped.push({
               item: `codex:mcp/${name}`,
-              reason: `env var ${varName} is not set`,
+              reason:
+                value === undefined
+                  ? `env var ${varName} is not set`
+                  : `env var ${varName} is daemon-scoped`,
             });
             missingVar = true;
             break;
@@ -213,10 +216,13 @@ export function importAgentConfig(
         const headers: Record<string, string> = { ...(s.http_headers ?? {}) };
         if (s.bearer_token_env_var !== undefined) {
           const token = env[s.bearer_token_env_var];
-          if (token === undefined) {
+          if (token === undefined || s.bearer_token_env_var.startsWith('CAIRN_')) {
             report.skipped.push({
               item: `codex:mcp/${name}`,
-              reason: `env var ${s.bearer_token_env_var} is not set`,
+              reason:
+                token === undefined
+                  ? `env var ${s.bearer_token_env_var} is not set`
+                  : `env var ${s.bearer_token_env_var} is daemon-scoped`,
             });
             continue;
           }

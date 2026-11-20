@@ -62,13 +62,3 @@ export function compareVersions(a: string, b: string): number {
   }
   return 0;
 }
-
-export function managedVersionedBins(
-  versionsDir: string,
-  versions: readonly string[],
-  binRelPaths: readonly string[],
-): string[] {
-  return [...versions]
-    .sort((a, b) => compareVersions(b, a))
-    .flatMap((version) => binRelPaths.map((rel) => `${versionsDir}/${version}/${rel}`));
-}

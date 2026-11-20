@@ -91,7 +91,7 @@ function parseNpmPackage(spec: string): { name: string; version: string } | null
   const at = spec.lastIndexOf('@');
   if (at <= 0) return null;
   const version = spec.slice(at + 1);
-  if (version === '' || /[/\\]/.test(version) || version === '..') return null;
+  if (version === '' || /[/\\]/.test(version) || version.startsWith('.')) return null;
   return { name: spec.slice(0, at), version };
 }
 
@@ -192,13 +192,14 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
     const lock = `${root}.lock`;
     mkdirSync(root, { recursive: true });
     try {
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
+          rmSync(lock, { recursive: true });
+        }
+      } catch {}
       mkdirSync(lock);
     } catch {
-      try {
-        if (Date.now() - statSync(lock).mtimeMs < LOCK_STALE_MS) return current();
-      } catch {
-        return null;
-      }
+      return current();
     }
     try {
       const response = await fetchImpl(meta.data.dist.tarball, {
