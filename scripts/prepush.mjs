@@ -18,6 +18,8 @@ export const prepushModules = [
   'scripts/diff-base.mjs',
   'scripts/scrub-git-env.mjs',
   'scripts/import-cycle-gate.mjs',
+  'scripts/conflict-marker-gate.mjs',
+  'scripts/drizzle-drift-gate.mjs',
 ];
 
 export const ciOnlyScripts = {
@@ -90,6 +92,11 @@ export function needsGates(paths, testsRead) {
 
 const FEATURE_REGISTRY = '.claude/skills/verify-cairn/feature-map.json';
 
+const OPS_SELFTEST_PATHS =
+  /^(?:scripts\/|\.github\/|\.claude\/skills\/verify-cairn\/scripts\/|ops\/langfuse\/|packages\/shared\/|package\.json$|pnpm-lock\.yaml$)/;
+const DRIZZLE_CHANGE = /^apps\/server\/(?:drizzle\/|src\/db\/schema\.ts$)/;
+const conflictMarker = ['node', 'scripts/conflict-marker-gate.mjs'];
+
 export function testsRead(path) {
   const result = spawnSync(
     'git',
@@ -137,13 +144,14 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   const codePaths = paths.filter((path) => hasCode([path]));
   const docPaths = paths.filter(isDocument);
   if (codePaths.length === 0 && !forceFull) {
-    const checks = [language, publicContent];
+    const checks = [language, publicContent, conflictMarker];
     checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
     return checks;
   }
   const required = [
     language,
     publicContent,
+    conflictMarker,
     ['node', 'scripts/journal-newline-gate.mjs'],
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],
@@ -159,25 +167,43 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', '--test', 'scripts/review-escapes.test.mjs'],
     ...(docPaths.length ? [['node', 'scripts/doc-reader-tests.mjs', ...docPaths]] : []),
   ];
+  const opsSelftests = paths.some((path) => OPS_SELFTEST_PATHS.test(path));
+  const local = [
+    ...required,
+    ...localOnly,
+    ...(opsSelftests ||
+    paths.some(
+      (path) =>
+        path === '.github/workflows/ci.yml' ||
+        path === 'apps/web/playwright.config.ts' ||
+        path === 'apps/web/e2e/port-holder-guard.ts' ||
+        selfTests.some(
+          (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
+        ) ||
+        /^scripts\/(prepush|heavy-slots|owned-process|spawn-ownership|english-only-gate|public-content|scrub-git-env|doc-reader-tests)/.test(
+          path,
+        ),
+    )
+      ? [selfTest]
+      : []),
+    ...(opsSelftests
+      ? [
+          ['node', '--test', 'scripts/ops/orb/canary-stack.test.mjs'],
+          ['node', '.claude/skills/verify-cairn/scripts/vp-selftest.mjs'],
+        ]
+      : []),
+    ...(paths.some((path) => DRIZZLE_CHANGE.test(path))
+      ? [
+          ['pnpm', '--filter', '@xiechimon/cairn', 'db:check'],
+          ['pnpm', '--filter', '@xiechimon/cairn', 'db:generate'],
+          ['node', 'scripts/drizzle-drift-gate.mjs'],
+        ]
+      : []),
+  ];
   return mode === 'ci'
     ? required
     : [
-        ...required,
-        ...localOnly,
-        ...(paths.some(
-          (path) =>
-            path === '.github/workflows/ci.yml' ||
-            path === 'apps/web/playwright.config.ts' ||
-            path === 'apps/web/e2e/port-holder-guard.ts' ||
-            selfTests.some(
-              (selfTest) => path === selfTest || path === selfTest.replace(/\.test\.mjs$/, '.mjs'),
-            ) ||
-            /^scripts\/(prepush|heavy-slots|owned-process|spawn-ownership|english-only-gate|public-content|scrub-git-env|doc-reader-tests)/.test(
-              path,
-            ),
-        )
-          ? [selfTest]
-          : []),
+        ...local,
         ...workflowTestSteps()
           .filter(({ workflow, tests }) =>
             paths.some(
@@ -190,7 +216,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
           )
           .filter(({ tests }) => !tests.some((test) => test in ciOnlyTestSteps))
           .map(({ tests }) => ['node', '--test', ...tests])
-          .filter((step) => !required.some((args) => args.join(' ') === step.join(' '))),
+          .filter((step) => !local.some((args) => args.join(' ') === step.join(' '))),
         ...advisory,
       ];
 }

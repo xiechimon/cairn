@@ -457,11 +457,13 @@ test('documentation skips code checks, unknown paths fail closed', () => {
   assert.deepEqual(prepushPlan(['docs/lessons.md', 'AGENTS.md']), [
     ['node', 'scripts/english-only-gate.mjs'],
     ['node', 'scripts/public-content-gate.mjs'],
+    ['node', 'scripts/conflict-marker-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md', 'AGENTS.md'],
   ]);
   assert.deepEqual(prepushPlan(['docs/lessons.md'], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
     ['node', 'scripts/public-content-gate.mjs'],
+    ['node', 'scripts/conflict-marker-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons.md'],
   ]);
   assert.deepEqual(
@@ -494,6 +496,57 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
   assert.ok(
     !prepushPlan(['apps/web/src/main.tsx']).some((args) => args.join(' ') === selfTest.join(' ')),
   );
+});
+
+test('CI ops-selftests paths run the same self-tests locally, once', () => {
+  const commands = (paths) => prepushPlan(paths).map((args) => args.join(' '));
+  const canary = 'node --test scripts/ops/orb/canary-stack.test.mjs';
+  const vpSelftest = 'node .claude/skills/verify-cairn/scripts/vp-selftest.mjs';
+  for (const path of [
+    'scripts/ops/rebuild-queue.mjs',
+    'ops/langfuse/compose.yml',
+    'packages/shared/src/vocabulary.ts',
+    'pnpm-lock.yaml',
+  ]) {
+    const plan = commands([path]);
+    assert.ok(plan.includes(canary), path);
+    assert.ok(plan.includes(vpSelftest), path);
+    assert.ok(plan.includes(['node', '--test', ...selfTests].join(' ')), path);
+  }
+  const workflow = commands(['.github/workflows/ci.yml']);
+  assert.equal(workflow.filter((step) => step === canary).length, 1);
+  for (const step of [canary, vpSelftest])
+    assert.ok(!commands(['apps/web/src/main.tsx']).includes(step), step);
+});
+
+test('drizzle inputs run the chain guard and the drift check locally', () => {
+  const steps = [
+    'pnpm --filter @xiechimon/cairn db:check',
+    'pnpm --filter @xiechimon/cairn db:generate',
+    'node scripts/drizzle-drift-gate.mjs',
+  ];
+  for (const path of [
+    'apps/server/drizzle/0185_lane.sql',
+    'apps/server/drizzle/meta/0185_snapshot.json',
+    'apps/server/src/db/schema.ts',
+  ]) {
+    const commands = prepushPlan([path]).map((args) => args.join(' '));
+    for (const step of steps) assert.ok(commands.includes(step), `${path}: ${step}`);
+  }
+  const commands = prepushPlan(['apps/server/src/routes-machines.ts']).map((args) =>
+    args.join(' '),
+  );
+  for (const step of steps) assert.ok(!commands.includes(step), step);
+});
+
+test('the conflict-marker gate runs on document and code plans like the CI grep', () => {
+  const step = 'node scripts/conflict-marker-gate.mjs';
+  for (const mode of ['local', 'ci'])
+    for (const paths of [['docs/lessons.md'], ['apps/web/src/main.tsx']])
+      assert.ok(
+        prepushPlan(paths, mode).some((args) => args.join(' ') === step),
+        `${mode} ${paths.join(',')}`,
+      );
 });
 
 test('the CI self-test step runs selfTests through prepush and names no self-test file itself', () => {
@@ -582,6 +635,7 @@ test('lesson entries use the same document checks as other Markdown', () => {
       assert.deepEqual(prepushPlan([path], mode), [
         ['node', 'scripts/english-only-gate.mjs'],
         ['node', 'scripts/public-content-gate.mjs'],
+        ['node', 'scripts/conflict-marker-gate.mjs'],
         ['node', 'scripts/doc-reader-tests.mjs', path],
       ]);
 });
@@ -633,6 +687,7 @@ test('code changes keep suites in CI and out of local plans', () => {
       assert.deepEqual(prepushPlan(paths, 'ci', forceFull), [
         ['node', 'scripts/english-only-gate.mjs'],
         ['node', 'scripts/public-content-gate.mjs'],
+        ['node', 'scripts/conflict-marker-gate.mjs'],
         ['node', 'scripts/journal-newline-gate.mjs'],
         ['node', 'scripts/ui-debt-gate.mjs'],
         ['node', 'scripts/ui-drift-gate.mjs'],
@@ -695,6 +750,7 @@ test('a docs-only data change still runs every test that reads the changed file'
   assert.deepEqual(prepushPlan(['docs/lessons/README.md', data], 'ci'), [
     ['node', 'scripts/english-only-gate.mjs'],
     ['node', 'scripts/public-content-gate.mjs'],
+    ['node', 'scripts/conflict-marker-gate.mjs'],
     ['node', 'scripts/doc-reader-tests.mjs', 'docs/lessons/README.md', data],
   ]);
   assert.ok(
@@ -855,7 +911,7 @@ test('CLI skips real document changes and rejects a missing base', () => {
       env: prepushEnv({ PREPUSH_BASE_SHA: 'origin/main' }),
     });
     assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /PASS \(3 checks\)/);
+    assert.match(result.stdout, /PASS \(4 checks\)/);
     const forced = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: directory,
       encoding: 'utf8',
@@ -933,7 +989,7 @@ test('a stale local origin/main is refreshed by fetch before computing changes',
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(3 checks\)/);
+    assert.match(result.stdout, /PASS \(4 checks\)/);
     assert.doesNotMatch(result.stderr, /may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -956,7 +1012,7 @@ test('fetch failure falls back to the local origin/main and prints a stale notic
     gitIn(work, ['commit', '-m', 'docs']);
     const result = runPrepushCi(work);
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-    assert.match(result.stdout, /PASS \(3 checks\)/);
+    assert.match(result.stdout, /PASS \(4 checks\)/);
     assert.match(result.stderr, /git fetch origin main failed.*may be stale/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -984,7 +1040,7 @@ test('a dead configured base falls back to origin/main only under a queue ref', 
       env: prepushEnv({ PREPUSH_BASE_SHA: dead, GITHUB_REF: 'refs/heads/queue/main' }),
     });
     assert.equal(queued.status, 0, `${queued.stdout}\n${queued.stderr}`);
-    assert.match(queued.stdout, /PASS \(3 checks\)/);
+    assert.match(queued.stdout, /PASS \(4 checks\)/);
     const ordinary = spawnSync(process.execPath, ['scripts/prepush.mjs', '--ci'], {
       cwd: work,
       encoding: 'utf8',
