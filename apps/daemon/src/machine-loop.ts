@@ -178,7 +178,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const migratedHomes = migrateRuntimeHomes(paths.home);
   for (const moved of migratedHomes) logger.machine(`runtime home moved: ${moved}`);
   ensureStateDirs(paths);
-  const imported = importAgentConfig({ cairnHome: paths.home });
+  const imported = importAgentConfig({
+    cairnHome: paths.home,
+    realHome: process.env[ENV_VARS.agentImportHome],
+  });
   if (imported !== null) {
     logger.machine(
       `agent config import: ${imported.copied.length} copied, ` +

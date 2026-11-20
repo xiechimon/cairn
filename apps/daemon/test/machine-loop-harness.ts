@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
   AgentBackend,
@@ -306,6 +307,7 @@ export interface BootOpts {
 
 export function startMachine(opts: BootOpts) {
   const home = makeTestTempDir('loop-');
+  process.env.CAIRN_AGENT_IMPORT_HOME = join(home, 'import-source');
   try {
     const { logger, lines } = captureLogger();
     const config = loadDaemonConfig(
