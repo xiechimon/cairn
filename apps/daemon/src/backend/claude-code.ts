@@ -1046,6 +1046,7 @@ export function sdkTranscriptPath(
 export const HOST_MCP_SERVER_NAME = 'cairn';
 const HOST_TOOL_PREFIX = `mcp__${HOST_MCP_SERVER_NAME}__`;
 const HOST_BUILTIN_TOOLS = ['Read', 'Glob', 'Grep'] as const;
+const TOOL_SEARCH_BUILTIN = 'ToolSearch';
 const HOST_ALLOWED_TOOLS = [`mcp__${HOST_MCP_SERVER_NAME}`, ...HOST_BUILTIN_TOOLS] as const;
 
 function jsonSchemaToZod(schema: unknown, where: string): z.ZodType {
@@ -1160,35 +1161,47 @@ export function buildHostTools(sources: HostToolSources): HostMcpTool[] {
   for (const def of sources.remoteTools) {
     const shape = parametersToShape(def.parameters, def.name);
     tools.push(
-      tool(def.name, def.description, shape, async (params: Record<string, unknown>) => {
-        try {
-          const text = await sources.relay?.(def.name, params ?? {});
-          return { content: hostToolContent(def.name, text ?? '') };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return {
-            content: [{ type: 'text' as const, text: `${def.name} rejected: ${msg}` }],
-            isError: true,
-          };
-        }
-      }),
+      tool(
+        def.name,
+        def.description,
+        shape,
+        async (params: Record<string, unknown>) => {
+          try {
+            const text = await sources.relay?.(def.name, params ?? {});
+            return { content: hostToolContent(def.name, text ?? '') };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: 'text' as const, text: `${def.name} rejected: ${msg}` }],
+              isError: true,
+            };
+          }
+        },
+        { alwaysLoad: def.deferred !== true },
+      ),
     );
   }
   for (const def of sources.localTools) {
     const shape = parametersToShape(def.parameters, def.name);
     tools.push(
-      tool(def.name, def.description, shape, async (params: Record<string, unknown>) => {
-        try {
-          const text = await def.execute(params ?? {});
-          return { content: [{ type: 'text' as const, text }] };
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          return {
-            content: [{ type: 'text' as const, text: `${def.name} failed: ${msg}` }],
-            isError: true,
-          };
-        }
-      }),
+      tool(
+        def.name,
+        def.description,
+        shape,
+        async (params: Record<string, unknown>) => {
+          try {
+            const text = await def.execute(params ?? {});
+            return { content: [{ type: 'text' as const, text }] };
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            return {
+              content: [{ type: 'text' as const, text: `${def.name} failed: ${msg}` }],
+              isError: true,
+            };
+          }
+        },
+        { alwaysLoad: true },
+      ),
     );
   }
   return tools;
@@ -1205,7 +1218,6 @@ export function createHostMcpServer(tools: HostMcpTool[]): ReturnType<typeof cre
   );
   const server = createSdkMcpServer({
     name: HOST_MCP_SERVER_NAME,
-    alwaysLoad: true,
     tools: tools.filter((tool) => !canonicalTaskTools.includes(tool)),
   });
   for (const tool of canonicalTaskTools) {
@@ -1338,6 +1350,7 @@ export interface ClaudeSdkOptionParts {
   sessionId: string;
   disallowedTools: string[];
   builtinTools?: string[];
+  deferredTools?: boolean;
   inOrb: boolean;
   lockedDown: boolean;
   mcpServers: Record<string, McpServerConfig>;
@@ -1431,7 +1444,13 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
     cwd: parts.cwd,
     model: parts.modelId,
     ...(locked
-      ? { permissionMode: 'dontAsk' as const, allowedTools: [...HOST_ALLOWED_TOOLS] }
+      ? {
+          permissionMode: 'dontAsk' as const,
+          allowedTools: [
+            ...HOST_ALLOWED_TOOLS,
+            ...(parts.deferredTools === true ? [TOOL_SEARCH_BUILTIN] : []),
+          ],
+        }
       : scrubbed
         ? {
             permissionMode: 'default' as const,
@@ -1442,7 +1461,13 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
           : { permissionMode: 'bypassPermissions' as const }),
     disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
     ...(locked
-      ? { tools: parts.builtinTools ?? [...HOST_BUILTIN_TOOLS] }
+      ? {
+          tools:
+            parts.builtinTools ??
+            (parts.deferredTools === true
+              ? [...HOST_BUILTIN_TOOLS, TOOL_SEARCH_BUILTIN]
+              : [...HOST_BUILTIN_TOOLS]),
+        }
       : parts.builtinTools !== undefined
         ? { tools: parts.builtinTools }
         : {}),
@@ -1568,7 +1593,12 @@ export class ClaudeCodeBackend implements AgentBackend {
       session: opts,
       ...(this.opts.onSkillsLog !== undefined ? { log: this.opts.onSkillsLog } : {}),
     });
+    const deferredTools = (opts.remoteTools ?? []).some((def) => def.deferred === true);
     const sessionEnv = claudeSessionEnv(opts);
+    const mergedEnv =
+      sessionEnv === undefined && !deferredTools
+        ? undefined
+        : { ...(sessionEnv ?? {}), ...(deferredTools ? { ENABLE_TOOL_SEARCH: 'true' } : {}) };
     const sdkOptions: Options = buildClaudeSdkOptions({
       cwd: opts.cwd,
       modelId: opts.modelId,
@@ -1577,7 +1607,10 @@ export class ClaudeCodeBackend implements AgentBackend {
       disallowedTools,
       inOrb: this.opts.inOrb === true,
       lockedDown: opts.lockedDown === true,
-      ...(opts.remoteToolsOnly === true ? { builtinTools: [] } : {}),
+      ...(opts.remoteToolsOnly === true
+        ? { builtinTools: deferredTools ? [TOOL_SEARCH_BUILTIN] : [] }
+        : {}),
+      deferredTools,
       mcpServers,
       ...(managedMcp ? { strictMcpConfig: true } : {}),
       ...(effort !== undefined ? { effort } : {}),
@@ -1586,7 +1619,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       ...(this.opts.executablePath !== undefined
         ? { executablePath: this.opts.executablePath }
         : {}),
-      ...(sessionEnv !== undefined ? { env: sessionEnv } : {}),
+      ...(mergedEnv !== undefined ? { env: mergedEnv } : {}),
       ...(nativePluginDir !== null && opts.remoteToolsOnly !== true
         ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
         : {}),

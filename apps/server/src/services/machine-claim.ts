@@ -5,6 +5,7 @@ import {
   buildMergedPrGuardInstruction,
   buildMergedPrGuardNote,
   buildTaskPromptText,
+  CORE_COORDINATOR_TOOLS,
   claudeRateBlock,
   confinementDispatchReady,
   confinementEnforced,
@@ -422,7 +423,9 @@ function chiefClaimPayload(
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),
-            ]),
+            ].map((def) =>
+              CORE_COORDINATOR_TOOLS.has(def.name) ? def : { ...def, deferred: true },
+            )),
     ],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),
     ...(locked ? { remoteToolsOnly: true as const } : {}),

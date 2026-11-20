@@ -275,18 +275,7 @@ export function coordinatorTool(
   });
 }
 
-export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
-  'create_todo',
-  'todos',
-  'threads',
-  'message_thread',
-  'answer_question',
-  'needs_you',
-  'notify_user',
-  'ask_user',
-  'memories',
-  'attachment',
-]);
+export { CORE_COORDINATOR_TOOLS } from '@cairn/shared';
 
 export const TOOL_SEARCH_TOOL = 'tool_search';
 export const CALL_TOOL_TOOL = 'call_tool';

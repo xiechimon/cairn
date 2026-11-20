@@ -164,8 +164,8 @@ describe('47-item vocabulary', () => {
 describe('Coordinator task text contract', () => {
   it('keeps routing references out of verbatim task text', () => {
     const tool = CHIEF_REMOTE_TOOLS.find((t) => t.name === 'create_todo');
-    expect(tool?.description).toContain('copied character for character');
-    expect(tool?.description).toContain('You add the title and routing only');
+    expect(tool?.description).toContain('verbatim');
+    expect(tool?.description).toContain('You write no task text');
   });
 
   it('takes a summary title on create_todo and bounds the update_todo summary title', () => {
