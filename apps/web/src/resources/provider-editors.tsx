@@ -10,6 +10,7 @@ import {
 import { cn } from 'cn';
 import { Download, Play, Server, X } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
+import { isPermissionRefusal } from '../api/account-verification.js';
 import { AnthropicMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -151,7 +152,25 @@ export interface ProviderEditActions {
 export type ModelCheck =
   | { phase: 'running' }
   | { phase: 'done'; result: ProviderTestResult }
-  | { phase: 'unavailable' };
+  | { phase: 'unavailable' }
+  | { phase: 'refused' };
+
+export function checkModel(
+  test: (model: string) => Promise<ProviderTestResult>,
+  model: string,
+): Promise<ModelCheck> {
+  return test(model).then(
+    (result): ModelCheck => ({ phase: 'done', result }),
+    (error): ModelCheck =>
+      isPermissionRefusal(error) ? { phase: 'refused' } : { phase: 'unavailable' },
+  );
+}
+
+export const isSettledCheck = (check: ModelCheck | undefined): boolean =>
+  check !== undefined && check.phase !== 'running' && check.phase !== 'refused';
+
+export const REFUSED_TEST_COPY =
+  '这台设备是配对设备，没有权限测试模型，结果没有改变。请在运行 Cairn 的电脑上打开这一页再测试。';
 
 export const FAILURE_SHORT: Record<ProviderFailure, string> = {
   auth: 'key 无效',
@@ -217,8 +236,8 @@ export function ModelChip({
       data-check={
         check === undefined
           ? 'none'
-          : check.phase === 'running'
-            ? 'running'
+          : check.phase === 'running' || check.phase === 'refused'
+            ? check.phase
             : failure === null
               ? 'ok'
               : 'failed'
@@ -238,7 +257,15 @@ export function ModelChip({
       {check?.phase === 'running' && (
         <Spinner aria-label={t('测试中')} className="size-3.5 flex-none text-content-tertiary" />
       )}
-      {check !== undefined && check.phase !== 'running' && (
+      {check?.phase === 'refused' && (
+        <span
+          data-testid="provider-model-check"
+          className="flex flex-none items-center gap-1 text-meta text-content-tertiary"
+        >
+          {t('没有权限')}
+        </span>
+      )}
+      {isSettledCheck(check) && (
         <span
           data-testid="provider-model-check"
           className={cn(
@@ -362,10 +389,7 @@ export function TeamProviderEditor({
     const worker = async () => {
       for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
         const model = id;
-        const outcome: ModelCheck = await test(model).then(
-          (result) => ({ phase: 'done', result }),
-          () => ({ phase: 'unavailable' }),
-        );
+        const outcome = await checkModel(test, model);
         if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
       }
     };
@@ -377,8 +401,9 @@ export function TeamProviderEditor({
   };
   const ids = models.map((m) => m.id);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const tested = ids.filter((id) => checks[id] !== undefined && checks[id].phase !== 'running');
+  const tested = ids.filter((id) => isSettledCheck(checks[id]));
   const failed = ids.filter((id) => failureOf(checks[id]) !== null);
+  const refused = ids.some((id) => checks[id]?.phase === 'refused');
   const summary =
     ids.length === 0
       ? null
@@ -482,6 +507,11 @@ export function TeamProviderEditor({
               />
             ))}
           </div>
+        )}
+        {refused && (
+          <p data-testid="model-test-refused" className="m-0 text-meta text-content-secondary">
+            {t(REFUSED_TEST_COPY)}
+          </p>
         )}
         {failed.length > 0 && (
           <ul

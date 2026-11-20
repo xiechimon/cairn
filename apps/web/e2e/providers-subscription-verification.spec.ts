@@ -13,7 +13,17 @@ test.use({
   viewport: { width: WIDTH, height: WIDTH < 500 ? 812 : 732 },
 });
 
-type Verify = 'ok' | 'auth' | 'timeout' | 'unavailable' | 'quota' | 'rate-limited' | 'reset' | 'restart' | 'slow';
+type Verify =
+  | 'ok'
+  | 'auth'
+  | 'timeout'
+  | 'unavailable'
+  | 'quota'
+  | 'rate-limited'
+  | 'forbidden'
+  | 'reset'
+  | 'restart'
+  | 'slow';
 
 async function open(page: Page, verify: { current: Verify }, subscriptions?: ClaudeSubscriptionListEntry[]) {
   const accounts = subscriptions ?? [
@@ -65,6 +75,8 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: Cla
           return json({ ok: false, reason: 'quota' });
         case 'rate-limited':
           return json({ error: 'wait' }, 429);
+        case 'forbidden':
+          return json({ error: 'only the owner token can do this' }, 403);
         case 'reset':
           return route.abort('connectionreset');
         case 'restart':
@@ -74,6 +86,15 @@ async function open(page: Page, verify: { current: Verify }, subscriptions?: Cla
             setTimeout(() => resolve(json({ ok: true })), 2_500),
           );
       }
+    }
+    if (path === '/api/teams/t1/claude-subscriptions/s1/test' && verify.current === 'forbidden') {
+      return json({ error: 'only the owner token can do this' }, 403);
+    }
+    if (
+      path === '/api/teams/t1/claude-subscriptions/s1/upstream-models' &&
+      verify.current === 'forbidden'
+    ) {
+      return json({ error: 'only the owner token can do this' }, 403);
     }
     return undefined;
   });
@@ -123,9 +144,6 @@ const FAILURES: { mode: Verify; label: string; reason: string; shot: string }[] 
   { mode: 'timeout', label: '验证超时', reason: '验证超时，请重试', shot: 'failed-timeout' },
   { mode: 'unavailable', label: '没法验证', reason: '服务器上找不到 claude 命令', shot: 'failed-unavailable' },
   { mode: 'quota', label: '额度用尽', reason: '模型额度已用尽，请等待额度恢复后重试。', shot: 'failed-quota' },
-  { mode: 'rate-limited', label: '验证太频繁', reason: '验证太频繁，请 10 秒后重试', shot: 'failed-rate-limited' },
-  { mode: 'reset', label: '连接中断', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-connection-dropped' },
-  { mode: 'restart', label: '连接中断', reason: '连接中断，服务器可能正在重启，请重试', shot: 'failed-server-restarting' },
 ];
 
 for (const failure of FAILURES) {
@@ -151,6 +169,83 @@ for (const failure of FAILURES) {
     await expect(row(page)).not.toContainText(failure.label);
   });
 }
+
+const PASSED_CHECK = {
+  at: NOW - 3_600_000,
+  ok: true,
+  reason: null,
+  check: 'model-request',
+  command: 'claude -p --model claude-haiku-5-5',
+  model: 'claude-haiku-5-5',
+  durationMs: 3_700,
+} as const;
+
+const HEALTHY: ClaudeSubscriptionListEntry = {
+  id: 's1',
+  kind: 'claude-subscription',
+  label: 'Claude subscription',
+  expiresAt: null,
+  createdAt: NOW - 10 * HOUR,
+  lastUsedAt: NOW - 120_000,
+  lastCheck: PASSED_CHECK,
+};
+
+const NOT_RUN: { mode: Verify; reason: string; shot: string }[] = [
+  {
+    mode: 'forbidden',
+    reason: '这台设备是配对设备，没有权限运行验证，订阅状态没有改变。请在运行 Cairn 的电脑上打开这一页再验证。',
+    shot: 'not-run-paired-device',
+  },
+  { mode: 'rate-limited', reason: '验证太频繁，这次没有运行。请 10 秒后重试。', shot: 'not-run-rate-limited' },
+  {
+    mode: 'reset',
+    reason: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
+    shot: 'not-run-connection-dropped',
+  },
+  {
+    mode: 'restart',
+    reason: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
+    shot: 'not-run-server-restarting',
+  },
+];
+
+for (const notRun of NOT_RUN) {
+  test(`verify refused as ${notRun.mode}: the healthy status stays and the real reason shows`, async ({
+    page,
+  }) => {
+    await open(page, { current: notRun.mode }, [HEALTHY]);
+    await expect(status(page)).toHaveText('可用');
+    await verify(page).click();
+    await expect(feedback(page)).toHaveAttribute('data-phase', 'not-run');
+    await expect(feedback(page)).toContainText(notRun.reason);
+    await expect(feedback(page)).not.toContainText('验证没有通过');
+    await expect(page.getByTestId('subscription-verify-detail')).toContainText('通过');
+    await expect(status(page)).toHaveText('可用');
+    await expect(row(page)).toContainText('可用');
+    await expect(row(page)).not.toHaveAttribute('data-tone', 'fail');
+    await expect(verify(page)).toHaveText('验证');
+    await shot(page, notRun.shot);
+  });
+}
+
+test('a paired device testing models or opening upstream is told why, not that the models failed', async ({
+  page,
+}) => {
+  await open(page, { current: 'forbidden' }, [HEALTHY]);
+  await page.getByTestId('subscription-test-all').click();
+  await expect(page.getByTestId('model-test-refused')).toContainText(
+    '这台设备是配对设备，没有权限测试模型',
+  );
+  await expect(page.getByTestId('subscription-model-failures')).toHaveCount(0);
+  await expect(page.getByTestId('subscription-models-summary')).not.toContainText('失败');
+  await expect(page.locator('[data-testid="subscription-model"][data-check="failed"]')).toHaveCount(0);
+  await shot(page, 'model-test-paired-device');
+
+  await page.getByTestId('subscription-pick-upstream').click();
+  await expect(page.getByTestId('upstream-error')).toContainText(
+    '这台设备是配对设备，没有权限获取上游模型',
+  );
+});
 
 test('an account nobody has used shows one muted line instead of dashes', async ({ page }) => {
   const mode = { current: 'ok' as Verify };

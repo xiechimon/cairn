@@ -8,7 +8,12 @@ import {
 import { cn } from 'cn';
 import { Download, Play } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type { AccountStatus, Verification, VerifyFailure } from '../api/account-verification.js';
+import type {
+  AccountStatus,
+  Verification,
+  VerifyFailure,
+  VerifyNotRun,
+} from '../api/account-verification.js';
 import type {
   AccountVendor,
   QuotaWindow,
@@ -32,12 +37,15 @@ import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
 import {
   CommitInput,
+  checkModel,
   FAILURE_SENTENCE,
   FAILURE_SHORT,
   Field,
   failureOf,
+  isSettledCheck,
   type ModelCheck,
   ModelChip,
+  REFUSED_TEST_COPY,
 } from './provider-editors.js';
 import { COST_TIER_LABEL } from './upstream-model-picker.js';
 
@@ -84,8 +92,6 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
     unavailable: UNAVAILABLE_COPY[vendor],
     quota: '模型额度已用尽，请等待额度恢复后重试。',
     failed: '验证没有通过，请重试',
-    network: '连接中断，服务器可能正在重启，请重试',
-    'rate-limited': '验证太频繁，请 10 秒后重试',
     missing_local_login:
       '执行机上还没有登录 Antigravity，请先运行 `agy acp --login` 或改用 API Key',
   };
@@ -112,9 +118,17 @@ const FAILED_LABEL: Record<VerifyFailure, string> = {
   unavailable: '没法验证',
   quota: '额度用尽',
   failed: '验证失败',
-  network: '连接中断',
-  'rate-limited': '验证太频繁',
   missing_local_login: '执行机未登录',
+};
+
+const NOT_RUN_COPY: Record<VerifyNotRun, string> = {
+  forbidden:
+    '这台设备是配对设备，没有权限运行验证，订阅状态没有改变。请在运行 Cairn 的电脑上打开这一页再验证。',
+  'signed-out':
+    '这台设备的登录已失效，这次没有验证，订阅状态没有改变。请重新配对或在运行 Cairn 的电脑上验证。',
+  network: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
+  'rate-limited': '验证太频繁，这次没有运行。请 10 秒后重试。',
+  error: '服务器没能运行这次验证，订阅状态没有改变。请重试。',
 };
 
 const STATUS_CLS = 'flex items-center gap-1.5 text-meta text-content-secondary';
@@ -369,7 +383,11 @@ function VerifyResult({
 }) {
   const { t } = useI18n();
   if (verification?.phase === 'verifying') return null;
-  const check = verification === undefined ? account.lastCheck : (verification.check ?? null);
+  const notRun = verification?.phase === 'not-run' ? verification.cause : null;
+  const check =
+    verification === undefined || verification.phase === 'not-run'
+      ? account.lastCheck
+      : (verification.check ?? null);
   const failure: VerifyFailure | null =
     verification?.phase === 'failed'
       ? verification.reason
@@ -379,28 +397,28 @@ function VerifyResult({
           : 'failed'
         : null;
   if (verification === undefined && check === null) return null;
+  const tone = notRun !== null ? 'off' : failure === null ? 'ok' : 'fail';
   return (
     <div
       role="status"
       data-testid="subscription-verify-feedback"
-      data-phase={failure === null ? 'passed' : 'failed'}
+      data-phase={notRun !== null ? 'not-run' : failure === null ? 'passed' : 'failed'}
       className="-mt-2 flex flex-col gap-1.5 rounded-lg px-3 py-2.5 ring-1 ring-border"
     >
       <span
         className={cn(
           'flex items-start gap-1.5 text-ui font-medium',
-          failure === null ? 'text-foreground' : 'text-destructive',
+          tone === 'fail' ? 'text-destructive' : 'text-foreground',
         )}
       >
-        <span
-          aria-hidden
-          className={cn(STATUS_DOT_CLS, 'mt-2', failure === null ? 'bg-running' : 'bg-destructive')}
-        />
+        <span aria-hidden className={cn(STATUS_DOT_CLS, 'mt-2', TONE_DOT[tone])} />
         <span>
           {withCodeSpans(
-            failure === null
-              ? t(PASSED_COPY[account.vendor])
-              : t(failureCopy(account.vendor)[failure]),
+            notRun !== null
+              ? t(NOT_RUN_COPY[notRun])
+              : failure === null
+                ? t(PASSED_COPY[account.vendor])
+                : t(failureCopy(account.vendor)[failure]),
           )}
         </span>
       </span>
@@ -491,10 +509,7 @@ export function SubscriptionDetail({
     const worker = async () => {
       for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
         const model = id;
-        const outcome: ModelCheck = await test(model).then(
-          (result) => ({ phase: 'done', result }),
-          () => ({ phase: 'unavailable' }),
-        );
+        const outcome = await checkModel(test, model);
         if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
       }
     };
@@ -502,8 +517,9 @@ export function SubscriptionDetail({
   };
   const ids = models.map((model) => model.id);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const tested = ids.filter((id) => checks[id] !== undefined && checks[id].phase !== 'running');
+  const tested = ids.filter((id) => isSettledCheck(checks[id]));
   const failed = ids.filter((id) => failureOf(checks[id]) !== null);
+  const refused = ids.some((id) => checks[id]?.phase === 'refused');
   const summary =
     running > 0
       ? t('测试中 {done}/{n}', { done: ids.length - running, n: ids.length })
@@ -654,6 +670,11 @@ export function SubscriptionDetail({
         {fallback && models.length > 0 && actions.onPickUpstream !== undefined && (
           <p className="m-0 text-meta text-content-tertiary">
             {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
+          </p>
+        )}
+        {refused && (
+          <p data-testid="model-test-refused" className="m-0 text-meta text-content-secondary">
+            {t(REFUSED_TEST_COPY)}
           </p>
         )}
         {failed.length > 0 && (

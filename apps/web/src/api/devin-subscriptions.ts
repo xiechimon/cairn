@@ -8,12 +8,7 @@ import type {
 import { devinKeyFromToml } from '@cairn/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import {
-  runVerification,
-  type Verification,
-  type VerifyOutcome,
-  verificationOf,
-} from './account-verification.js';
+import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
 import type { SubscriptionAccount, SubscriptionModel } from './claude-accounts.js';
 import { api } from './client.js';
 
@@ -137,7 +132,7 @@ export function useDevinSubscriptionVerification(teamId: string | undefined) {
       const { [id]: _settled, ...rest } = current;
       return {
         ...rest,
-        [id]: verificationOf(outcome),
+        [id]: outcome,
       };
     });
     void client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] });

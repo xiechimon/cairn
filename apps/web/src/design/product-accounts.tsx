@@ -81,7 +81,7 @@ function subscriptionStates(): {
     },
     {
       account: { ...personal, id: 'network', label: 'After restart' },
-      verification: { phase: 'failed', reason: 'network' },
+      verification: { phase: 'not-run', cause: 'network' },
     },
     { account: work },
     { account: { ...legacy, state: 'expired' } },

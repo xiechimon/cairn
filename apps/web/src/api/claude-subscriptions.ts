@@ -9,12 +9,7 @@ import type {
 } from '@cairn/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import {
-  runVerification,
-  type Verification,
-  type VerifyOutcome,
-  verificationOf,
-} from './account-verification.js';
+import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
 import { api } from './client.js';
 
 export function useClaudeSubscriptions(teamId: string | undefined, live: boolean) {
@@ -117,7 +112,7 @@ export function useSubscriptionVerification(teamId: string | undefined) {
       const { [id]: _settled, ...rest } = current;
       return {
         ...rest,
-        [id]: verificationOf(outcome),
+        [id]: outcome,
       };
     });
     void client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] });

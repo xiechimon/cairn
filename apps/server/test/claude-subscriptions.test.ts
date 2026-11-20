@@ -7,8 +7,10 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import {
   claudeSubscription,
   machine as machineTable,
+  pairedDevice,
   step as stepTable,
 } from '../src/db/schema.js';
+import { issueBrowserSession } from '../src/services/browser-session.js';
 import {
   bootServer,
   insertClaudeSubscription,
@@ -629,6 +631,43 @@ describe('switching the enabled Claude subscription', () => {
       expect([401, 403]).toContain(response.status);
     }
   });
+});
+
+test('a paired device cannot run subscription checks, and nothing is stored or run', async () => {
+  const s = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
+  s.db
+    .insert(pairedDevice)
+    .values({
+      id: 'phone',
+      teamId: s.team.id,
+      name: 'phone',
+      tokenHash: 'synthetic',
+      masked: 'phone',
+      createdAt: 1,
+    })
+    .run();
+  const id = insertClaudeSubscription(s);
+  const cookie = `cairn_auth=${issueBrowserSession(s.db, 'device', 'phone').token}`;
+  const team = `/api/teams/${s.team.id}`;
+  for (const url of [
+    `${team}/claude-subscriptions/${id}/verify`,
+    `${team}/claude-subscriptions/${id}/test`,
+    `${team}/claude-subscriptions/${id}/upstream-models`,
+    `${team}/devin-subscriptions/${id}/verify`,
+    `${team}/antigravity-subscriptions/${id}/verify`,
+  ]) {
+    const response = await s.app.request(url, {
+      method: 'POST',
+      headers: { cookie, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'claude-haiku-5-5' }),
+    });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: 'only the owner token can do this' });
+  }
+  expect(
+    s.db.select().from(claudeSubscription).where(eq(claudeSubscription.id, id)).get()?.lastCheck,
+  ).toBeNull();
+  s.dispose();
 });
 
 describe('the subscription list wire carries quota windows and usage stats', () => {
