@@ -56,7 +56,6 @@ export const EN: Record<string, string> = {
     'This is a paired device, so it cannot test models. Nothing changed. Open this page on the computer running Cairn to test.',
   '这台设备是配对设备，没有权限获取上游模型。请在运行 Cairn 的电脑上打开这一页再选择。':
     'This is a paired device, so it cannot fetch the upstream models. Open this page on the computer running Cairn to choose.',
-  没有权限: 'Not allowed',
   验证失败: 'Verification failed',
   '这个订阅已过期。先移除它，再在终端运行 `claude setup-token`，把新的 token 添加回来。':
     'This subscription has expired. Remove it, then run `claude setup-token` in a terminal and add the new token.',
@@ -1904,7 +1903,6 @@ export const EN: Record<string, string> = {
   '这个订阅的登录有效。': 'This subscription’s sign-in is valid.',
   'Devin 接受了这个凭据。': 'Devin accepted these credentials.',
   'Antigravity 接受了这个凭据。': 'Antigravity accepted these credentials.',
-  '验证中…': 'Verifying…',
   '重命名失败，请重试。': 'Could not rename. Try again.',
   '移除「{name}」？': 'Remove {name}?',
   '移除失败，请重试。': 'Could not remove. Try again.',
@@ -1926,7 +1924,6 @@ export const EN: Record<string, string> = {
   '移除 {name}': 'Remove {name}',
   '新的 API key': 'New API key',
   测试: 'Test',
-  '测试没能跑完，请重试。': 'The test could not finish. Try again.',
   协议: 'Protocol',
   地址: 'Base URL',
   移除服务商: 'Remove provider',
@@ -2537,8 +2534,6 @@ export const EN: Record<string, string> = {
   响应异常: 'Bad reply',
   没有模型: 'No model',
   'API key 无效或没有这个模型的权限': 'The API key is invalid or cannot use this model',
-  '订阅的登录已失效，按上面的提示换一个新 token':
-    'The subscription sign-in has expired; follow the steps above to add a new token',
   上游没有这个模型: 'The upstream has no such model',
   '上游限流了，稍后再测': 'The upstream is rate limiting; test again shortly',
   '10 秒内没回': 'No answer within 10 seconds',
@@ -2548,10 +2543,19 @@ export const EN: Record<string, string> = {
   没有可测的模型: 'No model to test',
   测试中: 'Testing',
   没测完: 'Not finished',
+  没有运行: 'Did not run',
   '测试 {name}': 'Test {name}',
   '测试中 {done}/{n}': 'Testing {done}/{n}',
-  '{ok} 个可用 · {failed} 个失败': '{ok} working · {failed} failed',
-  '{ok} 个可用': '{ok} working',
+  '{id} 回复了，能用。': '{id} answered; it works.',
+  '{n} 个模型都回复了，能用。':
+    '{n#1 The model answered; it works|All # models answered; they work}.',
+  '{id} 没连上：{reason}。': '{id} did not connect: {reason}.',
+  '{failed}/{n} 个模型没连上：{reason}。':
+    '{failed} of {n#1 1 model|# models} did not connect: {reason}.',
+  '{failed}/{n} 个模型没连上，按每行的原因处理后再测。':
+    '{failed} of {n#1 1 model|# models} did not connect; fix each one by its line below, then test again.',
+  '测试没能跑完，请重试': 'The test could not finish, try again',
+  连通: 'Connection',
   '{n} 个': '{n} total',
   从上游选择: 'Choose from upstream',
   全部测试: 'Test all',
@@ -2801,7 +2805,6 @@ export const EN: Record<string, string> = {
   通过: 'Passed',
   '没通过 · {reason}': 'Failed · {reason}',
   '{s} 秒': '{s}s',
-  重新验证: 'Check again',
   '每个模型测试会发一次很短的请求，算在订阅额度里。':
     'Each model test sends one short request, counted against the subscription quota.',
   '还没勾选模型，订阅按执行机上报的名单兜底。':

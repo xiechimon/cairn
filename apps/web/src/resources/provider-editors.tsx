@@ -11,14 +11,22 @@ import { cn } from 'cn';
 import { Download, Play, Server, X } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
 import { isPermissionRefusal } from '../api/account-verification.js';
+import { relativeTime } from '../board/rel-time.js';
 import { AnthropicMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
-import { ProviderEditorHead, type ProviderMark } from '../components/providers/provider-panel.js';
+import { withCodeSpans } from '../components/notice-banner.js';
+import {
+  ProviderEditorHead,
+  type ProviderMark,
+  type ProviderTone,
+  TONE_DOT,
+} from '../components/providers/provider-panel.js';
 import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
+import { Popover, PopoverContent } from '../components/ui/popover.js';
 import { Spinner } from '../components/ui/spinner.js';
 import { useI18n } from '../i18n/provider.js';
 import { presetMarkOf } from './provider-preset-icon.js';
@@ -151,26 +159,9 @@ export interface ProviderEditActions {
 
 export type ModelCheck =
   | { phase: 'running' }
-  | { phase: 'done'; result: ProviderTestResult }
-  | { phase: 'unavailable' }
-  | { phase: 'refused' };
-
-export function checkModel(
-  test: (model: string) => Promise<ProviderTestResult>,
-  model: string,
-): Promise<ModelCheck> {
-  return test(model).then(
-    (result): ModelCheck => ({ phase: 'done', result }),
-    (error): ModelCheck =>
-      isPermissionRefusal(error) ? { phase: 'refused' } : { phase: 'unavailable' },
-  );
-}
-
-export const isSettledCheck = (check: ModelCheck | undefined): boolean =>
-  check !== undefined && check.phase !== 'running' && check.phase !== 'refused';
-
-export const REFUSED_TEST_COPY =
-  '这台设备是配对设备，没有权限测试模型，结果没有改变。请在运行 Cairn 的电脑上打开这一页再测试。';
+  | { phase: 'done'; result: ProviderTestResult; at: number }
+  | { phase: 'unavailable'; at: number }
+  | { phase: 'refused'; at: number };
 
 export const FAILURE_SHORT: Record<ProviderFailure, string> = {
   auth: 'key 无效',
@@ -196,12 +187,213 @@ export const FAILURE_SENTENCE: Record<ProviderFailure, string> = {
 
 const TEST_CONCURRENCY = 3;
 
+const UNFINISHED_SENTENCE = '测试没能跑完，请重试';
+
+export const REFUSED_TEST_COPY =
+  '这台设备是配对设备，没有权限测试模型，结果没有改变。请在运行 Cairn 的电脑上打开这一页再测试。';
+
 export function failureOf(check: ModelCheck | undefined): ProviderFailure | 'unavailable' | null {
   if (check?.phase === 'unavailable') return 'unavailable';
   if (check?.phase === 'done' && check.result.status === 'failed') {
     return check.result.failure ?? 'upstream';
   }
   return null;
+}
+
+export function CheckResultPopover({
+  anchor,
+  open,
+  onClose,
+  tone,
+  sentence,
+  detail,
+  testId,
+  detailTestId,
+  phase,
+}: {
+  anchor: Element | null;
+  open: boolean;
+  onClose: () => void;
+  tone: Extract<ProviderTone, 'ok' | 'fail' | 'off'>;
+  sentence: ReactNode;
+  detail: string;
+  testId: string;
+  detailTestId?: string;
+  phase?: string;
+}) {
+  if (anchor === null) return null;
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+    >
+      <PopoverContent
+        anchor={anchor}
+        align="end"
+        sideOffset={8}
+        initialFocus={false}
+        finalFocus={false}
+        collisionPadding={12}
+        data-testid={testId}
+        data-phase={phase ?? (tone === 'ok' ? 'passed' : 'failed')}
+        className="w-96 max-w-[calc(100vw-24px)] gap-2 p-3"
+      >
+        <div role="status" className="flex flex-col gap-2">
+          <span
+            className={cn(
+              'flex items-start gap-1.5 text-ui font-medium',
+              tone === 'fail' ? 'text-destructive' : 'text-foreground',
+            )}
+          >
+            <span
+              aria-hidden
+              className={cn('mt-2 size-1.5 flex-none rounded-full', TONE_DOT[tone])}
+            />
+            <span>{sentence}</span>
+          </span>
+          <pre
+            data-testid={detailTestId}
+            className="m-0 rounded-md bg-secondary px-2.5 py-2 font-mono text-caption whitespace-pre-wrap text-content-secondary tabular-nums [overflow-wrap:anywhere]"
+          >
+            {detail}
+          </pre>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface ModelReport {
+  ids: readonly string[];
+  anchor: Element | null;
+  open: boolean;
+}
+
+export function useModelTests(
+  test: ((model: string) => Promise<ProviderTestResult>) | undefined,
+  concurrency: number,
+) {
+  const [checks, setChecks] = useState<Record<string, ModelCheck>>({});
+  const [report, setReport] = useState<ModelReport | null>(null);
+  const generation = useRef(0);
+  const reset = () => {
+    generation.current += 1;
+    setChecks({});
+    setReport(null);
+  };
+  const run = async (ids: readonly string[], anchor: Element | null) => {
+    if (test === undefined || ids.length === 0) return;
+    const started = generation.current;
+    setReport(null);
+    setChecks((prev) => ({
+      ...prev,
+      ...Object.fromEntries(ids.map((id) => [id, { phase: 'running' }])),
+    }));
+    const queue = [...ids];
+    const worker = async () => {
+      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
+        const model = id;
+        const outcome: ModelCheck = await test(model).then(
+          (result) => ({ phase: 'done', result, at: Date.now() }),
+          (error: unknown) => ({
+            phase: isPermissionRefusal(error) ? 'refused' : 'unavailable',
+            at: Date.now(),
+          }),
+        );
+        if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
+    if (generation.current === started) setReport({ ids, anchor, open: true });
+  };
+  const drop = (id: string) => {
+    setChecks(({ [id]: _, ...rest }) => rest);
+    setReport((prev) => (prev?.ids.includes(id) ? null : prev));
+  };
+  const close = () => setReport((prev) => (prev === null ? null : { ...prev, open: false }));
+  return { checks, report, run, reset, drop, close };
+}
+
+export function ModelTestReport({
+  report,
+  checks,
+  failureSentence,
+  failureShort = FAILURE_SHORT,
+  onClose,
+}: {
+  report: ModelReport | null;
+  checks: Record<string, ModelCheck>;
+  failureSentence: Record<ProviderFailure, string>;
+  failureShort?: Record<ProviderFailure, string>;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  if (report === null) return null;
+  const done = report.ids.flatMap((id) => {
+    const check = checks[id];
+    return check === undefined || check.phase === 'running' ? [] : [{ id, check }];
+  });
+  if (done.length === 0) return null;
+  const refused = done.some(({ check }) => check.phase === 'refused');
+  const failures = done.flatMap(({ id, check }) => {
+    const failure = failureOf(check);
+    return failure === null ? [] : [{ id, failure }];
+  });
+  const reasonOf = (failure: ProviderFailure | 'unavailable') =>
+    t(failure === 'unavailable' ? UNFINISHED_SENTENCE : failureSentence[failure]).replace(
+      /[。.]$/,
+      '',
+    );
+  const kinds = new Set(failures.map(({ failure }) => failure));
+  const [first] = failures;
+  const sentence = refused
+    ? t(REFUSED_TEST_COPY)
+    : first === undefined
+      ? done.length === 1
+        ? t('{id} 回复了，能用。', { id: done[0]?.id ?? '' })
+        : t('{n} 个模型都回复了，能用。', { n: done.length })
+      : done.length === 1
+        ? t('{id} 没连上：{reason}。', { id: first.id, reason: reasonOf(first.failure) })
+        : kinds.size === 1
+          ? t('{failed}/{n} 个模型没连上：{reason}。', {
+              failed: failures.length,
+              n: done.length,
+              reason: reasonOf(first.failure),
+            })
+          : t('{failed}/{n} 个模型没连上，按每行的原因处理后再测。', {
+              failed: failures.length,
+              n: done.length,
+            });
+  const now = Date.now();
+  const detail = done
+    .map(({ id, check }) => {
+      const failure = failureOf(check);
+      const outcome =
+        check.phase === 'refused'
+          ? t('没有运行')
+          : failure === null
+            ? `${t('通过')} · ${check.phase === 'done' ? (check.result.latencyMs ?? 0) : 0} ms`
+            : failure === 'unavailable'
+              ? t('没测完')
+              : t('没通过 · {reason}', { reason: t(failureShort[failure]) });
+      return `${id} · ${outcome} · ${relativeTime(check.at, now, t)}`;
+    })
+    .join('\n');
+  return (
+    <CheckResultPopover
+      anchor={report.anchor}
+      open={report.open}
+      onClose={onClose}
+      tone={refused ? 'off' : first === undefined ? 'ok' : 'fail'}
+      phase={refused ? 'not-run' : first === undefined ? 'passed' : 'failed'}
+      sentence={withCodeSpans(sentence)}
+      detail={detail}
+      testId="model-test-result"
+      detailTestId="model-test-detail"
+    />
+  );
 }
 
 export function ModelChip({
@@ -211,23 +403,21 @@ export function ModelChip({
   busy,
   meta,
   testId = 'provider-model',
-  failureShort = FAILURE_SHORT,
   onTest,
   onRemove,
 }: {
   id: string;
   dead: boolean;
   meta?: ReactNode;
-  failureShort?: Record<ProviderFailure, string>;
   testId?: string;
   check: ModelCheck | undefined;
   busy: boolean;
-  onTest?: () => void;
+  onTest?: (anchor: Element) => void;
   onRemove?: () => void;
 }) {
   const { t } = useI18n();
   const failure = failureOf(check);
-  const latency = check?.phase === 'done' ? check.result.latencyMs : null;
+  const running = check?.phase === 'running';
   return (
     <span
       data-testid={testId}
@@ -236,7 +426,7 @@ export function ModelChip({
       data-check={
         check === undefined
           ? 'none'
-          : check.phase === 'running' || check.phase === 'refused'
+          : running || check.phase === 'refused'
             ? check.phase
             : failure === null
               ? 'ok'
@@ -254,39 +444,6 @@ export function ModelChip({
       </span>
       {meta}
       {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
-      {check?.phase === 'running' && (
-        <Spinner aria-label={t('测试中')} className="size-3.5 flex-none text-content-tertiary" />
-      )}
-      {check?.phase === 'refused' && (
-        <span
-          data-testid="provider-model-check"
-          className="flex flex-none items-center gap-1 text-meta text-content-tertiary"
-        >
-          {t('没有权限')}
-        </span>
-      )}
-      {isSettledCheck(check) && (
-        <span
-          data-testid="provider-model-check"
-          className={cn(
-            'flex flex-none items-center gap-1 text-meta tabular-nums',
-            failure === null ? 'text-content-tertiary' : 'text-destructive',
-          )}
-        >
-          <span
-            aria-hidden
-            className={cn(
-              'size-1.5 rounded-full',
-              failure === null ? 'bg-running' : 'bg-destructive',
-            )}
-          />
-          {failure === null
-            ? `${latency ?? 0} ms`
-            : failure === 'unavailable'
-              ? t('没测完')
-              : t(failureShort[failure])}
-        </span>
-      )}
       {onTest !== undefined && (
         <IconTooltip
           label={t('测试 {name}', { name: id })}
@@ -295,12 +452,12 @@ export function ModelChip({
               variant="ghost"
               size="icon-xs"
               className="text-content-tertiary"
-              disabled={check?.phase === 'running'}
-              onClick={onTest}
+              disabled={running}
+              onClick={(event) => onTest(event.currentTarget)}
             />
           }
         >
-          <Play aria-hidden />
+          {running ? <Spinner aria-label={t('测试中')} /> : <Play aria-hidden />}
         </IconTooltip>
       )}
       {onRemove !== undefined && (
@@ -343,26 +500,23 @@ export function TeamProviderEditor({
   const [models, setModels] = useState(record.models);
   const [savedModels, setSavedModels] = useState(record.models);
   const [savingModels, setSavingModels] = useState(false);
-  const [checks, setChecks] = useState<Record<string, ModelCheck>>({});
-  const generation = useRef(0);
+  const test = actions.test;
+  const tests = useModelTests(test, TEST_CONCURRENCY);
+  const { checks } = tests;
+  const testAllRef = useRef<HTMLButtonElement>(null);
   const connection = `${record.api}|${record.baseUrl}|${record.authHeader}`;
   const [checkedConnection, setCheckedConnection] = useState(connection);
   if (checkedConnection !== connection) {
-    generation.current += 1;
     setCheckedConnection(connection);
-    setChecks({});
+    tests.reset();
   }
   if (savedModels !== record.models && !savingModels) {
     setSavedModels(record.models);
     setModels(record.models);
   }
   const oauth = isOAuthPreset(record.providerId);
-  const test = actions.test;
   const fire = (body: Parameters<NonNullable<ProviderEditActions['patch']>>[0]) => {
-    if (body.apiKey !== undefined || body.baseUrl !== undefined) {
-      generation.current += 1;
-      setChecks({});
-    }
+    if (body.apiKey !== undefined || body.baseUrl !== undefined) tests.reset();
     void actions.patch?.(body).catch(() => undefined);
   };
   const saveModels = (next: ProviderRecord['models']) => {
@@ -378,45 +532,18 @@ export function TeamProviderEditor({
       })
       .finally(() => setSavingModels(false));
   };
-  const runTests = async (ids: readonly string[]) => {
-    if (test === undefined || ids.length === 0) return;
-    const started = generation.current;
-    setChecks((prev) => ({
-      ...prev,
-      ...Object.fromEntries(ids.map((id) => [id, { phase: 'running' }])),
-    }));
-    const queue = [...ids];
-    const worker = async () => {
-      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-        const model = id;
-        const outcome = await checkModel(test, model);
-        if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(TEST_CONCURRENCY, ids.length) }, worker));
-  };
   const removeModel = (id: string) => {
     void saveModels(models.filter((m) => m.id !== id));
-    setChecks(({ [id]: _, ...rest }) => rest);
+    tests.drop(id);
   };
   const ids = models.map((m) => m.id);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const tested = ids.filter((id) => isSettledCheck(checks[id]));
-  const failed = ids.filter((id) => failureOf(checks[id]) !== null);
-  const refused = ids.some((id) => checks[id]?.phase === 'refused');
   const summary =
     ids.length === 0
       ? null
       : running > 0
         ? t('测试中 {done}/{n}', { done: ids.length - running, n: ids.length })
-        : tested.length > 0
-          ? failed.length > 0
-            ? t('{ok} 个可用 · {failed} 个失败', {
-                ok: tested.length - failed.length,
-                failed: failed.length,
-              })
-            : t('{ok} 个可用', { ok: tested.length })
-          : t('{n} 个', { n: ids.length });
+        : t('{n} 个', { n: ids.length });
   return (
     <>
       <ProviderEditorHead
@@ -478,10 +605,11 @@ export function TeamProviderEditor({
               <Button
                 variant="outline"
                 size="sm"
+                ref={testAllRef}
                 data-testid="provider-test-all"
                 className="min-w-24"
                 disabled={running > 0 || ids.length === 0}
-                onClick={() => void runTests(ids)}
+                onClick={() => void tests.run(ids, testAllRef.current)}
               >
                 {running > 0 ? <Spinner aria-hidden /> : <Play aria-hidden />}
                 {running > 0 ? t('测试中') : t('全部测试')}
@@ -502,67 +630,20 @@ export function TeamProviderEditor({
                 dead={deadModels.has(model.id)}
                 check={checks[model.id]}
                 busy={savingModels}
-                {...(test === undefined ? {} : { onTest: () => void runTests([model.id]) })}
+                {...(test === undefined
+                  ? {}
+                  : { onTest: (anchor: Element) => void tests.run([model.id], anchor) })}
                 {...(actions.patch === undefined ? {} : { onRemove: () => removeModel(model.id) })}
               />
             ))}
           </div>
         )}
-        {refused && (
-          <p data-testid="model-test-refused" className="m-0 text-meta text-content-secondary">
-            {t(REFUSED_TEST_COPY)}
-          </p>
-        )}
-        {failed.length > 0 && (
-          <ul
-            data-testid="provider-model-failures"
-            className="m-0 flex list-none flex-col gap-2 p-0"
-          >
-            {failed.map((id) => {
-              const failure = failureOf(checks[id]);
-              const check = checks[id];
-              const upstream =
-                check?.phase === 'done'
-                  ? [
-                      check.result.httpStatus === null ? null : `HTTP ${check.result.httpStatus}`,
-                      check.result.detail ?? null,
-                    ]
-                      .filter((part) => part !== null)
-                      .join(' · ')
-                  : '';
-              return (
-                <li key={id} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-meta">
-                  <code className="text-destructive">{id}</code>
-                  <span className="text-content-secondary">
-                    {failure === 'unavailable' || failure === null
-                      ? t('测试没能跑完，请重试。')
-                      : t(FAILURE_SENTENCE[failure])}
-                  </span>
-                  {upstream !== '' && (
-                    <span
-                      data-testid="provider-model-failure-detail"
-                      title={upstream}
-                      className="order-last min-w-0 basis-full truncate text-content-tertiary max-sm:line-clamp-2 max-sm:whitespace-normal max-sm:[overflow-wrap:anywhere]"
-                    >
-                      {upstream}
-                    </span>
-                  )}
-                  {actions.patch !== undefined && (
-                    <Button
-                      variant="link"
-                      size="xs"
-                      className="-my-1 ml-auto h-6 px-1 text-meta pointer-coarse:-my-3 pointer-coarse:h-11"
-                      disabled={savingModels}
-                      onClick={() => removeModel(id)}
-                    >
-                      {t('移除')}
-                    </Button>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <ModelTestReport
+          report={tests.report}
+          checks={checks}
+          failureSentence={FAILURE_SENTENCE}
+          onClose={tests.close}
+        />
       </section>
       <SettingsSection title={t('管理')}>
         <SettingsDangerZone
@@ -585,7 +666,7 @@ export function TeamProviderEditor({
             void saveModels(
               next.map((id) => byId.get(id) ?? { id, name: names.get(id) ?? id }),
             ).then((saved) => {
-              if (saved) void runTests(added);
+              if (saved) void tests.run(added, testAllRef.current);
             });
           }}
         />

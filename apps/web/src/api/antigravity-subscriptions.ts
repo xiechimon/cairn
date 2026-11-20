@@ -40,7 +40,6 @@ export function toAntigravityAccount(
     windows: [],
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
-    lastCheck: wire.lastCheck ?? null,
     models: Array.isArray(wire.models) ? wire.models : [],
   };
 }

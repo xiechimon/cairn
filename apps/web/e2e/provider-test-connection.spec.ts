@@ -70,15 +70,22 @@ test('an OAuth provider shows the same pick and test buttons', async ({ page }) 
   await expect(editor(page).getByRole('button', { name: '测试 small-model' })).toBeVisible();
 });
 
-test('test all sends one request per model and shows latency or the failure kind', async ({
+const report = (page: Page) => page.getByTestId('model-test-result');
+const MODEL_CHECK_WORDS = ['412 ms', '模型不存在', '个可用', '个失败', '上游没有这个模型', '没测完'];
+
+test('test all pops its result up from the button, never reflows the editor, and leaves no status', async ({
   page,
 }) => {
   const tested: string[] = [];
+  let release: (() => void) | undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/providers/prov-relay/test') {
       const model = route.request().postDataJSON().model as string;
       tested.push(model);
-      return json(model === 'large-model' ? NOT_FOUND : OK);
+      return held.then(() => json(model === 'large-model' ? NOT_FOUND : OK));
     }
     if (path === '/api/teams/t1/providers')
       return json({ presets: [], providers: [RECORD], canTestConnection: true });
@@ -86,26 +93,40 @@ test('test all sends one request per model and shows latency or the failure kind
     return undefined;
   });
   await page.goto('/app/resources/providers');
+  const manage = editor(page).getByRole('heading', { name: '管理' });
+  const name = editor(page).getByLabel('名称');
+  const top = async () =>
+    ((await manage.boundingBox())?.y ?? Number.NaN) - ((await name.boundingBox())?.y ?? Number.NaN);
+  const before = await top();
   await editor(page).getByTestId('provider-test-all').click();
-  await expect(chip(page, 'small-model')).toHaveAttribute('data-check', 'ok');
-  await expect(chip(page, 'small-model')).toContainText('412 ms');
+  await expect(chip(page, 'small-model')).toHaveAttribute('data-check', 'running');
+  expect(await top()).toBe(before);
+  release?.();
+
+  await expect(report(page)).toBeVisible();
+  await expect(report(page)).toHaveAttribute('data-phase', 'failed');
+  await expect(report(page)).toContainText('1/2 个模型没连上：上游没有这个模型。');
+  await expect(page.getByTestId('model-test-detail')).toContainText('small-model · 通过 · 412 ms');
+  await expect(page.getByTestId('model-test-detail')).toContainText('large-model · 没通过 · 模型不存在');
+  await expect(report(page)).not.toContainText('HTTP 404');
+  await expect(report(page)).not.toContainText('not supported by any configured account');
+  expect(await top()).toBe(before);
   await expect(chip(page, 'large-model')).toHaveAttribute('data-check', 'failed');
-  await expect(chip(page, 'large-model')).toContainText('模型不存在');
-  await expect(editor(page).getByTestId('provider-model-failures')).toContainText(
-    '上游没有这个模型',
-  );
-  await expect(editor(page).getByTestId('provider-model-failure-detail')).toHaveText(
-    'HTTP 404 · Model "large-model" is not supported by any configured account in this group',
-  );
-  await expect(editor(page).getByTestId('provider-models-summary')).toHaveText(
-    '1 个可用 · 1 个失败',
-  );
+  for (const word of MODEL_CHECK_WORDS) await expect(editor(page)).not.toContainText(word);
+  await expect(editor(page).getByTestId('provider-models-summary')).toHaveText('2 个');
   await expect(editor(page)).not.toContainText('Check the key');
   expect(tested.sort()).toEqual(['large-model', 'small-model']);
 
+  await page.keyboard.press('Escape');
+  await expect(report(page)).toHaveCount(0);
+
   await editor(page).getByRole('button', { name: '测试 small-model' }).click();
+  await expect(report(page)).toContainText('small-model 回复了，能用。');
   await expect.poll(() => tested.length).toBe(3);
   expect(tested[2]).toBe('small-model');
+  await editor(page).getByRole('heading', { name: '模型', exact: true }).click();
+  await expect(report(page)).toHaveCount(0);
+  expect(await top()).toBe(before);
 });
 
 test('editing the address drops results, including a test still running', async ({ page }) => {
@@ -149,10 +170,8 @@ test('a transport error reads as not finished', async ({ page }) => {
   });
   await page.goto('/app/resources/providers');
   await editor(page).getByRole('button', { name: '测试 small-model' }).click();
-  await expect(chip(page, 'small-model')).toContainText('没测完');
-  await expect(editor(page).getByTestId('provider-model-failures')).toContainText(
-    '测试没能跑完，请重试。',
-  );
+  await expect(report(page)).toContainText('small-model 没连上：测试没能跑完，请重试。');
+  await expect(page.getByTestId('model-test-detail')).toContainText('small-model · 没测完');
 });
 
 test('an empty provider offers the upstream list; a failed list falls back to adding by ID', async ({

@@ -1,4 +1,4 @@
-import type { ProviderFailure, ProviderTestResult, SubscriptionCheck } from '@cairn/shared';
+import type { ProviderFailure, ProviderTestResult } from '@cairn/shared';
 import {
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSource,
@@ -8,12 +8,7 @@ import {
 import { cn } from 'cn';
 import { Download, Play } from 'lucide-react';
 import { useRef, useState } from 'react';
-import type {
-  AccountStatus,
-  Verification,
-  VerifyFailure,
-  VerifyNotRun,
-} from '../api/account-verification.js';
+import type { Verification, VerifyFailure, VerifyNotRun } from '../api/account-verification.js';
 import type {
   AccountVendor,
   QuotaWindow,
@@ -36,16 +31,14 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { ACCENT_INK } from '../phase.js';
 import {
+  CheckResultPopover,
   CommitInput,
-  checkModel,
   FAILURE_SENTENCE,
   FAILURE_SHORT,
   Field,
-  failureOf,
-  isSettledCheck,
-  type ModelCheck,
   ModelChip,
-  REFUSED_TEST_COPY,
+  ModelTestReport,
+  useModelTests,
 } from './provider-editors.js';
 import { COST_TIER_LABEL } from './upstream-model-picker.js';
 
@@ -107,10 +100,10 @@ const PASSED_COPY: Record<AccountVendor, string> = {
 
 const MODEL_FAILURE_SHORT: Record<ProviderFailure, string> = { ...FAILURE_SHORT, auth: '登录失效' };
 
-const MODEL_FAILURE_SENTENCE: Record<ProviderFailure, string> = {
+const modelFailureSentence = (vendor: AccountVendor): Record<ProviderFailure, string> => ({
   ...FAILURE_SENTENCE,
-  auth: '订阅的登录已失效，按上面的提示换一个新 token',
-};
+  auth: AUTH_RENEWAL[vendor],
+});
 
 const FAILED_LABEL: Record<VerifyFailure, string> = {
   auth: '登录失效',
@@ -136,7 +129,7 @@ const STATUS_DOT_CLS = 'size-1.5 flex-none rounded-full';
 
 export interface SubscriptionStatusView {
   tone: ProviderTone;
-  label: string;
+  label: string | null;
   reason: string | null;
 }
 
@@ -152,24 +145,13 @@ function recoversIn(ts: number, now: number, t: TFunc): string {
 
 export function subscriptionStatusView(
   account: SubscriptionAccount,
-  status: AccountStatus,
   now: number,
   t: TFunc,
   clock: (ts: number, now: number) => string,
 ): SubscriptionStatusView {
-  if (status.kind === 'verifying') return { tone: 'off', label: t('验证中…'), reason: null };
-  if (status.kind === 'unverified') return { tone: 'off', label: t('未验证'), reason: null };
-  if (status.kind === 'verified') {
-    return {
-      tone: 'ok',
-      label: t('可用'),
-      reason: null,
-    };
-  }
-  if (status.kind === 'verify-failed') {
-    return { tone: 'fail', label: t(FAILED_LABEL[status.reason]), reason: null };
-  }
-  switch (status.state) {
+  switch (account.state) {
+    case 'ok':
+      return { tone: 'ok', label: null, reason: null };
     case 'cooling':
       return {
         tone: 'off',
@@ -248,8 +230,8 @@ export function subscriptionSummary(
     ...(account.plan === null ? [] : [account.plan]),
     t('{n} 个模型', { n: models.length }),
     ...(retired === 0 ? [] : [t('{n} 个已下架', { n: retired })]),
-    view.label,
-    ...(account.lastUsedAt === null || view.tone !== 'ok'
+    ...(view.label === null ? [] : [view.label]),
+    ...(account.lastUsedAt === null || view.label !== null
       ? []
       : [t('最近使用 {ago}', { ago: relativeTime(account.lastUsedAt, now, t) })]),
   ].join(' · ');
@@ -358,79 +340,66 @@ function QuotaHead({ account, now }: { account: SubscriptionAccount; now: number
   );
 }
 
-function checkLines(check: SubscriptionCheck, now: number, t: TFunc): string {
-  const seconds = (check.durationMs / 1000).toFixed(1);
-  return [
-    check.command,
-    `${
-      check.ok
-        ? t('通过')
-        : t('没通过 · {reason}', {
-            reason: t(FAILED_LABEL[(check.reason ?? 'failed') as VerifyFailure] ?? '验证失败'),
-          })
-    } · ${t('{s} 秒', { s: seconds })} · ${relativeTime(check.at, now, t)}`,
-  ].join('\n');
+function verifyDetail(
+  verification: Exclude<Verification, { phase: 'verifying' }>,
+  at: number,
+  now: number,
+  t: TFunc,
+): string {
+  const check = verification.phase === 'not-run' ? undefined : verification.check;
+  const outcome =
+    verification.phase === 'passed'
+      ? t('通过')
+      : verification.phase === 'not-run'
+        ? t('没有运行')
+        : t('没通过 · {reason}', { reason: t(FAILED_LABEL[verification.reason]) });
+  const timing = [
+    outcome,
+    ...(check === undefined ? [] : [t('{s} 秒', { s: (check.durationMs / 1000).toFixed(1) })]),
+    relativeTime(check?.at ?? at, now, t),
+  ].join(' · ');
+  return check === undefined ? timing : `${check.command}\n${timing}`;
 }
 
-function VerifyResult({
-  account,
+function VerifyResultPopover({
+  vendor,
   verification,
-  now,
+  anchor,
 }: {
-  account: SubscriptionAccount;
+  vendor: AccountVendor;
   verification: Verification | undefined;
-  now: number;
+  anchor: Element | null;
 }) {
   const { t } = useI18n();
-  if (verification?.phase === 'verifying') return null;
-  const notRun = verification?.phase === 'not-run' ? verification.cause : null;
-  const check =
-    verification === undefined || verification.phase === 'not-run'
-      ? account.lastCheck
-      : (verification.check ?? null);
-  const failure: VerifyFailure | null =
-    verification?.phase === 'failed'
-      ? verification.reason
-      : verification === undefined && check !== null && !check.ok
-        ? Object.keys(failureCopy(account.vendor)).includes(check.reason ?? '')
-          ? (check.reason as VerifyFailure)
-          : 'failed'
-        : null;
-  if (verification === undefined && check === null) return null;
-  const tone = notRun !== null ? 'off' : failure === null ? 'ok' : 'fail';
+  const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(verification);
+  const [at, setAt] = useState(0);
+  if (seen !== verification) {
+    setSeen(verification);
+    setAt(Date.now());
+    setOpen(verification !== undefined && verification.phase !== 'verifying');
+  }
+  if (verification === undefined || verification.phase === 'verifying') return null;
   return (
-    <div
-      role="status"
-      data-testid="subscription-verify-feedback"
-      data-phase={notRun !== null ? 'not-run' : failure === null ? 'passed' : 'failed'}
-      className="-mt-2 flex flex-col gap-1.5 rounded-lg px-3 py-2.5 ring-1 ring-border"
-    >
-      <span
-        className={cn(
-          'flex items-start gap-1.5 text-ui font-medium',
-          tone === 'fail' ? 'text-destructive' : 'text-foreground',
-        )}
-      >
-        <span aria-hidden className={cn(STATUS_DOT_CLS, 'mt-2', TONE_DOT[tone])} />
-        <span>
-          {withCodeSpans(
-            notRun !== null
-              ? t(NOT_RUN_COPY[notRun])
-              : failure === null
-                ? t(PASSED_COPY[account.vendor])
-                : t(failureCopy(account.vendor)[failure]),
-          )}
-        </span>
-      </span>
-      {check !== null && (
-        <pre
-          data-testid="subscription-verify-detail"
-          className="m-0 rounded-md bg-secondary px-2.5 py-2 font-mono text-caption whitespace-pre-wrap text-content-secondary [overflow-wrap:anywhere]"
-        >
-          {checkLines(check, now, t)}
-        </pre>
+    <CheckResultPopover
+      anchor={anchor}
+      open={open}
+      onClose={() => setOpen(false)}
+      tone={
+        verification.phase === 'passed' ? 'ok' : verification.phase === 'failed' ? 'fail' : 'off'
+      }
+      phase={verification.phase}
+      sentence={withCodeSpans(
+        verification.phase === 'passed'
+          ? t(PASSED_COPY[vendor])
+          : verification.phase === 'not-run'
+            ? t(NOT_RUN_COPY[verification.cause])
+            : t(failureCopy(vendor)[verification.reason]),
       )}
-    </div>
+      detail={verifyDetail(verification, at, Date.now(), t)}
+      testId="subscription-verify-feedback"
+      detailTestId="subscription-verify-detail"
+    />
   );
 }
 
@@ -489,48 +458,22 @@ export function SubscriptionDetail({
   actions: SubscriptionActions;
 }) {
   const { t } = useI18n();
-  const [checks, setChecks] = useState<Record<string, ModelCheck>>({});
-  const generation = useRef(0);
+  const test = actions.onTestModel;
+  const tests = useModelTests(test, TEST_CONCURRENCY);
+  const { checks } = tests;
+  const testAllRef = useRef<HTMLButtonElement>(null);
+  const verifyRef = useRef<HTMLButtonElement>(null);
   const [checkedAccount, setCheckedAccount] = useState(account.id);
   if (checkedAccount !== account.id) {
-    generation.current += 1;
     setCheckedAccount(account.id);
-    setChecks({});
+    tests.reset();
   }
-  const test = actions.onTestModel;
-  const runTests = async (ids: readonly string[]) => {
-    if (test === undefined || ids.length === 0) return;
-    const started = generation.current;
-    setChecks((prev) => ({
-      ...prev,
-      ...Object.fromEntries(ids.map((id) => [id, { phase: 'running' }])),
-    }));
-    const queue = [...ids];
-    const worker = async () => {
-      for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
-        const model = id;
-        const outcome = await checkModel(test, model);
-        if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(TEST_CONCURRENCY, ids.length) }, worker));
-  };
   const ids = models.map((model) => model.id);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const tested = ids.filter((id) => isSettledCheck(checks[id]));
-  const failed = ids.filter((id) => failureOf(checks[id]) !== null);
-  const refused = ids.some((id) => checks[id]?.phase === 'refused');
   const summary =
     running > 0
       ? t('测试中 {done}/{n}', { done: ids.length - running, n: ids.length })
-      : tested.length > 0
-        ? failed.length > 0
-          ? t('{ok} 个可用 · {failed} 个失败', {
-              ok: tested.length - failed.length,
-              failed: failed.length,
-            })
-          : t('{ok} 个可用', { ok: tested.length })
-        : t('{n} 个', { n: ids.length });
+      : t('{n} 个', { n: ids.length });
   const runtime = SUBSCRIPTION_RUNTIME[account.vendor];
   const runtimeLabel =
     runtime === undefined ? VENDORS[account.vendor].label : MODEL_SOURCE_RUNTIME_LABELS[runtime];
@@ -570,25 +513,26 @@ export function SubscriptionDetail({
             />
           )}
         </Field>
-        <Field label={t('状态')}>
+        <Field label={t('连通')}>
           <span className="flex h-8 items-center gap-2">
-            <span data-testid="subscription-status" className={STATUS_CLS}>
-              {verifying ? (
-                <Spinner aria-hidden className="size-3.5 flex-none text-content-tertiary" />
-              ) : (
+            {view.label !== null && (
+              <span data-testid="subscription-status" className={STATUS_CLS}>
                 <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
-              )}
-              {view.label}
-            </span>
+                {view.label}
+              </span>
+            )}
             {actions.onVerify !== undefined && (
               <Button
+                ref={verifyRef}
                 variant="outline"
                 size="sm"
                 data-testid="subscription-verify"
+                className="min-w-20"
                 disabled={verifying}
                 onClick={actions.onVerify}
               >
-                {view.tone === 'fail' ? t('重新验证') : t('验证')}
+                {verifying && <Spinner aria-hidden />}
+                {verifying ? t('验证中') : t('验证')}
               </Button>
             )}
           </span>
@@ -599,7 +543,11 @@ export function SubscriptionDetail({
           {withCodeSpans(view.reason)}
         </p>
       )}
-      <VerifyResult account={account} verification={verification} now={now} />
+      <VerifyResultPopover
+        vendor={account.vendor}
+        verification={verification}
+        anchor={verifyRef.current}
+      />
       <section data-testid="subscription-models" className="flex min-w-0 flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
           <h3 className="m-0 text-ui font-semibold text-foreground">{t('模型')}</h3>
@@ -625,10 +573,11 @@ export function SubscriptionDetail({
               <Button
                 variant="outline"
                 size="sm"
+                ref={testAllRef}
                 data-testid="subscription-test-all"
                 className="min-w-24"
                 disabled={running > 0 || ids.length === 0}
-                onClick={() => void runTests(ids)}
+                onClick={() => void tests.run(ids, testAllRef.current)}
               >
                 {running > 0 ? <Spinner aria-hidden /> : <Play aria-hidden />}
                 {running > 0 ? t('测试中') : t('全部测试')}
@@ -653,14 +602,15 @@ export function SubscriptionDetail({
                 check={checks[model.id]}
                 busy={actions.modelsBusy ?? false}
                 meta={tierMeta(model, t)}
-                failureShort={MODEL_FAILURE_SHORT}
-                {...(test === undefined ? {} : { onTest: () => void runTests([model.id]) })}
+                {...(test === undefined
+                  ? {}
+                  : { onTest: (anchor: Element) => void tests.run([model.id], anchor) })}
                 {...(actions.onRemoveModel === undefined
                   ? {}
                   : {
                       onRemove: () => {
                         actions.onRemoveModel?.(model.id);
-                        setChecks(({ [model.id]: _, ...rest }) => rest);
+                        tests.drop(model.id);
                       },
                     })}
               />
@@ -672,31 +622,13 @@ export function SubscriptionDetail({
             {t('还没勾选模型，订阅按执行机上报的名单兜底。')}
           </p>
         )}
-        {refused && (
-          <p data-testid="model-test-refused" className="m-0 text-meta text-content-secondary">
-            {t(REFUSED_TEST_COPY)}
-          </p>
-        )}
-        {failed.length > 0 && (
-          <ul
-            data-testid="subscription-model-failures"
-            className="m-0 flex list-none flex-col gap-1 p-0"
-          >
-            {failed.map((id) => {
-              const failure = failureOf(checks[id]);
-              return (
-                <li key={id} className="flex flex-wrap items-baseline gap-x-2 text-meta">
-                  <code className="text-destructive">{id}</code>
-                  <span className="text-content-secondary">
-                    {failure === 'unavailable' || failure === null
-                      ? t('测试没能跑完，请重试。')
-                      : t(MODEL_FAILURE_SENTENCE[failure])}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+        <ModelTestReport
+          report={tests.report}
+          checks={checks}
+          failureSentence={modelFailureSentence(account.vendor)}
+          failureShort={MODEL_FAILURE_SHORT}
+          onClose={tests.close}
+        />
         {test !== undefined && (
           <p className="m-0 text-meta text-content-tertiary">
             {t('每个模型测试会发一次很短的请求，算在订阅额度里。')}

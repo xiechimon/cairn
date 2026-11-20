@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Cpu } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { accountStatusOf, type Verification } from '../api/account-verification.js';
+import type { Verification } from '../api/account-verification.js';
 import {
   fetchAntigravityUpstreamModels,
   toAntigravityAccount,
@@ -142,13 +142,7 @@ function subscriptionEntries(
 ): Entry[] {
   return accounts.map((account) => {
     const verification = deps.verifications[account.id];
-    const view = subscriptionStatusView(
-      account,
-      accountStatusOf(account, verification),
-      deps.now,
-      deps.t,
-      deps.clock,
-    );
+    const view = subscriptionStatusView(account, deps.now, deps.t, deps.clock);
     const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
     const picked = account.models ?? [];
     const shown: SubscriptionModel[] = (

@@ -1,5 +1,4 @@
 import type { SubscriptionCheck } from '@cairn/shared';
-import type { AccountState } from './claude-accounts.js';
 import { ApiError } from './client.js';
 
 export const VERIFY_FAILURES = [
@@ -21,13 +20,6 @@ export type Verification =
   | { phase: 'not-run'; cause: VerifyNotRun };
 
 export type VerifyOutcome = Exclude<Verification, { phase: 'verifying' }>;
-
-export type AccountStatus =
-  | { kind: 'verifying' }
-  | { kind: 'unverified' }
-  | { kind: 'verified'; at: number | null }
-  | { kind: 'verify-failed'; reason: VerifyFailure }
-  | { kind: 'account'; state: Exclude<AccountState, 'ok'> };
 
 export const VERIFY_TIMEOUT_MS = 45_000;
 
@@ -63,24 +55,4 @@ export async function runVerification(
   } finally {
     clearTimeout(timer);
   }
-}
-
-const isVerifyFailure = (value: string | null): value is VerifyFailure =>
-  (VERIFY_FAILURES as readonly (string | null)[]).includes(value);
-
-export function accountStatusOf(
-  account: { state: AccountState; lastCheck: SubscriptionCheck | null },
-  verification: Verification | undefined,
-): AccountStatus {
-  if (verification?.phase === 'verifying') return { kind: 'verifying' };
-  if (account.state !== 'ok') return { kind: 'account', state: account.state };
-  if (verification?.phase === 'failed') {
-    return { kind: 'verify-failed', reason: verification.reason };
-  }
-  const check = account.lastCheck;
-  if (verification?.phase === 'passed')
-    return { kind: 'verified', at: check?.ok ? check.at : null };
-  if (check === null) return { kind: 'unverified' };
-  if (check.ok) return { kind: 'verified', at: check.at };
-  return { kind: 'verify-failed', reason: isVerifyFailure(check.reason) ? check.reason : 'failed' };
 }

@@ -2,7 +2,7 @@ import type { ModelSourceModel, ProviderRecord } from '@cairn/shared';
 import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
-import { accountStatusOf, type Verification } from '../api/account-verification.js';
+import type { Verification } from '../api/account-verification.js';
 import type { MachineWithProviders, SubscriptionAccount } from '../api/claude-accounts.js';
 import { MachineProvidersCard, useClock } from '../components/accounts/account-parts.js';
 import { ClaudeMark } from '../components/brand-marks.js';
@@ -63,7 +63,6 @@ const FRESH_SUBSCRIPTION: SubscriptionAccount = {
   windows: [],
   lastUsedAt: null,
   stepsLast24h: null,
-  lastCheck: null,
 };
 
 function subscriptionStates(): {
@@ -97,7 +96,7 @@ function SubscriptionPanelSpecimen() {
   const views = states.map(({ account, verification }) => ({
     account,
     verification,
-    view: subscriptionStatusView(account, accountStatusOf(account, verification), NOW, t, clock),
+    view: subscriptionStatusView(account, NOW, t, clock),
   }));
   const items: ProviderItem[] = [
     ...views.map(({ account, view }) => ({
@@ -146,7 +145,7 @@ function SubscriptionDetailSpecimen({ state }: { state: 'ok' }) {
   const { t } = useI18n();
   const clock = useClock();
   const account = fixtureAccount('Personal');
-  const view = subscriptionStatusView(account, accountStatusOf(account, undefined), NOW, t, clock);
+  const view = subscriptionStatusView(account, NOW, t, clock);
   return (
     <div data-state={state} className="flex flex-col gap-6">
       <SubscriptionDetail

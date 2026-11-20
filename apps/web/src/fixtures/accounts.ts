@@ -24,16 +24,6 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
-const PASSED_CHECK = {
-  at: NOW - 20 * MINUTE,
-  ok: true,
-  reason: null,
-  check: 'model-request',
-  command: 'claude -p "Reply with OK"',
-  model: null,
-  durationMs: 2140,
-} as const;
-
 export const ACCOUNT_OK_ID = 'sub-personal';
 export const ACCOUNT_COOLING_ID = 'sub-work';
 export const ACCOUNT_EXPIRED_ID = 'sub-old-laptop';
@@ -59,7 +49,6 @@ export const ACCOUNT_SUBSCRIPTIONS: SubscriptionAccount[] = [
     ],
     lastUsedAt: NOW - 2 * MINUTE,
     stepsLast24h: 37,
-    lastCheck: PASSED_CHECK,
   },
   {
     id: ACCOUNT_COOLING_ID,
@@ -86,7 +75,6 @@ export const ACCOUNT_SUBSCRIPTIONS: SubscriptionAccount[] = [
     ],
     lastUsedAt: NOW - 48 * MINUTE,
     stepsLast24h: 112,
-    lastCheck: PASSED_CHECK,
   },
   {
     id: ACCOUNT_EXPIRED_ID,
@@ -100,7 +88,6 @@ export const ACCOUNT_SUBSCRIPTIONS: SubscriptionAccount[] = [
     windows: [],
     lastUsedAt: NOW - 5 * DAY,
     stepsLast24h: 0,
-    lastCheck: null,
   },
 ];
 
@@ -119,7 +106,6 @@ export const DEVIN_SUBSCRIPTIONS: SubscriptionAccount[] = [
     windows: [],
     lastUsedAt: NOW - 3 * HOUR,
     stepsLast24h: 4,
-    lastCheck: { ...PASSED_CHECK, check: 'sign-in', command: 'devin acp · authenticate' },
     models: [
       {
         id: 'swe-2-high',
@@ -182,7 +168,6 @@ export const OTHER_ACCOUNTS: SubscriptionAccount[] = [
     ],
     lastUsedAt: NOW - 20 * MINUTE,
     stepsLast24h: null,
-    lastCheck: PASSED_CHECK,
   },
   {
     id: 'grok-main',
@@ -203,7 +188,6 @@ export const OTHER_ACCOUNTS: SubscriptionAccount[] = [
     ],
     lastUsedAt: NOW - 6 * HOUR,
     stepsLast24h: null,
-    lastCheck: PASSED_CHECK,
   },
 ];
 
