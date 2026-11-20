@@ -27,5 +27,5 @@ export function migrateUpTo(sqlite: Database.Database, directory: string, lastTa
 }
 
 export function migrateAll(sqlite: Database.Database): void {
-  migrateDatabase(drizzle(sqlite));
+  migrateDatabase(drizzle(sqlite), sqlite);
 }

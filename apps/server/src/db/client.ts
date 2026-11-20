@@ -18,8 +18,19 @@ function resolveMigrationsFolder(): string {
 
 export const MIGRATIONS_FOLDER = resolveMigrationsFolder();
 
-export function migrateDatabase(db: Db): void {
-  migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+export function migrateDatabase(db: Db, sqlite: Database.Database): void {
+  const foreignKeysOn = sqlite.pragma('foreign_keys', { simple: true }) === 1;
+  if (foreignKeysOn) sqlite.pragma('foreign_keys = OFF');
+  try {
+    migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+  } finally {
+    if (foreignKeysOn) sqlite.pragma('foreign_keys = ON');
+  }
+  const violations = sqlite.pragma('foreign_key_check') as unknown[];
+  if (violations.length > 0)
+    throw new Error(
+      `foreign_key_check after migrations reported ${violations.length} violation(s)`,
+    );
   foldMemoryIndexes(db);
 }
 
@@ -34,7 +45,7 @@ export function openDbWithHandle(dbPath: string): OpenedDb {
   }
   const sqlite = openConnection(dbPath);
   const db = drizzle(sqlite, { schema });
-  migrateDatabase(db);
+  migrateDatabase(db, sqlite);
   return { db, close: () => sqlite.close() };
 }
 
@@ -56,7 +67,7 @@ let migratedMemoryImage: Buffer | null = null;
 function migratedImage(): Buffer {
   if (migratedMemoryImage === null) {
     const sqlite = openConnection(':memory:');
-    migrateDatabase(drizzle(sqlite, { schema }));
+    migrateDatabase(drizzle(sqlite, { schema }), sqlite);
     migratedMemoryImage = sqlite.serialize();
     sqlite.close();
   }
