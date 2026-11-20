@@ -163,7 +163,7 @@ function fakeWorkspace(cwd: string): WorktreeOps {
       };
     },
     async commitAll() {
-      return { committed: true, head: 'def456', setupDrift: [] };
+      return { committed: true, head: 'def456', setupDrift: [], preexisting: [] };
     },
     async push() {},
     async mergeDefaultBranch() {

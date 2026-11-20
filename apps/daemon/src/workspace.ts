@@ -49,6 +49,7 @@ import {
 } from './workspace-hooks.js';
 
 const SETUP_DRIFT_FILE = 'cairn-setup-drift.json';
+const STEP_BASELINE_FILE = 'cairn-step-baseline.json';
 
 type PathFingerprints = Record<string, string>;
 
@@ -87,7 +88,7 @@ async function fingerprintsOf(cwd: string, paths: readonly string[]): Promise<Pa
   return Object.fromEntries(entries);
 }
 
-function readSetupDrift(file: string): PathFingerprints {
+function readPathMap(file: string): PathFingerprints {
   if (!existsSync(file)) return {};
   const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'));
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
@@ -284,6 +285,7 @@ export class WorkspaceManager implements WorktreeOps {
           if (remoteAhead > 0 && current !== branch) throw new RemoteBranchDivergedError(branch);
         }
         this.logger.workspace('Worktree reused');
+        await this.recordStepBaseline(convDir);
         const hooks = await this.runHookStage(convDir, 'resume', input.credentials);
         return {
           cwd: convDir,
@@ -313,6 +315,7 @@ export class WorkspaceManager implements WorktreeOps {
       }
       await gitPrim.worktreeAdd(baseRepoDir, branch, convDir, base);
       this.logger.workspace(`Worktree added (${branch} from ${base})`);
+      await this.recordStepBaseline(convDir);
       const hooks = await this.runHookStage(convDir, 'setup', input.credentials);
       return {
         cwd: convDir,
@@ -394,7 +397,7 @@ export class WorkspaceManager implements WorktreeOps {
       if (existsSync(cwd)) {
         const after = await fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd));
         const file = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
-        const drift = readSetupDrift(file);
+        const drift = readPathMap(file);
         for (const path of new Set([...Object.keys(before), ...Object.keys(after)])) {
           if (before[path] === after[path]) continue;
           const agentOwned = before[path] !== undefined && drift[path] !== before[path];
@@ -407,28 +410,47 @@ export class WorkspaceManager implements WorktreeOps {
     }
   }
 
+  private async recordStepBaseline(cwd: string): Promise<void> {
+    const file = await gitPrim.gitPath(cwd, STEP_BASELINE_FILE);
+    writeFileSync(file, JSON.stringify(await fingerprintsOf(cwd, await gitPrim.dirtyPaths(cwd))));
+  }
+
   async commitAll(
     cwd: string,
     message: string,
     identity: CommitIdentity,
-  ): Promise<{ committed: boolean; head: string | null; setupDrift: string[] }> {
+  ): Promise<{
+    committed: boolean;
+    head: string | null;
+    setupDrift: string[];
+    preexisting: string[];
+  }> {
     if (isReadonlyExportDir(cwd)) throw new ReadOnlyWorkspaceError(cwd);
     const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
-    const drift = readSetupDrift(driftFile);
+    const drift = readPathMap(driftFile);
+    const baseline = readPathMap(await gitPrim.gitPath(cwd, STEP_BASELINE_FILE));
     const dirty = await gitPrim.dirtyPaths(cwd);
     const current = await fingerprintsOf(cwd, dirty);
     const setupDrift = dirty.filter(
       (path) => drift[path] !== undefined && drift[path] === current[path],
     );
     const driftSet = new Set(setupDrift);
+    const preexisting = dirty.filter(
+      (path) =>
+        !driftSet.has(path) && baseline[path] !== undefined && baseline[path] === current[path],
+    );
+    const excluded = new Set([...setupDrift, ...preexisting]);
     await gitPrim.addPaths(
       cwd,
-      dirty.filter((path) => !driftSet.has(path)),
+      dirty.filter((path) => !excluded.has(path)),
     );
-    await gitPrim.unstagePaths(cwd, setupDrift);
+    await gitPrim.unstagePaths(cwd, [...excluded]);
     writeFileSync(driftFile, JSON.stringify(await fingerprintsOf(cwd, setupDrift)));
     for (const path of setupDrift) {
       this.logger.workspace(`workspace setup drift left out of the commit: ${path}`);
+    }
+    for (const path of preexisting) {
+      this.logger.workspace(`path changed before this step, left out of the commit: ${path}`);
     }
     const leaked = await gitPrim.stagedPathsContaining(cwd, BRIEF_MARKER_BEGIN, [
       ...BRIEF_RECONCILE_FILENAMES,
@@ -439,7 +461,7 @@ export class WorkspaceManager implements WorktreeOps {
     }
     const committed = await gitPrim.commit(cwd, message, identity, this.hookTimeoutMs);
     const head = await gitPrim.head(cwd);
-    return { committed, head, setupDrift };
+    return { committed, head, setupDrift, preexisting };
   }
 
   async briefMarkerInRef(cwd: string, ref: string): Promise<string[]> {
@@ -471,7 +493,7 @@ export class WorkspaceManager implements WorktreeOps {
     credentials: BoundGitCredentials | null,
   ): Promise<{ output: string }> {
     const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
-    const drift = readSetupDrift(driftFile);
+    const drift = readPathMap(driftFile);
     const recorded = Object.keys(drift);
     const current = await fingerprintsOf(cwd, recorded);
     const setupDrift = recorded.filter((path) => drift[path] === current[path]);

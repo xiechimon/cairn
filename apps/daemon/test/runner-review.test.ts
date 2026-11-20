@@ -214,7 +214,7 @@ function fakeWorkspace(cwd: string, calls: string[], opts: WorkspaceOptions = {}
     },
     async commitAll() {
       calls.push('commitAll');
-      return { committed: true, head: 'abc123', setupDrift: [] };
+      return { committed: true, head: 'abc123', setupDrift: [], preexisting: [] };
     },
     async push(_cwd, branch) {
       calls.push(`push:${branch}`);

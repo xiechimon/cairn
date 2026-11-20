@@ -199,7 +199,7 @@ function fakeWorkspace(opts: {
     },
     async commitAll() {
       calls.push('commitAll');
-      return { committed: true, head: 'abc123', setupDrift: [] };
+      return { committed: true, head: 'abc123', setupDrift: [], preexisting: [] };
     },
     async push(_cwd, branch, cred) {
       calls.push(`push:${branch}`);

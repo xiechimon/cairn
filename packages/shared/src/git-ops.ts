@@ -113,7 +113,12 @@ export interface WorktreeOps {
     cwd: string,
     message: string,
     identity: CommitIdentity,
-  ): Promise<{ committed: boolean; head: string | null; setupDrift: string[] }>;
+  ): Promise<{
+    committed: boolean;
+    head: string | null;
+    setupDrift: string[];
+    preexisting: string[];
+  }>;
   push(
     cwd: string,
     branch: string,
