@@ -253,7 +253,7 @@ describe('devin credential delivery', () => {
 
 describe('devin advertised model catalog', () => {
   const advertised = [
-    { id: 'stub-model', name: 'Stub Model' },
+    { id: 'stub-model', name: 'Stub Model', thinkingLevels: [] },
     { id: 'swe-2-high', name: 'SWE-2' },
     { id: 'swe-2-flash-medium', name: 'SWE-2 Flash' },
     { id: 'adaptive', name: 'adaptive' },

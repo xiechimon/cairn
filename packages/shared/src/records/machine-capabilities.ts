@@ -126,9 +126,11 @@ export const devinReportSchema = z
   .strict();
 export type DevinReport = z.infer<typeof devinReportSchema>;
 
-export const antigravityModelSchema = z.object({
-  id: z.string().min(1),
-  name: z.string().min(1),
+export const antigravityModelSchema = modelSourceModelSchema.pick({
+  id: true,
+  name: true,
+  thinkingLevels: true,
+  thinkingDefault: true,
 });
 
 export const antigravityReportSchema = z

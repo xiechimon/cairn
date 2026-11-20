@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { thinkingLevelSchema } from '../agent-backend.js';
+import { thinkingLevelSchema } from '../thinking-levels.js';
 import { epochMs, recordId } from './common.js';
 import { workerBriefTextSchema } from './worker-brief-text.js';
 

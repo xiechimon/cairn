@@ -1,12 +1,11 @@
-import {
-  type CoordinatorDefault,
-  type RouteUse,
-  type RoutingRuleRecord,
-  type RuleFix,
-  type TeamRoutingSettings,
-  THINKING_LEVELS,
-  type ThinkingLevel,
-  type TopModel,
+import type {
+  CoordinatorDefault,
+  RouteUse,
+  RoutingRuleRecord,
+  RuleFix,
+  TeamRoutingSettings,
+  ThinkingLevel,
+  TopModel,
 } from '@cairn/shared';
 import { ChevronRight } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
@@ -23,19 +22,13 @@ import { modelGroupKey, modelGroupName } from '../components/model-select-core.j
 import { QueryBoundary } from '../components/query-state.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { FrequentModelsCard, levelLabel, vendorMark } from './frequent-models-card.js';
+import { FrequentModelsCard, vendorMark } from './frequent-models-card.js';
 import { RuleIssueNotices } from './rule-issue-notices.js';
+import { ThinkingLevelSelect } from './thinking-level-select.js';
 
 const AGENT_USES: readonly RouteUse[] = ['coordinator'];
 
@@ -107,7 +100,7 @@ export function ModelPicker({
   const { t } = useI18n();
   const picked = currentOption(rule, options);
   const shownId = picked?.modelId ?? rule?.modelId ?? '';
-  const Vendor = vendorMark(shownId);
+  const Vendor = vendorMark({ runtime: picked?.runtime ?? rule?.provider ?? '', modelId: shownId });
   const byKey = new Map(options.map((o) => [modelKey(o), o]));
   const rows = [...byKey.values()];
   return (
@@ -222,10 +215,7 @@ export function RuleRow({
   testId?: string;
 }) {
   const { t } = useI18n();
-  const devinPicked = currentOption(rule, options)?.runtime === 'devin';
-  const level = devinPicked
-    ? 'off'
-    : ((rule?.thinkingLevel as ThinkingLevel | null | undefined) ?? 'off');
+  const picked = currentOption(rule, options);
   return (
     <div
       id={testId === undefined ? `route-${use}` : undefined}
@@ -238,36 +228,17 @@ export function RuleRow({
         hintClassName="text-pretty break-keep"
       >
         <div className="flex items-center justify-end gap-1.5 max-sm:w-full max-sm:justify-start">
-          {!devinPicked && (followDefault === undefined || rule !== null) && (
-            <Select
-              value={level}
-              disabled={rule === null}
-              onValueChange={(next) => {
-                if (rule === null || next === null) return;
-                onSave({
-                  provider: rule.provider,
-                  modelId: rule.modelId,
-                  thinkingLevel: next === 'off' ? null : (next as ThinkingLevel),
-                });
-              }}
-            >
-              <SelectTrigger
-                aria-label={t('{use} 的思考强度', { use: label })}
-                className="routing-rule-level-select w-auto flex-none max-sm:-ml-2.5 border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta disabled:text-content-dim disabled:opacity-100"
-              >
-                <SelectValue>
-                  <span className="text-content-tertiary">{t('思考')}</span>
-                  {levelLabel(level)}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {THINKING_LEVELS.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {levelLabel(value)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {rule !== null && picked !== undefined && (
+            <ThinkingLevelSelect
+              levels={picked.coordinatorThinkingLevels}
+              resolvesTo={picked.coordinatorThinkingDefault}
+              value={rule.thinkingLevel ?? null}
+              onChange={(thinkingLevel) =>
+                onSave({ provider: rule.provider, modelId: rule.modelId, thinkingLevel })
+              }
+              label={t('{use} 的思考强度', { use: label })}
+              className="routing-rule-level-select max-sm:-ml-2.5"
+            />
           )}
           <ModelPicker
             use={use}
@@ -278,7 +249,10 @@ export function RuleRow({
               onSave({
                 provider: option.provider,
                 modelId: option.modelId,
-                thinkingLevel: option.runtime === 'devin' || level === 'off' ? null : level,
+                thinkingLevel:
+                  option.coordinatorThinkingLevels?.find(
+                    (known) => known === rule?.thinkingLevel,
+                  ) ?? null,
               })
             }
           />

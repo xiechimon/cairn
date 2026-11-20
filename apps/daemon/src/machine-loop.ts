@@ -401,9 +401,17 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         allowHostMcp: true,
         usageEvents: true,
         onDevinModels: (models) => {
-          devinModels = models;
+          devinModels = models.map((model) => {
+            const learned = devinModels.find((known) => known.id === model.id);
+            if (model.thinkingLevels !== undefined || learned?.thinkingLevels === undefined)
+              return model;
+            const { thinkingLevels, thinkingDefault } = learned;
+            return thinkingDefault === undefined
+              ? { ...model, thinkingLevels }
+              : { ...model, thinkingLevels, thinkingDefault };
+          });
           try {
-            saveDevinModels(paths, models);
+            saveDevinModels(paths, devinModels);
           } catch (error) {
             logger.machine(
               `devin model catalog persist failed: ${

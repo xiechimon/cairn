@@ -1551,6 +1551,23 @@ export function toThinkingLevelDisplay(
   return value !== null && levels.includes(value) ? value : null;
 }
 
+function thinkingOf(
+  m: ModelSource['models'][number],
+): Pick<
+  ModelOption,
+  'thinkingLevels' | 'thinkingDefault' | 'coordinatorThinkingLevels' | 'coordinatorThinkingDefault'
+> {
+  const inServer = m.inServerThinkingLevels !== undefined;
+  const coordinatorLevels = inServer ? m.inServerThinkingLevels : m.thinkingLevels;
+  const coordinatorDefault = inServer ? m.inServerThinkingDefault : m.thinkingDefault;
+  return {
+    ...(m.thinkingLevels !== undefined ? { thinkingLevels: m.thinkingLevels } : {}),
+    ...(m.thinkingDefault !== undefined ? { thinkingDefault: m.thinkingDefault } : {}),
+    ...(coordinatorLevels !== undefined ? { coordinatorThinkingLevels: coordinatorLevels } : {}),
+    ...(coordinatorDefault !== undefined ? { coordinatorThinkingDefault: coordinatorDefault } : {}),
+  };
+}
+
 export function toModelOptions(sources: ModelSource[]): ModelOption[] {
   const livenessByModelId = new Map<string, 'alive' | 'dead' | 'unknown'>();
   for (const source of sources) {
@@ -1584,6 +1601,7 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
         modelName: m.name,
         ...(source.machineId !== undefined ? { machineId: source.machineId } : {}),
         ...(lv !== undefined && lv !== 'unknown' ? { liveness: lv } : {}),
+        ...thinkingOf(m),
       });
     }
   }

@@ -225,12 +225,17 @@ describe('antigravity managed binary resolution', () => {
         `#!${process.execPath}`,
         "import { createInterface } from 'node:readline';",
         'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+        'const selected = [];',
         'for await (const line of createInterface({ input: process.stdin })) {',
         '  const msg = JSON.parse(line);',
         '  if (msg.method === "initialize") {',
         '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentInfo: { name: "agy", version: "1.5.10" }, agentCapabilities: {} } });',
         '  } else if (msg.method === "session/new") {',
-        '    send({ id: msg.id, result: { sessionId: "probe-1", configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-carbon", options: [{ value: "gemini-4-carbon", name: "Gemini 4 Carbon" }] }] } });',
+        '    send({ id: msg.id, result: { sessionId: "probe-1", configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-carbon", options: [{ value: "gemini-4-carbon", name: "Gemini 4 Carbon" }, { value: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" }] }] } });',
+        '  } else if (msg.method === "session/set_config_option") {',
+        '    selected.push(msg.params.value);',
+        '    const thought = msg.params.value === "gemini-4-carbon" ? [{ id: "thought_level", name: "Thinking", category: "thought_level", type: "select", currentValue: "high", options: [{ value: "low", name: "Low" }, { value: "high", name: "High" }] }] : [];',
+        '    send({ id: msg.id, result: { configOptions: thought } });',
         '  }',
         '}',
       ].join('\n'),
@@ -249,7 +254,15 @@ describe('antigravity managed binary resolution', () => {
       source: 'local',
       version: '1.5.10',
       authenticated: true,
-      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+      models: [
+        {
+          id: 'gemini-4-carbon',
+          name: 'Gemini 4 Carbon',
+          thinkingLevels: ['low', 'high'],
+          thinkingDefault: 'high',
+        },
+        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', thinkingLevels: [] },
+      ],
     });
   });
 });

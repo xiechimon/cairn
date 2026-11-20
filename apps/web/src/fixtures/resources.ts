@@ -1,4 +1,9 @@
-import type { McpConnectorRecord, ModelSource, ProviderRecord } from '@cairn/shared';
+import {
+  claudeCodeThinkingLevels,
+  type McpConnectorRecord,
+  type ModelSource,
+  type ProviderRecord,
+} from '@cairn/shared';
 import {
   legacyDone,
   legacyReview,
@@ -16,9 +21,9 @@ const PROVIDER_SOURCE_PI: ModelSource = {
   installed: true,
   hostname: MACHINE_NAME,
   models: [
-    { id: 'claude-sonnet-5', name: 'Claude Sonnet 5（R3 网关）' },
-    { id: 'claude-opus-4-5', name: 'Claude Opus 4.5（R3 网关）' },
-    { id: 'gpt-5.2', name: 'GPT-5.2（R3 网关）' },
+    { id: 'claude-sonnet-5', name: 'Claude Sonnet 5（R3 网关）', thinkingLevels: [] },
+    { id: 'claude-opus-4-5', name: 'Claude Opus 4.5（R3 网关）', thinkingLevels: [] },
+    { id: 'gpt-5.2', name: 'GPT-5.2（R3 网关）', thinkingLevels: [] },
   ],
 };
 
@@ -34,7 +39,7 @@ const PROVIDER_SOURCE_CC: ModelSource = {
     { id: 'claude-opus-4-1', name: 'claude-opus-4-1', slot: 'opus' },
     { id: 'claude-sonnet-5', name: 'claude-sonnet-5', slot: 'sonnet' },
     { id: 'claude-haiku-4-5', name: 'claude-haiku-4-5', slot: 'haiku' },
-  ],
+  ].map((model) => ({ ...model, thinkingLevels: claudeCodeThinkingLevels(model.id) })),
 };
 
 function fixtureProvider(

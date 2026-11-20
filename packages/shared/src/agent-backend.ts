@@ -135,10 +135,6 @@ export const stepEventSchema = z.discriminatedUnion('type', [
 ]);
 export type StepEvent = z.infer<typeof stepEventSchema>;
 
-export const THINKING_LEVELS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
-export const thinkingLevelSchema = z.enum(THINKING_LEVELS);
-export type ThinkingLevel = z.infer<typeof thinkingLevelSchema>;
-
 export interface AgentBackendCapabilities {
   readonly name: string;
   readonly thinkingLevels: readonly string[];

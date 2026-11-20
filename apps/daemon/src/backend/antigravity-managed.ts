@@ -23,8 +23,16 @@ import {
   type NewSessionResponse,
   ndJsonStream,
   PROTOCOL_VERSION,
+  type SessionConfigOption,
+  type SetSessionConfigOptionResponse,
 } from '@agentclientprotocol/sdk';
-import { antigravityBinaryCandidates, DEFAULT_ANTIGRAVITY_MODELS } from '@cairn/shared';
+import {
+  acpThoughtLevel,
+  acpThoughtLevels,
+  antigravityBinaryCandidates,
+  DEFAULT_ANTIGRAVITY_MODELS,
+  type ThinkingLevel,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
 
@@ -76,6 +84,8 @@ type InstallMarker = z.infer<typeof installMarkerSchema>;
 export interface AntigravityModel {
   id: string;
   name: string;
+  thinkingLevels?: ThinkingLevel[];
+  thinkingDefault?: ThinkingLevel;
 }
 
 export interface AntigravityInstall {
@@ -136,10 +146,62 @@ function markerOf(versionDir: string): InstallMarker | null {
   }
 }
 
+function defaultModels(): AntigravityModel[] {
+  return DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name, thinkingLevels, thinkingDefault }) => ({
+    id,
+    name,
+    ...(thinkingLevels === undefined ? {} : { thinkingLevels }),
+    ...(thinkingDefault === undefined ? {} : { thinkingDefault }),
+  }));
+}
+
+function thoughtChoiceOf(
+  options: readonly SessionConfigOption[],
+): Pick<AntigravityModel, 'thinkingLevels' | 'thinkingDefault'> {
+  const option = options.find((entry) => entry.category === 'thought_level');
+  if (option?.type !== 'select') return { thinkingLevels: [] };
+  const thinkingLevels = acpThoughtLevels(
+    option.options.flatMap((entry) =>
+      'options' in entry ? entry.options.map((item) => item.value) : [entry.value],
+    ),
+  );
+  const thinkingDefault = acpThoughtLevel(option.currentValue);
+  return thinkingDefault === undefined ? { thinkingLevels } : { thinkingLevels, thinkingDefault };
+}
+
+function within<T>(request: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    request,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timeout`)), PROBE_SESSION_TIMEOUT_MS),
+    ),
+  ]);
+}
+
+async function withThinkingLevels(
+  setModel: (configId: string, modelId: string) => Promise<SetSessionConfigOptionResponse>,
+  created: NewSessionResponse,
+  models: AntigravityModel[],
+): Promise<AntigravityModel[]> {
+  const modelOption = created.configOptions?.find((option) => option.category === 'model');
+  if (modelOption?.type !== 'select') return models;
+  const learned: AntigravityModel[] = [];
+  for (const model of models) {
+    try {
+      const selected = await setModel(modelOption.id, model.id);
+      learned.push({ ...model, ...thoughtChoiceOf(selected.configOptions) });
+    } catch {
+      learned.push(model);
+    }
+  }
+  await setModel(modelOption.id, modelOption.currentValue).catch(() => {});
+  return learned;
+}
+
 function extractModels(response: NewSessionResponse): AntigravityModel[] {
   const modelOption = response.configOptions?.find((option) => option.category === 'model');
   if (modelOption?.type !== 'select') {
-    return DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name }));
+    return defaultModels();
   }
   const models: AntigravityModel[] = [];
   for (const entry of modelOption.options) {
@@ -149,9 +211,7 @@ function extractModels(response: NewSessionResponse): AntigravityModel[] {
       models.push({ id: entry.value, name: entry.name });
     }
   }
-  return models.length > 0
-    ? models
-    : DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name }));
+  return models.length > 0 ? models : defaultModels();
 }
 
 function isExecutableFile(path: string): boolean {
@@ -211,14 +271,19 @@ async function probeAntigravityBinary(
           setTimeout(() => reject(new Error('probe session timeout')), PROBE_SESSION_TIMEOUT_MS),
         ),
       ]);
-      return {
-        version,
-        binPath,
-        args,
-        source,
-        authenticated: true,
-        models: extractModels(created),
-      };
+      const models = await withThinkingLevels(
+        (configId, value) =>
+          within(
+            connection.agent.request<SetSessionConfigOptionResponse>(
+              methods.agent.session.setConfigOption,
+              { sessionId: created.sessionId, configId, value },
+            ),
+            'probe model',
+          ),
+        created,
+        extractModels(created),
+      );
+      return { version, binPath, args, source, authenticated: true, models };
     } catch {
       return {
         version,
@@ -226,7 +291,7 @@ async function probeAntigravityBinary(
         args,
         source,
         authenticated: false,
-        models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
+        models: defaultModels(),
       };
     }
   } catch {
@@ -321,7 +386,7 @@ export function createAntigravityManaged(
         args: local.args,
         source: 'local',
         authenticated: false,
-        models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
+        models: defaultModels(),
       };
     }
     const managed = currentManaged();
@@ -332,7 +397,7 @@ export function createAntigravityManaged(
         args: managed.args,
         source: 'managed',
         authenticated: false,
-        models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
+        models: defaultModels(),
       };
     }
     return null;

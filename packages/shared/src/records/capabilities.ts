@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { thinkingLevelSchema } from '../agent-backend.js';
+import { thinkingLevelSchema } from '../thinking-levels.js';
 
 export const capabilitiesResponseSchema = z.object({
   thinkingLevels: z.array(thinkingLevelSchema),

@@ -1,4 +1,4 @@
-import type { ThinkingLevel } from './agent-backend.js';
+import type { ThinkingLevel } from './thinking-levels.js';
 
 export const ROUTING_USES = [
   'coordinator',

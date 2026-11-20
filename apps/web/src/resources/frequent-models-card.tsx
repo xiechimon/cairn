@@ -1,4 +1,4 @@
-import { THINKING_LEVELS, type ThinkingLevel, type TopModel } from '@cairn/shared';
+import type { ThinkingLevel, TopModel } from '@cairn/shared';
 import { cn } from 'cn';
 import { Box, Plus, X } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
@@ -14,19 +14,19 @@ import { FilterPicker } from '../components/filter-picker.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { SETTINGS_ROW_CLS, SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../components/ui/select.js';
 import type { ModelOption } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { ThinkingLevelSelect } from './thinking-level-select.js';
 
-export const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
-
-export function vendorMark(modelId: string): ComponentType<SVGProps<SVGSVGElement>> {
+export function vendorMark({
+  runtime,
+  modelId,
+}: {
+  runtime: string;
+  modelId: string;
+}): ComponentType<SVGProps<SVGSVGElement>> {
+  if (runtime === 'devin') return DevinMark;
+  if (runtime === 'antigravity') return AntigravityMark;
   if (modelId.startsWith('claude')) return ClaudeMark;
   if (modelId.startsWith('devin')) return DevinMark;
   if (modelId.startsWith('antigravity')) return AntigravityMark;
@@ -62,8 +62,7 @@ function FrequentModelRow({
 }) {
   const { t } = useI18n();
   const name = option?.modelName ?? model.modelId;
-  const Vendor = vendorMark(model.modelId);
-  const level = model.thinkingLevel ?? 'off';
+  const Vendor = vendorMark({ runtime: option?.runtime ?? model.provider, modelId: model.modelId });
   return (
     <div
       data-testid="frequent-model-row"
@@ -87,30 +86,15 @@ function FrequentModelRow({
         </span>
       </span>
       <span className="flex flex-none items-center gap-1 max-sm:ml-auto">
-        {option?.runtime !== 'devin' && (
-          <Select
-            value={level}
-            onValueChange={(next) => {
-              if (next !== null) onLevel(next === 'off' ? null : (next as ThinkingLevel));
-            }}
-          >
-            <SelectTrigger
-              aria-label={t('{model} 的思考强度', { model: name })}
-              className="frequent-model-level w-auto flex-none border-transparent bg-transparent shadow-none hover:bg-muted dark:bg-transparent dark:hover:bg-muted max-sm:h-7 max-sm:text-meta"
-            >
-              <SelectValue>
-                <span className="text-content-tertiary">{t('思考')}</span>
-                {levelLabel(level)}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {THINKING_LEVELS.map((value) => (
-                <SelectItem key={value} value={value}>
-                  {levelLabel(value)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {option !== undefined && (
+          <ThinkingLevelSelect
+            levels={option.thinkingLevels}
+            resolvesTo={option.thinkingDefault}
+            value={model.thinkingLevel}
+            onChange={onLevel}
+            label={t('{model} 的思考强度', { model: name })}
+            className="frequent-model-level"
+          />
         )}
         <Button
           variant="ghost"

@@ -1,6 +1,8 @@
 import { hostname } from 'node:os';
 import {
   canonicalClaudeModels,
+  claudeCodeThinkingDefault,
+  claudeCodeThinkingLevels,
   DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
   type ModelSourceModel,
@@ -15,7 +17,12 @@ import {
   topModelsSchema,
 } from '@cairn/shared';
 import { and, asc, eq, inArray } from 'drizzle-orm';
-import { builtinModelIds } from '../coordinator/runtime/provider.js';
+import {
+  builtinModelIds,
+  inServerThinking,
+  piThinking,
+  type ThinkingChoice,
+} from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -140,14 +147,57 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
           installed: report.installed,
           hostname: report.hostname,
           machineId: row.id,
-          models:
-            picked === null
-              ? canonicalClaudeModels(report.models)
-              : picked.map((model) => ({ ...model, slot: 'builtin' })),
+          models: (picked === null
+            ? canonicalClaudeModels(report.models)
+            : picked.map((model) => ({ ...model, slot: 'builtin' }))
+          ).map((model) => ({
+            ...model,
+            ...asTask({
+              levels: claudeCodeThinkingLevels(model.id),
+              resolvesTo: claudeCodeThinkingDefault(model.id),
+            }),
+          })),
           ...(report.bin !== undefined ? { bin: report.bin } : {}),
         },
       ];
     });
+}
+
+function uniqueModels<T extends { id: string }>(models: readonly T[]): T[] {
+  const seen = new Set<string>();
+  return models.filter((model) => {
+    if (model.id === '' || seen.has(model.id)) return false;
+    seen.add(model.id);
+    return true;
+  });
+}
+
+function asTask({ levels, resolvesTo }: ThinkingChoice) {
+  return resolvesTo === undefined
+    ? { thinkingLevels: levels }
+    : { thinkingLevels: levels, thinkingDefault: resolvesTo };
+}
+
+function asInServer({ levels, resolvesTo }: ThinkingChoice) {
+  return resolvesTo === undefined
+    ? { inServerThinkingLevels: levels }
+    : { inServerThinkingLevels: levels, inServerThinkingDefault: resolvesTo };
+}
+
+function withKnownThinkingLevels(
+  models: readonly ModelSourceModel[],
+  known: readonly ModelSourceModel[],
+): ModelSourceModel[] {
+  return models.map((model) => {
+    const learned = known.find(
+      (entry) => entry.id === model.id && entry.thinkingLevels !== undefined,
+    );
+    if (learned?.thinkingLevels === undefined) return model;
+    return {
+      ...model,
+      ...asTask({ levels: learned.thinkingLevels, resolvesTo: learned.thinkingDefault }),
+    };
+  });
 }
 
 export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
@@ -158,15 +208,11 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
     .orderBy(asc(machine.name))
     .all()
     .filter((row) => row.capabilities?.devin?.installed === true);
-  const seen = new Set<string>();
-  const merged = [
-    ...enabledDevinSubscriptionModels({ db }, teamId),
-    ...machines.flatMap((row) => row.capabilities?.devin?.models ?? []),
-  ].filter((model) => {
-    if (model.id === '' || seen.has(model.id)) return false;
-    seen.add(model.id);
-    return true;
-  });
+  const reported = machines.flatMap((row) => row.capabilities?.devin?.models ?? []);
+  const merged = withKnownThinkingLevels(
+    uniqueModels([...enabledDevinSubscriptionModels({ db }, teamId), ...reported]),
+    [...reported, ...DEFAULT_DEVIN_MODELS],
+  );
   const models: ModelSourceModel[] = merged.length > 0 ? merged : [...DEFAULT_DEVIN_MODELS];
   return machines.map((row) => ({
     runtime: 'devin' as const,
@@ -185,18 +231,14 @@ export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnve
     .orderBy(asc(machine.name))
     .all()
     .filter((row) => row.capabilities?.antigravity?.installed === true);
-  const seen = new Set<string>();
-  const merged = [
-    ...enabledAntigravitySubscriptionModels({ db }, teamId),
-    ...machines.flatMap((row) => row.capabilities?.antigravity?.models ?? []),
-  ].filter((model) => {
-    if (model.id === '' || seen.has(model.id)) return false;
-    seen.add(model.id);
-    return true;
-  });
+  const reported = machines.flatMap((row) => row.capabilities?.antigravity?.models ?? []);
+  const merged = withKnownThinkingLevels(
+    uniqueModels([...enabledAntigravitySubscriptionModels({ db }, teamId), ...reported]),
+    [...reported, ...DEFAULT_ANTIGRAVITY_MODELS],
+  );
   const models: ModelSourceModel[] =
     merged.length > 0
-      ? merged.map((model) => ({ id: model.id, name: model.name, slot: 'builtin' }))
+      ? merged.map((model) => ({ ...model, slot: 'builtin' }))
       : [...DEFAULT_ANTIGRAVITY_MODELS];
   return machines.map((row) => ({
     runtime: 'antigravity' as const,
@@ -223,6 +265,8 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
       models: models.map((m) => ({
         ...m,
         liveness: getModelLiveness(teamId, p.providerId, m.id),
+        ...asTask(piThinking(p.providerId, m.id)),
+        ...asInServer(inServerThinking(p, m.id)),
       })),
     };
   });

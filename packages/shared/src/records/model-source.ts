@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { thinkingLevelSchema } from '../thinking-levels.js';
 import { claudeLoginSchema } from './claude-login.js';
 
 export const MODEL_SOURCE_RUNTIMES = [
@@ -25,16 +26,44 @@ export const DEFAULT_ANTIGRAVITY_MODELS: readonly ModelSourceModel[] = [
   { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', slot: 'builtin' },
   { id: 'gemini-pro-orchestrator', name: 'Orchestrator (Carbon)', slot: 'builtin' },
   { id: 'gemini-pro-orchestrator-argon', name: 'Orchestrator (Argon)', slot: 'builtin' },
-  { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash', slot: 'builtin' },
-  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', slot: 'builtin' },
-  { id: 'claude-opus-4-6-thinking', name: 'Claude Opus 4.6 (Thinking)', slot: 'builtin' },
-  { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)', slot: 'builtin' },
+  {
+    id: 'gemini-3.8-flash',
+    name: 'Gemini 3.8 Flash',
+    slot: 'builtin',
+    thinkingLevels: ['low', 'medium', 'high'],
+    thinkingDefault: 'high',
+  },
+  {
+    id: 'claude-sonnet-4-6',
+    name: 'Claude Sonnet 4.6 (Thinking)',
+    slot: 'builtin',
+    thinkingLevels: [],
+  },
+  {
+    id: 'claude-opus-4-6-thinking',
+    name: 'Claude Opus 4.6 (Thinking)',
+    slot: 'builtin',
+    thinkingLevels: [],
+  },
+  { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)', slot: 'builtin', thinkingLevels: [] },
 ];
 
 export const DEFAULT_DEVIN_MODELS: readonly ModelSourceModel[] = [
-  { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },
-  { id: 'swe-2-flash-medium', name: 'SWE-2 Flash', slot: 'builtin' },
-  { id: 'adaptive', name: 'Adaptive', slot: 'builtin' },
+  {
+    id: 'swe-2-high',
+    name: 'SWE-2',
+    slot: 'builtin',
+    thinkingLevels: ['medium', 'high', 'max'],
+    thinkingDefault: 'high',
+  },
+  {
+    id: 'swe-2-flash-medium',
+    name: 'SWE-2 Flash',
+    slot: 'builtin',
+    thinkingLevels: ['medium', 'high', 'max'],
+    thinkingDefault: 'medium',
+  },
+  { id: 'adaptive', name: 'Adaptive', slot: 'builtin', thinkingLevels: [] },
 ];
 
 export const modelSourceModelSchema = z.object({
@@ -42,6 +71,10 @@ export const modelSourceModelSchema = z.object({
   name: z.string().min(1),
   slot: z.string().optional(),
   liveness: z.enum(['alive', 'dead', 'unknown']).optional(),
+  thinkingLevels: z.array(thinkingLevelSchema).optional(),
+  thinkingDefault: thinkingLevelSchema.optional(),
+  inServerThinkingLevels: z.array(thinkingLevelSchema).optional(),
+  inServerThinkingDefault: thinkingLevelSchema.optional(),
 });
 export type ModelSourceModel = z.infer<typeof modelSourceModelSchema>;
 

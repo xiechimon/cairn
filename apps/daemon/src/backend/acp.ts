@@ -18,6 +18,7 @@ import {
   type ResumeSessionResponse,
   type SessionConfigOption,
   type SessionUpdate,
+  type SetSessionConfigOptionResponse,
 } from '@agentclientprotocol/sdk';
 import type {
   AgentBackend,
@@ -34,7 +35,13 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { AGENT_TODO_MAX_ITEMS, CLAUDE_TODO_STATUS_STATES } from '@cairn/shared';
+import {
+  AGENT_TODO_MAX_ITEMS,
+  acpThoughtLevel,
+  acpThoughtLevels,
+  acpThoughtValue,
+  CLAUDE_TODO_STATUS_STATES,
+} from '@cairn/shared';
 import { DAEMON_VERSION } from '../version.js';
 import {
   type AcpToolCall,
@@ -98,7 +105,10 @@ export function validateGeminiSession(opts: GeminiSessionValidation): {
   return { prompt: opts.prompt, resumeId: opts.resumeId };
 }
 
-function advertisedDevinModels(option: SessionConfigOption): ModelSourceModel[] {
+function advertisedDevinModels(
+  option: SessionConfigOption,
+  thoughtByModel: Record<string, readonly SessionConfigOption[]>,
+): ModelSourceModel[] {
   if (option.type !== 'select') return [];
   const seen = new Set<string>();
   const models: ModelSourceModel[] = [];
@@ -107,23 +117,36 @@ function advertisedDevinModels(option: SessionConfigOption): ModelSourceModel[] 
     for (const candidate of candidates) {
       if (candidate.value === '' || seen.has(candidate.value)) continue;
       seen.add(candidate.value);
+      const options = thoughtByModel[candidate.value];
       models.push({
         id: candidate.value,
         name: candidate.name === '' ? candidate.value : candidate.name,
+        ...(options === undefined ? {} : thoughtChoice(options)),
       });
     }
   }
   return models;
 }
 
-const THINKING_FALLBACKS: Record<string, readonly string[]> = {
-  minimal: ['minimal', 'low'],
-  low: ['low'],
-  medium: ['medium'],
-  high: ['high'],
-  xhigh: ['xhigh', 'max', 'high'],
-  max: ['max', 'xhigh', 'high'],
-};
+function isThoughtOption(option: SessionConfigOption): boolean {
+  return (
+    option.category === 'thought_level' || option.id === 'thought_level' || option.id === 'effort'
+  );
+}
+
+function thoughtChoice(
+  options: readonly SessionConfigOption[],
+): Pick<ModelSourceModel, 'thinkingLevels' | 'thinkingDefault'> {
+  const option = options.find(isThoughtOption);
+  if (option === undefined) return { thinkingLevels: [] };
+  const thinkingDefault = acpThoughtLevel(currentValueOf(option));
+  const thinkingLevels = acpThoughtLevels(selectOptionValues(option));
+  return thinkingDefault === undefined ? { thinkingLevels } : { thinkingLevels, thinkingDefault };
+}
+
+function currentValueOf(option: SessionConfigOption): string {
+  return option.type === 'select' ? option.currentValue : '';
+}
 
 function selectOptionValues(option: SessionConfigOption): Set<string> {
   if (option.type !== 'select') return new Set();
@@ -820,14 +843,18 @@ class AcpBackend implements AgentBackend {
           : resumeId;
       if (!sessionId) throw new Error(`${adapter?.harness ?? 'Gemini'} ACP returned no sessionId`);
       const modelOption = response.configOptions?.find((option) => option.category === 'model');
+      let configOptions = response.configOptions ?? [];
       if (modelOption) {
-        await connection.agent.request(methods.agent.session.setConfigOption, {
-          sessionId,
-          configId: modelOption.id,
-          value: opts.modelId,
-        });
+        const selected = await connection.agent.request<SetSessionConfigOptionResponse>(
+          methods.agent.session.setConfigOption,
+          { sessionId, configId: modelOption.id, value: opts.modelId },
+        );
+        configOptions = selected.configOptions ?? [];
         if (adapter?.harness === 'devin') {
-          const models = advertisedDevinModels(modelOption);
+          const models = advertisedDevinModels(modelOption, {
+            [currentValueOf(modelOption)]: response.configOptions ?? [],
+            [opts.modelId]: configOptions,
+          });
           if (models.length > 0) adapter.onDevinModels?.(models);
         }
       } else if (adapter) {
@@ -837,25 +864,17 @@ class AcpBackend implements AgentBackend {
           `Gemini ACP: no model configuration advertised; using the CLI default instead of ${opts.modelId}\n`,
         );
       }
-      if (opts.thinkingLevel !== undefined && opts.thinkingLevel !== 'off') {
-        const thinkingOption = response.configOptions?.find(
-          (option) =>
-            option.category === 'thought_level' ||
-            option.id === 'thought_level' ||
-            option.id === 'effort',
-        );
-        if (thinkingOption !== undefined) {
-          const supported = selectOptionValues(thinkingOption);
-          const candidates = THINKING_FALLBACKS[opts.thinkingLevel] ?? [opts.thinkingLevel];
-          const chosen = candidates.find((candidate) => supported.has(candidate));
-          if (chosen !== undefined) {
-            await connection.agent.request(methods.agent.session.setConfigOption, {
-              sessionId,
-              configId: thinkingOption.id,
-              value: chosen,
-            });
-          }
-        }
+      const thinkingOption = configOptions.find(isThoughtOption);
+      const thinkingValue =
+        opts.thinkingLevel === undefined || thinkingOption === undefined
+          ? undefined
+          : acpThoughtValue(opts.thinkingLevel, selectOptionValues(thinkingOption));
+      if (thinkingOption !== undefined && thinkingValue !== undefined) {
+        await connection.agent.request(methods.agent.session.setConfigOption, {
+          sessionId,
+          configId: thinkingOption.id,
+          value: thinkingValue,
+        });
       }
       const modes = 'modes' in response ? response.modes : null;
       if (policy !== 'normal') {

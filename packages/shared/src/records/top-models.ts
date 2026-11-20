@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { thinkingLevelSchema } from '../agent-backend.js';
+import { thinkingLevelSchema } from '../thinking-levels.js';
 import { modelRefSchema } from './model-source.js';
 
 export const topModelSchema = modelRefSchema.extend({

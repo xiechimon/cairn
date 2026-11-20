@@ -30,6 +30,7 @@ import {
   type StepPromptOrigin,
   type StepQueueBlocked,
   type TaskRequest,
+  type ThinkingLevel,
   type ThreadMessageContent,
   type ThreadReportContent,
   type TodoDeliverables,
@@ -730,6 +731,10 @@ export interface ModelOption {
   modelId: string;
   modelName: string;
   liveness?: 'alive' | 'dead' | 'unknown';
+  thinkingLevels?: readonly ThinkingLevel[];
+  thinkingDefault?: ThinkingLevel;
+  coordinatorThinkingLevels?: readonly ThinkingLevel[];
+  coordinatorThinkingDefault?: ThinkingLevel;
 }
 
 export interface ChiefContextUsage {

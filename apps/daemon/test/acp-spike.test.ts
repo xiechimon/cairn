@@ -457,15 +457,30 @@ describe('ACP spike with a real scripted stdio child', () => {
     expect(await collect(remoteOnlySession.events)).toContainEqual({ type: 'done', usage: [] });
   });
 
-  test('maps thinkingLevel onto thought_level configOptions and tolerates skills and absent thinking options', async () => {
-    const withThinking = await adapter('thinking').createSession({
-      ...opts,
-      thinkingLevel: 'xhigh',
-      skillsAllowlist: [],
-      injectedSkills: ['sample-skill'],
-    });
-    expect(await collect(withThinking.events)).toContainEqual({ type: 'done', usage: [] });
+  test.each([
+    ['max', 'max'],
+    ['xhigh', 'unset'],
+  ])(
+    'sets thinking %s from the selected model thought_level values, never a neighbour (expects %s)',
+    async (thinkingLevel, expected) => {
+      const backend = createAcpBackend({
+        harness: 'claude-code',
+        command: process.execPath,
+        args: [fixture, 'thinking', expected],
+        initializeTimeoutMs: 3_000,
+        cancelTimeoutMs: 100,
+      });
+      const session = await backend.createSession({
+        ...opts,
+        thinkingLevel,
+        skillsAllowlist: [],
+        injectedSkills: ['sample-skill'],
+      });
+      expect(await collect(session.events)).toContainEqual({ type: 'done', usage: [] });
+    },
+  );
 
+  test('tolerates an adapter without thinking options', async () => {
     const withoutThinking = await adapter('complete').createSession({
       ...opts,
       thinkingLevel: 'xhigh',

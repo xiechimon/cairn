@@ -214,8 +214,8 @@ test('adding, tuning and removing a frequently used model saves the whole list',
             providerLabel: 'domestic-proxy',
             installed: true,
             models: [
-              { id: 'glm-5.3', name: 'GLM-5.3' },
-              { id: 'claude-opus-5', name: 'Claude Opus 5' },
+              { id: 'glm-5.3', name: 'GLM-5.3', thinkingLevels: ['low', 'high', 'max'] },
+              { id: 'claude-opus-5', name: 'Claude Opus 5', thinkingLevels: [] },
             ],
           },
         ],
@@ -233,6 +233,7 @@ test('adding, tuning and removing a frequently used model saves the whole list',
   const row = card.getByTestId('frequent-model-row');
   await expect(row).toContainText('GLM-5.3');
   await row.locator('.frequent-model-level').click();
+  await expect(page.getByRole('option')).toHaveText(['Default', 'Low', 'High', 'Max']);
   await page.getByRole('option', { name: 'High', exact: true }).click();
   await expect
     .poll(() => puts.at(-1))
@@ -268,7 +269,12 @@ test('a stored Devin model shows available and the picker offers the Devin group
             hostname: 'exec-mac',
             machineId: 'm1',
             models: [
-              { id: 'swe-2-high', name: 'SWE-2' },
+              {
+                id: 'swe-2-high',
+                name: 'SWE-2',
+                thinkingLevels: ['medium', 'high', 'max'],
+                thinkingDefault: 'high',
+              },
               { id: 'swe-2-flash-medium', name: 'SWE-2 Flash' },
             ],
           },
@@ -282,7 +288,9 @@ test('a stored Devin model shows available and the picker offers the Devin group
   await expect(row).toHaveCount(1);
   await expect(row).toContainText('SWE-2');
   await expect(row).not.toHaveAttribute('data-unavailable', '');
-  await expect(row.locator('.frequent-model-level')).toHaveCount(0);
+  await row.locator('.frequent-model-level').click();
+  await expect(page.getByRole('option')).toHaveText(['Default (High)', 'Medium', 'High', 'Max']);
+  await page.keyboard.press('Escape');
   await card.getByTestId('frequent-models-add').click();
   const menu = page.locator('[data-slot="select-content"][aria-label="添加模型"]');
   await expect(menu.getByText('Devin', { exact: true })).toBeVisible();
@@ -293,4 +301,23 @@ test('a stored Devin model shows available and the picker offers the Devin group
       { provider: 'devin', modelId: 'swe-2-high', thinkingLevel: null },
       { provider: 'devin', modelId: 'swe-2-flash-medium', thinkingLevel: null },
     ]);
+  await expect(card.getByTestId('frequent-model-row').nth(1).locator('.frequent-model-level')).toHaveCount(0);
+});
+
+test('the Model page renders no thinking selector without a real choice and no cannot-do label (C25)', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/routing?scenario=routing-settings');
+  const settings = page.getByRole('dialog', { name: '设置' });
+  await expect(settings.getByTestId('frequent-model-row').first()).toBeVisible();
+  await expect(settings.getByText(/不可调|Fixed/)).toHaveCount(0);
+  const selectors = settings.locator('.frequent-model-level, .routing-rule-level-select');
+  const count = await selectors.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i += 1) {
+    await selectors.nth(i).click();
+    await expect(page.getByRole('option').nth(1)).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('option')).toHaveCount(0);
+  }
 });

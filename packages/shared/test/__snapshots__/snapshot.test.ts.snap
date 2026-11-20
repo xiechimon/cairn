@@ -2589,6 +2589,33 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "minLength": 1,
                 "type": "string",
               },
+              "inServerThinkingDefault": {
+                "enum": [
+                  "off",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max",
+                ],
+                "type": "string",
+              },
+              "inServerThinkingLevels": {
+                "items": {
+                  "enum": [
+                    "off",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                "type": "array",
+              },
               "liveness": {
                 "enum": [
                   "alive",
@@ -2603,6 +2630,33 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               },
               "slot": {
                 "type": "string",
+              },
+              "thinkingDefault": {
+                "enum": [
+                  "off",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max",
+                ],
+                "type": "string",
+              },
+              "thinkingLevels": {
+                "items": {
+                  "enum": [
+                    "off",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                "type": "array",
               },
             },
             "required": [
@@ -2766,6 +2820,33 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "minLength": 1,
                 "type": "string",
               },
+              "inServerThinkingDefault": {
+                "enum": [
+                  "off",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max",
+                ],
+                "type": "string",
+              },
+              "inServerThinkingLevels": {
+                "items": {
+                  "enum": [
+                    "off",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                "type": "array",
+              },
               "liveness": {
                 "enum": [
                   "alive",
@@ -2780,6 +2861,33 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               },
               "slot": {
                 "type": "string",
+              },
+              "thinkingDefault": {
+                "enum": [
+                  "off",
+                  "minimal",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max",
+                ],
+                "type": "string",
+              },
+              "thinkingLevels": {
+                "items": {
+                  "enum": [
+                    "off",
+                    "minimal",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max",
+                  ],
+                  "type": "string",
+                },
+                "type": "array",
               },
             },
             "required": [
@@ -11907,6 +12015,33 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                         "minLength": 1,
                         "type": "string",
                       },
+                      "thinkingDefault": {
+                        "enum": [
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                        ],
+                        "type": "string",
+                      },
+                      "thinkingLevels": {
+                        "items": {
+                          "enum": [
+                            "off",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max",
+                          ],
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
                     },
                     "required": [
                       "id",
@@ -12102,6 +12237,33 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                         "minLength": 1,
                         "type": "string",
                       },
+                      "inServerThinkingDefault": {
+                        "enum": [
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                        ],
+                        "type": "string",
+                      },
+                      "inServerThinkingLevels": {
+                        "items": {
+                          "enum": [
+                            "off",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max",
+                          ],
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
                       "liveness": {
                         "enum": [
                           "alive",
@@ -12116,6 +12278,33 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                       },
                       "slot": {
                         "type": "string",
+                      },
+                      "thinkingDefault": {
+                        "enum": [
+                          "off",
+                          "minimal",
+                          "low",
+                          "medium",
+                          "high",
+                          "xhigh",
+                          "max",
+                        ],
+                        "type": "string",
+                      },
+                      "thinkingLevels": {
+                        "items": {
+                          "enum": [
+                            "off",
+                            "minimal",
+                            "low",
+                            "medium",
+                            "high",
+                            "xhigh",
+                            "max",
+                          ],
+                          "type": "string",
+                        },
+                        "type": "array",
                       },
                     },
                     "required": [

@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 
 const scenario = process.argv[2] ?? 'complete';
+const expectedThinking = process.argv[3] === 'unset' ? null : (process.argv[3] ?? 'high');
 const devin = scenario.startsWith('devin');
 const gate = scenario.endsWith('gate');
 const ask = scenario === 'ask-gate';
@@ -263,11 +264,32 @@ for await (const line of createInterface({ input: process.stdin })) {
     } else if (params.configId === 'thought_level') {
       configuredThinking = params.value;
     }
-    send({ id, result: { configOptions: [] } });
+    send({
+      id,
+      result: {
+        configOptions:
+          scenario === 'thinking' && params.configId === 'model'
+            ? [
+                {
+                  id: 'thought_level',
+                  name: 'Thinking',
+                  category: 'thought_level',
+                  type: 'select',
+                  currentValue: 'high',
+                  options: [
+                    { value: 'low', name: 'Low' },
+                    { value: 'high', name: 'High' },
+                    { value: 'max', name: 'Max' },
+                  ],
+                },
+              ]
+            : [],
+      },
+    });
   } else if (method === 'session/prompt') {
     if (!configuredModel) throw new Error('Model was not configured before prompting');
-    if (scenario === 'thinking' && configuredThinking !== 'high') {
-      throw new Error(`Expected thinking high, got ${configuredThinking}`);
+    if (scenario === 'thinking' && configuredThinking !== expectedThinking) {
+      throw new Error(`Expected thinking ${expectedThinking}, got ${configuredThinking}`);
     }
     const text = params.prompt.find((block) => block.type === 'text')?.text ?? '';
     if (scenario === 'devin-steer' && text.includes('steer-now')) {

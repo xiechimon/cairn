@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { thinkingLevelSchema } from '../agent-backend.js';
+import { thinkingLevelSchema } from '../thinking-levels.js';
 import { FALLBACK_MODELS_MAX } from './agent.js';
 import { epochMs, recordId } from './common.js';
 import { type RunnerOs, requiredCapabilitiesSchema } from './machine-capabilities.js';

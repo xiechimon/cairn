@@ -2,8 +2,8 @@ import { hostname } from 'node:os';
 import { modelSourcesEnvelopeSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { builtinModelIds } from '../src/coordinator/runtime/provider.js';
-import { getModelSources } from '../src/services/providers.js';
-import { bootServer, issueApiKey, req, type TestServer } from './helpers.js';
+import { createProvider, getModelSources, type ProviderBody } from '../src/services/providers.js';
+import { bootServer, insertMachine, issueApiKey, req, type TestServer } from './helpers.js';
 
 function modelSourcesPath(s: TestServer): string {
   return `/api/teams/${s.team.id}/model-sources`;
@@ -93,8 +93,20 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
       ['deepseek', 'DeepSeek'],
     ]);
     expect(pi[0]?.models).toEqual([
-      { id: 'model-a', name: '模型甲', liveness: 'unknown' },
-      { id: 'model-b', name: '模型乙', liveness: 'unknown' },
+      {
+        id: 'model-a',
+        name: '模型甲',
+        liveness: 'unknown',
+        thinkingLevels: [],
+        inServerThinkingLevels: [],
+      },
+      {
+        id: 'model-b',
+        name: '模型乙',
+        liveness: 'unknown',
+        thinkingLevels: [],
+        inServerThinkingLevels: [],
+      },
     ]);
     expect(pi[1]?.models.map((m) => m.id)).toEqual(['model-a']);
     expect(pi[2]?.models.map((m) => m.id)).toEqual([...builtinModelIds('deepseek')]);
@@ -111,7 +123,7 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
     const cc = env.sources.find((src) => src.runtime === 'claude-code');
     expect(cc?.hostname).toBe('exec-host-1');
     expect(cc?.installed).toBe(true);
-    expect(cc?.models).toEqual([{ id: 'exec-model', name: 'exec-model' }]);
+    expect(cc?.models).toEqual([{ id: 'exec-model', name: 'exec-model', thinkingLevels: [] }]);
     s.dispose();
   });
 
@@ -201,7 +213,7 @@ describe('getModelSources (service layer, aggregated per machine)', () => {
     await enroll(s, 'exec-1', report('exec-host-1', [{ id: 'm-early', name: 'm-early' }]));
     const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
     const cc = env.sources.find((src) => src.runtime === 'claude-code');
-    expect(cc?.models).toEqual([{ id: 'm-early', name: 'm-early' }]);
+    expect(cc?.models).toEqual([{ id: 'm-early', name: 'm-early', thinkingLevels: [] }]);
     s.dispose();
   });
 });
@@ -233,6 +245,129 @@ describe('GET /api/teams/:id/model-sources (route surface)', () => {
     const cc = body.sources.find((src) => src.runtime === 'claude-code');
     expect(cc?.installed).toBe(true);
     expect(cc?.hostname).toBe('exec-host-1');
+    s.dispose();
+  });
+});
+
+describe('thinking levels per model', () => {
+  const levelsOf = (
+    env: ReturnType<typeof getModelSources>,
+    runtime: string,
+    provider?: string,
+  ): Record<
+    string,
+    { task?: string[]; taskDefault?: string; inServer?: string[]; inServerDefault?: string }
+  > =>
+    Object.fromEntries(
+      env.sources
+        .filter(
+          (src) => src.runtime === runtime && (provider === undefined || src.provider === provider),
+        )
+        .flatMap((src) => src.models)
+        .map((m) => [
+          m.id,
+          Object.fromEntries(
+            Object.entries({
+              task: m.thinkingLevels,
+              taskDefault: m.thinkingDefault,
+              inServer: m.inServerThinkingLevels,
+              inServerDefault: m.inServerThinkingDefault,
+            }).filter(([, v]) => v !== undefined),
+          ),
+        ]),
+    );
+
+  test('each model lists only the levels its backend tells apart, and Devin models keep the levels a Runner learned', () => {
+    const s = bootServer();
+    const bodies: ProviderBody[] = [
+      {
+        providerId: 'anthropic',
+        label: 'Anthropic',
+        baseUrl: 'https://api.anthropic.com',
+        api: 'anthropic-messages',
+        models: [{ id: 'claude-opus-5-5', name: 'Opus' }],
+      },
+      {
+        providerId: 'deepseek',
+        label: 'DeepSeek',
+        baseUrl: 'https://api.deepseek.com/v1',
+        api: 'openai-completions',
+        models: [{ id: 'deepseek-v4-pro', name: 'V4 Pro' }],
+      },
+      {
+        providerId: 'openai-codex',
+        label: 'Codex',
+        baseUrl: 'https://chatgpt.com/backend-api',
+        api: 'openai-responses',
+        models: [{ id: 'gpt-6-sol', name: 'Sol' }],
+      },
+      {
+        providerId: 'relay',
+        label: 'Relay',
+        baseUrl: 'https://relay.example.com/v1',
+        api: 'openai-completions',
+        models: [{ id: 'glm-5.3', name: 'GLM' }],
+      },
+    ];
+    for (const body of bodies) {
+      createProvider({ db: s.db, box: s.secretBox }, { teamId: s.team.id, createdBy: 'u', body });
+    }
+    insertMachine(s, {
+      name: 'mac',
+      claudeCodeReport: {
+        installed: true,
+        hostname: 'mac',
+        models: [
+          { id: 'claude-opus-5-5', name: 'claude-opus-5-5' },
+          { id: 'claude-haiku-4-5', name: 'claude-haiku-4-5' },
+          { id: 'deepseek-v4-pro', name: 'deepseek-v4-pro' },
+        ],
+      },
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        devin: {
+          installed: true,
+          models: [
+            { id: 'swe-2-high', name: 'SWE-2' },
+            {
+              id: 'claude-opus-5-5-medium',
+              name: 'Opus via Devin',
+              thinkingLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+            },
+            { id: 'gpt-6-sol-medium', name: 'GPT via Devin' },
+          ],
+        },
+      },
+    });
+    const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
+    expect(modelSourcesEnvelopeSchema.safeParse(env).success).toBe(true);
+    const claude = ['low', 'medium', 'high', 'xhigh', 'max'];
+    expect(levelsOf(env, 'claude-code')).toEqual({
+      'claude-opus-5-5': { task: claude, taskDefault: 'medium' },
+      'claude-haiku-4-5': { task: [] },
+      'deepseek-v4-pro': { task: [] },
+    });
+    expect(levelsOf(env, 'pi', 'anthropic')).toEqual({
+      'claude-opus-5-5': { task: claude, taskDefault: 'medium', inServer: [] },
+    });
+    expect(levelsOf(env, 'pi', 'deepseek')).toEqual({
+      'deepseek-v4-pro': { task: ['off', 'high', 'max'], taskDefault: 'high', inServer: [] },
+    });
+    expect(levelsOf(env, 'pi', 'openai-codex')).toEqual({
+      'gpt-6-sol': {
+        task: ['off', 'low', 'medium', 'high', 'xhigh', 'max'],
+        taskDefault: 'medium',
+        inServer: ['low', 'medium', 'high', 'xhigh', 'max'],
+        inServerDefault: 'off',
+      },
+    });
+    expect(levelsOf(env, 'pi', 'relay')).toEqual({ 'glm-5.3': { task: [], inServer: [] } });
+    expect(levelsOf(env, 'devin')).toEqual({
+      'swe-2-high': { task: ['medium', 'high', 'max'], taskDefault: 'high' },
+      'claude-opus-5-5-medium': { task: claude },
+      'gpt-6-sol-medium': {},
+    });
     s.dispose();
   });
 });

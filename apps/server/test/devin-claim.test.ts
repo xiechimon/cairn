@@ -327,9 +327,21 @@ describe('model sources', () => {
     s.db.update(machineTable).set({ online: false }).where(eq(machineTable.id, offline)).run();
     insertMachine(s, { name: 'no-devin' });
     const statics = [
-      { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },
-      { id: 'swe-2-flash-medium', name: 'SWE-2 Flash', slot: 'builtin' },
-      { id: 'adaptive', name: 'Adaptive', slot: 'builtin' },
+      {
+        id: 'swe-2-high',
+        name: 'SWE-2',
+        slot: 'builtin',
+        thinkingLevels: ['medium', 'high', 'max'],
+        thinkingDefault: 'high',
+      },
+      {
+        id: 'swe-2-flash-medium',
+        name: 'SWE-2 Flash',
+        slot: 'builtin',
+        thinkingLevels: ['medium', 'high', 'max'],
+        thinkingDefault: 'medium',
+      },
+      { id: 'adaptive', name: 'Adaptive', slot: 'builtin', thinkingLevels: [] },
     ];
     expect(listDevinSources(s.db, s.team.id)).toEqual([
       {
@@ -399,7 +411,12 @@ describe('model sources', () => {
         models: [
           { id: 'swe-3', name: 'SWE-3' },
           { id: 'gpt-5.5', name: 'GPT-5.5' },
-          { id: 'swe-2-high', name: 'SWE-2' },
+          {
+            id: 'swe-2-high',
+            name: 'SWE-2',
+            thinkingLevels: ['medium', 'high', 'max'],
+            thinkingDefault: 'high',
+          },
         ],
       },
     ]);
@@ -418,9 +435,21 @@ describe('model sources', () => {
         hostname: 'devin-empty',
         machineId,
         models: [
-          { id: 'swe-2-high', name: 'SWE-2', slot: 'builtin' },
-          { id: 'swe-2-flash-medium', name: 'SWE-2 Flash', slot: 'builtin' },
-          { id: 'adaptive', name: 'Adaptive', slot: 'builtin' },
+          {
+            id: 'swe-2-high',
+            name: 'SWE-2',
+            slot: 'builtin',
+            thinkingLevels: ['medium', 'high', 'max'],
+            thinkingDefault: 'high',
+          },
+          {
+            id: 'swe-2-flash-medium',
+            name: 'SWE-2 Flash',
+            slot: 'builtin',
+            thinkingLevels: ['medium', 'high', 'max'],
+            thinkingDefault: 'medium',
+          },
+          { id: 'adaptive', name: 'Adaptive', slot: 'builtin', thinkingLevels: [] },
         ],
       },
     ]);
@@ -462,7 +491,12 @@ describe('model sources', () => {
         models: [
           { id: 'swe-3', name: 'SWE-3 picked' },
           { id: 'gpt-5.5', name: 'GPT-5.5' },
-          { id: 'swe-2-high', name: 'SWE-2' },
+          {
+            id: 'swe-2-high',
+            name: 'SWE-2',
+            thinkingLevels: ['medium', 'high', 'max'],
+            thinkingDefault: 'high',
+          },
         ],
       },
     ]);
@@ -500,7 +534,14 @@ describe('model sources', () => {
         installed: true,
         hostname: 'devin-plain',
         machineId,
-        models: [{ id: 'swe-2-high', name: 'SWE-2' }],
+        models: [
+          {
+            id: 'swe-2-high',
+            name: 'SWE-2',
+            thinkingLevels: ['medium', 'high', 'max'],
+            thinkingDefault: 'high',
+          },
+        ],
       },
     ]);
   });

@@ -1,10 +1,19 @@
-import { type ProviderConfig, resolveModelInput } from '@cairn/shared';
+import {
+  distinctThinkingLevels,
+  type ProviderConfig,
+  resolveModelInput,
+  type ThinkingLevel,
+} from '@cairn/shared';
 import type { Api, Model, Provider, ProviderStreams } from '@earendil-works/pi-ai';
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy';
 import { openAICodexResponsesApi } from '@earendil-works/pi-ai/api/openai-codex-responses.lazy';
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
 import { openAIResponsesApi } from '@earendil-works/pi-ai/api/openai-responses.lazy';
-import { createProvider } from '@earendil-works/pi-ai/models';
+import {
+  clampThinkingLevel,
+  createProvider,
+  getSupportedThinkingLevels,
+} from '@earendil-works/pi-ai/models';
 import {
   type BuiltinProvider,
   getBuiltinModels,
@@ -41,12 +50,57 @@ export function catalogContextWindow(providerId: string, modelId: string): numbe
   );
 }
 
+function catalogModel(
+  providerId: string,
+  modelId: string,
+  subscription: boolean,
+): Model<Api> | undefined {
+  const catalogId = subscription ? CODEX_PROVIDER_ID : providerId;
+  return isBuiltinProvider(catalogId)
+    ? getBuiltinModels(catalogId).find((model) => model.id === modelId)
+    : undefined;
+}
+
+function isCodexSubscription(config: Pick<ProviderConfig, 'providerId' | 'baseUrl'>): boolean {
+  return (
+    config.providerId === CODEX_PROVIDER_ID &&
+    (!config.baseUrl || config.baseUrl === CODEX_BASE_URL)
+  );
+}
+
+function catalogThinkingLevels(entry: Model<Api> | undefined): ThinkingLevel[] {
+  if (entry?.reasoning !== true) return [];
+  return distinctThinkingLevels(getSupportedThinkingLevels(entry), entry.thinkingLevelMap ?? {});
+}
+
+const RUNNER_DEFAULT_THINKING: ThinkingLevel = 'medium';
+
+export interface ThinkingChoice {
+  levels: ThinkingLevel[];
+  resolvesTo?: ThinkingLevel;
+}
+
+export function piThinking(providerId: string, modelId: string): ThinkingChoice {
+  const entry = catalogModel(providerId, modelId, false);
+  const levels = catalogThinkingLevels(entry);
+  if (entry === undefined || levels.length === 0) return { levels };
+  return { levels, resolvesTo: clampThinkingLevel(entry, RUNNER_DEFAULT_THINKING) };
+}
+
+export function inServerThinking(
+  config: Pick<ProviderConfig, 'providerId' | 'baseUrl'>,
+  modelId: string,
+): ThinkingChoice {
+  if (!isCodexSubscription(config)) return { levels: [] };
+  const entry = catalogModel(config.providerId, modelId, true);
+  const levels = catalogThinkingLevels(entry).filter((level) => level !== 'off');
+  return entry?.thinkingLevelMap?.off === null ? { levels } : { levels, resolvesTo: 'off' };
+}
+
 export type KeyResolver = () => string | null | Promise<string | null>;
 
 export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): Provider | null {
-  const subscription =
-    config.providerId === CODEX_PROVIDER_ID &&
-    (!config.baseUrl || config.baseUrl === CODEX_BASE_URL);
+  const subscription = isCodexSubscription(config);
   const api = subscription ? CODEX_API : config.api;
   const streams = api === undefined ? undefined : STREAMS[api];
   const baseUrl = subscription ? CODEX_BASE_URL : config.baseUrl;
@@ -61,7 +115,7 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
     cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     reasoning: subscription,
     thinkingLevelMap: subscription
-      ? getBuiltinModels(CODEX_PROVIDER_ID).find((model) => model.id === m.id)?.thinkingLevelMap
+      ? catalogModel(config.providerId, m.id, true)?.thinkingLevelMap
       : undefined,
     contextWindow: m.contextWindow ?? catalogContextWindow(config.providerId, m.id),
     maxTokens: m.maxTokens ?? DEFAULT_MAX_TOKENS,

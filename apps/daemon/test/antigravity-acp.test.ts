@@ -49,7 +49,7 @@ describe('antigravity ACP runtime and credentials', () => {
         '    send({ id: msg.id, result: {} });',
         '  } else if (msg.method === "session/set_config_option") {',
         '    if (msg.params.configId === "thought_level") selectedThinking = msg.params.value;',
-        '    send({ id: msg.id, result: { configOptions: [] } });',
+        '    send({ id: msg.id, result: { configOptions: [{ id: "thought_level", name: "Thought Level", category: "thought_level", type: "select", currentValue: "medium", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }] }] } });',
         '  } else if (msg.method === "session/prompt") {',
         '    send({ method: "session/update", params: { sessionId: "ag-1", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: currentMode + ":" + selectedThinking } } } });',
         '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
