@@ -1187,6 +1187,13 @@ body:has([data-testid="chief-body"]),
   line-height: 16px;
 }
 
+.tray-head-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .tray-head-meta {
   display: flex;
   flex: none;

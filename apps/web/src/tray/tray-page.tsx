@@ -1,7 +1,7 @@
 import type { DesktopRunnerState, DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
-import { ChartColumn, Coffee, Laptop, Search, Settings, SquarePen } from 'lucide-react';
+import { ChartColumn, Coffee, Laptop, Settings } from 'lucide-react';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -18,6 +18,7 @@ import { useDailyUsage } from '../api/usage-daily.js';
 import { tasksFromQuery } from '../board/tasks-sections.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
+import { MachineIcon } from '../components/machine-label.js';
 import { StatusGlyph } from '../components/status-glyph.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
@@ -175,39 +176,6 @@ export function TrayPage() {
       style={accent as CSSProperties}
       onKeyDown={(event) => moveFocus(event, () => bridge?.hide())}
     >
-      <div className="tray-row">
-        <Button
-          variant="ghost"
-          data-testid="tray-new-task"
-          className="tray-tile"
-          onClick={() => open({ kind: 'command', command: 'new-task' })}
-        >
-          <SquarePen className="size-5" aria-hidden="true" />
-          <span className="min-w-0">
-            <span className="tray-tile-title">{t('新任务')}</span>
-            {state?.newTaskKey != null && <span className="tray-tile-sub">{state.newTaskKey}</span>}
-          </span>
-        </Button>
-        <Button
-          variant="ghost"
-          className="tray-disc"
-          title={t('打开 Cairn')}
-          aria-label={t('打开 Cairn')}
-          onClick={() => open({ kind: 'path', path: '/app' })}
-        >
-          <BrandGlyph className="size-5" />
-        </Button>
-        <Button
-          variant="ghost"
-          className="tray-disc"
-          title={t('搜索')}
-          aria-label={t('搜索')}
-          onClick={() => open({ kind: 'command', command: 'search' })}
-        >
-          <Search className="size-5" aria-hidden="true" />
-        </Button>
-      </div>
-
       <div data-testid="tray-rows" className="flex flex-col">
         <TrayItem
           glyph={<BrandGlyph className="size-4" />}
@@ -218,8 +186,13 @@ export function TrayPage() {
         {groups.map((group) => (
           <section key={group.key} aria-label={t(group.label)} className="flex flex-col">
             <h2 className="tray-head">
-              <span className="min-w-0 truncate">
-                {group.literal ? group.label : t(group.label)}
+              <span className="tray-head-name">
+                {group.os !== undefined && (
+                  <MachineIcon machine={{ capabilities: group.os }} className="size-3" />
+                )}
+                <span className="min-w-0 truncate">
+                  {group.literal ? group.label : t(group.label)}
+                </span>
               </span>
               {group.meta !== undefined && (
                 <TrayHeadMeta meta={group.meta} tip={say(group.meta.tip)} />

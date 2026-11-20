@@ -123,6 +123,29 @@ test('a running task on a computer leaves the 进行中 group, and a long list e
   expect(rows.at(-1)?.note).toEqual({ key: '还有 {n} 个，在 Cairn 里看', vars: { n: 2 } });
 });
 
+test('a computer group carries the machine OS for the header icon', () => {
+  const groups = trayGroups(
+    { questions: [], entries: [] },
+    [
+      machine({
+        running: [thread('t', 0)],
+        capabilities: {
+          osPlatform: 'linux',
+          osDistribution: 'arch',
+        } as TrayMachine['capabilities'],
+      }),
+    ],
+    0,
+  );
+  expect(groups[0]?.os).toEqual({ osPlatform: 'linux', osDistribution: 'arch' });
+  const bare = trayGroups(
+    { questions: [], entries: [] },
+    [machine({ running: [thread('t', 0)] })],
+    0,
+  );
+  expect(bare[0]?.os).toBeNull();
+});
+
 test('an idle computer shows only when strained, with a pressure percent and level in the header', () => {
   const hardware = { cpuCores: 10, memoryTotalMb: 16_384, memoryAvailableMb: 1_024, loadAvg1: 2, loadAvg5: 7, diskFreeMb: 2_048 };
   const groups = trayGroups(

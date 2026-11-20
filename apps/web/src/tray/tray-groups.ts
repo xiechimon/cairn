@@ -2,6 +2,7 @@ import {
   type ClaudeSubscriptionListEntry,
   type DailyUsage,
   isStalled,
+  type MachineCapabilities,
   type MachineQueuedThread,
   type MachineRecord,
   type MachineRunningThread,
@@ -45,6 +46,7 @@ export interface TrayGroup {
   key: string;
   label: string;
   literal?: boolean;
+  os?: Pick<MachineCapabilities, 'osPlatform' | 'osDistribution'> | null;
   meta?: { percent: number; level: TrayMetaLevel; warn: boolean; tip: TrayText };
   rows: TrayRow[];
 }
@@ -176,6 +178,7 @@ function machineGroup(machine: TrayMachine, now: number): TrayGroup | null {
     key: `machine:${machine.id}`,
     label: machine.name,
     literal: true,
+    os: machine.capabilities,
     meta: machineMeta(machine),
     rows,
   };

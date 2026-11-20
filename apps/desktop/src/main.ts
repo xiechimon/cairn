@@ -83,7 +83,6 @@ const UPDATE_FIRST_CHECK_MS = 10_000;
 const UPDATE_CHECK_EVERY_MS = 60 * 60 * 1000;
 const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
 const NEW_TASK_SHORTCUT = 'Control+Alt+N';
-const NEW_TASK_SHORTCUT_LABEL = '⌃⌥N';
 const TRAY_FIRST_HEIGHT = 440;
 const TRAY_MAX_HEIGHT = 900;
 const TRAY_REFRESH_MS = 2_000;
@@ -424,18 +423,13 @@ function showTray(origin: string, controls: TrayControls): Tray {
     wakeAhead.start();
     powerMonitor.on('resume', () => void wakeAhead.pollNow());
   }
-  const newTaskKey = globalShortcut.register(NEW_TASK_SHORTCUT, () =>
-    sendToWindow('desktop-menu', 'new-task'),
-  )
-    ? NEW_TASK_SHORTCUT_LABEL
-    : null;
+  globalShortcut.register(NEW_TASK_SHORTCUT, () => sendToWindow('desktop-menu', 'new-task'));
   let popover: BrowserWindow | null = null;
   let height = TRAY_FIRST_HEIGHT;
   let hiddenAt = 0;
   const state = (): DesktopTrayState => ({
     runner: controls.runner(),
     keepAwake: keepAwake.isOn(),
-    newTaskKey,
     accent: systemAccent(),
   });
   const publish = (): void => {

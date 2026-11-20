@@ -108,7 +108,7 @@ try {
       trayShotPath,
     ]);
   }
-  await tray.locator('[data-testid="tray-new-task"]').focus();
+  await tray.locator('[data-testid="tray-quit"]').focus();
   await tray.keyboard.press('Escape');
   await tray.waitForTimeout(500);
   const afterEscape = await app.evaluate(({ BrowserWindow }) =>

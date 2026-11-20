@@ -16,7 +16,6 @@ export type DesktopRunnerState = 'starting' | 'on' | 'off' | 'failed';
 export interface DesktopTrayState {
   runner: DesktopRunnerState;
   keepAwake: boolean;
-  newTaskKey: string | null;
   accent: string | null;
 }
 
