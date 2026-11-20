@@ -86,6 +86,12 @@ const ATTACHMENT_TYPES: Readonly<Record<string, AttachmentTypeEntry>> = {
     inline: true,
   },
   m4a: { kind: 'download', mime: 'audio/mp4', extraMimes: ['audio/x-m4a'], inline: true },
+  ogg: {
+    kind: 'download',
+    mime: 'audio/ogg',
+    extraMimes: ['video/ogg', 'application/ogg'],
+    inline: true,
+  },
   xlsx: {
     kind: 'download',
     mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

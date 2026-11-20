@@ -35,6 +35,21 @@ describe('attachment type allowlist', () => {
     expect(ATTACHMENT_ACCEPT.split(',')).toContain(`.${ext}`);
   });
 
+  test.each([
+    ['clip.mp4', 'video/mp4'],
+    ['clip.webm', 'video/webm'],
+    ['clip.mov', 'video/quicktime'],
+    ['voice.mp3', 'audio/mpeg'],
+    ['voice.m4a', 'audio/mp4'],
+    ['voice.wav', 'audio/wav'],
+    ['voice.ogg', 'audio/ogg'],
+  ])('%s uploads with %s and plays inline', (name, mime) => {
+    expect(resolveAttachmentMime(name, mime)).toBe(mime);
+    expect(resolveAttachmentMime(name, 'application/octet-stream')).toBe(mime);
+    expect(ATTACHMENT_ACCEPT.split(',')).toContain(`.${attachmentExtOf(name)}`);
+    expect(isInlineAttachment(name, servedAttachmentMime(name))).toBe(true);
+  });
+
   test.each(['exe', 'bin', 'dll', 'xlsm', 'jar', 'app', '', 'constructor'])(
     '%s is rejected',
     (ext) => {

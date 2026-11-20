@@ -61,7 +61,7 @@ const TEXT_EXTS = new Set([
 ]);
 
 const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm']);
-const AUDIO_EXTS = new Set(['mp3', 'wav', 'm4a']);
+const AUDIO_EXTS = new Set(['mp3', 'wav', 'm4a', 'ogg']);
 const DOCUMENT_EXTS = new Set(['docx', 'pptx', 'xlsx']);
 
 export function fileExtOf(name: string): string {
