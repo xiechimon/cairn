@@ -3,6 +3,7 @@ import { ATTACHMENT_TOKEN_LINE, renderAttachmentTokensToLabels } from '../attach
 import { replyQuoteText } from '../reply-quote.js';
 import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
+import { designCommentIdsSchema } from './design.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
 import { contextCacheSchema } from './token-usage.js';
 
@@ -192,6 +193,7 @@ export const chiefSendMessageBodySchema = z.object({
   projectId: z.string().min(1).nullish(),
   clientMessageId: z.string().min(1).max(200),
   mode: z.literal('queue').optional(),
+  designCommentIds: designCommentIdsSchema.optional(),
 });
 export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
 

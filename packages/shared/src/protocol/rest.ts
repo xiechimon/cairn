@@ -177,6 +177,41 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
     path: '/api/attachments/{id}/document-preview',
     note: 'docx, pptx, xlsx text sections (borrowed from Open Design)',
   },
+  {
+    method: 'GET',
+    path: '/api/todos/{id}/design/{fileName}/comments',
+    note: 'all statuses, by pin',
+  },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/design/comments',
+    note: 'body {versionId, viewport, note, target fields, markAttachmentId?}; inserts an open comment with the next pin',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/todos/{id}/design/comments/{commentId}',
+    note: 'body {note?} on an open comment, {status: resolved|open} to resolve or reopen; 409 otherwise',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/todos/{id}/design/comments/{commentId}',
+    note: 'open comments only; 409 once sent',
+  },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/design/marks',
+    note: 'body {pngBase64}; stores the baked mark-up PNG as a design-scope attachment',
+  },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/design/{fileName}/share',
+    note: 'returns the live share link through the relay or creates one; 409 relay-missing without a relay',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/todos/{id}/design/{fileName}/share',
+    note: 'revokes the live link',
+  },
   { method: 'POST', path: '/api/projects/{id}/archive', note: 'sets project.archivedAt' },
   { method: 'POST', path: '/api/projects/{id}/unarchive', note: 'clears project.archivedAt' },
   { method: 'GET', path: '/api/builds/{id}' },

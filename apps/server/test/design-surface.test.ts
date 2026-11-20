@@ -1,12 +1,27 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { DesignPageRecord, DesignVersionRecord } from '@cairn/shared';
-import { sql } from 'drizzle-orm';
+import type {
+  DesignCommentRecord,
+  DesignPageRecord,
+  DesignShareRecord,
+  DesignVersionRecord,
+} from '@cairn/shared';
+import { eq, sql } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { prepareFileAttachment } from '../../daemon/src/attach-file.js';
-import { attachment, build, designVersion, machine, message, step } from '../src/db/schema.js';
+import {
+  attachment,
+  build,
+  chiefMessage,
+  designVersion,
+  machine,
+  message,
+  steerPending,
+  step,
+  todo,
+} from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
-import { bootServer, postProject, req } from './helpers.js';
+import { bootServer, postProject, req, seedRoute } from './helpers.js';
 
 async function world() {
   const s = bootServer();
@@ -231,4 +246,107 @@ test('a Word file opens as its paragraphs', async () => {
     kind: 'document',
     sections: [{ lines: ['Launch plan', 'Ship & measure'] }],
   });
+});
+
+const target = {
+  elementId: 'hero',
+  selector: '[data-od-id="hero"]',
+  label: 'h1',
+  text: 'Two',
+  htmlHint: '<h1 data-od-id="hero">',
+  position: { x: 0, y: 0, width: 300, height: 40 },
+  style: { color: 'rgb(0, 0, 0)' },
+};
+
+test('comments save, edit, delete and resolve; sending puts the notes in the Coordinator message and the task once', async () => {
+  const { s, task, attachHtml, pages } = await world();
+  await attachHtml('<h1 data-od-id="hero">Two</h1>');
+  s.db
+    .update(todo)
+    .set({ latestBuildId: 'b1', phase: 'building' })
+    .where(eq(todo.id, task.id))
+    .run();
+  seedRoute(s, 'coordinator', {
+    id: 'agent-coordinator',
+    provider: 'stub-gw',
+    modelId: 'stub-model',
+  });
+  const versionId = (await pages()).pages[0]?.current.id;
+  const create = (note: string) =>
+    req(s.app, 'POST', `/api/todos/${task.id}/design/comments`, {
+      ...target,
+      versionId,
+      viewport: 'desktop',
+      note,
+    });
+  const first = (await (await create('Make the title larger')).json()) as DesignCommentRecord;
+  const second = (await (await create('Drop this')).json()) as DesignCommentRecord;
+  expect([first.pin, second.pin, first.status]).toEqual([1, 2, 'open']);
+  const edited = await req(s.app, 'PATCH', `/api/todos/${task.id}/design/comments/${first.id}`, {
+    note: 'Make the title 48px',
+  });
+  expect(await edited.json()).toMatchObject({ note: 'Make the title 48px' });
+  expect(
+    (await req(s.app, 'DELETE', `/api/todos/${task.id}/design/comments/${second.id}`)).status,
+  ).toBe(200);
+
+  const send = {
+    content: 'Please fix the page',
+    clientMessageId: 'design-send-1',
+    designCommentIds: [first.id],
+  };
+  const sent = await req(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, send);
+  expect(sent.status).toBe(201);
+  const again = await req(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, send);
+  expect(again.status).toBe(201);
+  const ownerMessages = s.db
+    .select()
+    .from(chiefMessage)
+    .all()
+    .filter((m) => m.role === 'user' && String(m.content).includes('Make the title 48px'));
+  expect(ownerMessages).toHaveLength(1);
+  const steers = s.db
+    .select()
+    .from(steerPending)
+    .all()
+    .filter((m) => String(m.content).includes('Make the title 48px'));
+  expect(steers).toHaveLength(1);
+  expect(String(steers[0]?.content)).toContain('[data-od-id="hero"]');
+
+  const comments = (await (
+    await req(s.app, 'GET', `/api/todos/${task.id}/design/index.html/comments`)
+  ).json()) as DesignCommentRecord[];
+  expect(comments.map((c) => [c.pin, c.status])).toEqual([[1, 'sent']]);
+  expect(
+    (await req(s.app, 'DELETE', `/api/todos/${task.id}/design/comments/${first.id}`)).status,
+  ).toBe(409);
+  const resolved = await req(s.app, 'PATCH', `/api/todos/${task.id}/design/comments/${first.id}`, {
+    status: 'resolved',
+  });
+  expect(await resolved.json()).toMatchObject({ status: 'resolved' });
+});
+
+test('share needs a relay; with one the link serves the current version until it is stopped', async () => {
+  const { s, task, attachHtml } = await world();
+  await attachHtml('<h1>Shared</h1>');
+  const refused = await req(s.app, 'POST', `/api/todos/${task.id}/design/index.html/share`);
+  expect(refused.status).toBe(409);
+  process.env.CAIRN_RELAY_ORIGIN = 'https://relay.example.test';
+  try {
+    const created = (await (
+      await req(s.app, 'POST', `/api/todos/${task.id}/design/index.html/share`)
+    ).json()) as DesignShareRecord;
+    expect(created.path).toBe(`https://relay.example.test/s/${created.token}`);
+    await attachHtml('<h1>Shared v2</h1>');
+    const page = await s.app.request(`/s/${created.token}`);
+    expect(page.status).toBe(200);
+    expect(page.headers.get('content-security-policy')).toBe(
+      'sandbox allow-scripts allow-forms allow-downloads',
+    );
+    expect(await page.text()).toContain('Shared v2');
+    await req(s.app, 'DELETE', `/api/todos/${task.id}/design/index.html/share`);
+    expect((await s.app.request(`/s/${created.token}`)).status).toBe(404);
+  } finally {
+    delete process.env.CAIRN_RELAY_ORIGIN;
+  }
 });

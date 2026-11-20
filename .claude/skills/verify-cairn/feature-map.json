@@ -2055,7 +2055,9 @@
       "code": {
         "server": [
           "apps/server/src/routes-design.ts",
-          "apps/server/src/services/design.ts"
+          "apps/server/src/services/design.ts",
+          "apps/server/src/services/design-comments.ts",
+          "apps/server/src/routes-design-share.ts"
         ],
         "other": [
           "packages/shared/src/records/design.ts"
@@ -2066,7 +2068,13 @@
           "/api/todos/:id/design",
           "/api/todos/:id/design/:fileName/versions",
           "/api/todos/:id/design/versions/:versionId/restore",
-          "/api/design/versions/:versionId/page"
+          "/api/design/versions/:versionId/page",
+          "/api/todos/:id/design/:fileName/comments",
+          "/api/todos/:id/design/comments",
+          "/api/todos/:id/design/comments/:commentId",
+          "/api/todos/:id/design/marks",
+          "/api/todos/:id/design/:fileName/share",
+          "/s/:token"
         ]
       },
       "reach": [

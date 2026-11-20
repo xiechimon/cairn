@@ -1,5 +1,6 @@
 import {
   buildSteerBodySchema,
+  type ChiefSendMessageBody,
   chiefMessageEditBodySchema,
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
@@ -41,6 +42,7 @@ import {
 } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
+import { sendDesignComments } from './services/design-comments.js';
 import { isChiefConversation } from './services/machines.js';
 import {
   cancelQueuedMessage,
@@ -48,6 +50,17 @@ import {
   editQueuedMessage,
   queueTaskMessage,
 } from './services/task-message-queue.js';
+
+function sendFromComposer(
+  deps: Parameters<typeof sendDesignComments>[0],
+  teamId: string,
+  body: ChiefSendMessageBody,
+): ReturnType<typeof sendDesignComments> {
+  const { designCommentIds, ...rest } = body;
+  if (designCommentIds === undefined)
+    return Promise.resolve(sendChiefMessageFromComposer(deps, teamId, rest));
+  return sendDesignComments(deps, teamId, { ...rest, designCommentIds });
+}
 
 export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -103,6 +116,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       projectId?: unknown;
       clientMessageId?: unknown;
       mode?: unknown;
+      designCommentIds?: unknown;
     };
     const body = parseWith(
       chiefSendMessageBodySchema,
@@ -112,10 +126,11 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         projectId: raw?.projectId,
         clientMessageId: raw?.clientMessageId,
         mode: raw?.mode,
+        designCommentIds: raw?.designCommentIds,
       },
       'body',
     );
-    const { result, replayed } = sendChiefMessageFromComposer(svc, teamId, body);
+    const { result, replayed } = await sendFromComposer(svc, teamId, body);
     if (!replayed)
       ctx.convHub?.publishMessage(
         result.thread.id,
@@ -265,6 +280,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       projectId?: unknown;
       clientMessageId?: unknown;
       mode?: unknown;
+      designCommentIds?: unknown;
     };
     const thread = getChiefThread(svc, conversationId);
     if (!thread) throw notFound(`conversation ${conversationId}`);
@@ -276,10 +292,11 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         projectId: raw?.projectId,
         clientMessageId: raw?.clientMessageId,
         mode: raw?.mode,
+        designCommentIds: raw?.designCommentIds,
       },
       'body',
     );
-    const { result, replayed } = sendChiefMessageFromComposer(svc, thread.teamId, body);
+    const { result, replayed } = await sendFromComposer(svc, thread.teamId, body);
     if (!replayed)
       ctx.convHub?.publishMessage(
         conversationId,

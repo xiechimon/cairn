@@ -18,7 +18,7 @@ Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalE
 
 - Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth,github-connection,github-connection-device,github-device-core}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
 - Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
-- MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers,composio,composio-connectors,github-webhook,schedule-webhook,connector-broker}.ts`, `apps/server/src/lib/webhook-token.ts`, `apps/server/src/{routes-github-webhook,routes-schedule-webhook}.ts`
+- MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers,composio,composio-connectors,github-webhook,schedule-webhook,connector-broker}.ts`, `apps/server/src/lib/webhook-token.ts`, `apps/server/src/{routes-github-webhook,routes-schedule-webhook,routes-design-share}.ts`
 
 ## Ship
 

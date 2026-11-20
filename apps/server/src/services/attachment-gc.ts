@@ -84,6 +84,13 @@ export function* sweepAttachmentBatches(
       { table: 'steer_pending', cursor: 'conversationId', content: 'content', json: false },
       { table: 'plan', cursor: 'id', content: 'content', json: false },
       { table: 'composer_draft', cursor: 'id', content: 'content', json: false },
+      { table: 'design_version', cursor: 'id', content: 'attachmentId', json: false },
+      {
+        table: 'design_comment',
+        cursor: 'id',
+        content: "coalesce(markAttachmentId, '')",
+        json: false,
+      },
     ];
     for (const source of sources) {
       let cursor: string | null = null;

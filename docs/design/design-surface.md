@@ -211,6 +211,7 @@ Anchor state (`anchored`, `moved`, `lost`) is computed on each render, never sto
 | W1b attach | version | `attachWorkerFile` (`apps/server/src/services/agent-attachments.ts`) | A `.html` attachment inserts a version with the W1 rule in the attachment's transaction |
 | W2 restore | version | `POST /api/todos/:id/design/versions/:versionId/restore` | Appends a `restore` row on the old row's attachment; publishes the todo |
 | W3 save comment | comment | `POST /api/todos/:id/design/comments` | Version must belong to the todo; a mark attachment must be the caller's `design` attachment; inserts `open` |
+| W3b save mark image | attachment | `POST /api/todos/:id/design/marks` | Body is the baked PNG (base64, at most 5 MiB, PNG signature checked, team quota applies); inserts a `design` attachment owned by the caller |
 | W4 edit, resolve, reopen | comment | `PATCH /api/todos/:id/design/comments/:commentId` | Allowed transitions only, else 409 |
 | W5 delete | comment | `DELETE /api/todos/:id/design/comments/:commentId` | `open` only, else 409 |
 | W6 send | Coordinator message, task message, comments | the Coordinator send route (`POST /api/conversations/:id/messages`) with new optional `designCommentIds` | Loads the rows (same team, `open`, one todo), renders the comment block, delivers it to the task thread with `messageThreadAsUser` as the Coordinator (client id `design:<clientMessageId>`), then in one transaction stores the owner's Coordinator message with the block and a `已转给任务` line appended and flips the rows to `sent` with `messageId`. Both steps coalesce on their client ids, so a retry after any failure sends each message once |
@@ -221,10 +222,10 @@ Anchor state (`anchored`, `moved`, `lost`) is computed on each render, never sto
 | R3 page content | read | `GET /api/design/versions/:versionId/page` | The version's HTML with `content-security-policy: sandbox allow-scripts allow-forms allow-downloads`; `?print=1` adds `allow-modals` and a `print()` call; same auth as attachments |
 | R4 comments | read | `GET /api/todos/:id/design/:fileName/comments` | All statuses |
 | R5 document text | read | `GET /api/attachments/:id/document-preview` | Borrowed docx, pptx, xlsx extraction |
-| R6 shared page | read, public | `GET /s/:token` | Live token: current version's HTML under the R3 CSP; else 404 page |
+| R6 shared page | read, public | `GET /s/:token` (`apps/server/src/routes-design-share.ts`, a listed security surface) | Live token: current version's HTML under the R3 CSP; else 404 page |
 | R7 todo record | read | the todo deliverables join | Adds current `seq` per page for the card |
 
-No other code reads or writes the three tables.
+Attachment garbage collection reads `design_version.attachmentId` and `design_comment.markAttachmentId` as references, so a version file or mark is never reaped while its row exists. No other code reads or writes the three tables.
 
 ### Failure behavior
 

@@ -1,6 +1,13 @@
+import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { type DesignPageRecord, type DesignVersionRecord, isDesignPageName } from '@cairn/shared';
+import {
+  type DesignPageRecord,
+  type DesignShareRecord,
+  type DesignVersionRecord,
+  designSharePath,
+  isDesignPageName,
+} from '@cairn/shared';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, designComment, designShare, designVersion, todo } from '../db/schema.js';
@@ -245,4 +252,97 @@ export function designPageResponse(html: Buffer, opts: { print: boolean }): Resp
         : DESIGN_PAGE_SANDBOX,
     },
   });
+}
+
+export function relayOrigin(): string | null {
+  const value = process.env.CAIRN_RELAY_ORIGIN?.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+function liveShare(db: Db, todoId: string, fileName: string) {
+  return db
+    .select()
+    .from(designShare)
+    .where(
+      and(
+        eq(designShare.todoId, todoId),
+        eq(designShare.fileName, fileName),
+        isNull(designShare.revokedAt),
+      ),
+    )
+    .get();
+}
+
+export function createDesignShare(
+  db: Db,
+  input: { teamId: string; todoId: string; fileName: string; userId: string },
+): DesignShareRecord {
+  const origin = relayOrigin();
+  if (origin === null) throw new HttpError(409, 'a share link needs a relay', 'relay-missing');
+  requireTodo(db, input.teamId, input.todoId);
+  if (currentVersion(db, input.todoId, input.fileName) === undefined) {
+    throw new HttpError(404, `design page ${input.fileName}`);
+  }
+  const row = db.transaction(() => {
+    const existing = liveShare(db, input.todoId, input.fileName);
+    if (existing !== undefined) return existing;
+    const next = {
+      id: newRecordId(),
+      teamId: input.teamId,
+      todoId: input.todoId,
+      fileName: input.fileName,
+      token: randomBytes(32).toString('base64url'),
+      createdBy: input.userId,
+      createdAt: nowMs(),
+      revokedAt: null,
+    };
+    db.insert(designShare).values(next).run();
+    return next;
+  });
+  return {
+    token: row.token,
+    path: `${origin}${designSharePath(row.token)}`,
+    createdAt: row.createdAt,
+  };
+}
+
+export function revokeDesignShare(
+  db: Db,
+  input: { teamId: string; todoId: string; fileName: string },
+): void {
+  requireTodo(db, input.teamId, input.todoId);
+  db.update(designShare)
+    .set({ revokedAt: nowMs() })
+    .where(
+      and(
+        eq(designShare.todoId, input.todoId),
+        eq(designShare.teamId, input.teamId),
+        eq(designShare.fileName, input.fileName),
+        isNull(designShare.revokedAt),
+      ),
+    )
+    .run();
+}
+
+export function readSharedPage(db: Db, attachmentsDir: string, token: string): Buffer | null {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+  const share = db
+    .select()
+    .from(designShare)
+    .where(and(eq(designShare.token, token), isNull(designShare.revokedAt)))
+    .get();
+  if (share === undefined) return null;
+  const current = currentVersion(db, share.todoId, share.fileName);
+  if (current === undefined) return null;
+  try {
+    return readDesignVersionHtml(db, attachmentsDir, current);
+  } catch {
+    return null;
+  }
 }
