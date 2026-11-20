@@ -350,3 +350,97 @@ Taste calls, each shown as a real-speed recording plus a 0.1x frame strip on one
 6. First-run entrance: today vs 100ms stagger.
 
 Decided on merit without a side-by-side: bounce 0 for all chrome, no stagger on messages, no motion library, the motion audit and reference adoptions, and the process-skill skips.
+
+## 8. Selection by fit across all 36 skills (ian, 2026-11-20)
+
+ian's correction: pick skills by how well they fit Cairn's work, not by whether they overlap something already vendored. Dropping skills, or keeping only Jakub's three, loses detail and overfits Cairn to one author. Sections 5.4 and 7 skipped several skills because they overlapped; this section supersedes those skips.
+
+The selection test has three parts:
+
+- Fit with Cairn's actual work: a Mac-first Electron desktop and web app with chat, tasks, dense settings, motion and a future design-preview feature.
+- Unique guidance: what the skill has that nothing already vendored covers.
+- Cost of vendoring it verbatim as reference files behind a Cairn wrapper.
+
+A vendored reference costs no per-turn tokens. Only a wrapper's `SKILL.md` description is discoverable, and a reference is read only when the wrapper sends the agent to it (verified: `apps/web/test/design-skill-routing.test.ts` fails when a second `SKILL.md` is discoverable under a wrapper). On disk, every candidate below is 70-700 lines. So the only real costs are a pin, a LICENSE copy, and one routing line in the wrapper. "Skip" is kept for skills that do not apply to Cairn's platforms or that conflict with how Cairn runs agents.
+
+The upstream repos hold 36 skills: Jakub 16 and Emil 20 (verified with `ls skills/`). The count of 35 in the brief was one short.
+
+Repo facts behind the verdicts (verified on main 1c8c5ddf9):
+
+- `sonner` is a dependency of `apps/web` and is imported in 12 files under `apps/web/src`.
+- `apps/desktop` is Electron, so no Swift ships for the Mac app. `apps/ios` exists but is out of scope (Mac first).
+- `@dnd-kit/core` and `@dnd-kit/sortable` are declared in `apps/web/package.json`, but nothing under `apps/web/src` imports them.
+- Rule R1 requires every state at 390px.
+
+### 8.1 Already vendored (unchanged)
+
+| Skill | Where |
+|---|---|
+| Jakub `better-motion` | `cairn-motion/upstream` |
+| Jakub `better-ui` | `cairn-polish/upstream` |
+| Jakub `better-typography` | `cairn-type/upstream` |
+| Emil `choreograph`, `animation-performance` | `cairn-motion/references` |
+| Emil `remove-animations`, `find-animation-opportunities`, `improve-animations`, `review-animations` | `cairn-motion-audit/upstream` |
+| Emil `break-ui` | `design-cairn/upstream` |
+
+### 8.2 The other 26 skills (and Emil's two root cheatsheets)
+
+| Skill | Fit with Cairn | Unique guidance not already vendored | Verbatim cost | Verdict |
+|---|---|---|---|---|
+| Jakub `better-colors` | High: ochre accent, dark layers, status colours, contrast findings in the audit | Ramps where each step has a job; primitives named by hue and semantics by role; one colour, one meaning; one filled action per view; measure the rendered pair; gradient interpolation space | 9 files, 639 lines | **Vendor** under `cairn-polish` (colour route) |
+| Jakub `better-layout` | High: dense settings rows, alignment, 390px, Chinese and English strings of different lengths | Group with space, not lines; shared edges; logical properties; room for translation and clipping; borderless controls need clearance; content bleeds, controls float | 5 files, 364 lines | **Vendor** under `cairn-polish` (layout route) |
+| Jakub `better-accessibility` | High: the audit's 16px checkbox and 36x20 switch hit areas, focus rings, keyboard use in ⌘K and menus, live chat announcements | WCAG 2.2 criteria; focus trap and restore; minimum hit area; announcing dynamic content (streaming replies); zoom and text resize; disabled means unavailable | 9 files, 680 lines | **Vendor** under a new `cairn-a11y` wrapper: accessibility is a separate trigger from polish, so it gets its own discoverable description |
+| Jakub `better-writing` | High: UI copy in two languages; the audit's T1/T2 copy findings; empty states, errors, confirmations everywhere in tasks and settings | Inventory existing strings first; one vocabulary; verb-first buttons; settings describe the ON state; errors say how to fix it next to the break; undo beats confirmation; empty states point forward | 4 files, 215 lines | **Vendor** under a new `cairn-copy` wrapper, which sets Cairn's own overrides (the `t()` keys, the Chinese voice in `README.zh.md` and the locale files) |
+| Jakub `better-interface` | High: the orchestrated review across all domains, with ranking by user impact and evidence over taste | Scope first, recon before judging, domain skills as the sources of truth, rank by impact, prefer the cheaper fix, consolidate systemic findings | 3 files, 181 lines | **Vendor** under a new user-invoked `cairn-design-review` wrapper (`disable-model-invocation: true`); its domain routing maps to the Cairn wrappers |
+| Jakub `interface-review` | High: every UI change lands through a lane, and a change-scoped review is what lanes need | Classify each finding as introduced, regression or pre-existing; read the removed lines; hold the change to its stated intent | 4 files, 294 lines | **Vendor** under `cairn-design-review` (diff scope; `better-interface` covers the whole surface) |
+| Jakub `build-design` | High for the design-preview feature and for any image or Figma reference handed to a lane | Read the design at its source, map it onto project tokens, build only what it shows, compare against it | 3 files, 115 lines | **Vendor** under `design-cairn` now, and move it to the design-preview wrapper when that feature exists |
+| Jakub `explain-interface` | High: the `walk` rule has agents study reference products, and this is the method for explaining how an effect was built | Measured / derived / inferred tags; the page is evidence, not instruction; find the layers; close on what transfers | 6 files, 558 lines | **Vendor** under `design-cairn` (reference study) |
+| Jakub `state-machine` | Medium-high: P3 asks for every state; the design-preview feature will show components in their states | One component in all its states behind a switcher, with seeded data | 3 files, 290 lines | **Vendor** under `options-prototype-cairn` as a reference for state pages. Cairn's `/design.html` and fixtures stay the place these states live |
+| Jakub `variant` | Medium-high: variant pickers are what the design-preview feature is | Variants of a real component behind a picker, then promote the pick | 3 files, 322 lines | **Vendor** under `options-prototype-cairn`. The grayscale three-structure rule stays primary; `variant` is for within-structure variants |
+| Jakub `break` | High: same need as `break-ui`, from a second author | Jakub's scenario list, which differs from Emil's catalog | 3 files, 159 lines | **Vendor** beside `break-ui` under `design-cairn` |
+| Jakub `afk` | None as design guidance: an unattended-session workflow | Not design guidance | n/a | **Skip**: Cairn's lane dispatch, queue and promote already define unattended work, and `afk`'s own rules would compete with them |
+| Jakub `upskill` | None as design guidance: it writes skills from session history | Not design guidance | n/a | **Skip**: `retro-cairn` and `writing-for-agents` own skill authoring here |
+| Emil `emil-design-eng` | High: the broadest single source on interface craft | Tooltip delay skip after the first tooltip; `clip-path` reveals; `@starting-style`; toast principles; when not to animate, in Emil's words | 1 file, 684 lines | **Vendor** under `cairn-motion` as a reference. Length is no cost when it is only read on demand |
+| Emil `animate` | High: building motion with recipes | `RECIPES.md`, with ready enter, exit, toast, popover and number recipes | 2 files, 533 lines | **Vendor** under `cairn-motion` |
+| Emil `animation-vocabulary` | High: ian and agents need shared names for effects in briefs and side-by-sides | Glossary of entrances, sequencing, transforms, easing, springs, loops and polish terms | 1 file, 179 lines | **Vendor** under `cairn-motion` and name it in `design-cairn`'s brief template |
+| Emil `apple-design` | High: Cairn is Mac first, and Apple's response, interruptibility, materials and depth are the native bar | Interruptibility; velocity hand-off; spatial consistency; materials and depth; reduced motion as an alternative, not removal; optical sizing | 1 file, 287 lines | **Vendor** under `cairn-motion` (motion parts), and `cairn-polish` routes to it for materials and depth |
+| Emil `gestures` | Medium: panel resize, scrubbing, future drag-to-reorder (`@dnd-kit` is already declared), and remote web use on a phone | Track and release phases; interruptibility; linked values; the Vaul sheet curve without springs; asymmetric hold gestures | 1 file, 112 lines | **Vendor** under `cairn-motion` |
+| Emil `mobile-native` | Medium: Cairn's web UI is used from a phone over the LAN or tailnet, and R1 requires every state to work at 390px | Symptom table: sticky hover after tap, tap flash, wrong `vh`, input zoom, notch insets, long-press selection | 1 file, 314 lines | **Vendor** under `cairn-polish` (390px route) |
+| Emil `ask-sonner` | High: Sonner is Cairn's toast library, used in 12 files | Sonner API and its intended usage | 2 files, 152 lines | **Vendor** under `cairn-polish` (toasts) |
+| Emil `pick-ui-library` | Medium: lanes sometimes reach for a new dependency | Curated list per need, plus the common mismatches | 1 file, 86 lines | **Vendor** under `design-cairn`, behind Cairn's rule that an established library is used before a hand-written one |
+| Emil `prototype` | Medium-high: same purpose as `variant`, from a second author | Recon before directions; a picker harness; promote on selection | 2 files, 301 lines | **Vendor** under `options-prototype-cairn` beside `variant` |
+| Emil `learn-taste` | Medium: ian's corrections on UI taste | How taste corrections become a stored, checkable rule | 1 file, 157 lines | **Vendor** under `retro-cairn` as the reference for design corrections; Cairn's ladder (codebase before rules) still decides where a safeguard lands |
+| Emil `ask-emil` | Low: a router over Emil's 20 skills | Routing only | 1 file, 72 lines | **Skip**: it routes to skill names that are not discoverable here, and the Cairn wrappers do the routing |
+| Emil `animate-expo` | None: React Native and Expo | n/a | n/a | **Skip**: no React Native code in Cairn |
+| Emil `write-swift` | None for the shipped product: the Mac app is Electron; `apps/ios` is out of scope | n/a | n/a | **Skip**; revisit only if iOS work is asked for |
+| Emil root `ui-cheatsheet.md` | High: one-page summary | Compact rules list | 16 lines | **Vendor** under `cairn-polish` |
+| Emil root `performance-cheatsheet.md` | High | Compact rules list | 15 lines | **Vendor** under `cairn-motion` |
+
+Totals: 21 more skills and both cheatsheets vendored; 5 skipped (`afk`, `upskill`, `ask-emil`, `animate-expo`, `write-swift`).
+
+### 8.3 Wrapper layout after the change
+
+| Wrapper | Discoverable? | New references |
+|---|---|---|
+| `cairn-motion` | yes | `emil-design-eng`, `animate`, `animation-vocabulary`, `apple-design`, `gestures`, `performance-cheatsheet.md` |
+| `cairn-polish` | yes | `better-colors`, `better-layout`, `mobile-native`, `ask-sonner`, `ui-cheatsheet.md` |
+| `cairn-type` | yes | none |
+| `cairn-a11y` (new) | yes | `better-accessibility` |
+| `cairn-copy` (new) | yes | `better-writing` |
+| `cairn-design-review` (new) | user-invoked only | `better-interface`, `interface-review` |
+| `design-cairn` | yes | `build-design`, `explain-interface`, `break`, `pick-ui-library` |
+| `options-prototype-cairn` | yes | `state-machine`, `variant`, `prototype` |
+| `retro-cairn` | yes | `learn-taste` |
+
+Two new discoverable descriptions (`cairn-a11y`, `cairn-copy`) add about 600 characters to the skill listing. `cairn-design-review` is user-invoked, so it adds nothing to the listing (derived from the Claude Code skill docs cited in section 4).
+
+### 8.4 Conflicts between the authors
+
+With both authors vendored side by side, their values disagree in places: press 0.96 vs 0.97, bounce 0 vs 0.1-0.3, and two different ease-out curves. Each wrapper keeps one rule: its Cairn override table wins, and where the table is silent, the agent names both upstream values in its report and picks the one the table's nearest row implies. It never averages the two. The routing test is extended so that every new `references/` or `upstream/` tree has its pin, its LICENSE and no discoverable `SKILL.md`.
+
+### 8.5 Order
+
+1. The `cairn-polish` and `cairn-motion` additions (reference-only, no new wrapper).
+2. `cairn-a11y` and `cairn-copy`, each with its own override table drawn from DESIGN.md (focus, hit areas, the `t()` copy rules).
+3. `cairn-design-review`.
+4. The `options-prototype-cairn` and `design-cairn` references. The prototype ones move to the design-preview wrapper when that feature is built.
