@@ -15,8 +15,7 @@ function tmpHome(settingsJson?: string): string {
   const dir = testTempDir('cairn-daemon-cc-');
   dirs.push(dir);
   if (settingsJson !== undefined) {
-    mkdirSync(join(dir, '.claude'), { recursive: true });
-    writeFileSync(join(dir, '.claude', 'settings.json'), settingsJson);
+    writeFileSync(join(dir, 'settings.json'), settingsJson);
   }
   return dir;
 }
@@ -51,16 +50,20 @@ describe('readClaudeCodeReport', () => {
 
   test('claude binary found but no settings.json → installed with the built-in models', () => {
     const report = readClaudeCodeReport(tmpHome(), {
-      bin: { path: '/usr/bin/claude', version: '2.1.0' },
+      bin: { path: '/usr/bin/claude', version: '2.1.0', source: 'bundled' },
     });
     expect(report.installed).toBe(true);
     expect(report.models).toEqual(DEFAULT_CLAUDE_CODE_MODELS);
-    expect(report.bin).toEqual({ path: '/usr/bin/claude', version: '2.1.0' });
+    expect(report.bin).toEqual({
+      path: '/usr/bin/claude',
+      version: '2.1.0',
+      source: 'bundled',
+    });
   });
 
   test('claude binary found with settings.json that lists no model → built-in models', () => {
     const report = readClaudeCodeReport(tmpHome('{}'), {
-      bin: { path: '/usr/bin/claude', version: null },
+      bin: { path: '/usr/bin/claude', version: null, source: 'bundled' },
     });
     expect(report.installed).toBe(true);
     expect(report.models).toEqual(DEFAULT_CLAUDE_CODE_MODELS);
@@ -75,7 +78,7 @@ describe('readClaudeCodeReport', () => {
       },
     });
     const report = readClaudeCodeReport(tmpHome(settings), {
-      bin: { path: '/usr/bin/claude', version: null },
+      bin: { path: '/usr/bin/claude', version: null, source: 'bundled' },
     });
     expect(report.models.map((model) => model.id)).toEqual([
       'claude-haiku-5-5',
@@ -99,7 +102,7 @@ describe('readClaudeCodeReport', () => {
     });
     expect(
       readClaudeCodeReport(tmpHome(relay), {
-        bin: { path: '/usr/bin/claude', version: null },
+        bin: { path: '/usr/bin/claude', version: null, source: 'bundled' },
       }).models.map((model) => model.id),
     ).toEqual(['deepseek-v4.1-flash']);
   });
@@ -111,7 +114,7 @@ describe('readClaudeCodeReport', () => {
 
   test('a logged-out machine keeps its auth state next to the built-in models', () => {
     const report = readClaudeCodeReport(tmpHome(), {
-      bin: { path: '/usr/bin/claude', version: null },
+      bin: { path: '/usr/bin/claude', version: null, source: 'bundled' },
       auth: { state: 'not-logged-in', provider: 'firstParty' },
     });
     expect(report.installed).toBe(true);

@@ -146,7 +146,7 @@ describe('agent config isolation', () => {
         runtimeId: 'claude-code',
       }),
     );
-    expect(env.CLAUDE_CONFIG_DIR).toBe(join('/cairn-home', 'claude'));
+    expect(env.CLAUDE_CONFIG_DIR).toBe(join('/cairn-home', 'homes', 'claude'));
   });
 
   test('an Orb guest keeps the image config, whose Claude settings the sandbox needs', () => {

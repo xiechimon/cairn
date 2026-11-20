@@ -80,76 +80,40 @@ describe('resolveCommandPath', () => {
   });
 });
 
-describe('probeClaudeBin well-known fallback (#1290)', () => {
-  test('failure mode 10: empty PATH + fake claude in well-known → found, source names well-known', async () => {
+describe('probeClaudeBin managed resolution', () => {
+  test('no override → the SDK-bundled binary, source bundled', async () => {
     const dir = testTempDir('cairn-cc-bin-');
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
-      const info = await probeClaudeBin({
-        env: { PATH: '/nowhere' },
-        wellKnownDirs: [dir],
-      });
-      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'well-known' });
+      const info = await probeClaudeBin({ bundledPath: stub });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'bundled' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  test('failure mode 11: on PATH → no fallback (stubs in well-known dirs are not hit)', async () => {
-    const pathDir = testTempDir('cairn-cc-bin-path-');
-    const fallbackDir = testTempDir('cairn-cc-bin-fallback-');
-    try {
-      const pathStub = makeStub(pathDir, 'claude', '#!/bin/sh\necho 2.1.289\n');
-      makeStub(fallbackDir, 'claude', '#!/bin/sh\necho 9.9.9\n');
-      const info = await probeClaudeBin({
-        env: { PATH: pathDir },
-        wellKnownDirs: [fallbackDir],
-      });
-      expect(info).toEqual({ path: pathStub, version: '2.1.289', source: 'PATH' });
-    } finally {
-      rmSync(pathDir, { recursive: true, force: true });
-      rmSync(fallbackDir, { recursive: true, force: true });
-    }
-  });
-
-  test('failure mode 12: empty PATH + empty well-known → null (no throw)', async () => {
+  test('a user-installed claude on PATH is never picked', async () => {
     const dir = testTempDir('cairn-cc-bin-');
     try {
-      const info = await probeClaudeBin({
-        command: 'cairn-no-such-claude',
-        env: { PATH: '/nowhere' },
-        wellKnownDirs: [dir],
-      });
+      makeStub(dir, 'claude', '#!/bin/sh\necho 9.9.9\n');
+      const info = await probeClaudeBin({ env: { PATH: dir }, bundledPath: null });
       expect(info).toBeNull();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  test('failure mode 13: file in a well-known dir without the execute bit → skipped', async () => {
-    const dir = testTempDir('cairn-cc-bin-');
-    try {
-      writeFileSync(join(dir, 'claude'), '#!/bin/sh\necho 2.1.289\n');
-      const info = await probeClaudeBin({
-        env: { PATH: '/nowhere' },
-        wellKnownDirs: [dir],
-      });
-      expect(info).toBeNull();
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+  test('bundled package missing → null (installed:false, no PATH fallback)', async () => {
+    const info = await probeClaudeBin({ bundledPath: null });
+    expect(info).toBeNull();
   });
 
-  test('absolute-path commands skip the fallback (explicit-path criterion unchanged)', async () => {
+  test('override beats the bundled binary', async () => {
     const dir = testTempDir('cairn-cc-bin-');
     try {
-      makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
-      const info = await probeClaudeBin({
-        command: '/no/such/claude',
-        env: { PATH: '/nowhere' },
-        wellKnownDirs: [dir],
-      });
-      expect(info).toBeNull();
+      const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\n');
+      const info = await probeClaudeBin({ command: stub, bundledPath: '/sdk/bundled/claude' });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'override' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -162,7 +126,7 @@ describe('probeClaudeBin', () => {
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "2.1.289 (Claude Code)"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'PATH' });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'override' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -173,7 +137,7 @@ describe('probeClaudeBin', () => {
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho 2.1.289\nexit 1\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'PATH' });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'override' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -201,7 +165,7 @@ describe('probeClaudeBin', () => {
     try {
       const stub = makeStub(dir, 'claude', '#!/bin/sh\necho "hello from a wrapper"\n');
       const info = await probeClaudeBin({ command: stub, env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: null, source: 'PATH' });
+      expect(info).toEqual({ path: stub, version: null, source: 'override' });
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -212,7 +176,7 @@ describe('probeClaudeBin', () => {
       command: '/fake/claude',
       run: async () => ({ stdout: '2.1.289 (Claude Code)\n' }),
     });
-    expect(info).toEqual({ path: '/fake/claude', version: '2.1.289' });
+    expect(info).toEqual({ path: '/fake/claude', version: '2.1.289', source: 'override' });
   });
 
   test('injected run: run throws → null (reason not leaked, no throw)', async () => {
@@ -232,7 +196,7 @@ describe('probeClaudeBin', () => {
       const stub = makeStub(dir, 'my-claude', '#!/bin/sh\necho 2.1.289\n');
       process.env.CAIRN_CLAUDE_BIN = 'my-claude';
       const info = await probeClaudeBin({ env: { PATH: dir } });
-      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'PATH' });
+      expect(info).toEqual({ path: stub, version: '2.1.289', source: 'override' });
     } finally {
       if (prev === undefined) delete process.env.CAIRN_CLAUDE_BIN;
       else process.env.CAIRN_CLAUDE_BIN = prev;

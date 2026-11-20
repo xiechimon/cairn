@@ -51,7 +51,7 @@ export function antigravityCliDir(home: string): string {
   return `${home}/.gemini/antigravity-cli`;
 }
 
-function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string): number {
   const pa = a.split('.').map(Number);
   const pb = b.split('.').map(Number);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
@@ -63,26 +63,12 @@ function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export function antigravityBinaryCandidates(opts: {
-  home: string;
-  pathEnv: string | undefined;
-  managedVersions: readonly string[];
-  explicitPath?: string | undefined;
-}): string[] {
-  const explicit =
-    opts.explicitPath !== undefined && opts.explicitPath.trim() !== ''
-      ? [opts.explicitPath.trim()]
-      : [];
-  const wellKnown = [`${opts.home}/.local/bin/agy`, '/opt/homebrew/bin/agy', '/usr/local/bin/agy'];
-  const fromPath = (opts.pathEnv ?? '')
-    .split(':')
-    .filter((dir) => dir !== '')
-    .map((dir) => `${dir}/agy`);
-  const managed = [...opts.managedVersions]
+export function managedVersionedBins(
+  versionsDir: string,
+  versions: readonly string[],
+  binRelPaths: readonly string[],
+): string[] {
+  return [...versions]
     .sort((a, b) => compareVersions(b, a))
-    .flatMap((v) => [
-      `${opts.home}/.local/share/cairn/antigravity/versions/${v}/bin/antigravity-acp`,
-      `${opts.home}/.local/share/cairn/antigravity/versions/${v}/bin/agy`,
-    ]);
-  return [...new Set([...explicit, ...wellKnown, ...fromPath, ...managed])];
+    .flatMap((version) => binRelPaths.map((rel) => `${versionsDir}/${version}/${rel}`));
 }

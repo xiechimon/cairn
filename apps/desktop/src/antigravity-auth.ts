@@ -13,9 +13,9 @@ import { basename, join } from 'node:path';
 import {
   type AntigravityLocalStatus,
   type AntigravityLoginOutcome,
-  antigravityBinaryCandidates,
   antigravityCliDir,
   antigravityKeyFromText,
+  managedVersionedBins,
 } from '@cairn/shared';
 
 const STATUS_TIMEOUT_MS = 4_000;
@@ -35,9 +35,13 @@ interface JsonRpcMessage {
   error?: unknown;
 }
 
+function managedVersionsRoot(): string {
+  return `${homedir()}/.cairn/tools/antigravity/versions`;
+}
+
 function managedVersions(): string[] {
   try {
-    return readdirSync(`${homedir()}/.local/share/cairn/antigravity/versions`, {
+    return readdirSync(managedVersionsRoot(), {
       withFileTypes: true,
     })
       .filter((entry) => entry.isDirectory())
@@ -57,19 +61,17 @@ function isExecutableFile(path: string): boolean {
 }
 
 function resolveAntigravityBinary(): ResolvedBinary | null {
-  const home = homedir();
-  const managedPrefix = `${home}/.local/share/cairn/antigravity/`;
-  for (const candidate of antigravityBinaryCandidates({
-    home,
-    pathEnv: process.env.PATH,
-    managedVersions: managedVersions(),
-    explicitPath: process.env.CAIRN_AGY_PATH,
-  })) {
+  const explicit = process.env.CAIRN_AGY_PATH?.trim();
+  const candidates = [
+    ...(explicit !== undefined && explicit !== '' ? [explicit] : []),
+    ...managedVersionedBins(managedVersionsRoot(), managedVersions(), [
+      'bin/antigravity-acp',
+      'bin/agy',
+    ]),
+  ];
+  for (const candidate of candidates) {
     if (!isExecutableFile(candidate)) continue;
-    return {
-      binPath: candidate,
-      source: candidate.startsWith(managedPrefix) ? 'managed' : 'local',
-    };
+    return { binPath: candidate, source: 'managed' };
   }
   return null;
 }

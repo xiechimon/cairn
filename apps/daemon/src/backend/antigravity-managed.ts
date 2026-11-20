@@ -29,7 +29,7 @@ import {
 import {
   acpThoughtLevel,
   acpThoughtLevels,
-  antigravityBinaryCandidates,
+  BRAND,
   DEFAULT_ANTIGRAVITY_MODELS,
   type ThinkingLevel,
 } from '@cairn/shared';
@@ -105,9 +105,6 @@ export interface AntigravityManaged {
 
 export interface AntigravityManagedOptions {
   root?: string;
-  home?: string;
-  agyPath?: string;
-  pathEnv?: string;
   platform?: string;
   arch?: string;
   fetchImpl?: typeof fetch;
@@ -122,8 +119,8 @@ export interface AntigravityManagedOptions {
   ) => Promise<AntigravityInstall | null>;
 }
 
-export function antigravityInstallRoot(home = homedir()): string {
-  return join(home, '.local', 'share', 'cairn', 'antigravity');
+export function antigravityInstallRoot(cairnHome: string): string {
+  return join(cairnHome, 'tools', 'antigravity');
 }
 
 function sha256File(path: string): string {
@@ -214,15 +211,6 @@ function extractModels(response: NewSessionResponse): AntigravityModel[] {
   return models.length > 0 ? models : defaultModels();
 }
 
-function isExecutableFile(path: string): boolean {
-  try {
-    accessSync(path, constants.X_OK);
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
-}
-
 async function probeAntigravityBinary(
   binPath: string,
   args: string[],
@@ -308,11 +296,8 @@ async function probeAntigravityBinary(
 export function createAntigravityManaged(
   options: AntigravityManagedOptions = {},
 ): AntigravityManaged {
-  const home = options.home ?? homedir();
-  const root = options.root ?? antigravityInstallRoot(home);
+  const root = options.root ?? antigravityInstallRoot(join(homedir(), BRAND.homeDirName));
   const env = options.env ?? process.env;
-  const pathEnv = options.pathEnv ?? env.PATH;
-  const agyPath = options.agyPath ?? env.CAIRN_AGY_PATH;
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -327,20 +312,6 @@ export function createAntigravityManaged(
   let cached: AntigravityInstall | null = null;
   let pendingEnsure: Promise<AntigravityInstall | null> | null = null;
   let pendingProbe: Promise<AntigravityInstall | null> | null = null;
-
-  function resolveLocalCandidate(): { binPath: string; args: string[] } | null {
-    const managedPrefix = join(root, 'versions');
-    for (const candidate of antigravityBinaryCandidates({
-      home,
-      pathEnv,
-      managedVersions: [],
-      explicitPath: agyPath,
-    })) {
-      if (candidate.startsWith(managedPrefix)) continue;
-      if (isExecutableFile(candidate)) return { binPath: candidate, args: ['acp'] };
-    }
-    return null;
-  }
 
   function managedInstallFromDir(
     versionDir: string,
@@ -384,17 +355,6 @@ export function createAntigravityManaged(
   function current(): AntigravityInstall | null {
     const hit = cachedInstall();
     if (hit !== null) return hit;
-    const local = resolveLocalCandidate();
-    if (local !== null) {
-      return {
-        version: 'local',
-        binPath: local.binPath,
-        args: local.args,
-        source: 'local',
-        authenticated: false,
-        models: defaultModels(),
-      };
-    }
     const managed = currentManaged();
     if (managed !== null) {
       return {
@@ -535,14 +495,6 @@ export function createAntigravityManaged(
   async function probe(): Promise<AntigravityInstall | null> {
     if (pendingProbe !== null) return pendingProbe;
     pendingProbe = (async () => {
-      const local = resolveLocalCandidate();
-      if (local !== null) {
-        const probed = await probeImpl(local.binPath, local.args, 'local');
-        if (probed !== null) {
-          cached = probed;
-          return probed;
-        }
-      }
       const managed = currentManaged();
       if (managed !== null) {
         const probed = await probeImpl(managed.binPath, managed.args, 'managed', managed.version);
@@ -561,14 +513,6 @@ export function createAntigravityManaged(
   async function ensure(): Promise<AntigravityInstall | null> {
     if (pendingEnsure !== null) return pendingEnsure;
     pendingEnsure = (async () => {
-      const local = resolveLocalCandidate();
-      if (local !== null) {
-        const probed = await probeImpl(local.binPath, local.args, 'local');
-        if (probed !== null) {
-          cached = probed;
-          return probed;
-        }
-      }
       const managed = currentManaged() ?? (await installFromRegistry());
       if (managed === null) return current();
       const probed = await probeImpl(managed.binPath, managed.args, 'managed', managed.version);

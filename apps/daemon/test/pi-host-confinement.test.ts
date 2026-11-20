@@ -94,7 +94,7 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
     const runnerHome = join(root, 'support', 'runner');
     const worktree = join(runnerHome, 'workspaces', 'a');
     const temp = join(root, 'tmp-user', 'T');
-    const agentDir = join(runnerHome, 'agent-runtime');
+    const agentDir = join(runnerHome, 'homes', 'pi');
     const sessionDir = join(runnerHome, 'chat-sessions');
     for (const path of [home, serverHome, worktree, temp, join(runnerHome, 'skills')])
       mkdirSync(path, { recursive: true });
@@ -195,7 +195,7 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
     });
     const files = new Map<string, string>();
     const backend = createPiBackend({
-      agentDir: join(runnerHome, 'agent-runtime'),
+      agentDir: join(runnerHome, 'homes', 'pi'),
       sessionDir: join(runnerHome, 'chat-sessions'),
       skills: { skillsDir: join(runnerHome, 'skills'), cwd: runnerHome },
       onSession: (id, file) => {

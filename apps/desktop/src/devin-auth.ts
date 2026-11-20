@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import {
   type DevinLocalStatus,
   type DevinLoginOutcome,
-  devinBinaryCandidates,
+  compareVersions,
   devinCredentialsPath,
   devinKeyFromToml,
 } from '@cairn/shared';
@@ -23,7 +23,7 @@ function credentialsFile(): { key: string | null; mtimeMs: number } {
 
 function managedVersions(): string[] {
   try {
-    return readdirSync(`${homedir()}/.local/share/cairn/agents/devin`, { withFileTypes: true })
+    return readdirSync(`${homedir()}/.cairn/tools/devin/versions`, { withFileTypes: true })
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name);
   } catch {
@@ -32,11 +32,8 @@ function managedVersions(): string[] {
 }
 
 function resolveDevinBinary(): string | null {
-  for (const candidate of devinBinaryCandidates({
-    home: homedir(),
-    pathEnv: process.env.PATH,
-    managedVersions: managedVersions(),
-  })) {
+  for (const version of [...managedVersions()].sort((a, b) => compareVersions(b, a))) {
+    const candidate = `${homedir()}/.cairn/tools/devin/versions/${version}/bin/devin`;
     try {
       accessSync(candidate, constants.X_OK);
       return candidate;

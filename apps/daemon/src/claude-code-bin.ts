@@ -1,12 +1,13 @@
 import { execFile } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
-import { homedir } from 'node:os';
+import { createRequire } from 'node:module';
 import { delimiter, isAbsolute, join } from 'node:path';
+import { arch, platform } from 'node:process';
 
 export interface ClaudeBinInfo {
   path: string;
   version: string | null;
-  source?: 'PATH' | 'well-known';
+  source: 'override' | 'bundled';
 }
 
 export type ClaudeBinRun = (
@@ -19,8 +20,8 @@ export interface ClaudeBinProbeOpts {
   command?: string;
   timeoutMs?: number;
   run?: ClaudeBinRun;
-  env?: { PATH?: string; HOME?: string };
-  wellKnownDirs?: readonly string[];
+  env?: { PATH?: string };
+  bundledPath?: string | null;
 }
 
 const DEFAULT_TIMEOUT_MS = 2_000;
@@ -56,15 +57,22 @@ export function resolveCommandPath(
   return null;
 }
 
-// launchd omits login-shell PATH; Homebrew claude needs well-known bin dirs.
-export function wellKnownClaudeBinDirs(env: { HOME?: string } = process.env): string[] {
-  return ['/opt/homebrew/bin', '/usr/local/bin', join(env.HOME ?? homedir(), '.local/bin')];
+function sdkBundledCandidates(): string[] {
+  const key = `${platform}-${arch}`;
+  const candidates = [key];
+  if (platform === 'linux') candidates.push(`${key}-musl`);
+  return candidates;
 }
 
-function resolveWellKnown(command: string, dirs: readonly string[]): string | null {
-  for (const dir of dirs) {
-    const candidate = join(dir, command);
-    if (isExecutable(candidate)) return candidate;
+export function bundledClaudeCodePath(
+  resolve: (specifier: string) => string = createRequire(
+    createRequire(import.meta.url).resolve('@anthropic-ai/claude-agent-sdk'),
+  ).resolve,
+): string | null {
+  for (const candidate of sdkBundledCandidates()) {
+    try {
+      return resolve(`@anthropic-ai/claude-agent-sdk-${candidate}/claude`);
+    } catch {}
   }
   return null;
 }
@@ -86,32 +94,37 @@ function defaultRun(
 }
 
 export async function probeClaudeBin(opts: ClaudeBinProbeOpts = {}): Promise<ClaudeBinInfo | null> {
-  const command = opts.command ?? process.env.CAIRN_CLAUDE_BIN ?? 'claude';
-  if (opts.run === undefined) {
-    const env = opts.env ?? process.env;
-    const resolved = resolveCommandPath(command, env);
-    const fallback =
-      resolved === null && !isAbsolute(command) && !command.includes('/')
-        ? resolveWellKnown(command, opts.wellKnownDirs ?? wellKnownClaudeBinDirs(env))
-        : null;
-    const path = resolved ?? fallback;
-    if (path === null) return null;
-    const source: 'PATH' | 'well-known' = fallback !== null ? 'well-known' : 'PATH';
-    const run = defaultRun;
+  const override = opts.command ?? process.env.CAIRN_CLAUDE_BIN;
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  if (opts.run !== undefined) {
+    const command =
+      override ??
+      (opts.bundledPath !== undefined ? opts.bundledPath : bundledClaudeCodePath()) ??
+      'claude';
     try {
-      const { stdout } = await run(path, ['--version'], {
-        timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-      });
-      return { path, version: parseClaudeVersion(stdout), source };
+      const { stdout } = await opts.run(command, ['--version'], { timeoutMs });
+      return {
+        path: command,
+        version: parseClaudeVersion(stdout),
+        source: override !== undefined ? 'override' : 'bundled',
+      };
     } catch {
       return null;
     }
   }
+  let info: { path: string; source: 'override' | 'bundled' } | null = null;
+  if (override !== undefined) {
+    const resolved = resolveCommandPath(override, opts.env ?? process.env);
+    if (resolved !== null) info = { path: resolved, source: 'override' };
+  } else {
+    const path =
+      opts.bundledPath !== undefined ? opts.bundledPath : bundledClaudeCodePath();
+    if (path !== null) info = { path, source: 'bundled' };
+  }
+  if (info === null) return null;
   try {
-    const { stdout } = await opts.run(command, ['--version'], {
-      timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    });
-    return { path: command, version: parseClaudeVersion(stdout) };
+    const { stdout } = await defaultRun(info.path, ['--version'], { timeoutMs });
+    return { path: info.path, version: parseClaudeVersion(stdout), source: info.source };
   } catch {
     return null;
   }

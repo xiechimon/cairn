@@ -130,9 +130,11 @@ describe('loadDaemonConfig (Settings seam precedence)', () => {
     );
   });
 
-  test('mcpConfigPath default = ~/.claude.json', () => {
+  test('mcpConfigPath default = managed claude home .claude.json', () => {
     const cfg = loadDaemonConfig({}, {});
-    expect(cfg.mcpConfigPath).toBe(join(homedir(), '.claude.json'));
+    expect(cfg.mcpConfigPath).toBe(
+      join(homedir(), '.cairn', 'homes', 'claude', '.claude.json'),
+    );
   });
 
   test('mcpConfigPath env override (CAIRN_MCP_CONFIG)', () => {
@@ -185,7 +187,7 @@ describe('local state layout (02 §5.3)', () => {
     expect(modeBits(state)).toBe(0o600);
   });
 
-  test('ensureStateDirs creates home + outbox/chat-sessions/agent-runtime/workspaces', () => {
+  test('ensureStateDirs creates home + outbox/chat-sessions/homes/pi/workspaces', () => {
     const home = join(tmp(), 'cairn-home');
     const paths = statePaths(home);
     ensureStateDirs(paths);

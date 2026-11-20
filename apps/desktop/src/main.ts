@@ -1,7 +1,7 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { release } from 'node:os';
-import { join } from 'node:path';
+import { homedir, release } from 'node:os';
+import { dirname, join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -128,7 +128,33 @@ function cairnHome(): string {
 }
 
 function runnerHome(): string {
-  return join(app.getPath('userData'), 'runner');
+  return join(homedir(), '.cairn');
+}
+
+function migrateRunnerHome(): void {
+  const legacy = join(app.getPath('userData'), 'runner');
+  const target = runnerHome();
+  let entries: string[];
+  try {
+    entries = readdirSync(legacy);
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const to = join(target, entry);
+    try {
+      if (existsSync(to)) continue;
+      mkdirSync(target, { recursive: true });
+      renameSync(join(legacy, entry), to);
+    } catch {}
+  }
+  try {
+    const mcpTarget = join(target, 'homes', 'claude', '.claude.json');
+    if (!existsSync(mcpTarget) && existsSync(join(target, 'mcp.json'))) {
+      mkdirSync(dirname(mcpTarget), { recursive: true });
+      renameSync(join(target, 'mcp.json'), mcpTarget);
+    }
+  } catch {}
 }
 
 function bundledRoot(name: string): string {
@@ -670,6 +696,7 @@ async function boot(): Promise<void> {
         runner.ensureRunning();
         return Promise.resolve();
       }
+      migrateRunnerHome();
       runnerStarting ??= startLocalRunner({
         root: bundledRoot('runner'),
         home: runnerHome(),

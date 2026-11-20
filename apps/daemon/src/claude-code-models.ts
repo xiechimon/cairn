@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { homedir, hostname } from 'node:os';
+import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
   type ClaudeAuthStateWire,
@@ -40,12 +40,12 @@ function usesCustomBackend(raw: string | undefined): boolean {
 }
 
 export function readClaudeCodeReport(
-  homeDir: string = homedir(),
+  configDir: string,
   extra: ClaudeCodeReportExtra = {},
 ): ClaudeCodeReport {
   let raw: string | undefined;
   try {
-    raw = readFileSync(join(homeDir, '.claude', 'settings.json'), 'utf8');
+    raw = readFileSync(join(configDir, 'settings.json'), 'utf8');
   } catch {
     raw = undefined;
   }

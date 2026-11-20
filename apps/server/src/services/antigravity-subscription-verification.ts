@@ -5,11 +5,11 @@ import { homedir, tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import {
   type AntigravitySubscriptionVerifyResult,
-  antigravityBinaryCandidates,
+  managedVersionedBins,
 } from '@cairn/shared';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
-const MANAGED_ROOT = join(homedir(), '.local', 'share', 'cairn', 'antigravity');
+const MANAGED_ROOT = join(homedir(), '.cairn', 'tools', 'antigravity');
 export const ANTIGRAVITY_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const FORWARDED_ENV = [
   'HTTPS_PROXY',
@@ -82,12 +82,20 @@ function managedMarkerCommand(): { command: string; args: string[] } | null {
 function resolveAgyBinary(): { command: string; args: string[] } {
   const explicit = process.env.AGY_BIN ?? process.env.CAIRN_AGY_PATH;
   const managed = managedMarkerCommand();
-  const candidates = antigravityBinaryCandidates({
-    home: homedir(),
-    pathEnv: process.env.PATH,
-    managedVersions: managedVersions(),
-    explicitPath: explicit,
-  });
+  const candidates = [
+    ...(explicit !== undefined && explicit.trim() !== '' ? [explicit.trim()] : []),
+    ...managedVersionedBins(join(MANAGED_ROOT, 'versions'), managedVersions(), [
+      'bin/antigravity-acp',
+      'bin/agy',
+    ]),
+    `${homedir()}/.local/bin/agy`,
+    '/opt/homebrew/bin/agy',
+    '/usr/local/bin/agy',
+    ...(process.env.PATH ?? '')
+      .split(':')
+      .filter((dir) => dir !== '')
+      .map((dir) => join(dir, 'agy')),
+  ];
   for (const candidate of candidates) {
     try {
       accessSync(candidate, constants.X_OK);

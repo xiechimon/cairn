@@ -43,6 +43,12 @@ import {
 } from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
+import {
+  claudeConfigHome,
+  migrateRuntimeHomes,
+  runtimeHome,
+  toolInstallRoot,
+} from './runtime-homes.js';
 import type { ComputerDesktops } from './computer/desktops.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
@@ -167,6 +173,8 @@ export function portBaseForSlot(slot: number): number {
 
 export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> {
   const { config, paths, logger } = opts;
+  const migratedHomes = migrateRuntimeHomes(paths.home);
+  for (const moved of migratedHomes) logger.machine(`runtime home moved: ${moved}`);
   ensureStateDirs(paths);
   const confine = createSessionConfiner({
     daemonHome: config.home,
@@ -201,13 +209,19 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let claudeAuth: ClaudeCodeAuthProbe | null = null;
   let claudeLogin: ClaudeLogin | null = null;
   let loginProbe: Promise<ClaudeCodeAuthProbe> | null = null;
-  const readExpiresAt = opts.readClaudeOauthExpiresAt ?? readDefaultClaudeOauthExpiresAt;
+  const claudeHome = claudeConfigHome(paths.home);
+  const readExpiresAt =
+    opts.readClaudeOauthExpiresAt ?? (() => readDefaultClaudeOauthExpiresAt(claudeHome));
   const probeAuthAndRemember = (): Promise<ClaudeCodeAuthProbe> => {
     if (platform !== 'darwin' && !availability?.ready)
       return Promise.resolve({ state: 'unknown', reason: 'confinement unavailable' });
     if (loginProbe) return loginProbe;
     const pending = (async () => {
-      const probe = await (opts.claudeCodeAuthProbe ?? probeClaudeCodeAuth)();
+      const probe = await (opts.claudeCodeAuthProbe ??
+        (() =>
+          probeClaudeCodeAuth({
+            env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome },
+          })))();
       claudeAuth = probe;
       const expiresAt =
         probe.state === 'logged-in' &&
@@ -224,7 +238,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     return loginProbe;
   };
   const claudeReport = () =>
-    readClaudeCodeReport(undefined, {
+    readClaudeCodeReport(claudeHome, {
       bin: claudeBin,
       ...(claudeAuth !== null ? { auth: claudeAuth } : {}),
       ...(claudeLogin !== null ? { login: claudeLogin } : {}),
@@ -287,13 +301,22 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const agentReach = new AgentReachProbe(undefined, undefined, () => agentReachEnabled(paths.home));
   const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
   const devinManaged =
-    opts.devinManaged ?? createDevinManaged({ log: (line) => logger.machine(line) });
+    opts.devinManaged ??
+    createDevinManaged({
+      root: toolInstallRoot(paths.home, 'devin'),
+      home: runtimeHome(paths.home, 'devin'),
+      log: (line) => logger.machine(line),
+    });
   let devinInstalling = false;
   let devinEnsured = false;
   let devinEnsureRetryAt = 0;
   let devinModels = loadDevinModels(paths);
   const antigravityManaged =
-    opts.antigravityManaged ?? createAntigravityManaged({ log: (line) => logger.machine(line) });
+    opts.antigravityManaged ??
+    createAntigravityManaged({
+      root: toolInstallRoot(paths.home, 'antigravity'),
+      log: (line) => logger.machine(line),
+    });
   let sendPresenceNow: (() => Promise<void>) | null = null;
   const phones = createPhones({
     home: paths.home,
@@ -638,8 +661,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     if (platform !== 'darwin') claudeBin = await probeClaudeBin();
     logger.machine(
       claudeBin
-        ? `claude binary: ${claudeBin.path}${claudeBin.version !== null ? ` (${claudeBin.version})` : ''}${claudeBin.source === 'well-known' ? ' [well-known fallback]' : ''}`
-        : 'claude binary: not found on PATH or well-known dirs',
+        ? `claude binary: ${claudeBin.path}${claudeBin.version !== null ? ` (${claudeBin.version})` : ''} [${claudeBin.source}]`
+        : 'claude binary: no managed install (SDK platform package missing)',
     );
 
     if (claudeAuth === null) await probeAuthAndRemember();

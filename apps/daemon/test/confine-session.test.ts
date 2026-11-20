@@ -59,7 +59,7 @@ describe('session confiner', () => {
   test('an isolated Antigravity HOME opens only that HOME and the linked sign-in file', () => {
     const { confine, worktree, runnerHome, root } = fixture();
     const home = join(root, 'user');
-    const agentHome = join(runnerHome, 'agent-homes', 'antigravity');
+    const agentHome = join(runnerHome, 'homes', 'antigravity');
     const token = join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
     mkdirSync(agentHome, { recursive: true });
     mkdirSync(join(home, '.gemini', 'antigravity-cli'), { recursive: true });
@@ -230,7 +230,7 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
 
   test('the pi profile exposes only its own state and keeps the same denied roots', () => {
     const { confine, worktree, runnerHome, serverHome } = fixture();
-    const agentDir = join(runnerHome, 'agent-runtime');
+    const agentDir = join(runnerHome, 'homes', 'pi');
     const privateDirectory = join(runnerHome, 'chat-sessions', 'host-x');
     mkdirSync(agentDir, { recursive: true });
     mkdirSync(privateDirectory, { recursive: true });

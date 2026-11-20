@@ -10147,7 +10147,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > local state layou
   "LOCAL_STATE_DIRS": [
     "outbox",
     "chat-sessions",
-    "agent-runtime",
+    "homes/pi",
     "workspaces",
   ],
   "LOCAL_STATE_FILES": [

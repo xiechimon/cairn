@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { CLAUDE_CODE_AUTH_FAILURE_MARKER } from '@cairn/shared';
+import { bundledClaudeCodePath } from './claude-code-bin.js';
 
 export type ClaudeCodeAuthProbe =
   | { state: 'logged-in'; method: string; provider: string }
@@ -12,13 +12,15 @@ export type ClaudeCodeAuthProbe =
 export type ClaudeCodeAuthRun = (
   command: string,
   args: readonly string[],
-  opts: { timeoutMs: number },
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv },
 ) => Promise<{ stdout: string }>;
 
 export interface ClaudeCodeAuthProbeOpts {
   command?: string;
   timeoutMs?: number;
   run?: ClaudeCodeAuthRun;
+  env?: NodeJS.ProcessEnv;
+  bundledPath?: string | null;
 }
 
 const DEFAULT_PROBE_TIMEOUT_MS = 5_000;
@@ -53,27 +55,39 @@ export function parseClaudeCodeAuthStatus(stdout: string): ClaudeCodeAuthProbe {
 function defaultRun(
   command: string,
   args: readonly string[],
-  opts: { timeoutMs: number },
+  opts: { timeoutMs: number; env?: NodeJS.ProcessEnv },
 ): Promise<{ stdout: string }> {
   return new Promise((resolve, reject) => {
-    execFile(command, [...args], { timeout: opts.timeoutMs, encoding: 'utf8' }, (err, stdout) => {
-      if (typeof stdout === 'string' && stdout.trim() !== '') {
-        resolve({ stdout });
-        return;
-      }
-      reject(err ?? new Error('claude auth status produced no stdout'));
-    });
+    execFile(
+      command,
+      [...args],
+      { timeout: opts.timeoutMs, encoding: 'utf8', env: opts.env },
+      (err, stdout) => {
+        if (typeof stdout === 'string' && stdout.trim() !== '') {
+          resolve({ stdout });
+          return;
+        }
+        reject(err ?? new Error('claude auth status produced no stdout'));
+      },
+    );
   });
 }
 
 export async function probeClaudeCodeAuth(
   opts: ClaudeCodeAuthProbeOpts = {},
 ): Promise<ClaudeCodeAuthProbe> {
-  const command = opts.command ?? process.env.CAIRN_CLAUDE_BIN ?? 'claude';
+  const command =
+    opts.command ??
+    process.env.CAIRN_CLAUDE_BIN ??
+    (opts.bundledPath !== undefined ? opts.bundledPath : bundledClaudeCodePath());
+  if (command === null) {
+    return { state: 'unknown', reason: 'managed claude binary is not installed' };
+  }
   const run = opts.run ?? defaultRun;
   try {
     const { stdout } = await run(command, ['auth', 'status'], {
       timeoutMs: opts.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
+      env: opts.env,
     });
     return parseClaudeCodeAuthStatus(stdout);
   } catch (err) {
@@ -115,15 +129,11 @@ export function parseClaudeOauthExpiresAt(raw: string): number | null {
   return Math.trunc(expiresAt);
 }
 
-export function readDefaultClaudeOauthExpiresAt(): number | null {
-  const configDir = process.env.CLAUDE_CONFIG_DIR;
-  if (configDir && !isAbsolute(configDir)) return null;
+export function readDefaultClaudeOauthExpiresAt(configDir: string): number | null {
+  if (!isAbsolute(configDir)) return null;
   try {
     return parseClaudeOauthExpiresAt(
-      readFileSync(
-        join((configDir || join(homedir(), '.claude')).normalize('NFC'), '.credentials.json'),
-        'utf8',
-      ),
+      readFileSync(join(configDir.normalize('NFC'), '.credentials.json'), 'utf8'),
     );
   } catch {
     return null;

@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
+import { claudeConfigHome, runtimeHome } from './runtime-homes.js';
 
 export const ANTIGRAVITY_CREDENTIAL_FILES = [
   '.gemini/antigravity-cli/antigravity-oauth-token',
@@ -22,11 +23,11 @@ export const GEMINI_CREDENTIAL_FILES = [
 const MAC_KEYCHAINS = 'Library/Keychains';
 
 export function claudeConfigDir(cairnHome: string): string {
-  return join(cairnHome, 'claude');
+  return claudeConfigHome(cairnHome);
 }
 
 export function agentHomeDir(cairnHome: string, name: string): string {
-  return join(cairnHome, 'agent-homes', name);
+  return runtimeHome(cairnHome, name);
 }
 
 function lstatOrNull(path: string) {

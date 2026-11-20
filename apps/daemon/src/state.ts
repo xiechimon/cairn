@@ -40,7 +40,7 @@ export function statePaths(home: string, workspacesDir?: string): StatePaths {
     devinModelsJson: join(home, 'devin-models.json'),
     outboxDir: join(home, 'outbox'),
     chatSessionsDir: join(home, 'chat-sessions'),
-    agentRuntimeDir: join(home, 'agent-runtime'),
+    agentRuntimeDir: join(home, 'homes', 'pi'),
     workspacesDir: workspacesDir ?? join(home, 'workspaces'),
     teamSkillsCacheDir: join(home, 'team-skills'),
     stepAttachmentsDir: join(home, 'step-attachments'),

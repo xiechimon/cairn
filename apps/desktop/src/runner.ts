@@ -79,7 +79,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       [ENV_VARS.confineDeniedRoots]: options.serverHome,
       [ENV_VARS.server]: options.origin,
       [ENV_VARS.skillsDir]: join(options.home, 'skills'),
-      [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),
+      [ENV_VARS.mcpConfig]: join(options.home, 'homes', 'claude', '.claude.json'),
       ...(options.agentDesktop === null
         ? {}
         : { CAIRN_AGENT_DESKTOP: options.agentDesktop, CAIRN_OWN_COMPUTER: '1' }),

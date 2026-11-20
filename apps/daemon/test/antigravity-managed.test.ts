@@ -18,8 +18,32 @@ afterEach(() => {
   for (const dir of tempDirs.splice(0)) releaseTestTempDir(dir);
 });
 
+function writeManagedInstall(root: string, binPath: string): void {
+  const versionDir = join(root, 'versions', '1.5.10');
+  mkdirSync(versionDir, { recursive: true });
+  const binRelPath = 'bin/antigravity-acp';
+  mkdirSync(join(versionDir, 'bin'), { recursive: true });
+  const bin = join(versionDir, binRelPath);
+  const body = readFileSync(binPath);
+  writeFileSync(bin, body);
+  chmodSync(bin, 0o755);
+  writeFileSync(
+    join(versionDir, '.install-complete'),
+    JSON.stringify({
+      version: '1.5.10',
+      url: 'https://example.invalid/ag.tar.gz',
+      archiveSha256: '0'.repeat(64),
+      binRelPath,
+      binSha256: createHash('sha256').update(body).digest('hex'),
+      args: ['acp'],
+      installedAt: Date.now(),
+    }),
+  );
+  writeFileSync(join(root, 'current.json'), JSON.stringify({ version: '1.5.10' }));
+}
+
 describe('antigravity managed binary resolution', () => {
-  test('prefers local agy binary on ~/.local/bin and probes authenticated status & models', async () => {
+  test('ignores a local agy binary on ~/.local/bin — managed copy or nothing', async () => {
     const dir = tempDir('ag-local-');
     const home = join(dir, 'home');
     const binDir = join(home, '.local', 'bin');
@@ -30,42 +54,22 @@ describe('antigravity managed binary resolution', () => {
 
     const fetched: string[] = [];
     const managed = createAntigravityManaged({
-      home,
-      pathEnv: '',
+      root: join(dir, 'managed'),
       platform: 'darwin',
       arch: 'arm64',
       fetchImpl: async (url) => {
         fetched.push(String(url));
         return new Response('{}', { status: 500 });
       },
-      probeBinary: async (binPath, args, source) => ({
-        version: '1.5.10',
-        binPath,
-        args,
-        source,
-        authenticated: true,
-        models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
-      }),
     });
 
-    const beforeEnsure = managed.current();
-    expect(beforeEnsure).toMatchObject({ binPath: agy, source: 'local' });
-
-    const ensured = await managed.ensure();
-    expect(ensured).toMatchObject({
-      binPath: agy,
-      args: ['acp'],
-      source: 'local',
-      version: '1.5.10',
-      authenticated: true,
-    });
-    expect(ensured?.models).toHaveLength(9);
-    expect(fetched).toHaveLength(0);
+    expect(managed.current()).toBeNull();
+    expect(await managed.ensure()).toBeNull();
+    expect(fetched).toHaveLength(1);
   });
 
-  test('downloads .tar.gz from ACP registry with sha256 verification when local binary is absent', async () => {
+  test('downloads .tar.gz from ACP registry with sha256 verification', async () => {
     const dir = tempDir('ag-reg-');
-    const home = join(dir, 'home');
     const src = join(dir, 'src');
     mkdirSync(join(src, 'bin'), { recursive: true });
     const bin = join(src, 'bin', 'antigravity-acp');
@@ -77,8 +81,7 @@ describe('antigravity managed binary resolution', () => {
     const archiveSha256 = createHash('sha256').update(archiveBytes).digest('hex');
 
     const managed = createAntigravityManaged({
-      home,
-      pathEnv: '',
+      root: join(dir, 'managed'),
       platform: 'darwin',
       arch: 'arm64',
       registryUrl: 'https://example.invalid/registry.json',
@@ -159,7 +162,6 @@ describe('antigravity managed binary resolution', () => {
 
   test('downloads .zip from ACP registry and rejects checksum mismatches', async () => {
     const dir = tempDir('ag-zip-');
-    const home = join(dir, 'home');
     const src = join(dir, 'src');
     mkdirSync(join(src, 'bin'), { recursive: true });
     writeFileSync(join(src, 'bin', 'antigravity-acp'), '#!/bin/sh\nexit 0\n');
@@ -170,8 +172,7 @@ describe('antigravity managed binary resolution', () => {
     const validSha = createHash('sha256').update(zipBytes).digest('hex');
 
     const badManaged = createAntigravityManaged({
-      home: join(dir, 'bad-home'),
-      pathEnv: '',
+      root: join(dir, 'bad-managed'),
       platform: 'darwin',
       arch: 'arm64',
       registryUrl: 'https://example.invalid/registry.json',
@@ -202,8 +203,7 @@ describe('antigravity managed binary resolution', () => {
     await expect(badManaged.ensure()).resolves.toBeNull();
 
     const goodManaged = createAntigravityManaged({
-      home,
-      pathEnv: '',
+      root: join(dir, 'good-managed'),
       platform: 'darwin',
       arch: 'arm64',
       registryUrl: 'https://example.invalid/registry.json',
@@ -243,12 +243,9 @@ describe('antigravity managed binary resolution', () => {
     expect(zipInstall).toMatchObject({ version: '1.5.10', source: 'managed', authenticated: true });
   });
 
-  test('runs live ACP initialize + session/new probe against scripted binary', async () => {
+  test('runs live ACP initialize + session/new probe against a managed install', async () => {
     const dir = tempDir('ag-live-');
-    const home = join(dir, 'home');
-    const binDir = join(home, '.local', 'bin');
-    mkdirSync(binDir, { recursive: true });
-    const fakeAgy = join(binDir, 'agy');
+    const fakeAgy = join(dir, 'agy-src');
     writeFileSync(
       fakeAgy,
       [
@@ -272,16 +269,16 @@ describe('antigravity managed binary resolution', () => {
     );
     chmodSync(fakeAgy, 0o755);
 
+    const root = join(dir, 'managed');
+    writeManagedInstall(root, fakeAgy);
     const managed = createAntigravityManaged({
-      home,
-      pathEnv: '',
+      root,
       platform: 'darwin',
       arch: 'arm64',
     });
     const probed = await managed.probe();
     expect(probed).toMatchObject({
-      binPath: fakeAgy,
-      source: 'local',
+      source: 'managed',
       version: '1.5.10',
       authenticated: true,
       models: [

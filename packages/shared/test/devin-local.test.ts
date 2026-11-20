@@ -1,7 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { devinBinaryCandidates, devinKeyFromToml } from '../src/devin-local.js';
-
-const HOME = '/Users/tester';
+import { compareVersions } from '../src/antigravity-local.js';
+import { devinKeyFromToml } from '../src/devin-local.js';
 
 describe('devinKeyFromToml', () => {
   test('pulls the double-quoted key', () => {
@@ -29,47 +28,10 @@ describe('devinKeyFromToml', () => {
   });
 });
 
-describe('devinBinaryCandidates', () => {
-  test('PATH entries come first, then the installer and packaged locations', () => {
-    const candidates = devinBinaryCandidates({
-      home: HOME,
-      pathEnv: '/opt/thing/bin:/usr/bin',
-      managedVersions: [],
-    });
-    expect(candidates).toEqual([
-      '/opt/thing/bin/devin',
-      '/usr/bin/devin',
-      '/Users/tester/.local/bin/devin',
-      '/opt/homebrew/bin/devin',
-      '/usr/local/bin/devin',
-    ]);
-  });
-
-  test('falls back to well-known paths when PATH is empty', () => {
-    const candidates = devinBinaryCandidates({ home: HOME, pathEnv: '', managedVersions: [] });
-    expect(candidates[0]).toBe(`${HOME}/.local/bin/devin`);
-  });
-
-  test('managed installs sort newest version last', () => {
-    const candidates = devinBinaryCandidates({
-      home: HOME,
-      pathEnv: '',
-      managedVersions: ['3000.1.0', '3000.13.4', '3000.2.0'],
-    });
-    const managed = candidates.filter((c) => c.includes('agents/devin'));
-    expect(managed).toEqual([
-      `${HOME}/.local/share/cairn/agents/devin/3000.13.4/bin/devin`,
-      `${HOME}/.local/share/cairn/agents/devin/3000.2.0/bin/devin`,
-      `${HOME}/.local/share/cairn/agents/devin/3000.1.0/bin/devin`,
-    ]);
-  });
-
-  test('dedupes candidates', () => {
-    const candidates = devinBinaryCandidates({
-      home: HOME,
-      pathEnv: `${HOME}/.local/bin`,
-      managedVersions: [],
-    });
-    expect(candidates.filter((c) => c === `${HOME}/.local/bin/devin`)).toHaveLength(1);
+describe('compareVersions', () => {
+  test('sorts dotted versions numerically', () => {
+    expect(
+      ['3000.1.0', '3000.13.4', '3000.2.0'].sort((a, b) => compareVersions(b, a)),
+    ).toEqual(['3000.13.4', '3000.2.0', '3000.1.0']);
   });
 });

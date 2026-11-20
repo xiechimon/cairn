@@ -81,6 +81,7 @@ export interface DevinManaged {
 
 export interface DevinManagedOptions {
   root?: string;
+  home?: string;
   platform?: string;
   arch?: string;
   fetchImpl?: typeof fetch;
@@ -89,8 +90,8 @@ export interface DevinManagedOptions {
   log?: (message: string) => void;
 }
 
-export function devinInstallRoot(): string {
-  return join(homedir(), '.local', 'share', 'cairn', 'devin');
+export function devinInstallRoot(cairnHome: string): string {
+  return join(cairnHome, 'tools', 'devin');
 }
 
 function sha256File(path: string): string {
@@ -121,7 +122,7 @@ function markerOf(versionDir: string): InstallMarker | null {
 }
 
 export function createDevinManaged(options: DevinManagedOptions = {}): DevinManaged {
-  const root = options.root ?? devinInstallRoot();
+  const root = options.root ?? devinInstallRoot(join(homedir(), '.cairn'));
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -129,7 +130,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
   const manifestUrl = options.manifestUrl ?? MANIFEST_URL;
   const log = options.log ?? (() => {});
   const key = platformKey(platform, arch);
-  const home = join(root, 'home');
+  const home = options.home ?? join(root, 'home');
   let pending: Promise<DevinInstall | null> | null = null;
 
   function installFor(versionDir: string): DevinInstall | null {

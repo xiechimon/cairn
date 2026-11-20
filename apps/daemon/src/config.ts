@@ -86,7 +86,9 @@ export function loadDaemonConfig(
     foreground: input.foreground ?? false,
     skillsDir,
     mcpConfigPath: resolve(
-      input.mcpConfigPath ?? env[ENV_VARS.mcpConfig] ?? join(homedir(), CLAUDE_CONFIG_FILE_NAME),
+      input.mcpConfigPath ??
+        env[ENV_VARS.mcpConfig] ??
+        join(home, 'homes', 'claude', CLAUDE_CONFIG_FILE_NAME),
     ),
     hookTimeoutMs,
   });

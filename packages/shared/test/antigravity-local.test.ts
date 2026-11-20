@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
-  antigravityBinaryCandidates,
   antigravityKeyFromText,
   createAntigravitySubscriptionSchema,
   DEFAULT_ANTIGRAVITY_MODELS,
+  managedVersionedBins,
 } from '../src/index.js';
 
 describe('antigravity local helpers and schemas', () => {
@@ -19,24 +19,17 @@ describe('antigravity local helpers and schemas', () => {
     expect(antigravityKeyFromText('{bad')).toBeNull();
   });
 
-  test('orders explicit, local agy, PATH, and managed binary candidates', () => {
-    const candidates = antigravityBinaryCandidates({
-      home: '/home/tester',
-      pathEnv: '/custom/bin:/usr/bin',
-      managedVersions: ['1.0.0', '1.5.10'],
-      explicitPath: '/opt/agy',
-    });
+  test('managedVersionedBins sorts newest version first across the bin names', () => {
+    const candidates = managedVersionedBins(
+      '/cairn/tools/antigravity/versions',
+      ['1.0.0', '1.5.10'],
+      ['bin/antigravity-acp', 'bin/agy'],
+    );
     expect(candidates).toEqual([
-      '/opt/agy',
-      '/home/tester/.local/bin/agy',
-      '/opt/homebrew/bin/agy',
-      '/usr/local/bin/agy',
-      '/custom/bin/agy',
-      '/usr/bin/agy',
-      '/home/tester/.local/share/cairn/antigravity/versions/1.5.10/bin/antigravity-acp',
-      '/home/tester/.local/share/cairn/antigravity/versions/1.5.10/bin/agy',
-      '/home/tester/.local/share/cairn/antigravity/versions/1.0.0/bin/antigravity-acp',
-      '/home/tester/.local/share/cairn/antigravity/versions/1.0.0/bin/agy',
+      '/cairn/tools/antigravity/versions/1.5.10/bin/antigravity-acp',
+      '/cairn/tools/antigravity/versions/1.5.10/bin/agy',
+      '/cairn/tools/antigravity/versions/1.0.0/bin/antigravity-acp',
+      '/cairn/tools/antigravity/versions/1.0.0/bin/agy',
     ]);
   });
 
