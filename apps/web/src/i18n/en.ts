@@ -2875,6 +2875,7 @@ export const EN: Record<string, string> = {
   评论: 'Comments',
   关闭评论列表: 'Close the comment list',
   评论列表: 'Comment list',
+  '任务已归档，不能再生成分享链接。': 'The task is archived, so a share link cannot be created.',
   '还没有评论。点「评论」后在页面上点一个元素。':
     'No comments yet. Turn on Comments, then click an element on the page.',
   这个页面不支持点选评论: 'This page does not support picking elements to comment on',

@@ -118,7 +118,9 @@ export function SharePopover({
         ) : (
           <div data-testid="design-share-off" className="flex flex-col gap-2">
             <p className="m-0 text-ui text-foreground">
-              {t('生成一个公开链接，拿到链接的人都能看这个页面的当前版本。')}
+              {readOnly
+                ? t('任务已归档，不能再生成分享链接。')
+                : t('生成一个公开链接，拿到链接的人都能看这个页面的当前版本。')}
             </p>
             {!readOnly && (
               <Button
