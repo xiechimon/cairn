@@ -2,6 +2,7 @@ import type { DesignCommentRecord } from '@cairn/shared';
 import { useDesignComments, useDesignMutations, useDesignPages } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
 import type { PendingComments } from '../../chief/chief-conversation.js';
+import { Button } from '../../components/ui/button.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
@@ -43,14 +44,15 @@ export function useDesignComposer(
             className="inline-flex h-6 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-border bg-background pr-0.5 pl-2 text-meta text-foreground"
           >
             <span className="flex-none font-medium tabular-nums">{comment.pin}</span>
-            <span className="min-w-0 max-w-[22rem] truncate">
+            <span className="min-w-0 max-w-88 truncate">
               {commentSubject(comment)} · {comment.note}
             </span>
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon-xs"
               data-testid="design-comment-chip-remove"
               aria-label={t('删除评论 {n}', { n: comment.pin })}
-              className="flex size-5 flex-none cursor-pointer items-center justify-center rounded-full text-content-tertiary hover:bg-(--hover-1) hover:text-foreground"
+              className="size-5 flex-none rounded-full text-content-tertiary hover:bg-(--hover-1) hover:text-foreground"
               onClick={() =>
                 deleteComment.mutate(comment.id, {
                   onError: (error) => toastError(t('评论没删掉'), error),
@@ -58,7 +60,7 @@ export function useDesignComposer(
               }
             >
               <X aria-hidden className="size-3.5" />
-            </button>
+            </Button>
           </span>
         ))}
       </div>

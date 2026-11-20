@@ -34,17 +34,18 @@ export function CommentPin({
 }) {
   const { t } = useI18n();
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
+      size="icon-xs"
       data-testid="design-pin"
       data-pin={pin}
       data-status={status}
       aria-label={t('评论 {n}', { n: pin })}
       onClick={onClick}
-      className="pointer-events-auto flex size-5.5 -translate-x-1/2 -translate-y-full cursor-pointer items-center justify-center rounded-full rounded-bl-none bg-foreground text-[11px] leading-none font-medium text-background tabular-nums shadow-(--shadow-xs) data-[status=sent]:bg-content-secondary"
+      className="pointer-events-auto size-5.5 -translate-x-1/2 -translate-y-full rounded-full rounded-bl-none bg-foreground text-caption leading-none text-background tabular-nums shadow-(--shadow-xs) hover:bg-foreground hover:text-background data-[status=sent]:bg-content-secondary"
     >
       {pin}
-    </button>
+    </Button>
   );
 }
 
@@ -73,7 +74,7 @@ function CommentRow({
       data-focused={focused || undefined}
       className="flex gap-2.5 border-b border-border px-3 py-3 data-focused:bg-(--surface-1)"
     >
-      <span className="mt-0.5 flex size-5 flex-none items-center justify-center rounded-full bg-secondary text-[11px] font-medium text-foreground tabular-nums">
+      <span className="mt-0.5 flex size-5 flex-none items-center justify-center rounded-full bg-secondary text-caption font-medium text-foreground tabular-nums">
         {comment.pin}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-1">
