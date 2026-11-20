@@ -178,7 +178,7 @@ test('masks an absent or non-regular .git so a pointer cannot be planted', () =>
   const policy = fixture();
   const args = confinementArgs(policy, 'linux');
   const dotGit = join(policy.workspace, '.git');
-  const index = args.findIndex((arg) => arg === dotGit);
+  const index = args.indexOf(dotGit);
   expect(args[index - 2]).toBe('--ro-bind');
   expect(args[index - 1]).toBe('/dev/null');
 });
