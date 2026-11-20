@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { type RouteObject, useLocation, useNavigate, useRoutes } from 'react-router';
 import { useLiveData } from '../api/provider.js';
+import { FileLightboxHost } from '../board/file-lightbox.js';
 import { coordinatorSearch, useOpenComposer, useOpenNewTask } from '../board/open-composer.js';
 import { useDesktopMenu } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -148,18 +149,20 @@ export function ChiefRoot({
   );
   return (
     <ChiefRootContext.Provider value={api}>
-      <div className="contents" inert={settings.open}>
-        <Suspense fallback={null}>{page}</Suspense>
-      </div>
-      {settings.section !== null ? (
-        <Suspense fallback={null}>
-          <SettingsDialog section={settings.section} onClose={settings.close} />
-        </Suspense>
-      ) : (
-        <RouteDialogCloseProvider value={settings.close}>
-          <Suspense fallback={null}>{dialog}</Suspense>
-        </RouteDialogCloseProvider>
-      )}
+      <FileLightboxHost>
+        <div className="contents" inert={settings.open}>
+          <Suspense fallback={null}>{page}</Suspense>
+        </div>
+        {settings.section !== null ? (
+          <Suspense fallback={null}>
+            <SettingsDialog section={settings.section} onClose={settings.close} />
+          </Suspense>
+        ) : (
+          <RouteDialogCloseProvider value={settings.close}>
+            <Suspense fallback={null}>{dialog}</Suspense>
+          </RouteDialogCloseProvider>
+        )}
+      </FileLightboxHost>
     </ChiefRootContext.Provider>
   );
 }

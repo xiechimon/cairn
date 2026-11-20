@@ -1,8 +1,8 @@
 import { expect, type Page, test } from '@playwright/test';
-import { HISTORY, mockLive } from './chief-home-mock';
+import { HISTORY, mockLive, THREAD } from './chief-home-mock';
 
 const TEXT_DEEP_LINK =
-  '/app?scenario=chief-files&pane=file&file=team-files/att-test-txt.txt&fileName=test.txt';
+  '/app?scenario=chief-files&file=team-files/att-test-txt.txt&fileName=test.txt';
 
 async function dropFiles(page: Page, selector: string, files: { name: string; type: string; body: string }[]) {
   await page.evaluate(
@@ -21,7 +21,7 @@ async function dropFiles(page: Page, selector: string, files: { name: string; ty
   );
 }
 
-test('a sent attachment is a 122px card above the bubble that opens the file panel', async ({
+test('a sent attachment is a 122px card with its type icon that opens the lightbox', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -29,7 +29,8 @@ test('a sent attachment is a 122px card above the bubble that opens the file pan
   const card = page.getByTestId('chief-sent-attachment');
   await expect(card).toBeVisible();
   await expect(card).toContainText('test.txt');
-  await expect(card).toContainText('TXT');
+  await expect(card.locator('[data-file-icon="text"]').first()).toBeVisible();
+  await expect(card.getByTestId('attachment-tile-preview')).toHaveCount(0);
   const cardBox = await card.boundingBox();
   expect(cardBox?.width).toBe(122);
   expect(cardBox?.height).toBe(122);
@@ -42,9 +43,10 @@ test('a sent attachment is a 122px card above the bubble that opens the file pan
   expect(Math.abs((bubbleBox?.x ?? 0) + (bubbleBox?.width ?? 0) - (cardBox?.x ?? 0) - 122)).toBeLessThan(1);
 
   await card.getByRole('button', { name: 'test.txt', exact: true }).click();
-  const panel = page.getByTestId('file-preview-panel');
+  const panel = page.getByTestId('file-lightbox');
   await expect(panel).toBeVisible();
-  await expect(page).toHaveURL(/pane=file/);
+  await expect(page).toHaveURL(/file=team-files/);
+  await expect(page).not.toHaveURL(/pane=/);
   await expect(panel.getByTestId('file-preview-name')).toHaveText('test.txt');
   const lines = panel.getByTestId('file-preview-text').locator('[data-slot="file-line"]');
   await expect(lines).toHaveCount(1);
@@ -53,18 +55,18 @@ test('a sent attachment is a 122px card above the bubble that opens the file pan
 
   await page.goBack();
   await expect(panel).toHaveCount(0);
-  await expect(page).not.toHaveURL(/pane=file/);
+  await expect(page).not.toHaveURL(/file=/);
 });
 
-test('the file panel deep-links, copies the text, downloads with the name and closes', async ({
+test('the lightbox deep-links, copies the text, downloads with the name and closes', async ({
   page,
   context,
 }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(
-    '/app?scenario=chief-files-long&pane=file&file=team-files/att-verify-log.log&fileName=verify-3877.log',
+    '/app?scenario=chief-files-long&file=team-files/att-verify-log.log&fileName=verify-3877.log',
   );
-  const panel = page.getByTestId('file-preview-panel');
+  const panel = page.getByTestId('file-lightbox');
   await expect(panel).toBeVisible();
   const viewer = panel.getByTestId('file-preview-text');
   await expect(viewer.locator('[data-slot="file-line"]')).toHaveCount(240);
@@ -97,9 +99,9 @@ test('a Markdown file renders as a document, the toggle shows the source and cop
 }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(
-    '/app?scenario=chief-files-markdown&pane=file&file=team-files/att-release-notes.md&fileName=release-notes.md',
+    '/app?scenario=chief-files-markdown&file=team-files/att-release-notes.md&fileName=release-notes.md',
   );
-  const panel = page.getByTestId('file-preview-panel');
+  const panel = page.getByTestId('file-lightbox');
   const rendered = panel.getByTestId('file-preview-markdown');
   await expect(rendered.getByRole('heading', { name: '发布检查清单', level: 1 })).toBeVisible();
   await expect(rendered.getByRole('heading', { name: '必做', level: 2 })).toBeVisible();
@@ -134,29 +136,30 @@ test('a Markdown file renders as a document, the toggle shows the source and cop
 
 test('a plain text file keeps the line view and has no source toggle', async ({ page }) => {
   await page.goto(TEXT_DEEP_LINK);
-  const panel = page.getByTestId('file-preview-panel');
+  const panel = page.getByTestId('file-lightbox');
   await expect(panel.getByTestId('file-preview-text')).toBeVisible();
   await expect(panel.getByTestId('file-preview-markdown')).toHaveCount(0);
   await expect(panel.getByTestId('file-preview-source-toggle')).toHaveCount(0);
 });
 
-test('the file panel shows images fitted and a quiet download state for other types', async ({
+test('the lightbox shows images fitted and a quiet download state for other types', async ({
   page,
 }) => {
   await page.goto(
-    '/app?scenario=chief-files-image&pane=file&file=team-files/att-home-shot.png&fileName=首页设计稿.png',
+    '/app?scenario=chief-files-image&file=team-files/att-home-shot.png&fileName=首页设计稿.png',
   );
-  const panel = page.getByTestId('file-preview-panel');
+  const panel = page.getByTestId('file-lightbox');
   const image = panel.getByTestId('file-preview-image');
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(960);
   const imageBox = await image.boundingBox();
   const panelBox = await panel.boundingBox();
   expect(imageBox?.width ?? 0).toBeLessThanOrEqual(panelBox?.width ?? 0);
-  await expect(panel.getByRole('button', { name: '复制' })).toBeDisabled();
+  expect(imageBox?.height ?? 0).toBeLessThanOrEqual(panelBox?.height ?? 0);
+  await expect(panel.getByRole('button', { name: '复制' })).toHaveCount(0);
 
   await page.goto(
-    '/app?scenario=chief-files-unsupported&pane=file&file=team-files/att-office.xlsx&fileName=汇总.xlsx',
+    '/app?scenario=chief-files-unsupported&file=team-files/att-office.xlsx&fileName=汇总.xlsx',
   );
   const unsupported = page.getByTestId('file-preview-unsupported');
   await expect(unsupported).toContainText('无法预览，下载查看');
@@ -168,23 +171,71 @@ test('a text file that fails to load shows the error state with retry', async ({
     route.fulfill({ status: 500, body: 'boom' }),
   );
   await page.goto(
-    '/app?scenario=chief-files&pane=file&file=team-files/att-missing.txt&fileName=missing.txt',
+    '/app?scenario=chief-files&file=team-files/att-missing.txt&fileName=missing.txt',
   );
-  const panel = page.getByTestId('file-preview-panel');
+  const panel = page.getByTestId('file-lightbox');
   await expect(panel.getByTestId('query-error')).toContainText('文件没能加载');
   await expect(panel.getByRole('button', { name: '重试' })).toBeVisible();
 });
 
-test('opening the file panel hides the sidebar like the other panels', async ({ page }) => {
+test('the lightbox floats over the conversation, pages across the message files and closes three ways', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(TEXT_DEEP_LINK);
-  await expect(page.getByTestId('file-preview-panel')).toBeVisible();
-  await expect(page.getByTestId('side-panel-resize')).toBeAttached();
-  await expect(page.locator('.board-shell > .board-sidebar')).toHaveCount(0);
-  await expect(page.getByTestId('sidebar-reopen')).toBeVisible();
-  await page.getByTestId('file-preview-panel').getByRole('button', { name: '关闭' }).click();
+  const files = [
+    ['att-shot', 'png', 'shot.png'],
+    ['att-clip', 'mp4', 'clip.mp4'],
+    ['att-plan', 'docx', 'plan.docx'],
+  ];
+  const message = `${files.map(([id, ext, name]) => `![${name}](attachment:team-files/${id}.${ext})`).join('\n')}\n看看`;
+  await mockLive(
+    page,
+    { threads: [THREAD], messages: [...HISTORY, { id: 'm9', role: 'user', content: message, createdAt: 40 }] },
+    (path, route) =>
+      path === '/api/attachments/att-plan/document-preview'
+        ? route.fulfill({
+            json: { kind: 'document', title: '第一阶段计划', sections: [{ title: '目标', lines: ['先做桌面端'] }] },
+          })
+        : path.startsWith('/api/attachments/')
+          ? route.fulfill({ status: 404, body: '' })
+          : undefined,
+  );
+  await page.goto('/app');
+  const tiles = page.getByTestId('chief-sent-attachment');
+  await expect(tiles).toHaveCount(3);
+  await expect(tiles.nth(2).locator('[data-file-icon="word"]').first()).toBeVisible();
+  await expect(tiles.nth(2).getByTestId('attachment-tile-preview')).toContainText('第一阶段计划');
+  await tiles.nth(0).getByRole('button', { name: 'shot.png', exact: true }).click();
+  const lightbox = page.getByTestId('file-lightbox');
+  await expect(lightbox).toBeVisible();
   await expect(page.locator('.board-shell > .board-sidebar')).toBeVisible();
-  await expect(page.getByTestId('sidebar-reopen')).toHaveCount(0);
+  await expect(page.getByTestId('side-panel-resize')).toHaveCount(0);
+  await expect.poll(async () => (await lightbox.boundingBox())?.width).toBe(1440);
+  await expect.poll(async () => (await lightbox.boundingBox())?.height).toBe(900);
+  const position = lightbox.getByTestId('file-lightbox-position');
+  await expect(position).toHaveText('第 1 个，共 3 个');
+  await expect(lightbox.getByTestId('file-lightbox-prev')).toBeDisabled();
+  await page.keyboard.press('ArrowRight');
+  await expect(position).toHaveText('第 2 个，共 3 个');
+  await expect(lightbox.getByTestId('file-preview-name')).toHaveText('clip.mp4');
+  await lightbox.getByTestId('file-lightbox-next').click();
+  await expect(position).toHaveText('第 3 个，共 3 个');
+  await expect(lightbox.getByTestId('file-preview-document')).toContainText('先做桌面端');
+  await page.keyboard.press('ArrowLeft');
+  await expect(position).toHaveText('第 2 个，共 3 个');
+
+  await page.keyboard.press('Escape');
+  await expect(lightbox).toHaveCount(0);
+  await expect(page).not.toHaveURL(/file=/);
+
+  await tiles.nth(0).getByRole('button', { name: 'shot.png', exact: true }).click();
+  await expect(lightbox).toBeVisible();
+  await page.mouse.click(40, 450);
+  await expect(lightbox).toHaveCount(0);
+
+  await tiles.nth(2).getByRole('button', { name: 'plan.docx', exact: true }).click();
+  await lightbox.getByTestId('file-lightbox-close').click();
+  await expect(lightbox).toHaveCount(0);
 });
 
 test('composer tiles: 122px, remove tooltip names the file, keyboard removal returns focus', async ({
@@ -196,7 +247,7 @@ test('composer tiles: 122px, remove tooltip names the file, keyboard removal ret
   const box = await tile.boundingBox();
   expect(box?.width).toBe(122);
   expect(box?.height).toBe(122);
-  await expect(tile).toContainText('XLSX');
+  await expect(tile.locator('[data-file-icon="excel"]').first()).toBeVisible();
   const remove = tile.getByRole('button', { name: /^移除附件：第一阶段交付/ });
   await expect(remove).toHaveCSS('opacity', '0');
   await tile.hover();
@@ -218,7 +269,6 @@ test('composer tiles: uploading pulses without a progress bar and failed keeps a
   const uploading = page.getByTestId('attachment-pending');
   await expect(uploading).toHaveAttribute('data-state', 'uploading');
   await expect(uploading).toContainText('上传中');
-  await expect(uploading).not.toContainText('XLSX');
   await expect(uploading).toHaveCSS('animation-name', 'pulse');
 
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -286,15 +336,14 @@ test('a failed drop upload leaves an error tile and a toast, and keeps the draft
   await expect(input).toHaveValue('这段话要留着');
 });
 
-test('the file panel fills the phone screen inside the existing panel mechanism', async ({
+test('the lightbox fills the phone screen', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(TEXT_DEEP_LINK);
-  const panel = page.getByTestId('file-preview-panel');
+  const panel = page.getByTestId('file-lightbox');
   await expect(panel).toBeVisible();
-  const box = await panel.boundingBox();
-  expect(box?.width ?? 0).toBeCloseTo(390, 0);
+  await expect.poll(async () => Math.round((await panel.boundingBox())?.width ?? 0)).toBe(390);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   await panel.getByRole('button', { name: '关闭' }).click();
   await expect(panel).toHaveCount(0);
@@ -306,8 +355,8 @@ test('a live file downloads through the endpoint that names the file', async ({ 
       ? route.fulfill({ contentType: 'text/plain', body: 'one\ntwo\n' })
       : undefined,
   );
-  await page.goto('/app?pane=file&file=team-files/att-notes.log&fileName=notes.log');
-  const panel = page.getByTestId('file-preview-panel');
+  await page.goto('/app?file=team-files/att-notes.log&fileName=notes.log');
+  const panel = page.getByTestId('file-lightbox');
   await expect(panel.getByTestId('file-preview-text').locator('[data-slot="file-line"]')).toHaveCount(2);
   const download = panel.getByRole('link', { name: '下载' });
   await expect(download).toHaveAttribute('href', '/api/attachments/att-notes?download=1');
@@ -330,14 +379,14 @@ test('an office file shows its extracted text, and one the server cannot read of
         ? route.fulfill({ status: 422, json: { error: 'unreadable' } })
         : undefined,
   );
-  await page.goto('/app?pane=file&file=team-files/att-plan.docx&fileName=计划.docx');
-  const panel = page.getByTestId('file-preview-panel');
+  await page.goto('/app?file=team-files/att-plan.docx&fileName=计划.docx');
+  const panel = page.getByTestId('file-lightbox');
   const document = panel.getByTestId('file-preview-document');
   await expect(document.getByRole('heading', { name: '第一阶段计划', level: 2 })).toBeVisible();
   await expect(document.getByRole('heading', { name: '目标', level: 3 })).toBeVisible();
   await expect(document).toContainText('三周内上线定价页');
 
-  await page.goto('/app?pane=file&file=team-files/att-broken.xlsx&fileName=汇总.xlsx');
+  await page.goto('/app?file=team-files/att-broken.xlsx&fileName=汇总.xlsx');
   const fallback = page.getByTestId('file-preview-unsupported');
   await expect(fallback).toContainText('无法预览，下载查看');
   await expect(fallback.getByRole('button', { name: '下载' })).toBeVisible();

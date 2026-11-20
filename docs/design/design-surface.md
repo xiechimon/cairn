@@ -8,7 +8,7 @@ Owner decisions (ian, 2026-11-20) that override the first draft:
 2. Take Open Design's code, not a rewrite. Borrowed code lives in its own directories with `LICENSE`, `NOTICE.md` and one SPDX line per file, restyled with Cairn tokens and components.
 3. The left side is the Coordinator conversation. The owner talks to the Coordinator; comments on a page are forwarded to the task whose agent built it.
 4. Preview network: pages have network access (fonts, images, APIs), as in Open Design (see Security).
-5. Images open in the side panel through the borrowed image viewer; the image dialog goes.
+5. Finished files (images, video, docx, pdf, pptx, xlsx and every other non-HTML type) open in a floating lightbox over the app with a pager across the message's files, through the borrowed viewers; the side panel is only for the design view while a page is being iterated (ian, 2026-11-20, superseding the side-panel file view). Tiles show a type glyph with the conventional office accent and the first lines when they are cheap to read.
 6. Previews are served by Cairn itself, so a page keeps opening after the task that made it stops; no preview depends on a task's own dev server.
 
 Tags: **verified** = read in source at the named commit or run live; **derived** = follows from verified facts; **guess** = the rest.
@@ -38,23 +38,22 @@ Measured in the code (verified, this worktree):
 Pick the surface by what the user does next:
 
 - **Inline in chat**: glance. A card, chip or collapsed row, never a scrolling viewer.
-- **Side panel** (`SidePanel` beside the chat, `FilePreviewPanel`): read. Every non-HTML type opens here through the borrowed Open Design viewer for its kind.
+- **Lightbox** (`FileLightbox`, full window over the app): read. Every non-HTML type opens here through the borrowed Open Design viewer for its kind, with a pager across the message's files.
 - **Design view** (Coordinator chat left, design right): iterate on a page.
 - **External app**: a type Cairn cannot render; the viewer offers download and, on the Mac app, `用默认应用打开`.
-- Never a modal dialog for content.
 
 | Type | Inline | Click opens | Viewer (borrowed) |
 |---|---|---|---|
 | html (deliverable or attached by a task) | card: thumbnail, name, `vN`, open-comment count | design view | `HtmlPreview` with the comment, mark-up and snapshot bridges |
-| md | chat markdown or card | side panel | `MarkdownViewer` (rendered, source toggle) |
-| image (png, jpg, gif, webp, avif) | thumbnail chip | side panel | `ImageViewer` |
-| svg | thumbnail chip | side panel | `SvgViewer` (preview, source) |
-| video (mp4, webm, mov) | chip | side panel | `VideoViewer` |
-| audio (mp3, wav, m4a) | chip | side panel | `AudioViewer` |
-| pdf | chip | side panel | browser PDF frame (see Borrowed code, deviations) |
-| docx, pptx, xlsx | chip with type and size | side panel | `DocumentPreviewViewer` over the server text extraction |
-| text, code, json, log, diff | chip; tool output stays collapsed in the transcript | side panel | `TextViewer` with line numbers; diffs and code highlighted |
-| other (zip, binary) | chip | side panel with download | `BinaryViewer` |
+| md | chat markdown or card | lightbox | `MarkdownViewer` (rendered, source toggle) |
+| image (png, jpg, gif, webp, avif) | thumbnail chip | lightbox | `ImageViewer` |
+| svg | thumbnail chip | lightbox | `SvgViewer` (preview, source) |
+| video (mp4, webm, mov) | chip | lightbox | `VideoViewer` |
+| audio (mp3, wav, m4a) | chip | lightbox | `AudioViewer` |
+| pdf | chip | lightbox | browser PDF frame (see Borrowed code, deviations) |
+| docx, pptx, xlsx | chip with type and size | lightbox | `DocumentPreviewViewer` over the server text extraction |
+| text, code, json, log, diff | chip; tool output stays collapsed in the transcript | lightbox | `TextViewer` with line numbers; diffs and code highlighted |
+| other (zip, binary) | chip | lightbox with download | `BinaryViewer` |
 
 ## Scope
 
@@ -75,7 +74,7 @@ Each phase lands on `main` on its own and ends in a check run on a `verify-cairn
 | Phase | Scope | Acceptance |
 |---|---|---|
 | 1. Data and serving | Shared contract; the three tables and the W8 backfill; W1 and W1b; R1, R2, R3 (Cairn-served page, sandbox header, `?print=1`); R5 document text; the worker prompt line | Server tests for W1, W1b, W8, R3 header and R5; an attached `.html` from a finished task opens at its R3 URL after the task stops |
-| 2. File viewer | The borrowed viewers (image, video, audio, SVG, text with JSON formatting, code with lines and diff colouring, Markdown, document text for docx/pptx/xlsx, PDF frame, binary) in `FilePreviewPanel`; the image dialog removed | Each sample type (md, png, pdf, mp4, diff, log, docx, pptx, xlsx) shows in the side panel, light and dark, next to the Open Design screenshot of the same file; image before/after |
+| 2. File viewer | The borrowed viewers (image, video, audio, SVG, text with JSON formatting, code with lines and diff colouring, Markdown, document text for docx/pptx/xlsx, PDF frame, binary) in `FileLightbox`, type-glyph tiles with first-line previews; the image dialog and the side-panel file view removed | Each sample type (md, png, pdf, mp4, diff, log, docx, pptx, xlsx) shows in the lightbox, light and dark, next to the Open Design screenshot of the same file; image before/after |
 | 3. Design view | `view=design` with the Coordinator chat left; toolbar, page picker, reload, source toggle, viewports, versions list and restore (W2), open in browser; entry points from the task's page card and the attachment chip; the report dialog's 380px frame removed | A two-version page: v1 and v2 switch, restore makes v3, each viewport fits, compared with Open Design |
 | 4. Comments | Comment bridge, hover outline, popover with inspect rows, save and send, chips above the composer, comment list with anchor state; W3 to W6 | Save, edit, delete, resolve; sending puts the notes in the Coordinator message and the task message once, live |
 | 5. Mark-up | Draw overlay, undo and redo, snapshot bake into a `design` PNG, mark comment | A boxed and annotated mark shows as a comment with its PNG, and the task message carries it |

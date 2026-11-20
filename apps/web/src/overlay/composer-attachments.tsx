@@ -1,15 +1,9 @@
-import { useContext, useMemo, useRef } from 'react';
-import { attachmentUrl, OpenFileContext } from '../board/file-pane.js';
+import { useMemo, useRef } from 'react';
+import { FileTile } from '../board/file-tile.js';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import type { ComposerFileSeed } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  attachmentKind,
-  type PendingAttachment,
-  parseAttachmentTokens,
-} from './attachment-paste.js';
-
-const IMAGE_KEY = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
+import { type PendingAttachment, parseAttachmentTokens } from './attachment-paste.js';
 
 export function ComposerAttachments({
   tokens,
@@ -28,7 +22,6 @@ export function ComposerAttachments({
 }) {
   const { t } = useI18n();
   const settled = useMemo(() => parseAttachmentTokens(tokens.join('\n')), [tokens]);
-  const openFile = useContext(OpenFileContext);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const thenFocusInput = (remove: () => void) => () => {
     const host = stripRef.current?.parentElement ?? null;
@@ -49,7 +42,6 @@ export function ComposerAttachments({
           key={`seed-${entry.name}`}
           {...(entry.state === 'ready' ? {} : { testId: 'attachment-pending' })}
           name={entry.name}
-          kind={attachmentKind(entry.name)}
           state={entry.state}
           {...(entry.state !== 'uploading' && onDismissSeeded !== undefined
             ? { onRemove: thenFocusInput(() => onDismissSeeded(index)) }
@@ -61,7 +53,6 @@ export function ComposerAttachments({
           key={entry.uid}
           testId="attachment-pending"
           name={entry.name}
-          kind={attachmentKind(entry.name)}
           state={entry.failed ? 'error' : 'uploading'}
           {...(entry.url !== null ? { imageSrc: entry.url } : {})}
           {...(entry.failed && onDismissPending !== undefined
@@ -69,23 +60,14 @@ export function ComposerAttachments({
             : {})}
         />
       ))}
-      {settled.map((token, index) => {
-        const source = attachmentUrl(token.key);
-        const isImage = IMAGE_KEY.test(token.key);
-        return (
-          <ComposerAttachmentTile
-            key={`${token.key}#${index}`}
-            name={token.name}
-            kind={attachmentKind(token.name)}
-            state="ready"
-            onRemove={thenFocusInput(() => onRemove(index))}
-            {...(isImage ? { imageSrc: source } : {})}
-            {...(openFile !== undefined
-              ? { onPreview: () => openFile({ name: token.name, key: token.key }) }
-              : { href: source })}
-          />
-        );
-      })}
+      {settled.map((token, index) => (
+        <FileTile
+          key={`${token.key}#${index}`}
+          file={token}
+          set={settled}
+          onRemove={thenFocusInput(() => onRemove(index))}
+        />
+      ))}
     </div>
   );
 }

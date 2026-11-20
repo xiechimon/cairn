@@ -79,11 +79,6 @@ export function joinDraft(tokens: string[], text: string): string {
   return tokens.join('\n') + (text === '' ? '' : `\n${text}`);
 }
 
-export function attachmentKind(name: string): string {
-  const dot = name.lastIndexOf('.');
-  return dot > 0 && dot < name.length - 1 ? name.slice(dot + 1).toUpperCase() : 'FILE';
-}
-
 export interface PendingAttachment {
   uid: string;
   name: string;

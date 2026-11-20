@@ -783,5 +783,10 @@
     "path": "apps/web/src/vendor-open-design/viewers/video-viewer.tsx",
     "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
     "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/file-type-icon.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileTypeIcon.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
   }
 ]

@@ -80,25 +80,17 @@ function ComposerSpecimen() {
       </Cell>
       <Cell label="Attachment tile states: file, image, uploading, upload failed">
         <div className="flex w-160 flex-wrap gap-2 rounded-(--radius-composer) bg-card px-3.5 pt-3.5 pb-3 shadow-(--shadow-composer)">
-          <ComposerAttachmentTile
-            name="error.log"
-            kind="LOG"
-            state="ready"
-            href="#"
-            onRemove={noop}
-          />
+          <ComposerAttachmentTile name="error.log" state="ready" href="#" onRemove={noop} />
           <ComposerAttachmentTile
             name="screenshot.png"
-            kind="PNG"
             state="ready"
             imageSrc={TILE_IMAGE}
             onPreview={noop}
             onRemove={noop}
           />
-          <ComposerAttachmentTile name="screen-recording.mov" kind="MOV" state="uploading" />
+          <ComposerAttachmentTile name="screen-recording.mov" state="uploading" />
           <ComposerAttachmentTile
             name="build.zip"
-            kind="ZIP"
             state="error"
             errorReason="Over 50 MB"
             onRemove={noop}

@@ -243,6 +243,14 @@
   --count-badge: #376dd6;
   --count-badge-ink: var(--text-on-veil);
   --overlay-scrim: rgb(0 0 0 / 0.5);
+  --file-word: #6f9cf2;
+  --file-excel: #52b37d;
+  --file-ppt: #ec8b5c;
+  --file-pdf: #f0716b;
+  --lightbox-scrim: rgb(12 12 11 / 0.88);
+  --lightbox-ink: rgb(255 255 255 / 0.92);
+  --lightbox-control: rgb(255 255 255 / 0.1);
+  --lightbox-control-hover: rgb(255 255 255 / 0.18);
   --text-on-veil: #ffffff;
   --qr-light: #ffffff;
   --page-preview: #ffffff;
@@ -400,6 +408,10 @@
   --count-badge: #376dd6;
   --count-badge-ink: var(--text-on-veil);
   --overlay-scrim: rgb(0 0 0 / 0.4);
+  --file-word: #2b5bc4;
+  --file-excel: #1e7a4a;
+  --file-ppt: #c4521f;
+  --file-pdf: #c8312c;
   --text-on-veil: #ffffff;
   --qr-light: #ffffff;
   --page-preview: #ffffff;

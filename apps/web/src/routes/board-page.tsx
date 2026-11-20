@@ -22,7 +22,6 @@ import type { ArchivedProjectState } from '../board/archived-project-bar.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { DevinLoginBanner, useDevinLoginWarnings } from '../board/devin-login-banner.js';
-import { OpenFileContext } from '../board/file-pane.js';
 import { setupShown } from '../board/first-run-checklist-model.js';
 import {
   FirstRunFrame,
@@ -32,7 +31,7 @@ import {
   useFirstRunSetup,
 } from '../board/first-run-setup.js';
 import { type HomeBannerKind, pickHomeBanners } from '../board/home-banners.js';
-import { HomeC, useOpenFile } from '../board/home-c.js';
+import { HomeC } from '../board/home-c.js';
 import { NotificationBanner, useNotificationBanner } from '../board/notify-banner.js';
 import { ProjectNotFound, ProjectsFailed, ProjectsLoading } from '../board/project-not-found.js';
 import { type SuggestableProject, suggestProjects } from '../board/project-suggestions.js';
@@ -231,25 +230,22 @@ export function BoardPage() {
     threadId !== null &&
     panelDocked &&
     paneOf(searchParams.get(PANE_PARAM)) === 'tasks';
-  const openFile = useOpenFile();
   const sideChat = (docked: boolean) =>
     threadId !== null && (
-      <OpenFileContext.Provider value={openFile}>
-        <TodoGlanceContext.Provider value={todoGlances}>
-          <SideChat
-            key={threadId}
-            todoId={threadId}
-            listed={
-              todos.find((todo) => todo.id === threadId) ??
-              (!live && todos.length === 1 ? todos[0] : undefined)
-            }
-            now={live ? Date.now() : fixture.now}
-            chatStream={{ items: chief.chiefData.stream ?? [], at: chief.chiefData.streamAt ?? [] }}
-            docked={docked}
-            onClose={closeThread}
-          />
-        </TodoGlanceContext.Provider>
-      </OpenFileContext.Provider>
+      <TodoGlanceContext.Provider value={todoGlances}>
+        <SideChat
+          key={threadId}
+          todoId={threadId}
+          listed={
+            todos.find((todo) => todo.id === threadId) ??
+            (!live && todos.length === 1 ? todos[0] : undefined)
+          }
+          now={live ? Date.now() : fixture.now}
+          chatStream={{ items: chief.chiefData.stream ?? [], at: chief.chiefData.streamAt ?? [] }}
+          docked={docked}
+          onClose={closeThread}
+        />
+      </TodoGlanceContext.Provider>
     );
   if (setupHome && setupDecision === undefined && firstRunRemembered()) {
     return <FirstRunFrame />;

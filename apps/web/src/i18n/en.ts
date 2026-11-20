@@ -538,6 +538,10 @@ export const EN: Record<string, string> = {
   文稿: 'Document',
   演示文稿: 'Presentation',
   表格: 'Spreadsheet',
+  上一个: 'Previous',
+  下一个: 'Next',
+  切换文件: 'Switch file',
+  '第 {n} 个，共 {total} 个': '{n} of {total}',
   '只显示前 {n} 行，下载查看完整文件': 'Showing lines 1 to {n}. Download for the full file',
   '此任务为只读，请在实时工作区中打开后继续。':
     'This task is read only. Open it in the live workspace to continue.',

@@ -1,13 +1,5 @@
 import { ListChecks, MessageSquareWarning, PackageCheck } from 'lucide-react';
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -38,16 +30,6 @@ import {
   type ArchivedProjectState,
 } from './archived-project-bar.js';
 import { ComposerSetupHint, useComposerSetupStep } from './composer-setup-hint.js';
-import {
-  FILE_FROM_THREAD_PARAM,
-  FILE_NAME_PARAM,
-  FILE_PARAM,
-  type FileTarget,
-  fileTargetOf,
-  OpenFileContext,
-  withoutFileTarget,
-} from './file-pane.js';
-import { FilePreviewPanel } from './file-preview-panel.js';
 import { HomeSpiral, type SpiralProject } from './home-spiral.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
@@ -170,25 +152,6 @@ function PanelBoundary({
   );
 }
 
-export function useOpenFile(): (target: FileTarget) => void {
-  const [, setSearchParams] = useSearchParams();
-  return useCallback(
-    (target: FileTarget) =>
-      setSearchParams((prev) => {
-        const params = withoutFileTarget(new URLSearchParams(prev));
-        const fromThread = params.get(THREAD_PARAM);
-        if (fromThread !== null) params.set(FILE_FROM_THREAD_PARAM, fromThread);
-        params.delete(THREAD_PARAM);
-        params.delete(VIEW_PARAM);
-        params.set(PANE_PARAM, 'file');
-        params.set(FILE_PARAM, target.key);
-        params.set(FILE_NAME_PARAM, target.name);
-        return params;
-      }),
-    [setSearchParams],
-  );
-}
-
 export function HomeC({
   surface,
   todos,
@@ -235,7 +198,7 @@ export function HomeC({
   const saveProjectId =
     projectId ?? (activeProjects.length === 1 ? (activeProjects[0]?.id ?? null) : null);
   const showPane = (next: WorkPane | null, state: unknown = location.state) => {
-    const params = withoutFileTarget(new URLSearchParams(searchParams));
+    const params = new URLSearchParams(searchParams);
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
     params.delete(TASKS_TAB_PARAM);
@@ -243,19 +206,6 @@ export function HomeC({
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state });
   };
-  const fileTarget = pane === 'file' ? fileTargetOf(searchParams) : null;
-  const closeFile = () => {
-    const fromThread = searchParams.get(FILE_FROM_THREAD_PARAM);
-    if (fromThread === null) {
-      showPane(null);
-      return;
-    }
-    const params = withoutFileTarget(new URLSearchParams(searchParams));
-    params.delete(PANE_PARAM);
-    params.set(THREAD_PARAM, fromThread);
-    setSearchParams(params, { replace: true });
-  };
-  const openFile = useOpenFile();
   const togglePane = (next: WorkPane) => {
     showPane(pane === next && paneShown ? null : next);
   };
@@ -465,11 +415,7 @@ export function HomeC({
     />
   );
 
-  const panelBody = !paneShown ? null : pane === 'file' ? (
-    fileTarget !== null && (
-      <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={closeFile} />
-    )
-  ) : pane === 'machines' ? (
+  const panelBody = !paneShown ? null : pane === 'machines' ? (
     <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
   ) : pane === 'tasks' ? (
     <TasksPanel
@@ -508,18 +454,10 @@ export function HomeC({
   );
   const workPanel = paneShown && pane !== null && (
     <PanelBoundary
-      title={
-        pane === 'file'
-          ? (fileTarget?.name ?? '')
-          : pane === 'machines'
-            ? t('执行机')
-            : pane === 'tasks'
-              ? t('任务')
-              : t('成果')
-      }
+      title={pane === 'machines' ? t('执行机') : pane === 'tasks' ? t('任务') : t('成果')}
       phoneTab={pane === 'tasks' || pane === 'made'}
-      resetKey={`${pane}:${fileTarget?.key ?? ''}:${projectId ?? ''}`}
-      onClose={pane === 'file' ? closeFile : () => showPane(null)}
+      resetKey={`${pane}:${projectId ?? ''}`}
+      onClose={() => showPane(null)}
     >
       {panelBody}
     </PanelBoundary>
@@ -619,50 +557,48 @@ export function HomeC({
               {banner}
             </div>
           )}
-          <OpenFileContext.Provider value={openFile}>
-            <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>
-              <ChiefConversation
-                mentionGroups={mentionGroups}
-                chief={{
-                  ...chiefData,
-                  stream: conversation,
-                  ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
-                }}
-                onSend={
-                  archived !== null
-                    ? undefined
-                    : surface.onSend != null
-                      ? (text: string) => surface.onSend?.(text, projectId)
-                      : live
-                        ? undefined
-                        : () => Promise.resolve()
-                }
-                onQueue={
-                  archived === null && surface.onSend != null
-                    ? (text: string) => surface.onSend?.(text, projectId, 'queue')
-                    : undefined
-                }
-                onEditQueued={archived === null ? surface.onEditQueued : undefined}
-                onRewind={archived === null ? surface.onRewind : undefined}
-                onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
-                onWithdraw={archived === null ? surface.onWithdraw : undefined}
-                unsent={archived === null ? surface.unsent : undefined}
-                onSteer={archived === null ? surface.onSteer : undefined}
-                onStop={archived === null ? surface.onStop : undefined}
-                composerReplacement={archivedBar}
-                earlier={surface.earlier}
-                onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
-                showBindGate={!live}
-                todoGlances={todoGlances}
-                prefill={prefill}
-                placeholder={composerPlaceholder}
-                composerTools={setupStep !== null && <ComposerSetupHint step={setupStep} />}
-                composerRef={(node) => {
-                  composerRef.current = node;
-                }}
-              />
-            </ConversationBoundary>
-          </OpenFileContext.Provider>
+          <ConversationBoundary key={channelKey} resetKey={conversationResetKey}>
+            <ChiefConversation
+              mentionGroups={mentionGroups}
+              chief={{
+                ...chiefData,
+                stream: conversation,
+                ...(quickReplies !== undefined ? { quickReplies } : { quickReplies: [] }),
+              }}
+              onSend={
+                archived !== null
+                  ? undefined
+                  : surface.onSend != null
+                    ? (text: string) => surface.onSend?.(text, projectId)
+                    : live
+                      ? undefined
+                      : () => Promise.resolve()
+              }
+              onQueue={
+                archived === null && surface.onSend != null
+                  ? (text: string) => surface.onSend?.(text, projectId, 'queue')
+                  : undefined
+              }
+              onEditQueued={archived === null ? surface.onEditQueued : undefined}
+              onRewind={archived === null ? surface.onRewind : undefined}
+              onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
+              onWithdraw={archived === null ? surface.onWithdraw : undefined}
+              unsent={archived === null ? surface.unsent : undefined}
+              onSteer={archived === null ? surface.onSteer : undefined}
+              onStop={archived === null ? surface.onStop : undefined}
+              composerReplacement={archivedBar}
+              earlier={surface.earlier}
+              onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
+              showBindGate={!live}
+              todoGlances={todoGlances}
+              prefill={prefill}
+              placeholder={composerPlaceholder}
+              composerTools={setupStep !== null && <ComposerSetupHint step={setupStep} />}
+              composerRef={(node) => {
+                composerRef.current = node;
+              }}
+            />
+          </ConversationBoundary>
         </section>
         {thread}
         {workPanel}

@@ -9,7 +9,12 @@ import {
   useRef,
   useState,
 } from 'react';
-import { attachmentOpener, OpenFileContext } from '../board/file-pane.js';
+import {
+  attachmentOpener,
+  FileSetContext,
+  fileSetOf,
+  OpenFileContext,
+} from '../board/file-pane.js';
 import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
@@ -286,12 +291,13 @@ function MarkdownListItem({
 
 function AttachmentBlock({ name, attachmentKey }: { name: string; attachmentKey: string }) {
   const openFile = useContext(OpenFileContext);
+  const set = useContext(FileSetContext);
   return (
     <div className="chat-md-attachment">
       <AttachmentChip
         name={name}
         attachmentKey={attachmentKey}
-        {...attachmentOpener(openFile, name, attachmentKey)}
+        {...attachmentOpener(openFile, set, name, attachmentKey)}
       />
     </div>
   );
@@ -594,19 +600,22 @@ export function ChatMarkdown({
 }) {
   const groups = useMemo(() => (bubbles ? chatBubbleGroups(text) : null), [bubbles, text]);
   const blocks = useMemo(() => (bubbles ? null : parseChatMarkdown(text)), [bubbles, text]);
-  return groups !== null ? (
-    <div className="flex flex-col items-start gap-1" data-slot="reply-blocks">
-      {groups.map((group, i) => (
-        <ReplyGroup
-          key={i}
-          group={group}
-          tools={bubbleTools?.(group, i)}
-          highlighted={highlight?.(group) === true}
-          footer={i === groups.length - 1 ? bubbleFooter : null}
-        />
-      ))}
-    </div>
-  ) : (
-    <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
-  );
+  const files = useMemo(() => fileSetOf(text), [text]);
+  const body =
+    groups !== null ? (
+      <div className="flex flex-col items-start gap-1" data-slot="reply-blocks">
+        {groups.map((group, i) => (
+          <ReplyGroup
+            key={i}
+            group={group}
+            tools={bubbleTools?.(group, i)}
+            highlighted={highlight?.(group) === true}
+            footer={i === groups.length - 1 ? bubbleFooter : null}
+          />
+        ))}
+      </div>
+    ) : (
+      <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
+    );
+  return <FileSetContext.Provider value={files}>{body}</FileSetContext.Provider>;
 }

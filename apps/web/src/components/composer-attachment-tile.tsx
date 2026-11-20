@@ -1,16 +1,20 @@
 import { cn } from 'cn';
+import { Play } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useI18n } from '../i18n/provider.js';
 import { X } from '../icons/index.js';
+import { FileGlyph } from './file-glyph.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { AttachmentTrigger } from './ui/attachment.js';
 import { Button } from './ui/button.js';
 
 export interface ComposerAttachmentTileProps {
   name: string;
-  kind: string;
   state: 'ready' | 'uploading' | 'error';
   imageSrc?: string | undefined;
+  videoSrc?: string | undefined;
+  previewLines?: readonly string[] | undefined;
+  previewProse?: boolean;
   errorReason?: string | undefined;
   href?: string | undefined;
   onPreview?: (() => void) | undefined;
@@ -27,9 +31,11 @@ const TRIGGER_CLS =
 
 export function ComposerAttachmentTile({
   name,
-  kind,
   state,
   imageSrc,
+  videoSrc,
+  previewLines,
+  previewProse = false,
   errorReason,
   href,
   onPreview,
@@ -86,27 +92,66 @@ export function ComposerAttachmentTile({
             uploading && 'opacity-60',
           )}
         />
-      ) : (
-        <div className="flex size-full min-w-0 flex-col p-2.5">
-          <span
-            className={cn(
-              'line-clamp-4 text-caption [overflow-wrap:anywhere]',
-              uploading ? 'text-content-tertiary' : 'text-foreground',
-            )}
+      ) : videoSrc !== undefined && !uploading && !failed ? (
+        <>
+          <video
+            data-testid="attachment-tile-video"
+            src={`${videoSrc}#t=0.1`}
+            muted
+            playsInline
+            preload="metadata"
+            tabIndex={-1}
+            aria-hidden
+            className="pointer-events-none size-full rounded-(--radius-tile) bg-(--surface-tertiary) object-cover"
           >
-            {name}
+            <track kind="captions" />
+          </video>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 m-auto flex size-9 items-center justify-center rounded-full bg-(--lightbox-scrim) text-(--lightbox-ink)"
+          >
+            <Play className="size-4 fill-current" />
           </span>
-          {failed ? (
-            <span className={`${PILL_CLS} bg-(--danger-soft) text-destructive`}>
-              {errorReason ?? t('上传失败')}
-            </span>
-          ) : (
-            !uploading && (
-              <span className={`${PILL_CLS} text-content-secondary inset-ring-1 inset-ring-border`}>
-                {kind}
+        </>
+      ) : (
+        <div className="flex size-full min-w-0 flex-col">
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden px-2.5 pt-2.5">
+            {failed ? (
+              <span className={cn(PILL_CLS, 'mt-0 bg-(--danger-soft) text-destructive')}>
+                {errorReason ?? t('上传失败')}
               </span>
-            )
-          )}
+            ) : previewLines !== undefined && previewLines.length > 0 && !uploading ? (
+              <div
+                data-testid="attachment-tile-preview"
+                aria-hidden
+                className={cn(
+                  'w-[133.333%] min-w-0 origin-top-left scale-75 text-caption leading-4 text-content-secondary mask-b-from-40%',
+                  !previewProse && 'font-mono',
+                )}
+              >
+                {previewLines.map((line, index) => (
+                  <p key={index} className="m-0 truncate">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            ) : (
+              <span className="m-auto flex">
+                <FileGlyph name={name} large />
+              </span>
+            )}
+          </div>
+          <div className="flex min-w-0 flex-none items-center gap-1.5 px-2.5 pt-1.5 pb-2.5">
+            <FileGlyph name={name} />
+            <span
+              className={cn(
+                'min-w-0 truncate text-caption',
+                uploading ? 'text-content-tertiary' : 'text-foreground',
+              )}
+            >
+              {name}
+            </span>
+          </div>
         </div>
       )}
       {uploading && <span className="sr-only">{t('上传中')}</span>}
