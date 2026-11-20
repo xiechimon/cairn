@@ -201,8 +201,22 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
     });
   }
 
+  const procargsReader = [
+    'import ctypes, sys',
+    'libc = ctypes.CDLL(None)',
+    'mib = (ctypes.c_int * 3)(1, 49, int(sys.argv[1]))',
+    'size = ctypes.c_size_t(1 << 20)',
+    'buffer = ctypes.create_string_buffer(size.value)',
+    'ok = libc.sysctl(mib, 3, buffer, ctypes.byref(size), None, 0) == 0',
+    "sys.stdout.write(buffer.raw[: size.value].decode('latin1') if ok else 'procargs-denied')",
+  ].join('\n');
+
+  function readEnvironment(pid: string): string {
+    return `python3 -c "${procargsReader}" ${pid}`;
+  }
+
   function inspectAndSignal(pid: number): string {
-    return `ps -E -ww -o command= -p ${pid}; kill -0 ${pid} && echo signal-delivered`;
+    return `${readEnvironment(String(pid))}; kill -0 ${pid} && echo signal-delivered`;
   }
 
   test('without confinement a session can signal and read the environment of another process', () => {
@@ -228,6 +242,7 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
         fixture.worktree,
       );
       expect(probe.stdout).not.toContain(outsideSentinel);
+      expect(probe.stdout).toContain('procargs-denied');
       expect(probe.stdout).not.toContain('signal-delivered');
       await waitTimeout(500);
       expect(outside.exitCode).toBeNull();
@@ -235,15 +250,15 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
       const own = runConfined(
         fixture.policy,
         [
-          'sleep 30 & child=$!',
-          'ps -o pid= -p $child >/dev/null && echo own-listed',
-          'ps -o command= -p $$ | grep -q sh && echo self-listed',
+          'CAIRN_PROBE_SENTINEL=own-child-env sleep 30 & child=$!',
+          'sleep 0.2',
+          readEnvironment('$child'),
           'kill -0 $child && echo own-signalled',
           'kill -TERM $child; wait $child; test $? -eq 143 && echo own-stopped',
         ].join('; '),
         fixture.worktree,
       );
-      for (const marker of ['own-listed', 'self-listed', 'own-signalled', 'own-stopped'])
+      for (const marker of ['own-child-env', 'own-signalled', 'own-stopped'])
         expect(own.stdout, `${marker} in ${JSON.stringify(own.stdout + own.stderr)}`).toContain(
           marker,
         );
