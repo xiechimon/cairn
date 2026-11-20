@@ -9,6 +9,7 @@ import {
   selectSpecs,
   workspacePackages,
 } from './e2e-affected-select.mjs';
+import { shardOf } from './e2e-shard-run.mjs';
 import { mergeWeights, parseWeights } from './e2e-shard-weights.mjs';
 import { partitionByWeight } from './timed-partition.mjs';
 
@@ -527,5 +528,25 @@ test('Palette source edits keep their navigation regressions in the affected set
     });
     assert.equal(result.full, false, path);
     assert.ok(result.selection.includes('search-syntax-palette.spec.ts'), path);
+  }
+});
+
+test('shardOf spreads the full spec list across bins by recorded weight', () => {
+  const specs = listSpecs();
+  const weights = JSON.parse(
+    readFileSync(new URL('./e2e-shard-weights.json', import.meta.url), 'utf8'),
+  );
+  const known = Object.values(weights).sort((a, b) => a - b);
+  const fallback = known[Math.floor(known.length / 2)];
+  for (const count of [2, 5]) {
+    const bins = Array.from({ length: count }, (_, index) =>
+      shardOf(specs, `${index + 1}/${count}`),
+    );
+    assert.deepEqual(bins.flat().sort(), [...specs].sort(), `${count} bins cover every spec once`);
+    const totals = bins.map((bin) =>
+      bin.reduce((sum, spec) => sum + (weights[spec] ?? fallback), 0),
+    );
+    const spread = (Math.max(...totals) - Math.min(...totals)) / Math.min(...totals);
+    assert.ok(spread < 0.05, `${count} bins spread ${(spread * 100).toFixed(1)}%`);
   }
 });

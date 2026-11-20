@@ -37,13 +37,15 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const runId = process.argv[2];
   if (!/^\d+$/.test(runId ?? '')) {
     console.error(
-      'usage: node scripts/e2e-shard-weights.mjs <ci run id whose e2e-affected shards passed>',
+      'usage: node scripts/e2e-shard-weights.mjs <ci run id whose e2e or e2e-affected shards passed>',
     );
     process.exit(2);
   }
   const jobs = JSON.parse(
     gh(['api', `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100`]),
-  ).jobs.filter((job) => job.name.startsWith('e2e-affected') && job.conclusion === 'success');
+  ).jobs.filter(
+    (job) => /^e2e(-affected)? \(\d+\)$/.test(job.name) && job.conclusion === 'success',
+  );
   const recorded = {};
   for (const job of jobs)
     Object.assign(
