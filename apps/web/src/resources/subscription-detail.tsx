@@ -307,7 +307,7 @@ function QuotaHead({ account, now }: { account: SubscriptionAccount; now: number
             data-testid="subscription-usage-note"
             className="text-caption text-content-tertiary"
           >
-            {t('{vendor} 不报告剩余额度', { vendor: VENDORS[account.vendor].short })}
+            {t('{vendor} 不提供剩余用量', { vendor: VENDORS[account.vendor].short })}
           </span>
         )}
       </span>

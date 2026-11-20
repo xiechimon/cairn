@@ -11,6 +11,7 @@ import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import { QrCode } from '../components/qr-code.js';
+import { RouteUseGlyph } from '../components/route-use-glyph.js';
 import { Button } from '../components/ui/button.js';
 import {
   Card,
@@ -133,6 +134,17 @@ export function IdentitySection() {
               <Mark width={20} height={20} />
             </span>
             <Mark width={16} height={16} className="text-content-secondary" />
+          </Cell>
+        ))}
+      </Specimen>
+      <Specimen
+        id="route-use-glyphs"
+        title="Route use glyphs"
+        note="One glyph per model use on the Models page"
+      >
+        {(['coordinator', 'session', 'review', 'compaction'] as const).map((use) => (
+          <Cell key={use} label={use}>
+            <RouteUseGlyph use={use} />
           </Cell>
         ))}
       </Specimen>

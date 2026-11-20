@@ -60,7 +60,7 @@ export const EN: Record<string, string> = {
     'Press Space to pick up, move with the Up and Down arrow keys, press Space again to drop, or Escape to cancel.',
   '顺序没能保存，已恢复原来的顺序。': 'The order was not saved; the previous order is back.',
   '近 24 小时': 'Last 24 hours',
-  '{vendor} 不报告剩余额度': '{vendor} does not report remaining quota',
+  '{vendor} 不提供剩余用量': "Remaining usage isn't reported by {vendor}",
   验证命令: 'Command',
   '服务器没能运行这次验证，订阅状态没有改变。请重试。':
     'The server could not run this check. The subscription status is unchanged. Try again.',

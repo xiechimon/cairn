@@ -74,7 +74,7 @@ test('section and scope changes keep the page settings will return to', async ({
   await navItem(page, 'routing').click();
   await settings(page)
     .locator('[data-testid="provider-instance"][data-instance-id="provider:prov-relay"]')
-    .getByRole('button')
+    .locator('button:not([data-testid="provider-drag-handle"])')
     .first()
     .click();
   await expect(page).toHaveURL(/item=provider%3Aprov-relay/);

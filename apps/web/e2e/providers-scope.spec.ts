@@ -24,7 +24,10 @@ test('provider rows open an editor; the selection lives in the URL and survives 
   const rows = page.getByTestId('provider-instance');
   await expect(rows).toHaveCount(3);
   await expect(rows.first()).toHaveAttribute('aria-current', 'true');
-  await instance(page, 'provider:prov-relay').getByRole('button').first().click();
+  await instance(page, 'provider:prov-relay')
+    .locator('button:not([data-testid="provider-drag-handle"])')
+    .first()
+    .click();
   await expect(page).toHaveURL(/item=provider%3Aprov-relay/);
   await expect(page).toHaveURL(/scenario=providers-fleet/);
   await expect(editor(page)).toContainText('OpenAI Chat Completions');
