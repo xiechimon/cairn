@@ -591,7 +591,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
-    return c.json(await enableClaudeSubscription(keysvc, teamId, c.req.param('cid')));
+    return c.json(await enableClaudeSubscription(claudeUpstreamSvc(), teamId, c.req.param('cid')));
   });
 
   app.post('/api/teams/:id/claude-subscriptions/:cid/disable', (c) => {
@@ -606,7 +606,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     const subscriptionId = c.req.param('cid');
     const started = performance.now();
-    const result = await verifySubscriptionConnection(keysvc, teamId, subscriptionId);
+    const result = await verifySubscriptionConnection(claudeUpstreamSvc(), teamId, subscriptionId);
     ctx.logger?.info(
       {
         teamId,

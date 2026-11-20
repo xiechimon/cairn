@@ -1,186 +1,165 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
-import { afterAll, afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
-import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { verifyClaudeSubscription } from '../src/services/claude-subscription-verification.js';
-
-vi.mock('node:fs', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:fs')>();
-  return {
-    ...actual,
-    accessSync: (...args: Parameters<typeof actual.accessSync>) => {
-      if (args[0] === '/opt/homebrew/bin/claude' || args[0] === '/usr/local/bin/claude') {
-        throw new Error('No system Claude installation in this fixture');
-      }
-      return actual.accessSync(...args);
-    },
-  };
-});
+import { readFileSync } from 'node:fs';
+import { describe, expect, test, vi } from 'vitest';
+import {
+  probeClaudeSubscriptionModel,
+  verifyClaudeSubscription,
+} from '../src/services/claude-subscription-verification.js';
 
 const TOKEN = `sk-ant-oat01-verification-test-token-${'z'.repeat(60)}`;
 
-const dirs: string[] = [];
-function fixtureDir(): string {
-  const dir = makeTestTempDir('claude-verify-');
-  dirs.push(dir);
-  return dir;
-}
-afterAll(() => {
-  for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
-});
-
-function fakeClaude(dir: string, body: string): string {
-  const path = join(dir, 'claude');
-  writeFileSync(path, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
-  return path;
-}
-
-function recordingBody(dir: string, tail: string): string {
-  return [
-    `printf '%s\\n' "$@" > "${dir}/argv"`,
-    `env > "${dir}/env"`,
-    `pwd > "${dir}/cwd"`,
-    `if [ -d "$HOME" ]; then echo present > "${dir}/home-state"; fi`,
-    tail,
-  ].join('\n');
-}
-
-beforeEach(() => {
-  vi.stubEnv('ANTHROPIC_API_KEY', 'sk-ant-api03-must-not-leak');
-  vi.stubEnv('CAIRN_MASTER_KEY', 'cairn-secret-must-not-leak');
-  vi.stubEnv('HTTPS_PROXY', 'http://proxy.test:3128');
-  vi.stubEnv('NO_PROXY', 'localhost');
-});
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
-
-describe('verifyClaudeSubscription', () => {
-  test('exit status 0 verifies the token', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, 'exit 0'));
-    expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: true });
-  });
-
-  test('a child that reads stdin receives EOF and verifies the token', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, 'while IFS= read -r line; do :; done\nexit 0'));
-    expect(await verifyClaudeSubscription(TOKEN, { timeoutMs: 1_000 })).toEqual({ ok: true });
-  });
-
-  test('an authentication failure is classified without echoing the output', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv(
-      'CLAUDE_BIN',
-      fakeClaude(dir, `echo "Invalid authentication credentials ${TOKEN}" >&2\nexit 1`),
-    );
-    const result = await verifyClaudeSubscription(TOKEN);
-    expect(result).toEqual({ ok: false, reason: 'auth' });
-    expect(JSON.stringify(result)).not.toContain(TOKEN);
-  });
-
-  test.each(['weekly ', ''])(
-    'an exhausted %slimit is distinct from invalid credentials',
-    async (window) => {
-      const dir = fixtureDir();
-      const output = JSON.stringify({
-        type: 'result',
-        subtype: 'success',
-        is_error: true,
-        result: `You've hit your ${window}limit · resets 5pm (UTC)`,
-      });
-      vi.stubEnv(
-        'CLAUDE_BIN',
-        fakeClaude(dir, `printf '%s\\n' "${output.replaceAll('"', '\\"')}"\nexit 1`),
-      );
-      expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: false, reason: 'quota' });
-    },
+const modelsPage = (ids: string[] = ['claude-opus-5-5']) =>
+  new Response(
+    JSON.stringify({
+      data: ids.map((id) => ({ id, display_name: id })),
+      has_more: false,
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
   );
 
-  test('a non-auth failure is classified as failed', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, 'echo "region blocked" >&2\nexit 3'));
-    expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: false, reason: 'failed' });
+describe('verifyClaudeSubscription (oauth /v1/models probe, no model call)', () => {
+  test('a 200 token list verifies the token', async () => {
+    const stub = vi.fn<typeof globalThis.fetch>(async () => modelsPage());
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub })).toEqual({ ok: true });
+    const [url, init] = stub.mock.calls[0]!;
+    expect(String(url)).toBe('https://api.anthropic.com/v1/models?limit=1000');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
+    expect(headers.get('anthropic-beta')).toBe('oauth-2025-04-20');
+    expect(String(url)).not.toContain(TOKEN);
   });
 
-  test('a run that outlives the timeout is killed and classified as timeout', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, 'exec sleep 20'));
-    const started = Date.now();
-    expect(await verifyClaudeSubscription(TOKEN, { timeoutMs: 200 })).toEqual({
+  test('verification never spawns the claude binary or sends a prompt', async () => {
+    const source = readFileSync(
+      new URL('../src/services/claude-subscription-verification.ts', import.meta.url),
+      'utf8',
+    );
+    expect(source).not.toContain('child_process');
+    expect(source).not.toContain('execFile');
+    const stub = vi.fn<typeof globalThis.fetch>(async () => modelsPage());
+    await verifyClaudeSubscription(TOKEN, { fetch: stub });
+    for (const [url, init] of stub.mock.calls) {
+      expect(init?.method ?? 'GET').toBe('GET');
+      expect(init?.body).toBeUndefined();
+      expect(String(url)).not.toContain('messages');
+    }
+  });
+
+  test.each([401, 403])('HTTP %d is classified as auth', async (status) => {
+    const stub = vi.fn(async () => new Response('{"error":"invalid"}', { status }));
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub })).toEqual({
+      ok: false,
+      reason: 'auth',
+    });
+  });
+
+  test('HTTP 429 is classified as quota', async () => {
+    const stub = vi.fn(async () => new Response('{"error":"rate limited"}', { status: 429 }));
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub })).toEqual({
+      ok: false,
+      reason: 'quota',
+    });
+  });
+
+  test.each([500, 502, 503])('HTTP %d is classified as unavailable', async (status) => {
+    const stub = vi.fn(async () => new Response('oops', { status }));
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub })).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+  });
+
+  test('a network error is classified as unavailable', async () => {
+    const stub = vi.fn(async () => {
+      throw new TypeError('fetch failed');
+    });
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub })).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+  });
+
+  test('an aborted request is classified as timeout', async () => {
+    const stub = vi.fn(
+      (_url: unknown, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted.', 'AbortError')),
+          );
+        }),
+    );
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub, timeoutMs: 50 })).toEqual({
       ok: false,
       reason: 'timeout',
     });
-    expect(Date.now() - started).toBeLessThan(5_000);
   });
 
-  test('a missing binary is classified as unavailable', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', join(dir, 'does-not-exist'));
-    expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: false, reason: 'unavailable' });
+  test('an empty model list is classified as failed', async () => {
+    const stub = vi.fn<typeof globalThis.fetch>(async () => modelsPage([]));
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub })).toEqual({
+      ok: false,
+      reason: 'failed',
+    });
   });
 
-  test('a desktop launch finds the native install outside its minimal PATH', async () => {
-    const dir = fixtureDir();
-    const binDir = join(dir, '.local', 'bin');
-    mkdirSync(binDir, { recursive: true });
-    fakeClaude(binDir, 'exit 0');
-    vi.stubEnv('HOME', dir);
-    vi.stubEnv('PATH', join(dir, 'empty-bin'));
-    vi.stubEnv('CLAUDE_BIN', '');
-    vi.stubEnv('CAIRN_CLAUDE_BIN', '');
-    expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: true });
+  test('a malformed success body is classified as failed', async () => {
+    const stub = vi.fn(async () => new Response('<html>ok</html>', { status: 200 }));
+    expect(await verifyClaudeSubscription(TOKEN, { fetch: stub })).toEqual({
+      ok: false,
+      reason: 'failed',
+    });
   });
 
-  test('verification honors the same explicit Claude executable as the Runner', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('HOME', dir);
-    vi.stubEnv('PATH', '/usr/bin:/bin');
-    vi.stubEnv('CLAUDE_BIN', '');
-    vi.stubEnv('CAIRN_CLAUDE_BIN', fakeClaude(dir, 'exit 0'));
-    expect(await verifyClaudeSubscription(TOKEN)).toEqual({ ok: true });
-  });
-
-  test('the child gets a clean environment and a throwaway HOME', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, recordingBody(dir, 'exit 0')));
-    await verifyClaudeSubscription(TOKEN);
-    const env = readFileSync(join(dir, 'env'), 'utf8').split('\n');
-    expect(env).toContain(`CLAUDE_CODE_OAUTH_TOKEN=${TOKEN}`);
-    expect(env).toContain('HTTPS_PROXY=http://proxy.test:3128');
-    expect(env).toContain('NO_PROXY=localhost');
-    expect(env.join('\n')).not.toContain('ANTHROPIC_API_KEY');
-    expect(env.join('\n')).not.toContain('must-not-leak');
-    expect(env.filter((line) => line.startsWith('CAIRN_'))).toEqual([]);
-    const home = env.find((line) => line.startsWith('HOME='))?.slice('HOME='.length);
-    expect(home).toBeTruthy();
-    expect(home).not.toBe(homedir());
-    expect(home).not.toBe(process.env.HOME);
-    expect(readFileSync(join(dir, 'home-state'), 'utf8').trim()).toBe('present');
-    expect(existsSync(home ?? '')).toBe(false);
-    expect(readFileSync(join(dir, 'cwd'), 'utf8').trim()).toBe(home);
-  });
-
-  test('the throwaway HOME is removed after a failure too', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, recordingBody(dir, 'exit 1')));
-    await verifyClaudeSubscription(TOKEN);
-    const home = readFileSync(join(dir, 'env'), 'utf8')
-      .split('\n')
-      .find((line) => line.startsWith('HOME='))
-      ?.slice('HOME='.length);
-    expect(existsSync(home ?? '')).toBe(false);
-  });
-
-  test('the token never appears in argv or in the result', async () => {
-    const dir = fixtureDir();
-    vi.stubEnv('CLAUDE_BIN', fakeClaude(dir, recordingBody(dir, 'exit 0')));
-    const result = await verifyClaudeSubscription(TOKEN);
-    const argv = readFileSync(join(dir, 'argv'), 'utf8');
-    expect(argv).toContain('-p');
-    expect(argv).not.toContain(TOKEN);
-    expect(argv).not.toContain('sk-ant');
+  test('the token never appears in the result or in logs-facing fields', async () => {
+    const stub = vi.fn(async () => new Response(`unauthorized ${TOKEN}`, { status: 401 }));
+    const result = await verifyClaudeSubscription(TOKEN, { fetch: stub });
     expect(JSON.stringify(result)).not.toContain(TOKEN);
+    expect(JSON.stringify(result)).not.toContain('sk-ant');
+  });
+});
+
+describe('probeClaudeSubscriptionModel (per-model /v1/messages ping)', () => {
+  test('posts a one-token message for the requested model', async () => {
+    const stub = vi.fn<typeof globalThis.fetch>(
+      async () => new Response('{"type":"message"}', { status: 200 }),
+    );
+    expect(await probeClaudeSubscriptionModel(TOKEN, 'claude-opus-5-5', { fetch: stub })).toEqual({
+      ok: true,
+    });
+    const [url, init] = stub.mock.calls[0]!;
+    expect(String(url)).toBe('https://api.anthropic.com/v1/messages');
+    expect(init?.method).toBe('POST');
+    const headers = new Headers(init?.headers);
+    expect(headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
+    expect(headers.get('anthropic-beta')).toBe('oauth-2025-04-20');
+    expect(JSON.parse(init?.body as string)).toMatchObject({
+      model: 'claude-opus-5-5',
+      max_tokens: 1,
+    });
+  });
+
+  test.each([
+    [401, 'auth'],
+    [429, 'quota'],
+    [500, 'unavailable'],
+  ])('HTTP %d maps to %s', async (status, reason) => {
+    const stub = vi.fn(async () => new Response('oops', { status }));
+    expect(await probeClaudeSubscriptionModel(TOKEN, 'claude-opus-5-5', { fetch: stub })).toEqual({
+      ok: false,
+      reason,
+    });
+  });
+
+  test('an aborted request is classified as timeout', async () => {
+    const stub = vi.fn(
+      (_url: unknown, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted.', 'AbortError')),
+          );
+        }),
+    );
+    expect(
+      await probeClaudeSubscriptionModel(TOKEN, 'claude-opus-5-5', { fetch: stub, timeoutMs: 50 }),
+    ).toEqual({ ok: false, reason: 'timeout' });
   });
 });

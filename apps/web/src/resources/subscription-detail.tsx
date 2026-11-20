@@ -71,7 +71,7 @@ const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
 };
 
 const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
-  claude: '服务器上找不到 claude 命令',
+  claude: '暂时连不上 Claude 服务，请检查网络后重试。',
   codex: '服务器上找不到 codex 命令',
   grok: '服务器上找不到可执行的 agent',
   devin: '服务器上找不到 devin 命令',
@@ -91,7 +91,7 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
 }
 
 const PASSED_COPY: Record<AccountVendor, string> = {
-  claude: 'Claude 回复了这次模型请求，订阅能用。',
+  claude: '这个订阅的登录有效。',
   codex: '这个订阅的登录有效。',
   grok: '这个订阅的登录有效。',
   devin: 'Devin 接受了这个凭据。',
@@ -99,7 +99,7 @@ const PASSED_COPY: Record<AccountVendor, string> = {
 };
 
 const VERIFYING_COPY: Record<AccountVendor, string> = {
-  claude: '正在让 Claude 回复一次很短的请求…',
+  claude: '正在检查这个订阅的登录…',
   codex: '正在检查这个订阅的登录…',
   grok: '正在检查这个订阅的登录…',
   devin: '正在让 Devin 检查这个凭据…',

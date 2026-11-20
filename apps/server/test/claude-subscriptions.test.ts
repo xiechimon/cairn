@@ -1,9 +1,7 @@
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
 import { eq, sql } from 'drizzle-orm';
 import pino from 'pino';
-import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
-import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   claudeSubscription,
   machine as machineTable,
@@ -22,15 +20,28 @@ import {
 const TOKEN =
   'sk-ant-oat01-subscription-test-private-token-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz';
 
-const fixtureDirs: string[] = [];
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
-afterAll(() => {
-  for (const dir of fixtureDirs.splice(0)) releaseTestTempDir(dir);
-});
+
+const CLAUDE_MODEL_IDS = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'];
+
+const modelsOk = (ids: string[] = CLAUDE_MODEL_IDS) =>
+  new Response(
+    JSON.stringify({
+      data: ids.map((id) => ({ id, display_name: id })),
+      has_more: false,
+    }),
+    { status: 200, headers: { 'content-type': 'application/json' } },
+  );
+
+function stubClaudeModels(handler?: () => Promise<Response> | Response) {
+  const stub = vi.fn<typeof globalThis.fetch>(async () => (await handler?.()) ?? modelsOk());
+  vi.stubGlobal('fetch', stub);
+  return stub;
+}
 
 describe('Claude subscription connections', () => {
   test('seals independent connections and never returns or logs the token', async () => {
@@ -65,7 +76,7 @@ describe('Claude subscription connections', () => {
     expect(logs.join('')).not.toContain(TOKEN);
   });
 
-  test('verification runs the real claude binary once and hides upstream failures', async () => {
+  test('verification probes the OAuth models endpoint and hides upstream failures', async () => {
     const logs: string[] = [];
     const s = bootServer({
       logger: pino({ level: 'trace' }, { write: (line) => logs.push(line) }),
@@ -74,16 +85,7 @@ describe('Claude subscription connections', () => {
     const created = await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
-    const dir = makeTestTempDir('claude-subscriptions-');
-    fixtureDirs.push(dir);
-    const runs = join(dir, 'runs');
-    const binary = join(dir, 'claude');
-    const script = (body: string) =>
-      writeFileSync(binary, `#!/bin/sh\necho run >> "${runs}"\n${body}\n`, { mode: 0o755 });
-    vi.stubEnv('CLAUDE_BIN', binary);
-    const fetchStub = vi.fn();
-    vi.stubGlobal('fetch', fetchStub);
-    script('exit 0');
+    const fetchStub = stubClaudeModels();
     const listed = async () =>
       ((await (await req(s.app, 'GET', path)).json()) as { lastCheck: unknown }[])[0]?.lastCheck;
     expect(await listed()).toBeNull();
@@ -92,22 +94,29 @@ describe('Claude subscription connections', () => {
       check: {
         ok: true,
         reason: null,
-        check: 'model-request',
-        command: 'claude -p "Reply with OK"',
+        check: 'sign-in',
+        command: 'GET https://api.anthropic.com/v1/models',
       },
     });
     expect(await listed()).toMatchObject({ ok: true, durationMs: expect.any(Number) });
+    const [checkedUrl, checkedInit] = fetchStub.mock.calls[0]!;
+    expect(String(checkedUrl)).toBe('https://api.anthropic.com/v1/models?limit=1000');
+    expect(new Headers(checkedInit?.headers).get('authorization')).toBe(`Bearer ${TOKEN}`);
     const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 10_000);
-    script(`echo "401 ${TOKEN} private-upstream-response" >&2\nexit 1`);
+    fetchStub.mockImplementation(
+      async () => new Response(`private-upstream-response ${TOKEN}`, { status: 401 }),
+    );
     const rejected = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await rejected.json()).toMatchObject({ ok: false, reason: 'auth' });
     expect(await listed()).toMatchObject({ ok: false, reason: 'auth' });
     clock.mockReturnValue(Date.now() + 10_000);
-    script(`echo "You've hit your weekly limit private-quota-response ${TOKEN}" >&2\nexit 1`);
+    fetchStub.mockImplementation(
+      async () => new Response(`private-quota-response ${TOKEN}`, { status: 429 }),
+    );
     const exhausted = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await exhausted.json()).toMatchObject({ ok: false, reason: 'quota' });
     clock.mockReturnValue(Date.now() + 10_000);
-    vi.stubEnv('CLAUDE_BIN', join(dir, 'missing'));
+    fetchStub.mockImplementation(async () => new Response('down', { status: 503 }));
     const failed = await req(s.app, 'POST', `${path}/${id}/verify`);
     expect(await failed.json()).toMatchObject({ ok: false, reason: 'unavailable' });
     expect(JSON.stringify(await listed())).not.toContain(TOKEN);
@@ -133,26 +142,23 @@ describe('Claude subscription connections', () => {
         durationMs: expect.any(Number),
       })),
     );
-    expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(3);
-    expect(fetchStub).not.toHaveBeenCalled();
+    expect(fetchStub).toHaveBeenCalledTimes(4);
   });
 
-  test('a model test runs claude with that model, refuses flag-shaped ids and leaves the last check alone', async () => {
+  test('a model test checks the listed model against the subscription token, refuses flag-shaped ids and leaves the last check alone', async () => {
     const s = bootServer();
     const path = `/api/teams/${s.team.id}/claude-subscriptions`;
     const { id } = (await (
       await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN })
     ).json()) as { id: string };
-    const dir = makeTestTempDir('claude-subscriptions-');
-    fixtureDirs.push(dir);
-    const args = join(dir, 'args');
-    const binary = join(dir, 'claude');
-    writeFileSync(binary, `#!/bin/sh\necho "$@" >> "${args}"\nexit 0\n`, { mode: 0o755 });
-    vi.stubEnv('CLAUDE_BIN', binary);
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    const fetchStub = stubClaudeModels();
     const tested = await req(s.app, 'POST', `${path}/${id}/test`, { model: 'claude-opus-5-5' });
     expect(await tested.json()).toMatchObject({ status: 'ok', latencyMs: expect.any(Number) });
-    expect(readFileSync(args, 'utf8')).toContain('--model claude-opus-5-5');
+    const probeCall = fetchStub.mock.calls.find(([url]) => String(url).includes('/v1/messages'))!;
+    expect(JSON.parse(probeCall[1]?.body as string)).toMatchObject({
+      model: 'claude-opus-5-5',
+      max_tokens: 1,
+    });
     expect(
       (await req(s.app, 'POST', `${path}/${id}/test`, { model: 'claude-opus-5-5' })).status,
     ).toBe(429);
@@ -450,45 +456,37 @@ test('verification limits concurrent and repeated calls per connection for ten s
     expect(response.status).toBe(201);
     ids.push(((await response.json()) as { id: string }).id);
   }
-  const dir = makeTestTempDir('claude-subscriptions-');
-  fixtureDirs.push(dir);
-  const runs = join(dir, 'runs');
-  const hold = join(dir, 'hold');
-  const release = join(dir, 'release');
-  const fail = join(dir, 'fail');
-  const binary = join(dir, 'claude');
-  writeFileSync(
-    binary,
-    [
-      '#!/bin/sh',
-      `echo run >> "${runs}"`,
-      `if [ -f "${hold}" ]; then while [ ! -f "${release}" ]; do sleep 0.05; done; fi`,
-      `if [ -f "${fail}" ]; then echo "401 ${TOKEN}" >&2; exit 1; fi`,
-      'exit 0',
-    ].join('\n'),
-    { mode: 0o755 },
+  let mode: 'hold' | 'ok' | 'auth' = 'ok';
+  const queued: (() => void)[] = [];
+  const fetchStub = vi.fn(
+    () =>
+      new Promise<Response>((resolve) => {
+        if (mode === 'hold') {
+          queued.push(() => resolve(modelsOk()));
+          return;
+        }
+        resolve(mode === 'auth' ? new Response('x', { status: 401 }) : modelsOk());
+      }),
   );
-  const runCount = () =>
-    existsSync(runs) ? readFileSync(runs, 'utf8').trim().split('\n').length : 0;
-  vi.stubEnv('CLAUDE_BIN', binary);
-  writeFileSync(hold, '');
+  vi.stubGlobal('fetch', fetchStub);
+  mode = 'hold';
   const first = req(s.app, 'POST', `${path}/${ids[0]}/verify`);
-  await vi.waitFor(() => expect(runCount()).toBe(1));
-  rmSync(hold);
+  await vi.waitFor(() => expect(queued).toHaveLength(1));
   const limited = await req(s.app, 'POST', `${path}/${ids[0]}/verify`);
   expect(limited.status).toBe(429);
   const message = await limited.text();
   expect(message).toContain('10 seconds');
   expect(message).not.toContain(TOKEN);
-  expect(runCount()).toBe(1);
+  expect(fetchStub).toHaveBeenCalledTimes(1);
+  mode = 'ok';
   expect((await req(s.app, 'POST', `${path}/${ids[1]}/verify`)).status).toBe(200);
-  writeFileSync(release, '');
+  queued[0]?.();
   expect((await first).status).toBe(200);
   now += 9_999;
   expect((await req(s.app, 'POST', `${path}/${ids[0]}/verify`)).status).toBe(429);
-  expect(runCount()).toBe(2);
+  expect(fetchStub).toHaveBeenCalledTimes(2);
   now += 1;
-  writeFileSync(fail, '');
+  mode = 'auth';
   const failed = await req(s.app, 'POST', `${path}/${ids[0]}/verify`);
   expect(failed.status).toBe(200);
   expect(await failed.json()).toMatchObject({ ok: false, reason: 'auth' });
@@ -497,7 +495,7 @@ test('verification limits concurrent and repeated calls per connection for ten s
   expect(
     (await req(s.app, 'POST', `/api/teams/other/claude-subscriptions/${ids[0]}/verify`)).status,
   ).toBe(404);
-  expect(runCount()).toBe(3);
+  expect(fetchStub).toHaveBeenCalledTimes(3);
   expect(logs.join('')).not.toContain(TOKEN);
 });
 
@@ -526,15 +524,6 @@ describe('the setup token is stored only for the owner session', () => {
 
 describe('switching the enabled Claude subscription', () => {
   const tokenOf = (letter: string) => `sk-ant-oat01-${letter.repeat(64)}`;
-
-  function fakeClaude(body: string): string {
-    const dir = makeTestTempDir('claude-switch-');
-    fixtureDirs.push(dir);
-    const binary = join(dir, 'claude');
-    writeFileSync(binary, `#!/bin/sh\n${body}\n`, { mode: 0o755 });
-    vi.stubEnv('CLAUDE_BIN', binary);
-    return binary;
-  }
 
   async function twoAccounts() {
     const s = bootServer();
@@ -575,7 +564,7 @@ describe('switching the enabled Claude subscription', () => {
   }
 
   test('a verified account becomes the only enabled one, the list shows it and no response carries a token', async () => {
-    fakeClaude('exit 0');
+    stubClaudeModels();
     const { s, path, first, second } = await twoAccounts();
     expect(enabledIds(s)).toEqual([first]);
     const response = await req(s.app, 'POST', `${path}/${second}/enable`);
@@ -602,12 +591,11 @@ describe('switching the enabled Claude subscription', () => {
   });
 
   test.each([
-    ['a rejected token', 'echo "401 invalid" >&2\nexit 1', 'auth'],
-    ['a server without claude', null, 'unavailable'],
-    ['an exhausted subscription', 'echo "You\'ve hit your weekly limit" >&2\nexit 1', 'quota'],
-  ])('%s fails the precheck and the old account stays enabled', async (_name, script, reason) => {
-    if (script === null) vi.stubEnv('CLAUDE_BIN', '/nonexistent/claude');
-    else fakeClaude(script);
+    ['a rejected token', () => new Response('x', { status: 401 }), 'auth'],
+    ['an unreachable upstream', () => Promise.reject(new TypeError('fetch failed')), 'unavailable'],
+    ['an exhausted subscription', () => new Response('x', { status: 429 }), 'quota'],
+  ])('%s fails the precheck and the old account stays enabled', async (_name, impl, reason) => {
+    stubClaudeModels(impl);
     const { s, path, first, second } = await twoAccounts();
     const response = await req(s.app, 'POST', `${path}/${second}/enable`);
     expect(response.status).toBe(409);
@@ -620,7 +608,7 @@ describe('switching the enabled Claude subscription', () => {
   });
 
   test('a running task on the enabled account blocks the switch, disable and delete and changes nothing', async () => {
-    fakeClaude('exit 0');
+    stubClaudeModels();
     const { s, path, first, second } = await twoAccounts();
     runningStep(s, first);
     runningStep(s, first, 'run-2');
@@ -641,7 +629,7 @@ describe('switching the enabled Claude subscription', () => {
   });
 
   test('a running task bound to a disabled account does not block enabling it or another account', async () => {
-    fakeClaude('exit 0');
+    stubClaudeModels();
     const { s, path, first, second } = await twoAccounts();
     runningStep(s, second);
     runningStep(s, 'someone-else', 'run-other');
@@ -652,7 +640,7 @@ describe('switching the enabled Claude subscription', () => {
   });
 
   test('an expired target is refused and an unknown or foreign id is 404', async () => {
-    fakeClaude('exit 0');
+    stubClaudeModels();
     const { s, path, second } = await twoAccounts();
     s.db
       .update(claudeSubscription)
@@ -669,7 +657,9 @@ describe('switching the enabled Claude subscription', () => {
   });
 
   test('two switches racing during verification leave one enabled account and one conflict', async () => {
-    fakeClaude('sleep 0.3\nexit 0');
+    stubClaudeModels(
+      () => new Promise<Response>((resolve) => setTimeout(() => resolve(modelsOk()), 300)),
+    );
     const { s, path, first, second } = await twoAccounts();
     const third = (
       (await (await req(s.app, 'POST', path, { label: 'Third', token: tokenOf('c') })).json()) as {
@@ -693,7 +683,7 @@ describe('switching the enabled Claude subscription', () => {
     expect(await disabled.json()).toMatchObject({ id: first, enabled: false });
     expect(enabledIds(s)).toEqual([]);
     expect((await req(s.app, 'POST', `${path}/${first}/disable`)).status).toBe(200);
-    fakeClaude('exit 0');
+    stubClaudeModels();
     expect((await req(s.app, 'POST', `${path}/${second}/enable`)).status).toBe(200);
     expect((await req(s.app, 'DELETE', `${path}/${second}`)).status).toBe(204);
     expect(enabledIds(s)).toEqual([]);
@@ -701,7 +691,7 @@ describe('switching the enabled Claude subscription', () => {
   });
 
   test('a switch clears the rate-limit rejection recorded for the old account', async () => {
-    fakeClaude('exit 0');
+    stubClaudeModels();
     const { s, path, second } = await twoAccounts();
     const machineId = insertMachine(s, { name: 'limited' });
     s.db
@@ -756,9 +746,6 @@ describe('switching the enabled Claude subscription', () => {
 
 test('a paired device runs subscription checks, and the check bookkeeping is stored', async () => {
   const s = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
-  const dir = makeTestTempDir('paired-subscription-checks-');
-  fixtureDirs.push(dir);
-  vi.stubEnv('CLAUDE_BIN', join(dir, 'missing'));
   vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
   s.db
     .insert(pairedDevice)

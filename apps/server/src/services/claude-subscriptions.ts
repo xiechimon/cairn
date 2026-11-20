@@ -24,7 +24,9 @@ import { claudeSubscription, machine, step } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import {
-  claudeCheckCommand,
+  CLAUDE_CHECK_COMMAND,
+  CLAUDE_MODEL_TEST_COMMAND,
+  probeClaudeSubscriptionModel,
   verifyClaudeSubscription,
 } from './claude-subscription-verification.js';
 import { timedCheck } from './subscription-check.js';
@@ -196,7 +198,7 @@ export function enabledClaudeSubscriptionModels(
 }
 
 export async function enableClaudeSubscription(
-  deps: Deps,
+  deps: UpstreamDeps,
   teamId: string,
   id: string,
 ): Promise<ClaudeSubscription> {
@@ -207,9 +209,10 @@ export async function enableClaudeSubscription(
   }
   if (target.enabledAt !== null) return toRecord(target);
   const enabledBefore = enabledRow(deps.db, teamId)?.id ?? null;
-  const verified = await verifyClaudeSubscription(deps.box.open(target.tokenCipher)).catch(
-    (): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' }),
-  );
+  const verified = await verifyClaudeSubscription(deps.box.open(target.tokenCipher), {
+    fetch: deps.fetch,
+    ...(deps.timeoutMs !== undefined ? { timeoutMs: deps.timeoutMs } : {}),
+  }).catch((): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' }));
   if (!verified.ok) {
     throw new HttpError(
       409,
@@ -360,7 +363,7 @@ export function createClaudeSubscription(
 }
 
 export async function verifySubscriptionConnection(
-  deps: Deps,
+  deps: UpstreamDeps,
   teamId: string,
   id: string,
 ): Promise<ClaudeSubscriptionVerifyResult> {
@@ -375,9 +378,14 @@ export async function verifySubscriptionConnection(
   const result = await timedCheck(
     () =>
       Promise.resolve()
-        .then(() => verifyClaudeSubscription(deps.box.open(row.tokenCipher)))
+        .then(() =>
+          verifyClaudeSubscription(deps.box.open(row.tokenCipher), {
+            fetch: deps.fetch,
+            ...(deps.timeoutMs !== undefined ? { timeoutMs: deps.timeoutMs } : {}),
+          }),
+        )
         .catch((): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
-    { check: 'model-request', command: claudeCheckCommand(null), model: null },
+    { check: 'sign-in', command: CLAUDE_CHECK_COMMAND, model: null },
   );
   deps.db
     .update(claudeSubscription)
@@ -424,9 +432,14 @@ export async function testClaudeSubscriptionModel(
   const result = await timedCheck(
     () =>
       Promise.resolve()
-        .then(() => verifyClaudeSubscription(deps.box.open(row.tokenCipher), { model }))
+        .then(() =>
+          probeClaudeSubscriptionModel(deps.box.open(row.tokenCipher), model, {
+            fetch: deps.fetch,
+            ...(deps.timeoutMs !== undefined ? { timeoutMs: deps.timeoutMs } : {}),
+          }),
+        )
         .catch((): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
-    { check: 'model-request', command: claudeCheckCommand(model), model },
+    { check: 'model-request', command: CLAUDE_MODEL_TEST_COMMAND, model },
   );
   return result.ok
     ? {

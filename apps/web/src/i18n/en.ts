@@ -38,7 +38,8 @@ export const EN: Record<string, string> = {
   '这个订阅的登录已失效。先移除它，再重新添加新的 token。':
     'This subscription is no longer signed in. Remove it, then add a new token.',
   '验证超时，请重试': 'Verification timed out. Try again.',
-  '服务器上找不到 claude 命令': 'The claude command was not found on the server.',
+  '暂时连不上 Claude 服务，请检查网络后重试。':
+    'Cannot reach the Claude service right now. Check your network and try again.',
   '服务器上找不到 codex 命令': 'The codex command was not found on the server.',
   '服务器上找不到可执行的 agent': 'No runnable agent was found on the server.',
   '验证没有通过，请重试': 'Verification did not pass. Try again.',
@@ -2519,7 +2520,6 @@ export const EN: Record<string, string> = {
   '周 {left}%': 'wk {left}%',
   '正在测试 {id}…': 'Testing {id}…',
   '正在测试 {done}/{n} 个模型…': 'Testing models, {done} of {n} done…',
-  '正在让 Claude 回复一次很短的请求…': 'Asking Claude to answer one short request…',
   '正在检查这个订阅的登录…': 'Checking this subscription’s sign-in…',
   '正在让 Devin 检查这个凭据…': 'Asking Devin to check these credentials…',
   '正在让 Antigravity 检查这个凭据…': 'Asking Antigravity to check these credentials…',
@@ -2774,8 +2774,6 @@ export const EN: Record<string, string> = {
     'Create one under Settings → API Keys in the Composio dashboard; it starts with ak_.',
   '打开 Composio 控制台': 'Open the Composio dashboard',
   '自定义 MCP 服务器': 'Custom MCP server',
-  'Claude 回复了这次模型请求，订阅能用。':
-    'Claude answered the model request; the subscription works.',
   登录失效: 'Sign-in expired',
   验证超时: 'Check timed out',
   没法验证: 'Cannot check',

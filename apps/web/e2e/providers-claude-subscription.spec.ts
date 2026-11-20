@@ -62,8 +62,8 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
   await expect(feedback).toHaveAttribute('data-phase', 'passed');
   await expect(feedback).toContainText(
     locale === 'zh'
-      ? 'Claude 回复了这次模型请求，订阅能用。'
-      : 'Claude answered the model request; the subscription works.',
+      ? '这个订阅的登录有效。'
+      : 'This subscription’s sign-in is valid.',
   );
   await expect(detail.getByLabel(locale === 'zh' ? '名称' : 'Name')).toBeVisible();
 

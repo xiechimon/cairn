@@ -96,6 +96,31 @@ export interface RealServer {
   close(): Promise<void>;
 }
 
+const defaultProviderTestFetch: typeof fetch = async (input, init) => {
+  const url =
+    typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+  const auth = new Headers(init?.headers).get('authorization') ?? '';
+  const valid = /^Bearer sk-ant-oat01-[A-Za-z0-9._~-]+$/.test(auth);
+  if (url.startsWith('https://api.anthropic.com/v1/models') && valid) {
+    return Response.json({
+      data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' }],
+      has_more: false,
+    });
+  }
+  if (url === 'https://api.anthropic.com/v1/messages' && valid) {
+    return Response.json({
+      id: 'msg_stub',
+      type: 'message',
+      role: 'assistant',
+      model: 'claude-sonnet-5-5',
+      content: [{ type: 'text', text: 'OK' }],
+      stop_reason: 'max_tokens',
+      usage: { input_tokens: 1, output_tokens: 1 },
+    });
+  }
+  return new Response('{"error":{"type":"authentication_error"}}', { status: 401 });
+};
+
 export async function bootRealServer(opts: {
   providerBaseUrl: string;
   bare?: boolean;
@@ -106,6 +131,7 @@ export async function bootRealServer(opts: {
   mcpConfigPath?: string;
   dbPath?: string;
   port?: number;
+  providerTestFetch?: typeof fetch;
 }): Promise<RealServer> {
   const ownedDirs: string[] = [];
   const takeDir = (prefix: string): string => {
@@ -158,6 +184,7 @@ export async function bootRealServer(opts: {
       webDir: opts.webDir ?? null,
       authToken: null,
       mcpConfigPath,
+      providerTestFetch: opts.providerTestFetch ?? defaultProviderTestFetch,
     });
     const scheduler = opts.scheduler
       ? createScheduler({ db, hub, user, convHub }, { tickMs: 60_000 })

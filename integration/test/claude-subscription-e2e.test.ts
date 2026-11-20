@@ -58,7 +58,21 @@ beforeAll(async () => {
     process.env[key] = value;
   }
   stub = await startStubLlm([{ content: 'unused' }]);
-  server = await bootRealServer({ providerBaseUrl: stub.url, claimHoldMs: 1_000 });
+  server = await bootRealServer({
+    providerBaseUrl: stub.url,
+    claimHoldMs: 1_000,
+    providerTestFetch: async (input, init) => {
+      const url = String(input instanceof Request ? input.url : input);
+      const auth = new Headers(init?.headers).get('authorization');
+      if (url.startsWith('https://api.anthropic.com/v1/models') && auth === `Bearer ${TOKEN}`) {
+        return Response.json({
+          data: [{ id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5' }],
+          has_more: false,
+        });
+      }
+      return new Response('{"error":{"type":"authentication_error"}}', { status: 401 });
+    },
+  });
   server.db
     .update(routingRule)
     .set({ provider: 'claude-code', modelId: 'claude-sonnet-5-5' })

@@ -17,9 +17,9 @@ const passedCheck = () => ({
   at: Date.now(),
   ok: true,
   reason: null,
-  check: 'model-request',
-  command: 'claude -p --model claude-haiku-5-5',
-  model: 'claude-haiku-5-5',
+  check: 'sign-in',
+  command: 'GET https://api.anthropic.com/v1/models',
+  model: null,
   durationMs: 2400,
 });
 
@@ -144,7 +144,7 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
 
   await verify(page).click();
   await expect(result(page)).toHaveAttribute('data-phase', 'checking');
-  await expect(result(page)).toContainText('正在让 Claude 回复一次很短的请求…');
+  await expect(result(page)).toContainText('正在检查这个订阅的登录…');
   await expect(result(page).locator('[data-slot="spinner"]')).toHaveCount(1);
   await expect(verify(page)).toBeDisabled();
   await expect(verify(page)).toHaveText('验证');
@@ -155,8 +155,10 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
 
   await expect(result(page)).toBeVisible();
   await expect(result(page)).toHaveAttribute('data-phase', 'passed');
-  await expect(result(page)).toContainText('Claude 回复了这次模型请求，订阅能用。');
-  await expect(page.getByTestId('subscription-verify-detail')).toContainText('claude -p');
+  await expect(result(page)).toContainText('这个订阅的登录有效。');
+  await expect(page.getByTestId('subscription-verify-detail')).toContainText(
+    'GET https://api.anthropic.com/v1/models',
+  );
   expect(await top(page)).toBe(before);
   await expectNoCheckStatus(page);
   await shot(page, 'connected');
@@ -171,7 +173,7 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
 const FAILURES: { mode: Verify; reason: string; shot: string }[] = [
   { mode: 'auth', reason: '这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token，把新的 token 添加回来。', shot: 'failed-auth' },
   { mode: 'timeout', reason: '验证超时，请重试', shot: 'failed-timeout' },
-  { mode: 'unavailable', reason: '服务器上找不到 claude 命令', shot: 'failed-unavailable' },
+  { mode: 'unavailable', reason: '暂时连不上 Claude 服务，请检查网络后重试。', shot: 'failed-unavailable' },
   { mode: 'quota', reason: '模型额度已用尽，请等待额度恢复后重试。', shot: 'failed-quota' },
 ];
 
@@ -206,9 +208,9 @@ const PASSED_CHECK = {
   at: NOW - 3_600_000,
   ok: true,
   reason: null,
-  check: 'model-request',
-  command: 'claude -p --model claude-haiku-5-5',
-  model: 'claude-haiku-5-5',
+  check: 'sign-in',
+  command: 'GET https://api.anthropic.com/v1/models',
+  model: null,
   durationMs: 3_700,
 } as const;
 
@@ -271,8 +273,8 @@ test('a stored last check is not shown until the user runs one', async ({ page }
         at: NOW - HOUR,
         ok: false,
         reason: 'auth',
-        check: 'model-request',
-        command: 'claude -p',
+        check: 'sign-in',
+        command: 'GET https://api.anthropic.com/v1/models',
         model: null,
         durationMs: 900,
       },
