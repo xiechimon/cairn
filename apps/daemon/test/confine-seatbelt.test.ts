@@ -101,6 +101,9 @@ describe('seatbelt profile', () => {
         index(`(allow ${operation} (target same-sandbox))`),
       );
     }
+    expect(lines).toContain(
+      '(deny sysctl-read (sysctl-name "kern.procargs") (sysctl-name "kern.procargs2"))',
+    );
   });
 
   test('rejects a cache that overlaps a denied root and unsafe paths', () => {
@@ -250,15 +253,13 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
       const own = runConfined(
         fixture.policy,
         [
-          'CAIRN_PROBE_SENTINEL=own-child-env sleep 30 & child=$!',
-          'sleep 0.2',
-          readEnvironment('$child'),
+          'sleep 30 & child=$!',
           'kill -0 $child && echo own-signalled',
           'kill -TERM $child; wait $child; test $? -eq 143 && echo own-stopped',
         ].join('; '),
         fixture.worktree,
       );
-      for (const marker of ['own-child-env', 'own-signalled', 'own-stopped'])
+      for (const marker of ['own-signalled', 'own-stopped'])
         expect(own.stdout, `${marker} in ${JSON.stringify(own.stdout + own.stderr)}`).toContain(
           marker,
         );
