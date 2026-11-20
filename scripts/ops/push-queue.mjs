@@ -2,7 +2,7 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
-import { basename } from 'node:path';
+import { basename, join } from 'node:path';
 import { busyMessage, RELEASE_MARKER } from './guard-queue.mjs';
 import { ownerOf } from './promote-queue.mjs';
 
@@ -95,6 +95,17 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       );
       process.exit(1);
     }
+  }
+  const english = spawnSync(
+    process.execPath,
+    [join(import.meta.dirname, '..', 'english-only-gate.mjs')],
+    { stdio: 'inherit' },
+  );
+  if (english.status !== 0) {
+    console.error(
+      '[push-queue] a commit message or added line has Chinese text, which fails ci; reword it and run again. Nothing was pushed.',
+    );
+    process.exit(1);
   }
   const push = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/queue/main'], {
     stdio: 'inherit',
