@@ -106,13 +106,7 @@ export function taskRowCopy(
           : todo.phase === 'failed'
             ? { key: '失败了，等自动重试' }
             : { key: threadCopy(todo).reason };
-      return {
-        ...base,
-        running,
-        word: todo.phase === 'queued' ? '排队中' : '进行中',
-        what,
-        where: null,
-      };
+      return { ...base, running, word: '进行中', what, where: null };
     }
     case 'resolved': {
       const word = todo.phase === 'closed' ? '已归档' : '已完成';

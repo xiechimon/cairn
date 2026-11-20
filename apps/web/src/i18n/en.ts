@@ -1812,7 +1812,7 @@ export const EN: Record<string, string> = {
   '计划已就绪，批准后开工。': 'Plan ready. Approve to start.',
   '已就绪，等你审阅。': 'Ready for your review.',
   '失败了，打开它重试。': 'Failed. Open it to retry.',
-  '排队等执行机。': 'Waiting for a Runner.',
+  '准备开工。': 'Getting ready to start.',
   '等前置任务完成。': 'Waits for the task it depends on.',
   '正在写计划。': 'Writing the plan.',
   '正在动手。': 'Working on it.',

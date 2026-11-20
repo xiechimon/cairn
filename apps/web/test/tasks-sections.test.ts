@@ -74,7 +74,7 @@ describe('a task waiting on another task reads as waiting on it, not on a Runner
   });
 
   test('its status line no longer says it waits for a Runner', () => {
-    expect(taskRowCopy(waiting, undefined, lookup).what.key).not.toBe('排队等执行机。');
+    expect(taskRowCopy(waiting, undefined, lookup).what.key).not.toMatch(/排队/);
     expect(threadCopy(waiting.todo).reason).toBe('等前置任务完成。');
   });
 });

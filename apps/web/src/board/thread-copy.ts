@@ -72,7 +72,7 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
     case 'queued':
       return todo.section === 'up_next'
         ? { state: STATUS_WORDS.waiting, reason: '等前置任务完成。' }
-        : { state: STATUS_WORDS.queued, reason: '排队等执行机。' };
+        : { state: STATUS_WORDS.running, reason: '准备开工。' };
     case 'planning':
       return { state: STATUS_WORDS.running, reason: '正在写计划。' };
     case 'building':
