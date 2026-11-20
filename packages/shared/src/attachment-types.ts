@@ -75,6 +75,17 @@ const ATTACHMENT_TYPES: Readonly<Record<string, AttachmentTypeEntry>> = {
   ico: { kind: 'image', mime: 'image/x-icon', extraMimes: ['image/vnd.microsoft.icon'] },
   avif: { kind: 'image', mime: 'image/avif' },
   pdf: { kind: 'pdf', mime: 'application/pdf', inline: true },
+  mp4: { kind: 'download', mime: 'video/mp4', inline: true },
+  webm: { kind: 'download', mime: 'video/webm', extraMimes: ['audio/webm'], inline: true },
+  mov: { kind: 'download', mime: 'video/quicktime', inline: true },
+  mp3: { kind: 'download', mime: 'audio/mpeg', extraMimes: ['audio/mp3'], inline: true },
+  wav: {
+    kind: 'download',
+    mime: 'audio/wav',
+    extraMimes: ['audio/x-wav', 'audio/wave'],
+    inline: true,
+  },
+  m4a: { kind: 'download', mime: 'audio/mp4', extraMimes: ['audio/x-m4a'], inline: true },
   xlsx: {
     kind: 'download',
     mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

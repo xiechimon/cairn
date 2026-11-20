@@ -718,5 +718,70 @@
     "path": "apps/server/src/vendor-open-design/document-preview.ts",
     "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/daemon/src/document-preview.ts",
     "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/comment-bridge.ts",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/runtime/comment-bridge.ts",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/preview-guards.ts",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 packages/contracts/src/runtime/preview-guards.ts",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/snapshot-bridge.ts",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/runtime/srcdoc.ts",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/audio-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/binary-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/code-with-lines.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/document-preview-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/file-kind.ts",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/daemon/src/projects.ts",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/image-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/markdown-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/svg-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/text-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
+  },
+  {
+    "path": "apps/web/src/vendor-open-design/viewers/video-viewer.tsx",
+    "line": "// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx",
+    "reason": "Apache-2.0 attribution required for code borrowed from Open Design"
   }
 ]

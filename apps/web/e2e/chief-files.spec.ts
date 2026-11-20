@@ -313,3 +313,32 @@ test('a live file downloads through the endpoint that names the file', async ({ 
   await expect(download).toHaveAttribute('href', '/api/attachments/att-notes?download=1');
   await expect(download).toHaveAttribute('download', 'notes.log');
 });
+
+test('an office file shows its extracted text, and one the server cannot read offers the download', async ({
+  page,
+}) => {
+  await mockLive(page, { threads: [], messages: HISTORY }, (path, route) =>
+    path === '/api/attachments/att-plan/document-preview'
+      ? route.fulfill({
+          json: {
+            kind: 'document',
+            title: '第一阶段计划',
+            sections: [{ title: '目标', lines: ['三周内上线定价页', '先做桌面端'] }],
+          },
+        })
+      : path === '/api/attachments/att-broken/document-preview'
+        ? route.fulfill({ status: 422, json: { error: 'unreadable' } })
+        : undefined,
+  );
+  await page.goto('/app?pane=file&file=team-files/att-plan.docx&fileName=计划.docx');
+  const panel = page.getByTestId('file-preview-panel');
+  const document = panel.getByTestId('file-preview-document');
+  await expect(document.getByRole('heading', { name: '第一阶段计划', level: 2 })).toBeVisible();
+  await expect(document.getByRole('heading', { name: '目标', level: 3 })).toBeVisible();
+  await expect(document).toContainText('三周内上线定价页');
+
+  await page.goto('/app?pane=file&file=team-files/att-broken.xlsx&fileName=汇总.xlsx');
+  const fallback = page.getByTestId('file-preview-unsupported');
+  await expect(fallback).toContainText('无法预览，下载查看');
+  await expect(fallback.getByRole('button', { name: '下载' })).toBeVisible();
+});

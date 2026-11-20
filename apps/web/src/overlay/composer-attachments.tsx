@@ -1,6 +1,6 @@
-import { useMemo, useRef, useState } from 'react';
+import { useContext, useMemo, useRef } from 'react';
+import { attachmentUrl, OpenFileContext } from '../board/file-pane.js';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
-import { attachmentIdFromKey } from '../detail/chat-markdown.js';
 import type { ComposerFileSeed } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -8,12 +8,6 @@ import {
   type PendingAttachment,
   parseAttachmentTokens,
 } from './attachment-paste.js';
-import { AttachmentPreview } from './attachment-preview.js';
-
-interface PreviewTarget {
-  name: string;
-  src: string;
-}
 
 const IMAGE_KEY = /\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i;
 
@@ -34,7 +28,7 @@ export function ComposerAttachments({
 }) {
   const { t } = useI18n();
   const settled = useMemo(() => parseAttachmentTokens(tokens.join('\n')), [tokens]);
-  const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const openFile = useContext(OpenFileContext);
   const stripRef = useRef<HTMLDivElement | null>(null);
   const thenFocusInput = (remove: () => void) => () => {
     const host = stripRef.current?.parentElement ?? null;
@@ -69,19 +63,14 @@ export function ComposerAttachments({
           name={entry.name}
           kind={attachmentKind(entry.name)}
           state={entry.failed ? 'error' : 'uploading'}
-          {...(entry.url !== null
-            ? {
-                imageSrc: entry.url,
-                onPreview: () => setPreview({ name: entry.name, src: entry.url ?? '' }),
-              }
-            : {})}
+          {...(entry.url !== null ? { imageSrc: entry.url } : {})}
           {...(entry.failed && onDismissPending !== undefined
             ? { onRemove: thenFocusInput(() => onDismissPending(entry.uid)) }
             : {})}
         />
       ))}
       {settled.map((token, index) => {
-        const source = `/api/attachments/${encodeURIComponent(attachmentIdFromKey(token.key))}`;
+        const source = attachmentUrl(token.key);
         const isImage = IMAGE_KEY.test(token.key);
         return (
           <ComposerAttachmentTile
@@ -90,18 +79,13 @@ export function ComposerAttachments({
             kind={attachmentKind(token.name)}
             state="ready"
             onRemove={thenFocusInput(() => onRemove(index))}
-            {...(isImage
-              ? {
-                  imageSrc: source,
-                  onPreview: () => setPreview({ name: token.name, src: source }),
-                }
+            {...(isImage ? { imageSrc: source } : {})}
+            {...(openFile !== undefined
+              ? { onPreview: () => openFile({ name: token.name, key: token.key }) }
               : { href: source })}
           />
         );
       })}
-      {preview !== null && (
-        <AttachmentPreview name={preview.name} src={preview.src} onClose={() => setPreview(null)} />
-      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { cn } from 'cn';
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
+import { attachmentOpener, OpenFileContext } from '../board/file-pane.js';
 import { useThreadHref } from '../board/thread-link.js';
 import { echoTaskRef, hoverTaskRef, useTaskRefSignal } from '../chief/task-ref-signal.js';
 import { MachineName } from '../components/machine-label.js';
@@ -10,7 +11,7 @@ import { useI18n } from '../i18n/provider.js';
 import { Eye } from '../icons/index.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_UI } from '../phase.js';
-import { AttachmentChip, AttachmentPreviewHandler } from './attachment-chip.js';
+import { AttachmentChip } from './attachment-chip.js';
 
 const CODE_SKIN: Record<string, string> = {
   'chat-code':
@@ -261,7 +262,7 @@ function decorate(seg: DocSegment, key: number, node: ReactNode): ReactNode {
 }
 
 export function Segments({ segments, codeClassName }: SegmentsProps) {
-  const onPreview = useContext(AttachmentPreviewHandler);
+  const openFile = useContext(OpenFileContext);
   const glances = useContext(TodoGlanceContext);
   return (
     <>
@@ -278,7 +279,7 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               key={j}
               name={seg.text}
               attachmentKey={seg.attachmentKey}
-              {...(onPreview !== undefined ? { onPreview } : {})}
+              {...attachmentOpener(openFile, seg.text, seg.attachmentKey)}
             />
           ) : seg.style === 'anchor' ? (
             <a

@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { attachmentOpener, OpenFileContext } from '../board/file-pane.js';
 import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
@@ -27,13 +28,7 @@ import {
   type TaskItem,
   type TaskState,
 } from '../lib/markdown.js';
-import { AttachmentPreview } from '../overlay/attachment-preview.js';
-import {
-  AttachmentChip,
-  AttachmentPreviewHandler,
-  attachmentIdFromKey,
-  COMPOSER_CHIP_LABEL,
-} from './attachment-chip.js';
+import { AttachmentChip, attachmentIdFromKey, COMPOSER_CHIP_LABEL } from './attachment-chip.js';
 import { type CodeToken, highlightCode } from './code-highlight.js';
 import { Segments } from './segments.js';
 
@@ -290,13 +285,13 @@ function MarkdownListItem({
 }
 
 function AttachmentBlock({ name, attachmentKey }: { name: string; attachmentKey: string }) {
-  const onPreview = useContext(AttachmentPreviewHandler);
+  const openFile = useContext(OpenFileContext);
   return (
     <div className="chat-md-attachment">
       <AttachmentChip
         name={name}
         attachmentKey={attachmentKey}
-        {...(onPreview !== undefined ? { onPreview } : {})}
+        {...attachmentOpener(openFile, name, attachmentKey)}
       />
     </div>
   );
@@ -599,27 +594,19 @@ export function ChatMarkdown({
 }) {
   const groups = useMemo(() => (bubbles ? chatBubbleGroups(text) : null), [bubbles, text]);
   const blocks = useMemo(() => (bubbles ? null : parseChatMarkdown(text)), [bubbles, text]);
-  const [preview, setPreview] = useState<{ name: string; src: string } | null>(null);
-  return (
-    <AttachmentPreviewHandler.Provider value={(name, src) => setPreview({ name, src })}>
-      {groups !== null ? (
-        <div className="flex flex-col items-start gap-1" data-slot="reply-blocks">
-          {groups.map((group, i) => (
-            <ReplyGroup
-              key={i}
-              group={group}
-              tools={bubbleTools?.(group, i)}
-              highlighted={highlight?.(group) === true}
-              footer={i === groups.length - 1 ? bubbleFooter : null}
-            />
-          ))}
-        </div>
-      ) : (
-        <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
-      )}
-      {preview !== null && (
-        <AttachmentPreview name={preview.name} src={preview.src} onClose={() => setPreview(null)} />
-      )}
-    </AttachmentPreviewHandler.Provider>
+  return groups !== null ? (
+    <div className="flex flex-col items-start gap-1" data-slot="reply-blocks">
+      {groups.map((group, i) => (
+        <ReplyGroup
+          key={i}
+          group={group}
+          tools={bubbleTools?.(group, i)}
+          highlighted={highlight?.(group) === true}
+          footer={i === groups.length - 1 ? bubbleFooter : null}
+        />
+      ))}
+    </div>
+  ) : (
+    <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
   );
 }

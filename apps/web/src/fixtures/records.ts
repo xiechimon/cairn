@@ -43,6 +43,7 @@ import {
 } from '@cairn/shared';
 import type { MachineProvider } from '../api/claude-accounts.js';
 import type { EngineRun, EngineRunStage } from '../board/engine-run.js';
+import type { DocumentPreview } from '../vendor-open-design/viewers/document-preview-viewer.js';
 import type { AccountsContent } from './accounts.js';
 
 export type { Phase };
@@ -277,7 +278,7 @@ export interface FixtureSet {
   chief?: ChiefContent;
   chiefChannels?: Record<string, ChiefContent>;
   github?: GithubFixture;
-  attachments?: Record<string, { text?: string; src?: string }>;
+  attachments?: Record<string, { text?: string; src?: string; document?: DocumentPreview }>;
 }
 
 export interface GithubFixture {

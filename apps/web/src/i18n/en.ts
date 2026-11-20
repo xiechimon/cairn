@@ -533,6 +533,11 @@ export const EN: Record<string, string> = {
   查看渲染效果: 'View rendered',
   '无法预览，下载查看': 'No preview. Download to view',
   '图片没能加载，下载查看': 'The image did not load. Download to view',
+  '视频没能加载，下载查看': 'The video did not load. Download to view',
+  '音频没能加载，下载查看': 'The audio did not load. Download to view',
+  文稿: 'Document',
+  演示文稿: 'Presentation',
+  表格: 'Spreadsheet',
   '只显示前 {n} 行，下载查看完整文件': 'Showing lines 1 to {n}. Download for the full file',
   '此任务为只读，请在实时工作区中打开后继续。':
     'This task is read only. Open it in the live workspace to continue.',

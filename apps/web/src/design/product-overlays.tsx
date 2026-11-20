@@ -5,7 +5,6 @@ import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Kbd } from '../components/ui/kbd.js';
 import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Search, Settings } from '../icons/index.js';
-import { AttachmentPreview } from '../overlay/attachment-preview.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
@@ -189,30 +188,6 @@ function PickersSpecimen() {
   );
 }
 
-function AttachmentsSpecimen() {
-  const [preview, setPreview] = useState<{ name: string; src: string } | null>(null);
-  return (
-    <Specimen
-      id="attachments-2"
-      title="Attachments"
-      note="AttachmentPreview, opened from a done attachment"
-      stage="canvas"
-    >
-      <Cell label="Preview, broken image">
-        <Button
-          variant="outline"
-          onClick={() => setPreview({ name: 'missing.png', src: '/missing.png' })}
-        >
-          Preview a missing image
-        </Button>
-      </Cell>
-      {preview != null && (
-        <AttachmentPreview name={preview.name} src={preview.src} onClose={() => setPreview(null)} />
-      )}
-    </Specimen>
-  );
-}
-
 function MenusSpecimen() {
   const [moreOpen, setMoreOpen] = useState(false);
   const [last, setLast] = useState<string | null>(null);
@@ -296,7 +271,6 @@ export function ProductOverlaysSection() {
     >
       <SearchSpecimen />
       <PickersSpecimen />
-      <AttachmentsSpecimen />
       <MenusSpecimen />
       <ConfirmsSpecimen />
     </Section>

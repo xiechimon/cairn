@@ -1,25 +1,37 @@
 import { useQuery } from '@tanstack/react-query';
-import { Check, Code, Copy, Download, Eye, FileText, ImageOff } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Check, Code, Copy, Download, Eye } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useLiveData } from '../api/provider.js';
-import { EmptyState } from '../components/empty-state.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
 import { toastError } from '../components/ui/toaster.js';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
-import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { attachmentUrl, type FileTarget, filePreviewKind, isMarkdownFile } from './file-pane.js';
-
-export const FILE_PREVIEW_MAX_LINES = 5000;
+import { AudioViewer } from '../vendor-open-design/viewers/audio-viewer.js';
+import { BinaryViewer } from '../vendor-open-design/viewers/binary-viewer.js';
+import {
+  type DocumentPreview,
+  DocumentPreviewViewer,
+} from '../vendor-open-design/viewers/document-preview-viewer.js';
+import { kindFor } from '../vendor-open-design/viewers/file-kind.js';
+import { ImageViewer } from '../vendor-open-design/viewers/image-viewer.js';
+import { MarkdownViewer } from '../vendor-open-design/viewers/markdown-viewer.js';
+import { SvgViewer } from '../vendor-open-design/viewers/svg-viewer.js';
+import { TextViewer } from '../vendor-open-design/viewers/text-viewer.js';
+import { VideoViewer } from '../vendor-open-design/viewers/video-viewer.js';
+import { attachmentUrl, type FileTarget } from './file-pane.js';
 
 const COPIED_MS = 1500;
 
 const HEAD_BTN_CLS = 'text-content-secondary hover:text-foreground';
+
+const DOCUMENT_UNAVAILABLE_STATUSES = new Set([413, 415, 422]);
+
+class DocumentPreviewUnavailable extends Error {}
 
 async function fetchAttachmentText(url: string): Promise<string> {
   const res = await fetch(url, { credentials: 'same-origin' });
@@ -27,10 +39,18 @@ async function fetchAttachmentText(url: string): Promise<string> {
   return res.text();
 }
 
-export function fileLines(text: string): string[] {
-  const lines = text.split(/\r?\n/);
-  if (lines.length > 1 && lines.at(-1) === '') lines.pop();
-  return lines;
+async function fetchDocumentPreview(url: string): Promise<DocumentPreview> {
+  const res = await fetch(`${url}/document-preview`, { credentials: 'same-origin' });
+  if (DOCUMENT_UNAVAILABLE_STATUSES.has(res.status))
+    throw new DocumentPreviewUnavailable(`document preview unavailable: ${res.status}`);
+  if (!res.ok) throw new Error(`document preview failed: ${res.status}`);
+  return (await res.json()) as DocumentPreview;
+}
+
+async function fetchAttachmentSize(url: string): Promise<number | null> {
+  const res = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
+  const length = res.ok ? Number(res.headers.get('content-length')) : Number.NaN;
+  return Number.isFinite(length) && length > 0 ? length : null;
 }
 
 function downloadFile(href: string, name: string): void {
@@ -43,128 +63,44 @@ function downloadFile(href: string, name: string): void {
   anchor.remove();
 }
 
-function FileTextView({ text }: { text: string }) {
-  const { t } = useI18n();
-  const lines = fileLines(text);
-  const shown = lines.slice(0, FILE_PREVIEW_MAX_LINES);
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
-      <div
-        data-testid="file-preview-text"
-        className="grid flex-none grid-cols-[auto_minmax(0,1fr)] rounded-(--radius-tile) bg-(--card) font-mono text-code text-foreground inset-ring-1 inset-ring-(--border)"
-      >
-        <span aria-hidden className="h-2 border-r border-(--border)" />
-        <span aria-hidden className="h-2" />
-        {shown.map((line, index) => (
-          <div key={index} data-slot="file-line" className="contents">
-            <span
-              aria-hidden
-              className="min-w-10 border-r border-(--border) pr-2 pl-3 text-right text-content-tertiary tabular-nums select-none"
-            >
-              {index + 1}
-            </span>
-            <span className="min-w-0 px-3 whitespace-pre-wrap [overflow-wrap:anywhere]">
-              {line === '' ? '​' : line}
-            </span>
-          </div>
-        ))}
-        <span aria-hidden className="h-2 border-r border-(--border)" />
-        <span aria-hidden className="h-2" />
-      </div>
-      {truncatedNote(
-        shown.length,
-        lines.length,
-        t('只显示前 {n} 行，下载查看完整文件', { n: FILE_PREVIEW_MAX_LINES }),
-      )}
-    </div>
-  );
-}
-
-function truncatedNote(shown: number, total: number, label: string) {
-  if (total <= shown) return null;
-  return (
-    <p
-      data-testid="file-preview-truncated"
-      className="m-0 px-1 pt-2 text-meta text-content-tertiary"
-    >
-      {label}
-    </p>
-  );
-}
-
-function FileMarkdownView({ text }: { text: string }) {
-  const { t } = useI18n();
-  const lines = fileLines(text);
-  const shown = lines.slice(0, FILE_PREVIEW_MAX_LINES);
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
-      <div
-        data-testid="file-preview-markdown"
-        className="mx-auto w-full max-w-chat min-w-0 px-3 py-2 text-ui leading-5 text-foreground [overflow-wrap:anywhere]"
-      >
-        <ChatMarkdown text={shown.join('\n')} />
-      </div>
-      {truncatedNote(
-        shown.length,
-        lines.length,
-        t('只显示前 {n} 行，下载查看完整文件', { n: FILE_PREVIEW_MAX_LINES }),
-      )}
-    </div>
-  );
-}
-
-function FileImageView({
-  name,
-  src,
-  onDownload,
-}: {
-  name: string;
-  src: string;
-  onDownload: () => void;
-}) {
-  const { t } = useI18n();
-  const [broken, setBroken] = useState(false);
-  if (broken)
-    return (
-      <EmptyState
-        testId="file-preview-broken"
-        icon={ImageOff}
-        title={t('图片没能加载，下载查看')}
-        action={{ label: t('下载'), onClick: onDownload }}
-        className="mt-[10vh]"
-      />
-    );
-  return (
-    <div className="flex min-h-0 flex-1 items-center justify-center p-2">
-      <img
-        data-testid="file-preview-image"
-        src={src}
-        alt={name}
-        className="max-h-full max-w-full rounded-(--radius-tile) object-contain"
-        onError={() => setBroken(true)}
-      />
-    </div>
-  );
-}
-
 export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onClose: () => void }) {
   const { t } = useI18n();
   const { live } = useLiveData();
   const { search } = useLocation();
-  const kind = filePreviewKind(target.key);
+  const kind = kindFor(target.key);
   const fixture = live
     ? undefined
     : resolveScenario(new URLSearchParams(search)).attachments?.[attachmentIdFromKey(target.key)];
   const url = attachmentUrl(target.key);
+  const src = fixture?.src ?? url;
   const fixtureText = fixture?.text;
+  const readsText = kind === 'markdown' || kind === 'text' || kind === 'svg';
   const textQ = useQuery({
     queryKey: ['attachment-text', target.key, fixtureText ?? null],
     queryFn: () =>
       fixtureText !== undefined ? Promise.resolve(fixtureText) : fetchAttachmentText(url),
-    enabled: kind === 'text',
+    enabled: readsText,
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
   });
+  const fixtureDocument = fixture?.document;
+  const readsDocument = kind === 'document' && (live || fixtureDocument !== undefined);
+  const documentQ = useQuery({
+    queryKey: ['attachment-document-preview', target.key, fixtureDocument ?? null],
+    queryFn: () =>
+      fixtureDocument !== undefined ? Promise.resolve(fixtureDocument) : fetchDocumentPreview(url),
+    enabled: readsDocument,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+  const sizeQ = useQuery({
+    queryKey: ['attachment-size', target.key],
+    queryFn: () => fetchAttachmentSize(url),
+    enabled: live && (kind === 'document' || kind === 'binary'),
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+  });
+  const size = sizeQ.data ?? undefined;
   const downloadHref =
     fixture?.src ??
     (fixtureText !== undefined
@@ -173,13 +109,13 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
   const download = () => downloadFile(downloadHref, target.name);
   const [copied, setCopied] = useState(false);
   const [showSource, setShowSource] = useState(false);
-  const markdown = kind === 'text' && isMarkdownFile(target.key);
+  const togglesSource = kind === 'markdown' || kind === 'svg';
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
     return () => window.clearTimeout(timer);
   }, [copied]);
-  const text = kind === 'text' ? textQ.data : undefined;
+  const text = readsText ? textQ.data : undefined;
   const copy = () => {
     if (text === undefined) return;
     navigator.clipboard.writeText(text).then(
@@ -187,25 +123,52 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
       (error: unknown) => toastError(t('没能复制，再试一次'), error),
     );
   };
+  const withText = (render: (value: string) => ReactNode) => (
+    <QueryBoundary
+      query={textQ}
+      isEmpty={false}
+      errorWins
+      empty={null}
+      loadingLabel={t('正在加载文件')}
+      errorTitle={t('文件没能加载')}
+      className="px-2"
+    >
+      {render(text ?? '')}
+    </QueryBoundary>
+  );
+  const binary = <BinaryViewer size={size} onDownload={download} />;
   const body =
-    kind === 'text' ? (
-      <QueryBoundary
-        query={textQ}
-        isEmpty={false}
-        errorWins
-        empty={null}
-        loadingLabel={t('正在加载文件')}
-        errorTitle={t('文件没能加载')}
-        className="px-2"
-      >
-        {markdown && !showSource ? (
-          <FileMarkdownView text={text ?? ''} />
-        ) : (
-          <FileTextView text={text ?? ''} />
-        )}
-      </QueryBoundary>
+    kind === 'markdown' ? (
+      withText((value) => <MarkdownViewer text={value} mode={showSource ? 'source' : 'preview'} />)
+    ) : kind === 'text' ? (
+      withText((value) => <TextViewer name={target.key} text={value} />)
+    ) : kind === 'svg' ? (
+      showSource ? (
+        withText((value) => (
+          <SvgViewer
+            name={target.name}
+            src={src}
+            mode="source"
+            source={value}
+            onDownload={download}
+          />
+        ))
+      ) : (
+        <SvgViewer
+          key={src}
+          name={target.name}
+          src={src}
+          mode="preview"
+          source=""
+          onDownload={download}
+        />
+      )
     ) : kind === 'image' ? (
-      <FileImageView key={url} name={target.name} src={fixture?.src ?? url} onDownload={download} />
+      <ImageViewer key={src} name={target.name} src={src} onDownload={download} />
+    ) : kind === 'video' ? (
+      <VideoViewer key={src} name={target.name} src={src} onDownload={download} />
+    ) : kind === 'audio' ? (
+      <AudioViewer key={src} name={target.name} src={src} onDownload={download} />
     ) : kind === 'pdf' && fixture === undefined ? (
       <div className="flex min-h-0 flex-1 p-2">
         <iframe
@@ -215,14 +178,26 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
           className="min-h-0 flex-1 rounded-(--radius-tile) border-0 inset-ring-1 inset-ring-(--border)"
         />
       </div>
+    ) : kind === 'document' && readsDocument ? (
+      documentQ.error instanceof DocumentPreviewUnavailable ? (
+        binary
+      ) : (
+        <QueryBoundary
+          query={documentQ}
+          isEmpty={false}
+          errorWins
+          empty={null}
+          loadingLabel={t('正在加载文件')}
+          errorTitle={t('文件没能加载')}
+          className="px-2"
+        >
+          {documentQ.data !== undefined && (
+            <DocumentPreviewViewer preview={documentQ.data} size={size} />
+          )}
+        </QueryBoundary>
+      )
     ) : (
-      <EmptyState
-        testId="file-preview-unsupported"
-        icon={FileText}
-        title={t('无法预览，下载查看')}
-        action={{ label: t('下载'), onClick: download }}
-        className="mt-[10vh]"
-      />
+      binary
     );
   return (
     <SidePanel label={target.name} onDismiss={onClose} testId="file-preview-panel">
@@ -236,7 +211,7 @@ export function FilePreviewPanel({ target, onClose }: { target: FileTarget; onCl
             {target.name}
           </span>
         </SidePanelTitle>
-        {markdown && (
+        {togglesSource && (
           <IconTooltip
             label={showSource ? t('查看渲染效果') : t('查看源码')}
             side="bottom"

@@ -1,5 +1,5 @@
 import { INLINE_IMAGE_EXTS } from '@cairn/shared';
-import { createContext } from 'react';
+import type { MouseEvent } from 'react';
 import { Button } from '../components/ui/button.js';
 
 export function attachmentIdFromKey(key: string): string {
@@ -23,22 +23,18 @@ export const SPEC_CHIP_IMG = 'block max-h-40 max-w-full rounded-(--cds-radius-sm
 
 export const COMPOSER_CHIP_LABEL = 'block min-w-0 max-w-65 truncate';
 
-export const AttachmentPreviewHandler = createContext<
-  ((name: string, src: string) => void) | undefined
->(undefined);
-
 export function AttachmentChip({
   name,
   attachmentKey,
-  onPreview,
+  onOpen,
 }: {
   name: string;
   attachmentKey: string;
-  onPreview?: (name: string, src: string) => void;
+  onOpen?: (() => void) | undefined;
 }) {
   const href = `/api/attachments/${encodeURIComponent(attachmentIdFromKey(attachmentKey))}`;
   const isImage = isImageAttachmentKey(attachmentKey);
-  if (isImage && onPreview !== undefined) {
+  if (isImage && onOpen !== undefined) {
     return (
       <Button
         variant="ghost"
@@ -48,7 +44,7 @@ export function AttachmentChip({
         render={<a href={href} />}
         onClick={(event) => {
           event.preventDefault();
-          onPreview(name, href);
+          onOpen();
         }}
       >
         <img src={href} alt={name} className={`spec-chip-img ${SPEC_CHIP_IMG}`} />
@@ -75,6 +71,14 @@ export function AttachmentChip({
       target="_blank"
       rel="noopener noreferrer"
       title={name}
+      {...(onOpen !== undefined
+        ? {
+            onClick: (event: MouseEvent<HTMLAnchorElement>) => {
+              event.preventDefault();
+              onOpen();
+            },
+          }
+        : {})}
     >
       {name}
     </a>
