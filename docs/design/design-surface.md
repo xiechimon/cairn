@@ -83,7 +83,7 @@ Each phase lands on `main` on its own and ends in a check run on a `verify-cairn
 
 ## Layout
 
-- Route: `/app?view=design&thread=<todoId>&file=<name>` (`THREAD_PARAM`, `VIEW_PARAM` in `apps/web/src/board/thread-copy.ts`). Back returns to the previous view.
+- Route: `/app?view=design&thread=<todoId>&page=<name>` (`page`, not the file lightbox's `file`) (`THREAD_PARAM`, `VIEW_PARAM` in `apps/web/src/board/thread-copy.ts`). Back returns to the previous view.
 - Left: the Coordinator conversation and composer as on the home page, at the docked width bounds. Pending comment chips sit above the composer.
 - Right: a toolbar laid out like Open Design's (left: file picker when the task made several pages, reload, preview/source toggle, viewport menu; right: comment, mark-up, comment count, versions, export, share, `⋯` with open in browser and download), then the canvas.
 - Below 1100px the halves become one pane with a `对话` / `设计` switch in the head; at 390px the toolbar keeps viewport, comment and versions and moves the rest into `⋯`.

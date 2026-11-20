@@ -8,6 +8,7 @@ import { THREAD_PARAM, VIEW_PARAM } from '../thread-copy.js';
 import { PANE_PARAM, TASKS_TAB_PARAM } from '../work-panel.js';
 
 export const DESIGN_VIEW = 'design';
+export const DESIGN_PAGE_PARAM = 'page';
 
 export interface DesignTarget {
   todoId: string;
@@ -24,7 +25,7 @@ export function pickPage(
 export function designTargetOf(params: URLSearchParams): DesignTarget | null {
   const todoId = params.get(THREAD_PARAM);
   if (params.get(VIEW_PARAM) !== DESIGN_VIEW || todoId === null || todoId === '') return null;
-  const fileName = params.get(FILE_PARAM);
+  const fileName = params.get(DESIGN_PAGE_PARAM);
   return { todoId, fileName: fileName === null || fileName === '' ? null : fileName };
 }
 
@@ -32,11 +33,12 @@ export function withDesignTarget(prev: URLSearchParams, target: DesignTarget): U
   const params = new URLSearchParams(prev);
   params.delete(PANE_PARAM);
   params.delete(TASKS_TAB_PARAM);
+  params.delete(FILE_PARAM);
   params.delete(FILE_NAME_PARAM);
   params.set(VIEW_PARAM, DESIGN_VIEW);
   params.set(THREAD_PARAM, target.todoId);
-  if (target.fileName === null) params.delete(FILE_PARAM);
-  else params.set(FILE_PARAM, target.fileName);
+  if (target.fileName === null) params.delete(DESIGN_PAGE_PARAM);
+  else params.set(DESIGN_PAGE_PARAM, target.fileName);
   return params;
 }
 
@@ -44,7 +46,7 @@ export function withoutDesignTarget(prev: URLSearchParams): URLSearchParams {
   const params = new URLSearchParams(prev);
   params.delete(VIEW_PARAM);
   params.delete(THREAD_PARAM);
-  params.delete(FILE_PARAM);
+  params.delete(DESIGN_PAGE_PARAM);
   return params;
 }
 

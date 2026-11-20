@@ -306,6 +306,7 @@ export const FILE_RULES = new Map([
 export const DIR_RULES = [
   { prefix: 'apps/web/src/usage/', specs: ['usage-page'] },
   { prefix: 'apps/web/src/search/', specs: ['search-'] },
+  { prefix: 'apps/web/src/board/design/', specs: ['design-view'] },
   { prefix: 'apps/web/src/board/', specs: BOARD },
   {
     prefix: 'apps/web/src/task-panel/',

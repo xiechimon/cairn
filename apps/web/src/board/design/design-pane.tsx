@@ -34,7 +34,6 @@ import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
 import { ChevronDown, Download, X } from '../../icons/index.js';
 import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
-import { FILE_PARAM } from '../file-pane.js';
 import { deliverableHref } from '../made-files.js';
 import {
   type CommentDraftHandlers,
@@ -45,7 +44,7 @@ import {
 import type { CommentActions } from './design-comment-list.js';
 import { ExportMenu } from './design-export.js';
 import { bakeMarkPng, MarkError, markTarget } from './design-markup.js';
-import { type DesignTarget, pickPage } from './design-route.js';
+import { DESIGN_PAGE_PARAM, type DesignTarget, pickPage } from './design-route.js';
 import { SharePopover } from './design-share.js';
 import { VersionsMenu, versionLabel } from './design-versions.js';
 import { designSrcdoc } from './srcdoc.js';
@@ -294,7 +293,7 @@ function DesignPage({
     setSearchParams(
       (prev) => {
         const params = new URLSearchParams(prev);
-        params.set(FILE_PARAM, name);
+        params.set(DESIGN_PAGE_PARAM, name);
         return params;
       },
       { replace: true },

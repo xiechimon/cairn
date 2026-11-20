@@ -184,7 +184,7 @@ async function openDesign(page: Page, seeded: Comment[] = [], shareOrigin: strin
     }
     return undefined;
   });
-  await page.goto(`/app?view=design&thread=${PAGE_TASK.id}&file=pricing.html`);
+  await page.goto(`/app?view=design&thread=${PAGE_TASK.id}&page=pricing.html`);
   return state;
 }
 

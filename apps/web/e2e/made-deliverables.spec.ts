@@ -151,7 +151,7 @@ test('the dialog lists each file with open and download above the report, explai
   await expect(dialog).toHaveCount(0);
   await expect(page).toHaveURL(/view=design/);
   await expect(page).toHaveURL(/thread=page/);
-  await expect(page).toHaveURL(/file=benchmark\.html/);
+  await expect(page).toHaveURL(/page=benchmark\.html/);
   await expect(page.getByTestId('design-pane')).toBeVisible();
   await page.goBack();
   await expect(page.getByTestId('design-pane')).toHaveCount(0);
