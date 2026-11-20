@@ -10,6 +10,10 @@ import type {
 } from './types.js';
 
 const TELEGRAM_API = 'https://api.telegram.org';
+
+function telegramApi(): string {
+  return process.env.CAIRN_TELEGRAM_API ?? TELEGRAM_API;
+}
 const POLL_TIMEOUT_SECONDS = 50;
 const MESSAGE_MAX_CHARS = 4096;
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
@@ -104,7 +108,7 @@ async function telegramApi<T>(
 ): Promise<T> {
   let res: Response;
   try {
-    res = await env.fetch(`${TELEGRAM_API}/bot${token}/${method}`, {
+    res = await env.fetch(`${telegramApi()}/bot${token}/${method}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -175,7 +179,7 @@ async function telegramFile(
   if (info.file_size !== undefined && info.file_size > FILE_MAX_BYTES) return null;
   let res: Response;
   try {
-    res = await env.fetch(`${TELEGRAM_API}/file/bot${token}/${info.file_path}`);
+    res = await env.fetch(`${telegramApi()}/file/bot${token}/${info.file_path}`);
   } catch {
     return null;
   }
