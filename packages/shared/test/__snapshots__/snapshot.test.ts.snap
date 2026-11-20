@@ -12347,10 +12347,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               ],
               "type": "object",
             },
-            "enginePty": {
-              "const": true,
-              "type": "boolean",
-            },
             "executor": {
               "enum": [
                 "orb",
