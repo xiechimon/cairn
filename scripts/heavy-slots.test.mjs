@@ -15,18 +15,20 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
 import {
   foreignPortHolderReport,
   probeAnswers,
+  probePath,
   skipsQueue,
   slotCount,
   slotLockDir,
   slotPortHolder,
   slotResources,
+  unreachableProbeError,
 } from './heavy-slots.mjs';
 import { prepushModules } from './prepush.mjs';
 import { scrubGateEnv } from './scrub-git-env.mjs';
@@ -480,15 +482,39 @@ function deadPid() {
   return Number(out);
 }
 
-test('the liveness probe socket lives inside the shared locks dir', async () => {
+test('probe connect errors a listener could never have answered mark the holder dead', () => {
+  for (const code of ['ENOENT', 'ECONNREFUSED', 'ECONNRESET', 'EINVAL', 'ENAMETOOLONG'])
+    assert.equal(unreachableProbeError({ code }), true, code);
+  for (const code of ['EMFILE', 'EPERM', 'EACCES', 'ENOTSOCK'])
+    assert.equal(unreachableProbeError({ code }), false, code);
+});
+
+test('a lock directory deeper than the unix socket limit still gets a short probe path', async () => {
+  const { env, cleanup } = sandbox(1);
+  env.CAIRN_HEAVY_SLOTS_DIR = join(env.CAIRN_HEAVY_SLOTS_DIR, 'a'.repeat(60), 'b'.repeat(60));
+  try {
+    const locks = env.CAIRN_HEAVY_SLOTS_DIR;
+    const holder = startHolder(env, { lingerMs: 200 });
+    await until(holder, 'out', /SLOT 1/);
+    const record = JSON.parse(readFileSync(join(locks, 'slot-1.lock'), 'utf8'));
+    assert.equal(record.probe, probePath(record.token, env.TMPDIR));
+    assert.ok(record.probe.length <= 100, record.probe);
+    await holder.exited;
+  } finally {
+    cleanup();
+  }
+});
+
+test('the liveness probe socket lives under the os tmpdir, bounded in length', async () => {
   const { env, cleanup } = sandbox(1);
   try {
     const locks = env.CAIRN_HEAVY_SLOTS_DIR;
     const holder = startHolder(env, { lingerMs: 200 });
     await until(holder, 'out', /SLOT 1/);
     const record = JSON.parse(readFileSync(join(locks, 'slot-1.lock'), 'utf8'));
-    assert.equal(dirname(record.probe), locks);
-    assert.match(record.probe, /cairn-heavy-[a-f0-9-]+\.sock$/);
+    assert.equal(record.probe, probePath(record.token, env.TMPDIR));
+    assert.match(record.probe, /cairn-heavy-[a-f0-9]+\.sock$/);
+    assert.ok(record.probe.length <= 100, record.probe);
     await holder.exited;
     assert.equal(existsSync(record.probe), false);
   } finally {
@@ -915,7 +941,7 @@ test('the live-stack pool reads its own count and defaults to one', () => {
   );
 });
 
-test('a verify stack launch queues for the shared live-stack slot and releases it on exit', async (t) => {
+test('a verify stack launch queues for the shared live-stack slot and releases it on exit', async () => {
   const { dir, env, cleanup } = sandbox(1);
   try {
     const holder = startLiveStackHolder(env);

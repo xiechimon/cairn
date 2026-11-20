@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
   chmodSync,
   closeSync,
@@ -22,8 +22,15 @@ import { ownerChain, runOwned } from './owned-process.mjs';
 const DEFAULT_SLOTS = 2;
 const POLL_MS = 250;
 const PARTIAL_WRITE_GRACE_MS = 2_000;
-const CLOSED_PROBE_CODES = new Set(['ENOENT', 'ECONNREFUSED', 'ECONNRESET']);
+const CLOSED_PROBE_CODES = new Set([
+  'ENOENT',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EINVAL',
+  'ENAMETOOLONG',
+]);
 const REACH_PROBE_CODES = new Set(['EPERM', 'EACCES', 'ENOTSOCK', 'ENOTDIR']);
+const PROBE_PATH_LIMIT = 100;
 const DEFAULT_E2E_PORT = 8398;
 const PORT_STRIDE = 10;
 const LOCK_SCRIPT = `
@@ -148,15 +155,31 @@ function isAlive(pid) {
   }
 }
 
+export function unreachableProbeError(error) {
+  return CLOSED_PROBE_CODES.has(error.code);
+}
+
+export function probePath(token, tmp = tmpdir()) {
+  const name = `cairn-heavy-${createHash('sha256').update(token).digest('hex').slice(0, 16)}.sock`;
+  const underTmp = join(tmp, name);
+  return underTmp.length <= PROBE_PATH_LIMIT ? underTmp : join('/tmp', name);
+}
+
 export function probeAnswers(probe) {
   return new Promise((done, reject) => {
-    const connection = createConnection(probe);
+    let connection;
+    try {
+      connection = createConnection(probe);
+    } catch (error) {
+      if (unreachableProbeError(error)) return done(false);
+      return reject(error);
+    }
     connection.once('connect', () => {
       connection.destroy();
       done(true);
     });
     connection.once('error', (error) => {
-      if (CLOSED_PROBE_CODES.has(error.code)) done(false);
+      if (unreachableProbeError(error)) done(false);
       else reject(error);
     });
   });
@@ -201,6 +224,7 @@ async function holderState(path, legacyPid) {
       !alive &&
       typeof record.token === 'string' &&
       [
+        probePath(record.token),
         join(dirname(path), `cairn-heavy-${record.token}.sock`),
         join('/tmp', `cairn-heavy-${record.token}.sock`),
       ].includes(record.probe)
@@ -267,7 +291,7 @@ export async function acquireSlot({
   }
 
   const token = randomUUID();
-  const probe = join(dir, `cairn-heavy-${token}.sock`);
+  const probe = probePath(token);
   const server = createServer((connection) => connection.destroy());
   await new Promise((done, reject) => {
     server.once('error', reject);
