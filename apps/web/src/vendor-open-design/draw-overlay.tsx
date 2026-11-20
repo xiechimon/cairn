@@ -428,7 +428,7 @@ export function DrawLayer({
                   list.filter((item) => !(item.kind === 'text' && item.id === mark.id)),
                 );
             }}
-            className="absolute m-0 min-h-0 w-auto resize-none overflow-hidden rounded-none border-0 bg-transparent p-0 font-semibold field-sizing-fixed focus-visible:ring-0 dark:bg-transparent"
+            className="absolute m-0 min-h-0 w-auto resize-none overflow-hidden border-0 bg-transparent p-0 font-semibold field-sizing-fixed focus-visible:ring-0 dark:bg-transparent"
             style={{
               left: `${mark.x * 100}%`,
               top: `${mark.y * 100}%`,

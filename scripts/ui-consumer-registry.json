@@ -12,6 +12,12 @@
       "reason": "ResourceRow button form (#1416): a full-width Button row inside the settings card. It draws the row divider itself because the Button's transparent border hides the card's divide-y rule (last:border-b-0 keeps the last row clean), and a divider on a rounded box would curl up at both ends, so the box stays square. The card's --radius-card corners stay the visible shape."
     },
     {
+      "file": "apps/web/src/board/design/design-frame.tsx",
+      "anchor": "absolute top-0 left-0 block origin-top-left border-0 bg-(--page-preview)",
+      "kind": "deviation",
+      "reason": "Design view page frame: the iframe is the agent's page at the chosen viewport width, scaled to fit, and stands for a browser window, so it keeps the page's own square edges as Open Design's preview does; the surrounding stage carries the rounded Cairn surface."
+    },
+    {
       "file": "apps/web/src/board/file-lightbox.tsx",
       "anchor": "inset-0 top-0 left-0 flex h-dvh w-full max-w-none",
       "kind": "deviation",
