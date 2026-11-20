@@ -153,7 +153,9 @@ function migrateRunnerHome(): void {
       if (existsSync(to)) continue;
       mkdirSync(target, { recursive: true });
       renameSync(join(legacy, entry), to);
-    } catch {}
+    } catch (error) {
+      console.warn(`runner-home migration skipped ${entry}:`, error);
+    }
   }
   try {
     const mcpTarget = join(target, 'homes', 'claude', '.claude.json');
@@ -161,7 +163,9 @@ function migrateRunnerHome(): void {
       mkdirSync(dirname(mcpTarget), { recursive: true });
       renameSync(join(target, 'mcp.json'), mcpTarget);
     }
-  } catch {}
+  } catch (error) {
+    console.warn('runner-home mcp.json migration failed:', error);
+  }
 }
 
 function bundledRoot(name: string): string {
