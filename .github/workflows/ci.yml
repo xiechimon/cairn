@@ -524,7 +524,7 @@ jobs:
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/real-smoke.test.mjs
+        run: node --test scripts/ops/real-smoke.test.mjs scripts/smoke/post-install.test.mjs
 
       - name: Orb host provisioning fixtures (#2273)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { ENV_VARS } from '@cairn/shared';
+import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
@@ -409,4 +410,9 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     void shutdown();
   });
+}
+
+const parentPid = parentPidFromEnv(process.env);
+if (parentPid !== null) {
+  watchParentProcess({ pid: parentPid, onDead: () => void shutdown() });
 }

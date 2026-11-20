@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
 
@@ -10,12 +11,37 @@ const FIRST_RUN_SETUP = '[data-testid="first-run-setup"]';
 const RUNNER_ONLINE_TIMEOUT_MS = 90_000;
 const RUNNER_ENTRY = 'Resources/runner/dist/cli.mjs';
 
-function runnerProcesses() {
+const SERVER_ENTRY =
+  'Contents/Frameworks/Cairn Helper.app/Contents/MacOS/Cairn Helper --type=utility';
+
+function matchingPids(pattern) {
   try {
-    return execFileSync('pgrep', ['-f', RUNNER_ENTRY], { encoding: 'utf8' }).trim();
+    return execFileSync('pgrep', ['-f', pattern], { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
   } catch {
-    return '';
+    return [];
   }
+}
+
+function childPids(parentPid) {
+  try {
+    return execFileSync('pgrep', ['-P', String(parentPid)], { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function utilityPids(parentPid) {
+  return childPids(parentPid).filter((pid) =>
+    execFileSync('ps', ['-o', 'command=', '-p', pid], { encoding: 'utf8' }).includes(
+      '--type=utility',
+    ),
+  );
 }
 
 const [appPath, screenshotPath, trayShotPath] = process.argv.slice(2);
@@ -23,6 +49,18 @@ if (appPath === undefined || screenshotPath === undefined) {
   console.error('usage: node scripts/smoke-mac.mjs <Cairn.app> <screenshot.png>');
   process.exit(2);
 }
+
+const appRoot = realpathSync(resolve(appPath));
+if (appRoot.startsWith('/Applications/')) {
+  console.error(`refusing to smoke an installed app: ${appRoot}`);
+  process.exit(2);
+}
+
+function runnerProcesses() {
+  return matchingPids(`${appRoot}/${RUNNER_ENTRY}`).join('\n');
+}
+
+const serverProcesses = () => matchingPids(`${appRoot}/${SERVER_ENTRY}`);
 
 const app = await electron.launch({
   executablePath: join(resolve(appPath), 'Contents', 'MacOS', 'Cairn'),
@@ -129,6 +167,27 @@ try {
   assert.deepEqual(closed, { windows: 1, visible: false }, 'closing the window did not hide it');
   assert.equal((await fetch(origin)).status, 200, 'the server stopped when the window closed');
 
+  const pids = utilityPids(child.pid);
+  assert.equal(pids.length, 1, `expected one server process, found ${pids}`);
+  process.kill(Number(pids[0]), 'SIGKILL');
+  const recovered = await (async () => {
+    const deadline = Date.now() + 30_000;
+    while (Date.now() < deadline) {
+      if (
+        await fetch(origin).then(
+          () => true,
+          () => false,
+        )
+      )
+        return true;
+      await new Promise((wake) => setTimeout(wake, 500));
+    }
+    return false;
+  })();
+  assert.equal(recovered, true, 'the server did not come back after a SIGKILL');
+  assert.equal(child.exitCode, null, 'the app quit instead of recovering the server');
+  console.log('server SIGKILL: restarted on the same origin');
+
   const exited = new Promise((done) => child.once('exit', done));
   await app
     .evaluate(({ app: electronApp }) => {
@@ -142,6 +201,48 @@ try {
   );
   assert.equal(reachable, false, 'the server outlived the app');
   assert.equal(runnerProcesses(), '', 'the local Runner outlived the app');
+
+  const abrupt = await electron.launch({
+    executablePath: join(resolve(appPath), 'Contents', 'MacOS', 'Cairn'),
+    timeout: LAUNCH_TIMEOUT_MS,
+  });
+  const abruptChild = abrupt.process();
+  try {
+    await abrupt.firstWindow({ timeout: LAUNCH_TIMEOUT_MS });
+    const abruptOrigin = new URL((await abrupt.windows())[0].url()).origin;
+    const spawned = await (async () => {
+      const deadline = Date.now() + 15_000;
+      while (Date.now() < deadline) {
+        if (utilityPids(abruptChild.pid).length > 0) return true;
+        await new Promise((done) => setTimeout(done, 500));
+      }
+      return false;
+    })();
+    assert.equal(spawned, true, 'the relaunched app never forked a server');
+    abruptChild.kill('SIGKILL');
+    await new Promise((done) => abruptChild.once('exit', done));
+    const drained = await (async () => {
+      const deadline = Date.now() + 30_000;
+      while (Date.now() < deadline) {
+        const unreachable = await fetch(abruptOrigin).then(
+          () => false,
+          () => true,
+        );
+        if (serverProcesses().length === 0 && unreachable) return true;
+        await new Promise((wake) => setTimeout(wake, 500));
+      }
+      return false;
+    })();
+    assert.equal(drained, true, 'the server outlived a killed app');
+    assert.equal(runnerProcesses(), '', 'the local Runner outlived a killed app');
+    console.log('abrupt kill: server and Runner died with the app');
+  } finally {
+    for (const pid of matchingPids(`^${appRoot}/`)) {
+      try {
+        process.kill(Number(pid), 'SIGKILL');
+      } catch {}
+    }
+  }
 
   console.log(
     `desktop smoke passed: ${origin} signed in, no pairing gate, Runner online, close hides, quit stops the server and Runner`,

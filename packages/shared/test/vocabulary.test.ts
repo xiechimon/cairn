@@ -464,6 +464,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       trajectoryOutcomeBackfill,
       trajectoryReflectCurate,
       trajectoryReflectOpenGuardIssues,
+      parentPid,
       ...observed
     } = ENV_VARS;
     expect(observed).toEqual({
@@ -473,6 +474,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       workspacesDir: 'CAIRN_WORKSPACES_DIR',
       home: 'CAIRN_HOME',
     });
+    expect(parentPid).toBe('CAIRN_PARENT_PID');
     expect(githubCreateMinIntervalMs).toBe('CAIRN_GITHUB_CREATE_MIN_INTERVAL_MS');
     expect(githubCreateHourlyCap).toBe('CAIRN_GITHUB_CREATE_HOURLY_CAP');
     expect(webDir).toBe('CAIRN_WEB_DIR');

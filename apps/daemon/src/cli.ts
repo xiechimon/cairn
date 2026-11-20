@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { BRAND, ENV_VARS, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
+import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
@@ -126,9 +127,15 @@ export async function runForeground(opts: StartOptions): Promise<void> {
   };
   process.on('SIGTERM', () => onSignal('SIGTERM'));
   process.on('SIGINT', () => onSignal('SIGINT'));
+  const parentPid = parentPidFromEnv(process.env);
+  const stopParentWatch =
+    parentPid === null
+      ? () => {}
+      : watchParentProcess({ pid: parentPid, onDead: () => onSignal('parent') });
   try {
     await handle.done;
   } finally {
+    stopParentWatch();
     await shutdownDaemonOtel();
   }
 }

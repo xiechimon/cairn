@@ -69,7 +69,10 @@ import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
+import { createRestartBudget } from './restart-budget.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
+import { runnerHomeFor } from './runner-home.js';
+import { createServerExitHandler } from './server-exit.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { addLiquidGlass } from './tray-glass.js';
 import { trayMenuTemplate } from './tray-menu.js';
@@ -116,6 +119,8 @@ const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 60_000;
 const READY_POLL_MS = 250;
 const STOP_TIMEOUT_MS = 10_000;
+const SERVER_RESTART_MAX = 3;
+const SERVER_RESTART_STABLE_MS = 60_000;
 const UPDATE_FIRST_CHECK_MS = 10_000;
 const UPDATE_CHECK_EVERY_MS = 60 * 60 * 1000;
 const UPDATE_CHECK_ON_FOCUS_AFTER_MS = 10 * 60 * 1000;
@@ -145,6 +150,26 @@ interface RunningServer {
 }
 
 let server: RunningServer | null = null;
+let serverOtelEnv: OtelEnv | null = null;
+const serverRestartBudget = createRestartBudget(SERVER_RESTART_MAX, SERVER_RESTART_STABLE_MS);
+const serverExited = createServerExitHandler<RunningServer>({
+  budget: serverRestartBudget,
+  hooks: {
+    isQuitting: () => quitting,
+    current: () => server,
+    gate: async (_dead, code) => {
+      const guard = activeGuard;
+      if (guard === null) return false;
+      await guard.step('server-exit', `The Cairn server exited with code ${code}.`);
+      return guard.rollingBack();
+    },
+    restart: (dead) => void restartServer(dead),
+    fatal: (code) => {
+      dialog.showErrorBox('Cairn server stopped', `The Cairn server exited with code ${code}.`);
+      app.quit();
+    },
+  },
+});
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let runner: LocalRunner | null = null;
@@ -175,7 +200,13 @@ function cairnHome(): string {
 }
 
 function runnerHome(): string {
-  return join(homedir(), '.cairn');
+  return runnerHomeFor({
+    userData: app.getPath('userData'),
+    defaultUserData: join(app.getPath('appData'), app.getName()),
+    bundle: runningBundle(),
+    installedBundle: '/Applications/Cairn.app',
+    home: homedir(),
+  });
 }
 
 function migrateRunnerHome(): void {
@@ -264,10 +295,17 @@ async function serverPort(): Promise<number> {
 function startServer(
   port: number,
   otelEnv: OtelEnv,
-  onExit: (code: number | null) => void,
+  onExit: (dead: RunningServer, code: number | null) => void,
 ): RunningServer {
+  serverRestartBudget.started();
   const env = withOtelEnv(
-    { ...process.env, HOST: LOOPBACK, PORT: String(port), [ENV_VARS.home]: cairnHome() },
+    {
+      ...process.env,
+      HOST: LOOPBACK,
+      PORT: String(port),
+      [ENV_VARS.home]: cairnHome(),
+      [ENV_VARS.parentPid]: String(process.pid),
+    },
     otelEnv,
   );
   delete env[ENV_VARS.token];
@@ -288,9 +326,26 @@ function startServer(
   child.on('exit', (code) => {
     running.exitCode = code;
     log.close();
-    onExit(code);
+    onExit(running, code);
   });
   return running;
+}
+
+function serverPortOf(running: RunningServer): number {
+  return Number(new URL(running.origin).port);
+}
+
+async function restartServer(dead: RunningServer): Promise<void> {
+  if (quitting) return;
+  console.error(`Cairn server exited (code ${dead.exitCode}); restarting`);
+  const next = startServer(serverPortOf(dead), serverOtelEnv as OtelEnv, serverExited);
+  server = next;
+  try {
+    await waitUntilServing(next);
+    startHealthWatch(next, activeGuard);
+  } catch {
+    next.process.kill();
+  }
 }
 
 async function waitUntilServing(running: RunningServer): Promise<void> {
@@ -915,20 +970,9 @@ async function boot(): Promise<void> {
     guard = armVersionGuard(userData);
     activeGuard = guard;
     const otelEnv = desktopOtelEnv(join(userData, 'otel.env'), console.error);
+    serverOtelEnv = otelEnv;
     otelHeaderLogSecrets.push(...otelHeaderSecrets(otelEnv.CAIRN_OTEL_HEADERS));
-    const handleServerExit = async (code: number | null): Promise<void> => {
-      if (quitting) return;
-      const reason = `The Cairn server exited with code ${code}.`;
-      if (guard !== null) {
-        await guard.step('server-exit', reason);
-        if (guard.rollingBack()) return;
-      }
-      dialog.showErrorBox('Cairn server stopped', reason);
-      app.quit();
-    };
-    server = startServer(await serverPort(), otelEnv, (code) => {
-      void handleServerExit(code);
-    });
+    server = startServer(await serverPort(), otelEnv, serverExited);
     await waitUntilServing(server);
     startHealthWatch(server, guard);
     const ownerToken = readOwnerToken();

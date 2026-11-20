@@ -1,5 +1,14 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -759,6 +768,39 @@ async function waitForServerUp(base, timeoutMs) {
   throw new Error(`server never came up${lastError ? `: ${lastError.message}` : ''}`);
 }
 
+const INSTALLED_APPS = /^\/applications(\/|$)/i;
+
+export function smokableBundle(appPath) {
+  const resolved = resolve(appPath);
+  if (INSTALLED_APPS.test(resolved)) {
+    throw new Error(`refusing to run against the installed app: ${resolved}`);
+  }
+  const root = realpathSync(resolved);
+  if (INSTALLED_APPS.test(root)) {
+    throw new Error(`refusing to run against the installed app: ${root}`);
+  }
+  return root;
+}
+
+function matchingPids(pattern) {
+  try {
+    return execFileSync('pgrep', ['-f', pattern], { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function killTree(root) {
+  for (const pid of matchingPids(`^${root}/`)) {
+    try {
+      process.kill(Number(pid), 'SIGKILL');
+    } catch {}
+  }
+}
+
 async function launchPackagedApp(executable, userData) {
   return electron.launch({
     executablePath: executable,
@@ -777,14 +819,16 @@ function procOf(electronApp) {
 
 async function connectApp(appPath, prevAppPath) {
   const scratch = mkdtempSync(join(tmpdir(), 'cairn-smoke-'));
-  const executable = join(resolve(appPath), 'Contents', 'MacOS', 'Cairn');
+  const appRoot = smokableBundle(appPath);
+  const executable = join(appRoot, 'Contents', 'MacOS', 'Cairn');
   if (!existsSync(executable)) {
     throw new Error(`no executable at ${executable}; pass the path to Cairn.app`);
   }
   await seedTsnet(scratch);
   let seededTables;
   if (prevAppPath !== null) {
-    const prevExecutable = join(resolve(prevAppPath), 'Contents', 'MacOS', 'Cairn');
+    const prevRoot = smokableBundle(prevAppPath);
+    const prevExecutable = join(prevRoot, 'Contents', 'MacOS', 'Cairn');
     if (!existsSync(prevExecutable)) {
       throw new Error(`no executable at ${prevExecutable}; pass the previous release's Cairn.app`);
     }
@@ -801,6 +845,7 @@ async function connectApp(appPath, prevAppPath) {
     } finally {
       await Promise.race([prevApp.close(), delay(30_000)]).catch(() => {});
       prevProc?.kill('SIGKILL');
+      killTree(prevRoot);
     }
     const dbPath = join(scratch, 'home', 'server', 'server.db');
     const seeded = seedEveryTable(dbPath);
@@ -853,6 +898,7 @@ async function connectApp(appPath, prevAppPath) {
     page,
     electronApp,
     appProc,
+    appRoot,
     launchedAt,
     scratch,
     seededTables,
@@ -960,6 +1006,7 @@ async function main() {
     if (ctx.electronApp) {
       await Promise.race([ctx.electronApp.close(), delay(30_000)]).catch(() => {});
       ctx.appProc?.kill('SIGKILL');
+      killTree(ctx.appRoot);
       if (ctx.scratch) rmSync(ctx.scratch, { recursive: true, force: true });
     }
     if (ctx.browser) await ctx.browser.close().catch(() => {});

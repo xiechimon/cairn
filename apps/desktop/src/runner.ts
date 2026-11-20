@@ -76,6 +76,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
       [ENV_VARS.home]: options.home,
+      [ENV_VARS.parentPid]: String(process.pid),
       [ENV_VARS.confineDeniedRoots]: options.serverHome,
       [ENV_VARS.server]: options.origin,
       [ENV_VARS.skillsDir]: join(options.home, 'skills'),
