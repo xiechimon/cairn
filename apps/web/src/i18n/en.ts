@@ -2631,6 +2631,19 @@ export const EN: Record<string, string> = {
   '连接 Telegram': 'Connect Telegram',
   '连接 Telegram 机器人': 'Connect a Telegram bot',
   '连接 Slack': 'Connect Slack',
+  '连接 iMessage': 'Connect iMessage',
+  '借一台一直开机的 Mac 收发 iMessage，不开端口。':
+    'Send and receive iMessage through an always-on Mac. No open ports.',
+  '回复数字或文字就能点卡片上的按钮。':
+    'Reply with a number or the label text to tap a card button.',
+  '桥接跑在选中的 Mac 上，和你已有的 Cairn Runner 共用一条通道，不需要开端口。':
+    'The bridge runs on the Mac you pick and shares the outbound channel your Cairn Runner already uses. No open ports needed.',
+  '运行桥接的 Mac': 'Mac running the bridge',
+  '选一台一直开机的 Mac。这台机器上要装好 imsg 并给 iMessage 读取权限；第一次连接时会自动安装受管版本。':
+    'Pick an always-on Mac. It needs imsg installed with Messages read access; a managed copy installs automatically on first connect.',
+  '还没有已注册的机器。先在一台 Mac 上启动 Cairn Runner。':
+    'No machines registered yet. Start a Cairn Runner on a Mac first.',
+  选择机器: 'Choose a machine',
   '在 @BotFather 里创建机器人，把 bot token 粘到这里。':
     'Create a bot in @BotFather and paste the bot token here.',
   '建一个 Slack App 并打开 Socket Mode，把两个 token 粘到这里。':

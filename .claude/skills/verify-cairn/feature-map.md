@@ -878,8 +878,8 @@ Reach:
 
 - Web routes: none
 - Settings: `设置` (Settings) › `消息` (Messages) › `IM`
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `im-app-token-input`, `im-approve-*`, `im-bot-token-input`, `im-catalog`, `im-connect-imessage`, `im-connect-slack`, `im-connect-submit`, `im-connect-telegram`, `im-connect-wechat`, `im-connected`, `im-connection-*`, `im-delete-*`, `im-machine-select`, `im-no-machines`, `im-pairing-*`, `im-pending`, `im-platform-imessage`, `im-platform-slack`, `im-platform-telegram`, `im-platform-wechat`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
+- Keyboard shortcuts in its code: `C`, `D`
+- Test ids in its code: `im-app-token-input`, `im-approve-*`, `im-bot-token-input`, `im-connect-*`, `im-connect-another-*`, `im-connect-submit`, `im-connection-*`, `im-delete-*`, `im-machine-select`, `im-menu-*`, `im-no-machines`, `im-pairing-*`, `im-platform-*`, `im-platforms`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/design/im-connections.md](../../../docs/design/im-connections.md), [docs/design/im-bridge.md](../../../docs/design/im-bridge.md)

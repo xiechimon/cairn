@@ -74,6 +74,7 @@ const PLATFORM_COPY: Record<
   imessage: {
     name: 'iMessage',
     description: '借一台一直开机的 Mac 收发 iMessage，不开端口。',
+    info: '回复数字或文字就能点卡片上的按钮。',
     connect: '连接 iMessage',
   },
   wechat: {

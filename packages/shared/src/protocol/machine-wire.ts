@@ -679,6 +679,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     path: '/api/machine/session/{stepId}',
     reason: '[设计] #1512 按 stepId 取回步收尾上传的原始会话 JSONL（session.jsonl）',
   },
+  {
+    method: 'POST',
+    path: '/api/machine/im/{connId}/event',
+    reason:
+      '[design] iMessage bridge inbound events (im.attach/im.detach/im.send/im.action) from the machine owning the connection; see docs/design/im-bridge.md',
+  },
 ] as const;
 
 export const MACHINE_WIRE = [
