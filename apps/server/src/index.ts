@@ -42,6 +42,7 @@ import { killInFlightPick } from './services/fs-pick.js';
 import { refreshingGithubFetch } from './services/github-connection.js';
 import { createImService } from './services/im/core.js';
 import { liveImEnv } from './services/im/env.js';
+import { createImBridge, createImessageAdapter } from './services/im/imessage.js';
 import { setImRuntime } from './services/im/runtime.js';
 import { createSlackAdapter } from './services/im/slack.js';
 import { createTelegramAdapter } from './services/im/telegram.js';
@@ -175,6 +176,7 @@ const tailscale = createTailscaleServe({
   listenPort: config.port,
   recordPath: join(config.dataDir, 'tailscale-serve.json'),
 });
+const imBridge = createImBridge(machineHub);
 const im = createImService({
   db,
   hub,
@@ -189,6 +191,7 @@ const im = createImService({
     telegram: createTelegramAdapter(),
     wechat: wechatAdapter,
     slack: createSlackAdapter(),
+    imessage: createImessageAdapter({ db, bridge: imBridge }),
   },
 });
 setImRuntime(im.runtime);
@@ -225,6 +228,7 @@ const app = createApp(
     user: seeded.user,
     team: seeded.team,
     im,
+    imBridge,
     mail,
     pingIntervalMs: config.pingIntervalMs,
     claimHoldMs: config.claimHoldMs,

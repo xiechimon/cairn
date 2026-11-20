@@ -864,9 +864,9 @@ Reach:
 
 ### im-connections
 
-**IM connections** (partial, centrality 3). Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account; Slack connects with an app-level token and bot token over Socket Mode. Paired senders' messages become coordinator turns and text replies return to the same chat.
+**IM connections** (partial, centrality 3). Outbound-only chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account; Slack connects with an app-level token and bot token over Socket Mode; iMessage bridges through imsg on a registered always-on Mac over the machine stream, with no inbound port. Paired senders' messages become coordinator turns, card answers arrive as button taps or replies, and text replies return to the same chat.
 
-States: An empty connections list, a connecting/ready/degraded/expired/error status per connection, a pending WeChat QR login that turns done or expired, pending pairing requests with approve/reject, and paired senders listed under the connection.
+States: An empty connections list, a connecting/ready/degraded/expired/error status per connection, a pending WeChat QR login that turns done or expired, pending pairing requests with approve/reject, paired senders listed under the connection, and an iMessage connection bound to a registered machine that reports the bridge's status.
 
 Reach:
 
@@ -874,15 +874,16 @@ Reach:
 2. `click testid:im-connect-telegram`
 3. `click testid:im-connect-wechat`
 4. `click testid:im-connect-slack`
+5. `click testid:im-connect-imessage`
 
 - Web routes: none
 - Settings: `设置` (Settings) › `消息` (Messages) › `IM`
-- Keyboard shortcuts in its code: `C`, `D`
-- Test ids in its code: `im-app-token-input`, `im-approve-*`, `im-bot-token-input`, `im-connect-*`, `im-connect-another-*`, `im-connect-submit`, `im-connection-*`, `im-delete-*`, `im-menu-*`, `im-pairing-*`, `im-platform-*`, `im-platforms`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `im-app-token-input`, `im-approve-*`, `im-bot-token-input`, `im-catalog`, `im-connect-imessage`, `im-connect-slack`, `im-connect-submit`, `im-connect-telegram`, `im-connect-wechat`, `im-connected`, `im-connection-*`, `im-delete-*`, `im-machine-select`, `im-no-machines`, `im-pairing-*`, `im-pending`, `im-platform-imessage`, `im-platform-slack`, `im-platform-telegram`, `im-platform-wechat`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
-- Backend design: [docs/design/im-connections.md](../../../docs/design/im-connections.md)
-- Evidence: `apps/server/test/im-telegram.test.ts`, `apps/server/test/im-wechat.test.ts`, `apps/server/test/im-slack.test.ts`, `apps/server/test/im-core.test.ts`, `apps/server/test/im-routes.test.ts`
+- Backend design: [docs/design/im-connections.md](../../../docs/design/im-connections.md), [docs/design/im-bridge.md](../../../docs/design/im-bridge.md)
+- Evidence: `apps/server/test/im-telegram.test.ts`, `apps/server/test/im-wechat.test.ts`, `apps/server/test/im-slack.test.ts`, `apps/server/test/im-core.test.ts`, `apps/server/test/im-routes.test.ts`, `apps/server/test/im-imessage.test.ts`, `apps/daemon/test/imsg-bridge.test.ts`
 
 ### mail-connector
 

@@ -15,6 +15,7 @@ import {
   type MachineDoneBody,
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
+  type MachineImEventBody,
   type MachineOfflineBody,
   type MachineOfflineResponse,
   type MachinePresenceBody,
@@ -161,6 +162,7 @@ export interface MachineApi {
     body: MachineComputerFramesBody,
     signal?: AbortSignal,
   ): Promise<MachineComputerFramesResponse>;
+  imEvent?(connId: string, body: MachineImEventBody): Promise<void>;
   stream(
     signal: AbortSignal,
     onEvent: (ev: MachineStreamEvent) => void,
@@ -599,6 +601,13 @@ export class MachineClient implements MachineApi {
       body,
       signal,
       parse: (raw) => machineComputerFramesResponseSchema.parse(raw),
+    });
+  }
+
+  async imEvent(connId: string, body: MachineImEventBody): Promise<void> {
+    await this.request('POST', `/api/machine/im/${encodeURIComponent(connId)}/event`, {
+      body,
+      parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }
 

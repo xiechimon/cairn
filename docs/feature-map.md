@@ -545,11 +545,11 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### im-connections
 
-**IM connections** (partial). Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account; Slack connects with an app-level token and bot token over Socket Mode. Paired senders' messages become coordinator turns and text replies return to the same chat.
+**IM connections** (partial). Outbound-only chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account; Slack connects with an app-level token and bot token over Socket Mode; iMessage bridges through imsg on a registered always-on Mac over the machine stream, with no inbound port. Paired senders' messages become coordinator turns, card answers arrive as button taps or replies, and text replies return to the same chat.
 
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied
 - Frontend design: [docs/design/references/settings](design/references/settings)
-- Backend design: [docs/design/im-connections.md](design/im-connections.md)
+- Backend design: [docs/design/im-connections.md](design/im-connections.md), [docs/design/im-bridge.md](design/im-bridge.md)
 
 ### mail-connector
 

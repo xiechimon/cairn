@@ -99,6 +99,8 @@ export function bootServer(
     deployRecordPath?: string;
     remote?: Partial<NonNullable<AppContext['remote']>>;
     im?: AppContext['im'];
+    imBridge?: AppContext['imBridge'];
+    machineHub?: MachineWakeHub;
     openMailbox?: OpenMailbox;
     mailSend?: SendMail;
   } = {},
@@ -106,7 +108,7 @@ export function bootServer(
   const db = opts.db ?? openMemoryDb();
   const { user, team } = seed(db);
   const hub = new TeamStreamHub();
-  const machineHub = new MachineWakeHub(opts.offlineGraceMs);
+  const machineHub = opts.machineHub ?? new MachineWakeHub(opts.offlineGraceMs);
   const convHub = new ConversationStreamHub();
   const secretBox = createEphemeralSecretBox();
   const generatedVapidKeys = webpush.generateVAPIDKeys();
@@ -171,6 +173,7 @@ export function bootServer(
       user,
       team,
       ...(opts.im !== undefined ? { im: opts.im } : {}),
+      ...(opts.imBridge !== undefined ? { imBridge: opts.imBridge } : {}),
       mail,
       ...(opts.mailSend !== undefined ? { mailSend: opts.mailSend } : {}),
       pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,

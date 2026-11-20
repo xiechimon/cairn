@@ -2773,8 +2773,8 @@
     {
       "id": "im-connections",
       "name": "IM connections",
-      "summary": "Outbound-polling chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account; Slack connects with an app-level token and bot token over Socket Mode. Paired senders' messages become coordinator turns and text replies return to the same chat.",
-      "states": "An empty connections list, a connecting/ready/degraded/expired/error status per connection, a pending WeChat QR login that turns done or expired, pending pairing requests with approve/reject, and paired senders listed under the connection.",
+      "summary": "Outbound-only chat connections that reach the Coordinator without a native app or a public callback. Telegram connects with a bot token; WeChat connects by scanning a Tencent iLink QR that creates the connection and pairs the scanning account; Slack connects with an app-level token and bot token over Socket Mode; iMessage bridges through imsg on a registered always-on Mac over the machine stream, with no inbound port. Paired senders' messages become coordinator turns, card answers arrive as button taps or replies, and text replies return to the same chat.",
+      "states": "An empty connections list, a connecting/ready/degraded/expired/error status per connection, a pending WeChat QR login that turns done or expired, pending pairing requests with approve/reject, paired senders listed under the connection, and an iMessage connection bound to a registered machine that reports the bridge's status.",
       "centrality": 3,
       "status": "partial",
       "code": {
@@ -2787,12 +2787,15 @@
           "apps/server/src/services/im/telegram.ts",
           "apps/server/src/services/im/wechat.ts",
           "apps/server/src/services/im/slack.ts",
+          "apps/server/src/services/im/imessage.ts",
           "apps/server/src/services/im/core.ts",
           "apps/server/src/services/im/runtime.ts",
           "apps/server/src/routes-im.ts"
         ],
         "other": [
-          "packages/shared/src/im.ts"
+          "packages/shared/src/im.ts",
+          "packages/shared/src/protocol/machine-wire.ts",
+          "apps/daemon/src/imsg-bridge.ts"
         ]
       },
       "routes": {
@@ -2808,15 +2811,18 @@
           "/api/teams/:id/im/pairing-requests/:requestId/reject",
           "/api/teams/:id/im/telegram",
           "/api/teams/:id/im/slack",
+          "/api/teams/:id/im/imessage",
           "/api/teams/:id/im/wechat/login",
-          "/api/teams/:id/im/wechat/login/:loginId"
+          "/api/teams/:id/im/wechat/login/:loginId",
+          "/api/machine/im/:connId/event"
         ]
       },
       "reach": [
         "settings im",
         "click testid:im-connect-telegram",
         "click testid:im-connect-wechat",
-        "click testid:im-connect-slack"
+        "click testid:im-connect-slack",
+        "click testid:im-connect-imessage"
       ],
       "research": {
         "na": "the binding contract is docs/design/im-connections.md; no reference product is copied"
@@ -2825,14 +2831,17 @@
         "docs/design/references/settings"
       ],
       "backendDesign": [
-        "docs/design/im-connections.md"
+        "docs/design/im-connections.md",
+        "docs/design/im-bridge.md"
       ],
       "evidence": [
         "apps/server/test/im-telegram.test.ts",
         "apps/server/test/im-wechat.test.ts",
         "apps/server/test/im-slack.test.ts",
         "apps/server/test/im-core.test.ts",
-        "apps/server/test/im-routes.test.ts"
+        "apps/server/test/im-routes.test.ts",
+        "apps/server/test/im-imessage.test.ts",
+        "apps/daemon/test/imsg-bridge.test.ts"
       ]
     },
     {

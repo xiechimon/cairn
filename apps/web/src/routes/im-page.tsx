@@ -3,25 +3,39 @@ import type {
   ImConnectionStatus,
   ImPlatform,
   ImWechatLoginStart,
+  MachineRecord,
 } from '@cairn/shared';
-import { Ellipsis, Hash, MessageCircle, Send } from 'lucide-react';
+import { Ellipsis, Hash, MessageCircle, MessageSquare, Send } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
+  registeredMachines,
   useImConnections,
   useImMutations,
   useImPairingRequests,
   useImWechatLoginPoll,
+  useMachines,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FormField, FormStack } from '../components/form-layout.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QrCode } from '../components/qr-code.js';
-import { SettingsCard, SettingsSection } from '../components/settings-list.js';
+import {
+  SETTINGS_SELECT_TRIGGER_CLS,
+  SettingsCard,
+  SettingsSection,
+} from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -39,7 +53,7 @@ const STATUS_LABEL: Record<ImConnectionStatus, string> = {
   error: '错误',
 };
 
-const PLATFORM_ORDER: readonly ImPlatform[] = ['telegram', 'slack', 'wechat'];
+const PLATFORM_ORDER: readonly ImPlatform[] = ['telegram', 'slack', 'imessage', 'wechat'];
 
 const PLATFORM_COPY: Record<
   ImPlatform,
@@ -57,6 +71,11 @@ const PLATFORM_COPY: Record<
     info: '在私聊里和 Coordinator 对话。',
     connect: '连接 Slack',
   },
+  imessage: {
+    name: 'iMessage',
+    description: '借一台一直开机的 Mac 收发 iMessage，不开端口。',
+    connect: '连接 iMessage',
+  },
   wechat: {
     name: '微信',
     description: '扫码登录',
@@ -66,7 +85,13 @@ const PLATFORM_COPY: Record<
 };
 
 const platformLabel = (platform: ImPlatform, t: (key: string) => string): string =>
-  platform === 'wechat' ? t('微信') : platform === 'slack' ? 'Slack' : 'Telegram';
+  platform === 'wechat'
+    ? t('微信')
+    : platform === 'slack'
+      ? 'Slack'
+      : platform === 'imessage'
+        ? 'iMessage'
+        : 'Telegram';
 
 function ConnectDialog({
   onClose,
@@ -169,6 +194,80 @@ function SlackConnectDialog({
   );
 }
 
+function ImessageConnectDialog({
+  machines,
+  onClose,
+  onSubmit,
+  pending,
+}: {
+  machines: MachineRecord[];
+  onClose: () => void;
+  onSubmit: (machineId: string) => void;
+  pending: boolean;
+}) {
+  const { t } = useI18n();
+  const [machineId, setMachineId] = useState(machines[0]?.id ?? '');
+  const ready = machineId !== '';
+  return (
+    <DialogShell
+      title={t('连接 iMessage')}
+      subtitle={t('桥接跑在选中的 Mac 上，和你已有的 Cairn Runner 共用一条通道，不需要开端口。')}
+      onClose={onClose}
+      footer={
+        <Button
+          className={DIALOG_PRIMARY_BUTTON}
+          disabled={pending || !ready}
+          onClick={() => onSubmit(machineId)}
+          data-testid="im-connect-submit"
+        >
+          {t('连接 iMessage')}
+        </Button>
+      }
+    >
+      <FormStack>
+        <FormField
+          label={t('运行桥接的 Mac')}
+          htmlFor="im-imessage-machine"
+          help={t(
+            '选一台一直开机的 Mac。这台机器上要装好 imsg 并给 iMessage 读取权限；第一次连接时会自动安装受管版本。',
+          )}
+        >
+          {machines.length === 0 ? (
+            <p className="m-0 text-meta text-content-secondary" data-testid="im-no-machines">
+              {t('还没有已注册的机器。先在一台 Mac 上启动 Cairn Runner。')}
+            </p>
+          ) : (
+            <Select
+              value={machineId}
+              onValueChange={(next) => {
+                if (next !== null) setMachineId(next);
+              }}
+            >
+              <SelectTrigger
+                id="im-imessage-machine"
+                aria-label={t('运行桥接的 Mac')}
+                className={SETTINGS_SELECT_TRIGGER_CLS}
+                data-testid="im-machine-select"
+              >
+                <SelectValue>
+                  {machines.find((m) => m.id === machineId)?.name ?? t('选择机器')}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                {machines.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
+                    {m.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </FormField>
+      </FormStack>
+    </DialogShell>
+  );
+}
+
 function WechatLoginDialog({
   teamId,
   login,
@@ -238,6 +337,8 @@ const platformIcon = (platform: ImPlatform) =>
     <MessageCircle className="size-5 text-content-secondary" aria-hidden="true" />
   ) : platform === 'slack' ? (
     <Hash className="size-5 text-content-secondary" aria-hidden="true" />
+  ) : platform === 'imessage' ? (
+    <MessageSquare className="size-5 text-content-secondary" aria-hidden="true" />
   ) : (
     <Send className="size-5 text-content-secondary" aria-hidden="true" />
   );
@@ -252,8 +353,11 @@ export function ImConnectionsPage() {
   const mutations = useImMutations(teamId);
   const [connecting, setConnecting] = useState(false);
   const [connectingSlack, setConnectingSlack] = useState(false);
+  const [connectingImessage, setConnectingImessage] = useState(false);
   const [wechatLogin, setWechatLogin] = useState<ImWechatLoginStart | null>(null);
   const [deleting, setDeleting] = useState<ImConnectionRecord | null>(null);
+  const machinesQ = useMachines(teamId, live && connectingImessage);
+  const machines = registeredMachines(machinesQ.data ?? []);
   const connections = connectionsQ.data?.connections ?? [];
   const requests = (requestsQ.data?.requests ?? []).filter((row) => row.status === 'pending');
   const connectionIds = new Set(connections.map((conn) => conn.id));
@@ -267,14 +371,18 @@ export function ImConnectionsPage() {
       ? setConnecting(true)
       : platform === 'slack'
         ? setConnectingSlack(true)
-        : startWechatLogin();
+        : platform === 'imessage'
+          ? setConnectingImessage(true)
+          : startWechatLogin();
   const connectionName = (conn: ImConnectionRecord) =>
     conn.accountLabel ??
     (conn.platform === 'wechat'
       ? t('WeChat 账号')
       : conn.platform === 'slack'
         ? 'Slack'
-        : t('Telegram 机器人'));
+        : conn.platform === 'imessage'
+          ? 'iMessage'
+          : t('Telegram 机器人'));
   const remove = () => {
     if (deleting === null) return;
     mutations.deleteConnection.mutate(deleting.id, {
@@ -496,6 +604,19 @@ export function ImConnectionsPage() {
                 onError: (error) => toastError(t('连接失败，请重试。'), error),
               },
             )
+          }
+        />
+      )}
+      {connectingImessage && (
+        <ImessageConnectDialog
+          machines={machines}
+          pending={mutations.connectImessage.isPending}
+          onClose={() => setConnectingImessage(false)}
+          onSubmit={(machineId) =>
+            mutations.connectImessage.mutate(machineId, {
+              onSuccess: () => setConnectingImessage(false),
+              onError: (error) => toastError(t('连接失败，请重试。'), error),
+            })
           }
         />
       )}

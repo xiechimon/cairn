@@ -63,6 +63,7 @@ import { OutboundEngineScreens } from './engine/screen-channel.js';
 import { createEngineScreenProvider } from './engine/screen-provider.js';
 import { FolderPins } from './folder-pins.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
+import { createImsgBridge } from './imsg-bridge.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
@@ -1021,6 +1022,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
     ],
   });
+  const imsgBridge = createImsgBridge({ api: client, logger, home: config.home });
   void (async () => {
     let backoff = 1_000;
     let announced = false;
@@ -1054,6 +1056,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
             if (ev.type === 'engine.screen') void engineScreens.dispatch(ev.channel);
+            if (ev.type === 'im.attach' || ev.type === 'im.detach' || ev.type === 'im.send') {
+              imsgBridge.handle(ev);
+            }
           },
           () => {
             if (!announced) {
@@ -1260,6 +1265,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     clearInterval(stepScratchTimer);
     streamCtrl.abort();
     claimCtrl.abort();
+    imsgBridge.stop();
     void screens.close();
     void engineScreens.close();
     caffeinate?.kill();

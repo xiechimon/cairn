@@ -853,6 +853,7 @@ export function createImService(deps: ImServiceDeps): ImService {
           onStatus: (status, detail) => onStatus(connId, status, detail),
         },
         deps.env,
+        { connId },
       );
     } catch (err) {
       const fresh = connRow(connId);
@@ -959,7 +960,7 @@ export function createImService(deps: ImServiceDeps): ImService {
       if (adapter === undefined) {
         throw new HttpError(400, `im platform ${platform} is not available yet`);
       }
-      const checked = await adapter.check(fields);
+      const checked = await adapter.check(fields, { teamId });
       if (!checked.ok) throw new HttpError(400, checked.reason);
       const now = nowMs();
       const id = newRecordId();

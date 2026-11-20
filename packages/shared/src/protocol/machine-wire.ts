@@ -339,6 +339,22 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
   z.object({ type: z.literal('engine.screen'), channel: engineScreenRequestSchema }),
+  z.object({ type: z.literal('im.attach'), connId: z.string().min(1).max(128) }),
+  z.object({ type: z.literal('im.detach'), connId: z.string().min(1).max(128) }),
+  z.object({
+    type: z.literal('im.send'),
+    connId: z.string().min(1).max(128),
+    sendId: z.string().min(1).max(128),
+    message: z.object({
+      chatKey: z.string().min(1).max(512),
+      text: z.string().max(64 * 1024),
+      replyToMessageId: z.string().max(256).optional(),
+      buttons: z
+        .array(z.array(z.object({ label: z.string().max(256), value: z.string().max(256) })))
+        .max(8)
+        .optional(),
+    }),
+  }),
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
 

@@ -20,6 +20,7 @@ import {
   machineEnrollPollBodySchema,
   machineEnrollStartBodySchema,
   machineHeartbeatBodySchema,
+  machineImEventBodySchema,
   machineOfflineBodySchema,
   machinePresenceBodySchema,
   machineSteerAckBodySchema,
@@ -174,6 +175,7 @@ const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
 const UPLOAD_URLS_MAX_BODY_BYTES = 64 * 1024;
 const COMPUTER_FRAMES_MAX_BODY_BYTES = 24 * 1024 * 1024;
 const DONE_MAX_BODY_BYTES = 16 * 1024 * 1024;
+const IM_EVENT_MAX_BODY_BYTES = 24 * 1024 * 1024;
 
 const ENROLL_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -781,6 +783,31 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
           return c.json(
             receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames, ctx.secretBox),
           );
+        },
+      );
+    },
+  );
+
+  app.post(
+    '/api/machine/im/:connId/event',
+    bodyLimit({
+      maxSize: IM_EVENT_MAX_BODY_BYTES,
+      onError: (c) => c.json({ error: 'im event body too large' }, 413),
+    }),
+    async (c) => {
+      const connId = c.req.param('connId');
+      return executeMachineCommand(
+        c,
+        () => jsonBody(c),
+        async (row, decoded) => {
+          const bridge = ctx.imBridge;
+          if (bridge === undefined) throw new HttpError(404, 'im bridge unavailable');
+          const bound = bridge.connMachine(connId);
+          if (bound === undefined) throw new HttpError(404, 'im connection not attached');
+          if (bound !== row.id) throw new HttpError(403, 'im connection bound to another machine');
+          const body = parseWith(machineImEventBodySchema, decoded, 'body');
+          bridge.handleEvent(connId, body);
+          return c.json({ ok: true as const });
         },
       );
     },

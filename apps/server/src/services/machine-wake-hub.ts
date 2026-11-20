@@ -23,6 +23,7 @@ export class MachineWakeHub {
   private readonly streams = new Map<string, Set<(ev: MachineStreamEvent) => void>>();
   private readonly stopListeners = new Map<string, Set<() => void>>();
   private readonly disconnectListeners = new Set<(machineId: string) => void>();
+  private readonly connectListeners = new Set<(machineId: string) => void>();
   private readonly wakeSeqs = new Map<string, number>();
   private readonly streamsByMachine = new Map<
     string,
@@ -127,6 +128,7 @@ export class MachineWakeHub {
       }
     };
     this.streamsByMachine.set(machineId, { teamId, connectionId, send, close, release });
+    for (const listener of this.connectListeners) listener(machineId);
     return release;
   }
 
@@ -249,6 +251,24 @@ export class MachineWakeHub {
     return () => {
       this.disconnectListeners.delete(listener);
     };
+  }
+
+  onConnect(listener: (machineId: string) => void): () => void {
+    this.connectListeners.add(listener);
+    return () => {
+      this.connectListeners.delete(listener);
+    };
+  }
+
+  pushIm(machineId: string, ev: MachineStreamEvent): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send(ev);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   pushComputerScreen(machineId: string, channel: ComputerScreenRequest): boolean {

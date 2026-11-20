@@ -10,6 +10,7 @@ import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { GithubConnectionDeviceAttempt } from './services/github-connection-device.js';
 import type { ImService } from './services/im/core.js';
+import type { ImBridge } from './services/im/imessage.js';
 import type { PendingUpload } from './services/machine-uploads.js';
 import type { MachineWakeHub } from './services/machine-wake-hub.js';
 import type { MailConnector } from './services/mail-connector.js';
@@ -46,6 +47,7 @@ export interface AppContext {
   user: UserRecord;
   team: TeamRecord;
   im?: ImService;
+  imBridge?: ImBridge;
   mail?: MailConnector;
   mailSend?: SendMail;
   pingIntervalMs: number;

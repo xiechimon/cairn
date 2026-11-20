@@ -62,11 +62,13 @@ export interface ImAdapter {
   platform: ImPlatform;
   check(
     fields: Record<string, string>,
+    ctx?: { teamId: string },
   ): Promise<{ ok: true; accountLabel: string } | { ok: false; reason: string }>;
   connect(
     fields: Record<string, string>,
     handlers: ImConnectionHandlers,
     env: ImEnv,
+    ctx?: { connId: string },
   ): Promise<{ send(msg: ImOutboundMessage): Promise<void>; stop(): Promise<void> }>;
   loginStart?(env: ImEnv): Promise<{ loginId: string; qr?: string; expiresAt: number }>;
   loginWait?(

@@ -1,4 +1,8 @@
-import { imSlackConnectBodySchema, imTelegramConnectBodySchema } from '@cairn/shared';
+import {
+  imImessageConnectBodySchema,
+  imSlackConnectBodySchema,
+  imTelegramConnectBodySchema,
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
@@ -31,6 +35,15 @@ export function registerImRoutes(app: Hono, ctx: AppContext): void {
     const record = await requireIm(ctx).createConnection(ctx.team.id, 'slack', {
       appToken: body.appToken,
       botToken: body.botToken,
+    });
+    return c.json({ connection: record });
+  });
+
+  app.post('/api/teams/:id/im/imessage', async (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    const body = parseWith(imImessageConnectBodySchema, await jsonBody(c), 'body');
+    const record = await requireIm(ctx).createConnection(ctx.team.id, 'imessage', {
+      machineId: body.machineId,
     });
     return c.json({ connection: record });
   });
