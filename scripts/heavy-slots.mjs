@@ -35,20 +35,27 @@ except OSError as error:
 `;
 const PID_NAMESPACE = process.platform === 'linux' ? readlinkSync('/proc/self/ns/pid') : 'host';
 
-export function slotCount(env) {
-  const raw = env.CAIRN_HEAVY_SLOTS;
-  if (raw === undefined || raw === '') return { count: DEFAULT_SLOTS };
+export const LIVE_STACK_POOL = {
+  countEnv: 'CAIRN_LIVE_STACK_SLOTS',
+  defaultCount: 1,
+  dirName: 'live-stack',
+  label: 'live-stack-slots',
+};
+
+export function slotCount(env, countEnv = 'CAIRN_HEAVY_SLOTS', defaultCount = DEFAULT_SLOTS) {
+  const raw = env[countEnv];
+  if (raw === undefined || raw === '') return { count: defaultCount };
   if (/^[1-9]\d*$/.test(raw.trim())) return { count: Number(raw) };
   return {
     count: 1,
-    warning: `CAIRN_HEAVY_SLOTS=${raw} is not a positive integer; treating it as 1`,
+    warning: `${countEnv}=${raw} is not a positive integer; treating it as 1`,
   };
 }
 
-export function skipsQueue(env) {
+export function skipsQueue(env, dir = slotLockDir(env)) {
   if (env.CI === undefined || env.CI === '' || env.CI === 'false' || env.CI === '0') return false;
   try {
-    statSync(slotLockDir(env));
+    statSync(dir);
     return false;
   } catch (error) {
     if (error.code === 'ENOENT') return true;
@@ -212,11 +219,22 @@ export function slotLockDir(
   return join(tmpdir(), 'cairn-heavy-slots');
 }
 
-export async function acquireSlot({ env = process.env, wait = true, log = console.error } = {}) {
-  if (skipsQueue(env)) return null;
-  const { count, warning } = slotCount(env);
-  if (warning) log(`[heavy-slots] ${warning}`);
-  const dir = slotLockDir(env);
+export async function acquireSlot({
+  env = process.env,
+  wait = true,
+  log = console.error,
+  pool = {},
+} = {}) {
+  const {
+    countEnv = 'CAIRN_HEAVY_SLOTS',
+    defaultCount = DEFAULT_SLOTS,
+    dirName = '',
+    label = 'heavy-slots',
+  } = pool;
+  const dir = join(slotLockDir(env), dirName);
+  if (skipsQueue(env, dir)) return null;
+  const { count, warning } = slotCount(env, countEnv, defaultCount);
+  if (warning) log(`[${label}] ${warning}`);
   const slotPath = (slot) => join(dir, `slot-${slot}.lock`);
   mkdirSync(dir, { recursive: true });
 
@@ -299,7 +317,7 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
         retained = true;
         claimed = true;
         process.once('exit', release);
-        log(`[heavy-slots] acquired slot ${slot}/${count}`);
+        log(`[${label}] acquired slot ${slot}/${count}`);
         return { slot, owner: process.pid, release };
       } finally {
         if (!retained) closeSync(descriptor);
@@ -373,7 +391,7 @@ export async function acquireSlot({ env = process.env, wait = true, log = consol
           )
         ).filter(Boolean);
         log(
-          `[heavy-slots] queued, position ${position} (all ${count} slots are busy); ${holders.join('; ')}`,
+          `[${label}] queued, position ${position} (all ${count} slots are busy); ${holders.join('; ')}`,
         );
         announced = position;
       }

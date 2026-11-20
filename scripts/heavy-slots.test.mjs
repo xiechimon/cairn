@@ -730,6 +730,63 @@ second.release();
   }
 });
 
+const launchScript = resolve('.claude/skills/verify-cairn/scripts/launch.mjs');
+
+const startLiveStackHolder = (env) =>
+  watch(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+import { acquireSlot, LIVE_STACK_POOL } from ${JSON.stringify(moduleUrl)};
+const lease = await acquireSlot({ env: process.env, pool: LIVE_STACK_POOL });
+console.log(lease ? 'LIVE-SLOT ' + lease.slot : 'NONE');
+setInterval(() => {}, 1000);
+`,
+    ],
+    { env },
+  );
+
+test('the live-stack pool reads its own count and defaults to one', () => {
+  assert.equal(slotCount({}, 'CAIRN_LIVE_STACK_SLOTS', 1).count, 1);
+  assert.equal(slotCount({ CAIRN_LIVE_STACK_SLOTS: '3' }, 'CAIRN_LIVE_STACK_SLOTS', 1).count, 3);
+  assert.match(
+    slotCount({ CAIRN_LIVE_STACK_SLOTS: 'x' }, 'CAIRN_LIVE_STACK_SLOTS', 1).warning,
+    /CAIRN_LIVE_STACK_SLOTS/,
+  );
+});
+
+test('a verify stack launch queues for the shared live-stack slot and releases it on exit', async (t) => {
+  const { dir, env, cleanup } = sandbox(1);
+  try {
+    const holder = startLiveStackHolder(env);
+    await until(holder, 'out', /LIVE-SLOT 1/);
+    const squatter = startSquatter(env, dir);
+    await until(squatter, 'out', /SQUATTER-READY/);
+    const launch = watch(process.execPath, [launchScript], {
+      env: {
+        ...env,
+        CAIRN_LIVE_STACK_SLOTS: '1',
+        VERIFY_RUN_DIR: join(dir, 'run'),
+        VERIFY_PORT: squatter.out.match(/SQUATTER-READY (\d+)/)[1],
+        VERIFY_WEB_PORT: '1',
+      },
+    });
+    await until(launch, 'err', /queued, position 1/);
+    assert.match(launch.err, new RegExp(`pid ${holder.child.pid}, cwd`));
+    const slotFile = join(env.CAIRN_HEAVY_SLOTS_DIR, 'live-stack', 'slot-1.lock');
+    assert.equal(existsSync(slotFile), true);
+    holder.child.kill('SIGKILL');
+    await until(launch, 'err', /acquired slot 1\/1/, 5_000);
+    assert.equal(await launch.exited, 1, launch.out + launch.err);
+    assert.match(launch.err, /VERIFY_PORT/);
+    assert.equal(existsSync(slotFile), false);
+  } finally {
+    cleanup();
+  }
+});
+
 test('kernel helper failures propagate and release candidate descriptors', () => {
   const { dir, env, cleanup } = sandbox(1);
   try {

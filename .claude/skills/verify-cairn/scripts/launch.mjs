@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, resolve } from 'node:path';
+import { acquireSlot, leaseEnv, LIVE_STACK_POOL } from '../../../../scripts/heavy-slots.mjs';
 import { spawnOwned } from '../../../../scripts/owned-process.mjs';
 
 const SCRIPT_ROOT = fileURLToPath(new URL('../../../..', import.meta.url));
@@ -14,6 +16,8 @@ const SERVER_PORT = Number(process.env.VERIFY_PORT ?? 8791);
 const WEB_PORT = Number(process.env.VERIFY_WEB_PORT ?? 5273);
 const HOME_DIR = join(RUN_DIR, 'home');
 const SKILLS_DIR = join(HOME_DIR, 'skills');
+const rawIdleMs = Number(process.env.VERIFY_IDLE_TIMEOUT_MS ?? '1200000');
+const IDLE_TIMEOUT_MS = Number.isFinite(rawIdleMs) && rawIdleMs >= 0 ? rawIdleMs : 1_200_000;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -36,17 +40,6 @@ function groupAlive(pid) {
 }
 
 async function main() {
-  if (!(await portFree(SERVER_PORT))) {
-    console.error(`VERIFY_PORT ${SERVER_PORT} 被占——别的 lane?不能杀,换端口重试:`);
-    console.error(`  VERIFY_PORT=<别的> VERIFY_WEB_PORT=<别的> node ${process.argv[1]}`);
-    console.error(`  查占用:lsof -iTCP:${SERVER_PORT} -sTCP:LISTEN`);
-    process.exit(1);
-  }
-  if (!(await portFree(WEB_PORT))) {
-    console.error(`VERIFY_WEB_PORT ${WEB_PORT} 被占——同上,换端口重试`);
-    process.exit(1);
-  }
-
   const portsFile = join(RUN_DIR, 'ports.json');
   if (existsSync(portsFile)) {
     try {
@@ -60,6 +53,20 @@ async function main() {
     } catch {
 
     }
+  }
+
+  const lease = await acquireSlot({ pool: LIVE_STACK_POOL });
+  if (lease !== null) Object.assign(process.env, leaseEnv(lease));
+
+  if (!(await portFree(SERVER_PORT))) {
+    console.error(`VERIFY_PORT ${SERVER_PORT} 被占——别的 lane?不能杀,换端口重试:`);
+    console.error(`  VERIFY_PORT=<别的> VERIFY_WEB_PORT=<别的> node ${process.argv[1]}`);
+    console.error(`  查占用:lsof -iTCP:${SERVER_PORT} -sTCP:LISTEN`);
+    process.exit(1);
+  }
+  if (!(await portFree(WEB_PORT))) {
+    console.error(`VERIFY_WEB_PORT ${WEB_PORT} 被占——同上,换端口重试`);
+    process.exit(1);
   }
 
   rmSync(RUN_DIR, { recursive: true, force: true });
@@ -103,11 +110,15 @@ async function main() {
 
   const stopStack = () => Promise.all([server.stop(), web.stop()]);
   let stopping = false;
+  const shutdown = async () => {
+    if (stopping) return;
+    stopping = true;
+    await stopStack();
+    process.exit(0);
+  };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'])
-    process.once(signal, async () => {
-      stopping = true;
-      await stopStack();
-      process.exit(0);
+    process.once(signal, () => {
+      void shutdown();
     });
 
   const tailOf = (name, lines = 30) => {
@@ -168,6 +179,25 @@ async function main() {
   console.log(`  运行态          ${RUN_DIR}`);
   console.log(`  supervisor     pid ${process.pid}: the stack lives exactly as long as this process and its parent chain`);
   console.log('next:node scripts/doctor.mjs 体检 → node scripts/drive.mjs <probe>; stop with vp.mjs cleanup');
+
+  if (IDLE_TIMEOUT_MS > 0) {
+    let lastActive = Date.now();
+    const watcher = setInterval(() => {
+      const busy = [SERVER_PORT, WEB_PORT].some((port) => {
+        const probe = spawnSync('lsof', ['-nP', `-iTCP:${port}`], { encoding: 'utf8' });
+        if (probe.error) return true;
+        return (probe.stdout ?? '').split('\n').some((line) => line.includes('->'));
+      });
+      if (busy) {
+        lastActive = Date.now();
+        return;
+      }
+      if (Date.now() - lastActive < IDLE_TIMEOUT_MS) return;
+      console.error(`${Math.round(IDLE_TIMEOUT_MS / 60_000)} 分钟无连接,自动停栈(VERIFY_IDLE_TIMEOUT_MS)`);
+      void shutdown();
+    }, 15_000);
+    watcher.unref();
+  }
 
   const ended = await Promise.race([
     server.exited.then(() => 'server'),
