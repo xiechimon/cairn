@@ -317,12 +317,31 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const orbComputer = opts.orbComputer ?? hostDesktops;
   const agentReach = new AgentReachProbe(undefined, undefined, () => agentReachEnabled(paths.home));
   const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
+  const installStop = new AbortController();
+  const installFetch: typeof fetch = (url, init) =>
+    fetch(url, {
+      ...init,
+      signal: AbortSignal.any(
+        init?.signal != null ? [init.signal, installStop.signal] : [installStop.signal],
+      ),
+    });
+  const pendingInstalls = new Set<Promise<unknown>>();
+  const trackInstall = <T>(install: Promise<T>): Promise<T> => {
+    pendingInstalls.add(
+      install.then(
+        () => {},
+        () => {},
+      ),
+    );
+    return install;
+  };
   const devinManaged =
     opts.devinManaged ??
     createDevinManaged({
       root: toolInstallRoot(paths.home, 'devin'),
       home: runtimeHome(paths.home, 'devin'),
       log: (line) => logger.machine(line),
+      fetchImpl: installFetch,
     });
   let devinInstalling = false;
   let devinEnsured = false;
@@ -333,12 +352,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     createAntigravityManaged({
       root: toolInstallRoot(paths.home, 'antigravity'),
       log: (line) => logger.machine(line),
+      fetchImpl: installFetch,
     });
   const geminiManaged =
     opts.geminiManaged ??
     createGeminiManaged({
       root: toolInstallRoot(paths.home, 'gemini'),
       log: (line) => logger.machine(line),
+      fetchImpl: installFetch,
     });
   let sendPresenceNow: (() => Promise<void>) | null = null;
   const phones = createPhones({
@@ -347,8 +368,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     onStale: () => void sendPresenceNow?.(),
     adbPath: platform === 'darwin' ? undefined : null,
   });
-  void antigravityManaged
-    .ensure()
+  void trackInstall(antigravityManaged.ensure())
     .then((install) => {
       if (install !== null && sendPresenceNow !== null) return sendPresenceNow();
     })
@@ -489,7 +509,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       }
       const install = geminiManaged.current();
       if (install === null) {
-        void geminiManaged.ensure().catch((error: unknown) => {
+        void trackInstall(geminiManaged.ensure()).catch((error: unknown) => {
           logger.machine(
             `gemini managed install failed: ${error instanceof Error ? error.message : String(error)}`,
           );
@@ -542,8 +562,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claudeBackend = createClaudeCodeBackend({
         skills: { skillsDir: config.skillsDir, cwd: config.home },
         onSkillsLog: (msg) => logger.skills(msg),
+        ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
         ...(confine !== null ? { confine } : {}),
         teamSkillsCacheDir: paths.teamSkillsCacheDir,
+        ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
       });
     }
     return claudeBackend;
@@ -640,8 +662,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       ) {
         devinInstalling = true;
         devinEnsureRetryAt = Date.now() + (opts.devinEnsureRetryMs ?? MANAGED_ENSURE_RETRY_MS);
-        void devinManaged
-          .ensure()
+        void trackInstall(devinManaged.ensure())
           .then(
             (install) => {
               devinEnsured = install !== null;
@@ -1319,12 +1340,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     streamCtrl.abort();
     claimCtrl.abort();
     imsgBridge.stop();
+    installStop.abort();
     void screens.close();
     caffeinate?.kill();
     await Promise.race([
       availability?.settled(),
       waitTimeout(CONFINEMENT_STOP_WAIT_MS, undefined, { ref: false }),
     ]);
+    await Promise.allSettled([...pendingInstalls]);
     await presenceReporter.close();
     if (connectionId !== null && client.offline) {
       await client

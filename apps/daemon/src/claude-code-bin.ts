@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { accessSync, constants } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire as createModuleRequire } from 'node:module';
 import { delimiter, isAbsolute, join } from 'node:path';
 import { arch, platform } from 'node:process';
 
@@ -65,8 +65,8 @@ function sdkBundledCandidates(): string[] {
 }
 
 export function bundledClaudeCodePath(
-  resolve: (specifier: string) => string = createRequire(
-    createRequire(import.meta.url).resolve('@anthropic-ai/claude-agent-sdk'),
+  resolve: (specifier: string) => string = createModuleRequire(
+    createModuleRequire(import.meta.url).resolve('@anthropic-ai/claude-agent-sdk'),
   ).resolve,
 ): string | null {
   for (const candidate of sdkBundledCandidates()) {
