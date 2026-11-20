@@ -1863,8 +1863,8 @@ export const EN: Record<string, string> = {
   '{count} 个项目单独设置了模型': '{count#1 project sets|# projects set} their own models',
   项目单独设置: 'Set per project',
   常用模型: 'Frequently used models',
-  '任务默认用 Coordinator 的模型。在这里加几个常用模型，Coordinator 派活时会按任务难度从中挑一个。':
-    'Tasks use the Coordinator model by default. Add a few frequently used models here and the Coordinator picks one per task, by how hard it is.',
+  'Coordinator 派活时按任务难度从这里挑一个。':
+    'The Coordinator picks one from here for each task, by how hard it is.',
   '还没有常用模型。先接入服务商，再回来添加。':
     'No frequently used models yet. Connect a provider first, then come back to add some.',
   '还没有常用模型，所有任务都用 Coordinator 的模型。':

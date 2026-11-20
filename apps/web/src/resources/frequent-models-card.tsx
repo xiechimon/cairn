@@ -132,9 +132,6 @@ export function FrequentModelsCard({
     <SettingsSection
       testId="frequent-models"
       title={t('常用模型')}
-      description={t(
-        '任务默认用 Coordinator 的模型。在这里加几个常用模型，Coordinator 派活时会按任务难度从中挑一个。',
-      )}
       action={
         <FilterPicker
           options={addable.map((o) => ({
@@ -196,6 +193,14 @@ export function FrequentModelsCard({
           ))
         )}
       </SettingsCard>
+      {models.length > 0 && (
+        <p
+          data-testid="frequent-models-footer"
+          className="m-0 px-1 text-meta text-pretty text-content-tertiary"
+        >
+          {t('Coordinator 派活时按任务难度从这里挑一个。')}
+        </p>
+      )}
     </SettingsSection>
   );
 }

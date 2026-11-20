@@ -312,7 +312,7 @@ Reach:
 - Web routes: `/app/resources/model-routing`, `/app/resources/routing-settings`, `/app/settings/team`, `/app/team`
 - Settings: `设置` (Settings) › `模型` (Model) › `模型` (Model)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `frequent-model-row`, `frequent-models`, `frequent-models-empty`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-coordinator-default`, `routing-project-overrides`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`
+- Test ids in its code: `frequent-model-row`, `frequent-models`, `frequent-models-empty`, `frequent-models-footer`, `route-override-dialog`, `route-override-machine`, `route-override-mcp-*`, `route-override-platform`, `route-override-save`, `routing-add-provider`, `routing-coordinator-default`, `routing-project-overrides`, `routing-rule-*`, `routing-rule-new-*`, `routing-section`
 - Research: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md), [docs/research/agent-machine-routing.md](../../../docs/research/agent-machine-routing.md) (not on main)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: [docs/research/capability-routing-2026-11-06.md](../../../docs/research/capability-routing-2026-11-06.md)

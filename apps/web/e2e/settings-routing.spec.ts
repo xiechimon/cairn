@@ -225,6 +225,8 @@ test('adding, tuning and removing a frequently used model saves the whole list',
   await page.goto('/app/settings/routing');
   const card = page.getByRole('dialog', { name: '设置' }).getByTestId('frequent-models');
   await expect(card.getByTestId('frequent-models-empty')).toBeVisible();
+  await expect(card.locator('h2 + p')).toHaveCount(0);
+  await expect(card.getByTestId('frequent-models-footer')).toHaveCount(0);
   await card.getByTestId('frequent-models-add').click();
   await page.locator('.frequent-models-add-row', { hasText: 'GLM-5.3' }).click();
   await expect
@@ -232,6 +234,9 @@ test('adding, tuning and removing a frequently used model saves the whole list',
     .toEqual([[{ provider: 'relay', modelId: 'glm-5.3', thinkingLevel: null }]]);
   const row = card.getByTestId('frequent-model-row');
   await expect(row).toContainText('GLM-5.3');
+  await expect(card.getByTestId('frequent-models-footer')).toHaveText(
+    'Coordinator 派活时按任务难度从这里挑一个。',
+  );
   await row.locator('.frequent-model-level').click();
   await expect(page.getByRole('option')).toHaveText(['Default', 'Low', 'High', 'Max']);
   await page.getByRole('option', { name: 'High', exact: true }).click();
