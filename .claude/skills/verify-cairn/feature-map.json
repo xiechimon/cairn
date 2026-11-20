@@ -2104,6 +2104,11 @@
           "apps/web/src/board/design/design-route.ts",
           "apps/web/src/board/design/design-split.tsx",
           "apps/web/src/board/design/design-versions.tsx",
+          "apps/web/src/board/design/design-bridge.ts",
+          "apps/web/src/board/design/design-canvas.tsx",
+          "apps/web/src/board/design/design-comment-list.tsx",
+          "apps/web/src/board/design/design-comment-popover.tsx",
+          "apps/web/src/board/design/design-composer.tsx",
           "apps/web/src/board/design/srcdoc.ts"
         ],
         "server": [

@@ -30,6 +30,7 @@ import {
   type ArchivedProjectState,
 } from './archived-project-bar.js';
 import { ComposerSetupHint, useComposerSetupStep } from './composer-setup-hint.js';
+import { useDesignComposer } from './design/design-composer.js';
 import type { DesignTarget } from './design/design-route.js';
 import { useDesignSplit } from './design/design-split.js';
 import { HomeSpiral, type SpiralProject } from './home-spiral.js';
@@ -191,7 +192,13 @@ export function HomeC({
   );
   const threadId = searchParams.get(THREAD_PARAM);
   const docked = thread != null;
-  const designSplit = useDesignSplit(design);
+  const sendDesignComments =
+    archived === null && surface.onSend != null
+      ? (ids: readonly string[]) =>
+          Promise.resolve(surface.onSend?.(t('按下面的设计评论改。'), projectId, undefined, ids))
+      : undefined;
+  const designSplit = useDesignSplit(design, sendDesignComments);
+  const designComposer = useDesignComposer(design);
   const paneShown = threadId === null || docked;
   const narrow = useNarrow();
   const { createTodo } = useApiMutations(teamId);
@@ -576,7 +583,8 @@ export function HomeC({
                 archived !== null
                   ? undefined
                   : surface.onSend != null
-                    ? (text: string) => surface.onSend?.(text, projectId)
+                    ? (text: string) =>
+                        surface.onSend?.(text, projectId, undefined, designComposer?.ids)
                     : live
                       ? undefined
                       : () => Promise.resolve()
@@ -594,6 +602,7 @@ export function HomeC({
               onSteer={archived === null ? surface.onSteer : undefined}
               onStop={archived === null ? surface.onStop : undefined}
               composerReplacement={archivedBar}
+              pendingComments={archived === null ? designComposer : null}
               earlier={surface.earlier}
               onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
               showBindGate={!live}

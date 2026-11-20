@@ -5,10 +5,11 @@ import {
   designPagePath,
 } from '@cairn/shared';
 import { Code, Ellipsis, FileWarning, Globe, RotateCw } from 'lucide-react';
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../../api/client.js';
 import {
+  useDesignComments,
   useDesignMutations,
   useDesignPageHtml,
   useDesignPages,
@@ -35,8 +36,9 @@ import { ChevronDown, Download, X } from '../../icons/index.js';
 import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
 import { FILE_PARAM } from '../file-pane.js';
 import { deliverableHref } from '../made-files.js';
-import { DesignFrame } from './design-frame.js';
-import type { DesignTarget } from './design-route.js';
+import { type CommentDraftHandlers, DesignCanvas } from './design-canvas.js';
+import type { CommentActions } from './design-comment-list.js';
+import { type DesignTarget, pickPage } from './design-route.js';
 import { VersionsMenu, versionLabel } from './design-versions.js';
 import { designSrcdoc } from './srcdoc.js';
 
@@ -48,23 +50,20 @@ const VIEWPORT_LABEL: Record<DesignViewport, string> = {
   mobile: '手机',
 };
 
-function pickPage(
-  pages: readonly DesignPageRecord[],
-  fileName: string | null,
-): DesignPageRecord | undefined {
-  return pages.find((page) => page.fileName === fileName) ?? pages[0];
-}
+export type SendDesignComments = (ids: readonly string[]) => Promise<void>;
 
 export function DesignPane({
   target,
   switcher,
   hidden,
   onClose,
+  sendComments,
 }: {
   target: DesignTarget;
   switcher: ReactNode;
   hidden: boolean;
   onClose: () => void;
+  sendComments: SendDesignComments | undefined;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -127,6 +126,7 @@ export function DesignPane({
       page={page}
       pages={pages}
       readOnly={todoQ.data?.archivedAt != null}
+      sendComments={sendComments}
     />
   );
   return (
@@ -162,11 +162,13 @@ function DesignPage({
   page,
   pages,
   readOnly,
+  sendComments,
 }: {
   todoId: string;
   page: DesignPageRecord;
   pages: readonly DesignPageRecord[];
   readOnly: boolean;
+  sendComments: SendDesignComments | undefined;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -186,7 +188,57 @@ function DesignPage({
     [htmlQ.data],
   );
   const frameRef = useRef<HTMLIFrameElement | null>(null);
-  const { restore } = useDesignMutations(todoId);
+  const { restore, createComment, patchComment, deleteComment } = useDesignMutations(
+    todoId,
+    page.fileName,
+  );
+  const [commenting, setCommenting] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
+  const stopCommenting = useCallback(() => setCommenting(false), []);
+  const commentsQ = useDesignComments(todoId, page.fileName, live);
+  const comments = commentsQ.data ?? [];
+  const activeComments = comments.filter((comment) => comment.status !== 'resolved').length;
+  const canComment = !readOnly && live && !viewingOld && !source;
+  const commentFailed = (message: string) => (error: unknown) => toastError(t(message), error);
+  const actions: CommentActions = {
+    edit: (id, note) =>
+      patchComment.mutate({ id, patch: { note } }, { onError: commentFailed('评论没改成') }),
+    remove: (id) => deleteComment.mutate(id, { onError: commentFailed('评论没删掉') }),
+    resolve: (id) =>
+      patchComment.mutate(
+        { id, patch: { status: 'resolved' } },
+        { onError: commentFailed('评论没改成') },
+      ),
+    reopen: (id) =>
+      patchComment.mutate(
+        { id, patch: { status: 'open' } },
+        { onError: commentFailed('评论没改成') },
+      ),
+  };
+  const createFrom = (
+    target: Parameters<CommentDraftHandlers['save']>[0],
+    note: string,
+    then: (id: string) => void,
+  ) =>
+    createComment.mutate(
+      { ...target, versionId: shown.id, viewport, note },
+      {
+        onSuccess: (row) => then(row.id),
+        onError: commentFailed('评论没保存上'),
+      },
+    );
+  const draft: CommentDraftHandlers = {
+    busy: createComment.isPending,
+    save: (target, note, done) => createFrom(target, note, () => done()),
+    send:
+      sendComments === undefined
+        ? undefined
+        : (target, note, done) =>
+            createFrom(target, note, (id) => {
+              done();
+              void sendComments([id]);
+            }),
+  };
   const pageHref = designPagePath(shown.id);
   const openPage = (name: string) =>
     setSearchParams(
@@ -299,6 +351,19 @@ function DesignPage({
             testId: `design-viewport-${value}`,
           }))}
         />
+        {!readOnly && live && (
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="design-comment-mode"
+            aria-pressed={commenting && canComment}
+            disabled={!canComment}
+            className="flex-none text-content-secondary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/80"
+            onClick={() => setCommenting((on) => !on)}
+          >
+            {t('评论')}
+          </Button>
+        )}
         <VersionsMenu
           fileName={page.fileName}
           versions={versions}
@@ -312,6 +377,20 @@ function DesignPage({
             )
           }
         />
+        {live && (
+          <Button
+            variant="ghost"
+            size="sm"
+            data-testid="design-comments-toggle"
+            aria-expanded={listOpen && !source}
+            disabled={source}
+            className="flex-none gap-1 text-content-secondary"
+            onClick={() => setListOpen((open) => !open)}
+          >
+            {t('评论')}
+            <span className="tabular-nums">{activeComments}</span>
+          </Button>
+        )}
         <DropdownMenu>
           <IconTooltip
             label={t('更多')}
@@ -421,12 +500,20 @@ function DesignPage({
           <TextViewer name={page.fileName} text={htmlQ.data} />
         </div>
       ) : (
-        <DesignFrame
+        <DesignCanvas
           key={`${shown.id}:${reloads}`}
           frameRef={frameRef}
           srcdoc={srcdoc}
           title={`${page.fileName} · ${versionLabel(shown, t)}`}
           viewport={viewport}
+          commenting={commenting && canComment}
+          onStopCommenting={stopCommenting}
+          comments={comments}
+          listOpen={listOpen}
+          onListOpen={setListOpen}
+          readOnly={readOnly}
+          actions={actions}
+          draft={draft}
         />
       )}
     </div>

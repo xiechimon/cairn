@@ -9,6 +9,7 @@ export interface OutboxEntry {
   projectId: string | null;
   text: string;
   mode?: 'queue';
+  designCommentIds?: readonly string[];
   state: OutboxState;
   messageId: string | null;
   createdAt: number;
@@ -22,6 +23,7 @@ export interface StoredOutboxEntry {
   projectId: string | null;
   text: string;
   mode?: 'queue';
+  designCommentIds?: readonly string[];
   state: 'sending' | 'failed' | 'returned';
   createdAt: number;
 }
@@ -61,6 +63,7 @@ export interface Outbox {
       projectId: string | null;
       text: string;
       mode?: 'queue';
+      designCommentIds?: readonly string[];
     },
     deliver: Deliver,
   ): string;
@@ -186,6 +189,9 @@ export function createOutbox({
           projectId: entry.projectId,
           text: entry.text,
           ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
+          ...(entry.designCommentIds !== undefined
+            ? { designCommentIds: entry.designCommentIds }
+            : {}),
           state,
           createdAt: entry.createdAt,
         };
@@ -332,6 +338,7 @@ export function createOutbox({
           projectId: row.projectId,
           text: row.text,
           ...(row.mode !== undefined ? { mode: row.mode } : {}),
+          ...(row.designCommentIds !== undefined ? { designCommentIds: row.designCommentIds } : {}),
           state,
           messageId: null,
           createdAt: row.createdAt,

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router';
 import { SegmentedTabs } from '../../components/segmented.js';
 import { useI18n } from '../../i18n/provider.js';
 import { usePanelDocked } from '../use-narrow.js';
-import { DesignPane } from './design-pane.js';
+import { DesignPane, type SendDesignComments } from './design-pane.js';
 import { type DesignTarget, withoutDesignTarget } from './design-route.js';
 
 type DesignFocus = 'chat' | 'design';
@@ -37,7 +37,10 @@ function FocusSwitch({
   );
 }
 
-export function useDesignSplit(target: DesignTarget | null): DesignSplit | null {
+export function useDesignSplit(
+  target: DesignTarget | null,
+  sendComments: SendDesignComments | undefined,
+): DesignSplit | null {
   const wide = usePanelDocked();
   const [focus, setFocus] = useState<DesignFocus>('design');
   const [, setSearchParams] = useSearchParams();
@@ -61,6 +64,7 @@ export function useDesignSplit(target: DesignTarget | null): DesignSplit | null 
         switcher={switcher}
         hidden={!wide && focus === 'chat'}
         onClose={close}
+        sendComments={sendComments}
       />
     ),
   };

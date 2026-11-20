@@ -222,6 +222,13 @@ export interface ChiefConversationProps {
   composerReplacement?: ReactNode;
   composerTools?: ReactNode;
   showBindGate?: boolean;
+  pendingComments?: PendingComments | null;
+}
+
+export interface PendingComments {
+  count: number;
+  chips: ReactNode;
+  emptyDraftText: string;
 }
 
 export function ChiefConversation({
@@ -252,6 +259,7 @@ export function ChiefConversation({
   composerReplacement,
   composerTools,
   showBindGate = true,
+  pendingComments,
 }: ChiefConversationProps) {
   const questionPending = useQuestionPending();
   const { t, locale } = useI18n();
@@ -826,7 +834,19 @@ export function ChiefConversation({
                       testId: 'chief-queue-save',
                       enabled: liveDraft.trim() !== '',
                     }
-                  : undefined
+                  : pendingComments != null && pendingComments.count > 0
+                    ? {
+                        label: t('发送（含 {n} 条评论）', { n: pendingComments.count }),
+                        text: t('发送（含 {n} 条评论）', { n: pendingComments.count }),
+                        testId: 'chief-send-comments',
+                        enabled: onSend != null,
+                        ...(liveDraft.trim() === '' && sendFromComposer !== undefined
+                          ? {
+                              onClick: () => void sendFromComposer(pendingComments.emptyDraftText),
+                            }
+                          : {}),
+                      }
+                    : undefined
               }
               onAttachment={onAttachment}
               mentionGroups={mentionGroups}
@@ -844,7 +864,14 @@ export function ChiefConversation({
               placeholder={composerPlaceholder}
               composerRef={answerActive ? undefined : composerRef}
               tab={answerActive ? null : queueTab}
-              above={answerActive ? null : capsules}
+              above={
+                answerActive ? null : (
+                  <>
+                    {pendingComments?.chips}
+                    {capsules}
+                  </>
+                )
+              }
               tools={answerActive ? null : composerTools}
               context={chief.context}
               running={chief.running}

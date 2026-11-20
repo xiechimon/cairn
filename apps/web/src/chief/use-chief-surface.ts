@@ -68,7 +68,12 @@ export interface ChiefSurface {
   chiefUnread: number;
   chiefBusy: boolean;
   chiefFresh: boolean;
-  onSend?: (text: string, projectId: string | null, mode?: 'queue') => void | Promise<void>;
+  onSend?: (
+    text: string,
+    projectId: string | null,
+    mode?: 'queue',
+    designCommentIds?: readonly string[],
+  ) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
   onRetryGreeting?: () => void;
   onAnswerQuestion?: (input: {
@@ -398,6 +403,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         projectId: entry.projectId,
         clientMessageId: entry.key,
         ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
+        ...(entry.designCommentIds !== undefined
+          ? { designCommentIds: entry.designCommentIds }
+          : {}),
       })
       .then(
         (result) => ({
@@ -432,7 +440,12 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     [live, outbox],
   );
   const onSend = live
-    ? (text: string, projectId: string | null, mode?: 'queue') => {
+    ? (
+        text: string,
+        projectId: string | null,
+        mode?: 'queue',
+        designCommentIds?: readonly string[],
+      ) => {
         const sessionMachineId = routingRules?.find((rule) => rule.use === 'session')?.machineId;
         if (activeThread == null && needsMachineName(machines, sessionMachineId)) {
           toast.warning(t('先选择执行机'), {
@@ -452,6 +465,9 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
             projectId,
             text,
             ...(mode !== undefined ? { mode } : {}),
+            ...(designCommentIds !== undefined && designCommentIds.length > 0
+              ? { designCommentIds }
+              : {}),
           },
           deliver,
         );

@@ -1,3 +1,4 @@
+import type { DesignPageRecord } from '@cairn/shared';
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router';
 import { FILE_NAME_PARAM, FILE_PARAM } from '../file-pane.js';
@@ -9,6 +10,13 @@ export const DESIGN_VIEW = 'design';
 export interface DesignTarget {
   todoId: string;
   fileName: string | null;
+}
+
+export function pickPage(
+  pages: readonly DesignPageRecord[],
+  fileName: string | null,
+): DesignPageRecord | undefined {
+  return pages.find((page) => page.fileName === fileName) ?? pages[0];
 }
 
 export function designTargetOf(params: URLSearchParams): DesignTarget | null {

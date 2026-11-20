@@ -37,12 +37,94 @@ function version(seq: number, over: Partial<Version> = {}): Version {
   };
 }
 
-async function openDesign(page: Page) {
-  const state = { versions: [version(1), version(2)], restored: [] as string[] };
-  await mockLive(page, { threads: [THREAD], messages: [], todos: [PAGE_TASK] }, (path, route, json) => {
+type Comment = Record<string, unknown> & { id: string; pin: number; status: string };
+
+function lostComment(): Comment {
+  return {
+    id: 'cmt-lost',
+    todoId: PAGE_TASK.id,
+    fileName: 'pricing.html',
+    versionId: 'ver-1',
+    versionSeq: 1,
+    pin: 1,
+    viewport: 'desktop',
+    note: '这一块删掉',
+    markAttachmentId: null,
+    status: 'sent',
+    messageId: 'm-old',
+    createdAt: 1,
+    updatedAt: 1,
+    elementId: 'promo',
+    selector: '[data-od-id="promo"]',
+    label: 'section',
+    text: '限时优惠',
+    htmlHint: '<section data-od-id="promo">',
+    position: { x: 10, y: 10, width: 200, height: 40 },
+    style: null,
+  };
+}
+
+async function openDesign(page: Page, seeded: Comment[] = []) {
+  const state = {
+    versions: [version(1), version(2)],
+    restored: [] as string[],
+    comments: seeded,
+    sends: [] as { content: string; designCommentIds?: string[] }[],
+    writes: [] as string[],
+  };
+  const mock = { threads: [THREAD], messages: [] as unknown[], todos: [PAGE_TASK] };
+  await mockLive(page, mock, (path, route, json) => {
     const method = route.request().method();
+    const base = `/api/todos/${PAGE_TASK.id}/design`;
+    if (path === `${base}/pricing.html/comments`) return json(state.comments);
+    if (path === `${base}/comments` && method === 'POST') {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      const version = state.versions.find((v) => v.id === body.versionId);
+      const row: Comment = {
+        ...body,
+        id: `cmt-${state.comments.length + 1}`,
+        todoId: PAGE_TASK.id,
+        fileName: 'pricing.html',
+        versionSeq: version?.seq ?? 0,
+        pin: Math.max(0, ...state.comments.map((c) => c.pin)) + 1,
+        markAttachmentId: null,
+        status: 'open',
+        messageId: null,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      state.comments = [...state.comments, row];
+      state.writes.push(`create ${row.id}`);
+      return json(row, 201);
+    }
+    const commentId = /\/design\/comments\/([^/]+)$/.exec(path)?.[1];
+    if (commentId !== undefined && method === 'PATCH') {
+      const patch = route.request().postDataJSON() as Record<string, unknown>;
+      state.comments = state.comments.map((c) => (c.id === commentId ? { ...c, ...patch } : c));
+      state.writes.push(`patch ${commentId} ${JSON.stringify(patch)}`);
+      return json(state.comments.find((c) => c.id === commentId));
+    }
+    if (commentId !== undefined && method === 'DELETE') {
+      state.comments = state.comments.filter((c) => c.id !== commentId);
+      state.writes.push(`delete ${commentId}`);
+      return route.fulfill({ status: 204 });
+    }
+    if (/^\/api\/conversations\/[^/]+\/messages$/.test(path) && method === 'POST') {
+      const body = route.request().postDataJSON() as {
+        content: string;
+        designCommentIds?: string[];
+      };
+      state.sends.push(body);
+      const ids = new Set(body.designCommentIds ?? []);
+      state.comments = state.comments.map((c) => (ids.has(c.id) ? { ...c, status: 'sent' } : c));
+      mock.messages = [
+        ...mock.messages,
+        { id: `n${mock.messages.length + 1}`, role: 'user', content: body.content, createdAt: Date.now() },
+      ];
+      return json({ thread: THREAD }, 201);
+    }
     if (path === `/api/todos/${PAGE_TASK.id}`) return json(PAGE_TASK);
-    if (path === `/api/todos/${PAGE_TASK.id}/design`) {
+    if (path === base) {
       const current = state.versions[state.versions.length - 1];
       return json({
         pages: [
@@ -50,14 +132,14 @@ async function openDesign(page: Page) {
             fileName: 'pricing.html',
             current,
             versionCount: state.versions.length,
-            openComments: 0,
+            openComments: state.comments.filter((c) => c.status === 'open').length,
             shareToken: null,
           },
         ],
         shareOrigin: null,
       });
     }
-    if (path === `/api/todos/${PAGE_TASK.id}/design/pricing.html/versions`) return json(state.versions);
+    if (path === `${base}/pricing.html/versions`) return json(state.versions);
     const restore = /\/design\/versions\/(ver-\d+)\/restore$/.exec(path)?.[1];
     if (restore !== undefined && method === 'POST') {
       const from = state.versions.find((v) => v.id === restore);
@@ -158,4 +240,80 @@ test('below 1100px the design view is one pane with a chat and design switch', a
   await expect(pane.getByTestId('design-frame').contentFrame().getByRole('heading')).toHaveText(
     '随你一起长大的定价',
   );
+});
+
+test('comments: pick an element, save, edit, delete, send with the next message, resolve, and show a lost anchor', async ({
+  page,
+}) => {
+  const state = await openDesign(page, [lostComment()]);
+  const pane = page.getByTestId('design-pane');
+  const frame = pane.getByTestId('design-frame').contentFrame();
+  await expect(frame.getByRole('heading', { name: '随你一起长大的定价' })).toBeVisible();
+
+  await pane.getByTestId('design-comment-mode').click();
+  await expect(pane.getByTestId('design-comment-mode')).toHaveAttribute('aria-pressed', 'true');
+  await frame.getByRole('button', { name: '升级到 Pro' }).hover();
+  await expect(pane.getByTestId('design-hover-outline')).toBeVisible();
+  await frame.getByRole('button', { name: '升级到 Pro' }).click();
+  const popover = pane.getByTestId('design-comment-popover');
+  await expect(popover.getByTestId('design-comment-target')).toHaveText('button · 「升级到 Pro」');
+  await expect(popover.getByTestId('design-inspect')).toContainText('尺寸');
+  await popover.getByTestId('design-comment-note').fill('只让 Pro 的按钮是实心');
+  await popover.getByTestId('design-comment-save').click();
+  await expect(popover).toHaveCount(0);
+  await expect(pane.locator('[data-testid="design-pin"][data-pin="2"]')).toBeVisible();
+
+  await frame.getByRole('heading').click();
+  await pane.getByTestId('design-comment-note').fill('标题短一点');
+  await pane.getByTestId('design-comment-save').click();
+  const chips = page.getByTestId('design-comment-chip');
+  await expect(chips).toHaveText([/^2升级到 Pro · 只让 Pro 的按钮是实心$/, /^3随你一起长大的定价 · 标题短一点$/]);
+  await expect(page.getByTestId('chief-send-comments')).toHaveText('发送（含 2 条评论）');
+  const created = state.comments.find((c) => c.id === 'cmt-2');
+  expect(created).toMatchObject({ versionId: 'ver-2', viewport: 'desktop', label: 'button', text: '升级到 Pro' });
+
+  await pane.getByTestId('design-comments-toggle').click();
+  const rows = pane.getByTestId('design-comment-row');
+  await expect(rows).toHaveCount(3);
+  const lost = rows.filter({ has: page.getByTestId('design-comment-lost') });
+  await expect(lost).toHaveAttribute('data-anchor', 'lost');
+  await expect(lost).toContainText('在 v1 上提的，这一版没找到');
+  await expect(pane.locator('[data-testid="design-pin"][data-pin="1"]')).toHaveCount(0);
+  const second = pane.locator('[data-testid="design-comment-row"][data-pin="2"]');
+  await expect(second).toContainText('未发送');
+  await second.getByTestId('design-comment-edit').click();
+  await second.getByTestId('design-comment-edit-note').fill('只让 Pro 的按钮是实心，另外两个描边');
+  await second.getByTestId('design-comment-edit-save').click();
+  await expect(second).toContainText('另外两个描边');
+  await pane.locator('[data-testid="design-comment-row"][data-pin="3"]').getByTestId('design-comment-delete').click();
+  await expect(rows).toHaveCount(2);
+  await expect(page.getByTestId('chief-send-comments')).toHaveText('发送（含 1 条评论）');
+  expect(state.writes).toEqual([
+    'create cmt-2',
+    'create cmt-3',
+    'patch cmt-2 {"note":"只让 Pro 的按钮是实心，另外两个描边"}',
+    'delete cmt-3',
+  ]);
+
+  await page.getByTestId('chief-composer-input').fill('按评论改');
+  await page.getByTestId('chief-send-comments').click();
+  await expect.poll(() => state.sends.length).toBe(1);
+  expect(state.sends[0]).toMatchObject({ content: '按评论改', designCommentIds: ['cmt-2'] });
+  await expect(page.getByTestId('design-comment-chip')).toHaveCount(0);
+  await expect(second).toContainText('已发给 agent');
+  await expect(second.getByTestId('design-comment-delete')).toHaveCount(0);
+  await second.getByTestId('design-comment-resolve').click();
+  await expect(second).toHaveAttribute('data-status', 'resolved');
+  await expect(pane.locator('[data-testid="design-pin"][data-pin="2"]')).toHaveCount(0);
+  await second.getByTestId('design-comment-reopen').click();
+  await expect(second).toHaveAttribute('data-status', 'open');
+
+  await frame.getByText('一个工作区').click();
+  await pane.getByTestId('design-comment-note').fill('这句去掉');
+  await pane.getByTestId('design-comment-send').click();
+  await expect.poll(() => state.sends.length).toBe(2);
+  expect(state.sends[1]).toMatchObject({ content: '按下面的设计评论改。', designCommentIds: ['cmt-3'] });
+
+  await page.keyboard.press('Escape');
+  await expect(pane.getByTestId('design-comment-mode')).toHaveAttribute('aria-pressed', 'false');
 });

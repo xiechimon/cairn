@@ -27,6 +27,9 @@ import type {
   CreateProviderBody,
   CreateScheduleBody,
   CreateSkillBody,
+  DesignCommentCreate,
+  DesignCommentPatch,
+  DesignCommentRecord,
   DesignPageRecord,
   DesignVersionRecord,
   DiffFileContent,
@@ -1356,12 +1359,16 @@ export function useApiMutations(teamId: string | undefined) {
         projectId?: string | null;
         clientMessageId?: string;
         mode?: 'queue';
+        designCommentIds?: readonly string[];
       }) => {
         const body = {
           content: input.content,
           ...(input.projectId != null ? { projectId: input.projectId } : {}),
           ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
           ...(input.mode !== undefined ? { mode: input.mode } : {}),
+          ...(input.designCommentIds !== undefined && input.designCommentIds.length > 0
+            ? { designCommentIds: input.designCommentIds }
+            : {}),
         };
         return input.threadId === null
           ? api.post<{ thread: ChiefThread; message: TranscriptRow }>(
@@ -1900,9 +1907,38 @@ export const useDesignPageHtml = (versionId: string | null) =>
     },
   });
 
-export function useDesignMutations(todoId: string) {
+const designCommentsKey = (todoId: string, fileName: string) =>
+  [...designKey(todoId), 'comments', fileName] as const;
+
+export const useDesignComments = (todoId: string, fileName: string | null, enabled: boolean) =>
+  useQuery({
+    queryKey: designCommentsKey(todoId, fileName ?? ''),
+    queryFn: () =>
+      api.get<DesignCommentRecord[]>(
+        `${designPath(todoId)}/${encodeURIComponent(fileName ?? '')}/comments`,
+      ),
+    enabled: enabled && fileName !== null,
+  });
+
+export function useDesignMutations(todoId: string, fileName: string) {
   const qc = useQueryClient();
   const refresh = () => qc.invalidateQueries({ queryKey: designKey(todoId) });
+  const commentsKey = designCommentsKey(todoId, fileName);
+  const changeComments = async (change: (rows: DesignCommentRecord[]) => DesignCommentRecord[]) => {
+    await qc.cancelQueries({ queryKey: commentsKey });
+    const previous = qc.getQueryData<DesignCommentRecord[]>(commentsKey);
+    if (previous !== undefined) qc.setQueryData(commentsKey, change(previous));
+    return { previous };
+  };
+  const rollback = (
+    _error: unknown,
+    _input: unknown,
+    context: { previous: DesignCommentRecord[] | undefined } | undefined,
+  ) => {
+    if (context?.previous !== undefined) qc.setQueryData(commentsKey, context.previous);
+  };
+  const commentPath = (commentId: string) =>
+    `${designPath(todoId)}/comments/${encodeURIComponent(commentId)}`;
   return {
     restore: useMutation({
       mutationFn: (versionId: string) =>
@@ -1910,6 +1946,38 @@ export function useDesignMutations(todoId: string) {
           `${designPath(todoId)}/versions/${encodeURIComponent(versionId)}/restore`,
         ),
       onSuccess: refresh,
+    }),
+    createComment: useMutation({
+      mutationFn: (input: DesignCommentCreate) =>
+        api.post<DesignCommentRecord>(`${designPath(todoId)}/comments`, input),
+      onSuccess: (row) => {
+        qc.setQueryData<DesignCommentRecord[]>(commentsKey, (rows) => [...(rows ?? []), row]);
+        void refresh();
+      },
+    }),
+    patchComment: useMutation({
+      mutationFn: ({ id, patch }: { id: string; patch: DesignCommentPatch }) =>
+        api.patch<DesignCommentRecord>(commentPath(id), patch),
+      onMutate: ({ id, patch }) =>
+        changeComments((rows) =>
+          rows.map((row) =>
+            row.id === id
+              ? {
+                  ...row,
+                  ...(patch.note !== undefined ? { note: patch.note } : {}),
+                  ...(patch.status !== undefined ? { status: patch.status } : {}),
+                }
+              : row,
+          ),
+        ),
+      onError: rollback,
+      onSettled: refresh,
+    }),
+    deleteComment: useMutation({
+      mutationFn: (id: string) => api.del<void>(commentPath(id)),
+      onMutate: (id) => changeComments((rows) => rows.filter((row) => row.id !== id)),
+      onError: rollback,
+      onSettled: refresh,
     }),
   };
 }
