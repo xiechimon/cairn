@@ -135,7 +135,7 @@ export function DesignCanvas({
             {bridge.hover !== null && picked === null && (
               <div
                 data-testid="design-hover-outline"
-                className="absolute rounded-xs outline-2 outline-(--accent) outline-offset-1"
+                className="absolute rounded-xs border border-(--background) outline-2 outline-(--focus-ring)"
                 style={{
                   left: bridge.hover.position.x * transform.scale,
                   top: bridge.hover.position.y * transform.scale,
@@ -146,7 +146,7 @@ export function DesignCanvas({
             )}
             {picked !== null && (
               <div
-                className="absolute rounded-xs outline-2 outline-(--accent) outline-offset-1"
+                className="absolute rounded-xs border border-(--background) outline-2 outline-(--focus-ring)"
                 style={{
                   left: picked.position.x * transform.scale,
                   top: picked.position.y * transform.scale,
