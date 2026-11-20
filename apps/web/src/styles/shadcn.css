@@ -270,7 +270,8 @@
   --reply-bubble-highlight: #313231;
   --code-pill-ring: #2f302f;
   --switch-off: #434443;
-  --switch-thumb: color-mix(in srgb, var(--card-button) 30%, var(--card));
+  --switch-thumb: var(--foreground);
+  --switch-thumb-on: var(--card);
   --running-track: #262726;
   --accent-hover: #33290f;
   --dialog-surface: var(--canvas);
@@ -417,6 +418,7 @@
   --code-pill-ring: #d5d4cf;
   --switch-off: #787873;
   --switch-thumb: #ffffff;
+  --switch-thumb-on: var(--switch-thumb);
   --running-track: #d9d9d4;
   --accent-hover: #f7ecd2;
   --dialog-surface: var(--background);

@@ -51,6 +51,42 @@ test('dark: the switch thumb stands at least 3:1 from the on track (#5202)', asy
   expect(value).toBeGreaterThanOrEqual(3);
 });
 
+const saturation = ([r, g, b]: number[]) => {
+  const max = Math.max(r as number, g as number, b as number) / 255;
+  const min = Math.min(r as number, g as number, b as number) / 255;
+  const light = (max + min) / 2;
+  return max === min ? 0 : (max - min) / (1 - Math.abs(2 * light - 1));
+};
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`${theme}: a switch thumb is neutral on and off, the accent stays on the on track`, async ({
+    page,
+  }) => {
+    await openGallery(page, theme);
+    const specimen = switchSpecimen(page);
+    for (const checked of [false, true]) {
+      const thumb = specimen
+        .getByRole('switch', { checked })
+        .first()
+        .locator('[data-slot="switch-thumb"]');
+      await expect(thumb).toBeVisible();
+      expect(
+        saturation(await rgb(thumb, 'background-color')),
+        `V5: ${checked ? 'on' : 'off'} thumb saturation`,
+      ).toBeLessThanOrEqual(0.15);
+    }
+  });
+}
+
+test('dark: the off switch thumb stands at least 3:1 from the off track', async ({ page }) => {
+  await openGallery(page, 'dark');
+  const track = switchSpecimen(page).getByRole('switch', { checked: false }).first();
+  const thumb = track.locator('[data-slot="switch-thumb"]');
+  await expect(thumb).toBeVisible();
+  const value = ratio(await rgb(thumb, 'background-color'), await rgb(track, 'background-color'));
+  expect(value).toBeGreaterThanOrEqual(3);
+});
+
 test.describe('at phone width on a touch device', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
