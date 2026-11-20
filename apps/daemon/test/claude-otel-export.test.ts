@@ -153,6 +153,7 @@ async function runCli(
   token = secret,
   generations = 0,
   credentialKey = 'CLAUDE_CODE_OAUTH_TOKEN',
+  stepSecrets: readonly string[] = [],
 ) {
   const directory = testTempDir('cairn-claude-otel-');
   const executablePath = join(directory, 'cli.mjs');
@@ -217,7 +218,7 @@ async function runCli(
       HOME: directory,
       CLAUDE_CONFIG_DIR: join(directory, 'config'),
       TEST_ENV_FILE: envFile,
-      TEST_TOOL_OUTPUT: `Tool output: ${token}`,
+      TEST_TOOL_OUTPUT: `Tool output: ${token}${stepSecrets.length > 0 ? ` ${stepSecrets.join(' ')}` : ''}`,
       TEST_COMPLETION: completion,
       TEST_GENERATIONS: String(generations),
       [credentialKey]: token,
@@ -226,6 +227,7 @@ async function runCli(
       OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: `${endpoint}/v1/traces`,
       OTEL_LOGS_EXPORTER: 'otlp',
     },
+    ...(stepSecrets.length > 0 ? { secrets: () => stepSecrets } : {}),
     ...(configured ? { telemetry } : {}),
   };
   const handle = await createClaudeCodeBackend({ executablePath }).createSession(opts);
@@ -329,6 +331,16 @@ test.each(['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN
     expect(body).not.toContain(token);
   },
 );
+
+test('step credentials outside the provider env are scrubbed from exported spans', async () => {
+  const stepSecret = 'step-credential-plain-value-9q2w';
+  const { requests } = await runCli('success', true, 200, secret, 0, 'CLAUDE_CODE_OAUTH_TOKEN', [
+    stepSecret,
+  ]);
+  const body = requests.map((request) => request.body).join('');
+  expect(body).not.toContain(stepSecret);
+  expect(body).toContain('[REDACTED]');
+});
 
 test('a stalled collector cannot delay CLI session completion', async () => {
   const { completedBeforeResponse } = await runCli('success', true, 0);

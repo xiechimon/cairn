@@ -73,7 +73,8 @@ export async function runPiHost(): Promise<void> {
   };
 
   const start = async (frame: Extract<ParentFrame, { t: 'initialize' }>): Promise<void> => {
-    redact = credentialRedactor(frame.session.provider.apiKey);
+    const secrets = frame.session.secrets ?? [];
+    redact = credentialRedactor(frame.session.provider.apiKey, ...secrets);
     const log = (channel: PiHostLogChannel) => (message: string) =>
       writer.send({ t: 'log', channel, message });
     const backend = new PiBackend({
@@ -96,6 +97,7 @@ export async function runPiHost(): Promise<void> {
     const remoteTools = frame.session.remoteTools ?? [];
     const opts = {
       ...frame.session,
+      secrets: () => secrets,
       localTools,
       ...(remoteTools.length > 0
         ? {

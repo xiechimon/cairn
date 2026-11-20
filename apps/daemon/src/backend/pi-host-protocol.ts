@@ -40,6 +40,7 @@ const sessionSchema = z.object({
   remoteToolsOnly: z.boolean().optional(),
   ownAgentConfig: z.boolean().optional(),
   env: z.record(z.string(), z.string()).optional(),
+  secrets: z.array(z.string()).optional(),
   telemetry: z
     .object({
       traceId: z.string(),

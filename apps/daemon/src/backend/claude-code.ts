@@ -40,7 +40,7 @@ import type {
 import { contextTokensOf, subscriptionKeyOf, todoFromTodoWrite } from '@cairn/shared';
 import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
-import { credentialRedactor } from '../credential-output.js';
+import { stepCredentialRedactor } from '../credential-output.js';
 import { ProcessTree, SESSION_TREE_ENV } from '../process-tree.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
@@ -1603,7 +1603,8 @@ export class ClaudeCodeBackend implements AgentBackend {
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined)
       input.push({ ...buildUserMessage(opts.prompt, opts.promptImages), uuid: randomUUID() });
-    const redact = credentialRedactor(
+    const redact = stepCredentialRedactor(
+      opts.secrets,
       sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN ?? sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
       sdkOptions.env?.ANTHROPIC_API_KEY,
       sdkOptions.env?.ANTHROPIC_AUTH_TOKEN,

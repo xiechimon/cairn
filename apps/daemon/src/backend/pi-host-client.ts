@@ -8,7 +8,7 @@ import type {
   SessionOpts,
   StepEvent,
 } from '@cairn/shared';
-import { credentialRedactor } from '../credential-output.js';
+import { stepCredentialRedactor } from '../credential-output.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
 import { EventQueue } from './event-queue.js';
 import type { PiBackendOpts } from './pi.js';
@@ -86,7 +86,7 @@ class PiHostSession implements AgentSessionHandle {
   ) {
     const { opts, backend } = args;
     this.events = this.queue.iterable();
-    this.redact = credentialRedactor(opts.provider.apiKey);
+    this.redact = stepCredentialRedactor(opts.secrets, opts.provider.apiKey);
     this.remoteNames = new Set((opts.remoteTools ?? []).map((tool) => tool.name));
     this.localNames = new Set((opts.localTools ?? []).map((tool) => tool.name));
     this.ready = new Promise<void>((resolve, reject) => {
@@ -345,6 +345,9 @@ function serializableSession(opts: SessionOpts) {
     ...(opts.remoteToolsOnly !== undefined ? { remoteToolsOnly: opts.remoteToolsOnly } : {}),
     ...(opts.ownAgentConfig !== undefined ? { ownAgentConfig: opts.ownAgentConfig } : {}),
     ...(opts.env !== undefined ? { env: opts.env } : {}),
+    ...(opts.secrets !== undefined
+      ? { secrets: opts.secrets().filter((value): value is string => Boolean(value)) }
+      : {}),
     ...(opts.telemetry !== undefined ? { telemetry: opts.telemetry } : {}),
     ...(opts.prompt !== undefined ? { prompt: opts.prompt } : {}),
     ...(opts.promptImages !== undefined

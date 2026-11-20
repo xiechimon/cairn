@@ -23,6 +23,20 @@ export function credentialRedactor(...values: (string | undefined)[]): <T>(value
   return <T>(value: T): T => visit(value) as T;
 }
 
+export function stepCredentialRedactor(
+  secrets: (() => readonly (string | undefined)[]) | undefined,
+  ...values: (string | undefined)[]
+): <T>(value: T) => T {
+  const snapshot = () => {
+    try {
+      return secrets?.() ?? [];
+    } catch {
+      return [];
+    }
+  };
+  return (value) => credentialRedactor(...values, ...snapshot())(value);
+}
+
 export function guardCredentialOutputs<T extends object>(target: T, redact: <V>(value: V) => V): T {
   return new Proxy(target, {
     get(object, key) {

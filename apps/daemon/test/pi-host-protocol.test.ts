@@ -46,6 +46,9 @@ function handle(frame) {
     if (mode === 'undeclared') { send({ t: 'tool_request', id: 't1', kind: 'remote', name: 'delete_everything', params: {} }); return; }
     if (mode === 'unknown-method') { send({ t: 'read_file', path: '/etc/hosts' }); return; }
     if (mode === 'local') { send({ t: 'tool_request', id: 't1', kind: 'local', name: 'lookup', params: { q: 2 } }); return; }
+    if (mode === 'echo-secrets') { send({ t: 'tool_request', id: 't1', kind: 'remote', name: 'ask_user', params: { echo: frame.session.secrets } }); return; }
+    if (mode === 'mcp-secret') { send({ t: 'log', channel: 'mcp', message: 'connect failed: ' + (frame.session.secrets ?? []).join(' ') }); send({ t: 'ended' }); return; }
+    if (mode === 'crash-secret') { process.stderr.write('boom ' + (frame.session.secrets ?? []).join(' ')); process.exit(3); }
     return;
   }
   if (frame.t === 'steer') { send({ t: 'steer_reply', id: frame.id, ok: frame.text !== 'reject', error: 'no' }); return; }
@@ -72,6 +75,7 @@ function fixture() {
       sessionDir,
       onSession: (id, file) => sessions.push([id, file]),
       onGateLog: (line) => logs.push(line),
+      onMcpLog: (line) => logs.push(line),
       resolveSessionFile: () => null,
       confine:
         confine ??
@@ -219,6 +223,45 @@ describe('pi host protocol', () => {
   ])('%s before ready rejects the open', async (mode, message) => {
     const f = fixture();
     await expect(f.make(mode).createSession(session(f.root))).rejects.toThrow(message);
+  });
+
+  test('step secrets ride the initialize frame for the host to redact with', async () => {
+    const f = fixture();
+    const calls: [string, Record<string, unknown>][] = [];
+    const handle = await f.make('echo-secrets').createSession(
+      session(f.root, {
+        remoteTools: [{ name: 'ask_user', description: 'ask' }],
+        executeRemoteTool: async (name, params) => {
+          calls.push([name, params]);
+          return 'ok';
+        },
+        secrets: () => ['step-secret-host-9'],
+      }),
+    );
+    await drain(handle.events);
+    expect(calls).toEqual([['ask_user', { echo: ['step-secret-host-9'] }]]);
+  });
+
+  test('host log frames are scrubbed with the step credential list', async () => {
+    const f = fixture();
+    const handle = await f
+      .make('mcp-secret')
+      .createSession(session(f.root, { secrets: () => ['step-secret-host-9'] }));
+    await drain(handle.events);
+    const joined = f.logs.join('\n');
+    expect(joined).not.toContain('step-secret-host-9');
+    expect(joined).toContain('[REDACTED]');
+  });
+
+  test('a crashed host exposes no step credential in its stderr tail', async () => {
+    const f = fixture();
+    const handle = await f
+      .make('crash-secret')
+      .createSession(session(f.root, { secrets: () => ['step-secret-host-9'] }));
+    const events = await drain(handle.events);
+    const message = events.find((event) => event.type === 'error')?.error.message ?? '';
+    expect(message).toContain('boom [REDACTED]');
+    expect(message).not.toContain('step-secret-host-9');
   });
 
   test('a confiner failure returns no handle and starts no child', async () => {

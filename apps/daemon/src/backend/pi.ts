@@ -60,7 +60,7 @@ import {
   SessionManager,
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
-import { credentialRedactor } from '../credential-output.js';
+import { stepCredentialRedactor } from '../credential-output.js';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { compactionCeilingFetch } from './compaction-ceiling.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
@@ -922,25 +922,33 @@ export class PiBackend implements AgentBackend {
 
   readonly brief: BriefChannel = {
     backendId: 'pi',
-    composeBody: (opts, base) =>
-      appendSkillsCatalog(
-        base,
-        composeSkillsSection(
-          this.opts.skills,
-          {
-            ...(opts.skillsAllowlist !== undefined
-              ? { skillsAllowlist: opts.skillsAllowlist }
-              : {}),
-            ...(opts.injectedSkills !== undefined ? { injectedSkills: opts.injectedSkills } : {}),
-            ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
-            ...(opts.onSkillsResolved !== undefined
-              ? { onSkillsResolved: opts.onSkillsResolved }
-              : {}),
-            worktreeSkillsDirs: piWorktreeSkillDirs(opts.cwd),
-          },
-          this.opts.onSkillsLog,
-        ),
-      ) ?? '',
+    composeBody: (opts, base) => {
+      const redact = stepCredentialRedactor(opts.secrets, opts.provider.apiKey);
+      const skillsLog =
+        this.opts.onSkillsLog === undefined
+          ? undefined
+          : (line: string) => this.opts.onSkillsLog?.(redact(line));
+      return (
+        appendSkillsCatalog(
+          base,
+          composeSkillsSection(
+            this.opts.skills,
+            {
+              ...(opts.skillsAllowlist !== undefined
+                ? { skillsAllowlist: opts.skillsAllowlist }
+                : {}),
+              ...(opts.injectedSkills !== undefined ? { injectedSkills: opts.injectedSkills } : {}),
+              ...(opts.teamSkillsDir !== undefined ? { teamSkillsDir: opts.teamSkillsDir } : {}),
+              ...(opts.onSkillsResolved !== undefined
+                ? { onSkillsResolved: opts.onSkillsResolved }
+                : {}),
+              worktreeSkillsDirs: piWorktreeSkillDirs(opts.cwd),
+            },
+            skillsLog,
+          ),
+        ) ?? ''
+      );
+    },
   };
 
   constructor(private readonly opts: PiBackendOpts) {
@@ -1013,16 +1021,26 @@ export class PiBackend implements AgentBackend {
     }
     const providerResponses: ProviderResponseSink = { current: null };
     const diagnosedFetch = wrapProviderFetch(globalThis.fetch, providerResponses);
+    const redact = stepCredentialRedactor(opts.secrets, opts.provider.apiKey);
+    const sessionLog = (channel: ((line: string) => void) | undefined) =>
+      channel === undefined ? undefined : (line: string) => channel(redact(line));
+    const log = {
+      compaction: sessionLog(this.opts.onCompactionLog),
+      otel: sessionLog(this.opts.onOtelLog),
+      trust: sessionLog(this.opts.onTrustLog),
+      gate: sessionLog(this.opts.onGateLog),
+      skills: sessionLog(this.opts.onSkillsLog),
+      mcp: sessionLog(this.opts.onMcpLog),
+    };
     const ceilingFetch = compactionCeilingFetch(diagnosedFetch, (line) => {
-      this.opts.onCompactionLog?.(line);
+      log.compaction?.(line);
     });
-    const redact = credentialRedactor(opts.provider.apiKey);
     const spans =
       opts.telemetry !== undefined
         ? new PiStepSpanSink(
             opts.telemetry,
             { provider: opts.provider.providerId, model: opts.modelId },
-            this.opts.onOtelLog,
+            log.otel,
             redact,
           )
         : undefined;
@@ -1088,7 +1106,7 @@ export class PiBackend implements AgentBackend {
     const settingsManager = daemonSettingsManager();
     const protectedPresent = detectTrustProtectedResources(opts.cwd);
     if (protectedPresent.length > 0) {
-      this.opts.onTrustLog?.(
+      log.trust?.(
         `denied: ${protectedPresent.join(', ')} present in worktree — project trust is denied by policy, protected resources are not loaded (spec 26)`,
       );
     }
@@ -1099,7 +1117,7 @@ export class PiBackend implements AgentBackend {
           'tool_call',
           gateToolCallHandler({
             ...(this.opts.gateRules ? { rules: this.opts.gateRules } : {}),
-            ...(this.opts.onGateLog ? { log: this.opts.onGateLog } : {}),
+            ...(log.gate ? { log: log.gate } : {}),
             folders: {
               cwd: opts.cwd,
               roots: this.opts.folderRoots?.() ?? [],
@@ -1121,7 +1139,7 @@ export class PiBackend implements AgentBackend {
       },
     };
     const mcpEndpoints = opts.mcpServers ?? [];
-    const onMcpLog = this.opts.onMcpLog;
+    const onMcpLog = log.mcp;
     const mcpRegisterExtension: InlineExtension = {
       name: 'cairn-mcp-bridge',
       factory: (pi) => {
@@ -1226,12 +1244,12 @@ export class PiBackend implements AgentBackend {
       deniedSkills.length > 0
         ? defineTool(
             createReadToolDefinition(opts.cwd, {
-              operations: createSkillReadGate(deniedSkills, this.opts.onSkillsLog).operations,
+              operations: createSkillReadGate(deniedSkills, log.skills).operations,
             }),
           )
         : null;
     if (deniedSkills.length > 0) {
-      this.opts.onSkillsLog?.(`deny: ${deniedSkills.length} skill dir(s) hard-blocked`);
+      log.skills?.(`deny: ${deniedSkills.length} skill dir(s) hard-blocked`);
     }
     const envBash = defineTool(
       createBashToolDefinition(opts.cwd, {
@@ -1283,9 +1301,7 @@ export class PiBackend implements AgentBackend {
       mcpEndpoints.length > 0 || askRelay !== undefined ? { uiContext: mcpCaptureUi } : {},
     );
     this.opts.onSession?.(session.sessionId, session.sessionFile);
-    const handle = new PiSessionHandle(session, model, diagnose, spans, (line) =>
-      this.opts.onCompactionLog?.(line),
-    );
+    const handle = new PiSessionHandle(session, model, diagnose, spans, log.compaction);
     if (opts.prompt !== undefined) {
       const promptImages =
         opts.promptImages !== undefined && opts.promptImages.length > 0
