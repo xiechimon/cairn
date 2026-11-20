@@ -300,9 +300,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const rows = ctx.db.select().from(machine).where(eq(machine.teamId, id)).all();
     const running = runningThreadsByMachine(ctx.db, id);
     const queued = queuedThreadsByMachine(ctx.db, id);
+    const now = nowMs();
     return c.json(
       rows.map((r) => ({
         ...toMachineRecord(r, machineRunningCount(ctx.db, r.id)),
+        starting: !r.online && ctx.machineHub.isStarting(r.id, now),
         running: running.get(r.id) ?? [],
         queued: queued.get(r.id) ?? [],
         strain: machineStrain(r.capabilities?.hardware),

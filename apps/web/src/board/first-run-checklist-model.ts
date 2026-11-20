@@ -10,7 +10,7 @@ export interface ModelSides {
 
 export interface FirstRunFacts {
   models: ModelSides | undefined;
-  machinesOnline: number | undefined;
+  machinesReady: number | undefined;
 }
 
 export interface FirstRunStep {
@@ -46,11 +46,11 @@ export function bothSidesHaveModels(models: ModelSides): boolean {
 }
 
 export function firstRunSteps(facts: FirstRunFacts): FirstRunStep[] | null {
-  const { models, machinesOnline } = facts;
-  if (models === undefined || machinesOnline === undefined) return null;
+  const { models, machinesReady } = facts;
+  if (models === undefined || machinesReady === undefined) return null;
   return [
     { id: 'models', done: bothSidesHaveModels(models) },
-    { id: 'machine', done: machinesOnline > 0 },
+    { id: 'machine', done: machinesReady > 0 },
   ];
 }
 

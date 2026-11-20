@@ -337,6 +337,19 @@ function adoptAsDefaultIfUnset(db: Db, teamId: string, machineId: string): void 
     .run();
 }
 
+export function beginMachineStarting(
+  deps: Pick<MachineDeps, 'hub' | 'machineHub'>,
+  machine: { id: string; teamId: string; online: boolean },
+): void {
+  deps.machineHub.beginStarting(machine.id, nowMs());
+  if (machine.online) return;
+  deps.hub.publish(machine.teamId, () => ({
+    type: 'machine_presence',
+    machineId: machine.id,
+    online: false,
+  }));
+}
+
 export function enrollMachine(
   deps: MachineDeps,
   input: {
@@ -380,8 +393,8 @@ export function enrollMachine(
       })
       .where(eq(machine.id, byKey.id))
       .run();
-    markOffline(deps, byKey.id);
-    deps.machineHub.revokeMachine(byKey.id);
+    if (deps.machineHub.isConnected(byKey.id)) deps.machineHub.revokeMachine(byKey.id);
+    beginMachineStarting(deps, byKey);
     adoptAsDefaultIfUnset(db, input.teamId, byKey.id);
     return {
       machineId: byKey.id,
@@ -418,6 +431,7 @@ export function enrollMachine(
         : {}),
     })
     .run();
+  beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
   adoptAsDefaultIfUnset(db, input.teamId, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
@@ -448,8 +462,8 @@ export function authorizeEnrollmentMachine(
       })
       .where(eq(machine.id, existing.id))
       .run();
-    markOffline(deps, existing.id);
-    deps.machineHub.revokeMachine(existing.id);
+    if (deps.machineHub.isConnected(existing.id)) deps.machineHub.revokeMachine(existing.id);
+    beginMachineStarting(deps, existing);
     adoptAsDefaultIfUnset(db, input.teamId, existing.id);
     return {
       machineId: existing.id,
@@ -471,6 +485,7 @@ export function authorizeEnrollmentMachine(
       kind: isLocal ? 'local' : 'remote',
     })
     .run();
+  beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
   adoptAsDefaultIfUnset(db, input.teamId, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
@@ -546,6 +561,20 @@ export function sweepStaleMachines(
   now: number = nowMs(),
 ): void {
   const { db } = deps;
+  for (const machineId of deps.machineHub?.expireStarting(now) ?? []) {
+    if (deps.machineHub?.isConnected(machineId)) continue;
+    const row = db
+      .select({ teamId: machine.teamId, online: machine.online })
+      .from(machine)
+      .where(eq(machine.id, machineId))
+      .get();
+    if (row === undefined) continue;
+    if (row.online) {
+      markOffline(deps, machineId);
+      continue;
+    }
+    deps.hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online: false }));
+  }
   const stale = db
     .select({ id: machine.id })
     .from(machine)

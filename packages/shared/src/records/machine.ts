@@ -30,6 +30,7 @@ export const machineRecordSchema = z.object({
   hostname: z.string().optional(),
   teamId: recordId,
   online: z.boolean(),
+  starting: z.boolean().optional(),
   lastSeenAt: z.number().int().nullable().optional(),
   latestCliVersion: z.string().nullable(),
   kind: z.enum(['local', 'remote']),

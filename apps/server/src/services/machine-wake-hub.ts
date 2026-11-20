@@ -9,6 +9,8 @@ import type {
 
 export const MACHINE_OFFLINE_GRACE_MS = 45_000;
 
+export const MACHINE_STARTING_MS = 45_000;
+
 export type PresenceAdmission = 'online' | 'seen' | 'ignore';
 
 interface MachineGrace {
@@ -19,6 +21,7 @@ interface MachineGrace {
 
 export class MachineWakeHub {
   private readonly graces = new Map<string, MachineGrace>();
+  private readonly starting = new Map<string, number>();
   private readonly waiters = new Map<string, Set<() => void>>();
   private readonly streams = new Map<string, Set<(ev: MachineStreamEvent) => void>>();
   private readonly stopListeners = new Map<string, Set<() => void>>();
@@ -114,6 +117,7 @@ export class MachineWakeHub {
     close: () => void = () => {},
   ): () => void {
     this.revokeMachine(machineId);
+    this.starting.delete(machineId);
     const connectionId = randomBytes(16).toString('base64url');
     const unsubscribeTeam = this.subscribe(teamId, send);
     let released = false;
@@ -194,6 +198,7 @@ export class MachineWakeHub {
 
   revokeMachine(machineId: string): void {
     this.cancelGrace(machineId);
+    this.starting.delete(machineId);
     const entry = this.streamsByMachine.get(machineId);
     if (!entry) return;
     this.streamsByMachine.delete(machineId);
@@ -220,6 +225,26 @@ export class MachineWakeHub {
 
   isConnected(machineId: string): boolean {
     return this.streamsByMachine.has(machineId);
+  }
+
+  beginStarting(machineId: string, now: number): void {
+    if (this.starting.has(machineId)) return;
+    this.starting.set(machineId, now);
+  }
+
+  isStarting(machineId: string, now: number): boolean {
+    const since = this.starting.get(machineId);
+    return since !== undefined && now - since < MACHINE_STARTING_MS;
+  }
+
+  expireStarting(now: number): string[] {
+    const expired: string[] = [];
+    for (const [machineId, since] of this.starting) {
+      if (now - since < MACHINE_STARTING_MS) continue;
+      this.starting.delete(machineId);
+      expired.push(machineId);
+    }
+    return expired;
   }
 
   pushComputer(machineId: string, call: ComputerCall): boolean {

@@ -12843,6 +12843,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "starting": {
+      "type": "boolean",
+    },
     "strain": {
       "items": {
         "enum": [

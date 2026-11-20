@@ -17,23 +17,23 @@ const tasksOnly = { coordinator: false, tasks: true };
 const none = { coordinator: false, tasks: false };
 
 test('the models step needs a model on both sides, not just any model source', () => {
-  expect(firstRunSteps({ models: tasksOnly, machinesOnline: 1 })?.map((s) => [s.id, s.done])).toEqual([
+  expect(firstRunSteps({ models: tasksOnly, machinesReady: 1 })?.map((s) => [s.id, s.done])).toEqual([
     ['models', false],
     ['machine', true],
   ]);
-  expect(firstRunSteps({ models: both, machinesOnline: 1 })?.every((s) => s.done)).toBe(true);
+  expect(firstRunSteps({ models: both, machinesReady: 1 })?.every((s) => s.done)).toBe(true);
 });
 
 test('the composer chip names models before an offline Runner', () => {
-  expect(nextOpenStep(firstRunSteps({ models: tasksOnly, machinesOnline: 0 }))).toBe('models');
-  expect(nextOpenStep(firstRunSteps({ models: both, machinesOnline: 0 }))).toBe('machine');
-  expect(nextOpenStep(firstRunSteps({ models: both, machinesOnline: 1 }))).toBeNull();
+  expect(nextOpenStep(firstRunSteps({ models: tasksOnly, machinesReady: 0 }))).toBe('models');
+  expect(nextOpenStep(firstRunSteps({ models: both, machinesReady: 0 }))).toBe('machine');
+  expect(nextOpenStep(firstRunSteps({ models: both, machinesReady: 1 }))).toBeNull();
 });
 
 test('while any fact is still loading nothing is named', () => {
-  expect(firstRunSteps({ models: undefined, machinesOnline: 1 })).toBeNull();
-  expect(firstRunSteps({ models: both, machinesOnline: undefined })).toBeNull();
-  expect(firstRunComplete(firstRunSteps({ models: undefined, machinesOnline: 0 }))).toBe(true);
+  expect(firstRunSteps({ models: undefined, machinesReady: 1 })).toBeNull();
+  expect(firstRunSteps({ models: both, machinesReady: undefined })).toBeNull();
+  expect(firstRunComplete(firstRunSteps({ models: undefined, machinesReady: 0 }))).toBe(true);
 });
 
 test('model sides come from whether the Coordinator can answer and whether any source exists', () => {

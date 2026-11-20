@@ -6,7 +6,11 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { machine as machineTable, team as teamTable } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
-import { MACHINE_OFFLINE_GRACE_MS, MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import {
+  MACHINE_OFFLINE_GRACE_MS,
+  MACHINE_STARTING_MS,
+  MachineWakeHub,
+} from '../src/services/machine-wake-hub.js';
 import { sweepStaleMachines } from '../src/services/machines.js';
 import { bootServer, type TestServer } from './helpers.js';
 
@@ -260,6 +264,86 @@ describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
     expect(machineRow(s, first.machineId).online).toBe(true);
   });
 
+  test('re-enrolling with a live stream keeps the Runner online with no presence event while the displaced stream shuts down', async () => {
+    const s = boot();
+    const key = issueKey(s);
+    const m = await enroll(s, key);
+    const a = await openStream(s, m.token, m.machineId);
+    const events = presenceEvents(s, m.machineId);
+    const rotated = await enroll(s, key);
+    expect(rotated.machineId).toBe(m.machineId);
+    await waitFor(() => a.events.some((e) => e.type === 'shutdown'));
+    expect(machineRow(s, m.machineId).online).toBe(true);
+    const b = await openStream(s, rotated.token, m.machineId);
+    await sleep(GRACE_MS + 200);
+    expect(s.machineHub.connectionId(m.machineId)).toBe(b.connectionId);
+    expect(machineRow(s, m.machineId).online).toBe(true);
+    expect(events).toEqual([]);
+  });
+
+  test('re-enrolling during a pending grace keeps the Runner online until the grace expires', async () => {
+    const s = boot();
+    const key = issueKey(s);
+    const m = await enroll(s, key);
+    const a = await openStream(s, m.token, m.machineId);
+    await a.drop();
+    const events = presenceEvents(s, m.machineId);
+    const rotated = await enroll(s, key);
+    expect(rotated.machineId).toBe(m.machineId);
+    expect(machineRow(s, m.machineId).online).toBe(true);
+    expect(events).toEqual([]);
+    await waitFor(() => !machineRow(s, m.machineId).online);
+    expect(events).toEqual([false]);
+  });
+
+  test('an enrolling Runner reads as starting until its stream arrives, and the sweep ends a start that never connected with one offline event', async () => {
+    const s = boot();
+    const key = issueKey(s);
+    const m = await enroll(s, key);
+    const listed = async () => {
+      const res = await call(s.app, 'GET', `/api/teams/${s.team.id}/machines`);
+      expect(res.status).toBe(200);
+      const rows = (await res.json()) as { id: string; online: boolean; starting?: boolean }[];
+      return rows.find((row) => row.id === m.machineId)!;
+    };
+    expect(await listed()).toMatchObject({ online: false, starting: true });
+
+    const a = await openStream(s, m.token, m.machineId);
+    expect(await listed()).toMatchObject({ online: true, starting: false });
+    expect(await (await goodbye(s, m.token, a.connectionId)).json()).toEqual({ applied: true });
+
+    const after = presenceEvents(s, m.machineId);
+    expect((await enroll(s, key)).machineId).toBe(m.machineId);
+    expect(await listed()).toMatchObject({ online: false, starting: true });
+    expect(after).toEqual([false]);
+
+    sweepStaleMachines(s.svc, Date.now() + MACHINE_STARTING_MS);
+    expect(await listed()).toMatchObject({ online: false, starting: false });
+    expect(after).toEqual([false, false]);
+  });
+
+  test('a rotation that leaves the Runner online ends the start at its window with one offline event, and a further enrollment does not extend the window', async () => {
+    const s = boot();
+    const key = issueKey(s);
+    const m = await enroll(s, key);
+    const a = await openStream(s, m.token, m.machineId);
+    const events = presenceEvents(s, m.machineId);
+    expect((await enroll(s, key)).machineId).toBe(m.machineId);
+    expect(machineRow(s, m.machineId).online).toBe(true);
+    await waitFor(() => a.events.some((e) => e.type === 'shutdown'));
+    expect(events).toEqual([]);
+
+    sweepStaleMachines(s.svc, Date.now());
+    expect(machineRow(s, m.machineId).online).toBe(true);
+    sweepStaleMachines(s.svc, Date.now() + MACHINE_STARTING_MS);
+    expect(machineRow(s, m.machineId).online).toBe(false);
+    expect(events).toEqual([false]);
+
+    s.machineHub.beginStarting('early-box', 1_000);
+    s.machineHub.beginStarting('early-box', 1_000 + MACHINE_STARTING_MS - 1);
+    expect(s.machineHub.isStarting('early-box', 1_000 + MACHINE_STARTING_MS)).toBe(false);
+  });
+
   test('6: goodbye ends the current connection or a grace at once; unknown or expired ids do nothing; null presence after goodbye stays offline', async () => {
     const s = boot();
     const m = await enroll(s, issueKey(s));
@@ -388,6 +472,7 @@ describe('Runner offline grace (docs/design/runner-offline-grace.md)', () => {
       .run();
     await presence(s, m.token, 'id-from-before-restart');
     expect(machineRow(s, m.machineId).lastSeenAt).toBe(5);
+    s.machineHub.expireStarting(Date.now() + MACHINE_STARTING_MS);
     sweepStaleMachines({ db: s.db, hub: s.hub, machineHub: s.machineHub });
     expect(machineRow(s, m.machineId).online).toBe(false);
     await openStream(s, m.token, m.machineId);

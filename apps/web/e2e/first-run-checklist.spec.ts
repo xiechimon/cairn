@@ -4,7 +4,14 @@ import { mockLive, PROJECT } from './chief-home-mock';
 interface World {
   providers: unknown[];
   connections?: unknown[];
-  machines: { id: string; name: string; online: boolean; kind?: 'local' | 'remote'; lastSeenAt?: number }[];
+  machines: {
+    id: string;
+    name: string;
+    online: boolean;
+    starting?: boolean;
+    kind?: 'local' | 'remote';
+    lastSeenAt?: number;
+  }[];
   bound: boolean;
   teamPaths: string[];
 }
@@ -115,7 +122,6 @@ test('a machine coming back online clears the chip', async ({ page }) => {
 });
 
 async function openDesktop(page: Page, world: World) {
-  await page.clock.install();
   await page.addInitScript(() => {
     const calls: string[] = [];
     Object.assign(window, {
@@ -127,28 +133,56 @@ async function openDesktop(page: Page, world: World) {
   await open(page, world);
   await machinesRead;
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
-  await page.clock.runFor(1_000);
 }
 
 const OWN_OFFLINE = { id: 'm1', name: 'xmonsMac', online: false, kind: 'local' as const, lastSeenAt: 1 };
 
-test('opening the desktop app shows no Runner hint while its own Runner is still starting', async ({
+test('a re-registering Runner counts as a Runner already, so its startup shows no chip, and one reported offline again shows at once', async ({
   page,
 }) => {
   const world: World = {
     ...fresh(),
     providers: [{ id: 'p1', name: 'gw' }],
     bound: true,
-    machines: [OWN_OFFLINE],
+    machines: [{ ...OWN_OFFLINE, starting: true }],
+  };
+  const machinesRead = page.waitForResponse((res) => res.url().endsWith('/api/teams/t1/machines'));
+  await open(page, world);
+  await machinesRead;
+  await expect(page.getByTestId('chief-composer-input')).toBeVisible();
+  await expect(chip(page)).toHaveCount(0);
+  await expect(hint(page)).toHaveCount(0);
+  world.machines = [OWN_OFFLINE];
+  await page.evaluate(() => {
+    for (const es of window.__es)
+      es.emit({ type: 'machine_presence', machineId: 'm1', online: false });
+  });
+  await expect(chip(page)).toHaveText('xmonsMac 离线');
+  await expect(hint(page)).toHaveText(/^在 xmonsMac 上运行 .+ start 让它重新上线$/);
+});
+
+test('opening the desktop app shows no Runner hint while its own Runner re-registers, and a reported offline state shows at once', async ({
+  page,
+}) => {
+  const world: World = {
+    ...fresh(),
+    providers: [{ id: 'p1', name: 'gw' }],
+    bound: true,
+    machines: [{ ...OWN_OFFLINE, online: true }],
   };
   await openDesktop(page, world);
   await expect(chip(page)).toHaveCount(0);
   await expect(hint(page)).toHaveCount(0);
+  world.machines = [OWN_OFFLINE];
+  await page.evaluate(() => {
+    for (const es of window.__es)
+      es.emit({ type: 'machine_presence', machineId: 'm1', online: false });
+  });
+  await expect(chip(page)).toHaveText('xmonsMac 离线');
   world.machines = [{ ...OWN_OFFLINE, online: true }];
   await page.evaluate(() => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
-  await page.clock.runFor(30_000);
   await expect(chip(page)).toHaveCount(0);
 });
 
@@ -161,8 +195,6 @@ test('in the desktop app its own offline machine reconnects instead of asking fo
     bound: true,
     machines: [OWN_OFFLINE],
   });
-  await expect(chip(page)).toHaveCount(0);
-  await page.clock.runFor(15_000);
   await expect(chip(page)).toHaveText('xmonsMac 离线');
   await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
   await expect(hint(page).locator('code')).toHaveCount(0);

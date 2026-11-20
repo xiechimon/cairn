@@ -12,6 +12,10 @@ Every stream gets a connection id: 128 random bits from the server, sent as the 
 
 A daemon from this change sends `connectionId` in every presence body: `null` before its first `hello`, then the last id it received. A daemon that predates this sends no `connectionId` field, ignores the unknown `hello` event (`hasKnownStreamEventType` in `machine-client.ts`) and never sends goodbye. A new daemon on an old server gets no `hello`, sends `null` and skips goodbye.
 
+Every enrollment (`enrollMachine`, `authorizeEnrollmentMachine`) also opens a *starting window* of `MACHINE_STARTING_MS` = 45 s on that machine in `MachineWakeHub.beginStarting`: the machine just rotated its credential and its new Runner is about to open a stream. The window lives in memory only, is cleared when a stream connects (`subscribeMachine`) or is revoked (`revokeMachine`), and an enrollment inside a live window does not extend it, the earliest start wins. The machines list route reports `starting: !online && isStarting`, and the web counts a starting machine as a Runner it already has, so a desktop app that starts its own Runner shows no missing-Runner hint during the start (the earlier 15 s client-side hold in `composer-setup-hint.tsx` is gone).
+
+When a window expires on a machine with no live stream, the sweep ends the start: a row that is still `online` from before the rotation is marked offline, and a row that is already offline publishes one offline presence so cached clients drop the flag. A Runner that was online across a rotation therefore reads online for at most 45 s without reconnecting, which bounds the window in which dispatch can pick a machine whose stream is gone (a pushed command still fails at once, since no stream is there to take it). The window does not exempt a row from the stale sweep: `starting` alone keeps the missing-Runner hint away, and a row whose `lastSeenAt` is older than 150 s still turns offline on the next tick.
+
 ## Transitions
 
 | Event | Condition | Effect |
@@ -25,13 +29,14 @@ A daemon from this change sends `connectionId` in every presence body: `null` be
 | Goodbye | Id matches neither | Nothing; `200 {"applied":false}` |
 | Ping finds the token invalid | Its id is the current connection | Clears the connection, no grace; `markOffline`; closes the stream |
 | Ping finds the token invalid | Not current | Closes the stream only |
-| Revoke, re-enroll with the same key, enrollment authorization | Always | Unchanged: rotates or clears the token, `markOffline`, `revokeMachine`; also cancels any pending grace |
+| Revoke | Always | Unchanged: clears the token, `markOffline`, `revokeMachine`; also cancels any pending grace |
+| Re-enroll with the same key, enrollment authorization | Always | Rotates the token and, when a stream is live, `revokeMachine` closes it; `online` is not touched, so a Runner that was online stays shown online while its new daemon connects, and a pending grace still expires on its own clock if nothing connects; opens the starting window, and when the row is offline publishes one offline presence so cached clients refresh |
 | Presence with the current connection id | Always | As today: `online`, `lastSeenAt`, reports |
 | Presence with the pending grace id | Always | `lastSeenAt` and reports; sets `presenceSinceDrop`; does not cancel the grace, so the Runner still turns offline 45 s after the drop unless a stream returns |
 | Presence with any other id: superseded, expired, ended by goodbye, or from before a server restart | Always | Writes nothing; `200` |
 | Presence with `connectionId: null` | Always | `lastSeenAt` and reports; `online` unchanged |
 | Presence with no `connectionId` field (daemon that predates this) | Always | As today: `online`, `lastSeenAt`, reports; during a grace it also sets `presenceSinceDrop` |
-| `sweepStaleMachines` (15 s tick) | `lastSeenAt` older than 150 s | Unchanged: `markOffline`; also cancels any pending grace. Offline wins over a running grace |
+| `sweepStaleMachines` (15 s tick) | `lastSeenAt` older than 150 s | `markOffline`; also cancels any pending grace. Offline wins over a running grace. A starting window expiring with no live stream comes first: an online row is `markOffline`d and an offline one gets one offline presence, so cached clients drop the `starting` flag |
 
 So for a daemon from this change, `online` becomes true only through a stream open or a presence on the current connection. A Runner whose connection expired or said goodbye stays offline until a new stream opens; one the stale sweep marked offline while its connection is still current comes back on its next presence. `markOffline` publishes only on the online-to-offline transition, so a timer, a goodbye and the sweep together produce one offline event.
 
@@ -55,7 +60,8 @@ These are age thresholds checked by timers and a 15 s scheduler tick, so each ca
 | Reconnect within 45 s | Never shown offline | Offline until the next presence |
 | Frozen or half-open daemon (`kill -STOP`, sleep, a silent network). The ping is one-way and unacknowledged, so the server may see no abort | When `lastSeenAt` is older than 150 s, up to 165 s | Same |
 | Server restart. Grace timers and ids are lost | A new stream marks online; otherwise `lastSeenAt` older than 150 s | Same |
-| Revoked or rotated token | At once | At once |
+| Revoked token | At once | At once |
+| Rotated token (re-enroll) | Until the starting window ends (45 s) if nothing connects, then the pending grace or the 150 s sweep | At once |
 | Daemon that predates this | Detected abort: 45 s; a late presence can revive it until the stale sweep | At the abort |
 
 ## Work and recovery during grace
@@ -71,7 +77,7 @@ These are age thresholds checked by timers and a 15 s scheduler tick, so each ca
 ## Security boundary
 
 - `online` grants nothing. Every machine endpoint authenticates the bearer token against `tokenHash` (`findMachineByToken`) on each request, and long-poll routes recheck it after each wait.
-- Revoke, re-enroll and enrollment authorization keep marking the Runner offline at once, and now also cancel its grace, so a revoked or rotated credential is never shown online longer than today.
+- Revoke keeps marking the Runner offline at once and cancelling its grace, so a revoked credential is never shown online longer than today. Re-enroll and enrollment authorization rotate the credential and close a live stream but leave `online` to the stream/presence/sweep transitions: a re-registering Runner that was online stays shown online only until its starting window ends (45 s) or its pending grace fires, so a rotated credential's dead connection is still detected on a bounded clock. The starting window grants nothing beyond delaying the stale sweep of a row whose credential was just rotated: it expires on its own 45 s clock, cannot be extended by a further enrollment, is read only by the sweep and the machines list route, and no request can open it.
 - Goodbye derives the machine only from `me(c)`, the current bearer token. It accepts no machine id, uses the `executeMachineCommand` pattern, and revalidates the token after reading the body, before any change. It can only mark the caller's own machine offline, and only for a connection id that machine holds. Presence admission uses the same rule: the id is looked up under the caller's own machine.
 - The grace length is a server constant; no request sets or extends it.
 - Not a goal: a stolen token that is still valid is indistinguishable from the real daemon. It can post presence, open streams and say goodbye for its own machine, as it can today. Connection ids keep a replaced daemon from changing the current connection; they do not defend against the holder of the active token. Revocation is the remedy.
@@ -85,7 +91,7 @@ Server, Vitest with fake timers, through the HTTP routes. Each is a new behavior
 2. A new stream within 45 s keeps it online with no event. A new stream after expiry marks it online at once and refreshes `lastSeenAt`.
 3. Presence on the grace id at 30 s refreshes `lastSeenAt` and does not cancel the grace: offline at 45 s; presence on the same id at 60 s writes nothing and it stays offline; a new stream then marks it online.
 4. Replacement: stream A, then stream B; A's late abort, goodbye(A) and presence(A) change nothing and B stays online. Then goodbye(B), then presence(A): stays offline.
-5. Rotation: re-enroll while stream A is open, the new daemon opens stream B and posts presence; then A's ping finds its old token invalid. The machine stays online.
+5. Rotation: re-enroll while stream A is open, the new daemon opens stream B and posts presence; then A's ping finds its old token invalid. The machine stays online. Re-enrolling with a live stream closes it but keeps the Runner online with no presence event; re-enrolling during a pending grace keeps the Runner online until the grace expires.
 6. Goodbye for the current connection and for a pending grace marks offline at once; goodbye with an unknown id returns `applied: false`. Goodbye(A) after expiry does nothing. Presence with `null` after goodbye leaves it offline.
 7. Goodbye is rejected with no token, a wrong token, a revoked token and a rotated token. Token A with machine B's connection id, in the same team and in another team, leaves B's state, grace and stream untouched; the same for presence with B's id.
 8. Revoke during grace: offline at once, and the old timer firing later changes nothing.
@@ -95,6 +101,7 @@ Server, Vitest with fake timers, through the HTTP routes. Each is a new behavior
 12. Restart: a new server with the machine online in the database. Presence with a pre-restart id writes nothing; a new stream marks it online; with no stream it turns offline only after 150 s without presence.
 13. Presence without a `connectionId` field keeps today's behavior, including marking an offline Runner online.
 14. During grace, pushed commands (repo archive) find no connection and fail at once.
+15. An enrolling Runner reads as `starting` in the machines list until its stream arrives and clears the flag; a start that never connected is ended by the sweep with one offline event, whether the row was offline or still online from before; a second enrollment inside a live window does not extend it.
 
 Daemon, Vitest: presence sends `null` before `hello` and the last id after it; `stop()` waits for `presenceReporter.close()` before goodbye and sends the last id; a goodbye that times out after 2 s or fails does not block shutdown; a daemon that received no `hello` sends no goodbye.
 

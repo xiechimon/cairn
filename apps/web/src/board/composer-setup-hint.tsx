@@ -1,5 +1,5 @@
 import { PUBLISHED_PACKAGES } from '@cairn/shared';
-import { Fragment, type ReactNode, useEffect, useState } from 'react';
+import { Fragment, type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { useChief, useMachines, useProviders } from '../api/hooks.js';
 import { useModelRouting } from '../api/model-routing.js';
@@ -29,21 +29,6 @@ export interface ComposerSetupStep {
   models: ModelSides;
 }
 
-export const OWN_RUNNER_START_GRACE_MS = 15_000;
-
-function useHeldFor(active: boolean, ms: number): boolean {
-  const [held, setHeld] = useState(false);
-  useEffect(() => {
-    if (!active) {
-      setHeld(false);
-      return;
-    }
-    const id = setTimeout(() => setHeld(true), ms);
-    return () => clearTimeout(id);
-  }, [active, ms]);
-  return active && held;
-}
-
 export function useComposerSetupStep(): ComposerSetupStep | null {
   const { live, teamId } = useLiveData();
   const providersQ = useProviders(teamId, live);
@@ -60,13 +45,11 @@ export function useComposerSetupStep(): ComposerSetupStep | null {
   const next = nextOpenStep(
     firstRunSteps({
       models,
-      machinesOnline: machinesQ.data?.filter((machine) => machine.online).length,
+      machinesReady: machinesQ.data?.filter(
+        (machine) => machine.online || machine.starting === true,
+      ).length,
     }),
   );
-  const [appRunsLocal] = useState(() => localRunnerBridge() !== null);
-  const runnerMissing = live && next === 'machine';
-  const runnerMissingSettled = useHeldFor(runnerMissing && appRunsLocal, OWN_RUNNER_START_GRACE_MS);
-  if (runnerMissing && appRunsLocal && !runnerMissingSettled) return null;
   return live && next !== null && models !== undefined ? { next, models } : null;
 }
 

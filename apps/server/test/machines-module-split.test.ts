@@ -25,6 +25,7 @@ describe('machines.ts facade', () => {
       'STEER_SENT_STALE_MS',
       'ackSteer',
       'authorizeEnrollmentMachine',
+      'beginMachineStarting',
       'claimStep',
       'enrollMachine',
       'fetchSteer',

@@ -514,7 +514,7 @@ describe('machine token revocation (#2494)', () => {
     }
   });
 
-  test('byKey rotation of an already-online machine marks it offline and publishes presence before closing the stream', async () => {
+  test('byKey rotation of an already-online machine keeps it online and publishes nothing before closing the stream', async () => {
     const w = await setupWorld({ pinRoute: false });
     try {
       const present = await call(w.s.app, 'POST', '/api/machine/presence', {
@@ -549,9 +549,9 @@ describe('machine token revocation (#2494)', () => {
         streamEnded: await stream.waitEnded(),
         shutdown: stream.events.at(0),
       }).toEqual({
-        online: false,
-        events: [{ type: 'machine_presence', machineId: w.a.machineId, online: false }],
-        order: ['offline-before-revoke'],
+        online: true,
+        events: [],
+        order: ['revoke-while-online'],
         hold: { claim: false, waitingFor: w.a.machineId },
         oldToken: 401,
         newToken: 200,
@@ -563,7 +563,7 @@ describe('machine token revocation (#2494)', () => {
     }
   });
 
-  test('authorizeEnrollmentMachine rotation of an already-online local machine marks it offline and publishes presence before closing the stream', async () => {
+  test('authorizeEnrollmentMachine rotation of an already-online local machine keeps it online and publishes nothing before closing the stream', async () => {
     const w = await setupWorld({ authToken: OWNER_TOKEN, pinRoute: false });
     try {
       seedLocalMachine(w.s.db, w.s.team.id);
@@ -613,9 +613,9 @@ describe('machine token revocation (#2494)', () => {
         streamEnded: await stream.waitEnded(),
         shutdown: stream.events.at(0),
       }).toEqual({
-        online: false,
-        events: [{ type: 'machine_presence', machineId: first.machineId, online: false }],
-        order: ['offline-before-revoke'],
+        online: true,
+        events: [],
+        order: ['revoke-while-online'],
         hold: { claim: false, waitingFor: first.machineId },
         oldToken: 401,
         newToken: 200,
