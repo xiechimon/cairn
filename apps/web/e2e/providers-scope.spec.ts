@@ -49,7 +49,7 @@ test('OAuth providers show no API key row; key providers show a write-only key r
   await page.goto(`${FLEET}&item=provider%3Aprov-copilot`);
   await expect(editor(page)).toContainText('OAuth');
   await expect(editor(page).getByRole('button', { name: '更换', exact: true })).toHaveCount(0);
-  await expect(editor(page).getByTestId('provider-test-all')).toHaveCount(0);
+  await expect(editor(page).getByTestId('provider-test-all')).toBeVisible();
   await page.goto(`${FLEET}&item=provider%3Aprov-anthropic`);
   await expect(editor(page)).toContainText('Anthropic Messages');
   await expect(editor(page).getByRole('button', { name: '更换', exact: true })).toBeVisible();
@@ -283,4 +283,18 @@ test('live: a finished save does not wipe a draft typed into another field', asy
   await expect(instance(page, 'provider:p1')).toContainText('Anthropic 主账号');
   await expect(baseUrl).toHaveValue('https://proxy.example.invalid');
   await expect(baseUrl).toBeFocused();
+});
+
+test('the sample data shows the owner controls, so design screenshots match the real page', async ({
+  page,
+}) => {
+  await page.goto('/app/settings/routing?scenario=model-routing');
+  await page.locator('[data-testid="provider-instance"]:not([data-instance-id^="subscription:"])').first().click();
+  await expect(editor(page).getByRole('button', { name: '从上游选择' })).toBeVisible();
+  await expect(editor(page).getByTestId('provider-test-all')).toBeVisible();
+  const chip = editor(page).getByTestId('provider-model').first();
+  await expect(chip.getByRole('button', { name: /^测试 / })).toBeVisible();
+  await expect(chip.getByRole('button', { name: /^移除 / })).toBeVisible();
+  await page.locator('[data-instance-id="subscription:sub-personal"]').click();
+  await expect(page.getByTestId('subscription-detail').getByTestId('subscription-verify')).toBeVisible();
 });

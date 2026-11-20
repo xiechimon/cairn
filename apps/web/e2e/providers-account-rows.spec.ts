@@ -67,7 +67,7 @@ test('subscriptions whose Runner reports nothing: Claude reads 0 models and warn
   await expect(row).toHaveAttribute('data-tone', 'warn');
   await row.click();
   const detail = page.getByTestId('subscription-detail');
-  await expect(detail).toContainText('还没有执行机上报 Claude Code 模型');
+  await expect(detail).toContainText('还没勾选模型。从上游拉一份清单来勾选。');
   const devin = page.locator('[data-instance-id="subscription:sub-devin"]');
   await expect(devin).toContainText('订阅 · 5 个模型 · 最近使用');
   await expect(devin).toHaveAttribute('data-tone', 'ok');

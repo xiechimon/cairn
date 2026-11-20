@@ -1,4 +1,9 @@
-import type { ModelSource, ModelSourceModel, ProviderRecord } from '@cairn/shared';
+import type {
+  ModelSource,
+  ModelSourceModel,
+  ProviderRecord,
+  ProviderTestResult,
+} from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -179,6 +184,15 @@ function subscriptionEntries(
   });
 }
 
+const SAMPLE_TEST_RESULT: ProviderTestResult = {
+  status: 'ok',
+  reason: null,
+  failure: null,
+  httpStatus: 200,
+  detail: null,
+  latencyMs: 420,
+};
+
 export function ProvidersSection() {
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -265,8 +279,18 @@ export function ProvidersSection() {
   };
 
   const actionsFor = (record: ProviderRecord): ProviderEditActions =>
-    live
+    !live
       ? {
+          patch: () => Promise.resolve(),
+          test: () => Promise.resolve(SAMPLE_TEST_RESULT),
+          listUpstream: () =>
+            Promise.resolve({
+              status: 'ok' as const,
+              models: record.models.map((model) => ({ id: model.id, name: model.name })),
+            }),
+          remove: () => undefined,
+        }
+      : {
           patch: (body) =>
             mutations.patchProvider.mutateAsync({ id: record.id, body }).catch((error) => {
               toastError(t('保存失败，请重试。'), error);
@@ -283,8 +307,7 @@ export function ProvidersSection() {
             mutations.deleteProvider.mutate(record.id, {
               onError: (error) => toastError(t('移除失败，请重试。'), error),
             }),
-        }
-      : {};
+        };
 
   const saveSubscriptionModels = (account: SubscriptionAccount, models: SubscriptionModel[]) => {
     const update =
@@ -383,7 +406,18 @@ export function ProvidersSection() {
                 }
               : {}),
           }
-        : {}),
+        : {
+            onVerify: () => undefined,
+            onRename: () => undefined,
+            ...(account.vendor === 'devin' ||
+            account.vendor === 'antigravity' ||
+            account.vendor === 'claude'
+              ? { onPickUpstream: () => undefined, onRemoveModel: () => undefined }
+              : {}),
+            ...(account.vendor === 'claude'
+              ? { onTestModel: () => Promise.resolve(SAMPLE_TEST_RESULT) }
+              : {}),
+          }),
     };
   };
 
