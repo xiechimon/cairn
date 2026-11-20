@@ -4,7 +4,6 @@ import type { ComponentProps, ReactNode } from 'react';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { Card } from '../components/ui/card.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronRight } from '../icons/index.js';
 
@@ -135,35 +134,42 @@ export function RowNote({ danger = false, children }: { danger?: boolean; childr
   );
 }
 
-export interface AppItem {
+export interface IntegrationItem {
   key: string;
   testId?: string;
   icon: ReactNode;
   name: string;
-  description: string;
+  kind?: string;
+  description: ReactNode;
   status?: ReactNode;
-  action: ReactNode;
+  action?: ReactNode;
 }
 
-export function CardGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>;
-}
-
-export function AppCard({ testId, icon, name, description, status, action }: Omit<AppItem, 'key'>) {
+export function IntegrationRow({
+  testId,
+  icon,
+  name,
+  kind,
+  description,
+  status,
+  action,
+}: Omit<IntegrationItem, 'key'>) {
   return (
-    <Card
-      size="sm"
+    <div
       data-connector-card={name}
       data-testid={testId}
-      className="gap-2 rounded-(--radius-card) px-4 ring-border"
+      className={cn(SETTINGS_ROW_CLS, 'justify-start gap-3 py-2.5')}
     >
-      <div className="flex items-center gap-3">
-        {icon}
-        <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">{name}</span>
-        {action}
-      </div>
-      <p className="m-0 line-clamp-2 text-meta text-content-secondary">{description}</p>
-      {status !== undefined && <div className="mt-auto flex">{status}</div>}
-    </Card>
+      <span className="flex size-5 flex-none items-center justify-center">{icon}</span>
+      <RowText className="flex-1">
+        <RowLine>
+          <RowTitle className="font-medium">{name}</RowTitle>
+          {kind !== undefined && <RowMeta>{kind}</RowMeta>}
+        </RowLine>
+        <span className="line-clamp-2 text-meta text-content-tertiary">{description}</span>
+      </RowText>
+      {status}
+      {action !== undefined && <span className="flex flex-none items-center gap-2">{action}</span>}
+    </div>
   );
 }

@@ -17,8 +17,6 @@ const SURFACES = [
   { name: 'settings im', url: '/app/settings/im?scenario=01' },
 ];
 
-const CARD_GRID_ALLOWED = new Set(['settings apps', 'settings im']);
-
 async function open(page: Page, url: string) {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(url);
@@ -93,7 +91,6 @@ for (const surface of SURFACES) {
   test(`${surface.name}: an object list is rows in one card, not a grid or stack of cards`, async ({
     page,
   }) => {
-    test.skip(CARD_GRID_ALLOWED.has(surface.name), 'V20: the owner keeps the Apps and IM card grids');
     await open(page, surface.url);
     const grids = await page.evaluate(() => {
       const found: string[] = [];

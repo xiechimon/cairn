@@ -2639,7 +2639,11 @@ export const EN: Record<string, string> = {
   不稳定: 'Unstable',
   凭证失效: 'Credentials expired',
   错误: 'Error',
-  '已配对 {count} 个联系人': '{count} paired contacts',
+  '已配对 {count} 个联系人': '{count#1 paired contact|# paired contacts}',
+  聊天应用: 'Chat apps',
+  再连接一个: 'Connect another',
+  '删除后，配对的联系人就不能再通过它找 Coordinator':
+    'Once deleted, paired contacts can no longer reach the Coordinator through it',
   重连: 'Reconnect',
   '重连失败，请重试。': 'Could not reconnect. Try again.',
   '删除失败，请重试。': 'Could not delete it. Try again.',

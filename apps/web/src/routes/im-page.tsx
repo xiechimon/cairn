@@ -4,8 +4,8 @@ import type {
   ImPlatform,
   ImWechatLoginStart,
 } from '@cairn/shared';
-import { Hash, MessageCircle, Send } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { Ellipsis, Hash, MessageCircle, Send } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   useImConnections,
@@ -15,28 +15,21 @@ import {
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FormField, FormStack } from '../components/form-layout.js';
+import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QrCode } from '../components/qr-code.js';
-import { SettingsFlat, SettingsSection } from '../components/settings-list.js';
+import { SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { Card } from '../components/ui/card.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import { DropdownMenu, DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
-import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
-import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
+import { IntegrationRow, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
 export const IM_ROUTE = 'im-connections';
-
-const STATUS_TONE: Record<ImConnectionStatus, StatusTone> = {
-  connecting: 'confirm',
-  ready: 'done',
-  degraded: 'confirm',
-  expired: 'failed',
-  error: 'failed',
-};
 
 const STATUS_LABEL: Record<ImConnectionStatus, string> = {
   connecting: '连接中',
@@ -44,6 +37,26 @@ const STATUS_LABEL: Record<ImConnectionStatus, string> = {
   degraded: '不稳定',
   expired: '凭证失效',
   error: '错误',
+};
+
+const PLATFORM_ORDER: readonly ImPlatform[] = ['telegram', 'slack', 'wechat'];
+
+const PLATFORM_COPY: Record<ImPlatform, { name: string; description: string; connect: string }> = {
+  telegram: {
+    name: 'Telegram 机器人',
+    description: '官方 Bot API',
+    connect: '连接 Telegram',
+  },
+  slack: {
+    name: 'Slack',
+    description: 'Socket Mode 直连',
+    connect: '连接 Slack',
+  },
+  wechat: {
+    name: '微信',
+    description: '扫码登录',
+    connect: '连接 WeChat',
+  },
 };
 
 const platformLabel = (platform: ImPlatform, t: (key: string) => string): string =>
@@ -214,38 +227,6 @@ function WechatLoginDialog({
   );
 }
 
-function CardGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>;
-}
-
-function ImCard({
-  icon,
-  name,
-  status,
-  description,
-  action,
-  testId,
-}: {
-  icon: ReactNode;
-  name: string;
-  status?: ReactNode;
-  description: ReactNode;
-  action: ReactNode;
-  testId?: string;
-}) {
-  return (
-    <Card size="sm" className="gap-2 rounded-(--radius-card) px-4 ring-border" data-testid={testId}>
-      <div className="flex items-center gap-3">
-        {icon}
-        <span className="min-w-0 flex-1 truncate text-ui font-medium text-foreground">{name}</span>
-        {status}
-      </div>
-      <div className="m-0 line-clamp-2 text-meta text-content-secondary">{description}</div>
-      <div className="mt-auto flex justify-end gap-2">{action}</div>
-    </Card>
-  );
-}
-
 const platformIcon = (platform: ImPlatform) =>
   platform === 'wechat' ? (
     <MessageCircle className="size-5 text-content-secondary" aria-hidden="true" />
@@ -266,216 +247,219 @@ export function ImConnectionsPage() {
   const [connecting, setConnecting] = useState(false);
   const [connectingSlack, setConnectingSlack] = useState(false);
   const [wechatLogin, setWechatLogin] = useState<ImWechatLoginStart | null>(null);
+  const [deleting, setDeleting] = useState<ImConnectionRecord | null>(null);
   const connections = connectionsQ.data?.connections ?? [];
   const requests = (requestsQ.data?.requests ?? []).filter((row) => row.status === 'pending');
+  const connectionIds = new Set(connections.map((conn) => conn.id));
   const startWechatLogin = () =>
     mutations.startWechatLogin.mutate(undefined, {
       onSuccess: setWechatLogin,
       onError: (error) => toastError(t('微信登录失败，请重试。'), error),
     });
-  const connectedPlatforms = new Set(connections.map((conn) => conn.platform));
+  const connect = (platform: ImPlatform) =>
+    platform === 'telegram'
+      ? setConnecting(true)
+      : platform === 'slack'
+        ? setConnectingSlack(true)
+        : startWechatLogin();
+  const connectionName = (conn: ImConnectionRecord) =>
+    conn.accountLabel ??
+    (conn.platform === 'wechat'
+      ? t('WeChat 账号')
+      : conn.platform === 'slack'
+        ? 'Slack'
+        : t('Telegram 机器人'));
+  const remove = () => {
+    if (deleting === null) return;
+    mutations.deleteConnection.mutate(deleting.id, {
+      onError: (error) => toastError(t('删除失败，请重试。'), error),
+    });
+    setDeleting(null);
+  };
 
-  const connectionCard = (conn: ImConnectionRecord) => (
-    <ImCard
-      key={conn.id}
-      testId={`im-connection-${conn.id}`}
-      icon={platformIcon(conn.platform)}
-      name={
-        conn.accountLabel ??
-        (conn.platform === 'wechat'
-          ? t('WeChat 账号')
-          : conn.platform === 'slack'
-            ? 'Slack'
-            : t('Telegram 机器人'))
-      }
-      status={
-        <StatusChip tone={STATUS_TONE[conn.status]}>{t(STATUS_LABEL[conn.status])}</StatusChip>
-      }
-      description={
-        <>
-          {conn.statusDetail ?? conn.lastSendError ?? ''}
-          {conn.pairedSenders.length > 0 &&
-            t('已配对 {count} 个联系人', { count: conn.pairedSenders.length })}
-        </>
-      }
-      action={
-        <>
-          {conn.status === 'expired' && conn.platform === 'wechat' ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={mutations.startWechatLogin.isPending}
-              onClick={startWechatLogin}
-              data-testid={`im-rescan-${conn.id}`}
-            >
-              {t('重新扫码')}
-            </Button>
-          ) : (
-            (conn.status === 'expired' || conn.status === 'error') && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={mutations.reconnectConnection.isPending}
-                onClick={() =>
-                  mutations.reconnectConnection.mutate(conn.id, {
-                    onError: (error) => toastError(t('重连失败，请重试。'), error),
-                  })
-                }
-                data-testid={`im-reconnect-${conn.id}`}
-              >
-                {t('重连')}
-              </Button>
+  const pairingRow = (request: (typeof requests)[number]) => (
+    <ResourceRow key={request.id} className="pl-12" data-testid={`im-pairing-${request.id}`}>
+      <RowText>
+        <RowTitle>{request.senderName ?? request.senderId}</RowTitle>
+        <RowDesc>
+          {t('请求配对 · {platform}', { platform: platformLabel(request.platform, t) })}
+        </RowDesc>
+      </RowText>
+      <span className="flex flex-none items-center gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={mutations.decidePairing.isPending}
+          onClick={() =>
+            mutations.decidePairing.mutate(
+              { id: request.id, decision: 'rejected' },
+              { onError: (error) => toastError(t('拒绝失败，请重试。'), error) },
             )
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={mutations.deleteConnection.isPending}
-            onClick={() =>
-              mutations.deleteConnection.mutate(conn.id, {
-                onError: (error) => toastError(t('删除失败，请重试。'), error),
-              })
-            }
-            data-testid={`im-delete-${conn.id}`}
-          >
-            {t('删除')}
-          </Button>
-        </>
-      }
-    />
+          }
+          data-testid={`im-reject-${request.id}`}
+        >
+          {t('拒绝')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={mutations.decidePairing.isPending}
+          onClick={() =>
+            mutations.decidePairing.mutate(
+              { id: request.id, decision: 'approved' },
+              { onError: (error) => toastError(t('批准失败，请重试。'), error) },
+            )
+          }
+          data-testid={`im-approve-${request.id}`}
+        >
+          {t('批准')}
+        </Button>
+      </span>
+    </ResourceRow>
   );
+
+  const repairButton = (conn: ImConnectionRecord) =>
+    conn.status === 'expired' && conn.platform === 'wechat' ? (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={mutations.startWechatLogin.isPending}
+        onClick={startWechatLogin}
+        data-testid={`im-rescan-${conn.id}`}
+      >
+        {t('重新扫码')}
+      </Button>
+    ) : conn.status === 'expired' || conn.status === 'error' ? (
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={mutations.reconnectConnection.isPending}
+        onClick={() =>
+          mutations.reconnectConnection.mutate(conn.id, {
+            onError: (error) => toastError(t('重连失败，请重试。'), error),
+          })
+        }
+        data-testid={`im-reconnect-${conn.id}`}
+      >
+        {t('重连')}
+      </Button>
+    ) : null;
+
+  const connectionRow = (conn: ImConnectionRecord) => {
+    const failing = conn.status === 'expired' || conn.status === 'error';
+    const detail = conn.statusDetail ?? conn.lastSendError;
+    const name = connectionName(conn);
+    return (
+      <IntegrationRow
+        key={conn.id}
+        testId={`im-connection-${conn.id}`}
+        icon={platformIcon(conn.platform)}
+        name={name}
+        {...(conn.accountLabel !== null ? { kind: t(PLATFORM_COPY[conn.platform].name) } : {})}
+        description={
+          <>
+            <span className={failing ? 'text-destructive' : undefined}>
+              {t(STATUS_LABEL[conn.status])}
+            </span>
+            {conn.pairedSenders.length > 0 &&
+              ` · ${t('已配对 {count} 个联系人', { count: conn.pairedSenders.length })}`}
+            {detail !== null && ` · ${detail}`}
+          </>
+        }
+        action={
+          <>
+            {repairButton(conn)}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    data-testid={`im-menu-${conn.id}`}
+                    className="text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-menu-hover aria-expanded:text-foreground pointer-coarse:size-11 dark:hover:bg-transparent dark:aria-expanded:bg-menu-hover"
+                    aria-label={t('{name} 的菜单', { name })}
+                  />
+                }
+              >
+                <Ellipsis aria-hidden strokeWidth={1.75} />
+              </DropdownMenuTrigger>
+              <KeyedMenuContent
+                side="bottom"
+                align="end"
+                sideOffset={4}
+                className="w-auto min-w-40"
+              >
+                {live && (
+                  <KeyedMenuItem
+                    shortcut="C"
+                    data-testid={`im-connect-another-${conn.id}`}
+                    onClick={() => connect(conn.platform)}
+                  >
+                    {t('再连接一个')}
+                  </KeyedMenuItem>
+                )}
+                <KeyedMenuItem
+                  shortcut="D"
+                  confirms
+                  data-testid={`im-delete-${conn.id}`}
+                  onClick={() => setDeleting(conn)}
+                >
+                  {t('删除')}
+                </KeyedMenuItem>
+              </KeyedMenuContent>
+            </DropdownMenu>
+          </>
+        }
+      />
+    );
+  };
+
+  const platformRows = (platform: ImPlatform) => {
+    const own = connections.filter((conn) => conn.platform === platform);
+    const copy = PLATFORM_COPY[platform];
+    const orphans = requests.filter(
+      (request) => request.platform === platform && !connectionIds.has(request.connId),
+    );
+    if (own.length === 0)
+      return [
+        <IntegrationRow
+          key={platform}
+          testId={`im-platform-${platform}`}
+          icon={platformIcon(platform)}
+          name={t(copy.name)}
+          description={t(copy.description)}
+          {...(live
+            ? {
+                action: (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={platform === 'wechat' && mutations.startWechatLogin.isPending}
+                    onClick={() => connect(platform)}
+                    data-testid={`im-connect-${platform}`}
+                  >
+                    {t(copy.connect)}
+                  </Button>
+                ),
+              }
+            : {})}
+        />,
+        ...orphans.map(pairingRow),
+      ];
+    return [
+      ...own.flatMap((conn) => [
+        connectionRow(conn),
+        ...requests.filter((request) => request.connId === conn.id).map(pairingRow),
+      ]),
+      ...orphans.map(pairingRow),
+    ];
+  };
 
   return (
     <PageShell route={IM_ROUTE} fixture={fixture} selected="none" title="IM">
-      <div className="mt-6 flex flex-col gap-8">
-        <SettingsFlat>
-          {live && requests.length > 0 && (
-            <SettingsSection title={t('待处理')} testId="im-pending">
-              <ResourceList>
-                {requests.map((request) => (
-                  <ResourceRow key={request.id} data-testid={`im-pairing-${request.id}`}>
-                    <RowText>
-                      <RowTitle>{request.senderName ?? request.senderId}</RowTitle>
-                      <RowDesc>
-                        {t('请求配对 · {platform}', {
-                          platform: platformLabel(request.platform, t),
-                        })}
-                      </RowDesc>
-                    </RowText>
-                    <Button
-                      variant="ghost"
-                      className={DIALOG_PRIMARY_BUTTON}
-                      disabled={mutations.decidePairing.isPending}
-                      onClick={() =>
-                        mutations.decidePairing.mutate(
-                          { id: request.id, decision: 'approved' },
-                          { onError: (error) => toastError(t('批准失败，请重试。'), error) },
-                        )
-                      }
-                      data-testid={`im-approve-${request.id}`}
-                    >
-                      {t('批准')}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      className={DIALOG_PRIMARY_BUTTON}
-                      disabled={mutations.decidePairing.isPending}
-                      onClick={() =>
-                        mutations.decidePairing.mutate(
-                          { id: request.id, decision: 'rejected' },
-                          { onError: (error) => toastError(t('拒绝失败，请重试。'), error) },
-                        )
-                      }
-                      data-testid={`im-reject-${request.id}`}
-                    >
-                      {t('拒绝')}
-                    </Button>
-                  </ResourceRow>
-                ))}
-              </ResourceList>
-            </SettingsSection>
-          )}
-          {connections.length > 0 && (
-            <SettingsSection title={t('已接入')} testId="im-connected">
-              <CardGrid>{connections.map(connectionCard)}</CardGrid>
-            </SettingsSection>
-          )}
-          <SettingsSection title={t('可接入')} testId="im-catalog">
-            <CardGrid>
-              <ImCard
-                testId="im-platform-telegram"
-                icon={platformIcon('telegram')}
-                name={t('Telegram 机器人')}
-                status={
-                  connectedPlatforms.has('telegram') ? (
-                    <StatusChip tone="done">{t('已连接')}</StatusChip>
-                  ) : undefined
-                }
-                description={t('官方 Bot API')}
-                action={
-                  live ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setConnecting(true)}
-                      data-testid="im-connect-telegram"
-                    >
-                      {t('连接 Telegram')}
-                    </Button>
-                  ) : undefined
-                }
-              />
-              <ImCard
-                testId="im-platform-slack"
-                icon={platformIcon('slack')}
-                name="Slack"
-                status={
-                  connectedPlatforms.has('slack') ? (
-                    <StatusChip tone="done">{t('已连接')}</StatusChip>
-                  ) : undefined
-                }
-                description={t('Socket Mode 直连')}
-                action={
-                  live ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setConnectingSlack(true)}
-                      data-testid="im-connect-slack"
-                    >
-                      {t('连接 Slack')}
-                    </Button>
-                  ) : undefined
-                }
-              />
-              <ImCard
-                testId="im-platform-wechat"
-                icon={platformIcon('wechat')}
-                name={t('微信')}
-                status={
-                  connectedPlatforms.has('wechat') ? (
-                    <StatusChip tone="done">{t('已连接')}</StatusChip>
-                  ) : undefined
-                }
-                description={t('扫码登录')}
-                action={
-                  live ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={mutations.startWechatLogin.isPending}
-                      onClick={startWechatLogin}
-                      data-testid="im-connect-wechat"
-                    >
-                      {t('连接 WeChat')}
-                    </Button>
-                  ) : undefined
-                }
-              />
-            </CardGrid>
-          </SettingsSection>
-        </SettingsFlat>
-      </div>
+      <SettingsSection className="mt-6" title={t('聊天应用')} testId="im-platforms">
+        <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>
+      </SettingsSection>
       {connecting && (
         <ConnectDialog
           pending={mutations.connectTelegram.isPending}
@@ -517,6 +501,14 @@ export function ImConnectionsPage() {
           onRetry={startWechatLogin}
         />
       )}
+      <DeleteConfirm
+        open={deleting !== null}
+        title={t('删除后，配对的联系人就不能再通过它找 Coordinator')}
+        summary={deleting === null ? '' : connectionName(deleting)}
+        ariaLabel={t('删除 {name}', { name: deleting === null ? '' : connectionName(deleting) })}
+        onClose={() => setDeleting(null)}
+        onConfirm={remove}
+      />
     </PageShell>
   );
 }

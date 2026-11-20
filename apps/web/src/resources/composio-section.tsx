@@ -14,7 +14,7 @@ import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { Grid2x2 } from '../icons/index.js';
 import { McpConnectorIcon } from './mcp-connector-icon.js';
-import { type AppItem, RowNote } from './parts.js';
+import { type IntegrationItem, RowNote } from './parts.js';
 
 const AUTH_POLL_MS = 2_500;
 const AUTH_POLL_MAX_ATTEMPTS = 90;
@@ -199,7 +199,7 @@ export function useComposioRows({
     );
   };
 
-  const keyItem: AppItem = {
+  const keyItem: IntegrationItem = {
     key: 'composio-key',
     testId: 'mcp-composio',
     icon: <ComposioMark />,
@@ -217,7 +217,7 @@ export function useComposioRows({
     ),
   };
 
-  const setupItem: AppItem = {
+  const setupItem: IntegrationItem = {
     key: 'composio-setup',
     testId: 'composio-setup-card',
     icon: <ComposioMark />,
@@ -235,13 +235,13 @@ export function useComposioRows({
     ),
   };
 
-  const items = (view: AppsView): AppItem[] => {
+  const items = (view: AppsView): IntegrationItem[] => {
     if (data === undefined) return [];
     if (!configured) return view === 'available' ? [setupItem] : [];
     const list = all
       .filter((app) => (view === 'connected') === (app.connector !== null))
       .map(
-        (app): AppItem => ({
+        (app): IntegrationItem => ({
           key: `composio-${app.slug}`,
           testId: `composio-app-${app.slug}`,
           icon:
@@ -269,7 +269,6 @@ export function useComposioRows({
 
   return {
     items,
-    connectedCount: all.filter((app) => app.connector !== null).length,
     dialog: keyDialog ? (
       <ComposioKeyDialog
         live={live}

@@ -21,7 +21,7 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON } from '../board/filter-panel.js';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
-import { SettingsFlat, SettingsSection } from '../components/settings-list.js';
+import { SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -41,9 +41,8 @@ import {
 import { McpConnectorIcon } from './mcp-connector-icon.js';
 import { GithubDeviceDialog } from './mcp-github-device-dialog.js';
 import {
-  AppCard,
-  type AppItem,
-  CardGrid,
+  type IntegrationItem,
+  IntegrationRow,
   ResourceList,
   ResourceRow,
   RowDesc,
@@ -207,7 +206,6 @@ export function McpServersPage() {
   const connectedCatalog = new Set(connectors.map((c) => c.catalogId));
   const available = MCP_CATALOG.filter((entry) => !connectedCatalog.has(entry.id));
   const composio = useComposioRows({ live, teamId, data: composioApps });
-  const _connectedCount = connectors.length + mailConnected.length + composio.connectedCount;
   const connectButton = (label: string, onClick: () => void, busy = false) => (
     <Button
       variant="outline"
@@ -229,8 +227,8 @@ export function McpServersPage() {
       {t('管理')}
     </Button>
   );
-  const connectedItems: AppItem[] = [
-    ...connectors.map((record): AppItem => {
+  const connectedItems: IntegrationItem[] = [
+    ...connectors.map((record): IntegrationItem => {
       const entry = MCP_CATALOG.find((e) => e.id === record.catalogId);
       return {
         key: record.id,
@@ -248,7 +246,7 @@ export function McpServersPage() {
       };
     }),
     ...mailConnected.map(
-      (card): AppItem => ({
+      (card): IntegrationItem => ({
         key: card.provider,
         testId: `mail-card-${card.provider}`,
         icon: <MailIcon />,
@@ -260,9 +258,9 @@ export function McpServersPage() {
     ),
     ...composio.items('connected'),
   ];
-  const availableItems: AppItem[] = [
+  const availableItems: IntegrationItem[] = [
     ...available.map(
-      (entry): AppItem => ({
+      (entry): IntegrationItem => ({
         key: entry.id,
         icon: <McpConnectorIcon catalogId={entry.id} />,
         name: entry.name,
@@ -274,7 +272,7 @@ export function McpServersPage() {
       }),
     ),
     ...mailAvailable.map(
-      (card): AppItem => ({
+      (card): IntegrationItem => ({
         key: card.provider,
         testId: `mail-card-${card.provider}`,
         icon: <MailIcon />,
@@ -405,54 +403,51 @@ export function McpServersPage() {
         empty={null}
       >
         <div className="mt-6 flex flex-col gap-8">
-          <SettingsFlat>
-            {notice !== null && (
-              <NoticeBanner
-                tone="danger"
-                icon={Ban}
-                title={notice.title}
-                body={notice.body}
-                data-testid="mcp-oauth-error"
-                actions={
-                  <>
-                    <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>
-                      {t('知道了')}
+          {notice !== null && (
+            <NoticeBanner
+              tone="danger"
+              icon={Ban}
+              title={notice.title}
+              body={notice.body}
+              data-testid="mcp-oauth-error"
+              actions={
+                <>
+                  <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>
+                    {t('知道了')}
+                  </Button>
+                  {notice.retry !== undefined && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => notice.retry !== undefined && startSignIn(notice.retry)}
+                    >
+                      {t('重试')}
                     </Button>
-                    {notice.retry !== undefined && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => notice.retry !== undefined && startSignIn(notice.retry)}
-                      >
-                        {t('重试')}
-                      </Button>
-                    )}
-                  </>
-                }
-              />
-            )}
-            {connectedItems.length > 0 && (
-              <SettingsSection title={t('已接入')} testId="mcp-connected">
-                <CardGrid>
-                  {connectedItems.map(({ key, ...item }) => (
-                    <AppCard key={key} {...item} />
-                  ))}
-                </CardGrid>
-              </SettingsSection>
-            )}
-            {availableItems.length > 0 && (
-              <SettingsSection title={t('可接入')} testId="mcp-catalog">
-                <CardGrid>
-                  {availableItems.map(({ key, ...item }) => (
-                    <AppCard key={key} {...item} />
-                  ))}
-                </CardGrid>
-              </SettingsSection>
-            )}
-          </SettingsFlat>
+                  )}
+                </>
+              }
+            />
+          )}
+          {connectedItems.length > 0 && (
+            <SettingsSection title={t('已接入')} testId="mcp-connected">
+              <SettingsCard>
+                {connectedItems.map(({ key, ...item }) => (
+                  <IntegrationRow key={key} {...item} />
+                ))}
+              </SettingsCard>
+            </SettingsSection>
+          )}
+          {availableItems.length > 0 && (
+            <SettingsSection title={t('可接入')} testId="mcp-catalog">
+              <SettingsCard>
+                {availableItems.map(({ key, ...item }) => (
+                  <IntegrationRow key={key} {...item} />
+                ))}
+              </SettingsCard>
+            </SettingsSection>
+          )}
           {local.length > 0 && (
             <SettingsSection
-              className="[&>div:first-child]:px-0"
               title={t('本机配置')}
               description={t('来自服务器所在电脑的本机配置文件，在那里修改。')}
               testId="mcp-local"
