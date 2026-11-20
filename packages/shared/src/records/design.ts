@@ -170,7 +170,9 @@ export function renderDesignCommentBlock(input: {
     const target =
       c.elementId !== ''
         ? `${oneLine(c.label)}[data-od-id="${oneLine(c.elementId)}"]`
-        : oneLine(c.selector);
+        : c.markAttachmentId !== null
+          ? '页面标注（画在下面的标注图上）'
+          : oneLine(c.selector);
     const text = c.text !== '' ? `（当前文字：「${oneLine(c.text)}」）` : '';
     lines.push(`${c.pin}. ${c.fileName} v${c.versionSeq} · ${target}${text}：${c.note}`);
     const mark =
