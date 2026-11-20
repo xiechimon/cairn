@@ -1,10 +1,10 @@
 import { ChildProcess, type spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import type { MachineImEventBody } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createImsgBridge } from '../src/imsg-bridge.js';
 
 interface FakeChild {
@@ -16,6 +16,13 @@ interface FakeChild {
 }
 
 const spawned: FakeChild[] = [];
+const dirs: string[] = [];
+
+function makeDir(prefix: string): string {
+  const dir = makeTestTempDir(prefix);
+  dirs.push(dir);
+  return dir;
+}
 
 function fakeSpawn(
   onRequest?: (
@@ -81,7 +88,7 @@ function makeBridge(spawnProc: typeof spawn, now?: () => number) {
       },
     },
     logger: { machine: () => {}, wake: () => {} },
-    home: mkdtempSync(join(tmpdir(), 'imsg-home-')),
+    home: makeDir('imsg-home-'),
     env: { CAIRN_IMSG_BIN: '/fake/imsg' },
     spawnProc,
     ...(now !== undefined ? { now } : {}),
@@ -113,6 +120,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
 });
 
 describe('imsg bridge', () => {
@@ -154,7 +162,7 @@ describe('imsg bridge', () => {
 
   test('attachments on disk are read and uploaded as base64 images', async () => {
     const bridge = await attachAndReady(fakeSpawn());
-    const file = join(mkdtempSync(join(tmpdir(), 'imsg-att-')), 'photo.png');
+    const file = join(makeDir('imsg-att-'), 'photo.png');
     writeFileSync(file, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     spawned[0]?.notify('message', {
       subscription: 1,
@@ -350,7 +358,7 @@ describe('imsg bridge', () => {
         },
       },
       logger: { machine: () => {}, wake: () => {} },
-      home: mkdtempSync(join(tmpdir(), 'imsg-home-')),
+      home: makeDir('imsg-home-'),
       env: {},
       spawnProc: fakeSpawn(),
       fetchImpl: (() => Promise.resolve(new Response('not-the-real-zip'))) as typeof fetch,

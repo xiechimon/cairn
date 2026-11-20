@@ -8,6 +8,7 @@ import { ImSendError } from './errors.js';
 import type { ImAdapter, ImConnectionHandlers, ImOutboundMessage } from './types.js';
 
 const IM_SEND_TIMEOUT_MS = 30_000;
+const IM_SEND_TEXT_CHUNK = 60_000;
 
 interface PendingSend {
   resolve(): void;
@@ -107,34 +108,47 @@ export function createImBridge(machineHub: MachineWakeHub): ImBridge {
       if (conn === undefined) {
         throw new ImSendError('permanent', 'imessage connection is not live');
       }
-      const sendId = randomBytes(9).toString('base64url');
-      const sent = new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          conn.pending.delete(sendId);
-          reject(new ImSendError('retry', 'imessage send timed out'));
-        }, IM_SEND_TIMEOUT_MS);
-        conn.pending.set(sendId, { resolve, reject, timer });
-      });
-      const pushed = push(conn.machineId, {
-        type: 'im.send',
-        connId,
-        sendId,
-        message: {
-          chatKey: msg.chatKey,
-          text: msg.text,
-          ...(msg.replyToMessageId !== undefined ? { replyToMessageId: msg.replyToMessageId } : {}),
-          ...(msg.buttons !== undefined ? { buttons: msg.buttons } : {}),
-        },
-      });
-      if (!pushed) {
-        const pending = conn.pending.get(sendId);
-        if (pending !== undefined) {
-          clearTimeout(pending.timer);
-          conn.pending.delete(sendId);
-        }
-        throw new ImSendError('retry', 'imessage bridge machine is offline');
+      const chunks: string[] = [];
+      for (let i = 0; i < msg.text.length; i += IM_SEND_TEXT_CHUNK) {
+        chunks.push(msg.text.slice(i, i + IM_SEND_TEXT_CHUNK));
       }
-      await sent;
+      if (chunks.length === 0) chunks.push('');
+      let trackedSent: Promise<void> | null = null;
+      for (let index = 0; index < chunks.length; index++) {
+        const last = index === chunks.length - 1;
+        const sendId = randomBytes(9).toString('base64url');
+        if (last) {
+          trackedSent = new Promise<void>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              conn.pending.delete(sendId);
+              reject(new ImSendError('retry', 'imessage send timed out'));
+            }, IM_SEND_TIMEOUT_MS);
+            conn.pending.set(sendId, { resolve, reject, timer });
+          });
+        }
+        const pushed = push(conn.machineId, {
+          type: 'im.send',
+          connId,
+          sendId,
+          message: {
+            chatKey: msg.chatKey,
+            text: chunks[index] ?? '',
+            ...(index === 0 && msg.replyToMessageId !== undefined
+              ? { replyToMessageId: msg.replyToMessageId }
+              : {}),
+            ...(last && msg.buttons !== undefined ? { buttons: msg.buttons } : {}),
+          },
+        });
+        if (!pushed) {
+          const pending = conn.pending.get(sendId);
+          if (pending !== undefined) {
+            clearTimeout(pending.timer);
+            conn.pending.delete(sendId);
+          }
+          throw new ImSendError('retry', 'imessage bridge machine is offline');
+        }
+      }
+      if (trackedSent !== null) await trackedSent;
     },
   };
 }
@@ -159,6 +173,14 @@ export function createImessageAdapter(deps: { db: Db; bridge: ImBridge }): ImAda
       const machineId = fields.machineId?.trim() ?? '';
       if (machineId === '' || ctx === undefined) {
         throw new ImSendError('permanent', 'imessage connection lacks machineId');
+      }
+      const machineRow = deps.db
+        .select({ id: machine.id })
+        .from(machine)
+        .where(eq(machine.id, machineId))
+        .get();
+      if (machineRow === undefined) {
+        throw new ImSendError('permanent', 'imessage bound machine is not registered');
       }
       deps.bridge.register(ctx.connId, machineId, handlers);
       return {

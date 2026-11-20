@@ -705,6 +705,7 @@ export function createImService(deps: ImServiceDeps): ImService {
       .where(
         and(
           eq(externalEffect.kind, 'im-send'),
+          eq(externalEffect.state, 'delivered'),
           sql`json_extract(${externalEffect.payload}, '$.connId') = ${connId}`,
           sql`json_extract(${externalEffect.payload}, '$.requestId') = ${parsed.requestId}`,
         ),

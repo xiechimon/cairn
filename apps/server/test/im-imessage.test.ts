@@ -1,9 +1,7 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { MachineStreamEvent } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openMemoryDb } from '../src/db/client.js';
 import { imConnection, imPairingRequest } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
@@ -33,8 +31,14 @@ let service: ImService;
 let bridge: ImBridge;
 let machineHub: MachineWakeHub;
 let teamId: string;
+let attachmentsDir = '';
+let reposDir = '';
+let dirs: string[] = [];
 
 beforeEach(() => {
+  attachmentsDir = makeTestTempDir('im-att-');
+  reposDir = makeTestTempDir('im-repos-');
+  dirs = [attachmentsDir, reposDir];
   const db = openMemoryDb();
   const seeded = seed(db);
   teamId = seeded.team.id;
@@ -48,8 +52,8 @@ beforeEach(() => {
     box: createEphemeralSecretBox(),
     user: seeded.user,
     env,
-    attachmentsDir: mkdtempSync(join(tmpdir(), 'im-att-')),
-    reposDir: mkdtempSync(join(tmpdir(), 'im-repos-')),
+    attachmentsDir,
+    reposDir,
     adapters: { imessage: createImessageAdapter({ db, bridge }) },
   });
   setImRuntime(service.runtime);
@@ -59,6 +63,7 @@ beforeEach(() => {
 afterEach(() => {
   setImRuntime(null);
   void service.shutdown();
+  for (const dir of dirs) releaseTestTempDir(dir);
 });
 
 function collectStream(machineId: string): {

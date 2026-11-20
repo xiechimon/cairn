@@ -1,8 +1,6 @@
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import type { ImPlatform } from '@cairn/shared';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openMemoryDb } from '../src/db/client.js';
 import { seed } from '../src/db/seed.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
@@ -116,12 +114,18 @@ const inbound = (senderId: string): ImInboundMessage => {
 let s: TestServer;
 let service: ImService;
 let teamId: string;
+let attachmentsDir = '';
+let reposDir = '';
+let dirs: string[] = [];
 
 let adapters: Partial<Record<ImPlatform, ImAdapter>>;
 
 beforeEach(() => {
   sessions.length = 0;
   wechatWaits.clear();
+  attachmentsDir = makeTestTempDir('im-att-');
+  reposDir = makeTestTempDir('im-repos-');
+  dirs = [attachmentsDir, reposDir];
   const db = openMemoryDb();
   const seeded = seed(db);
   teamId = seeded.team.id;
@@ -134,8 +138,8 @@ beforeEach(() => {
     box: createEphemeralSecretBox(),
     user: seeded.user,
     env,
-    attachmentsDir: mkdtempSync(join(tmpdir(), 'im-att-')),
-    reposDir: mkdtempSync(join(tmpdir(), 'im-repos-')),
+    attachmentsDir,
+    reposDir,
     adapters,
   });
   setImRuntime(service.runtime);
@@ -145,6 +149,7 @@ beforeEach(() => {
 afterEach(() => {
   setImRuntime(null);
   void service.shutdown();
+  for (const dir of dirs) releaseTestTempDir(dir);
 });
 
 describe('im routes', () => {

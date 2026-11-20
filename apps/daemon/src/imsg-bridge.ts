@@ -1,7 +1,7 @@
 import { type ChildProcess, spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream, existsSync } from 'node:fs';
-import { chmod, mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { createWriteStream } from 'node:fs';
+import { chmod, lstat, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -183,7 +183,12 @@ async function ensureImsgBin(deps: ImsgBridgeDeps): Promise<string> {
   const override = env.CAIRN_IMSG_BIN?.trim();
   if (override !== undefined && override !== '') return override;
   const managed = join(deps.home, 'imsg', 'imsg');
-  if (existsSync(managed)) return managed;
+  const managedInfo = await lstat(managed).catch(() => null);
+  if (managedInfo !== null) {
+    if (managedInfo.isFile() && !managedInfo.isSymbolicLink()) return managed;
+    deps.logger.machine(`imsg managed binary at ${managed} is not a regular file; reinstalling`);
+    await rm(managed, { force: true });
+  }
   const fetchImpl = deps.fetchImpl ?? fetch;
   const dir = await mkdtemp(join(tmpdir(), 'cairn-imsg-'));
   try {
@@ -194,7 +199,7 @@ async function ensureImsgBin(deps: ImsgBridgeDeps): Promise<string> {
       throw new Error(`imsg-macos.zip sha256 mismatch: ${digest}`);
     }
     await mkdir(join(deps.home, 'imsg'), { recursive: true });
-    const unzipped = spawnSync('ditto', ['-xk', zipPath, join(deps.home, 'imsg')], {
+    const unzipped = spawnSync('/usr/bin/ditto', ['-xk', zipPath, join(deps.home, 'imsg')], {
       encoding: 'utf8',
     });
     if (unzipped.status !== 0) {
@@ -233,6 +238,12 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
 
   const post = (connId: string, body: MachineImEventBody): void => {
     void deps.api.imEvent?.(connId, body).catch((err: unknown) => {
+      const status = (err as { status?: number }).status;
+      if (status === 403 || status === 404) {
+        log(`imsg bridge post rejected conn=${connId} status=${status}; detaching`);
+        detach(connId);
+        return;
+      }
       log(
         `imsg bridge post failed conn=${connId} kind=${body.kind}: ${err instanceof Error ? err.message : String(err)}`,
       );
@@ -246,13 +257,19 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       return null;
     }
     try {
-      const info = await stat(row.original_path);
-      if (info.size > ATTACHMENT_MAX_BYTES) return null;
+      const info = await lstat(row.original_path);
+      if (!info.isFile() || info.size > ATTACHMENT_MAX_BYTES) return null;
       const buf = await readFile(row.original_path);
+      if (buf.length > ATTACHMENT_MAX_BYTES) return null;
       return asInboundFile(row, buf.toString('base64'));
     } catch {
       return null;
     }
+  };
+
+  const senderIdOf = (msg: ImsgMessageRow): string | null => {
+    if (msg.sender !== undefined && msg.sender !== '') return msg.sender;
+    return msg.is_from_me === true ? 'self' : null;
   };
 
   const cardAction = (session: Session, msg: ImsgMessageRow): ImInboundActionBody | null => {
@@ -272,6 +289,8 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       button = card.buttons.find((b) => b.label.toLowerCase() === lower);
     }
     if (button === undefined) return null;
+    const senderId = senderIdOf(msg);
+    if (senderId === null) return null;
     session.cards.delete(chatKey);
     return {
       chat: {
@@ -280,7 +299,7 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
         title: msg.chat_name ?? null,
       },
       sender: {
-        id: msg.sender !== undefined && msg.sender !== '' ? msg.sender : 'self',
+        id: senderId,
         name: msg.sender_name ?? null,
       },
       value: button.value,
@@ -308,6 +327,8 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       post(session.connId, { kind: 'action', action });
       return;
     }
+    const senderId = senderIdOf(msg);
+    if (senderId === null) return;
     const files: ImInboundFileBody[] = [];
     const images: ImInboundFileBody[] = [];
     for (const att of msg.attachments ?? []) {
@@ -328,7 +349,7 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
           title: msg.chat_name ?? null,
         },
         sender: {
-          id: msg.sender !== undefined && msg.sender !== '' ? msg.sender : 'self',
+          id: senderId,
           name: msg.sender_name ?? null,
         },
         text,
@@ -462,14 +483,14 @@ export function createImsgBridge(deps: ImsgBridgeDeps) {
       });
       return;
     }
-    if (message.buttons !== undefined) {
-      session.cards.set(message.chatKey, {
-        buttons: message.buttons.flat(),
-        at: now(),
-      });
-    }
     try {
       await rpc.call('send', { chat_guid: message.chatKey, text: message.text });
+      if (message.buttons !== undefined) {
+        session.cards.set(message.chatKey, {
+          buttons: message.buttons.flat(),
+          at: now(),
+        });
+      }
       session.recentOwn.push({ chatGuid: message.chatKey, text: message.text, at: now() });
       session.recentOwn = session.recentOwn.slice(-32);
       post(connId, { kind: 'sent', sendId, ok: true });
