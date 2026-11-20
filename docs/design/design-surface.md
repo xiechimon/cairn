@@ -1,13 +1,13 @@
 # Design surface: preview, comment on, mark up, version, export and share the pages a task makes
 
-Status: one scope, building (ian, 2026-11-20). The owner overruled the phased plan of the first draft (a5ccfe8bd): everything below ships together, there is no phase 2. Borrow Open Design's implementation (Apache-2.0) consistently instead of keeping home-made halves; its file viewer covers the non-HTML file types. Prior art: [`open-design-2026-11-20.md`](../research/open-design-2026-11-20.md) (source read at `nexu-io/open-design@07258801b9e4ae80553816bb1606af7aa9a63dff`); the running pilot (`ghcr.io/nexu-io/od`, `127.0.0.1:7456`) was walked through every feature named here, screenshots kept local under `/tmp/dogfood/design-surface/`.
+Status: building (ian, 2026-11-20). Every phase is planned below with its scope and acceptance and is built in this lane, one after another; none is left for later. Borrow Open Design's implementation (Apache-2.0) consistently instead of keeping home-made halves; its file viewer covers the non-HTML file types. Prior art: [`open-design-2026-11-20.md`](../research/open-design-2026-11-20.md) (source read at `nexu-io/open-design@07258801b9e4ae80553816bb1606af7aa9a63dff`); the running pilot (`ghcr.io/nexu-io/od`, `127.0.0.1:7456`) was walked through every feature named here, screenshots kept local under `/tmp/dogfood/design-surface/`.
 
 Owner decisions (ian, 2026-11-20) that override the first draft:
 
-1. No phases: preview, comments, mark-up, versions, viewports, export and share ship together, and the file-type rule for the other file types ships with them.
+1. Phases are planned up front (all of them, each with scope and acceptance, see Phases) and executed one after another in the same lane; nothing is deferred.
 2. Take Open Design's code, not a rewrite. Borrowed code lives in its own directories with `LICENSE`, `NOTICE.md` and one SPDX line per file, restyled with Cairn tokens and components.
 3. The left side is the Coordinator conversation. The owner talks to the Coordinator; comments on a page are forwarded to the task whose agent built it.
-4. Preview network: as Open Design does it (see Security).
+4. Preview network: pages have network access (fonts, images, APIs), as in Open Design (see Security).
 5. Images open in the side panel through the borrowed image viewer; the image dialog goes.
 6. Previews are served by Cairn itself, so a page keeps opening after the task that made it stops; no preview depends on a task's own dev server.
 
@@ -21,7 +21,7 @@ Someone who installed Cairn today asks the Coordinator: `做一个定价页，�
 - What they must already know: how to talk to the Coordinator. Nothing about Open Design; it is not installed or shown.
 - Accounts, payments, keys: none. Comments, marks, versions, export and share make no model call of their own; sending comments is one Coordinator message plus one task message, billed like any turn.
 - Where it stores what they give: page versions are attachment files already stored by the Cairn server; comments, versions and share links are three tables in the server database; a mark-up is a PNG attachment. Nothing leaves the machine that runs the server, except the page itself when its own code loads fonts, images or scripts from the internet (Security), and a shared link when the owner gives it to someone.
-- Where they get stuck: a page over 2 MiB (deliverables) or 10 MiB (attached by a code task) is not kept, so no card appears and the reply says it was skipped; a comment whose element is gone in a newer version is listed as `这一版没找到`; a failed save or send keeps the text and says it did not go through; a shared link only opens for people who can reach this Cairn server (same machine, the tailnet, or a remote-access URL).
+- Where they get stuck: a page over 2 MiB (deliverables) or 10 MiB (attached by a code task) is not kept, so no card appears and the reply says it was skipped; a comment whose element is gone in a newer version is listed as `这一版没找到`; a failed save or send keeps the text and says it did not go through; a share link needs a public address, which comes from the user's own relay ([remote-reach](remote-reach.md) phase 2a, a self-hosted VPS relay; a Cloudflare-managed one later); until a relay is configured, `分享` exports a self-contained HTML file instead and says that a link needs a relay.
 
 ## Why
 
@@ -65,8 +65,22 @@ Pick the surface by what the user does next:
 5. **Versions**: every published or attached page is a version; the list shows each with time and source; picking one shows it read-only; `切回这个版本` appends it as a new version; each can be downloaded.
 6. **Viewports**: desktop (fills the pane), tablet 820x1180, phone 390x844, scaled to fit.
 7. **Export**: HTML (the version file), ZIP (page plus Open Design's handoff and manifest files), PNG (snapshot of the page), PDF (the browser's print of the Cairn-served page).
-8. **Share**: create a public link for one page; it always serves the page's current version; revoke turns it off. The link works for anyone who can reach the server.
+8. **Share**: with a relay configured, create a public link for one page, served through the relay at `<relay origin>/s/<token>`; it always serves the page's current version; revoke turns it off. Without a relay, `分享` downloads the page as one self-contained HTML file (the HTML export) and the popover says `生成链接需要先配置中继（远程访问）`, linking to the remote-access settings.
 9. **The file-type rule** above, with the image dialog and the report dialog's 380px frame removed.
+
+## Phases
+
+Each phase lands on `main` on its own and ends in a check run on a `verify-cairn` live stack; the next starts when it is green.
+
+| Phase | Scope | Acceptance |
+|---|---|---|
+| 1. Data and serving | Shared contract; the three tables and the W8 backfill; W1 and W1b; R1, R2, R3 (Cairn-served page, sandbox header, `?print=1`); R5 document text; the worker prompt line | Server tests for W1, W1b, W8, R3 header and R5; an attached `.html` from a finished task opens at its R3 URL after the task stops |
+| 2. File viewer | The borrowed viewers (image, video, audio, SVG, text with JSON formatting, code with lines and diff colouring, Markdown, document text for docx/pptx/xlsx, PDF frame, binary) in `FilePreviewPanel`; the image dialog removed | Each sample type (md, png, pdf, mp4, diff, log, docx, pptx, xlsx) shows in the side panel, light and dark, next to the Open Design screenshot of the same file; image before/after |
+| 3. Design view | `view=design` with the Coordinator chat left; toolbar, page picker, reload, source toggle, viewports, versions list and restore (W2), open in browser; entry points from the task's page card and the attachment chip; the report dialog's 380px frame removed | A two-version page: v1 and v2 switch, restore makes v3, each viewport fits, compared with Open Design |
+| 4. Comments | Comment bridge, hover outline, popover with inspect rows, save and send, chips above the composer, comment list with anchor state; W3 to W6 | Save, edit, delete, resolve; sending puts the notes in the Coordinator message and the task message once, live |
+| 5. Mark-up | Draw overlay, undo and redo, snapshot bake into a `design` PNG, mark comment | A boxed and annotated mark shows as a comment with its PNG, and the task message carries it |
+| 6. Export | HTML, ZIP with handoff and manifest, PNG snapshot, PDF through print | Each file downloads and opens |
+| 7. Share | W7, R6, `shareOrigin` read from `CAIRN_RELAY_ORIGIN`, which the relay setup of [remote-reach](remote-reach.md) phase 2a writes (no relay exists yet, so it is `null` today); without a relay the HTML export plus the relay message | Without a relay: the file downloads and the message shows; with a relay origin set: the link serves the current version through it and stops after `停止分享` |
 
 ## Layout
 
@@ -93,7 +107,8 @@ Pick the surface by what the user does next:
 | Switches back to v1 | v3 appears, labelled `从 v1 恢复` | W2 appends a `restore` version | No model cost |
 | Export PNG | A PNG download of what the frame shows | Snapshot bridge renders the page to a canvas | Under a second |
 | Export PDF | The browser's print dialog for the page | Opens the Cairn-served page with `?print=1`; its injected script calls `print()` | None |
-| Share | A link and `复制`; later `停止分享` | W7 creates or revokes a share row; R6 serves it | None |
+| Share, relay configured | A relay link and `复制`; later `停止分享` | W7 creates or revokes a share row; the relay forwards `/s/:token` to R6 | None |
+| Share, no relay | The HTML file downloads; the popover says a link needs a relay | Nothing stored | None |
 | Someone opens a revoked or unknown link | `链接已失效` page | R6 answers 404 | None |
 | The page loads a CDN font or script | It renders with it | No CSP network limit on the frame (Security) | Network fetches by the page |
 | Server unreachable | Last loaded version stays; save or send says it did not go through and keeps the text | Writes fail | None |
@@ -120,7 +135,7 @@ Web, `apps/web/src/vendor-open-design/` (with `LICENSE` and `NOTICE.md` naming e
 
 Server, `apps/server/src/vendor-open-design/`: `document-preview.ts` from `apps/daemon/src/document-preview.ts` (docx, pptx, xlsx text extraction), reading the archive with Node's `zlib` instead of JSZip so the lockfile does not change.
 
-Deviations, each decided here: PDF keeps the browser's own viewer in a frame (upstream extracts text with `pdftotext`, which a Mac does not have; the frame shows the real pages). The 20,759-line `FileViewer.tsx` is split per viewer and its `HtmlViewer` (12,000 lines of edit mode, decks, collaboration and live artifacts) is not taken; the design pane composes the borrowed bridges itself. Share uses a Cairn link instead of Open Design's cloud account.
+Deviations, each decided here: PDF keeps the browser's own viewer in a frame (upstream extracts text with `pdftotext`, which a Mac does not have; the frame shows the real pages). The 20,759-line `FileViewer.tsx` is split per viewer and its `HtmlViewer` (12,000 lines of edit mode, decks, collaboration and live artifacts) is not taken; the design pane composes the borrowed bridges itself. Share uses a Cairn link through the user's own relay instead of Open Design's cloud account.
 
 Each borrowed file carries one line `// SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 <path>`; Apache-2.0 section 4(b) asks for it, so it is listed in `scripts/comment-discipline-allowlist.json` as a legal notice.
 
@@ -198,10 +213,10 @@ Anchor state (`anchored`, `moved`, `lost`) is computed on each render, never sto
 | W3 save comment | comment | `POST /api/todos/:id/design/comments` | Version must belong to the todo; a mark attachment must be the caller's `design` attachment; inserts `open` |
 | W4 edit, resolve, reopen | comment | `PATCH /api/todos/:id/design/comments/:commentId` | Allowed transitions only, else 409 |
 | W5 delete | comment | `DELETE /api/todos/:id/design/comments/:commentId` | `open` only, else 409 |
-| W6 send | Coordinator message, task message, comments | the Coordinator send route (`POST /api/conversations/:id/messages`) with new optional `designCommentIds` | Loads the rows (same team, `open`, one todo), renders the comment block, stores the owner's Coordinator message with the block appended, delivers the block to the task thread the way `message_thread` does, flips rows to `sent` with `messageId`; one transaction inside the existing `clientMessageId` coalescing, so a retry sends once |
+| W6 send | Coordinator message, task message, comments | the Coordinator send route (`POST /api/conversations/:id/messages`) with new optional `designCommentIds` | Loads the rows (same team, `open`, one todo), renders the comment block, delivers it to the task thread with `messageThreadAsUser` as the Coordinator (client id `design:<clientMessageId>`), then in one transaction stores the owner's Coordinator message with the block and a `已转给任务` line appended and flips the rows to `sent` with `messageId`. Both steps coalesce on their client ids, so a retry after any failure sends each message once |
 | W7 share | share row | `POST` and `DELETE /api/todos/:id/design/:fileName/share` | Create returns the live row or inserts one; delete sets `revokedAt` |
 | W8 migration | versions | one Drizzle migration | For every deliverables message and `.html` message attachment, oldest first, insert versions with the W1 rule |
-| R1 pages | read | `GET /api/todos/:id/design` | Pages with current version, version count, open comment count, live share token |
+| R1 pages | read | `GET /api/todos/:id/design` | Pages with current version, version count, open comment count, live share token, and `shareOrigin`: the configured relay's public origin or `null` |
 | R2 versions | read | `GET /api/todos/:id/design/:fileName/versions` | By `seq` descending |
 | R3 page content | read | `GET /api/design/versions/:versionId/page` | The version's HTML with `content-security-policy: sandbox allow-scripts allow-forms allow-downloads`; `?print=1` adds `allow-modals` and a `print()` call; same auth as attachments |
 | R4 comments | read | `GET /api/todos/:id/design/:fileName/comments` | All statuses |
@@ -216,13 +231,13 @@ No other code reads or writes the three tables.
 - W1, W1b insert fails: the surrounding transaction fails as it does today; nothing half-published.
 - W2 on an archived todo or a foreign version: 409 or 404; the pane keeps the old view and says so.
 - W3 to W5, W7 network failure: the pin, chip or link returns to its previous state with a toast; typed text stays.
-- W6 failure: the Coordinator message, the task message and the status flips roll back together; chips and composer text stay. A comment already `sent` by a concurrent send makes the request 409 and the chips refresh. A task that refuses messages (pending question, archived) makes the request 409 with that reason.
+- W6 failure: a failed task delivery writes nothing; a failure after it leaves the task message delivered and the rows `open`, and the retry (same `clientMessageId`) replays the delivery and stores the Coordinator message once; chips and composer text stay until success. A comment already `sent` by a concurrent send makes the request 409 and the chips refresh. A task that refuses messages (pending question, archived) makes the request 409 with that reason.
 - Attachment missing: the version row stays; the pane shows `这一版的文件已经不在了`, versions still usable.
 - Bridge never answers: comment and mark modes say `这个页面不支持点选评论`; viewports and versions still work.
 
 ### Security
 
-As Open Design does it: the page runs in an iframe with `sandbox="allow-scripts allow-forms allow-downloads"` (upstream's `HTML_PREVIEW_SANDBOX`) and no `allow-same-origin`, so it has an opaque origin: no Cairn cookies, storage or API access, no access to the Cairn window, no top navigation and no popups. There is no CSP on network: the page may load fonts, images and scripts from the internet, as the page would in any browser. Served URLs (R3, R6) carry the same sandbox as a `content-security-policy` header, so opening one directly in a tab is equally isolated (upstream does this for its raw routes); only the `?print=1` variant adds `allow-modals` so the page can open the print dialog. The parent accepts bridge messages only from the frame's own window and validates every field. R6 is a new unauthenticated route: it reads only a live token's current page, takes a constant-time lookup by unique token, and lists in the `externalEntryAuth` security surfaces; the change runs `/security-review`.
+As Open Design does it: the page runs in an iframe with `sandbox="allow-scripts allow-forms allow-downloads"` (upstream's `HTML_PREVIEW_SANDBOX`) and no `allow-same-origin`, so it has an opaque origin: no Cairn cookies, storage or API access, no access to the Cairn window, no top navigation and no popups. Network is allowed (owner decision 4): there is no network CSP, so the page loads fonts, images, scripts and calls APIs on the internet as it would in any browser, but never with Cairn's cookies. Served URLs (R3, R6) carry the same sandbox as a `content-security-policy` header, so opening one directly in a tab is equally isolated (upstream does this for its raw routes); only the `?print=1` variant adds `allow-modals` so the page can open the print dialog. The parent accepts bridge messages only from the frame's own window and validates every field. R6 is a new unauthenticated route, reached from outside only through the user's relay: it reads only a live token's current page, takes a constant-time lookup by unique token, and lists in the `externalEntryAuth` security surfaces; the change runs `/security-review`.
 
 ## Tests
 
