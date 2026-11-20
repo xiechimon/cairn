@@ -259,6 +259,8 @@ test('the plan keeps its card as the run advances and the item just finished dra
   await open(page, 'running');
   await expect(planStates(page)).resolves.toEqual(['done', 'done', 'doing', 'todo']);
   await watchRemounts(page, ['agent-todo']);
+  const summary = page.getByTestId('work-summary').last();
+  await expect(summary.locator('[data-swap]')).toHaveCount(0);
   await page.getByRole('button', { name: '下一步' }).click();
   await page.getByRole('button', { name: '下一步' }).click();
   await page.getByRole('button', { name: '允许这一次' }).click();

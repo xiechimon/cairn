@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { createContext, Fragment, type ReactNode, useContext, useEffect } from 'react';
+import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import { useThreadHref } from '../board/thread-link.js';
 import { echoTaskRef, hoverTaskRef, useTaskRefSignal } from '../chief/task-ref-signal.js';
@@ -139,7 +139,7 @@ export function taskStatusInk(phase: Phase): string {
   return TONE_CLASS[CONVERSATION_STATUS[phase].tone].ink;
 }
 
-export function TodoStatus({ phase }: { phase: Phase }) {
+export function TodoStatus({ phase, draw = false }: { phase: Phase; draw?: boolean }) {
   const { t } = useI18n();
   const { glyph, tone } = CONVERSATION_STATUS[phase];
   if (tone === 'wait')
@@ -158,6 +158,7 @@ export function TodoStatus({ phase }: { phase: Phase }) {
       kind={glyph}
       label={t(PHASE_UI[phase].chip)}
       className={cn('size-3', TONE_CLASS[tone].ink)}
+      draw={draw}
     />
   );
 }
@@ -169,17 +170,33 @@ export function TodoStatusTile({
   phase: Phase;
   className?: string | undefined;
 }) {
+  const sealed = useJustSealed(phase);
   return (
     <span
+      data-sealed={sealed ? '' : undefined}
       className={cn(
-        'grid size-5 flex-none place-items-center rounded-sm',
+        'grid size-5 flex-none place-items-center rounded-sm transition-colors duration-(--dur-overlay)',
         TONE_CLASS[CONVERSATION_STATUS[phase].tone].tile,
         className,
       )}
     >
-      <TodoStatus phase={phase} />
+      <TodoStatus phase={phase} draw={sealed} />
     </span>
   );
+}
+
+const SEAL_MS = 1500;
+
+function useJustSealed(phase: Phase): boolean {
+  const seen = useRef(phase);
+  const sealedAt = useRef<number | null>(null);
+  const done = CONVERSATION_STATUS[phase].glyph === 'done';
+  if (seen.current !== phase) {
+    sealedAt.current =
+      done && CONVERSATION_STATUS[seen.current].glyph !== 'done' ? Date.now() : null;
+    seen.current = phase;
+  }
+  return done && sealedAt.current !== null && Date.now() - sealedAt.current < SEAL_MS;
 }
 
 function MentionChip({ seg }: { seg: DocSegment }) {

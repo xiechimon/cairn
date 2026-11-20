@@ -668,6 +668,47 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 }
 
+@keyframes grow-cut-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+
+@keyframes grow-seal-in {
+  from {
+    opacity: 0.35;
+    transform: scale(0.82);
+  }
+}
+
+@utility grow-cut {
+  @media (prefers-reduced-motion: no-preference) {
+    stroke-dasharray: 1;
+    animation: grow-cut-draw 240ms var(--ease-standard) 200ms both;
+  }
+}
+
+@utility grow-seal {
+  transform-box: fill-box;
+  transform-origin: center;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: grow-seal-in 200ms var(--ease-out-expo) both;
+  }
+}
+
+@keyframes grow-digit-roll {
+  from {
+    opacity: 0;
+    transform: translateY(60%);
+  }
+}
+
+@utility grow-digit {
+  @media (prefers-reduced-motion: no-preference) {
+    animation: grow-digit-roll 180ms var(--ease-standard) both;
+  }
+}
+
 @utility grow-char {
   @media (prefers-reduced-motion: no-preference) {
     animation: grow-fade-in 160ms var(--ease-standard) both;

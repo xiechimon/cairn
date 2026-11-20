@@ -1,6 +1,6 @@
 import { cn } from 'cn';
 import { ChevronRight } from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
+import { type ComponentProps, type ReactNode, useRef } from 'react';
 import type { TFunc } from '../../i18n/translate.js';
 import { StatusGlyph } from '../status-glyph.js';
 import { Button } from '../ui/button.js';
@@ -100,10 +100,12 @@ export function TraceGroupSummary({
   open,
   summaryTitle,
   running = false,
+  liveKey,
   className,
   ...props
 }: Omit<ComponentProps<typeof Button>, 'children'> & {
   summary: ReactNode;
+  liveKey?: string | undefined;
   failed?: string | null;
   elapsed?: string;
   summaryTitle?: string;
@@ -111,6 +113,8 @@ export function TraceGroupSummary({
   running?: boolean;
 }) {
   const state = running ? 'running' : failed != null ? 'failed' : 'done';
+  const firstKey = useRef(liveKey);
+  const swapped = running && liveKey !== undefined && liveKey !== firstKey.current;
   return (
     <Button
       variant="ghost"
@@ -124,7 +128,17 @@ export function TraceGroupSummary({
         className={state === 'failed' ? 'text-destructive' : 'text-(--text-tertiary)'}
       />
       <span className="min-w-0 truncate" data-trace-summary="" title={summaryTitle}>
-        <span className={cn(running && 'shimmer motion-reduce:shimmer-none')}>{summary}</span>
+        <span
+          key={running ? liveKey : undefined}
+          data-swap={swapped ? '' : undefined}
+          className={cn(
+            'inline-block',
+            running && 'shimmer motion-reduce:shimmer-none',
+            swapped && 'grow-enter',
+          )}
+        >
+          {summary}
+        </span>
       </span>
       {failed != null && (
         <span className="-ml-1 flex-none text-destructive" data-trace-failed="">
@@ -136,7 +150,13 @@ export function TraceGroupSummary({
           className="flex-none text-meta tabular-nums text-(--text-tertiary)"
           data-slot="trace-elapsed"
         >
-          {elapsed}
+          {running
+            ? Array.from(elapsed, (char, n) => (
+                <span key={`${elapsed.length}-${n}-${char}`} className="grow-digit inline-block">
+                  {char}
+                </span>
+              ))
+            : elapsed}
         </span>
       )}
       <TraceChevron open={open} />

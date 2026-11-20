@@ -356,6 +356,7 @@ export function WorkTrace({
                   )
           }
           summaryTitle={failed === null ? detail : `${detail} ${failed}`}
+          liveKey={running ? purposes.join(t('，')) || text : undefined}
           failed={failed}
           elapsed={running ? formatLiveElapsed(liveSeconds) : ''}
           open={expanded}
