@@ -51,10 +51,8 @@ import {
   isOwnComputerTool,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
-  type OwnComputerTool,
   orchestratedTodoIdOf,
   orchestratePromptHeadOf,
-  ownComputerCallSummary,
   PACKAGES_DECLINED,
   PACKAGES_INSTALLED_PREFIX,
   PACKAGES_NOT_ANSWERED,
@@ -507,27 +505,6 @@ function verifyVerdictOfContent(content: unknown): {
       ...(e.note !== undefined ? { note: e.note } : {}),
     })),
     ...(typeof extractionError === 'string' ? { extractionError } : {}),
-  };
-}
-
-const MAC_SUMMARY_MAX = 160;
-
-function macActivityItemOf(
-  call: ToolCallRecord,
-  tool: OwnComputerTool,
-  id: string,
-): Extract<ChiefStreamItem, { kind: 'mac-activity' }> {
-  const full = ownComputerCallSummary(tool, (call.arguments ?? {}) as Record<string, unknown>);
-  const line = full.split('\n')[0] ?? '';
-  const clipped = line.length > MAC_SUMMARY_MAX ? line.slice(0, MAC_SUMMARY_MAX) : line;
-  const error = call.isError === true;
-  return {
-    kind: 'mac-activity',
-    id,
-    tool,
-    summary: clipped === full ? full : `${clipped} …`,
-    running: call.result === undefined && call.endedAt === undefined && !error,
-    error,
   };
 }
 
@@ -2023,10 +2000,7 @@ function collectChiefStream(
       items.push(packageInstallItemOf(call, m.id));
       continue;
     }
-    if (call !== null && isOwnComputerTool(call.name)) {
-      items.push(macActivityItemOf(call, call.name, m.id));
-      continue;
-    }
+    if (call !== null && isOwnComputerTool(call.name)) continue;
     if (call !== null) {
       const created = createdTodoOf(call);
       if (created !== null)

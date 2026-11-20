@@ -13,7 +13,6 @@ import {
   type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
-  type OwnComputerTool,
   type PermissionState,
   PHASE_VALUES,
   type Phase,
@@ -598,14 +597,6 @@ export type ChiefStreamItem =
       createdAt?: number;
     }
   | { kind: 'handoff'; todoId: string; id?: string }
-  | {
-      kind: 'mac-activity';
-      id: string;
-      tool: OwnComputerTool;
-      summary: string;
-      running: boolean;
-      error: boolean;
-    }
   | { kind: 'report-ack'; id: string; todoId: string; buildId: string }
   | {
       kind: 'takeover';

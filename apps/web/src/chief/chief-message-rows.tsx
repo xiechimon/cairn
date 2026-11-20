@@ -36,6 +36,7 @@ import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import { ChiefReportMessage } from './chief-report-row.js';
+import { chiefRowRenders } from './chief-row-kinds.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import type { TaskRef } from './chief-task-refs.js';
 import { CloakLicenseCard } from './cloak-license-card.js';
@@ -426,33 +427,6 @@ function HandoffRow({ todoId }: { todoId: string }) {
   );
 }
 
-function MacActivityRow({ item }: { item: Extract<ChiefStreamItem, { kind: 'mac-activity' }> }) {
-  const { t } = useI18n();
-  const verb =
-    item.tool === 'user_computer_shell'
-      ? item.running
-        ? t('正在你的 Mac 上运行')
-        : t('在你的 Mac 上运行了')
-      : item.tool === 'user_computer_act'
-        ? item.running
-          ? t('正在你的 Mac 上操作')
-          : t('在你的 Mac 上操作了')
-        : item.running
-          ? t('正在查看你的 Mac 上的')
-          : t('查看了你的 Mac 上的');
-  return (
-    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-      <StatusLine testId="chief-mac-activity">
-        {verb}{' '}
-        <code className="rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-meta">
-          {item.summary}
-        </code>
-        {item.error && <span className="text-destructive"> · {t('没有成功')}</span>}
-      </StatusLine>
-    </MessageScrollerItem>
-  );
-}
-
 const LIVE_TURN_KEY = 'live-turn';
 
 export function chiefStreamRowKeys(
@@ -486,7 +460,6 @@ export function chiefStreamRowKey(
     case 'thinking':
     case 'question':
     case 'handoff':
-    case 'mac-activity':
     case 'takeover':
     case 'cloak-license':
     case 'package-install':
@@ -689,6 +662,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     id !== undefined && id === highlightedSource?.sourceMessageId
       ? { [REPLY_HIGHLIGHT_ATTR]: '' }
       : {};
+  if (!chiefRowRenders(item.kind)) return null;
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
@@ -700,7 +674,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
-  if (item.kind === 'mac-activity') return <MacActivityRow item={item} />;
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'cloak-license') return <CloakLicenseCard item={item} />;
   if (item.kind === 'package-install') return <PackageInstallCard item={item} />;

@@ -77,65 +77,6 @@ export const chiefStreaming: FixtureSet = {
 
 const streamingChief = chiefStreaming.chief as ChiefContent;
 
-export const chiefMacActivity: FixtureSet = {
-  ...chiefStreaming,
-  chief: {
-    ...streamingChief,
-    running: false,
-    threadTitle: '验收桌面版的托盘菜单',
-    stream: [
-      { kind: 'note', text: '17:19' },
-      {
-        kind: 'user',
-        text: '在我的 Mac 上把桌面版构建一下，打开 Cairn 看看托盘菜单的“任务”一栏对不对。',
-      },
-      {
-        kind: 'mac-activity',
-        id: 'mac-1',
-        tool: 'user_computer_shell',
-        summary: 'cd ~/Code/cairn && pnpm --filter @cairn/desktop build',
-        running: false,
-        error: false,
-      },
-      {
-        kind: 'mac-activity',
-        id: 'mac-2',
-        tool: 'user_computer_observe',
-        summary: 'Cairn',
-        running: false,
-        error: false,
-      },
-      {
-        kind: 'mac-activity',
-        id: 'mac-3',
-        tool: 'user_computer_act',
-        summary: 'Cairn: click, wait',
-        running: false,
-        error: true,
-      },
-      {
-        kind: 'robot',
-        paragraphs: [
-          [
-            {
-              text: '构建通过了。托盘菜单里“任务”一栏显示了 3 个进行中的任务，和任务面板一致；点开第二个任务时菜单没有响应，我再看一下原因。',
-            },
-          ],
-        ],
-        seconds: '',
-      },
-      {
-        kind: 'mac-activity',
-        id: 'mac-4',
-        tool: 'user_computer_shell',
-        summary: 'log show --last 5m --predicate \'process == "Cairn"\' …',
-        running: true,
-        error: false,
-      },
-    ],
-  },
-};
-
 export const chiefWorking: FixtureSet = {
   ...chiefStreaming,
   chief: {
