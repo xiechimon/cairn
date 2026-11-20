@@ -27,13 +27,13 @@ import {
   type AntigravityManaged,
   createAntigravityManaged,
 } from './backend/antigravity-managed.js';
-import { createGeminiManaged, type GeminiManaged } from './backend/gemini-managed.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
 import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
 import { createDevinManaged, type DevinManaged } from './backend/devin-managed.js';
+import { createGeminiManaged, type GeminiManaged } from './backend/gemini-managed.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';
@@ -44,13 +44,6 @@ import {
 } from './claude-code-auth.js';
 import { type ClaudeBinInfo, probeClaudeBin } from './claude-code-bin.js';
 import { readClaudeCodeReport } from './claude-code-models.js';
-import { importAgentConfig } from './import-agent-config.js';
-import {
-  claudeConfigHome,
-  migrateRuntimeHomes,
-  runtimeHome,
-  toolInstallRoot,
-} from './runtime-homes.js';
 import type { ComputerDesktops } from './computer/desktops.js';
 import { createComputerDispatcher } from './computer/dispatch.js';
 import { HostComputerProvider } from './computer/host.js';
@@ -67,6 +60,7 @@ import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { createImsgBridge } from './imsg-bridge.js';
+import { importAgentConfig } from './import-agent-config.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
@@ -80,6 +74,12 @@ import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
 import { performRepoArchive } from './repo-archive.js';
 import type { RunStepOptions } from './runner.js';
+import {
+  claudeConfigHome,
+  migrateRuntimeHomes,
+  runtimeHome,
+  toolInstallRoot,
+} from './runtime-homes.js';
 import {
   ensureStateDirs,
   loadDevinModels,
@@ -229,11 +229,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       return Promise.resolve({ state: 'unknown', reason: 'confinement unavailable' });
     if (loginProbe) return loginProbe;
     const pending = (async () => {
-      const probe = await (opts.claudeCodeAuthProbe ??
+      const probe = await (
+        opts.claudeCodeAuthProbe ??
         (() =>
           probeClaudeCodeAuth({
             env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome },
-          })))();
+          }))
+      )();
       claudeAuth = probe;
       const expiresAt =
         probe.state === 'logged-in' &&

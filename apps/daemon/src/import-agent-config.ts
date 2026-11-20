@@ -1,11 +1,4 @@
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { parseClaudeMcpEntries } from '@cairn/shared';
@@ -84,7 +77,9 @@ const codexConfigSchema = z.object({
   mcp_servers: z.record(z.string(), z.unknown()).optional(),
 });
 
-export function importAgentConfig(options: AgentConfigImportOptions): AgentConfigImportReport | null {
+export function importAgentConfig(
+  options: AgentConfigImportOptions,
+): AgentConfigImportReport | null {
   const { cairnHome } = options;
   const realHome = options.realHome ?? homedir();
   const env = options.env ?? process.env;
@@ -130,7 +125,10 @@ export function importAgentConfig(options: AgentConfigImportOptions): AgentConfi
 
   const addServer = (name: string, entry: unknown, source: string): void => {
     if (managedServers[name] !== undefined) {
-      report.skipped.push({ item: `${source}:mcp/${name}`, reason: 'already present in managed config' });
+      report.skipped.push({
+        item: `${source}:mcp/${name}`,
+        reason: 'already present in managed config',
+      });
       return;
     }
     managedServers[name] = entry;
@@ -158,9 +156,7 @@ export function importAgentConfig(options: AgentConfigImportOptions): AgentConfi
   } else {
     let codex: z.infer<typeof codexConfigSchema>;
     try {
-      const parsed = codexConfigSchema.safeParse(
-        parseToml(readFileSync(codexConfigPath, 'utf8')),
-      );
+      const parsed = codexConfigSchema.safeParse(parseToml(readFileSync(codexConfigPath, 'utf8')));
       codex = parsed.success ? parsed.data : { mcp_servers: undefined };
       if (!parsed.success)
         report.failed.push({ item: codexConfigPath, reason: 'unexpected TOML shape' });
@@ -194,11 +190,15 @@ export function importAgentConfig(options: AgentConfigImportOptions): AgentConfi
           envOut[varName] = value;
         }
         if (missingVar) continue;
-        addServer(name, {
-          command: s.command,
-          ...(s.args !== undefined ? { args: s.args } : {}),
-          ...(Object.keys(envOut).length > 0 ? { env: envOut } : {}),
-        }, 'codex');
+        addServer(
+          name,
+          {
+            command: s.command,
+            ...(s.args !== undefined ? { args: s.args } : {}),
+            ...(Object.keys(envOut).length > 0 ? { env: envOut } : {}),
+          },
+          'codex',
+        );
       } else if (typeof s.url === 'string' && s.url.length > 0) {
         const headers: Record<string, string> = { ...(s.http_headers ?? {}) };
         if (s.bearer_token_env_var !== undefined) {
@@ -212,10 +212,14 @@ export function importAgentConfig(options: AgentConfigImportOptions): AgentConfi
           }
           headers.Authorization = `Bearer ${token}`;
         }
-        addServer(name, {
-          url: s.url,
-          ...(Object.keys(headers).length > 0 ? { headers } : {}),
-        }, 'codex');
+        addServer(
+          name,
+          {
+            url: s.url,
+            ...(Object.keys(headers).length > 0 ? { headers } : {}),
+          },
+          'codex',
+        );
       } else {
         report.skipped.push({
           item: `codex:mcp/${name}`,

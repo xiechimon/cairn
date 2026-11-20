@@ -1,6 +1,6 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import {
   parseClaudeOauthExpiresAt,
   readDefaultClaudeOauthExpiresAt,

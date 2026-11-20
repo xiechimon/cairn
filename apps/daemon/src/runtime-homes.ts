@@ -50,6 +50,10 @@ export function migrateRuntimeHomes(cairnHome: string, realHome = homedir()): st
   for (const name of ['devin', 'antigravity']) {
     move(join(legacyTools, name), toolInstallRoot(cairnHome, name), `tools/${name}`);
   }
-  move(join(toolInstallRoot(cairnHome, 'devin'), 'home'), runtimeHome(cairnHome, 'devin'), 'devin-home');
+  move(
+    join(toolInstallRoot(cairnHome, 'devin'), 'home'),
+    runtimeHome(cairnHome, 'devin'),
+    'devin-home',
+  );
   return moved;
 }

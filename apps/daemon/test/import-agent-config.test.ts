@@ -1,11 +1,8 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import {
-  agentConfigImportDone,
-  importAgentConfig,
-} from '../src/import-agent-config.js';
+import { agentConfigImportDone, importAgentConfig } from '../src/import-agent-config.js';
 
 const tempDirs: string[] = [];
 function tempDir(prefix: string): string {
@@ -31,18 +28,16 @@ describe('importAgentConfig', () => {
     expect(report?.copied).toEqual([]);
     expect(report?.skipped.length).toBeGreaterThanOrEqual(3);
     expect(agentConfigImportDone(cairn)).toBe(true);
-    expect(JSON.parse(readFileSync(join(cairn, 'imports', 'agent-config.json'), 'utf8'))).toMatchObject(
-      { version: 1 },
-    );
+    expect(
+      JSON.parse(readFileSync(join(cairn, 'imports', 'agent-config.json'), 'utf8')),
+    ).toMatchObject({ version: 1 });
   });
 
   test('runs only once unless forced', () => {
     const { cairn, real } = homes();
     importAgentConfig({ cairnHome: cairn, realHome: real });
     expect(importAgentConfig({ cairnHome: cairn, realHome: real })).toBeNull();
-    expect(
-      importAgentConfig({ cairnHome: cairn, realHome: real, force: true }),
-    ).not.toBeNull();
+    expect(importAgentConfig({ cairnHome: cairn, realHome: real, force: true })).not.toBeNull();
   });
 
   test('copies skills additively and never overwrites a managed skill', () => {
@@ -52,22 +47,17 @@ describe('importAgentConfig', () => {
     mkdirSync(join(real, '.claude', 'skills', 'beta'), { recursive: true });
     writeFileSync(join(real, '.claude', 'skills', 'beta', 'SKILL.md'), 'beta user\n');
     mkdirSync(join(cairn, 'homes', 'claude', 'skills', 'beta'), { recursive: true });
-    writeFileSync(
-      join(cairn, 'homes', 'claude', 'skills', 'beta', 'SKILL.md'),
-      'beta managed\n',
-    );
+    writeFileSync(join(cairn, 'homes', 'claude', 'skills', 'beta', 'SKILL.md'), 'beta managed\n');
 
     const report = importAgentConfig({ cairnHome: cairn, realHome: real });
     expect(report?.copied).toContain('skills/alpha');
-    expect(report?.skipped).toContainEqual(
-      expect.objectContaining({ item: 'skills/beta' }),
-    );
+    expect(report?.skipped).toContainEqual(expect.objectContaining({ item: 'skills/beta' }));
     expect(
       readFileSync(join(cairn, 'homes', 'claude', 'skills', 'alpha', 'SKILL.md'), 'utf8'),
     ).toBe('alpha user\n');
-    expect(
-      readFileSync(join(cairn, 'homes', 'claude', 'skills', 'beta', 'SKILL.md'), 'utf8'),
-    ).toBe('beta managed\n');
+    expect(readFileSync(join(cairn, 'homes', 'claude', 'skills', 'beta', 'SKILL.md'), 'utf8')).toBe(
+      'beta managed\n',
+    );
   });
 
   test('merges mcpServers from ~/.claude.json without touching existing keys', () => {
@@ -124,9 +114,7 @@ describe('importAgentConfig', () => {
       realHome: real,
       env: { CONTEXT7_KEY: 'k1', LINEAR_TOKEN: 'tok-1' },
     });
-    expect(report?.skipped).toContainEqual(
-      expect.objectContaining({ item: 'codex:mcp/context7' }),
-    );
+    expect(report?.skipped).toContainEqual(expect.objectContaining({ item: 'codex:mcp/context7' }));
     const managed = JSON.parse(
       readFileSync(join(cairn, 'homes', 'claude', '.claude.json'), 'utf8'),
     );
@@ -142,9 +130,7 @@ describe('importAgentConfig', () => {
     mkdirSync(join(real, '.codex'), { recursive: true });
     writeFileSync(
       join(real, '.codex', 'config.toml'),
-      ['[mcp_servers.context7]', 'command = "npx"', 'env_vars = ["CONTEXT7_KEY"]', ''].join(
-        '\n',
-      ),
+      ['[mcp_servers.context7]', 'command = "npx"', 'env_vars = ["CONTEXT7_KEY"]', ''].join('\n'),
     );
     importAgentConfig({
       cairnHome: cairn,

@@ -30,7 +30,9 @@ const registrySchema = z.object({
     z.object({
       id: z.string(),
       distribution: z
-        .object({ npx: z.object({ package: z.string(), args: z.array(z.string()).default([]) }).optional() })
+        .object({
+          npx: z.object({ package: z.string(), args: z.array(z.string()).default([]) }).optional(),
+        })
         .optional(),
     }),
   ),
@@ -221,9 +223,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
         const marker: InstallMarker = {
           version: parsed.version,
           url: meta.data.dist.tarball,
-          ...(meta.data.dist.shasum !== undefined
-            ? { tarballSha1: meta.data.dist.shasum }
-            : {}),
+          ...(meta.data.dist.shasum !== undefined ? { tarballSha1: meta.data.dist.shasum } : {}),
           binRelPath: 'bundle/gemini.js',
           args: npmArgs,
           installedAt: Date.now(),
@@ -232,7 +232,10 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
           mode: 0o600,
         });
         mkdirSync(root, { recursive: true });
-        writeFileSync(join(root, 'current.json'), `${JSON.stringify({ version: parsed.version })}\n`);
+        writeFileSync(
+          join(root, 'current.json'),
+          `${JSON.stringify({ version: parsed.version })}\n`,
+        );
       } finally {
         rmSync(staging, { recursive: true, force: true });
       }

@@ -2,9 +2,9 @@ import { type ChildProcess, spawn } from 'node:child_process';
 import { accessSync, constants, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import {
+  compareVersions,
   type DevinLocalStatus,
   type DevinLoginOutcome,
-  compareVersions,
   devinCredentialsPath,
   devinKeyFromToml,
 } from '@cairn/shared';

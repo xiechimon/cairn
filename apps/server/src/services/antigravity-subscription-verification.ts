@@ -3,10 +3,7 @@ import { accessSync, constants, readdirSync, readFileSync, statSync } from 'node
 import { mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
-import {
-  type AntigravitySubscriptionVerifyResult,
-  managedVersionedBins,
-} from '@cairn/shared';
+import { type AntigravitySubscriptionVerifyResult, managedVersionedBins } from '@cairn/shared';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MANAGED_ROOT = join(homedir(), '.cairn', 'tools', 'antigravity');

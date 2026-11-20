@@ -30,8 +30,10 @@ describe('devinKeyFromToml', () => {
 
 describe('compareVersions', () => {
   test('sorts dotted versions numerically', () => {
-    expect(
-      ['3000.1.0', '3000.13.4', '3000.2.0'].sort((a, b) => compareVersions(b, a)),
-    ).toEqual(['3000.13.4', '3000.2.0', '3000.1.0']);
+    expect(['3000.1.0', '3000.13.4', '3000.2.0'].sort((a, b) => compareVersions(b, a))).toEqual([
+      '3000.13.4',
+      '3000.2.0',
+      '3000.1.0',
+    ]);
   });
 });

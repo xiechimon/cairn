@@ -38,7 +38,14 @@ describe('migrateRuntimeHomes', () => {
     const moved = migrateRuntimeHomes(cairn, real);
 
     expect(moved.sort()).toEqual(
-      ['agent-homes/gemini', 'agent-runtime', 'claude', 'devin-home', 'tools/antigravity', 'tools/devin'].sort(),
+      [
+        'agent-homes/gemini',
+        'agent-runtime',
+        'claude',
+        'devin-home',
+        'tools/antigravity',
+        'tools/devin',
+      ].sort(),
     );
     expect(existsSync(claudeConfigHome(cairn))).toBe(true);
     expect(existsSync(piHome(cairn))).toBe(true);

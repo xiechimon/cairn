@@ -630,7 +630,9 @@ class AcpBackend implements AgentBackend {
     const command = adapter?.command ?? this.options.executablePath;
     if (command === undefined) {
       hostTools?.close();
-      throw new Error('Gemini managed install is missing: the managed runtime setup did not complete');
+      throw new Error(
+        'Gemini managed install is missing: the managed runtime setup did not complete',
+      );
     }
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {

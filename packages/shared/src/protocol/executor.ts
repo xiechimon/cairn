@@ -46,12 +46,7 @@ export const LOCAL_STATE_FILES = [
   'daemon.json',
   'daemon.log',
 ] as const;
-export const LOCAL_STATE_DIRS = [
-  'outbox',
-  'chat-sessions',
-  'homes/pi',
-  'workspaces',
-] as const;
+export const LOCAL_STATE_DIRS = ['outbox', 'chat-sessions', 'homes/pi', 'workspaces'] as const;
 
 export const machineJsonSchema = z.object({
   machineId: z.string(),

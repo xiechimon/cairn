@@ -1,8 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
-  accessSync,
-  constants,
   existsSync,
   mkdirSync,
   mkdtempSync,

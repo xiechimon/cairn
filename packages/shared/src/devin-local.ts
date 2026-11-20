@@ -25,4 +25,3 @@ export function devinKeyFromToml(toml: string): string | null {
 export function devinCredentialsPath(home: string): string {
   return `${home}/.local/share/devin/credentials.toml`;
 }
-

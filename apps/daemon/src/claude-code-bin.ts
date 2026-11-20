@@ -117,8 +117,7 @@ export async function probeClaudeBin(opts: ClaudeBinProbeOpts = {}): Promise<Cla
     const resolved = resolveCommandPath(override, opts.env ?? process.env);
     if (resolved !== null) info = { path: resolved, source: 'override' };
   } else {
-    const path =
-      opts.bundledPath !== undefined ? opts.bundledPath : bundledClaudeCodePath();
+    const path = opts.bundledPath !== undefined ? opts.bundledPath : bundledClaudeCodePath();
     if (path !== null) info = { path, source: 'bundled' };
   }
   if (info === null) return null;

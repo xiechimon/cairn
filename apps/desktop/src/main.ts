@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir, release } from 'node:os';
 import { dirname, join } from 'node:path';

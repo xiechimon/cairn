@@ -16,13 +16,13 @@ import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
 import { runPiHost } from './backend/pi-host.js';
+import { bundledClaudeCodePath } from './claude-code-bin.js';
 import {
   type DaemonConfig,
   type DaemonConfigInput,
   loadDaemonConfig,
   WorkspacesDirError,
 } from './config.js';
-import { bundledClaudeCodePath } from './claude-code-bin.js';
 import { realDoctorEnv, runDoctorCommand } from './doctor.js';
 import { importAgentConfig } from './import-agent-config.js';
 import { createDaemonLogger } from './log.js';
@@ -317,7 +317,9 @@ export function buildProgram(): Command {
     .description('Managed runtime homes and imports');
   agentConfig
     .command('import')
-    .description('Copy skills and MCP servers from your own Claude/Codex config into the managed homes')
+    .description(
+      'Copy skills and MCP servers from your own Claude/Codex config into the managed homes',
+    )
     .option('--force', 'run again even though the import already ran once')
     .action((opts: { force?: boolean }) => {
       const config = loadDaemonConfig({});
@@ -337,12 +339,16 @@ export function buildProgram(): Command {
   const claude = program.command('claude').description('Managed Claude Code');
   claude
     .command('login')
-    .description('Sign in to the managed Claude Code (writes into the Cairn-managed home, not your own)')
+    .description(
+      'Sign in to the managed Claude Code (writes into the Cairn-managed home, not your own)',
+    )
     .action(() => {
       const config = loadDaemonConfig({});
       const command = process.env[ENV_VARS.claudeBin] ?? bundledClaudeCodePath();
       if (command === null) {
-        process.stderr.write('No managed claude binary is installed (SDK platform package missing).\n');
+        process.stderr.write(
+          'No managed claude binary is installed (SDK platform package missing).\n',
+        );
         process.exitCode = 1;
         return;
       }
