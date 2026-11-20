@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -74,7 +73,7 @@ function world() {
       id: 'project',
       name: 'D121',
       teamId: team.id,
-      autonomy: DEFAULT_AUTONOMY_SETTINGS,
+      autonomy: {},
     })
     .run();
   db.insert(routingRule)
@@ -158,7 +157,7 @@ function world() {
     setPlanAutoApprove(enabled: boolean) {
       opened.db
         .update(project)
-        .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: enabled } })
+        .set({ autonomy: { planAutoApproveEnabled: enabled } })
         .where(eq(project.id, 'project'))
         .run();
     },
@@ -284,7 +283,7 @@ test('project disable survives restart, preserves other settings, and leaves man
   w.db
     .update(project)
     .set({
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: false },
+      autonomy: { planAutoApproveEnabled: false },
     })
     .where(eq(project.id, 'project'))
     .run();
@@ -306,7 +305,7 @@ test('project list reports the stored plan auto-approve toggle', async () => {
   w.db
     .update(project)
     .set({
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: false },
+      autonomy: { planAutoApproveEnabled: false },
     })
     .where(eq(project.id, 'project'))
     .run();

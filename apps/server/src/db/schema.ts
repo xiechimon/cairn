@@ -1,5 +1,4 @@
 import type {
-  ActionTier,
   ActiveRun,
   AntigravitySubscriptionModel,
   AutonomyPauseMarker,
@@ -62,7 +61,6 @@ import type {
   SplitPolicy,
   StepKind,
   StepPromptOrigin,
-  StoredAutonomySettings,
   SubscriptionCheck,
   TaskDecision,
   TaskRequest,
@@ -102,7 +100,6 @@ export const team = sqliteTable('team', {
   avatarStyle: text('avatarStyle'),
   maxAutonomousMergesPerDay: integer('maxAutonomousMergesPerDay').notNull().default(10),
   defaultMachineId: text('defaultMachineId'),
-  actionTier: text('actionTier').$type<ActionTier>().notNull().default('full'),
   providerOrder: json<string[]>('providerOrder'),
 });
 
@@ -149,7 +146,7 @@ export const project = sqliteTable('project', {
   color: text('color').$type<ProjectColor>(),
   archivedAt: epochMs('archivedAt'),
   modelOverrides: json<ProjectModelOverrides>('modelOverrides'),
-  autonomy: json<(StoredAutonomySettings & Partial<ProjectMergeConfig>) | null>('autonomy'),
+  autonomy: json<Partial<ProjectMergeConfig> | null>('autonomy'),
   personalOwnerId: text('personalOwnerId').references(() => user.id),
 });
 

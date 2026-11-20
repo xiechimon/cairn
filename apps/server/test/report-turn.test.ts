@@ -1,7 +1,6 @@
 import {
   CHIEF_NOTICE_KIND,
   chiefNoticeContentSchema,
-  DEFAULT_AUTONOMY_SETTINGS,
   newChiefThreadId,
   REPORT_ACK_KIND,
 } from '@cairn/shared';
@@ -50,7 +49,7 @@ function openWorld(opts: { origin?: 'none' | 'live' | 'archived' } = {}) {
       id: projectId,
       name: 'research',
       teamId: s.team.id,
-      autonomy: DEFAULT_AUTONOMY_SETTINGS,
+      autonomy: {},
     })
     .run();
   const addTodo = (seqNum: number) => {

@@ -1,14 +1,7 @@
 import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import {
-  actionJournal,
-  actionProposal,
-  chief,
-  chiefThread,
-  step,
-  team as teamTable,
-} from '../src/db/schema.js';
+import { actionJournal, actionProposal, chief, chiefThread, step } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { answerProposal, dispatchActionWakes } from '../src/services/action-proposals.js';
 import {
@@ -18,13 +11,12 @@ import {
   executeConnectorToolCall,
 } from '../src/services/connector-broker.js';
 import { newMcpOAuthState } from '../src/services/mcp-servers.js';
-import { fakeMcp, insertConnector, FAKE_MCP_TOOLS as TOOLS } from './fake-mcp-connector.js';
+import { fakeMcp, insertConnector } from './fake-mcp-connector.js';
 import { bootServer, type TestServer } from './helpers.js';
 
-function world(opts: { tier?: 'guarded' | 'full' } = {}) {
+function world(opts: { untrustedTurn?: boolean } = {}) {
   const mcp = fakeMcp();
   const s = bootServer({ mcpFetch: mcp.fetch });
-  if (opts.tier === 'guarded') s.db.update(teamTable).set({ actionTier: 'guarded' }).run();
   s.db
     .insert(chief)
     .values({ id: 'chief-a', userId: s.user.id, teamId: s.team.id, createdAt: 1 })
@@ -62,6 +54,7 @@ function world(opts: { tier?: 'guarded' | 'full' } = {}) {
     teamId: s.team.id,
     threadId: 'thread-a',
     scopeProjectId: null,
+    ...(opts.untrustedTurn === true ? { untrustedTurn: true } : {}),
   };
   return { s, mcp, deps, ctx };
 }
@@ -325,7 +318,7 @@ describe('executeConnectorToolCall dispatch', () => {
     s.dispose();
   });
 
-  test('an unannotated tool defaults to external and dispatches under full autonomy', async () => {
+  test('an unannotated tool defaults to external and dispatches in a trusted turn', async () => {
     const { s, mcp, deps, ctx } = world();
     insertConnector(s);
     const out = await executeConnectorToolCall(deps, ctx, 'connector_gmail__GMAIL_SEND', {
@@ -337,8 +330,8 @@ describe('executeConnectorToolCall dispatch', () => {
     s.dispose();
   });
 
-  test('guarded autonomy parks the call as a proposal and approval covers the retry', async () => {
-    const { s, mcp, deps, ctx } = world({ tier: 'guarded' });
+  test('an untrusted turn parks the call as a proposal and approval covers the retry', async () => {
+    const { s, mcp, deps, ctx } = world({ untrustedTurn: true });
     insertConnector(s);
     const parked = JSON.parse(
       await executeConnectorToolCall(deps, ctx, 'connector_gmail__GMAIL_DELETE', { id: 'm1' }),
@@ -374,7 +367,7 @@ describe('executeConnectorToolCall dispatch', () => {
   });
 
   test('the wake after approval hands back the approved arguments so the retry sends without a second card', async () => {
-    const { s, mcp, deps, ctx } = world({ tier: 'guarded' });
+    const { s, mcp, deps, ctx } = world({ untrustedTurn: true });
     insertConnector(s);
     const draft = { to: 'a@b.c', body: '收到，回信测试通过。' };
     const parked = JSON.parse(
@@ -406,7 +399,7 @@ describe('executeConnectorToolCall dispatch', () => {
   });
 
   test('changed args after approval are not covered by the earlier grant', async () => {
-    const { s, mcp, deps, ctx } = world({ tier: 'guarded' });
+    const { s, mcp, deps, ctx } = world({ untrustedTurn: true });
     insertConnector(s);
     const parked = JSON.parse(
       await executeConnectorToolCall(deps, ctx, 'connector_gmail__GMAIL_DELETE', { id: 'm1' }),

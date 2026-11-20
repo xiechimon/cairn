@@ -14,7 +14,7 @@ Decisions that close the open items for v1:
 - Socket drop or timeout: `degraded` with a one-line reason, exponential backoff (5 s doubling to 5 min), same cursor. A rejected login is `revoked` with no retry until the owner re-enters the password.
 - Wake rule: `mail_account.defaultRank` is `needs_you` by default (every new INBOX mail starts a Coordinator turn). The owner may switch to filtered mode: `mail_rule` rows (sender or subject contains) rank `needs_you`, and unmatched mail ranks `can_wait` (digest push, no turn).
 - Excerpt: display name, sender, subject and the first 2000 characters of the text part, from at most 256 KiB of the message source. Stored on the event, fenced with `fenceMailText` in the wake prompt.
-- Reply: the built-in tool `connector_cairn-mail__send` (`to`, `subject`, `body`, optional `inReplyTo` event id) goes through `connectorActionEntry` with no read-only hint, so the registry classes it `send` and a mail turn parks an approval card before SMTP is touched. The same SMTP account sends after the owner approves. Owner-started turns follow the action tier.
+- Reply: the built-in tool `connector_cairn-mail__send` (`to`, `subject`, `body`, optional `inReplyTo` event id) goes through `connectorActionEntry` with no read-only hint, so the registry classes it `send` and a mail turn parks an approval card before SMTP is touched. The same SMTP account sends after the owner approves. Owner-started turns send without a card (the action-tier setting was removed by the owner on 2026-11-20).
 - Disconnect: status `disconnected`, generation advances, the socket closes, the sealed password is deleted, events stay.
 - Password handling: the owner types it, it is sealed on arrival, no API response, log line, event row or error text contains it.
 
@@ -127,7 +127,7 @@ Paths:
 | Mail turn calls an outbound tool | one `pending` proposal per distinct call (the target carries a digest of the arguments, so two drafts make two cards), one card, nothing sent; the tool result tells the model a card is waiting and to end the turn |
 | Owner answers `发送` | the proposal is `executed` and the model is woken. The wake turn inherits the whole mail-turn rule, tool limits and cards alike (`action-proposal:<id>` of a proposal marked `untrustedTurn`); so does the wake after `不发` or expiry. Re-issuing the call with identical arguments sends it; any changed argument is a new proposal and a new card. The grant covers one send |
 | Owner answers `不发`, or the card expires after 7 days, or nobody answers | nothing is sent; the model is woken with `refused` or `expired` and told not to retry unless the owner asks again. An unanswered card stays pending |
-| Owner-started turn, same tool | unchanged: the team or project action tier decides (`full` sends without a card, `guarded` asks) |
+| Owner-started turn, same tool | sends without a card; the team and project action-tier settings were removed by the owner on 2026-11-20 |
 | Report turn | unchanged: the report allowlist already refuses every outbound tool |
 
 Residual risk, named: `create_todo` in a mail turn can put mail text into a local task, and the owner approves only what he sees on a card. Prompt injection can still steer what the card says, so the card is the check, not the model.

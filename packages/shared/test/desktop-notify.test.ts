@@ -10,7 +10,6 @@ const payload: DesktopNotifyPayload = {
   body: '修一下按钮',
   href: '/app?thread=todo-x',
   tag: 'u1:todo-x',
-  sound: 'system',
 };
 
 describe('isDesktopNotifyPayload', () => {
@@ -32,39 +31,14 @@ describe('isDesktopNotifyPayload', () => {
     expect(isDesktopNotifyPayload({ ...payload, href: '/settings' })).toBe(false);
     expect(isDesktopNotifyPayload({ ...payload, href: '/app?chief=c1' })).toBe(true);
   });
-
-  test('rejects unknown sound names', () => {
-    expect(isDesktopNotifyPayload({ ...payload, sound: 'Basso' })).toBe(false);
-    expect(isDesktopNotifyPayload({ ...payload, sound: '' })).toBe(false);
-    for (const sound of ['system', 'Glass', 'Ping', 'Pop', 'Purr', 'none']) {
-      expect(isDesktopNotifyPayload({ ...payload, sound })).toBe(true);
-    }
-  });
 });
 
 describe('desktopNotificationOptions', () => {
-  test('system sound maps to no explicit sound and audible delivery', () => {
+  test('always uses the audible system default sound', () => {
     expect(desktopNotificationOptions(payload)).toEqual({
       title: '需要你决定',
       body: '修一下按钮',
       silent: false,
-    });
-  });
-
-  test('named sound passes through to the OS sound name', () => {
-    expect(desktopNotificationOptions({ ...payload, sound: 'Glass' })).toEqual({
-      title: '需要你决定',
-      body: '修一下按钮',
-      silent: false,
-      sound: 'Glass',
-    });
-  });
-
-  test('none silences the notification', () => {
-    expect(desktopNotificationOptions({ ...payload, sound: 'none' })).toEqual({
-      title: '需要你决定',
-      body: '修一下按钮',
-      silent: true,
     });
   });
 });

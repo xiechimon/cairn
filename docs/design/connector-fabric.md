@@ -58,7 +58,7 @@ Lifecycle view over the stored `status` (`unchecked | connected | needs_auth | e
 | OAuth start/callback (`services/oauth.ts` `states` map, `/api/oauth/callback`) | pending state | `oauthCipher`, `oauthMeta`, `authRevision+1`, `tokenGeneration+1` | issuer/exchange/conflict → landing flag, no row change; restart drops pending back to `auth-required` |
 | Composio adapter (shipped) | sealed key, connected-account status | session URL + key cipher on the row | Composio down → `degraded`; bad key → `auth-required` |
 | Token delivery `stepConnectorEndpoints` | row, bearer; refresh if expiring within 10 min, 5 s bound | refreshed cipher, `tokenGeneration` | not deliverable → `withheldMcp`; step still runs |
-| Broker dispatch (shipped) | cached tool list, action registry, autonomy tier | journal entry per external call | unknown connector/tool/args or unapproved class → rejected before dispatch, logged; upstream error → tool error result, turn continues |
+| Broker dispatch (shipped) | cached tool list, action registry, turn trust | journal entry per external call | unknown connector/tool/args or unapproved class → rejected before dispatch, logged; upstream error → tool error result, turn continues |
 | Owner UI | records, status | sign-in, reconnect, revoke, delete | none — display only |
 
 ## 5. Failure modes to cover at build time
@@ -77,7 +77,7 @@ Lifecycle view over the stored `status` (`unchecked | connected | needs_auth | e
 
 Secrets stay in the existing vault: connector headers and OAuth material are `SecretBox` ciphers on the row (`valuesCipher`, `oauthCipher`); the Composio API key is a team `secret` row on the mail-secret precedent — a name `openSecretGrants` and `get_secret` refuse to hand a step. Connector bearers reach a step only as endpoint headers on its own token response and are added to log redaction (`mcpConnectorSecretValues`).
 
-The boundary is the action tier, not the connector: read-only tools are `free`; a tool whose call has an external effect (send, post, delete, pay) routes through the action registry's `send`/`submit`/`confirm-once` classes — `guarded` tier asks on a decision card, `full` runs and journals. Classification comes from the cached MCP annotations (`readOnlyHint`, `destructiveHint`) with an owner-pinnable per-tool override; absent annotations default to external — fail closed, never trust declared intent. Connector management itself (add, remove, sign in, revoke, overrides) is owner-only, the `set_secret` precedent: the agent may use a connector, never configure one. When the broker lands it joins `externalEntryAuth` in `packages/shared/merge-gate-paths.json`.
+The boundary is the action class and the turn's trust, not the connector: read-only tools are `free`; a tool whose call has an external effect (send, post, delete, pay) routes through the action registry's `send`/`submit`/`confirm-once` classes — a trusted turn runs `send`/`submit` and journals, an untrusted turn asks on a decision card (the action-tier setting was removed by the owner on 2026-11-20). Classification comes from the cached MCP annotations (`readOnlyHint`, `destructiveHint`) with an owner-pinnable per-tool override; absent annotations default to external — fail closed, never trust declared intent. Connector management itself (add, remove, sign in, revoke, overrides) is owner-only, the `set_secret` precedent: the agent may use a connector, never configure one. When the broker lands it joins `externalEntryAuth` in `packages/shared/merge-gate-paths.json`.
 
 ## 7. Config surface
 

@@ -1,20 +1,9 @@
-import {
-  type ActionTier,
-  DESKTOP_NOTIFY_SOUND_FILES,
-  type DesktopNotifySound,
-} from '@cairn/shared';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useApiMutations, useTeamAutonomy } from '../api/hooks.js';
+import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
-import {
-  type NotifyPref,
-  persistNotifyPref,
-  persistNotifySound,
-  readNotifyPref,
-  readNotifySound,
-} from '../board/notify-pref.js';
+import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -22,7 +11,6 @@ import {
   SettingsRow,
 } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
-import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import {
   Select,
@@ -33,11 +21,9 @@ import {
 } from '../components/ui/select.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
-import { desktopNotify } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
-import { TIER_LABELS } from '../pages/project-autonomy-card.js';
 import { PageShell } from '../pages/shell.js';
 import {
   currentDeviceSubscription,
@@ -48,35 +34,12 @@ import {
 } from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
 
-const NOTIFY_SOUND_OPTIONS: { value: DesktopNotifySound; label: string }[] = [
-  { value: 'system', label: '跟随系统' },
-  { value: 'Glass', label: 'Glass' },
-  { value: 'Ping', label: 'Ping' },
-  { value: 'Pop', label: 'Pop' },
-  { value: 'Purr', label: 'Purr' },
-  { value: 'none', label: '无声' },
-];
-
 export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
   const [searchParams] = useSearchParams();
   const fixture = resolveScenario(searchParams);
   const { live, teamId, user } = useLiveData();
   const mutations = useApiMutations(teamId);
-  const teamAutonomy = useTeamAutonomy(teamId, live);
-  const [fixtureTier, setFixtureTier] = useState<ActionTier>('full');
-  const actionTier = live ? (teamAutonomy.data?.actionTier ?? 'full') : fixtureTier;
-  const commitTier = (next: ActionTier) => {
-    if (!live) {
-      if (blockDemoWrite()) return;
-      setFixtureTier(next);
-      return;
-    }
-    mutations.patchTeamAutonomy.mutate(
-      { actionTier: next },
-      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
-    );
-  };
   const [fixtureName, setFixtureName] = useState<string | null>(null);
   const userName = live ? user.displayName : (fixtureName ?? user.displayName);
   const commitName = (next: string) => {
@@ -93,12 +56,6 @@ export function AccountPage() {
   const [notifyPref, setNotifyPref] = useState<NotifyPref | null>(() =>
     readNotifyPref(safeLocalStorage()),
   );
-  const [notifySound, setNotifySound] = useState<DesktopNotifySound>(() =>
-    readNotifySound(safeLocalStorage()),
-  );
-  const desktopSoundPickable = desktopNotify() !== null;
-  const soundPreviewable =
-    DESKTOP_NOTIFY_SOUND_FILES[notifySound] !== undefined && desktopNotify()?.preview !== undefined;
   const { permission, request } = useNotificationPermission(
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
@@ -155,29 +112,6 @@ export function AccountPage() {
               </SelectContent>
             </Select>
           </SettingsRow>
-          <SettingsRow label={t('对外动作')} hint={t('项目未单独设置时，跟随此项')}>
-            <Select
-              value={actionTier}
-              disabled={
-                live && (teamAutonomy.data === undefined || mutations.patchTeamAutonomy.isPending)
-              }
-              onValueChange={(next) => {
-                if (next !== null) commitTier(next as ActionTier);
-              }}
-            >
-              <SelectTrigger
-                aria-label={t('对外动作')}
-                className={SETTINGS_SELECT_TRIGGER_CLS}
-                data-testid="team-autonomy-tier"
-              >
-                <SelectValue>{t(TIER_LABELS[actionTier])}</SelectValue>
-              </SelectTrigger>
-              <SelectContent aria-label={t('对外动作')} align="end" alignItemWithTrigger={false}>
-                <SelectItem value="guarded">{t('先问我')}</SelectItem>
-                <SelectItem value="full">{t('完全放手')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </SettingsRow>
           <SettingsRow
             label={t('推送通知')}
             hint={
@@ -198,44 +132,6 @@ export function AccountPage() {
               }}
             />
           </SettingsRow>
-          {desktopSoundPickable && (
-            <SettingsRow label={t('提醒声音')} info={t('系统通知的提示音')}>
-              <Select
-                value={notifySound}
-                onValueChange={(next) => {
-                  if (next === null) return;
-                  const sound = next as DesktopNotifySound;
-                  setNotifySound(sound);
-                  persistNotifySound(sound, safeLocalStorage());
-                }}
-              >
-                <SelectTrigger aria-label={t('提醒声音')} className={SETTINGS_SELECT_TRIGGER_CLS}>
-                  <SelectValue>
-                    {t(
-                      NOTIFY_SOUND_OPTIONS.find((o) => o.value === notifySound)?.label ??
-                        '跟随系统',
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent aria-label={t('提醒声音')} align="end" alignItemWithTrigger={false}>
-                  {NOTIFY_SOUND_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {t(option.label)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {soundPreviewable && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => desktopNotify()?.preview?.(notifySound)}
-                >
-                  {t('试听')}
-                </Button>
-              )}
-            </SettingsRow>
-          )}
           {devicePushLive && (
             <SettingsRow
               label={t('在这台设备上接收推送')}

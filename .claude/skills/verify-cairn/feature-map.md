@@ -678,7 +678,7 @@ Reach:
 - Web routes: `/app/account`
 - Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `team-autonomy-tier`
+- Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
@@ -949,7 +949,7 @@ Reach:
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md)
-- Evidence: `apps/web/e2e/project-new-repo.spec.ts`, `apps/web/e2e/project-settings-autonomy.spec.ts`, `apps/server/test/project-delete.test.ts`
+- Evidence: `apps/web/e2e/project-new-repo.spec.ts`, `apps/server/test/project-delete.test.ts`
 
 ### quota-wait
 

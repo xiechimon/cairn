@@ -1,9 +1,4 @@
-import {
-  conversationBranch,
-  DEFAULT_AUTONOMY_SETTINGS,
-  MERGE_ANNOUNCEMENT,
-  type Phase,
-} from '@cairn/shared';
+import { conversationBranch, MERGE_ANNOUNCEMENT, type Phase } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -96,7 +91,7 @@ function makeWorld(opts: WorldOpts = {}): World {
       teamId: s.team.id,
       repoKind,
       githubRepo: repoKind === 'github' ? (opts.githubRepo ?? 'octo/demo') : null,
-      autonomy: DEFAULT_AUTONOMY_SETTINGS,
+      autonomy: {},
     })
     .run();
   seedSessionRoute(s, {

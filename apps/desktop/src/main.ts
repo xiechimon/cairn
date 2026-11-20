@@ -1,4 +1,3 @@
-import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { release } from 'node:os';
@@ -6,11 +5,9 @@ import { join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
-  DESKTOP_NOTIFY_SOUND_FILES,
   DESKTOP_SHELL_USER_AGENT,
   DESKTOP_TRAY_PATH,
   type DesktopMenuCommand,
-  type DesktopNotifySound,
   type DesktopRunnerState,
   type DesktopTrayState,
   type DesktopUpdateState,
@@ -519,12 +516,6 @@ function serveNotifications(origin: string): void {
     notification.on('click', () => sendToWindow('desktop-navigate', payload.href));
     notification.on('failed', (_event, error) => console.warn('notification failed:', error));
     notification.show();
-  });
-  ipcMain.on('desktop-notify:preview', (event, sound: unknown) => {
-    if (event.senderFrame?.origin !== origin || typeof sound !== 'string') return;
-    const file = DESKTOP_NOTIFY_SOUND_FILES[sound as DesktopNotifySound];
-    if (file === undefined) return;
-    execFile('/usr/bin/afplay', [join('/System/Library/Sounds', file)], () => {});
   });
 }
 

@@ -1703,7 +1703,6 @@
           "/api/projects",
           "/api/projects/:id",
           "/api/projects/:id/${action}",
-          "/api/projects/:id/autonomy",
           "/api/projects/:id/branches",
           "/api/projects/:id/files"
         ]
@@ -1734,7 +1733,6 @@
       ],
       "evidence": [
         "apps/web/e2e/project-new-repo.spec.ts",
-        "apps/web/e2e/project-settings-autonomy.spec.ts",
         "apps/server/test/project-delete.test.ts"
       ]
     },
@@ -2449,7 +2447,6 @@
           "/api/user/me",
           "/api/teams",
           "/api/teams/:id",
-          "/api/teams/:id/autonomy",
           "/api/teams/:id/members"
         ]
       },

@@ -3,7 +3,6 @@ import {
   type FsListResult,
   type FsPickResult,
   importGithubIssueBodySchema,
-  patchAutonomyBodySchema,
   patchProjectBodySchema,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
@@ -23,7 +22,6 @@ import {
 } from './routes-helpers.js';
 import { answerProposal } from './services/action-proposals.js';
 import { executeAction, undoJournalEntry } from './services/action-registry.js';
-import { patchAutonomy, readAutonomy } from './services/autonomy.js';
 import { toBuildRecord } from './services/builds.js';
 import { listDir } from './services/fs-list.js';
 import { pickFolder } from './services/fs-pick.js';
@@ -129,17 +127,6 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/fs/list', (c) => {
     const result = listDir(c.req.query('dir'));
     return c.json(result satisfies FsListResult);
-  });
-
-  app.get('/api/projects/:id/autonomy', (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    return c.json(readAutonomy(ctx.db, row.id));
-  });
-
-  app.patch('/api/projects/:id/autonomy', async (c) => {
-    const row = requireProject(ctx, c.req.param('id'));
-    const body = parseWith(patchAutonomyBodySchema, await jsonBody(c), 'body');
-    return c.json(patchAutonomy(ctx.db, row.id, body));
   });
 
   for (const [action, id] of [

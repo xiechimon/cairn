@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { DEFAULT_AUTONOMY_SETTINGS, type Phase, type TodoOwner } from '@cairn/shared';
+import type { Phase, TodoOwner } from '@cairn/shared';
 import { and, eq, like } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import {
@@ -76,7 +76,7 @@ function openWorld(
       id: projectId,
       name: `owner-${suffix}`,
       teamId: s.team.id,
-      autonomy: DEFAULT_AUTONOMY_SETTINGS,
+      autonomy: {},
       ...(opts.prNumber !== undefined || opts.repo === 'github'
         ? { repoKind: 'github', githubRepo: 'acme/app' }
         : {}),

@@ -1,9 +1,4 @@
-import {
-  ASK_USER_QUESTION_KIND,
-  DEFAULT_AUTONOMY_SETTINGS,
-  type TodoSourceKind,
-  type TriggerSource,
-} from '@cairn/shared';
+import { ASK_USER_QUESTION_KIND, type TodoSourceKind, type TriggerSource } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import webpush from 'web-push';
@@ -40,7 +35,7 @@ function world(
       id: 'project',
       name: 'Push tests',
       teamId: s.team.id,
-      autonomy: DEFAULT_AUTONOMY_SETTINGS,
+      autonomy: {},
     })
     .run();
   const record = createTodo(s.svc, {

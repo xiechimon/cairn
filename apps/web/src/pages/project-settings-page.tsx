@@ -46,7 +46,6 @@ import { useI18n } from '../i18n/provider.js';
 import { ChevronDown } from '../icons/index.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { RuleRow } from '../resources/routing-settings-page.js';
-import { ProjectAutonomyCard } from './project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
 
 const SECTIONS = [
@@ -475,11 +474,6 @@ export function ProjectSettingsPage() {
                 </div>
               </SettingsCard>
             )}
-          </Section>
-        )}
-        {live && wireProject?.repoKind === 'github' && id !== undefined && teamId !== undefined && (
-          <Section>
-            <ProjectAutonomyCard projectId={id} teamId={teamId} />
           </Section>
         )}
         <Section>

@@ -96,8 +96,8 @@ test('upgrade drops dead tables and columns and keeps live rows', () => {
     seed(sqlite, directory);
     migrateAll(sqlite);
     expectDeadSurfaceGone(sqlite);
-    expect(sqlite.prepare('SELECT id, plan, actionTier FROM team').all()).toEqual([
-      { id: 'team', plan: 'free', actionTier: 'full' },
+    expect(sqlite.prepare('SELECT id, plan FROM team').all()).toEqual([
+      { id: 'team', plan: 'free' },
     ]);
     expect(sqlite.prepare('SELECT id, online FROM machine').all()).toEqual([
       { id: 'machine', online: 1 },

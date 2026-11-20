@@ -1,7 +1,6 @@
 import {
   CONFIRM_ANNOUNCEMENT,
   claimedStepSchema,
-  DEFAULT_AUTONOMY_SETTINGS,
   machineUploadUrlsResponseSchema,
   PLAN_FILE_NAME,
 } from '@cairn/shared';
@@ -88,7 +87,7 @@ async function setupWorld() {
   const projectId = await postProject(s.app, 'demo');
   s.db
     .update(projectTable)
-    .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled: true } })
+    .set({ autonomy: { planAutoApproveEnabled: true } })
     .where(eq(projectTable.id, projectId))
     .run();
   const todoRes = await call(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -142,7 +141,7 @@ async function setupWorld() {
     setPlanAutoApprove(planAutoApproveEnabled: boolean) {
       s.db
         .update(projectTable)
-        .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, planAutoApproveEnabled } })
+        .set({ autonomy: { planAutoApproveEnabled } })
         .where(eq(projectTable.id, projectId))
         .run();
     },

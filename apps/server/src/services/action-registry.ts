@@ -28,7 +28,6 @@ import {
   SEND_CHOICE,
   settlePendingProposal,
 } from './action-proposals.js';
-import { actionTierOf } from './autonomy.js';
 import { isOwner } from './instance-owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { deleteProject } from './projects.js';
@@ -388,8 +387,7 @@ export function executeAction(
   if (request.actor === 'coordinator' && asks) {
     const covered =
       isExternalActionClass(entry.class) &&
-      ((request.untrustedTurn !== true &&
-        actionTierOf(deps.db, request.teamId, request.scopeProjectId ?? null) === 'full') ||
+      (request.untrustedTurn !== true ||
         coveringGrant(deps.db, request.teamId, entry, targetId, input) !== undefined);
     if (!covered) {
       if (!request.threadId)

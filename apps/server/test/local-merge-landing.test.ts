@@ -1,4 +1,4 @@
-import { DEFAULT_AUTONOMY_SETTINGS, parseLocalMergeInstruction } from '@cairn/shared';
+import { parseLocalMergeInstruction } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -39,7 +39,7 @@ function fixture(localChecks = ['true']) {
       name: 'Local',
       repoKind: 'local',
       localPath: '/repo',
-      autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, localChecks },
+      autonomy: { localChecks },
     })
     .run();
   seedSessionRoute(s, { provider: 'stub-gw', modelId: 'stub', tools });
@@ -184,7 +184,7 @@ test.each(['delivery', 'archive', 'base', 'path', 'checks'] as const)(
           if (changed === 'checks')
             f.s.db
               .update(project)
-              .set({ autonomy: { ...DEFAULT_AUTONOMY_SETTINGS, localChecks: ['false'] } })
+              .set({ autonomy: { localChecks: ['false'] } })
               .run();
           return f.deps.gitOps.localCompareFiles();
         },
@@ -240,7 +240,6 @@ test.each(['base', 'checks', 'project', 'delivery'] as const)(
         .update(project)
         .set({
           autonomy: {
-            ...DEFAULT_AUTONOMY_SETTINGS,
             localChecks: ['false'],
           },
         })

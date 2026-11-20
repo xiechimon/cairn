@@ -1,4 +1,4 @@
-import { CHIEF_REMOTE_TOOLS, DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
+import { CHIEF_REMOTE_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { build, chiefMessage, message, plan, project, step, todo } from '../src/db/schema.js';
@@ -28,11 +28,7 @@ function seedGate() {
       latestBuildId: 'gate-build',
     })
     .run();
-  H.s.db
-    .update(project)
-    .set({ autonomy: DEFAULT_AUTONOMY_SETTINGS })
-    .where(eq(project.id, H.projectId))
-    .run();
+  H.s.db.update(project).set({ autonomy: {} }).where(eq(project.id, H.projectId)).run();
   H.s.db
     .insert(build)
     .values({

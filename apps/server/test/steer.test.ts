@@ -1,4 +1,4 @@
-import { type ClaimedStep, claimedStepSchema, DEFAULT_AUTONOMY_SETTINGS } from '@cairn/shared';
+import { type ClaimedStep, claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
@@ -228,7 +228,7 @@ describe('the steer server write surface (W3 #278)', () => {
         .set({
           repoKind: 'local',
           localPath: '/tmp/continue-local',
-          autonomy: DEFAULT_AUTONOMY_SETTINGS,
+          autonomy: {},
         })
         .where(eq(project.id, task.projectId))
         .run();

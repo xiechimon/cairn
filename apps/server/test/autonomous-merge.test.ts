@@ -1,4 +1,4 @@
-import { conversationBranch, DEFAULT_AUTONOMY_SETTINGS, patchTeamBodySchema } from '@cairn/shared';
+import { conversationBranch, patchTeamBodySchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
 import {
@@ -36,7 +36,7 @@ function fixture() {
       id: 'p',
       teamId: s.team.id,
       name: 'P',
-      autonomy: DEFAULT_AUTONOMY_SETTINGS,
+      autonomy: {},
     })
     .run();
   for (const id of ['a', 'b']) {
@@ -281,7 +281,7 @@ test.each([
   'abandoned local command on a %s task is %s without being reissued',
   (state, status) => {
     const { s } = fixture();
-    s.db.update(project).set({ repoKind: 'local', autonomy: DEFAULT_AUTONOMY_SETTINGS }).run();
+    s.db.update(project).set({ repoKind: 'local', autonomy: {} }).run();
     s.db
       .update(todo)
       .set({

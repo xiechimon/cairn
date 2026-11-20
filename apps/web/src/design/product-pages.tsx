@@ -3,7 +3,6 @@ import { Button } from '../components/ui/button.js';
 import { Popover, PopoverTrigger } from '../components/ui/popover.js';
 import { Folder } from '../icons/index.js';
 import { DirBrowser } from '../pages/dir-browser.js';
-import { ProjectAutonomyCard } from '../pages/project-autonomy-card.js';
 import { ProjectBaseBranchSelect } from '../pages/project-base-branch-select.js';
 import type { GalleryTheme } from './design-doc.js';
 import { GALLERY_PROJECT, PROJECT, TEAM } from './product-fixtures.js';
@@ -47,16 +46,6 @@ export function ProductPagesSection({ theme }: { theme: GalleryTheme }) {
       title="Page parts"
       lede="Pieces of the project and schedules pages that are more than a settings row."
     >
-      <Specimen
-        id="background-tasks"
-        title="Background tasks"
-        note="ProjectAutonomyCard; saving needs the server and reports an error here"
-        stage="canvas"
-      >
-        <div className="w-160">
-          <ProjectAutonomyCard projectId={PROJECT} teamId={TEAM} />
-        </div>
-      </Specimen>
       <Specimen
         id="folder-and-branch-pickers"
         title="Folder and branch pickers"

@@ -13,7 +13,7 @@ import {
 } from '@cairn/shared';
 import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { readNotifyPref, readNotifySound } from '../board/notify-pref.js';
+import { readNotifyPref } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { desktopNotify } from '../desktop-shell.js';
 import { EN } from '../i18n/en.js';
@@ -179,13 +179,7 @@ function fireDesktopNotification(record: NotificationRecord): void {
   const href = notificationHref(record);
   const desktop = desktopNotify();
   if (desktop !== null) {
-    desktop.show({
-      title,
-      body,
-      href,
-      tag: record.id,
-      sound: readNotifySound(safeLocalStorage()),
-    });
+    desktop.show({ title, body, href, tag: record.id });
     return;
   }
   if (!document.hidden) return;

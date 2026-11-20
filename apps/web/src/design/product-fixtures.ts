@@ -1,10 +1,8 @@
 import type {
-  AutonomyRecord,
   FsListResult,
   GithubIssueEcho,
   ProjectRecord,
   TodoRecord as SharedTodoRecord,
-  TeamAutonomy,
 } from '@cairn/shared';
 import type { ChiefQuestionItem } from '../chief/question-chips.js';
 import type {
@@ -396,15 +394,6 @@ export const QUESTION_CANCELLED: ChiefQuestionItem = {
   ...QUESTION_PENDING,
   requestId: 'req-3',
   status: 'cancelled',
-};
-
-export const TEAM_AUTONOMY: TeamAutonomy = {
-  actionTier: 'guarded',
-};
-
-export const AUTONOMY: AutonomyRecord = {
-  actionTier: 'guarded',
-  actionTierOverride: null,
 };
 
 export const ISSUE_ECHO: GithubIssueEcho = {

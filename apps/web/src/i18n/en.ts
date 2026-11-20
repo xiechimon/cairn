@@ -707,9 +707,6 @@ export const EN: Record<string, string> = {
   名称: 'Name',
   语言: 'Language',
   推送通知: 'Push notifications',
-  提醒声音: 'Notification sound',
-  试听: 'Preview',
-  无声: 'Silent',
   在这台设备上接收推送: 'Push on this device',
   '需要你决定时立即推送，其余进展并入每日两次简报':
     'Push immediately when a decision is needed; everything else lands in the twice-daily digest',
@@ -1004,13 +1001,6 @@ export const EN: Record<string, string> = {
   重置图标: 'Reset icon',
   保存仓库: 'Save repository',
   '仓库保存失败，请重试。': 'Failed to save repository. Try again.',
-  对外动作: 'External actions',
-  先问我: 'Ask me first',
-  完全放手: 'Full access',
-  跟随全局: 'Follow global',
-  '跟随全局（{tier}）': 'Follow global ({tier})',
-  '项目未单独设置时，跟随此项': 'Projects without their own setting follow this',
-  '比如发送、发布': 'Such as sending or publishing',
   冷却中: 'cooling down',
   '转换失败，请重试。': 'Conversion failed. Try again.',
   '转换为 GitHub 形态': 'Convert to GitHub form',
@@ -2789,8 +2779,6 @@ export const EN: Record<string, string> = {
     'Cairn picks out windsurf_api_key; the token is stored encrypted',
   本任务的执行机与执行要求: 'Per-task Runner and capability requirements',
   'Coordinator 的长期记忆': "The Coordinator's long-term memory",
-  '发送、发布等对外动作，会先问过再跑，或完全交给它。':
-    'Send, publish and other external actions ask first, or run entirely on their own.',
   '转换后以 GitHub 仓为唯一真值源，本机路径转为执行加速位。':
     'After conversion the GitHub repo becomes the single source of truth and the local path becomes an execution accelerator.',
   '经 Composio 接入的应用都用它授权': 'Apps connected through Composio authorize with it',
@@ -2817,7 +2805,6 @@ export const EN: Record<string, string> = {
     'Site logins for browser fill live here. The Coordinator fills the username and password only on sites you approved, and neither value ever appears on a page or in a conversation.',
   'Coordinator 第一次在某个网站代填时会请求批准；撤销后重新请求。':
     'The Coordinator asks for approval the first time it fills on a site; revoking makes it ask again.',
-  系统通知的提示音: 'The sound system notifications play',
   锁屏也能收到: 'Arrives even on the lock screen',
   '按钮和回复都支持。': 'Buttons and replies are supported.',
   '在私聊里和 Coordinator 对话。': 'Talk to the Coordinator in DMs.',

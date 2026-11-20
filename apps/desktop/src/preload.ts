@@ -3,7 +3,6 @@ import type {
   AntigravityLoginOutcome,
   DesktopMenuCommand,
   DesktopNotifyPayload,
-  DesktopNotifySound,
   DesktopTrayOpen,
   DesktopTrayState,
   DesktopUpdateState,
@@ -36,7 +35,6 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   },
   notify: {
     show: (payload: DesktopNotifyPayload): void => ipcRenderer.send('desktop-notify', payload),
-    preview: (sound: DesktopNotifySound): void => ipcRenderer.send('desktop-notify:preview', sound),
   },
   tray: {
     state: (): Promise<DesktopTrayState | null> => ipcRenderer.invoke('desktop-tray:state'),

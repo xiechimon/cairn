@@ -54,7 +54,6 @@ const noted: ActionEntry = {
 
 function world() {
   const s = bootServer();
-  s.db.update(teamTable).set({ actionTier: 'guarded' }).run();
   s.db.insert(projectTable).values({ id: 'project-a', teamId: s.team.id, name: 'Alpha' }).run();
   s.db
     .insert(chief)
@@ -821,7 +820,7 @@ describe('send and submit action classes', () => {
     s: ReturnType<typeof world>,
     entry: ActionEntry,
     input: unknown,
-    scopeProjectId: string | null = 'project-a',
+    untrustedTurn = true,
   ) {
     return executeAction(
       { db: s.db, reposDir: s.reposDir },
@@ -832,7 +831,8 @@ describe('send and submit action classes', () => {
         surface: 'coordinator',
         teamId: s.team.id,
         threadId: 'thread-a',
-        scopeProjectId,
+        scopeProjectId: 'project-a',
+        untrustedTurn,
         registry,
       },
     );
@@ -854,7 +854,7 @@ describe('send and submit action classes', () => {
         .get()?.content,
     );
 
-  test('a send-class action asks with a parked card on the guarded tier and runs nothing', () => {
+  test('a send-class action in an untrusted turn asks with a parked card and runs nothing', () => {
     const s = world();
     const proposed = call(s, sendMessage, sendInput);
     expect(proposed.status).toBe('pending');
@@ -872,14 +872,14 @@ describe('send and submit action classes', () => {
     s.dispose();
   });
 
-  test('a submit-class action asks on the guarded tier', () => {
+  test('a submit-class action in an untrusted turn asks', () => {
     const s = world();
     const proposed = call(s, submitForm, { host: 'jobs.example.com', formId: 'apply' });
     expect(proposed.status).toBe('pending');
     s.dispose();
   });
 
-  test('non-send actions pass without asking on the guarded tier', () => {
+  test('non-send actions keep their own class rule', () => {
     const s = world();
     const archived = executeAction(
       { db: s.db, reposDir: s.reposDir },
@@ -954,14 +954,12 @@ describe('send and submit action classes', () => {
     s.dispose();
   });
 
-  test('the full tier runs send-class actions without asking', async () => {
+  test('a trusted turn runs send-class actions without asking', () => {
     const s = world();
-    const patched = await req(s.app, 'PATCH', '/api/projects/project-a/autonomy', {
-      actionTier: 'full',
-    });
-    expect(patched.status).toBe(200);
-    expect(((await patched.json()) as { actionTier: string }).actionTier).toBe('full');
-    expect(call(s, sendMessage, sendInput)).toMatchObject({ status: 'executed' });
+    expect(call(s, sendMessage, sendInput, false)).toMatchObject({ status: 'executed' });
+    expect(call(s, submitForm, { host: 'jobs.example.com', formId: 'apply' }, false)).toMatchObject(
+      { status: 'executed' },
+    );
     expect(s.db.select().from(actionProposal).all()).toEqual([]);
     s.dispose();
   });
