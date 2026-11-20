@@ -130,3 +130,31 @@ for (const surface of SURFACES) {
     expect(overflow, 'R1: scrollWidth <= innerWidth at 390px').toBeLessThanOrEqual(0);
   });
 }
+
+test('tasks panel: a row checkbox keeps its 16px box and takes clicks across 24px', async ({
+  page,
+}) => {
+  await open(page, '/app?scenario=home-c&pane=tasks');
+  const boxes = page.locator('[data-slot=task-row-frame] [role=checkbox]');
+  await expect(boxes.first()).toBeVisible();
+  const misses = await boxes.evaluateAll((els) =>
+    els.flatMap((el) => {
+      const box = el.getBoundingClientRect();
+      const x = box.left + box.width / 2;
+      const y = box.top + box.height / 2;
+      const reach = [
+        [x - 11.5, y],
+        [x + 11.5, y],
+        [x, y - 11.5],
+        [x, y + 11.5],
+      ];
+      const missed = reach.filter(
+        ([px, py]) => document.elementFromPoint(px ?? 0, py ?? 0)?.closest('[role=checkbox]') !== el,
+      );
+      return missed.length > 0 || Math.round(box.width) !== 16
+        ? [`${el.getAttribute('aria-label')}: ${box.width}px, ${missed.length} edge misses`]
+        : [];
+    }),
+  );
+  expect(misses, 'A1: a desktop click target is at least 24px').toEqual([]);
+});
