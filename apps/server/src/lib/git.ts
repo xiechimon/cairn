@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { rmSync } from 'node:fs';
+import { realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   GitCgiRequest,
@@ -18,6 +18,15 @@ export interface GitRunResult {
   stderr: string;
 }
 
+const REPO_BINDING_ENV =
+  /^GIT_(DIR|WORK_TREE|INDEX_FILE|PREFIX|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|NAMESPACE|CEILING_DIRECTORIES)$/;
+
+function inheritedGitEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) if (REPO_BINDING_ENV.test(key)) delete env[key];
+  return env;
+}
+
 export function runGit(
   args: string[],
   opts: { cwd?: string; stdin?: Uint8Array; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
@@ -25,7 +34,7 @@ export function runGit(
   return new Promise((resolve, reject) => {
     const child = spawn('git', args, {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      env: { ...inheritedGitEnv(), ...opts.env },
       windowsHide: true,
       ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
     });
@@ -37,7 +46,7 @@ export function runGit(
     });
     child.on('error', reject);
     child.on('close', (code) =>
-      resolve({ code: code ?? 0, stdout: Buffer.concat(stdout), stderr }),
+      resolve({ code: code ?? 1, stdout: Buffer.concat(stdout), stderr }),
     );
     // an in-flight stdin write becomes EPIPE when the child closes its read end early
     child.stdin.on('error', () => {});
@@ -416,11 +425,13 @@ export const systemGitOps: GitOps = {
 
   async isGitRepo(dir) {
     try {
-      const r = await runGit(['rev-parse', '--is-inside-work-tree'], {
+      const r = await runGit(['rev-parse', '--show-toplevel'], {
         cwd: dir,
         timeoutMs: META_TIMEOUT_MS,
       });
-      return r.code === 0 && r.stdout.toString('utf8').trim() === 'true';
+      if (r.code !== 0) return false;
+      const toplevel = r.stdout.toString('utf8').trim();
+      return toplevel !== '' && realpathSync(toplevel) === realpathSync(dir);
     } catch {
       return false;
     }
