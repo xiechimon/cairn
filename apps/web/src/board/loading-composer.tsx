@@ -22,7 +22,6 @@ export function LoadingComposer({ draft, onDraftChange, placeholder }: LoadingCo
         }}
         placeholder={placeholder}
         above={null}
-        tools={null}
         inputTestId="loading-composer-input"
       />
     </div>

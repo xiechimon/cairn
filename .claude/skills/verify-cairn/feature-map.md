@@ -454,19 +454,19 @@ Reach:
 
 ### first-run
 
-**First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped, centrality 2). The setup page before the first project, the Coordinator setup prompt and the first-PR card that take a new user to a first merged PR.
 
-States: A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
+States: A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards, while no model source is connected, an empty Coordinator home shows one centered sentence and a primary connect-a-model-source button, and a conversation with history shows one notice line after it; a missing or offline Runner shows the same notice line; then a first-PR card.
 
 Reach:
 
 1. `open /app`
 2. `click testid:first-run-confirm`
-3. `click testid:composer-setup-chip`
+3. `click testid:setup-prompt-action`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `composer-setup-reconnect`, `first-run-add-provider`, `first-run-confirm`, `first-run-frame`, `first-run-pick-coordinator`, `first-run-setup`, `first-run-step-*`, `first-run-task-model-note`, `first-run-vm`
+- Test ids in its code: `first-run-add-provider`, `first-run-confirm`, `first-run-frame`, `first-run-pick-coordinator`, `first-run-setup`, `first-run-step-*`, `first-run-task-model-note`, `first-run-vm`, `setup-prompt`, `setup-prompt-action`, `setup-prompt-hint`, `setup-prompt-label`, `setup-prompt-reconnect`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state and the 10-minute path

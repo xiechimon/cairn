@@ -414,10 +414,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         }),
         (error: unknown) => {
           if (isCoordinatorNotReady(error))
-            toastCoordinatorNotReady(
-              t('Coordinator 还不能回答'),
-              t('点输入框下方的按钮，把模型来源、执行机和 Coordinator 接上，再发一次。'),
-            );
+            toastCoordinatorNotReady(t('Coordinator 还不能回答'), t('先接入模型来源，再发一次。'));
           else toastError(t('发送失败，请重试。'), error);
           throw error;
         },

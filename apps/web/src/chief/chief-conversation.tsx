@@ -221,7 +221,7 @@ export interface ChiefConversationProps {
   prefill?: { text: string; key: number } | null;
   placeholder?: string;
   composerReplacement?: ReactNode;
-  composerTools?: ReactNode;
+  notice?: ReactNode;
   showBindGate?: boolean;
   pendingComments?: PendingComments | null;
 }
@@ -252,7 +252,7 @@ export function ChiefConversation({
   prefill = null,
   placeholder,
   composerReplacement,
-  composerTools,
+  notice,
   showBindGate = true,
   pendingComments,
 }: ChiefConversationProps) {
@@ -799,10 +799,10 @@ export function ChiefConversation({
           onRetry={failure.retry}
           onDismiss={() => setDismissedFailure(failure.key)}
         />
+      ) : chief.fallbackModel != null ? (
+        <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
       ) : (
-        chief.fallbackModel != null && (
-          <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
-        )
+        notice
       )}
       <div
         {...drop.bind}
@@ -867,7 +867,6 @@ export function ChiefConversation({
                   </>
                 )
               }
-              tools={answerActive ? null : composerTools}
               context={chief.context}
               running={chief.running}
               threadId={chief.threadId ?? null}
@@ -888,7 +887,6 @@ export function ChiefConversation({
                 composerRef={answerActive ? composerRef : undefined}
                 tab={answerActive ? queueTab : null}
                 above={answerActive ? capsules : null}
-                tools={answerActive ? composerTools : null}
                 context={chief.context}
                 running={chief.running}
                 threadId={chief.threadId ?? null}

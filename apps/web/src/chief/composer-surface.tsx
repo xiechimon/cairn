@@ -87,7 +87,6 @@ export interface ComposerSurfaceProps {
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   tab?: ReactNode;
   above: ReactNode;
-  tools: ReactNode;
   context?: ChiefContextUsage | null | undefined;
   running?: boolean | undefined;
   threadId?: string | null;
@@ -117,7 +116,6 @@ export function ComposerSurface({
   composerRef,
   tab,
   above,
-  tools,
   context = null,
   running = false,
   threadId = null,
@@ -301,14 +299,6 @@ export function ComposerSurface({
           seeded={seeded}
           onDismissSeeded={(index) => setSeeded((current) => current.filter((_, i) => i !== index))}
         />
-        {narrow && (
-          <div
-            data-slot="composer-tools"
-            className="mb-1 flex flex-wrap items-center gap-1 empty:hidden"
-          >
-            {tools}
-          </div>
-        )}
         <div className={cn('flex gap-2', narrow ? 'items-center' : 'items-end')}>
           {narrow && plusMenu}
           <div className="relative min-w-0 flex-1">
@@ -523,7 +513,6 @@ export function ComposerSurface({
       {!narrow && (
         <div className="mt-1.5 flex items-center gap-0 px-1.5">
           {plusMenu}
-          {tools}
           {showMeter && (
             <span className="ml-auto flex">
               <ContextMeterRing context={meterContext} running={running} loading={contextLoading} />

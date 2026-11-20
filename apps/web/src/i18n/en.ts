@@ -379,6 +379,9 @@ export const EN: Record<string, string> = {
   '添加模型服务商，或添加 Claude 订阅': 'Add a provider, or add a Claude subscription',
   连接一台执行机: 'Connect a Runner',
   'Coordinator 还缺模型': 'The Coordinator needs a model',
+  '先接入一个模型来源，Coordinator 才能回复你': 'Connect a model source so the Coordinator can reply',
+  'Coordinator 现在没有模型可用': 'The Coordinator has no model to use right now',
+  接入模型来源后就能发消息: 'Connect a model source to send messages',
   '添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机':
     'Add a provider the Coordinator can use, or a Claude subscription and a Runner with Claude Code',
   'Coordinator 和任务都能用': 'Serves the Coordinator and tasks',
@@ -425,8 +428,7 @@ export const EN: Record<string, string> = {
   '{n} 台执行机都离线': '{n#1 Runner is|# Runners are} offline',
   '在其中一台上运行 `{command}` 让它重新上线': 'Run `{command}` on one of them to bring it back',
   'Coordinator 还不能回答': 'The Coordinator cannot answer yet',
-  '点输入框下方的按钮，把模型来源、执行机和 Coordinator 接上，再发一次。':
-    'Use the button below the box to connect a model source, a Runner and the Coordinator, then send again.',
+  '先接入模型来源，再发一次。': 'Connect a model source, then send again.',
 
   '{n} 分': '{n}m',
   '{n} 小时': '{n}h',

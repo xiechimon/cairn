@@ -29,7 +29,6 @@ import {
   ArchivedProjectBar,
   type ArchivedProjectState,
 } from './archived-project-bar.js';
-import { ComposerSetupHint, useComposerSetupStep } from './composer-setup-hint.js';
 import { useDesignComposer } from './design/design-composer.js';
 import type { DesignTarget } from './design/design-route.js';
 import { useDesignSplit } from './design/design-split.js';
@@ -40,6 +39,7 @@ import { NarrowTopControls, useNarrowChrome } from './narrow-chrome.js';
 import { composeRequest } from './open-composer.js';
 import { PhoneTabs } from './phone-tabs.js';
 import { splitProjectsByArchive } from './project-archive.js';
+import { SetupPrompt, useSetupStep } from './setup-prompt.js';
 import { waitingProjectIds } from './sidebar-projects.js';
 import { TasksPanel } from './tasks-panel.js';
 import {
@@ -204,7 +204,9 @@ export function HomeC({
   const { createTodo } = useApiMutations(teamId);
   const projectsQuery = useProjects(teamId, live);
   const mentionGroups = useMentionGroups();
-  const setupStep = useComposerSetupStep();
+  const liveSetupStep = useSetupStep();
+  const setupStep = archived === null ? liveSetupStep : null;
+  const modelsMissing = setupStep?.next === 'models';
   usePrs(teamId, undefined, live);
   const activeProjects = splitProjectsByArchive(projectsQuery.data ?? []).active;
   const saveProjectId =
@@ -274,9 +276,10 @@ export function HomeC({
   const [only, ...rest] = stream;
   const fallbackOnly =
     only !== undefined && rest.length === 0 && !(chiefData.stream ?? []).includes(only);
-  const conversation = stream.filter(
-    (item) => !(item.kind === 'question' && item.status === 'pending'),
-  );
+  const setupEmpty = modelsMissing && fallbackOnly;
+  const conversation = setupEmpty
+    ? []
+    : stream.filter((item) => !(item.kind === 'question' && item.status === 'pending'));
   const questionScope = useMemo(
     () =>
       projectId === null
@@ -295,11 +298,13 @@ export function HomeC({
     return full[at];
   }, [chiefData.stream]);
   const homeSpiral = !narrow && fallbackOnly && projectId === null && archived === null;
-  const quickReplies = fallbackOnly
-    ? STARTERS.map((label) => t(label))
-    : quickOwner !== undefined && stream.includes(quickOwner)
-      ? chiefData.quickReplies
-      : undefined;
+  const quickReplies = setupEmpty
+    ? []
+    : fallbackOnly
+      ? STARTERS.map((label) => t(label))
+      : quickOwner !== undefined && stream.includes(quickOwner)
+        ? chiefData.quickReplies
+        : undefined;
   const scopeQuestions = (node: ReactNode) => (
     <QuestionScopeContext.Provider value={questionScope}>{node}</QuestionScopeContext.Provider>
   );
@@ -481,8 +486,9 @@ export function HomeC({
         ? 'error'
         : 'loading'
       : surface.load;
-  const composerPlaceholder =
-    projectName != null
+  const composerPlaceholder = modelsMissing
+    ? t('接入模型来源后就能发消息')
+    : projectName != null
       ? t('在 {name} 里发消息', { name: projectName })
       : t('给 Coordinator 发消息');
   const archivedBar =
@@ -609,7 +615,7 @@ export function HomeC({
               todoGlances={todoGlances}
               prefill={prefill}
               placeholder={composerPlaceholder}
-              composerTools={setupStep !== null && <ComposerSetupHint step={setupStep} />}
+              notice={setupStep !== null && <SetupPrompt step={setupStep} empty={setupEmpty} />}
               composerRef={(node) => {
                 composerRef.current = node;
               }}

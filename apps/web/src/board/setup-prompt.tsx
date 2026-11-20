@@ -4,7 +4,9 @@ import { Link } from 'react-router';
 import { useChief, useMachines, useProviders } from '../api/hooks.js';
 import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
+import { BANNER_CLS } from '../chief/chief-outage-banner.js';
 import { Button } from '../components/ui/button.js';
+import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Key, Monitor } from '../icons/index.js';
@@ -19,17 +21,14 @@ import {
   nextOpenStep,
 } from './first-run-checklist-model.js';
 
-const CHIP_CLS =
-  "h-7 flex-none cursor-pointer gap-1.5 rounded-lg border-none bg-(--menu-hover) px-2 text-meta font-normal text-(--text-secondary) hover:text-(--foreground) active:not-aria-[haspopup]:translate-y-0 [&_svg:not([class*='size-'])]:size-auto";
-
 const CODE_CLS = 'rounded bg-(--menu-hover) px-1 py-px font-mono text-meta text-(--text-secondary)';
 
-export interface ComposerSetupStep {
+export interface SetupStep {
   next: FirstRunStepId;
   models: ModelSides;
 }
 
-export function useComposerSetupStep(): ComposerSetupStep | null {
+export function useSetupStep(): SetupStep | null {
   const { live, teamId } = useLiveData();
   const providersQ = useProviders(teamId, live);
   const routingQ = useModelRouting(teamId, live);
@@ -114,62 +113,95 @@ export function runnerStep(
   };
 }
 
-export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSetupStep }) {
+function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean }) {
+  const { t } = useI18n();
+  const href = settingsHref('routing');
+  const hint = models.tasks
+    ? t('添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机')
+    : t('添加模型服务商，或添加 Claude 订阅');
+  if (empty) {
+    return (
+      <div
+        data-testid="setup-prompt"
+        data-step="models"
+        data-variant="empty"
+        className="mx-auto mb-6 flex w-[calc(100%-2rem)] max-w-chat flex-none flex-col items-center gap-3 text-center"
+      >
+        <p className="m-0 text-ui text-balance text-foreground">
+          {models.tasks
+            ? t('Coordinator 还缺模型')
+            : t('先接入一个模型来源，Coordinator 才能回复你')}
+        </p>
+        <Button
+          data-testid="setup-prompt-action"
+          className={`${DIALOG_PRIMARY_BUTTON} pointer-coarse:h-11`}
+          render={<Link to={href} />}
+        >
+          <Key width={16} height={16} />
+          {t('接入模型来源')}
+        </Button>
+        <p className="m-0 text-meta text-balance text-content-tertiary">{hint}</p>
+      </div>
+    );
+  }
+  return (
+    <div
+      role="status"
+      data-testid="setup-prompt"
+      data-step="models"
+      data-variant="line"
+      className={`${BANNER_CLS} items-center shadow-(--e1)`}
+    >
+      <Key aria-hidden="true" width={20} height={20} className="flex-none text-(--waiting-ink)" />
+      <span className="min-w-0 flex-1">{t('Coordinator 现在没有模型可用')}</span>
+      <Button
+        variant="outline"
+        size="sm"
+        data-testid="setup-prompt-action"
+        className="flex-none px-3"
+        render={<Link to={href} />}
+      >
+        {t('接入模型来源')}
+      </Button>
+    </div>
+  );
+}
+
+function MachinePrompt() {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
   const [bridge] = useState(localRunnerBridge);
   const [reconnecting, setReconnecting] = useState(false);
-  const { reconnect, ...runner } = runnerStep(
+  const { label, hint, reconnect } = runnerStep(
     machinesQ.data,
     `${PUBLISHED_PACKAGES.cli.command} start`,
     bridge !== null,
     t,
   );
-  const copy: Record<FirstRunStepId, { icon: ReactNode; label: string; hint: ReactNode }> = {
-    models: {
-      icon: <Key width={16} height={16} />,
-      ...(models.tasks
-        ? {
-            label: t('Coordinator 还缺模型'),
-            hint: t('添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机'),
-          }
-        : {
-            label: t('接入模型来源'),
-            hint: t('添加模型服务商，或添加 Claude 订阅'),
-          }),
-    },
-    machine: {
-      icon: <Monitor width={16} height={16} />,
-      ...runner,
-    },
-  };
-  const { icon, label, hint } = copy[next];
-  const href = settingsHref(next === 'models' ? 'routing' : 'machines');
   return (
-    <>
-      <Button
-        variant="ghost"
-        data-testid="composer-setup-chip"
-        data-step={next}
-        className={CHIP_CLS}
-        render={<Link to={href} />}
-      >
-        {icon}
-        {label}
-      </Button>
-      <span
-        data-testid="composer-setup-hint"
-        className="ml-1 min-w-0 truncate text-meta text-(--text-tertiary)"
-      >
-        {hint}
+    <div
+      role="status"
+      data-testid="setup-prompt"
+      data-step="machine"
+      data-variant="line"
+      className={`${BANNER_CLS} items-center shadow-(--e1)`}
+    >
+      <Monitor aria-hidden="true" width={20} height={20} className="flex-none text-icon" />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span data-testid="setup-prompt-label" className="text-foreground">
+          {label}
+        </span>
+        <span data-testid="setup-prompt-hint" className="min-w-0 truncate">
+          {hint}
+        </span>
       </span>
-      {next === 'machine' && reconnect && bridge !== null && (
+      {reconnect && bridge !== null ? (
         <Button
-          variant="ghost"
-          size="xs"
-          data-testid="composer-setup-reconnect"
-          className="ml-1 flex-none text-(--text-secondary)"
+          variant="outline"
+          size="sm"
+          data-testid="setup-prompt-reconnect"
+          className="flex-none px-3"
           disabled={reconnecting}
           onClick={() => {
             setReconnecting(true);
@@ -178,7 +210,25 @@ export function ComposerSetupHint({ step: { next, models } }: { step: ComposerSe
         >
           {t(reconnecting ? '正在重新连接…' : '重新连接')}
         </Button>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          data-testid="setup-prompt-action"
+          className="flex-none px-3"
+          render={<Link to={settingsHref('machines')} />}
+        >
+          {t('查看执行机')}
+        </Button>
       )}
-    </>
+    </div>
+  );
+}
+
+export function SetupPrompt({ step, empty }: { step: SetupStep; empty: boolean }) {
+  return step.next === 'models' ? (
+    <ModelsPrompt models={step.models} empty={empty} />
+  ) : (
+    <MachinePrompt />
   );
 }
