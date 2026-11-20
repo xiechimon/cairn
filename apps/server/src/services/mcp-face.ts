@@ -2,6 +2,7 @@ import {
   BRAND,
   CHIEF_REMOTE_TOOLS,
   githubReadToolParamsSchemas,
+  isRegisteredMachine,
   MCP_TOOL_REGISTRY,
   RUNNER_OS,
   runnerOsSchema,
@@ -218,7 +219,12 @@ export async function executeMcpTool(
       return json(scanned.map((k) => ({ id: k.id, name: k.name, description: k.description })));
     }
     case 'machines': {
-      const rows = db.select().from(machine).where(eq(machine.teamId, ctx.teamId)).all();
+      const rows = db
+        .select()
+        .from(machine)
+        .where(eq(machine.teamId, ctx.teamId))
+        .all()
+        .filter(isRegisteredMachine);
       return json(
         rows.map((m) => ({
           id: m.id,

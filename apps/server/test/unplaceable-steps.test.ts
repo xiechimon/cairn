@@ -13,7 +13,9 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { BLOCKED_BY_HOLD } from '../src/services/blockers.js';
+import { seedLocalMachine } from '../src/services/machines.js';
 import { RUNNER_OFFLINE_NOTICE_MS, sweepOfflineRunners } from '../src/services/runner-offline.js';
+import { stepQueueProjector } from '../src/services/step-queue.js';
 import { NO_MACHINE_ALERT_MS, sweepUnplaceableSteps } from '../src/services/unplaceable-steps.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
 
@@ -270,6 +272,32 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     expect(extra).toBeUndefined();
     expect(notice?.machineName).toBe('omarchy');
     expect(notice?.todos.filter((t) => t.state === 'waiting')).toHaveLength(10);
+  });
+
+  test('the host seat no daemon ever connected is not a Runner a task can start on or wait for', async () => {
+    const w = await world();
+    seedLocalMachine(w.s.db, w.s.team.id);
+    routeOf(w, null);
+    const created = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/todos`, {
+      title: 'Fix the Safari login loop',
+      spec: 'Safari bounces between /login and /app after sign-in',
+    });
+    const { id: todoId } = (await created.json()) as { id: string };
+    const started = await req(w.s.app, 'POST', `/api/projects/${w.projectId}/builds`, {
+      todoIds: [todoId],
+    });
+    expect(started.status).toBe(409);
+    const stepId = pendingStep(w);
+    sweepOfflineRunners(w.s.svc, Date.now());
+    expect(notices(w)).toEqual([]);
+    const queue = stepQueueProjector(w.s.db, w.s.team.id).project({
+      id: stepId,
+      createdAt: Date.now(),
+      homeMachineId: null,
+      holdReason: null,
+      holdUntil: null,
+    });
+    expect(queue?.waitingFor).toBeNull();
   });
 
   test('a task held behind another task is not counted as waiting for the Runner', async () => {

@@ -1,5 +1,5 @@
 import type { BuildRecord, TriggerSource } from '@cairn/shared';
-import { type RouteOverride, SESSION_BRIEF } from '@cairn/shared';
+import { isRegisteredMachine, type RouteOverride, SESSION_BRIEF } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { build, machine, project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -33,10 +33,16 @@ function namedMachineForStart(
   }
   if (teamDefaultMachineId(deps.db, todoRecord.teamId) !== null) return null;
   const registered = deps.db
-    .select({ id: machine.id, online: machine.online })
+    .select({
+      id: machine.id,
+      online: machine.online,
+      kind: machine.kind,
+      lastSeenAt: machine.lastSeenAt,
+    })
     .from(machine)
     .where(eq(machine.teamId, todoRecord.teamId))
-    .all();
+    .all()
+    .filter(isRegisteredMachine);
   const online = registered.filter((row) => row.online);
   const onlyOnline = online[0];
   if (online.length === 1 && onlyOnline !== undefined)

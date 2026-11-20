@@ -66,6 +66,14 @@ export const machineRecordSchema = z.object({
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
 
+export function isRegisteredMachine(row: {
+  kind: string;
+  online: boolean;
+  lastSeenAt?: number | null | undefined;
+}): boolean {
+  return row.kind !== 'local' || row.online || row.lastSeenAt != null;
+}
+
 export const machineFolderPinOpSchema = z.object({
   path: z.string().min(1).max(MACHINE_FOLDER_PATH_MAX),
   op: z.enum(['pin', 'enable', 'disable', 'remove']),

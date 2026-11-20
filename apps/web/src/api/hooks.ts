@@ -111,6 +111,7 @@ import {
   backupHealthSchema,
   backupNotice,
   IN_PROGRESS_PHASES,
+  isRegisteredMachine,
   SKILL_ENTRY_FILE,
   tasksQuerySchema,
 } from '@cairn/shared';
@@ -438,9 +439,7 @@ export const useSchedules = (enabled: boolean) =>
   });
 
 export function registeredMachines(machines: MachineRecord[]): MachineRecord[] {
-  return machines.filter(
-    (machine) => machine.kind !== 'local' || machine.online || machine.lastSeenAt != null,
-  );
+  return machines.filter(isRegisteredMachine);
 }
 
 export const useMachines = (teamId: string | undefined, enabled: boolean) =>

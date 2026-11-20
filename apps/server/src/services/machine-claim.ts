@@ -477,7 +477,12 @@ function claimChiefTurn(
     if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
     const sole = fallbackMachineId(
       db
-        .select({ id: machine.id, online: machine.online })
+        .select({
+          id: machine.id,
+          online: machine.online,
+          kind: machine.kind,
+          lastSeenAt: machine.lastSeenAt,
+        })
         .from(machine)
         .where(eq(machine.teamId, teamId))
         .all(),
@@ -614,6 +619,8 @@ async function tryClaim(
         .select({
           id: machine.id,
           online: machine.online,
+          kind: machine.kind,
+          lastSeenAt: machine.lastSeenAt,
           tokenHash: machine.tokenHash,
           capabilities: machine.capabilities,
         })

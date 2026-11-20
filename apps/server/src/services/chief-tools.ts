@@ -17,6 +17,7 @@ import {
   isChiefConversationId,
   isComposioSecretName,
   isMailSecretName,
+  isRegisteredMachine,
   isWaitingPhase,
   MODEL_SOURCE_RUNTIME_LABELS,
   SECRET_NAME_PATTERN,
@@ -482,7 +483,12 @@ export async function executeChiefTool(
       return json(rows);
     }
     case 'machines': {
-      const rows = db.select().from(machine).where(eq(machine.teamId, ctx.teamId)).all();
+      const rows = db
+        .select()
+        .from(machine)
+        .where(eq(machine.teamId, ctx.teamId))
+        .all()
+        .filter(isRegisteredMachine);
       return json(
         rows.map((m) => ({
           id: m.id,

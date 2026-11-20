@@ -1,4 +1,10 @@
-import { claudeRateBlock, isBuildStepKind, type RunnerOs, runnerOsOf } from '@cairn/shared';
+import {
+  claudeRateBlock,
+  isBuildStepKind,
+  isRegisteredMachine,
+  type RunnerOs,
+  runnerOsOf,
+} from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, type machine, step, team } from '../db/schema.js';
@@ -171,9 +177,10 @@ export function teamDefaultMachineId(db: Pick<Db, 'select'>, teamId: string): st
 }
 
 export function fallbackMachineId(
-  machines: readonly { id: string; online: boolean }[],
+  teamMachines: readonly Pick<MachineRow, 'id' | 'online' | 'kind' | 'lastSeenAt'>[],
   defaultMachineId: string | null,
 ): string | null {
+  const machines = teamMachines.filter(isRegisteredMachine);
   if (defaultMachineId !== null && machines.some((row) => row.id === defaultMachineId)) {
     return defaultMachineId;
   }
@@ -184,7 +191,10 @@ export function fallbackMachineId(
 
 export function platformFallbackMachineId(
   db: Db,
-  machines: readonly Pick<MachineRow, 'id' | 'online' | 'tokenHash' | 'capabilities'>[],
+  machines: readonly Pick<
+    MachineRow,
+    'id' | 'online' | 'kind' | 'lastSeenAt' | 'tokenHash' | 'capabilities'
+  >[],
   defaultMachineId: string | null,
   os: RunnerOs | undefined,
 ): string | null {
