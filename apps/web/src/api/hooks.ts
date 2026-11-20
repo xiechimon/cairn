@@ -1339,10 +1339,6 @@ export function useApiMutations(teamId: string | undefined) {
         qc.setQueryData(['projects', teamId], context?.previous);
       },
     }),
-    deleteProject: useMutation({
-      mutationFn: (id: string) => api.del<void>(`/api/projects/${id}`),
-      onSuccess: invalidateAll,
-    }),
     chiefSend: useMutation({
       mutationFn: (input: {
         threadId: string | null;

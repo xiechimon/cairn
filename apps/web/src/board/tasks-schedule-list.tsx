@@ -5,7 +5,7 @@ import { useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
-import { withCreatedSchedules, withoutDeleted } from '../fixtures/deletions.js';
+import { withCreatedSchedules, withoutClosed } from '../fixtures/deletions.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -46,7 +46,7 @@ export function TasksScheduleList({
   const [endedOpen, setEndedOpen] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
   const fixture = resolveScenario(searchParams);
-  const listed = withoutDeleted(
+  const listed = withoutClosed(
     live ? (query.data ?? []) : withCreatedSchedules(fixture.schedules ?? []),
   ).filter((row) => projectId === null || row.projectId === projectId);
   const scheduled = new Set(listed.map((row) => row.todoId));

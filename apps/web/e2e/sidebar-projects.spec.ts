@@ -26,13 +26,8 @@ async function open(
   await mockLive(page, { threads: [THREAD], messages: [], todos, tasks, projects }, (path, route, json) => {
     const m = /^\/api\/projects\/([^/]+)$/.exec(path);
     const method = route.request().method();
-    if (m === null || (method !== 'PATCH' && method !== 'DELETE')) return undefined;
+    if (m === null || method !== 'PATCH') return undefined;
     const index = projects.findIndex((row) => row.id === m[1]);
-    if (method === 'DELETE') {
-      patches.push({ id: m[1]!, body: 'DELETE' });
-      if (index >= 0) projects.splice(index, 1);
-      return json({});
-    }
     const body = route.request().postDataJSON() as Partial<Project>;
     patches.push({ id: m[1]!, body });
     if (fail.patch === true) return json({ error: 'boom' }, 500);
@@ -248,20 +243,6 @@ test('a failed in-place rename puts the old name back and says so', async ({ pag
   await expect(page.getByText('无法重命名项目。')).toBeVisible();
   await expect(rows(page)).toHaveText(['cairn', 'dogfood-sandbox']);
   expect(patches).toEqual([{ id: 'proj-2', body: { name: 'sandbox' } }]);
-});
-
-test('Delete asks for the name, then removes the project', async ({ page }) => {
-  const projects = [PROJECT, project('proj-2', 'dogfood-sandbox')];
-  const patches: { id: string; body: unknown }[] = [];
-  await open(page, projects, [], patches);
-  await openMenu(page, 'dogfood-sandbox');
-  await page.getByRole('menuitem', { name: '删除' }).click();
-  const confirm = page.getByRole('alertdialog', { name: '删除项目' });
-  await expect(confirm.getByRole('button', { name: '删除' })).toBeDisabled();
-  await confirm.getByRole('textbox').fill('dogfood-sandbox');
-  await confirm.getByRole('button', { name: '删除' }).click();
-  await expect(rows(page)).toHaveText(['cairn']);
-  expect(patches).toEqual([{ id: 'proj-2', body: 'DELETE' }]);
 });
 
 test('Project settings is the one page the row menu opens', async ({ page }) => {

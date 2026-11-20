@@ -1,23 +1,13 @@
 import type { ScheduleRecord } from './records.js';
 
-const deleted = new Set<string>();
-
-export function markDeleted(id: string): void {
-  deleted.add(id);
-}
-
 const closed = new Set<string>();
 
 export function markClosed(id: string): void {
   closed.add(id);
 }
 
-export function isDeleted(id: string): boolean {
-  return deleted.has(id);
-}
-
-export function withoutDeleted<T extends { id: string }>(todos: T[]): T[] {
-  return todos.filter((t) => !deleted.has(t.id) && !closed.has(t.id));
+export function withoutClosed<T extends { id: string }>(todos: T[]): T[] {
+  return todos.filter((t) => !closed.has(t.id));
 }
 
 const createdSchedules: ScheduleRecord[] = [];

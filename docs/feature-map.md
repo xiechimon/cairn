@@ -560,7 +560,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### projects
 
-**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, and an archived project opened read-only; the UI offers no project deletion.
 
 - Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
@@ -616,7 +616,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### sidebar
 
-**Sidebar** (shipped). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
+**Sidebar** (shipped). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, project settings, move to group, archive), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive) and the machine-status footer.
 
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)

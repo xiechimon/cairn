@@ -1,7 +1,7 @@
 import { useSearchParams } from 'react-router';
 import { useMachines, useProjectFiles, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { withoutDeleted } from '../fixtures/deletions.js';
+import { withoutClosed } from '../fixtures/deletions.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import type { FileMentionEntry, MentionGroups } from '../overlay/mention-token.js';
 
@@ -44,7 +44,7 @@ export function useThreadMentions(projectId: string | undefined): {
   const fixture = resolveScenario(searchParams);
   return {
     groups: {
-      todo: withoutDeleted(fixture.todos).map((t) => ({
+      todo: withoutClosed(fixture.todos).map((t) => ({
         id: t.id,
         label: `#${t.seqNum} ${t.title}`,
         seq: t.seqNum,

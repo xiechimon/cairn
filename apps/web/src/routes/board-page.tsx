@@ -47,7 +47,7 @@ import { useChiefRoot } from '../chief/chief-root.js';
 import { todoGlanceOf } from '../chief/chief-task-refs.js';
 import { toastError } from '../components/ui/toaster.js';
 import { TodoGlanceContext } from '../detail/segments.js';
-import { withoutDeleted } from '../fixtures/deletions.js';
+import { withoutClosed } from '../fixtures/deletions.js';
 import {
   fixtureProjects,
   setFixtureProjectArchived,
@@ -122,7 +122,7 @@ export function BoardPage() {
             : 'loading';
   const now = live ? Date.now() : fixture.now;
 
-  const fixtureTodos = useMemo(() => withoutDeleted(fixture.todos), [fixture]);
+  const fixtureTodos = useMemo(() => withoutClosed(fixture.todos), [fixture]);
   const liveTodos = useMemo(() => (todosQ.data ?? []).map(toDisplayTodo), [todosQ.data]);
   const todos = live ? liveTodos : fixtureTodos;
   const todoGlances = useMemo(

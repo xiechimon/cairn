@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useTasks } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { withoutDeleted } from '../fixtures/deletions.js';
+import { withoutClosed } from '../fixtures/deletions.js';
 import type { FixtureSet } from '../fixtures/records.js';
 import { type TasksView, tasksFromFixture, tasksFromQuery } from './tasks-sections.js';
 
@@ -12,7 +12,7 @@ export function useTasksView(fixture: FixtureSet): TasksView {
     () =>
       live
         ? tasksFromQuery(tasksQ.data)
-        : tasksFromFixture(withoutDeleted(fixture.todos), fixture.chief?.stream ?? []),
+        : tasksFromFixture(withoutClosed(fixture.todos), fixture.chief?.stream ?? []),
     [live, tasksQ.data, fixture],
   );
 }

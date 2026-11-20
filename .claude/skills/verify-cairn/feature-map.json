@@ -1615,8 +1615,8 @@
     {
       "id": "projects",
       "name": "Projects",
-      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.",
-      "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.",
+      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, and an archived project opened read-only; the UI offers no project deletion.",
+      "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -1873,7 +1873,7 @@
     {
       "id": "sidebar",
       "name": "Sidebar",
-      "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.",
+      "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, project settings, move to group, archive), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive) and the machine-status footer.",
       "states": "Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and collapsed with only the toggle, whose hover, edge or keyboard focus floats the whole sidebar as a peek.",
       "centrality": 3,
       "status": "shipped",

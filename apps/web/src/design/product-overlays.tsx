@@ -6,13 +6,12 @@ import { Kbd } from '../components/ui/kbd.js';
 import { useI18n } from '../i18n/provider.js';
 import { EllipsisVertical, Search, Settings } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
 import { type SearchContext, SearchPanel, useSearchState } from '../overlay/search-panel.js';
 import { BUILTIN_SLASH_COMMANDS, type SlashRow } from '../overlay/slash-commands.js';
 import { SlashMenu } from '../overlay/slash-menu.js';
-import { BOARD_FIXTURE, CARD_FACES, MENTION_GROUPS, PROJECT_TITLE } from './product-fixtures.js';
+import { BOARD_FIXTURE, CARD_FACES, MENTION_GROUPS } from './product-fixtures.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const SLASH_SECTIONS: { title: string; rows: SlashRow[] }[] = [
@@ -228,10 +227,7 @@ function ConfirmsSpecimen() {
     setLast(what);
     setOpen(null);
   };
-  const triggers = [
-    ['delete', 'Delete task'],
-    ['delete-project', 'Delete project'],
-  ] as const;
+  const triggers = [['delete', 'Delete task']] as const;
   return (
     <Specimen
       id="confirmations"
@@ -251,12 +247,6 @@ function ConfirmsSpecimen() {
         onClose={close}
         onConfirm={() => done('deleted')}
         summary={<span className="truncate">#44 Fix the stale branch badge on cards</span>}
-      />
-      <DeleteProjectConfirm
-        projectName={PROJECT_TITLE}
-        open={open === 'delete-project'}
-        onClose={close}
-        onConfirm={() => done('project deleted')}
       />
     </Specimen>
   );

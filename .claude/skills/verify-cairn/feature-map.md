@@ -913,9 +913,9 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, and an archived project opened read-only; the UI offers no project deletion.
 
-States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.
+States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.
 
 Reach:
 
@@ -1054,7 +1054,7 @@ Reach:
 
 ### sidebar
 
-**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
+**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, project settings, move to group, archive), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive) and the machine-status footer.
 
 States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and collapsed with only the toggle, whose hover, edge or keyboard focus floats the whole sidebar as a peek.
 
@@ -1067,8 +1067,8 @@ Reach:
 5. `click testid:archived-project-bar-unarchive`
 
 - Web routes: none
-- Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
+- Keyboard shortcuts in its code: `A`, `M`, `N`, `R`, `S`, `U`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

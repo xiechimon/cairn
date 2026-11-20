@@ -379,7 +379,8 @@ export const EN: Record<string, string> = {
   '添加模型服务商，或添加 Claude 订阅': 'Add a provider, or add a Claude subscription',
   连接一台执行机: 'Connect a Runner',
   'Coordinator 还缺模型': 'The Coordinator needs a model',
-  '先接入一个模型来源，Coordinator 才能回复你': 'Connect a model source so the Coordinator can reply',
+  '先接入一个模型来源，Coordinator 才能回复你':
+    'Connect a model source so the Coordinator can reply',
   'Coordinator 现在没有模型可用': 'The Coordinator has no model to use right now',
   接入模型来源后就能发消息: 'Connect a model source to send messages',
   '添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机':
@@ -1010,13 +1011,6 @@ export const EN: Record<string, string> = {
   'GitHub 仓库（owner/repo）': 'GitHub repository (owner/repo)',
   'GitHub 仓库格式应为 owner/repo。': 'GitHub repository must be in owner/repo form.',
   转换: 'Convert',
-  删除项目: 'Delete project',
-  // #1174：删除卡文案列真级联（正本 = server services/projects.ts 清图序：
-  // step/build → schedule → tag → todo → 托管 bare repo 磁盘面；技能不入库
-  // 亦不按项目授权，不在级联）。
-  // #207 确认弹层(r2 24d): 标题镜像删除任务句,确认输入行 {name} = 项目名。
-  '确定删除该项目？此操作不可撤销。': 'Delete this project? This cannot be undone.',
-  '输入 {name} 以确认删除': 'Type {name} to confirm deletion.',
 
   // —— chief drawer / settings (r5 100–116) ——
   主题: 'Thread',
@@ -1669,19 +1663,13 @@ export const EN: Record<string, string> = {
   取消归档: 'Unarchive',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
-  '已归档的项目和它们的对话会一直保留，直到你删除。': 'Kept until you delete them.',
+  '已归档的项目和它们的对话会一直保留，取消归档就能放回列表。':
+    'Archived projects and their conversations are kept. Unarchive one to put it back in the list.',
   '这个项目已归档。取消归档后才能发消息。':
     'This project is archived. Unarchive it to send messages.',
   '这个项目已归档。取消归档后才能修改。': 'This project is archived. Unarchive it to make changes.',
   没有已归档的项目: 'No archived projects',
   已归档的项目: 'Archived',
-  全部删除: 'Delete all',
-  没有可删除的已归档项目: 'No archived projects to delete',
-  '删除 {n} 个已归档的项目？': 'Delete {n#1 archived project|# archived projects}?',
-  '它们的对话、任务和仍在进行的工作会一起删除，无法恢复。':
-    'Their conversations, tasks and any work still running are deleted with them. This cannot be undone.',
-  '{n} 个项目没能删除，已留在列表里。':
-    '{n#1 project|# projects} could not be deleted and stay in the list.',
   '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',
   '批准失败，请重试。': 'Could not approve. Try again.',
   // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
@@ -1691,7 +1679,6 @@ export const EN: Record<string, string> = {
   '删除任务失败，请重试。': 'Could not delete the task. Try again.',
   '重试失败，请稍后再试。': 'Retry failed. Try again later.',
   '删除定时失败，请重试。': 'Could not delete the schedule. Try again.',
-  '删除项目失败，请重试。': 'Could not delete the project. Try again.',
   '断开连接失败，请重试。': 'Could not disconnect. Try again.',
   '添加模型服务失败，请重试。': 'Could not add the provider. Try again.',
   '新建 API 密钥失败，请重试。': 'Could not create the API key. Try again.',
