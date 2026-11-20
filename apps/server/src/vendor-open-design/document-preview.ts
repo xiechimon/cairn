@@ -60,8 +60,7 @@ export function buildDocumentPreview(file: { name: string; buffer: Buffer }): Do
 
 function previewDocx(zip: Zip): DocumentPreviewSection[] {
   const xml = readZipText(zip, 'word/document.xml');
-  const paragraphs = extractParagraphs(xml, /<w:p\b[\s\S]*?<\/w:p>/g);
-  return [{ title: 'Document', lines: paragraphs }];
+  return [{ title: 'Document', lines: extractParagraphs(xml) }];
 }
 
 function previewPptx(zip: Zip): DocumentPreviewSection[] {
@@ -85,22 +84,20 @@ function previewXlsx(zip: Zip): DocumentPreviewSection[] {
 function readSharedStrings(zip: Zip): string[] {
   const xml = readZipTextOrEmpty(zip, 'xl/sharedStrings.xml');
   if (!xml) return [];
-  return Array.from(xml.matchAll(/<si\b[\s\S]*?<\/si>/g)).map((m) =>
-    extractTextRuns(m[0]).join(''),
-  );
+  return xmlElements(xml, 'si').map((si) => extractTextRuns(si.body).join(''));
 }
 
 function readWorkbook(zip: Zip): WorkbookSheet[] {
   const workbookXml = readZipTextOrEmpty(zip, 'xl/workbook.xml');
   const relsXml = readZipTextOrEmpty(zip, 'xl/_rels/workbook.xml.rels');
   const rels = new Map<string, string>();
-  for (const rel of relsXml.matchAll(/<Relationship\b([^>]*)\/?>/g)) {
-    const attrs = parseAttrs(rel[1] ?? '');
+  for (const rel of xmlElements(relsXml, 'Relationship')) {
+    const attrs = parseAttrs(rel.attrs);
     if (attrs.Id && attrs.Target) rels.set(attrs.Id, attrs.Target);
   }
   const sheets: WorkbookSheet[] = [];
-  for (const sheet of workbookXml.matchAll(/<sheet\b([^>]*)\/?>/g)) {
-    const attrs = parseAttrs(sheet[1] ?? '');
+  for (const sheet of xmlElements(workbookXml, 'sheet')) {
+    const attrs = parseAttrs(sheet.attrs);
     const relId = attrs['r:id'];
     const target = relId ? rels.get(relId) : null;
     if (!target) continue;
@@ -118,19 +115,19 @@ function readWorkbook(zip: Zip): WorkbookSheet[] {
 
 function extractWorksheetRows(xml: string, sharedStrings: string[]): string[] {
   const rows: string[] = [];
-  for (const row of xml.matchAll(/<row\b[\s\S]*?<\/row>/g)) {
+  for (const row of xmlElements(xml, 'row')) {
     const values: string[] = [];
-    for (const cell of row[0].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
-      const attrs = parseAttrs(cell[1] ?? '');
-      const body = cell[2] ?? '';
+    for (const cell of xmlElements(row.body, 'c')) {
+      const attrs = parseAttrs(cell.attrs);
+      const body = cell.body;
       let value: string;
       if (attrs.t === 's') {
-        const idx = Number(extractFirst(body, /<v>([\s\S]*?)<\/v>/));
+        const idx = Number(firstBody(body, 'v'));
         value = Number.isInteger(idx) ? (sharedStrings[idx] ?? '') : '';
       } else if (attrs.t === 'inlineStr') {
         value = extractTextRuns(body).join('');
       } else {
-        value = decodeXml(extractFirst(body, /<v>([\s\S]*?)<\/v>/));
+        value = decodeXml(firstBody(body, 'v'));
       }
       if (value.trim()) values.push(value.trim());
     }
@@ -139,20 +136,52 @@ function extractWorksheetRows(xml: string, sharedStrings: string[]): string[] {
   return rows;
 }
 
-function extractParagraphs(xml: string, paragraphPattern: RegExp): string[] {
-  return Array.from(xml.matchAll(paragraphPattern))
-    .map((m) => extractTextRuns(m[0]).join(' ').replace(/\s+/g, ' ').trim())
+function extractParagraphs(xml: string): string[] {
+  return xmlElements(xml, 'w:p')
+    .map((p) => extractTextRuns(p.body).join(' ').replace(/\s+/g, ' ').trim())
     .filter(Boolean);
 }
 
+const TEXT_RUN_TAGS = ['a:t', 'w:t', 't'] as const;
+
 function extractTextRuns(xml: string): string[] {
-  return Array.from(
-    xml.matchAll(
-      /<a:t[^>]*>([\s\S]*?)<\/a:t>|<w:t[^>]*>([\s\S]*?)<\/w:t>|<t[^>]*>([\s\S]*?)<\/t>/g,
-    ),
-  )
-    .map((m) => decodeXml(m[1] ?? m[2] ?? m[3] ?? '').trim())
+  const tag = TEXT_RUN_TAGS.find((name) => xml.includes(`<${name}`)) ?? 't';
+  return xmlElements(xml, tag)
+    .map((run) => decodeXml(run.body).trim())
     .filter(Boolean);
+}
+
+const MAX_TAG_ATTRS_CHARS = 4096;
+const TAG_NAME_END = new Set([' ', '>', '/', '\t', '\n', '\r']);
+
+function xmlElements(xml: string, tag: string): { attrs: string; body: string }[] {
+  const open = `<${tag}`;
+  const close = `</${tag}>`;
+  const out: { attrs: string; body: string }[] = [];
+  let at = 0;
+  for (;;) {
+    const start = xml.indexOf(open, at);
+    if (start < 0) return out;
+    at = start + open.length;
+    if (!TAG_NAME_END.has(xml[at] ?? '')) continue;
+    const tagEnd = xml.indexOf('>', at);
+    if (tagEnd < 0) return out;
+    const rawAttrs = xml.slice(at, tagEnd);
+    at = tagEnd + 1;
+    const attrs = rawAttrs.length > MAX_TAG_ATTRS_CHARS ? '' : rawAttrs;
+    if (rawAttrs.endsWith('/')) {
+      out.push({ attrs: attrs.slice(0, -1), body: '' });
+      continue;
+    }
+    const end = xml.indexOf(close, at);
+    if (end < 0) return out;
+    out.push({ attrs, body: xml.slice(at, end) });
+    at = end + close.length;
+  }
+}
+
+function firstBody(xml: string, tag: string): string {
+  return xmlElements(xml, tag)[0]?.body ?? '';
 }
 
 function readZipText(zip: Zip, name: string): string {
@@ -186,11 +215,6 @@ function parseAttrs(raw: string): XmlAttrs {
     if (name) attrs[name] = decodeXml(m[2] ?? '');
   }
   return attrs;
-}
-
-function extractFirst(raw: string, pattern: RegExp): string {
-  const m = raw.match(pattern);
-  return m ? (m[1] ?? '') : '';
 }
 
 function decodeXml(raw: unknown): string {

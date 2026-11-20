@@ -140,6 +140,13 @@ export function designSharePath(token: string): string {
   return `/s/${encodeURIComponent(token)}`;
 }
 
+function oneLine(value: string): string {
+  return Array.from(value, (ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 0x20 || code === 0x7f || code === 0x2028 || code === 0x2029 ? ' ' : ch;
+  }).join('');
+}
+
 export function renderDesignCommentBlock(input: {
   todoRef: string;
   comments: readonly Pick<
@@ -160,12 +167,15 @@ export function renderDesignCommentBlock(input: {
     `【设计评论 · ${input.todoRef}】只改这些评论点到的元素；别的改动先列成后续建议，不要顺手改。`,
   ];
   for (const c of input.comments) {
-    const target = c.elementId !== '' ? `${c.label}[data-od-id="${c.elementId}"]` : c.selector;
-    const text = c.text !== '' ? `（当前文字：「${c.text}」）` : '';
+    const target =
+      c.elementId !== ''
+        ? `${oneLine(c.label)}[data-od-id="${oneLine(c.elementId)}"]`
+        : oneLine(c.selector);
+    const text = c.text !== '' ? `（当前文字：「${oneLine(c.text)}」）` : '';
     lines.push(`${c.pin}. ${c.fileName} v${c.versionSeq} · ${target}${text}：${c.note}`);
     const mark =
       c.markAttachmentId === null ? undefined : input.markTokens?.get(c.markAttachmentId);
-    if (mark !== undefined) lines.push(`   标注图：${mark}`);
+    if (mark !== undefined) lines.push('   标注图：', mark);
   }
   return lines.join('\n');
 }

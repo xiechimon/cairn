@@ -225,7 +225,7 @@ export function readDesignVersionHtml(
     .from(attachment)
     .where(and(eq(attachment.id, version.attachmentId), eq(attachment.teamId, version.teamId)))
     .get();
-  if (!file || file.status !== 'ready') throw new HttpError(410, 'design version file is gone');
+  if (file?.status !== 'ready') throw new HttpError(410, 'design version file is gone');
   try {
     return readFileSync(join(attachmentsDir, file.storageKey));
   } catch {

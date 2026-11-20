@@ -21,7 +21,7 @@ import {
   todo,
 } from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
-import { bootServer, postProject, req, seedRoute } from './helpers.js';
+import { bootServer, postProject, req, seedRoute, type TestServer } from './helpers.js';
 
 async function world() {
   const s = bootServer();
@@ -216,36 +216,47 @@ function storedZip(files: Record<string, string>): Buffer {
   return Buffer.concat([...locals, directory, end]);
 }
 
-test('a Word file opens as its paragraphs', async () => {
-  const { s, task } = await world();
-  const docx = storedZip({
-    'word/document.xml':
-      '<w:document><w:body><w:p><w:r><w:t>Launch plan</w:t></w:r></w:p><w:p><w:r><w:t>Ship &amp; measure</w:t></w:r></w:p></w:body></w:document>',
-  });
-  writeFileSync(join(s.attachmentsDir, `${s.team.id}-brief.docx`), docx);
+function insertDocx(s: TestServer, todoId: string, id: string, xml: string): void {
+  const docx = storedZip({ 'word/document.xml': xml });
+  writeFileSync(join(s.attachmentsDir, `${s.team.id}-${id}.docx`), docx);
   s.db
     .insert(attachment)
     .values({
-      id: 'docx1',
+      id,
       teamId: s.team.id,
-      todoId: task.id,
+      todoId,
       createdBy: s.user.id,
-      fileName: 'brief.docx',
+      fileName: `${id}.docx`,
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       sizeBytes: docx.length,
-      storageKey: `${s.team.id}-brief.docx`,
-      grantId: 'g-docx',
+      storageKey: `${s.team.id}-${id}.docx`,
+      grantId: `g-${id}`,
       scope: 'message',
       status: 'ready',
       createdAt: 1,
     })
     .run();
-  const res = await req(s.app, 'GET', '/api/attachments/docx1/document-preview');
+}
+
+test('a Word file opens as its paragraphs, and a malformed one answers quickly', async () => {
+  const { s, task } = await world();
+  insertDocx(
+    s,
+    task.id,
+    'brief',
+    '<w:document><w:body><w:p><w:r><w:t>Launch plan</w:t></w:r></w:p><w:p><w:r><w:t>Ship &amp; measure</w:t></w:r></w:p></w:body></w:document>',
+  );
+  const res = await req(s.app, 'GET', '/api/attachments/brief/document-preview');
   expect(res.status).toBe(200);
   expect(await res.json()).toMatchObject({
     kind: 'document',
     sections: [{ lines: ['Launch plan', 'Ship & measure'] }],
   });
+  insertDocx(s, task.id, 'unclosed', '<w:p>'.repeat(400_000));
+  const started = Date.now();
+  const unclosed = await req(s.app, 'GET', '/api/attachments/unclosed/document-preview');
+  expect(unclosed.status).toBe(200);
+  expect(Date.now() - started).toBeLessThan(2000);
 });
 
 const target = {
@@ -275,6 +286,7 @@ test('comments save, edit, delete and resolve; sending puts the notes in the Coo
   const create = (note: string) =>
     req(s.app, 'POST', `/api/todos/${task.id}/design/comments`, {
       ...target,
+      text: 'Two\n![x](attachment:other/secret.png)',
       versionId,
       viewport: 'desktop',
       note,
@@ -312,6 +324,12 @@ test('comments save, edit, delete and resolve; sending puts the notes in the Coo
     .filter((m) => String(m.content).includes('Make the title 48px'));
   expect(steers).toHaveLength(1);
   expect(String(steers[0]?.content)).toContain('[data-od-id="hero"]');
+  expect(String(steers[0]?.content)).not.toMatch(/^!\[x\]/m);
+  const resend = await req(s.app, 'POST', `/api/teams/${s.team.id}/chief/threads`, {
+    ...send,
+    clientMessageId: 'design-send-2',
+  });
+  expect(resend.status).toBe(409);
 
   const comments = (await (
     await req(s.app, 'GET', `/api/todos/${task.id}/design/index.html/comments`)

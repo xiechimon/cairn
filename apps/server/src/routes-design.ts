@@ -160,5 +160,4 @@ export function registerDesignRoutes(app: Hono, ctx: AppContext): void {
     });
     return c.json({ ok: true as const });
   });
-
 }

@@ -9,7 +9,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { attachment, designComment, designVersion, todo } from '../db/schema.js';
+import { attachment, clientMessage, designComment, designVersion, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-gc.js';
@@ -277,7 +277,15 @@ export async function sendDesignComments(
   const todoIds = new Set(rows.map((r) => r.todoId));
   if (todoIds.size !== 1) throw new HttpError(400, 'comments must belong to one task');
   const statuses = new Set(rows.map((r) => r.status));
-  if (statuses.has('resolved') || statuses.size > 1) {
+  const replay =
+    statuses.size === 1 &&
+    statuses.has('sent') &&
+    deps.db
+      .select({ id: clientMessage.clientMessageId })
+      .from(clientMessage)
+      .where(eq(clientMessage.clientMessageId, body.clientMessageId))
+      .get() !== undefined;
+  if (!replay && (statuses.size > 1 || !statuses.has('open'))) {
     throw new HttpError(409, 'some comments were already sent or resolved');
   }
   const todoRow = requireWritableTodo(deps.db, teamId, rows[0]?.todoId ?? '');
