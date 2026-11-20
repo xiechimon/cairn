@@ -3591,6 +3591,118 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       ],
       "type": "object",
     },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "connId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "im.attach",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "connId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "connId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "im.detach",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "connId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "connId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string",
+        },
+        "message": {
+          "additionalProperties": false,
+          "properties": {
+            "buttons": {
+              "items": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "label": {
+                      "maxLength": 256,
+                      "type": "string",
+                    },
+                    "value": {
+                      "maxLength": 256,
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "label",
+                    "value",
+                  ],
+                  "type": "object",
+                },
+                "type": "array",
+              },
+              "maxItems": 8,
+              "type": "array",
+            },
+            "chatKey": {
+              "maxLength": 512,
+              "minLength": 1,
+              "type": "string",
+            },
+            "replyToMessageId": {
+              "maxLength": 256,
+              "type": "string",
+            },
+            "text": {
+              "maxLength": 65536,
+              "type": "string",
+            },
+          },
+          "required": [
+            "chatKey",
+            "text",
+          ],
+          "type": "object",
+        },
+        "sendId": {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string",
+        },
+        "type": {
+          "const": "im.send",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "connId",
+        "sendId",
+        "message",
+      ],
+      "type": "object",
+    },
   ],
 }
 `;
