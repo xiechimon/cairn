@@ -11,6 +11,7 @@ const selectorDeps = [
   'scripts/owned-process.mjs',
   'scripts/diff-base.mjs',
   'scripts/e2e-affected-select.mjs',
+  'scripts/e2e-shard-run.mjs',
   'scripts/timed-partition.mjs',
 ];
 for (const [file, code] of [
