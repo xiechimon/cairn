@@ -53,7 +53,7 @@ async function open(
     return undefined;
   });
   await page.goto(url);
-  return page.getByRole('complementary', { name: '电脑' });
+  return page.getByRole('complementary', { name: '执行机' });
 }
 
 async function shot(page: Page, name: string) {
@@ -131,7 +131,7 @@ test('an offline machine shows only its header and no activity line', async ({ p
   );
   await expect(panel.getByTestId('machine-line')).toHaveAttribute(
     'title',
-    '在这台电脑上打开 Cairn，它就会上线',
+    '在这台执行机上打开 Cairn，它就会上线',
   );
   await expect(panel.getByTestId('machine-activity')).toHaveCount(0);
   await expect(panel.getByTestId('machine-screen')).toHaveCount(0);
@@ -173,7 +173,7 @@ test('with no machines the list is only the add row', async ({ page }) => {
   await expect(panel.getByRole('heading', { name: '你的电脑' })).toHaveCount(0);
   await expect(panel.locator('[data-slot="list-card"]')).toHaveCount(1);
   await expect(panel.getByTestId('machine-list-row')).toHaveCount(0);
-  await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加电脑' })).toBeVisible();
+  await expect(panel.getByTestId('machines-add').getByRole('link', { name: '添加执行机' })).toBeVisible();
   await expect(panel).not.toContainText('没有其他电脑时');
 });
 

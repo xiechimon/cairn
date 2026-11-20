@@ -73,7 +73,7 @@ describe('statusMarkView', () => {
       }),
     );
     expect(view.id).toBe('offline');
-    expect(view.label).toBe('等待电脑上线');
+    expect(view.label).toBe('等待执行机上线');
   });
 
   it('uses the running tool from the activity before the trace', () => {

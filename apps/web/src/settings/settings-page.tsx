@@ -236,7 +236,7 @@ function useMachineNote(): string | undefined {
     ? (machinesQ.data ?? []).map((m) => m.online)
     : (resolveScenario(searchParams).resources?.machines ?? []).map((m) => m.online === true);
   if (rows.length === 0) return undefined;
-  return t('{online}/{total} 台电脑在线', {
+  return t('{online}/{total} 台执行机在线', {
     online: rows.filter(Boolean).length,
     total: rows.length,
   });

@@ -126,5 +126,5 @@ test('the machines nav row carries the online count as its description, not as a
   await page.goto('/app/settings/appearance?scenario=home-c');
   const row = settings(page).locator('nav [data-settings-section="machines"]');
   await expect(row).toHaveText('执行机');
-  await expect(row).toHaveAttribute('aria-description', '1/2 台电脑在线');
+  await expect(row).toHaveAttribute('aria-description', '1/2 台执行机在线');
 });

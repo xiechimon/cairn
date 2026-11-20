@@ -168,7 +168,7 @@ export const EN: Record<string, string> = {
   正在创建任务: 'Creating a task',
   等你确认: 'Waiting for you',
   出错了: 'Something went wrong',
-  等待电脑上线: 'Waiting for the computer',
+  等待执行机上线: 'Waiting for the Runner',
   等待恢复: 'Waiting to resume',
   '正在读 {n} 个文件': 'Reading {n#1 file|# files}',
   '正在搜索 {n} 次': 'Searching {n#once|# times}',
@@ -314,13 +314,13 @@ export const EN: Record<string, string> = {
   '虚拟机已恢复，文件都还在。': 'The VM is recovered. Its files are kept.',
   '虚拟机已重置，现在是一台全新的虚拟机。': 'The VM is reset and starts fresh.',
   'Linux 虚拟机': 'Linux VM',
-  电脑设置: 'Computer settings',
+  执行机设置: 'Runner settings',
   '已休眠，用到时会自己启动': 'Asleep; it starts again when needed',
   '{size}，Coordinator 用它上网和操作软件':
     '{size}, the Coordinator uses it to browse and run apps',
-  重命名电脑: 'Rename computer',
-  电脑名称: 'Computer name',
-  '在这台电脑上打开 Cairn，它就会上线': 'Open Cairn on this computer to bring it online',
+  重命名执行机: 'Rename Runner',
+  执行机名称: 'Runner name',
+  '在这台执行机上打开 Cairn，它就会上线': 'Open Cairn on this Runner to bring it online',
   '电脑卡住了，文件都还在': 'The computer is stuck; its files are kept',
   '需要你登录，点屏幕接管': 'Login needed; click the screen to take over',
   正在用: 'in use',
@@ -349,17 +349,16 @@ export const EN: Record<string, string> = {
   打开画面: 'Open screen',
   还没有连上电脑: 'No computer connected yet',
   浏览器: 'Browser',
-  添加电脑: 'Add computer',
   你的电脑: 'Your computers',
   电脑控制: 'Computer control',
   '电脑控制 · {n} 项已关': 'Computer control · {n} off',
   '没能更改电脑控制，请重试': 'Could not change computer control; try again',
   '关掉后 Coordinator 不会在这台执行机上用对应能力；随时能开回来':
-    'When off, Coordinator will not use that capability on this machine; you can turn it back on anytime',
+    'When off, Coordinator will not use that capability on this Runner; you can turn it back on anytime',
   '已关闭，Coordinator 不会用它': 'Off; Coordinator will not use it',
   '默认开启，关掉可以单独禁掉': 'On by default; turn off to disable just this one',
-  这台执行机还没报这个能力: 'This machine has not reported this capability yet',
-  等这台执行机报了这个能力才能开: 'Available once this machine reports the capability',
+  这台执行机还没报这个能力: 'This Runner has not reported this capability yet',
+  等这台执行机报了这个能力才能开: 'Available once this Runner reports the capability',
   '让 Coordinator 使用{label}': 'Let Coordinator use {label}',
   桌面和命令: 'Desktop and commands',
   再检查一次: 'Check again',
@@ -455,6 +454,7 @@ export const EN: Record<string, string> = {
   技能: 'Skills',
   密钥: 'Secrets',
   执行机: 'Runners',
+  本机执行机: 'Runner',
   机器: 'Machine',
   用量: 'Usage',
   收起侧边栏: 'Collapse sidebar',
@@ -822,9 +822,9 @@ export const EN: Record<string, string> = {
   密钥与环境变量: 'Secrets & env vars',
   批量添加: 'Bulk add',
   '任务在执行机上运行时会拿到这些密钥和环境变量。项目里的同名条目优先于团队条目。也可以让 Coordinator 添加机密，值不会进入对话。':
-    'Tasks get these secrets and environment variables when they run on a machine. Project entries override team entries with the same name. The Coordinator can also add secrets without the value entering the conversation.',
+    'Tasks get these secrets and environment variables when they run on a Runner. Project entries override team entries with the same name. The Coordinator can also add secrets without the value entering the conversation.',
   还没有密钥或环境变量: 'No secrets or environment variables yet',
-  '执行机跑任务时会拿到它们。': 'Machines get them when they run tasks.',
+  '执行机跑任务时会拿到它们。': 'Runners get them when they run tasks.',
   按名称筛选: 'Filter by name',
   最后更新: 'Last updated',
   '没有名称包含「{q}」的条目': 'No entries whose name contains “{q}”',
@@ -877,7 +877,7 @@ export const EN: Record<string, string> = {
     'Stored encrypted. It is never shown again and never enters a conversation.',
   网站授权: 'Site authorizations',
   'Coordinator 第一次在某个网站代填时会请求批准；批准后这个网站在这台执行机上直接代填，撤销后重新请求。':
-    'The Coordinator asks for approval the first time it fills on a site; afterwards it fills directly on that site and machine, and revoking makes it ask again.',
+    'The Coordinator asks for approval the first time it fills on a site; afterwards it fills directly on that site and Runner, and revoking makes it ask again.',
   正在加载网站授权: 'Loading site authorizations',
   网站授权没能加载: 'Site authorizations could not be loaded',
   还没有批准过的网站: 'No approved sites yet',
@@ -886,7 +886,7 @@ export const EN: Record<string, string> = {
   已撤销: 'Revoked',
   已失效: 'Inactive',
   已删除的登录: 'Deleted login',
-  已删除的执行机: 'Deleted machine',
+  已删除的执行机: 'Deleted Runner',
   '没能撤销授权，请重试。': 'Could not revoke the authorization. Try again.',
   '删除后，用到它的任务和网站代填就拿不到这条登录了':
     'Once deleted, tasks and site fills that use it no longer get this login',
@@ -1225,7 +1225,7 @@ export const EN: Record<string, string> = {
   '6 小时前 · 66.1k tokens': '6h ago · 66.1k tokens',
   '3 天前 · 已取消': '3d ago · Cancelled',
   '3 天前': '3d ago',
-  '4 天前 · 执行机离线': '4d ago · Machine offline',
+  '4 天前 · 执行机离线': '4d ago · Runner offline',
   '2 天前 · 41.7k tokens': '2d ago · 41.7k tokens',
 
   // —— #75 deep dynamic states: reject loop / failed / reuse plan ——
@@ -1394,7 +1394,6 @@ export const EN: Record<string, string> = {
     'Authorized — the Runner is registered. The terminal connects by itself; you can close this page.',
   '授权完成，{name} 已注册为执行机。终端那边会自己连上，这一页可以关掉。':
     'Authorized — {name} is registered as a Runner. The terminal connects by itself; you can close this page.',
-  机器名: 'Machine name',
   '名字是那台电脑自己报的。和终端里显示的一样才确认。':
     'That computer reports this name itself. Confirm only if its terminal shows the same name.',
   '授权链接过期了。在执行机上重新运行 `cairn start` 拿新链接。':
@@ -1547,8 +1546,8 @@ export const EN: Record<string, string> = {
   'Coordinator 的电脑还没准备好': "The Coordinator's computer isn't ready",
   '执行机 {machine} 离线': 'Runner {machine} is offline',
   执行机离线: 'The Runner is offline',
-  '这一步要用电脑，但还没有能用的电脑。打开电脑面板启动它，就绪后这一轮会自动接着跑。':
-    "This step needs a computer and none is ready. Open the computers panel to start one; this turn continues on its own once it's ready.",
+  '这一步要用电脑，但还没有能用的电脑。打开执行机面板启动它，就绪后这一轮会自动接着跑。':
+    "This step needs a computer and none is ready. Open the Runners panel to start one; this turn continues on its own once it's ready.",
   '这一步要在执行机上跑，但它现在不在线。确认电脑开着、Cairn 在运行，它一上线这一轮就会自动接着跑。':
     "This step runs on a Runner that is offline. Make sure the computer is on and Cairn is running; this turn continues on its own once it's back.",
   打开电脑: 'Open computers',
@@ -1789,7 +1788,7 @@ export const EN: Record<string, string> = {
   '还在运行，但 {n} 分钟没有新输出或工具结果':
     'Still running, but no new output or tool result for {n#1 minute|# minutes}',
   '额度用完了，到点自动开始': 'Quota is used up; this starts on its own when it resets',
-  等这台电脑空出来: 'Waiting for this computer to free up',
+  等这台执行机空出来: 'Waiting for this Runner to free up',
   '等额度 · {at}': 'Quota · {at}',
   '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB':
     '{free} GB memory free; 5-minute load {load} on {cores#1 core|# cores}; {disk} GB disk free',
@@ -1938,7 +1937,7 @@ export const EN: Record<string, string> = {
   '添加 API key、订阅或自定义端点后，它们的模型会出现在这里。':
     'Add an API key, subscription or custom endpoint and its models show up here.',
   模型列表: 'Models',
-  '{online}/{total} 台电脑在线': '{online} of {total#1 computer|# computers} online',
+  '{online}/{total} 台执行机在线': '{online} of {total#1 Runner|# Runners} online',
   '{offline} 台离线（{names}）': '{offline#1 offline|# offline} ({names})',
   设置分区: 'Settings sections',
   搜索设置: 'Search settings',
@@ -2172,8 +2171,6 @@ export const EN: Record<string, string> = {
   还没有已归档的成果: 'Nothing archived yet',
   '已归档的成果会一直保留，直到你删除它或它所在的项目。':
     'Archived results are kept until you delete them or their project.',
-  正在加载电脑: 'Loading computers',
-  电脑没能加载: 'Computers did not load',
   '搜索没能完成，下面只是本地匹配的结果。': 'Search did not finish. These are local matches only.',
   正在加载对话: 'Loading the conversation',
   远程访问: 'Remote access',
@@ -2599,10 +2596,10 @@ export const EN: Record<string, string> = {
     'The upstream did not answer within 10 seconds, so no model list came back.',
   '连不上上游，没拿到模型清单。检查网络后重试。':
     'Cannot reach the upstream, so no model list came back. Check the network and retry.',
-  '电脑上的 Antigravity 还没登录，没拿到它的模型清单。登录后重试。':
-    'Antigravity on your computer is not signed in, so its model list is unavailable. Sign in and retry.',
-  '没有在线的电脑装着 Antigravity，没拿到它的模型清单。':
-    'No online computer has Antigravity installed, so its model list is unavailable.',
+  '执行机上的 Antigravity 还没登录，没拿到它的模型清单。登录后重试。':
+    'Antigravity on the Runner is not signed in, so its model list is unavailable. Sign in and retry.',
+  '没有在线的执行机装着 Antigravity，没拿到它的模型清单。':
+    'No online Runner has Antigravity installed, so its model list is unavailable.',
   '筛选{noun}': 'Filter {noun}',
   '没有匹配「{query}」的{noun}': 'Nothing matches “{query}”',
   输入可筛选: 'Type to filter',

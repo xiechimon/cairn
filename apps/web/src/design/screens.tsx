@@ -33,7 +33,7 @@ const SCREENS = [
     parts: 'Settings list, runtime and model pickers',
   },
   {
-    title: 'Machines',
+    title: 'Runners',
     url: '/app/resources/machines?scenario=06',
     parts: 'Resource rows, online status',
   },

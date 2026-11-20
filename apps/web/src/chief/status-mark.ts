@@ -32,7 +32,7 @@ export const STATUS_MARK_LABELS: Record<StatusMarkId, string> = {
   ask: '等你确认',
   done: '已完成',
   error: '出错了',
-  offline: '等待电脑上线',
+  offline: '等待执行机上线',
 };
 
 export const STATUS_MARK_IDS = Object.keys(STATUS_MARK_LABELS) as StatusMarkId[];

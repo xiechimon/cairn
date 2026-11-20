@@ -47,7 +47,7 @@ async function open(
     },
   );
   await page.goto('/app?pane=machines');
-  const panel = page.getByRole('complementary', { name: '电脑' });
+  const panel = page.getByRole('complementary', { name: '执行机' });
   return { panel, actions };
 }
 

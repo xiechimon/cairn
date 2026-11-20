@@ -39,7 +39,7 @@ export const VM_RUNTIME_START_MS = 10 * 60_000;
 const VM_COMMAND_MS = 30_000;
 const NOTARIZED = 'Notarization: trusted by the Apple notary service';
 export const VM_NOT_DOWNLOADED_MESSAGE =
-  'The Linux VM is not downloaded yet. Tell the owner in one sentence that this needs the Linux VM and that they can download it in the [电脑面板](/app?pane=machines); do not retry until they say it is ready';
+  'The Linux VM is not downloaded yet. Tell the owner in one sentence that this needs the Linux VM and that they can download it in the [执行机面板](/app?pane=machines); do not retry until they say it is ready';
 
 export interface VmCommandResult {
   code: number;

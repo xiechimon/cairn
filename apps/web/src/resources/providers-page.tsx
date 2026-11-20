@@ -71,8 +71,8 @@ import { groupAntigravityUpstream, groupDevinUpstream } from './upstream-model-g
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const ANTIGRAVITY_FALLBACK_REASONS = {
-  auth: '电脑上的 Antigravity 还没登录，没拿到它的模型清单。登录后重试。',
-  'not-found': '没有在线的电脑装着 Antigravity，没拿到它的模型清单。',
+  auth: '执行机上的 Antigravity 还没登录，没拿到它的模型清单。登录后重试。',
+  'not-found': '没有在线的执行机装着 Antigravity，没拿到它的模型清单。',
 } as const;
 
 interface Entry {

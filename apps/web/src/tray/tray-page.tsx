@@ -245,7 +245,7 @@ export function TrayPage() {
             <Laptop className="size-4" aria-hidden="true" />
           </span>
           <span className="min-w-0">
-            <span className="tray-tile-title">Runner</span>
+            <span className="tray-tile-title">{t('本机执行机')}</span>
             <span className="tray-tile-sub">{t(RUNNER_WORD[runner])}</span>
           </span>
         </Button>

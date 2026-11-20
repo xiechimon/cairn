@@ -493,7 +493,7 @@ export function HomeC({
         pane === 'file'
           ? (fileTarget?.name ?? '')
           : pane === 'machines'
-            ? t('电脑')
+            ? t('执行机')
             : pane === 'tasks'
               ? t('任务')
               : t('成果')

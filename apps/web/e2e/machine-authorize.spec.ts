@@ -150,7 +150,7 @@ test('pending with a name → name row, self-report warning, done copy names the
     });
   });
   await page.goto(`${AUTHORIZE}?enroll=e2e-enroll`);
-  await expect(card(page).getByText('机器名')).toBeVisible();
+  await expect(card(page).getByText('执行机名称')).toBeVisible();
   await expect(card(page).getByText('omarchy')).toBeVisible();
   await expect(card(page)).toContainText('名字是那台电脑自己报的');
   await page.getByRole('button', { name: '确认授权' }).click();

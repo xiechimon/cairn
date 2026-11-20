@@ -245,9 +245,9 @@ function SettingsNavSpecimen() {
                 { id: 'providers', label: 'Providers', Icon: Layers },
                 {
                   id: 'machines',
-                  label: 'Machines',
+                  label: 'Runners',
                   Icon: Server,
-                  note: '4 of 5 computers online',
+                  note: '4 of 5 Runners online',
                 },
               ],
             },

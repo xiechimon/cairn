@@ -38,7 +38,7 @@ test('home: every region shows a skeleton and no conclusion while the APIs are s
 test('home: the tasks, results and computers panels show a skeleton while loading', async ({ page }) => {
   await delayEveryApi(page);
   await page.goto('/app');
-  for (const name of ['任务', '成果', '电脑']) {
+  for (const name of ['任务', '成果', '执行机']) {
     await page.getByRole('button', { name }).first().click();
     await expect(page.getByTestId('query-loading').first()).toBeVisible();
     await expectNoConclusion(page);

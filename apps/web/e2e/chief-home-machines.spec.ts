@@ -5,7 +5,7 @@ const HOME = '/app?scenario=home-c';
 const MIDDAY_IN_BEIJING = Date.UTC(2026, 10, 12, 4);
 
 const chip = (page: Page) => page.getByTestId('machines-button');
-const panel = (page: Page) => page.getByRole('complementary', { name: '电脑' });
+const panel = (page: Page) => page.getByRole('complementary', { name: '执行机' });
 
 test('the computer chip names the Coordinator machine, its state and any offline machine', async ({
   page,
@@ -43,7 +43,7 @@ test('the chip opens a list with one row per computer, the Coordinator machine f
   await expect(panel(page)).not.toContainText('检查过');
   await expect(panel(page).getByRole('button', { name: '再检查一次' })).toHaveCount(0);
 
-  await panel(page).getByRole('link', { name: '添加电脑' }).click();
+  await panel(page).getByRole('link', { name: '添加执行机' }).click();
   await expect(page).toHaveURL(/\/app\/settings\/machines/);
 });
 
@@ -80,7 +80,7 @@ test('the chip badge is green when every computer is online and the sidebar has 
 
 test('the chip name carries the Coordinator machine and its state', async ({ page }) => {
   await page.goto(HOME);
-  await expect(chip(page)).toHaveAccessibleName('电脑 · xmonsMac · 1 台离线（omarchy）');
+  await expect(chip(page)).toHaveAccessibleName('执行机 · xmonsMac · 1 台离线（omarchy）');
 });
 
 test('at phone width the chip stays an icon and the title stays for screen readers', async ({ page }) => {
@@ -100,7 +100,7 @@ test('the icon-only header buttons show a tooltip with their name on hover', asy
   for (const [name, tip] of [
     ['任务', '任务，3 件等你'],
     ['成果', '成果'],
-    ['电脑', '电脑 · xmonsMac · 1 台离线（omarchy）'],
+    ['执行机', '执行机 · xmonsMac · 1 台离线（omarchy）'],
   ] as const) {
     const button = page.getByTestId('home-c-pane-buttons').getByRole('button', { name });
     await button.hover();

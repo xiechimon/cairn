@@ -104,7 +104,7 @@ function runningRow(thread: MachineRunningThread, now: number): TrayRow {
 
 const QUEUED_TIP: Record<MachineQueuedThread['reason'], string> = {
   quota: '额度用完了，到点自动开始',
-  waiting: '等这台电脑空出来',
+  waiting: '等这台执行机空出来',
 };
 
 function queuedRow(thread: MachineQueuedThread): TrayRow {

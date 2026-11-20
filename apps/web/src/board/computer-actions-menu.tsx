@@ -116,7 +116,7 @@ export function MachineMenu({
               data-testid="machine-settings"
               onClick={() => void navigate(settingsHref)}
             >
-              {t('电脑设置')}
+              {t('执行机设置')}
             </KeyedMenuItem>
           )}
           {vm !== null && (

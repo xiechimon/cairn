@@ -91,7 +91,7 @@ export function MachineChip({
   const host = coordinatorMachine(machines);
   const fleet = fleetStatus(machines);
   const label = joinMeta([
-    t('电脑'),
+    t('执行机'),
     host === null ? null : machineDisplayName(host),
     connected ? null : t('连接断开，正在重连…'),
     fleetStatusLine(fleet, t),
@@ -258,7 +258,7 @@ function RenameMachineDialog({
   };
   return (
     <DialogShell
-      title={t('重命名电脑')}
+      title={t('重命名执行机')}
       open
       onClose={onClose}
       size="s"
@@ -283,7 +283,7 @@ function RenameMachineDialog({
           autoFocus
           maxLength={64}
           data-testid="machine-rename-input"
-          aria-label={t('电脑名称')}
+          aria-label={t('执行机名称')}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
         />
@@ -311,7 +311,7 @@ function useCardLine({
     return {
       kind: 'quiet',
       node: seen > 0 ? joinMeta([t('离线'), relativeTime(seen, Date.now(), t)]) : t('离线'),
-      title: t('在这台电脑上打开 Cairn，它就会上线'),
+      title: t('在这台执行机上打开 Cairn，它就会上线'),
     };
   }
   if (note !== null)
@@ -525,16 +525,16 @@ export function MachinesPanel({
   const keyOf = (machine: MachineRow) => machine.id ?? machine.name;
 
   return (
-    <SidePanel label={t('电脑')} onDismiss={onClose}>
+    <SidePanel label={t('执行机')} onDismiss={onClose}>
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
-        <SidePanelTitle>{t('电脑')}</SidePanelTitle>
+        <SidePanelTitle>{t('执行机')}</SidePanelTitle>
       </SidePanelHead>
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-3 pt-1 pb-6">
         <QueryBoundary
           query={query}
           isEmpty={machines.length === 0}
-          loadingLabel={t('正在加载电脑')}
-          errorTitle={t('电脑没能加载')}
+          loadingLabel={t('正在加载执行机')}
+          errorTitle={t('执行机没能加载')}
           empty={null}
         >
           <div className="flex flex-none flex-col gap-3">
@@ -553,7 +553,7 @@ export function MachinesPanel({
         <div data-testid="machines-add">
           <LineRow
             icon={<Plus aria-hidden="true" className="size-5.5" />}
-            label={t('添加电脑')}
+            label={t('添加执行机')}
             render={<Link to={settingsHref('machines')} />}
           />
         </div>

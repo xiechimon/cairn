@@ -111,7 +111,7 @@ for (const viewport of [
       await expect(page.getByTestId('tasks-toggle')).toHaveAttribute('aria-pressed', 'false');
       await page.getByTestId('machines-button').click();
       await expect(page).toHaveURL(/[?&]pane=machines/);
-      await expect(page.getByRole('complementary', { name: '电脑' })).toBeVisible();
+      await expect(page.getByRole('complementary', { name: '执行机' })).toBeVisible();
       await expect(page.getByTestId('machines-button')).toHaveAttribute('aria-pressed', 'true');
       await expect(tabs(page).locator('[aria-current="page"]')).toHaveCount(0);
       await tab(page, /对话/).click();
@@ -126,7 +126,7 @@ for (const viewport of [
       for (const [pane, name, closable] of [
         ['tasks', '任务', false],
         ['made', '成果', false],
-        ['machines', '电脑', true],
+        ['machines', '执行机', true],
       ] as const) {
         await page.goto(`${HOME}&pane=${pane}`);
         const panel = page.getByRole('complementary', { name });

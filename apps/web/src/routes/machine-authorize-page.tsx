@@ -113,7 +113,7 @@ export function MachineAuthorizePage() {
               {name !== null && (
                 <>
                   <div className="flex items-baseline justify-between gap-3 rounded-md border border-border px-3 py-2 text-meta">
-                    <span className="text-content-secondary">{t('机器名')}</span>
+                    <span className="text-content-secondary">{t('执行机名称')}</span>
                     <span className="font-mono text-foreground break-all">{name}</span>
                   </div>
                   <p className="m-0 text-meta text-content-tertiary">
