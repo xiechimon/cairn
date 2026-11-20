@@ -15,8 +15,9 @@ import { Button } from '../components/ui/button.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { useOpenDesign } from './design/design-route.js';
 import { MadeCard, MadeCarousel, MadeSkeleton } from './made-carousel.js';
-import { MadeFiles, sizeLabel } from './made-files.js';
+import { MadeFiles, primaryPage, sizeLabel } from './made-files.js';
 import { groupMade, MADE_GROUP_LABEL, madeGroupOf, matchesMadeQuery } from './made-groups.js';
 import { MadeSearch } from './made-search.js';
 import { joinMeta, relativeTime } from './rel-time.js';
@@ -66,6 +67,7 @@ function MadeReport({
     [todo.latestBuildId, todo.title, todo.phase],
   );
   const { t } = useI18n();
+  const openDesign = useOpenDesign();
   const { report, settled } = useBuildReport(thread);
   useEffect(() => {
     if (settled && report === null) {
@@ -82,7 +84,13 @@ function MadeReport({
       open
       onClose={onClose}
     >
-      <MadeFiles deliverables={todo.deliverables} />
+      <MadeFiles
+        deliverables={todo.deliverables}
+        onOpenPage={(name) => {
+          onClose();
+          openDesign(todo.id, name);
+        }}
+      />
     </ResearchReportDialog>
   );
 }
@@ -107,6 +115,13 @@ export function WorkPanel({
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
   const [reportTodo, setReportTodo] = useState<TodoRecord | null>(null);
+  const openDesign = useOpenDesign();
+  const openMade = (todo: TodoRecord) => {
+    const page = todo.madeKind === 'page' ? primaryPage(todo.deliverables) : undefined;
+    if (isInfoOutput(todo.output) && todo.latestBuildId !== null) setReportTodo(todo);
+    else if (page !== undefined) openDesign(todo.id, page.name);
+    else onOpenThread(todo.id);
+  };
   const archivedQ = useArchivedTodos(teamId, connected && tab === 'archived');
   const archivedLive = useMemo(
     () =>
@@ -199,11 +214,7 @@ export function WorkPanel({
                   relativeTime(todo.phaseAt, now, t),
                   projectOf(todo),
                 ])}
-                onOpen={() =>
-                  isInfoOutput(todo.output) && todo.latestBuildId !== null
-                    ? setReportTodo(todo)
-                    : onOpenThread(todo.id)
-                }
+                onOpen={() => openMade(todo)}
               />
             ))}
           </MadeCarousel>

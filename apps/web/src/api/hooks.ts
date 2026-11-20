@@ -27,6 +27,8 @@ import type {
   CreateProviderBody,
   CreateScheduleBody,
   CreateSkillBody,
+  DesignPageRecord,
+  DesignVersionRecord,
   DiffFileContent,
   DocumentDiffFile,
   FsListResult,
@@ -131,7 +133,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { useAuth } from './auth.js';
-import { api } from './client.js';
+import { ApiError, api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { cacheUserMessage } from './message-cache.js';
 import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
@@ -1857,3 +1859,57 @@ export function useApiMutations(teamId: string | undefined) {
 }
 
 export type ApiMutations = ReturnType<typeof useApiMutations>;
+
+export interface DesignPagesResponse {
+  pages: DesignPageRecord[];
+  shareOrigin: string | null;
+}
+
+const designKey = (todoId: string) => ['design', todoId] as const;
+const designPath = (todoId: string) => `/api/todos/${encodeURIComponent(todoId)}/design`;
+
+export const useDesignPages = (todoId: string, enabled: boolean) =>
+  useQuery({
+    queryKey: designKey(todoId),
+    queryFn: () => api.get<DesignPagesResponse>(designPath(todoId)),
+    enabled,
+  });
+
+export const useDesignVersions = (todoId: string, fileName: string | null, enabled: boolean) =>
+  useQuery({
+    queryKey: [...designKey(todoId), 'versions', fileName],
+    queryFn: () =>
+      api.get<DesignVersionRecord[]>(
+        `${designPath(todoId)}/${encodeURIComponent(fileName ?? '')}/versions`,
+      ),
+    enabled: enabled && fileName !== null,
+  });
+
+export const useDesignPageHtml = (versionId: string | null) =>
+  useQuery({
+    queryKey: ['design-page', versionId],
+    enabled: versionId !== null,
+    staleTime: Number.POSITIVE_INFINITY,
+    retry: false,
+    queryFn: async () => {
+      const res = await fetch(`/api/design/versions/${encodeURIComponent(versionId ?? '')}/page`, {
+        credentials: 'same-origin',
+      });
+      if (!res.ok) throw new ApiError(res.status, res.statusText);
+      return res.text();
+    },
+  });
+
+export function useDesignMutations(todoId: string) {
+  const qc = useQueryClient();
+  const refresh = () => qc.invalidateQueries({ queryKey: designKey(todoId) });
+  return {
+    restore: useMutation({
+      mutationFn: (versionId: string) =>
+        api.post<DesignVersionRecord>(
+          `${designPath(todoId)}/versions/${encodeURIComponent(versionId)}/restore`,
+        ),
+      onSuccess: refresh,
+    }),
+  };
+}

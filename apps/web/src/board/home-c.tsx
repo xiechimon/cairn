@@ -30,6 +30,8 @@ import {
   type ArchivedProjectState,
 } from './archived-project-bar.js';
 import { ComposerSetupHint, useComposerSetupStep } from './composer-setup-hint.js';
+import type { DesignTarget } from './design/design-route.js';
+import { useDesignSplit } from './design/design-split.js';
 import { HomeSpiral, type SpiralProject } from './home-spiral.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
@@ -97,6 +99,7 @@ interface HomeCProps {
   archived?: ArchivedProjectState | null;
   fixtureProjects?: readonly SpiralProject[];
   thread?: ReactNode;
+  design?: DesignTarget | null;
 }
 
 export function conversationBoundaryKey(input: {
@@ -168,6 +171,7 @@ export function HomeC({
   archived = null,
   fixtureProjects,
   thread,
+  design = null,
 }: HomeCProps) {
   const { t } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -187,6 +191,7 @@ export function HomeC({
   );
   const threadId = searchParams.get(THREAD_PARAM);
   const docked = thread != null;
+  const designSplit = useDesignSplit(design);
   const paneShown = threadId === null || docked;
   const narrow = useNarrow();
   const { createTodo } = useApiMutations(teamId);
@@ -492,8 +497,9 @@ export function HomeC({
         <div className="relative flex min-h-0 min-w-0 flex-1">
           <section
             data-testid="home-c"
-            className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
+            className={`chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none ${designSplit?.sectionClass ?? ''}`}
           >
+            {designSplit?.chatBar}
             {paneButtons}
             {load === 'loading' ? (
               <>
@@ -524,7 +530,7 @@ export function HomeC({
               />
             )}
           </section>
-          {thread}
+          {designSplit?.pane ?? thread}
           {workPanel}
         </div>
         {phoneChrome}
@@ -540,8 +546,9 @@ export function HomeC({
           data-testid="home-c"
           data-chat-top={!narrow && banner == null ? 'under-header' : undefined}
           aria-label={t('与 Coordinator 的对话')}
-          className="chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none"
+          className={`chat-interactions relative flex min-h-0 min-w-0 flex-1 flex-col overscroll-none ${designSplit?.sectionClass ?? ''}`}
         >
+          {designSplit?.chatBar}
           {paneButtons}
           {!narrow && (
             <ChiefStatusMark chief={{ ...chiefData, stream }} hiddenWhenIdle={homeSpiral} />
@@ -600,7 +607,7 @@ export function HomeC({
             />
           </ConversationBoundary>
         </section>
-        {thread}
+        {designSplit?.pane ?? thread}
         {workPanel}
       </div>
       {phoneChrome}

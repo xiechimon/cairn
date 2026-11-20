@@ -34,6 +34,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
+import { useOpenDesign } from './design/design-route.js';
 import {
   type EngineRunView,
   engineCanTakeOver,
@@ -41,6 +42,7 @@ import {
   engineUsageSummary,
 } from './engine-run.js';
 import { EngineQuestion, EngineRawView, TakeOverDialog } from './engine-run-view.js';
+import { OpenDesignPageContext } from './file-pane.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { STATUS_WORDS } from './status-words.js';
@@ -577,6 +579,7 @@ export function SideChat({
   const { t } = useI18n();
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
+  const openDesign = useOpenDesign();
   const [searchParams, setSearchParams] = useSearchParams();
   const closeAll = () =>
     setSearchParams(
@@ -649,39 +652,41 @@ export function SideChat({
   }, [onClose, showsSubView]);
 
   return (
-    <SidePanel
-      ref={panelRef}
-      label={todo?.title ?? t('任务')}
-      onDismiss={onClose}
-      docked={docked}
-      testId="side-chat-panel"
-    >
-      {todo != null && chat.load === 'ready' ? (
-        Stage !== undefined ? (
-          <Stage>{thread}</Stage>
-        ) : (
-          thread(
-            chat.engineRun === undefined
-              ? undefined
-              : {
-                  run: chat.engineRun,
-                  ...(live ? { eventsInTranscript: true } : {}),
-                },
+    <OpenDesignPageContext.Provider value={(fileName) => openDesign(todoId, fileName)}>
+      <SidePanel
+        ref={panelRef}
+        label={todo?.title ?? t('任务')}
+        onDismiss={onClose}
+        docked={docked}
+        testId="side-chat-panel"
+      >
+        {todo != null && chat.load === 'ready' ? (
+          Stage !== undefined ? (
+            <Stage>{thread}</Stage>
+          ) : (
+            thread(
+              chat.engineRun === undefined
+                ? undefined
+                : {
+                    run: chat.engineRun,
+                    ...(live ? { eventsInTranscript: true } : {}),
+                  },
+            )
           )
-        )
-      ) : (
-        <>
-          <Head
-            todoId={todoId}
-            todo={null}
-            onBack={onClose}
-            onClose={closeAll}
-            {...(docked ? { onCollapse: onClose } : {})}
-          />
-          <Unavailable chat={chat} />
-        </>
-      )}
-    </SidePanel>
+        ) : (
+          <>
+            <Head
+              todoId={todoId}
+              todo={null}
+              onBack={onClose}
+              onClose={closeAll}
+              {...(docked ? { onCollapse: onClose } : {})}
+            />
+            <Unavailable chat={chat} />
+          </>
+        )}
+      </SidePanel>
+    </OpenDesignPageContext.Provider>
   );
 }
 

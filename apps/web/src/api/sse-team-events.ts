@@ -5,7 +5,7 @@ export function teamEventInvalidations(
   switch (ev.type) {
     case 'todo': {
       const doc = ev.doc as { id: string; latestBuildId?: string | null };
-      const keys: (readonly string[])[] = [['schedules'], ['plans']];
+      const keys: (readonly string[])[] = [['schedules'], ['plans'], ['design', doc.id]];
       if (typeof doc.latestBuildId === 'string')
         keys.push(['steps', doc.latestBuildId], ['messages', doc.latestBuildId]);
       return keys;
@@ -16,6 +16,7 @@ export function teamEventInvalidations(
         ['steps', doc.id],
         ['todo', doc.todoId],
         ['plans', doc.id],
+        ['design', doc.todoId],
       ];
     }
     case 'notification':

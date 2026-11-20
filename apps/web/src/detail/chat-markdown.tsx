@@ -13,6 +13,7 @@ import {
   attachmentOpener,
   FileSetContext,
   fileSetOf,
+  OpenDesignPageContext,
   OpenFileContext,
 } from '../board/file-pane.js';
 import { useArrivals } from '../components/growth.js';
@@ -290,14 +291,17 @@ function MarkdownListItem({
 }
 
 function AttachmentBlock({ name, attachmentKey }: { name: string; attachmentKey: string }) {
-  const openFile = useContext(OpenFileContext);
+  const openers = {
+    file: useContext(OpenFileContext),
+    designPage: useContext(OpenDesignPageContext),
+  };
   const set = useContext(FileSetContext);
   return (
     <div className="chat-md-attachment">
       <AttachmentChip
         name={name}
         attachmentKey={attachmentKey}
-        {...attachmentOpener(openFile, set, name, attachmentKey)}
+        {...attachmentOpener(openers, set, name, attachmentKey)}
       />
     </div>
   );

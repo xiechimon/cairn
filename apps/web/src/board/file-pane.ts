@@ -1,3 +1,4 @@
+import { isDesignPageName } from '@cairn/shared';
 import { createContext } from 'react';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
 
@@ -30,6 +31,10 @@ export function fileSetOf(text: string): FileTarget[] {
   return out;
 }
 
+export const OpenDesignPageContext = createContext<((fileName: string) => void) | undefined>(
+  undefined,
+);
+
 export function attachmentUrl(key: string): string {
   return `/api/attachments/${encodeURIComponent(attachmentIdFromKey(key))}`;
 }
@@ -47,10 +52,15 @@ export function withoutFileTarget(params: URLSearchParams): URLSearchParams {
 }
 
 export function attachmentOpener(
-  openFile: OpenFile | undefined,
+  openers: {
+    file: OpenFile | undefined;
+    designPage: ((fileName: string) => void) | undefined;
+  },
   set: readonly FileTarget[],
   name: string,
   key: string,
 ): { onOpen?: () => void } {
-  return openFile === undefined ? {} : { onOpen: () => openFile({ name, key }, set) };
+  const { file, designPage } = openers;
+  if (designPage !== undefined && isDesignPageName(name)) return { onOpen: () => designPage(name) };
+  return file === undefined ? {} : { onOpen: () => file({ name, key }, set) };
 }

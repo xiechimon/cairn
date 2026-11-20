@@ -814,10 +814,14 @@ States: Page with one version, several versions, a restored version, a missing v
 Reach:
 
 1. `open /app`
+2. `click label:成果`
+3. `click testid:made-card`
+4. `click testid:made-file-open`
+5. `click testid:design-versions`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `design-canvas`, `design-chat-bar`, `design-close`, `design-download`, `design-empty`, `design-error`, `design-frame`, `design-head`, `design-loading`, `design-missing`, `design-more`, `design-open-browser`, `design-page-name`, `design-page-option`, `design-page-picker`, `design-pane`, `design-reload`, `design-source`, `design-source-toggle`, `design-stage`, `design-toolbar`, `design-version-banner`, `design-version-current`, `design-version-item`, `design-version-meta`, `design-version-newer`, `design-version-restore`, `design-versions`
 - Verify recipes: [.claude/skills/verify-cairn/features/design-surface.md](features/design-surface.md)
 - Research: [docs/research/open-design-2026-11-20.md](../../../docs/research/open-design-2026-11-20.md)
 - Frontend design: [docs/design/design-surface.md](../../../docs/design/design-surface.md)

@@ -1,7 +1,12 @@
 import { cn } from 'cn';
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import { attachmentOpener, FileSetContext, OpenFileContext } from '../board/file-pane.js';
+import {
+  attachmentOpener,
+  FileSetContext,
+  OpenDesignPageContext,
+  OpenFileContext,
+} from '../board/file-pane.js';
 import { useThreadHref } from '../board/thread-link.js';
 import { echoTaskRef, hoverTaskRef, useTaskRefSignal } from '../chief/task-ref-signal.js';
 import { MachineName } from '../components/machine-label.js';
@@ -262,7 +267,10 @@ function decorate(seg: DocSegment, key: number, node: ReactNode): ReactNode {
 }
 
 export function Segments({ segments, codeClassName }: SegmentsProps) {
-  const openFile = useContext(OpenFileContext);
+  const openers = {
+    file: useContext(OpenFileContext),
+    designPage: useContext(OpenDesignPageContext),
+  };
   const fileSet = useContext(FileSetContext);
   const glances = useContext(TodoGlanceContext);
   return (
@@ -280,7 +288,7 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               key={j}
               name={seg.text}
               attachmentKey={seg.attachmentKey}
-              {...attachmentOpener(openFile, fileSet, seg.text, seg.attachmentKey)}
+              {...attachmentOpener(openers, fileSet, seg.text, seg.attachmentKey)}
             />
           ) : seg.style === 'anchor' ? (
             <a

@@ -129,7 +129,7 @@ test('Made groups pages and decks, previews a script-free page and never a scrip
   expect(tracker).toEqual([]);
 });
 
-test('the dialog lists each file with a download above the report and explains skipped files', async ({
+test('the dialog lists each file with open and download above the report, explains skipped files, and opens a page in the design view', async ({
   page,
 }) => {
   const { made, tracker } = await openMade(page);
@@ -138,33 +138,37 @@ test('the dialog lists each file with a download above the report and explains s
   const dialog = page.getByRole('dialog', { name: 'Export benchmark page' });
   await expect(dialog.getByTestId('research-report-meta')).toHaveText(/^网页\s*·\s*定稿/);
   const files = dialog.getByTestId('made-files');
-  await expect(files.getByTestId('made-file')).toHaveText([/^benchmark\.html网页 · 2 KB · 预览不运行脚本下载$/]);
+  await expect(files.getByTestId('made-file')).toHaveText([/^benchmark\.html网页 · 2 KB打开下载$/]);
   const download = files.getByRole('link', { name: '下载 benchmark.html' });
   await expect(download).toHaveAttribute('href', '/api/attachments/att-page?download=1');
   await expect(download).toHaveAttribute('download', 'benchmark.html');
-  const preview = files.getByTestId('made-page-frame');
-  await expect(preview).toHaveAttribute('sandbox', '');
-  await expect(preview.contentFrame().getByRole('heading', { name: 'Export benchmark' })).toBeVisible();
+  await expect(files.getByTestId('made-page-frame')).toHaveCount(0);
   await expect(dialog.getByTestId('made-skipped')).toHaveText('未收录 1 个文件：demo.mp4（文件太大）');
   const filesBox = await files.boundingBox();
   const docBox = await page.getByTestId('research-report-doc').boundingBox();
   expect(filesBox!.y + filesBox!.height).toBeLessThan(docBox!.y);
-  await page.keyboard.press('Escape');
+  await files.getByRole('button', { name: '打开 benchmark.html' }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page).toHaveURL(/view=design/);
+  await expect(page).toHaveURL(/thread=page/);
+  await expect(page).toHaveURL(/file=benchmark\.html/);
+  await expect(page.getByTestId('design-pane')).toBeVisible();
+  await page.goBack();
+  await expect(page.getByTestId('design-pane')).toHaveCount(0);
 
-  await made.getByRole('button', { name: 'Export review deck' }).click();
+  await page.getByRole('complementary', { name: '成果' }).getByRole('button', { name: 'Export review deck' }).click();
   const deckDialog = page.getByRole('dialog', { name: 'Export review deck' });
   await expect(deckDialog.getByTestId('research-report-meta')).toHaveText(/^PPT\s*·\s*定稿/);
   const deck = deckDialog.getByTestId('made-files');
   await expect(deck.getByTestId('made-file')).toHaveText([
     /^review\.pptxPPT · 3\.1 MB · 下载后打开下载$/,
-    /^appendix\.html网页 · 2 KB · 预览不运行脚本下载$/,
+    /^appendix\.html网页 · 2 KB打开下载$/,
   ]);
-  await expect(deck.getByTestId('made-page-frame')).toHaveCount(1);
   await expect(deck.getByTestId('made-skipped')).toHaveCount(0);
   expect(tracker).toEqual([]);
 });
 
-test('a page with a script tag, handler, script URL or noscript gets no preview on its card or in its dialog', async ({
+test('a page with a script tag, handler, script URL or noscript gets no preview on its card', async ({
   page,
 }) => {
   const { made } = await openMade(page);
@@ -172,11 +176,6 @@ test('a page with a script tag, handler, script URL or noscript gets no preview 
   for (const title of ['Live export board', 'Handler chart page', 'Link list page', 'Fallback note page']) {
     const card = made.getByTestId('made-card').filter({ hasText: title });
     await card.scrollIntoViewIfNeeded();
-    await made.getByRole('button', { name: title }).click();
-    const files = page.getByRole('dialog', { name: title }).getByTestId('made-files');
-    await expect(files.getByTestId('made-file')).toContainText('含脚本，下载后打开');
-    await expect(files.getByTestId('made-page-frame')).toHaveCount(0);
-    await page.keyboard.press('Escape');
     await expect(card.getByTestId('made-page-frame')).toHaveCount(0);
   }
 });
