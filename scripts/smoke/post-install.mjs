@@ -791,6 +791,7 @@ async function connectApp(appPath, prevAppPath) {
       console.log(`previous release server up on ${prevBase}`);
     } finally {
       await Promise.race([prevApp.close(), delay(30_000)]).catch(() => {});
+      prevApp.process()?.kill('SIGKILL');
     }
     const dbPath = join(scratch, 'home', 'server', 'server.db');
     const seeded = seedEveryTable(dbPath);
@@ -947,6 +948,7 @@ async function main() {
     for (const undo of ctx.cleanup.reverse()) await undo().catch(() => {});
     if (ctx.electronApp) {
       await Promise.race([ctx.electronApp.close(), delay(30_000)]).catch(() => {});
+      ctx.electronApp.process()?.kill('SIGKILL');
       if (ctx.scratch) rmSync(ctx.scratch, { recursive: true, force: true });
     }
     if (ctx.browser) await ctx.browser.close().catch(() => {});
