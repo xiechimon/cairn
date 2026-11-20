@@ -103,6 +103,12 @@ export const upstreamModelsResultSchema = z.discriminatedUnion('status', [
     failure: providerFailureSchema,
     httpStatus: z.number().int().nullable(),
   }),
+  z.strictObject({
+    status: z.literal('fallback'),
+    failure: providerFailureSchema,
+    httpStatus: z.number().int().nullable(),
+    models: z.array(z.strictObject({ id: z.string(), name: z.string() })),
+  }),
 ]);
 export type UpstreamModelsResult = z.infer<typeof upstreamModelsResultSchema>;
 

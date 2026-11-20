@@ -2587,6 +2587,20 @@ export const EN: Record<string, string> = {
   '上游返回了空清单。': 'The upstream returned an empty list.',
   '已选 {n}': 'Selected {n}',
   上游其他: 'Other upstream models',
+  '备用清单，不是上游返回的': 'Fallback list, not from the upstream',
+  '上游拒绝了这个订阅的登录，没拿到模型清单。重新登录后重试。':
+    'The upstream rejected this subscription sign-in, so no model list came back. Sign in again and retry.',
+  '上游没给出模型清单，稍后重试。': 'The upstream gave no model list. Retry shortly.',
+  '上游限流了，没拿到模型清单，稍后重试。':
+    'The upstream is rate limiting, so no model list came back. Retry shortly.',
+  '上游 10 秒内没回，没拿到模型清单。':
+    'The upstream did not answer within 10 seconds, so no model list came back.',
+  '连不上上游，没拿到模型清单。检查网络后重试。':
+    'Cannot reach the upstream, so no model list came back. Check the network and retry.',
+  '电脑上的 Antigravity 还没登录，没拿到它的模型清单。登录后重试。':
+    'Antigravity on your computer is not signed in, so its model list is unavailable. Sign in and retry.',
+  '没有在线的电脑装着 Antigravity，没拿到它的模型清单。':
+    'No online computer has Antigravity installed, so its model list is unavailable.',
   '筛选{noun}': 'Filter {noun}',
   '没有匹配「{query}」的{noun}': 'Nothing matches “{query}”',
   输入可筛选: 'Type to filter',

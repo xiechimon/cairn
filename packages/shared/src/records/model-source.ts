@@ -78,10 +78,55 @@ export const modelSourcesEnvelopeSchema = z.object({
 export type ModelSourcesEnvelope = z.infer<typeof modelSourcesEnvelopeSchema>;
 
 export const DEFAULT_CLAUDE_CODE_MODELS: readonly ModelSourceModel[] = [
-  { id: 'claude-opus-5-5', name: 'claude-opus-5-5', slot: 'builtin' },
-  { id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5', slot: 'builtin' },
-  { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'builtin' },
+  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5', slot: 'builtin' },
+  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', slot: 'builtin' },
+  { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', slot: 'builtin' },
 ];
+
+const CLAUDE_CODE_ALIAS_FAMILIES: Readonly<Record<string, string>> = {
+  best: 'opus',
+  opus: 'opus',
+  sonnet: 'sonnet',
+  haiku: 'haiku',
+  fable: 'fable',
+};
+const UNRESOLVABLE_CLAUDE_CODE_ALIASES = new Set(['default', 'opusplan']);
+const LONG_CONTEXT_SUFFIX = /\[1m\]$/i;
+export const CLAUDE_MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:[\]/-]*$/;
+
+export function canonicalClaudeModelId(
+  id: string,
+  newestFirst: readonly { id: string }[] = DEFAULT_CLAUDE_CODE_MODELS,
+): string | null {
+  const bare = id.trim().replace(LONG_CONTEXT_SUFFIX, '');
+  const key = bare.toLowerCase();
+  if (bare === '' || UNRESOLVABLE_CLAUDE_CODE_ALIASES.has(key)) return null;
+  const family = CLAUDE_CODE_ALIAS_FAMILIES[key];
+  if (family === undefined) return bare;
+  const prefix = `claude-${family}-`;
+  return (
+    newestFirst.find((model) => model.id.startsWith(prefix))?.id ??
+    DEFAULT_CLAUDE_CODE_MODELS.find((model) => model.id.startsWith(prefix))?.id ??
+    null
+  );
+}
+
+export function canonicalClaudeModels<T extends { id: string; name: string }>(
+  models: readonly T[],
+  newestFirst: readonly { id: string; name: string }[] = DEFAULT_CLAUDE_CODE_MODELS,
+): T[] {
+  const names = new Map(
+    [...DEFAULT_CLAUDE_CODE_MODELS, ...newestFirst].map((model) => [model.id, model.name]),
+  );
+  const byId = new Map<string, T>();
+  for (const model of models) {
+    const id = canonicalClaudeModelId(model.id, newestFirst);
+    if (id === null || byId.has(id)) continue;
+    const name = id === model.id && model.name !== model.id ? model.name : (names.get(id) ?? id);
+    byId.set(id, { ...model, id, name });
+  }
+  return [...byId.values()];
+}
 
 export const CLAUDE_MODEL_SLOT_PATTERN = /^ANTHROPIC_([A-Z0-9_]+)_MODEL$/;
 

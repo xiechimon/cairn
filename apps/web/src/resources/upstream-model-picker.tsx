@@ -25,6 +25,12 @@ type Load =
   | { phase: 'loading' }
   | { phase: 'ok'; models: UpstreamOption[] }
   | {
+      phase: 'fallback';
+      models: UpstreamOption[];
+      failure: ProviderFailure;
+      httpStatus: number | null;
+    }
+  | {
       phase: 'failed';
       failure: ProviderFailure | 'unavailable' | 'refused';
       httpStatus: number | null;
@@ -49,12 +55,24 @@ const LIST_FAILURE: Record<ProviderFailure | 'unavailable' | 'refused', string> 
   refused: '这台设备是配对设备，没有权限获取上游模型。请在运行 Cairn 的电脑上打开这一页再选择。',
 };
 
+const FALLBACK_REASON: Record<ProviderFailure, string> = {
+  auth: '上游拒绝了这个订阅的登录，没拿到模型清单。重新登录后重试。',
+  'not-found': '上游没给出模型清单，稍后重试。',
+  'rate-limit': '上游限流了，没拿到模型清单，稍后重试。',
+  timeout: '上游 10 秒内没回，没拿到模型清单。',
+  upstream: '上游没给出模型清单，稍后重试。',
+  invalid: '上游没给出模型清单，稍后重试。',
+  network: '连不上上游，没拿到模型清单。检查网络后重试。',
+  'no-model': '上游没给出模型清单，稍后重试。',
+};
+
 export function UpstreamModelPicker({
   endpoint,
   selected,
   load,
   groupModels,
   testable = true,
+  fallbackReasons,
   onClose,
   onSave,
 }: {
@@ -63,6 +81,7 @@ export function UpstreamModelPicker({
   load: () => Promise<UpstreamModelsResult>;
   groupModels?: (models: UpstreamOption[]) => [string, UpstreamOption[]][];
   testable?: boolean;
+  fallbackReasons?: Partial<Record<ProviderFailure, string>>;
   onClose: () => void;
   onSave: (ids: string[], names: ReadonlyMap<string, string>) => void;
 }) {
@@ -83,7 +102,14 @@ export function UpstreamModelPicker({
         setState(
           result.status === 'ok'
             ? { phase: 'ok', models: result.models }
-            : { phase: 'failed', failure: result.failure, httpStatus: result.httpStatus },
+            : result.status === 'fallback'
+              ? {
+                  phase: 'fallback',
+                  models: result.models,
+                  failure: result.failure,
+                  httpStatus: result.httpStatus,
+                }
+              : { phase: 'failed', failure: result.failure, httpStatus: result.httpStatus },
         );
       },
       (error: unknown) => {
@@ -100,7 +126,8 @@ export function UpstreamModelPicker({
     };
   }, [initialLoad, attempt]);
 
-  const upstream = state.phase === 'ok' ? state.models : [];
+  const listed = state.phase === 'ok' || state.phase === 'fallback';
+  const upstream = listed ? state.models : [];
   const names = new Map(upstream.map((model) => [model.id, model.name]));
   const byId = new Map(upstream.map((model) => [model.id, model]));
   const picked = new Set(draft);
@@ -170,6 +197,27 @@ export function UpstreamModelPicker({
     );
   };
 
+  const retry = (
+    <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
+      <RotateCw aria-hidden />
+      {t('重试')}
+    </Button>
+  );
+  const manualAdd = (
+    <div className="flex w-full flex-col gap-1.5 border-t border-border pt-3">
+      <span className="text-meta text-content-tertiary">{t('上游不给清单时，按模型 ID 添加')}</span>
+      <Input
+        aria-label={t('模型 ID')}
+        placeholder={t('模型 ID，回车加入')}
+        className={cn(FORM_CONTROL_CLS, 'w-full')}
+        value={typed}
+        onChange={(event) => setTyped(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') addTyped();
+        }}
+      />
+    </div>
+  );
   const added = draft.filter((id) => !selected.includes(id)).length;
   return (
     <DialogShell
@@ -225,31 +273,27 @@ export function UpstreamModelPicker({
             <CircleAlert aria-hidden className="mt-0.5 size-4 flex-none text-destructive" />
             {t(LIST_FAILURE[state.failure])}
           </p>
-          <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
-            <RotateCw aria-hidden />
-            {t('重试')}
-          </Button>
-          <div className="flex w-full flex-col gap-1.5 border-t border-border pt-3">
-            <span className="text-meta text-content-tertiary">
-              {t('上游不给清单时，按模型 ID 添加')}
-            </span>
-            <Input
-              aria-label={t('模型 ID')}
-              placeholder={t('模型 ID，回车加入')}
-              className={cn(FORM_CONTROL_CLS, 'w-full')}
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') addTyped();
-              }}
-            />
-          </div>
+          {retry}
+          {manualAdd}
           {draft.length > 0 && (
             <div className="flex w-full flex-col">{draft.map((id) => row(id))}</div>
           )}
         </div>
       )}
-      {state.phase === 'ok' && (
+      {state.phase === 'fallback' && (
+        <div data-testid="upstream-fallback" className="mb-3 flex flex-col items-start gap-3">
+          <p
+            role="alert"
+            className="m-0 flex items-start gap-2 text-ui text-content-secondary"
+            title={state.httpStatus === null ? undefined : `HTTP ${state.httpStatus}`}
+          >
+            <CircleAlert aria-hidden className="mt-0.5 size-4 flex-none text-destructive" />
+            {t(fallbackReasons?.[state.failure] ?? FALLBACK_REASON[state.failure])}
+          </p>
+          {retry}
+        </div>
+      )}
+      {listed && (
         <div className="flex flex-col gap-2">
           <div className="relative">
             <Search
@@ -264,7 +308,7 @@ export function UpstreamModelPicker({
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          {upstream.length === 0 && (
+          {state.phase === 'ok' && upstream.length === 0 && (
             <p className="m-0 py-2 text-meta text-content-tertiary">{t('上游返回了空清单。')}</p>
           )}
           {pickedRows.length > 0 && (
@@ -279,13 +323,13 @@ export function UpstreamModelPicker({
             </div>
           )}
           {otherRows.length > 0 &&
-            (groupModels === undefined ? (
+            (groupModels === undefined || state.phase === 'fallback' ? (
               <div className="flex flex-col">
                 <span
                   data-testid="upstream-group"
                   className="px-2 pt-1 pb-1 text-meta text-content-tertiary"
                 >
-                  {t('上游其他')}
+                  {state.phase === 'fallback' ? t('备用清单，不是上游返回的') : t('上游其他')}
                 </span>
                 {otherRows.map(row)}
               </div>
@@ -308,6 +352,7 @@ export function UpstreamModelPicker({
           {upstream.length > 0 && pickedRows.length === 0 && otherRows.length === 0 && (
             <p className="m-0 py-2 text-meta text-content-tertiary">{t('没有匹配的模型')}</p>
           )}
+          {state.phase === 'fallback' && manualAdd}
         </div>
       )}
     </DialogShell>

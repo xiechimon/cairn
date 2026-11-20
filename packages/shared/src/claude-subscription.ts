@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { CLAUDE_MODEL_ID_PATTERN } from './records/model-source.js';
 import { subscriptionCheckSchema } from './subscription-check.js';
 
 export const claudeSubscriptionModelSchema = z.strictObject({
-  id: z.string().min(1).max(256),
+  id: z.string().min(1).max(256).regex(CLAUDE_MODEL_ID_PATTERN, 'Invalid model id'),
   name: z.string().min(1).max(256),
 });
 
@@ -46,11 +47,7 @@ export const renameClaudeSubscriptionSchema = z
 export type PatchClaudeSubscription = z.infer<typeof renameClaudeSubscriptionSchema>;
 
 export const claudeSubscriptionTestSchema = z.object({
-  model: z
-    .string()
-    .trim()
-    .max(256)
-    .regex(/^[A-Za-z0-9][A-Za-z0-9._:[\]/-]*$/, 'Invalid model id'),
+  model: z.string().trim().max(256).regex(CLAUDE_MODEL_ID_PATTERN, 'Invalid model id'),
 });
 
 export const claudeSubscriptionVerifyResultSchema = z.object({

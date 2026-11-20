@@ -149,6 +149,7 @@ describe('Claude subscription connections', () => {
     const binary = join(dir, 'claude');
     writeFileSync(binary, `#!/bin/sh\necho "$@" >> "${args}"\nexit 0\n`, { mode: 0o755 });
     vi.stubEnv('CLAUDE_BIN', binary);
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
     const tested = await req(s.app, 'POST', `${path}/${id}/test`, { model: 'claude-opus-5-5' });
     expect(await tested.json()).toMatchObject({ status: 'ok', latencyMs: expect.any(Number) });
     expect(readFileSync(args, 'utf8')).toContain('--model claude-opus-5-5');
@@ -176,7 +177,7 @@ describe('Claude subscription connections', () => {
     expect(list[0]?.lastCheck).toBeNull();
   });
 
-  test('picked models are stored on the subscription and narrow the Claude Code model source', async () => {
+  test('picked models are stored canonically and become the Claude Code model source', async () => {
     const s = bootServer();
     const path = `/api/teams/${s.team.id}/claude-subscriptions`;
     const { id } = (await (
@@ -186,42 +187,162 @@ describe('Claude subscription connections', () => {
       claudeCodeReport: {
         installed: true,
         hostname: 'mac',
-        models: ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5'].map((model) => ({
-          id: model,
-          name: model,
-          slot: 'builtin',
-        })),
+        models: [
+          { id: 'opus[1m]', name: 'opus[1m]', slot: 'default' },
+          { id: 'claude-sonnet-5-5', name: 'claude-sonnet-5-5', slot: 'default-sonnet' },
+          { id: 'claude-opus-5-5', name: 'claude-opus-5-5', slot: 'builtin' },
+        ],
       },
     });
     const claudeModels = async () =>
       (
         (await (await req(s.app, 'GET', `/api/teams/${s.team.id}/model-sources`)).json()) as {
-          sources: { runtime: string; models: { id: string }[] }[];
+          sources: { runtime: string; models: { id: string; name: string }[] }[];
         }
       ).sources
         .filter((source) => source.runtime === 'claude-code')
-        .flatMap((source) => source.models.map((model) => model.id));
+        .flatMap((source) => source.models.map((model) => `${model.id} ${model.name}`));
     expect(await claudeModels()).toEqual([
-      'claude-opus-5-5',
-      'claude-sonnet-5-5',
-      'claude-haiku-5-5',
+      'claude-opus-5-5 Claude Opus 5.5',
+      'claude-sonnet-5-5 Claude Sonnet 5.5',
     ]);
     const picked = [
-      { id: 'claude-opus-5-5', name: 'claude-opus-5-5' },
-      { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5' },
-      { id: 'claude-opus-5-5', name: 'duplicate' },
+      { id: 'claude-fable-5-2', name: 'Claude Fable 5.2' },
+      { id: 'sonnet[1m]', name: 'sonnet[1m]' },
+      { id: 'claude-sonnet-5-5', name: 'duplicate' },
     ];
     const patched = await req(s.app, 'PATCH', `${path}/${id}`, { models: picked });
+    expect((await patched.json()) as { models: unknown }).toMatchObject({
+      models: [
+        { id: 'claude-fable-5-2', name: 'Claude Fable 5.2' },
+        { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+      ],
+    });
+    expect(await claudeModels()).toEqual([
+      'claude-fable-5-2 Claude Fable 5.2',
+      'claude-sonnet-5-5 Claude Sonnet 5.5',
+    ]);
+    s.db
+      .update(claudeSubscription)
+      .set({
+        models: [
+          { id: 'opus[1m]', name: 'opus[1m]' },
+          { id: 'default', name: 'default' },
+          { id: '--permission-mode', name: 'flag' },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
     expect(
-      ((await patched.json()) as { models: { id: string }[] }).models.map((m) => m.id),
-    ).toEqual(['claude-opus-5-5', 'claude-haiku-5-5']);
-    expect(await claudeModels()).toEqual(['claude-opus-5-5', 'claude-haiku-5-5']);
-    const upstream = await req(s.app, 'POST', `${path}/${id}/upstream-models`);
-    expect(
-      ((await upstream.json()) as { models: { id: string }[] }).models.map((m) => m.id),
-    ).toEqual(['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-haiku-5-5']);
+      (
+        await req(s.app, 'PATCH', `${path}/${id}`, {
+          models: [{ id: '--dangerously-skip-permissions', name: 'flag' }],
+        })
+      ).status,
+    ).toBe(400);
+    const listed = (await (await req(s.app, 'GET', path)).json()) as { models: unknown }[];
+    expect(listed[0]?.models).toEqual([{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }]);
+    expect(await claudeModels()).toEqual(['claude-opus-5-5 Claude Opus 5.5']);
     await req(s.app, 'PATCH', `${path}/${id}`, { models: null });
-    expect(await claudeModels()).toHaveLength(3);
+    expect(await claudeModels()).toHaveLength(2);
+  });
+
+  test('upstream models come from the Anthropic models API with the subscription token, newest first across pages', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const { id } = (await (
+      await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN })
+    ).json()) as { id: string };
+    insertMachine(s, {
+      claudeCodeReport: {
+        installed: true,
+        hostname: 'mac',
+        models: [{ id: 'opus[1m]', name: 'opus[1m]', slot: 'default' }],
+      },
+    });
+    const pages = [
+      {
+        data: [
+          { type: 'model', id: 'claude-fable-5-2', display_name: 'Claude Fable 5.2' },
+          { type: 'model', id: 'claude-opus-5-5', display_name: 'Claude Opus 5.5' },
+        ],
+        has_more: true,
+        last_id: 'claude-opus-5-5',
+      },
+      {
+        data: [
+          { type: 'model', id: 'claude-haiku-4-5-20251001', display_name: 'Claude Haiku 4.5' },
+        ],
+        has_more: false,
+        last_id: 'claude-haiku-4-5-20251001',
+      },
+    ];
+    const seen: { url: string; headers: Headers }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string | URL, init?: RequestInit) => {
+        seen.push({ url: String(url), headers: new Headers(init?.headers) });
+        return Response.json(pages[seen.length - 1]);
+      }),
+    );
+    const response = await req(s.app, 'POST', `${path}/${id}/upstream-models`);
+    const text = await response.text();
+    expect(text).not.toContain(TOKEN);
+    expect(JSON.parse(text)).toEqual({
+      status: 'ok',
+      models: [
+        { id: 'claude-fable-5-2', name: 'Claude Fable 5.2' },
+        { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+        { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+      ],
+    });
+    expect(seen.map((call) => call.url)).toEqual([
+      'https://api.anthropic.com/v1/models?limit=1000',
+      'https://api.anthropic.com/v1/models?limit=1000&after_id=claude-opus-5-5',
+    ]);
+    expect(seen[0]?.headers.get('authorization')).toBe(`Bearer ${TOKEN}`);
+    expect(seen[0]?.headers.get('anthropic-beta')).toBe('oauth-2025-04-20');
+    expect(seen[0]?.headers.has('x-api-key')).toBe(false);
+  });
+
+  test('a failed upstream call says so and offers the labelled fallback list without aliases', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const { id } = (await (
+      await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN })
+    ).json()) as { id: string };
+    insertMachine(s, {
+      claudeCodeReport: {
+        installed: true,
+        hostname: 'mac',
+        models: [
+          { id: 'opus[1m]', name: 'opus[1m]', slot: 'default' },
+          { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'default-haiku' },
+        ],
+      },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(
+          { type: 'error', error: { type: 'authentication_error', message: TOKEN } },
+          { status: 401 },
+        ),
+      ),
+    );
+    const response = await req(s.app, 'POST', `${path}/${id}/upstream-models`);
+    const text = await response.text();
+    expect(text).not.toContain(TOKEN);
+    expect(JSON.parse(text)).toEqual({
+      status: 'fallback',
+      failure: 'auth',
+      httpStatus: 401,
+      models: [
+        { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+        { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+        { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
+      ],
+    });
   });
 
   test('invalid input and foreign connection ids reveal no credentials', async () => {

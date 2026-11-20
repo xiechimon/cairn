@@ -125,7 +125,13 @@ export function useAntigravitySubscriptionVerification(teamId: string | undefine
 
 export type AntigravityUpstreamModelsResult =
   | { status: 'ok'; models: SubscriptionModel[] }
-  | { status: 'failed'; failure: ProviderFailure; httpStatus: number | null };
+  | { status: 'failed'; failure: ProviderFailure; httpStatus: number | null }
+  | {
+      status: 'fallback';
+      failure: ProviderFailure;
+      httpStatus: number | null;
+      models: SubscriptionModel[];
+    };
 
 export function fetchAntigravityUpstreamModels(
   teamId: string,

@@ -1,5 +1,6 @@
 import { hostname } from 'node:os';
 import {
+  canonicalClaudeModels,
   DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
   type ModelSourceModel,
@@ -124,7 +125,6 @@ export function getProvidersEnvelope(
 
 export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
   const picked = enabledClaudeSubscriptionModels({ db }, teamId);
-  const pickedIds = picked === null ? null : new Set(picked.map((model) => model.id));
   return db
     .select()
     .from(machine)
@@ -141,9 +141,9 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
           hostname: report.hostname,
           machineId: row.id,
           models:
-            pickedIds === null
-              ? report.models
-              : report.models.filter((model) => pickedIds.has(model.id)),
+            picked === null
+              ? canonicalClaudeModels(report.models)
+              : picked.map((model) => ({ ...model, slot: 'builtin' })),
           ...(report.bin !== undefined ? { bin: report.bin } : {}),
         },
       ];

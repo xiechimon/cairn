@@ -70,6 +70,11 @@ import {
 import { groupAntigravityUpstream, groupDevinUpstream } from './upstream-model-groups.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
+const ANTIGRAVITY_FALLBACK_REASONS = {
+  auth: '电脑上的 Antigravity 还没登录，没拿到它的模型清单。登录后重试。',
+  'not-found': '没有在线的电脑装着 Antigravity，没拿到它的模型清单。',
+} as const;
+
 interface Entry {
   item: ProviderItem;
   editor: ReactNode;
@@ -515,6 +520,9 @@ export function ProvidersSection() {
                     : groupAntigravityUpstream,
               })}
           testable={false}
+          {...(pickingSubscription.vendor === 'antigravity'
+            ? { fallbackReasons: ANTIGRAVITY_FALLBACK_REASONS }
+            : {})}
           load={async () => {
             const result =
               pickingSubscription.vendor === 'devin'
@@ -522,7 +530,7 @@ export function ProvidersSection() {
                 : pickingSubscription.vendor === 'claude'
                   ? await fetchClaudeUpstreamModels(teamId, pickingSubscription.id)
                   : await fetchAntigravityUpstreamModels(teamId, pickingSubscription.id);
-            if (result.status === 'ok')
+            if (result.status !== 'failed')
               upstreamCatalogRef.current = new Map(result.models.map((model) => [model.id, model]));
             return result;
           }}

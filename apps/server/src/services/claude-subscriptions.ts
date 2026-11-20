@@ -12,7 +12,12 @@ import type {
   SecretBox,
   UpstreamModelsResult,
 } from '@cairn/shared';
-import { claudeRateBlock, DEFAULT_CLAUDE_CODE_MODELS } from '@cairn/shared';
+import {
+  CLAUDE_MODEL_ID_PATTERN,
+  canonicalClaudeModels,
+  claudeRateBlock,
+  DEFAULT_CLAUDE_CODE_MODELS,
+} from '@cairn/shared';
 import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { claudeSubscription, machine, step } from '../db/schema.js';
@@ -24,8 +29,17 @@ import {
 } from './claude-subscription-verification.js';
 import { timedCheck } from './subscription-check.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
+import { fetchAnthropicOAuthModels } from './upstream-models.js';
 
 type Deps = { db: Db; box: SecretBox };
+type UpstreamDeps = Deps & { fetch?: typeof globalThis.fetch; timeoutMs?: number };
+
+const UPSTREAM_TIMEOUT_MS = 10_000;
+
+function savedModels(models: ClaudeSubscriptionModel[] | null): ClaudeSubscriptionModel[] | null {
+  if (models === null) return null;
+  return canonicalClaudeModels(models.filter((model) => CLAUDE_MODEL_ID_PATTERN.test(model.id)));
+}
 type Row = typeof claudeSubscription.$inferSelect;
 
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
@@ -61,7 +75,7 @@ function toRecord(row: Row): ClaudeSubscription {
     expiresAt: row.expiresAt,
     enabled: row.enabledAt !== null,
     enabledAt: row.enabledAt,
-    models: row.models,
+    models: savedModels(row.models),
     createdAt: row.createdAt,
   };
 }
@@ -123,7 +137,7 @@ export function updateClaudeSubscription(
   const models =
     patch.models === undefined || patch.models === null
       ? patch.models
-      : [...new Map(patch.models.map((model) => [model.id, model])).values()];
+      : canonicalClaudeModels(patch.models);
   const changes = {
     ...(patch.label !== undefined ? { label: patch.label } : {}),
     ...(models !== undefined ? { models } : {}),
@@ -132,31 +146,53 @@ export function updateClaudeSubscription(
   return toRecord({ ...row, ...changes });
 }
 
-export function claudeSubscriptionUpstreamModels(
-  deps: Deps,
-  teamId: string,
-  id: string,
-): UpstreamModelsResult {
-  if (!subscriptionRow(deps.db, teamId, id)) throw notFound('Claude subscription connection');
+function fallbackClaudeModels(deps: Deps, teamId: string): { id: string; name: string }[] {
   const reported = deps.db
     .select({ report: machine.claudeCodeReport })
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all()
     .flatMap((row) => (row.report?.installed ? row.report.models : []));
-  const byId = new Map<string, { id: string; name: string }>();
-  for (const model of [...DEFAULT_CLAUDE_CODE_MODELS, ...reported]) {
-    if (model.id !== '' && !byId.has(model.id))
-      byId.set(model.id, { id: model.id, name: model.name });
+  return canonicalClaudeModels([...DEFAULT_CLAUDE_CODE_MODELS, ...reported]).map(
+    ({ id, name }) => ({ id, name }),
+  );
+}
+
+export async function claudeSubscriptionUpstreamModels(
+  deps: UpstreamDeps,
+  teamId: string,
+  id: string,
+): Promise<UpstreamModelsResult> {
+  const row = subscriptionRow(deps.db, teamId, id);
+  if (!row) throw notFound('Claude subscription connection');
+  const fallback = (failure: ProviderFailure, httpStatus: number | null): UpstreamModelsResult => ({
+    status: 'fallback',
+    failure,
+    httpStatus,
+    models: fallbackClaudeModels(deps, teamId),
+  });
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return fallback('auth', null);
+  let token: string;
+  try {
+    token = deps.box.open(row.tokenCipher);
+  } catch {
+    return fallback('auth', null);
   }
-  return { status: 'ok', models: [...byId.values()] };
+  const listed = await fetchAnthropicOAuthModels({
+    oauthToken: token,
+    fetch: deps.fetch ?? globalThis.fetch,
+    timeoutMs: deps.timeoutMs ?? UPSTREAM_TIMEOUT_MS,
+  });
+  if (!listed.ok) return fallback(listed.failure, listed.httpStatus);
+  if (listed.models.length === 0) return fallback('no-model', null);
+  return { status: 'ok', models: listed.models };
 }
 
 export function enabledClaudeSubscriptionModels(
   deps: { db: Pick<Db, 'select'> },
   teamId: string,
 ): ClaudeSubscriptionModel[] | null {
-  return activeSubscriptionRow(deps, teamId)?.models ?? null;
+  return savedModels(activeSubscriptionRow(deps, teamId)?.models ?? null);
 }
 
 export async function enableClaudeSubscription(
@@ -363,7 +399,7 @@ const TEST_FAILURE: Record<
 };
 
 export async function testClaudeSubscriptionModel(
-  deps: Deps,
+  deps: UpstreamDeps,
   teamId: string,
   id: string,
   model: string,
@@ -380,8 +416,8 @@ export async function testClaudeSubscriptionModel(
       latencyMs: null,
     };
   }
-  const known = claudeSubscriptionUpstreamModels(deps, teamId, id);
-  if (known.status !== 'ok' || !known.models.some((entry) => entry.id === model)) {
+  const known = await claudeSubscriptionUpstreamModels(deps, teamId, id);
+  if (known.status === 'failed' || !known.models.some((entry) => entry.id === model)) {
     throw new HttpError(400, 'Unknown model for this subscription');
   }
   claimRateWindow(modelTestWindows, deps.db, `${row.id}:${model}`, 'tests of this model', 30_000);

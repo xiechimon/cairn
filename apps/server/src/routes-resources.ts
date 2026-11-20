@@ -525,6 +525,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   });
 
   const keysvc = { db: ctx.db, box: ctx.secretBox };
+  const claudeUpstreamSvc = () => ({
+    ...keysvc,
+    fetch: ctx.providerTestFetch ?? globalThis.fetch,
+    ...(ctx.providerTestTimeoutMs !== undefined ? { timeoutMs: ctx.providerTestTimeoutMs } : {}),
+  });
 
   app.get('/api/teams/:id/claude-subscriptions', (c) => {
     const teamId = c.req.param('id');
@@ -560,11 +565,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(updateClaudeSubscription(keysvc, teamId, c.req.param('cid'), body));
   });
 
-  app.post('/api/teams/:id/claude-subscriptions/:cid/upstream-models', (c) => {
+  app.post('/api/teams/:id/claude-subscriptions/:cid/upstream-models', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
-    return c.json(claudeSubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
+    return c.json(
+      await claudeSubscriptionUpstreamModels(claudeUpstreamSvc(), teamId, c.req.param('cid')),
+    );
   });
 
   app.post('/api/teams/:id/claude-subscriptions/:cid/test', async (c) => {
@@ -573,7 +580,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireOwnerSession(c);
     const body = parseWith(claudeSubscriptionTestSchema, await jsonBody(c), 'body');
     return c.json(
-      await testClaudeSubscriptionModel(keysvc, teamId, c.req.param('cid'), body.model),
+      await testClaudeSubscriptionModel(
+        claudeUpstreamSvc(),
+        teamId,
+        c.req.param('cid'),
+        body.model,
+      ),
     );
   });
 

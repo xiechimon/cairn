@@ -392,7 +392,7 @@ describe('antigravity upstream models', () => {
     expect(rateLimited.status).toBe(429);
   });
 
-  test('fails with upstream when no runner reports antigravity models', async () => {
+  test('labels the built-in list as a fallback when no signed-in runner reports models', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
     insertMachine(s, {
@@ -409,7 +409,33 @@ describe('antigravity upstream models', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/upstream-models`,
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: 'failed', failure: 'upstream', httpStatus: null });
+    expect(await res.json()).toMatchObject({
+      status: 'fallback',
+      failure: 'not-found',
+      models: expect.arrayContaining([{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }]),
+    });
+    insertMachine(s, {
+      name: 'agy-signed-out',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: false,
+          models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+        },
+      },
+    });
+    const second = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Second',
+    });
+    const other = (await second.json()) as { id: string };
+    const signedOut = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${other.id}/upstream-models`,
+    );
+    expect(await signedOut.json()).toMatchObject({ status: 'fallback', failure: 'auth' });
   });
 
   test('stores a curated model subset and offers it in model sources', async () => {

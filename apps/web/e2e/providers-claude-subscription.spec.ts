@@ -137,3 +137,56 @@ test('a Claude subscription picks Opus 5.5 from upstream and a failed model test
   await expect(detail.getByTestId('subscription-model-failures')).toContainText('订阅的登录已失效');
   await expect(detail).not.toContainText('key 无效');
 });
+
+test('a failed upstream model list says why and labels the fallback list', async ({ page }) => {
+  const record: ClaudeSubscriptionListEntry = {
+    id: 'subscription-1',
+    kind: 'claude-subscription',
+    label: 'Personal Claude',
+    expiresAt: Date.now() + 300 * 24 * 60 * 60 * 1000,
+    createdAt: Date.now(),
+    models: null,
+  };
+  let calls = 0;
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/claude-subscriptions') return json([record]);
+    if (path === '/api/teams/t1/claude-subscriptions/subscription-1/upstream-models') {
+      calls += 1;
+      return json(
+        calls === 1
+          ? {
+              status: 'fallback',
+              failure: 'auth',
+              httpStatus: 401,
+              models: [
+                { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+                { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+              ],
+            }
+          : {
+              status: 'ok',
+              models: [
+                { id: 'claude-fable-5-2', name: 'Claude Fable 5.2' },
+                { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+              ],
+            },
+      );
+    }
+  });
+  await page.goto('/app/resources/providers');
+  await page.getByTestId('subscription-detail').getByTestId('subscription-pick-upstream').click();
+  const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+  await expect(picker.getByTestId('upstream-fallback').getByRole('alert')).toHaveText(
+    '上游拒绝了这个订阅的登录，没拿到模型清单。重新登录后重试。',
+  );
+  await expect(picker.getByTestId('upstream-group')).toHaveText('备用清单，不是上游返回的');
+  await expect(picker.getByTestId('upstream-model')).toHaveCount(2);
+  await expect(picker).not.toContainText('上游其他');
+
+  await picker.getByRole('button', { name: '重试' }).click();
+  await expect(picker.getByTestId('upstream-fallback')).toHaveCount(0);
+  await expect(picker.getByTestId('upstream-group')).toHaveText('上游其他');
+  await expect(picker.locator('[data-model-id="claude-fable-5-2"]')).toBeVisible();
+});

@@ -7,6 +7,7 @@ import type {
   SecretBox,
   UpstreamModelsResult,
 } from '@cairn/shared';
+import { DEFAULT_ANTIGRAVITY_MODELS } from '@cairn/shared';
 import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { antigravitySubscription, build, chiefThread, machine, step, todo } from '../db/schema.js';
@@ -409,27 +410,31 @@ export async function antigravitySubscriptionUpstreamModels(
     return { status: 'failed', failure: 'auth', httpStatus: null };
   }
   claimRateWindow(upstreamModelsWindows, deps.db, row.id, 'model list attempts');
-  const seen = new Set<string>();
-  const models = deps.db
+  const runners = deps.db
     .select({ capabilities: machine.capabilities })
     .from(machine)
     .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
     .all()
     .flatMap((m) =>
-      m.capabilities?.antigravity?.installed === true
-        ? (m.capabilities.antigravity.models ?? [])
-        : [],
-    )
+      m.capabilities?.antigravity?.installed === true ? [m.capabilities.antigravity] : [],
+    );
+  const seen = new Set<string>();
+  const models = runners
+    .filter((runner) => runner.authenticated === true)
+    .flatMap((runner) => runner.models ?? [])
     .filter((model) => {
       if (model.id === '' || seen.has(model.id)) return false;
       seen.add(model.id);
       return true;
     })
     .map((model) => ({ id: model.id, name: model.name }));
-  if (models.length === 0) {
-    return { status: 'failed', failure: 'upstream', httpStatus: null };
-  }
-  return { status: 'ok', models };
+  if (models.length > 0) return { status: 'ok', models };
+  return {
+    status: 'fallback',
+    failure: runners.length > 0 ? 'auth' : 'not-found',
+    httpStatus: null,
+    models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
+  };
 }
 
 export function openAntigravitySubscription(

@@ -85,3 +85,75 @@ export async function fetchUpstreamModels(input: {
   if (models === null) return { ok: false, failure: 'invalid', httpStatus: null };
   return { ok: true, models };
 }
+
+const ANTHROPIC_MODELS_URL = 'https://api.anthropic.com/v1/models';
+const ANTHROPIC_OAUTH_BETA = 'oauth-2025-04-20';
+const ANTHROPIC_PAGE_LIMIT = 1000;
+const ANTHROPIC_MAX_PAGES = 5;
+
+function parseAnthropicPage(
+  raw: unknown,
+): { models: { id: string; name: string }[]; nextAfter: string | null } | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const { data, has_more: hasMore, last_id: lastId } = raw as Record<string, unknown>;
+  if (!Array.isArray(data)) return null;
+  const models: { id: string; name: string }[] = [];
+  for (const item of data) {
+    if (typeof item !== 'object' || item === null) continue;
+    const { id, display_name: displayName } = item as Record<string, unknown>;
+    if (typeof id !== 'string' || id.trim() === '') continue;
+    models.push({
+      id,
+      name: typeof displayName === 'string' && displayName.trim() !== '' ? displayName : id,
+    });
+  }
+  return {
+    models,
+    nextAfter: hasMore === true && typeof lastId === 'string' && lastId !== '' ? lastId : null,
+  };
+}
+
+export async function fetchAnthropicOAuthModels(input: {
+  oauthToken: string;
+  fetch: typeof globalThis.fetch;
+  timeoutMs: number;
+}): Promise<UpstreamModelList> {
+  const signal = AbortSignal.timeout(input.timeoutMs);
+  const byId = new Map<string, { id: string; name: string }>();
+  let after: string | null = null;
+  for (let page = 0; page < ANTHROPIC_MAX_PAGES; page += 1) {
+    const url = new URL(ANTHROPIC_MODELS_URL);
+    url.searchParams.set('limit', String(ANTHROPIC_PAGE_LIMIT));
+    if (after !== null) url.searchParams.set('after_id', after);
+    let response: Response;
+    try {
+      response = await input.fetch(url, {
+        headers: {
+          accept: 'application/json',
+          'anthropic-version': ANTHROPIC_VERSION,
+          'anthropic-beta': ANTHROPIC_OAUTH_BETA,
+          Authorization: `Bearer ${input.oauthToken}`,
+        },
+        signal,
+      });
+    } catch {
+      return { ok: false, failure: signal.aborted ? 'timeout' : 'network', httpStatus: null };
+    }
+    if (!response.ok) {
+      return { ok: false, failure: failureForStatus(response.status), httpStatus: response.status };
+    }
+    let parsed: ReturnType<typeof parseAnthropicPage>;
+    try {
+      parsed = parseAnthropicPage(await response.json());
+    } catch {
+      return { ok: false, failure: signal.aborted ? 'timeout' : 'invalid', httpStatus: null };
+    }
+    if (parsed === null) return { ok: false, failure: 'invalid', httpStatus: null };
+    for (const model of parsed.models) {
+      if (!byId.has(model.id) && byId.size < MAX_MODELS) byId.set(model.id, model);
+    }
+    if (parsed.nextAfter === null) break;
+    after = parsed.nextAfter;
+  }
+  return { ok: true, models: [...byId.values()] };
+}
