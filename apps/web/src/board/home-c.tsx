@@ -39,6 +39,7 @@ import {
 } from './archived-project-bar.js';
 import { ComposerSetupHint, useComposerSetupStep } from './composer-setup-hint.js';
 import {
+  FILE_FROM_THREAD_PARAM,
   FILE_NAME_PARAM,
   FILE_PARAM,
   type FileTarget,
@@ -169,6 +170,25 @@ function PanelBoundary({
   );
 }
 
+export function useOpenFile(): (target: FileTarget) => void {
+  const [, setSearchParams] = useSearchParams();
+  return useCallback(
+    (target: FileTarget) =>
+      setSearchParams((prev) => {
+        const params = withoutFileTarget(new URLSearchParams(prev));
+        const fromThread = params.get(THREAD_PARAM);
+        if (fromThread !== null) params.set(FILE_FROM_THREAD_PARAM, fromThread);
+        params.delete(THREAD_PARAM);
+        params.delete(VIEW_PARAM);
+        params.set(PANE_PARAM, 'file');
+        params.set(FILE_PARAM, target.key);
+        params.set(FILE_NAME_PARAM, target.name);
+        return params;
+      }),
+    [setSearchParams],
+  );
+}
+
 export function HomeC({
   surface,
   todos,
@@ -224,19 +244,18 @@ export function HomeC({
     setSearchParams(params, { replace: true, state });
   };
   const fileTarget = pane === 'file' ? fileTargetOf(searchParams) : null;
-  const openFile = useCallback(
-    (target: FileTarget) =>
-      setSearchParams((prev) => {
-        const params = new URLSearchParams(prev);
-        params.delete(THREAD_PARAM);
-        params.delete(VIEW_PARAM);
-        params.set(PANE_PARAM, 'file');
-        params.set(FILE_PARAM, target.key);
-        params.set(FILE_NAME_PARAM, target.name);
-        return params;
-      }),
-    [setSearchParams],
-  );
+  const closeFile = () => {
+    const fromThread = searchParams.get(FILE_FROM_THREAD_PARAM);
+    if (fromThread === null) {
+      showPane(null);
+      return;
+    }
+    const params = withoutFileTarget(new URLSearchParams(searchParams));
+    params.delete(PANE_PARAM);
+    params.set(THREAD_PARAM, fromThread);
+    setSearchParams(params, { replace: true });
+  };
+  const openFile = useOpenFile();
   const togglePane = (next: WorkPane) => {
     showPane(pane === next && paneShown ? null : next);
   };
@@ -448,7 +467,7 @@ export function HomeC({
 
   const panelBody = !paneShown ? null : pane === 'file' ? (
     fileTarget !== null && (
-      <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={() => showPane(null)} />
+      <FilePreviewPanel key={fileTarget.key} target={fileTarget} onClose={closeFile} />
     )
   ) : pane === 'machines' ? (
     <MachinesPanel machines={computers} onClose={() => showPane(null)} query={machinesQuery} />
@@ -500,7 +519,7 @@ export function HomeC({
       }
       phoneTab={pane === 'tasks' || pane === 'made'}
       resetKey={`${pane}:${fileTarget?.key ?? ''}:${projectId ?? ''}`}
-      onClose={() => showPane(null)}
+      onClose={pane === 'file' ? closeFile : () => showPane(null)}
     >
       {panelBody}
     </PanelBoundary>

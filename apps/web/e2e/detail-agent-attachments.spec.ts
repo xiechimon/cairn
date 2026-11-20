@@ -1,7 +1,7 @@
 import { chiefGetResponseSchema, encodeReplyQuote, renderTaskText, type TaskRequest } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
 
-test('a final assistant reply renders two loaded screenshots and opens each in a lightbox', async ({
+test('a final assistant reply renders two loaded screenshots and opens each in the side panel', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
@@ -162,8 +162,10 @@ test('a final assistant reply renders two loaded screenshots and opens each in a
   const original = context.getByRole('img', { name: 'Original screenshot', exact: true });
   await expect.poll(() => original.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await original.click();
-  await expect(page.getByRole('dialog', { name: 'Original screenshot', exact: true })).toBeVisible();
-  await page.keyboard.press('Escape');
+  const panel = page.getByTestId('file-preview-panel');
+  await expect(panel.getByTestId('file-preview-name')).toHaveText('Original screenshot');
+  await panel.locator('[data-panel-close]').click();
+  await expect(panel).toHaveCount(0);
   await context.getByTestId('reply-quote').getByRole('link').click();
   await expect(page.locator('[id="request-context-source-thread:ack"]')).toBeInViewport();
   await page.reload();
@@ -178,17 +180,17 @@ test('a final assistant reply renders two loaded screenshots and opens each in a
       .poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth))
       .toBeGreaterThan(0);
     await image.click();
-    const lightbox = page.getByRole('dialog', { name, exact: true });
-    await expect(lightbox).toBeVisible();
+    const viewer = page.getByTestId('file-preview-panel');
+    await expect(viewer.getByTestId('file-preview-name')).toHaveText(name);
     await expect
       .poll(() =>
-        lightbox
+        viewer
           .getByRole('img', { name, exact: true })
           .evaluate((element) => (element as HTMLImageElement).naturalWidth),
       )
       .toBeGreaterThan(0);
-    await page.keyboard.press('Escape');
-    await expect(lightbox).toHaveCount(0);
+    await viewer.locator('[data-panel-close]').click();
+    await expect(viewer).toHaveCount(0);
   }
   expect(pageErrors).toEqual([]);
 });

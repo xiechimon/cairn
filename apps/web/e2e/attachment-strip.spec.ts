@@ -313,7 +313,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
   await expect(chip).toHaveCount(0);
 });
 
-test('detail face: clicking the settled chip opens the image preview; Esc closes it', async ({
+test('detail face: clicking the settled chip opens the image in the side panel; closing keeps the draft', async ({
   page,
 }) => {
   const deferred = await deferUploads(page);
@@ -329,57 +329,21 @@ test('detail face: clicking the settled chip opens the image preview; Esc closes
   await expect(input).toHaveValue('');
   await expect(input).not.toHaveValue(/attachment:/);
 
-  // FM4: preview opens on the settled chip, paints the image, Esc closes.
   const chip = page.getByTestId('composer-attachments').getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await chip.click();
-  const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });
-  await expect(preview).toBeVisible();
-  await expect(preview).toContainText('pasted-image-1.png');
-  const view = preview.getByRole('img', { name: 'pasted-image-1.png' });
+  const panel = page.getByTestId('file-preview-panel');
+  await expect(panel.getByTestId('file-preview-name')).toHaveText('pasted-image-1.png');
+  const view = panel.getByRole('img', { name: 'pasted-image-1.png' });
   await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
     CARD_W,
   );
   await evidenceShot(page, 'strip-detail-preview.png');
 
-  await page.keyboard.press('Escape');
-  await expect(preview).toHaveCount(0);
-  // The draft survives the whole preview round trip untouched.
+  await panel.locator('[data-panel-close]').click();
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator(COMPOSER)).toBeVisible();
   await expect(input).toHaveValue('');
   await expect(input).not.toHaveValue(/attachment:/);
-});
-
-test('detail face: clicking the in-flight placeholder previews the local bytes', async ({
-  page,
-}) => {
-  const deferred = await deferUploads(page);
-  const art: TestArt = { b64: PNG_1PX };
-  await bootDetail(page, art);
-  art.b64 = await renderTestCard(page);
-
-  await pastePng(page, COMPOSER, art.b64);
-  const placeholder = page.getByTestId('composer-attachments').getByTestId('attachment-pending');
-  await expect(placeholder).toBeVisible();
-
-  // FM5: no server round trip has completed (grant still held) — the preview
-  // paints the pasted bytes straight from the blob URL.
-  await placeholder.click();
-  const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });
-  await expect(preview).toBeVisible();
-  const view = preview.getByRole('img', { name: 'pasted-image-1.png' });
-  await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
-    CARD_W,
-  );
-  await expect
-    .poll(() => view.evaluate((el) => (el as HTMLImageElement).src.startsWith('blob:')))
-    .toBe(true);
-  await page.keyboard.press('Escape');
-  await expect(preview).toHaveCount(0);
-
-  // Let the upload land afterwards — the strip settles normally.
-  await deferred.releaseAll(); // grant
-  await expect.poll(() => deferred.held.length).toBe(1);
-  await deferred.releaseAll(); // upload
-  await expect(page.locator(COMPOSER)).toHaveValue('');
 });
 
 test('detail face: a failed upload keeps an error tile, toasts, keeps the draft', async ({
@@ -494,7 +458,7 @@ async function openChief(page: Page, art: TestArt) {
   return { coordinator, input };
 }
 
-test('chief face: placeholder → settled chip → preview', async ({ page }) => {
+test('chief face: placeholder → settled chip → side-panel preview', async ({ page }) => {
   const deferred = await deferUploads(page);
   const art: TestArt = { b64: PNG_1PX };
   const { coordinator, input } = await openChief(page, art);
@@ -517,13 +481,13 @@ test('chief face: placeholder → settled chip → preview', async ({ page }) =>
   const chip = strip.getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await expect(chip).toBeVisible();
   await chip.click();
-  const preview = page.getByRole('dialog', { name: 'pasted-image-1.png' });
-  await expect(preview).toBeVisible();
-  const view = preview.getByRole('img', { name: 'pasted-image-1.png' });
+  const panel = page.getByTestId('file-preview-panel');
+  await expect(panel.getByTestId('file-preview-name')).toHaveText('pasted-image-1.png');
+  const view = panel.getByRole('img', { name: 'pasted-image-1.png' });
   await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
     CARD_W,
   );
   await evidenceShot(page, 'strip-chief-preview.png');
-  await page.keyboard.press('Escape');
-  await expect(preview).toHaveCount(0);
+  await panel.locator('[data-panel-close]').click();
+  await expect(panel).toHaveCount(0);
 });

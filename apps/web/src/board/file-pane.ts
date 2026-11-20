@@ -3,6 +3,7 @@ import { attachmentIdFromKey } from '../detail/attachment-chip.js';
 
 export const FILE_PARAM = 'file';
 export const FILE_NAME_PARAM = 'fileName';
+export const FILE_FROM_THREAD_PARAM = 'fileFrom';
 
 export interface FileTarget {
   name: string;
@@ -24,6 +25,7 @@ export function fileTargetOf(params: URLSearchParams): FileTarget | null {
 export function withoutFileTarget(params: URLSearchParams): URLSearchParams {
   params.delete(FILE_PARAM);
   params.delete(FILE_NAME_PARAM);
+  params.delete(FILE_FROM_THREAD_PARAM);
   return params;
 }
 
