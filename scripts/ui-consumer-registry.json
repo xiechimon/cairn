@@ -3,7 +3,7 @@
     "sha": "5d9d91d6",
     "date": "2026-10-09"
   },
-  "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph | action-link (#987: brand ink is spot emphasis only, never body/label/button-text ink; action-link = the board card accent text link, DESIGN.md 按钮). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md.",
+  "scope": "apps/web/src consumer points minus components/ui/ (#1054/#1055, ADR 0012 D1). Two ledgers in one review face. squareBoxes: every line the shape gate flags (visible square box: bare rounded-none + unconditional paint, or enclosing border + fill with no radius declared) must match an entry {file, anchor, kind, basis?, reason} — anchor = literal substring of the flagged line. kind deviation = deliberate non-registry geometry with reason; kind rides-primitive = radius comes through from the underlying registry component (basis names it); kind state-surface = state tint painted over an already-ruled box (line-level scan cannot see the base class). brandInkText: every consumer text-role use of the brand ink (--card-button/--focus-ring as text-(...) or CSS color:) must match an entry {file, anchor, role, reason, contrast} — role in selection-mark | indicator | badge-glyph | action-link (#987: brand ink is spot emphasis only, never body/label/button-text ink; action-link = the board card accent text link, docs/design/surfaces/chrome.md buttons). Solid-fill (bg-) uses are the slot's canonical role and are not policed. Full disposition inventory incl. wave-1 attribution: docs/spec/27-consumer-surface-shapes-and-brand-ink-ledger.md.",
   "squareBoxes": [
     {
       "file": "apps/web/src/resources/parts.tsx",
@@ -35,8 +35,8 @@
       "file": "apps/web/src/phase.ts",
       "anchor": "const ACCENT_INK = 'text-(--card-button)'",
       "role": "indicator",
-      "reason": "PHASE_STATUS ink for the three needs-you phases (icon + 失败/确认/审核), read by the detail top bar (paper-redesign-plan PR 7) and the project page task rows and cards (#1397). Same rule as the board card footer flag: DESIGN.md 颜色 reserves the accent for needs-you states; every status = icon + color + label.",
-      "contrast": "apps/web/DESIGN.md 颜色 (accent on sheet and on card 4.99, AA for 12px and 13.5px text)"
+      "reason": "PHASE_STATUS ink for the three needs-you phases (icon + 失败/确认/审核), read by the detail top bar (paper-redesign-plan PR 7) and the project page task rows and cards (#1397). Same rule as the board card footer flag: docs/design/surfaces/foundation.md colors reserves the accent for needs-you states; every status = icon + color + label.",
+      "contrast": "docs/design/surfaces/foundation.md colors (accent on sheet and on card 4.99, AA for 12px and 13.5px text)"
     },
     {
       "file": "apps/web/src/components/notice-banner.tsx",

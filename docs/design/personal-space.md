@@ -51,7 +51,7 @@ Privacy in v1: other members cannot see a space in the UI or API, but the runner
 
 ## Interaction
 
-No new entry point. A space task is one reference row in the conversation like any task; its finished report carries one file line (file icon and path in link ink, the style of the research report line, DESIGN-RULES C11) that opens the file preview panel. In the Results panel, space files sit in the existing groups by kind (text and Markdown under `文档`), sorted by time with reports; a card's meta line reads `我的空间` where a project name would be. The file preview panel gains a `历史` icon button left of copy, only for space files, and a line `在我的空间里，只有你能看到。` above the text. Each older version has a `恢复这个版本` text link; restoring shows a toast with `撤销`. A space task's progress row reads `改文件 → 存好`.
+No new entry point. A space task is one reference row in the conversation like any task; its finished report carries one file line (file icon and path in link ink, the style of the research report line, rule C11 in `apps/web/DESIGN.md`) that opens the file preview panel. In the Results panel, space files sit in the existing groups by kind (text and Markdown under `文档`), sorted by time with reports; a card's meta line reads `我的空间` where a project name would be. The file preview panel gains a `历史` icon button left of copy, only for space files, and a line `在我的空间里，只有你能看到。` above the text. Each older version has a `恢复这个版本` text link; restoring shows a toast with `撤销`. A space task's progress row reads `改文件 → 存好`.
 
 ## Failure behavior
 

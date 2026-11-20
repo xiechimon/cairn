@@ -64,7 +64,7 @@ Credentials, network and machines for a quick task are exactly those of an ordin
 
 ## Failure behavior
 
-- No machine online: the task queues; the composer line says which machine is offline and that the task starts when it returns (DESIGN-RULES C8).
+- No machine online: the task queues; the composer line says which machine is offline and that the task starts when it returns (rule C8 in `apps/web/DESIGN.md`).
 - The file already exists: the session asks instead of overwriting; the question returns to the creating channel.
 - A protected path is touched: the acknowledgment says it needs independent review and is slower.
 - CI fails: the existing CI fix rounds run; past the limit the task goes to needs-you.

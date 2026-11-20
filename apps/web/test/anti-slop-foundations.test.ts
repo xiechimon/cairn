@@ -20,7 +20,8 @@ const sourceFiles = walk(SRC)
   .map((path) => ({ path: path.slice(SRC.length), text: readFileSync(path, 'utf8') }));
 
 const appCss = readFileSync(join(SRC, 'styles/app.css'), 'utf8');
-const rules = readFileSync(join(ROOT, 'DESIGN-RULES.md'), 'utf8');
+const design = readFileSync(join(ROOT, 'DESIGN.md'), 'utf8');
+const rules = design;
 
 function offenders(pattern: RegExp): string[] {
   return sourceFiles.filter(({ text }) => pattern.test(text)).map(({ path }) => path);
@@ -104,7 +105,7 @@ describe('palette roles', () => {
   });
 });
 
-describe('DESIGN-RULES carries the anti-slop rules', () => {
+describe('the rule index carries the anti-slop rules', () => {
   test.each(['V11', 'V12', 'V13', 'V14', 'V15', 'V16', 'V17', 'V18', 'V19', 'V20', 'T3', 'V22', 'V23', 'V24', 'T4'])(
     '%s is a row with a measured baseline',
     (id) => {
@@ -122,15 +123,18 @@ describe('DESIGN-RULES carries the anti-slop rules', () => {
   });
 });
 
-const design = readFileSync(join(ROOT, 'DESIGN.md'), 'utf8');
 const SOURCE_PATH =
   /`((?:src|e2e|test|components|board|chief|detail|design|lib|api|styles|thread|overlay)\/[^`\s]*?\.(?:tsx?|css|mjs))`/g;
+const surfacesDir = join(ROOT, '../../docs/design/surfaces');
+const surfaceDocs = readdirSync(surfacesDir)
+  .filter((name) => name.endsWith('.md'))
+  .map((name) => [`docs/design/surfaces/${name}`, readFileSync(join(surfacesDir, name), 'utf8')] as const);
 const ruleRows = rules
   .split('\n')
   .filter((line) => /^\| [A-Z]\d+ \|/.test(line))
   .map((line) => {
     const cells = line.replace(/^\||\|$/g, '').split('|').map((cell) => cell.trim());
-    return { id: cells[0] ?? '', check: cells[2] ?? '' };
+    return { id: cells[0] ?? '', rule: cells[1] ?? '', check: cells[2] ?? '' };
   });
 const MEASURED_BY_HAND = [
   'C1', 'C2', 'C3', 'C4', 'C5', 'C7', 'C18', 'V12', 'V13', 'V15', 'V17', 'V18', 'L1', 'L3',
@@ -140,8 +144,9 @@ const MEASURED_BY_HAND = [
 describe('the design docs stay true and checkable', () => {
   test.each([
     ['DESIGN.md', design],
-    ['DESIGN-RULES.md', rules],
-  ])('every source path %s names exists', (_name, text) => {
+    ['src/components/ui/INVENTORY.md', readFileSync(join(SRC, 'components/ui/INVENTORY.md'), 'utf8')],
+    ...surfaceDocs,
+  ] as [string, string][])('every source path %s names exists', (_name, text) => {
     const dead = [...text.matchAll(SOURCE_PATH)]
       .map((match) => match[1] ?? '')
       .filter((path) =>
@@ -158,5 +163,17 @@ describe('the design docs stay true and checkable', () => {
       .map((row) => row.id);
     expect(unnamed.filter((id) => !MEASURED_BY_HAND.includes(id))).toEqual([]);
     expect(MEASURED_BY_HAND.filter((id) => !unnamed.includes(id))).toEqual([]);
+  });
+
+  test('no rule row statement passes 60 words', () => {
+    const tooLong = ruleRows
+      .filter((row) => row.rule.split(/\s+/).filter(Boolean).length > 60)
+      .map((row) => `${row.id} (${row.rule.split(/\s+/).filter(Boolean).length} words)`);
+    expect(tooLong).toEqual([]);
+  });
+
+  test('the entry file stays at most 150 lines', () => {
+    const lines = design.split('\n').length - (design.endsWith('\n') ? 1 : 0);
+    expect(lines).toBeLessThanOrEqual(150);
   });
 });

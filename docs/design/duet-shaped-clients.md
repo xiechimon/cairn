@@ -39,7 +39,7 @@ Duet is waitlisted, so nothing here comes from operating it. Every Duet row is S
 | WebKit blog, "Web Push for Web Apps on iOS and iPadOS" | iOS 16.4 adds Web Push to Home Screen web apps; permission only on a user gesture; "You do not need to be a member of the Apple Developer Program to use it" | https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/ |
 | Apple: Background Tasks, `earliestBeginDate` | "the system doesn't guarantee launching the task at the specified date, but only that it won't begin sooner" | https://developer.apple.com/documentation/backgroundtasks/bgtaskrequest/earliestbegindate |
 | Community guide on SideStore refresh automation | Shortcuts `Refresh All Apps` in a personal automation; reports of "took too long" errors and VPN steps | https://kitsah.bearblog.dev/how-to-setup-livecontainer-sidestore-with-automatic-refreshing/ |
-| cairn | `ownerOf` (`apps/server/src/services/owner.ts`), `docs/design/thread-owner-field.md`, `docs/design/coordinator-routes-verbatim.md`, `docs/design/mobile-information-architecture.md`, `docs/research/ios-app-pilot-2026-11-08.md`, `docs/research/desktop-app-stack-2026-11-08.md`, `docs/research/duet-proactive-coordinator.md`, `apps/web/DESIGN-RULES.md`, `apps/ios/` | this repository |
+| cairn | `ownerOf` (`apps/server/src/services/owner.ts`), `docs/design/thread-owner-field.md`, `docs/design/coordinator-routes-verbatim.md`, `docs/design/mobile-information-architecture.md`, `docs/research/ios-app-pilot-2026-11-08.md`, `docs/research/desktop-app-stack-2026-11-08.md`, `docs/research/duet-proactive-coordinator.md`, `apps/web/DESIGN.md`, `apps/ios/` | this repository |
 
 ## 1. What Duet's layout is
 
@@ -95,14 +95,14 @@ Duet channels are separate chats that share one memory (Read). cairn should not 
 - The composer in a project view sends to the one Coordinator thread with that `projectId` preset. The Coordinator still routes; the preset is a routing fact, not a rewrite of the owner's words.
 - Everything shows all messages, including those tagged to projects. Inferred: this matches Duet's "All chat context across every channel" (Seen).
 - Groups: add `project.group` (nullable text). The sidebar renders projects without a group first, then each group as a collapsible header with its projects, in name order. Moving a project is a `Move to group` item in the existing project menu (`sidebar-project-menu.tsx`, Read), with drag as a later nicety. No group table: a group with no projects does not exist. Inferred: a name column covers Duet's folders (Seen) without a second entity.
-- Sidebar row: project icon and name, plus an ochre dot when at least one of its tasks has `owner = 'owner'`. No count, no task rows, no status line on web. `apps/web/DESIGN-RULES.md` V5 allows ochre only for "waiting on you" and has no blue (Read), so Duet's blue dot becomes ochre and means needs-you, not unread (D8).
+- Sidebar row: project icon and name, plus an ochre dot when at least one of its tasks has `owner = 'owner'`. No count, no task rows, no status line on web. `apps/web/DESIGN.md` V5 allows ochre only for "waiting on you" and has no blue (Read), so Duet's blue dot becomes ochre and means needs-you, not unread (D8).
 - Phone drawer rows add one status line, as Duet does (Seen): the reason of the newest owner-owned task, else `N working`, else nothing.
 
 ### 2.4 Tasks from `ownerOf`
 
 The server computes one more field next to `owner`, `section`, in one function `sectionOf(todo)`, and returns it on every `TodoRecord`. Web, iOS and desktop read `section`; none of them derives it. This follows the owner-field invariant that no view computes ownership itself (Read, `thread-owner-field.md`, invariant 4), and it keeps Swift from re-implementing the rules.
 
-| `section` | Rule, first match wins | Row status word | Glyph and color (DESIGN-RULES V5, L2) |
+| `section` | Rule, first match wins | Row status word | Glyph and color (rule V5 in `apps/web/DESIGN.md`, L2) |
 |---|---|---|---|
 | `null` (not listed) | archived in any phase other than `done` or `closed`; or `done` or `closed` with `phaseAt` older than 7 days | none | none |
 | `resolved` | phase `done` or `closed` with `phaseAt` within the last 7 days, archived or not | `Done` or `Closed` (the phase) | ink check, no color |
@@ -129,7 +129,7 @@ Layout of the Tasks surface, same on all three clients:
 
 - A task opens as a sub-thread: web `?thread=<todoId>` in the main pane (existing, Read, `thread-link.tsx`); iOS a pushed full-screen view (existing, Read, `ThreadScreens.swift`); desktop the same web route.
 - Header: back, title, status word from `section` and the reason, `…` menu (Duet, Seen). Body: the owner's verbatim request as the first block (`coordinator-routes-verbatim.md`), then the task conversation and inline cards (question, plan approval, PR).
-- In the Coordinator conversation, a task card shows title, status word, `N updates` and the latest step, and opens the sub-thread (Duet, Seen). The card replaces today's plain "created task" line. Superseded 2026-11-12 (owner): the card repeated the task reference row and is gone; the reference row above the reply is the task's one mark in the conversation (`apps/web/DESIGN.md`, Coordinator chat).
+- In the Coordinator conversation, a task card shows title, status word, `N updates` and the latest step, and opens the sub-thread (Duet, Seen). The card replaces today's plain "created task" line. Superseded 2026-11-12 (owner): the card repeated the task reference row and is gone; the reference row above the reply is the task's one mark in the conversation (`docs/design/surfaces/conversation.md`).
 
 ### 2.6 Layout sketches
 
@@ -185,7 +185,7 @@ The web app is the reference implementation; iOS mirrors it natively and the des
 6. **Phone width**: bottom tabs `Chat` and `Tasks` with the drawer, replacing the current narrow layout. The PWA and the iOS app then match.
 7. **Deep-link routes** that both native clients target: `/app?thread=<todoId>` (exists), `/app?question=<requestId>`, `/app?project=<id>`, `/app?draft=<text>` (opens a prefilled composer, never sends).
 
-Each step keeps DESIGN-RULES L1 to L7 for list rows (Read); the gate tests in `apps/web/test/anti-slop-foundations.test.ts` and the sidebar row specs need their selectors updated in the same PR as the change, not later.
+Each step keeps rules L1 to L7 in `apps/web/DESIGN.md` for list rows (Read); the gate tests in `apps/web/test/anti-slop-foundations.test.ts` and the sidebar row specs need their selectors updated in the same PR as the change, not later.
 
 ## 4. iOS
 
@@ -337,7 +337,7 @@ Owner decision on 2026-11-12: the web app is settled first, and iOS follows it. 
 |---|---|---|
 | Channels share one memory, so context from one topic can surface in another | cairn has one Coordinator, which only routes, and each task's worker sees only the owner's verbatim words plus at most 280 characters of routing facts (`coordinator-routes-verbatim.md`). A project lens filters what the owner sees; it adds nothing to what a worker reads. Keep it that way: never feed one project's task context into another project's task. The owner reported user complaints about bleed; the help article confirms the shared-memory design, but no complaint was found in the sources read for this document. | Read (help article, cairn doc); complaint not found |
 | A separate chat per channel | One Coordinator entry is a product rule; a channel is a filter of it | Read (owner rule) |
-| Green, amber and blue status colors; blue unread dots | DESIGN-RULES V5: ochre means waiting on you, green is only a 6px running dot, no blue | Read |
+| Green, amber and blue status colors; blue unread dots | rule V5 in `apps/web/DESIGN.md`: ochre means waiting on you, green is only a 6px running dot, no blue | Read |
 | A checkbox to mark a task complete | cairn resolves a task from evidence (merge, close); a tick could close work no gate judged. The circle stays as a status glyph in the same place | Inferred |
 | The Make tab of finished artifacts and templates | Nothing in cairn maps to it (2.7): finished work is in its task thread, schedules are a link under Resolved | Inferred |
 | Duet's brand assets (logo, typeface, orange accent, illustrations) | Owner decision: Duet's layout and interaction, cairn's own tokens and marks | Read (owner decision) |

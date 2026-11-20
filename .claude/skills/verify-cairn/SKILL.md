@@ -29,13 +29,13 @@ The implementer templates incorporate the same checklist in `docs/agent-dispatch
 
 ## UI reference comparison
 
-A UI change is verified against the reference shots, not only against its own before picture. Surface to shots: `docs/design/references/README.md`; rules: `apps/web/DESIGN-RULES.md`; brief and coverage table: `.claude/skills/design-cairn/SKILL.md`.
+A UI change is verified against the reference shots, not only against its own before picture. Surface to shots: `docs/design/references/README.md`; rules: the rule index in `apps/web/DESIGN.md` and the surface files under `docs/design/surfaces/`; brief and coverage table: `.claude/skills/design-cairn/SKILL.md`.
 
 1. List the states from the brief's component x state table. Produce each on the live stack; seed what the stack cannot reach (pending question, offline machine, quota, error, long content) with a fixture or seed data and label it fixture.
 2. Capture each state: `node .claude/skills/verify-cairn/scripts/vp.mjs capture </app/route> --name <state>` writes a 1440x732 dark screenshot into the evidence directory. Light theme and 390px need a Playwright context with `viewport` and `colorScheme`; the screenshot matrix is 1440 and 390, light and dark.
 3. Put the reference beside ours, one image per state: `magick montage <reference> <ours> -tile 2x1 -geometry 1000x+8+8 <state>-compare.png`.
 4. Write one sentence per pair: what matches, what is still worse than the reference. A pair with no sentence does not count.
-5. Check the rules in `apps/web/DESIGN-RULES.md` that apply to the change and report what you measured.
+5. Check the rules in `apps/web/DESIGN.md` that apply to the change and report what you measured.
 
 The session that built the screen reviews its own pairs. The evidence limits above still apply: fixture pairs say so, and a real-stack pair is required for the main state.
 

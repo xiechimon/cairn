@@ -1,6 +1,6 @@
 # Reference screenshot library
 
-Real screenshots of reference products, captured 2026-11-06 by operating each product (D120). A UI brief names the surface, opens that folder first, and the PR shows our screen beside these shots (`.claude/skills/design-cairn/SKILL.md`). The rules that reference them are in `apps/web/DESIGN-RULES.md`.
+Real screenshots of reference products, captured 2026-11-06 by operating each product (D120). A UI brief names the surface, opens that folder first, and the PR shows our screen beside these shots (`.claude/skills/design-cairn/SKILL.md`). The rules that reference them are in `apps/web/DESIGN.md`.
 
 Owner decisions on which product is the reference for each surface:
 

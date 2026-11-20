@@ -6,7 +6,7 @@ Migration 0177 retired daily reports: it stopped active report-linked steps and 
 every route, scheduler path and writer. What remains is dead storage — `chief_report`
 and `retro_proposal` still exist in `apps/server/src/db/schema.ts` with zero runtime
 readers or writers, the `'research-intake-item'` member of `TASK_SOURCE_KINDS` has no
-producing or consuming path, and DESIGN-RULES C17 still describes the report as an
+producing or consuming path, and rule C17 in `apps/web/DESIGN.md` still describes the report as an
 active interactive surface.
 
 ## States and transitions

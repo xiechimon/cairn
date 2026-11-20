@@ -19,7 +19,7 @@ Why this note: ian reported that the Coordinator's replies arrive as several sep
 
 ## Other references
 
-- Claude.ai (cairn's designated chat reference per `apps/web/DESIGN-RULES.md`): assistant replies render as one continuous markdown surface — paragraphs, lists and headings flow inside a single message unit; prose is not boxed per block. (inferred: observed behavior of the product; not re-measured this round.)
+- Claude.ai (cairn's designated chat reference per `apps/web/DESIGN.md`): assistant replies render as one continuous markdown surface — paragraphs, lists and headings flow inside a single message unit; prose is not boxed per block. (inferred: observed behavior of the product; not re-measured this round.)
 - iMessage: one send = one bubble; consecutive sends by the same author weld into a group with tightened corners. dusk copies this directly. (inferred: product behavior.)
 
 ## The gap

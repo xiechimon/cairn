@@ -446,7 +446,7 @@ Whole app (27 light screens): icon stroke 1.75 totals 320 and 2px totals 131 (29
 
 Priority is P1, P2, P3; after G1-G5 are done, about half of the per-screen items disappear automatically. Overall estimate: 5 S + 3 M globally and 4 M per screen, no L; the only one close to L is re-measuring G1's dark-mode contrast (measure every color pair, do not estimate).
 
-### 4. New rules to add to `apps/web/DESIGN-RULES.md`
+### 4. New rules to add to `apps/web/DESIGN.md`
 
 Follow the file's numbering and `M / G / H` marks; assertion messages begin with the rule id. Each gives the current baseline for comparison during the non-blocking period. The baseline is in `slop-measure.json`.
 

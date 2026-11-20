@@ -1,6 +1,6 @@
 # Cairn Development Rules
 
-Before any change under `apps/web/src`, read `apps/web/DESIGN-RULES.md` and invoke the `design-cairn` skill, before reading or editing the code.
+Before any change under `apps/web/src`, read `apps/web/DESIGN.md` and invoke the `design-cairn` skill, before reading or editing the code.
 
 ## Safety
 
@@ -56,7 +56,7 @@ Work happens in worktrees, never in the primary checkout at `~/Code/AgentProject
 
 Where to look:
 
-- UI work under `apps/web/src`: `apps/web/DESIGN-RULES.md`, then `.claude/skills/design-cairn/SKILL.md` (see the first line of this file).
+- UI work under `apps/web/src`: `apps/web/DESIGN.md` (the rule index and one pointer per surface under `docs/design/surfaces/`), then `.claude/skills/design-cairn/SKILL.md` (see the first line of this file).
 - Every user-facing feature has a row in `.claude/skills/verify-cairn/feature-map.json`; run `node scripts/generate-feature-map.mjs` after changing routes, test ids or shortcuts. Acceptance and evidence: `.claude/skills/verify-cairn/SKILL.md`.
 - Test scope: `docs/spec/19-test-layering-and-blast-radius.md`; use real e2e for complex features.
 - Model-side latency, failures and usage: Langfuse first, `docs/ops/langfuse.md#debugging-a-turn-or-task`.

@@ -76,7 +76,7 @@ No new table and no migration (`message.content` is JSON). Sub-agent tool calls 
 2. Server: `reportAgentTodo` keeps publishing the live SSE event for a fast first paint but stores nothing.
 3. Server: `GET /api/builds/:id/messages` returns `agentTodo`, the latest snapshot computed with a query over the conversation's rows, so it does not depend on which page the web has loaded.
 
-**Paths that read.** `mapTranscript` uses, in order: the live `agent_todo` event for the running step, else the page's `agentTodo`. `liveEngineRun.plan` uses the same value. After step end the list stays at the tail while any item is open (`doing` shown as `todo`, as today) and disappears when all items are done, because `DESIGN-RULES.md` C14 forbids a `已完成` line on a finished task.
+**Paths that read.** `mapTranscript` uses, in order: the live `agent_todo` event for the running step, else the page's `agentTodo`. `liveEngineRun.plan` uses the same value. After step end the list stays at the tail while any item is open (`doing` shown as `todo`, as today) and disappears when all items are done, because `apps/web/DESIGN.md` C14 forbids a `已完成` line on a finished task.
 
 **Failures.** Server restart, reload, older pages not loaded: the list comes from SQLite. A malformed tool argument yields no snapshot and the previous one stands. A snapshot with zero items is a cleared list.
 

@@ -131,7 +131,7 @@ Settings → `MCP` becomes `连接器与 MCP`:
 - `本机配置`: today's read-only list from `~/.claude.json`.
 - `添加 MCP 服务器` (top right): name, URL, header rows (values write-only, never shown again). A server that answers 401 with OAuth metadata offers `用浏览器登录` instead of headers.
 
-Page draft and reference shots (Amp `Integrations & MCP` from mon X's recording, Claude.ai connectors) precede the web PR, per `apps/web/DESIGN-RULES.md`.
+Page draft and reference shots (Amp `Integrations & MCP` from mon X's recording, Claude.ai connectors) precede the web PR, per `apps/web/DESIGN.md`.
 
 ## PR plan
 

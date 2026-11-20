@@ -440,7 +440,7 @@
         "docs/research/duet-proactive-coordinator.md"
       ],
       "frontendDesign": [
-        "apps/web/DESIGN-RULES.md"
+        "apps/web/DESIGN.md"
       ],
       "backendDesign": {
         "gap": "Retired: only chief_message report rows remain for read-only rendering; report-linked steps are stopped and the bookkeeping tables are dropped."
@@ -2372,7 +2372,7 @@
         "web": [
           "apps/web/src/theme.ts",
           "apps/web/src/styles",
-          "apps/web/DESIGN-RULES.md"
+          "apps/web/DESIGN.md"
         ]
       },
       "routes": {

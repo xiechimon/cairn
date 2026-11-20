@@ -234,7 +234,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 **Read-only report history** (shipped). Existing report messages remain readable; daily generation, retries, push and suggestion decisions are retired.
 
 - Research: [docs/research/duet-proactive-coordinator.md](research/duet-proactive-coordinator.md)
-- Frontend design: [apps/web/DESIGN-RULES.md](../apps/web/DESIGN-RULES.md)
+- Frontend design: [apps/web/DESIGN.md](../apps/web/DESIGN.md)
 - Backend design: **gap**: Retired: only chief_message report rows remain for read-only rendering; report-linked steps are stopped and the bookkeeping tables are dropped.
 
 ### engine-view

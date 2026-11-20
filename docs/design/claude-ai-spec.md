@@ -2,13 +2,13 @@
 
 Owner decision (2026-11-07): Cairn's web UI follows claude.ai's design language one to one. This file is the measured reference. Phase 2 turns it into theme tokens, `ui-drift-gate` rules and gallery specimens; phase 3 brings the Coordinator, the thread panel and settings to it.
 
-Brand boundary: copy layout, spacing, type scale, color logic and interaction feel. Do not copy Anthropic's logo, spark mark, illustrations or fonts. Cairn keeps its own accent (ochre, rule V5 in `apps/web/DESIGN-RULES.md`) where claude.ai uses clay or blue.
+Brand boundary: copy layout, spacing, type scale, color logic and interaction feel. Do not copy Anthropic's logo, spark mark, illustrations or fonts. Cairn keeps its own accent (ochre, rule V5 in `apps/web/DESIGN.md`) where claude.ai uses clay or blue.
 
 Cairn exceptions (owner decisions; these override the measured claude.ai value):
 
 | Element | Cairn keeps | claude.ai value it replaces | Decision |
 |---|---|---|---|
-| User message bubble | The gradient bubble from #2390: a soft green, blue and violet wash with a matching gradient rim. It was flattened to `--bubble-base` by #3186 and is restored. | white 5% flat fill, radius 12 | Owner, 2026-11-07: keep our own bubble, the gradient one. Restoring it means amending rule V3 in `apps/web/DESIGN-RULES.md` and the `bubble-gradient` assertions in `apps/web/test/anti-slop-foundations.test.ts`. |
+| User message bubble | The gradient bubble from #2390: a soft green, blue and violet wash with a matching gradient rim. It was flattened to `--bubble-base` by #3186 and is restored. | white 5% flat fill, radius 12 | Owner, 2026-11-07: keep our own bubble, the gradient one. Restoring it means amending rule V3 in `apps/web/DESIGN.md` and the `bubble-gradient` assertions in `apps/web/test/anti-slop-foundations.test.ts`. |
 
 ## How the values were taken
 

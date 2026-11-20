@@ -85,7 +85,7 @@ Footer overlap: in the task transcript the reply text and its footer were siblin
 
 ## Blur
 
-`backdrop-filter` and `filter` read on the code block's `pre` and four ancestors, every layer of the copy button, and the status row with four ancestors: all `none` (measured). None of these surfaces uses blur. DESIGN-RULES V3 needs no change.
+`backdrop-filter` and `filter` read on the code block's `pre` and four ancestors, every layer of the copy button, and the status row with four ancestors: all `none` (measured). None of these surfaces uses blur. rule V3 (`apps/web/DESIGN.md`) needs no change.
 
 ## Evidence
 

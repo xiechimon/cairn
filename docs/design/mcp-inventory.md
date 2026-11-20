@@ -132,7 +132,7 @@ Comparison key: opaque HMAC identity within the same correlation group/version a
 
 ## Frontend design brief still required
 
-Reuse existing resource rows, query boundaries and machine detail panels. A machine selector plus harness/scope selector and project checkout selector precede the inventory; a comparison view shows one row per identity and one status cell per selected machine. At 390px use stacked machine/status rows rather than page overflow. Loading, empty-complete, partial/error, offline/stale, populated, disabled and long-name states require light/dark fixture captures and a real-stack populated capture. Read DESIGN-RULES and DESIGN, open the settings references, build the required real-component page draft and link research/frontend/backend designs in the existing feature registry row before UI implementation. No screenshots or rendered design acceptance have been produced yet.
+Reuse existing resource rows, query boundaries and machine detail panels. A machine selector plus harness/scope selector and project checkout selector precede the inventory; a comparison view shows one row per identity and one status cell per selected machine. At 390px use stacked machine/status rows rather than page overflow. Loading, empty-complete, partial/error, offline/stale, populated, disabled and long-name states require light/dark fixture captures and a real-stack populated capture. Read `apps/web/DESIGN.md` (the rule index) and the surface files, open the settings references, build the required real-component page draft and link research/frontend/backend designs in the existing feature registry row before UI implementation. No screenshots or rendered design acceptance have been produced yet.
 
 ## Execution and checks
 

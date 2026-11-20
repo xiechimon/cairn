@@ -1,7 +1,7 @@
 # Reuse inventory (cairn web)
 
 > This file answers exactly one question: **before writing a new UI piece, look here first — can an existing one be used directly?**
-> "What it looks like" (colors / font sizes / radii / shadows / motion / the visual spec of each piece) lives in [DESIGN.md](./DESIGN.md); this file governs "**what exists, where, and what to reuse**".
+> "What it looks like" (colors / font sizes / radii / shadows / motion / the visual spec of each piece) lives in `apps/web/DESIGN.md` and `docs/design/surfaces/`; this file governs "**what exists, where, and what to reuse**".
 > Three machine gates keep it from rotting (`test/ui-reuse-inventory.test.ts`): every new-track piece must be registered, every piece in the inventory must really exist, and the old track's final state must hold (the `src/ui/` directory must not resurrect).
 
 ## 1. Single track (the old track is retired)
@@ -90,17 +90,4 @@ trace.tsx                # shadcn Trace family (Trace/Line/Icon/Title/Descriptio
 | Shortcut hint chip | the `tooltip.tsx` + `kbd.tsx` composition assembled at the consumer (Kbd inside TooltipContent, the #1008/#983 ruling) | Do not hand-write absolute positioning + show/hide; the key caps in doc body text use `kbd.tsx` directly |
 | **Toast / lightweight failure feedback** | `toast.*` (imperative; `components/ui/toaster.tsx` is already mounted at the App root) | Do not silently swallow mutation errors; **surfaces that already have an in-surface scoped red-line canon (XMON-80/P2) keep going in-surface and do not stack toast on top** |
 
-## 4. Consumption snapshot (2026-09-30 snapshot, for judgment only, not gated)
-
-- `Button` has the widest consumer base (22/38 surfaces) and is the backbone of the primitive layer; `Card` has 0 consumers — **real cards are 7 per-face class families**, showing that the "Card" primitive abstraction mismatches in-repo actual needs. **When migrating, follow the consumers, not the primitive names.**
-- The overlay family measured **19 mounting files** (14 consumers of the shared shells + 2 handmade shells, see #418); migrate the whole family first, ahead of every domain, so the seam of a half-migration does not repeat in every domain.
-- Class-name pinning: 872 occurrences / 302 distinct; visual regression relies on computed-style probes (no bitmap baselines).
-
-## 5. Pointers
-
-- **#417** — the batch table and acceptance criteria for rolling shadcn/ui out across the site (the migration-period premise of this file)
-- **#409** — the per-piece tiered audit (low 2 / medium 9 / high 3)
-- **#410** — the primitives selection ruling (Base UI / `@base-ui/react`)
-- **#418** — the measured overlay-family comparison matrix
-- `design.html` (`src/design/`) — the live gallery: every piece above rendered on the real tokens, with page patterns; open `/design.html` on the web dev server
-- [DESIGN.md](./DESIGN.md) — the visual identity and the per-piece visual specs; the cross-shell seam color `--border-default` and the focus-ring canon are contracts, and changes go through the visual spec
+The gallery `design.html` (`src/design/`) renders every piece above on the real tokens; open `/design.html` on the web dev server.

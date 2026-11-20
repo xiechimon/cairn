@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { docChecks, parseFrontmatter } from '../src/design/design-doc.js';
 
@@ -48,6 +50,30 @@ describe('parseFrontmatter', () => {
   it('reads a file saved with CRLF line endings', () => {
     const doc = parseFrontmatter('---\r\ncolors:\r\n  canvas: \'#efe6d0\'\r\n---\r\n');
     expect(doc.colors?.canvas).toBe('#efe6d0');
+  });
+
+  it('reads several semicolon-separated entries on one line', () => {
+    const doc = parseFrontmatter(
+      `---\ncolors:\n  canvas: '#efe6d0'; hover: 'rgb(0 0 0 / 0.06)'\n  ink: '#1c1d1b'; icon: '#343633'  # ink family\nrounded:\n  card: 20px; full: 9999px\n---\n`,
+    );
+    expect(doc.colors?.canvas).toBe('#efe6d0');
+    expect(doc.colors?.hover).toBe('rgb(0 0 0 / 0.06)');
+    expect(doc.colors?.ink).toBe('#1c1d1b');
+    expect(doc.colors?.icon).toBe('#343633');
+    expect(doc.rounded?.card).toBe('20px');
+    expect(doc.rounded?.full).toBe('9999px');
+  });
+
+  it('parses every entry of the real DESIGN.md frontmatter', () => {
+    const doc = parseFrontmatter(
+      readFileSync(join(import.meta.dirname, '..', 'DESIGN.md'), 'utf8'),
+    );
+    expect(Object.keys(doc.colors ?? {}).length).toBe(44);
+    expect(Object.keys(doc['colors-dark'] ?? {}).length).toBe(44);
+    expect(Object.keys(doc.rounded ?? {}).length).toBe(9);
+    expect(Object.keys(doc.spacing ?? {}).length).toBe(11);
+    expect(Object.keys(doc.typography ?? {}).length).toBe(10);
+    expect(Object.keys(doc.fonts ?? {}).length).toBe(4);
   });
 });
 

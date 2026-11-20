@@ -22,7 +22,7 @@ function read(path: string): string {
   return readFileSync(join(SRC, path), 'utf8');
 }
 
-describe('the serif voice follows claude.ai (DESIGN.md Typography)', () => {
+describe('the serif voice follows claude.ai (docs/design/surfaces/foundation.md Typography)', () => {
   it('each voice role is a utility over the serif face and a weight token', () => {
     const app = readFileSync(join(STYLES, 'app.css'), 'utf8');
     for (const role of ['greeting', 'title', 'response']) {

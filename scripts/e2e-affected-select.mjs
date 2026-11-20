@@ -294,8 +294,7 @@ export const FILE_RULES = new Map([
   ],
   ['apps/web/vitest.config.ts', []],
   ['apps/web/DESIGN.md', ['texture-', 'a11y-axe', 'design-rules-']],
-  ['apps/web/DESIGN-RULES.md', ['design-rules-', 'a11y-axe']],
-  ['apps/web/COMPONENTS.md', []],
+  ['apps/web/src/components/ui/INVENTORY.md', []],
   ['apps/web/e2e/chief-home-mock.ts', ['chief-home-']],
   ['apps/web/e2e/demo-server.ts', ['demo-mode']],
   ['apps/web/e2e/live-server.ts', LIVE_SERVER],
@@ -469,7 +468,7 @@ export function selectSpecs({ paths, allSpecs, dependencies, workspace }) {
   const reasons = [];
   for (const path of paths) {
     const { specs, why } = classify(path, dependencyImpact, workspaceReach);
-    const axe = specs !== null && path.startsWith('apps/web/src/');
+    const axe = specs !== null && path.startsWith('apps/web/src/') && !path.endsWith('.md');
     reasons.push(
       `  ${path} → ${specs === null ? `FULL (${why})` : specs.length === 0 && !axe ? `none (${why})` : why}${axe ? ' + a11y-axe' : ''}`,
     );

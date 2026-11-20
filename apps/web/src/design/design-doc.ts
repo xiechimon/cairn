@@ -66,7 +66,8 @@ export const RADIUS_EXPRS: Record<string, string> = {
 };
 
 const SECTION_RE = /^([\w-]+):\s*$/;
-const ENTRY_RE = /^ {2}([\w-]+):\s*(\[[^\]]*\]|'[^']*'|"[^"]*"|[^#\s][^#]*?)\s*(?:#.*)?$/;
+const ENTRY_INDENT_RE = /^ {2}\S/;
+const ENTRY_RE = /^\s*([\w-]+):\s*(\[[^\]]*\]|'[^']*'|"[^"]*"|[^#\s][^#]*?)\s*$/;
 const QUOTED_RE = /^(['"])(.*)\1$/;
 
 export function parseFrontmatter(markdown: string): Frontmatter {
@@ -80,12 +81,16 @@ export function parseFrontmatter(markdown: string): Frontmatter {
       out[head[1]] = section;
       continue;
     }
-    const entry = ENTRY_RE.exec(line);
-    if (entry?.[1] == null || entry[2] == null || section == null) continue;
-    const raw = entry[2];
-    section[entry[1]] = raw.startsWith('[')
-      ? [...raw.matchAll(/(['"])([^'"]+)\1/g)].flatMap((m) => (m[2] == null ? [] : [m[2]]))
-      : raw.replace(QUOTED_RE, '$2');
+    const body = line.replace(/\s+#.*$/, '');
+    if (section == null || !ENTRY_INDENT_RE.test(body)) continue;
+    for (const segment of body.split(';')) {
+      const entry = ENTRY_RE.exec(segment);
+      if (entry?.[1] == null || entry[2] == null) continue;
+      const raw = entry[2];
+      section[entry[1]] = raw.startsWith('[')
+        ? [...raw.matchAll(/(['"])([^'"]+)\1/g)].flatMap((m) => (m[2] == null ? [] : [m[2]]))
+        : raw.replace(QUOTED_RE, '$2');
+    }
   }
   return out;
 }

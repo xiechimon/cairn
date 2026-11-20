@@ -88,4 +88,4 @@ Each active channel carries its own system prompt and session. Idle channels cos
 1. Server: scoped threads, index migration, prompt memory scope, mirror line, greeting turn, tests per table row above.
 2. Web: one thread per channel, delete `streamForProject`, greeting fallback for a new channel.
 3. `channel_messages` tool.
-4. Update `apps/web/DESIGN.md` (Coordinator chat) to describe separate channels.
+4. Update `docs/design/surfaces/conversation.md` to describe separate channels.

@@ -317,12 +317,12 @@ test('the dependency files share one comparison and never fall into the shared-s
   assert.deepEqual(result.selection, ['token-gate.spec.ts']);
 });
 
-test('the design doc the gallery imports selects the design specs; the component doc selects none', () => {
+test('the design doc the gallery imports selects the design specs; the inventory doc selects none', () => {
   assert.deepEqual(select(['apps/web/DESIGN.md']).selection, [
     'a11y-axe.spec.ts',
     'texture-grain.spec.ts',
   ]);
-  assert.deepEqual(select(['apps/web/COMPONENTS.md']).selection, []);
+  assert.deepEqual(select(['apps/web/src/components/ui/INVENTORY.md']).selection, []);
 });
 
 test('shared web surfaces and the e2e runner itself still run everything', () => {

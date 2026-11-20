@@ -16,7 +16,7 @@ Fixed briefs, written once. Each names a surface, its reference folder and the s
 ## Procedure
 
 1. Pick the rule and its scenes (the table above; a new rule adds its own scene or reuses one).
-2. Make two worktrees from `origin/main`. Arm B keeps `apps/web/DESIGN-RULES.md` as is. Arm A has the rule row removed, and nothing else changed (removing the id from the brief's rule list too).
+2. Make two worktrees from `origin/main`. Arm B keeps the rule index in `apps/web/DESIGN.md` as is. Arm A has the rule row removed, and nothing else changed (removing the id from the brief's rule list too).
 3. In each arm start a fresh agent session with the same brief from `.claude/skills/design-cairn/SKILL.md`, the same reference shots and the same model. Run each arm 3 times for each scene.
 4. Capture every result at 1440px and 390px, light and dark, with the stack's own tools (`vp.mjs capture` for the live stack or the CI screenshot job).
 5. Shuffle the results under random ids and put each beside its reference shot. Score blind: violates the rule or not (run the `M` assertion if the rule has one), and which of each pair is closer to the reference.
@@ -29,4 +29,4 @@ One row per rule check. Raw screenshots stay on the PR that ran it.
 | Date | Rule | Scenes | Runs per arm | Arm A violations | Arm B violations | Decision | PR |
 |---|---|---|---|---|---|---|---|
 
-No rule has been through the procedure yet. The rules in `apps/web/DESIGN-RULES.md` at its first merge are taken from `DESIGN.md` and the 2026-11-06 audit, and each is checked the first time a PR is reviewed against it; the first full A/B run is the first row above.
+No rule has been through the procedure yet. The rules in `apps/web/DESIGN.md` at its first merge are taken from the old design docs and the 2026-11-06 audit, and each is checked the first time a PR is reviewed against it; the first full A/B run is the first row above.

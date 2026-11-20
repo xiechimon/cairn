@@ -2,7 +2,7 @@
 
 The single source the iOS app (`apps/ios/`) and a future Android app follow. Both apps share the screens, tabs, navigation, states and row content below; only the platform styling differs (last section). A change to the layout lands here first, then in both apps.
 
-Decisions this follows, all in the owner's plan: the phone app copies the web app at phone width (`apps/web/src/board/phone-tabs.tsx`, DESIGN-RULES C10, C11, C13): the Coordinator conversation is the home, with `任务`, `成果` and the computers button beside it (owner 2026-11-14, replacing the needs-you inbox home of 2026-10-31); one global Coordinator, with projects as filters and context, and a home made of needs-you, going-on and the conversation (D58); web, desktop and phone show the same threads (D33); the needs-you inbox uses numbered option cards with a recommended option and fixed status words (D57). Stack choice and platform requirements: `docs/research/ios-app-pilot-2026-11-08.md`.
+Decisions this follows, all in the owner's plan: the phone app copies the web app at phone width (`apps/web/src/board/phone-tabs.tsx`, rules C10, C11, C13 in `apps/web/DESIGN.md`): the Coordinator conversation is the home, with `任务`, `成果` and the computers button beside it (owner 2026-11-14, replacing the needs-you inbox home of 2026-10-31); one global Coordinator, with projects as filters and context, and a home made of needs-you, going-on and the conversation (D58); web, desktop and phone show the same threads (D33); the needs-you inbox uses numbered option cards with a recommended option and fixed status words (D57). Stack choice and platform requirements: `docs/research/ios-app-pilot-2026-11-08.md`.
 
 ## Navigation
 
