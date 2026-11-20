@@ -57,7 +57,7 @@ export async function runOrbStep(
   if (options.stopRequest) stop.accept(options.stopRequest);
   const heartbeat = setInterval(() => {
     void deps.client.heartbeat(stepId).catch((error: unknown) => {
-      if (error instanceof MachineApiError && error.status === 410)
+      if (error instanceof MachineApiError && (error.status === 410 || error.status === 404))
         void stop.deliver({ discard: false });
     });
   }, deps.heartbeatIntervalMs ?? 30_000);

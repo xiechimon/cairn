@@ -74,6 +74,7 @@ import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { setupProxy } from './proxy.js';
 import { performRepoArchive } from './repo-archive.js';
+import type { RunStepOptions } from './runner.js';
 import {
   ensureStateDirs,
   loadDevinModels,
@@ -811,6 +812,24 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     : undefined;
   desktopSweepTimer?.unref?.();
 
+  const inFlight = new Map<string, Promise<void>>();
+  const launchStepRun = (claimed: ClaimedStep, options: RunStepOptions) => {
+    const stepId = claimed.step.id;
+    const launched = runOrbStep(orbs, stepDeps(), claimed, options)
+      .catch((err: unknown) => {
+        logger.step(
+          `runStep crashed (step may need recover): ${
+            err instanceof Error ? err.message : String(err)
+          }`,
+        );
+      })
+      .finally(() => {
+        inFlight.delete(stepId);
+        workerSlots.delete(stepId);
+      });
+    inFlight.set(stepId, launched);
+  };
+
   let recoveryPending = true;
   const recover = async () => {
     if (!availability?.ready || !recoveryPending) return;
@@ -843,9 +862,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               ...(stillPriorSession ? { priorMachineId } : {}),
             },
           };
-          await runOrbStep(orbs, stepDeps(), claimed, {
+          launchStepRun(claimed, {
             resume: { sessionId: entry.sessionId, prompt: entry.prompt },
-            running: 1,
+            running: inFlight.size + 1,
             ...(entry.stopRequest != null ? { stopRequest: entry.stopRequest } : {}),
             ...(claimed.step.kind === 'chief' ? {} : { env: workerEnv(stepRecord.id) }),
           });
@@ -1117,7 +1136,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     };
   }
 
-  const inFlight = new Map<string, Promise<void>>();
   const strandedMinAgeMs = opts.strandedUploadMinAgeMs ?? STRANDED_UPLOAD_MIN_AGE_MS;
   const strandedAttempts = new Map<string, number>();
   let replayingStranded = false;
@@ -1199,22 +1217,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         continue;
       }
       const stepEnv = step.step.kind === 'chief' ? undefined : workerEnv(stepId);
-      const launched = runOrbStep(orbs, stepDeps(), step, {
+      launchStepRun(step, {
         running: inFlight.size + 1,
         ...(stepEnv !== undefined ? { env: stepEnv } : {}),
-      })
-        .catch((err: unknown) => {
-          logger.step(
-            `runStep crashed (step may need recover): ${
-              err instanceof Error ? err.message : String(err)
-            }`,
-          );
-        })
-        .finally(() => {
-          inFlight.delete(stepId);
-          workerSlots.delete(stepId);
-        });
-      inFlight.set(stepId, launched);
+      });
     }
     await Promise.allSettled([...inFlight.values()]);
   })();

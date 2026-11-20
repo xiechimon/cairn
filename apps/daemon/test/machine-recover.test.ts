@@ -1,11 +1,21 @@
 import type { AgentBackend, ClaimedStep, MachineDoneBody, StepEvent } from '@cairn/shared';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test } from 'vitest';
+import { releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { SessionNotResumableError } from '../src/backend/errors.js';
 import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { StepJournalEntry } from '../src/journal.js';
 import { StepJournal } from '../src/journal.js';
+import { MachineApiError } from '../src/machine-client.js';
 import type { StatePaths } from '../src/state.js';
-import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
+import {
+  boot,
+  CLAIMED,
+  defer,
+  FakeMachineApi,
+  fakeBackend,
+  startMachine,
+  waitFor,
+} from './machine-loop-harness.js';
 
 describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
   test('server has a claimed step but no local journal → done failed (journal lost)', async () => {
@@ -265,6 +275,100 @@ describe('recover reconciliation (02 §5.4 step journal recovery)', () => {
     const note = api.uploads[0]?.body.messages.find((message) => message.role === 'system');
     expect(String(note?.content)).toContain('本机找不到会话 local-1');
     expect(String(note?.content)).not.toContain('另一台 Runner');
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a recovered step still running does not hold the push channel, presence or new claims', async () => {
+    const api = new FakeMachineApi();
+    api.recoverSteps = [
+      { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
+    ];
+    const gate = defer<void>();
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        throw new Error('recovered session must continue, not create');
+      },
+      async continueSession(id) {
+        return {
+          sessionId: id,
+          events: (async function* () {
+            await gate.promise;
+            const done: StepEvent = { type: 'done', usage: [] };
+            yield done;
+          })(),
+          async steer() {},
+          async stop() {
+            gate.resolve();
+          },
+          usage: () => [],
+        };
+      },
+    };
+    const started = startMachine({
+      api,
+      backend,
+      presenceIntervalMs: 30,
+      seedJournal: (paths) => seedS1Journal(paths, { state: 'running' }),
+    });
+    onTestFinished(async () => {
+      gate.resolve();
+      const handle = await started.handlePromise.catch(() => null);
+      if (handle !== null) {
+        await handle.stop();
+        await handle.done;
+      }
+      releaseTestTempDir(started.home);
+    });
+    await waitFor(() => started.lines.some((l) => l.includes('[wake] push channel connected')));
+    api.onStreamEvent?.({ type: 'hello', connectionId: 'conn-r' });
+    await waitFor(() =>
+      api.presenceBodies.some((b) => (b as { connectionId?: unknown }).connectionId === 'conn-r'),
+    );
+    await waitFor(() => api.claimCalls > 0);
+    const handle = await started.handlePromise;
+    gate.resolve();
+    await waitFor(() => api.doneBodies.length === 1);
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('a run stops itself when the server disowns it (heartbeat 404)', async () => {
+    const api = new FakeMachineApi();
+    api.claimQueue = [CLAIMED];
+    api.heartbeat = async (stepId: string) => {
+      api.calls.push(`heartbeat:${stepId}`);
+      throw new MachineApiError(404, `step ${stepId} (not yours) not found`);
+    };
+    const gate = defer<void>();
+    const backend: AgentBackend = {
+      capabilities: PI_CAPABILITIES,
+      async createSession() {
+        return {
+          sessionId: 'sess-z',
+          events: (async function* () {
+            await Promise.race([
+              gate.promise,
+              new Promise((resolve) => setTimeout(resolve, 5_000)),
+            ]);
+            const done: StepEvent = { type: 'done', usage: [] };
+            yield done;
+          })(),
+          async steer() {},
+          async stop() {
+            gate.resolve();
+          },
+          usage: () => [],
+        };
+      },
+      async continueSession() {
+        throw new Error('unused');
+      },
+    };
+    const { handle, lines } = await boot({ api, backend, heartbeatIntervalMs: 25 });
+    await waitFor(() => lines.some((l) => l.includes('no longer exists or is no longer ours')));
+    await waitFor(() => api.doneBodies.some((d) => d.stepId === 's1'));
     await handle.stop();
     await handle.done;
   });

@@ -112,6 +112,7 @@ test('daemon restart recovers a running machine with stale relay files and resum
       }),
   });
   try {
+    await waitFor(() => api.doneBodies.length === 1);
     expect(api.doneBodies).toEqual([{ stepId: 's1', body: { status: 'success' } }]);
     expect(new StepJournal(paths.outboxDir).pending()).toEqual([]);
     expect(worker).toHaveBeenCalledTimes(1);

@@ -113,11 +113,16 @@ export async function runStep(
   const provenance: MachineHeartbeatBody = {};
   const heartbeat = setInterval(() => {
     deps.client.heartbeat(stepId, provenance).catch((err: unknown) => {
-      if (!(err instanceof MachineApiError) || err.status !== 410 || stop.request !== null) return;
-      deps.logger.step(`step ${stepId} no longer exists on the server — stopping`);
+      if (
+        !(err instanceof MachineApiError) ||
+        (err.status !== 410 && err.status !== 404) ||
+        stop.request !== null
+      )
+        return;
+      deps.logger.step(`step ${stepId} no longer exists or is no longer ours — stopping`);
       stop.deliver({ discard: false }).catch((stopErr: unknown) => {
         deps.logger.step(
-          `stop after heartbeat 410 failed: ${stopErr instanceof Error ? stopErr.message : String(stopErr)}`,
+          `stop after heartbeat ${err.status} failed: ${stopErr instanceof Error ? stopErr.message : String(stopErr)}`,
         );
       });
     });

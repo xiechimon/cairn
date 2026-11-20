@@ -280,7 +280,7 @@ function handle(sessionId: string, events: StepEvent[]): AgentSessionHandle {
   };
 }
 
-export async function boot(opts: {
+export interface BootOpts {
   api?: FakeMachineApi;
   backend?: AgentBackend;
   useDefaultBackend?: boolean;
@@ -305,7 +305,10 @@ export async function boot(opts: {
   devinManaged?: import('../src/backend/devin-managed.js').DevinManaged;
   antigravityManaged?: import('../src/backend/antigravity-managed.js').AntigravityManaged;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
-}) {
+  heartbeatIntervalMs?: number;
+}
+
+export function startMachine(opts: BootOpts) {
   const home = makeTestTempDir('loop-');
   try {
     const { logger, lines } = captureLogger();
@@ -331,7 +334,7 @@ export async function boot(opts: {
       });
     }
     const api = opts.api ?? new FakeMachineApi();
-    const handle = await runMachine({
+    const handlePromise = runMachine({
       config,
       paths,
       logger,
@@ -360,6 +363,9 @@ export async function boot(opts: {
         : {}),
       idleSleepPrevention: false,
       presenceIntervalMs: opts.presenceIntervalMs ?? 60_000,
+      ...(opts.heartbeatIntervalMs !== undefined
+        ? { heartbeatIntervalMs: opts.heartbeatIntervalMs }
+        : {}),
       ...(opts.presenceTimeoutMs !== undefined
         ? { presenceTimeoutMs: opts.presenceTimeoutMs }
         : {}),
@@ -376,19 +382,37 @@ export async function boot(opts: {
       },
       ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
     });
-    onTestFinished(async () => {
-      try {
-        await handle.stop();
-        await handle.done;
-      } finally {
-        releaseTestTempDir(home);
-      }
-    });
-    return { handle, api, lines, paths, home };
+    return { handlePromise, api, lines, paths, home };
   } catch (error) {
     releaseTestTempDir(home);
     throw error;
   }
+}
+
+export async function boot(opts: BootOpts) {
+  const started = startMachine(opts);
+  let handle: Awaited<typeof started.handlePromise>;
+  try {
+    handle = await started.handlePromise;
+  } catch (error) {
+    releaseTestTempDir(started.home);
+    throw error;
+  }
+  onTestFinished(async () => {
+    try {
+      await handle.stop();
+      await handle.done;
+    } finally {
+      releaseTestTempDir(started.home);
+    }
+  });
+  return {
+    handle,
+    api: started.api,
+    lines: started.lines,
+    paths: started.paths,
+    home: started.home,
+  };
 }
 
 export function defer<T = void>(): { promise: Promise<T>; resolve: (v: T) => void } {

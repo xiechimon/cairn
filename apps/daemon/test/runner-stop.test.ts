@@ -311,7 +311,7 @@ describe('runner stop close-out (M7 #308)', () => {
   });
 });
 
-describe('runner heartbeat answers 410 = this step no longer exists on the server → stop (#1488)', () => {
+describe('runner heartbeat answers 404/410 = the server disowns this step → stop (#1488)', () => {
   async function heartbeatSetup(fail: () => Error) {
     const home = testTempDir('cairn-runner-hb-');
     const paths = statePaths(home, join(home, 'workspaces'));
@@ -356,14 +356,23 @@ describe('runner heartbeat answers 410 = this step no longer exists on the serve
     expect(client.doneBodies[0]!.body.status).toBe('stopped');
     expect(calls).not.toContain('commitAll');
     expect(calls).not.toContain('push');
-    expect(lines.some((l) => l.includes('no longer exists on the server'))).toBe(true);
+    expect(lines.some((l) => l.includes('no longer exists or is no longer ours'))).toBe(true);
   });
 
-  test.each([
-    ['404（被放回 / 不归本机）', () => new MachineApiError(404, '{"error":"step s1 (not yours)"}')],
-    ['网络错误', () => new Error('fetch failed')],
-  ])('失败方式 7：心跳 %s → 照常跑，不停', async (_label, fail) => {
-    const { client, running, stops, beats } = await heartbeatSetup(fail);
+  test('failure mode 7: heartbeat 404 (put back / no longer ours) → session interrupted, done(stopped), no commit/push', async () => {
+    const { client, calls, lines, running } = await heartbeatSetup(
+      () => new MachineApiError(404, '{"error":"step s1 (not yours)"}'),
+    );
+    await running;
+    expect(client.doneBodies).toHaveLength(1);
+    expect(client.doneBodies[0]!.body.status).toBe('stopped');
+    expect(calls).not.toContain('commitAll');
+    expect(calls).not.toContain('push');
+    expect(lines.some((l) => l.includes('no longer exists or is no longer ours'))).toBe(true);
+  });
+
+  test('failure mode 8: heartbeat network error → keeps running, no stop', async () => {
+    const { client, running, stops, beats } = await heartbeatSetup(() => new Error('fetch failed'));
     await waitFor(() => beats() >= 5);
     expect(client.doneBodies).toHaveLength(0);
     await stops.get('s1')?.deliver({ discard: false });
