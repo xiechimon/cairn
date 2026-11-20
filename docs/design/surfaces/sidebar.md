@@ -2,6 +2,22 @@
 
 Owner-reviewed sidebar prototype, measured against the Claude Duet recording (1 CSS px = 1.47 frame px). 220px wide on `--sidebar-surface` (the page `sheet`), one `--border` hairline to the main area. Reference shots: `docs/design/references/thread-list-sidebar/`. Source: the owner's reference-versus-ours review (#3144) against Amp and t3code. A list is any group of three or more rows that stand for entities (threads, projects, tasks); measure inside the list container (`aside`, the Tasks panel, a `ListCard`).
 
+## Rules
+
+Scope: `apps/web/src/board/sidebar` `apps/web/src/board/app-sidebar` `apps/web/src/board/archived-project-bar` `apps/web/src/board/archive-toast` `apps/web/src/board/project-` `apps/web/src/board/desktop-update` `apps/web/src/components/shell/` `apps/web/e2e/sidebar` `apps/web/e2e/paper-sidebar` `apps/web/e2e/board-shell` `apps/web/e2e/shell-` `apps/web/e2e/desktop-update` `apps/web/e2e/collapse-family` `apps/web/test/sidebar` `apps/web/test/tasks-sections` `apps/web/test/attention-title`
+
+| Id | Rule | Check |
+|---|---|---|
+| L1 | At most 2 distinct hues in a list, the accent included, except the Tasks panel's PR line. | M distinct chromatic hue buckets in the container is <= 2 |
+| L2 | Status in a row is a monochrome glyph or a muted text tag; only the state that needs the user may take the accent: a 6px dot, no number. | M `e2e/sidebar-visual.spec.ts`: every project-row glyph color is neutral, the only chromatic mark is the needs-you dot, a status row has `aria-description` |
+| L3 | No colored letter or tinted tile for a project or type in a list row; a person or agent may carry its `SeededAvatar`. | M no row descendant outside `[data-slot="avatar"]` has a chromatic background and a one-letter text; `.project-avatar` count is 0 |
+| L4 | The title gets the row: at least 80% of a task row's width, or 55% when the row carries meta or menu. | M `title.width / row.width` is >= 0.55 for every sidebar project row |
+| L5 | The sidebar is a tree under the Coordinator row: ungrouped projects, group folders, `新建项目`; pinned rows above the footer; archived projects on the flat page. | G `test/sidebar-projects.test.ts`, `test/tasks-sections.test.ts`, `e2e/sidebar-archived.spec.ts`; M header order in the DOM |
+| L6 | A sidebar row holds no time text; a task's age shows in the Tasks panel. | M no `aside` row text matches a duration |
+| L7 | The open row carries one subtle emphasis step, never a color change or a hue border. | M every row's border color is neutral |
+| L8 | A child row carries a tree guide under the parent icon's centre; siblings share one trunk, the last child ends in the elbow. | M `e2e/sidebar-visual.spec.ts`: guide x 22, elbow at the icon centre, continuous trunk, none below the last child |
+| L9 | Row geometry copies the measured reference: 34px rows on a 36px pitch, 14px labels, 22px hover actions, no collapsed rail, a 56px footer. | M `e2e/sidebar-visual.spec.ts`, `e2e/paper-sidebar.spec.ts` |
+
 ## Rows and geometry (L9)
 
 Row geometry copies the measured reference: 220px sidebar, 34px rows on a 36px pitch with 8px side insets, 6px corners (`--cds-radius-md`) and 14px `text-ui` labels at weight 400, 26px group rows, 22px hover actions with 16px glyphs (3px clear of the hover fill on every side; 20px glyphs under a coarse pointer, where the action is 44px), no collapsed rail (collapsed is the 28px toggle plus a hover peek, below), and a 56px footer under a hairline rule with 28px ghost icon buttons at the right, 8px edge inset: the desktop update button (desktop app only), usage and settings.

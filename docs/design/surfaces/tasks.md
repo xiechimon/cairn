@@ -2,6 +2,14 @@
 
 The right-hand Tasks panel (the `任务` button), the task thread panel it opens, and the task detail page. Reference shots: `docs/design/references/thread-review/` and the Claude Duet frames in `docs/design/references/coordinator-chat/`.
 
+## Rules
+
+Scope: `apps/web/src/board/tasks-` `apps/web/src/board/task-` `apps/web/src/board/thread-` `apps/web/src/board/use-thread-` `apps/web/src/board/use-tasks-view` `apps/web/src/board/use-mark-done` `apps/web/src/board/use-mark-thread-read` `apps/web/src/board/use-engine-screen` `apps/web/src/board/engine-run` `apps/web/src/board/live-engine-run` `apps/web/src/board/engine-terminal` `apps/web/src/board/work-panel` `apps/web/src/components/thread/` `apps/web/src/detail/` `apps/web/src/schedules/` `apps/web/e2e/detail-` `apps/web/e2e/schedules-` `apps/web/e2e/thread-` `apps/web/e2e/transcript-` `apps/web/e2e/spec-` `apps/web/e2e/escape-` `apps/web/test/tasks-` `apps/web/test/task-` `apps/web/test/thread-` `apps/web/test/transcript-` `apps/web/test/work-trace` `apps/web/test/can-mark-done`
+
+| Id | Rule | Check |
+|---|---|---|
+| C10 | A row that stands for work shows state and age, grouped by what needs the user; per-surface details live in the surface files. | H |
+
 ## Tasks panel
 
 - **TaskRow** (`thread/task-row.tsx`): one quiet line measured from the reference recording: one lead for every row (the list reads as one family): a 16px mark centred in a 28px box with no fill behind it. A row the owner can mark done shows the checkbox (its ring takes the accent when the task waits on the owner); a row that cannot be marked done shows one `ink-3` glyph of the same size in the same spot, with a tooltip that says why (the Coordinator's spiral for a question, the done or closed status glyph for a task; a failed task draws an outlined ring with a cross, stroke only, never a filled disc). The reference draws a grey tile behind that glyph; cairn leaves it out on the owner's instruction. Then the 14px regular title and, on resolved rows, the short date on the right; there is no running dot, the `进行中` section header says it; the `…` menu on hover or focus (always on touch). Rows are 46px with a 2px gap and `--radius-tile` corners.

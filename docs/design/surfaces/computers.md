@@ -2,9 +2,17 @@
 
 The computers panel (`board/machines-panel.tsx`) and the menu-bar tray page (`/tray`, `src/tray/`). Reference shots: `docs/design/references/settings/`.
 
+## Rules
+
+Scope: `apps/web/src/tray/` `apps/web/src/board/machines-` `apps/web/src/board/computer-` `apps/web/src/board/fleet-` `apps/web/src/board/machine-capabilities` `apps/web/e2e/machines-` `apps/web/e2e/machine-` `apps/web/e2e/desktop-update` `apps/web/test/tray-` `apps/web/test/machine-` `apps/web/test/computer-` `apps/web/test/fleet-`
+
+| Id | Rule | Check |
+|---|---|---|
+| V26 | The `/tray` popover is operating system chrome: system font, system accent, OS light and dark — the one exception to V2, V3 and V5. | H real Mac capture in the `desktop-mac` run |
+
 ## Entry
 
-The one entry to the computers panel is the laptop button at the top right of the Coordinator home (the round button on the phone); the sidebar footer carries no computers link. The button carries the fleet state as an 8px badge on its icon's corner (`board/fleet-status.ts`): `running` green when all listed machines are online, `destructive` when some are offline, a hollow ring when none are online — never a colour alone (V25): the tooltip and accessible name name any offline computer. The Coordinator machine's state is in the button's tooltip and accessible name; it dims only while the connection is down. An empty fleet shows no dot and `还没有电脑，点这里添加` points at the button itself.
+The one entry to the computers panel is the laptop button at the top right of the Coordinator home (the round button on the phone); the sidebar footer carries no computers link. The button carries the fleet state as an 8px badge on its icon's corner (`board/fleet-status.ts`): `running` green when all listed machines are online, `destructive` when some are offline, a hollow ring when none are online — never a colour alone (L2): the tooltip and accessible name name any offline computer. The Coordinator machine's state is in the button's tooltip and accessible name; it dims only while the connection is down. An empty fleet shows no dot and `还没有电脑，点这里添加` points at the button itself.
 
 ## Panel
 

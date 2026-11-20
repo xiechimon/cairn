@@ -5,7 +5,7 @@ description: Use when a task or brief touches apps/web/src (new screen, UI fix, 
 
 # design-cairn: UI work in cairn
 
-Read `apps/web/DESIGN.md` first — the token frontmatter, the rule index (one line per rule id) and the which-component table — then the surface file for the surface you touch under `docs/design/surfaces/`, and `apps/web/src/components/ui/INVENTORY.md` for what already exists to reuse. Reference screenshots live in `docs/design/references/<surface>/`; `docs/design/references/README.md` maps each surface to its shots.
+Read `apps/web/DESIGN.md` first — the token frontmatter and the which-component table — then the surface file for the surface you touch under `docs/design/surfaces/` (its `## Rules` section holds that surface's rule rows), and `apps/web/src/components/ui/INVENTORY.md` for what already exists to reuse. Then run `node scripts/design-rules-for.mjs` on the files you will touch and keep the printed rule rows; a rule id alone resolves through `node scripts/design-rules-for.mjs <id>`. Reference screenshots live in `docs/design/references/<surface>/`; `docs/design/references/README.md` maps each surface to its shots.
 | Surface | Reference product |
 |---|---|
 | Coordinator chat | Claude.ai |
@@ -56,7 +56,7 @@ UI brief
 
 Surface: <first run | coordinator chat | thread list and sidebar | thread and review | settings>
 Goal: <one sentence, in the user's words>
-Rules: read apps/web/DESIGN.md; the ids that apply here: <e.g. C1, C3, C11, V3>
+Rules: the verbatim output of `node scripts/design-rules-for.mjs <the paths this task touches>`
 
 References (open before coding; paths in the repo):
 - docs/design/references/<surface>/<shot>   what to take from it: <one line>
@@ -80,7 +80,7 @@ Craft (answer before code, one line each; rule P6):
 Acceptance (done means all of these):
 1. Coverage table: the filled component x state list above, each cell with a screenshot.
 2. Compare to reference: for each state with a reference shot, one row "reference | ours" and one sentence on the difference. State what is still worse than the reference.
-3. The DESIGN.md rule ids listed above checked; `M` rules measured, not eyeballed.
+3. The rule rows pasted in the Rules block checked; `M` rules measured, not eyeballed.
 4. Self-review at 1440 and 390, light and dark, by the building session against the reference shots (visual review stays with Claude; no second reviewer is needed).
 5. Interface review of the diff (`cairn-design-review`, adapted from Jakub Krehel's `interface-review`): read the whole diff; expand each changed file one hop to the surfaces it renders in, five consumers at most; read the removed lines for regressions; hold the change to its stated intent — a state left unbuilt is a finding; classify each finding `Introduced` / `Regression` / `Pre-existing`, keyed to its rule id, with at most three pre-existing findings as courtesy.
 6. Real stack shot for the main state (live, not `?scenario=`).
@@ -102,10 +102,10 @@ When a new reference is needed, operate the product (use the `walk` skill), save
 
 ## Using the rules
 
-- Briefs for UI work come from this skill; the brief lists the rule ids that apply and the reference shots.
-- The look-and-feel assertions come from the `M` rows of the rule index in `apps/web/DESIGN.md`. There is no separate screenshot job: an assertion lives in an ordinary e2e spec (axe runs in `e2e/a11y-axe.spec.ts`), and its message starts with the rule id (`C3: ...`) so a failure points at the rule. An `M` row with no spec yet (the by-hand list in `test/anti-slop-foundations.test.ts`) is measured by hand in the change that touches it.
+- Briefs for UI work come from this skill; the brief pastes the `design-rules-for.mjs` output for the task's paths and lists the reference shots.
+- The look-and-feel assertions come from the `M` rows of the `## Rules` sections in `apps/web/DESIGN.md` and `docs/design/surfaces/*.md`. There is no separate screenshot job: an assertion lives in an ordinary e2e spec (axe runs in `e2e/a11y-axe.spec.ts`), and its message starts with the rule id (`C3: ...`) so a failure points at the rule. An `M` row with no spec yet (the by-hand list in `test/anti-slop-foundations.test.ts`) is measured by hand in the change that touches it.
 - A spec that exercises a live surface carries `@motion` in its title; the `motion-reel` workflow records those specs every Monday (and on demand) and uploads the videos as the `motion-reel` artifact. It is not part of `ci`, so it never slows landing.
-- An `M` row names the spec or test that measures it in its Check column; `test/anti-slop-foundations.test.ts` fails on a new `M` row that names none, on any source path `apps/web/DESIGN.md`, a surface file or `INVENTORY.md` names that no longer exists, and on an entry file over 150 lines or a rule row over 60 words. The rows still measured by hand are listed there and the list only shrinks.
+- An `M` row names the spec or test that measures it in its Check column; `test/anti-slop-foundations.test.ts` fails on a new `M` row that names none, on any source path `apps/web/DESIGN.md`, a surface file or `INVENTORY.md` names that no longer exists, on a `## Rules` section without a live `Scope:` prefix or a rule id that appears twice, and on an entry file over 150 lines or a rule row over 60 words. The rows still measured by hand are listed there and the list only shrinks.
 - A rule enters the index after the A/B check in `docs/design/rule-ab.md`, or when it copies a measured value or an audit finding. A rule that stops changing output is deleted.
 - A review finding that can be measured becomes an `M` rule with an assertion; one that is taste becomes an `H` rule with a reference shot. Fixing the one page is not enough.
 

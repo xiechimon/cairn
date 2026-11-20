@@ -21,7 +21,18 @@ const sourceFiles = walk(SRC)
 
 const appCss = readFileSync(join(SRC, 'styles/app.css'), 'utf8');
 const design = readFileSync(join(ROOT, 'DESIGN.md'), 'utf8');
-const rules = design;
+const surfacesDir = join(ROOT, '../../docs/design/surfaces');
+const surfaceDocs = readdirSync(surfacesDir)
+  .filter((name) => name.endsWith('.md'))
+  .map((name) => [`docs/design/surfaces/${name}`, readFileSync(join(surfacesDir, name), 'utf8')] as const);
+const ruleSources = [['DESIGN.md', design], ...surfaceDocs] as [string, string][];
+
+function rulesSection(text: string): string {
+  const after = text.split('\n## Rules\n')[1] ?? (text.startsWith('## Rules\n') ? text : '');
+  return after.split('\n## ')[0] ?? '';
+}
+
+const rules = ruleSources.map(([, text]) => rulesSection(text)).join('\n');
 
 function offenders(pattern: RegExp): string[] {
   return sourceFiles.filter(({ text }) => pattern.test(text)).map(({ path }) => path);
@@ -130,10 +141,7 @@ describe('the rule index carries the anti-slop rules', () => {
 
 const SOURCE_PATH =
   /`((?:src|e2e|test|components|board|chief|detail|design|lib|api|styles|thread|overlay)\/[^`\s]*?\.(?:tsx?|css|mjs))`/g;
-const surfacesDir = join(ROOT, '../../docs/design/surfaces');
-const surfaceDocs = readdirSync(surfacesDir)
-  .filter((name) => name.endsWith('.md'))
-  .map((name) => [`docs/design/surfaces/${name}`, readFileSync(join(surfacesDir, name), 'utf8')] as const);
+const REPO_ROOT = join(ROOT, '../../');
 const ruleRows = rules
   .split('\n')
   .filter((line) => /^\| [A-Z]\d+ \|/.test(line))
@@ -175,6 +183,45 @@ describe('the design docs stay true and checkable', () => {
       .filter((row) => row.rule.split(/\s+/).filter(Boolean).length > 60)
       .map((row) => `${row.id} (${row.rule.split(/\s+/).filter(Boolean).length} words)`);
     expect(tooLong).toEqual([]);
+  });
+
+  test.each(ruleSources)('%s rules section opens with a Scope line of live prefixes', (name, text) => {
+    const section = rulesSection(text);
+    if (name === 'DESIGN.md') expect(section.length).toBeGreaterThan(0);
+    if (section === '') return;
+    const scopeLine = section.split('\n').find((line) => line.trim() !== '');
+    expect(scopeLine, `${name} ## Rules must start with a Scope: line`).toMatch(/^Scope: /);
+    const prefixes = [...(scopeLine ?? '').matchAll(/`([^`]+)`/g)].map((m) => m[1] ?? '');
+    expect(prefixes.length, `${name} Scope: names no prefix`).toBeGreaterThan(0);
+    const dead = prefixes.filter((prefix) => {
+      if (existsSync(join(REPO_ROOT, prefix))) return false;
+      const dir = join(REPO_ROOT, prefix.slice(0, Math.max(0, prefix.lastIndexOf('/'))));
+      if (!existsSync(dir) || !statSync(dir).isDirectory()) return true;
+      const leaf = prefix.slice(prefix.lastIndexOf('/') + 1);
+      return !readdirSync(dir).some((file) => file.startsWith(leaf));
+    });
+    expect(dead, `${name} Scope: prefixes match no repo path`).toEqual([]);
+  });
+
+  test('a rule id lives in exactly one file and no rule row sits outside a ## Rules section', () => {
+    const seen = new Map<string, string>();
+    const duplicates: string[] = [];
+    for (const [name, text] of ruleSources) {
+      const section = rulesSection(text);
+      for (const line of section.split('\n')) {
+        const id = line.match(/^\| ([A-Z]+\d+) \|/)?.[1];
+        if (id === undefined) continue;
+        if (seen.has(id)) duplicates.push(`${id} in ${seen.get(id)} and ${name}`);
+        seen.set(id, name);
+      }
+      const remainder = text
+        .split(/^## Rules$/m)
+        .map((part, index) => (index === 0 ? part : part.split(/^## /m).slice(1).join('\n## ')))
+        .join('\n');
+      const stray = remainder.split('\n').filter((line) => /^\| [A-Z]+\d+ \|/.test(line));
+      expect(stray, `${name} has rule rows outside its ## Rules section`).toEqual([]);
+    }
+    expect(duplicates).toEqual([]);
   });
 
   test('the entry file stays at most 150 lines', () => {

@@ -31,3 +31,11 @@ The stone is quiet. Motion only says where a surface came from or that something
 ## Texture (V16)
 
 The ASCII and dither texture components (`SpiralArt`, `SpiralMark`, `DriftField`, `DriftEdge`, `TextureSkeleton`) were retired in #5339; no surface carries texture now (V16). Loading skeletons are flat bars in the final shape (A4). A texture comes back only through a new A/B-checked rule.
+
+## Rules
+
+Scope: `apps/web/`
+
+| Id | Rule | Check |
+|---|---|---|
+| V24 | Motion names its properties: no `transition-all`, no hover transform, no transitions on layout properties; reduced motion honoured. | M; G `test/unslop-signs.test.ts` |

@@ -2,6 +2,66 @@
 
 The shared base every surface sits on. Token values live in `apps/web/src/styles/shadcn.css` (the file `components.json` points the shadcn CLI at): its first `:root` block holds theme-independent tokens (motion, z-index, type, radii, sizes, formulas over color slots) followed by the dark colors; `.light` overrides the colors only. A palette change touches one file. The gallery (`pnpm --filter @cairn/web dev`, `/design.html`) renders these tokens, and its Doc check compares the frontmatter of `apps/web/DESIGN.md` with the rendered values in both themes. Components write token names, never hex values (`scripts/ui-drift-gate.mjs` G2).
 
+## Rules
+
+Scope: `apps/web/`
+
+Shared visual, copy and accessibility rows; they load for every path under `apps/web/` via `node scripts/design-rules-for.mjs`. The detail each row compresses lives in this file and `apps/web/DESIGN.md`.
+
+| Id | Rule | Check |
+|---|---|---|
+| C1 | One fact, one wording: a status comes from one selector and is not restated differently elsewhere on the page. | M text of one entity is identical across header, list and footer |
+| C2 | No capability, no placeholder: never render a block for a feature that is not available; one line says what is off and the action to enable it. | M no element text matching `^[\s—·-]+$`; no empty fixed-ratio block |
+| C3 | Hidden means no space: an element shown on hover or focus takes no layout when hidden. | M gap between consecutive short chat messages is 16 to 24px |
+| C4 | Every icon-only control has a visible tooltip and an accessible name. | M hover 600ms shows a tooltip; axe `button-name` |
+| C5 | No raw error text reaches the user: map it to a plain sentence saying what to do next; raw text lives in a tooltip or details. | M toast and banner text does not match `\(.*\)$`, `Error:`, `\b[45]\d\d\b` |
+| C6 | Developer switches (feature flags, release buttons) never sit on a user page; they live behind the dev route or dev mode. | H |
+| C7 | A disabled control says why next to it. | M disabled composer has adjacent explanatory text |
+| C12 | An empty state is one sentence and at most one primary action. | G `ui-page-style-gate` |
+| C15 | A task is named by its title wherever a person reads it; the sequence number shows only in the `#` picker and the `#n` it inserts. | G `e2e/chief-thread-report.spec.ts`, `e2e/chief-stream-markdown.spec.ts`, `test/segments-mention-nav.test.ts` |
+| C19 | A user-data picker with more than 10 options filters as you type; build it from `components/filter-picker.tsx`. | G `e2e/picker-filter.spec.ts` |
+| C21 | A picker of something invisible (sound, haptics, timing) lets the user experience the real artifact in place, never a description alone. | H |
+| C23 | What the user already sees stays put while a live surface updates: no remount and no offset change until it settles. | G `e2e/chief-live-stability.spec.ts` |
+| C24 | A change the user makes shows in the same frame; a failure puts the row back and says so. | M `e2e/chief-home-tasks-panel.spec.ts` (Mark done lands / fails) |
+| C25 | No inert UI: a control offering fewer than two real choices, or a label that only says something cannot be done, is not rendered. | M `e2e/settings-routing.spec.ts` (C25 test) |
+| V1 | Colors, sizes, radii and shadows come from tokens; no hex, no arbitrary pixel values. | G `ui-drift-gate`, `ui-debt-gate` |
+| V2 | Fonts are Source Serif 4, Instrument Sans and JetBrains Mono only. | M `e2e/design-rules-measure.spec.ts`: computed `font-family` of every text node is in the set (CJK fallbacks allowed) |
+| V3 | No AI-default styling: no gradients, glow, gradient text, frosted blur panels, decorative blobs, emoji as icons or labels, or one radius and shadow stamped on every block. | M no `linear-gradient`, `radial-gradient` or `conic-gradient` in new CSS; G `test/anti-slop-foundations.test.ts`, `test/unslop-signs.test.ts` |
+| V4 | Not everything is a card: a list is rows in one divided `ListCard`; no card inside a card; one card corner per page. | M `e2e/design-rules-measure.spec.ts`: nested `[data-slot=card]` count is 0 |
+| V5 | Three roles carry colour: ochre = waiting on you (focus ring, switch on), green = running dot, rust = failure; all else ink; exceptions: task tint, count badge, PR state. | G `ui-drift-gate`, `test/anti-slop-foundations.test.ts`; H |
+| V6 | One primary action per screen, the `primary` Button; card actions are text links; sibling settings actions share `outline`. | M `e2e/design-rules-measure.spec.ts`: at most one filled `primary` outside dialog footers on each main surface; `e2e/settings-routing.spec.ts` |
+| V7 | Elevation is `--e1`, `--e1-lift`, `--e2` or `--e3` only; no second ring, no raw `box-shadow`. | G `ui-drift-gate` |
+| V8 | Spacing is on the 4px grid. | G `ui-debt-gate`; M computed margins and paddings are multiples of 4 |
+| V9 | Icons are lucide from the project icon set; never invent an icon name. | G `pnpm typecheck` |
+| V10 | Pages compose existing pieces before building their own. | G `ui-page-style-gate`, `ui-drift-gate` |
+| V11 | A project carries no colour: its chosen icon or a name-derived neutral glyph; only a person's `SeededAvatar` may be a tinted letter. | M; G `test/anti-slop-foundations.test.ts`, `test/avatar-tint.test.ts`, `e2e/avatar-initial.spec.ts` |
+| V12 | At most 2 non-neutral hue families per screen beyond the V5 roles (decoded avatars, provider marks, user content and the V11 tint excluded). | M |
+| V13 | Type budget: sizes from the token steps, at most 6 per screen; at most 3 font weights; at most 9 size and weight pairs. | M |
+| V14 | Icon uniformity: lucide stroke 1.75, sizes 16, 20 or 22px by role. | M; G `test/icon-stroke.test.ts` |
+| V15 | Badge budget: at most 3 tinted short-text elements per screen (keycaps excluded); the task glyph tile and chip are not counted. | M |
+| V16 | No texture or gradient on surfaces; ink grain only on the brand spiral and the filled-button specks. | M; G `test/anti-slop-foundations.test.ts` |
+| V17 | A speaker is not repeated: consecutive messages from one speaker show at most one avatar per speaker change. | M |
+| V18 | Like rows fold: three or more sibling rows with the same status sit under one section heading. | M |
+| V19 | A placeholder is not content: no text node consists only of `—`, `·` or `-`. | M; G `e2e/design-rules-measure.spec.ts` |
+| V20 | An object list is rows in one card, not a grid of identical cards; the results panel's preview row is the exception. | M; G `e2e/design-rules-measure.spec.ts`: no grid or stack of three or more outlined 12px-corner cards outside the results panel |
+| V21 | No hover shadows or elevation; a hover background covers the whole row or control. | G `ui-drift-gate` G8 |
+| V22 | Sentence case and normal tracking: no uppercase labels; `letter-spacing` normal on every text node. | M; G `test/unslop-signs.test.ts` |
+| V23 | No weight of 800 or more and no italic in chrome; emphasis is weight or ink step. | M; G `test/unslop-signs.test.ts` |
+| V25 | Text keeps the platform's default font smoothing: no `-webkit-font-smoothing` or `antialiased` utilities. | G `test/font-smoothing.test.ts` |
+| V27 | Every count, time and figure renders in tabular figures. | M `e2e/texture-tabular-figures.spec.ts` |
+| V28 | Dark layers separate by surface lightness, not stroke; an outlined group fills with `card` in dark. | M `test/dark-text-tertiary-contrast.test.ts` |
+| V29 | A status glyph sits on the optical centre of its box. | M `e2e/texture-glyph-alignment.spec.ts` |
+| V30 | A row of controls or fields fills its card: no blank region of 40% of a row's width at one side while a sibling spans full width; one-line sentences exempt. | M `e2e/design-rules-measure.spec.ts`: blank region beside content |
+| T1 | One language per screen: UI strings go through `t()`, no English inside Chinese labels; use the `CONTEXT.md` glossary term for thread, task and agent. | M no Latin word of 4+ letters inside a CJK string unless it is a glossary term |
+| T2 | Copy says what happened and what to do, in the user's words; errors say how to fix, empty states what is missing. | H |
+| T3 | No text node contains a backtick; code renders as `<code>`. | M; G `e2e/design-rules-measure.spec.ts` |
+| T4 | Copy is plain: no exclamation mark, emoji or hype word in UI strings; a one-sentence title ends without a period; visible copy states what is, never why (no `因为`, `所以`, `because`); a reason or background sentence goes behind an `InfoTip` (the `info` prop on `SettingsSection`, `SettingsRow`, `IntegrationRow` or `DialogShell`), shown on hover and focus. | M; G `test/unslop-signs.test.ts` |
+| A1 | Click targets are at least 24px on desktop and 44px on touch. | M hit area, also under `pointer: coarse`; `e2e/design-rules-measure.spec.ts` measures the Tasks panel checkbox |
+| A2 | Keyboard focus is visible (`--focus-ring`); `prefers-reduced-motion` respected; animate only `opacity` and `transform` except the named Growth utilities. | M |
+| A3 | axe reports 0 violations at `wcag2a/aa/21aa/22aa` in light and dark. | M `e2e/a11y-axe.spec.ts` |
+| A4 | Loading shows nothing for 150 to 300ms, then a skeleton in the final shape whose rows sit at the loaded tops. | M Tasks and Made: `tops()` of the skeleton rows equal the loaded rows' in `e2e/chief-home-tasks-panel.spec.ts`; other panels H |
+| R1 | Every state in P3 is checked at 1440px and 390px, light and dark; no horizontal scroll at 390. | M `e2e/design-rules-measure.spec.ts`: `scrollWidth <= innerWidth` at 390px |
+
 ## Direction
 
 Cairn is an open-source, self-hostable agent team. The user is a keyboard-first engineer who talks to a project's Coordinator, then checks back on the threads it ran; the core question is "what is waiting for me". Direction A, **Cairn**: a cairn is a pile of stones that marks a trail for the next walker. The paper is cool limestone in light and deep stone in dark; hierarchy comes from three surface steps (canvas → sheet → card) plus hairline rings, not heavy shadows. Three hues carry meaning and nothing else does: ochre `accent` means "waiting on you" and is actionable, lichen green `running` means "working", slate blue means "ready for review". Everything else is the ink ladder. The stone language lives inside the UI: status marks are one circular family that fills as a thread nears done, the Threads inbox reads as a trail with waypoints. The brand is the spiral mark, which is also the Coordinator's avatar and spins while it works.

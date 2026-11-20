@@ -8,9 +8,16 @@ const SKILLS = join(ROOT, '.claude/skills');
 const JAKUB = '672ae44ace6aaed65b86cbb1e2fd6fbea0e79578';
 const EMIL = '64eb3deb9a5fbfa041faf783e0bc3fd635872e9c';
 
-const rulesDoc = readFileSync(join(ROOT, 'apps/web/DESIGN.md'), 'utf8');
+const ruleDocs = [
+  readFileSync(join(ROOT, 'apps/web/DESIGN.md'), 'utf8'),
+  ...readdirSync(join(ROOT, 'docs/design/surfaces'))
+    .filter((name) => name.endsWith('.md'))
+    .map((name) => readFileSync(join(ROOT, 'docs/design/surfaces', name), 'utf8')),
+];
 const ruleIds = new Set(
-  rulesDoc
+  ruleDocs
+    .map((doc) => (doc.split('\n## Rules\n')[1] ?? '').split('\n## ')[0] ?? '')
+    .join('\n')
     .split('\n')
     .map((line) => line.match(/^\| ([A-Z]+\d+) \|/)?.[1])
     .filter((id): id is string => Boolean(id)),

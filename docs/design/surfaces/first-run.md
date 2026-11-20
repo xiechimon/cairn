@@ -2,6 +2,14 @@
 
 First run is a setup page shown before a team's first project, not a dead-end error (the desktop app starts the local Runner itself, so a newcomer only sets up models). Source: `board/first-run-setup.tsx`, `board/first-run-checklist-model.ts`; measured by `e2e/first-run-setup.spec.ts` and `e2e/first-run-checklist.spec.ts`.
 
+## Rules
+
+Scope: `apps/web/src/board/first-run-` `apps/web/e2e/first-run-`
+
+| Id | Rule | Check |
+|---|---|---|
+| C9 | First run is a setup page before the first project: two live-status steps (models, confirm settings), unskippable, closing into the conversation. | G `e2e/first-run-setup.spec.ts`, `e2e/first-run-checklist.spec.ts` |
+
 Two steps with live status:
 
 1. **Connect models** — the Coordinator needs a provider; a Claude Code sign-in serves tasks only. The provider list sits on the page with no dialog.

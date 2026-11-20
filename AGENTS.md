@@ -1,6 +1,6 @@
 # Cairn Development Rules
 
-Before any change under `apps/web/src`, read `apps/web/DESIGN.md` and invoke the `design-cairn` skill, before reading or editing the code.
+Before any change under `apps/web/src`, invoke the `design-cairn` skill and run `node scripts/design-rules-for.mjs` on the files you will touch, before reading or editing the code — the printed rule rows are the ones that apply; `apps/web/DESIGN.md` holds the token frontmatter and the which-component table.
 
 ## Safety
 
@@ -56,7 +56,7 @@ Work happens in worktrees, never in the primary checkout: a machine-level pre-co
 
 Where to look:
 
-- UI work under `apps/web/src`: `apps/web/DESIGN.md` (the rule index and one pointer per surface under `docs/design/surfaces/`), then `.claude/skills/design-cairn/SKILL.md` (see the first line of this file).
+- UI work under `apps/web/src`: `apps/web/DESIGN.md` (tokens, the which-component table, the process rules); rule rows live in the `## Rules` section of each `docs/design/surfaces/*.md`, and `node scripts/design-rules-for.mjs <paths>` prints the rows for given files; then `.claude/skills/design-cairn/SKILL.md` (see the first line of this file).
 - Every user-facing feature has a row in `.claude/skills/verify-cairn/feature-map.json`; run `node scripts/generate-feature-map.mjs` after changing routes, test ids or shortcuts. Acceptance and evidence: `.claude/skills/verify-cairn/SKILL.md`.
 - Test scope: `docs/spec/19-test-layering-and-blast-radius.md`; use real e2e for complex features.
 - Model-side latency, failures and usage: Langfuse first, `docs/ops/langfuse.md#debugging-a-turn-or-task`.

@@ -4,6 +4,20 @@ The `/app` home: the Coordinator's conversation, its composer, status mark, chan
 
 There is no floating Coordinator launcher or window: the Coordinator lives only on the home route `/app`. The sidebar's `Coordinator` row is the entry; Cmd/Ctrl+J, notification links and question links navigate to the home, and pending questions raise the row's needs-you count. `apps/web/test/no-floating-coordinator.test.ts` fails if a floating Coordinator returns.
 
+## Rules
+
+Scope: `apps/web/src/chief/` `apps/web/src/detail/` `apps/web/src/components/chat/` `apps/web/src/board/home-c` `apps/web/src/board/side-chat` `apps/web/src/board/narrow-` `apps/web/src/board/phone-tabs` `apps/web/src/board/open-composer` `apps/web/src/board/loading-composer` `apps/web/src/board/composer-setup-hint` `apps/web/src/board/attention-title` `apps/web/src/board/needs-you` `apps/web/src/board/rel-time` `apps/web/src/board/reply-delivery` `apps/web/src/board/status-words` `apps/web/src/board/made-` `apps/web/src/board/home-banners` `apps/web/src/board/notify-` `apps/web/src/board/quota-banner` `apps/web/src/board/backup-banner` `apps/web/src/board/claude-login-banner` `apps/web/src/board/devin-login-banner` `apps/web/src/board/antigravity-login-banner` `apps/web/src/board/route-override-dialog` `apps/web/src/board/stop-and-done-confirm` `apps/web/src/board/use-narrow` `apps/web/src/routes/board-page` `apps/web/e2e/chief-` `apps/web/e2e/chat-` `apps/web/e2e/composer-` `apps/web/e2e/info-card` `apps/web/e2e/agent-identity` `apps/web/e2e/coordinator-` `apps/web/e2e/home-composer` `apps/web/e2e/made-` `apps/web/e2e/mobile-narrow` `apps/web/e2e/cds-composer` `apps/web/e2e/attachment-strip` `apps/web/e2e/notify-` `apps/web/e2e/page-scroll` `apps/web/e2e/hotkeys` `apps/web/test/chief-` `apps/web/test/composer-` `apps/web/test/bubble-runs` `apps/web/test/segments-` `apps/web/test/chat-markdown` `apps/web/test/connection-state` `apps/web/test/agent-todo-row` `apps/web/test/approval-card`
+
+| Id | Rule | Check |
+|---|---|---|
+| C8 | Show connection and agent state where the user acts, on the composer line, not only on a settings page. | H |
+| C11 | Question chips show only option labels; `推荐` and the description live in the tooltip and accessible description; digits pick nothing. | G `e2e/chief-home-questions.spec.ts`, `e2e/chief-home-tray.spec.ts`, `e2e/chief-thread-report.spec.ts`, `e2e/info-card-report.spec.ts` |
+| C13 | Below 640px the Coordinator home floats three controls at the top: menu, the status mark, and the `任务` button with its count badge. | G `e2e/chief-home-narrow-shell.spec.ts` |
+| C14 | The task thread panel is the conversation, not a dashboard: head, transcript, composer; no stepper, dashboard card or extra footer between them. | G `e2e/chief-home-thread-panel.spec.ts`, `e2e/chief-home-side-chat.spec.ts`, `e2e/chief-home-thread-usage.spec.ts`, `e2e/info-card-report.spec.ts` |
+| C16 | A message carries no agent label; an agent mention in an old message is its name in plain text. | G `e2e/agent-identity-chip.spec.ts`, `test/segments-mention-nav.test.ts` |
+| C17 | Historical daily reports render read-only; no buttons and no new reports are generated. | G `e2e/chief-daily-report.spec.ts` |
+| C18 | After sending, the user's message and the reply's start are in the viewport; a jump-to-latest control appears after scrolling away. | M latest reply top is inside the viewport after send |
+
 ## Shell and top bar
 
 The Coordinator home has a 48px top bar with no visible title (the `Coordinator` or project `h1` is screen-reader only) and the `任务`, `成果` and computer icon buttons on the right; the floating status mark sits top centre.

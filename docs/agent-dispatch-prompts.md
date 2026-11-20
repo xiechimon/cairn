@@ -55,6 +55,14 @@ Apply this checklist before reporting verification or handing off a delivery. Fo
 - Mechanism claims require compiled or runtime evidence of the claimed effect, such as compiled CSS, observed animation state, actual wire payloads, runtime logs or schema snapshots. Source, configuration and installed dependencies alone do not establish that the mechanism took effect. Record the artifact and the assertion it supports.
 - Separate automated checks from review: no check judges evidence sufficiency, live-app origin or real-provider execution, so state them yourself and label stub-only runs as such.
 
+## Design rules for UI tasks
+
+A task that touches `apps/web/` gets its rule rows pasted into the brief, not a pointer at the design docs. Run `node scripts/design-rules-for.mjs` on the files the task names (or the directories it will live in) and paste the printed tables under the task text; the lane re-runs the same command when it ends up touching more paths. A task that leaves `apps/web/` prints nothing and needs no block.
+
+```sh
+node scripts/design-rules-for.mjs apps/web/src/chief/chief-conversation.tsx apps/web/src/components/chat/
+```
+
 ## Worker prompt (Codex, Grok, pi)
 
 Implement the task below and verify it according to the repository rules. Apply every item in the [Evidence limits checklist](#evidence-limits-checklist) and report the supported claims and unverified limits. Do not write comments; express intent through naming and code structure; exceptions follow the repository comment discipline. Write all repository content in English: comments, docs, test titles, commit messages and PR bodies. When you make a mistake during the task and fix it, and the same kind of mistake could recur, add a safeguard in the code (type, lint rule, test or CI check) at the highest feasible level, use the real mistake as its negative control, and name the mistake in the PR body. Do not write files under `docs/lessons/`.

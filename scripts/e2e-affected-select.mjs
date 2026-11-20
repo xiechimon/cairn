@@ -321,6 +321,7 @@ export const DIR_RULES = [
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
   { prefix: 'apps/web/src/pwa/', specs: ['notify-', 'push-device-switch'] },
   { prefix: 'apps/web/src/components/texture/', specs: ['texture-'] },
+  { prefix: 'docs/design/surfaces/', specs: ['design-rules-'] },
   { prefix: 'apps/web/src/design/', specs: ['texture-'] },
   { prefix: 'apps/web/test/', specs: [] },
 ];
