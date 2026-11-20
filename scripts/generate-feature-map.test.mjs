@@ -3,9 +3,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { makeTestTempDir } from './test-tmpdir.mjs';
 
-const SCRIPTS = new URL('.', import.meta.url).pathname;
+const SCRIPTS = fileURLToPath(new URL('.', import.meta.url));
 const REGISTRY = '.claude/skills/verify-cairn/feature-map.json';
 const MAP = 'docs/feature-map.md';
 const SKILL_MAP = '.claude/skills/verify-cairn/feature-map.md';

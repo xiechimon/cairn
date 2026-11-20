@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
+  chmodSync,
   closeSync,
   mkdirSync,
   openSync,
@@ -14,7 +15,7 @@ import {
 } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ownerChain, runOwned } from './owned-process.mjs';
 
@@ -22,6 +23,7 @@ const DEFAULT_SLOTS = 2;
 const POLL_MS = 250;
 const PARTIAL_WRITE_GRACE_MS = 2_000;
 const CLOSED_PROBE_CODES = new Set(['ENOENT', 'ECONNREFUSED', 'ECONNRESET']);
+const REACH_PROBE_CODES = new Set(['EPERM', 'EACCES']);
 const DEFAULT_E2E_PORT = 8398;
 const PORT_STRIDE = 10;
 const LOCK_SCRIPT = `
@@ -184,17 +186,29 @@ async function holderState(path, legacyPid) {
         cwd = 'unknown';
       }
     }
-    const alive =
-      typeof record.probe === 'string' ? await probeAnswers(record.probe) : isAlive(pid);
+    let alive;
+    if (typeof record.probe === 'string') {
+      try {
+        alive = await probeAnswers(record.probe);
+      } catch (error) {
+        if (REACH_PROBE_CODES.has(error.code)) alive = isAlive(pid);
+        else throw error;
+      }
+    } else {
+      alive = isAlive(pid);
+    }
     if (
       !alive &&
       typeof record.token === 'string' &&
-      record.probe === join('/tmp', `cairn-heavy-${record.token}.sock`)
+      [
+        join(dirname(path), `cairn-heavy-${record.token}.sock`),
+        join('/tmp', `cairn-heavy-${record.token}.sock`),
+      ].includes(record.probe)
     ) {
       try {
         unlinkSync(record.probe);
       } catch (error) {
-        if (error.code !== 'ENOENT') throw error;
+        if (error.code !== 'ENOENT' && !REACH_PROBE_CODES.has(error.code)) throw error;
       }
     }
     return { ...record, state: alive ? 'held' : 'stale', pid, cwd };
@@ -237,6 +251,7 @@ export async function acquireSlot({
   if (warning) log(`[${label}] ${warning}`);
   const slotPath = (slot) => join(dir, `slot-${slot}.lock`);
   mkdirSync(dir, { recursive: true });
+  chmodSync(dir, 0o700);
 
   const inherited = Number(env.CAIRN_HEAVY_SLOT);
   const owner = Number(env.CAIRN_HEAVY_SLOT_OWNER);
@@ -252,7 +267,7 @@ export async function acquireSlot({
   }
 
   const token = randomUUID();
-  const probe = join('/tmp', `cairn-heavy-${token}.sock`);
+  const probe = join(dir, `cairn-heavy-${token}.sock`);
   const server = createServer((connection) => connection.destroy());
   await new Promise((done, reject) => {
     server.once('error', reject);
@@ -268,6 +283,9 @@ export async function acquireSlot({
     probeClosed = true;
     process.off('exit', closeProbe);
     server.close();
+    try {
+      unlinkSync(probe);
+    } catch {}
   };
   process.once('exit', closeProbe);
   const record = {

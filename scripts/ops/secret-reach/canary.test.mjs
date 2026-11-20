@@ -197,10 +197,15 @@ test('CLI red and green controls exercise actual OS read permissions with metada
   const run = () =>
     spawnSync(process.execPath, [cli, '--profile', 'mac', '--path', f.path], {
       encoding: 'utf8',
-      env: { HOME: f.dir, PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1' },
+      env: {
+        HOME: f.dir,
+        PATH: process.env.PATH,
+        TMPDIR: process.env.TMPDIR,
+        GIT_CONFIG_NOSYSTEM: '1',
+      },
     });
   const red = run();
-  assert.equal(red.status, 1);
+  assert.equal(red.status, 1, red.stderr);
   assert.equal(red.stderr, '');
   const redRows = red.stdout
     .trim()
@@ -227,7 +232,12 @@ test('unexpected filesystem errors report error states in every ordinary read ch
   symlinkSync(loop, loop);
   const result = spawnSync(process.execPath, [cli, '--profile', 'mac', '--path', loop], {
     encoding: 'utf8',
-    env: { HOME: f.dir, PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: '1' },
+    env: {
+      HOME: f.dir,
+      PATH: process.env.PATH,
+      TMPDIR: process.env.TMPDIR,
+      GIT_CONFIG_NOSYSTEM: '1',
+    },
   });
   assert.equal(result.status, 2);
   const rows = result.stdout
@@ -271,7 +281,12 @@ for (const shell of ['/bin/dash', '/bin/sh', '/bin/bash'].filter((path) => exist
     const run = (path) =>
       spawnSync(process.execPath, [cli, '--profile', 'mac', '--path', path], {
         encoding: 'utf8',
-        env: { HOME: f.dir, PATH: `${bin}:${process.env.PATH}`, GIT_CONFIG_NOSYSTEM: '1' },
+        env: {
+          HOME: f.dir,
+          PATH: `${bin}:${process.env.PATH}`,
+          TMPDIR: process.env.TMPDIR,
+          GIT_CONFIG_NOSYSTEM: '1',
+        },
       });
     const shRow = (result) =>
       result.stdout

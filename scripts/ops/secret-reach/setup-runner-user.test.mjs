@@ -12,6 +12,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { protectAsOwner, setupRunner, tightenOwnerPath } from './setup-runner-user.mjs';
 
 function fixture() {
@@ -190,7 +191,7 @@ test('setup provisions the boot-time broker directory rule', () => {
 test('shell entry refuses unknown arguments without running setup', () => {
   const result = spawnSync(
     'sh',
-    [new URL('./setup-runner-user.sh', import.meta.url).pathname, '--unexpected'],
+    [fileURLToPath(new URL('./setup-runner-user.sh', import.meta.url)), '--unexpected'],
     { encoding: 'utf8' },
   );
   assert.equal(result.status, 2);
@@ -200,7 +201,7 @@ test('shell entry refuses unknown arguments without running setup', () => {
 test('shell entry runs only the system Node and names /usr/bin/node when it is missing', () => {
   const result = spawnSync(
     'sh',
-    [new URL('./setup-runner-user.sh', import.meta.url).pathname, '--dry-run'],
+    [fileURLToPath(new URL('./setup-runner-user.sh', import.meta.url)), '--dry-run'],
     {
       encoding: 'utf8',
       env: { PATH: '/usr/bin:/bin', SECRET_REACH_SYSTEM_NODE: '/nonexistent/node' },

@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import {
   appendFileSync,
+  chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -11,8 +13,9 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { pathToFileURL } from 'node:url';
@@ -455,6 +458,142 @@ test('a probe whose listener closes before accepting it reads as gone', {
     listener.child.kill('SIGKILL');
     execFileSync(process.execPath, ['-e', UNTIL_REFUSED, probe]);
     assert.equal(await answer, false);
+  } finally {
+    cleanup();
+  }
+});
+
+async function droppedSocket(path) {
+  const server = createServer();
+  await new Promise((done, reject) => {
+    server.once('error', reject);
+    server.listen(path, done);
+  });
+  await new Promise((done) => server.close(done));
+  return path;
+}
+
+function deadPid() {
+  const out = spawnSync(process.execPath, ['-e', 'process.stdout.write(String(process.pid))'], {
+    encoding: 'utf8',
+  }).stdout;
+  return Number(out);
+}
+
+test('the liveness probe socket lives inside the shared locks dir', async () => {
+  const { env, cleanup } = sandbox(1);
+  try {
+    const locks = env.CAIRN_HEAVY_SLOTS_DIR;
+    const holder = startHolder(env, { lingerMs: 200 });
+    await until(holder, 'out', /SLOT 1/);
+    const record = JSON.parse(readFileSync(join(locks, 'slot-1.lock'), 'utf8'));
+    assert.equal(dirname(record.probe), locks);
+    assert.match(record.probe, /cairn-heavy-[a-f0-9-]+\.sock$/);
+    await holder.exited;
+    assert.equal(existsSync(record.probe), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('a dead holder whose probe sits in the locks dir is reclaimed and its socket cleaned', async () => {
+  const { env, cleanup } = sandbox(1);
+  try {
+    const locks = env.CAIRN_HEAVY_SLOTS_DIR;
+    mkdirSync(locks, { recursive: true });
+    const token = randomUUID();
+    const probe = await droppedSocket(join(locks, `cairn-heavy-${token}.sock`));
+    writeFileSync(join(locks, 'slot-1.lock'), JSON.stringify({ pid: deadPid(), probe, token }));
+    const next = startHolder(env);
+    await until(next, 'out', /SLOT 1/);
+    assert.equal(existsSync(probe), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('a dead holder with a legacy /tmp probe path is reclaimed and its socket cleaned', async (t) => {
+  const { env, cleanup } = sandbox(1);
+  try {
+    const locks = env.CAIRN_HEAVY_SLOTS_DIR;
+    mkdirSync(locks, { recursive: true });
+    const token = randomUUID();
+    let probe;
+    try {
+      probe = await droppedSocket(join('/tmp', `cairn-heavy-${token}.sock`));
+    } catch (error) {
+      if (error.code === 'EPERM' || error.code === 'EACCES')
+        return t.skip('this host forbids unix sockets under /tmp');
+      throw error;
+    }
+    try {
+      writeFileSync(join(locks, 'slot-1.lock'), JSON.stringify({ pid: deadPid(), probe, token }));
+      const next = startHolder(env);
+      await until(next, 'out', /SLOT 1/);
+      assert.equal(existsSync(probe), false);
+    } finally {
+      rmSync(probe, { force: true });
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+test('a holder whose probe cannot be reached and whose pid is dead is still reclaimed', async () => {
+  const { dir, env, cleanup } = sandbox(1);
+  try {
+    const locks = env.CAIRN_HEAVY_SLOTS_DIR;
+    mkdirSync(locks, { recursive: true });
+    const sealed = join(dir, 'sealed');
+    mkdirSync(sealed, { recursive: true });
+    const token = randomUUID();
+    await droppedSocket(join(sealed, `cairn-heavy-${token}.sock`));
+    chmodSync(sealed, 0);
+    try {
+      writeFileSync(
+        join(locks, 'slot-1.lock'),
+        JSON.stringify({
+          pid: deadPid(),
+          probe: join(sealed, `cairn-heavy-${token}.sock`),
+          token,
+        }),
+      );
+      const next = startHolder(env);
+      await until(next, 'out', /SLOT 1/);
+    } finally {
+      chmodSync(sealed, 0o700);
+    }
+  } finally {
+    cleanup();
+  }
+});
+
+test('a holder whose probe cannot be reached but whose pid lives keeps its slot', async () => {
+  const { dir, env, cleanup } = sandbox(1);
+  try {
+    const locks = env.CAIRN_HEAVY_SLOTS_DIR;
+    mkdirSync(locks, { recursive: true });
+    const sealed = join(dir, 'sealed');
+    mkdirSync(sealed, { recursive: true });
+    const token = randomUUID();
+    await droppedSocket(join(sealed, `cairn-heavy-${token}.sock`));
+    chmodSync(sealed, 0);
+    try {
+      const live = watch(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { env });
+      writeFileSync(
+        join(locks, 'slot-1.lock'),
+        JSON.stringify({
+          pid: live.child.pid,
+          probe: join(sealed, `cairn-heavy-${token}.sock`),
+          token,
+        }),
+      );
+      const waiter = startHolder(env);
+      await until(waiter, 'err', /queued, position 1/);
+      assert.doesNotMatch(waiter.out, /SLOT/);
+    } finally {
+      chmodSync(sealed, 0o700);
+    }
   } finally {
     cleanup();
   }

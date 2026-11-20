@@ -17,6 +17,7 @@ import { connect, createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import {
   createRelay,
   identityFromCgroup,
@@ -26,7 +27,7 @@ import {
   unixPeerPid,
 } from './egress-relay.mjs';
 
-const relayScript = new URL('./egress-relay.mjs', import.meta.url).pathname;
+const relayScript = fileURLToPath(new URL('./egress-relay.mjs', import.meta.url));
 const peerCredAvailable =
   process.platform === 'linux' &&
   existsSync(join(dirname(process.execPath), '../include/node/node_api.h'));

@@ -3,9 +3,10 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
-const script = new URL('./migration-main-gate.mjs', import.meta.url).pathname;
+const script = fileURLToPath(new URL('./migration-main-gate.mjs', import.meta.url));
 const journal = 'apps/server/drizzle/meta/_journal.json';
 const common = { idx: 136, tag: '0136_base', when: 1000 };
 const main = { idx: 137, tag: '0137_cold_slim_markers', when: 3000 };

@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../../test-tmpdir.mjs';
 import { aggregateResult, plantSentinels, runCanary } from './canary.mjs';
 import {
@@ -457,7 +458,7 @@ test('the root probe reads sentinels as bytes without exposing them and reports 
     sentinels: planted.sentinels,
     realPaths: [],
   };
-  const script = new URL('./canary-attacker.mjs', import.meta.url).pathname;
+  const script = fileURLToPath(new URL('./canary-attacker.mjs', import.meta.url));
   const result = spawnSync(process.execPath, [script, '--root-read'], {
     input: JSON.stringify(config),
     encoding: 'utf8',
@@ -520,7 +521,7 @@ test('a sentinel name in the host home listing is host exposure', () => {
 });
 
 test('the root probe reports blocked rows for paths that do not exist', () => {
-  const script = new URL('./canary-attacker.mjs', import.meta.url).pathname;
+  const script = fileURLToPath(new URL('./canary-attacker.mjs', import.meta.url));
   const config = {
     ...containerConfig(),
     hostHome: '/nonexistent-canary-home',

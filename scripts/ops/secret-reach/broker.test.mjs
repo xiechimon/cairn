@@ -161,6 +161,8 @@ test('real Unix socket enforces directory and socket modes and refuses malformed
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'broker-')));
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   chmodSync(dir, 0o2710);
+  if ((statSync(dir).mode & 0o7777) !== 0o2710)
+    return t.skip('this host drops the setgid bit on fresh directories');
   const f = await fixture(t);
   const path = join(dir, 'broker.sock');
   const broker = await startBroker({

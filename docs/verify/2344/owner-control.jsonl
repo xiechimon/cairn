@@ -1,0 +1,32 @@
+{"channel":"direct","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"yes","bytes":925}
+{"channel":"symlink","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"yes","bytes":925}
+{"channel":"python","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"yes","bytes":925}
+{"channel":"node","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"yes","bytes":925}
+{"channel":"sh","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"yes","bytes":925}
+{"channel":"subprocess-file","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"yes","bytes":925}
+{"channel":"git-config","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"no","bytes":0}
+{"channel":"git-credential","path":"/Users/xmon/.config/cairn/slack-app.env","readable":"no","bytes":0}
+{"channel":"direct","path":"/Users/xmon/.config/cairn/composio.env","readable":"yes","bytes":41}
+{"channel":"symlink","path":"/Users/xmon/.config/cairn/composio.env","readable":"yes","bytes":41}
+{"channel":"python","path":"/Users/xmon/.config/cairn/composio.env","readable":"yes","bytes":41}
+{"channel":"node","path":"/Users/xmon/.config/cairn/composio.env","readable":"yes","bytes":41}
+{"channel":"sh","path":"/Users/xmon/.config/cairn/composio.env","readable":"yes","bytes":41}
+{"channel":"subprocess-file","path":"/Users/xmon/.config/cairn/composio.env","readable":"yes","bytes":41}
+{"channel":"git-config","path":"/Users/xmon/.config/cairn/composio.env","readable":"no","bytes":0}
+{"channel":"git-credential","path":"/Users/xmon/.config/cairn/composio.env","readable":"no","bytes":0}
+{"channel":"direct","path":"/Users/xmon/.config/cairn/telegram.env","readable":"yes","bytes":47}
+{"channel":"symlink","path":"/Users/xmon/.config/cairn/telegram.env","readable":"yes","bytes":47}
+{"channel":"python","path":"/Users/xmon/.config/cairn/telegram.env","readable":"yes","bytes":47}
+{"channel":"node","path":"/Users/xmon/.config/cairn/telegram.env","readable":"yes","bytes":47}
+{"channel":"sh","path":"/Users/xmon/.config/cairn/telegram.env","readable":"yes","bytes":47}
+{"channel":"subprocess-file","path":"/Users/xmon/.config/cairn/telegram.env","readable":"yes","bytes":47}
+{"channel":"git-config","path":"/Users/xmon/.config/cairn/telegram.env","readable":"no","bytes":0}
+{"channel":"git-credential","path":"/Users/xmon/.config/cairn/telegram.env","readable":"no","bytes":0}
+{"channel":"direct","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"yes","bytes":277}
+{"channel":"symlink","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"yes","bytes":277}
+{"channel":"python","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"yes","bytes":277}
+{"channel":"node","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"yes","bytes":277}
+{"channel":"sh","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"yes","bytes":277}
+{"channel":"subprocess-file","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"yes","bytes":277}
+{"channel":"git-config","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"no","bytes":0}
+{"channel":"git-credential","path":"/Users/xmon/Library/Application Support/@cairn/desktop/otel.env","readable":"no","bytes":0}
