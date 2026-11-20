@@ -26,9 +26,22 @@ Where this table differs from upstream, Cairn wins. An upstream rule not listed 
 
 Cairn tokens replace upstream's raw values: durations `--dur-fast` (150ms) and `--dur-overlay` (200ms), curves `--ease-standard` and `--ease-out-expo` (`src/styles/shadcn.css`).
 
-## Choreography and performance references
+## Reading beside the table
 
-Two of Emil Kowalski's skills ride along as reading, verbatim at `emilkowalski/skills@64eb3deb9a5fbfa041faf783e0bc3fd635872e9c` (MIT, `references/LICENSE`): `references/choreograph/README.md` with `RECIPES.md` for several elements moving together — the Growth rows — and `references/animation-performance/README.md` for the frame budget. Where their defaults (`scale(0.97)` press, `bounce 0.2`, `cubic-bezier(0.23, 1, 0.32, 1)`) conflict with the table above, the table wins.
+Emil Kowalski's references are vendored verbatim at `emilkowalski/skills@64eb3deb9a5fbfa041faf783e0bc3fd635872e9c` (MIT, `references/LICENSE`), each upstream `SKILL.md` kept as `README.md`. Read the one the job needs:
+
+| File | Read it for |
+|---|---|
+| `references/emil-design-eng/README.md` | The whole craft document: taste, why unseen details compound, his review format, his animation decision framework. Read it when no recipe below covers the technique |
+| `references/animate/README.md` + `RECIPES.md` | The build sequence (should this animate, what for, the cheapest tool that works) and the ready recipes for enter, exit, toast, popover and number |
+| `references/choreograph/README.md` + `RECIPES.md` | Several elements moving together — the Growth rows |
+| `references/animation-performance/README.md` | The frame budget |
+| `references/animation-vocabulary/README.md` | The glossary, to name an effect in a brief or a side-by-side prototype |
+| `references/apple-design/README.md` | Response, direct manipulation, interruptibility, velocity handoff, materials and depth; the materials and depth half belongs to `cairn-polish` |
+| `references/gestures/README.md` | Track and release phases, linked values, the sheet curve. Cairn has no gesture surface today — panel resize and the declared-but-unused `@dnd-kit` are the only candidates |
+| `references/performance-cheatsheet.md` | One page: what costs a frame |
+
+They keep Emil's "Initial Response" openers; skip those and start from recon, as this file does. Where their defaults (`scale(0.97)` press, `bounce 0.2`, `cubic-bezier(0.23, 1, 0.32, 1)`) conflict with the table above, the table wins; where the table is silent and two of them disagree, name both values in the report and pick the one the nearest row implies.
 
 ## Before wrap-up
 

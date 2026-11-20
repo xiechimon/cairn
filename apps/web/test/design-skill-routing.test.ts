@@ -35,11 +35,22 @@ function wrapperText(skill: string): string {
 const designCairn = wrapperText('design-cairn');
 const routing = section(designCairn, '## Skill routing');
 const routed = [
-  ...new Set([...routing.matchAll(/`?(cairn-[a-z-]+)`?/g)].map((match) => match[1] ?? '')),
+  ...new Set([...routing.matchAll(/`?(cairn-[a-z0-9-]+)`?/g)].map((match) => match[1] ?? '')),
 ];
 
 describe('no second SKILL.md is discoverable under a vendored tree', () => {
-  test.each(['design-cairn', 'cairn-motion', 'cairn-polish', 'cairn-type', 'cairn-motion-audit'])(
+  test.each([
+    'design-cairn',
+    'cairn-motion',
+    'cairn-polish',
+    'cairn-type',
+    'cairn-a11y',
+    'cairn-copy',
+    'cairn-design-review',
+    'cairn-motion-audit',
+    'options-prototype-cairn',
+    'retro-cairn',
+  ])(
     '%s',
     (skill) => {
       const dir = join(SKILLS, skill);
@@ -55,7 +66,15 @@ describe('no second SKILL.md is discoverable under a vendored tree', () => {
 describe('the design-cairn routing table', () => {
   test('names the domain skills and the audit', () => {
     expect(routed).toEqual(
-      expect.arrayContaining(['cairn-motion', 'cairn-polish', 'cairn-type', 'cairn-motion-audit']),
+      expect.arrayContaining([
+        'cairn-motion',
+        'cairn-polish',
+        'cairn-type',
+        'cairn-a11y',
+        'cairn-copy',
+        'cairn-motion-audit',
+        'cairn-design-review',
+      ]),
     );
   });
 
@@ -84,6 +103,18 @@ const VENDORED: Record<
     sha: JAKUB,
     repo: 'jakubkrehel/skills',
     upstreamName: 'better-typography',
+    entry: 'upstream/README.md',
+  },
+  'cairn-a11y': {
+    sha: JAKUB,
+    repo: 'jakubkrehel/skills',
+    upstreamName: 'better-accessibility',
+    entry: 'upstream/README.md',
+  },
+  'cairn-copy': {
+    sha: JAKUB,
+    repo: 'jakubkrehel/skills',
+    upstreamName: 'better-writing',
     entry: 'upstream/README.md',
   },
 };
@@ -129,6 +160,127 @@ describe('vendored upstream skills', () => {
     ]) {
       expect(existsSync(join(dir, file)), file).toBe(true);
     }
+  });
+});
+
+const TREES: Record<
+  string,
+  { pins: string[]; licenses: string[]; entries: string[]; files: string[] }
+> = {
+  'design-cairn': {
+    pins: [`jakubkrehel/skills@${JAKUB}`],
+    licenses: ['upstream/LICENSE', 'references/LICENSE'],
+    entries: [
+      'upstream/build-design/README.md',
+      'upstream/explain-interface/README.md',
+      'upstream/break/README.md',
+      'references/pick-ui-library/README.md',
+    ],
+    files: [
+      'upstream/build-design/figma.md',
+      'upstream/explain-interface/read-the-system.md',
+      'upstream/explain-interface/find-the-effect.md',
+      'upstream/explain-interface/from-an-image.md',
+      'upstream/explain-interface/no-browser.md',
+      'upstream/break/scenarios.md',
+    ],
+  },
+  'cairn-design-review': {
+    pins: [`jakubkrehel/skills@${JAKUB}`],
+    licenses: ['upstream/LICENSE'],
+    entries: ['upstream/better-interface/README.md', 'upstream/interface-review/README.md'],
+    files: [
+      'upstream/better-interface/review-format.md',
+      'upstream/interface-review/scope-resolution.md',
+      'upstream/interface-review/removed-signals.md',
+    ],
+  },
+  'cairn-motion': {
+    pins: [`emilkowalski/skills@${EMIL}`],
+    licenses: ['references/LICENSE'],
+    entries: [
+      'references/emil-design-eng/README.md',
+      'references/animate/README.md',
+      'references/animation-vocabulary/README.md',
+      'references/apple-design/README.md',
+      'references/gestures/README.md',
+      'references/choreograph/README.md',
+      'references/animation-performance/README.md',
+    ],
+    files: [
+      'references/animate/RECIPES.md',
+      'references/choreograph/RECIPES.md',
+      'references/performance-cheatsheet.md',
+    ],
+  },
+  'cairn-polish': {
+    pins: [`emilkowalski/skills@${EMIL}`],
+    licenses: ['references/LICENSE'],
+    entries: ['references/mobile-native/README.md', 'references/ask-sonner/README.md'],
+    files: ['references/ask-sonner/API.md', 'references/ui-cheatsheet.md'],
+  },
+  'options-prototype-cairn': {
+    pins: [`jakubkrehel/skills@${JAKUB}`, `emilkowalski/skills@${EMIL}`],
+    licenses: ['upstream/LICENSE', 'references/LICENSE'],
+    entries: [
+      'upstream/state-machine/README.md',
+      'upstream/variant/README.md',
+      'references/prototype/README.md',
+    ],
+    files: [
+      'upstream/state-machine/switcher.md',
+      'upstream/variant/picker.md',
+      'references/prototype/PICKER.md',
+    ],
+  },
+  'retro-cairn': {
+    pins: [`emilkowalski/skills@${EMIL}`],
+    licenses: ['references/LICENSE'],
+    entries: ['references/learn-taste/README.md'],
+    files: [],
+  },
+};
+
+describe('vendored reading trees', () => {
+  for (const [skill, tree] of Object.entries(TREES)) {
+    const dir = join(SKILLS, skill);
+    const wrapper = wrapperText(skill);
+
+    describe(skill, () => {
+      test('notes the upstream repo and commit for every author it vendors', () => {
+        for (const pin of tree.pins) expect(wrapper, pin).toContain(pin);
+      });
+
+      test('carries each vendored LICENSE beside its files', () => {
+        for (const license of tree.licenses) {
+          expect(readFileSync(join(dir, license), 'utf8'), license).toContain('MIT License');
+        }
+      });
+
+      test('keeps every upstream SKILL.md as README.md, frontmatter intact', () => {
+        for (const entry of tree.entries) {
+          const path = join(dir, entry);
+          expect(existsSync(path), entry).toBe(true);
+          const name = entry.split('/').at(-2) ?? '';
+          expect(readFileSync(path, 'utf8'), entry).toContain(`name: ${name}`);
+        }
+        for (const file of tree.files) expect(existsSync(join(dir, file)), file).toBe(true);
+      });
+    });
+  }
+});
+
+describe('cairn-design-review', () => {
+  const review = wrapperText('cairn-design-review');
+
+  test('stays manually invoked', () => {
+    expect(review).toContain('disable-model-invocation: true');
+  });
+
+  test('names only rule ids that exist in the DESIGN.md rule index', () => {
+    const ids = new Set([...review.matchAll(/\b([PCVTARL]\d+)\b/g)].map((match) => match[1] ?? ''));
+    expect(ids.size).toBeGreaterThan(0);
+    expect([...ids].filter((id) => !ruleIds.has(id))).toEqual([]);
   });
 });
 

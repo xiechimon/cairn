@@ -23,6 +23,10 @@ Principle: a mistake that appeared during the process, even if fixed by the end,
 5. Recurrence: an existing safeguard that stopped the mistake before commit is an intercept; count it and stop. The same kind of mistake landing despite a safeguard is a recurrence: the current rung failed, so choose again from codebase.
 6. Report: when wrapping up, summarize in one or two sentences how many process errors were caught and what safeguard each became.
 
+## Design taste corrections
+
+When the correction was about how something looks — a wrong radius, a spacing step, a colour role, a motion value — read `references/learn-taste/README.md` before choosing the safeguard: Emil Kowalski's `learn-taste` at `emilkowalski/skills@64eb3deb9a5fbfa041faf783e0bc3fd635872e9c` (MIT, `references/LICENSE`), upstream `SKILL.md` kept as `README.md`. Its four phases — collect the corrections, filter to the pattern, generalize and find the why, then decide where it goes — sit inside steps 1 to 3 above. The ladder still decides where the result lands: a correction that can be asserted becomes an `M` row in `apps/web/DESIGN.md` with a spec that goes red on the old code; one that is taste becomes an `H` row with a reference shot (`docs/design/rule-ab.md`). Fixing the one page is not a safeguard.
+
 ## Boundaries
 
 - Ask the user first before a safeguard that touches design decisions, protected paths, or changes intended behavior.

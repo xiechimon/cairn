@@ -23,7 +23,21 @@ Every `apps/web/src` change loads this skill first (AGENTS.md), then the domain 
 | Motion, animation, transitions, enter/exit, press feedback, loading or status motion | `cairn-motion` |
 | Surfaces, shadows, borders, radii, icons, optical alignment, spacing polish | `cairn-polish` |
 | Type, fonts, sizes, wrapping, truncation, tabular figures | `cairn-type` |
+| Focus, keyboard, accessible names, announcements, hit areas, form errors, an axe finding | `cairn-a11y` |
+| A new or edited user-facing string, an error, an empty state, a confirmation | `cairn-copy` |
 | Reviewing or auditing motion (only when someone asks) | `cairn-motion-audit` |
+| A cross-domain review of a surface or a UI diff (only when someone asks) | `cairn-design-review` |
+
+## Vendored references
+
+Jakub Krehel's skills are vendored verbatim at `jakubkrehel/skills@672ae44ace6aaed65b86cbb1e2fd6fbea0e79578` (MIT, `upstream/LICENSE`) and Emil Kowalski's at `emilkowalski/skills@64eb3deb9a5fbfa041faf783e0bc3fd635872e9c` (MIT, the tree's own `LICENSE`), each upstream `SKILL.md` kept as `README.md`. The extreme-data catalog is its own section below; these are the rest.
+
+| File | Use when |
+|---|---|
+| `upstream/build-design/README.md` with `figma.md` | The owner hands a Figma link or a design image: the design decides, its values map onto Cairn's tokens, and no new colour or font family enters |
+| `upstream/explain-interface/README.md` with `read-the-system.md`, `find-the-effect.md`, `from-an-image.md`, `no-browser.md` | Explaining how a reference product does something — the method behind the `walk` rule: read the system, find the effect, and say which part is measured, inferred or unknown |
+| `upstream/break/README.md` with `scenarios.md` | Hostile scenarios beside the extreme-data catalog: what the user does to the screen, and what it does back |
+| `references/pick-ui-library/README.md` | Before adding a dependency: AGENTS.md's established-library rule comes first, and this list is a shortlist to check Cairn's declared dependencies against, not a survey |
 
 ## Order of work
 
@@ -68,7 +82,7 @@ Acceptance (done means all of these):
 2. Compare to reference: for each state with a reference shot, one row "reference | ours" and one sentence on the difference. State what is still worse than the reference.
 3. The DESIGN.md rule ids listed above checked; `M` rules measured, not eyeballed.
 4. Self-review at 1440 and 390, light and dark, by the building session against the reference shots (visual review stays with Claude; no second reviewer is needed).
-5. Interface review of the diff (adapted from Jakub Krehel's `interface-review`): read the whole diff; expand each changed file one hop to the surfaces it renders in, five consumers at most; read the removed lines for regressions; hold the change to its stated intent — a state left unbuilt is a finding; classify each finding `Introduced` / `Regression` / `Pre-existing`, keyed to its rule id, with at most three pre-existing findings as courtesy.
+5. Interface review of the diff (`cairn-design-review`, adapted from Jakub Krehel's `interface-review`): read the whole diff; expand each changed file one hop to the surfaces it renders in, five consumers at most; read the removed lines for regressions; hold the change to its stated intent — a state left unbuilt is a finding; classify each finding `Introduced` / `Regression` / `Pre-existing`, keyed to its rule id, with at most three pre-existing findings as courtesy.
 6. Real stack shot for the main state (live, not `?scenario=`).
 ```
 

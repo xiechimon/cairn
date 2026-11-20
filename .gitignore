@@ -87,6 +87,9 @@ credentials.enc
 !.claude/skills/cairn-polish/
 !.claude/skills/cairn-type/
 !.claude/skills/cairn-motion-audit/
+!.claude/skills/cairn-a11y/
+!.claude/skills/cairn-copy/
+!.claude/skills/cairn-design-review/
 !.claude/settings.json
 !.claude/hooks/
 !.claude/workflows/
