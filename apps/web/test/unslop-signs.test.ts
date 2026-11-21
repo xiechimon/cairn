@@ -78,7 +78,8 @@ const SIGNS: Sign[] = [
   {
     id: 'V3',
     name: 'colored glow',
-    pattern: /(?<![\w-])drop-shadow(?![\w])|shadow-\[[^\]]*(?:#|rgba?\(|hsla?\(|oklch\()/,
+    pattern:
+      /(?<![\w-])drop-shadow(?![\w])|(?<![\w-])shadow-(?:(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3}|black|white)(?![\w-])/,
     allowed: [],
   },
   {
@@ -91,6 +92,12 @@ const SIGNS: Sign[] = [
 
 const OVERSHOOT = /cubic-bezier\(\s*([-\d.]+)[\s,_]+([-\d.]+)[\s,_]+([-\d.]+)[\s,_]+([-\d.]+)\s*\)/g;
 const LAYOUT_KEYFRAME = /(?:^|[{;\s])(?:width|height|top|left|right|bottom|inset|margin[\w-]*|padding[\w-]*)\s*:/;
+const SHADOW_DECLARATION = /(?:box-shadow|text-shadow)\s*:\s*([^;{}]*)/gi;
+const SHADOW_STYLE_OBJECT = /\bboxShadow\s*:\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+const SHADOW_ARBITRARY = /(?<![\w-])shadow-\[([^\]]*)\]/g;
+const SHADOW_TOKEN_CALL = /\b(?:var|calc|min|max|clamp)\([^()]*\)/gi;
+const SHADOW_COLOR_FUNCTION = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix|light-dark)\(/i;
+const SHADOW_NEUTRAL_WORD = /^(?:inset|none|inherit|initial|unset|revert|revert-layer|currentcolor|transparent)$/i;
 const HYPE =
   /\b(?:supercharge[sd]?|seamless(?:ly)?|unlock(?:s|ed|ing)?|magic(?:al|ally)?|revolutioni[sz]e[sd]?|game-?changing|effortless(?:ly)?|blazing(?:ly)?|ai-powered|next-gen)\b/i;
 const PICTOGRAPH = /\p{Extended_Pictographic}/u;
@@ -105,6 +112,20 @@ function walk(dir: string): string[] {
 }
 
 const stripBlockComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '');
+
+function bareShadowColor(value: string): boolean {
+  const withoutTokens = value.replace(SHADOW_TOKEN_CALL, ' ').replace(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)[a-z%]*/gi, ' ');
+  return (withoutTokens.match(/[a-z][\w-]*/gi) ?? []).some((word) => !SHADOW_NEUTRAL_WORD.test(word));
+}
+
+function coloredShadowIn(text: string): boolean {
+  const values = [
+    ...[...text.matchAll(SHADOW_DECLARATION)].map((declaration) => declaration[1] ?? ''),
+    ...[...text.matchAll(SHADOW_STYLE_OBJECT)].map((object) => object[2] ?? ''),
+    ...[...text.matchAll(SHADOW_ARBITRARY)].map((arbitrary) => (arbitrary[1] ?? '').replace(/_/g, ' ')),
+  ];
+  return values.some((value) => SHADOW_COLOR_FUNCTION.test(value) || bareShadowColor(value));
+}
 
 const SHIMMER = /@utility shimmer \{[\s\S]*?\n\}\n/;
 
@@ -131,6 +152,7 @@ function signsIn(text: string): string[] {
   for (const m of text.matchAll(/@keyframes\s+[\w-]+\s*\{((?:[^{}]*\{[^{}]*\})*)[^{}]*\}/g)) {
     if (LAYOUT_KEYFRAME.test(m[1] ?? '')) found.push('layout keyframe');
   }
+  if (coloredShadowIn(text)) found.push('colored glow');
   return [...new Set(found)];
 }
 
@@ -158,6 +180,22 @@ function endsLikeASentenceLabel(text: string): boolean {
 }
 
 const LABEL_CONSTANT = /\b(?:title|label|aria-label)(?:=\{|:\s*)t\(\s*([A-Z_]\w*)\.(\w+)\s*[,)]/g;
+const BUTTON_OPEN = /<((?:[A-Z]\w*)?Button|button)\b((?:=>|[^>])*)>/g;
+const BUTTON_CHILD = /\{\s*(?:t\(\s*(['"`])((?:\\.|(?!\1)[^\\])*)\1\s*\)|([A-Z_]\w*)\.(\w+))\s*\}/g;
+
+function buttonChildLiterals(text: string, constants: Map<string, string>): string[] {
+  const found: string[] = [];
+  for (const open of text.matchAll(BUTTON_OPEN)) {
+    if ((open[2] ?? '').trimEnd().endsWith('/')) continue;
+    const childrenFrom = open.index + open[0].length;
+    const childrenTo = text.indexOf(`</${open[1]}>`, childrenFrom);
+    if (childrenTo < 0) continue;
+    for (const child of text.slice(childrenFrom, childrenTo).matchAll(BUTTON_CHILD)) {
+      found.push(child[2] ?? constants.get(`${child[3]}.${child[4]}`) ?? '');
+    }
+  }
+  return found;
+}
 
 function copyConstantsIn(text: string): Map<string, string> {
   const found = new Map<string, string>();
@@ -178,6 +216,7 @@ const copyConstants = new Map(
 const labelLiterals = (text: string, constants: Map<string, string> = copyConstants) => [
   ...[...text.matchAll(LABEL_LITERAL)].map((m) => m[2] ?? ''),
   ...[...text.matchAll(LABEL_CONSTANT)].flatMap((m) => constants.get(`${m[1]}.${m[2]}`) ?? []),
+  ...buttonChildLiterals(text, constants),
 ];
 
 const INFO_PROP = /\binfo(?:=\{|:\s*)$/;
@@ -248,6 +287,10 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ['layout transition', '.panel { transition: padding-inline 120ms; }'],
     ['gradient text', '<h1 className="bg-gradient-to-r from-violet-500 to-pink-500 bg-clip-text">Cairn</h1>'],
     ['colored glow', '<div className="shadow-[0_0_20px_rgba(139,92,246,0.5)]" />'],
+    ['colored glow', '<div className="shadow-lg shadow-red-500" />'],
+    ['colored glow', '.card { box-shadow: 0 0 20px red; }'],
+    ['colored glow', '<div className="shadow-[0_0_20px_red]" />'],
+    ['colored glow', '<div style={{ boxShadow: \'0 0 20px red\' }} />'],
     ['colored glow', '<span className="drop-shadow-lg">AI</span>'],
     ['sparkle icon', "import { Sparkles } from 'lucide-react';"],
     ['overshoot easing', '.pop { transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1); }'],
@@ -264,6 +307,11 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     '.ease { transition-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }',
     '@keyframes in { from { opacity: 0; translate: 0 8px; } to { opacity: 1; } }',
     '<div className="shadow-[inset_1px_0_0_var(--border)]" />',
+    '<div className="shadow-lg" />',
+    '<div className="shadow-(--e1)" />',
+    '.panel { box-shadow: 0 0 0 1px var(--border); }',
+    '.panel { box-shadow: none; }',
+    '<div style={{ boxShadow: stone.shadow }} />',
     '<div className="[transition:visibility_0s_linear_var(--dur-overlay)]" />',
     '<span className="font-semibold">Inbox</span>',
     '<span className="font-[799.5]">Inbox</span>',
@@ -294,6 +342,14 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ["label: t('Loading…')", false],
     ["export const PAGE_COPY = {\n  empty: '尚无技能。',\n} as const;\ntitle={t(PAGE_COPY.empty)}", true],
     ["export const PAGE_COPY = {\n  empty: '尚无技能',\n} as const;\ntitle={t(PAGE_COPY.empty)}", false],
+    ["<Button>{t('Save.')}</Button>", true],
+    ["<Button variant=\"primary\" onClick={() => save()}>{t('保存。')}</Button>", true],
+    ['<button type="button">{t(\'Retry.\')}</button>', true],
+    ["<IconButton icon={Trash}>{t('Remove.')}</IconButton>", true],
+    ["export const PAGE_COPY = {\n  save: '保存。',\n} as const;\n<Button>{PAGE_COPY.save}</Button>", true],
+    ["<Button>{t('Save')}</Button>", false],
+    ["<Button\n  variant=\"primary\"\n>\n  {t('Save')}\n</Button>", false],
+    ['<Button className="icon" />\n<p>{t(\'Save.\')}</p>', false],
   ])('label literal %s ends in a period: %s', (snippet, expected) => {
     expect(labelLiterals(snippet, copyConstantsIn(snippet)).some(endsLikeASentenceLabel)).toBe(expected);
   });
