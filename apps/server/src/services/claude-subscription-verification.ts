@@ -11,6 +11,8 @@ export const CLAUDE_CHECK_COMMAND = 'GET https://api.anthropic.com/v1/models';
 export const CLAUDE_MODEL_TEST_COMMAND = 'POST https://api.anthropic.com/v1/messages';
 
 const ANTHROPIC_MESSAGES_URL = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_USAGE_URL = 'https://api.anthropic.com/api/oauth/usage';
+const USAGE_TIMEOUT_MS = 5_000;
 
 const REASON: Record<ProviderFailure, NonNullable<ClaudeSubscriptionVerifyResult['reason']>> = {
   auth: 'auth',
@@ -105,17 +107,90 @@ export function unifiedRateLimitNotices(headers: Headers): ClaudeRateLimitNotice
   return notices;
 }
 
+export interface ClaudeQuotaProbe {
+  notices: ClaudeRateLimitNotice[];
+  status: number | null;
+}
+
 export async function probeClaudeQuota(
   token: string,
   model: string,
   options: UpstreamOptions = {},
-): Promise<ClaudeRateLimitNotice[]> {
+): Promise<ClaudeQuotaProbe> {
   const signal = AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
     const response = await postOneTokenMessage(token, model, 'quota', signal, options);
     void response.body?.cancel();
-    return unifiedRateLimitNotices(response.headers);
+    return { notices: unifiedRateLimitNotices(response.headers), status: response.status };
   } catch {
-    return [];
+    return { notices: [], status: null };
+  }
+}
+
+export type ClaudeUsageRead =
+  | { status: 'ok'; notices: ClaudeRateLimitNotice[] }
+  | { status: 'unsupported' }
+  | { status: 'failed' };
+
+function usageWindowNotices(body: unknown): ClaudeRateLimitNotice[] {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return [];
+  const notices: ClaudeRateLimitNotice[] = [];
+  for (const [name, window] of Object.entries(body)) {
+    if (window === null || typeof window !== 'object' || Array.isArray(window)) continue;
+    const { utilization, resets_at: resetsAt } = window as {
+      utilization?: unknown;
+      resets_at?: unknown;
+    };
+    if (typeof utilization !== 'number' || !Number.isFinite(utilization) || utilization < 0)
+      continue;
+    const at =
+      typeof resetsAt === 'string'
+        ? Date.parse(resetsAt)
+        : typeof resetsAt === 'number'
+          ? resetsAt
+          : undefined;
+    if (resetsAt !== null && resetsAt !== undefined && !Number.isFinite(at)) continue;
+    if (at === undefined && resetsAt !== null) continue;
+    notices.push({
+      status: utilization >= 100 ? 'rejected' : 'allowed',
+      rateLimitType: name,
+      utilization: utilization / 100,
+      ...(at !== undefined ? { resetsAt: at } : {}),
+    });
+  }
+  return notices;
+}
+
+export async function fetchClaudeUsageWindows(
+  token: string,
+  options: UpstreamOptions = {},
+): Promise<ClaudeUsageRead> {
+  const signal = AbortSignal.timeout(options.timeoutMs ?? USAGE_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await (options.fetch ?? globalThis.fetch)(ANTHROPIC_USAGE_URL, {
+      headers: {
+        accept: 'application/json',
+        'anthropic-beta': 'oauth-2025-04-20',
+        Authorization: `Bearer ${token}`,
+      },
+      signal,
+    });
+  } catch {
+    return { status: 'failed' };
+  }
+  if (response.status === 401 || response.status === 403 || response.status === 404) {
+    void response.body?.cancel();
+    return { status: 'unsupported' };
+  }
+  if (!response.ok) {
+    void response.body?.cancel();
+    return { status: 'failed' };
+  }
+  try {
+    const notices = usageWindowNotices(await response.json());
+    return notices.length === 0 ? { status: 'failed' } : { status: 'ok', notices };
+  } catch {
+    return { status: 'failed' };
   }
 }

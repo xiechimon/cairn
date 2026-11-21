@@ -26,7 +26,7 @@ export function useRefreshClaudeQuota(teamId: string | undefined) {
   return useMutation({
     mutationFn: () =>
       api.post<ClaudeSubscriptionListEntry[]>(`/api/teams/${teamId}/claude-subscriptions/quota`),
-    onSuccess: (list) => client.setQueryData(['claude-subscriptions', teamId], list),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] }),
   });
 }
 

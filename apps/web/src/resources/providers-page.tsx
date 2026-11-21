@@ -30,6 +30,7 @@ import {
   testClaudeSubscriptionModel,
   useClaudeSubscriptions,
   useDeleteClaudeSubscription,
+  useRefreshClaudeQuota,
   useRenameClaudeSubscription,
   useSubscriptionVerification,
   useUpdateClaudeSubscriptionModels,
@@ -213,6 +214,7 @@ export function ProvidersSection() {
   const client = useQueryClient();
   const clock = useClock();
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const refreshQuota = useRefreshClaudeQuota(teamId).mutate;
   const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
@@ -257,6 +259,10 @@ export function ProvidersSection() {
   const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
   const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
   const antigravityApiIds = live ? (antigravitySubscriptionsQ.data ?? []).map((s) => s.id) : [];
+
+  useEffect(() => {
+    if (live && teamId !== undefined) refreshQuota();
+  }, [live, teamId, refreshQuota]);
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');
