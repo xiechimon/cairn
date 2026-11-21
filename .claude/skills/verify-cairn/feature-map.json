@@ -250,6 +250,9 @@
         ]
       },
       "routes": {
+        "web": [
+          "/app/project/:id/settings"
+        ],
         "server": [
           "/api/teams/:id/memories**",
           "/api/teams/:id/memory-edits**",
@@ -259,6 +262,8 @@
       },
       "reach": [
         "open /app",
+        "click label:记忆",
+        "open /app/project/<id of a project listed by the projects API>/settings",
         "click label:记忆"
       ],
       "research": [

@@ -174,8 +174,10 @@ Reach:
 
 1. `open /app`
 2. `click label:记忆`
+3. `open /app/project/<id of a project listed by the projects API>/settings`
+4. `click label:记忆`
 
-- Web routes: none
+- Web routes: `/app/project/:id/settings`
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `memory-edit-card`, `memory-edit-composer`, `memory-edit-content`, `memory-edit-input`, `memory-edit-send`, `memory-edit-stop`, `memory-edit-title`, `memory-list`, `memory-usage`, `project-instructions-input`
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](../../../docs/research/memory-inplace-edit-2026-11-09.md)
