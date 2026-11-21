@@ -1,4 +1,5 @@
 import {
+  CHIEF_NOTICE_KIND,
   type CitedSegment,
   type CoordinatorCreateTodoParams,
   type CoordinatorUpdateTodoParams,
@@ -6,7 +7,9 @@ import {
   isInfoOutput,
   isIssueSourcedTask,
   orchestratedTodoIdOf,
+  type Phase,
   PLACEHOLDER_TITLE_FALLBACK,
+  parseGithubIssueSourceRef,
   quoteSegments,
   RequestQuoteError,
   renderTaskText,
@@ -17,12 +20,15 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   uncoveredText,
 } from '@cairn/shared';
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
+import { nowMs } from '../lib/ids.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
+import { taskLink } from './chief.js';
 import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
+import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';
 import { frequentModelFor } from './top-models.js';
@@ -235,6 +241,175 @@ function requireUnboundMessages(
   }
 }
 
+const LIVE_REQUEST_PHASES: readonly Phase[] = [
+  'todo',
+  'queued',
+  'planning',
+  'confirm',
+  'building',
+  'needs_input',
+  'review',
+];
+const CONTINUABLE_PHASES: readonly Phase[] = ['failed', 'stopped'];
+const TWIN_TEXT_MIN_CHARS = 24;
+
+const normText = (text: string) => text.normalize('NFC').trim();
+
+interface RequestCover {
+  whole: Map<string, Set<string>>;
+  quote: Map<string, string[]>;
+  texts: Set<string>;
+}
+
+function coverOf(segments: readonly TaskSegment[]): RequestCover {
+  const whole = new Map<string, Set<string>>();
+  const quote = new Map<string, string[]>();
+  const texts = new Set<string>();
+  for (const segment of segments) {
+    const key = segmentKey(segment.source);
+    const text = normText(segment.text);
+    texts.add(text);
+    if (segment.source.span === 'whole') {
+      const set = whole.get(key) ?? new Set<string>();
+      set.add(text);
+      whole.set(key, set);
+    } else {
+      const list = quote.get(key) ?? [];
+      list.push(text);
+      quote.set(key, list);
+    }
+  }
+  return { whole, quote, texts };
+}
+
+function unionCovers(source: string | null, outers: readonly string[], inner: string): boolean {
+  if (source === null) return outers.some((outer) => outer.includes(inner));
+  const at = source.indexOf(inner);
+  if (at === -1) return outers.some((outer) => outer.includes(inner));
+  const covered = new Array<boolean>(source.length).fill(false);
+  for (const outer of outers) {
+    let from = source.indexOf(outer);
+    while (from !== -1) {
+      covered.fill(true, from, from + outer.length);
+      from = source.indexOf(outer, from + 1);
+    }
+  }
+  for (let i = at; i < at + inner.length; i += 1) if (covered[i] !== true) return false;
+  return true;
+}
+
+function dupCovered(inner: TaskSegment, cover: RequestCover, source: string | null): boolean {
+  const key = segmentKey(inner.source);
+  const text = normText(inner.text);
+  if ((cover.whole.get(key) ?? new Set<string>()).has(text)) return true;
+  if (text.length >= TWIN_TEXT_MIN_CHARS && cover.texts.has(text)) return true;
+  const quotes = cover.quote.get(key) ?? [];
+  return quotes.length > 0 && unionCovers(source, quotes, text);
+}
+
+function continuedCovered(inner: TaskSegment, cover: RequestCover): boolean {
+  const key = segmentKey(inner.source);
+  const text = normText(inner.text);
+  if ((cover.whole.get(key)?.size ?? 0) > 0) return true;
+  if (text.length >= TWIN_TEXT_MIN_CHARS && cover.texts.has(text)) return true;
+  return (cover.quote.get(key) ?? []).some((outer) => outer.includes(text));
+}
+
+function requestTwins(db: Db, teamId: string): { row: TodoRow; segments: TaskSegment[] }[] {
+  return db
+    .select()
+    .from(todo)
+    .where(and(eq(todo.teamId, teamId), isNotNull(todo.request)))
+    .all()
+    .flatMap((row) =>
+      row.request === null || row.request.segments.length === 0
+        ? []
+        : [{ row, segments: row.request.segments }],
+    );
+}
+
+function requireUncoveredRequest(
+  db: Db,
+  ctx: RequestCtx,
+  params: { projectId: string; sourceTodoId?: string },
+  cited: readonly CitedSegment[],
+  segments: readonly TaskSegment[],
+): { predecessors: TodoRow[]; donor: TodoRow | null } {
+  const twins = requestTwins(db, ctx.teamId);
+  const live = twins.filter(
+    ({ row }) =>
+      row.id !== params.sourceTodoId &&
+      row.archivedAt === null &&
+      LIVE_REQUEST_PHASES.includes(row.phase),
+  );
+  const liveCover = coverOf(live.flatMap(({ segments: twinSegments }) => twinSegments));
+  const sources = new Map<string, string>();
+  for (const c of cited) sources.set(segmentKey(c.quoteSource), normText(c.segment.text));
+  for (const { segments: twinSegments } of twins) {
+    for (const segment of twinSegments) {
+      if (segment.source.span === 'whole') {
+        sources.set(segmentKey(segment.source), normText(segment.text));
+      }
+    }
+  }
+  const holders = live
+    .filter(({ segments: twinSegments }) =>
+      segments.some((inner) => {
+        const key = segmentKey(inner.source);
+        const text = normText(inner.text);
+        return twinSegments.some(
+          (outer) =>
+            segmentKey(outer.source) === key ||
+            (text.length >= TWIN_TEXT_MIN_CHARS && normText(outer.text) === text),
+        );
+      }),
+    )
+    .map(({ row }) => row.id);
+  if (
+    segments.every((inner) =>
+      dupCovered(inner, liveCover, sources.get(segmentKey(inner.source)) ?? null),
+    )
+  ) {
+    throw new HttpError(
+      409,
+      `this request is already covered by ${holders.join(', ')}: open that task, steer it, or archive it first. Nothing was created.`,
+    );
+  }
+  const newCover = coverOf(segments);
+  const predecessors = twins
+    .filter(
+      ({ row, segments: twinSegments }) =>
+        row.archivedAt === null &&
+        CONTINUABLE_PHASES.includes(row.phase) &&
+        row.supersededBy === null &&
+        twinSegments.every((inner) => continuedCovered(inner, newCover)),
+    )
+    .map(({ row }) => row);
+  const repo = githubRepoOfProject(
+    projectOfTodo(db, { projectId: params.projectId, teamId: ctx.teamId }),
+  );
+  const donor =
+    twins
+      .filter(
+        ({ row, segments: twinSegments }) =>
+          !(row.archivedAt === null && LIVE_REQUEST_PHASES.includes(row.phase)) &&
+          row.sourceKind === 'github-issue-self' &&
+          row.sourceRef !== null &&
+          twinSegments.every((inner) => continuedCovered(inner, newCover)),
+      )
+      .sort((a, b) => b.row.seqNum - a.row.seqNum)
+      .map(({ row }) => row)
+      .find((row) => {
+        if (repo === null || row.sourceRef === null) return false;
+        const ref = parseGithubIssueSourceRef(row.sourceRef);
+        return (
+          ref !== null &&
+          `${ref.owner}/${ref.repo}`.toLowerCase() === `${repo.owner}/${repo.repo}`.toLowerCase()
+        );
+      }) ?? null;
+  return { predecessors, donor };
+}
+
 const CANDIDATE_PREVIEW_CHARS = 80;
 
 function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
@@ -267,12 +442,16 @@ function defaultQuoteIds(db: Db, ctx: RequestCtx): string[] {
   );
 }
 
+export interface ContinuedRequest {
+  predecessors: { id: string; title: string; phase: Phase }[];
+}
+
 export function createRequestTodo(
   deps: TodoDeps,
   ctx: RequestCtx,
   params: CoordinatorCreateTodoParams & { projectId: string },
   provenance: { createdBy: string | null; ownerId: string; withoutSelfIssue?: boolean },
-): TodoRecord & { uncovered?: string[] } {
+): TodoRecord & { uncovered?: string[]; continued?: ContinuedRequest } {
   const { db } = deps;
   if (params.sourceTodoId !== undefined) {
     refuseInfoCardReplacedByCode(
@@ -298,6 +477,7 @@ export function createRequestTodo(
   if (params.quotes === undefined && params.sourceTodoId === undefined) {
     requireUnboundMessages(db, ctx, segments);
   }
+  const { predecessors, donor } = requireUncoveredRequest(db, ctx, params, cited, segments);
   requireTeamTodos(db, ctx.teamId, params.dependsOn ?? []);
   const keys = new Set(cited.map((c) => segmentKey(c.quoteSource)));
   const siblings = params.quotes === undefined ? [] : splitSiblings(db, ctx.teamId, keys);
@@ -327,6 +507,13 @@ export function createRequestTodo(
     ownerId: provenance.ownerId,
     orchestration: { threadId: ctx.threadId },
     ...(provenance.withoutSelfIssue === true ? { withoutSelfIssue: true } : {}),
+    ...(donor !== null && donor.sourceRef !== null
+      ? {
+          sourceKind: 'github-issue-self' as const,
+          sourceRef: donor.sourceRef,
+          ...(donor.issueState !== null ? { issueState: donor.issueState } : {}),
+        }
+      : {}),
     request,
     userSpecAttachmentIds: ownerGrants(segments, ctx.teamId),
     ...(params.dependsOn !== undefined || params.blockedBy !== undefined
@@ -342,9 +529,63 @@ export function createRequestTodo(
       .where(eq(todo.id, sibling.id))
       .run();
   }
-  if (params.quotes === undefined) return record;
+  const { marked, notices } =
+    predecessors.length === 0 && donor === null
+      ? { marked: [], notices: [] }
+      : db.transaction(() => {
+          const superseded: TodoRow[] = [];
+          for (const row of predecessors) {
+            const changed = db
+              .update(todo)
+              .set({ supersededBy: record.id, v: row.v + 1 })
+              .where(and(eq(todo.id, row.id), isNull(todo.supersededBy)))
+              .run();
+            if (changed.changes === 1) superseded.push(row);
+          }
+          if (donor !== null && donor.sourceRef !== null) {
+            db.update(todo)
+              .set({ sourceRef: null, issueState: null, v: donor.v + 1 })
+              .where(and(eq(todo.id, donor.id), eq(todo.sourceRef, donor.sourceRef)))
+              .run();
+          }
+          const notices = superseded.map((row) => ({
+            id: `request-twin-${record.id}-${row.id}`,
+            role: 'system' as const,
+            content: JSON.stringify({
+              kind: CHIEF_NOTICE_KIND,
+              message: `${taskLink(record.id, record.title)} continues ${taskLink(row.id, row.title)}: the earlier card ${row.phase}, so its request was re-issued on a new card. The earlier card is superseded${
+                donor?.id === row.id ? ' and its GitHub issue moves to the new card' : ''
+              }.`,
+              provenance: `request-twin:${row.id}`,
+            }),
+            projectId: record.projectId,
+            createdAt: nowMs(),
+          }));
+          for (const notice of notices) {
+            db.insert(chiefMessage)
+              .values({ ...notice, threadId: ctx.threadId })
+              .onConflictDoNothing()
+              .run();
+          }
+          return { marked: superseded, notices };
+        });
+  for (const notice of notices) deps.convHub?.publishMessage(ctx.threadId, notice);
+  const enriched =
+    marked.length === 0
+      ? record
+      : {
+          ...record,
+          continued: {
+            predecessors: marked.map((row) => ({
+              id: row.id,
+              title: row.title,
+              phase: row.phase,
+            })),
+          },
+        };
+  if (params.quotes === undefined) return enriched;
   const allQuoted = [...siblings.flatMap((row) => row.request?.segments ?? []), ...segments];
-  return { ...record, uncovered: uncoveredText(cited, allQuoted) };
+  return { ...enriched, uncovered: uncoveredText(cited, allQuoted) };
 }
 
 function appendableRow(

@@ -566,6 +566,7 @@ export function createAutonomousTodo(
     ownerId: string | null;
     sourceKind?: TodoSourceKind;
     sourceRef?: string;
+    issueState?: 'open' | 'closed';
     withoutSelfIssue?: boolean;
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
@@ -636,6 +637,7 @@ export function createAutonomousTodo(
           (selfIssue === null && input.orchestration !== undefined
             ? orchestrationSourceRef(input.orchestration.threadId)
             : null),
+        issueState: input.issueState ?? null,
         output: input.output ?? 'code',
         ...(input.userSpecAttachmentIds !== undefined
           ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
