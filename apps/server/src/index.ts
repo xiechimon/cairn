@@ -1,4 +1,5 @@
 import { mkdirSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { ENV_VARS } from '@cairn/shared';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
@@ -139,7 +140,12 @@ const vapidKeys = {
 };
 const seeded = seed(db);
 await fillSystemAvatar(seeded.user);
-seedLocalMachine(db, seeded.team.id);
+if (seedLocalMachine(db, seeded.team.id) === 'blocked') {
+  logger.warn(
+    { name: hostname() },
+    'an enrolled machine holds the server hostname; the local-machine row stays unseeded until it is renamed or removed',
+  );
+}
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 runDataMigrationOnce(db, 'token-usage-cost-backfill', () => backfillTokenUsageCost(db));

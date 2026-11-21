@@ -203,6 +203,89 @@ describe('machine enrollment authority (#2054)', () => {
     }
   });
 
+  test('an api key cannot re-enroll a local row it is bound to', async () => {
+    const s = bootServer();
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const local = s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.teamId, s.team.id))
+        .all()
+        .find((row) => row.kind === 'local');
+      const key = createApiKey(s, {
+        teamId: s.team.id,
+        name: 'legacy-local-key',
+        gitAccess: false,
+        mcpAccess: false,
+        machineAccess: true,
+        toolGrants: { read: [], write: [] },
+      });
+      s.db
+        .update(machineTable)
+        .set({ apiKeyId: key.id, tokenHash: 'legacy-hash' })
+        .where(eq(machineTable.id, local?.id ?? ''))
+        .run();
+
+      const response = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'renamed-away', cliVersion: '0.1.0' },
+      });
+      expect(response.status).toBe(403);
+      const after = s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.id, local?.id ?? ''))
+        .get();
+      expect(after?.tokenHash).toBe('legacy-hash');
+      expect(after?.name).toBe(HOST);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a machineAccess key cannot mint kind=local once the seeded row is gone', async () => {
+    const s = bootServer();
+    try {
+      seedLocalMachine(s.db, s.team.id);
+      const seeded = s.db
+        .select()
+        .from(machineTable)
+        .where(eq(machineTable.teamId, s.team.id))
+        .all()
+        .find((row) => row.kind === 'local');
+      expect(seeded).toBeDefined();
+      s.db
+        .delete(machineTable)
+        .where(eq(machineTable.id, seeded?.id ?? ''))
+        .run();
+
+      const key = createApiKey(s, {
+        teamId: s.team.id,
+        name: 'post-delete-enroll',
+        gitAccess: false,
+        mcpAccess: false,
+        machineAccess: true,
+        toolGrants: { read: [], write: [] },
+      });
+      const response = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: HOST, cliVersion: '0.1.0' },
+      });
+      expect(response.status).toBe(403);
+      expect(
+        s.db
+          .select()
+          .from(machineTable)
+          .where(eq(machineTable.teamId, s.team.id))
+          .all()
+          .filter((row) => row.kind === 'local'),
+      ).toHaveLength(0);
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('same key re-enroll rotates its own machine token', async () => {
     const s = bootServer();
     try {

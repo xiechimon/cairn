@@ -280,12 +280,20 @@ describe('adoption guards', () => {
     }
   });
 
-  test('an api-key adoption never writes kind: the server hostname is not a credential', async () => {
+  test('the api-key path refuses the server hostname outright: the name is not a credential', async () => {
     const w = await world();
     try {
-      const again = await enroll(w.s, w.keyA, hostname(), HOST_KEY_A);
-      expect(again.machineId).toBe(w.a.machineId);
+      const res = await call(w.s.app, 'POST', '/api/machine/enroll', {
+        cred: w.keyA,
+        body: readyMachine({
+          teamId: w.s.team.id,
+          name: hostname(),
+          hostKey: HOST_KEY_A,
+        }),
+      });
+      expect(res.status).toBe(403);
       expect(machineRow(w.s, w.a.machineId)?.kind).toBe('remote');
+      expect(machineRow(w.s, w.a.machineId)?.name).toBe('host-a');
     } finally {
       w.s.dispose();
     }

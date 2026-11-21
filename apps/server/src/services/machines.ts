@@ -320,17 +320,21 @@ function hostKeyHeldByOther(db: Db, teamId: string, hostKey: string, machineId: 
   );
 }
 
-export function seedLocalMachine(db: Db, teamId: string): void {
+export function seedLocalMachine(
+  db: Db,
+  teamId: string,
+): 'existing' | 'adopted' | 'created' | 'blocked' {
   const local = db
     .select()
     .from(machine)
     .where(and(eq(machine.teamId, teamId), eq(machine.kind, 'local')))
     .get();
-  if (local) return;
+  if (local) return 'existing';
   const byName = localMachineRow(db, teamId, hostname());
-  if (byName) {
+  if (byName !== undefined) {
+    if (byName.tokenHash !== null || byName.apiKeyId !== null) return 'blocked';
     db.update(machine).set({ kind: 'local' }).where(eq(machine.id, byName.id)).run();
-    return;
+    return 'adopted';
   }
   db.insert(machine)
     .values({
@@ -344,6 +348,7 @@ export function seedLocalMachine(db: Db, teamId: string): void {
       kind: 'local',
     })
     .run();
+  return 'created';
 }
 
 function adoptAsDefaultIfUnset(db: Db, teamId: string, machineId: string): void {
@@ -386,8 +391,10 @@ export function enrollMachine(
   },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
+  if (input.name === hostname()) {
+    throw new HttpError(403, 'local machine requires owner approval');
+  }
   const token = newMachineToken();
-  const isLocalName = input.name === hostname();
   const capabilities = parseCapabilitiesField(input.capabilities);
   const hostKey = input.hostKey ?? null;
   const byHost = hostKey === null ? undefined : machineByHostKey(db, input.teamId, hostKey);
@@ -399,10 +406,10 @@ export function enrollMachine(
           .where(and(eq(machine.apiKeyId, input.keyId), eq(machine.teamId, input.teamId)))
           .get()
       : undefined;
-  if (byHost !== undefined && byHost.kind === 'local' && byHost.apiKeyId === null) {
+  const existing = byHost ?? byKey;
+  if (existing !== undefined && existing.kind === 'local') {
     throw new HttpError(403, 'local machine requires owner approval');
   }
-  const existing = byHost ?? byKey;
   if (existing !== undefined) {
     db.update(machine)
       .set({
@@ -437,17 +444,6 @@ export function enrollMachine(
       serverUrl: input.serverUrl,
     };
   }
-  if (isLocalName) {
-    const seeded = localMachineRow(db, input.teamId, input.name);
-    if (seeded) {
-      throw new HttpError(
-        403,
-        seeded.apiKeyId !== null || seeded.tokenHash !== null
-          ? 'local machine already enrolled'
-          : 'local machine requires owner approval',
-      );
-    }
-  }
   const machineId = newRecordId();
   db.insert(machine)
     .values({
@@ -458,7 +454,7 @@ export function enrollMachine(
       tokenHash: token.hash,
       apiKeyId: input.keyId,
       latestCliVersion: input.cliVersion ?? null,
-      kind: isLocalName ? 'local' : 'remote',
+      kind: 'remote',
       ...(hostKey !== null ? { hostKey } : {}),
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
       ...(capabilities !== undefined

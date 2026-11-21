@@ -84,21 +84,37 @@ describe('local-machine row seed (spec 11 A8: server boot seed, idempotent)', ()
     }
   });
 
-  test('an enrolled hostname row without a seed: seed adds kind=local, no separate row', async () => {
+  test('an unclaimed row named after the host: seed marks it local, no separate row', async () => {
+    const s = bootServer();
+    try {
+      s.db
+        .insert(machineTable)
+        .values({ id: 'unclaimed-host-row', teamId: s.team.id, name: HOST, online: false })
+        .run();
+      seedLocalMachine(s.db, s.team.id);
+      const rows = localRows(s.db, s.team.id);
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.kind).toBe('local');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('an enrolled remote row named after the host stays remote across reseeds', async () => {
     const s = bootServer();
     try {
       const key = await issueApiKey(s);
       const res = await call(s.app, 'POST', '/api/machine/enroll', {
         cred: key,
-        body: { teamId: s.team.id, name: HOST, cliVersion: '0.1.0' },
+        body: { teamId: s.team.id, name: 'drifted-name', cliVersion: '0.1.0' },
       });
       expect(res.status).toBe(200);
-      expect(localRows(s.db, s.team.id)[0]?.kind).toBe('local');
+      const { machineId } = (await res.json()) as { machineId: string };
+      s.db.update(machineTable).set({ name: HOST }).where(eq(machineTable.id, machineId)).run();
       seedLocalMachine(s.db, s.team.id);
       const rows = localRows(s.db, s.team.id);
       expect(rows).toHaveLength(1);
-      expect(rows[0]?.kind).toBe('local');
-      expect(rows[0]?.tokenHash).not.toBeNull();
+      expect(rows[0]?.kind).toBe('remote');
     } finally {
       s.dispose();
     }
