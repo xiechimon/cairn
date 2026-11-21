@@ -745,6 +745,7 @@ export function createImService(deps: ImServiceDeps): ImService {
             decision: cardDecision(option.label),
             decidedBy: `im:${action.sender.id}`,
             viaCard: true,
+            interactive: 'im',
           },
         );
         enqueueSend(

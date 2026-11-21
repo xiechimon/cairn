@@ -162,7 +162,14 @@ function world() {
   const answer = (proposalId: string, decision: 'allow-once' | 'refuse') =>
     answerProposal(
       { db: s.db, reposDir: s.reposDir, hub: s.hub, user: s.user },
-      { proposalId, teamId: s.team.id, decision, decidedBy: s.user.id, viaCard: true },
+      {
+        proposalId,
+        teamId: s.team.id,
+        decision,
+        decidedBy: s.user.id,
+        viaCard: true,
+        interactive: 'page',
+      },
     );
   return { s, mcp, deps, turn, call, answer };
 }
