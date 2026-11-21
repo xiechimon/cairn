@@ -6,7 +6,6 @@ import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { BANNER_CLS } from '../chief/chief-outage-banner.js';
 import { Button } from '../components/ui/button.js';
-import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Key, Monitor } from '../icons/index.js';
@@ -125,22 +124,23 @@ function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean })
         data-testid="setup-prompt"
         data-step="models"
         data-variant="empty"
-        className="mx-auto mb-6 flex w-[calc(100%-2rem)] max-w-chat flex-none flex-col items-center gap-3 text-center"
+        className="mx-auto mb-10 flex w-[calc(100%-2rem)] max-w-chat flex-1 flex-col items-center justify-center gap-4 text-center"
       >
-        <p className="m-0 text-ui text-balance text-foreground">
+        <p className="m-0 voice-title text-page text-balance text-foreground">
           {models.tasks
             ? t('Coordinator 还缺模型')
             : t('先接入一个模型来源，Coordinator 才能回复你')}
         </p>
         <Button
           data-testid="setup-prompt-action"
-          className={`${DIALOG_PRIMARY_BUTTON} pointer-coarse:h-11`}
+          size="lg"
+          className="h-11 gap-2 rounded-md px-5 text-heading"
           render={<Link to={href} />}
         >
-          <Key width={16} height={16} />
+          <Key width={20} height={20} />
           {t('接入模型来源')}
         </Button>
-        <p className="m-0 text-meta text-balance text-content-tertiary">{hint}</p>
+        <p className="m-0 text-ui text-balance text-content-secondary">{hint}</p>
       </div>
     );
   }

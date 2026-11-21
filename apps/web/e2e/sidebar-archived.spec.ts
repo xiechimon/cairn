@@ -51,9 +51,11 @@ test('the filter starts on active and lists archived projects, groups included',
   await chooseFilter(page, '已归档');
   await expect(rows(page)).toHaveCount(2);
   await expect(rows(page).first()).toHaveAttribute('data-archived', '');
-  await expect(page.getByTestId('sidebar-archived-note')).toHaveText(
-    '已归档的项目和它们的对话会一直保留，取消归档就能放回列表。',
-  );
+  const note = page.getByTestId('sidebar-archived-page').getByTestId('info-tip');
+  await expect(note).toHaveAccessibleName('已归档的项目和它们的对话会一直保留，取消归档就能放回列表。');
+  await expect(page.getByText('已归档的项目和它们的对话会一直保留，取消归档就能放回列表。')).toHaveCount(0);
+  await note.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('已归档的项目和它们的对话会一直保留，取消归档就能放回列表。');
   await expect(page.getByTestId('project-group-header')).toHaveCount(0);
   await expect(page.locator('aside [data-slot="sidebar-new-project"]')).toHaveCount(0);
   await expect(page.getByTestId('sidebar-project-filter')).toHaveCount(1);
@@ -68,17 +70,17 @@ test('the normal list never shows the note and pins the archived entry above the
   page,
 }) => {
   await open(page);
-  await expect(page.getByTestId('sidebar-archived-note')).toHaveCount(0);
+  await expect(page.getByTestId('sidebar-archived-page')).toHaveCount(0);
   const entry = page.locator('aside [data-slot="sidebar-archived-entry"]');
   await expect(entry).toHaveText('已归档');
   const footer = await page.getByTestId('sidebar-footer').boundingBox();
   const box = await entry.boundingBox();
   expect(box!.y + box!.height).toBeLessThanOrEqual(footer!.y);
   await entry.click();
-  await expect(page.getByTestId('sidebar-archived-note')).toBeVisible();
+  await expect(page.getByTestId('sidebar-archived-page')).toBeVisible();
   await expect(page.locator('aside [data-slot="sidebar-archived-entry"]')).toHaveCount(0);
   await page.locator('aside [data-slot="sidebar-filter-back"]').click();
-  await expect(page.getByTestId('sidebar-archived-note')).toHaveCount(0);
+  await expect(page.getByTestId('sidebar-archived-page')).toHaveCount(0);
   await expect(entry).toBeVisible();
 });
 
@@ -98,7 +100,7 @@ test('the filter choice survives a reload and the back row returns to active', a
 test('all shows both, with only the archived rows marked', async ({ page }) => {
   await open(page);
   await chooseFilter(page, '全部');
-  await expect(page.getByTestId('sidebar-archived-note')).toHaveCount(0);
+  await expect(page.getByTestId('sidebar-archived-page')).toHaveCount(0);
   await expect(rows(page)).toHaveCount(3);
   await expect(page.locator('aside [data-slot="sidebar-project-row"][data-archived]')).toHaveCount(
     2,
@@ -167,7 +169,7 @@ test('the phone drawer carries the archived entry and page', async ({ page }) =>
   const drawer = page.getByRole('dialog');
   await drawer.locator('[data-slot="sidebar-archived-entry"]').click();
   await expect(drawer.locator('[data-slot="sidebar-project-row"]')).toHaveCount(2);
-  await expect(drawer.getByTestId('sidebar-archived-note')).toBeVisible();
+  await expect(drawer.getByTestId('sidebar-archived-page').getByTestId('info-tip')).toBeVisible();
   await expect(drawer.locator('[data-slot="sidebar-filter-back"]')).toBeVisible();
 });
 

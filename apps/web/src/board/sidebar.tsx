@@ -27,6 +27,7 @@ import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
 import { createdHere, useArrivals } from '../components/growth.js';
+import { InfoTip } from '../components/info-tip.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
 import {
   SIDEBAR_ROW_ACTION,
@@ -512,9 +513,12 @@ export function BoardSidebar({
           <div data-testid="sidebar-archived-page" className="flex flex-none flex-col">
             <div className="mx-2 mt-3 border-t border-border pt-2.5">
               <div className="flex h-7 items-center justify-between">
-                <h2 className="m-0 text-[calc(1.25rem*var(--type-scale))] leading-7 font-normal text-foreground">
-                  {t('已归档的项目')}
-                </h2>
+                <div className="flex min-w-0 items-center gap-1">
+                  <h2 className="m-0 text-[calc(1.25rem*var(--type-scale))] leading-7 font-normal text-foreground">
+                    {t('已归档的项目')}
+                  </h2>
+                  <InfoTip info={t('已归档的项目和它们的对话会一直保留，取消归档就能放回列表。')} />
+                </div>
                 <ProjectFilterMenu
                   filter={filter}
                   onFilter={chooseFilter}
@@ -522,12 +526,6 @@ export function BoardSidebar({
                 />
               </div>
             </div>
-            <p
-              data-testid="sidebar-archived-note"
-              className="mx-2 mt-2.5 mb-2 text-caption text-content-tertiary"
-            >
-              {t('已归档的项目和它们的对话会一直保留，取消归档就能放回列表。')}
-            </p>
             {archivedCount === 0 && (
               <p
                 data-testid="sidebar-archived-empty"

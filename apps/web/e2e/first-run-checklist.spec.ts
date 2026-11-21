@@ -92,6 +92,7 @@ test('a fresh install puts one centered model-source prompt on the empty home in
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
   await expect(page.getByTestId('first-run-checklist')).toHaveCount(0);
   await expect(page.getByTestId('chief-gate')).toHaveCount(0);
+  await expect(page.getByTestId('home-spiral')).toHaveCount(0);
 });
 
 test('with a conversation already there the model-source prompt is one notice line after it', async ({

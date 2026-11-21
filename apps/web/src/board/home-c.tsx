@@ -297,7 +297,8 @@ export function HomeC({
     if (at < 0 || full.slice(at).some((item) => item.kind === 'user')) return undefined;
     return full[at];
   }, [chiefData.stream]);
-  const homeSpiral = !narrow && fallbackOnly && projectId === null && archived === null;
+  const homeSpiral =
+    !narrow && fallbackOnly && !setupEmpty && projectId === null && archived === null;
   const quickReplies = setupEmpty
     ? []
     : fallbackOnly
@@ -564,7 +565,10 @@ export function HomeC({
           {designSplit?.chatBar}
           {paneButtons}
           {!narrow && (
-            <ChiefStatusMark chief={{ ...chiefData, stream }} hiddenWhenIdle={homeSpiral} />
+            <ChiefStatusMark
+              chief={{ ...chiefData, stream }}
+              hiddenWhenIdle={homeSpiral || setupEmpty}
+            />
           )}
           {homeSpiral && (
             <HomeSpiral projects={fixtureProjects ?? activeProjects} waiting={waitingIds} />
