@@ -418,6 +418,16 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'eval-needed': 'false',
     });
 
+    assert.deepEqual(runClassify({ '.github/workflows/ci.yml': 'name: ci\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'true',
+      'needs-integration': 'true',
+      'e2e-tier': 'none',
+      'eval-needed': 'true',
+    });
+
     assert.deepEqual(
       runClassify(
         { 'docs/research/note2.md': 'x\n' },

@@ -81,7 +81,7 @@ export function hasCode(paths) {
   return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
 }
 
-const SIDECAR_INPUTS = ['apps/tsnet-sidecar/', '.github/workflows/ci.yml'];
+const SIDECAR_INPUTS = ['apps/tsnet-sidecar/'];
 
 export function hasSidecar(paths) {
   return paths.some((path) => SIDECAR_INPUTS.some((input) => path.startsWith(input)));

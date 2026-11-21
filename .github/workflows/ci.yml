@@ -77,7 +77,7 @@ jobs:
             gates_needed=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --needs-gates) || gates_needed=true
             if [ "$has_code" = "false" ]; then
               e2e_tier=none
-            elif printf '%s\n' "$changed" | grep -qE '^(apps/web/(package\.json|index\.html|vite\.config|playwright\.config)|apps/web/src/(components/|styles/|main\.tsx$|App\.tsx$)|packages/shared/|package\.json$|pnpm-lock\.yaml$|\.github/actions/playwright-chromium/|\.github/workflows/ci\.yml$)'; then
+            elif printf '%s\n' "$changed" | grep -qE '^(apps/web/(package\.json|index\.html|vite\.config|playwright\.config)|apps/web/src/(components/|styles/|main\.tsx$|App\.tsx$)|packages/shared/|package\.json$|pnpm-lock\.yaml$|\.github/actions/playwright-chromium/)'; then
               e2e_tier=full
             elif printf '%s\n' "$changed" | grep -vE '\.test\.tsx?$' | grep -qE '^(apps/web/src/|apps/web/e2e/|apps/server/(src/|drizzle/|package\.json$))'; then
               e2e_tier=affected
