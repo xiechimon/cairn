@@ -13,6 +13,7 @@ export const NOTIFICATION_TYPES = [
   'todo_failed',
   'schedule_run',
   'marked_unread',
+  'watchdog_flag',
 ] as const;
 export const SILENT_NOTIFICATION_TYPES: readonly NotificationType[] = [
   'todo_done',

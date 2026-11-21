@@ -137,6 +137,21 @@ export function notifyScheduleRun(
   });
 }
 
+export function notifyWatchdogFlag(
+  deps: NotificationDeps,
+  todoRow: TodoNoticeSource,
+  snippet: string,
+): NotificationRecord {
+  return upsertAndPublish(deps, {
+    teamId: todoRow.teamId,
+    type: 'watchdog_flag',
+    entityId: todoRow.id,
+    entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
+    agent: todoNoticeAgent(deps),
+    snippet,
+  });
+}
+
 export function listUnreadEntityIds(deps: NotificationDeps, teamId: string): string[] {
   return deps.db
     .selectDistinct({ entityId: notification.entityId })

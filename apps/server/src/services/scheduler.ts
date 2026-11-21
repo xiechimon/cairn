@@ -69,6 +69,7 @@ import {
 import { createTaskIssueSync } from './task-issue-sync.js';
 import { insertMessageRow } from './transcript.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
+import { sweepWorkerWatchdog } from './worker-watchdog.js';
 
 export interface SchedulerOptions {
   tickMs: number;
@@ -396,6 +397,7 @@ export function createScheduler(
     sweepQuotaWaitSteps(deps, now);
     sweepOfflineRunners(deps, now);
     sweepUnplaceableSteps(deps, now);
+    sweepWorkerWatchdog(deps, now);
     void sweepFailedRetries(deps).catch(() => {});
     const digestTimes = opts.pushDigestTimes ?? [];
     if (digestTimes.length > 0 && !digestSweeping) {
