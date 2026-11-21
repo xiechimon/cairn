@@ -77,6 +77,7 @@ import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { infoCardPlan, infoCardRemoteTools } from './info-card.js';
 import { infoRepoOffered } from './info-repo-snapshot.js';
+import { localMergeAuthorizationRefusal } from './local-merge.js';
 import { teamOffersDesktop } from './machine-computer.js';
 import { failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
@@ -103,7 +104,6 @@ import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { ownComputerOffered } from './own-computer.js';
 import { offeredPhoneNames } from './phone-computer.js';
-import { projectMergeConfigOf } from './projects.js';
 import {
   coordinatorMemoryOwner,
   coordinatorProfile,
@@ -549,25 +549,16 @@ async function tryClaim(
       continue;
     if (!stillAuthorized()) return null;
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
-    if (localMerge !== null) {
-      const project = projectOfTodo(db, cand.todoRow);
-      const config = project ? projectMergeConfigOf(project) : null;
-      if (
-        project?.repoKind !== 'local' ||
-        project.id !== localMerge.projectId ||
-        config === null ||
-        JSON.stringify(config.localChecks) !== JSON.stringify(localMerge.localChecks) ||
-        (project.baseBranch !== null && project.baseBranch !== localMerge.defaultBranch) ||
-        !['done', 'review', 'failed'].includes(cand.todoRow.phase) ||
-        cand.todoRow.latestBuildId !== localMerge.buildId
-      ) {
-        failStepWithEvents(
-          deps,
-          cand.stepRow,
-          'Local merge authorization changed; request the merge again',
-        );
-        continue;
-      }
+    if (
+      localMerge !== null &&
+      localMergeAuthorizationRefusal(db, localMerge, cand.todoRow) !== null
+    ) {
+      failStepWithEvents(
+        deps,
+        cand.stepRow,
+        'Local merge authorization changed; request the merge again',
+      );
+      continue;
     }
     const infoCard = isBuildStepKind(cand.stepRow.kind) && isInfoOutput(cand.todoRow.output);
     const infoPlan = infoCard ? infoCardPlan(db, cand.todoRow, cand.stepRow) : null;
@@ -692,17 +683,11 @@ async function tryClaim(
             !['done', 'review', 'failed'].includes(latestTodo.phase))
         )
           return false;
-        if (localMerge !== null) {
-          const target = projectOfTodo(db, latestTodo);
-          if (
-            target?.repoKind !== 'local' ||
-            target.id !== localMerge.projectId ||
-            JSON.stringify(projectMergeConfigOf(target).localChecks) !==
-              JSON.stringify(localMerge.localChecks) ||
-            (target.baseBranch !== null && target.baseBranch !== localMerge.defaultBranch)
-          )
-            return false;
-        }
+        if (
+          localMerge !== null &&
+          localMergeAuthorizationRefusal(db, localMerge, latestTodo) !== null
+        )
+          return false;
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)

@@ -20,6 +20,7 @@ import {
   machineEnrollStartBodySchema,
   machineHeartbeatBodySchema,
   machineImEventBodySchema,
+  machineLocalMergeRecheckBodySchema,
   machineOfflineBodySchema,
   machinePresenceBodySchema,
   machineSteerAckBodySchema,
@@ -51,6 +52,7 @@ import { githubAppOf, jsonBody } from './routes-helpers.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
+import { localMergeRecheckAuthorization } from './services/local-merge.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
@@ -733,6 +735,17 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/machine/session/:stepId', (c) => {
     const row = me(c);
     return c.json(getStepSession(deps, row.id, c.req.param('stepId')));
+  });
+
+  app.post('/api/machine/local-merge-recheck/:stepId', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineLocalMergeRecheckBodySchema, decoded, 'body');
+        return c.json(localMergeRecheckAuthorization(deps, row.id, c.req.param('stepId'), body));
+      },
+    );
   });
 
   app.post(

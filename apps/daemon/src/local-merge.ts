@@ -90,6 +90,7 @@ export async function inspectLocalPatch(
 export async function landLocalMerge(
   dir: string,
   command: LocalMergeCommand,
+  authorize: () => Promise<string | null>,
   shouldStop: () => boolean = () => false,
 ): Promise<LocalMergeResult> {
   for (const sha of [command.judgedBase, command.judgedHead]) {
@@ -175,6 +176,14 @@ export async function landLocalMerge(
     const checkedOut = worktrees.split('\n\n').filter((entry) => entry.includes(`\nbranch ${ref}`));
     if (checkedOut.length > (decision.action === 'fast-forward' ? 1 : 0))
       return { outcome: 'held', reason: 'checkout-unknown' };
+    let refusal: string | null;
+    try {
+      refusal = await authorize();
+    } catch {
+      return { outcome: 'recheck', reason: 'authorization-unreachable' };
+    }
+    if (refusal !== null) return { outcome: 'recheck', reason: refusal };
+    if (shouldStop()) return { outcome: 'held', reason: 'stopped' };
     const landed = await landGitSquash({
       dir,
       branch: command.defaultBranch,

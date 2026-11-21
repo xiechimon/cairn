@@ -1,12 +1,16 @@
 import {
   conversationBranch,
+  type LocalMergeCommand,
   type LocalMergeReport,
   localCommitIdentity,
   localMergeCommandSchema,
+  type MachineLocalMergeRecheckBody,
+  type MachineLocalMergeRecheckResponse,
   parseGithubIssueSourceRef,
   parseLocalMergeInstruction,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import { build, step, stopPending, todo } from '../db/schema.js';
 import { conflict } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
@@ -17,7 +21,7 @@ import { triggerChiefWakes } from './chief.js';
 import { projectOfTodo } from './git.js';
 import { softwareCommitIdentity } from './github-autonomous-token.js';
 import type { MachineDeps } from './machine-deps.js';
-import { publishStepStatus, upsertMessage } from './machine-deps.js';
+import { ownedStep, publishStepStatus, upsertMessage } from './machine-deps.js';
 import { announceMergeStepOutcome } from './merge-announcement.js';
 import { computePatchDigest } from './merge-gate/digest.js';
 import { notifyTodo } from './notifications.js';
@@ -94,6 +98,48 @@ export async function enqueueLocalMerge(
     );
   });
   return { enqueued: true };
+}
+
+export function localMergeAuthorizationRefusal(
+  db: Db,
+  command: LocalMergeCommand,
+  todoRow: typeof todo.$inferSelect,
+): string | null {
+  if (todoRow.archivedAt !== null) return 'task-archived';
+  if (todoRow.latestBuildId !== command.buildId) return 'build-superseded';
+  if (todoRow.projectId !== command.projectId) return 'task-moved';
+  if (!['done', 'review', 'failed'].includes(todoRow.phase)) return 'task-phase';
+  const target = projectOfTodo(db, todoRow);
+  if (target?.repoKind !== 'local' || target.id !== command.projectId) return 'project-target';
+  if (
+    JSON.stringify(projectMergeConfigOf(target).localChecks) !== JSON.stringify(command.localChecks)
+  )
+    return 'checks-changed';
+  if (target.baseBranch !== null && target.baseBranch !== command.defaultBranch)
+    return 'branch-changed';
+  return null;
+}
+
+export function localMergeRecheckAuthorization(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  body: MachineLocalMergeRecheckBody,
+): MachineLocalMergeRecheckResponse {
+  const stepRow = ownedStep(deps, machineId, stepId);
+  if (stepRow.status !== 'claimed') return { authorized: false, reason: 'step-released' };
+  const stored = parseLocalMergeInstruction(stepRow.prompt);
+  if (stepRow.kind !== 'merge' || stored === null)
+    return { authorized: false, reason: 'not-local-merge' };
+  if (JSON.stringify(stored) !== JSON.stringify(body.command))
+    return { authorized: false, reason: 'command-mismatch' };
+  const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+  const todoRow = buildRow
+    ? deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get()
+    : undefined;
+  if (todoRow === undefined) return { authorized: false, reason: 'task-missing' };
+  const reason = localMergeAuthorizationRefusal(deps.db, stored, todoRow);
+  return reason === null ? { authorized: true } : { authorized: false, reason };
 }
 
 export function applyLocalMergeReport(

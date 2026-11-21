@@ -190,6 +190,19 @@ export const localMergeReportSchema = z.object({
 });
 export type LocalMergeReport = z.infer<typeof localMergeReportSchema>;
 
+export const machineLocalMergeRecheckBodySchema = z.object({
+  command: localMergeCommandSchema,
+});
+export type MachineLocalMergeRecheckBody = z.infer<typeof machineLocalMergeRecheckBodySchema>;
+
+export const machineLocalMergeRecheckResponseSchema = z.object({
+  authorized: z.boolean(),
+  reason: z.string().min(1).optional(),
+});
+export type MachineLocalMergeRecheckResponse = z.infer<
+  typeof machineLocalMergeRecheckResponseSchema
+>;
+
 const MIB = 1024 * 1024;
 
 export const DELIVERABLE_LIMITS = {
@@ -651,6 +664,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'GET',
     path: '/api/machine/session/{stepId}',
     reason: '[设计] #1512 按 stepId 取回步收尾上传的原始会话 JSONL（session.jsonl）',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/local-merge-recheck/{stepId}',
+    reason:
+      '[design] #5210 landing round-trip: after the local checks and before the ref write the daemon re-asks the claim-time authorization; a refusal or no answer stops the landing (docs/design/local-merge-landing-recheck.md)',
   },
   {
     method: 'POST',

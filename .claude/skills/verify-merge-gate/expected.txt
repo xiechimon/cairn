@@ -40,21 +40,33 @@ R5_MergedAfterUpdate FAIL BaseMoveBenign,UpdateBranch,RecordVerdict,RecordVerdic
 P3_LocalLandingBindsJudgedPatch PASS
 
 # P3 negative controls: each of the three re-checks dropped in turn.
-P3A_NoLandingRecheck FAIL JudgeLocalPatch,LocalPatchChange,CreateCommit,DecideLocalMerge,LandLocal
-P3B_NoFfCheck FAIL JudgeLocalPatch,CreateCommit,DecideLocalMerge,LocalBaseMove,LandLocal
-P3C_NoBaseRecheck FAIL JudgeLocalPatch,LocalBaseMove,CreateCommit,DecideLocalMerge,LandLocal
+P3A_NoLandingRecheck FAIL JudgeLocalPatch,LocalPatchChange,CreateCommit,DecideLocalMerge,AuthorizeLanding,LandLocal
+P3B_NoFfCheck FAIL JudgeLocalPatch,CreateCommit,DecideLocalMerge,LocalBaseMove,AuthorizeLanding,LandLocal
+P3C_NoBaseRecheck FAIL JudgeLocalPatch,LocalBaseMove,CreateCommit,DecideLocalMerge,AuthorizeLanding,LandLocal
 
 # P3 over re-judging and rebuilding after drift (#2526). P3D: after Rebuild the re-checks
 # compare against the rebuilt commit instead of a judgement, so the first judgement is
 # reused for a patch it never covered. P3F: no Rejudge or Rebuild at all (the model
 # before #2526) leaves a drifted judgement with no way out. P3R1-P3R3: reachability
 # witnesses that a landing is reached after Rejudge, after Rebuild, and after two drifts.
-P3D_RebuildReusesJudgement FAIL JudgeLocalPatch,CreateCommit,LocalPatchChange,Rebuild,DecideLocalMerge,LandLocal
+P3D_RebuildReusesJudgement FAIL JudgeLocalPatch,CreateCommit,LocalPatchChange,Rebuild,DecideLocalMerge,AuthorizeLanding,LandLocal
 P3E_DriftHasWayOut PASS
 P3F_NoRejudgeNoRebuild FAIL JudgeLocalPatch,LocalPatchChange
-P3R1_LandedAfterRejudge FAIL JudgeLocalPatch,LocalPatchChange,CreateCommit,Rejudge,DecideLocalMerge,LandLocal
-P3R2_LandedAfterRebuild FAIL CreateCommit,LocalPatchChange,JudgeLocalPatch,Rebuild,DecideLocalMerge,LandLocal
-P3R3_LandedAfterTwoDrifts FAIL JudgeLocalPatch,CreateCommit,LocalPatchChange,Rejudge,Rebuild,LocalBaseMove,Rejudge,Rebuild,DecideLocalMerge,LandLocal
+P3R1_LandedAfterRejudge FAIL JudgeLocalPatch,LocalPatchChange,CreateCommit,Rejudge,DecideLocalMerge,AuthorizeLanding,LandLocal
+P3R2_LandedAfterRebuild FAIL CreateCommit,LocalPatchChange,JudgeLocalPatch,Rebuild,DecideLocalMerge,AuthorizeLanding,LandLocal
+P3R3_LandedAfterTwoDrifts FAIL JudgeLocalPatch,CreateCommit,LocalPatchChange,Rejudge,Rebuild,LocalBaseMove,Rejudge,Rebuild,DecideLocalMerge,AuthorizeLanding,LandLocal
+
+# P3G/P3H: the landing authorization round-trip (#5210). The daemon re-asks the
+# claim-time authorization after the local checks and before the ref write; the
+# model records the last answer in `rechecked` and LandLocal requires it under
+# AuthRecheck. P3H drops that guard (the pre-#5210 shape) and lands with no
+# authorization at all. P3R4/P3R5: reachability — a landing after a held
+# authorization, and the residual race: a revocation between the authorize
+# answer and the ref write still lands (recorded, not closed, by the fix).
+P3G_LandingHeldAuthorization PASS
+P3H_NoAuthRecheck FAIL JudgeLocalPatch,CreateCommit,DecideLocalMerge,LandLocal
+P3R4_LandedAfterAuthorize FAIL JudgeLocalPatch,CreateCommit,DecideLocalMerge,AuthorizeLanding,LandLocal
+P3R5_LandedAcrossRevoke FAIL JudgeLocalPatch,CreateCommit,DecideLocalMerge,AuthorizeLanding,RevokeAuthorization,LandLocal
 
 P5_RepeatedVerdictRemainsBlocked PASS
 P6_ReviewHeadWasObserved PASS
