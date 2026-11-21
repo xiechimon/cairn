@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import {
   existsSync,
   lstatSync,
@@ -23,6 +24,9 @@ import {
   ENV_VARS,
   isAppPath,
   isDesktopNotifyPayload,
+  OWNER_CHANNEL_HEADER,
+  OWNER_CHANNEL_MESSAGE,
+  OWNER_CHANNEL_READY,
   parseAccessTokenFile,
 } from '@cairn/shared';
 import {
@@ -292,6 +296,8 @@ async function serverPort(): Promise<number> {
   return port;
 }
 
+const ownerChannelKey = randomBytes(32).toString('base64url');
+
 function startServer(
   port: number,
   otelEnv: OtelEnv,
@@ -305,15 +311,26 @@ function startServer(
       PORT: String(port),
       [ENV_VARS.home]: cairnHome(),
       [ENV_VARS.parentPid]: String(process.pid),
+      [ENV_VARS.ownerChannel]: 'ipc',
     },
     otelEnv,
   );
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
+  delete env[ENV_VARS.apiKey];
   const child = utilityProcess.fork(join(bundledRoot('server'), 'dist', 'index.mjs'), [], {
     serviceName: 'Cairn server',
     stdio: 'pipe',
     env,
+  });
+  child.on('message', (data: unknown) => {
+    if (
+      data !== null &&
+      typeof data === 'object' &&
+      (data as { type?: unknown }).type === OWNER_CHANNEL_READY
+    ) {
+      child.postMessage({ type: OWNER_CHANNEL_MESSAGE, key: ownerChannelKey });
+    }
   });
   const log = createServerLog(serverLogPath(app.getPath('userData')), logSecrets);
   child.stdout?.on('data', (chunk) => log.write(chunk));
@@ -384,10 +401,17 @@ function signOwnPagesIn(origin: string, token: string): void {
       }
       const requestHeaders = Object.fromEntries(
         Object.entries(details.requestHeaders).filter(
-          ([name]) => name.toLowerCase() !== 'authorization',
+          ([name]) =>
+            name.toLowerCase() !== 'authorization' && name.toLowerCase() !== OWNER_CHANNEL_HEADER,
         ),
       );
-      callback({ requestHeaders: { ...requestHeaders, Authorization: `Bearer ${token}` } });
+      callback({
+        requestHeaders: {
+          ...requestHeaders,
+          Authorization: `Bearer ${token}`,
+          [OWNER_CHANNEL_HEADER]: ownerChannelKey,
+        },
+      });
     },
   );
 }
@@ -983,6 +1007,7 @@ async function boot(): Promise<void> {
         serverHome: cairnHome(),
         origin,
         ownerToken,
+        ownerChannelKey,
         otelEnv,
         agentDesktop: agentDesktopBinary(),
         isQuitting: () => quitting,

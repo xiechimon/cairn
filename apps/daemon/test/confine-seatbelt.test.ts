@@ -88,7 +88,22 @@ describe('seatbelt profile', () => {
       index(`(allow file-read* file-write* (subpath "${worktree}")`),
     );
     expect(index('(allow file-read* file-write*')).toBeLessThan(index('/repo.git/config'));
-    expect(lines).toContain('(deny network-outbound (remote ip "localhost:8123"))');
+    expect(lines).toContain('(deny network-outbound (remote tcp "localhost:8123"))');
+    expect(lines).toContain('(deny network-inbound (local tcp "*:8123"))');
+    expect(lines).toContain('(deny network-bind (local tcp "*:8123"))');
+    const socketLines = lines.filter((line) =>
+      line.startsWith('(deny network-outbound (remote unix-socket'),
+    );
+    expect(socketLines.length).toBeGreaterThan(1);
+    expect(
+      socketLines.every((line) => (line.match(/\((subpath|literal|regex)/g) ?? []).length === 1),
+    ).toBe(true);
+    expect(socketLines).toContain(
+      '(deny network-outbound (remote unix-socket (literal "/var/run/docker.sock")))',
+    );
+    expect(lines).toContain(
+      '(deny mach-lookup (global-name-prefix "com.apple.windowserver") (global-name-prefix "com.apple.hiservices") (global-name-prefix "com.apple.pasteboard"))',
+    );
   });
 
   test('rejects a cache that overlaps a denied root and unsafe paths', () => {
@@ -137,12 +152,12 @@ describe('seatbelt profile', () => {
 });
 
 describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
-  const finderName = `osascript -e 'tell application "Finder" to get name'`;
+  const finderName = `osascript -e 'tell application "Finder" to get name of every window'`;
 
   test('without confinement a session can drive another app through Apple Events', () => {
     const fixture = layout();
     const result = runConfined(null, finderName, fixture.worktree);
-    expect(result.stdout).toContain('Finder');
+    expect(result.status).toBe(0);
   });
 
   test('a confined session cannot start or script an unsandboxed app', () => {

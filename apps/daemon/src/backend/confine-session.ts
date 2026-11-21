@@ -143,7 +143,9 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
   if ((options.platform ?? process.platform) !== 'darwin') return null;
   const environment = options.environment ?? process.env;
   const home = realpathSync(options.home ?? homedir());
-  const port = Number(new URL(options.serverUrl).port);
+  const serverUrl = new URL(options.serverUrl);
+  const port =
+    serverUrl.port === '' ? (serverUrl.protocol === 'https:' ? 443 : 80) : Number(serverUrl.port);
   return (opts, harness, launch, extraState = []) => {
     const env = { ...environment, ...opts.env };
     const workspace = realpathSync(opts.cwd);

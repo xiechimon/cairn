@@ -462,6 +462,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
       claudeBin,
       agentImportHome,
       parentPid,
+      ownerChannel,
       ...observed
     } = ENV_VARS;
     expect(observed).toEqual({
@@ -496,6 +497,7 @@ describe('brand slots (02 §5.8 consolidation + replacement plan §2 canonical r
     expect(confineDeniedRoots).toBe('CAIRN_CONFINE_DENIED_ROOTS');
     expect(claudeBin).toBe('CAIRN_CLAUDE_BIN');
     expect(agentImportHome).toBe('CAIRN_AGENT_IMPORT_HOME');
+    expect(ownerChannel).toBe('CAIRN_OWNER_CHANNEL');
   });
 
   it('credential formats match the observed shapes (key prefix follows the BRAND slot)', () => {

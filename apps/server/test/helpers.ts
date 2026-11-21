@@ -86,7 +86,7 @@ export function bootServer(
     oauthFetch?: AppContext['oauthFetch'];
     providerTestTimeoutMs?: number;
     authToken?: string | null;
-    loopbackOwner?: AppContext['loopbackOwner'];
+    ownerChannel?: AppContext['ownerChannel'];
     accessVerifier?: AppContext['accessVerifier'];
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
@@ -207,7 +207,7 @@ export function bootServer(
       skillSourcesPath,
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
       authToken: opts.authToken ?? null,
-      loopbackOwner: opts.loopbackOwner ?? null,
+      ownerChannel: opts.ownerChannel,
       accessVerifier: opts.accessVerifier ?? null,
       mcpConfigPath: opts.mcpConfigPath ?? join(tmpdir(), `cairn-mcp-absent-${randomUUID()}.json`),
       ...(opts.mcpFetch !== undefined ? { mcpFetch: opts.mcpFetch } : {}),

@@ -2,13 +2,6 @@ import { lookup } from 'node:dns/promises';
 import { isIP } from 'node:net';
 import { networkInterfaces } from 'node:os';
 
-const BROWSER_NAME =
-  /chrom|firefox|brave|vivaldi|edge|opera|zen|librewolf|epiphany|safari|browser/i;
-
-export function isBrowserApp(appName: string): boolean {
-  return BROWSER_NAME.test(appName);
-}
-
 export function originHosts(origins: readonly string[]): string[] {
   const hosts: string[] = [];
   for (const origin of origins) {

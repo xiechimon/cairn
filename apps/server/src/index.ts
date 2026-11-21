@@ -27,7 +27,7 @@ import { createAccessVerifier } from './lib/cloudflare-access.js';
 import { installEnvProxy } from './lib/env-proxy.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
-import { loopbackOwnerFor } from './lib/loopback-owner.js';
+import { listenOwnerChannel, ownerChannelFromEnv } from './lib/owner-channel.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
@@ -215,6 +215,8 @@ const tailnet = createTsnetRemote({
   authToken: config.authToken,
   logger,
 });
+const ownerChannel = ownerChannelFromEnv(process.env);
+listenOwnerChannel(ownerChannel);
 const app = createApp(
   {
     remote: {
@@ -260,7 +262,7 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
-    loopbackOwner: loopbackOwnerFor(config),
+    ownerChannel,
     accessVerifier:
       config.cloudflareAccess === null ? null : createAccessVerifier(config.cloudflareAccess),
     mcpConfigPath: config.mcpConfigPath,

@@ -90,6 +90,7 @@ function registerStaticSpa(app: Hono, webDir: string): void {
 export function createApp(ctx: AppContext, logger?: Logger): Hono {
   const app = new Hono();
   registerTokenAuth(app, ctx.authToken, {
+    ownerChannel: ctx.ownerChannel,
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
     resolveSession: (cookie) => resolveBrowserSession(ctx.db, cookie),
     redeemTicket: (ticket) => {

@@ -73,7 +73,12 @@ export const ENV_VARS = {
   claudeBin: 'CAIRN_CLAUDE_BIN',
   agentImportHome: 'CAIRN_AGENT_IMPORT_HOME',
   parentPid: 'CAIRN_PARENT_PID',
+  ownerChannel: 'CAIRN_OWNER_CHANNEL',
 } as const;
+
+export const OWNER_CHANNEL_HEADER = 'x-cairn-owner-channel';
+export const OWNER_CHANNEL_READY = 'cairn-owner-channel-ready';
+export const OWNER_CHANNEL_MESSAGE = 'cairn-owner-channel';
 
 export const API_KEY_PATTERN = /^cairn_[0-9a-f]{48}$/;
 

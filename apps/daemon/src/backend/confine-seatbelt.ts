@@ -3,11 +3,17 @@ import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { canonical, contains, DENIED_DIRECTORIES, DENIED_FILES } from './confine.js';
+import {
+  CONTAINER_SOCKETS,
+  canonical,
+  contains,
+  DENIED_DIRECTORIES,
+  DENIED_FILES,
+} from './confine.js';
 
 export const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
 
-const MAC_DENIED_DIRECTORIES = [
+export const MAC_DENIED_DIRECTORIES = [
   'Library/Keychains',
   'Library/Application Support/Google/Chrome',
   'Library/Application Support/Chromium',
@@ -20,9 +26,39 @@ const MAC_DENIED_DIRECTORIES = [
 const OWN_STATE_NAMES = ['.claude', '.pi', '.gemini', '.claude.json'];
 const DEVICE_WRITES = ['/dev/null', '/dev/dtracehelper'];
 
-const LAUNCH_SERVICE_DENIALS = [
+const MACH_SERVICE_DENIALS = [
   '(deny mach-lookup (global-name-prefix "com.apple.coreservices") (global-name-prefix "com.apple.lsd"))',
+  '(deny mach-lookup (global-name-prefix "com.apple.windowserver") (global-name-prefix "com.apple.hiservices") (global-name-prefix "com.apple.pasteboard"))',
 ];
+
+const TEMP_SOCKET_DENY =
+  '(regex #"^(/private)?/(tmp|var/tmp|var/run|var/folders/[^/]+/[^/]+/T)/(com\\.apple\\.launchd\\.|ssh-|tmux-|uscreens|screens/|zellij-)")';
+
+function unixSocketDenies(directories: string[], files: string[]): string[] {
+  const filters = [
+    ...directories.map((path) => `(subpath ${quoted(path)})`),
+    ...files.map((path) => `(literal ${quoted(path)})`),
+    ...CONTAINER_SOCKETS.map((path) => `(literal ${quoted(path)})`),
+    TEMP_SOCKET_DENY,
+  ];
+  return [
+    ...filters.map((filter) => `(deny network-outbound (remote unix-socket ${filter}))`),
+    `(deny file-write* ${TEMP_SOCKET_DENY})`,
+    `(deny network-bind (local unix-socket ${TEMP_SOCKET_DENY}))`,
+    ...CONTAINER_SOCKETS.map(
+      (path) => `(deny network-bind (local unix-socket (literal ${quoted(path)})))`,
+    ),
+  ];
+}
+
+function serverPortDenies(lines: string[], port: number): void {
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid server port');
+  for (const host of ['localhost', '*']) {
+    lines.push(`(deny network-outbound (remote tcp "${host}:${port}"))`);
+    lines.push(`(deny network-inbound (local tcp "${host}:${port}"))`);
+    lines.push(`(deny network-bind (local tcp "${host}:${port}"))`);
+  }
+}
 
 export interface SeatbeltPolicy {
   home: string;
@@ -151,13 +187,10 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
       : []),
     ...(readable.length > 0 ? [`(allow file-read* ${subpaths(readable)})`] : []),
     `(deny file-write* ${subpaths(protectedGit)} (literal ${quoted(workspaceGit)})${protectedGitPatterns.length > 0 ? ` ${protectedGitPatterns.join(' ')}` : ''})`,
-    ...LAUNCH_SERVICE_DENIALS,
+    ...unixSocketDenies(deniedDirectories, deniedFiles),
+    ...MACH_SERVICE_DENIALS,
   ];
-  if (policy.serverPort !== undefined) {
-    if (!Number.isInteger(policy.serverPort) || policy.serverPort < 1 || policy.serverPort > 65535)
-      throw new Error('Invalid server port');
-    lines.push(`(deny network-outbound (remote ip "localhost:${policy.serverPort}"))`);
-  }
+  if (policy.serverPort !== undefined) serverPortDenies(lines, policy.serverPort);
   return `${lines.join('\n')}\n`;
 }
 
@@ -167,6 +200,39 @@ export function seatbeltCommand(
   args: string[],
 ): { command: string; args: string[] } {
   return { command: SANDBOX_EXEC, args: ['-p', seatbeltProfile(policy), command, ...args] };
+}
+
+export interface HostShellPolicy {
+  deniedDirectories: string[];
+  deniedFiles: string[];
+  serverPort?: number;
+  agentDesktopDir?: string;
+}
+
+export function hostShellProfile(policy: HostShellPolicy): string {
+  const lines = ['(version 1)', '(allow default)'];
+  if (policy.deniedDirectories.length > 0 || policy.deniedFiles.length > 0) {
+    lines.push(
+      `(deny file-read* file-write* ${subpaths(policy.deniedDirectories)} ${policy.deniedFiles
+        .map((path) => `(literal ${quoted(path)})`)
+        .join(' ')})`,
+    );
+  }
+  if (policy.agentDesktopDir !== undefined) {
+    lines.push(`(deny process-exec (subpath ${quoted(policy.agentDesktopDir)}))`);
+  }
+  lines.push(...unixSocketDenies(policy.deniedDirectories, policy.deniedFiles));
+  lines.push(...MACH_SERVICE_DENIALS);
+  if (policy.serverPort !== undefined) serverPortDenies(lines, policy.serverPort);
+  return `${lines.join('\n')}\n`;
+}
+
+export function hostShellCommand(
+  policy: HostShellPolicy,
+  command: string,
+  args: string[],
+): { command: string; args: string[] } {
+  return { command: SANDBOX_EXEC, args: ['-p', hostShellProfile(policy), command, ...args] };
 }
 
 export class SeatbeltProbeError extends Error {

@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { hostCommandEnvironment } from './host.js';
 import { fitPngUnderCap } from './host-screen-png.js';
 import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
+import { originHosts, showsCairn } from './host-screen-self.js';
 
 const PERM_DENIED = 'PERM_DENIED';
 export const SCREEN_MAX_ACTIONS = 24;
@@ -26,6 +27,7 @@ const SNAPSHOT_TIMEOUT_MS = '8000';
 const FIND_LIMIT = 50;
 const UNPROVEN_RECEIVER =
   'Raw coordinate clicks are unavailable until their receiver identity can be proven; use an observed element number instead';
+const CAIRN_WINDOW_REFUSAL = 'This window shows the cairn web app; it is never driven';
 
 export type ScreenOutcome =
   | { kind: 'done'; text: string; images: ComputerImage[] }
@@ -131,11 +133,12 @@ export interface AgentDesktopHostScreenOptions {
   outputCapBytes?: number;
   imageMaxBase64Chars?: number;
   now?: () => number;
+  cairnOrigins?: readonly string[];
 }
 
 export function createHostScreenFromEnv(
   env: NodeJS.ProcessEnv,
-  options: Pick<AgentDesktopHostScreenOptions, 'stateDir' | 'onPermissionDenied'>,
+  options: Pick<AgentDesktopHostScreenOptions, 'stateDir' | 'onPermissionDenied' | 'cairnOrigins'>,
 ): HostScreen | undefined {
   if (!env.CAIRN_AGENT_DESKTOP) return undefined;
   return new AgentDesktopHostScreen({ env, binary: env.CAIRN_AGENT_DESKTOP, ...options });
@@ -161,8 +164,10 @@ export class AgentDesktopHostScreen implements HostScreen {
   private readonly outputCapBytes: number;
   private readonly imageMaxBase64Chars: number;
   private readonly now: () => number;
+  private readonly hosts: string[];
   private readonly closing = new AbortController();
   private readonly snapshots = new Map<string, { id: string; windowId: string }>();
+  private readonly cairnWindows = new Set<string>();
   private windowCaptureUnsupported = false;
 
   constructor(options: AgentDesktopHostScreenOptions) {
@@ -174,6 +179,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     this.outputCapBytes = options.outputCapBytes ?? SCREEN_OUTPUT_CAP_BYTES;
     this.imageMaxBase64Chars = options.imageMaxBase64Chars ?? COMPUTER_IMAGE_MAX_BASE64_CHARS;
     this.now = options.now ?? Date.now;
+    this.hosts = ['cairn', ...originHosts(options.cairnOrigins ?? [])];
   }
 
   async killAll(): Promise<void> {
@@ -230,6 +236,7 @@ export class AgentDesktopHostScreen implements HostScreen {
       const done: string[] = [];
       for (const [index, action] of actions.entries()) {
         try {
+          await this.assertNotCairn(target, call, budget);
           await this.perform(target, action, index, done.length, call, budget);
         } catch (error) {
           if (error instanceof Stop && done.length > 0) {
@@ -378,7 +385,43 @@ export class AgentDesktopHostScreen implements HostScreen {
       throw refuse(`${matching[0]?.app_name ?? appName} has no visible, restored window to drive`);
     }
     const title = window.title ?? '';
+    if (
+      this.cairnWindows.has(window.id) ||
+      window.app_name.toLowerCase().includes('cairn') ||
+      showsCairn([title], this.hosts)
+    ) {
+      this.cairnWindows.add(window.id);
+      throw refuse(CAIRN_WINDOW_REFUSAL);
+    }
     return { app: window.app_name, windowId: window.id, title };
+  }
+
+  private async assertNotCairn(
+    target: Target,
+    call: ScreenCall,
+    budget: { endsAt: number },
+  ): Promise<void> {
+    const read = await this.read(
+      [
+        'snapshot',
+        '--window-id',
+        target.windowId,
+        '--timeout-ms',
+        SNAPSHOT_TIMEOUT_MS,
+        '--compact',
+        '--max-depth',
+        '40',
+      ],
+      call,
+      budget,
+    );
+    if (!read.ok) throw refuse(clip(read.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
+    const data = (read.data ?? {}) as { tree?: AccessibilityNode };
+    const rows = accessibilityRows(data.tree ? [data.tree] : [], '', false);
+    if (showsCairn(rows.strings, this.hosts)) {
+      this.cairnWindows.add(target.windowId);
+      throw refuse(CAIRN_WINDOW_REFUSAL);
+    }
   }
 
   private async observation(
@@ -412,6 +455,10 @@ export class AgentDesktopHostScreen implements HostScreen {
       snapshotId,
       data.complete === false || data.truncated === true,
     );
+    if (showsCairn(rows.strings, this.hosts)) {
+      this.cairnWindows.add(target.windowId);
+      throw refuse(CAIRN_WINDOW_REFUSAL);
+    }
     const shot = await this.screenshot(target, call, budget);
     const header = [
       `app: ${target.app}`,

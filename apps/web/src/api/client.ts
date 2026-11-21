@@ -3,12 +3,10 @@ import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
 import {
   authSnapshot,
   awaitGate,
-  bootstrapLoopback,
   clearLegacyBrowserToken,
   consumePairFragment,
   demandGate,
   exchangeAccessIdentity,
-  isLoopbackPage,
   passGate,
 } from './auth.js';
 
@@ -37,14 +35,6 @@ function send(path: string, init?: { method?: string; body?: unknown }): Promise
 
 if (typeof window !== 'undefined') clearLegacyBrowserToken();
 
-let bootstrapped = false;
-
-async function ensureLoopbackSession(): Promise<void> {
-  if (DEMO_MODE || bootstrapped || typeof window === 'undefined' || !isLoopbackPage()) return;
-  bootstrapped = true;
-  await bootstrapLoopback();
-}
-
 let establishing: Promise<boolean> | null = null;
 
 function establishSession(): Promise<boolean> {
@@ -59,7 +49,6 @@ function establishSession(): Promise<boolean> {
       if (failed) return false;
     }
     if ((await fetch('/api/teams')).ok) return true;
-    if (await bootstrapLoopback()) return (await fetch('/api/teams')).ok;
     return (await exchangeAccessIdentity()) && (await fetch('/api/teams')).ok;
   })().finally(() => {
     establishing = null;
@@ -88,7 +77,6 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   if (init?.method != null && init.method !== 'GET' && blockDemoWrite()) {
     return new Promise<T>(() => {});
   }
-  await ensureLoopbackSession();
   const first = await send(path, init);
   if (first.status !== 401) return settle<T>(signedIn(first));
   if (await establishSession()) {

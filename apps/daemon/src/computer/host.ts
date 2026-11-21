@@ -14,6 +14,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import type { HostShellConfinement } from '../backend/host-shell-confinement.js';
 import { childEnv } from '../child-env.js';
 import { COMPUTER_MARKER_ENV, ProcessTree } from '../process-tree.js';
 import { AGENT_BROWSER_BINARY } from './browser.js';
@@ -41,6 +42,10 @@ const AGENT_BROWSER_ENV = new Set(
   ].map((name) => name.toUpperCase()),
 );
 
+const HOST_STRIPPED_ENV = new Set(
+  ['DBUS_SESSION_BUS_ADDRESS', 'SSH_AGENT_PID', 'SSH_AUTH_SOCK'].map((name) => name.toUpperCase()),
+);
+
 export interface HostComputerOptions {
   home?: string;
   env?: NodeJS.ProcessEnv;
@@ -48,6 +53,7 @@ export interface HostComputerOptions {
   streamDrainMs?: number;
   maxFileBytes?: number;
   browserEnvironment?: (argv: readonly string[]) => Promise<Record<string, string>>;
+  confinement?: HostShellConfinement;
 }
 
 export function hostCommandEnvironment(
@@ -58,7 +64,11 @@ export function hostCommandEnvironment(
   for (const [name, value] of Object.entries(inherited)) {
     if (value !== undefined && AGENT_BROWSER_ENV.has(name.toUpperCase())) extra[name] = value;
   }
-  return childEnv({ ...extra, ...requested }, inherited);
+  const env = childEnv({ ...extra, ...requested }, inherited);
+  for (const name of Object.keys(env)) {
+    if (HOST_STRIPPED_ENV.has(name.toUpperCase())) delete env[name];
+  }
+  return env;
 }
 
 function isInside(root: string, target: string): boolean {
@@ -179,7 +189,11 @@ export class HostComputerProvider implements ComputerProvider {
     if (!isInside(realHome, existing)) {
       throw new ComputerRefusal(`${label} resolves outside the home folder`);
     }
-    return path.join(existing, ...missing);
+    const target = path.join(existing, ...missing);
+    if (this.options.confinement?.denied(target) === true) {
+      throw new ComputerRefusal(`${label} is inside a protected directory`);
+    }
+    return target;
   }
 
   async execute(request: ComputerExecuteRequest): Promise<AsyncIterable<ComputerProcessEvent>> {
@@ -247,7 +261,8 @@ export class HostComputerProvider implements ComputerProvider {
     };
     let child: ReturnType<typeof spawnContainedCommand>;
     try {
-      child = spawnContainedCommand(command, args, {
+      const launched = this.options.confinement?.wrap(command, args) ?? { command, args };
+      child = spawnContainedCommand(launched.command, launched.args, {
         cwd,
         env,
         detached: true,

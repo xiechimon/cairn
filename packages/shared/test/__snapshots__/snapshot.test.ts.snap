@@ -10128,6 +10128,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "home": "CAIRN_HOME",
     "hookTimeoutMs": "CAIRN_HOOK_TIMEOUT_MS",
     "mcpConfig": "CAIRN_MCP_CONFIG",
+    "ownerChannel": "CAIRN_OWNER_CHANNEL",
     "parentPid": "CAIRN_PARENT_PID",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",

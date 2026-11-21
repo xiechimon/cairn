@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import type {
@@ -35,6 +36,7 @@ import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
 import { createDevinManaged, type DevinManaged } from './backend/devin-managed.js';
 import { createGeminiManaged, type GeminiManaged } from './backend/gemini-managed.js';
+import { createHostShellConfinement } from './backend/host-shell-confinement.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';
@@ -193,11 +195,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.machine(`agent config import failed: ${failure.item}: ${failure.reason}`);
     }
   }
+  const extraDeniedRoots = (process.env[ENV_VARS.confineDeniedRoots] ?? '')
+    .split(delimiter)
+    .filter((path) => path !== '');
   const confine = createSessionConfiner({
     daemonHome: config.home,
-    extraDeniedRoots: (process.env[ENV_VARS.confineDeniedRoots] ?? '')
-      .split(delimiter)
-      .filter((path) => path !== ''),
+    extraDeniedRoots,
     readable: [config.skillsDir, paths.teamSkillsCacheDir, join(paths.home, 'tools')],
     handoffDirectories: [paths.plansDir],
     serverUrl: config.serverUrl,
@@ -273,15 +276,31 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
     });
+  const serverUrl = new URL(config.serverUrl);
+  const serverPort =
+    serverUrl.port === '' ? (serverUrl.protocol === 'https:' ? 443 : 80) : Number(serverUrl.port);
   const hostComputer =
     opts.hostComputer ??
-    (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
+    (capEnv.CAIRN_OWN_COMPUTER === '1'
+      ? new HostComputerProvider({
+          confinement: createHostShellConfinement({
+            deniedRoots: [config.home, join(homedir(), '.cairn'), ...extraDeniedRoots],
+            ...(Number.isInteger(serverPort) && serverPort > 0 ? { serverPort } : {}),
+            agentDesktop: capEnv.CAIRN_AGENT_DESKTOP ?? null,
+          }),
+        })
+      : undefined);
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? createHostPermissionsProbe(capEnv);
+  const cairnOrigins = [
+    config.serverUrl,
+    ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
+  ];
   const hostScreen =
     opts.hostScreen ??
     createHostScreenFromEnv(capEnv, {
       stateDir: join(paths.home, 'agent-desktop'),
       onPermissionDenied: () => hostPermissionsProbe.refreshNow(),
+      cairnOrigins,
     });
   const enrolledIdentity = { machineId: '' };
   const computerInputLocks = join(paths.home, 'computer-input');
@@ -1092,10 +1111,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
     phones,
-    cairnOrigins: [
-      config.serverUrl,
-      ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
-    ],
+    cairnOrigins,
   });
   const imsgBridge = createImsgBridge({ api: client, logger, home: config.home });
   void (async () => {

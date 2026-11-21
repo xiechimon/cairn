@@ -21,6 +21,17 @@ export const DENIED_DIRECTORIES = [
   '.aws',
   '.config/gh',
   '.docker',
+  '.orbstack',
+  '.colima',
+  '.lima',
+  '.rd',
+  '.local/share/containers',
+  '.config/containers',
+  '.local/share/docker',
+  '.local/share/containerd',
+  '.local/share/buildkit',
+  '.tmux',
+  '.screen',
   '.kube',
   '.password-store',
   '.config/google-chrome',
@@ -31,6 +42,12 @@ export const DENIED_DIRECTORIES = [
   '.gemini',
 ];
 export const DENIED_FILES = ['.netrc', '.git-credentials', '.claude.json'];
+export const CONTAINER_SOCKETS = [
+  '/var/run/docker.sock',
+  '/private/var/run/docker.sock',
+  '/run/docker.sock',
+  '/run/podman/podman.sock',
+];
 
 export function contains(parent: string, child: string): boolean {
   const path = relative(parent, child);

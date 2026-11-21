@@ -493,7 +493,35 @@ describe('act', () => {
 });
 
 describe('Cairn itself', () => {
-  test('a browser window showing the cairn web app is driven like any other window', async () => {
+  test('the Cairn app window is never driven', async () => {
+    const fake = setup([
+      {
+        command: 'list-windows',
+        fixture: 'list-windows-wayland-gtk4',
+        override: (value) => {
+          const listed = value as { data: Record<string, unknown>[] };
+          return {
+            ...listed,
+            data: listed.data.map((window) => ({
+              ...window,
+              app_name: 'Cairn',
+              title: 'Cairn',
+              pid: process.pid,
+            })),
+          };
+        },
+      },
+    ]);
+    const observed = error(await fake.screen.observe(call({ app: 'Cairn' })));
+    expect(observed.message).toBe('This window shows the cairn web app; it is never driven');
+    const acted = error(
+      await fake.screen.act(call({ app: 'Cairn', actions: [{ kind: 'key', key: 'j' }] })),
+    );
+    expect(acted.message).toBe('This window shows the cairn web app; it is never driven');
+    expect(fake.commands()).not.toContain('snapshot');
+  });
+
+  test('a browser window showing the cairn web app is refused by its title', async () => {
     const fake = setup([
       {
         command: 'list-windows',
@@ -511,9 +539,54 @@ describe('Cairn itself', () => {
           };
         },
       },
-      ...observing().slice(1),
     ]);
-    done(await fake.screen.observe(call({ app: 'google-chrome' })));
+    const result = error(await fake.screen.observe(call({ app: 'google-chrome' })));
+    expect(result.message).toBe('This window shows the cairn web app; it is never driven');
+    expect(fake.commands()).not.toContain('snapshot');
+  });
+
+  test('a browser window whose page shows a cairn origin is refused by its contents', async () => {
+    const fake = setup(
+      [
+        {
+          command: 'list-windows',
+          fixture: 'list-windows-wayland-gtk4',
+          override: (value) => {
+            const listed = value as { data: Record<string, unknown>[] };
+            return {
+              ...listed,
+              data: listed.data.map((window) => ({
+                ...window,
+                app_name: 'google-chrome',
+                title: 'Threads',
+                pid: process.pid,
+              })),
+            };
+          },
+        },
+        {
+          command: 'snapshot',
+          stdout: JSON.stringify({
+            ok: true,
+            command: 'snapshot',
+            data: {
+              complete: true,
+              snapshot_id: 'snap-cairn-page',
+              tree: {
+                role: 'window',
+                children: [{ role: 'address_bar', value: 'http://127.0.0.1:5273/app/tasks' }],
+              },
+            },
+          }),
+        },
+        windowShotRefused,
+        fullShot(solidPng(8, 8)),
+      ],
+      { cairnOrigins: ['http://127.0.0.1:5273'] },
+    );
+    const result = error(await fake.screen.observe(call({ app: 'google-chrome' })));
+    expect(result.message).toBe('This window shows the cairn web app; it is never driven');
+    expect(fake.commands()).not.toContain('screenshot');
   });
 });
 

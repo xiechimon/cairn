@@ -9,6 +9,7 @@ import {
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
   machineJsonSchema,
+  OWNER_CHANNEL_HEADER,
 } from '@cairn/shared';
 import { probeHostKey } from '@cairn/shared/host-identity';
 import { type OtelEnv, withOtelEnv } from './otel-config.js';
@@ -27,6 +28,7 @@ export interface RunnerOptions {
   serverHome: string;
   origin: string;
   ownerToken: string;
+  ownerChannelKey: string;
   otelEnv: OtelEnv;
   agentDesktop: string | null;
   isQuitting: () => boolean;
@@ -55,6 +57,7 @@ async function postJson(
 async function enrollLocalMachine(
   origin: string,
   ownerToken: string,
+  ownerChannelKey: string,
   hostKey: string | undefined,
 ): Promise<MachineJson> {
   const started = machineEnrollStartResponseSchema.parse(
@@ -63,12 +66,24 @@ async function enrollLocalMachine(
       ...(hostKey !== undefined ? { hostKey } : {}),
     }),
   );
-  const confirmed = (await postJson(
-    `${origin}/api/machine/enroll/confirm`,
-    { enrollId: started.enrollId },
-    { Authorization: `Bearer ${ownerToken}` },
-  )) as { machine?: unknown };
-  return machineEnrollResponseSchema.parse(confirmed.machine);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const confirmed = (await postJson(
+        `${origin}/api/machine/enroll/confirm`,
+        { enrollId: started.enrollId },
+        {
+          Authorization: `Bearer ${ownerToken}`,
+          [OWNER_CHANNEL_HEADER]: ownerChannelKey,
+        },
+      )) as { machine?: unknown };
+      return machineEnrollResponseSchema.parse(confirmed.machine);
+    } catch (error) {
+      const pending =
+        error instanceof Error && error.message.endsWith('answered HTTP 503') && attempt < 9;
+      if (!pending) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
 }
 
 function storedHostKey(home: string): string | undefined {
@@ -109,13 +124,19 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
   );
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
+  delete env[ENV_VARS.apiKey];
   return env;
 }
 
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
   const hostKey = storedHostKey(options.home) ?? probeHostKey(options.home) ?? undefined;
   writeMachineJson(options.home, {
-    ...(await enrollLocalMachine(options.origin, options.ownerToken, hostKey)),
+    ...(await enrollLocalMachine(
+      options.origin,
+      options.ownerToken,
+      options.ownerChannelKey,
+      hostKey,
+    )),
     ...(hostKey !== undefined ? { hostKey } : {}),
   });
   let child: ChildProcess | null = null;

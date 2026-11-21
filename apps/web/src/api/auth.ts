@@ -111,16 +111,6 @@ export function isLoopbackPage(): boolean {
   return LOOPBACK_HOSTS.has(window.location.hostname);
 }
 
-export async function bootstrapLoopback(): Promise<boolean> {
-  if (!isLoopbackPage()) return false;
-  try {
-    const res = await fetch('/api/auth/bootstrap', { method: 'POST' });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 export async function exchangeAccessIdentity(): Promise<boolean> {
   if (isLoopbackPage()) return false;
   try {
