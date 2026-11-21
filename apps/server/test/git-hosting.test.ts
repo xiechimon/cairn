@@ -37,7 +37,15 @@ let closeServer: () => Promise<void>;
 const API_KEY = 'cairn_e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0';
 
 beforeAll(async () => {
-  s = bootServer();
+  s = bootServer({
+    githubFetch: async () => ({
+      ok: false,
+      status: 404,
+      headers: { get: () => null },
+      json: async () => ({ message: 'Not Found' }),
+      text: async () => 'Not Found',
+    }),
+  });
   insertGitApiKey(s, API_KEY);
   const server = serve({ fetch: s.app.fetch, port: 0 });
   await new Promise<void>((resolve) => server.once('listening', resolve));
@@ -250,7 +258,9 @@ describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () =
       repoKind: 'github',
       githubRepo: 'octocat/hello',
     });
-    expect((await req(s.app, 'GET', `/api/projects/${gh.id}/files`)).status).toBe(404);
+    const unavailable = await req(s.app, 'GET', `/api/projects/${gh.id}/files`);
+    expect(unavailable.status).toBe(404);
+    expect(await unavailable.text()).toContain('octocat/hello');
     expect((await req(s.app, 'GET', `/api/projects/${newUuidv7()}/files`)).status).toBe(404);
   });
 });

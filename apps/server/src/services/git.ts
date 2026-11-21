@@ -27,9 +27,14 @@ import {
   todo as todoTable,
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
-import { isSafeRepoPath, lsFilesRecursive, runGit, systemGitOps } from '../lib/git.js';
+import { isSafeRepoPath, looksBinary, lsFilesRecursive, runGit, systemGitOps } from '../lib/git.js';
 import type { FetchLike } from '../lib/github.js';
 import { githubBranches } from '../lib/github-branches.js';
+import {
+  type GithubRepoRead,
+  listGithubProjectFiles,
+  readGithubProjectFile,
+} from '../lib/github-repo-files.js';
 import { githubReadToken } from './github-autonomous-token.js';
 
 export type ProjectRow = typeof project.$inferSelect;
@@ -38,6 +43,12 @@ export interface RepoCtx {
   db: Db;
   reposDir: string;
   workspacesDir?: string | undefined;
+}
+
+export interface RepoReadCtx extends RepoCtx {
+  box?: SecretBox | undefined;
+  githubFetch?: FetchLike | undefined;
+  githubAppTokenSocket?: string | null | undefined;
 }
 
 export function slugifyRepoName(name: string): string {
@@ -235,27 +246,51 @@ async function requireGithubRepoIdentity(dir: string, ref: GithubRepoRef): Promi
   }
 }
 
-export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promise<string> {
+function projectRowOf(ctx: RepoCtx, projectId: string): ProjectRow {
   const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
   if (!row) throw notFound(`project ${projectId}`);
+  return row;
+}
+
+async function githubRepoCacheDir(ctx: RepoCtx, row: ProjectRow): Promise<string | null> {
+  if (ctx.workspacesDir === undefined) return null;
+  const ref = githubRepoOfProject(row);
+  if (ref === null) throw new HttpError(409, 'invalid GitHub repository binding');
+  if (!/^[A-Za-z0-9_-]+$/.test(row.id))
+    throw new HttpError(409, 'invalid project repository identity');
+  const cache = join(ctx.workspacesDir, row.id, 'repo');
+  if (!existsSync(cache)) return null;
+  const expected = join(realpathSync(ctx.workspacesDir), row.id, 'repo');
+  if (realpathSync(cache) !== expected)
+    throw new HttpError(403, 'project repository cache escapes its root');
+  await requireGithubRepoIdentity(cache, ref);
+  return cache;
+}
+
+async function githubRepoReader(ctx: RepoReadCtx, row: ProjectRow): Promise<GithubRepoRead> {
+  const repository = githubRepoOfProject(row);
+  if (repository === null) throw new HttpError(409, 'invalid GitHub repository binding');
+  const token = await githubReadToken(
+    {
+      db: ctx.db,
+      box: ctx.box,
+      githubFetch: ctx.githubFetch,
+      githubAppTokenSocket: ctx.githubAppTokenSocket,
+    },
+    row.teamId,
+    repository,
+  );
+  return { fetchImpl: ctx.githubFetch ?? fetch, token, repository };
+}
+
+export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promise<string> {
+  const row = projectRowOf(ctx, projectId);
   if (row.repoKind === 'hosted' && row.repoName !== null) {
     return repoDirFor(ctx.reposDir, row.teamId, row.repoName);
   }
-  if (row.repoKind === 'github' && ctx.workspacesDir !== undefined) {
-    const ref = githubRepoOfProject(row);
-    if (ref === null) throw new HttpError(409, 'invalid GitHub repository binding');
-    if (!/^[A-Za-z0-9_-]+$/.test(row.id))
-      throw new HttpError(409, 'invalid project repository identity');
-    const cache = join(ctx.workspacesDir, row.id, 'repo');
-    if (existsSync(cache)) {
-      const expected = join(realpathSync(ctx.workspacesDir), row.id, 'repo');
-      if (realpathSync(cache) !== expected)
-        throw new HttpError(403, 'project repository cache escapes its root');
-      await requireGithubRepoIdentity(cache, ref);
-      return cache;
-    }
-  }
   if (row.repoKind === 'github') {
+    const cache = await githubRepoCacheDir(ctx, row);
+    if (cache !== null) return cache;
     throw new HttpError(404, 'github repository cache unavailable on this server');
   }
   if (row.repoKind === 'local') {
@@ -340,42 +375,59 @@ async function resolveCommitOr404(
 export const PROJECT_FILES_DEFAULT_LIMIT = 2000;
 export const PROJECT_FILES_MAX_LIMIT = 5000;
 
+function filesLimit(limitParam: string | undefined): number {
+  const parsed = limitParam === undefined || limitParam === '' ? NaN : Number(limitParam);
+  return Number.isInteger(parsed)
+    ? Math.min(Math.max(parsed, 1), PROJECT_FILES_MAX_LIMIT)
+    : PROJECT_FILES_DEFAULT_LIMIT;
+}
+
 export async function readFiles(
-  ctx: RepoCtx,
+  ctx: RepoReadCtx,
   projectId: string,
   refParam?: string,
   limitParam?: string,
 ): Promise<ProjectFilesResponse> {
-  const dir = await requireRepoReadDir(ctx, projectId);
+  const row = projectRowOf(ctx, projectId);
+  const cache = row.repoKind === 'github' ? await githubRepoCacheDir(ctx, row) : null;
+  if (row.repoKind === 'github' && cache === null) {
+    return listGithubProjectFiles(
+      await githubRepoReader(ctx, row),
+      refParam,
+      filesLimit(limitParam),
+    );
+  }
+  const dir = cache ?? (await requireRepoReadDir(ctx, projectId));
   const ref = refParam ?? 'HEAD';
   const commit = await resolveCommitOr404(ctx, projectId, dir, ref);
-  const parsed = limitParam === undefined || limitParam === '' ? NaN : Number(limitParam);
-  const limit = Number.isInteger(parsed)
-    ? Math.min(Math.max(parsed, 1), PROJECT_FILES_MAX_LIMIT)
-    : PROJECT_FILES_DEFAULT_LIMIT;
+  const limit = filesLimit(limitParam);
   const all = await lsFilesRecursive(dir, commit);
   const files = all.slice(0, limit).map((e) => ({ path: e.path, type: e.type, size: e.size }));
   return { ref, commit, truncated: all.length > files.length, files };
 }
 
-function looksBinary(buf: Uint8Array): boolean {
-  const window = buf.subarray(0, 8000);
-  return window.includes(0);
-}
-
 export async function readFile(
-  ctx: RepoCtx,
+  ctx: RepoReadCtx,
   projectId: string,
   path: string,
   refParam?: string,
   options: { defaultBranch?: boolean; maxBytes?: number } = {},
 ): Promise<ProjectFileResponse> {
   if (!isSafeRepoPath(path)) throw new HttpError(400, `invalid query path: ${path}`);
-  const dir = await requireRepoReadDir(ctx, projectId);
+  const row = projectRowOf(ctx, projectId);
+  const cache = row.repoKind === 'github' ? await githubRepoCacheDir(ctx, row) : null;
+  if (row.repoKind === 'github' && cache === null) {
+    return readGithubProjectFile(
+      await githubRepoReader(ctx, row),
+      path,
+      refParam ?? row.baseBranch ?? undefined,
+      options,
+    );
+  }
+  const dir = cache ?? (await requireRepoReadDir(ctx, projectId));
   let ref = refParam ?? 'HEAD';
-  if (ctx.workspacesDir !== undefined && dir === join(ctx.workspacesDir, projectId, 'repo')) {
-    const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
-    if (refParam === undefined && row?.baseBranch != null) {
+  if (cache !== null) {
+    if (refParam === undefined && row.baseBranch != null) {
       ref = `refs/remotes/origin/${row.baseBranch}`;
     } else if (refParam === undefined) {
       const head = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
@@ -387,15 +439,10 @@ export async function readFile(
       ref = head.stdout.toString('utf8').trim();
     }
   }
-  if (
-    refParam === undefined &&
-    options.defaultBranch === true &&
-    !(ctx.workspacesDir !== undefined && dir === join(ctx.workspacesDir, projectId, 'repo'))
-  ) {
-    const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
-    if (row?.baseBranch != null) {
+  if (refParam === undefined && options.defaultBranch === true && cache === null) {
+    if (row.baseBranch != null) {
       ref = `refs/heads/${row.baseBranch}`;
-    } else if (row?.repoKind !== 'hosted') {
+    } else if (row.repoKind !== 'hosted') {
       const remoteHead = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
         cwd: dir,
         timeoutMs: 15000,
@@ -442,7 +489,7 @@ export async function readFile(
 }
 
 export async function readBranches(
-  ctx: RepoCtx & { box?: SecretBox; githubFetch?: FetchLike },
+  ctx: RepoReadCtx,
   projectId: string,
 ): Promise<ProjectBranchesResponse> {
   const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();

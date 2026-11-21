@@ -66,6 +66,10 @@ export function isSafeRepoPath(path: string): boolean {
   return !path.split('/').includes('..');
 }
 
+export function looksBinary(buf: Uint8Array): boolean {
+  return buf.subarray(0, 8000).includes(0);
+}
+
 export function decodeCgiResponse(raw: Buffer): GitCgiResponse {
   let split = -1;
   let splitLen = 0;

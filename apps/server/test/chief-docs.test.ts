@@ -9,8 +9,9 @@ import { gitPrim } from '../../daemon/src/git.js';
 import { ensureStateDirs, statePaths } from '../../daemon/src/state.js';
 import { project } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
+import type { FetchLike } from '../src/lib/github.js';
 import { localWorkspaceRoot } from '../src/lib/workspace-root.js';
-import { executeChiefTool } from '../src/services/chief-tools.js';
+import { type ChiefToolDeps, executeChiefTool } from '../src/services/chief-tools.js';
 import { readFile, readFiles } from '../src/services/git.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
@@ -80,8 +81,59 @@ async function fetchFixture(
   }
 }
 
-async function docs(paths: string[], ref?: string): Promise<Docs> {
-  return (await relay('docs', { projectId: H.projectId, paths, ...(ref ? { ref } : {}) })) as Docs;
+async function docs(
+  paths: string[],
+  ref?: string,
+  over: Partial<ChiefToolDeps> = {},
+): Promise<Docs> {
+  return JSON.parse(
+    await executeChiefTool({ ...toolDeps(), ...over }, ctx(), 'docs', {
+      projectId: H.projectId,
+      paths,
+      ...(ref ? { ref } : {}),
+    }),
+  ) as Docs;
+}
+
+const API = 'https://api.github.com';
+const GITHUB_COMMIT = 'a'.repeat(40);
+const GITHUB_SOURCE = 'export const spawn = true;\n';
+
+type ApiRoute = (url: URL) => { status?: number; body: unknown };
+
+function githubApiStub(routes: Record<string, ApiRoute>) {
+  const calls: string[] = [];
+  const impl: FetchLike = async (input) => {
+    const url = String(input);
+    calls.push(url);
+    const parsed = new URL(url);
+    const route =
+      routes[url] ?? routes[`${parsed.pathname}${parsed.search}`] ?? routes[parsed.pathname];
+    const res =
+      route === undefined ? { status: 404, body: { message: 'no stub route' } } : route(parsed);
+    const status = res.status ?? 200;
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: () => null },
+      json: async () => res.body,
+      text: async () => JSON.stringify(res.body),
+    };
+  };
+  return { impl, calls };
+}
+
+function contentsRoute(content: string, extra: Record<string, unknown> = {}): ApiRoute {
+  return () => ({
+    body: {
+      type: 'file',
+      size: Buffer.byteLength(content),
+      encoding: 'base64',
+      content: Buffer.from(content).toString('base64'),
+      sha: 'c'.repeat(40),
+      ...extra,
+    },
+  });
 }
 
 describe('Coordinator repository reads', () => {
@@ -459,29 +511,30 @@ describe('Coordinator repository reads', () => {
         const workspaces = withCacheRoot
           ? { workspacesDir: join(H.s.reposDir, 'absent-workspaces') }
           : {};
-        const repo = { db: H.s.db, reposDir: H.s.reposDir, ...workspaces };
+        const api = githubApiStub({});
+        const repo = {
+          db: H.s.db,
+          reposDir: H.s.reposDir,
+          githubFetch: api.impl,
+          ...workspaces,
+        };
         for (const ref of ['HEAD', 'retained', 'refs/heads/main', oldCommit]) {
           if (entry === 'docs') {
-            const result = JSON.parse(
-              await executeChiefTool({ ...toolDeps(), ...workspaces }, ctx(), 'docs', {
-                projectId: H.projectId,
-                paths: ['scripts/owned-process.mjs'],
-                ref,
-              }),
-            ) as Docs;
+            const result = await docs(['scripts/owned-process.mjs'], ref, {
+              githubFetch: api.impl,
+              ...workspaces,
+            });
             expect(result.files[0]?.content).toBeUndefined();
-            expect(result.files[0]?.error).toMatch(/github.*cache.*unavailable/i);
+            expect(result.files[0]?.error).toMatch(/not found/i);
           } else {
             const reads = {
               file: () => readFile(repo, H.projectId, 'scripts/owned-process.mjs', ref),
               files: () => readFiles(repo, H.projectId, ref),
             };
-            await expect(reads[entry]()).rejects.toMatchObject({
-              status: 404,
-              message: expect.stringMatching(/github.*cache.*unavailable/i),
-            });
+            await expect(reads[entry]()).rejects.toMatchObject({ status: 404 });
           }
         }
+        expect(api.calls.length).toBeGreaterThan(0);
       },
     );
   }
@@ -662,17 +715,6 @@ describe('Coordinator repository reads', () => {
     }
   });
 
-  test('github without a project cache reports the missing cache', async () => {
-    H.s.db
-      .update(project)
-      .set({ repoKind: 'github', githubRepo: 'fixture/repository', localPath: null })
-      .where(eq(project.id, H.projectId))
-      .run();
-    const result = await docs(['scripts/owned-process.mjs']);
-    expect(result.files[0]?.error).toMatch(/github.*repository.*unavailable/i);
-    expect(result.files[0]?.error).not.toContain('hosted');
-  });
-
   test('missing local directory and missing file/ref remain visible per path', async () => {
     await bindRepo('local');
     expect((await docs(['absent'])).files[0]?.error).toContain('file absent');
@@ -794,5 +836,168 @@ describe('Coordinator repository reads', () => {
     const result = await read();
     expect(result.files[0]?.content).toBe(readFileSync('scripts/owned-process.mjs', 'utf8'));
     expect(result.files[0]?.commit).toBe(commit);
+  });
+});
+
+describe('Coordinator reads of a GitHub project without a local cache', () => {
+  const path = 'scripts/owned-process.mjs';
+  const contentsUrl = `${API}/repos/fixture/repository/contents/${path}?ref=${GITHUB_COMMIT}`;
+
+  test('docs reads the base branch through the GitHub API instead of the absent cache', async () => {
+    const dir = await bindRepo('github');
+    writeFileSync(join(dir, path), 'local checkout content\n');
+    H.s.db
+      .update(project)
+      .set({ localPath: '/different-machine/repo' })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits/main`]: () => ({ body: { sha: GITHUB_COMMIT } }),
+      [contentsUrl]: contentsRoute(GITHUB_SOURCE),
+    });
+    const result = await docs([path], undefined, {
+      workspacesDir: join(H.s.reposDir, 'no-cache-here'),
+      githubFetch: api.impl,
+    });
+    expect(result.files[0]).toMatchObject({
+      path,
+      commit: GITHUB_COMMIT,
+      encoding: 'utf-8',
+      content: GITHUB_SOURCE,
+    });
+    expect(api.calls).toEqual([`${API}/repos/fixture/repository/commits/main`, contentsUrl]);
+  });
+
+  test('docs falls back to the repository default branch when the project has no base branch', async () => {
+    await bindRepo('github');
+    H.s.db
+      .update(project)
+      .set({ baseBranch: null, localPath: null })
+      .where(eq(project.id, H.projectId))
+      .run();
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits?per_page=1`]: () => ({
+        body: [{ sha: GITHUB_COMMIT }],
+      }),
+      [contentsUrl]: contentsRoute(GITHUB_SOURCE),
+    });
+    const result = await docs([path], undefined, { githubFetch: api.impl });
+    expect(result.files[0]).toMatchObject({ commit: GITHUB_COMMIT, content: GITHUB_SOURCE });
+    expect(api.calls[0]).toBe(`${API}/repos/fixture/repository/commits?per_page=1`);
+  });
+
+  test('an explicit ref resolves through the GitHub API and reads that commit', async () => {
+    await bindRepo('github');
+    const releaseCommit = 'd'.repeat(40);
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits/release`]: () => ({ body: { sha: releaseCommit } }),
+      [`${API}/repos/fixture/repository/contents/${path}?ref=${releaseCommit}`]:
+        contentsRoute('release content\n'),
+    });
+    const result = await readFile(
+      { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl },
+      H.projectId,
+      path,
+      'refs/tags/release',
+    );
+    expect(result).toMatchObject({ ref: 'refs/tags/release', commit: releaseCommit });
+    expect(result.content).toBe('release content\n');
+  });
+
+  test('binary content comes back base64-encoded like the cache path', async () => {
+    await bindRepo('github');
+    const bytes = Buffer.from([0x00, 0x01, 0x02, 0xff]);
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits/main`]: () => ({ body: { sha: GITHUB_COMMIT } }),
+      [contentsUrl]: () => ({
+        body: {
+          type: 'file',
+          size: bytes.byteLength,
+          encoding: 'base64',
+          content: bytes.toString('base64'),
+          sha: 'e'.repeat(40),
+        },
+      }),
+    });
+    expect(
+      await readFile(
+        { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl },
+        H.projectId,
+        path,
+      ),
+    ).toMatchObject({ encoding: 'base64', content: bytes.toString('base64'), size: 4 });
+  });
+
+  test('an oversized document is refused before the blob is fetched', async () => {
+    await bindRepo('github');
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits/main`]: () => ({ body: { sha: GITHUB_COMMIT } }),
+      [contentsUrl]: () => ({
+        body: { type: 'file', size: 8 * 1024 * 1024, encoding: 'none', sha: 'f'.repeat(40) },
+      }),
+    });
+    const result = await docs([path], undefined, { githubFetch: api.impl });
+    expect(result.files[0]?.error).toMatch(/too large|limit/i);
+    expect(api.calls.some((call) => call.includes('/git/blobs/'))).toBe(false);
+  });
+
+  test('a path missing at the commit reports the file and ref', async () => {
+    await bindRepo('github');
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits/main`]: () => ({ body: { sha: GITHUB_COMMIT } }),
+    });
+    const result = await docs([path], undefined, { githubFetch: api.impl });
+    expect(result.files[0]?.error).toBe(`file ${path} at ref main of fixture/repository not found`);
+    expect(result.files[0]?.content).toBeUndefined();
+  });
+
+  test('a refused GitHub read names the project and asks for a connection', async () => {
+    await bindRepo('github');
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits/main`]: () => ({
+        status: 401,
+        body: { message: 'Bad credentials' },
+      }),
+    });
+    const result = await docs([path], undefined, { githubFetch: api.impl });
+    expect(result.files[0]?.error).toMatch(
+      /GitHub refused to read ref main of fixture\/repository/,
+    );
+    await expect(
+      readFile({ db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl }, H.projectId, path),
+    ).rejects.toMatchObject({ status: 401 });
+  });
+
+  test('the file listing reads the GitHub tree and honours the limit', async () => {
+    await bindRepo('github');
+    const tree = {
+      tree: [
+        { path: 'scripts', type: 'tree' },
+        { path, type: 'blob', size: 26 },
+        { path: 'vendor', type: 'commit' },
+      ],
+    };
+    const api = githubApiStub({
+      [`${API}/repos/fixture/repository/commits?per_page=1`]: () => ({
+        body: [{ sha: GITHUB_COMMIT }],
+      }),
+      [`${API}/repos/fixture/repository/git/trees/${GITHUB_COMMIT}?recursive=1`]: () => ({
+        body: tree,
+      }),
+    });
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    expect(await readFiles(repo, H.projectId)).toEqual({
+      ref: 'HEAD',
+      commit: GITHUB_COMMIT,
+      truncated: false,
+      files: [
+        { path: 'scripts', type: 'tree', size: null },
+        { path, type: 'blob', size: 26 },
+      ],
+    });
+    expect(await readFiles(repo, H.projectId, undefined, '1')).toMatchObject({
+      truncated: true,
+      files: [{ path: 'scripts', type: 'tree', size: null }],
+    });
   });
 });

@@ -559,7 +559,14 @@ export async function executeChiefTool(
             throw new HttpError(403, 'credential file access denied');
           }
           const f = await readFile(
-            { db, reposDir: deps.reposDir, workspacesDir: deps.workspacesDir },
+            {
+              db,
+              reposDir: deps.reposDir,
+              workspacesDir: deps.workspacesDir,
+              box: deps.box,
+              githubFetch: deps.githubFetch,
+              githubAppTokenSocket: deps.githubAppTokenSocket,
+            },
             projectId,
             p,
             ref,

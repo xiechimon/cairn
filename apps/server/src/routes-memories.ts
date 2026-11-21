@@ -67,7 +67,11 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json({
-      candidates: await listMemoryImportCandidates(ctx.db, teamId, repoReaderOf(ctx)),
+      candidates: await listMemoryImportCandidates(
+        ctx.db,
+        teamId,
+        repoReaderOf({ ...ctx, box: ctx.secretBox }),
+      ),
     });
   });
 
@@ -75,7 +79,17 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     const body = parseWith(memoryImportBodySchema, await jsonBody(c), 'body');
-    return c.json({ result: await importMemoryFile(ctx.db, teamId, body, repoReaderOf(ctx)) }, 201);
+    return c.json(
+      {
+        result: await importMemoryFile(
+          ctx.db,
+          teamId,
+          body,
+          repoReaderOf({ ...ctx, box: ctx.secretBox }),
+        ),
+      },
+      201,
+    );
   });
 
   app.patch('/api/teams/:id/memories/:mid', async (c) => {
