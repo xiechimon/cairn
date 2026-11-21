@@ -7,29 +7,35 @@ export const machineHardwareSchema = z.object({
   memoryAvailableMb: z.number().int().nonnegative(),
   loadAvg1: z.number().nonnegative(),
   loadAvg5: z.number().nonnegative().optional(),
+  cpuUtilization: z.number().min(0).max(1).optional(),
+  memoryPressure: z.number().min(0).max(1).optional(),
   diskFreeMb: z.number().int().nonnegative(),
 });
 export type MachineHardware = z.infer<typeof machineHardwareSchema>;
 
-export const MACHINE_STRAIN_REASONS = ['memory', 'load', 'disk'] as const;
+export const MACHINE_STRAIN_REASONS = ['memory', 'cpu', 'disk'] as const;
 export const machineStrainReasonSchema = z.enum(MACHINE_STRAIN_REASONS);
 export type MachineStrainReason = z.infer<typeof machineStrainReasonSchema>;
 
 export const STRAIN_MEMORY_AVAILABLE_RATIO = 0.1;
+export const STRAIN_MEMORY_PRESSURE = 1 - STRAIN_MEMORY_AVAILABLE_RATIO;
+export const STRAIN_CPU_UTILIZATION = 0.9;
 export const STRAIN_DISK_FREE_MB = 5 * 1024;
+
+function memoryPressureOf(hardware: MachineHardware): number | null {
+  if (hardware.memoryPressure !== undefined) return hardware.memoryPressure;
+  const total = hardware.memoryTotalMb;
+  if (total === undefined || total <= 0) return null;
+  return 1 - hardware.memoryAvailableMb / total;
+}
 
 export function machineStrain(hardware: MachineHardware | null | undefined): MachineStrainReason[] {
   if (hardware == null) return [];
   const reasons: MachineStrainReason[] = [];
-  if (
-    hardware.memoryTotalMb !== undefined &&
-    hardware.memoryTotalMb > 0 &&
-    hardware.memoryAvailableMb < hardware.memoryTotalMb * STRAIN_MEMORY_AVAILABLE_RATIO
-  ) {
-    reasons.push('memory');
-  }
-  if (hardware.loadAvg5 !== undefined && hardware.loadAvg5 > hardware.cpuCores) {
-    reasons.push('load');
+  const pressure = memoryPressureOf(hardware);
+  if (pressure !== null && pressure >= STRAIN_MEMORY_PRESSURE) reasons.push('memory');
+  if (hardware.cpuUtilization !== undefined && hardware.cpuUtilization >= STRAIN_CPU_UTILIZATION) {
+    reasons.push('cpu');
   }
   if (hardware.diskFreeMb < STRAIN_DISK_FREE_MB) reasons.push('disk');
   return reasons;

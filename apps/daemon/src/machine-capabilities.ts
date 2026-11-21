@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statfsSync, statSync } from 'node:fs';
-import { cpus, freemem, hostname, loadavg, totalmem } from 'node:os';
+import { type CpuInfo, cpus, freemem, hostname, loadavg, totalmem } from 'node:os';
 import { join } from 'node:path';
 import { parseEnv } from 'node:util';
 import {
@@ -92,20 +92,65 @@ function diskFreeMb(path: string): number | undefined {
   return read(path) ?? read('/');
 }
 
-function availableMemoryMb(
+function kernelMemoryLevel(readMemoryLevel: () => string): number | null {
+  try {
+    const level = Number(readMemoryLevel().trim());
+    return Number.isInteger(level) && level >= 0 && level <= 100 ? level : null;
+  } catch {
+    return null;
+  }
+}
+
+interface MemoryFigures {
+  memoryAvailableMb: number;
+  memoryPressure?: number;
+}
+
+function clampRatio(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function memoryFigures(
   totalMb: number,
   platform: NodeJS.Platform,
   readMemoryLevel: () => string,
-): number {
+): MemoryFigures {
   const freeMb = Math.max(0, Math.floor(freemem() / (1024 * 1024)));
-  if (platform !== 'darwin') return freeMb;
-  try {
-    const level = Number(readMemoryLevel().trim());
-    if (!Number.isInteger(level) || level < 0 || level > 100) return freeMb;
-    return Math.floor((totalMb * level) / 100);
-  } catch {
-    return freeMb;
+  if (platform === 'darwin') {
+    const level = kernelMemoryLevel(readMemoryLevel);
+    if (level === null) return { memoryAvailableMb: freeMb };
+    return {
+      memoryAvailableMb: Math.floor((totalMb * level) / 100),
+      memoryPressure: clampRatio((100 - level) / 100),
+    };
   }
+  if (totalMb <= 0) return { memoryAvailableMb: freeMb };
+  return { memoryAvailableMb: freeMb, memoryPressure: clampRatio(1 - freeMb / totalMb) };
+}
+
+const CPU_WINDOW_MIN_MS = 1_000;
+
+export interface CpuWindow {
+  total: number;
+  idle: number;
+}
+
+export function cpuWindowOf(readCpus: () => CpuInfo[] = cpus): CpuWindow {
+  let total = 0;
+  let idle = 0;
+  for (const cpu of readCpus()) {
+    const { user, nice, sys, idle: coreIdle, irq } = cpu.times;
+    total += user + nice + sys + coreIdle + irq;
+    idle += coreIdle;
+  }
+  return { total, idle };
+}
+
+export function cpuUtilizationBetween(prev: CpuWindow, next: CpuWindow): number | undefined {
+  const total = next.total - prev.total;
+  if (total <= 0) return undefined;
+  const idle = next.idle - prev.idle;
+  return clampRatio((total - Math.max(0, idle)) / total);
 }
 
 export function probeMachineHardware(
@@ -116,6 +161,7 @@ export function probeMachineHardware(
       encoding: 'utf8',
       timeout: 2_000,
     }),
+  cpuUtilization?: number,
 ): MachineHardware | undefined {
   try {
     const cpuCores = cpus().length;
@@ -125,12 +171,14 @@ export function probeMachineHardware(
     const [load, load5] = loadavg();
     if (load === undefined || !Number.isFinite(load) || load < 0) return undefined;
     const memoryTotalMb = Math.max(0, Math.floor(totalmem() / (1024 * 1024)));
+    const memory = memoryFigures(memoryTotalMb, platform, readMemoryLevel);
     return {
       cpuCores,
       memoryTotalMb,
-      memoryAvailableMb: availableMemoryMb(memoryTotalMb, platform, readMemoryLevel),
+      ...memory,
       loadAvg1: load,
       ...(load5 !== undefined && Number.isFinite(load5) && load5 >= 0 ? { loadAvg5: load5 } : {}),
+      ...(cpuUtilization !== undefined ? { cpuUtilization } : {}),
       diskFreeMb: free,
     };
   } catch {
@@ -153,12 +201,29 @@ export function probeMachineCapabilities(sources: MachineCapabilitySources): Mac
   };
 }
 
+export interface MachineCapabilityProbeOptions {
+  readCpus?: () => CpuInfo[];
+}
+
 export function createMachineCapabilitiesProbe(
   sources: MachineCapabilitySources,
+  options: MachineCapabilityProbeOptions = {},
 ): () => MachineCapabilities {
   let mcpCache: { mtimeMs: number; value: string[] } | null = null;
   let skillsCache: { mtimeMs: number; value: string[] } | null = null;
   const deviceName = probeDeviceName();
+  const readCpus = options.readCpus ?? cpus;
+  let cpuWindow = cpuWindowOf(readCpus);
+  let lastCpuUtilization: number | undefined;
+
+  const cpuUtilization = (): number | undefined => {
+    const next = cpuWindowOf(readCpus);
+    const coreCount = Math.max(1, readCpus().length);
+    if (next.total - cpuWindow.total < coreCount * CPU_WINDOW_MIN_MS) return lastCpuUtilization;
+    lastCpuUtilization = cpuUtilizationBetween(cpuWindow, next);
+    cpuWindow = next;
+    return lastCpuUtilization;
+  };
 
   const mtimeOf = (path: string): number | null => {
     try {
@@ -183,7 +248,12 @@ export function createMachineCapabilitiesProbe(
     if (skillsCache === null) {
       skillsCache = { mtimeMs: Number.NaN, value: scanSkillNames(sources.skillsDir) };
     }
-    const hardware = probeMachineHardware(sources.skillsDir);
+    const hardware = probeMachineHardware(
+      sources.skillsDir,
+      process.platform,
+      undefined,
+      cpuUtilization(),
+    );
     const osDistribution = probeOsDistribution();
     return {
       osPlatform: osPlatformOf(process.platform),

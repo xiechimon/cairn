@@ -1747,8 +1747,9 @@ export const EN: Record<string, string> = {
   '额度用完了，到点自动开始': 'Quota is used up; this starts on its own when it resets',
   等这台执行机空出来: 'Waiting for this Runner to free up',
   '等额度 · {at}': 'Quota · {at}',
-  '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB':
-    '{free} GB memory free; 5-minute load {load} on {cores#1 core|# cores}; {disk} GB disk free',
+  '内存压力 {mem}%；CPU {cpu}%；剩余磁盘 {disk} GB':
+    'Memory pressure {mem}%; CPU {cpu}%; {disk} GB disk free',
+  '内存压力 {mem}%；剩余磁盘 {disk} GB': 'Memory pressure {mem}%; {disk} GB disk free',
   '还有 {n} 个，在 Cairn 里看': '{n} more, see them in Cairn',
   '今天用了 {tokens} tokens': 'Used today: {tokens}',
   '{n} tokens': '{n#1 token|# tokens}',

@@ -12360,6 +12360,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "maximum": 9007199254740991,
                   "type": "integer",
                 },
+                "cpuUtilization": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number",
+                },
                 "diskFreeMb": {
                   "maximum": 9007199254740991,
                   "minimum": 0,
@@ -12377,6 +12382,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "maximum": 9007199254740991,
                   "minimum": 0,
                   "type": "integer",
+                },
+                "memoryPressure": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number",
                 },
                 "memoryTotalMb": {
                   "maximum": 9007199254740991,
@@ -12745,7 +12755,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "items": {
         "enum": [
           "memory",
-          "load",
+          "cpu",
           "disk",
         ],
         "type": "string",

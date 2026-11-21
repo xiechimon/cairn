@@ -7,6 +7,7 @@ import {
   machineHardwareSchema,
   machinePresenceBodySchema,
   machineRecordSchema,
+  machineStrain,
   osPlatformOf,
   parseReportedCapabilities,
   requiredCapabilitiesSchema,
@@ -628,5 +629,55 @@ describe('Runner OS platform', () => {
     expect(
       parseReportedCapabilities({ mcpServers: [], skills: [], osPlatform: 'win32' })?.osPlatform,
     ).toBeUndefined();
+  });
+});
+
+describe('machine strain reads CPU utilization and memory pressure, not the load average', () => {
+  const ownerMac = {
+    cpuCores: 8,
+    memoryTotalMb: 16_384,
+    memoryAvailableMb: 6_062,
+    loadAvg1: 12.4,
+    loadAvg5: 12.1,
+    cpuUtilization: 0.03,
+    memoryPressure: 0.63,
+    diskFreeMb: 182_000,
+  };
+
+  it('a Mac with load 12 on 8 cores, 3% CPU and 63% memory pressure is not strained', () => {
+    expect(machineStrain(ownerMac)).toEqual([]);
+  });
+
+  it('a pinned CPU is strained even when the load average is low', () => {
+    expect(
+      machineStrain({ ...ownerMac, loadAvg1: 0.4, loadAvg5: 0.3, cpuUtilization: 0.97 }),
+    ).toEqual(['cpu']);
+  });
+
+  it('memory pressure above 90% is strained even while some memory is still free', () => {
+    expect(machineStrain({ ...ownerMac, memoryAvailableMb: 4_000, memoryPressure: 0.93 })).toEqual([
+      'memory',
+    ]);
+  });
+
+  it('a Runner that reports no CPU utilization is never strained by the load average alone', () => {
+    const { cpuUtilization: _dropped, ...oldRunner } = ownerMac;
+    expect(machineStrain({ ...oldRunner, loadAvg1: 40, loadAvg5: 30 })).toEqual([]);
+  });
+
+  it('a Runner that reports no memory pressure still strains on the available share', () => {
+    const { memoryPressure: _dropped, ...oldRunner } = ownerMac;
+    expect(machineStrain({ ...oldRunner, memoryAvailableMb: 1_000 })).toEqual(['memory']);
+  });
+
+  it('CPU utilization and memory pressure are fractions between 0 and 1 on the wire', () => {
+    for (const bad of [
+      { cpuUtilization: 1.2 },
+      { cpuUtilization: -0.1 },
+      { memoryPressure: 1.2 },
+    ]) {
+      expect(machineHardwareSchema.safeParse({ ...ownerMac, ...bad }).success).toBe(false);
+    }
+    expect(machineHardwareSchema.parse(ownerMac)).toEqual(ownerMac);
   });
 });
