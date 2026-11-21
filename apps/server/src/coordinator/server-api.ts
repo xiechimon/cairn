@@ -136,8 +136,8 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       heartbeatStep(deps, null, stepId);
     },
     stop: async (stepId) => {
-      const owned = stepRow(stepId);
-      if (owned.machineId === null && owned.status !== 'claimed') return false;
+      const owned = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+      if (owned === undefined || owned.status !== 'claimed') return false;
       return fetchStop(deps, { id: null }, stepId).discard;
     },
     inputs: {
@@ -287,11 +287,11 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     },
     done: async (stepId, body, observation) => {
       const owned = stepRow(stepId);
+      recordStepUsage(deps, owned, body.usage ?? []);
       if (owned.status !== 'claimed') {
         stopStepComputer(deps, stepId);
         return;
       }
-      recordStepUsage(deps, owned, body.usage ?? []);
       deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
       releaseUnconsumedSteer(deps.db, owned);
       const chiefAgent = chiefStepAgent(deps, owned);

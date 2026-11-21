@@ -665,11 +665,11 @@ function stopClaimedChiefStep(
   deps.db.delete(stopPending).where(eq(stopPending.stepId, head.id)).run();
   releaseUnconsumedSteer(deps.db, head);
   settleMemoryEditTurn(deps.db, head, 'stopped', 'executor lost');
-  recordChiefStop(deps, head);
   deps.machineHub?.stopSignal(thread.teamId, head.id);
   settleChiefActiveRun(deps.db, threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);
+  recordChiefStop(deps, head);
   return { delegated: false };
 }
 

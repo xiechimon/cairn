@@ -397,9 +397,6 @@ async function executeWorkerMemoryToolCall(
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  if (isThreadScheduleTool(name)) {
-    return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
-  }
   if (name === 'thread_report' && row.kind === 'session') {
     if (row.status !== 'claimed') {
       throw new HttpError(409, 'thread_report requires a currently claimed step');
@@ -417,6 +414,9 @@ async function executeWorkerMemoryToolCall(
   }
   if (row.status !== 'claimed') {
     throw new HttpError(409, 'worker tools require a currently claimed step');
+  }
+  if (isThreadScheduleTool(name)) {
+    return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') {

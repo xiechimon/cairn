@@ -62,7 +62,7 @@ export async function stepToken(
       stepId,
       claimedAt: owned.claimedAt,
     });
-  } else if (projectRow?.repoKind === 'github' && todoRow) {
+  } else if (projectRow?.repoKind === 'github' && todoRow && owned.status === 'claimed') {
     const ref = githubRepoOfProject(projectRow);
     const githubToken =
       ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref, true, 50 * 60_000);
