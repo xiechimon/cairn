@@ -124,11 +124,23 @@ try {
 
   await window.screenshot({ path: screenshotPath });
 
+  const trayPage = () => app.windows().find((page) => page.url().endsWith('/tray'));
+  const tray =
+    trayPage() ??
+    (await app.waitForEvent('window', {
+      predicate: (page) => page.url().endsWith('/tray'),
+      timeout: GATE_SETTLE_MS * 4,
+    }));
+  assert.equal(
+    await app.evaluate(({ BrowserWindow }) =>
+      BrowserWindow.getAllWindows().some(
+        (w) => w.webContents.getURL().endsWith('/tray') && w.isVisible(),
+      ),
+    ),
+    false,
+    'the tray popover showed before the icon was clicked',
+  );
   await app.evaluate(({ app: electronApp }) => electronApp.emit('cairn-tray-toggle'));
-  const tray = await app.waitForEvent('window', {
-    predicate: (page) => page.url().endsWith('/tray'),
-    timeout: GATE_SETTLE_MS * 4,
-  });
   await tray.locator('[data-testid="tray-popover"]').waitFor({ timeout: GATE_SETTLE_MS * 4 });
   await tray.waitForTimeout(1_000);
   const opened = await app.evaluate(({ BrowserWindow }) => {

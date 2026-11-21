@@ -562,7 +562,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
     powerMonitor.on('resume', () => void wakeAhead.pollNow());
   }
   globalShortcut.register(NEW_TASK_SHORTCUT, () => sendToWindow('desktop-menu', 'new-task'));
-  let popover: BrowserWindow | null = null;
+  const popover = createTrayPopover(origin);
   let height = TRAY_FIRST_HEIGHT;
   let hiddenAt = 0;
   const state = (): DesktopTrayState => ({
@@ -571,39 +571,33 @@ function showTray(origin: string, controls: TrayControls): Tray {
     accent: systemAccent(),
   });
   const publish = (): void => {
-    if (popover?.isVisible()) popover.webContents.send('desktop-tray:state', state());
+    if (popover.isVisible()) popover.webContents.send('desktop-tray:state', state());
   };
   const place = (): void => {
-    if (popover === null) return;
     const iconBounds = created.getBounds();
     popover.setBounds(
       trayPopoverBounds(iconBounds, screen.getDisplayMatching(iconBounds).workArea, height),
     );
   };
   const hide = (): void => {
-    if (popover?.isVisible()) popover.hide();
+    if (popover.isVisible()) popover.hide();
   };
+  popover.on('blur', () => {
+    hiddenAt = Date.now();
+    popover.hide();
+  });
   const toggle = (): void => {
-    if (popover === null) {
-      const made = createTrayPopover(origin);
-      made.on('blur', () => {
-        hiddenAt = Date.now();
-        made.hide();
-      });
-      popover = made;
-    }
     if (popover.isVisible() || Date.now() - hiddenAt < TRAY_REOPEN_GUARD_MS) {
       hide();
       return;
     }
-    const shown = popover;
     const show = (): void => {
       place();
-      shown.show();
-      if (!IS_MAC) shown.focus();
+      popover.show();
+      if (!IS_MAC) popover.focus();
       publish();
     };
-    if (shown.webContents.isLoading()) shown.once('ready-to-show', show);
+    if (popover.webContents.isLoading()) popover.once('ready-to-show', show);
     else show();
   };
   created.on('click', toggle);
@@ -612,9 +606,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
   else created.setContextMenu(fallbackMenu());
   setInterval(publish, TRAY_REFRESH_MS);
   const fromPopover = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
-    popover !== null &&
-    event.sender === popover.webContents &&
-    event.senderFrame?.origin === origin;
+    event.sender === popover.webContents && event.senderFrame?.origin === origin;
   ipcMain.handle('desktop-tray:state', (event) => (fromPopover(event) ? state() : null));
   ipcMain.on('desktop-tray:open', (event, target: unknown) => {
     if (!fromPopover(event)) return;
@@ -635,7 +627,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
     if (!fromPopover(event) || typeof next !== 'number' || !Number.isFinite(next) || next <= 0)
       return;
     height = Math.min(next, TRAY_MAX_HEIGHT);
-    if (popover?.isVisible()) place();
+    if (popover.isVisible()) place();
   });
   ipcMain.on('desktop-tray:hide', (event) => {
     if (fromPopover(event)) hide();

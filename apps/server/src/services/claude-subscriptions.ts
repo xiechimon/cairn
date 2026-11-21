@@ -13,7 +13,9 @@ import type {
   UpstreamModelsResult,
 } from '@cairn/shared';
 import {
+  applyClaudeRateLimit,
   CLAUDE_MODEL_ID_PATTERN,
+  canonicalClaudeModelId,
   canonicalClaudeModels,
   claudeRateBlock,
   DEFAULT_CLAUDE_CODE_MODELS,
@@ -26,6 +28,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   CLAUDE_CHECK_COMMAND,
   CLAUDE_MODEL_TEST_COMMAND,
+  probeClaudeQuota,
   probeClaudeSubscriptionModel,
   verifyClaudeSubscription,
 } from './claude-subscription-verification.js';
@@ -322,6 +325,76 @@ export function listClaudeSubscriptions(deps: Deps, teamId: string): ClaudeSubsc
       stepsLast24h: stats?.stepsLast24h ?? null,
     };
   });
+}
+
+export const CLAUDE_QUOTA_REFRESH_MS = 60_000;
+const QUOTA_PROBED_WINDOWS = ['five_hour', 'seven_day'];
+
+const quotaProbes = new WeakMap<Db, Map<string, { at: number; done: Promise<void> }>>();
+
+function quotaFresh(row: Row, now: number): boolean {
+  const windows = row.quotaWindows ?? [];
+  return QUOTA_PROBED_WINDOWS.every((name) => {
+    const window = windows.find((entry) => entry.subscription === name);
+    return window !== undefined && now - window.reportedAt < CLAUDE_QUOTA_REFRESH_MS;
+  });
+}
+
+async function probeAndStoreQuota(deps: UpstreamDeps, row: Row): Promise<void> {
+  const model =
+    canonicalClaudeModelId('haiku', savedModels(row.models) ?? undefined) ??
+    DEFAULT_CLAUDE_CODE_MODELS[0]?.id;
+  if (model === undefined) return;
+  let token: string;
+  try {
+    token = deps.box.open(row.tokenCipher);
+  } catch {
+    return;
+  }
+  const notices = await probeClaudeQuota(token, model, {
+    fetch: deps.fetch,
+    timeoutMs: deps.timeoutMs ?? UPSTREAM_TIMEOUT_MS,
+  });
+  if (notices.length === 0) return;
+  const now = nowMs();
+  const current = subscriptionRow(deps.db, row.teamId, row.id);
+  if (current === undefined) return;
+  deps.db
+    .update(claudeSubscription)
+    .set({
+      quotaWindows: notices.reduce(
+        (windows, notice) => applyClaudeRateLimit(windows, notice, now),
+        current.quotaWindows ?? [],
+      ),
+    })
+    .where(eq(claudeSubscription.id, row.id))
+    .run();
+}
+
+export async function refreshClaudeQuota(
+  deps: UpstreamDeps,
+  teamId: string,
+): Promise<ClaudeSubscriptionListEntry[]> {
+  const row = enabledRow(deps.db, teamId);
+  const now = nowMs();
+  if (
+    row !== undefined &&
+    (row.expiresAt === null || row.expiresAt > now) &&
+    !quotaFresh(row, now)
+  ) {
+    const probes =
+      quotaProbes.get(deps.db) ?? new Map<string, { at: number; done: Promise<void> }>();
+    quotaProbes.set(deps.db, probes);
+    const last = probes.get(row.id);
+    if (last === undefined || now - last.at >= CLAUDE_QUOTA_REFRESH_MS) {
+      const done = probeAndStoreQuota(deps, row).catch(() => undefined);
+      probes.set(row.id, { at: now, done });
+      await done;
+    } else {
+      await last.done;
+    }
+  }
+  return listClaudeSubscriptions(deps, teamId);
 }
 
 export function createClaudeSubscription(

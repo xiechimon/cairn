@@ -937,3 +937,90 @@ describe('the subscription list wire carries quota windows and usage stats', () 
     s.dispose();
   });
 });
+
+describe('opening the tray refreshes the Claude quota from upstream', () => {
+  const quotaHeaders = (fiveHour: string, sevenDay: string) =>
+    new Response('{}', {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'anthropic-ratelimit-unified-status': 'allowed',
+        'anthropic-ratelimit-unified-representative-claim': 'seven_day',
+        'anthropic-ratelimit-unified-5h-utilization': fiveHour,
+        'anthropic-ratelimit-unified-5h-reset': '1800000000',
+        'anthropic-ratelimit-unified-7d-utilization': sevenDay,
+        'anthropic-ratelimit-unified-7d-reset': '1800500000',
+      },
+    });
+
+  const staleWeek = (s: TestServer, id: string, reportedAt: number) =>
+    s.db
+      .update(claudeSubscription)
+      .set({
+        quotaWindows: [
+          {
+            subscription: 'seven_day',
+            status: 'allowed',
+            utilization: 0.31,
+            resetsAt: null,
+            reportedAt,
+          },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+
+  test('a figure used elsewhere since the last Cairn run is read back from the account, once per minute', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    const fetchStub = vi.fn<typeof globalThis.fetch>(async () => quotaHeaders('0.14', '0.33'));
+    vi.stubGlobal('fetch', fetchStub);
+    const path = `/api/teams/${s.team.id}/claude-subscriptions/quota`;
+    const refreshed = (await (await req(s.app, 'POST', path)).json()) as {
+      windows: { name: string; utilization: number; resetsAt: number | null }[];
+    }[];
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({
+        name: 'seven_day',
+        utilization: 0.33,
+        resetsAt: 1_800_500_000_000,
+      }),
+      expect.objectContaining({
+        name: 'five_hour',
+        utilization: 0.14,
+        resetsAt: 1_800_000_000_000,
+      }),
+    ]);
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchStub.mock.calls[0]!;
+    expect(String(url)).toBe('https://api.anthropic.com/v1/messages');
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      max_tokens: 1,
+      model: 'claude-haiku-5-5',
+    });
+    expect((await req(s.app, 'POST', path)).status).toBe(200);
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    s.dispose();
+  });
+
+  test('an upstream that answers without quota headers keeps the stored figure and is not asked again within the minute', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    const fetchStub = vi.fn<typeof globalThis.fetch>(
+      async () => new Response('{"error":{}}', { status: 401 }),
+    );
+    vi.stubGlobal('fetch', fetchStub);
+    const path = `/api/teams/${s.team.id}/claude-subscriptions/quota`;
+    const first = (await (await req(s.app, 'POST', path)).json()) as {
+      windows: { name: string; utilization: number }[];
+    }[];
+    expect(first[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.31 }),
+    ]);
+    await req(s.app, 'POST', path);
+    expect(fetchStub).toHaveBeenCalledTimes(1);
+    s.dispose();
+  });
+});

@@ -31,6 +31,7 @@ const INFERRED_ROUTES = [
   'GET /api/teams/{id}/claude-subscriptions',
   'DELETE /api/teams/{id}/claude-subscriptions/{cid}',
   'POST /api/teams/{id}/claude-subscriptions',
+  'POST /api/teams/{id}/claude-subscriptions/quota',
   'POST /api/teams/{id}/claude-subscriptions/{cid}/verify',
   'PATCH /api/teams/{id}/claude-subscriptions/{cid}',
   'POST /api/teams/{id}/claude-subscriptions/{cid}/enable',
