@@ -24,6 +24,14 @@ const LAUNCH_SERVICE_DENIALS = [
   '(deny mach-lookup (global-name-prefix "com.apple.coreservices") (global-name-prefix "com.apple.lsd"))',
 ];
 
+const OUTSIDE_PROCESS_DENIALS = [
+  '(deny signal)',
+  '(allow signal (target same-sandbox))',
+  '(deny process-info*)',
+  '(allow process-info* (target same-sandbox))',
+  '(deny sysctl-read (sysctl-name-prefix "kern.procargs"))',
+];
+
 export interface SeatbeltPolicy {
   home: string;
   daemonHome?: string;
@@ -152,6 +160,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     ...(readable.length > 0 ? [`(allow file-read* ${subpaths(readable)})`] : []),
     `(deny file-write* ${subpaths(protectedGit)} (literal ${quoted(workspaceGit)})${protectedGitPatterns.length > 0 ? ` ${protectedGitPatterns.join(' ')}` : ''})`,
     ...LAUNCH_SERVICE_DENIALS,
+    ...OUTSIDE_PROCESS_DENIALS,
   ];
   if (policy.serverPort !== undefined) {
     if (!Number.isInteger(policy.serverPort) || policy.serverPort < 1 || policy.serverPort > 65535)
