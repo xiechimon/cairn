@@ -24,7 +24,7 @@ test('the jump-to-latest button is 36px', async ({ page }) => {
     .poll(() => body.evaluate((node) => node.scrollHeight - node.scrollTop - node.clientHeight))
     .toBeLessThanOrEqual(2);
   await body.evaluate((node) => {
-    node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+    node.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, bubbles: true }));
     node.scrollTo({ top: 0 });
   });
   const jump = home.getByTestId('jump-to-latest');
