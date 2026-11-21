@@ -22,6 +22,7 @@ import {
   upsertChiefRow,
   upsertMessage,
 } from './machines.js';
+import { stepScopeProjectId } from './picked-project.js';
 
 export interface PendingUpload {
   stepId: string;
@@ -120,6 +121,7 @@ export function receiveUpload(
         role: m.role,
         content: m.content,
         createdAt: m.createdAt,
+        projectId: stepScopeProjectId(stepRow),
         origin:
           m.role === 'user' && m.id === transcriptPromptRowId(body.stepId) ? 'task-prompt' : null,
       });

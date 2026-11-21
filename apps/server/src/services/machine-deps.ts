@@ -130,7 +130,11 @@ export function upsertMessage(
 
 export function upsertChiefRow(
   deps: { db: Db; convHub?: ConversationStreamHub },
-  row: MessageRowInput & { threadId: string; origin?: TranscriptUserOrigin | null },
+  row: MessageRowInput & {
+    threadId: string;
+    projectId?: string | null;
+    origin?: TranscriptUserOrigin | null;
+  },
 ): void {
   const stored = upsertChiefMessage(deps.db, row);
   deps.convHub?.publishMessage(row.threadId, stored);

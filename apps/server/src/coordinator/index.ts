@@ -431,6 +431,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         role: 'user',
         content: row.prompt,
         createdAt: nowMs(),
+        projectId: stepScopeProjectId(row),
         origin: 'task-prompt',
       });
     }

@@ -95,6 +95,7 @@ import {
 } from './model-fallback.js';
 import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
+import { stepScopeProjectId } from './picked-project.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
 import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
@@ -124,6 +125,7 @@ function holdStepForQuota(
     upsertChiefRow(deps, {
       id: `quota-hold-${stepRow.id}`,
       threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
       role: 'system',
       content: note,
       createdAt: nowMs(),
@@ -204,7 +206,12 @@ function recordSkillInjectionCheck(
     }),
     createdAt: nowMs(),
   };
-  if (chiefStep) upsertChiefRow(deps, { ...row, threadId: stepRow.buildId });
+  if (chiefStep)
+    upsertChiefRow(deps, {
+      ...row,
+      threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
+    });
   else upsertMessage(deps, { ...row, conversationId: stepRow.buildId });
 }
 
@@ -741,7 +748,11 @@ function requeueStep(
     createdAt: nowMs(),
   };
   if (isChiefConversation(stepRow.buildId)) {
-    upsertChiefRow(deps, { ...noteRow, threadId: stepRow.buildId });
+    upsertChiefRow(deps, {
+      ...noteRow,
+      threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
+    });
   } else {
     upsertMessage(deps, { ...noteRow, conversationId: stepRow.buildId });
   }

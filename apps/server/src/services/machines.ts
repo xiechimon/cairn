@@ -60,6 +60,7 @@ import {
   upsertMessage,
 } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { stepScopeProjectId } from './picked-project.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
 import { flushShield, shieldFor, stepClaimFacts } from './terminal-claims.js';
@@ -706,7 +707,11 @@ export function reportTool(
   if (isChiefConversation(row.buildId)) {
     const rest = flushShield(stepId);
     if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
-    upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });
+    upsertChiefRow(deps, {
+      ...messageRow,
+      threadId: row.buildId,
+      projectId: stepScopeProjectId(row),
+    });
     return;
   }
   upsertMessage(deps, { ...messageRow, conversationId: row.buildId });
@@ -735,7 +740,11 @@ export function reportBackgroundTask(
   if (isChiefConversation(row.buildId)) {
     const rest = flushShield(stepId);
     if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
-    upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });
+    upsertChiefRow(deps, {
+      ...messageRow,
+      threadId: row.buildId,
+      projectId: stepScopeProjectId(row),
+    });
     return;
   }
   upsertMessage(deps, { ...messageRow, conversationId: row.buildId });
@@ -788,6 +797,7 @@ export function storeTranscriptRow(
       role: row.role,
       content: row.content,
       createdAt: row.createdAt,
+      projectId: stepScopeProjectId(owned),
       origin,
     });
     return;

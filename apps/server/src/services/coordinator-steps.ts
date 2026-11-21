@@ -482,6 +482,7 @@ export function finishCoordinatorTurn(
     upsertChiefRow(deps, {
       id: `chief-err-${stepRow.id}`,
       threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
       role: 'system',
       content: JSON.stringify({
         kind: CHIEF_TURN_ERROR_KIND,
