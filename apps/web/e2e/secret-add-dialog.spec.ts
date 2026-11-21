@@ -61,6 +61,24 @@ test('a lowercase name shows the format line and blocks submit; an env var may b
   await expect(submit).toBeEnabled();
 });
 
+test('a credential-looking name ticks `机密` on its own; a manual toggle wins over later names', async ({
+  page,
+}) => {
+  const dialog = await openDialog(page);
+  const box = dialog.getByRole('checkbox', { name: /机密/ });
+  await expect(box).not.toBeChecked();
+  await dialog.getByLabel('名称', { exact: true }).fill('LANGFUSE_SECRET_KEY');
+  await expect(box).toBeChecked();
+  await dialog.getByLabel('名称', { exact: true }).fill('NODE_ENV');
+  await expect(box).not.toBeChecked();
+  await dialog.getByLabel('名称', { exact: true }).fill('STRIPE_API_KEY');
+  await expect(box).toBeChecked();
+  await box.click();
+  await expect(box).not.toBeChecked();
+  await dialog.getByLabel('名称', { exact: true }).fill('GH_TOKEN');
+  await expect(box).not.toBeChecked();
+});
+
 test('a cancelled draft is gone when the dialog opens again', async ({ page }) => {
   let dialog = await openDialog(page);
   await dialog.getByLabel('名称', { exact: true }).fill('LEFT_OVER');

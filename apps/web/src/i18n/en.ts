@@ -2835,8 +2835,8 @@ export const EN: Record<string, string> = {
   '因为这是最早添加、Coordinator 能直接用的服务商':
     'Because it is the earliest added provider the Coordinator can use',
   'Coordinator 要有模型才能回答你的消息': 'The Coordinator needs a model to answer your messages',
-  '任务在执行机上运行时会拿到这些密钥和环境变量。也可以让 Coordinator 添加机密，值不会进入对话。':
-    'Tasks get these secrets and environment variables when they run on a Runner. The Coordinator can also add secrets without the value entering the conversation.',
+  '任务在执行机上运行时按需取用被授予的条目——取用走 get_secret 工具，每次都有记录，值不预置进 shell 环境。遥测导出这类进程级设置不走这里，放在执行机或服务器的环境变量。':
+    'When a task runs on a Runner it takes granted entries on demand through the get_secret tool — every take is recorded and values are never preloaded into the shell environment. Process-level settings such as telemetry export do not come from here; they belong in the Runner or server environment variables.',
   '浏览器代填用的网站登录保存在这里。Coordinator 只在你批准的网站上填入用户名和密码，这两个值不会出现在页面或对话里。':
     'Site logins for browser fill live here. The Coordinator fills the username and password only on sites you approved, and neither value ever appears on a page or in a conversation.',
   'Coordinator 第一次在某个网站代填时会请求批准；撤销后重新请求。':

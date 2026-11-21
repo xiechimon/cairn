@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import {
+  isCredentialSecretName,
   isDaemonReadSecretName,
   isHttpSecretValue,
   isSecretHeaderName,
@@ -62,5 +63,55 @@ describe('secret http policy rules', () => {
     expect(isDaemonReadSecretName('EXA_API_KEY')).toBe(true);
     expect(isDaemonReadSecretName('BRAVE_SEARCH_API_KEY')).toBe(true);
     expect(isDaemonReadSecretName('STRIPE_API_KEY')).toBe(false);
+  });
+
+  test('credential-looking names suggest the secret kind', () => {
+    for (const name of [
+      'LANGFUSE_SECRET_KEY',
+      'LANGFUSE_PUBLIC_KEY',
+      'STRIPE_API_KEY',
+      'GH_TOKEN',
+      'GH_PAT',
+      'LOGIN_PASSWORD',
+      'OAUTH_CLIENT_SECRET',
+      'BRAVE_SEARCH_API_KEY',
+      'SSH_PRIVATE_KEY',
+      'KEY',
+      'DB_PASS',
+      'PASSPHRASE',
+      'AWS_CREDS',
+      'TLS_CERT',
+      'KEY_PEM',
+      'MASTER_KEY_MATERIAL',
+      'SESSION_ID',
+      'MNEMONIC',
+      'TOTP_SEED',
+      'BACKUP_PIN',
+      'BASIC_AUTH',
+      'AUTHORIZATION',
+      'MY_OTP',
+      'OPENAI_APIKEY',
+    ])
+      expect(isCredentialSecretName(name)).toBe(true);
+    for (const name of [
+      'NODE_ENV',
+      'DEBUG',
+      'LANGFUSE_BASE_URL',
+      'DATABASE_URL',
+      'MY_VAR',
+      'MONKEY',
+      'HOTKEY',
+      'AUTHOR',
+      'COMPASS',
+      'CONCERT',
+      'PATTERN',
+      'PING',
+      'MAPPING',
+      'KEYWORD',
+      'KEYSTONE',
+      'SPIN',
+      'INCREDIBLE',
+    ])
+      expect(isCredentialSecretName(name)).toBe(false);
   });
 });

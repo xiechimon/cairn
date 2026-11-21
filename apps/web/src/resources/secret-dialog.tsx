@@ -1,4 +1,4 @@
-import { SECRET_NAME_PATTERN, type SecretListEntry } from '@cairn/shared';
+import { isCredentialSecretName, SECRET_NAME_PATTERN, type SecretListEntry } from '@cairn/shared';
 import { useRef, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -46,10 +46,13 @@ export function SecretDialog({
   const wasSecret = editing !== null && editing.kind !== 'env';
   const [name, setName] = useState(editing?.name ?? '');
   const [value, setValue] = useState(editing?.kind === 'env' ? (editing.value ?? '') : '');
-  const [secret, setSecret] = useState(wasSecret || startSecret);
+  const [secretChoice, setSecretChoice] = useState<boolean | null>(
+    wasSecret || startSecret ? true : editing === null ? null : false,
+  );
   const [scope, setScope] = useState(defaultProjectId ?? '');
   const valueRef = useRef<HTMLTextAreaElement>(null);
   const trimmed = name.trim();
+  const secret = secretChoice ?? isCredentialSecretName(trimmed);
   const nameChecked = editing === null || trimmed !== editing.name;
   const nameInvalid = nameChecked && trimmed !== '' && !SECRET_NAME_PATTERN.test(trimmed);
   const valueMissing = secret && value === '' && !wasSecret;
@@ -170,7 +173,7 @@ export function SecretDialog({
             className="mt-0.5 data-disabled:cursor-not-allowed data-disabled:opacity-50"
             checked={secret}
             disabled={wasSecret}
-            onCheckedChange={(next) => setSecret(next === true)}
+            onCheckedChange={(next) => setSecretChoice(next === true)}
           />
           <span className="flex min-w-0 flex-col gap-1">
             <span className="text-ui text-foreground">{t('机密')}</span>
