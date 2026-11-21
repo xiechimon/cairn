@@ -1,7 +1,14 @@
 import type { DailyUsage } from '@cairn/shared';
 import { cn } from 'cn';
 import { ChartColumn, TriangleAlert } from 'lucide-react';
-import { type CSSProperties, type KeyboardEvent, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type RefObject,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useSearchParams } from 'react-router';
 import { useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -187,36 +194,111 @@ function Readout({ cell, month }: { cell: UsageCell | null; month: MonthTotals }
   );
 }
 
-function monthOutline(grid: UsageGrid, month: string, pitch: number, gap: number): string | null {
-  const spots = grid.weeks.flatMap((week, col) =>
-    week
-      .filter((cell) => !cell.future && cell.date.startsWith(month))
-      .map((cell) => ({ col, row: cell.weekday })),
+type Point = readonly [number, number];
+
+function monthLoops(grid: UsageGrid, month: string): Point[][] {
+  const inMonth = new Set(
+    grid.weeks.flatMap((week, col) =>
+      week
+        .filter((cell) => !cell.future && cell.date.startsWith(month))
+        .map((cell) => `${col},${cell.weekday}`),
+    ),
   );
-  const first = spots[0];
-  const last = spots.at(-1);
-  if (first === undefined || last === undefined) return null;
-  const x = (line: number) => line * pitch - gap / 2;
-  const y = x;
-  const points =
-    first.col === last.col
-      ? [
-          [first.col, first.row],
-          [first.col + 1, first.row],
-          [first.col + 1, last.row + 1],
-          [first.col, last.row + 1],
-        ]
-      : [
-          [first.col, first.row],
-          [first.col + 1, first.row],
-          [first.col + 1, 0],
-          [last.col + 1, 0],
-          [last.col + 1, last.row + 1],
-          [last.col, last.row + 1],
-          [last.col, 7],
-          [first.col, 7],
-        ];
-  return `M${points.map(([c = 0, r = 0]) => `${x(c)},${y(r)}`).join('L')}Z`;
+  const has = (col: number, row: number) => inMonth.has(`${col},${row}`);
+  const edges = new Map<string, Point[]>();
+  const add = (from: Point, to: Point) => {
+    const key = `${from[0]},${from[1]}`;
+    edges.set(key, [...(edges.get(key) ?? []), to]);
+  };
+  for (const spot of inMonth) {
+    const [c = 0, r = 0] = spot.split(',').map(Number);
+    if (!has(c, r - 1)) add([c, r], [c + 1, r]);
+    if (!has(c + 1, r)) add([c + 1, r], [c + 1, r + 1]);
+    if (!has(c, r + 1)) add([c + 1, r + 1], [c, r + 1]);
+    if (!has(c - 1, r)) add([c, r + 1], [c, r]);
+  }
+  const loops: Point[][] = [];
+  for (const [key, targets] of edges) {
+    while (targets.length > 0) {
+      const [x0 = 0, y0 = 0] = key.split(',').map(Number);
+      const loop: Point[] = [[x0, y0]];
+      let at: Point = [x0, y0];
+      let heading: Point | null = null;
+      for (;;) {
+        const atKey = `${at[0]},${at[1]}`;
+        const out = edges.get(atKey) ?? [];
+        const turn = (to: Point) => {
+          if (heading === null) return 0;
+          const dx = to[0] - at[0];
+          const dy = to[1] - at[1];
+          return heading[0] * dy - heading[1] * dx;
+        };
+        const pick = out.reduce<number>(
+          (best, to, i) => (turn(to) > turn(out[best] ?? to) ? i : best),
+          0,
+        );
+        const next = out.splice(pick, 1)[0];
+        if (next === undefined) break;
+        heading = [next[0] - at[0], next[1] - at[1]];
+        at = next;
+        if (at[0] === x0 && at[1] === y0) break;
+        loop.push(at);
+      }
+      loops.push(
+        loop.filter((point, i) => {
+          const prev = loop[(i + loop.length - 1) % loop.length] ?? point;
+          const next = loop[(i + 1) % loop.length] ?? point;
+          return (
+            (point[0] - prev[0]) * (next[1] - point[1]) !==
+            (point[1] - prev[1]) * (next[0] - point[0])
+          );
+        }),
+      );
+    }
+  }
+  return loops;
+}
+
+function roundedLoop(loop: Point[], pitch: number, gap: number, radius: number): string {
+  const at = (i: number) => {
+    const [c = 0, r = 0] = loop[(i + loop.length) % loop.length] ?? [];
+    return [c * pitch - gap / 2, r * pitch - gap / 2] as const;
+  };
+  const corners = loop.map((_, i) => {
+    const [px, py] = at(i - 1);
+    const [x, y] = at(i);
+    const [nx, ny] = at(i + 1);
+    const inLen = Math.hypot(x - px, y - py);
+    const outLen = Math.hypot(nx - x, ny - y);
+    const r = Math.min(radius, inLen / 2, outLen / 2);
+    const [ix, iy] = [(x - px) / inLen, (y - py) / inLen];
+    const [ox, oy] = [(nx - x) / outLen, (ny - y) / outLen];
+    return {
+      enter: `${x - ix * r},${y - iy * r}`,
+      leave: `${x + ox * r},${y + oy * r}`,
+      arc: `A${r},${r} 0 0 ${ix * oy - iy * ox > 0 ? 1 : 0} `,
+    };
+  });
+  const start = corners.at(-1)?.leave ?? '0,0';
+  return `M${start}${corners.map((c) => `L${c.enter}${c.arc}${c.leave}`).join('')}Z`;
+}
+
+function useCellMetrics(ref: RefObject<HTMLDivElement | null>) {
+  const [metrics, setMetrics] = useState<{ pitch: number; radius: number } | null>(null);
+  useLayoutEffect(() => {
+    const grid = ref.current;
+    if (!grid) return;
+    const measure = () => {
+      const cell = grid.querySelector('[data-day]');
+      const radius = cell ? Number.parseFloat(getComputedStyle(cell).borderTopLeftRadius) : 0;
+      setMetrics({ pitch: grid.clientHeight / (7 - CELL_GAP), radius });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [ref]);
+  return metrics;
 }
 
 function Legend() {
@@ -269,7 +351,20 @@ function Heatmap({
 
   const firstWeek = grid.weeks[0] ?? [];
   const month = cells.at(-1)?.date.slice(0, 7) ?? '';
-  const outline = monthOutline(grid, month, 1, CELL_GAP);
+  const metrics = useCellMetrics(gridRef);
+  const outline =
+    metrics === null || metrics.pitch === 0
+      ? null
+      : monthLoops(grid, month)
+          .map((loop) =>
+            roundedLoop(
+              loop,
+              metrics.pitch,
+              metrics.pitch * CELL_GAP,
+              metrics.radius + (metrics.pitch * CELL_GAP) / 2,
+            ),
+          )
+          .join('');
   const weeks = grid.weeks.length;
   return (
     <div
@@ -295,7 +390,7 @@ function Heatmap({
               'whitespace-nowrap',
               week.some((cell) => !cell.future && cell.date.startsWith(month)) &&
                 grid.monthStarts[w] !== null &&
-                'font-medium text-foreground',
+                '-ml-[calc(var(--gap)/2)] font-medium text-foreground',
             )}
           >
             {grid.monthStarts[w] !== null && week[0] ? labels.month(week[0].date) : ''}
@@ -314,23 +409,13 @@ function Heatmap({
         data-testid="usage-heatmap"
         className={cn('relative grid grid-flow-col', cols, rows)}
       >
-        {outline !== null && (
+        {outline !== null && outline !== '' && (
           <svg
             aria-hidden
             data-testid="usage-current-month"
-            viewBox={`0 0 ${weeks - CELL_GAP} ${7 - CELL_GAP}`}
-            preserveAspectRatio="none"
-            className="pointer-events-none absolute inset-0 size-full overflow-visible text-foreground"
+            className="pointer-events-none absolute top-0 left-0 size-px overflow-visible text-input"
           >
-            <path
-              d={outline}
-              fill="none"
-              stroke="currentColor"
-              vectorEffect="non-scaling-stroke"
-              strokeWidth={1.75}
-              strokeDasharray="3 2.5"
-              strokeLinejoin="round"
-            />
+            <path d={outline} fill="none" stroke="currentColor" />
           </svg>
         )}
         {grid.weeks

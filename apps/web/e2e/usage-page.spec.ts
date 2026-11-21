@@ -88,6 +88,43 @@ test.describe('live', () => {
     await expect(cell(page, '2026-11-16')).toHaveAttribute('aria-pressed', 'false');
     await expect(stats).toContainText('864K token');
   });
+
+  test('the current month outline runs in the gaps around its days', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.clock.setFixedTime(new Date('2026-11-21T12:00:00Z'));
+    await mockLive(page, { threads: [], messages: [] }, (path, _route, json) =>
+      path === '/api/teams/t1/usage/daily'
+        ? json({
+            days: [day('2026-11-02', 4000, 0, { 'cc/haiku': 4000 })],
+            models: [{ key: 'cc/haiku', name: 'claude-haiku-5-5', provider: 'Claude Code' }],
+            projects: [],
+          })
+        : undefined,
+    );
+    await page.goto('/app/usage');
+    const days = page.locator('[data-testid="usage-heatmap"] [data-day^="2026-11-"]');
+    await expect(days).toHaveCount(21);
+    const boxes = await days.evaluateAll((els) =>
+      els.map((el) => {
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      }),
+    );
+    const outline = page.getByTestId('usage-current-month').locator('path');
+    await expect(outline).toBeVisible();
+    const line = await outline.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    });
+    const monday = (await cell(page, '2026-11-02').boundingBox())!;
+    const nextMonday = (await cell(page, '2026-11-09').boundingBox())!;
+    const half = (nextMonday.x - monday.x - monday.width) / 2;
+    const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(1);
+    near(line.left, Math.min(...boxes.map((b) => b.left)) - half);
+    near(line.right, Math.max(...boxes.map((b) => b.right)) + half);
+    near(line.top, Math.min(...boxes.map((b) => b.top)) - half);
+    near(line.bottom, Math.max(...boxes.map((b) => b.bottom)) + half);
+  });
 });
 
 test('a new team sees an empty state instead of a blank chart', async ({ page }) => {
