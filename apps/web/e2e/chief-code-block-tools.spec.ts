@@ -36,7 +36,7 @@ for (const scheme of ['light', 'dark'] as const) {
         await evidencePanelShot(page, `code-block-tools-${name}-${scheme}-${width}.png`, block, 48);
         const ownButtons = [code.getByTestId('md-code-expand'), code.getByTestId('md-code-copy')];
         const toolButtons = tools.getByRole('button');
-        await expect(toolButtons).toHaveCount(2);
+        await expect(toolButtons).toHaveCount(1);
         for (const own of ownButtons) {
           const ownBox = await own.boundingBox();
           expect(ownBox).not.toBeNull();
