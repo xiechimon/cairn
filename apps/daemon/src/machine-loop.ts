@@ -986,6 +986,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           await client.done(stepRecord.id, {
             status: 'failed',
             errorMessage: 'daemon journal lost across restart',
+            generation: stepRecord.generation,
           });
         }
       }

@@ -86,7 +86,7 @@ export async function runCoordinatorTurn(
   let observation: OtelObservation | undefined;
   const done = async (body: MachineDoneBody) => {
     await deps.inputs?.barrier();
-    await api.done(stepId, body, observation);
+    await api.done(stepId, { ...body, generation: claimed.step.generation }, observation);
     await deps.inputs?.recover(harness);
     return body;
   };

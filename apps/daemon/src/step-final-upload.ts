@@ -103,8 +103,12 @@ export async function resumePendingUpload(
     logger.step(`transcript upload failed: ${err instanceof Error ? err.message : String(err)}`);
     return;
   }
+  const generation = entry.claimed?.step.generation;
   try {
-    await client.done(stepId, doneBody);
+    await client.done(stepId, {
+      ...doneBody,
+      ...(generation !== undefined ? { generation } : {}),
+    });
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
     if (
@@ -117,6 +121,7 @@ export async function resumePendingUpload(
     const failedBody: MachineDoneBody = {
       status: 'failed',
       errorMessage: `Orb completion rejected with HTTP ${err.status}: ${err.body}`,
+      ...(generation !== undefined ? { generation } : {}),
     };
     journal.update(stepId, { doneBody: failedBody });
     try {

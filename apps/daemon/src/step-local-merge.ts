@@ -31,12 +31,14 @@ export async function localMergeDoneBody(
     return {
       status: 'success',
       localMerge: { command, result },
+      generation: claimed.step.generation,
       ...(result.outcome === 'merged' ? { commit: result.commit } : {}),
     };
   } catch (err) {
     return {
       status: 'failed',
       errorMessage: err instanceof Error ? err.message : String(err),
+      generation: claimed.step.generation,
     };
   }
 }

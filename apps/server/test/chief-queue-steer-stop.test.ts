@@ -714,7 +714,7 @@ describe('chief unavailable (T4)', () => {
     });
   });
 
-  test('a backup model on another runtime is skipped, so the thread session stays usable', async () => {
+  test('a backup model on another runtime is skipped when no machine can run it', async () => {
     const w = await setupWorld([{ provider: 'claude-code', modelId: 'sonnet' }]);
     w.s.db;
     await w.send('第一句');
@@ -724,7 +724,7 @@ describe('chief unavailable (T4)', () => {
     expect(w.stepRow(running!.step.id)?.fallback ?? null).toBeNull();
   });
 
-  test('a backup model on a different backend runtime is skipped too', async () => {
+  test('a backup model on a different backend runtime takes over the turn', async () => {
     const w = await setupWorld([{ provider: 'gemini', modelId: 'gemini-pro' }]);
     w.s.db
       .update(routingRule)
@@ -741,7 +741,13 @@ describe('chief unavailable (T4)', () => {
     const running = await w.claim();
     expect(running?.agent?.provider).toBe('claude-code');
     await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
-    expect(w.stepRow(running!.step.id)?.fallback ?? null).toBeNull();
+    expect(w.stepRow(running!.step.id)?.fallback?.model).toEqual({
+      provider: 'gemini',
+      modelId: 'gemini-pro',
+    });
+    const retried = await w.claim();
+    expect(retried?.agent?.provider).toBe('gemini');
+    expect(retried?.agent?.modelId).toBe('gemini-pro');
   });
 
   test('fallback chain exhausted: the turn parks on quota and the outage shows', async () => {

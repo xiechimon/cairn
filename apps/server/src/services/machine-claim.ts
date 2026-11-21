@@ -369,6 +369,7 @@ function chiefClaimPayload(
   const continuesSession =
     !stepRow.freshSession &&
     threadRow.sessionId !== '' &&
+    threadRow.sessionRuntime === runtime &&
     (runtime !== 'claude-code' && runtime !== 'devin' && runtime !== 'antigravity'
       ? true
       : !chiefLastRanOnOtherAccount(
@@ -390,6 +391,7 @@ function chiefClaimPayload(
       kind: 'chief',
       machineId,
       createdAt: stepRow.createdAt,
+      generation: stepRow.claimedAt ?? undefined,
     },
     conversationId: stepRow.buildId,
     session: {
@@ -816,6 +818,7 @@ async function tryClaim(
         kind: cand.stepRow.kind,
         machineId,
         createdAt: cand.stepRow.createdAt,
+        generation: claimedAt,
       },
       conversationId: cand.stepRow.buildId,
       ...(localMerge !== null ? { localMerge } : {}),

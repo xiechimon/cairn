@@ -265,6 +265,41 @@ async function finishStepReport(
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
+  if (
+    (stepRow.kind === 'review' || stepRow.kind === 'verify') &&
+    stepRow.archiveStop === null &&
+    db
+      .select({ stepId: stopPending.stepId })
+      .from(stopPending)
+      .where(eq(stopPending.stepId, stepRow.id))
+      .get() === undefined
+  ) {
+    const gateWorker = workerStepContext(deps, stepRow);
+    const plan = gateWorker?.agentRow
+      ? planModelFallback(db, stepRow, gateWorker.agentRow, body)
+      : null;
+    if (plan !== null && gateWorker?.agentRow) {
+      recordStepUsage(deps, stepRow, body.usage ?? []);
+      recordProviderOutcome(
+        stepTeamId(deps, stepRow),
+        ranModel(gateWorker.agentRow, stepRow).provider,
+        body,
+        false,
+      );
+      if (plan.trigger === 'model_unavailable') {
+        const teamId = stepTeamId(deps, stepRow);
+        if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
+      }
+      requeueStep(deps, stepRow, plan.row, {
+        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: plan.note,
+      });
+      notifyModelFallback(deps, gateWorker.todoRow, gateWorker.agentRow, plan.note);
+      revokeStepGitCredential(deps, stepId);
+      emitRuntimeStepSpan(db, stepId);
+      return;
+    }
+  }
   if (settleRetiredGateStep(deps, stepRow, body)) {
     recordStepUsage(deps, stepRow, body.usage ?? []);
     revokeStepGitCredential(deps, stepId);

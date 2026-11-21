@@ -1452,6 +1452,7 @@ export const gateVerdict = sqliteTable(
     patchDigest: text('patchDigest'),
     headSha: text('headSha'),
     expectedHeadSha: text('expectedHeadSha').notNull(),
+    ranModel: json<StepRanModel>('ranModel'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [index('gate_verdict_buildId_idx').on(t.buildId)],

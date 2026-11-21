@@ -288,8 +288,12 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     done: async (stepId, body, observation) => {
       const owned = stepRow(stepId);
       recordStepUsage(deps, owned, body.usage ?? []);
-      if (owned.status !== 'claimed') {
-        stopStepComputer(deps, stepId);
+      if (
+        owned.status !== 'claimed' ||
+        owned.machineId !== null ||
+        (body.generation !== undefined && owned.claimedAt !== body.generation)
+      ) {
+        if (owned.status !== 'claimed') stopStepComputer(deps, stepId);
         return;
       }
       deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();

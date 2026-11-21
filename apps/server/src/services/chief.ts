@@ -1983,14 +1983,21 @@ export function parseChiefTrigger(prompt: string | null): 'user' | ChiefWakeKind
     : 'wake';
 }
 
-export function finishChiefTurn(deps: { db: Db }, threadId: string, body: MachineDoneBody): void {
+export function finishChiefTurn(
+  deps: { db: Db },
+  threadId: string,
+  body: MachineDoneBody,
+  runtime: string,
+): void {
   const threadRow = deps.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get();
   if (!threadRow) return;
   const now = nowMs();
   deps.db
     .update(chiefThread)
     .set({
-      ...(body.sessionId !== undefined ? { sessionId: body.sessionId } : {}),
+      ...(body.sessionId !== undefined
+        ? { sessionId: body.sessionId, sessionRuntime: runtime }
+        : {}),
       lastTurnAt: now,
       updatedAt: now,
     })

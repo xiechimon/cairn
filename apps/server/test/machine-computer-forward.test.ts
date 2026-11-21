@@ -767,6 +767,7 @@ describe('stop and finish', () => {
     connect(ctx.s, 'omarchy');
     void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', shell('ls'));
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBe('step-a');
+    ctx.s.db.update(stepTable).set({ machineId: null }).where(eq(stepTable.id, 'step-a')).run();
     await createCoordinatorServerApi(ctx.deps).done('step-a', { status: 'success' });
     expect(ctx.s.db.select().from(computerTable).get()?.executionStepId).toBeNull();
   });

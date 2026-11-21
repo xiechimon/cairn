@@ -38,6 +38,7 @@ import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
+import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { imTurnFinished } from './im/runtime.js';
 import {
   isChiefConversation,
@@ -454,7 +455,12 @@ export function finishCoordinatorTurn(
   if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
   publishStepStatus(deps, stepRow.id);
   cancelPendingQuestions(deps, stepRow.buildId, CHIEF_TURN_END_REASON);
-  finishChiefTurn(deps, stepRow.buildId, { ...outcome, sessionId: reportedSessionId });
+  finishChiefTurn(
+    deps,
+    stepRow.buildId,
+    { ...outcome, sessionId: reportedSessionId },
+    stepRuntimeFor(stepRow.ranModel?.provider ?? null),
+  );
   settleMemoryEditTurn(
     db,
     stepRow,

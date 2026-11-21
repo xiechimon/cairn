@@ -561,6 +561,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           kind: 'chief',
           machineId: null,
           createdAt: row.createdAt,
+          generation: row.claimedAt ?? undefined,
         },
         conversationId: row.buildId,
         session: { action: 'new', sessionId: null },
@@ -631,7 +632,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       logger.error({ stepId: row.id, error: scrubbed }, 'coordinator turn failed');
       const current = db.select().from(step).where(eq(step.id, row.id)).get();
       if (!closing && current?.status === 'claimed') {
-        await api.done(row.id, { status: 'failed', errorMessage: scrubbed });
+        await api.done(row.id, {
+          status: 'failed',
+          errorMessage: scrubbed,
+          generation: row.claimedAt ?? undefined,
+        });
       }
     } finally {
       clearInterval(heartbeat);

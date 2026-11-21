@@ -662,7 +662,11 @@ async function failStep(
   deps.sessionHandles?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
   try {
-    await deps.client.done(stepId, { status: 'failed', errorMessage: message });
+    await deps.client.done(stepId, {
+      status: 'failed',
+      errorMessage: message,
+      generation: deps.journal.get(stepId)?.claimed?.step.generation,
+    });
     deps.journal.remove(stepId);
   } catch (err) {
     deps.logger.step(

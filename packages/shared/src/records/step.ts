@@ -32,6 +32,7 @@ export const stepRecordSchema = z.object({
   kind: stepKindSchema,
   machineId: recordId.nullable(),
   createdAt: epochMs,
+  generation: epochMs.optional(),
 });
 export type StepRecord = z.infer<typeof stepRecordSchema>;
 

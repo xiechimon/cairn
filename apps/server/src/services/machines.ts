@@ -710,6 +710,7 @@ function toStepRecord(r: typeof step.$inferSelect): StepRecord {
     kind: r.kind,
     machineId: r.machineId,
     createdAt: r.createdAt,
+    generation: r.claimedAt ?? undefined,
   };
 }
 

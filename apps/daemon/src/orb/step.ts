@@ -354,7 +354,11 @@ export async function runOrbStep(
         await resumePendingUpload(deps, pending, { ...options, failOnRejectedDone: true });
       } else {
         deps.logger.step(`Orb step exited: ${exitError}`);
-        const doneBody: MachineDoneBody = { status: 'failed', errorMessage: exitError };
+        const doneBody: MachineDoneBody = {
+          status: 'failed',
+          errorMessage: exitError,
+          generation: pending?.claimed?.step.generation,
+        };
         deps.journal.update(stepId, { state: 'awaiting-upload', doneBody });
         try {
           await deps.client.done(stepId, doneBody);
