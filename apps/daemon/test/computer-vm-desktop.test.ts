@@ -87,14 +87,14 @@ if (command === 'run') {
   if (flag('run-fails')) process.exit(1);
   const name = rest[rest.indexOf('--name') + 1];
   const label = rest[rest.indexOf('--label') + 1].split('=');
-  state.vms[name] = { state: flag('guard-fails') ? 'stopped' : 'running', address: '127.0.0.1', ready: !flag('never-ready'), labels: { [label[0]]: label[1] }, image: rest.at(-1), installed: [] };
+  state.vms[name] = { state: flag('guard-fails') ? 'stopped' : 'running', address: '127.0.0.1', ready: !flag('never-ready'), display: !flag('never-displayed'), labels: { [label[0]]: label[1] }, image: rest.at(-1), installed: [] };
   write(state);
   process.exit(0);
 }
 if (command === 'start') {
   const vm = state.vms[rest[0]];
   if (!vm) process.exit(1);
-  vm.state = 'running'; vm.ready = true; write(state);
+  vm.state = 'running'; vm.ready = true; vm.display = true; write(state);
   process.exit(0);
 }
 if (command === 'stop') {
@@ -127,6 +127,11 @@ if (command === 'exec') {
   const vm = state.vms[name];
   if (!vm || vm.state !== 'running') process.exit(1);
   if (argv[0] === 'test' && argv[2] === '/run/cairn/ready') process.exit(vm.ready ? 0 : 1);
+  if (argv[0] === 'xdotool' && argv[1] === 'getdisplaygeometry') {
+    if (!vm.display) process.exit(1);
+    process.stdout.write('1600 1000\\n');
+    process.exit(0);
+  }
   if (argv[0] === 'cairn-browser') {
     if (argv[1] === 'key') fs.writeFileSync(path.join(dir, 'key'), fs.readFileSync(0));
     if (argv[1] === 'prepare') {
@@ -399,6 +404,15 @@ describe('VmDesktops', () => {
     env.flag('never-ready');
     const desktops = env.make({ now: () => Date.now(), readyMs: 300 });
     await expect(desktops.ensure('chief:a')).rejects.toThrow('did not become ready');
+    expect(env.calls()).toContainEqual(['delete', '--force', NAME]);
+  });
+
+  test('a VM whose display does not answer is not accepted although its ready marker exists', async () => {
+    const env = setup();
+    env.flag('never-displayed');
+    const desktops = env.make({ now: () => Date.now(), readyMs: 300 });
+    await expect(desktops.ensure('chief:a')).rejects.toThrow('did not become ready');
+    expect(env.calls().some((argv) => argv.includes('xdotool'))).toBe(true);
     expect(env.calls()).toContainEqual(['delete', '--force', NAME]);
   });
 

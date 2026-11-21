@@ -13,7 +13,11 @@ import {
 } from 'node:fs';
 import { createServer, type Server } from 'node:net';
 import { basename, dirname, join } from 'node:path';
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+
+const { displayAnswers } = vi.hoisted(() => ({ displayAnswers: vi.fn(async () => true) }));
+
+vi.mock('../src/computer/x11-display.js', () => ({ x11DisplayAnswers: displayAnswers }));
 
 vi.mock('cloakbrowser', () => ({
   binaryInfo: () => ({ installed: true, binaryPath: '/fake/cloak', version: '156' }),
@@ -40,6 +44,10 @@ import { ComputerRefusal } from '../src/computer/provider.js';
 const cleanups: (() => void)[] = [];
 afterEach(() => {
   for (const cleanup of cleanups.splice(0)) cleanup();
+});
+beforeEach(() => {
+  displayAnswers.mockReset();
+  displayAnswers.mockResolvedValue(true);
 });
 
 function workspace(programs: readonly string[]) {
@@ -774,6 +782,32 @@ describe('HostDesktops', () => {
     const desktops = new HostDesktops({ root, toolsRoot: root, env, run, readyMs: 50 });
     await expect(desktops.ensure('chief:a')).rejects.toThrow('did not become ready');
     expect(calls.at(-1)?.slice(0, 3)).toEqual(['systemctl', '--user', 'stop']);
+    expect((await desktops.presence())[0]?.state).toBe('failed');
+  });
+
+  test('a desktop is accepted only after its display answers, not when its socket exists', async () => {
+    const { root, env } = workspace(BROWSER);
+    const systemd = fakeSystemd('95');
+    displayAnswers.mockResolvedValueOnce(false);
+    const desktops = new HostDesktops({ root, toolsRoot: root, env, run: systemd.run });
+    expect(await desktops.ensure('chief:a')).toBe(':95');
+    expect(displayAnswers).toHaveBeenCalledTimes(2);
+    expect(displayAnswers).toHaveBeenCalledWith('95');
+  });
+
+  test('a desktop whose display never answers is stopped and reported failed', async () => {
+    const { root, env } = workspace(BROWSER);
+    const systemd = fakeSystemd('96');
+    displayAnswers.mockResolvedValue(false);
+    const desktops = new HostDesktops({
+      root,
+      toolsRoot: root,
+      env,
+      run: systemd.run,
+      readyMs: 50,
+      now: () => Date.now(),
+    });
+    await expect(desktops.ensure('chief:a')).rejects.toThrow('did not become ready');
     expect((await desktops.presence())[0]?.state).toBe('failed');
   });
 

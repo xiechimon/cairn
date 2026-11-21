@@ -46,6 +46,7 @@ export const VM_HOME = '/home/agent';
 export const VM_INIT_IMAGE = 'ghcr.io/apple/containerization/vminit:0.54.0';
 export const VM_CONTROL_PORT = 5900;
 export const VM_VIEW_PORT = 5901;
+export const VM_DISPLAY = ':1';
 const VM_USER = '1000';
 const GIB = 1024 ** 3;
 const VM_MEMORY_MIN_GIB = 3;
@@ -72,6 +73,7 @@ export const PACKAGE_INSTALL_SCRIPT = [
     '; status=$?; find / -xdev -type f -perm /6000 -exec chmod a-s {} + 2>/dev/null; exit $status',
   );
 const BROWSER_COMMAND_MS = 60_000;
+const DISPLAY_PROBE_MS = 5_000;
 const KILL_GRACE_MS = 1_000;
 
 const FILES_SCRIPT = `
@@ -330,7 +332,7 @@ export class VmDesktops implements ComputerDesktops {
       '--env',
       'USER=agent',
       '--env',
-      'DISPLAY=:1',
+      `DISPLAY=${VM_DISPLAY}`,
       '--env',
       'LANG=C.UTF-8',
     ];
@@ -922,6 +924,21 @@ export class VmDesktops implements ComputerDesktops {
       '/run/cairn/ready',
     ]);
     if (marker.code !== 0) return false;
+    const display = await this.run(
+      [
+        binary,
+        'exec',
+        '--uid',
+        VM_USER,
+        '--env',
+        `DISPLAY=${VM_DISPLAY}`,
+        name,
+        'xdotool',
+        'getdisplaygeometry',
+      ],
+      { timeoutMs: DISPLAY_PROBE_MS },
+    );
+    if (display.code !== 0) return false;
     const ports = await Promise.all([
       this.probe(address, VM_CONTROL_PORT),
       this.probe(address, VM_VIEW_PORT),
