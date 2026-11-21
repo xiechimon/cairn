@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { fenceMailText } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
-import { fauxAssistantMessage, fauxProvider } from '@earendil-works/pi-ai';
+import { fauxAssistantMessage, fauxProvider, fauxToolCall } from '@earendil-works/pi-ai';
 import { UserEntry } from '@earendil-works/pi-durable';
 import { afterEach, describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../../scripts/test-tmpdir.mjs';
@@ -29,6 +29,10 @@ import {
 import { chiefStep, fakeMachineApi } from './fake-machine-api.js';
 
 const ctx = BACKGROUND_CONTEXT;
+const png = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+).toString('base64');
 const dirs: string[] = [];
 afterEach(() => {
   for (const d of dirs.splice(0)) releaseTestTempDir(d);
@@ -175,6 +179,77 @@ describe('volatile turn context', () => {
       expect(after.slice(0, before.length)).toEqual(before);
     }
     await harness.close(ctx);
+  });
+
+  it('keeps an attachment image fetched alongside two other tools in the same turn', async () => {
+    const dir = makeTestTempDir('coord-volatile-image-');
+    dirs.push(dir);
+    const requests: { role: string; content: unknown }[][] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000, input: ['text', 'image'] }],
+      tokensPerSecond: 1e9,
+    });
+    faux.setResponses([
+      (c: { messages: { role: string; content: unknown }[] }) => {
+        requests.push(c.messages);
+        return fauxAssistantMessage(
+          [
+            fauxToolCall('attachment', { attachmentId: 'team1/shot.png' }),
+            fauxToolCall('threads', {}),
+            fauxToolCall('machines', {}),
+          ],
+          { stopReason: 'toolUse' },
+        );
+      },
+      (c: { messages: { role: string; content: unknown }[] }) => {
+        requests.push(c.messages);
+        return fauxAssistantMessage('done');
+      },
+    ]);
+    const models = createCoordinatorModels([faux.provider]);
+    const volatile = createVolatileContext();
+    const api = fakeMachineApi();
+    api.relayTool = async (_stepId, name) =>
+      name === 'attachment'
+        ? JSON.stringify({
+            id: 'att-1',
+            fileName: 'shot.png',
+            mimeType: 'image/png',
+            sizeBytes: png.length,
+            encoding: 'base64',
+            content: png,
+          })
+        : `result of ${name}`;
+    const gate = createConversationGate();
+    const harness = await openCoordinatorHarness(join(dir, 's.sqlite'), models.models, ctx, {
+      extensions: [coordinatorToolsExtension(api, gate), volatileContextExtension(volatile)],
+    });
+    try {
+      await runCoordinatorTurn(
+        {
+          harness,
+          models,
+          api,
+          context: ctx,
+          heartbeatMs: 1000,
+          now: () => 1,
+          conversationGate: gate,
+          volatile,
+        },
+        chiefStep('s-image', 'what does the screenshot say?'),
+      );
+      const second = requests[1] ?? [];
+      const images = second.filter(
+        (message) =>
+          Array.isArray(message.content) &&
+          (message.content as { type: string }[]).some((block) => block.type === 'image'),
+      );
+      expect(images).toHaveLength(1);
+      expect(JSON.stringify(second)).not.toContain('Image omitted');
+    } finally {
+      await harness.close(ctx);
+    }
   });
 
   it('appends to the last user message in string and block form', () => {
