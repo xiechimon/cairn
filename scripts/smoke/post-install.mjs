@@ -125,6 +125,25 @@ async function api(ctx, method, path, body, token = ctx.token) {
   return text === '' ? null : JSON.parse(text);
 }
 
+async function windowApi(ctx, method, path, body) {
+  await ctx.page.waitForLoadState('load');
+  const result = await ctx.page.evaluate(
+    async (request) => {
+      const res = await fetch(request.path, {
+        method: request.method,
+        headers: request.body === undefined ? {} : { 'content-type': 'application/json' },
+        body: request.body === undefined ? undefined : JSON.stringify(request.body),
+      });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    },
+    { method, path, body },
+  );
+  if (!result.ok) {
+    throw new Error(`${method} ${path} from the app window -> ${result.status}: ${result.text}`);
+  }
+  return result.text === '' ? null : JSON.parse(result.text);
+}
+
 const SEEDED_MODELS = [
   { provider: 'devin', modelId: 'swe-2-high', thinkingLevel: null },
   { provider: 'claude-code', modelId: 'claude-sonnet-5-5', thinkingLevel: null },
@@ -146,7 +165,7 @@ async function seedModelSources(ctx) {
     ],
   });
   const started = await api(ctx, 'POST', '/api/machine/enroll/start', { name: SMOKE_LABEL });
-  const confirmed = await api(ctx, 'POST', '/api/machine/enroll/confirm', {
+  const confirmed = await windowApi(ctx, 'POST', '/api/machine/enroll/confirm', {
     enrollId: started.enrollId,
   });
   const machine = confirmed.machine ?? confirmed;
