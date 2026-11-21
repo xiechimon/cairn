@@ -34,7 +34,8 @@ export function runGit(
   return new Promise((resolve, reject) => {
     const child = spawn('git', args, {
       cwd: opts.cwd,
-      env: { ...inheritedGitEnv(), ...opts.env },
+      // a pushed refs/replace/* ref must never change what server-side git reads see
+      env: { ...inheritedGitEnv(), ...opts.env, GIT_NO_REPLACE_OBJECTS: '1' },
       windowsHide: true,
       ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
     });
@@ -108,6 +109,34 @@ export function decodeCgiResponse(raw: Buffer): GitCgiResponse {
   }
   if (chunked) body = decodeChunked(body);
   return { status, headers, body };
+}
+
+const REPLACE_REFS_PREFIX = 'refs/replace';
+
+async function transferHideRefs(dir: string): Promise<string[]> {
+  const listed = await runGit(['config', '--get-all', 'transfer.hideRefs'], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  return listed.code === 0 ? listed.stdout.toString('utf8').split('\n') : [];
+}
+
+async function denyReplaceRefs(dir: string): Promise<void> {
+  // the dir itself must be the git dir; inside an unrelated repo the config write would land there
+  const probe = await runGit(['rev-parse', '--absolute-git-dir'], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  if (probe.code !== 0 || probe.stdout.toString('utf8').trim() !== realpathSync(dir)) return;
+  if ((await transferHideRefs(dir)).includes(REPLACE_REFS_PREFIX)) return;
+  const added = await runGit(['config', '--add', 'transfer.hideRefs', REPLACE_REFS_PREFIX], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  // a racing first touch may hold the config lock; the value it wrote satisfies the guard
+  if (added.code !== 0 && !(await transferHideRefs(dir)).includes(REPLACE_REFS_PREFIX)) {
+    throw new Error(`git config transfer.hideRefs failed: ${added.stderr}`);
+  }
 }
 
 export function decodeChunked(buf: Buffer): Buffer {
@@ -357,6 +386,7 @@ export const systemGitOps: GitOps = {
       ['symbolic-ref', 'HEAD', `refs/heads/${DEFAULT_HEAD_BRANCH}`],
       ['config', 'http.receivepack', 'true'],
       ['config', 'http.uploadpack', 'true'],
+      ['config', 'transfer.hideRefs', REPLACE_REFS_PREFIX],
     ];
     for (const args of steps) {
       const r = await runGit(args, { cwd: dir, timeoutMs: META_TIMEOUT_MS });
@@ -545,6 +575,9 @@ export const systemGitOps: GitOps = {
   },
 
   async httpBackend(req: GitCgiRequest): Promise<GitCgiResponse> {
+    // existing repositories predate initBareRepo's transfer.hideRefs; backfill on first touch
+    const repoName = req.pathInfo.slice(1).split('/')[0] ?? '';
+    if (repoName.endsWith('.git')) await denyReplaceRefs(join(req.projectRoot, repoName));
     const env: NodeJS.ProcessEnv = {
       GIT_PROJECT_ROOT: req.projectRoot,
       GIT_HTTP_EXPORT_ALL: '1',

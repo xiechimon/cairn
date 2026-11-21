@@ -5,7 +5,7 @@ import { BRAND, conversationBranch, type ProjectRecord } from '@cairn/shared';
 import { serve } from '@hono/node-server';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { runGit } from '../src/lib/git.js';
+import { runGit, systemGitOps } from '../src/lib/git.js';
 import { newUuidv7 } from '../src/lib/ids.js';
 import { readFile } from '../src/services/git.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
@@ -231,6 +231,76 @@ describe('hosted form: bare repo + git http-backend (02 section 3 locked)', () =
     const file = await readFile(s, record.id, 'icon.png', branch);
     expect(file.encoding).toBe('base64');
     expect(Buffer.from(file.content, 'base64').equals(png)).toBe(true);
+  });
+
+  test('a hosted repository refuses refs/replace pushes (#5242)', async () => {
+    const record = await createProject({ name: 'replace-push', repoKind: 'hosted' });
+    const dir = workdir('replace-push');
+    const repoDir = join(dir, 'repo');
+    expect((await git(['clone', authedUrl(record), repoDir], dir)).code).toBe(0);
+    writeFileSync(join(repoDir, 'a.txt'), 'real\n');
+    expect((await git(['checkout', '-B', 'main'], repoDir)).code).toBe(0);
+    await git(['add', 'a.txt'], repoDir);
+    await git(['commit', '-m', 'real'], repoDir);
+    expect((await git(['push', '-u', 'origin', 'main'], repoDir)).code).toBe(0);
+    const victim = (await git(['rev-parse', 'HEAD'], repoDir)).stdout.toString().trim();
+    expect((await git(['checkout', '-b', 'side'], repoDir)).code).toBe(0);
+    writeFileSync(join(repoDir, 'a.txt'), 'forged\n');
+    await git(['commit', '-am', 'forged'], repoDir);
+    const forged = (await git(['rev-parse', 'HEAD'], repoDir)).stdout.toString().trim();
+    expect((await git(['push', 'origin', 'side'], repoDir)).code).toBe(0);
+    const replace = await git(['push', 'origin', `${forged}:refs/replace/${victim}`], repoDir);
+    expect(replace.code).not.toBe(0);
+    expect(replace.stderr.toString()).toContain('hidden ref');
+    const remote = await git(['ls-remote', authedUrl(record)], dir);
+    expect(remote.stdout.toString()).not.toContain('refs/replace');
+  });
+
+  test('server reads ignore a refs/replace ref already inside the bare repository (#5242)', async () => {
+    const record = await createProject({ name: 'replace-read', repoKind: 'hosted' });
+    const bare = join(s.reposDir, s.team.id, `${record.repoName}.git`);
+    const dir = workdir('replace-read');
+    const repoDir = join(dir, 'repo');
+    expect((await git(['clone', authedUrl(record), repoDir], dir)).code).toBe(0);
+    writeFileSync(join(repoDir, 'a.txt'), 'real\n');
+    expect((await git(['checkout', '-B', 'main'], repoDir)).code).toBe(0);
+    await git(['add', 'a.txt'], repoDir);
+    await git(['commit', '-m', 'real'], repoDir);
+    expect((await git(['push', '-u', 'origin', 'main'], repoDir)).code).toBe(0);
+    const victim = (await git(['rev-parse', 'HEAD'], repoDir)).stdout.toString().trim();
+    const parent = (await git(['rev-parse', 'HEAD^'], repoDir)).stdout.toString().trim();
+    expect((await git(['checkout', '-b', 'side'], repoDir)).code).toBe(0);
+    writeFileSync(join(repoDir, 'a.txt'), 'forged\n');
+    writeFileSync(join(repoDir, 'planted.txt'), 'planted\n');
+    await git(['add', '.'], repoDir);
+    await git(['commit', '-m', 'forged'], repoDir);
+    const forged = (await git(['rev-parse', 'HEAD'], repoDir)).stdout.toString().trim();
+    expect((await git(['push', 'origin', 'side'], repoDir)).code).toBe(0);
+    // a repository provisioned before the guard: no transfer.hideRefs, ref planted on disk
+    await git(['config', '--unset-all', 'transfer.hideRefs'], bare);
+    expect((await git(['update-ref', `refs/replace/${victim}`, forged], bare)).code).toBe(0);
+
+    // cat-file, ls-tree and diff all read the real objects, not the replacement
+    const file = await readFile(s, record.id, 'a.txt', 'main');
+    expect(file.content).toBe('real\n');
+    const listing = (await (
+      await req(s.app, 'GET', `/api/projects/${record.id}/files?ref=main`)
+    ).json()) as { files: { path: string }[] };
+    expect(listing.files.map((f) => f.path)).toEqual(['a.txt']);
+    const changes = await systemGitOps.localCompareFiles(bare, parent, victim);
+    expect(changes.map((c) => c.filename)).toEqual(['a.txt']);
+
+    // the transport re-applies the guard on first touch: hidden from ls-remote, push refused
+    const remote = await git(['ls-remote', authedUrl(record)], dir);
+    expect(remote.stdout.toString()).not.toContain('refs/replace');
+    const replace = await git(['push', 'origin', `${forged}:refs/replace/${victim}`], repoDir);
+    expect(replace.code).not.toBe(0);
+    expect(replace.stderr.toString()).toContain('hidden ref');
+    expect(
+      (await git(['rev-parse', '--verify', `refs/replace/${victim}`], bare)).stdout
+        .toString()
+        .trim(),
+    ).toBe(forged);
   });
 
   test('same-name project repoName uniquified (-2 suffix [design]); unknown repo 404', async () => {
