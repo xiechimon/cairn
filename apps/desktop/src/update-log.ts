@@ -7,6 +7,8 @@ export function updateLogPath(userData: string): string {
 
 export function appendUpdateLog(userData: string, line: string, at: Date = new Date()): void {
   const path = updateLogPath(userData);
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  appendFileSync(path, `${at.toISOString()} ${line}\n`, { mode: 0o600 });
+  try {
+    mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+    appendFileSync(path, `${at.toISOString()} ${line}\n`, { mode: 0o600 });
+  } catch {}
 }
