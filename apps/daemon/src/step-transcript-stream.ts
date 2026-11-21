@@ -59,9 +59,10 @@ export class StepTranscriptStream {
     this.thinkingDeltas.push(text);
   }
 
-  discardDeltas(): void {
+  discardAttempt(): void {
     this.thinkingDeltas.discard();
     this.textDeltas.discard();
+    this.segments.discard();
   }
 
   flushDeltas(): void {

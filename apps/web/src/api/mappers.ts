@@ -1882,6 +1882,25 @@ export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
   return collectChiefStream(messages).items;
 }
 
+function dropThinkingOfFailedTurns(items: ChiefStreamItem[], itemsAt: number[]): void {
+  const drop = new Set<number>();
+  let turn: number[] = [];
+  let answered = false;
+  items.forEach((item, index) => {
+    if (item.kind === 'user') {
+      turn = [];
+      answered = false;
+    } else if (item.kind === 'robot') answered = true;
+    else if (item.kind === 'thinking') turn.push(index);
+    else if (item.kind === 'error' && !answered) for (const at of turn) drop.add(at);
+  });
+  for (let index = items.length - 1; index >= 0; index--) {
+    if (!drop.has(index)) continue;
+    items.splice(index, 1);
+    itemsAt.splice(index, 1);
+  }
+}
+
 function collectChiefStream(
   messages: MessageRow[],
   pendingIds: ReadonlyMap<string, ChiefPendingMessage['state']> = new Map(),
@@ -2155,6 +2174,7 @@ function collectChiefStream(
   }
   flushCards();
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  dropThinkingOfFailedTurns(items, itemsAt);
   items.forEach((item, index) => {
     if (
       item.kind === 'user' ||

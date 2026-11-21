@@ -74,7 +74,7 @@ function harness(
       noteUsage: () => {},
     } as unknown as StepPassLoopInput['activity'],
     stream: {
-      discardDeltas: () => {},
+      discardAttempt: () => {},
       flushDeltas: () => {
         flushed += 1;
       },

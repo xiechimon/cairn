@@ -113,7 +113,7 @@ export async function runStepPasses(input: StepPassLoopInput): Promise<StepPassL
       priorPassMadeProgress ||= passState.sawProgress;
       resetStepPassForRetry(passState);
       watchdog.clearTrip();
-      stream.discardDeltas();
+      stream.discardAttempt();
     }
     if (stop.request !== null) break;
     input.activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);

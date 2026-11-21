@@ -109,6 +109,39 @@ test('a stored raw API error reply renders as the marker, never as a chat bubble
   await expect(stream.getByTestId('chief-reply')).toHaveCount(0);
 });
 
+test('a turn that failed shows only its marker: no thinking and no second failure notice', async ({
+  page,
+}) => {
+  const raw =
+    "API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required. Run 'claude update', or update the Claude desktop app, then try again.";
+  await open(page, [
+    { id: 'm1', role: 'user', content: '#5393 现在进展到哪了？', createdAt: 10 },
+    {
+      id: 'm2',
+      role: 'assistant',
+      content: [{ type: 'thinking', thinking: '先查 #5393 的最近一步和它卡住的原因。' }],
+      createdAt: 11,
+    },
+    failure('m3', 12, { message: raw }),
+    { id: 'm4', role: 'user', content: '再试一次', createdAt: 13 },
+    {
+      id: 'm5',
+      role: 'assistant',
+      content: [{ type: 'thinking', thinking: '逐条核对它的执行机、模型和最后一次输出。' }],
+      createdAt: 14,
+    },
+    failure('m6', 15, { message: raw }),
+  ]);
+  const stream = page.getByTestId('chief-stream');
+  await expect(page.getByTestId('chief-turn-error-card')).toHaveCount(1);
+  await expect(page.getByTestId('chief-turn-error')).toHaveText(['没完成']);
+  await expect(page.getByRole('button', { name: '展开思考' })).toHaveCount(0);
+  await expect(stream).not.toContainText('先查 #5393');
+  await expect(stream).not.toContainText('逐条核对');
+  await expect(page.getByTestId('chief-status-mark')).toHaveAttribute('data-state', 'idle');
+  await expect(page.getByText('出错了', { exact: true })).toHaveCount(0);
+});
+
 test('expanding a row in the history keeps it where it was and opens below it', async ({ page }) => {
   const filler = '这一段是之前的回复，用来把对话撑到需要滚动的长度。'.repeat(6);
   const messages: unknown[] = [];

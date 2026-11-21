@@ -81,7 +81,7 @@ describe('StepTranscriptStream', () => {
   test('discarded deltas are never sent', async () => {
     const h = harness();
     h.stream.pushText('dropped');
-    h.stream.discardDeltas();
+    h.stream.discardAttempt();
     h.stream.flushDeltas();
     await Promise.resolve();
     expect(h.calls).toEqual([]);

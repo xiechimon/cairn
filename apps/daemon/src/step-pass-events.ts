@@ -246,7 +246,8 @@ export async function consumeStepPassEvent(
         });
         break;
       }
-      await segments.endAssistantMessage(ev.message.content);
+      if (ev.message.stopReason === 'error') stream.discardAttempt();
+      else await segments.endAssistantMessage(ev.message.content);
       break;
     }
     case 'error':
@@ -308,7 +309,8 @@ export async function consumeStepPassEvent(
         void handle.stop();
       }
       logger.step(`auto_retry_start attempt=${ev.attempt}`);
-      activity.setPhase('retrying', { attempt: ev.attempt });
+      stream.discardAttempt();
+      activity.setPhase('retrying', { attempt: ev.attempt, resetLive: true });
       break;
     case 'auto_retry_end':
       activity.setPhase('awaiting_model');
