@@ -247,7 +247,7 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
       if (route === null) throw new Error('The info card model has no keyed provider');
       const models = createCoordinatorModels(options.fixedProviders ?? []);
       const binding = providerBinding({ db, box: machine.box }, teamId, route);
-      models.useProvider(binding.config, binding.resolveKey);
+      models.useProvider(binding.config, binding.resolveKey, binding.observe);
       const gate = createStepGate();
       const extension = defineExtension({
         name: TOOLS_PAGE,

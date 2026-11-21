@@ -999,6 +999,64 @@ describe('opening the tray refreshes the Claude quota from upstream', () => {
     s.dispose();
   });
 
+  test('a fresh observation suppresses the paid probe', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 120_000);
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url) => {
+        calls.push(String(url));
+        const target = String(url);
+        if (target.includes('/v1/models')) return modelsOk();
+        if (target.includes('/v1/messages')) return quotaHeaders('0.14', '0.33');
+        return new Response('{}', { status: 403 });
+      }),
+    );
+    const refreshed = (await (
+      await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`)
+    ).json()) as {
+      windows: { name: string; utilization: number }[];
+    }[];
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.31 }),
+    ]);
+    expect(calls.filter((url) => url.includes('/v1/messages'))).toEqual([]);
+    s.dispose();
+  });
+
+  test('the paid probe opens with the cheapest model the account lists', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    s.db
+      .update(claudeSubscription)
+      .set({
+        models: [
+          { id: 'claude-opus-5-5', name: 'Opus' },
+          { id: 'claude-sonnet-5-5', name: 'Sonnet' },
+          { id: 'claude-haiku-5-5', name: 'Haiku' },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+    staleWeek(s, id, Date.now() - 10 * 60_000 - 1_000);
+    const probed: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url, init) => {
+        const target = String(url);
+        if (target.includes('/api/oauth/usage')) return new Response('{}', { status: 403 });
+        if (target.includes('/v1/models')) return modelsOk();
+        probed.push(JSON.parse(String(init?.body)).model as string);
+        return quotaHeaders('0.14', '0.33');
+      }),
+    );
+    await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`);
+    expect(probed[0]).toBe('claude-haiku-5-5');
+    s.dispose();
+  });
+
   test('a refused first model falls through to the next model the account lists', async () => {
     const s = bootServer();
     const id = insertClaudeSubscription(s);
@@ -1129,7 +1187,7 @@ describe('opening the tray refreshes the Claude quota from upstream', () => {
     const path = `/api/teams/${s.team.id}/claude-subscriptions/quota`;
     const t0 = Date.now();
     await req(s.app, 'POST', path);
-    vi.spyOn(Date, 'now').mockReturnValue(t0 + 61_000);
+    vi.spyOn(Date, 'now').mockReturnValue(t0 + 601_000);
     const refreshed = (await (await req(s.app, 'POST', path)).json()) as {
       windows: { name: string; utilization: number }[];
     }[];
@@ -1168,7 +1226,7 @@ describe('opening the tray refreshes the Claude quota from upstream', () => {
     const t0 = Date.now();
     const first = (await (await req(s.app, 'POST', path)).json()) as { state?: string }[];
     expect(first[0]?.state).toBe('exhausted');
-    vi.spyOn(Date, 'now').mockReturnValue(t0 + 61_000);
+    vi.spyOn(Date, 'now').mockReturnValue(t0 + 601_000);
     const refreshed = (await (await req(s.app, 'POST', path)).json()) as {
       state?: string;
       windows: { name: string; utilization: number }[];

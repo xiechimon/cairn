@@ -336,17 +336,73 @@ export function listClaudeSubscriptions(deps: Deps, teamId: string): ClaudeSubsc
 }
 
 export const CLAUDE_QUOTA_REFRESH_MS = 60_000;
-const QUOTA_PROBED_WINDOWS = ['five_hour', 'seven_day'];
+export const CLAUDE_QUOTA_OBSERVED_MS = 10 * 60_000;
 
 const quotaProbes = new WeakMap<Db, Map<string, { at: number; done: Promise<void> }>>();
 const usageEndpointRefusals = new WeakMap<Db, Set<string>>();
 
-function quotaFresh(row: Row, now: number): boolean {
-  const windows = row.quotaWindows ?? [];
-  return QUOTA_PROBED_WINDOWS.every((name) => {
-    const window = windows.find((entry) => entry.subscription === name);
-    return window !== undefined && now - window.reportedAt < CLAUDE_QUOTA_REFRESH_MS;
-  });
+function observedFresh(row: Row, now: number): boolean {
+  return (row.quotaWindows ?? []).some(
+    (window) => now - window.reportedAt < CLAUDE_QUOTA_OBSERVED_MS,
+  );
+}
+
+export function recordClaudeQuotaNotices(
+  deps: Deps,
+  teamId: string,
+  subscriptionId: string,
+  notices: readonly ClaudeRateLimitNotice[],
+): void {
+  if (notices.length === 0) return;
+  const current = subscriptionRow(deps.db, teamId, subscriptionId);
+  if (current === undefined) return;
+  const windows = notices.reduce(
+    (stored, notice) => applyClaudeRateLimit(stored, notice, nowMs()),
+    current.quotaWindows ?? [],
+  );
+  const named = notices.some((notice) => notice.rateLimitType !== undefined);
+  deps.db
+    .update(claudeSubscription)
+    .set({
+      quotaWindows: named
+        ? windows.filter(
+            (window) =>
+              window.subscription !== CLAUDE_RATE_LIMIT_UNSPECIFIED || window.status !== 'rejected',
+          )
+        : windows,
+    })
+    .where(eq(claudeSubscription.id, subscriptionId))
+    .run();
+}
+
+export function claudeSubscriptionIdForToken(
+  deps: Deps,
+  teamId: string,
+  token: string,
+): string | null {
+  const now = nowMs();
+  const rows = deps.db
+    .select({
+      id: claudeSubscription.id,
+      tokenCipher: claudeSubscription.tokenCipher,
+      expiresAt: claudeSubscription.expiresAt,
+    })
+    .from(claudeSubscription)
+    .where(eq(claudeSubscription.teamId, teamId))
+    .all();
+  for (const row of rows) {
+    if (row.expiresAt !== null && row.expiresAt <= now) continue;
+    try {
+      if (deps.box.open(row.tokenCipher) === token) return row.id;
+    } catch {}
+  }
+  return null;
+}
+
+function probeCandidates(saved: string[], listed: string[]): string[] {
+  const unique = [...new Set([...saved, ...listed])];
+  const haiku = unique.filter((id) => /haiku/i.test(id));
+  return [...haiku, ...unique.filter((id) => !/haiku/i.test(id))].slice(0, 3);
 }
 
 async function probeAndStoreQuota(deps: UpstreamDeps, row: Row): Promise<void> {
@@ -366,65 +422,37 @@ async function probeAndStoreQuota(deps: UpstreamDeps, row: Row): Promise<void> {
     else if (usage.status === 'unsupported') refused.add(row.id);
   }
   if (notices === null) {
-    const tried = new Set<string>();
-    let refusedAll = false;
-    let done = false;
-    for (const source of [
-      () => Promise.resolve((savedModels(row.models) ?? []).map((entry) => entry.id)),
-      async () => {
-        const listed = await fetchAnthropicOAuthModels({
-          oauthToken: token,
-          fetch: options.fetch ?? globalThis.fetch,
-          timeoutMs: options.timeoutMs,
-        });
-        if (!listed.ok) return [];
-        const ids = listed.models.map((entry) => entry.id);
-        return [
-          ...ids.filter((id) => id.startsWith('claude-haiku')),
-          ...ids.filter((id) => !id.startsWith('claude-haiku')),
-        ];
-      },
-    ]) {
-      for (const candidate of (await source()).filter((id) => !tried.has(id)).slice(0, 3)) {
-        tried.add(candidate);
+    const current = subscriptionRow(deps.db, row.teamId, row.id);
+    const observed = (current?.quotaWindows ?? []).some(
+      (window) => nowMs() - window.reportedAt < CLAUDE_QUOTA_OBSERVED_MS,
+    );
+    if (!observed) {
+      const listed = await fetchAnthropicOAuthModels({
+        oauthToken: token,
+        fetch: options.fetch ?? globalThis.fetch,
+        timeoutMs: options.timeoutMs,
+      })
+        .then((result) => (result.ok ? result.models.map((entry) => entry.id) : []))
+        .catch(() => []);
+      const saved = (savedModels(row.models) ?? []).map((entry) => entry.id);
+      let refusedAll = false;
+      for (const candidate of probeCandidates(saved, listed)) {
         const probe = await probeClaudeQuota(token, candidate, options);
         if (probe.notices.length > 0) {
           notices = probe.notices;
-          done = true;
           break;
         }
         if (probe.status === 429) {
           refusedAll = true;
           continue;
         }
-        done = true;
         break;
       }
-      if (done) break;
+      if (notices === null && refusedAll) notices = [{ status: 'rejected' }];
     }
-    if (notices === null && refusedAll) notices = [{ status: 'rejected' }];
   }
   if (notices === null || notices.length === 0) return;
-  const now = nowMs();
-  const current = subscriptionRow(deps.db, row.teamId, row.id);
-  if (current === undefined) return;
-  const windows = notices.reduce(
-    (stored, notice) => applyClaudeRateLimit(stored, notice, now),
-    current.quotaWindows ?? [],
-  );
-  const named = notices.some((notice) => notice.rateLimitType !== undefined);
-  deps.db
-    .update(claudeSubscription)
-    .set({
-      quotaWindows: named
-        ? windows.filter(
-            (window) =>
-              window.subscription !== CLAUDE_RATE_LIMIT_UNSPECIFIED || window.status !== 'rejected',
-          )
-        : windows,
-    })
-    .where(eq(claudeSubscription.id, row.id))
-    .run();
+  recordClaudeQuotaNotices(deps, row.teamId, row.id, notices);
 }
 
 export async function refreshClaudeQuota(
@@ -436,7 +464,7 @@ export async function refreshClaudeQuota(
   if (
     row !== undefined &&
     (row.expiresAt === null || row.expiresAt > now) &&
-    !quotaFresh(row, now)
+    !observedFresh(row, now)
   ) {
     const probes =
       quotaProbes.get(deps.db) ?? new Map<string, { at: number; done: Promise<void> }>();
