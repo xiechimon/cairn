@@ -39,7 +39,6 @@ import {
   chiefTurnStoppedContentSchema,
   classifySkillFact,
   classifyStepFailure,
-  classifyUserText,
   conversationBranch,
   DONE_ROW,
   derivePlaceholderTitle,
@@ -799,7 +798,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (m.origin === 'task-prompt' || m.origin === 'synthetic') continue;
-      if (m.origin !== 'user' && classifyUserText(text, todo) !== 'user') continue;
       entries.push({
         at: m.createdAt,
         item: { kind: 'user', text, markdown: text, id: m.id, createdAt: m.createdAt },

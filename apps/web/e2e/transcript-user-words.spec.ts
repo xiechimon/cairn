@@ -77,16 +77,21 @@ const WIRE_BUILD = {
 const STEER_MD = '按这个改：\n\n```css\n.login-btn { border-radius: 10px; }\n```';
 
 let msgSeq = 0;
-function msg(role: 'system' | 'user' | 'assistant', content: unknown, at: number) {
+function msg(
+  role: 'system' | 'user' | 'assistant',
+  content: unknown,
+  at: number,
+  origin?: 'task-prompt' | 'synthetic' | 'user',
+) {
   msgSeq += 1;
-  return { id: `msg-${msgSeq}`, role, content, createdAt: at };
+  return { id: `msg-${msgSeq}`, role, content, createdAt: at, ...(origin === undefined ? {} : { origin }) };
 }
 
 const MESSAGES = [
-  msg('user', TASK_PROMPT, 1000),
+  msg('user', TASK_PROMPT, 1000, 'task-prompt'),
   msg('system', JSON.stringify({ kind: 'machine_selected', machineId: 'm1', name: 'mbp' }), 1100),
   msg('assistant', [{ type: 'text', text: '好的，方案已就绪。' }], 1200),
-  msg('user', '方案已确认。请按方案执行，完成改动。', 1300),
+  msg('user', '方案已确认。请按方案执行，完成改动。', 1300, 'synthetic'),
   msg('user', '发起了 AI 审核', 1400),
   msg('user', STEER_MD, 1500),
   msg('user', '收到，谢谢', 1600),

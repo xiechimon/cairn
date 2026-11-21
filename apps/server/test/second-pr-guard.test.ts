@@ -4,8 +4,6 @@ import {
   buildMergedPrGuardNote,
   buildRestartPrompt,
   buildSecondPrWarningNote,
-  classifyUserText,
-  composeTaskPromptWithInstruction,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -419,20 +417,5 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
           }),
     );
     expect(warnings).toHaveLength(1);
-  });
-
-  test('failure mode 9: a guard-shaped instruction line does not impersonate user speech (classifyUserText judges all synthetic)', () => {
-    const task = { title: '守卫探针', spec: '首 PR 合并后重跑，不得开出第二张 PR。' };
-    const guard = buildMergedPrGuardInstruction({ prNumber: PR1_NUMBER, prUrl: PR1_URL });
-    expect(classifyUserText(guard, task)).toBe('synthetic');
-    expect(classifyUserText(`${buildRestartPrompt('合并后再补一步')}\n${guard}`, task)).toBe(
-      'synthetic',
-    );
-    expect(
-      classifyUserText(
-        composeTaskPromptWithInstruction(`${task.title}\n\n${task.spec}`, guard),
-        task,
-      ),
-    ).toBe('synthetic');
   });
 });

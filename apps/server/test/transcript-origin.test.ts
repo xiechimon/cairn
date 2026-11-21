@@ -1,8 +1,8 @@
 import { transcriptPromptRowId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
-import { message, step } from '../src/db/schema.js';
-import { startBuilds } from '../src/services/builds.js';
+import { message, step, todo } from '../src/db/schema.js';
+import { messageTodo, startBuilds } from '../src/services/builds.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
 import { receiveUpload } from '../src/services/machine-uploads.js';
 import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
@@ -90,4 +90,27 @@ test('upsertMessage persists origin and keeps it across conflict updates', () =>
     createdAt: 3,
   });
   expect(s.db.select().from(message).where(eq(message.id, 'm-2')).get()?.origin).toBeNull();
+});
+
+test("a person's message through the todo message route is stored with the person marker", async () => {
+  const s = bootServer();
+  const machineId = insertMachine(s);
+  seedSessionRoute(s, { provider: 'p', modelId: 'm', machineId });
+  const projectId = await postProject(s.app, 'Prompt provenance');
+  const created = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+    title: 'Do a thing',
+    spec: 'the spec',
+  });
+  const { id: todoId } = (await created.json()) as { id: string };
+  const [started] = startBuilds(s.svc, { projectId, todoIds: [todoId] });
+  s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
+  s.db.update(step).set({ status: 'done' }).where(eq(step.buildId, started!.id)).run();
+  await messageTodo(s.svc, s.team.id, todoId, 'Do a thing\n\nthe spec', 'client-1');
+  const row = s.db
+    .select()
+    .from(message)
+    .where(eq(message.conversationId, started!.id))
+    .all()
+    .find((r) => r.content === 'Do a thing\n\nthe spec');
+  expect(row?.origin).toBe('user');
 });

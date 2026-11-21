@@ -1,14 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
   appendWorkBranchNote,
-  buildRestartPrompt,
   buildReviewFindingsPrompt,
   buildTaskPromptText,
   buildWorkBranchNote,
-  CONTINUE_PROMPTS,
-  classifyUserText,
-  composeTaskPromptWithInstruction,
-  stripWorkBranchNote,
 } from '../src/records/prompts.js';
 
 const TITLE = '分支契约探针';
@@ -33,51 +28,14 @@ describe('note assembly (failure mode 6)', () => {
     const once = appendWorkBranchNote(TASK_TEXT, BRANCH);
     expect(appendWorkBranchNote(once, BRANCH)).toBe(once);
   });
-
-  test('strip restore: trailing note removed, remainder returned verbatim; non-note endings untouched', () => {
-    expect(stripWorkBranchNote(`${TASK_TEXT}\n${NOTE}`)).toBe(TASK_TEXT);
-    expect(stripWorkBranchNote(TASK_TEXT)).toBe(TASK_TEXT);
-  });
 });
 
-describe('classifyUserText note-line recognition (failure modes 1/3/4/5)', () => {
-  const task = { title: TITLE, spec: SPEC };
-
-  test('task text + note -> task-prompt (build-step new-session delivery form, no double render)', () => {
-    const composed = appendWorkBranchNote(TASK_TEXT, BRANCH);
-    expect(classifyUserText(composed.trim(), task)).toBe('task-prompt');
-  });
-
-  test('continuation placeholder + note -> synthetic (CONTINUE_PROMPTS.build form)', () => {
-    expect(classifyUserText(`${CONTINUE_PROMPTS.build}\n${NOTE}`.trim(), task)).toBe('synthetic');
-  });
-
-  test('failed-restart combined line + note -> synthetic (#720 combined shape stacking a note)', () => {
-    const composed = appendWorkBranchNote(
-      composeTaskPromptWithInstruction(TASK_TEXT, buildRestartPrompt('别自己开分支')),
-      BRANCH,
-    );
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test("task prefix + user's own words -> user (no false kills; no-note negative cases do not regress)", () => {
-    const text = `${TASK_TEXT}\n\n另外移动端也要看一眼`;
-    expect(classifyUserText(text.trim(), task)).toBe('user');
-  });
-
-  test('note-shaped trailing line but the remainder is user words -> user (strip only lets template matches through, it is not a synthesis judgment)', () => {
-    expect(classifyUserText(`另外移动端也要看一眼\n${NOTE}`.trim(), task)).toBe('user');
-  });
-});
-
-test('a configured base is explicit in PR creation instructions and remains strippable', () => {
+test('a configured base is explicit in PR creation instructions', () => {
   const note = buildWorkBranchNote(BRANCH, 'dev');
   expect(note).toContain('gh pr create --base');
   expect(note).toContain("--base 'dev'");
   const prompt = appendWorkBranchNote(TASK_TEXT, BRANCH, 'dev');
   expect(prompt).toContain("--base 'dev'");
-  expect(stripWorkBranchNote(prompt)).toBe(TASK_TEXT);
-  expect(classifyUserText(prompt, { title: TITLE, spec: SPEC })).toBe('task-prompt');
 });
 
 test('a resumed head-only note is updated with the configured base without duplication', () => {
@@ -109,10 +67,9 @@ describe('the injected PR rule is a labelled system rule that opens ready PRs', 
     expect(NOTE).toContain('用户本人');
   });
 
-  test('a prompt carrying a legacy note is rewritten to the current note and strips back to the task', () => {
+  test('a prompt carrying a legacy note is rewritten to the current note', () => {
     const legacy = `${TASK_TEXT}\n${LEGACY_NOTE}`;
     expect(appendWorkBranchNote(legacy, BRANCH)).toBe(`${TASK_TEXT}\n${NOTE}`);
-    expect(stripWorkBranchNote(legacy)).toBe(TASK_TEXT);
   });
 
   test('a prompt stored with the draft-holding note and the PR-body overlap rule is rewritten', () => {
@@ -123,7 +80,6 @@ describe('the injected PR rule is a labelled system rule that opens ready PRs', 
     ].join('\n');
     const stored = `${TASK_TEXT}\n${draftNote}`;
     expect(appendWorkBranchNote(stored, BRANCH)).toBe(`${TASK_TEXT}\n${NOTE}`);
-    expect(stripWorkBranchNote(stored)).toBe(TASK_TEXT);
   });
 });
 

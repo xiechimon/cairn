@@ -5,11 +5,7 @@ import {
   buildPlanFirstRoundInstruction,
   buildPlanLocationNote,
   buildPlanRewritePrompt,
-  buildReplanPrompt,
-  buildRestartPrompt,
   buildTaskPromptText,
-  CONTINUE_PROMPTS,
-  classifyUserText,
   composeTaskPromptWithInstruction,
 } from '../src/records/prompts.js';
 
@@ -60,52 +56,5 @@ describe('contract combined shape (failure mode 6)', () => {
     expect(composed).toBe(`${TASK_TEXT}\n\n${CONTRACT}`);
     expect(composed.startsWith(TASK_TEXT)).toBe(true);
     expect(composed.endsWith(CONTRACT)).toBe(true);
-  });
-});
-
-describe('classifyUserText note-line recognition (failure modes 2/4/5)', () => {
-  const task = { title: TITLE, spec: SPEC };
-
-  test('combined line + note -> synthetic whole line exits (first-round plan-step delivery form)', () => {
-    const composed = appendPlanLocationNote(
-      composeTaskPromptWithInstruction(TASK_TEXT, CONTRACT),
-      PLAN_FILE,
-    );
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test('bare contract instruction + note -> synthetic', () => {
-    expect(classifyUserText(`${CONTRACT}\n${NOTE}`.trim(), task)).toBe('synthetic');
-  });
-
-  test('rewrite instruction + note -> synthetic (continuation-round instruction single-line form)', () => {
-    expect(classifyUserText(`${REWRITE}\n${NOTE}`.trim(), task)).toBe('synthetic');
-  });
-
-  test('continuation placeholder + note -> synthetic (CONTINUE_PROMPTS.plan form)', () => {
-    expect(classifyUserText(`${CONTINUE_PROMPTS.plan}\n${NOTE}`.trim(), task)).toBe('synthetic');
-  });
-
-  test('rejection restart + note -> synthetic (wrappedBy family stacking a note)', () => {
-    expect(classifyUserText(`${buildReplanPrompt('太重了')}\n${NOTE}`.trim(), task)).toBe(
-      'synthetic',
-    );
-  });
-
-  test('failed-restart combined line + note -> synthetic (#720 combined shape stacking a note)', () => {
-    const composed = appendPlanLocationNote(
-      composeTaskPromptWithInstruction(TASK_TEXT, buildRestartPrompt('把测试也补上')),
-      PLAN_FILE,
-    );
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test("task prefix + user's own words -> user (no false kills; no-note negative cases do not regress)", () => {
-    const text = `${TASK_TEXT}\n\n另外移动端也要看一眼`;
-    expect(classifyUserText(text.trim(), task)).toBe('user');
-  });
-
-  test('note-shaped trailing line but the remainder is user words -> user (strip only lets template matches through, it is not a synthesis judgment)', () => {
-    expect(classifyUserText(`另外移动端也要看一眼\n${NOTE}`.trim(), task)).toBe('user');
   });
 });

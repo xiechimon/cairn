@@ -440,11 +440,34 @@ describe('mapTranscript user-row provenance markers (#3532)', () => {
     expect(userItems(items).map((item) => item.text)).toEqual([text.trim()]);
   });
 
-  test('unmarked rows fall back to user (defined fallback for legacy data)', () => {
+  test('a task prompt row carrying a delivery section the renderer never learned stays out of the bubbles', () => {
+    const delivered = `${buildTaskPromptText(TITLE, SPEC)}\n\n[cairn screenshot proof: /Users/u/.cairn/deliverables/conv-1/]`;
     const items = render({
-      messages: [msg('user', '旧库里的行没有标记', NOW - 50_000)],
+      messages: [
+        { ...msg('user', delivered, NOW - 50_000), origin: 'task-prompt' as const },
+        msg('user', '另外移动端也要看一眼', NOW - 40_000),
+      ],
     });
-    expect(userItems(items).map((item) => item.text)).toEqual(['旧库里的行没有标记']);
+    expect(userItems(items).map((item) => item.text)).toEqual(['另外移动端也要看一眼']);
+  });
+
+  test("a person's message whose text equals the brief renders as the person's words", () => {
+    const text = buildTaskPromptText(TITLE, SPEC);
+    const items = render({ messages: [msg('user', text, NOW - 50_000)] });
+    expect(userItems(items).map((item) => item.text)).toEqual([text.trim()]);
+  });
+
+  test('an unmarked row renders as the person whether or not its text looks generated', () => {
+    const items = render({
+      messages: [
+        msg('user', '旧库里的行没有标记', NOW - 50_000),
+        msg('user', CONTINUE_PROMPTS.build, NOW - 40_000),
+      ],
+    });
+    expect(userItems(items).map((item) => item.text)).toEqual([
+      '旧库里的行没有标记',
+      CONTINUE_PROMPTS.build,
+    ]);
   });
 });
 

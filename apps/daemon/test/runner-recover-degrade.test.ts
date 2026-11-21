@@ -15,9 +15,9 @@ import type {
 import {
   buildTaskPromptText,
   CONTINUE_PROMPTS,
-  classifyUserText,
   formatAttachmentToken,
   PLAN_FILE_NAME,
+  transcriptPromptRowId,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { SessionNotResumableError } from '../src/backend/errors.js';
@@ -386,7 +386,7 @@ describe('#1286 recover-surface session degradation', () => {
     expect(String(note?.content)).not.toContain('本机找不到会话');
   });
 
-  test('7. non-empty plan.md at the local handoff location → degraded prompt points at that file, wire line is not a user bubble', async () => {
+  test('7. non-empty plan.md at the local handoff location → degraded prompt points at that file, delivered as the step prompt row', async () => {
     const claimed = execStep(SESSION_ID);
     const { backend, prompts } = recoveringBackend(true);
     let planFile = '';
@@ -405,7 +405,8 @@ describe('#1286 recover-surface session degradation', () => {
     const user = client.uploads
       .flatMap((upload) => upload.messages)
       .find((message) => message.role === 'user');
-    expect(classifyUserText(String(user?.content).trim(), TASK)).toBe('task-prompt');
+    expect(user?.id).toBe(transcriptPromptRowId('s1'));
+    expect(String(user?.content)).toContain(`已确认方案位置：${planFile}`);
   });
 
   test('8. machine switched and no local plan.md → degraded prompt does not point at the handoff path', async () => {

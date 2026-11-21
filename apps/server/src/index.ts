@@ -63,6 +63,7 @@ import { prepareSkillsHome } from './services/skills-home.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
 import { createTailscaleServe } from './services/tailscale-serve.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
+import { backfillTranscriptOrigins } from './services/transcript-origin-backfill.js';
 import { createTsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
@@ -149,6 +150,11 @@ if (seedLocalMachine(db, seeded.team.id) === 'blocked') {
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 runDataMigrationOnce(db, 'token-usage-cost-backfill', () => backfillTokenUsageCost(db));
+const originsStamped = runDataMigrationOnce(db, 'transcript-origin-backfill', () =>
+  backfillTranscriptOrigins(db),
+);
+if (originsStamped !== undefined)
+  logger.info(originsStamped, 'transcript user-row provenance backfilled');
 const ownersSeeded = runDataMigrationOnce(db, 'owner-checkpoints-seed', () =>
   seedOwnerCheckpoints(db),
 );

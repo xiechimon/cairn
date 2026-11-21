@@ -5,7 +5,6 @@ import {
   CAIRN_REVIEW_HOLD_LABEL,
   isReviewBotAuthor,
   reviewFindingBadge,
-  stripWorkBranchNote,
 } from '@cairn/shared';
 import { eq, ne } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -634,9 +633,6 @@ test('shared matcher, badges and prompts preserve the ready boundary', () => {
   const note = buildWorkBranchNote('work');
   expect(note).toContain('Codex');
   expect(note).toContain('draft');
-  expect(stripWorkBranchNote(`task\n${note}`)).toBe('task');
-  const old = note.slice(note.indexOf('工作分支注记'), note.indexOf('\n'));
-  expect(stripWorkBranchNote(`task\n${old}`)).toBe('task');
   expect(buildReviewFindingsPrompt({ prNumber: 1, round: 1, findings: [] })).toContain(
     'addPullRequestReviewThreadReply',
   );
