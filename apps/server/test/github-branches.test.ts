@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { githubBranches } from '../src/lib/github-branches.js';
 
-test('branch listing stops after ten full pages', async () => {
+test('branch listing reads every page up to the last one', async () => {
   let pages = 0;
   const result = await githubBranches(
     async (url) => {
@@ -24,6 +24,7 @@ test('branch listing stops after ten full pages', async () => {
     null,
     { owner: 'o', repo: 'r' },
   );
-  expect(pages).toBe(10);
-  expect(result.branches).toHaveLength(1000);
+  expect(pages).toBe(12);
+  expect(result.branches).toHaveLength(1100);
+  expect(result.branches.at(-1)).toEqual({ name: 'branch-11-99', isDefault: false });
 });

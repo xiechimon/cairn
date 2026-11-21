@@ -1928,6 +1928,8 @@ export async function githubComment(
   );
 }
 
+const ISSUE_COMMENTS_PER_PAGE = 100;
+
 export async function githubIssueComments(
   fetchImpl: FetchLike,
   token: AutonomousToken,
@@ -1936,10 +1938,10 @@ export async function githubIssueComments(
   issueNumber: number,
 ): Promise<{ author: string; body: string }[] | null> {
   const comments: { author: string; body: string }[] = [];
-  for (let page = 1; page <= 10; page += 1) {
+  for (let page = 1; ; page += 1) {
     const got = await conditionalGetJson(
       fetchImpl,
-      `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      `${githubApiBaseUrl()}/${repoPath(owner, repo)}/issues/${issueNumber}/comments?per_page=${ISSUE_COMMENTS_PER_PAGE}&page=${page}`,
       token,
       null,
       FETCH_TIMEOUT_MS,
@@ -1949,9 +1951,8 @@ export async function githubIssueComments(
     for (const row of rows)
       if (typeof row?.body === 'string' && typeof row.user?.login === 'string')
         comments.push({ author: row.user.login, body: row.body });
-    if (rows.length < 100) return comments;
+    if (rows.length < ISSUE_COMMENTS_PER_PAGE) return comments;
   }
-  return null;
 }
 
 export function githubReplyReviewThread(

@@ -1067,8 +1067,6 @@ function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
 
 const selfIssueMarker = (todoId: string) => `<!-- cairn:todo ${todoId} -->`;
 
-const SELF_ISSUE_PROBE_PAGES = 3;
-
 interface SelfIssuePayload {
   todoId: string;
   owner: string;
@@ -1156,7 +1154,7 @@ async function probeSelfIssueCreated(
   const token = await autonomousToken(deps, effectRow.teamId, { owner: p.owner, repo: p.repo });
   if (token === null) return { verdict: 'unknown' };
   const marker = selfIssueMarker(p.todoId);
-  for (let page = 1; page <= SELF_ISSUE_PROBE_PAGES; page += 1) {
+  for (let page = 1; ; page += 1) {
     const res = await githubListIssues(deps.githubFetch ?? fetch, token, p.owner, p.repo, {
       state: 'all',
       page,

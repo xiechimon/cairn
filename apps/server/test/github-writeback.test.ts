@@ -455,6 +455,62 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     s.dispose();
   });
 
+  test('a crashed create whose issue sits past the third probed page is still delivered', async () => {
+    const issueRow = (n: number, body: string | null) => ({
+      number: n,
+      title: `issue ${n}`,
+      state: 'open',
+      labels: [],
+      body,
+      user: { login: 'octo-bot' },
+      author_association: 'NONE',
+      created_at: '2026-11-18T00:00:00Z',
+      updated_at: '2026-11-18T00:00:00Z',
+    });
+    let marker = '';
+    const mock = ghMock({
+      [`POST ${ISSUES_PATH}`]: { status: 410, body: { message: 'Issues are disabled' } },
+    });
+    const listPages: FetchLike = async (input, init) => {
+      const url = new URL(String(input));
+      if ((init?.method ?? 'GET') !== 'GET' || url.pathname !== ISSUES_PATH)
+        return mock.impl(input, init);
+      const page = Number(url.searchParams.get('page') ?? '1');
+      const body =
+        page < 4
+          ? Array.from({ length: 100 }, (_, index) => issueRow(page * 100 + index, null))
+          : page === 4
+            ? [issueRow(401, marker)]
+            : [];
+      return {
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) =>
+            name.toLowerCase() === 'link' && page < 4
+              ? `<https://api.github.com${ISSUES_PATH}?page=${page + 1}>; rel="next"`
+              : null,
+        },
+        json: async () => body,
+        text: async () => JSON.stringify(body),
+      };
+    };
+    const s = bootServer({ githubFetch: listPages });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    marker = `spec\n\n<!-- cairn:todo ${created.id} -->`;
+    await flushSelfIssueWrites();
+    expect((await getTodo(s.app, created.id)).sourceRef).toBeNull();
+    markCrashedSend(s, created.id);
+    const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
+    expect(retry.status).toBe(200);
+    expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#401`);
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
+    expect(s.db.select().from(externalEffectTable).all()[0]?.state).toBe('delivered');
+    s.dispose();
+  });
+
   test('a crashed create with no matching issue resends exactly once', async () => {
     const mock = ghMock({
       [`POST ${ISSUES_PATH}`]: { status: 410, body: { message: 'Issues are disabled' } },
