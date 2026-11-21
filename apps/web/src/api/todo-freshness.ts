@@ -1,10 +1,23 @@
 import type { TasksQuery, TodoRecord } from '@cairn/shared';
 import { replaceEqualDeep } from '@tanstack/react-query';
 
+const pendingPatches = new Map<string, Partial<TodoRecord>[]>();
+
+export function holdTodoPatch(id: string, patch: Partial<TodoRecord>): () => void {
+  const held = [...(pendingPatches.get(id) ?? []), patch];
+  pendingPatches.set(id, held);
+  return () => {
+    const rest = (pendingPatches.get(id) ?? []).filter((entry) => entry !== patch);
+    if (rest.length === 0) pendingPatches.delete(id);
+    else pendingPatches.set(id, rest);
+  };
+}
+
 function newerOf<T extends { id: string; v: number }>(cached: T | undefined, fetched: T): T {
-  return cached !== undefined && cached.id === fetched.id && cached.v > fetched.v
-    ? cached
-    : fetched;
+  const newer =
+    cached !== undefined && cached.id === fetched.id && cached.v > fetched.v ? cached : fetched;
+  const held = pendingPatches.get(newer.id);
+  return held === undefined ? newer : Object.assign({}, newer, ...held);
 }
 
 export function keepNewerTodo(cached: unknown, fetched: unknown): unknown {

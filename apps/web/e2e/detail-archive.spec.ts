@@ -239,8 +239,19 @@ test('archive toast Undo restores the composer immediately', async ({
     })
     .toBe(true);
   await page.getByRole('button', { name: '撤销', exact: true }).click();
+  const staleReads = (async () => {
+    for (let read = 0; read < 2; read++)
+      await page.waitForResponse(
+        (response) =>
+          response.request().method() === 'GET' &&
+          new URL(response.url()).pathname === '/api/todos/todo-archive',
+      );
+  })();
   try {
     await expect(page.locator('.side-panel textarea')).toBeVisible();
+    await staleReads;
+    await expect(page.locator('.side-panel textarea')).toBeVisible();
+    await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toHaveCount(0);
   } finally {
     releaseUnarchive();
   }

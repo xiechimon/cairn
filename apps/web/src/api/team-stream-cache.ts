@@ -1,6 +1,7 @@
 import type { TasksQuery, TodoRecord } from '@cairn/shared';
 import { buildRecordSchema, notificationRecordSchema, todoRecordSchema } from '@cairn/shared';
 import type { QueryClient } from '@tanstack/react-query';
+import { holdTodoPatch } from './todo-freshness.js';
 
 export const TEAM_LIST_KEYS = ['todos', 'tasks'] as const;
 
@@ -56,12 +57,17 @@ export function cachedTodo(qc: QueryClient, teamId: string, id: string): TodoRec
   );
 }
 
+export interface OptimisticTodo {
+  settle: () => void;
+  rollback: () => void;
+}
+
 export async function optimisticTodo(
   qc: QueryClient,
   teamId: string,
   id: string,
   patch: Partial<TodoRecord>,
-): Promise<() => void> {
+): Promise<OptimisticTodo> {
   const keys = [
     ['todo', id],
     ['todos', teamId],
@@ -69,6 +75,7 @@ export async function optimisticTodo(
   ];
   await Promise.all(keys.map((queryKey) => qc.cancelQueries({ queryKey })));
   const before = keys.map((queryKey) => [queryKey, qc.getQueryData(queryKey)] as const);
+  const release = holdTodoPatch(id, patch);
   qc.setQueryData<TodoRecord>(['todo', id], (record) => record && { ...record, ...patch });
   qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
     records?.map((row) => (row.id === id ? { ...row, ...patch } : row)),
@@ -82,8 +89,12 @@ export async function optimisticTodo(
           ),
         },
   );
-  return () => {
-    for (const [queryKey, data] of before) qc.setQueryData(queryKey, data);
+  return {
+    settle: release,
+    rollback: () => {
+      release();
+      for (const [queryKey, data] of before) qc.setQueryData(queryKey, data);
+    },
   };
 }
 
