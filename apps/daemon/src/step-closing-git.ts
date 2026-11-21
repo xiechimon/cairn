@@ -4,9 +4,30 @@ import type {
   CommitIdentity,
   GitCredentialSource,
   PreparedWorkspace,
+  StepKind,
   WorktreeOps,
 } from '@cairn/shared';
 import { AGENT_TOOL_PUSH, BRAND, gitCredentialRowContent } from '@cairn/shared';
+
+const STEP_COMMIT_LABEL: Record<StepKind, string> = {
+  plan: 'write the task plan',
+  build: 'apply the task changes',
+  session: 'continue the task',
+  merge: 'merge the default branch',
+  chief: 'run a coordinator turn',
+  review: 'review the task changes',
+  verify: 'record the verification evidence',
+};
+
+export function stepCommitSubject(
+  claimed: Pick<ClaimedStep, 'step' | 'todo' | 'conversationId'>,
+): string {
+  const owner =
+    claimed.todo === undefined
+      ? `conversation ${claimed.conversationId.slice(0, 8)}`
+      : `task ${claimed.todo.seqNum}`;
+  return `${claimed.step.kind}: ${STEP_COMMIT_LABEL[claimed.step.kind]} (${owner})`;
+}
 
 export interface ClosingGitInput {
   git: WorktreeOps;
@@ -50,12 +71,18 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
         `检测到工作分支偏离：收尾时 HEAD 在「${headBranch}」，契约工作分支是「${ws.branch}」。本步产物判定已按步窗口内有新提交的任意分支放宽；交付（提交/推送/PR head）应留在契约分支上。`,
       );
     }
-    const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
+    const commitMessage = stepCommitSubject(claimed);
     const committed = await git.commitAll(ws.cwd, commitMessage, input.identity);
     if (committed.setupDrift.length > 0) {
       note(
         `setup-drift-${stepId}`,
         `Workspace setup changed ${committed.setupDrift.join(', ')}; these changes were left out of the commit because the agent did not make them.`,
+      );
+    }
+    if (committed.preexisting.length > 0) {
+      note(
+        `preexisting-${stepId}`,
+        `${committed.preexisting.join(', ')} changed before this step started, so this step's commit left them out; they are still uncommitted in the worktree, and belong to this task only if you commit them yourself.`,
       );
     }
     if (claimed.step.kind === 'merge') {

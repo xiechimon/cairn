@@ -150,7 +150,7 @@ function fakeWorkspace(): WorktreeOps {
       };
     },
     async commitAll() {
-      return { committed: false, head: null, setupDrift: [] };
+      return { committed: false, head: null, setupDrift: [], preexisting: [] };
     },
     async push() {},
     async mergeDefaultBranch() {

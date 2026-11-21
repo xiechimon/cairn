@@ -284,6 +284,43 @@ describe('commitAll stages only the agent work, never workspace setup drift (tas
     expect(result.setupDrift).not.toContain('vendor/sub');
   }, 60_000);
 
+  test('changes that were already uncommitted when the step started stay out of this step commit', async () => {
+    await seedRepo(userRepo);
+    const earlier = await new WorkspaceManager({ logger: quietLogger() }).prepare(prepareInput());
+    writeFileSync(join(earlier.cwd, 'README.md'), '# repo\nunfinished earlier step\n');
+    writeFileSync(join(earlier.cwd, 'scratch.txt'), 'earlier step output\n');
+
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const started = await ws.prepare(prepareInput());
+    expect(started.reused).toBe(true);
+    writeFileSync(join(started.cwd, 'feature.txt'), 'agent work\n');
+
+    const result = await ws.commitAll(started.cwd, 'build: feature', IDENTITY);
+
+    expect(result.committed).toBe(true);
+    expect(await committedPaths(started.cwd)).toEqual(['feature.txt']);
+    expect(result.preexisting.sort()).toEqual(['README.md', 'scratch.txt']);
+    expect(
+      await git(started.cwd, ['status', '--porcelain', '--', 'README.md', 'scratch.txt']),
+    ).not.toBe('');
+  }, 60_000);
+
+  test('a leftover the agent stages during the step is the agent choice and is committed', async () => {
+    await seedRepo(userRepo);
+    const earlier = await new WorkspaceManager({ logger: quietLogger() }).prepare(prepareInput());
+    writeFileSync(join(earlier.cwd, 'README.md'), '# repo\nunfinished earlier step\n');
+
+    const ws = new WorkspaceManager({ logger: quietLogger() });
+    const started = await ws.prepare(prepareInput());
+    writeFileSync(join(started.cwd, 'feature.txt'), 'agent work\n');
+    await git(started.cwd, ['add', 'README.md']);
+
+    const result = await ws.commitAll(started.cwd, 'build: feature', IDENTITY);
+
+    expect((await committedPaths(started.cwd)).sort()).toEqual(['README.md', 'feature.txt']);
+    expect(result.preexisting).toEqual([]);
+  }, 60_000);
+
   test('the commit runs its hooks inside the repository hook budget, and a timeout says so', async () => {
     await seedRepo(
       userRepo,
@@ -311,5 +348,6 @@ test('a step with only setup drift skips commit hooks and finishes with no chang
     committed: false,
     head,
     setupDrift: expect.arrayContaining(['.setup-cache/state', 'pnpm-lock.yaml']),
+    preexisting: [],
   });
 });

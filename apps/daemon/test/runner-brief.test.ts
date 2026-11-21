@@ -219,7 +219,7 @@ function fakeWorkspace(
     },
     async commitAll() {
       calls.push('commitAll');
-      return { committed: true, head: 'def456', setupDrift: [] };
+      return { committed: true, head: 'def456', setupDrift: [], preexisting: [] };
     },
     async push() {
       calls.push('push');
