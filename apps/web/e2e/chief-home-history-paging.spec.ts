@@ -46,7 +46,7 @@ const row = (page: Page, text: string) => stream(page).getByText(text, { exact: 
 
 const toTop = (page: Page) =>
   viewport(page).evaluate((node) => {
-    node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+    node.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, bubbles: true }));
     node.scrollTop = 0;
   });
 
@@ -69,7 +69,7 @@ async function offsetOf(page: Page, text: string, scrollToTop = false): Promise<
   return viewport(page).evaluate(
     (node, [label, toTop]) => {
       if (toTop) {
-        node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+        node.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, bubbles: true }));
         node.scrollTop = 0;
       }
       const target = [...node.querySelectorAll('*')].find(
@@ -106,7 +106,7 @@ test('scrolling up shows the loaded rows above before asking for an older page',
   await expect
     .poll(async () => {
       await viewport(page).evaluate((node) => {
-        node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+        node.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, bubbles: true }));
         node.scrollTop = Math.max(node.scrollTop - 400, 600);
       });
       return row(page, 'question 200').count();
