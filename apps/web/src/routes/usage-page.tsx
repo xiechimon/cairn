@@ -1,7 +1,7 @@
 import type { DailyUsage } from '@cairn/shared';
 import { cn } from 'cn';
 import { ChartColumn, TriangleAlert } from 'lucide-react';
-import { type KeyboardEvent, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -35,6 +35,8 @@ const LEVEL_BG = [
   'bg-(--heat-4)',
 ] as const;
 const TYPE_INKS = ['bg-(--heat-4)', 'bg-(--heat-3)', 'bg-(--heat-2)', 'bg-(--heat-1)'] as const;
+const CELL_GAP = 0.2;
+
 const CARD_CLS = 'rounded-(--radius-card) bg-card shadow-(--e1)';
 
 function useDateLabels() {
@@ -60,14 +62,14 @@ function Swatch({ ink }: { ink: string }) {
   return <i aria-hidden className={cn('block size-2 flex-none rounded-(--cds-radius-xs)', ink)} />;
 }
 
-function Stat({ label, value, note }: { label: string; value: string; note?: string }) {
+function Stat({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 bg-card px-5 py-4 max-sm:px-4 max-sm:py-3">
+    <div className="flex min-w-0 flex-col items-center gap-1 bg-card px-5 py-4 text-center max-sm:px-4 max-sm:py-3">
       <span className="text-meta text-content-tertiary">{label}</span>
       <span className="voice-title text-brand text-foreground tabular-nums">{value}</span>
-      {note !== undefined && (
-        <span className="truncate text-meta text-content-tertiary tabular-nums">{note}</span>
-      )}
+      <span className="max-w-full truncate text-meta text-content-tertiary tabular-nums">
+        {note}
+      </span>
     </div>
   );
 }
@@ -91,7 +93,7 @@ function Stats({ summary, days }: { summary: UsageSummary; days: number }) {
                 a: percent(summary.coordinator / summary.total),
                 b: percent(summary.tasks / summary.total),
               })
-            : undefined
+            : t('没有用量')
         }
       />
       <Stat
@@ -109,7 +111,11 @@ function Stats({ summary, days }: { summary: UsageSummary; days: number }) {
       <Stat
         label={t('缓存命中')}
         value={summary.cacheHit === null ? '0%' : percent(summary.cacheHit)}
-        note={summary.cost === null ? undefined : t('按标价 {cost}', { cost: usd(summary.cost) })}
+        note={
+          summary.cost === null
+            ? t('缓存读取 {n}', { n: formatTokens(summary.cacheRead) })
+            : t('按标价 {cost}', { cost: usd(summary.cost) })
+        }
       />
     </div>
   );
@@ -245,9 +251,8 @@ function Heatmap({
   const labels = useDateLabels();
   const narrow = useNarrow();
   const gridRef = useRef<HTMLDivElement>(null);
-  const cols = narrow ? 'auto-cols-[16px]' : 'auto-cols-[12px]';
-  const rows = narrow ? 'grid-rows-[repeat(7,16px)]' : 'grid-rows-[repeat(7,12px)]';
-  const cellSize = narrow ? 'size-4' : 'size-3';
+  const cols = 'auto-cols-(--cell) gap-x-(--gap)';
+  const rows = 'grid-rows-[repeat(7,var(--cell))] gap-y-(--gap)';
   const cells = grid.weeks.flat().filter((cell) => !cell.future);
   const focusDate = selected ?? cells.at(-1)?.date;
 
@@ -264,16 +269,24 @@ function Heatmap({
 
   const firstWeek = grid.weeks[0] ?? [];
   const month = cells.at(-1)?.date.slice(0, 7) ?? '';
-  const outline = monthOutline(grid, month, narrow ? 20 : 16, 4);
+  const outline = monthOutline(grid, month, 1, CELL_GAP);
+  const weeks = grid.weeks.length;
   return (
     <div
-      className="grid w-max grid-cols-[auto_auto] gap-x-1.5 gap-y-1"
+      data-testid="usage-heatmap-frame"
+      style={{ '--weeks': weeks } as CSSProperties}
+      className={cn(
+        'grid grid-cols-[2rem_auto] gap-x-1.5 gap-y-1 [--cell:calc(var(--pitch)*0.8)] [--gap:calc(var(--pitch)*0.2)]',
+        narrow
+          ? 'w-max [--pitch:1.25rem]'
+          : 'w-full [--pitch:min(calc((100cqw-2.375rem)/var(--weeks)),1.5rem)]',
+      )}
       onPointerLeave={() => onHover(null)}
     >
       <span />
       <div
         aria-hidden
-        className={cn('grid h-3.5 grid-flow-col gap-x-1 text-caption text-content-tertiary', cols)}
+        className={cn('grid h-3.5 grid-flow-col text-caption text-content-tertiary', cols)}
       >
         {grid.weeks.map((week, w) => (
           <span
@@ -289,10 +302,7 @@ function Heatmap({
           </span>
         ))}
       </div>
-      <div
-        aria-hidden
-        className={cn('grid gap-y-1 text-caption leading-none text-content-tertiary', rows)}
-      >
+      <div aria-hidden className={cn('grid text-caption leading-none text-content-tertiary', rows)}>
         {firstWeek.map((cell) => (
           <span key={cell.weekday} className="flex items-center">
             {cell.weekday % 2 === 0 && cell.weekday < 6 ? labels.weekday(cell.date) : ''}
@@ -302,19 +312,22 @@ function Heatmap({
       <div
         ref={gridRef}
         data-testid="usage-heatmap"
-        className={cn('relative grid grid-flow-col gap-1', cols, rows)}
+        className={cn('relative grid grid-flow-col', cols, rows)}
       >
         {outline !== null && (
           <svg
             aria-hidden
             data-testid="usage-current-month"
+            viewBox={`0 0 ${weeks - CELL_GAP} ${7 - CELL_GAP}`}
+            preserveAspectRatio="none"
             className="pointer-events-none absolute inset-0 size-full overflow-visible text-foreground"
           >
             <path
               d={outline}
               fill="none"
               stroke="currentColor"
-              strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke"
+              strokeWidth={1.75}
               strokeDasharray="3 2.5"
               strokeLinejoin="round"
             />
@@ -341,8 +354,7 @@ function Heatmap({
                 }
                 tabIndex={cell.date === focusDate ? 0 : -1}
                 className={cn(
-                  cellSize,
-                  'rounded-(--cds-radius-xs) border-0 p-0 hover:outline-solid hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
+                  'size-(--cell) rounded-(--cds-radius-xs) border-0 p-0 hover:outline-solid hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
                   LEVEL_BG[cell.level],
                   cell.date === selected &&
                     'outline-solid outline-2 outline-offset-1 outline-foreground hover:outline-foreground',
@@ -396,7 +408,7 @@ function Year({
         <Readout cell={cell} month={month} />
         <Legend />
       </div>
-      <div className="-m-1 flex justify-end overflow-hidden p-1">
+      <div className="@container -m-1 flex justify-end overflow-hidden p-1">
         <Heatmap grid={grid} selected={selected} onSelect={onSelect} onHover={setHover} />
       </div>
       {fresh && firstDay !== null && (

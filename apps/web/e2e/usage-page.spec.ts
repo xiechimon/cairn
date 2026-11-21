@@ -61,6 +61,11 @@ test.describe('live', () => {
     await expect(page.getByTestId('usage-since')).toHaveText('Started 11/15');
     await expect(readout(page)).toHaveText('This month · 864K token · Coordinator 616K · Tasks 248K');
     await expect(page.getByTestId('usage-current-month')).toBeVisible();
+    const card = (await page.getByTestId('usage-year').boundingBox())!;
+    const frame = (await page.getByTestId('usage-heatmap-frame').boundingBox())!;
+    const map = (await page.getByTestId('usage-heatmap').boundingBox())!;
+    expect(Math.abs(frame.x - card.x - (card.x + card.width - map.x - map.width))).toBeLessThan(3);
+    await expect(stats.locator(':scope > div').nth(3)).toContainText('Cache read');
 
     await cell(page, '2026-11-16').hover();
     await expect(readout(page)).toHaveText(
