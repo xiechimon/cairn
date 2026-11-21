@@ -954,6 +954,7 @@ export const EN: Record<string, string> = {
   // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
   构建待审核: 'Build awaiting review',
+  需要你决定: 'Waiting for your decision',
   // #1261 等额度族（桌面通知标题 + 卡芯片 + 横幅 + 详情行标签）。
   等额度: 'Waiting for quota',
   // #1493 降级链：桌面通知标题。

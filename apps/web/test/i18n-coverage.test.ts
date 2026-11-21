@@ -18,8 +18,10 @@ import {
   SKILL_PAGE_COPY,
 } from '@cairn/shared';
 import { describe, expect, it } from 'vitest';
+import { NOTIFICATION_TITLES } from '../src/api/sse.js';
 import { PROBE_TOOL_CALL_LABEL } from '../src/fixtures/fixtures.js';
 import { EN } from '../src/i18n/en.js';
+import { translate } from '../src/i18n/translate.js';
 import { scanFile } from './i18n-scan.js';
 
 const SRC = resolve(import.meta.dirname, '../src');
@@ -82,6 +84,13 @@ const COMPUTED_KEYS = new Set<string>([
   ...GATE_ANNOUNCEMENTS.map((announcement) => `{name} ${announcement}`),
 ]);
 
+/** The desktop-notification titles the SSE path translates, as
+ *  `type`/source-key pairs (api/ sits outside the static scan above, so its
+ *  translation keys are named here instead of discovered). */
+const NOTIFICATION_TITLE_SOURCES = Object.entries(NOTIFICATION_TITLES).flatMap(
+  ([type, source]) => (source === undefined ? [] : [{ type, source }]),
+);
+
 const EXCLUDED_DIRS = ['fixtures', 'api'];
 const EXCLUDED_FILES = ['i18n/en.ts'];
 
@@ -129,6 +138,20 @@ describe('EN dict coverage of computed keys', () => {
   it('every computed key resolves in EN', () => {
     const missing = [...COMPUTED_KEYS].filter((key) => !(key in EN));
     expect(missing).toEqual([]);
+  });
+
+  it('every desktop-notification title the SSE path shows resolves in EN', () => {
+    const missing = NOTIFICATION_TITLE_SOURCES.filter(({ source }) => !(source in EN)).map(
+      ({ type, source }) => `${type}: ${source}`,
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('no desktop-notification title falls back to Chinese on an English desktop', () => {
+    const chinese = NOTIFICATION_TITLE_SOURCES.map(
+      ({ type, source }) => `${type}: ${translate('en', EN, source)}`,
+    ).filter((shown) => /[一-鿿]/.test(shown));
+    expect(chinese).toEqual([]);
   });
 });
 

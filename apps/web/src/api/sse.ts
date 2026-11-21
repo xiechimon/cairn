@@ -127,6 +127,17 @@ export function startTeamStream(
   };
 }
 
+/** Desktop-notification titles per record type; each value is a `t()` source
+ *  key the EN dict must carry (the i18n-coverage gate checks every entry). */
+export const NOTIFICATION_TITLES: Partial<Record<NotificationRecord['type'], string>> = {
+  plan_ready: '方案已就绪',
+  coordinator_handoff: '需要你决定',
+  build_review: '构建待审核',
+  quota_wait: '等额度',
+  model_fallback: '已换备用模型',
+  no_machine: '没有执行机能跑',
+};
+
 function notificationHref(record: NotificationRecord): string {
   return record.type === 'chief_message'
     ? `/app?chief=${encodeURIComponent(record.entityId)}`
@@ -157,20 +168,8 @@ function fireDesktopNotification(record: NotificationRecord): void {
   if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
   if (readNotifyPref(safeLocalStorage()) === 'off') return;
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);
-  const title =
-    record.type === 'plan_ready'
-      ? t('方案已就绪')
-      : record.type === 'coordinator_handoff'
-        ? t('需要你决定')
-        : record.type === 'build_review'
-          ? t('构建待审核')
-          : record.type === 'quota_wait'
-            ? t('等额度')
-            : record.type === 'model_fallback'
-              ? t('已换备用模型')
-              : record.type === 'no_machine'
-                ? t('没有执行机能跑')
-                : record.entityRef.title;
+  const titleSource = NOTIFICATION_TITLES[record.type];
+  const title = titleSource === undefined ? record.entityRef.title : t(titleSource);
   const body = record.snippet ?? record.entityRef.title;
   const href = notificationHref(record);
   const desktop = desktopNotify();
