@@ -2454,7 +2454,7 @@ export const EN: Record<string, string> = {
   按用了的天算: 'Over the days used',
   '共 {n} 天': 'of {n#1 day|# days}',
   'Coordinator {a} · 任务 {b}': 'Coordinator {a} · Tasks {b}',
-  '点一格看那天；再点一次回到全年': 'Click a day to see it; click again for the whole year',
+  '本月': 'This month',
   '{date} 开始使用': 'Started {date}',
   少: 'Less',
   多: 'More',

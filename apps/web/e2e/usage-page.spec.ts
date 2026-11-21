@@ -59,8 +59,8 @@ test.describe('live', () => {
     await expect(page.locator('[data-testid="usage-heatmap"] [data-day]')).toHaveCount(365);
     await expect(page.getByTestId('usage-legend')).toHaveText('LessMore');
     await expect(page.getByTestId('usage-since')).toHaveText('Started 11/15');
-    await expect(page.getByTestId('usage-year')).not.toContainText('864K');
-    await expect(readout(page)).toHaveText('Click a day to see it; click again for the whole year');
+    await expect(readout(page)).toHaveText('This month · 864K token · Coordinator 616K · Tasks 248K');
+    await expect(page.getByTestId('usage-current-month')).toBeVisible();
 
     await cell(page, '2026-11-16').hover();
     await expect(readout(page)).toHaveText(

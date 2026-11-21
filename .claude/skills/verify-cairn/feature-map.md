@@ -641,7 +641,7 @@ Reach:
 
 - Web routes: `/app/usage`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `usage-empty`, `usage-error`, `usage-heatmap`, `usage-legend`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-since`, `usage-stats`, `usage-year`
+- Test ids in its code: `usage-current-month`, `usage-empty`, `usage-error`, `usage-heatmap`, `usage-legend`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-since`, `usage-stats`, `usage-year`
 - Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar)
 - Backend design: [docs/design/step-usage-daily.md](../../../docs/design/step-usage-daily.md)

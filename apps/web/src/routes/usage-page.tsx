@@ -145,12 +145,23 @@ function TokenMix({ summary }: { summary: UsageSummary }) {
   );
 }
 
-function Readout({ cell }: { cell: UsageCell | null }) {
+interface MonthTotals {
+  total: number;
+  coordinator: number;
+  tasks: number;
+}
+
+function Readout({ cell, month }: { cell: UsageCell | null; month: MonthTotals }) {
   const { t } = useI18n();
   const labels = useDateLabels();
   const text =
     cell === null
-      ? t('点一格看那天；再点一次回到全年')
+      ? [
+          t('本月'),
+          `${formatTokens(month.total)} token`,
+          `Coordinator ${formatTokens(month.coordinator)}`,
+          `${t('任务')} ${formatTokens(month.tasks)}`,
+        ].join(' · ')
       : cell.day === null || cell.total === 0
         ? `${labels.day(cell.date)} · ${t('没有用量')}`
         : [
@@ -163,14 +174,43 @@ function Readout({ cell }: { cell: UsageCell | null }) {
     <p
       data-testid="usage-readout"
       aria-live="polite"
-      className={cn(
-        'm-0 min-w-0 truncate text-meta tabular-nums',
-        cell === null ? 'text-content-tertiary' : 'text-content-secondary',
-      )}
+      className="m-0 min-w-0 truncate text-meta text-content-secondary tabular-nums"
     >
       {text}
     </p>
   );
+}
+
+function monthOutline(grid: UsageGrid, month: string, pitch: number, gap: number): string | null {
+  const spots = grid.weeks.flatMap((week, col) =>
+    week
+      .filter((cell) => !cell.future && cell.date.startsWith(month))
+      .map((cell) => ({ col, row: cell.weekday })),
+  );
+  const first = spots[0];
+  const last = spots.at(-1);
+  if (first === undefined || last === undefined) return null;
+  const x = (line: number) => line * pitch - gap / 2;
+  const y = x;
+  const points =
+    first.col === last.col
+      ? [
+          [first.col, first.row],
+          [first.col + 1, first.row],
+          [first.col + 1, last.row + 1],
+          [first.col, last.row + 1],
+        ]
+      : [
+          [first.col, first.row],
+          [first.col + 1, first.row],
+          [first.col + 1, 0],
+          [last.col + 1, 0],
+          [last.col + 1, last.row + 1],
+          [last.col, last.row + 1],
+          [last.col, 7],
+          [first.col, 7],
+        ];
+  return `M${points.map(([c = 0, r = 0]) => `${x(c)},${y(r)}`).join('L')}Z`;
 }
 
 function Legend() {
@@ -223,6 +263,8 @@ function Heatmap({
   };
 
   const firstWeek = grid.weeks[0] ?? [];
+  const month = cells.at(-1)?.date.slice(0, 7) ?? '';
+  const outline = monthOutline(grid, month, narrow ? 20 : 16, 4);
   return (
     <div
       className="grid w-max grid-cols-[auto_auto] gap-x-1.5 gap-y-1"
@@ -234,7 +276,15 @@ function Heatmap({
         className={cn('grid h-3.5 grid-flow-col gap-x-1 text-caption text-content-tertiary', cols)}
       >
         {grid.weeks.map((week, w) => (
-          <span key={week[0]?.date ?? w} className="whitespace-nowrap">
+          <span
+            key={week[0]?.date ?? w}
+            className={cn(
+              'whitespace-nowrap',
+              week.some((cell) => !cell.future && cell.date.startsWith(month)) &&
+                grid.monthStarts[w] !== null &&
+                'font-medium text-foreground',
+            )}
+          >
             {grid.monthStarts[w] !== null && week[0] ? labels.month(week[0].date) : ''}
           </span>
         ))}
@@ -252,8 +302,24 @@ function Heatmap({
       <div
         ref={gridRef}
         data-testid="usage-heatmap"
-        className={cn('grid grid-flow-col gap-1', cols, rows)}
+        className={cn('relative grid grid-flow-col gap-1', cols, rows)}
       >
+        {outline !== null && (
+          <svg
+            aria-hidden
+            data-testid="usage-current-month"
+            className="pointer-events-none absolute inset-0 size-full overflow-visible text-foreground"
+          >
+            <path
+              d={outline}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeDasharray="3 2.5"
+              strokeLinejoin="round"
+            />
+          </svg>
+        )}
         {grid.weeks
           .flat()
           .map((cell) =>
@@ -310,16 +376,27 @@ function Year({
   const shown = hover ?? selected;
   const cell = shown === null ? null : (cells.find((c) => c.date === shown) ?? null);
   const fresh = firstDay !== null && firstDay > shiftDay(grid.from, 28);
+  const thisMonth =
+    cells
+      .filter((c) => !c.future)
+      .at(-1)
+      ?.date.slice(0, 7) ?? '';
+  const monthCells = cells.filter((c) => !c.future && c.date.startsWith(thisMonth));
+  const month = {
+    total: monthCells.reduce((sum, c) => sum + c.total, 0),
+    coordinator: monthCells.reduce((sum, c) => sum + (c.day?.coordinator ?? 0), 0),
+    tasks: monthCells.reduce((sum, c) => sum + (c.day?.tasks ?? 0), 0),
+  };
   return (
     <section
       data-testid="usage-year"
       className={cn('flex min-w-0 flex-col gap-3 px-4 pt-3.5 pb-3', CARD_CLS)}
     >
       <div className="flex min-h-5 items-center justify-between gap-4">
-        <Readout cell={cell} />
+        <Readout cell={cell} month={month} />
         <Legend />
       </div>
-      <div className="flex justify-end overflow-hidden">
+      <div className="-m-1 flex justify-end overflow-hidden p-1">
         <Heatmap grid={grid} selected={selected} onSelect={onSelect} onHover={setHover} />
       </div>
       {fresh && firstDay !== null && (
