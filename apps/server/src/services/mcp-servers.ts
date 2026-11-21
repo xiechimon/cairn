@@ -20,6 +20,8 @@ import {
   mcpCatalogEntry,
   type PatchMcpConnectorBody,
   parseClaudeMcpEntries,
+  publicOrigin,
+  publicUrl,
   type SecretBox,
   type StartMcpConnectorOAuthBody,
 } from '@cairn/shared';
@@ -118,7 +120,7 @@ export function readClaudeMcpServers(path: string): ClaudeMcpRead {
       label: key,
       slug,
       transport: 'http',
-      url: entry.url,
+      url: publicUrl(entry.url),
       hasCredential: credentialKeys.length > 0,
       credentialKeys,
     });
@@ -150,7 +152,8 @@ export function listMcpServers(
         label: c.label,
         slug: c.slug,
         transport: 'http' as const,
-        url: publicUrl(c.url) ?? '',
+        url:
+          c.url === null ? '' : c.authKind === 'composio' ? publicOrigin(c.url) : publicUrl(c.url),
         hasCredential: c.authKind !== 'none',
         credentialKeys: c.headerNames,
         createdBy: '',
@@ -199,20 +202,6 @@ export function githubAppOfDeps(deps: Pick<McpConnectorDeps, 'githubApp'>): Gith
 
 type ConnectorRow = typeof mcpConnector.$inferSelect;
 
-export function publicUrl(raw: string | null): string | null {
-  if (raw === null) return null;
-  const url = new URL(raw);
-  return `${url.origin}${url.pathname}`;
-}
-
-function composioPublicUrl(raw: string): string {
-  try {
-    return new URL(raw).origin;
-  } catch {
-    return '';
-  }
-}
-
 function connectorRows(db: Db, teamId: string): ConnectorRow[] {
   return db
     .select()
@@ -245,7 +234,7 @@ export function toConnectorRecord(
       row.url === null
         ? null
         : row.authKind === 'composio'
-          ? composioPublicUrl(row.url)
+          ? publicOrigin(row.url)
           : publicUrl(row.url),
     headerNames: row.headerNames,
     authKind: row.authKind,
