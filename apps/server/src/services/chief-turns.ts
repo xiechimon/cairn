@@ -43,6 +43,7 @@ export const QUEUED_HOLD = 'queued';
 export { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
 export const CHIEF_TURN_MAX_MS = 30 * 60_000;
+export const CHIEF_TURN_STOP_GRACE_MS = 120_000;
 
 export interface ChiefTurnDeps {
   db: Db;
@@ -631,15 +632,26 @@ function stopClaimedChiefStep(
   now: number,
 ): { delegated: boolean } {
   const threadId = thread.id;
+  const requested = deps.db
+    .select()
+    .from(stopPending)
+    .where(eq(stopPending.conversationId, threadId))
+    .get();
   const abandoned =
     head.lastHeartbeatAt !== null && now - head.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
-  if (!abandoned) {
+  const ignored =
+    requested?.stepId === head.id && now - requested.createdAt >= CHIEF_TURN_STOP_GRACE_MS;
+  if (!abandoned && !ignored) {
     deps.db
       .insert(stopPending)
       .values({ conversationId: threadId, stepId: head.id, discard: false, createdAt: now })
       .onConflictDoUpdate({
         target: stopPending.conversationId,
-        set: { stepId: head.id, discard: false, createdAt: now },
+        set: {
+          stepId: head.id,
+          discard: false,
+          createdAt: requested?.stepId === head.id ? requested.createdAt : now,
+        },
       })
       .run();
     deps.machineHub?.stopSignal(thread.teamId, head.id);
@@ -654,6 +666,7 @@ function stopClaimedChiefStep(
   releaseUnconsumedSteer(deps.db, head);
   settleMemoryEditTurn(deps.db, head, 'stopped', 'executor lost');
   recordChiefStop(deps, head);
+  deps.machineHub?.stopSignal(thread.teamId, head.id);
   settleChiefActiveRun(deps.db, threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);

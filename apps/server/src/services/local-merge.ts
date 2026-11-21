@@ -21,7 +21,7 @@ import { triggerChiefWakes } from './chief.js';
 import { projectOfTodo } from './git.js';
 import { softwareCommitIdentity } from './github-autonomous-token.js';
 import type { MachineDeps } from './machine-deps.js';
-import { ownedStep, publishStepStatus, upsertMessage } from './machine-deps.js';
+import { ownedStepRow, publishStepStatus, upsertMessage } from './machine-deps.js';
 import { announceMergeStepOutcome } from './merge-announcement.js';
 import { computePatchDigest } from './merge-gate/digest.js';
 import { notifyTodo } from './notifications.js';
@@ -126,7 +126,7 @@ export function localMergeRecheckAuthorization(
   stepId: string,
   body: MachineLocalMergeRecheckBody,
 ): MachineLocalMergeRecheckResponse {
-  const stepRow = ownedStep(deps, machineId, stepId);
+  const stepRow = ownedStepRow(deps, machineId, stepId);
   if (stepRow.status !== 'claimed') return { authorized: false, reason: 'step-released' };
   const stored = parseLocalMergeInstruction(stepRow.prompt);
   if (stepRow.kind !== 'merge' || stored === null)

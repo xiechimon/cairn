@@ -23,7 +23,7 @@ import { chiefTurnLocked, stepMcpGrant } from './machine-claim.js';
 import {
   isChiefConversation,
   type MachineDeps,
-  ownedStep,
+  ownedStepRow,
   profileForStep,
 } from './machine-deps.js';
 import {
@@ -41,7 +41,7 @@ export async function stepToken(
   stepId: string,
   surface: SecretSurface = 'host',
 ): Promise<MachineTokenResponse> {
-  const owned = ownedStep(deps, machineId, stepId);
+  const owned = ownedStepRow(deps, machineId, stepId);
   if (isChiefConversation(owned.buildId))
     return chiefStepToken(deps, stepId, owned.buildId, owned.status === 'claimed');
   const bundle = resolveStepCredentials({ db: deps.db, box: deps.box }, stepId);

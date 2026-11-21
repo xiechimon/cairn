@@ -85,7 +85,7 @@ import {
 } from './computer-thread.js';
 import type { TeamStreamHub } from './events.js';
 import { isOwner } from './instance-owner.js';
-import { type MachineDeps, ownedStep } from './machine-deps.js';
+import { type MachineDeps, ownedStepRow } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { localBrowserConnector } from './mcp-servers.js';
 import { ownComputerTarget } from './own-computer.js';
@@ -1453,7 +1453,7 @@ export async function forwardComputerCall(
   } = {},
 ): Promise<ComputerRelayResult> {
   const { db } = deps;
-  const stepRow = ownedStep(deps, machineId, stepId);
+  const stepRow = ownedStepRow(deps, machineId, stepId);
   const thread = computerThreadOf(db, stepRow);
   if (thread === null) {
     throw new HttpError(400, `step ${stepId} is not a chief step or an info card`);

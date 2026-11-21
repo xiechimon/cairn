@@ -33,7 +33,7 @@ import { stopStepComputer } from '../services/machine-computer.js';
 import {
   isChiefConversation,
   type MachineDeps,
-  ownedStep,
+  ownedStepRow,
   stepTeamId,
 } from '../services/machine-deps.js';
 import { chiefStepAgent, requeueChiefStepOnFallback } from '../services/machine-finish-step.js';
@@ -42,7 +42,7 @@ import {
   fetchStop,
   heartbeatStep,
   reportTranscriptDelta,
-  reportTranscriptRow,
+  storeTranscriptRow,
 } from '../services/machines.js';
 import { ranModel, recordProviderOutcome } from '../services/model-fallback.js';
 import { publishStepRow } from '../services/quota-wait.js';
@@ -135,7 +135,11 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     heartbeat: async (stepId) => {
       heartbeatStep(deps, null, stepId);
     },
-    stop: async (stepId) => fetchStop(deps, { id: null }, stepId).discard,
+    stop: async (stepId) => {
+      const owned = stepRow(stepId);
+      if (owned.machineId === null && owned.status !== 'claimed') return false;
+      return fetchStop(deps, { id: null }, stepId).discard;
+    },
     inputs: {
       position: async (threadId) =>
         deps.db
@@ -223,13 +227,19 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         ...(signal === undefined ? {} : { signal }),
       }),
     transcriptRow: async (stepId, row, entryId) => {
-      const owned = ownedStep(deps, null, stepId);
+      let owned: ReturnType<typeof ownedStepRow>;
+      try {
+        owned = ownedStepRow(deps, null, stepId);
+      } catch (error) {
+        if (error instanceof NotFoundError) return;
+        throw error;
+      }
       deps.db.transaction(() => {
         if (
           !isChiefConversation(owned.buildId) ||
           !chiefMessageStored(deps.db, { ...row, threadId: owned.buildId })
         )
-          reportTranscriptRow(deps, null, stepId, row);
+          storeTranscriptRow(deps, owned, stepId, row);
         if (entryId !== undefined && isChiefConversation(owned.buildId)) {
           mapEntry(row.id, owned.buildId, entryId);
           if (!coordinatorInputs(deps.db, owned.buildId).some((input) => input.stepId === stepId))
@@ -264,7 +274,11 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         .run();
     },
     transcriptDelta: async (stepId, text) => {
-      reportTranscriptDelta(deps, null, stepId, text);
+      try {
+        reportTranscriptDelta(deps, null, stepId, text);
+      } catch (error) {
+        if (!(error instanceof NotFoundError)) throw error;
+      }
     },
     canSuggestReplies: async (stepId) => canSuggestReplies(stepId),
     suggestReplies: async (stepId, replies) => {
@@ -273,6 +287,10 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
     },
     done: async (stepId, body, observation) => {
       const owned = stepRow(stepId);
+      if (owned.status !== 'claimed') {
+        stopStepComputer(deps, stepId);
+        return;
+      }
       recordStepUsage(deps, owned, body.usage ?? []);
       deps.db.delete(stopPending).where(eq(stopPending.stepId, stepId)).run();
       releaseUnconsumedSteer(deps.db, owned);

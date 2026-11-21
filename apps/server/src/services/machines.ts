@@ -54,6 +54,7 @@ import {
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  ownedStepRow,
   profileForStep,
   upsertChiefRow,
   upsertMessage,
@@ -68,6 +69,7 @@ export {
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  ownedStepRow,
   profileForStep,
   publishStepStatus,
   upsertChiefRow,
@@ -716,7 +718,7 @@ export function reportBackgroundTask(
   stepId: string,
   task: BackgroundTask,
 ): void {
-  const row = ownedStep(deps, machineId, stepId);
+  const row = ownedStepRow(deps, machineId, stepId);
   markProgress(deps, row);
   const messageRow = {
     id: backgroundTaskMessageId(row.id, task.taskId),
@@ -768,13 +770,12 @@ export function reportThinkingDelta(
   deps.convHub?.publishThinkingDelta(row.buildId, text);
 }
 
-export function reportTranscriptRow(
+export function storeTranscriptRow(
   deps: MachineDeps,
-  machineId: string | null,
+  owned: ReturnType<typeof ownedStepRow>,
   stepId: string,
   row: TranscriptRow,
 ): void {
-  const owned = ownedStep(deps, machineId, stepId);
   markProgress(deps, owned);
   const origin =
     row.role === 'user' && row.id === transcriptPromptRowId(stepId) ? 'task-prompt' : null;
@@ -799,6 +800,15 @@ export function reportTranscriptRow(
     createdAt: row.createdAt,
     origin,
   });
+}
+
+export function reportTranscriptRow(
+  deps: MachineDeps,
+  machineId: string | null,
+  stepId: string,
+  row: TranscriptRow,
+): void {
+  storeTranscriptRow(deps, ownedStep(deps, machineId, stepId), stepId, row);
 }
 
 export function reportActivity(

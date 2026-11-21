@@ -67,10 +67,16 @@ export function profileForStep(
   return profileForStepRoute(deps.db, todoRow, kind, stepId);
 }
 
-export function ownedStep(deps: MachineDeps, machineId: string | null, stepId: string) {
+export function ownedStepRow(deps: MachineDeps, machineId: string | null, stepId: string) {
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) throw new NotFoundError(`step ${stepId}`);
   if (row.machineId !== machineId) throw new NotFoundError(`step ${stepId} (not yours)`);
+  return row;
+}
+
+export function ownedStep(deps: MachineDeps, machineId: string | null, stepId: string) {
+  const row = ownedStepRow(deps, machineId, stepId);
+  if (row.status !== 'claimed') throw new NotFoundError(`step ${stepId} (not running)`);
   return row;
 }
 
