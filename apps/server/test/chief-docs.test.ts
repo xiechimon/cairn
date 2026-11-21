@@ -81,6 +81,31 @@ async function fetchFixture(
   }
 }
 
+const REPLACEMENT_SOURCE = 'replacement default branch\n';
+
+async function replacementRepository(name: string, branch: string): Promise<string> {
+  const dir = join(H.s.reposDir, name);
+  mkdirSync(join(dir, 'scripts'), { recursive: true });
+  writeFileSync(join(dir, 'scripts/owned-process.mjs'), REPLACEMENT_SOURCE);
+  for (const args of [
+    ['init', `--initial-branch=${branch}`],
+    ['add', 'scripts/owned-process.mjs'],
+    [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.test',
+      'commit',
+      '-m',
+      'replacement',
+    ],
+  ]) {
+    const result = await runGit(args, { cwd: dir });
+    expect(result.code, result.stderr).toBe(0);
+  }
+  return dir;
+}
+
 async function docs(
   paths: string[],
   ref?: string,
@@ -219,6 +244,76 @@ describe('Coordinator repository reads', () => {
     ).toBe(0);
     expect((await read()).files[0]?.content).toBeUndefined();
     expect((await read()).files[0]?.error).toMatch(/repository.*mismatch/i);
+  });
+
+  test('retargeting the cache refreshes the default branch an omitted ref reads', async () => {
+    const original = await bindRepo('github');
+    const workspacesDir = join(H.s.reposDir, 'retarget-default-workspaces');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', original, cache])).code).toBe(0);
+    await fetchFixture(cache, original);
+    const read = async (ref?: string) =>
+      JSON.parse(
+        await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+          projectId: H.projectId,
+          paths: ['scripts/owned-process.mjs'],
+          ...(ref ? { ref } : {}),
+        }),
+      ) as Docs;
+    expect((await read()).files[0]?.content).toBe('export const spawn = true;\n');
+    const replacement = await replacementRepository('retarget-default', 'trunk');
+    const replacementCommit = (await runGit(['rev-parse', 'HEAD'], { cwd: replacement })).stdout
+      .toString()
+      .trim();
+    H.s.db
+      .update(project)
+      .set({ githubRepo: 'fixture/retargeted', baseBranch: null, localPath: null })
+      .where(eq(project.id, H.projectId))
+      .run();
+    await fetchFixture(cache, replacement, 'fixture/retargeted');
+    expect((await read()).files[0]).toMatchObject({
+      path: 'scripts/owned-process.mjs',
+      content: REPLACEMENT_SOURCE,
+      commit: replacementCommit,
+    });
+    expect((await read('trunk')).files[0]?.content).toBe(REPLACEMENT_SOURCE);
+    expect((await read('main')).files[0]?.content).toBeUndefined();
+    expect((await read('main')).files[0]?.error).toMatch(/current repository|verified repository/);
+    expect((await read('refs/remotes/origin/trunk')).files[0]?.commit).toBe(replacementCommit);
+    H.s.db.update(project).set({ baseBranch: 'trunk' }).where(eq(project.id, H.projectId)).run();
+    expect((await read()).files[0]?.commit).toBe(replacementCommit);
+  });
+
+  test('a cache default branch left dangling by an older daemon names the refresh', async () => {
+    const original = await bindRepo('github');
+    const workspacesDir = join(H.s.reposDir, 'stale-default-workspaces');
+    const cache = join(workspacesDir, H.projectId, 'repo');
+    mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
+    expect((await runGit(['clone', original, cache])).code).toBe(0);
+    await fetchFixture(cache, original);
+    const replacement = await replacementRepository('stale-default', 'trunk');
+    H.s.db
+      .update(project)
+      .set({ githubRepo: 'fixture/retargeted', baseBranch: null, localPath: null })
+      .where(eq(project.id, H.projectId))
+      .run();
+    await fetchFixture(cache, replacement, 'fixture/retargeted');
+    expect(
+      (
+        await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/main'], {
+          cwd: cache,
+        })
+      ).code,
+    ).toBe(0);
+    const result = JSON.parse(
+      await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
+        projectId: H.projectId,
+        paths: ['scripts/owned-process.mjs'],
+      }),
+    ) as Docs;
+    expect(result.files[0]?.content).toBeUndefined();
+    expect(result.files[0]?.error).toMatch(/cache default branch is missing.*re-prepare/);
   });
 
   test.each(['docs', 'file', 'files'] as const)(

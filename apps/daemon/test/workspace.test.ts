@@ -138,6 +138,32 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     expect(logger.lines).toContain('[workspace] Repo origin re-pointed to the project clone URL');
   }, 30_000);
 
+  test('#3703: retargeting the project to a repository with another default branch refreshes it', async () => {
+    const first = await ws.prepare(prepareInput(CONV_A));
+    expect(first.defaultBranch).toBe('main');
+    const replacement = join(testTempDir('cairn-ws-replacement-'), 'repo.git');
+    const replacementWork = join(testTempDir('cairn-ws-replacement-work-'), 'repo');
+    await runGit(['init', '--bare', replacement]);
+    await runGit(['symbolic-ref', 'HEAD', 'refs/heads/trunk'], { cwd: replacement });
+    await runGit(['clone', replacement, replacementWork]);
+    await runGit(['checkout', '-B', 'trunk'], { cwd: replacementWork });
+    writeFileSync(join(replacementWork, 'README.md'), '# replacement trunk\n');
+    await runGit(['add', '-A'], { cwd: replacementWork });
+    await runGit(['commit', '-m', 'trunk seed'], {
+      cwd: replacementWork,
+      env: commitEnv(IDENTITY),
+    });
+    await runGit(['push', 'origin', 'trunk'], { cwd: replacementWork });
+    await runGit(['checkout', '-B', 'main'], { cwd: replacementWork });
+    writeFileSync(join(replacementWork, 'README.md'), '# replacement main\n');
+    await runGit(['add', '-A'], { cwd: replacementWork });
+    await runGit(['commit', '-m', 'main seed'], { cwd: replacementWork, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: replacementWork });
+    const second = await ws.prepare({ ...prepareInput(CONV_B), cloneUrl: replacement });
+    expect(second.defaultBranch).toBe('trunk');
+    expect(readFileSync(join(second.cwd, 'README.md'), 'utf8')).toBe('# replacement trunk\n');
+  }, 30_000);
+
   test("#1484: comparison uses origin's raw configured value, insteadOf rewrites do not trigger repointing", async () => {
     const alias = 'cairn-alias:repo';
     stubOutInheritedGitConfig();

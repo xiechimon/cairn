@@ -372,6 +372,17 @@ async function resolveCommitOr404(
   return commit;
 }
 
+async function remoteDefaultRef(dir: string, message: string): Promise<string> {
+  const head = await runGit(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], {
+    cwd: dir,
+    timeoutMs: 15000,
+  });
+  const target = head.stdout.toString('utf8').trim();
+  if (head.code !== 0 || target === '') throw new HttpError(409, message);
+  if ((await systemGitOps.resolveCommit(dir, target)) === null) throw new HttpError(409, message);
+  return target;
+}
+
 export const PROJECT_FILES_DEFAULT_LIMIT = 2000;
 export const PROJECT_FILES_MAX_LIMIT = 5000;
 
@@ -430,31 +441,20 @@ export async function readFile(
     if (refParam === undefined && row.baseBranch != null) {
       ref = `refs/remotes/origin/${row.baseBranch}`;
     } else if (refParam === undefined) {
-      const head = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
-        cwd: dir,
-        timeoutMs: 15000,
-      });
-      if (head.code !== 0)
-        throw new HttpError(409, 'project repository cache has no default remote branch');
-      ref = head.stdout.toString('utf8').trim();
+      ref = await remoteDefaultRef(
+        dir,
+        'project repository cache default branch is missing; re-prepare the project to refresh it or configure baseBranch',
+      );
     }
   }
   if (refParam === undefined && options.defaultBranch === true && cache === null) {
     if (row.baseBranch != null) {
       ref = `refs/heads/${row.baseBranch}`;
     } else if (row.repoKind !== 'hosted') {
-      const remoteHead = await runGit(['symbolic-ref', 'refs/remotes/origin/HEAD'], {
-        cwd: dir,
-        timeoutMs: 15000,
-      });
-      if (remoteHead.code === 0) {
-        ref = remoteHead.stdout.toString('utf8').trim();
-      } else {
-        throw new HttpError(
-          409,
-          'repository default branch is unknown; configure baseBranch or supply ref',
-        );
-      }
+      ref = await remoteDefaultRef(
+        dir,
+        'repository default branch is unknown; configure baseBranch or supply ref',
+      );
     }
   }
   const commit = await resolveCommitOr404(ctx, projectId, dir, ref);

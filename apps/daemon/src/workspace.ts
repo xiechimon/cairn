@@ -193,7 +193,7 @@ export class WorkspaceManager implements WorktreeOps {
           await gitPrim.clone(seed, baseRepoDir, null);
           await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
           await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
-          await gitPrim.remoteSetHeadAuto(baseRepoDir, input.credentials);
+          await runNet('set-head', (cred) => gitPrim.remoteSetHeadAuto(baseRepoDir, cred));
           this.logger.workspace('Repo source: orb seed');
           fromSeed = true;
         }
@@ -210,11 +210,15 @@ export class WorkspaceManager implements WorktreeOps {
         }
       } else {
         const origin = await gitPrim.originConfigUrl(baseRepoDir);
-        if (origin !== null && origin !== cloneUrl) {
+        const retargeted = origin !== null && origin !== cloneUrl;
+        if (retargeted) {
           await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
           this.logger.workspace('Repo origin re-pointed to the project clone URL');
         }
         await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
+        if (retargeted) {
+          await runNet('set-head', (cred) => gitPrim.remoteSetHeadAuto(baseRepoDir, cred));
+        }
       }
       const defaultBranch = input.baseBranch ?? (await gitPrim.remoteDefaultBranch(baseRepoDir));
       if (input.readonly === true) {

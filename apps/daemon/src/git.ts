@@ -460,17 +460,36 @@ export const gitPrim = {
         timeoutMs: options.timeoutMs ?? NET_TIMEOUT_MS,
       },
     );
+    if ((await gitPrim.remoteHeadRef(repoDir)) !== null) return;
+    const fetched = await runGit(
+      ['for-each-ref', '--count=1', '--format=%(refname)', 'refs/remotes/origin/'],
+      { cwd: repoDir, timeoutMs: META_TIMEOUT_MS },
+    );
+    if (fetched.code !== 0 || fetched.stdout.trim() === '') return;
+    if ((await gitPrim.originConfigUrl(repoDir)) !== origin) return;
+    await gitPrim.remoteSetHeadAuto(repoDir, cred);
+    if ((await gitPrim.remoteHeadRef(repoDir)) === null) {
+      throw new Error(`git fetch left ${origin} without a resolvable default branch`);
+    }
   },
 
-  async remoteDefaultBranch(repoDir: string): Promise<string> {
-    const r = await runGit(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], {
+  async remoteHeadRef(repoDir: string): Promise<string | null> {
+    const r = await runGit(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], {
       cwd: repoDir,
       timeoutMs: META_TIMEOUT_MS,
     });
-    if (r.code === 0) {
-      const name = r.stdout.trim().replace(/^origin\//, '');
-      if (name !== '') return name;
-    }
+    const target = r.stdout.trim();
+    if (r.code !== 0 || target === '') return null;
+    const resolved = await runGit(
+      ['rev-parse', '--verify', '--quiet', '--end-of-options', target],
+      { cwd: repoDir, timeoutMs: META_TIMEOUT_MS },
+    );
+    return resolved.code === 0 && resolved.stdout.trim() !== '' ? target : null;
+  },
+
+  async remoteDefaultBranch(repoDir: string): Promise<string> {
+    const name = (await gitPrim.remoteHeadRef(repoDir))?.replace(/^refs\/remotes\/origin\//, '');
+    if (name !== undefined && name !== '') return name;
     return 'main';
   },
 
