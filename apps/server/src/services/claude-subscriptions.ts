@@ -1,4 +1,5 @@
 import type {
+  ClaudeRateLimitNotice,
   ClaudeRateLimitWindow,
   ClaudeSubscription,
   ClaudeSubscriptionListEntry,
@@ -15,7 +16,7 @@ import type {
 import {
   applyClaudeRateLimit,
   CLAUDE_MODEL_ID_PATTERN,
-  canonicalClaudeModelId,
+  CLAUDE_RATE_LIMIT_UNSPECIFIED,
   canonicalClaudeModels,
   claudeRateBlock,
   DEFAULT_CLAUDE_CODE_MODELS,
@@ -28,6 +29,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import {
   CLAUDE_CHECK_COMMAND,
   CLAUDE_MODEL_TEST_COMMAND,
+  fetchClaudeUsageWindows,
   probeClaudeQuota,
   probeClaudeSubscriptionModel,
   verifyClaudeSubscription,
@@ -288,8 +290,12 @@ export function disableClaudeSubscription(
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function quotaWindowWire(window: ClaudeRateLimitWindow): ClaudeSubscriptionQuotaWindow | null {
+function quotaWindowWire(
+  window: ClaudeRateLimitWindow,
+  now: number,
+): ClaudeSubscriptionQuotaWindow | null {
   if (window.utilization === null) return null;
+  if (window.resetsAt !== null && window.resetsAt <= now) return null;
   return {
     name: window.subscription,
     utilization: window.utilization,
@@ -318,7 +324,9 @@ export function listClaudeSubscriptions(deps: Deps, teamId: string): ClaudeSubsc
     const stats = usage.get(row.id);
     return {
       ...toRecord(row),
-      windows: stored.map(quotaWindowWire).filter((window) => window !== null),
+      windows: stored
+        .map((window) => quotaWindowWire(window, now))
+        .filter((window) => window !== null),
       lastCheck: row.lastCheck,
       ...(block !== null ? { state: 'exhausted' as const, cooldownUntil: block.until } : {}),
       lastUsedAt: stats?.lastUsedAt ?? null,
@@ -331,6 +339,7 @@ export const CLAUDE_QUOTA_REFRESH_MS = 60_000;
 const QUOTA_PROBED_WINDOWS = ['five_hour', 'seven_day'];
 
 const quotaProbes = new WeakMap<Db, Map<string, { at: number; done: Promise<void> }>>();
+const usageEndpointRefusals = new WeakMap<Db, Set<string>>();
 
 function quotaFresh(row: Row, now: number): boolean {
   const windows = row.quotaWindows ?? [];
@@ -341,31 +350,78 @@ function quotaFresh(row: Row, now: number): boolean {
 }
 
 async function probeAndStoreQuota(deps: UpstreamDeps, row: Row): Promise<void> {
-  const model =
-    canonicalClaudeModelId('haiku', savedModels(row.models) ?? undefined) ??
-    DEFAULT_CLAUDE_CODE_MODELS[0]?.id;
-  if (model === undefined) return;
   let token: string;
   try {
     token = deps.box.open(row.tokenCipher);
   } catch {
     return;
   }
-  const notices = await probeClaudeQuota(token, model, {
-    fetch: deps.fetch,
-    timeoutMs: deps.timeoutMs ?? UPSTREAM_TIMEOUT_MS,
-  });
-  if (notices.length === 0) return;
+  const options = { fetch: deps.fetch, timeoutMs: deps.timeoutMs ?? UPSTREAM_TIMEOUT_MS };
+  const refused = usageEndpointRefusals.get(deps.db) ?? new Set<string>();
+  usageEndpointRefusals.set(deps.db, refused);
+  let notices: ClaudeRateLimitNotice[] | null = null;
+  if (!refused.has(row.id)) {
+    const usage = await fetchClaudeUsageWindows(token, options);
+    if (usage.status === 'ok') notices = usage.notices;
+    else if (usage.status === 'unsupported') refused.add(row.id);
+  }
+  if (notices === null) {
+    const tried = new Set<string>();
+    let refusedAll = false;
+    let done = false;
+    for (const source of [
+      () => Promise.resolve((savedModels(row.models) ?? []).map((entry) => entry.id)),
+      async () => {
+        const listed = await fetchAnthropicOAuthModels({
+          oauthToken: token,
+          fetch: options.fetch ?? globalThis.fetch,
+          timeoutMs: options.timeoutMs,
+        });
+        if (!listed.ok) return [];
+        const ids = listed.models.map((entry) => entry.id);
+        return [
+          ...ids.filter((id) => id.startsWith('claude-haiku')),
+          ...ids.filter((id) => !id.startsWith('claude-haiku')),
+        ];
+      },
+    ]) {
+      for (const candidate of (await source()).filter((id) => !tried.has(id)).slice(0, 3)) {
+        tried.add(candidate);
+        const probe = await probeClaudeQuota(token, candidate, options);
+        if (probe.notices.length > 0) {
+          notices = probe.notices;
+          done = true;
+          break;
+        }
+        if (probe.status === 429) {
+          refusedAll = true;
+          continue;
+        }
+        done = true;
+        break;
+      }
+      if (done) break;
+    }
+    if (notices === null && refusedAll) notices = [{ status: 'rejected' }];
+  }
+  if (notices === null || notices.length === 0) return;
   const now = nowMs();
   const current = subscriptionRow(deps.db, row.teamId, row.id);
   if (current === undefined) return;
+  const windows = notices.reduce(
+    (stored, notice) => applyClaudeRateLimit(stored, notice, now),
+    current.quotaWindows ?? [],
+  );
+  const named = notices.some((notice) => notice.rateLimitType !== undefined);
   deps.db
     .update(claudeSubscription)
     .set({
-      quotaWindows: notices.reduce(
-        (windows, notice) => applyClaudeRateLimit(windows, notice, now),
-        current.quotaWindows ?? [],
-      ),
+      quotaWindows: named
+        ? windows.filter(
+            (window) =>
+              window.subscription !== CLAUDE_RATE_LIMIT_UNSPECIFIED || window.status !== 'rejected',
+          )
+        : windows,
     })
     .where(eq(claudeSubscription.id, row.id))
     .run();

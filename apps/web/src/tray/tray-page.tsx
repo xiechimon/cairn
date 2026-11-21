@@ -62,9 +62,10 @@ function useTrayData(): { groups: TrayGroup[]; usage: TrayUsage | null; coordina
       setNow(Date.now());
       void client.invalidateQueries({ queryKey: ['machines', teamId] });
       void client.invalidateQueries({ queryKey: ['usage-daily', teamId] });
+      if (live && document.visibilityState === 'visible') refreshQuota();
     }, TRAY_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [client, teamId]);
+  }, [client, live, teamId, refreshQuota]);
 
   useEffect(() => {
     if (!live || teamId === undefined) return;
