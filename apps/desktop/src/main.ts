@@ -531,9 +531,9 @@ function showTray(origin: string, controls: TrayControls): Tray {
   const idleIcon = trayIcon('trayTemplate.png');
   const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
-  const created = new Tray(keepAwake.isOn() ? awakeIcon : idleIcon);
+  const created = new Tray(keepAwake.isHolding() ? awakeIcon : idleIcon);
   const refreshIcon = (): void => {
-    created.setImage(keepAwake.isOn() ? awakeIcon : idleIcon);
+    created.setImage(keepAwake.isHolding() ? awakeIcon : idleIcon);
   };
   const fallbackMenu = (): Menu =>
     Menu.buildFromTemplate(

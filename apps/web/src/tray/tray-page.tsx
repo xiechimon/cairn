@@ -266,8 +266,8 @@ export function TrayPage() {
           role="switch"
           aria-checked={keepAwake}
           className="tray-disc"
-          title={t('保持 Mac 唤醒')}
-          aria-label={t('保持 Mac 唤醒')}
+          title={t('保持屏幕常亮')}
+          aria-label={t('保持屏幕常亮')}
           onClick={() => bridge?.setKeepAwake(!keepAwake)}
         >
           <Coffee className="size-5" aria-hidden="true" />

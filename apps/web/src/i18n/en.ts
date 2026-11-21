@@ -2662,7 +2662,7 @@ export const EN: Record<string, string> = {
   归档项目: 'Archive project',
   正在启动: 'Starting',
   已停止: 'Stopped',
-  '保持 Mac 唤醒': 'Keep the Mac awake',
+  保持屏幕常亮: 'Keep the screen on',
   '退出 Cairn': 'Quit Cairn',
   等你: 'Waiting on you',
   已断开: 'Disconnected',
