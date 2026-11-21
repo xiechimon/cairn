@@ -50,7 +50,7 @@ test.describe('live', () => {
     await page.getByTestId('sidebar-usage').click();
     await expect(page).toHaveURL(/\/app\/usage/);
     await expect(page.getByRole('dialog', { name: 'Usage' })).toBeVisible();
-    expect(asked.at(-1)?.get('tz')).toBe('Asia/Shanghai');
+    await expect.poll(() => asked.at(-1)?.get('tz')).toBe('Asia/Shanghai');
     expect(asked.at(-1)?.get('days')).toBe('371');
     const stats = page.getByTestId('usage-stats');
     await expect(stats).toContainText('Past year864K token');
