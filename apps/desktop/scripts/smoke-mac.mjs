@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { realpathSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
 import { isServerHelper } from '../src/server-process.ts';
+import { isTrayPage, mainWindow } from './main-window.mjs';
 
 const LAUNCH_TIMEOUT_MS = 120_000;
 const GATE_SETTLE_MS = 5_000;
@@ -55,7 +56,7 @@ if (appPath === undefined || screenshotPath === undefined) {
   process.exit(2);
 }
 
-const appRoot = realpathSync(resolve(appPath));
+const appRoot = existsSync(appPath) ? realpathSync(resolve(appPath)) : resolve(appPath);
 if (appRoot.startsWith('/Applications/')) {
   console.error(`refusing to smoke an installed app: ${appRoot}`);
   process.exit(2);
@@ -74,7 +75,7 @@ const app = await electron.launch({
 });
 const child = app.process();
 try {
-  const window = await app.firstWindow({ timeout: LAUNCH_TIMEOUT_MS });
+  const window = await mainWindow(app, LAUNCH_TIMEOUT_MS);
   await window.waitForLoadState('load');
   const { hostname, protocol } = new URL(window.url());
   assert.equal(`${protocol}//${hostname}`, 'http://127.0.0.1', `window opened ${window.url()}`);
@@ -124,11 +125,10 @@ try {
 
   await window.screenshot({ path: screenshotPath });
 
-  const trayPage = () => app.windows().find((page) => page.url().endsWith('/tray'));
   const tray =
-    trayPage() ??
+    app.windows().find(isTrayPage) ??
     (await app.waitForEvent('window', {
-      predicate: (page) => page.url().endsWith('/tray'),
+      predicate: isTrayPage,
       timeout: GATE_SETTLE_MS * 4,
     }));
   assert.equal(
@@ -226,8 +226,7 @@ try {
   });
   const abruptChild = abrupt.process();
   try {
-    await abrupt.firstWindow({ timeout: LAUNCH_TIMEOUT_MS });
-    const abruptOrigin = new URL((await abrupt.windows())[0].url()).origin;
+    const abruptOrigin = new URL((await mainWindow(abrupt, LAUNCH_TIMEOUT_MS)).url()).origin;
     const spawned = await (async () => {
       const deadline = Date.now() + 15_000;
       while (Date.now() < deadline) {

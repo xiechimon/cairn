@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import test from 'node:test';
 import { isServerHelper } from '../src/server-process.ts';
+import { mainWindow } from './main-window.mjs';
 
 const CLI = join(import.meta.dirname, 'smoke-mac.mjs');
 
@@ -23,6 +24,26 @@ test('the smoke refuses to signal the installed app', () => {
     encoding: 'utf8',
     timeout: 30_000,
   });
+  assert.equal(result.status, 2, result.stderr);
+  assert.match(result.stderr, /installed app/);
+});
+
+test('the smokes drive the main window, not the hidden tray popover created before it', async () => {
+  const page = (url) => ({ url: () => url });
+  const tray = page('http://127.0.0.1:4100/tray');
+  const main = page('http://127.0.0.1:4100/app');
+  const windows = [tray, page('about:blank')];
+  const app = { firstWindow: async () => tray, windows: () => windows };
+  setTimeout(() => windows.push(main), 50);
+  assert.equal(await mainWindow(app, 5_000), main);
+});
+
+test('the installed-app refusal does not need the app to exist', () => {
+  const result = spawnSync(
+    process.execPath,
+    [CLI, '/Applications/Cairn-absent-on-this-host.app', 'out.png'],
+    { encoding: 'utf8', timeout: 30_000 },
+  );
   assert.equal(result.status, 2, result.stderr);
   assert.match(result.stderr, /installed app/);
 });
