@@ -90,3 +90,51 @@ it('does not duplicate a replayed message already loaded on an older page', () =
   cacheUserMessage(qc, 'build-1', message);
   expect(qc.getQueryData<InfiniteData<ConversationMessagesResponse>>(key)?.pages.flatMap((row) => row.messages)).toEqual([message]);
 });
+
+function queue(qc: QueryClient, conversationId: string) {
+  return qc.getQueryData<InfiniteData<ConversationMessagesResponse>>(['messages', conversationId, 'pages'])?.pages[0]?.queuedMessages;
+}
+
+it.each([
+  ['HTTP acknowledgement', 'http'],
+  ['source-stream confirmation', 'sse'],
+] as const)('moves every surviving capsule to the replacement build on %s', async (_name, entry) => {
+  const { qc, mutations } = setup();
+  const delivered = { id: 'queued-a', content: 'Same words', createdAt: 2, deliverAfterStop: false };
+  const survivor = { id: 'queued-b', content: 'Same words', createdAt: 2, error: 'Task cannot accept a message', deliverAfterStop: false };
+  const later = { id: 'queued-c', content: 'Third', createdAt: 5, deliverAfterStop: true };
+  for (const row of [delivered, survivor, later]) cacheUserMessage(qc, 'build-1', row);
+  cacheUserMessage(qc, 'replacement-build', { id: 'target-own', content: 'Queued on target', createdAt: 4, deliverAfterStop: false });
+  const handoff = { conversationId: 'build-1', messageId: delivered.id };
+  if (entry === 'http') {
+    vi.spyOn(api, 'post').mockResolvedValue({ conversationId: 'replacement-build', message });
+    await mutations.sendSteer.mutateAsync({ conversationId: 'build-1', content: delivered.content, queuedMessageId: delivered.id });
+  } else cacheUserMessage(qc, 'replacement-build', message, handoff);
+  cacheUserMessage(qc, 'replacement-build', message, handoff);
+  expect(queue(qc, 'build-1')).toEqual([]);
+  expect(queue(qc, 'replacement-build')).toEqual([
+    { id: 'queued-b', content: 'Same words', createdAt: 2, error: 'Task cannot accept a message' },
+    { id: 'target-own', content: 'Queued on target', createdAt: 4 },
+    { id: 'queued-c', content: 'Third', createdAt: 5 },
+  ]);
+  expect(qc.getQueryData<InfiniteData<ConversationMessagesResponse>>(['messages', 'replacement-build', 'pages'])?.pages[0]?.messages).toEqual([message]);
+  expect(newest(qc)?.messages).toEqual([]);
+});
+
+it('moves the queue when a plain steer rolls the task over to a replacement build', async () => {
+  const { qc, mutations } = setup();
+  cacheUserMessage(qc, 'build-1', { id: 'queued-b', content: 'Still waiting', createdAt: 2, deliverAfterStop: false });
+  vi.spyOn(api, 'post').mockResolvedValue({ conversationId: 'replacement-build', message });
+  await mutations.sendSteer.mutateAsync({ conversationId: 'build-1', content: message.content, clientMessageId: 'c1' });
+  expect(queue(qc, 'build-1')).toEqual([]);
+  expect(queue(qc, 'replacement-build')).toEqual([{ id: 'queued-b', content: 'Still waiting', createdAt: 2 }]);
+});
+
+it('moves the queue when a thread message continues the task on a replacement build', async () => {
+  const { qc, mutations } = setup();
+  cacheUserMessage(qc, 'build-1', { id: 'queued-b', content: 'Still waiting', createdAt: 2, deliverAfterStop: false });
+  vi.spyOn(api, 'post').mockResolvedValue({ todoId: 't1', conversationId: 'replacement-build', delivered: 'new-turn' });
+  await mutations.messageThread.mutateAsync({ todoId: 't1', conversationId: 'build-1', content: 'Rework it' });
+  expect(queue(qc, 'build-1')).toEqual([]);
+  expect(queue(qc, 'replacement-build')).toEqual([{ id: 'queued-b', content: 'Still waiting', createdAt: 2 }]);
+});

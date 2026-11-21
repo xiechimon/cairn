@@ -135,7 +135,7 @@ import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { useAuth } from './auth.js';
 import { ApiError, api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
-import { cacheUserMessage } from './message-cache.js';
+import { cacheUserMessage, moveQueueToReplacement } from './message-cache.js';
 import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 import { cachedTodo, optimisticTodo } from './team-stream-cache.js';
 import { keepNewerTasks, keepNewerTodo, keepNewerTodos } from './todo-freshness.js';
@@ -1819,17 +1819,10 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
       },
       onSuccess: (data, input) => {
-        cacheUserMessage(
-          qc,
-          data.conversationId ?? input.conversationId,
-          data.message,
-          input.queuedMessageId === undefined
-            ? undefined
-            : {
-                conversationId: input.conversationId,
-                messageId: input.queuedMessageId,
-              },
-        );
+        cacheUserMessage(qc, data.conversationId ?? input.conversationId, data.message, {
+          conversationId: input.conversationId,
+          messageId: input.queuedMessageId,
+        });
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });
@@ -1837,12 +1830,19 @@ export function useApiMutations(teamId: string | undefined) {
       },
     }),
     messageThread: useMutation({
-      mutationFn: (input: { todoId: string; content: string; clientMessageId?: string }) =>
+      mutationFn: (input: {
+        todoId: string;
+        content: string;
+        clientMessageId?: string;
+        conversationId?: string | null;
+      }) =>
         api.post<ThreadMessageResult>(`/api/todos/${input.todoId}/messages`, {
           content: input.content,
           clientMessageId: input.clientMessageId ?? crypto.randomUUID(),
         }),
-      onSuccess: (result) => {
+      onSuccess: (result, input) => {
+        if (input.conversationId != null && result.conversationId != null)
+          moveQueueToReplacement(qc, input.conversationId, result.conversationId);
         void qc.invalidateQueries({ queryKey: ['messages'] });
         void qc.invalidateQueries({ queryKey: ['steps', result.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });

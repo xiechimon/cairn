@@ -2,7 +2,7 @@ import { chiefGetResponseSchema } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { installConversationStreams } from './tab-stream-fakes.js';
 
-async function runningTask(page: Page, readDelay = 0) {
+async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 'reject' | 'hold' = 'answer') {
   const chief = chiefGetResponseSchema.parse({
     chief: {
       id: 'chief-user-1-team-1',
@@ -160,6 +160,9 @@ async function runningTask(page: Page, readDelay = 0) {
         task.v += 1;
         return route.fulfill({ status: 201, json: { message } });
       }
+      if (build.id === 'replacement-build' && targetRead === 'reject')
+        return route.fulfill({ status: 503, json: { error: 'Replacement transcript unavailable' } });
+      if (build.id === 'replacement-build' && targetRead === 'hold') return new Promise<void>(() => {});
       if (sent.length > 0 && readDelay > 0) await new Promise((resolve) => setTimeout(resolve, readDelay));
       return route.fulfill({
         json: {
@@ -253,6 +256,31 @@ test('rollover confirms the bubble through the source stream before the target G
   await expect(page.getByTestId('user-bubble').filter({ hasText: 'Continue on the replacement build' })).toHaveCount(1, { timeout: 700 });
   await expect(page.getByTestId('queued-message')).toHaveCount(0, { timeout: 700 });
 });
+
+for (const targetRead of ['reject', 'hold'] as const) {
+  test(`rollover keeps the surviving queued capsule actionable when the replacement read is ${targetRead === 'reject' ? 'rejected' : 'held'}`, async ({ page }) => {
+    const task = await runningTask(page, 0, targetRead);
+    await task.input.fill('Deliver A on the replacement build');
+    await task.input.press('Control+Enter');
+    await task.input.fill('B waits behind A');
+    await task.input.press('Control+Enter');
+    await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(2);
+    await task.rollover();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __streams: { url: string; readyState: number }[] }).__streams.some((stream) => stream.url.includes('/conversations/replacement-build/stream') && stream.readyState === 1))).toBe(true);
+    await expect(page.getByTestId('user-bubble').filter({ hasText: 'Deliver A on the replacement build' })).toHaveCount(1);
+    const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+    await expect(capsule).toHaveCount(1);
+    await expect(capsule).toContainText('B waits behind A');
+    expect(task.queuedMessages.map((row) => row.content)).toEqual(['B waits behind A']);
+    await expect(capsule.getByRole('button', { name: '编辑排队消息' })).toBeEnabled();
+    await expect(capsule.getByRole('button', { name: '移除' })).toBeEnabled();
+    await capsule.getByRole('button', { name: '现在插话' }).click();
+    await expect.poll(() => task.sent.at(-1)).toMatchObject({ content: 'B waits behind A', queuedMessageId: 'message-2' });
+    await expect(page.getByTestId('user-bubble').filter({ hasText: 'B waits behind A' })).toHaveCount(1);
+    await expect(capsule).toHaveCount(0);
+    expect(task.queuedMessages).toEqual([]);
+  });
+}
 
 test('send now removes the capsule as soon as delivery is confirmed despite a slow read', async ({ page }) => {
   const task = await runningTask(page, 3000);
