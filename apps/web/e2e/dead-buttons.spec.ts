@@ -135,7 +135,7 @@ test('mcp page: catalog cards connect, add-server opens a form, local rows stay 
 }) => {
   await page.goto('/app/resources/mcp-servers?scenario=01');
   const catalog = page.getByTestId('mcp-catalog');
-  await expect(catalog.locator('[data-connector-card]')).toHaveCount(11);
+  await expect(catalog.locator('[data-connector-card]')).toHaveCount(12);
   await expect(page.getByTestId('resource-empty')).toHaveCount(0);
   await catalog.getByRole('button', { name: '接入 Linear' }).click();
   const signIn = page.getByRole('dialog', { name: '前往 mcp.linear.app 登录' });

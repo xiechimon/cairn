@@ -96,7 +96,7 @@ import {
   type WorkerStepFacts,
   workerIneligibility,
 } from './machine-routing.js';
-import { connectorSlugs } from './mcp-servers.js';
+import { connectorSlugs, localBrowserConnector } from './mcp-servers.js';
 import { injectMemories } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
@@ -423,6 +423,7 @@ function chiefClaimPayload(
                 vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
                 vmBrowser: teamHasVmBrowser(deps.db, threadRow.teamId),
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
+                ownerChrome: localBrowserConnector(deps.db, threadRow.teamId) !== null,
                 phoneComputer: offeredPhoneNames(deps, stepRow.buildId),
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),

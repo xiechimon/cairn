@@ -37,6 +37,7 @@ import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTurnModel } from '../services/machine-claim.js';
 import { teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
+import { localBrowserConnector } from '../services/mcp-servers.js';
 import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
@@ -582,6 +583,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             vmComputer: teamHasVmComputer(db, threadRow.teamId),
             vmBrowser: teamHasVmBrowser(db, threadRow.teamId),
             ownComputer: ownComputerOffered(db, row.buildId),
+            ownerChrome: localBrowserConnector(db, threadRow.teamId) !== null,
             phoneComputer: offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
           }),
           ...connectorToolDefsForTeam(db, threadRow.teamId),

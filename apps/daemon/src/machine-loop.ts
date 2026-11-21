@@ -51,6 +51,7 @@ import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
 import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
+import { closeOwnerChrome } from './computer/owner-chrome.js';
 import { createPhones } from './computer/phones.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
@@ -1372,6 +1373,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         });
     }
     await computerDispatcher.close();
+    await closeOwnerChrome();
     hostDesktops?.close();
   }
 

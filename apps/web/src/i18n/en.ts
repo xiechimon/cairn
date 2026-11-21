@@ -2441,6 +2441,21 @@ export const EN: Record<string, string> = {
   '最新的库文档与代码示例，也支持登录':
     'Up-to-date library docs and code examples; sign-in also supported',
   '登录没有完成，在下面重新接入一次。': 'The sign-in did not finish. Connect again below.',
+  '让 Agent 在你自己的 Chrome 里干活：已登录的站点直接可用，标签页在后台打开，不会把窗口弹到前面':
+    'Lets the agent work in your own Chrome: signed-in sites just work, tabs open in the background and the window never jumps to the front',
+  '在 Chrome 应用商店安装扩展': 'Install the extension from the Chrome Web Store',
+  '把 Browser MCP 扩展装进你要用的那个 Chrome，并固定到工具栏。':
+    'Install the Browser MCP extension in the Chrome you want to use, and pin it to the toolbar.',
+  '回到对话里让 Agent 打开一个网页。第一次它会告诉你扩展弹窗里那行六位数字，你在扩展里核对同一个数字，再点 Allow。':
+    'Back in the chat, ask the agent to open a page. The first time it tells you the six-digit code shown in the extension popup; check the same code there, then click Allow.',
+  两步用起来: 'Two steps to get going',
+  启用: 'Enable',
+  '正在启用…': 'Enabling…',
+  'Chrome 没开、扩展没连上或被暂停时，Agent 会退回 Cairn 自己的浏览器，并在结果里说明原因。':
+    'When Chrome is closed, the extension is not connected, or it is paused, the agent falls back to the browser Cairn runs and says why in the result.',
+  '这个连接在你的电脑上启动，不用填地址，也不用令牌。':
+    'This connector starts on your computer. No address or token is needed.',
+  '在你的 Chrome 里': 'In your Chrome',
   没能完成登录: 'Could not finish the sign-in',
   '{name}：删除后 Agent 不能再用它的工具。':
     '{name}: Agents can no longer use its tools after deletion.',

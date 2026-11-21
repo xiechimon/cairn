@@ -20,6 +20,15 @@ const ACTION_COPY: Record<string, string> = {
     'Ask the owner to approve deleting a project. This call deletes nothing: the server parks an approval card and deletes only when the owner approves it there, and the delete cannot be undone. Tell the owner you are waiting for that approval and end the turn.',
 };
 
+const OWNER_CHROME_TOOLS: ReadonlySet<string> = new Set([
+  'browser_navigate',
+  'browser_snapshot',
+  'browser_act',
+]);
+
+const OWNER_CHROME_NOTE =
+  " This team turned on Browser MCP, so these calls run in the owner's own Chrome, in background tabs of a tab group Cairn opens, with their own sessions already signed in; pass stealth: true when you want the stealth browser instead. The first call may answer that the extension needs Allow, with a six-digit code: tell the owner to click Allow in its popup and end the turn.";
+
 export type CoordinatorComputerToolOffer =
   | { offered: 'always' }
   | { offered: 'when_machine_reports_computer' }
@@ -102,14 +111,23 @@ export function coordinatorToolDefs(
     vmComputer?: boolean;
     vmBrowser?: boolean;
     ownComputer?: boolean;
+    ownerChrome?: boolean;
     phoneComputer?: readonly string[];
   } = {},
 ): RemoteToolDef[] {
+  const browserTools =
+    options.ownerChrome === true
+      ? COMPUTER_REMOTE_TOOLS.map((def) =>
+          OWNER_CHROME_TOOLS.has(def.name)
+            ? { ...def, description: `${def.description}${OWNER_CHROME_NOTE}` }
+            : def,
+        )
+      : COMPUTER_REMOTE_TOOLS;
   return [
     ...CHIEF_REMOTE_TOOLS,
     ...(options.routerTools === false ? [] : CHIEF_ROUTER_TOOLS),
     ...CHIEF_REPLY_TOOLS,
-    ...COMPUTER_REMOTE_TOOLS,
+    ...browserTools,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
     ...(options.vmComputer === true
       ? COMPUTER_VM_TOOLS

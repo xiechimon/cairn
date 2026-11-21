@@ -1674,6 +1674,13 @@
       "when": 1795215830198,
       "tag": "0243_elite_the_liberteens",
       "breakpoints": true
+    },
+    {
+      "idx": 244,
+      "version": "6",
+      "when": 1795238242958,
+      "tag": "0244_browsermcp_local_connector",
+      "breakpoints": true
     }
   ]
 }

@@ -36,6 +36,7 @@ import type {
   McpConnectorOAuthMeta,
   McpConnectorStatus,
   McpConnectorTool,
+  McpConnectorTransport,
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
@@ -1570,7 +1571,8 @@ export const mcpConnector = sqliteTable(
     slug: text('slug').notNull(),
     label: text('label').notNull(),
     catalogId: text('catalogId'),
-    url: text('url').notNull(),
+    transport: text('transport').$type<McpConnectorTransport>().notNull().default('http'),
+    url: text('url'),
     headerNames: json<string[]>('headerNames').notNull(),
     valuesCipher: text('valuesCipher'),
     authKind: text('authKind').$type<McpConnectorAuthKind>().notNull().default('none'),
@@ -1592,8 +1594,9 @@ export const mcpConnector = sqliteTable(
     uniqueIndex('mcp_connector_team_slug_idx').on(t.teamId, t.slug),
     check(
       'mcp_connector_status',
-      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error', 'revoked')`,
+      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error', 'revoked', 'local')`,
     ),
+    check('mcp_connector_transport', sql`${t.transport} in ('http', 'stdio')`),
     check(
       'mcp_connector_auth_kind',
       sql`${t.authKind} in ('none', 'static', 'oauth', 'github-app', 'composio')`,

@@ -138,6 +138,7 @@ export const computerCallSchema = z.object({
     )
     .optional(),
   browserLicense: z.string().min(1).max(4096).optional(),
+  ownerChrome: z.literal('browsermcp').optional(),
   computerGrant: z.enum(['browser', 'desktop']).optional(),
   phone: z
     .strictObject({

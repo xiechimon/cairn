@@ -61,6 +61,9 @@ const COMPUTED_KEYS = new Set<string>([
     entry.description,
     ...(entry.tokenLabel === undefined ? [] : [entry.tokenLabel]),
     ...(entry.tokenHelp === undefined ? [] : [entry.tokenHelp]),
+    ...(entry.setup === undefined
+      ? []
+      : [entry.setup.installLabel, ...entry.setup.steps]),
     ...entry.options.map((option) => option.label),
   ]),
 

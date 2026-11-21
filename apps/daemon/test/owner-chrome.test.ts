@@ -1,0 +1,270 @@
+import { describe, expect, test } from 'vitest';
+import {
+  type OwnerChromeAnswer,
+  type OwnerChromeCaller,
+  OwnerChromeUnavailable,
+  ownerChromeActionCommands,
+  ownerChromeRefs,
+  runOwnerChromeTool,
+} from '../src/computer/owner-chrome.js';
+import { ComputerRefusal } from '../src/computer/provider.js';
+
+const ORIGINS = ['http://127.0.0.1:4319'];
+
+function recording(answer: (commands: readonly string[]) => string | OwnerChromeAnswer | Error): {
+  call: OwnerChromeCaller;
+  seen: string[][];
+} {
+  const seen: string[][] = [];
+  return {
+    seen,
+    call: async (_session, commands) => {
+      seen.push([...commands]);
+      const result = answer(commands);
+      if (result instanceof Error) throw result;
+      return typeof result === 'string' ? { text: result, isError: false } : result;
+    },
+  };
+}
+
+function options(call: OwnerChromeCaller, cairnOrigins: readonly string[] = []) {
+  return {
+    signal: AbortSignal.timeout(30_000),
+    deadlineAt: Date.now() + 60_000,
+    session: 'coordinator',
+    cairnOrigins,
+    call,
+  };
+}
+
+describe('the owner’s Chrome through browser tools', () => {
+  test('navigate opens the address in the owner tab and reports what landed', async () => {
+    const { call, seen } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('goto')) return '✓ opened';
+      if (command.includes('document.title'))
+        return JSON.stringify({ title: 'Inbox', url: 'https://mail.example.com/inbox' });
+      return '[]';
+    });
+    const result = await runOwnerChromeTool(
+      'browser_navigate',
+      { url: 'https://mail.example.com/inbox' },
+      options(call),
+    );
+    expect(seen[0]).toEqual(['goto "https://mail.example.com/inbox"']);
+    expect(result.text).toBe('✓ Inbox\n  https://mail.example.com/inbox');
+    expect(result.loginForm).toBeUndefined();
+  });
+
+  test('a page that needs a login says so and keeps the refs usable', async () => {
+    const { call } = recording((commands) => {
+      if (commands[0]?.startsWith('goto') === true) return '✓ opened';
+      if (commands[0]?.startsWith('snapshot') === true)
+        return '- textbox "Password" [ref=e4]\n- button "Sign in" [ref=e5]';
+      if (commands[0]?.startsWith('eval') !== true) return '';
+      const command = commands[0];
+      return command.includes('document.title')
+        ? JSON.stringify({ title: 'Sign in', url: 'https://app.example.com/login' })
+        : command.includes('current-password')
+          ? '["password"]'
+          : '"Welcome back"';
+    });
+    const result = await runOwnerChromeTool('browser_snapshot', {}, options(call));
+    expect(result.loginForm).toEqual({ signals: ['password'] });
+    expect(result.text).toContain('[login form: password]');
+    expect(result.text).toContain('[ref=@e4]');
+    expect(result.text).toContain('[page text]\nWelcome back');
+  });
+
+  test('every eval script reaches the daemon as a single line it can parse', async () => {
+    const { call, seen } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('goto')) return '✓ opened';
+      if (command.startsWith('snapshot')) return '';
+      if (command.includes('document.title'))
+        return JSON.stringify({ title: 'Inbox', url: 'https://mail.example.com/inbox' });
+      return command.includes('current-password') ? '["password"]' : '"Welcome back"';
+    });
+    await runOwnerChromeTool(
+      'browser_navigate',
+      { url: 'https://mail.example.com/inbox' },
+      options(call),
+    );
+    await runOwnerChromeTool('browser_snapshot', {}, options(call));
+    const evals = seen.flat().filter((command) => command.startsWith('eval'));
+    expect(evals.length).toBeGreaterThan(0);
+    for (const command of evals) {
+      expect(command.includes('\n')).toBe(false);
+      expect(command.includes('\\n')).toBe(false);
+    }
+  });
+
+  test('a Cairn origin is refused before anything opens', async () => {
+    const { call, seen } = recording(() => '');
+    await expect(
+      runOwnerChromeTool(
+        'browser_navigate',
+        { url: 'http://127.0.0.1:4319/threads' },
+        options(call, ORIGINS),
+      ),
+    ).rejects.toBeInstanceOf(ComputerRefusal);
+    expect(seen).toEqual([]);
+  });
+
+  test('the extension asking for Allow keeps the code and opens nothing else', async () => {
+    const { call } = recording(() => ({
+      text: "Click Allow in the Browser MCP extension's popup. The code is 482 913",
+      isError: true,
+    }));
+    const error = await runOwnerChromeTool(
+      'browser_navigate',
+      { url: 'https://mail.example.com' },
+      options(call),
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ComputerRefusal);
+    expect((error as ComputerRefusal).message).toContain('The code is 482 913');
+    expect((error as ComputerRefusal).message).toContain('click Allow in its popup');
+  });
+
+  test('a missing extension is an unavailable browser the call can fall back from', async () => {
+    const { call } = recording(() => ({
+      text: 'No browser is connected. Install the Browser MCP extension',
+      isError: true,
+    }));
+    const error = await runOwnerChromeTool(
+      'browser_navigate',
+      { url: 'https://mail.example.com' },
+      options(call),
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(OwnerChromeUnavailable);
+    expect((error as OwnerChromeUnavailable).reason).toBe('no-extension');
+  });
+
+  test('a saved password never goes to the owner’s Chrome, whose commands are logged', () => {
+    expect(() =>
+      ownerChromeActionCommands({
+        kind: 'fill_secret',
+        ref: '@e4',
+        secret: 'bank',
+        origin: 'https://bank.example',
+      }),
+    ).toThrow(/request_takeover/);
+  });
+
+  test.each([
+    [{ kind: 'click', ref: '@e2' }, ['click e2']],
+    [{ kind: 'hover', ref: 'e3' }, ['hover e3']],
+    [{ kind: 'scrollintoview', ref: '@e4' }, ['scroll e4']],
+    [{ kind: 'check', ref: '@e5' }, ['check e5']],
+    [{ kind: 'fill', ref: '@e6', text: 'two words' }, ['fill e6 "two words"']],
+    [{ kind: 'type', ref: '@e7', text: 'a "quote"' }, ['click e7', 'type "a \\"quote\\""']],
+    [{ kind: 'press', text: 'Enter' }, ['press "Enter"']],
+    [{ kind: 'select', ref: '@e8', text: 'b' }, ['select e8 "b"']],
+  ])('act maps %o onto one command per step', (action, expected) => {
+    expect(ownerChromeActionCommands(action as Record<string, unknown>)).toEqual(expected);
+  });
+
+  test.each([
+    [{ kind: 'click', ref: 'e4\neval "alert(1)"' }],
+    [{ kind: 'click', ref: 'e4 extra' }],
+    [{ kind: 'click', ref: 'e4"eval' }],
+    [{ kind: 'fill', ref: '@e4\t"owned"', text: 'x' }],
+    [{ kind: 'select', ref: 'e4\ngoto "https://evil.example"', text: 'a' }],
+  ])('act refuses a ref that is not a single snapshot token %o', (action) => {
+    expect(() => ownerChromeActionCommands(action as Record<string, unknown>)).toThrow(
+      ComputerRefusal,
+    );
+  });
+
+  test('a browser_act call runs each step in turn', async () => {
+    const { call, seen } = recording((commands) =>
+      (commands[0] ?? '').startsWith('get attr') ? '(none)' : '✓ done',
+    );
+    const result = await runOwnerChromeTool(
+      'browser_act',
+      {
+        actions: [
+          { kind: 'click', ref: '@e1' },
+          { kind: 'fill', ref: '@e2', text: 'hi' },
+        ],
+      },
+      options(call),
+    );
+    expect(seen).toEqual([
+      ['click e1'],
+      ['get attr type e2'],
+      ['get attr autocomplete e2'],
+      ['fill e2 "hi"'],
+    ]);
+    expect(result.text).toBe('✓ done\n✓ done');
+  });
+
+  test('fill into a password field is refused before the text is sent', async () => {
+    const { call, seen } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('get attr type')) return 'password';
+      if (command.startsWith('get attr autocomplete')) return '(none)';
+      return '';
+    });
+    await expect(
+      runOwnerChromeTool(
+        'browser_act',
+        { actions: [{ kind: 'fill', ref: '@e4', text: 'hunter2' }] },
+        options(call),
+      ),
+    ).rejects.toThrow(/password or one-time code field/);
+    expect(seen.flat().some((line) => line.startsWith('fill '))).toBe(false);
+  });
+
+  test('fill into a plain field sends the text after the attribute check', async () => {
+    const { call, seen } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('get attr type')) return 'text';
+      if (command.startsWith('get attr autocomplete')) return '(none)';
+      return '✓ filled';
+    });
+    const result = await runOwnerChromeTool(
+      'browser_act',
+      { actions: [{ kind: 'fill', ref: '@e4', text: 'hi' }] },
+      options(call),
+    );
+    expect(result.text).toBe('✓ filled');
+    expect(seen.flat()).toContain('fill e4 "hi"');
+  });
+
+  test('an act that navigates onto Cairn stops the rest of the batch', async () => {
+    let onCairn = false;
+    const { call, seen } = recording((commands) => {
+      const command = commands[0] ?? '';
+      if (command.startsWith('click')) {
+        onCairn = true;
+        return '✓ clicked';
+      }
+      if (command.includes('document.title'))
+        return JSON.stringify({
+          title: onCairn ? 'Cairn' : 'Docs',
+          url: onCairn ? 'http://127.0.0.1:4319/threads' : 'https://docs.example.com',
+        });
+      return '';
+    });
+    await expect(
+      runOwnerChromeTool(
+        'browser_act',
+        {
+          actions: [
+            { kind: 'click', ref: '@e1' },
+            { kind: 'click', ref: '@e2' },
+          ],
+        },
+        options(call, ORIGINS),
+      ),
+    ).rejects.toThrow(/is Cairn itself/);
+    expect(seen.flat().filter((line) => line.startsWith('click'))).toEqual(['click e1']);
+  });
+
+  test('snapshot output carries refs in the shape the other browser tools use', () => {
+    expect(ownerChromeRefs('- button "Go" [ref=e12]\n- link "In" [ref=f1e3]')).toBe(
+      '- button "Go" [ref=@e12]\n- link "In" [ref=@f1e3]',
+    );
+  });
+});

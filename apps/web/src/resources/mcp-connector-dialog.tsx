@@ -1,5 +1,6 @@
 import {
   type CreateMcpConnectorBody,
+  isLocalCatalogEntry,
   type McpCatalogEntry,
   type McpConnectorRecord,
   mcpCatalogEntry,
@@ -50,7 +51,8 @@ export type McpOAuthRequest =
 type Translate = (text: string, vars?: Record<string, string | number>) => string;
 
 export function connectorProblem(t: Translate, record: McpConnectorRecord): string | null {
-  if (record.status === 'connected' || record.status === 'unchecked') return null;
+  if (record.status === 'connected' || record.status === 'unchecked' || record.status === 'local')
+    return null;
   const name = record.label;
   switch (record.statusReason) {
     case 'unauthorized':
@@ -162,12 +164,14 @@ function DialogFoot({
   danger,
   secondary,
   primaryRef,
+  hideCancel,
 }: {
   primary: FootAction;
   primaryRef?: Ref<HTMLButtonElement>;
   onCancel: () => void;
   danger?: FootAction;
   secondary?: FootAction;
+  hideCancel?: boolean;
 }) {
   const { t } = useI18n();
   return (
@@ -193,9 +197,11 @@ function DialogFoot({
         </Button>
       )}
       <span className="flex-1" />
-      <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onCancel}>
-        {t('取消')}
-      </Button>
+      {hideCancel !== true && (
+        <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onCancel}>
+          {t('取消')}
+        </Button>
+      )}
       <Button
         ref={primaryRef}
         className={cn(DIALOG_PRIMARY_BUTTON, PALE_DISABLED)}
@@ -260,6 +266,33 @@ function TokenField({
   );
 }
 
+function SetupSteps({ entry }: { entry: McpCatalogEntry }) {
+  const { t } = useI18n();
+  if (entry.setup === undefined) return null;
+  return (
+    <>
+      <Field>
+        <a
+          href={entry.setup.installUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="self-start text-ui text-foreground underline underline-offset-2"
+        >
+          {t(entry.setup.installLabel)}
+        </a>
+      </Field>
+      <Field>
+        <span className="text-ui font-medium text-foreground">{t('两步用起来')}</span>
+        <ol className="m-0 flex list-decimal flex-col gap-2 pl-5 text-meta text-content-secondary">
+          {entry.setup.steps.map((step) => (
+            <li key={step}>{t(step)}</li>
+          ))}
+        </ol>
+      </Field>
+    </>
+  );
+}
+
 function CatalogConnectDialog({
   entry,
   live,
@@ -275,6 +308,7 @@ function CatalogConnectDialog({
   const mutations = useApiMutations(teamId);
   const [token, setToken] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
+  const local = isLocalCatalogEntry(entry);
   const tokenRequired = !entry.auth.includes('none');
   const pending = mutations.createMcpConnector.isPending;
   const submit = () => {
@@ -295,6 +329,33 @@ function CatalogConnectDialog({
       onError: (error) => setProblem(submitError(t, error)),
     });
   };
+  if (local)
+    return (
+      <DialogShell
+        title={t('连接 {name}', { name: entry.name })}
+        subtitle={t(entry.description)}
+        info={t(
+          'Chrome 没开、扩展没连上或被暂停时，Agent 会退回 Cairn 自己的浏览器，并在结果里说明原因。',
+        )}
+        size="s"
+        onClose={onClose}
+        footer={
+          <DialogFoot
+            primary={{
+              label: pending ? t('正在启用…') : t('启用'),
+              onClick: submit,
+              disabled: pending,
+            }}
+            onCancel={onClose}
+          />
+        }
+      >
+        <FormStack className={DIALOG_FORM_CLS}>
+          <SetupSteps entry={entry} />
+          <DialogError message={problem} />
+        </FormStack>
+      </DialogShell>
+    );
   return (
     <DialogShell
       title={t('连接 {name}', { name: entry.name })}
@@ -512,6 +573,7 @@ function ManageConnectorDialog({
   const primaryRef = useRef<HTMLButtonElement>(null);
   const github = current.authKind === 'github-app';
   const oauth = current.authKind === 'oauth' || github;
+  const local = current.transport === 'stdio';
   const needsAuth = oauth && current.status === 'needs_auth';
   const pending =
     mutations.patchMcpConnector.isPending ||
@@ -570,19 +632,29 @@ function ManageConnectorDialog({
       footer={
         <DialogFoot
           primaryRef={primaryRef}
-          primary={needsAuth ? reconnect : recheck}
+          primary={local ? { label: t('关闭'), onClick: onClose } : needsAuth ? reconnect : recheck}
           onCancel={onClose}
+          hideCancel={local}
           danger={{ label: t('删除'), onClick: () => setConfirmDelete(true), disabled: pending }}
-          {...(oauth ? { secondary: needsAuth ? recheck : reconnect } : {})}
+          {...(local ? {} : oauth ? { secondary: needsAuth ? recheck : reconnect } : {})}
         />
       }
     >
       <FormStack className={DIALOG_FORM_CLS}>
         {!needsAuth && <DialogError message={connectorProblem(t, current)} />}
-        <Field>
-          <span className="text-ui font-medium text-foreground">{t('地址')}</span>
-          <p className={VALUE_BOX_CLS}>{current.url}</p>
-        </Field>
+        {local && entry !== undefined ? (
+          <>
+            <SetupSteps entry={entry} />
+            <p className="m-0 text-meta text-content-tertiary">
+              {t('这个连接在你的电脑上启动，不用填地址，也不用令牌。')}
+            </p>
+          </>
+        ) : (
+          <Field>
+            <span className="text-ui font-medium text-foreground">{t('地址')}</span>
+            <p className={VALUE_BOX_CLS}>{current.url}</p>
+          </Field>
+        )}
         {github && (
           <p data-testid="mcp-github-delete-note" className="m-0 text-meta text-content-tertiary">
             <span className="block">{t('删除只移除 Cairn 里的连接。')}</span>
@@ -622,6 +694,13 @@ function ManageConnectorDialog({
 
 export function ConnectorStatus({ record }: { record: McpConnectorRecord }) {
   const { t } = useI18n();
+  if (record.status === 'local')
+    return (
+      <span className="inline-flex items-center gap-1.5 text-meta text-content-secondary">
+        <span aria-hidden className="size-1.5 flex-none rounded-full bg-running" />
+        {t('在你的 Chrome 里')}
+      </span>
+    );
   if (record.status === 'connected')
     return (
       <span className="inline-flex items-center gap-1.5 text-meta text-content-secondary">

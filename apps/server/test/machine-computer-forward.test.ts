@@ -13,6 +13,7 @@ import {
   computerCall as computerCallTable,
   computer as computerTable,
   machine as machineTable,
+  mcpConnector as mcpConnectorTable,
   step as stepTable,
 } from '../src/db/schema.js';
 import {
@@ -1065,5 +1066,101 @@ describe('Coordinator tool-name errors', () => {
     expect(err.message).toContain('user_computer_shell');
     expect(err.message).toContain('user_computer_observe');
     expect(err.message).toContain('user_computer_act');
+  });
+});
+
+describe('the owner’s own Chrome behind browser tools', () => {
+  function ownerMachine(
+    s: TestServer,
+    capabilities: Record<string, unknown> = { computerKind: 'vm' },
+    kind: 'local' | 'remote' = 'local',
+  ) {
+    s.db
+      .insert(machineTable)
+      .values({
+        id: 'owner-mac',
+        teamId: s.team.id,
+        name: 'owner-mac',
+        online: true,
+        lastSeenAt: 1,
+        kind,
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          computer: true,
+          browser: true,
+          ...capabilities,
+        },
+      })
+      .run();
+  }
+
+  function enableBrowserMcp(s: TestServer) {
+    s.db
+      .insert(mcpConnectorTable)
+      .values({
+        id: 'conn-browsermcp',
+        teamId: s.team.id,
+        slug: 'browsermcp',
+        label: 'Browser MCP',
+        catalogId: 'browsermcp',
+        transport: 'stdio',
+        url: null,
+        headerNames: [],
+        valuesCipher: null,
+        authKind: 'none',
+        status: 'local',
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+  }
+
+  async function stampFor(
+    setup: (s: TestServer) => void,
+    params: Record<string, unknown> = { url: 'https://mail.example.com' },
+    kind: 'local' | 'remote' = 'local',
+    capabilities: Record<string, unknown> = { computerKind: 'vm' },
+  ): Promise<ComputerCall> {
+    const { s, deps } = boot();
+    ownerMachine(s, capabilities, kind);
+    setup(s);
+    const calls = connect(s, 'owner-mac');
+    const pending = forwardComputerCall(deps, 'sidecar', 'step-a', {
+      computer: true,
+      name: 'browser_navigate',
+      toolCallId: 'owner-chrome',
+      params,
+    });
+    await vi.waitFor(() => expect(calls).toHaveLength(1));
+    receiveComputerFrames(s.db, s.hub, 'owner-mac', calls[0]!.callId, [done(1, 'ok')]);
+    await pending;
+    return calls[0]!;
+  }
+
+  test('a browser call opens the owner’s Chrome when the connector is on', async () => {
+    const call = await stampFor(enableBrowserMcp);
+    expect(call.ownerChrome).toBe('browsermcp');
+  });
+
+  test('the stealth browser and a remote machine never take the owner’s Chrome', async () => {
+    expect(
+      (
+        await stampFor(enableBrowserMcp, { url: 'https://a.test', stealth: true }, 'local', {
+          computerKind: 'host',
+        })
+      ).ownerChrome,
+    ).toBeUndefined();
+    expect(
+      (
+        await stampFor(enableBrowserMcp, { url: 'https://a.test' }, 'remote', {
+          computerKind: 'host',
+        })
+      ).ownerChrome,
+    ).toBeUndefined();
+  });
+
+  test('turning the connector off returns browser calls to Cairn’s own browser', async () => {
+    expect((await stampFor(() => {})).ownerChrome).toBeUndefined();
   });
 });

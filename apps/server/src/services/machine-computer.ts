@@ -87,6 +87,7 @@ import type { TeamStreamHub } from './events.js';
 import { isOwner } from './instance-owner.js';
 import { type MachineDeps, ownedStep } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { localBrowserConnector } from './mcp-servers.js';
 import { ownComputerTarget } from './own-computer.js';
 import {
   acquirePhoneLease,
@@ -1634,6 +1635,14 @@ export async function forwardComputerCall(
     db.select().from(computer).where(eq(computer.id, target.computerId)).get()?.state !== 'running';
   const deadlineAt = now + computerDeadlineMs(tool, body.params, computerStarting);
   const browserTool = isComputerBrowserTool(tool);
+  const ownerChrome =
+    browserTool &&
+    body.params.stealth !== true &&
+    secretActions.length === 0 &&
+    host?.kind === 'local' &&
+    localBrowserConnector(db, thread.teamId) !== null
+      ? ('browsermcp' as const)
+      : null;
   if (target.computerId !== null) {
     if (browserTool)
       acquireBrowserLease(db, target.computerId, browserScopeFor(thread), stepId, safe, deadlineAt);
@@ -1712,6 +1721,7 @@ export async function forwardComputerCall(
     ...(browserTool
       ? { tabScope: browserTabScope(stepRow), browserScope: browserScopeFor(thread) }
       : {}),
+    ...(ownerChrome === null ? {} : { ownerChrome }),
     ...(own === null && phoneTarget === null
       ? { computerGrant: browserTool ? ('browser' as const) : ('desktop' as const) }
       : {}),
