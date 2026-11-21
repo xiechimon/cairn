@@ -78,7 +78,8 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
    - `dependsOn?`: writes `blockedBy`;
    - `priority?`: `first` | `normal`, which sets `orderIndex`;
    - `difficulty?`;
-   - `output?`.
+   - `output?`;
+   - `start?`: `false` creates the task in phase `todo` without starting a build, so `open_thread` or the owner starts it later; omitted, the thread starts in this call (#5389). A parked call skips the machine check, because nothing dispatches.
 
    Each quote must be an exact substring of one cited segment (NFC, trimmed at the ends). It becomes a new `quote` segment that keeps that segment's `author` and `sourceRef`, so re-splitting a corrected issue child keeps the owner's correction owner-authored.
 7. `update_todo` (Coordinator surface) takes `todoId`, `tagIds`, `projectId` and `addMessageIds`. `addMessageIds` is allowed only on a task that has `request` and has not started. The cited messages and the task state are validated first, then the routing changes run, and only then the new owner segments are appended and `spec` is re-rendered, in one transaction.

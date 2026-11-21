@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { build as buildTable, step as stepTable, todo as todoTable } from '../src/db/schema.js';
 import { AGENT_ID, H, ownerTodo, registerChiefHarness, relay } from './chief-harness.js';
-import { postProject, req } from './helpers.js';
+import { insertMachine, postProject, req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -42,6 +42,38 @@ describe('open_thread dispatch', () => {
     expect(build).toMatchObject({ withPlan: false, triggerSource: 'chief' });
     const steps = H.s.db.select().from(stepTable).where(eq(stepTable.buildId, out.buildId)).all();
     expect(steps.map((r) => r.kind)).toEqual(['session']);
+  });
+});
+
+describe('create_todo parking', () => {
+  test('start:false puts the task on the board unstarted, and open_thread starts it later', async () => {
+    const created = (await relay('create_todo', {
+      ...ownerTodo('先把季度报告放到待办，等我决定再做'),
+      start: false,
+    })) as { id: string; phase: string; buildId: string | null };
+    expect(created.buildId).toBeNull();
+    const row = H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!;
+    expect(row.phase).toBe('todo');
+    expect(row.latestBuildId).toBeNull();
+    expect(H.s.db.select().from(buildTable).where(eq(buildTable.todoId, created.id)).all()).toEqual(
+      [],
+    );
+    const opened = (await relay('open_thread', { todoId: created.id })) as { buildId: string };
+    const started = H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!;
+    expect(started.phase).toBe('queued');
+    expect(started.latestBuildId).toBe(opened.buildId);
+  });
+
+  test('a parked task needs no machine to be named, while a started one still does', async () => {
+    insertMachine(H.s, { name: 'second' });
+    await expect(relay('create_todo', ownerTodo('整理季度报告'))).rejects.toThrow(/Name a machine/);
+    const parked = (await relay('create_todo', {
+      ...ownerTodo('先把季度报告放到待办'),
+      start: false,
+    })) as { id: string };
+    expect(H.s.db.select().from(todoTable).where(eq(todoTable.id, parked.id)).get()?.phase).toBe(
+      'todo',
+    );
   });
 });
 

@@ -210,6 +210,7 @@ export const coordinatorCreateTodoParamsSchema = z
     difficulty: z.enum(TASK_REQUEST_DIFFICULTIES).optional(),
     model: z.string().trim().min(1).max(200).optional(),
     output: todoOutputSchema.optional(),
+    start: z.boolean().optional(),
     platform: runnerOsSchema.optional(),
     briefing: z.string().trim().min(1).max(TASK_BRIEFING_MAX_CHARS).optional(),
     codeChangeQuote: z.string().trim().min(1).optional(),
@@ -528,7 +529,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'create_todo',
-    description: `Create a todo in a project and start its thread right away (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages or from a source todo. Always pass title (at most 50 characters); there is no summary, description or body parameter. An info card (output 'info', 'report', 'dataset' or 'link') runs alone in its own computer and sees only the owner's cited words plus its briefing, so put every link, name, id and finding it needs into the briefing. A message already bound to a task returns 409: use that task or split it explicitly with quotes (the owner's exact sentences that todo covers), once per independently accepted outcome. When you already did part of the request yourself, pass quotes covering only the rest. Open a separate research todo only when the owner explicitly wants the report before any code changes, or when research and change are accepted separately; otherwise research is the thread's own first step. A vague request still gets a todo: its thread researches and proposes; ask_user only when the need itself is ambiguous. Order work with dependsOn or blockedBy; the thread wakes you when it needs someone, finishes or fails, so never wait or poll for it.\n\nBefore creating, search todos with query and check threads: when the same work is already running, pass the new words to it with message_thread instead. When the owner's message starts with ${PICKED_PROJECT_OPEN}…】 (the project they picked in the composer), every todo of this turn goes there without asking; otherwise use the project the owner names or the one the turn notes point to, and only when the evidence cannot decide, ask_user listing the remaining candidates plus a "none of these" option. One message about several projects becomes one todo per project. Research belonging to no project omits projectId with output "info"; its report comes back to this conversation.\n\nThe result carries link, a Markdown link to the task: write tasks that way in replies, never as #n. Do not announce the new task; say where it went and what happens next.`,
+    description: `Create a todo in a project, on the board right away and started unless you park it (no open_thread needed). You write no task text: the server copies the owner's own words into the task, verbatim, from the cited messages or from a source todo. Always pass title (at most 50 characters); there is no summary, description or body parameter. Pass start: false when the owner wants the task only recorded ("放到待办", "先记下来", "later"): it sits in 待开始 as not started until open_thread or the owner starts it. An info card (output 'info', 'report', 'dataset' or 'link') runs alone in its own computer and sees only the owner's cited words plus its briefing, so put every link, name, id and finding it needs into the briefing. A message already bound to a task returns 409: use that task or split it explicitly with quotes (the owner's exact sentences that todo covers), once per independently accepted outcome. When you already did part of the request yourself, pass quotes covering only the rest. Open a separate research todo only when the owner explicitly wants the report before any code changes, or when research and change are accepted separately; otherwise research is the thread's own first step. A vague request still gets a todo: its thread researches and proposes; ask_user only when the need itself is ambiguous. Order work with dependsOn or blockedBy; the thread wakes you when it needs someone, finishes or fails, so never wait or poll for it.\n\nBefore creating, search todos with query and check threads: when the same work is already running, pass the new words to it with message_thread instead. When the owner's message starts with ${PICKED_PROJECT_OPEN}…】 (the project they picked in the composer), every todo of this turn goes there without asking; otherwise use the project the owner names or the one the turn notes point to, and only when the evidence cannot decide, ask_user listing the remaining candidates plus a "none of these" option. One message about several projects becomes one todo per project. Research belonging to no project omits projectId with output "info"; its report comes back to this conversation.\n\nThe result carries link, a Markdown link to the task: write tasks that way in replies, never as #n. Do not announce the new task; say where it went and what happens next.`,
     parameters: obj(
       {
         title: str(
@@ -558,6 +559,11 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
         output: str(
           'Optional deliverable kind: "code" (default, finishes after delivering changes on its branch or PR, without merging) or one of "info", "report", "dataset", "link" (info card: read-only workspace, no commits or pushes, deliverable is a report stored as an attachment; pick the kind that names the artifact).',
         ),
+        start: {
+          type: 'boolean',
+          description:
+            'Optional. Pass false when the owner wants the task recorded without running it now: it is created in 待开始 as not started and starts later with open_thread or when the owner starts it. Omit it (default true) to start the thread right away.',
+        },
         blockedBy: idArr(
           'Optional todo ids that must finish first. The thread starts now but waits until every blocker is done (an info blocker counts once its report is in review); a failed or closed blocker wakes you to decide.',
         ),
@@ -866,7 +872,7 @@ export const CHIEF_ROUTER_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'open_thread',
     description:
-      'Open a thread on a todo the user created that has not started (create_todo and unarchive_todos already start theirs): one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
+      'Open a thread on a todo that has not started (one the user created, or one create_todo parked with start: false; create_todo without it and unarchive_todos already start theirs): one session plans, writes tests, implements and checks its own work end to end. Pass the todo id (from todos). You pick no agent and no plan mode; the thread reports back to this conversation when it needs the user, finishes or fails.',
     parameters: obj({ todoId: str('Id of the todo to open a thread on.') }, ['todoId']),
   },
   {

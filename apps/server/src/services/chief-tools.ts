@@ -714,8 +714,9 @@ export async function executeChiefTool(
 
     case 'create_todo': {
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
-      assertNamedMachineForNewTask(svc, ctx.teamId);
       const untrustedTurn = turnForcesOutboundApproval(db, turnPrompt);
+      const parked = untrustedTurn || body.start === false;
+      if (!parked) assertNamedMachineForNewTask(svc, ctx.teamId);
       const record = db.transaction(() => {
         const projectRow =
           body.projectId === undefined
@@ -747,13 +748,16 @@ export async function executeChiefTool(
           });
         return created;
       });
-      if (untrustedTurn)
+      if (parked)
         return json({
           ...record,
           ...getTodo(svc, record.id),
+          link: taskLink(record.id, record.title),
           sourceBuildId: ctx.chiefId,
           buildId: null,
-          note: 'Created but not started: this turn carries outside content, so only the owner starts the task. Tell the owner it is waiting for them.',
+          note: untrustedTurn
+            ? 'Created but not started: this turn carries outside content, so only the owner starts the task. Tell the owner it is waiting for them.'
+            : 'Created and parked, not started: it sits in 待开始 until open_thread or the owner starts it. Say so instead of starting it now.',
         });
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',

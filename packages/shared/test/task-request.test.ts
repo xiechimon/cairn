@@ -67,6 +67,7 @@ describe('Coordinator tools that write todo text take no task text', () => {
         'priority',
         'difficulty',
         'output',
+        'start',
         'platform',
         'briefing',
         'codeChangeQuote',
@@ -135,6 +136,12 @@ describe('Coordinator tools that write todo text take no task text', () => {
       coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', title: '新建 HELLO.md' })
         .success,
     ).toBe(true);
+    expect(
+      coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', start: false }).success,
+    ).toBe(true);
+    expect(
+      coordinatorCreateTodoParamsSchema.safeParse({ projectId: 'p', start: 'no' }).success,
+    ).toBe(false);
     expect(coordinatorUpdateTodoParamsSchema.safeParse({ todoId: 't', spec: 'x' }).success).toBe(
       false,
     );
