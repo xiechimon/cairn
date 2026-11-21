@@ -79,7 +79,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const remoteSha = (ref) => git(['ls-remote', 'origin', ref]).split(/\s+/)[0] || null;
   const wait = process.argv.includes('--wait');
-  const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? 15);
+  const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? 60);
   const waitMinutes = Number(process.env.PUSH_QUEUE_WAIT_MINUTES ?? 120);
   const deadline = Date.now() + waitMinutes * 60_000;
 
