@@ -107,7 +107,8 @@ test('Claude child environment keeps its telemetry scrub and unrelated variables
     TRACEPARENT: 'existing-traceparent',
     UNSET: undefined,
   };
-  expect(claudeCliEnv(source)).toEqual({
+  const result = claudeCliEnv(source);
+  expect(result).toMatchObject({
     PATH: '/usr/bin',
     HOME: '/synthetic/home',
     FOO: 'bar',
@@ -118,6 +119,18 @@ test('Claude child environment keeps its telemetry scrub and unrelated variables
     ENABLE_BETA_TRACING_DETAILED: '0',
     BETA_TRACING_ENDPOINT: '',
   });
+  for (const key of [
+    'CAIRN_OTEL_ENDPOINT',
+    'CAIRN_OTEL_HEADERS',
+    'CAIRN_OTEL_ENVIRONMENT',
+    'OTEL_EXPORTER_OTLP_ENDPOINT',
+    'ANT_OTEL_ENDPOINT',
+    'BETA_TRACING_ENDPOINT',
+  ]) {
+    if (key !== 'BETA_TRACING_ENDPOINT') expect(result[key]).toBeUndefined();
+  }
+  expect(result.UNSET).toBeUndefined();
+  expect(result.BETA_TRACING_ENDPOINT).toBe('');
   expect(source.CAIRN_OTEL_ENDPOINT).toBe(env.CAIRN_OTEL_ENDPOINT);
   expect(source.OTEL_SDK_DISABLED).toBe('false');
 });

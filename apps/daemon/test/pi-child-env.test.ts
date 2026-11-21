@@ -37,6 +37,9 @@ test.each([undefined, { ...exporterEnv, FOO: 'step-value' }])(
     for (const [key, value] of Object.entries(exporterEnv)) vi.stubEnv(key, value);
     vi.stubEnv('HOME', directory);
     vi.stubEnv('FOO', 'daemon-value');
+    vi.stubEnv('GH_TOKEN', 'daemon-gh-token');
+    vi.stubEnv('GITHUB_TOKEN', 'daemon-github-token');
+    vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-anthropic-key');
     const path = process.env.PATH;
     const before = { ...process.env };
     const backend = createPiBackend({
@@ -76,12 +79,15 @@ test.each([undefined, { ...exporterEnv, FOO: 'step-value' }])(
       for (const key of Object.keys(exporterEnv)) {
         if (key !== 'OTEL_SDK_DISABLED') expect(child).not.toHaveProperty(key);
       }
+      for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'ANTHROPIC_API_KEY']) {
+        expect(child).not.toHaveProperty(key);
+      }
       expect(child.OTEL_SDK_DISABLED).toBe('true');
       expect(child).toMatchObject({
         PATH: `${join(directory, 'agent', 'bin')}${delimiter}${path}`,
         HOME: directory,
-        FOO: env?.FOO ?? 'daemon-value',
       });
+      expect(child.FOO).toBe(env?.FOO);
       for (const key of Object.keys(exporterEnv)) expect(process.env[key]).toBe(before[key]);
       expect(daemonOtelFromEnv(process.env)?.contextFor('build', 'step').environment).toBe(
         'production',
@@ -113,7 +119,7 @@ test('the embedded pi keeps its agent dir and pins out of task commands', async 
     expect(child).not.toHaveProperty('PI_CODING_AGENT_DIR');
     expect(child).not.toHaveProperty('PI_OFFLINE');
     expect(child.PI_SKIP_VERSION_CHECK).toBe('1');
-    expect(child.PI_TELEMETRY).toBe('operator-choice');
+    expect(child).not.toHaveProperty('PI_TELEMETRY');
   } finally {
     await handle.stop();
   }

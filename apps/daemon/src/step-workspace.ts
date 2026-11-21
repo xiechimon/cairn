@@ -22,6 +22,7 @@ export interface StepWorkspaceInput {
   credentials: BoundGitCredentials | null;
   refresh: GitCredentialFallbackOpts['refresh'];
   machineName: string;
+  env?: NodeJS.ProcessEnv;
 }
 
 export type StepWorkspaceResult = { ws: PreparedWorkspace | null } | { error: string };
@@ -41,6 +42,7 @@ export async function prepareStepWorkspace(
         workspacesRoot: input.workspacesRoot,
         credentials: input.credentials,
         machineCredentialFallback: repo.kind === 'github',
+        env: input.env,
       });
     const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
     await withGitCredentialFallback(
@@ -115,6 +117,7 @@ export interface StepWorkspaceSetupInput {
   attachmentVerify: boolean;
   evidenceDirectory: string | undefined;
   expectedHeadSha: string | undefined;
+  env?: NodeJS.ProcessEnv;
   cleanups: (() => void | Promise<void>)[];
 }
 
@@ -142,6 +145,7 @@ export async function setUpStepWorkspace(
       credentials: input.credentials,
       refresh: input.refresh,
       machineName: input.machineName,
+      env: input.env,
     });
     if ('error' in prepared) return prepared;
     ws = prepared.ws;

@@ -1,0 +1,79 @@
+const CHILD_ENV_BASE = new Set(
+  [
+    'PATH',
+    'HOME',
+    'USER',
+    'LOGNAME',
+    'SHELL',
+    'LANG',
+    'LANGUAGE',
+    'TERM',
+    'COLORTERM',
+    'TZ',
+    'TMPDIR',
+    'TMP',
+    'TEMP',
+    'DISPLAY',
+    'WAYLAND_DISPLAY',
+    'XAUTHORITY',
+    'XDG_RUNTIME_DIR',
+    'XDG_CONFIG_HOME',
+    'XDG_DATA_HOME',
+    'XDG_CACHE_HOME',
+    'XDG_STATE_HOME',
+    'DBUS_SESSION_BUS_ADDRESS',
+    'SSH_AUTH_SOCK',
+    'SSH_AGENT_PID',
+    'HTTP_PROXY',
+    'HTTPS_PROXY',
+    'ALL_PROXY',
+    'NO_PROXY',
+    'SSL_CERT_FILE',
+    'SSL_CERT_DIR',
+    'NODE_EXTRA_CA_CERTS',
+    'REQUESTS_CA_BUNDLE',
+    'CURL_CA_BUNDLE',
+    'GIT_SSL_CAINFO',
+    'SYSTEMROOT',
+    'WINDIR',
+    'SYSTEMDRIVE',
+    'COMSPEC',
+    'PATHEXT',
+    'PSMODULEPATH',
+    'USERPROFILE',
+    'HOMEDRIVE',
+    'HOMEPATH',
+    'USERNAME',
+    'APPDATA',
+    'LOCALAPPDATA',
+    'PROGRAMDATA',
+    'PROGRAMFILES',
+    'PROGRAMFILES(X86)',
+    'PROGRAMW6432',
+    'COMMONPROGRAMFILES',
+    'COMMONPROGRAMFILES(X86)',
+    'PROCESSOR_ARCHITECTURE',
+    'NUMBER_OF_PROCESSORS',
+    'OS',
+  ].map((name) => name.toUpperCase()),
+);
+
+function inherited(name: string): boolean {
+  const key = name.toUpperCase();
+  return CHILD_ENV_BASE.has(key) || key.startsWith('LC_');
+}
+
+export function childEnv(
+  extra: NodeJS.ProcessEnv = {},
+  parent: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [name, value] of Object.entries(parent)) {
+    if (value !== undefined && inherited(name)) env[name] = value;
+  }
+  for (const [name, value] of Object.entries(extra)) {
+    if (value === undefined) delete env[name];
+    else env[name] = value;
+  }
+  return env;
+}

@@ -55,8 +55,8 @@ import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
-import { claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
-import { withoutPinnedEnv } from './pinned-env.js';
+import { CLAUDE_TELEMETRY_PINS, claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
+
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
@@ -1423,7 +1423,6 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const locked = !parts.inOrb && parts.lockedDown;
   const stepToken = parts.env?.CLAUDE_CODE_OAUTH_TOKEN;
   const inheritedEnv = claudeCliEnv({
-    ...withoutPinnedEnv(process.env),
     ...parts.env,
     ...(stepToken !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
   });
@@ -1494,7 +1493,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       : {}),
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
     settings: {
-      env: claudeCliEnv({}),
+      env: { ...CLAUDE_TELEMETRY_PINS },
       ...(locked ? { disableAllHooks: true, disableSkillShellExecution: true } : {}),
       ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
         ? { permissions: { deny: [...parts.skillDenyRules] } }

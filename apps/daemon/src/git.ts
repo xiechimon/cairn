@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
-import { withoutPinnedEnv } from './backend/pinned-env.js';
+import { childEnv } from './child-env.js';
 import { loopbackNoProxy } from './proxy.js';
 
 export interface GitRunResult {
@@ -33,7 +33,7 @@ export function runGit(
   opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string } = {},
 ): Promise<GitRunResult> {
   return new Promise((resolve, reject) => {
-    const env = { ...withoutPinnedEnv(process.env), ...opts.env };
+    const env = childEnv(opts.env);
     const noProxy = LOOPBACK_URL_HOSTS.reduce<string | undefined>(
       (merged, host) => loopbackNoProxy({ NO_PROXY: merged }, `http://${host}`),
       env.NO_PROXY ?? env.no_proxy,
@@ -137,7 +137,7 @@ const CREDENTIAL_HELPER =
 
 export function gitCredentialEnv(
   cred: BoundGitCredentials,
-  parent: NodeJS.ProcessEnv = process.env,
+  parent: NodeJS.ProcessEnv = {},
 ): NodeJS.ProcessEnv {
   const n = inheritedGitConfigCount(parent);
   if (/[\r\n\0]/.test(cred.username + cred.password)) {
@@ -311,7 +311,7 @@ export async function landGitSquash(input: {
   return new Promise((resolve, reject) => {
     const child = spawn('git', ['update-ref', '--no-deref', '--stdin'], {
       cwd: dir,
-      env: withoutPinnedEnv(process.env),
+      env: childEnv(),
     });
     let output = '';
     let preparing = false;
@@ -898,7 +898,7 @@ export const gitPrim = {
       const proofId = randomUUID();
       const proofRef = `refs/cairn/push-check/${proofId}`;
       const proofRemote = `cairn-proof-${proofId}`;
-      const configIndex = inheritedGitConfigCount({ ...process.env, ...env });
+      const configIndex = inheritedGitConfigCount(env);
       let remote = '';
       try {
         const fetched = await runGit(

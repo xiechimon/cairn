@@ -86,6 +86,7 @@ export interface WorktreePrepareInput {
   baseBranch?: string | null;
   machineCredentialFallback?: boolean;
   readonly?: boolean;
+  env?: NodeJS.ProcessEnv;
 }
 
 export interface PreparedWorkspace {
@@ -123,6 +124,7 @@ export interface WorktreeOps {
     cwd: string,
     defaultBranch: string,
     credentials: BoundGitCredentials | null,
+    env?: NodeJS.ProcessEnv,
   ): Promise<{ output: string }>;
   headCommit(cwd: string): Promise<string | null>;
   countAhead(cwd: string, defaultBranch: string): Promise<number>;

@@ -167,9 +167,9 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
   test("#1484: comparison uses origin's raw configured value, insteadOf rewrites do not trigger repointing", async () => {
     const alias = 'cairn-alias:repo';
     stubOutInheritedGitConfig();
-    vi.stubEnv('GIT_CONFIG_COUNT', '1');
-    vi.stubEnv('GIT_CONFIG_KEY_0', `url.${originDir}.insteadOf`);
-    vi.stubEnv('GIT_CONFIG_VALUE_0', alias);
+    const home = testTempDir('cairn-ws-home-');
+    writeFileSync(join(home, '.gitconfig'), `[url "${originDir}"]\n\tinsteadOf = ${alias}\n`);
+    vi.stubEnv('HOME', home);
     try {
       await ws.prepare({ ...prepareInput(CONV_A), cloneUrl: alias });
       logger.lines.length = 0;

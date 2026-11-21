@@ -189,6 +189,9 @@ test('a team subscription token blanks inherited metered Claude auth so the CLI 
     expect(team.env?.[key]).toBe('');
   }
   const local = buildClaudeSdkOptions({ ...base, env: { FOO: '1' } });
-  expect(local.env?.ANTHROPIC_API_KEY).toBe('sk-ant-api03-inherited');
-  expect(local.env?.CLAUDE_CODE_USE_BEDROCK).toBe('1');
+  expect(local.env?.ANTHROPIC_API_KEY).toBeUndefined();
+  expect(local.env?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+  expect(local.env?.CLAUDE_CODE_USE_BEDROCK).toBeUndefined();
+  expect(local.env?.FOO).toBe('1');
+  expect(local.env?.PATH).toBe(process.env.PATH);
 });

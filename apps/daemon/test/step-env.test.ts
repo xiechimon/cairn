@@ -77,6 +77,21 @@ describe('assembleStepEnv', () => {
     expect(env.GIT_CONFIG_COUNT).toBe('1');
     expect(env.GIT_CONFIG_KEY_0).toBe('url.cairn-readonly-workspace-denied://.pushInsteadOf');
     expect(env.GIT_CONFIG_VALUE_0).toBe('');
+    expect(env.GIT_CONFIG_GLOBAL).toBe(process.platform === 'win32' ? 'NUL' : '/dev/null');
+    expect(env.GIT_CONFIG_SYSTEM).toBe(process.platform === 'win32' ? 'NUL' : '/dev/null');
+    expect(env.GIT_TERMINAL_PROMPT).toBe('0');
+    expect(env.GIT_ASKPASS).toBe('false');
+    expect(env.SSH_ASKPASS).toBe('false');
+    expect(env.GIT_SSH_COMMAND).toBe('false');
+    expect(env.SSH_AUTH_SOCK).toBe('');
+    expect(env.SSH_AGENT_PID).toBe('');
+  });
+
+  test('a read-only workspace cannot recover push credentials from injected git config', () => {
+    const { env } = assembleStepEnv(input({ git, readonlyGit: true }));
+    expect(env.GH_TOKEN).toBeUndefined();
+    expect(env.GITHUB_TOKEN).toBeUndefined();
+    expect(env.CAIRN_GIT_CRED_PASSWORD).toBeUndefined();
   });
 
   test('an inherited subscription token is removed', () => {

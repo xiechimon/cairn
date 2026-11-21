@@ -15,6 +15,7 @@ import {
   StreamableHttpTransport,
   type StreamableHttpTransportOptions,
 } from '@earendil-works/pi-mcp';
+import { childEnv } from '../child-env.js';
 
 export type McpLogRedactor = <T>(value: T) => T;
 
@@ -111,9 +112,8 @@ function stdioOptions(
     command: expandHome(config.command),
     ...(config.args === undefined ? {} : { args: config.args.map(expandHome) }),
     cwd: resolve(cwd, expandHome(config.cwd ?? '.')),
-    ...(config.env === undefined
-      ? {}
-      : { env: resolvedValues(config.env, `MCP server "${name}" env`) }),
+    env: childEnv(resolvedValues(config.env, `MCP server "${name}" env`) ?? {}),
+    inheritEnv: false,
     stderr: 'pipe',
   };
 }

@@ -14,6 +14,7 @@ import {
 } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
+import { childEnv } from '../child-env.js';
 import { COMPUTER_MARKER_ENV, ProcessTree } from '../process-tree.js';
 import { AGENT_BROWSER_BINARY } from './browser.js';
 import { awaitWithSignal } from './cancellation.js';
@@ -30,38 +31,13 @@ export const HOST_MAX_FILE_BYTES = 8 * 1024 * 1024;
 export const HOST_KILL_GRACE_MS = 1_000;
 const STREAM_DRAIN_MS = 100;
 
-const INHERITED_ENV = new Set(
+const AGENT_BROWSER_ENV = new Set(
   [
-    'PATH',
-    'HOME',
-    'USER',
-    'LOGNAME',
-    'SHELL',
-    'LANG',
-    'LANGUAGE',
-    'TERM',
-    'TZ',
-    'TMPDIR',
-    'DISPLAY',
-    'WAYLAND_DISPLAY',
-    'XDG_RUNTIME_DIR',
-    'DBUS_SESSION_BUS_ADDRESS',
     'AGENT_BROWSER_EXECUTABLE_PATH',
     'AGENT_BROWSER_NO_VERSION_CHECK',
     'AGENT_BROWSER_PROFILE',
     'AGENT_BROWSER_ARGS',
     'AGENT_BROWSER_SOCKET_DIR',
-    'HTTP_PROXY',
-    'HTTPS_PROXY',
-    'NO_PROXY',
-    'ALL_PROXY',
-    'SSH_AUTH_SOCK',
-    'SSL_CERT_FILE',
-    'SSL_CERT_DIR',
-    'NODE_EXTRA_CA_CERTS',
-    'REQUESTS_CA_BUNDLE',
-    'CURL_CA_BUNDLE',
-    'GIT_SSL_CAINFO',
   ].map((name) => name.toUpperCase()),
 );
 
@@ -78,12 +54,11 @@ export function hostCommandEnvironment(
   inherited: NodeJS.ProcessEnv,
   requested: Readonly<Record<string, string>> = {},
 ): Record<string, string> {
-  const env: Record<string, string> = {};
+  const extra: Record<string, string> = {};
   for (const [name, value] of Object.entries(inherited)) {
-    const key = name.toUpperCase();
-    if (value !== undefined && (INHERITED_ENV.has(key) || key.startsWith('LC_'))) env[name] = value;
+    if (value !== undefined && AGENT_BROWSER_ENV.has(name.toUpperCase())) extra[name] = value;
   }
-  return { ...env, ...requested };
+  return childEnv({ ...extra, ...requested }, inherited);
 }
 
 function isInside(root: string, target: string): boolean {

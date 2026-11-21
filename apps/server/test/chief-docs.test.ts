@@ -69,10 +69,10 @@ async function fetchFixture(
 ) {
   const url = `https://github.com/${repository}.git`;
   await gitPrim.setRemoteUrl(cache, url);
-  const configIndex = Number(process.env.GIT_CONFIG_COUNT ?? '0');
-  vi.stubEnv('GIT_CONFIG_COUNT', String(configIndex + 1));
-  vi.stubEnv(`GIT_CONFIG_KEY_${configIndex}`, `url.${source}.insteadOf`);
-  vi.stubEnv(`GIT_CONFIG_VALUE_${configIndex}`, url);
+  const home = join(H.s.reposDir, `git-home-${repository.replaceAll('/', '-')}`);
+  mkdirSync(home, { recursive: true });
+  writeFileSync(join(home, '.gitconfig'), `[url "${source}"]\n\tinsteadOf = ${url}\n`);
+  vi.stubEnv('HOME', home);
   try {
     if (backfillRoot === undefined) await gitPrim.fetch(cache, null);
     else await backfillRepositoryCaches(backfillRoot, () => {});

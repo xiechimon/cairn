@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
 import { z } from 'zod';
+import { childEnv } from '../child-env.js';
 import {
   AGENT_BROWSER_BINARY,
   browserProfileKeyOfSession,
@@ -189,7 +190,7 @@ function runCommand(argv: readonly string[], env?: NodeJS.ProcessEnv): Promise<C
     execFile(
       argv[0] as string,
       argv.slice(1),
-      { timeout: 15_000, env: env ? { ...process.env, ...env } : process.env },
+      { timeout: 15_000, env: childEnv(env) },
       (error, stdout) => {
         const code = error ? (typeof error.code === 'number' ? error.code : 1) : 0;
         resolve({ code, stdout: String(stdout) });

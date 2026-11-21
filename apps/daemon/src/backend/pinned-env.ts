@@ -6,11 +6,3 @@ export function pinProcessEnv(pins: Record<string, string>): void {
     pinnedByDaemon.set(key, value);
   }
 }
-
-export function withoutPinnedEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const childEnv = { ...env };
-  for (const [key, value] of pinnedByDaemon) {
-    if (childEnv[key] === value) delete childEnv[key];
-  }
-  return childEnv;
-}

@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { stripTurnContext } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -47,11 +47,18 @@ beforeAll(async () => {
     join(userHome, '.claude', 'settings.json'),
     `${JSON.stringify({ model: 'sonnet', env: { ANTHROPIC_DEFAULT_SONNET_MODEL: 'claude-sonnet-5-5' } })}\n`,
   );
+  const fake = join(userHome, 'fake-claude-env.mjs');
+  writeFileSync(
+    fake,
+    '#!/usr/bin/env node\n' +
+      `process.env.FAKE_CLAUDE_PROMPT_LOG = ${JSON.stringify(claudeLog)};\n` +
+      `await import(${JSON.stringify(`file://${FAKE}`)});\n`,
+  );
+  chmodSync(fake, 0o755);
   for (const [key, value] of Object.entries({
     HOME: userHome,
-    CAIRN_CLAUDE_BIN: FAKE,
-    CLAUDE_BIN: FAKE,
-    FAKE_CLAUDE_PROMPT_LOG: claudeLog,
+    CAIRN_CLAUDE_BIN: fake,
+    CLAUDE_BIN: fake,
   })) {
     saved[key] = process.env[key];
     process.env[key] = value;

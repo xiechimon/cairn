@@ -17,6 +17,7 @@ import {
   type VmDownload,
 } from '@cairn/shared';
 import { z } from 'zod';
+import { childEnv } from '../child-env.js';
 import {
   AGENT_BROWSER_BINARY,
   browserScopedSessionName,
@@ -227,6 +228,7 @@ export interface VmDesktopsOptions {
     markDownloaded(): void;
   };
   env?: NodeJS.ProcessEnv;
+  commandEnv?: NodeJS.ProcessEnv;
   image?: string;
   run?: VmCommandRunner;
   probe?: ScreenProbe;
@@ -271,7 +273,12 @@ export class VmDesktops implements ComputerDesktops {
 
   constructor(private readonly options: VmDesktopsOptions) {
     this.hostRoot = options.root;
-    this.run = options.run ?? runVmCommand;
+    const runner = options.run ?? runVmCommand;
+    this.run = (argv, commandOptions) =>
+      runner(argv, {
+        ...commandOptions,
+        env: { ...options.commandEnv, ...commandOptions?.env },
+      });
     this.probe = options.probe ?? probeTcp;
     this.now = options.now ?? Date.now;
     this.image =
@@ -700,7 +707,7 @@ export class VmDesktops implements ComputerDesktops {
           'sh',
           ...packages,
         ],
-        { stdio: ['ignore', 'pipe', 'pipe'] },
+        { env: childEnv(this.options.commandEnv), stdio: ['ignore', 'pipe', 'pipe'] },
       );
       const timer = setTimeout(
         () => child.kill('SIGKILL'),
@@ -993,7 +1000,7 @@ export class VmDesktops implements ComputerDesktops {
       return queue;
     }
     const child = spawn(desktop.binary, argv, {
-      env: { ...process.env, ...Object.fromEntries(requested) },
+      env: childEnv({ ...this.options.commandEnv, ...Object.fromEntries(requested) }),
       stdio: [request.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
     child.stdin?.on('error', () => {});

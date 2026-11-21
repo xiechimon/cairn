@@ -247,7 +247,7 @@ export class WorkspaceManager implements WorktreeOps {
           if (remoteAhead > 0 && current !== branch) throw new RemoteBranchDivergedError(branch);
         }
         this.logger.workspace('Worktree reused');
-        const hooks = await this.runHookStage(convDir, 'resume', input.credentials);
+        const hooks = await this.runHookStage(convDir, 'resume', input.credentials, input.env);
         return {
           cwd: convDir,
           baseRepoDir,
@@ -276,7 +276,7 @@ export class WorkspaceManager implements WorktreeOps {
       }
       await gitPrim.worktreeAdd(baseRepoDir, branch, convDir, base);
       this.logger.workspace(`Worktree added (${branch} from ${base})`);
-      const hooks = await this.runHookStage(convDir, 'setup', input.credentials);
+      const hooks = await this.runHookStage(convDir, 'setup', input.credentials, input.env);
       return {
         cwd: convDir,
         baseRepoDir,
@@ -322,6 +322,7 @@ export class WorkspaceManager implements WorktreeOps {
     cwd: string,
     name: 'setup' | 'resume',
     credentials: BoundGitCredentials | null,
+    env?: NodeJS.ProcessEnv,
   ): Promise<WorkspaceHookNoteData[]> {
     try {
       const note = await this.recordingSetupDrift(cwd, () =>
@@ -329,6 +330,7 @@ export class WorkspaceManager implements WorktreeOps {
           cwd,
           name,
           credentials,
+          env,
           timeoutMs: this.hookTimeoutMs,
           log: (line) => this.logger.workspace(line),
         }),
@@ -437,6 +439,7 @@ export class WorkspaceManager implements WorktreeOps {
     cwd: string,
     defaultBranch: string,
     credentials: BoundGitCredentials | null,
+    env?: NodeJS.ProcessEnv,
   ): Promise<{ output: string }> {
     const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
     const drift = readSetupDrift(driftFile);
@@ -456,6 +459,7 @@ export class WorkspaceManager implements WorktreeOps {
           cwd,
           name: 'setup',
           credentials,
+          env,
           timeoutMs: this.hookTimeoutMs,
           log: (line) => this.logger.workspace(line),
         }),

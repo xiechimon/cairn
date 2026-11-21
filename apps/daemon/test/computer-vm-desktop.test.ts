@@ -204,6 +204,7 @@ function setup(options: { unsupported?: string; resolveError?: Error } = {}) {
     new VmDesktops({
       root: join(dir, 'vm'),
       runtime,
+      commandEnv: { FAKE_CONTAINER_DIR: fake, FAKE_HOME: home },
       probe: async () => open.ports,
       readyMs: 1_000,
       now: () => clock,

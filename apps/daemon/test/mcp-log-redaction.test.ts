@@ -71,7 +71,8 @@ setInterval(() => {}, 60000);
   if (!(transport instanceof StdioTransport)) throw new Error('expected a stdio transport');
   transports.push(transport);
   expect(transport.options.command).toBe(process.execPath);
-  expect(transport.options.env).toEqual({ MCP_FIXTURE_TOKEN: SECRET });
+  expect(transport.options.env?.MCP_FIXTURE_TOKEN).toBe(SECRET);
+  expect(transport.options.env?.GH_TOKEN).toBeUndefined();
   expect(transport.options.cwd).toBe('/tmp');
   const seen: JsonRpcMessage[] = [];
   transport.onMessage((message) => {
@@ -130,5 +131,7 @@ test('a stdio server without env keeps the working directory of the session', ()
   if (!(transport instanceof StdioTransport)) throw new Error('expected a stdio transport');
   transports.push(transport);
   expect(transport.options.cwd).toBe(join('/work/tree'));
-  expect(transport.options.env).toBeUndefined();
+  expect(transport.options.env?.PATH).toBe(process.env.PATH);
+  expect(transport.options.env?.HOME).toBe(process.env.HOME);
+  expect(transport.options.env?.GH_TOKEN).toBeUndefined();
 });

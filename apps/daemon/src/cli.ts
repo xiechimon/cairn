@@ -17,6 +17,7 @@ import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
 import { runPiHost } from './backend/pi-host.js';
+import { childEnv } from './child-env.js';
 import { bundledClaudeCodePath } from './claude-code-bin.js';
 import {
   type DaemonConfig,
@@ -365,7 +366,7 @@ export function buildProgram(): Command {
       ensurePrivateDir(claudeHome);
       const result = spawnSync(command, ['auth', 'login'], {
         stdio: 'inherit',
-        env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome },
+        env: childEnv({ CLAUDE_CONFIG_DIR: claudeHome }),
       });
       if (result.error !== undefined) throw result.error;
       process.exitCode = result.status ?? 1;

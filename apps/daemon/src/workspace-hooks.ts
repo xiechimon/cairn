@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
-import { withoutPinnedEnv } from './backend/pinned-env.js';
+import { childEnv } from './child-env.js';
 import { gitCredentialEnv } from './git.js';
 
 export const HOOK_OUTPUT_CHAR_LIMIT = 100_000;
@@ -29,6 +29,7 @@ export interface RunWorkspaceHookInput {
   cwd: string;
   name: 'setup' | 'resume';
   credentials: BoundGitCredentials | null;
+  env?: NodeJS.ProcessEnv;
   timeoutMs: number;
   log: (line: string) => void;
 }
@@ -53,10 +54,10 @@ export async function runWorkspaceHook(
     );
   }
   log(`${name} hook: running`);
-  const env: NodeJS.ProcessEnv =
-    credentials !== null
-      ? { ...withoutPinnedEnv(process.env), ...gitCredentialEnv(credentials) }
-      : withoutPinnedEnv(process.env);
+  const env: NodeJS.ProcessEnv = childEnv({
+    ...(credentials !== null ? gitCredentialEnv(credentials) : {}),
+    ...input.env,
+  });
   const startedAt = Date.now();
   let kept = '';
   let total = 0;

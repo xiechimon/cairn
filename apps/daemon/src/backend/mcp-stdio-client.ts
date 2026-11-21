@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import { childEnv } from '../child-env.js';
 
 export interface StdioToolAnswer {
   text: string;
@@ -25,6 +26,7 @@ export async function openStdioToolClient(input: {
   const transport = new StdioClientTransport({
     command: input.command,
     args: [...input.args],
+    env: childEnv(),
     stderr: 'ignore',
   });
   const client = new Client({ name: 'cairn-computer', version: '0.1.0' });

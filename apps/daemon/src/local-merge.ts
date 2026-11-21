@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { LocalMergeCommand, LocalMergeResult } from '@cairn/shared';
 import { type CompareFile, PATCH_DIGEST_VERSION } from '@cairn/shared/merge-gate';
-import { withoutPinnedEnv } from './backend/pinned-env.js';
+import { childEnv } from './child-env.js';
 import { commitEnv, gitPrim, landGitSquash, runGit, runGitOk } from './git.js';
 import { decideLocalMerge } from './merge-decision.js';
 
@@ -159,7 +159,7 @@ export async function landLocalMerge(
       try {
         await exec('/bin/sh', ['-c', check], {
           cwd: candidate,
-          env: withoutPinnedEnv(process.env),
+          env: childEnv(),
           timeout: 300_000,
           maxBuffer: 1024 * 1024,
         });
