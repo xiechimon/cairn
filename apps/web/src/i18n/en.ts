@@ -358,7 +358,6 @@ export const EN: Record<string, string> = {
   还没有连上电脑: 'No computer connected yet',
   你的电脑: 'Your computers',
   再检查一次: 'Check again',
-  在进行: 'In progress',
   等你处理: 'Needs you',
   接下来: 'Up next',
   已暂停: 'Paused',
