@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { dropNotice, evaluate, ownerOf, planDrop, REQUIRED_CHECKS } from './promote-queue.mjs';
+import {
+  closeLandedIssues,
+  closingTargets,
+  dropNotice,
+  evaluate,
+  ownerOf,
+  planDrop,
+  REQUIRED_CHECKS,
+} from './promote-queue.mjs';
 
 const SHA = 'a'.repeat(40);
 const run = (over) => ({
@@ -255,4 +263,107 @@ test('the drop notice names the owners and the run, or says no owner is marked',
   assert.match(unmarked, /No Amp-Thread-ID or Lane trailer/);
   assert.match(unmarked, /ccccccccc/);
   assert.doesNotMatch(unmarked, /Run:/);
+});
+
+const closesCommit = (sha, trailer) => ({
+  sha,
+  subject: `subject of ${sha.slice(0, 9)}`,
+  body: `subject of ${sha.slice(0, 9)}\n\n${trailer}\n`,
+});
+
+test('closingTargets names issues from Closes and Fixes trailers, never Part of', () => {
+  const targets = closingTargets([
+    closesCommit('a'.repeat(40), 'Closes #5399\nPart of #5380'),
+    closesCommit('b'.repeat(40), 'Fixes #5374\nCloses #5399'),
+    closesCommit('c'.repeat(40), 'See #123 for context, resolves #5'),
+  ]);
+  assert.deepEqual(
+    [...targets.keys()].sort((a, b) => a - b),
+    [5, 5374, 5399],
+  );
+  assert.deepEqual(
+    targets.get(5399).map((c) => c.sha),
+    ['a'.repeat(40), 'b'.repeat(40)],
+  );
+});
+
+function fakeIssues(open) {
+  const states = new Map(Object.entries(open));
+  const calls = [];
+  return {
+    calls,
+    states,
+    io: {
+      commits: [],
+      getIssue: (n) => {
+        if (!states.has(String(n))) throw new Error('HTTP 404');
+        return { state: states.get(String(n)) };
+      },
+      postComment: (n, body) => calls.push(['comment', n, body]),
+      closeIssue: (n) => {
+        states.set(String(n), 'closed');
+        calls.push(['close', n]);
+      },
+      warn: (m) => calls.push(['warn', m]),
+    },
+  };
+}
+
+test('landing two commits with Closes trailers closes both issues exactly once and names the commits', () => {
+  const { calls, states, io } = fakeIssues({ 5399: 'open', 5374: 'open' });
+  const commits = [
+    closesCommit('d'.repeat(40), 'Closes #5399'),
+    closesCommit('e'.repeat(40), 'Fixes #5374'),
+  ];
+  closeLandedIssues({ ...io, commits });
+  assert.equal(states.get('5399'), 'closed');
+  assert.equal(states.get('5374'), 'closed');
+  const closedNumbers = calls.filter(([k]) => k === 'close').map(([, n]) => n);
+  assert.deepEqual(closedNumbers.sort(), [5374, 5399]);
+  const commentFor = (n) => calls.find(([k, m]) => k === 'comment' && m === n)[2];
+  assert.match(commentFor(5399), /ddddddddd/);
+  assert.match(commentFor(5374), /eeeeeeeee/);
+});
+
+test('Part of trailers never close an issue', () => {
+  const { calls, states, io } = fakeIssues({ 31: 'open' });
+  closeLandedIssues({
+    ...io,
+    commits: [closesCommit('f'.repeat(40), 'Part of #31')],
+  });
+  assert.equal(states.get('31'), 'open');
+  assert.deepEqual(calls, []);
+});
+
+test('already closed issues are skipped, so a rerun is a no-op', () => {
+  const { calls, io } = fakeIssues({ 5399: 'open', 5374: 'open' });
+  const commits = [closesCommit('d'.repeat(40), 'Closes #5399\nCloses #5374')];
+  closeLandedIssues({ ...io, commits });
+  const firstRunCalls = calls.length;
+  assert.ok(firstRunCalls > 0);
+  closeLandedIssues({ ...io, commits });
+  assert.equal(calls.length, firstRunCalls);
+  assert.deepEqual(
+    calls
+      .filter(([k]) => k === 'close')
+      .map(([, n]) => n)
+      .sort(),
+    [5374, 5399],
+  );
+});
+
+test('a failure to close is logged and never aborts the other issues', () => {
+  const { calls, states, io } = fakeIssues({ 5399: 'open', 5374: 'open' });
+  io.closeIssue = (n) => {
+    if (n === 5399) throw new Error('boom');
+    states.set(String(n), 'closed');
+    calls.push(['close', n]);
+  };
+  closeLandedIssues({
+    ...io,
+    commits: [closesCommit('d'.repeat(40), 'Closes #5399\nFixes #5374')],
+  });
+  assert.equal(states.get('5374'), 'closed');
+  assert.equal(states.get('5399'), 'open');
+  assert.ok(calls.some(([k, m]) => k === 'warn' && /5399/.test(m)));
 });

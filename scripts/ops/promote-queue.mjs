@@ -101,6 +101,60 @@ const gh = (args, options = {}) =>
     }),
   );
 
+const CLOSING_KEYWORD = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b/gi;
+
+export function closingTargets(commits) {
+  const targets = new Map();
+  for (const commit of commits) {
+    for (const match of (commit.body ?? '').matchAll(CLOSING_KEYWORD)) {
+      const issue = Number(match[1]);
+      targets.set(issue, [...(targets.get(issue) ?? []), commit]);
+    }
+  }
+  return targets;
+}
+
+export function landedCommits(before, after) {
+  return git(['log', '--reverse', '--format=%H%x1f%s%x1f%B%x1e', `${before}..${after}`])
+    .split('\x1e')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [sha, subject, body] = entry.split('\x1f');
+      return { sha, subject, body };
+    });
+}
+
+export function closingComment(commits) {
+  const lines = commits.map((c) => `- ${c.sha.slice(0, 9)} ${c.subject}`);
+  return [`Closed by ${commits.length === 1 ? 'commit' : 'commits'}:`, ...lines].join('\n');
+}
+
+export function closeLandedIssues({ commits, getIssue, postComment, closeIssue, warn }) {
+  const closed = [];
+  for (const [issue, naming] of closingTargets(commits)) {
+    try {
+      const info = getIssue(issue);
+      if (!info || info.state !== 'open') continue;
+    } catch (error) {
+      warn(`issue #${issue}: ${String(error.message ?? error).split('\n')[0]}`);
+      continue;
+    }
+    try {
+      postComment(issue, closingComment(naming));
+    } catch (error) {
+      warn(`issue #${issue} comment: ${String(error.message ?? error).split('\n')[0]}`);
+    }
+    try {
+      closeIssue(issue);
+      closed.push(issue);
+    } catch (error) {
+      warn(`issue #${issue} close: ${String(error.message ?? error).split('\n')[0]}`);
+    }
+  }
+  return closed;
+}
+
 export function evaluateHead(repo) {
   let queueHead;
   try {
@@ -224,10 +278,51 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.log(`[promote-queue] ${verdict.action}: ${verdict.reason ?? verdict.sha}`);
     if (verdict.action === 'idle') process.exit(0);
     if (verdict.action === 'promote') {
+      let before = 'origin/main';
+      try {
+        before = git(['rev-parse', 'origin/main']);
+      } catch {
+        console.log('::warning::could not resolve origin/main; issue closing range may be empty');
+      }
       execFileSync('git', ['push', 'origin', `${verdict.sha}:refs/heads/main`], {
         stdio: 'inherit',
       });
       console.log(`[promote-queue] promoted ${verdict.sha} to main`);
+      try {
+        const ghWrite = (args) => {
+          const tokens = new Set([process.env.QUEUE_WRITE_TOKEN, process.env.GH_TOKEN, undefined]);
+          let last;
+          for (const token of tokens) {
+            try {
+              return gh(args, token ? { env: { ...process.env, GH_TOKEN: token } } : undefined);
+            } catch (error) {
+              last = error;
+            }
+          }
+          throw last;
+        };
+        const closed = closeLandedIssues({
+          commits: landedCommits(before, verdict.sha),
+          getIssue: (n) => ghWrite([`repos/${repo}/issues/${n}`]),
+          postComment: (n, body) =>
+            ghWrite([
+              '--method',
+              'POST',
+              `repos/${repo}/issues/${n}/comments`,
+              '-f',
+              `body=${body}`,
+            ]),
+          closeIssue: (n) =>
+            ghWrite(['--method', 'PATCH', `repos/${repo}/issues/${n}`, '-f', 'state=closed']),
+          warn: (message) => console.log(`::warning::${message}`),
+        });
+        if (closed.length > 0)
+          console.log(`[promote-queue] closed ${closed.map((n) => `#${n}`).join(', ')}`);
+      } catch (error) {
+        console.log(
+          `::warning::issue closing after landing failed: ${String(error.message ?? error).split('\n')[0]}`,
+        );
+      }
       process.exit(0);
     }
     if (enforce && verdict.action === 'drop') {
