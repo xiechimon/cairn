@@ -645,6 +645,11 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     completeStep(w.deps, deliverStepId, { hasChanges: true });
     const mergePromise = requestMerge(w.deps, w.buildId);
     await posted;
+    await vi.waitFor(() =>
+      expect(w.fake.requests.some((r) => r.url.includes('/check-runs'))).toBe(true),
+    );
+    await new Promise((r) => setTimeout(r, 50));
+    expect(w.fake.puts()).toEqual([]);
     release();
     const outcome = await mergePromise;
     await flushSelfIssueWrites();
