@@ -353,6 +353,7 @@ describe('executeConnectorToolCall dispatch', () => {
         decision: 'allow-once',
         decidedBy: s.user.id,
         viaCard: true,
+        interactive: 'page',
       },
     );
     expect(mcp.calls).toHaveLength(0);
@@ -381,6 +382,7 @@ describe('executeConnectorToolCall dispatch', () => {
         decision: 'allow-once',
         decidedBy: s.user.id,
         viaCard: true,
+        interactive: 'page',
       },
     );
     dispatchActionWakes(s);
@@ -412,6 +414,7 @@ describe('executeConnectorToolCall dispatch', () => {
         decision: 'allow-once',
         decidedBy: s.user.id,
         viaCard: true,
+        interactive: 'page',
       },
     );
     const again = JSON.parse(

@@ -149,7 +149,7 @@ async function answer(s: TestServer, id: string, headers: Record<string, string>
     `/api/teams/${s.team.id}/chief/threads/${THREAD}/questions/${proposalCardId(id)}/answer`,
     {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...headers },
+      headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', ...headers },
       body: JSON.stringify({ answers: [{ header: '网站授权', choices: ['批准执行'] }] }),
     },
   );

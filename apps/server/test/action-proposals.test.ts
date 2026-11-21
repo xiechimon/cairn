@@ -22,10 +22,13 @@ import {
   ALWAYS_CHOICE,
   APPROVE_CHOICE,
   answerProposal,
+  DECLINE_SEND_CHOICE,
   type Decision,
   dispatchActionWakes,
   proposalById,
+  proposeAction,
   REFUSE_CHOICE,
+  SEND_CHOICE,
   sweepExpiredActionProposals,
 } from '../src/services/action-proposals.js';
 import { executeAction } from '../src/services/action-registry.js';
@@ -841,7 +844,14 @@ describe('send and submit action classes', () => {
   function answerDecision(s: ReturnType<typeof world>, proposalId: string, decision: Decision) {
     return answerProposal(
       { db: s.db, reposDir: s.reposDir, hub: s.hub, user: s.user, registry },
-      { proposalId, teamId: s.team.id, decision, decidedBy: s.user.id, viaCard: true },
+      {
+        proposalId,
+        teamId: s.team.id,
+        decision,
+        decidedBy: s.user.id,
+        viaCard: true,
+        interactive: 'page',
+      },
     );
   }
 
@@ -961,6 +971,87 @@ describe('send and submit action classes', () => {
       { status: 'executed' },
     );
     expect(s.db.select().from(actionProposal).all()).toEqual([]);
+    s.dispose();
+  });
+});
+
+describe('outbound mail approval', () => {
+  function parkMailSend(s: ReturnType<typeof world>) {
+    return proposeAction(s.db, {
+      teamId: s.team.id,
+      actionId: 'connector.cairn-mail.send',
+      targetId: 'cairn-mail#reply',
+      input: { to: 'someone@example.com', subject: 'Re: hello', body: 'Got it.' },
+      threadId: 'thread-a',
+      scopeProjectId: null,
+      card: [
+        {
+          header: '审批',
+          question: '对外发送：cairn-mail send',
+          options: [{ label: SEND_CHOICE }, { label: DECLINE_SEND_CHOICE }],
+        },
+      ],
+    }).proposalId;
+  }
+
+  function answerMail(
+    s: ReturnType<typeof world>,
+    proposalId: string,
+    choice: string,
+    headers: Record<string, string> = {},
+  ) {
+    return s.app.request(
+      `/api/teams/${s.team.id}/chief/threads/thread-a/questions/approval-${proposalId}/answer`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify({ answers: [{ header: '审批', choices: [choice] }] }),
+      },
+    );
+  }
+
+  test('a send answered by a request no Cairn page made stays pending and sends nothing', async () => {
+    const s = world();
+    const proposalId = parkMailSend(s);
+    const res = await answerMail(s, proposalId, SEND_CHOICE);
+    expect(res.status).toBe(403);
+    expect(proposalById(s.db, proposalId)).toMatchObject({
+      status: 'pending',
+      decision: null,
+      decidedBy: null,
+    });
+    expect(s.db.select().from(actionWakeOutbox).all()).toEqual([]);
+    expect(
+      askQuestionContentOf(
+        s.db
+          .select()
+          .from(chiefMessage)
+          .where(eq(chiefMessage.id, `approval-${proposalId}`))
+          .get()?.content,
+      )?.status,
+    ).toBe('pending');
+    s.dispose();
+  });
+
+  test('the send button pressed in the Cairn window approves the send', async () => {
+    const s = world();
+    const proposalId = parkMailSend(s);
+    const res = await answerMail(s, proposalId, SEND_CHOICE, { 'sec-fetch-site': 'same-origin' });
+    expect(res.status).toBe(200);
+    expect(proposalById(s.db, proposalId)).toMatchObject({
+      status: 'executed',
+      decision: 'allow-once',
+      decidedBy: s.user.id,
+    });
+    s.dispose();
+  });
+
+  test('declining a send works from any caller', async () => {
+    const s = world();
+    const proposalId = parkMailSend(s);
+    const res = await answerMail(s, proposalId, DECLINE_SEND_CHOICE);
+    expect(res.status).toBe(200);
+    expect(proposalById(s.db, proposalId)?.status).toBe('refused');
     s.dispose();
   });
 });

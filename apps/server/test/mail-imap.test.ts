@@ -416,6 +416,7 @@ describe('replying to mail', () => {
           decision: 'allow-once',
           decidedBy: s.user.id,
           viaCard: true,
+          interactive: 'page',
         },
       ),
     ).toEqual({ status: 'executed' });

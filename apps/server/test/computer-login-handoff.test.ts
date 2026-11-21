@@ -160,12 +160,19 @@ function pendingApproval(s: TestServer) {
   return s.db.select().from(actionProposal).where(eq(actionProposal.status, 'pending')).get()!;
 }
 
-function answer(s: TestServer, id: string, choice = '批准执行') {
-  return req(
-    s.app,
-    'POST',
+function answer(
+  s: TestServer,
+  id: string,
+  choice = '批准执行',
+  headers: Record<string, string> = { 'sec-fetch-site': 'same-origin' },
+) {
+  return s.app.request(
     `/api/teams/${s.team.id}/chief/threads/${THREAD}/questions/${proposalCardId(id)}/answer`,
-    { answers: [{ header: '网站授权', choices: [choice] }] },
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...headers },
+      body: JSON.stringify({ answers: [{ header: '网站授权', choices: [choice] }] }),
+    },
   );
 }
 
@@ -344,7 +351,7 @@ describe('login handoff gate', () => {
       expect(calls).toHaveLength(0);
       const ownerHeaders: Record<string, string> =
         kind === 'bearer'
-          ? { authorization: `Bearer ${ownerToken}` }
+          ? { authorization: `Bearer ${ownerToken}`, 'sec-fetch-site': 'same-origin' }
           : {
               cookie: `cairn_auth=${issueBrowserSession(s.db, 'owner').token}`,
               'sec-fetch-site': 'same-origin',
@@ -458,6 +465,18 @@ describe('login handoff gate', () => {
       expect((await answer(s, pending.id)).status).toBe(409);
     },
   );
+
+  test('an owner-token request no Cairn page made cannot authorize a password website', async () => {
+    const { s, deps, calls } = boot();
+    createSecret(deps, { teamId: s.team.id, name: 'LOGIN', value: 'synthetic-password' });
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill());
+    const pending = pendingApproval(s);
+    expect((await answer(s, pending.id, '批准执行', {})).status).toBe(403);
+    expect(pendingApproval(s)).toMatchObject({ id: pending.id, decidedBy: null });
+    await forwardComputerCall(deps, 'sidecar', 'step-a', fill('retry'));
+    expect(calls).toHaveLength(0);
+    expect((await answer(s, pending.id, '不执行', {})).status).toBe(200);
+  });
 
   test('only an owner card approval works; model text and an intact but superseded card do not', async () => {
     const { s, deps, calls } = boot();

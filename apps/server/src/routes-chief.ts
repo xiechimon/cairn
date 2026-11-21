@@ -10,7 +10,7 @@ import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { chiefMessage } from './db/schema.js';
 import { notFound, parseWith } from './lib/errors.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
+import { pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
 import {
   ALWAYS_CHOICE,
@@ -75,6 +75,19 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   ) => {
     if (requestId !== proposalCardId(proposalId)) throw notFound(`question ${requestId}`);
     const deviceId = pairedDeviceIdOf(c);
+    const interactive = sameOriginPageWrite(c) ? ('page' as const) : undefined;
+    ctx.logger?.info(
+      {
+        proposalId,
+        decision,
+        deviceId,
+        interactive: interactive ?? null,
+        secFetchSite: c.req.header('sec-fetch-site') ?? null,
+        origin: c.req.header('origin') ?? null,
+        userAgent: c.req.header('user-agent') ?? null,
+      },
+      'approval card answered',
+    );
     try {
       return answerProposal(svc, {
         proposalId,
@@ -82,6 +95,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         decision,
         decidedBy: deviceId === null ? ctx.user.id : `device:${deviceId}`,
         viaCard: true,
+        interactive,
       });
     } finally {
       publishQuestion(svc, threadId, requestId);
