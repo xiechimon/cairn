@@ -1,7 +1,7 @@
-import type { RoutingRuleRecord } from '@cairn/shared';
+import type { ProviderRecord, RoutingRuleRecord } from '@cairn/shared';
 import { cn } from 'cn';
 import { Check, KeyRound } from 'lucide-react';
-import { type CSSProperties, type ReactNode, useState } from 'react';
+import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import {
   useApiMutations,
   useChief,
@@ -38,8 +38,16 @@ import {
   type SetupStepId,
   setupOpenStep,
 } from './first-run-checklist-model.js';
+import { failureCopy, ProviderCheckList } from './first-run-provider-check.js';
 import { LocalProviderImportCard } from './local-provider-import.js';
 import { formatDownloadBytes } from './machines-panel.js';
+import {
+  checkKey,
+  hiddenFromPicker,
+  type ModelChecks,
+  rejectedProviders,
+  useModelChecks,
+} from './model-checks.js';
 
 export const SETUP_HREF = '/app';
 
@@ -93,6 +101,7 @@ export function useFirstRunSetup() {
     projects: live ? projectsQ.data?.length : undefined,
     progress,
     connections: connections ?? [],
+    providers: providersQ.data?.providers ?? [],
     machines: machinesQ.data ?? [],
     settings,
     options: toModelOptions(sourcesQ.data?.sources ?? []),
@@ -173,7 +182,15 @@ function SourceRow({
   );
 }
 
-function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress }) {
+function ModelsBody({
+  setup,
+  progress,
+  onImported,
+}: {
+  setup: Setup;
+  progress: SetupProgress;
+  onImported: (recordIds: string[]) => void;
+}) {
   const { t } = useI18n();
   const { live } = useLiveData();
   const [addView, setAddView] = useState<AddProviderView>('closed');
@@ -215,7 +232,7 @@ function ModelsBody({ setup, progress }: { setup: Setup; progress: SetupProgress
         onViewChange={setAddView}
         connectError={connectError}
         onConnectError={setConnectError}
-        lead={<LocalProviderImportCard teamId={setup.teamId} live={live} />}
+        lead={<LocalProviderImportCard teamId={setup.teamId} live={live} onImported={onImported} />}
       />
     </>
   );
@@ -252,10 +269,45 @@ function modelName(pick: Pick, options: readonly ModelOption[]): string {
   return row?.modelName ?? pick.modelId;
 }
 
-function ConfirmBody({ setup }: { setup: Setup }) {
+function PickCheck({ check }: { check: ReturnType<ModelChecks['checks']['get']> }) {
+  const { t } = useI18n();
+  if (check === undefined || check.state === 'ok') return null;
+  return (
+    <span
+      className="basis-full pl-32 text-pretty break-keep text-meta text-content-secondary max-sm:pl-0"
+      title={check.state === 'failed' ? (check.reason ?? undefined) : undefined}
+    >
+      {check.state === 'checking' ? (
+        <span className="inline-flex items-center gap-1.5">
+          <RingSpinner className="size-4" />
+          {t('正在发一句试试…')}
+        </span>
+      ) : (
+        <>
+          <span className="text-foreground">{t('不能用')}</span>
+          {' · '}
+          {failureCopy(check.failure, t)}
+        </>
+      )}
+    </span>
+  );
+}
+
+function recordFor(setup: Setup, pick: Pick): ProviderRecord | undefined {
+  return setup.providers.find((record) => record.providerId === pick.provider);
+}
+
+function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
   const { t } = useI18n();
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
   const { manageComputer } = useApiMutations(setup.teamId);
+  const [checking, setChecking] = useState(false);
+  const rejected = rejectedProviders(checks.checks);
+  const options = setup.options.filter(
+    (option) =>
+      option.runtime !== 'pi' ||
+      !hiddenFromPicker(checks.checks, rejected, option.provider, option.modelId),
+  );
   const computersQ = useComputers(setup.teamId, setup.live);
   const vm =
     computersQ.data?.find(
@@ -281,6 +333,20 @@ function ConfirmBody({ setup }: { setup: Setup }) {
     setChanged(same ? null : option);
   };
   const confirm = async () => {
+    setChecking(true);
+    try {
+      if (pick != null) {
+        const record = recordFor(setup, pick);
+        if (record !== undefined) {
+          const known = checks.checks.get(checkKey(pick.provider, pick.modelId));
+          const check =
+            known?.state === 'ok' ? known : await checks.checkModel(record, pick.modelId);
+          if (check.state !== 'ok') return;
+        }
+      }
+    } finally {
+      setChecking(false);
+    }
     try {
       if (pick != null && !pick.stored) {
         await patchRule.mutateAsync({
@@ -315,7 +381,7 @@ function ConfirmBody({ setup }: { setup: Setup }) {
             <ModelPicker
               use="coordinator"
               rule={pick ?? null}
-              options={setup.options}
+              options={options}
               onPick={pickModel}
               trigger={{
                 label: t('换一个'),
@@ -324,6 +390,9 @@ function ConfirmBody({ setup }: { setup: Setup }) {
               }}
             />
           </span>
+          {pick != null && (
+            <PickCheck check={checks.checks.get(checkKey(pick.provider, pick.modelId))} />
+          )}
         </li>
       </ul>
       <p
@@ -367,11 +436,11 @@ function ConfirmBody({ setup }: { setup: Setup }) {
           data-testid="first-run-confirm"
           size="lg"
           className="px-4 pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
-          disabled={pick == null || patchRule.isPending}
+          disabled={pick == null || checking || patchRule.isPending}
           onClick={() => void confirm()}
         >
-          {patchRule.isPending && <RingSpinner data-icon="inline-start" />}
-          {patchRule.isPending ? t('保存中…') : t('确认并开始对话')}
+          {(checking || patchRule.isPending) && <RingSpinner data-icon="inline-start" />}
+          {checking ? t('正在试模型…') : patchRule.isPending ? t('保存中…') : t('确认并开始对话')}
         </Button>
       </div>
     </>
@@ -463,9 +532,29 @@ function Segments({ open }: { open: SetupStepId }) {
 
 export function FirstRunSetup({ setup }: { setup: Setup }) {
   const { t } = useI18n();
+  const checks = useModelChecks(setup.teamId);
+  const { deleteProvider } = useApiMutations(setup.teamId);
+  const [imported, setImported] = useState<readonly string[]>([]);
+  const reviewed = setup.providers.filter((record) => imported.includes(record.id));
+  const { checkProvider } = checks;
+  useEffect(() => {
+    for (const record of reviewed) void checkProvider(record);
+  }, [reviewed, checkProvider]);
+  const remove = async (records: readonly ProviderRecord[]): Promise<boolean> => {
+    for (const record of records) {
+      try {
+        await deleteProvider.mutateAsync(record.id);
+      } catch (error) {
+        toastError(t('移除失败，请重试。'), error);
+        return false;
+      }
+    }
+    return true;
+  };
   const progress = setup.progress;
   if (progress === undefined) return null;
-  const open = setupOpenStep(progress);
+  const reviewing = reviewed.length > 0;
+  const open = reviewing ? 'models' : setupOpenStep(progress);
   if (open === null) return null;
   return (
     <main
@@ -517,12 +606,27 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
           <h2 className="m-0 voice-response text-page lg:sr-only">
             {open === 'models' ? t('接入模型') : t('确认设置')}
           </h2>
-          {open === 'models' ? (
+          {reviewing ? (
             <div className="mt-5 lg:mt-0">
-              <ModelsBody setup={setup} progress={progress} />
+              <ProviderCheckList
+                records={reviewed}
+                checks={checks}
+                removing={deleteProvider.isPending}
+                onRemove={(record) => void remove([record])}
+                onUndo={() =>
+                  void remove(reviewed).then((done) => {
+                    if (done) setImported([]);
+                  })
+                }
+                onNext={() => setImported([])}
+              />
+            </div>
+          ) : open === 'models' ? (
+            <div className="mt-5 lg:mt-0">
+              <ModelsBody setup={setup} progress={progress} onImported={setImported} />
             </div>
           ) : (
-            <ConfirmBody setup={setup} />
+            <ConfirmBody setup={setup} checks={checks} />
           )}
         </section>
       </div>
