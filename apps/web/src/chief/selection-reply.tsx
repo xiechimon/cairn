@@ -24,9 +24,9 @@ interface Target {
 }
 
 const PILL_CLS =
-  'fixed top-0 left-0 z-(--z-dialog) flex h-9 items-center gap-0.5 rounded-(--radius-control) bg-(--selection-bar-bg) p-0.5 text-(--selection-bar-ink) shadow-(--e2) select-none';
+  'fixed top-0 left-0 z-(--z-dialog) flex h-9 items-center gap-0.5 rounded-(--radius-control) bg-popover p-0.5 text-popover-foreground shadow-(--shadow-popover) select-none';
 const PILL_BUTTON_CLS =
-  'cursor-pointer rounded-(--cds-radius-sm) border-0 text-ui text-(--selection-bar-ink) hover:bg-(--selection-bar-hover) hover:text-(--selection-bar-ink) focus-visible:outline-2 focus-visible:outline-(--focus-ring) dark:hover:bg-(--selection-bar-hover)';
+  'cursor-pointer gap-1.5 rounded-(--cds-radius-sm) border-0 text-ui font-medium text-foreground hover:bg-menu-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-(--focus-ring) dark:hover:bg-menu-hover [&_svg]:text-content-secondary';
 const BOX_CLS =
   'fixed top-0 left-0 z-(--z-dialog) flex w-95 max-w-[calc(100vw-24px)] flex-col gap-2 rounded-(--radius-composer) bg-(--composer-fill) px-3.5 pt-2.5 pb-2 shadow-(--shadow-composer-focus)';
 
@@ -288,7 +288,7 @@ export function SelectionReply({
               <PanelRight aria-hidden strokeWidth={1.75} className="size-4" />
               {t('问侧聊')}
             </Button>
-            <span aria-hidden className="h-4 w-px bg-(--selection-bar-rule)" />
+            <span aria-hidden className="h-4 w-px bg-border" />
           </>
         )}
         <Button
@@ -301,7 +301,7 @@ export function SelectionReply({
         >
           <TextQuote aria-hidden strokeWidth={1.75} className="size-4" />
           {t('引用')}
-          <ShortcutHint keys={['R']} className="ml-0.5 opacity-70" />
+          <ShortcutHint keys={['R']} className="ml-0.5" />
         </Button>
       </div>
     ),

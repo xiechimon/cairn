@@ -178,10 +178,6 @@
   --surface-1: var(--canvas);
   --hover-1: var(--sidebar-hover);
   --border-soft: color-mix(in oklab, var(--foreground) 9%, transparent);
-  --selection-bar-bg: var(--foreground);
-  --selection-bar-ink: var(--background);
-  --selection-bar-hover: color-mix(in oklab, var(--background) 16%, var(--foreground));
-  --selection-bar-rule: color-mix(in oklab, var(--background) 30%, var(--foreground));
   color-scheme: dark light;
 
   --top: inset 0 1px 0 rgb(255 255 255 / 0.05);
