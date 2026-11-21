@@ -31,10 +31,10 @@ import {
 } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { sha256Hex } from '../src/lib/crypto.js';
-import { newRecordId, newUuidv7 } from '../src/lib/ids.js';
+import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { createAntigravitySubscription } from '../src/services/antigravity-subscriptions.js';
-import { enqueueStep } from '../src/services/builds.js';
+import { type BuildDeps, completeStep, enqueueStep } from '../src/services/builds.js';
 import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
@@ -455,6 +455,30 @@ export function insertAntigravitySubscription(
     ...(opts.token !== undefined ? { token: opts.token } : {}),
     ...(opts.expiresAt !== undefined ? { expiresAt: opts.expiresAt } : {}),
   }).id;
+}
+
+export function deliverCodeStep(
+  deps: BuildDeps,
+  todoId: string,
+  opts: { hasChanges?: boolean } = {},
+): { buildId: string; stepId: string } {
+  const buildId = newUuidv7();
+  const stepId = newRecordId();
+  deps.db
+    .insert(buildTable)
+    .values({ id: buildId, todoId, withPlan: false, triggerSource: 'user', createdAt: nowMs() })
+    .run();
+  deps.db
+    .insert(stepTable)
+    .values({ id: stepId, buildId, kind: 'session', status: 'claimed', createdAt: nowMs() })
+    .run();
+  deps.db
+    .update(todoTable)
+    .set({ phase: 'building', latestBuildId: buildId })
+    .where(eq(todoTable.id, todoId))
+    .run();
+  completeStep(deps, stepId, { hasChanges: opts.hasChanges ?? true });
+  return { buildId, stepId };
 }
 
 export function insertMachine(

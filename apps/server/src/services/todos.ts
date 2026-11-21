@@ -26,7 +26,7 @@ import {
   parseGithubIssueSourceRef,
   renderTaskText,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, or, sql } from 'drizzle-orm';
 import { cacheTtlMsFor, resolveCacheRetentionTier } from '../coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import type { Db } from '../db/client.js';
@@ -600,7 +600,7 @@ export function createAutonomousTodo(
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
   const selfIssue =
     input.sourceKind === undefined && input.withoutSelfIssue !== true
-      ? planSelfIssue(deps, input.teamId, input.projectId)
+      ? planSelfIssue(deps, input.teamId, input.projectId, input.output ?? 'code')
       : null;
   db.transaction((tx) => {
     tx.insert(todo)
@@ -653,7 +653,6 @@ export function createAutonomousTodo(
   const record = getTodo(deps, id);
   if (!record) throw new Error('todo missing after insert');
   hub.publishTodoDoc(input.teamId, record);
-  if (selfIssue !== null) scheduleSelfIssueCreate(deps, id);
   return record;
 }
 
@@ -840,9 +839,6 @@ export function updateAutonomousTodo(
       `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
     );
   }
-  if (move !== null && record.sourceKind === 'github-issue-self') {
-    scheduleSelfIssueCreate(deps, id);
-  }
   if (patch.phase !== undefined && !manualPhaseApplied) {
     notifyPhaseEntry(deps, record, row.phase, patch.phase);
   }
@@ -880,7 +876,7 @@ function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): Proje
     .where(and(eq(todo.projectId, target.id), eq(todo.phase, 'todo')))
     .get();
   const sets: ProjectMove['sets'] = { projectId: target.id, orderIndex: (orderRow?.n ?? -1) + 1 };
-  const targetOpensIssues = planSelfIssue(deps, row.teamId, target.id) !== null;
+  const targetOpensIssues = planSelfIssue(deps, row.teamId, target.id, row.output) !== null;
   const dropsIssue = row.sourceKind === 'github-issue-self' && !targetOpensIssues;
   if (dropsIssue) {
     sets.sourceKind = null;
@@ -1044,7 +1040,13 @@ export async function flushSelfIssueWrites(): Promise<void> {
   await Promise.all([...selfIssueInFlight.values()]);
 }
 
-function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): GithubRepoRef | null {
+function planSelfIssue(
+  deps: TodoDeps,
+  teamId: string,
+  projectId: string,
+  output: TodoOutputKind,
+): GithubRepoRef | null {
+  if (output !== 'code') return null;
   if (deps.box === undefined) return null;
   const ref = githubRepoOfProject(projectOfTodo(deps.db, { projectId, teamId }));
   if (ref === null) return null;
@@ -1063,6 +1065,27 @@ function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
       if (selfIssueInFlight.get(todoId) === pending) selfIssueInFlight.delete(todoId);
     });
   selfIssueInFlight.set(todoId, pending);
+}
+
+export function selfIssueCreateInFlight(todoId: string): boolean {
+  return selfIssueInFlight.has(todoId);
+}
+
+export function noteTaskCodeDelivered(deps: TodoDeps, todoId: string): void {
+  const row = getRow(deps, todoId);
+  if (row?.sourceKind !== 'github-issue-self') return;
+  scheduleSelfIssueCreate(deps, todoId);
+}
+
+function taskDeliveredCode(db: Db, row: TodoRow): boolean {
+  if (row.hasChanges) return true;
+  return (
+    db
+      .select({ id: build.id })
+      .from(build)
+      .where(and(eq(build.todoId, row.id), or(isNotNull(build.prNumber), isNotNull(build.prUrl))))
+      .get() !== undefined
+  );
 }
 
 const selfIssueMarker = (todoId: string) => `<!-- cairn:todo ${todoId} -->`;
@@ -1258,6 +1281,15 @@ export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Prom
   }
   if (selfIssueInFlight.has(todoId)) {
     throw new HttpError(409, 'github issue creation already in flight');
+  }
+  if (githubRepoOfProject(projectOfTodo(deps.db, row)) === null) {
+    throw new HttpError(404, 'project is not github-backed');
+  }
+  if (row.sourceRef === null && !taskDeliveredCode(deps.db, row)) {
+    throw new HttpError(
+      409,
+      'the task has not delivered any code yet; its issue opens when a leg reports commits or a PR',
+    );
   }
   const raw = runSelfIssueCreate(
     { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },

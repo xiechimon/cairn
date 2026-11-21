@@ -26,6 +26,7 @@ import {
 import { flushSelfIssueWrites, setTodoPhase } from '../src/services/todos.js';
 import {
   bootServer,
+  deliverCodeStep,
   issueApiKey,
   postProject,
   seedSessionRoute,
@@ -153,10 +154,40 @@ async function getTodo(app: Hono, id: string) {
   return todoRecordSchema.parse(await (await call(app, 'GET', `/api/todos/${id}`)).json());
 }
 
+const deliver = (s: TestServer, fetch: FetchLike, todoId: string, hasChanges = true) =>
+  deliverCodeStep(
+    {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      githubFetch: fetch,
+    },
+    todoId,
+    { hasChanges },
+  );
+
+const markIssued = (s: TestServer, todoId: string, ref: string | null = `github:${REPO}#101`) =>
+  s.db
+    .update(todoTable)
+    .set({ sourceKind: 'github-issue-self', sourceRef: ref, issueState: 'open' })
+    .where(eq(todoTable.id, todoId))
+    .run();
+
 describe('self-created issues: stored as not-yet-created, source backfilled after async creation (A family)', () => {
-  test('W1 creating a task on a connected github project: 201 returns immediately (not-yet-created state) -> async creation backfills sourceRef + v++ + doc event; POST body = title + body, token only in headers', async () => {
+  test('W1 a code task on a connected github project opens its issue on first delivered code: marked at create, sourceRef + v++ + doc event backfill after delivery; POST body = title + body, token only in headers', async () => {
     const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE } });
-    const s = bootServer({ githubFetch: mock.impl });
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const fetch: FetchLike = async (input, init) => {
+      const res = await mock.impl(input, init);
+      if ((init?.method ?? 'GET') === 'POST' && new URL(String(input)).pathname === ISSUES_PATH)
+        await gate;
+      return res;
+    };
+    const s = bootServer({ githubFetch: fetch });
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const publishSpy = vi.spyOn(s.hub, 'publishTodoDoc');
@@ -165,10 +196,14 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect(created.status).toBe(201);
     expect(created.record?.sourceKind).toBe('github-issue-self');
     expect(created.record?.sourceRef).toBeNull();
+    deliver(s, fetch, created.id);
+    await vi.waitFor(() => expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1));
+    const vBefore = (await getTodo(s.app, created.id)).v;
+    release();
     await flushSelfIssueWrites();
     const after = await getTodo(s.app, created.id);
     expect(after.sourceRef).toBe(`github:${REPO}#101`);
-    expect(after.v).toBe((created.record?.v ?? 0) + 1);
+    expect(after.v).toBe(vBefore + 1);
     const published = publishSpy.mock.calls.map(([, rec]) => rec);
     expect(published.some((r) => r.sourceRef === `github:${REPO}#101`)).toBe(true);
     const posts = mock.callsTo('POST', ISSUES_PATH);
@@ -182,7 +217,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     s.dispose();
   });
 
-  test('W2/A6 critical-path constraint: with outbound GitHub hanging, the create-task request still returns immediately, zero GitHub awaits', async () => {
+  test('W2/A6 critical-path constraint: create touches no GitHub call at all; with outbound GitHub hanging, delivery still settles and the issue backfills when the call returns', async () => {
     let release:
       | ((res: {
           ok: boolean;
@@ -204,6 +239,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect(created.elapsedMs).toBeLessThan(2000);
     expect(created.record?.sourceKind).toBe('github-issue-self');
     expect(created.record?.sourceRef).toBeNull();
+    deliver(s, hanging, created.id);
     await vi.waitFor(() => expect(release).toBeDefined());
     release?.({
       ok: true,
@@ -241,6 +277,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
       const projectId = await postGithubProject(s.app);
       const created = await createTask(s.app, projectId);
       expect(created.status, f.key).toBe(201);
+      deliver(s, mock.impl, created.id);
       await flushSelfIssueWrites();
       const after = await getTodo(s.app, created.id);
       expect(after.sourceKind, f.key).toBe('github-issue-self');
@@ -252,26 +289,26 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
   test('a secondary limit retries the pending task and backfills its source', async () => {
     const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE } });
     let attempts = 0;
-    const s = bootServer({
-      githubFetch: async (input, init) => {
-        if (init?.method === 'POST' && attempts++ === 0) {
-          return {
-            ok: false,
-            status: 403,
-            headers: { get: (name) => (name === 'retry-after' ? '1' : null) },
-            json: async () => ({ message: 'secondary rate limit' }),
-            text: async () => 'secondary rate limit',
-          };
-        }
-        return mock.impl(input, init);
-      },
-    });
+    const fetch: FetchLike = async (input, init) => {
+      if (init?.method === 'POST' && attempts++ === 0) {
+        return {
+          ok: false,
+          status: 403,
+          headers: { get: (name) => (name === 'retry-after' ? '1' : null) },
+          json: async () => ({ message: 'secondary rate limit' }),
+          text: async () => 'secondary rate limit',
+        };
+      }
+      return mock.impl(input, init);
+    };
+    const s = bootServer({ githubFetch: fetch });
     try {
       seedConnection(s);
       const projectId = await postGithubProject(s.app);
       const created = await createTask(s.app, projectId);
       expect(created.status).toBe(201);
       expect(created.record?.sourceRef).toBeNull();
+      deliver(s, fetch, created.id);
       await flushSelfIssueWrites();
       expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#101`);
       expect(attempts).toBe(2);
@@ -288,6 +325,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect(created.status).toBe(201);
     expect(created.record?.sourceKind).toBeNull();
     expect(created.record?.sourceRef).toBeNull();
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect(mock.calls).toHaveLength(0);
     s.dispose();
@@ -302,6 +340,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect(created.status).toBe(201);
     expect(created.record?.sourceKind).toBeNull();
     expect(created.record?.sourceRef).toBeNull();
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect(mock.calls).toHaveLength(0);
     s.dispose();
@@ -313,6 +352,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect((await getTodo(s.app, created.id)).sourceRef).toBeNull();
     const patched = await call(s.app, 'PATCH', `/api/todos/${created.id}`, {
@@ -339,6 +379,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, hanging, created.id);
     const retry = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
     expect(retry.status).toBe(409);
     await vi.waitFor(() => expect(release).toBeDefined());
@@ -366,6 +407,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     const dup = await call(s.app, 'POST', `/api/todos/${created.id}/github-issue/retry`);
     expect(dup.status).toBe(409);
@@ -427,6 +469,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect((await getTodo(s.app, created.id)).sourceRef).toBeNull();
     expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
@@ -500,6 +543,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
     marker = `spec\n\n<!-- cairn:todo ${created.id} -->`;
+    deliver(s, listPages, created.id);
     await flushSelfIssueWrites();
     expect((await getTodo(s.app, created.id)).sourceRef).toBeNull();
     markCrashedSend(s, created.id);
@@ -520,6 +564,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
     markCrashedSend(s, created.id);
@@ -536,7 +581,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
 describe('title write-back and claim meta (B family)', () => {
   async function world(
     mock: GhMock,
-    opts: { buildIssue: boolean },
+    opts: { issued: boolean },
   ): Promise<{ s: TestServer; token: string; step: ClaimedStep; todoId: string }> {
     const s = bootServer({ githubFetch: mock.impl, claimHoldMs: 250 });
     seedConnection(s);
@@ -550,7 +595,7 @@ describe('title write-back and claim meta (B family)', () => {
 
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
-    if (opts.buildIssue) await flushSelfIssueWrites();
+    if (opts.issued) markIssued(s, created.id);
     await call(s.app, 'POST', `/api/projects/${projectId}/builds`, {
       body: {
         todoIds: [created.id],
@@ -577,7 +622,7 @@ describe('title write-back and claim meta (B family)', () => {
       [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
       [`PATCH ${issuePath(101)}`]: { body: { number: 101 } },
     });
-    const { s, token, step, todoId } = await world(mock, { buildIssue: true });
+    const { s, token, step, todoId } = await world(mock, { issued: true });
     const res = await relay(s.app, token, step.step.id, { title: '正式标题' });
     expect(res.status).toBe(200);
     expect((await getTodo(s.app, todoId)).title).toBe('正式标题');
@@ -594,7 +639,7 @@ describe('title write-back and claim meta (B family)', () => {
       [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE },
       [`PATCH ${issuePath(101)}`]: { status: 404, body: { message: 'Not Found' } },
     });
-    const { s, token, step, todoId } = await world(mock, { buildIssue: true });
+    const { s, token, step, todoId } = await world(mock, { issued: true });
     const res = await relay(s.app, token, step.step.id, { title: '正式标题' });
     expect(res.status).toBe(200);
     expect((await getTodo(s.app, todoId)).title).toBe('正式标题');
@@ -603,7 +648,7 @@ describe('title write-back and claim meta (B family)', () => {
 
   test('W11/B3 title backfill on a not-yet-created task: local only, zero PATCH outbound (the later-created issue naturally uses the current title)', async () => {
     const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 502, body: {} } });
-    const { s, token, step, todoId } = await world(mock, { buildIssue: true });
+    const { s, token, step, todoId } = await world(mock, { issued: false });
     expect((await getTodo(s.app, todoId)).sourceRef).toBeNull();
     const res = await relay(s.app, token, step.step.id, { title: '正式标题' });
     expect(res.status).toBe(200);
@@ -614,7 +659,7 @@ describe('title write-back and claim meta (B family)', () => {
 
   test('W13/B5 claim meta: self-created task (issue created) has titleFinal=false -- the backfill instruction is not short-circuited', async () => {
     const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE } });
-    const { s, step, todoId } = await world(mock, { buildIssue: true });
+    const { s, step, todoId } = await world(mock, { issued: true });
     expect((await getTodo(s.app, todoId)).sourceRef).not.toBeNull();
     expect(step.todo?.meta?.titleFinal).toBe(false);
     s.dispose();
@@ -648,6 +693,7 @@ describe('import dedup guardrails (C family)', () => {
     });
     expect(again.status).toBe(409);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#9`);
     const selfImport = await call(
@@ -673,6 +719,7 @@ describe('GET /api/todos/{id}/github-issue read-only echo (D family)', () => {
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     const res = await call(s.app, 'GET', `/api/todos/${created.id}/github-issue`);
     expect(res.status).toBe(200);
@@ -697,13 +744,11 @@ describe('GET /api/todos/{id}/github-issue read-only echo (D family)', () => {
     const localProject = await postProject(s.app, 'plain');
     const local = await createTask(s.app, localProject);
     expect((await call(s.app, 'GET', `/api/todos/${local.id}/github-issue`)).status).toBe(404);
-    mock.set(`POST ${ISSUES_PATH}`, { status: 502, body: {} });
     const pending = await createTask(s.app, projectId);
-    await flushSelfIssueWrites();
     expect((await getTodo(s.app, pending.id)).sourceRef).toBeNull();
     expect((await call(s.app, 'GET', `/api/todos/${pending.id}/github-issue`)).status).toBe(404);
-    mock.set(`POST ${ISSUES_PATH}`, { status: 201, body: CREATED_ISSUE });
     const built = await createTask(s.app, projectId);
+    deliver(s, mock.impl, built.id);
     await flushSelfIssueWrites();
     mock.set(`GET ${issuePath(101)}`, { status: 404, body: { message: 'Not Found' } });
     expect((await call(s.app, 'GET', `/api/todos/${built.id}/github-issue`)).status).toBe(404);
@@ -739,11 +784,12 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     });
     const beta = ((await betaRes.json()) as { id: string }).id;
     const created = await createTask(s.app, alpha);
-    await flushSelfIssueWrites();
+    markIssued(s, created.id);
     const moved = await call(s.app, 'PATCH', `/api/todos/${created.id}`, {
       body: { projectId: beta },
     });
     expect(moved.status).toBe(200);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     await sweepIssues(s, mock.impl);
     expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1);
@@ -774,8 +820,9 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     });
     const beta = ((await betaRes.json()) as { id: string }).id;
     const created = await createTask(s.app, alpha);
-    await flushSelfIssueWrites();
+    markIssued(s, created.id);
     await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: beta } });
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect(mock.callsTo('POST', `/repos/${BETA}/issues`)).toHaveLength(1);
     expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(0);
@@ -802,13 +849,12 @@ describe('moving a task with a self-created issue to another project (#2009)', (
       [`POST /repos/${BETA}/issues`]: { status: 201, body: { ...CREATED_ISSUE, number: 7 } },
     });
     let rotate = (): void => undefined;
-    const s = bootServer({
-      githubFetch: async (input, init) => {
-        const res = await mock.impl(input, init);
-        if (new URL(String(input)).pathname === `/repos/${BETA}/issues`) rotate();
-        return res;
-      },
-    });
+    const fetch: FetchLike = async (input, init) => {
+      const res = await mock.impl(input, init);
+      if (new URL(String(input)).pathname === `/repos/${BETA}/issues`) rotate();
+      return res;
+    };
+    const s = bootServer({ githubFetch: fetch });
     seedConnection(s);
     rotate = () =>
       upsertGithubConnection(
@@ -821,8 +867,9 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     });
     const beta = ((await betaRes.json()) as { id: string }).id;
     const created = await createTask(s.app, alpha);
-    await flushSelfIssueWrites();
+    markIssued(s, created.id);
     await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: beta } });
+    deliver(s, fetch, created.id);
     await flushSelfIssueWrites();
     await sweepIssues(s, mock.impl);
     const close = mock.callsTo('PATCH', issuePath(101));
@@ -842,7 +889,7 @@ describe('moving a task with a self-created issue to another project (#2009)', (
     const alpha = await postGithubProject(s.app);
     const local = await postProject(s.app, 'local');
     const created = await createTask(s.app, alpha);
-    await flushSelfIssueWrites();
+    markIssued(s, created.id);
     await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { projectId: local } });
     await sweepIssues(s, mock.impl);
     expect(mock.callsTo('PATCH', issuePath(101))).toHaveLength(1);
@@ -875,6 +922,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#101`);
     return { s, id: created.id, projectId, sync: syncOf(s, mock.impl) };
@@ -953,6 +1001,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     const { s, id, projectId, sync } = await startedTask(mock);
     mock.set(`POST ${ISSUES_PATH}`, { status: 201, body: { ...CREATED_ISSUE, number: 102 } });
     const successor = await createTask(s.app, projectId, '换一种做法');
+    deliver(s, mock.impl, successor.id);
     await flushSelfIssueWrites();
     const result = transitionTodos(
       s.svc,
@@ -969,16 +1018,36 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     s.dispose();
   });
 
-  test('a superseded task waits until the successor issue exists', async () => {
+  test('a superseded task waits while the successor issue creation is in flight', async () => {
+    let posts = 0;
+    let release = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const mock = lifecycleMock();
-    const { s, id, projectId, sync } = await startedTask(mock);
-    const successor = await createTask(s.app, projectId, '换一种做法');
+    const fetch: FetchLike = async (input, init) => {
+      if ((init?.method ?? 'GET') === 'POST' && new URL(String(input)).pathname === ISSUES_PATH) {
+        posts += 1;
+        if (posts > 1) await gate;
+      }
+      return mock.impl(input, init);
+    };
+    const s = bootServer({ githubFetch: fetch });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    deliver(s, fetch, created.id);
     await flushSelfIssueWrites();
-    setRow(s, successor.id, { sourceRef: null });
-    setRow(s, id, { phase: 'closed', supersededBy: successor.id });
+    mock.set(`POST ${ISSUES_PATH}`, { status: 201, body: { ...CREATED_ISSUE, number: 102 } });
+    const successor = await createTask(s.app, projectId, '换一种做法');
+    deliver(s, fetch, successor.id);
+    await vi.waitFor(() => expect(posts).toBe(2));
+    const sync = syncOf(s, fetch);
+    setRow(s, created.id, { phase: 'closed', supersededBy: successor.id });
     await sync.sweep();
     expect(writes(mock)).toEqual([]);
-    setRow(s, successor.id, { sourceRef: `github:${REPO}#102` });
+    release();
+    await flushSelfIssueWrites();
     await sync.sweep();
     expect(comments(mock)).toEqual(['Cairn：这个任务被 #102 取代，这里的 issue 关闭（未计划）。']);
     s.dispose();
@@ -1169,6 +1238,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, fetch, created.id);
     await call(s.app, 'DELETE', `/api/todos/${created.id}`);
     release();
     await flushSelfIssueWrites();
@@ -1228,6 +1298,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
     const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { phase: 'closed' } });
     const sync = syncOf(s, mock.impl);

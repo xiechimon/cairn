@@ -49,7 +49,7 @@ import {
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planAutoConfirmation, planContractOfStep } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
-import { setTodoPhase } from './todos.js';
+import { noteTaskCodeDelivered, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -228,6 +228,12 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     .run();
 
   finishScheduledStep(deps, stepRow);
+
+  if (
+    isBuildStepKind(stepRow.kind) &&
+    (outcome.hasChanges === true || buildRow.prNumber !== null || buildRow.prUrl !== null)
+  )
+    noteTaskCodeDelivered(deps, todoRow.id);
 
   if (
     receivesAnswers(stepRow.kind) &&

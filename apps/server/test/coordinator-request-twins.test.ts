@@ -1,4 +1,4 @@
-import { CHIEF_NOTICE_KIND } from '@cairn/shared';
+import { CHIEF_NOTICE_KIND, orchestrationSourceRef } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
@@ -16,9 +16,9 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { sweepFailedRetries } from '../src/services/needs-you.js';
 import { ownershipOf } from '../src/services/owner.js';
 import { createTaskIssueSync } from '../src/services/task-issue-sync.js';
-import { flushSelfIssueWrites } from '../src/services/todos.js';
+import { flushSelfIssueWrites, retrySelfIssueCreate } from '../src/services/todos.js';
 import { ctx, H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
-import { req } from './helpers.js';
+import { deliverCodeStep, req } from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 
 registerChiefHarness();
@@ -85,6 +85,10 @@ async function githubProject(): Promise<string> {
   });
   if (res.status !== 201) throw new Error(`github project: ${res.status}`);
   return ((await res.json()) as { id: string }).id;
+}
+
+function deliverCode(deps: BuildDeps, todoId: string, hasChanges = true): void {
+  deliverCodeStep(deps, todoId, { hasChanges });
 }
 
 function notices(): { message: string }[] {
@@ -188,6 +192,7 @@ describe('a continued task inherits the request issue instead of opening another
       { projectId, messageIds: [message(LONG_WORDS)] },
       { createdBy: H.userId, ownerId: H.userId },
     );
+    deliverCode(deps, first.id);
     await flushSelfIssueWrites();
     expect(row(first.id).sourceRef).toBe(`github:${REPO}#101`);
     expect(row(first.id).issueState).toBe('open');
@@ -220,6 +225,7 @@ describe('a continued task inherits the request issue instead of opening another
       { projectId, messageIds: [message(LONG_WORDS)] },
       { createdBy: H.userId, ownerId: H.userId },
     );
+    deliverCode(deps, first.id);
     await flushSelfIssueWrites();
     H.s.db
       .update(todoTable)
@@ -259,6 +265,7 @@ describe('a continued task inherits the request issue instead of opening another
       { projectId, messageIds: [message(LONG_WORDS)] },
       { createdBy: H.userId, ownerId: H.userId },
     );
+    deliverCode(deps, first.id);
     await flushSelfIssueWrites();
     H.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, first.id)).run();
     const continued = createRequestTodo(
@@ -355,5 +362,100 @@ describe('a superseded failed card leaves the retry and needs-you paths', () => 
   test('a superseded failed task claims no coordinator ownership', () => {
     const { todoId } = seedFailedTodo('todo-successor');
     expect(ownershipOf(H.s.db, row(todoId))).toBeNull();
+  });
+});
+
+describe('a Coordinator task opens its GitHub issue only when it delivers code', () => {
+  test('a one-off install request never reaches GitHub, even marked for a self issue', async () => {
+    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
+    const projectId = await githubProject();
+    const deps = { ...toolDeps(), githubFetch: mock.impl };
+    const created = createRequestTodo(
+      deps,
+      ctx(),
+      { projectId, messageIds: [message('帮我安装 cloakbrowser')] },
+      { createdBy: H.userId, ownerId: H.userId },
+    );
+    await flushSelfIssueWrites();
+    expect(row(created.id).sourceKind).toBe('github-issue-self');
+    expect(row(created.id).sourceRef).toBeNull();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
+  });
+
+  test('a research request opens no issue and carries no self-issue mark', async () => {
+    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
+    const projectId = await githubProject();
+    const deps = { ...toolDeps(), githubFetch: mock.impl };
+    const created = createRequestTodo(
+      deps,
+      ctx(),
+      { projectId, output: 'report', messageIds: [message('调研一下 ampcode')] },
+      { createdBy: H.userId, ownerId: H.userId },
+    );
+    await flushSelfIssueWrites();
+    expect(row(created.id).sourceKind).toBe('orchestration');
+    expect(row(created.id).sourceRef).toBe(orchestrationSourceRef(H.threadId));
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
+  });
+
+  test('a code task opens exactly one issue on the first leg that reports changes', async () => {
+    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
+    const projectId = await githubProject();
+    const deps = { ...toolDeps(), githubFetch: mock.impl };
+    const created = createRequestTodo(
+      deps,
+      ctx(),
+      { projectId, messageIds: [message(LONG_WORDS)] },
+      { createdBy: H.userId, ownerId: H.userId },
+    );
+    await flushSelfIssueWrites();
+    expect(row(created.id).sourceRef).toBeNull();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
+    deliverCode(deps, created.id);
+    await flushSelfIssueWrites();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
+    expect(row(created.id).sourceRef).toBe(`github:${REPO}#101`);
+    expect(row(created.id).issueState).toBe('open');
+  });
+
+  test('a successful leg that reports no changes opens no issue', async () => {
+    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
+    const projectId = await githubProject();
+    const deps = { ...toolDeps(), githubFetch: mock.impl };
+    const created = createRequestTodo(
+      deps,
+      ctx(),
+      { projectId, messageIds: [message(LONG_WORDS)] },
+      { createdBy: H.userId, ownerId: H.userId },
+    );
+    deliverCode(deps, created.id, false);
+    await flushSelfIssueWrites();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(0);
+    expect(row(created.id).sourceRef).toBeNull();
+  });
+
+  test('a later leg still opens the issue once, and retry then answers 409', async () => {
+    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: { number: 101 } } });
+    const projectId = await githubProject();
+    const deps = { ...toolDeps(), githubFetch: mock.impl };
+    const created = createRequestTodo(
+      deps,
+      ctx(),
+      { projectId, messageIds: [message(LONG_WORDS)] },
+      { createdBy: H.userId, ownerId: H.userId },
+    );
+    await expect(retrySelfIssueCreate(deps, created.id)).rejects.toMatchObject({
+      status: 409,
+    });
+    deliverCode(deps, created.id, false);
+    deliverCode(deps, created.id);
+    await flushSelfIssueWrites();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
+    deliverCode(deps, created.id);
+    await flushSelfIssueWrites();
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
+    await expect(retrySelfIssueCreate(deps, created.id)).rejects.toMatchObject({
+      status: 409,
+    });
   });
 });

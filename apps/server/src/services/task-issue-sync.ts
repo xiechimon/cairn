@@ -11,7 +11,7 @@ import {
 } from '../lib/github.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
-import type { TodoDeps } from './todos.js';
+import { selfIssueCreateInFlight, type TodoDeps } from './todos.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -53,7 +53,11 @@ export function desiredIssue(
   const archived = row.archivedAt !== null;
   if (row.supersededBy !== null) {
     const successor = deps.db.select().from(todo).where(eq(todo.id, row.supersededBy)).get();
-    if (successor?.sourceKind === 'github-issue-self' && successor.sourceRef === null)
+    if (
+      successor?.sourceKind === 'github-issue-self' &&
+      successor.sourceRef === null &&
+      selfIssueCreateInFlight(successor.id)
+    )
       return 'wait';
     const repo = githubRepoOfProject(projectOfTodo(deps.db, row));
     const ref =
