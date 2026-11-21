@@ -67,7 +67,10 @@ test('dragging a provider row moves it and the order survives a reload', async (
   if (target === null || from === null) throw new Error('rows not laid out');
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
-  await page.mouse.move(from.x + from.width / 2, target.y + 4, { steps: 12 });
+  await page.mouse.move(from.x + 400, target.y - 300, { steps: 12 });
+  const held = await page.locator('[data-instance-id="provider:p-b"]').boundingBox();
+  expect(held?.x ?? 0, 'the dragged row stays in its column').toBeCloseTo(from.x, 0);
+  expect(held?.y ?? 0, 'the dragged row stops at the top of the list').toBeCloseTo(target.y, 0);
   await page.mouse.up();
 
   const moved = ['provider:p-b', 'subscription:sub-d1', 'provider:p-a'];

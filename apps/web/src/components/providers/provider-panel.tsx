@@ -4,6 +4,7 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
+  type Modifier,
   MouseSensor,
   TouchSensor,
   useSensor,
@@ -17,7 +18,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { cn } from 'cn';
-import { Pencil } from 'lucide-react';
+import { GripVertical, Pencil } from 'lucide-react';
 import type { ComponentType, CSSProperties, DOMAttributes, ReactNode, Ref, SVGProps } from 'react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
@@ -67,10 +68,12 @@ export function ProviderInstanceRow({
   selectProps,
   style,
   dragging = false,
+  grip,
 }: {
   item: ProviderItem;
   selected: boolean;
   onSelect: () => void;
+  grip?: ReactNode;
   rowRef?: (node: HTMLElement | null) => void;
   rowListeners?: DOMAttributes<HTMLDivElement>;
   selectRef?: Ref<HTMLButtonElement>;
@@ -89,14 +92,16 @@ export function ProviderInstanceRow({
       data-dragging={dragging ? 'true' : undefined}
       aria-current={selected ? 'true' : undefined}
       className={cn(
-        'relative flex items-start gap-3 px-3.5 py-3',
+        'group/row relative flex items-start gap-3 px-3.5 py-3',
+        grip !== undefined && 'pl-1.5',
         dragging
-          ? 'z-10 cursor-grabbing bg-popover shadow-(--shadow-popover)'
+          ? 'z-10 cursor-grabbing bg-popover shadow-(--e2)'
           : selected
             ? 'bg-(--sidebar-active)'
             : 'bg-card hover:bg-menu-hover',
       )}
     >
+      {grip}
       <Button
         ref={selectRef}
         variant="ghost"
@@ -132,6 +137,38 @@ export function ProviderInstanceRow({
   );
 }
 
+function RowGrip({ dragging }: { dragging: boolean }) {
+  const { t } = useI18n();
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            aria-hidden
+            data-testid="provider-drag-grip"
+            className={cn(
+              '-mr-2 flex h-5 w-4 flex-none items-center justify-center rounded-(--cds-radius-xs) text-content-dim group-hover/row:text-content-secondary',
+              dragging ? 'cursor-grabbing text-content-secondary' : 'cursor-grab',
+            )}
+          />
+        }
+      >
+        <GripVertical className="size-4" />
+      </TooltipTrigger>
+      <TooltipContent side="left" sideOffset={6}>
+        {t('拖动调整优先级')}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+const keepInList: Modifier = ({ transform, draggingNodeRect, containerNodeRect }) => {
+  if (draggingNodeRect === null || containerNodeRect === null) return { ...transform, x: 0 };
+  const top = containerNodeRect.top - draggingNodeRect.top;
+  const bottom = containerNodeRect.bottom - draggingNodeRect.bottom;
+  return { ...transform, x: 0, y: Math.min(Math.max(transform.y, top), bottom) };
+};
+
 const KEYBOARD_CODES = {
   start: ['Space'],
   cancel: ['Escape'],
@@ -162,6 +199,7 @@ function SortableRow({
       item={item}
       selected={selected}
       onSelect={onSelect}
+      grip={<RowGrip dragging={isDragging} />}
       rowRef={setNodeRef}
       rowListeners={listeners}
       selectRef={setActivatorNodeRef}
@@ -226,6 +264,8 @@ function SortableRows({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      modifiers={[keepInList]}
+      autoScroll={false}
       onDragEnd={onDragEnd}
       accessibility={{
         announcements,
@@ -235,14 +275,16 @@ function SortableRows({
       }}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        {items.map((item) => (
-          <SortableRow
-            key={item.id}
-            item={item}
-            selected={item.id === selectedId}
-            onSelect={() => onSelect(item.id)}
-          />
-        ))}
+        <div className="flex flex-col divide-y divide-border">
+          {items.map((item) => (
+            <SortableRow
+              key={item.id}
+              item={item}
+              selected={item.id === selectedId}
+              onSelect={() => onSelect(item.id)}
+            />
+          ))}
+        </div>
       </SortableContext>
     </DndContext>
   );

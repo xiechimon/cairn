@@ -269,7 +269,7 @@ export function CheckResultPopover({
                 <div key={`${fact.label}/${fact.value}`} className="contents">
                   <dt
                     className={cn(
-                      'text-content-tertiary',
+                      'text-content-secondary',
                       fact.code === true && 'font-mono text-caption leading-5',
                     )}
                   >

@@ -55,6 +55,7 @@ export const EN: Record<string, string> = {
   即将重置: 'Resets soon',
   点击改名: 'Click to rename',
   可拖动排序: 'sortable',
+  拖动调整优先级: 'Drag to change priority',
   '已拿起 {name}，在第 {n} 位': 'Picked up {name} at position {n}',
   '{name} 移到第 {n} 位': '{name} moved to position {n}',
   '{name} 放在第 {n} 位': '{name} dropped at position {n}',
