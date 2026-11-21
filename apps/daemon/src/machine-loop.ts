@@ -21,6 +21,7 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
 } from '@cairn/shared';
+import { probeHostKey } from '@cairn/shared/host-identity';
 import { AgentReachProbe } from './agent-reach.js';
 import { createAcpBackend, createGeminiBackend } from './backend/acp.js';
 import {
@@ -581,6 +582,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
 
   let machineJson = loadMachineJson(paths);
+  const hostKey = machineJson?.hostKey ?? probeHostKey(paths.home);
   if (machineJson && machineJson.serverUrl !== config.serverUrl) {
     logger.machine(
       `enrolled against ${machineJson.serverUrl} but polling ${config.serverUrl} — if auth fails, re-enroll: logout, then start --api-key <k> --team <id>`,
@@ -588,11 +590,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   if (!machineJson) {
     if (!config.apiKey || !config.teamId) {
-      const enrolled = await enrollThroughBrowser(client, paths, config.serverUrl, config.name, {
-        now: () => Date.now(),
-        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-        log: (line) => logger.raw(line),
-      });
+      const enrolled = await enrollThroughBrowser(
+        client,
+        paths,
+        config.serverUrl,
+        config.name,
+        {
+          now: () => Date.now(),
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+          log: (line) => logger.raw(line),
+        },
+        hostKey ?? undefined,
+      );
       machineJson = {
         machineId: enrolled.machineId,
         token: enrolled.token,
@@ -608,6 +617,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         cliVersion: DAEMON_VERSION,
         claudeCode: claudeReport(),
         capabilities: capabilitiesReport(),
+        hostKey: hostKey ?? undefined,
       });
       machineJson = {
         machineId: enrolled.machineId,
@@ -618,6 +628,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       saveMachineJson(paths, machineJson);
       logger.raw(`Enrolled in team ${machineJson.teamId} (machine ${machineJson.machineId})`);
     }
+  }
+  if (hostKey !== null && machineJson.hostKey !== hostKey) {
+    machineJson = { ...machineJson, hostKey };
+    saveMachineJson(paths, machineJson);
   }
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
@@ -649,6 +663,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
       capabilities: capabilitiesReport(),
+      hostKey: hostKey ?? undefined,
     }),
     timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
     send: async (body, signal) => {

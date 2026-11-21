@@ -5,7 +5,7 @@ import { backgroundTaskSchema } from '../background-task.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
-import { machineRecordSchema } from '../records/machine.js';
+import { hostKeySchema, machineRecordSchema } from '../records/machine.js';
 import { confinementIdentitySchema } from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
@@ -40,10 +40,11 @@ export const machineEnrollBodySchema = z.object({
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
+  hostKey: hostKeySchema.optional(),
 });
 export type MachineEnrollBody = z.infer<typeof machineEnrollBodySchema>;
 
-export const machineEnrollResponseSchema = machineJsonSchema;
+export const machineEnrollResponseSchema = machineJsonSchema.omit({ hostKey: true });
 export type MachineEnrollResponse = z.infer<typeof machineEnrollResponseSchema>;
 
 export const MACHINE_ENROLL_TTL_MS = 600_000;
@@ -51,6 +52,7 @@ export const MACHINE_ENROLL_TTL_MS = 600_000;
 export const machineEnrollStartBodySchema = z.object({
   teamId: recordId.optional(),
   name: z.string().optional(),
+  hostKey: hostKeySchema.optional(),
 });
 export const machineEnrollStartResponseSchema = z.object({
   enrollId: z.string(),
@@ -61,7 +63,7 @@ export const machineEnrollStartResponseSchema = z.object({
 export const machineEnrollPollBodySchema = z.object({ enrollId: z.string() });
 export const machineEnrollPollResponseSchema = z.union([
   z.object({ status: z.literal('pending'), name: z.string().optional() }),
-  z.object({ status: z.literal('authorized'), machine: machineJsonSchema }),
+  z.object({ status: z.literal('authorized'), machine: machineEnrollResponseSchema }),
   z.object({ status: z.literal('expired') }),
 ]);
 export type MachineEnrollPollResponse = z.infer<typeof machineEnrollPollResponseSchema>;
@@ -106,6 +108,7 @@ export const machinePresenceBodySchema = z.object({
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
   connectionId: z.string().min(1).max(64).nullable().optional(),
+  hostKey: hostKeySchema.optional(),
 });
 export type MachinePresenceBody = z.infer<typeof machinePresenceBodySchema>;
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });

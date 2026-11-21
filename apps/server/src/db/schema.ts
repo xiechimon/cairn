@@ -976,8 +976,13 @@ export const machine = sqliteTable(
     claudeRateLimits: json<ClaudeRateLimitWindow[] | null>('claudeRateLimits'),
     lastSeenAt: epochMs('lastSeenAt'),
     capabilities: json<MachineCapabilities | null>('capabilities'),
+    hostKey: text('hostKey'),
+    retiredAt: epochMs('retiredAt'),
   },
-  (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
+  (t) => [
+    index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt),
+    index('machine_team_hostKey_idx').on(t.teamId, t.hostKey),
+  ],
 );
 
 export const threadPr = sqliteTable(

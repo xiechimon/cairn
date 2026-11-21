@@ -1102,6 +1102,10 @@ export const EN: Record<string, string> = {
     'Queued: {machine} cannot use the model for this step. Pick another model in work routing',
   '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了':
     'Queued: a local project only runs on the Runner that holds it, so {machine} cannot run it',
+  '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派':
+    'Queued: {machine} is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or reassign this step in work routing',
+  '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在工作路由里改派':
+    'Queued: the Runner this step is bound to was deleted or revoked and the step is not moved to another Runner. Register that Runner again, or reassign this step in work routing',
   '排队中：{machine} 的 Claude 被限流，恢复后自动继续':
     'Queued: Claude is rate limited on {machine}; this continues once the limit lifts',
   '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始':

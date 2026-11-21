@@ -379,6 +379,32 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     );
   });
 
+  test('a step pinned to a retired machine names it and says the step is not reassigned', () => {
+    const items = render({
+      steps: [
+        queuedStep({
+          position: 1,
+          waitingFor: { machineId: 'm1', name: 'xmonsMac' },
+          blocked: { kind: 'machine-retired', missing: [] },
+        }),
+      ],
+    });
+    const row = tail(items) as {
+      blocked?: boolean;
+      blockedKind?: string;
+      label: string;
+      labelVars: Record<string, string | number>;
+    };
+    expect(row.blocked).toBe(true);
+    expect(row.blockedKind).toBe('machine-retired');
+    expect(translate('zh', EN, row.label, row.labelVars)).toBe(
+      '排队中：xmonsMac 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派',
+    );
+    expect(translate('en', EN, row.label, row.labelVars)).toBe(
+      'Queued: xmonsMac is deleted or revoked and this step is not moved to another Runner. Register that Runner again, or reassign this step in work routing',
+    );
+  });
+
   test('a step held behind another task names the task, not a machine', () => {
     const items = render({
       steps: [

@@ -1,6 +1,6 @@
 import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -8,7 +8,9 @@ import {
   type MachineJson,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
+  machineJsonSchema,
 } from '@cairn/shared';
+import { probeHostKey } from '@cairn/shared/host-identity';
 import { type OtelEnv, withOtelEnv } from './otel-config.js';
 import { createRestartBudget } from './restart-budget.js';
 
@@ -50,9 +52,16 @@ async function postJson(
   return response.json();
 }
 
-async function enrollLocalMachine(origin: string, ownerToken: string): Promise<MachineJson> {
+async function enrollLocalMachine(
+  origin: string,
+  ownerToken: string,
+  hostKey: string | undefined,
+): Promise<MachineJson> {
   const started = machineEnrollStartResponseSchema.parse(
-    await postJson(`${origin}/api/machine/enroll/start`, { name: hostname() }),
+    await postJson(`${origin}/api/machine/enroll/start`, {
+      name: hostname(),
+      ...(hostKey !== undefined ? { hostKey } : {}),
+    }),
   );
   const confirmed = (await postJson(
     `${origin}/api/machine/enroll/confirm`,
@@ -60,6 +69,17 @@ async function enrollLocalMachine(origin: string, ownerToken: string): Promise<M
     { Authorization: `Bearer ${ownerToken}` },
   )) as { machine?: unknown };
   return machineEnrollResponseSchema.parse(confirmed.machine);
+}
+
+function storedHostKey(home: string): string | undefined {
+  try {
+    const parsed = machineJsonSchema.safeParse(
+      JSON.parse(readFileSync(join(home, 'machine.json'), 'utf8')),
+    );
+    return parsed.success ? parsed.data.hostKey : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function writeMachineJson(home: string, machine: MachineJson): void {
@@ -93,7 +113,11 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
 }
 
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
-  writeMachineJson(options.home, await enrollLocalMachine(options.origin, options.ownerToken));
+  const hostKey = storedHostKey(options.home) ?? probeHostKey(options.home) ?? undefined;
+  writeMachineJson(options.home, {
+    ...(await enrollLocalMachine(options.origin, options.ownerToken, hostKey)),
+    ...(hostKey !== undefined ? { hostKey } : {}),
+  });
   let child: ChildProcess | null = null;
   let unit: string | null = null;
   let pending: NodeJS.Timeout | null = null;

@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { type build, type machine, step, team } from '../db/schema.js';
+import { type build, machine, step, team } from '../db/schema.js';
 import { activeAntigravitySubscriptionMode } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
@@ -90,6 +90,7 @@ export function priorSessionOf(
 ): {
   priorSessionId: string | null;
   priorMachineId: string | null;
+  priorMachineLiveId: string | null;
   priorSubscriptionId: string | null;
   freshSession: boolean;
 } {
@@ -143,6 +144,10 @@ export function priorSessionOf(
   return {
     priorSessionId: startsNewRun ? null : (priorRow?.sessionId ?? null),
     priorMachineId: startsNewRun ? null : (priorRow?.machineId ?? null),
+    priorMachineLiveId:
+      startsNewRun || priorRow?.machineId == null || !machineCanReturn(db, priorRow.machineId)
+        ? null
+        : priorRow.machineId,
     priorSubscriptionId,
     freshSession:
       startsNewRun ||
@@ -176,11 +181,26 @@ export function teamDefaultMachineId(db: Pick<Db, 'select'>, teamId: string): st
   );
 }
 
+export function machineCanReturn(db: Pick<Db, 'select'>, machineId: string): boolean {
+  const row = db
+    .select({ id: machine.id, retiredAt: machine.retiredAt })
+    .from(machine)
+    .where(eq(machine.id, machineId))
+    .get();
+  return row !== undefined && row.retiredAt === null;
+}
+
+export function liveMachineId(db: Pick<Db, 'select'>, machineId: string | null): string | null {
+  return machineId !== null && machineCanReturn(db, machineId) ? machineId : null;
+}
+
 export function fallbackMachineId(
-  teamMachines: readonly Pick<MachineRow, 'id' | 'online' | 'kind' | 'lastSeenAt'>[],
+  teamMachines: readonly (Pick<MachineRow, 'id' | 'online' | 'kind' | 'lastSeenAt'> & {
+    retiredAt?: number | null | undefined;
+  })[],
   defaultMachineId: string | null,
 ): string | null {
-  const machines = teamMachines.filter(isRegisteredMachine);
+  const machines = teamMachines.filter((row) => row.retiredAt == null && isRegisteredMachine(row));
   if (defaultMachineId !== null && machines.some((row) => row.id === defaultMachineId)) {
     return defaultMachineId;
   }
@@ -191,16 +211,16 @@ export function fallbackMachineId(
 
 export function platformFallbackMachineId(
   db: Db,
-  machines: readonly Pick<
+  machines: readonly (Pick<
     MachineRow,
     'id' | 'online' | 'kind' | 'lastSeenAt' | 'tokenHash' | 'capabilities'
-  >[],
+  > & { retiredAt?: number | null | undefined })[],
   defaultMachineId: string | null,
   os: RunnerOs | undefined,
 ): string | null {
   if (os === undefined) return fallbackMachineId(machines, defaultMachineId);
   const matching = machines.filter(
-    (row) => row.tokenHash !== null && runnerOsOf(row.capabilities) === os,
+    (row) => row.retiredAt == null && row.tokenHash !== null && runnerOsOf(row.capabilities) === os,
   );
   if (matching.some((row) => row.id === defaultMachineId)) return defaultMachineId;
   const online = matching

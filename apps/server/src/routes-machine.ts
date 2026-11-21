@@ -272,6 +272,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ...(body.cliVersion !== undefined ? { cliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCode: body.claudeCode } : {}),
       ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
+      ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
       serverUrl: originOf(c),
     });
     return c.json(result);
@@ -296,6 +297,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       name: body.name,
       code,
       createdAt: now,
+      ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
     });
     return c.json({
       enrollId,
@@ -333,6 +335,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       name: entry.name ?? 'machine',
       serverUrl: originOf(c),
       ownerApproved: pairedDeviceIdOf(c) === null,
+      ...(entry.hostKey !== undefined ? { hostKey: entry.hostKey } : {}),
     });
     entry.machine = machineJson;
     return c.json({ machine: machineJson });

@@ -300,6 +300,26 @@ function localMachineRow(db: Db, teamId: string, name: string) {
     .get();
 }
 
+function machineByHostKey(db: Db, teamId: string, hostKey: string) {
+  return db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.hostKey, hostKey)))
+    .get();
+}
+
+function hostKeyHeldByOther(db: Db, teamId: string, hostKey: string, machineId: string): boolean {
+  return (
+    db
+      .select({ id: machine.id })
+      .from(machine)
+      .where(
+        and(eq(machine.teamId, teamId), eq(machine.hostKey, hostKey), ne(machine.id, machineId)),
+      )
+      .get() !== undefined
+  );
+}
+
 export function seedLocalMachine(db: Db, teamId: string): void {
   const local = db
     .select()
@@ -362,44 +382,56 @@ export function enrollMachine(
     serverUrl: string;
     claudeCode?: ClaudeCodeReport;
     capabilities?: unknown;
+    hostKey?: string;
   },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
   const isLocalName = input.name === hostname();
   const capabilities = parseCapabilitiesField(input.capabilities);
-  const byKey = db
-    .select()
-    .from(machine)
-    .where(and(eq(machine.apiKeyId, input.keyId), eq(machine.teamId, input.teamId)))
-    .get();
-  if (byKey) {
+  const hostKey = input.hostKey ?? null;
+  const byHost = hostKey === null ? undefined : machineByHostKey(db, input.teamId, hostKey);
+  const byKey =
+    byHost === undefined
+      ? db
+          .select()
+          .from(machine)
+          .where(and(eq(machine.apiKeyId, input.keyId), eq(machine.teamId, input.teamId)))
+          .get()
+      : undefined;
+  if (byHost !== undefined && byHost.kind === 'local' && byHost.apiKeyId === null) {
+    throw new HttpError(403, 'local machine requires owner approval');
+  }
+  const existing = byHost ?? byKey;
+  if (existing !== undefined) {
     db.update(machine)
       .set({
         tokenHash: token.hash,
         name: input.name,
         apiKeyId: input.keyId,
+        retiredAt: null,
+        ...(existing.hostKey === null && hostKey !== null ? { hostKey } : {}),
         ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
         ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-        ...(capabilities !== undefined || byKey.capabilities?.confinement
+        ...(capabilities !== undefined || existing.capabilities?.confinement
           ? {
               capabilities: mergeReportedCapabilities(
-                byKey.capabilities,
+                existing.capabilities,
                 capabilities ?? {
-                  ...(byKey.capabilities ?? { mcpServers: [], skills: [] }),
+                  ...(existing.capabilities ?? { mcpServers: [], skills: [] }),
                   confinement: undefined,
                 },
               ),
             }
           : {}),
       })
-      .where(eq(machine.id, byKey.id))
+      .where(eq(machine.id, existing.id))
       .run();
-    if (deps.machineHub.isConnected(byKey.id)) deps.machineHub.revokeMachine(byKey.id);
-    beginMachineStarting(deps, byKey);
-    adoptAsDefaultIfUnset(db, input.teamId, byKey.id);
+    if (deps.machineHub.isConnected(existing.id)) deps.machineHub.revokeMachine(existing.id);
+    beginMachineStarting(deps, existing);
+    adoptAsDefaultIfUnset(db, input.teamId, existing.id);
     return {
-      machineId: byKey.id,
+      machineId: existing.id,
       token: token.plain,
       teamId: input.teamId,
       serverUrl: input.serverUrl,
@@ -427,6 +459,7 @@ export function enrollMachine(
       apiKeyId: input.keyId,
       latestCliVersion: input.cliVersion ?? null,
       kind: isLocalName ? 'local' : 'remote',
+      ...(hostKey !== null ? { hostKey } : {}),
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
       ...(capabilities !== undefined
         ? { capabilities: mergeReportedCapabilities(null, capabilities) }
@@ -440,7 +473,13 @@ export function enrollMachine(
 
 export function authorizeEnrollmentMachine(
   deps: MachineDeps,
-  input: { teamId: string; name: string; serverUrl: string; ownerApproved: boolean },
+  input: {
+    teamId: string;
+    name: string;
+    serverUrl: string;
+    ownerApproved: boolean;
+    hostKey?: string;
+  },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
@@ -448,12 +487,21 @@ export function authorizeEnrollmentMachine(
   if (isLocal && !input.ownerApproved) {
     throw new HttpError(403, 'local machine requires owner approval');
   }
-  const existing = isLocal ? localMachineRow(db, input.teamId, input.name) : undefined;
+  const hostKey = input.hostKey ?? null;
+  const byHost = hostKey === null ? undefined : machineByHostKey(db, input.teamId, hostKey);
+  if (byHost?.kind === 'local' && !input.ownerApproved) {
+    throw new HttpError(403, 'local machine requires owner approval');
+  }
+  const existing = byHost ?? (isLocal ? localMachineRow(db, input.teamId, input.name) : undefined);
   if (existing) {
     db.update(machine)
       .set({
         tokenHash: token.hash,
-        kind: 'local',
+        name: input.name,
+        apiKeyId: null,
+        retiredAt: null,
+        ...(existing.kind === 'local' || isLocal ? { kind: 'local' as const } : {}),
+        ...(existing.hostKey === null && hostKey !== null ? { hostKey } : {}),
         capabilities:
           existing.capabilities === null
             ? null
@@ -485,6 +533,7 @@ export function authorizeEnrollmentMachine(
       apiKeyId: null,
       latestCliVersion: null,
       kind: isLocal ? 'local' : 'remote',
+      ...(hostKey !== null ? { hostKey } : {}),
     })
     .run();
   beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
@@ -515,9 +564,17 @@ export function markPresence(
     capabilities !== undefined
       ? mergeReportedCapabilities(row.capabilities, capabilities)
       : undefined;
+  const reportedHostKey = body.hostKey ?? null;
+  const backfilledHostKey =
+    reportedHostKey !== null &&
+    row.hostKey === null &&
+    !hostKeyHeldByOther(db, row.teamId, reportedHostKey, machineId)
+      ? reportedHostKey
+      : undefined;
   db.update(machine)
     .set({
       ...(admitOnline ? { online: true } : {}),
+      ...(backfilledHostKey !== undefined ? { hostKey: backfilledHostKey } : {}),
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),

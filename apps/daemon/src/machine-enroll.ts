@@ -17,6 +17,7 @@ const pendingSchema = z.object({
   expiresAt: z.number(),
   serverUrl: z.string().optional(),
   name: z.string().optional(),
+  hostKey: z.string().optional(),
 });
 
 export type PendingEnrollment = z.infer<typeof pendingSchema>;
@@ -64,6 +65,7 @@ export async function enrollThroughBrowser(
   serverUrl: string,
   name: string,
   io: EnrollIo,
+  hostKey?: string,
 ): Promise<EnrolledMachine> {
   const api = asEnrollApi(client);
   const path = pendingPath(paths);
@@ -72,13 +74,14 @@ export async function enrollThroughBrowser(
     pending !== null &&
     (pending.expiresAt <= io.now() ||
       (pending.serverUrl !== undefined && pending.serverUrl !== serverUrl) ||
-      (pending.name !== undefined && pending.name !== name))
+      (pending.name !== undefined && pending.name !== name) ||
+      (hostKey !== undefined && pending.hostKey !== hostKey))
   ) {
     rmSync(path, { force: true });
     pending = null;
   }
   if (pending === null) {
-    const started = await api.enrollStart({ name });
+    const started = await api.enrollStart({ name, ...(hostKey !== undefined ? { hostKey } : {}) });
     pending = {
       enrollId: started.enrollId,
       url: started.url,
@@ -86,6 +89,7 @@ export async function enrollThroughBrowser(
       expiresAt: io.now() + ENROLL_TTL_MS,
       serverUrl,
       name,
+      ...(hostKey !== undefined ? { hostKey } : {}),
     };
     writePrivateFile(path, `${JSON.stringify(pending, null, 2)}\n`);
     io.log(
@@ -116,6 +120,7 @@ export async function enrollThroughBrowser(
         token: machine.token,
         teamId: machine.teamId,
         serverUrl: machine.serverUrl,
+        ...(hostKey !== undefined ? { hostKey } : {}),
       });
       rmSync(path, { force: true });
       return machine;

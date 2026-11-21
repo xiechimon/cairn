@@ -29,6 +29,7 @@ import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import {
+  liveMachineId,
   platformFallbackMachineId,
   priorSessionOf,
   routeTargets,
@@ -135,6 +136,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
         ? {
             priorSessionId: null,
             priorMachineId: null,
+            priorMachineLiveId: null,
             priorSubscriptionId: null,
             freshSession: true,
           }
@@ -150,8 +152,9 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
             agentRow.provider,
           );
     const sessionId =
-      !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
-    const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;
+      !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineLiveId : null;
+    const namedId =
+      routeTargets(sessionId, liveMachineId(deps.db, agentRow.machineId))[0]?.machineId ?? null;
     const homeId =
       namedId ??
       platformFallbackMachineId(

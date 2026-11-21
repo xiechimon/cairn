@@ -2678,6 +2678,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "cliVersion": {
       "type": "string",
     },
+    "hostKey": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string",
+    },
     "name": {
       "type": "string",
     },
@@ -2954,6 +2958,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "type": "null",
         },
       ],
+    },
+    "hostKey": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string",
     },
   },
   "type": "object",
@@ -5841,6 +5849,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                     "kind": {
                       "enum": [
                         "machine-offline",
+                        "machine-retired",
                         "capability-missing",
                         "sandbox-unavailable",
                         "runtime-disabled",
@@ -6686,6 +6695,10 @@ exports[`body/envelope schema snapshots > machineJson > machineJson.json 1`] = `
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "hostKey": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string",
+    },
     "machineId": {
       "type": "string",
     },
@@ -7469,6 +7482,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
             "kind": {
               "enum": [
                 "machine-offline",
+                "machine-retired",
                 "capability-missing",
                 "sandbox-unavailable",
                 "runtime-disabled",
@@ -9468,6 +9482,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                             "kind": {
                               "enum": [
                                 "machine-offline",
+                                "machine-retired",
                                 "capability-missing",
                                 "sandbox-unavailable",
                                 "runtime-disabled",
@@ -11815,6 +11830,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                 "kind": {
                   "enum": [
                     "machine-offline",
+                    "machine-retired",
                     "capability-missing",
                     "sandbox-unavailable",
                     "runtime-disabled",

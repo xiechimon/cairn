@@ -86,7 +86,12 @@ import {
   todoGithubLabelIds,
 } from './github-labels.js';
 import { DELIVERABLES_MESSAGE_PREFIX, retireTodoDeliverables } from './machine-deliverables.js';
-import { priorSessionOf, soleOnlineMachineId, teamDefaultMachineId } from './machine-routing.js';
+import {
+  liveMachineId,
+  priorSessionOf,
+  soleOnlineMachineId,
+  teamDefaultMachineId,
+} from './machine-routing.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -442,6 +447,7 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
   const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  const localProject = projectOfTodo(deps.db, row)?.repoKind === 'local';
   const sole =
     teamDefaultMachineId(deps.db, row.teamId) ?? soleOnlineMachineId(online.map((m) => m.id));
   for (const s of pendingSteps) {
@@ -452,6 +458,7 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
         ? {
             priorSessionId: null,
             priorMachineId: null,
+            priorMachineLiveId: null,
             priorSubscriptionId: null,
             freshSession: true,
           }
@@ -468,8 +475,9 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
           );
     const named =
       !prior.freshSession && prior.priorSessionId !== null
-        ? prior.priorMachineId
-        : (agentRow.machineId ?? sole);
+        ? prior.priorMachineLiveId
+        : ((localProject ? agentRow.machineId : liveMachineId(deps.db, agentRow.machineId)) ??
+          sole);
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
     const target = online.find(
       (m) => m.id === named && runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),

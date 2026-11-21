@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { BRAND, DEVICE_ID_PATTERN, MACHINE_TOKEN_PATTERN } from '../brand.js';
 import { recordId } from '../records/common.js';
+import { hostKeySchema } from '../records/machine.js';
 
 export const CLI_COMMANDS = [
   'start',
@@ -53,6 +54,7 @@ export const machineJsonSchema = z.object({
   token: z.string().regex(MACHINE_TOKEN_PATTERN),
   teamId: recordId,
   serverUrl: z.string(),
+  hostKey: hostKeySchema.optional(),
 });
 export type MachineJson = z.infer<typeof machineJsonSchema>;
 

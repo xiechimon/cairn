@@ -126,6 +126,8 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'runtime-disabled': '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机',
   'model-unavailable': '排队中：{machine} 用不了这一步的模型——在工作路由里换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了',
+  'machine-retired':
+    '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
     '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
@@ -146,6 +148,8 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
   'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机',
   'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了',
+  'machine-retired':
+    '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在工作路由里改派',
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
     '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',

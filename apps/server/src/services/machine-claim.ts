@@ -87,6 +87,7 @@ import {
 } from './machine-deps.js';
 import {
   fallbackMachineId,
+  liveMachineId,
   platformFallbackMachineId,
   priorSessionOf,
   routeTargets,
@@ -487,13 +488,14 @@ function claimChiefTurn(
           online: machine.online,
           kind: machine.kind,
           lastSeenAt: machine.lastSeenAt,
+          retiredAt: machine.retiredAt,
         })
         .from(machine)
         .where(eq(machine.teamId, teamId))
         .all(),
       teamDefaultMachineId(db, teamId),
     );
-    const chiefMachine = cand.agentRow.machineId ?? sole;
+    const chiefMachine = liveMachineId(db, cand.agentRow.machineId) ?? sole;
     if (chiefMachine !== machineId) continue;
     const claimed = buildChiefClaim(
       deps,
@@ -614,7 +616,7 @@ async function tryClaim(
       },
       model.provider,
     );
-    const { priorSessionId, priorMachineId, freshSession } = prior;
+    const { priorSessionId, priorMachineId, priorMachineLiveId, freshSession } = prior;
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
@@ -628,6 +630,7 @@ async function tryClaim(
           lastSeenAt: machine.lastSeenAt,
           tokenHash: machine.tokenHash,
           capabilities: machine.capabilities,
+          retiredAt: machine.retiredAt,
         })
         .from(machine)
         .where(eq(machine.teamId, teamId))
@@ -638,8 +641,8 @@ async function tryClaim(
     const allowed = routeVerdict({
       machineId,
       targets: routeTargets(
-        !freshSession && priorSessionId !== null ? priorMachineId : null,
-        agentRow.machineId,
+        !freshSession && priorSessionId !== null ? priorMachineLiveId : null,
+        facts.localProject ? agentRow.machineId : liveMachineId(db, agentRow.machineId),
         sole,
       ),
     }).claim;
