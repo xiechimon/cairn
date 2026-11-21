@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
+import { isServerHelper } from '../src/server-process.ts';
 
 const LAUNCH_TIMEOUT_MS = 120_000;
 const GATE_SETTLE_MS = 5_000;
@@ -36,12 +37,16 @@ function childPids(parentPid) {
   }
 }
 
-function utilityPids(parentPid) {
-  return childPids(parentPid).filter((pid) =>
-    execFileSync('ps', ['-o', 'command=', '-p', pid], { encoding: 'utf8' }).includes(
-      '--type=utility',
-    ),
-  );
+function commandOf(pid) {
+  try {
+    return execFileSync('ps', ['-o', 'command=', '-p', pid], { encoding: 'utf8' });
+  } catch {
+    return '';
+  }
+}
+
+function serverPids(parentPid) {
+  return childPids(parentPid).filter((pid) => isServerHelper(commandOf(pid)));
 }
 
 const [appPath, screenshotPath, trayShotPath] = process.argv.slice(2);
@@ -60,7 +65,8 @@ function runnerProcesses() {
   return matchingPids(`${appRoot}/${RUNNER_ENTRY}`).join('\n');
 }
 
-const serverProcesses = () => matchingPids(`${appRoot}/${SERVER_ENTRY}`);
+const serverProcesses = () =>
+  matchingPids(`${appRoot}/${SERVER_ENTRY}`).filter((pid) => isServerHelper(commandOf(pid)));
 
 const app = await electron.launch({
   executablePath: join(resolve(appPath), 'Contents', 'MacOS', 'Cairn'),
@@ -167,7 +173,7 @@ try {
   assert.deepEqual(closed, { windows: 1, visible: false }, 'closing the window did not hide it');
   assert.equal((await fetch(origin)).status, 200, 'the server stopped when the window closed');
 
-  const pids = utilityPids(child.pid);
+  const pids = serverPids(child.pid);
   assert.equal(pids.length, 1, `expected one server process, found ${pids}`);
   process.kill(Number(pids[0]), 'SIGKILL');
   const recovered = await (async () => {
@@ -213,7 +219,7 @@ try {
     const spawned = await (async () => {
       const deadline = Date.now() + 15_000;
       while (Date.now() < deadline) {
-        if (utilityPids(abruptChild.pid).length > 0) return true;
+        if (serverPids(abruptChild.pid).length > 0) return true;
         await new Promise((done) => setTimeout(done, 500));
       }
       return false;
