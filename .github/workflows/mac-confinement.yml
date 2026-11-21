@@ -4,15 +4,19 @@ on:
   pull_request:
     paths:
       - apps/daemon/src/backend/**
+      - apps/daemon/src/process-tree.ts
       - apps/daemon/test/confine-*.test.ts
       - apps/daemon/test/confinement-availability.test.ts
+      - apps/daemon/test/computer-host-detached.test.ts
       - .github/workflows/mac-confinement.yml
   push:
     branches: [main]
     paths:
       - apps/daemon/src/backend/**
+      - apps/daemon/src/process-tree.ts
       - apps/daemon/test/confine-*.test.ts
       - apps/daemon/test/confinement-availability.test.ts
+      - apps/daemon/test/computer-host-detached.test.ts
       - .github/workflows/mac-confinement.yml
   workflow_dispatch:
 
@@ -47,3 +51,6 @@ jobs:
 
       - name: Run the Seatbelt session probes
         run: pnpm exec vitest run apps/daemon/test/confine-seatbelt.test.ts apps/daemon/test/confine-session.test.ts apps/daemon/test/acp-spike.test.ts
+
+      - name: Run the macOS process-cleanup probes
+        run: pnpm exec vitest run apps/daemon/test/computer-host-detached.test.ts
