@@ -188,6 +188,59 @@ describe('compaction failures are never silent', () => {
     },
   );
 
+  it('retries a length-capped summary once with a tighter bound and reports both calls', async () => {
+    const prompts: string[] = [];
+    const summarize = summarizerFor(
+      {
+        getModel: () => ({ provider: 'stub', id: 'sum' }),
+        completeSimple: async (_model: unknown, context: { messages: { content: string }[] }) => {
+          prompts.push(context.messages[0]!.content);
+          if (prompts.length === 1)
+            return {
+              ...fauxAssistantMessage('truncated tail', { stopReason: 'length' }),
+              usage: { input: 12_175, output: 8_192 },
+            };
+          return {
+            ...fauxAssistantMessage('shorter summary', { stopReason: 'stop' }),
+            usage: { input: 12_175, output: 900 },
+          };
+        },
+      } as never,
+      { provider: 'stub', modelId: 'sum' },
+      { threadId: 'summary-thread', stage: 'summary-fold' },
+    );
+    expect(await summarize('long transcript')).toBe('shorter summary');
+    expect(prompts.length).toBe(2);
+    expect(prompts[1]).toContain('long transcript');
+    expect(prompts[1]).toContain('6000');
+    await flushSpans();
+    expect(spans.filter((s) => s.name === 'summary summary-fold').length).toBe(2);
+  });
+
+  it('still reports and throws when the shorter summary retry also ends at the length limit', async () => {
+    let calls = 0;
+    const summarize = summarizerFor(
+      {
+        getModel: () => ({ provider: 'stub', id: 'sum' }),
+        completeSimple: async () => {
+          calls += 1;
+          return {
+            ...fauxAssistantMessage('truncated', { stopReason: 'length' }),
+            usage: { input: 12_175, output: 8_192 },
+          };
+        },
+      } as never,
+      { provider: 'stub', modelId: 'sum' },
+      { threadId: 'summary-thread', stage: 'summary-fold' },
+    );
+    await expect(summarize('long transcript')).rejects.toThrow('length');
+    expect(calls).toBe(2);
+    await flushSpans();
+    const foldSpans = spans.filter((s) => s.name === 'summary summary-fold');
+    expect(foldSpans.length).toBe(2);
+    expect(foldSpans.every((s) => s.status?.code === 2)).toBe(true);
+  });
+
   it('a failing memory flush is logged, marked on a span and counted while compaction completes', async () => {
     const window = 80_000;
     const faux = fauxProvider({
