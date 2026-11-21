@@ -8,6 +8,7 @@ import {
   isProviderOutage,
   noVisionSignalOf,
   parseRetryAfterMs,
+  runtimeUpdateRequired,
   STEP_FAILURE_KINDS,
 } from '../src/task-failure.js';
 
@@ -110,9 +111,33 @@ describe('classifyStepFailure (#1257 three-bucket classification)', () => {
       'quota',
       'capacity',
       'model_unavailable',
+      'runtime_outdated',
       'network',
       'other',
     ]);
+  });
+});
+
+const OUTDATED_CLI =
+  'API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required';
+
+describe('runtime_outdated: the provider asks for a newer agent CLI', () => {
+  test('the measured Claude Code rejection is runtime_outdated, not a retryable other', () => {
+    expect(classifyStepFailure(OUTDATED_CLI)).toBe('runtime_outdated');
+  });
+
+  test('it names the runtime and both versions', () => {
+    expect(runtimeUpdateRequired(OUTDATED_CLI)).toEqual({
+      runtime: 'Claude Code',
+      current: '2.1.278',
+      required: '2.1.280',
+    });
+    expect(runtimeUpdateRequired('400 version 3.0.1 or newer is required')).toEqual({
+      runtime: null,
+      current: null,
+      required: '3.0.1',
+    });
+    expect(runtimeUpdateRequired('400 invalid_request_error: bad tool schema')).toBeNull();
   });
 });
 

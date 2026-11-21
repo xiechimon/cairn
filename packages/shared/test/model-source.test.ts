@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import {
   claudeCodeReportSchema,
+  claudeCodeUpdateRequired,
   modelSourcesEnvelopeSchema,
   parseClaudeCodeModelSource,
 } from '../src/records/model-source.js';
@@ -139,5 +140,22 @@ describe('parseClaudeCodeModelSource', () => {
     });
     expect(envelope.sources).toHaveLength(2);
     expect(envelope.sources[1]?.hostname).toBe('exec-1');
+  });
+});
+
+describe('claudeCodeUpdateRequired flags a model before a turn fails', () => {
+  test('Opus 5.5 on Claude Code 2.1.278 needs 2.1.280', () => {
+    expect(claudeCodeUpdateRequired('claude-opus-5-5', '2.1.278 (Claude Code)')).toEqual({
+      runtime: 'Claude Code',
+      current: '2.1.278',
+      required: '2.1.280',
+    });
+    expect(claudeCodeUpdateRequired('claude-opus-5-5[1m]', '2.1.278')?.required).toBe('2.1.280');
+  });
+
+  test('a new enough CLI, an unlisted model or an unknown version flags nothing', () => {
+    expect(claudeCodeUpdateRequired('claude-opus-5-5', '2.1.330')).toBeNull();
+    expect(claudeCodeUpdateRequired('glm-5.3', '2.1.0')).toBeNull();
+    expect(claudeCodeUpdateRequired('claude-opus-5-5', null)).toBeNull();
   });
 });

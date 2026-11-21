@@ -2,6 +2,7 @@ import {
   CHIEF_NOTICE_KIND,
   classifyStepFailure,
   isProviderAuthFailure,
+  runtimeUpdateRequired,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import { and, eq, gt, inArray, isNotNull, lte, sql } from 'drizzle-orm';
@@ -45,7 +46,17 @@ const MISSING_CREDENTIALS = [
 ] as const;
 
 export function retryIsParked(error: string): boolean {
-  return error.startsWith(RETRY_PARKED_MARK) || classifyStepFailure(error) === 'model_unavailable';
+  if (error.startsWith(RETRY_PARKED_MARK)) return true;
+  const kind = classifyStepFailure(error);
+  return kind === 'model_unavailable' || kind === 'runtime_outdated';
+}
+
+function runtimeUpdateReason(
+  update: NonNullable<ReturnType<typeof runtimeUpdateRequired>>,
+): string {
+  const runtime = update.runtime ?? 'agent runtime';
+  const current = update.current === null ? '' : ` ships ${runtime} ${update.current}, but`;
+  return `${RETRY_PARKED_MARK}: this Cairn${current} the model needs ${runtime} ${update.required} or newer. Update Cairn, then retry.`;
 }
 
 export function failureNeedsHuman(errorMessage: string): boolean {
@@ -138,13 +149,20 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
     /(?:model_not_found|unsupported[ _-]model)\s*:\s*([\w./:-]+)/i.exec(error)?.[1] ??
     routeForStep(deps.db, owner, 'session')?.modelId ??
     'unknown';
+  const runtimeUpdate = runtimeUpdateRequired(error);
   const reason = error.startsWith(RETRY_PARKED_MARK)
     ? error
-    : modelUnavailable
-      ? `${RETRY_PARKED_MARK}: model unavailable (${rejectedModel}). Update model routing before retrying.`
-      : retriesExhausted
-        ? `${RETRY_PARKED_MARK}: automatic retries exhausted (${AUTOMATIC_RETRY_LIMIT}). Last error: ${error}`
-        : `${RETRY_PARKED_MARK}: ${failures} failed builds in one hour (limit ${FAILED_BUILDS_PER_HOUR_LIMIT}). Last error: ${error}`;
+    : runtimeUpdate !== null
+      ? `${runtimeUpdateReason(runtimeUpdate)}\n${error}`
+      : modelUnavailable
+        ? `${RETRY_PARKED_MARK}: model unavailable (${rejectedModel}). Update model routing before retrying.`
+        : retriesExhausted
+          ? `${RETRY_PARKED_MARK}: automatic retries exhausted (${AUTOMATIC_RETRY_LIMIT}). Last error: ${error}`
+          : `${RETRY_PARKED_MARK}: ${failures} failed builds in one hour (limit ${FAILED_BUILDS_PER_HOUR_LIMIT}). Last error: ${error}`;
+  const noticeReason =
+    runtimeUpdate !== null
+      ? runtimeUpdateReason(runtimeUpdate)
+      : reason.replace(/\. Last error: [\s\S]*$/, '. Open the task to see the error.');
   const id = `retry-parked-${buildId}`;
   const taskNotice = {
     id,
@@ -171,8 +189,11 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
       role: 'system' as const,
       content: JSON.stringify({
         kind: CHIEF_NOTICE_KIND,
-        message: `Task #${owner.seqNum} (${owner.title}): ${reason}`,
+        message: `Task #${owner.seqNum} (${owner.title}): ${noticeReason}`,
         provenance: `retry-parking:${owner.id}`,
+        ...(runtimeUpdate !== null
+          ? { runtimeUpdate: { task: owner.title, ...runtimeUpdate } }
+          : {}),
       }),
       projectId: owner.projectId,
       createdAt: now,

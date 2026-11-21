@@ -1,4 +1,4 @@
-import { classifyStepFailure } from '@cairn/shared';
+import { classifyStepFailure, failureEndsStepNow } from '@cairn/shared';
 import type { StepPassState } from './step-pass-events.js';
 
 export type StepPassRetry =
@@ -31,7 +31,7 @@ export function planStepPassRetry(input: StepPassRetryInput): StepPassRetry {
   ) {
     return { kind: 'network', delayMs: input.networkRetryDelays[input.networkRetries] ?? 0 };
   }
-  if (failure === 'model_unavailable') return { kind: 'finish' };
+  if (failureEndsStepNow(failureText)) return { kind: 'finish' };
   const modelErrorAfterTrip =
     state.lastModelError !== null && (input.watchdogTripped || state.retryStorm);
   if (

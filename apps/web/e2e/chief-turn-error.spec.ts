@@ -185,3 +185,49 @@ test('a turn waiting for a computer or an offline Runner shows the card and leav
   await expect(card).toHaveCount(0);
   await expect(page.getByTestId('chief-turn-error')).toHaveCount(0);
 });
+
+test('an outdated built-in Claude Code says so in English, offers only Update Cairn, and updates in place', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('cairn.locale', 'en');
+    const calls: string[] = [];
+    let status = 'idle';
+    Object.assign(window, {
+      updateCalls: calls,
+      cairnDesktop: {
+        update: {
+          state: async () => ({ status, version: '0.1.600' }),
+          check: async () => {
+            calls.push('check');
+            status = 'available';
+          },
+          install: async () => {
+            calls.push('install');
+          },
+          subscribe: () => () => {},
+        },
+      },
+    });
+  });
+  const raw =
+    'API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required';
+  await open(page, [
+    { id: 'm1', role: 'user', content: 'hello', createdAt: 10 },
+    { id: 'm2', role: 'assistant', content: 'Done.', createdAt: 11 },
+    { id: 'm3', role: 'user', content: 'again', createdAt: 12 },
+    failure('m4', 13, { message: raw }),
+  ]);
+  const card = page.getByTestId('chief-turn-error-card');
+  await expect(card).toHaveAttribute('data-kind', 'runtime-update');
+  await expect(card).toContainText(
+    "Cairn's built-in Claude Code 2.1.278 is too old: this model needs 2.1.280 or newer",
+  );
+  await expect(card).toContainText('Update Cairn, then try again.');
+  await expect(page.getByTestId('chief-stream')).not.toContainText('API Error');
+  await expect(card.getByTestId('chief-turn-retry')).toHaveCount(0);
+  await card.getByTestId('chief-turn-update').click();
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { updateCalls: string[] }).updateCalls))
+    .toEqual(['check', 'install']);
+});

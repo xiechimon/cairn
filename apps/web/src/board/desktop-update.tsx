@@ -18,6 +18,21 @@ function desktopUpdates(): DesktopUpdateBridge | null {
   return desktop?.update ?? null;
 }
 
+export function canUpdateDesktop(): boolean {
+  return desktopUpdates() !== null;
+}
+
+function installable(state: DesktopUpdateState | null): boolean {
+  return state?.status === 'available' || state?.status === 'ready';
+}
+
+export async function updateDesktopNow(): Promise<void> {
+  const bridge = desktopUpdates();
+  if (bridge === null) return;
+  if (!installable(await bridge.state())) await bridge.check();
+  if (installable(await bridge.state())) await bridge.install();
+}
+
 const BLOCKER_HINTS: Record<DesktopUpdateBlocker, string> = {
   development: '开发版不检查更新',
   'not-in-applications': '把 Cairn 移到「应用程序」后才能自动更新',

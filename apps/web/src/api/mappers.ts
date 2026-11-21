@@ -68,6 +68,7 @@ import {
   reviewVerdictSchema,
   reworkNoteWithoutReason,
   runnerOfflineContentSchema,
+  runtimeUpdateRequired,
   SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
@@ -1108,11 +1109,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         failureReasonKey(item.raw) === failureReasonKey(build.errorMessage ?? ''),
     )
   ) {
+    const plain = runtimeUpdatePlain(build.errorMessage);
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
       createdAt: todo.phaseAt,
       body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
+      ...(plain !== null ? { plain } : {}),
     });
   }
   if (
@@ -1207,12 +1210,14 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
     case BUILD_FAILURE_ROW_KIND: {
       const headline =
         /^(.+?\(exit -?\d+\))/.exec(row.reason)?.[1] ?? row.reason.split('\n')[0] ?? '';
+      const plain = runtimeUpdatePlain(row.reason);
       return {
         kind: 'fail',
         id,
         createdAt,
         title: stripAnsiEscapes(headline),
         body: failGuidanceBody(classifyStepFailure(row.reason)),
+        ...(plain !== null ? { plain } : {}),
         facts: {
           files: row.fileCount,
           commits: row.commits.map((commit) => commit.slice(0, 9)),
@@ -1224,8 +1229,29 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
   }
 }
 
+export function runtimeUpdatePlain(
+  raw: string,
+): { key: string; vars: Record<string, string> } | null {
+  const update = runtimeUpdateRequired(raw);
+  if (update === null) return null;
+  const vars = {
+    runtime: update.runtime ?? 'Claude Code',
+    current: update.current ?? '',
+    required: update.required,
+  };
+  return {
+    key:
+      update.current === null
+        ? '这个模型需要 {runtime} {required} 或更新的版本'
+        : 'Cairn 自带的 {runtime} {current} 太旧，这个模型需要 {required} 或更新的版本',
+    vars,
+  };
+}
+
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
+    case 'runtime_outdated':
+      return '更新 Cairn 后再重跑这个任务。';
     case 'network':
       return '连接模型服务时超时或断开，通常是暂时的，重跑即可。';
     case 'quota':
@@ -1538,6 +1564,7 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
         modelName: m.name,
         ...(source.machineId !== undefined ? { machineId: source.machineId } : {}),
         ...(lv !== undefined && lv !== 'unknown' ? { liveness: lv } : {}),
+        ...(m.updateRequired !== undefined ? { updateRequired: m.updateRequired } : {}),
         ...thinkingOf(m),
       });
     }
@@ -1548,6 +1575,7 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
 export type TurnErrorFacts = Omit<ChiefTurnErrorContent, 'kind'>;
 
 export type TurnFailureAction =
+  | 'update'
   | 'retry'
   | 'continue'
   | 'swap'
@@ -1650,6 +1678,13 @@ export function turnErrorCopy(error: TurnErrorFacts, onMac: boolean): TurnErrorC
         'Cairn 在回复途中重启或断开了，这一轮没跑完。已经做完的操作不会撤回；重试会把刚才的话再发一次。',
         ['retry'],
       );
+    case 'runtime-update': {
+      const plain = runtimeUpdatePlain(error.message);
+      Object.assign(vars, plain?.vars ?? {});
+      return copy(plain?.key ?? '这个模型需要更新的 Claude Code', '更新 Cairn 后再重试。', [
+        'update',
+      ]);
+    }
     case 'turn-limit':
       return copy(
         '这一轮的步数用完了',
@@ -1953,9 +1988,26 @@ function collectChiefStream(
       const notice = chiefNoticeContentSchema.safeParse(parsed);
       if (notice.success) {
         pendingTools = [];
+        const update = notice.data.runtimeUpdate;
         items.push({
           kind: 'robot',
           markdown: notice.data.message,
+          ...(update !== undefined
+            ? {
+                plain: {
+                  key:
+                    update.current === null
+                      ? '任务「{task}」已暂停：它的模型需要 {runtime} {required} 或更新的版本。更新 Cairn 后再重试。'
+                      : '任务「{task}」已暂停：Cairn 自带的 {runtime} {current} 太旧，它的模型需要 {required} 或更新的版本。更新 Cairn 后再重试。',
+                  vars: {
+                    task: update.task,
+                    runtime: update.runtime ?? 'Claude Code',
+                    current: update.current ?? '',
+                    required: update.required,
+                  },
+                },
+              }
+            : {}),
           seconds: '',
           id: m.id,
           ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),

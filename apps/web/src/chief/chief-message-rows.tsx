@@ -873,7 +873,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   const settled = item.typing !== true;
-  const whole = robotText(item);
+  const markdown = item.plain !== undefined ? t(item.plain.key, item.plain.vars) : item.markdown;
+  const whole = markdown ?? robotText(item);
   const fallbackNote =
     item.fallbackModel != null ? (
       <span data-testid="chief-fallback-note">
@@ -913,9 +914,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
             {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
           >
-            {item.markdown != null ? (
+            {markdown != null ? (
               <ChatMarkdown
-                text={item.markdown}
+                text={markdown}
                 bubbles
                 bubbleFooter={<BubbleReports todoIds={reports} />}
                 bubbleTools={(group, n) =>

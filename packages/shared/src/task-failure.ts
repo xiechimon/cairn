@@ -2,6 +2,7 @@ export const STEP_FAILURE_KINDS = [
   'quota',
   'capacity',
   'model_unavailable',
+  'runtime_outdated',
   'network',
   'other',
 ] as const;
@@ -18,10 +19,37 @@ function containsAny(haystack: string, needles: readonly string[]): boolean {
   return needles.some((n) => haystack.includes(n));
 }
 
+export const RUNTIME_UPDATE_REQUIRED_RE =
+  /(?:([A-Za-z][\w .-]*?)\s+(\d+(?:\.\d+)+)\s+does not support this model;\s*)?version\s+(\d+(?:\.\d+)+)\s+or newer is required/i;
+
+export interface RuntimeUpdateRequired {
+  runtime: string | null;
+  current: string | null;
+  required: string;
+}
+
+export function runtimeUpdateRequired(rawError: string): RuntimeUpdateRequired | null {
+  const match = RUNTIME_UPDATE_REQUIRED_RE.exec(rawError);
+  if (match === null || match[3] === undefined) return null;
+  const runtime = match[1]?.replace(/^.*\b(?:api error|error):?\s*\d{3}\s+/i, '').trim();
+  return {
+    runtime: runtime === undefined || runtime === '' ? null : runtime,
+    current: match[2] ?? null,
+    required: match[3],
+  };
+}
+
+export function failureEndsStepNow(rawError: string): boolean {
+  const kind = classifyStepFailure(rawError);
+  return kind === 'model_unavailable' || kind === 'runtime_outdated';
+}
+
 export function classifyStepFailure(rawError: string): StepFailureKind {
   const trimmed = rawError.trim();
   if (trimmed === '') return 'other';
   const lower = trimmed.toLowerCase();
+
+  if (RUNTIME_UPDATE_REQUIRED_RE.test(trimmed)) return 'runtime_outdated';
 
   if (
     /\bmodel\s+[^\n]+?\s+not found\b/.test(lower) ||

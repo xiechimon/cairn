@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { modelSourceModelSchema } from './model-source.js';
+import { reportedModelSchema } from './model-source.js';
 
 export const machineHardwareSchema = z.object({
   cpuCores: z.number().int().positive(),
@@ -121,12 +121,12 @@ export const devinReportSchema = z
   .object({
     installed: z.boolean(),
     version: z.string().min(1).max(64).optional(),
-    models: z.array(modelSourceModelSchema).optional(),
+    models: z.array(reportedModelSchema).optional(),
   })
   .strict();
 export type DevinReport = z.infer<typeof devinReportSchema>;
 
-export const antigravityModelSchema = modelSourceModelSchema.pick({
+export const antigravityModelSchema = reportedModelSchema.pick({
   id: true,
   name: true,
   thinkingLevels: true,

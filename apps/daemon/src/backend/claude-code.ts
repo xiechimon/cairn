@@ -37,7 +37,12 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { contextTokensOf, subscriptionKeyOf, todoFromTodoWrite } from '@cairn/shared';
+import {
+  contextTokensOf,
+  failureEndsStepNow,
+  subscriptionKeyOf,
+  todoFromTodoWrite,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { stepCredentialRedactor } from '../credential-output.js';
@@ -76,7 +81,8 @@ const SDK_WRITE_TOOLS = ['Edit', 'Write'];
 const SDK_ASK_TOOL = 'AskUserQuestion';
 
 function isRetryableError(message: string): boolean {
-  return /rate.?limit|overloaded|timeout|temporarily|5\d\d/i.test(message);
+  if (failureEndsStepNow(message)) return false;
+  return /rate.?limit|overloaded|timeout|temporarily|\b5\d\d\b/i.test(message);
 }
 
 export { todoFromTodoWrite };
@@ -279,7 +285,8 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             cacheWrite: callUsage.cache_creation_input_tokens ?? 0,
           });
       }
-      if ((msg as { error?: unknown }).error === 'authentication_failed') {
+      const apiError = (msg as { error?: unknown }).error;
+      if (apiError === 'authentication_failed') {
         state.authFailed = true;
       }
       const out: StepEvent[] = [];
@@ -314,6 +321,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
         }
       }
       if (parent !== undefined) return out;
+      if (typeof apiError === 'string' && apiError !== 'max_output_tokens') return out;
       out.push({
         type: 'message_end',
         message: {

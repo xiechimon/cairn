@@ -9,6 +9,7 @@ import {
   classifyAgentFailure,
   classifySkillFact,
   classifyStepFailure,
+  failureEndsStepNow,
   noVisionSignalOf,
   parseRetryAfterMs,
   REMOTE_TOOL_RETRY_DELAYS_MS,
@@ -257,11 +258,10 @@ export async function consumeStepPassEvent(
         const failureKind = s.lastErrorWasProcessCrash
           ? 'other'
           : classifyAgentFailure(ev.error.message);
-        if (
-          !s.lastErrorWasProcessCrash &&
-          classifyStepFailure(ev.error.message) === 'model_unavailable'
-        ) {
-          logger.step(`model unavailable: ${modelKey} — stopping session without retry`);
+        if (!s.lastErrorWasProcessCrash && failureEndsStepNow(ev.error.message)) {
+          logger.step(
+            `${classifyStepFailure(ev.error.message)}: ${modelKey} — stopping session without retry`,
+          );
           await handle.stop();
         } else if (failureKind === 'quota' || failureKind === 'capacity') {
           if (s.quotaTrip === null) {

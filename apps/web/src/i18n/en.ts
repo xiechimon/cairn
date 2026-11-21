@@ -1556,6 +1556,20 @@ export const EN: Record<string, string> = {
   模型服务: 'the model provider',
   复制原始错误: 'Copy original error',
   '没完成：{title}': "Didn't finish: {title}",
+  '更新 Cairn': 'Update Cairn',
+  '需要更新 Cairn': 'Needs a Cairn update',
+  '{n} 个需要更新 Cairn': '{n} need a Cairn update',
+  '更新 Cairn 后再重试。': 'Update Cairn, then try again.',
+  '更新 Cairn 后再重跑这个任务。': 'Update Cairn, then run this task again.',
+  '这个模型需要更新的 Claude Code': 'This model needs a newer Claude Code',
+  '这个模型需要 {runtime} {required} 或更新的版本':
+    'This model needs {runtime} {required} or newer',
+  'Cairn 自带的 {runtime} {current} 太旧，这个模型需要 {required} 或更新的版本':
+    "Cairn's built-in {runtime} {current} is too old: this model needs {required} or newer",
+  '任务「{task}」已暂停：它的模型需要 {runtime} {required} 或更新的版本。更新 Cairn 后再重试。':
+    'Task "{task}" is paused: its model needs {runtime} {required} or newer. Update Cairn, then try again.',
+  '任务「{task}」已暂停：Cairn 自带的 {runtime} {current} 太旧，它的模型需要 {required} 或更新的版本。更新 Cairn 后再重试。':
+    'Task "{task}" is paused: Cairn\'s built-in {runtime} {current} is too old, and its model needs {required} or newer. Update Cairn, then try again.',
   模型服务这次出错了: 'The model provider returned an error',
   连不上模型服务: "Can't reach the model provider",
   '模型服务不接受这个 API key': "The model provider didn't accept this API key",

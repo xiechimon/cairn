@@ -20,9 +20,9 @@ import type {
   ToolCallRecord,
 } from '@cairn/shared';
 import {
-  classifyStepFailure,
   createThinkingBindingGuard,
   ENV_VARS,
+  failureEndsStepNow,
   LANGFUSE_ATTR,
   observationAttributes,
   THINKING_LEVELS,
@@ -767,7 +767,7 @@ export class PiSessionHandle implements AgentSessionHandle {
         raw.type === 'message_end' &&
         raw.message?.role === 'assistant' &&
         raw.message.stopReason === 'error' &&
-        classifyStepFailure(raw.message.errorMessage ?? '') === 'model_unavailable'
+        failureEndsStepNow(raw.message.errorMessage ?? '')
       ) {
         session.setAutoRetryEnabled(false);
       }

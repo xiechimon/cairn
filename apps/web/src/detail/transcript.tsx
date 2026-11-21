@@ -494,7 +494,11 @@ function FailRow({
 }) {
   const [rawOpen, setRawOpen] = useState(false);
   const title =
-    item.facts === undefined ? item.title : t('本步异常结束：{reason}', { reason: item.title });
+    item.plain !== undefined
+      ? t(item.plain.key, item.plain.vars)
+      : item.facts === undefined
+        ? item.title
+        : t('本步异常结束：{reason}', { reason: item.title });
   const facts = failFactsText(item.facts, t);
   const copy = [title, item.body === '' ? '' : t(item.body), facts]
     .filter((part) => part !== '')

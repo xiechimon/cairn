@@ -218,7 +218,11 @@ export function subscriptionRowTone(
   models: readonly ModelSourceModel[],
 ): ProviderTone {
   if (view.tone === 'fail') return 'fail';
-  if (models.length === 0 || models.some((model) => model.liveness === 'dead')) return 'warn';
+  if (
+    models.length === 0 ||
+    models.some((model) => model.liveness === 'dead' || model.updateRequired !== undefined)
+  )
+    return 'warn';
   return view.tone;
 }
 
@@ -230,11 +234,13 @@ export function subscriptionSummary(
   t: TFunc,
 ): string {
   const retired = models.filter((model) => model.liveness === 'dead').length;
+  const outdated = models.filter((model) => model.updateRequired !== undefined).length;
   return [
     t('订阅'),
     ...(account.plan === null ? [] : [account.plan]),
     t('{n} 个模型', { n: models.length }),
     ...(retired === 0 ? [] : [t('{n} 个已下架', { n: retired })]),
+    ...(outdated === 0 ? [] : [t('{n} 个需要更新 Cairn', { n: outdated })]),
     ...(view.label === null ? [] : [view.label]),
     ...(account.lastUsedAt === null || view.label !== null
       ? []
@@ -638,6 +644,7 @@ export function SubscriptionDetail({
                 id={model.id}
                 testId="subscription-model"
                 dead={model.liveness === 'dead'}
+                needsUpdate={'updateRequired' in model && model.updateRequired !== undefined}
                 check={checks[model.id]}
                 busy={actions.modelsBusy ?? false}
                 meta={tierMeta(model, t)}

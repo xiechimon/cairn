@@ -1,3 +1,4 @@
+import semver from 'semver';
 import { z } from 'zod';
 import { thinkingLevelSchema } from '../thinking-levels.js';
 import { claudeLoginSchema } from './claude-login.js';
@@ -66,7 +67,7 @@ export const DEFAULT_DEVIN_MODELS: readonly ModelSourceModel[] = [
   { id: 'adaptive', name: 'Adaptive', slot: 'builtin', thinkingLevels: [] },
 ];
 
-export const modelSourceModelSchema = z.object({
+export const reportedModelSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   slot: z.string().optional(),
@@ -75,6 +76,12 @@ export const modelSourceModelSchema = z.object({
   thinkingDefault: thinkingLevelSchema.optional(),
   inServerThinkingLevels: z.array(thinkingLevelSchema).optional(),
   inServerThinkingDefault: thinkingLevelSchema.optional(),
+});
+
+export const modelSourceModelSchema = reportedModelSchema.extend({
+  updateRequired: z
+    .object({ runtime: z.string(), current: z.string(), required: z.string() })
+    .optional(),
 });
 export type ModelSourceModel = z.infer<typeof modelSourceModelSchema>;
 
@@ -115,6 +122,28 @@ export const DEFAULT_CLAUDE_CODE_MODELS: readonly ModelSourceModel[] = [
   { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', slot: 'builtin' },
   { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5', slot: 'builtin' },
 ];
+
+export const CLAUDE_CODE_MIN_CLI_VERSIONS: Readonly<Record<string, string>> = {
+  'claude-opus-5-5': '2.1.280',
+  'claude-sonnet-5-5': '2.1.284',
+  'claude-haiku-5-5': '2.1.293',
+  'claude-fable-5-2': '2.1.321',
+  'claude-fable-5-1': '2.1.257',
+  'claude-opus-5': '2.1.219',
+  'claude-fable-5': '2.1.169',
+  'claude-opus-4-8': '2.1.154',
+  'claude-opus-4-7': '2.1.111',
+};
+
+export function claudeCodeUpdateRequired(
+  modelId: string,
+  cliVersion: string | null | undefined,
+): { runtime: string; current: string; required: string } | null {
+  const required = CLAUDE_CODE_MIN_CLI_VERSIONS[modelId.replace(LONG_CONTEXT_SUFFIX, '')];
+  const current = semver.coerce(cliVersion ?? '')?.version;
+  if (required === undefined || current === undefined || semver.gte(current, required)) return null;
+  return { runtime: 'Claude Code', current, required };
+}
 
 const CLAUDE_CODE_ALIAS_FAMILIES: Readonly<Record<string, string>> = {
   best: 'opus',
@@ -209,7 +238,7 @@ export function parseClaudeCodeModelSource(raw: unknown, hostname: string): Mode
 export const claudeCodeReportSchema = z.object({
   installed: z.boolean(),
   hostname: z.string(),
-  models: z.array(modelSourceModelSchema),
+  models: z.array(reportedModelSchema),
   bin: claudeBinInfoSchema.nullable().optional(),
   auth: claudeAuthStateSchema.optional(),
   login: claudeLoginSchema.optional(),

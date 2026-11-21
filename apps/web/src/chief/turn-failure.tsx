@@ -7,6 +7,7 @@ import {
   type TurnFailureAction,
   turnErrorCopy,
 } from '../api/mappers.js';
+import { canUpdateDesktop, updateDesktopNow } from '../board/desktop-update.js';
 import { PANE_PARAM } from '../board/work-panel.js';
 import { Button } from '../components/ui/button.js';
 import { Marker } from '../components/ui/marker.js';
@@ -22,6 +23,7 @@ const FAIL_ICON_CLS = 'mt-0.5 size-5.5 flex-none text-(--destructive)';
 const WAIT_ICON_CLS = 'mt-0.5 size-5.5 flex-none text-(--card-button)';
 
 const ACTION_LABELS: Record<TurnFailureAction, string> = {
+  update: '更新 Cairn',
   retry: '重试',
   continue: '继续',
   swap: '换 Coordinator 模型',
@@ -186,8 +188,10 @@ export function TurnFailureCard({
   const text = useCopyText()(copy);
   const [open, setOpen] = useState(false);
   const detailId = useId();
-  const actions = copy.actions.filter(
-    (action) => (action !== 'retry' && action !== 'continue') || onRetry !== undefined,
+  const actions = copy.actions.filter((action) =>
+    action === 'update'
+      ? canUpdateDesktop()
+      : (action !== 'retry' && action !== 'continue') || onRetry !== undefined,
   );
   return (
     <NoticeCard
@@ -210,8 +214,8 @@ export function TurnFailureCard({
               size="sm"
               variant={variant}
               className="pointer-coarse:h-11"
-              data-testid="chief-turn-retry"
-              onClick={onRetry}
+              data-testid={action === 'update' ? 'chief-turn-update' : 'chief-turn-retry'}
+              onClick={action === 'update' ? () => void updateDesktopNow() : onRetry}
             >
               {label}
             </Button>

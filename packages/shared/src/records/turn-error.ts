@@ -1,7 +1,10 @@
+import { RUNTIME_UPDATE_REQUIRED_RE } from '../task-failure.js';
+
 export const TURN_ERROR_KINDS = [
   'no-model',
   'interrupted',
   'turn-limit',
+  'runtime-update',
   'connect',
   'key',
   'context',
@@ -21,6 +24,7 @@ const RULES: readonly [TurnErrorKind, RegExp][] = [
     /\b(interrupted|restart_limit|faulted|orphaned|reset)\b|journal lost|server restarted|stream disconnected/i,
   ],
   ['turn-limit', /\bturn_limit\b/i],
+  ['runtime-update', RUNTIME_UPDATE_REQUIRED_RE],
   [
     'connect',
     /Connection error|NECP|ECONNREFUSED|ENOTFOUND|EHOSTUNREACH|ENETUNREACH|ECONNRESET|fetch failed/i,
