@@ -68,6 +68,7 @@ import { EventQueue } from './event-queue.js';
 import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { describeImageWithModels } from './image-text.js';
 import { connectFailedLine } from './mcp-config.js';
+import { redactingMcpTransports } from './mcp-log-redaction.js';
 import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
 import { openPiHostSession } from './pi-host-client.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
@@ -1160,6 +1161,7 @@ export class PiBackend implements AgentBackend {
         createMcpExtension({
           loadConfig: () => ({ servers: [], errors: [] }),
           credentials: this.mcpCredentials,
+          createTransport: redactingMcpTransports(redact),
           logPath: join(this.opts.agentDir, 'mcp.log'),
         }),
       ],
