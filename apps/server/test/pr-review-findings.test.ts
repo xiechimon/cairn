@@ -255,7 +255,7 @@ function fixture() {
     now: 1000,
   });
   const reconcile = () => reconcilePrReviewFindings(deps, input());
-  const wake = () =>
+  const wake = (opts: { mergeableState?: string } = {}) =>
     createPrWakes(deps)({
       ...input(),
       pull: {
@@ -266,8 +266,10 @@ function fixture() {
         body: '',
         htmlUrl: null,
         headSha: 'abc',
+        baseSha: 'base',
+        baseRef: 'main',
         headRef: 'work',
-        mergeableState: 'clean',
+        mergeableState: opts.mergeableState ?? 'clean',
         additions: 1,
         deletions: 0,
       },
@@ -287,10 +289,22 @@ test.each(['P2', 'P3'])(
     expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(1);
     expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
     expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
+    expect(f.s.db.select().from(step).get()?.promptOrigin).toEqual({
+      kind: 'pr-wake',
+      reasons: ['review'],
+    });
     expect(f.s.db.select().from(step).get()?.prompt).toContain('a.ts:7');
     expect(f.s.db.select().from(step).get()?.prompt).toContain(f.state.body);
   },
 );
+
+test('a wake whose events are a conflict and a review marks both reasons on the enqueued step', async () => {
+  const f = fixture();
+  await f.wake({ mergeableState: 'dirty' });
+  const steps = f.s.db.select().from(step).where(ne(step.kind, 'chief')).all();
+  expect(steps).toHaveLength(1);
+  expect(steps[0]!.promptOrigin).toEqual({ kind: 'pr-wake', reasons: ['conflict', 'review'] });
+});
 
 test.each([true, false])(
   'dismissed ready PR with findings stays ready without notices or wakes (autoFix=%s)',

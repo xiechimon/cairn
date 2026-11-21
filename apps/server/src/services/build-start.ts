@@ -156,6 +156,9 @@ export function startBuilds(
         'session',
         todoRecord.teamId,
         [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
+        undefined,
+        undefined,
+        { kind: 'first-task' },
       );
       setTodoPhase(deps, todoId, 'queued', {
         ...(routeOverride !== undefined ? { routeOverride } : {}),

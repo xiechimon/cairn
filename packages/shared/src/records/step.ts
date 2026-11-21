@@ -78,7 +78,16 @@ export const stepPromptOriginSchema = z.discriminatedUnion('kind', [
     roundsMax: promptRound,
   }),
   z.object({ kind: z.literal('merge-conflict'), round: promptRound, roundsMax: promptRound }),
+  z.object({
+    kind: z.literal('pr-wake'),
+    reasons: z.array(z.enum(['ci', 'conflict', 'review', 'queue'])).min(1),
+  }),
+  z.object({ kind: z.literal('first-task') }),
+  z.object({ kind: z.literal('restart') }),
   z.object({ kind: z.literal('rework') }),
+  z.object({ kind: z.literal('replan') }),
+  z.object({ kind: z.literal('plan-rewrite') }),
+  z.object({ kind: z.literal('continue') }),
 ]);
 export type StepPromptOrigin = z.infer<typeof stepPromptOriginSchema>;
 

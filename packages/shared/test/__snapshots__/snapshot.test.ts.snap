@@ -5833,7 +5833,99 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                   "additionalProperties": false,
                   "properties": {
                     "kind": {
+                      "const": "pr-wake",
+                      "type": "string",
+                    },
+                    "reasons": {
+                      "items": {
+                        "enum": [
+                          "ci",
+                          "conflict",
+                          "review",
+                          "queue",
+                        ],
+                        "type": "string",
+                      },
+                      "minItems": 1,
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "reasons",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "first-task",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "restart",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
                       "const": "rework",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "replan",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "plan-rewrite",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "continue",
                       "type": "string",
                     },
                   },
@@ -7466,7 +7558,99 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
           "additionalProperties": false,
           "properties": {
             "kind": {
+              "const": "pr-wake",
+              "type": "string",
+            },
+            "reasons": {
+              "items": {
+                "enum": [
+                  "ci",
+                  "conflict",
+                  "review",
+                  "queue",
+                ],
+                "type": "string",
+              },
+              "minItems": 1,
+              "type": "array",
+            },
+          },
+          "required": [
+            "kind",
+            "reasons",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "first-task",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "restart",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
               "const": "rework",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "replan",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "plan-rewrite",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "continue",
               "type": "string",
             },
           },
@@ -9466,7 +9650,99 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                           "additionalProperties": false,
                           "properties": {
                             "kind": {
+                              "const": "pr-wake",
+                              "type": "string",
+                            },
+                            "reasons": {
+                              "items": {
+                                "enum": [
+                                  "ci",
+                                  "conflict",
+                                  "review",
+                                  "queue",
+                                ],
+                                "type": "string",
+                              },
+                              "minItems": 1,
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "reasons",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "first-task",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "restart",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
                               "const": "rework",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "replan",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "plan-rewrite",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "continue",
                               "type": "string",
                             },
                           },

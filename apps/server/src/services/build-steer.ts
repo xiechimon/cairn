@@ -338,6 +338,7 @@ export async function sendBuildSteer(
             answered ? ANSWERS_CONTINUE_PROMPT : body.content,
             false,
             human && !continuationOptions.schedule,
+            answered ? { kind: 'continue' } : undefined,
           );
           if (continuationOptions.schedule) {
             const wake = continuationOptions.schedule;

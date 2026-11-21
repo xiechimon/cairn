@@ -575,6 +575,13 @@ function RawTextDialog({
   );
 }
 
+const PR_WAKE_REASON_LABELS = {
+  ci: 'CI 检查未通过',
+  conflict: '分支冲突',
+  review: '评审意见',
+  queue: '合并队列未就绪',
+} as const;
+
 function stepPromptLine(origin: StepPromptOrigin, t: TFunc): string {
   switch (origin.kind) {
     case 'ci-fix': {
@@ -588,8 +595,22 @@ function stepPromptLine(origin: StepPromptOrigin, t: TFunc): string {
         round: origin.round,
         max: origin.roundsMax,
       });
+    case 'pr-wake':
+      return t('PR 唤醒：{reasons}', {
+        reasons: origin.reasons.map((reason) => t(PR_WAKE_REASON_LABELS[reason])).join('、'),
+      });
+    case 'first-task':
+      return t('任务开始：第一步的指令');
+    case 'restart':
+      return t('按反馈重启，继续本任务');
     case 'rework':
       return t('按反馈返工，继续本会话');
+    case 'replan':
+      return t('方案被驳回，重新规划');
+    case 'plan-rewrite':
+      return t('方案文件需要补齐');
+    case 'continue':
+      return t('问题已回答，继续本轮');
   }
 }
 

@@ -250,6 +250,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       ANSWERS_CONTINUE_PROMPT,
       false,
       true,
+      { kind: 'continue' },
     );
     return;
   }
@@ -260,7 +261,18 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       .where(eq(planTable.buildId, stepRow.buildId))
       .get();
     if (!planDoc) {
-      enqueueStep(deps, stepRow.buildId, 'plan', todoRow.teamId, PLAN_REWRITE_PROMPT);
+      enqueueStep(
+        deps,
+        stepRow.buildId,
+        'plan',
+        todoRow.teamId,
+        PLAN_REWRITE_PROMPT,
+        undefined,
+        undefined,
+        {
+          kind: 'plan-rewrite',
+        },
+      );
       return;
     }
     if (planContract !== null && !planContract.ok) {
@@ -270,6 +282,9 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         'plan',
         todoRow.teamId,
         buildPlanContractRewritePrompt(planContract.problem),
+        undefined,
+        undefined,
+        { kind: 'plan-rewrite' },
       );
       return;
     }

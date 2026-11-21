@@ -111,7 +111,9 @@ export async function applyBuildStepAction(
       revising.phase === 'review'
         ? buildReviewRejectPrompt(body.feedback)
         : buildReplanPrompt(body.feedback);
-    enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person');
+    enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person', {
+      kind: 'replan',
+    });
     holdSecondRejectionRework(deps, buildId);
   });
   for (const publish of afterCommit) publish();
