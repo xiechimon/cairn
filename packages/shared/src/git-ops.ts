@@ -83,6 +83,7 @@ export interface WorktreePrepareInput {
   repoKind?: ProjectRepoKind;
   workspacesRoot: string;
   credentials: BoundGitCredentials | null;
+  hookCredentials?: BoundGitCredentials | null;
   baseBranch?: string | null;
   machineCredentialFallback?: boolean;
   readonly?: boolean;

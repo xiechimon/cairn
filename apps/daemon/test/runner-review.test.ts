@@ -13,6 +13,7 @@ import type {
   ToolCallRecord,
   TranscriptUpload,
   WorktreeOps,
+  WorktreePrepareInput,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { builtinToolNames, PI_CAPABILITIES, sessionToolNames } from '../src/backend/pi.js';
@@ -102,7 +103,10 @@ class FakeClient implements MachineApi {
   uploadedTranscript = '';
   attachments: Record<string, unknown>[] = [];
 
-  constructor(private readonly uploadFailure?: 'reject' | 'unbound') {}
+  constructor(
+    private readonly uploadFailure?: 'reject' | 'unbound',
+    private readonly gitCredentials: GitCredentials | null = null,
+  ) {}
 
   async enroll(): Promise<never> {
     throw new Error('unused');
@@ -147,7 +151,7 @@ class FakeClient implements MachineApi {
         models: [{ id: 'stub-model', name: 'stub-model' }],
       },
       secrets: {},
-      git: null as GitCredentials | null,
+      git: this.gitCredentials,
     };
   }
   async skillsManifest() {
@@ -190,6 +194,7 @@ class FakeClient implements MachineApi {
 }
 
 interface WorkspaceOptions {
+  gitCredentials?: GitCredentials | null;
   rewindError?: string;
   uploadFailure?: 'reject' | 'unbound';
   head?: string | null;
@@ -316,7 +321,7 @@ async function setupWithBackend(
     }
   }
   const calls: string[] = [];
-  const client = new FakeClient(opts.uploadFailure);
+  const client = new FakeClient(opts.uploadFailure, opts.gitCredentials ?? null);
   client.calls = calls;
   const captured: SessionOpts[] = [];
   const deps = {
@@ -725,6 +730,44 @@ describe('out-of-tree verify execution', () => {
     const { client, captured } = await setup(verify, { head: null, reused: false });
     expect(captured).toHaveLength(0);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
+  });
+
+  test('verify clone/fetch keeps the step git credentials while workspace hooks get none', async () => {
+    const root = testTempDir('cairn-verify-creds-');
+    const source = join(root, 'source');
+    const env = commitEnv({ name: 'test-agent', email: 'test@example.com' });
+    await runGitOk(['init', '--initial-branch=main', source]);
+    writeFileSync(join(source, 'delivery.txt'), 'delivered\n');
+    await runGitOk(['add', 'delivery.txt'], { cwd: source });
+    await runGitOk(['commit', '-m', 'delivery'], { cwd: source, env });
+    const head = await runGitOk(['rev-parse', 'HEAD'], { cwd: source });
+    const prepareInputs: WorktreePrepareInput[] = [];
+    const calls: string[] = [];
+    const base = fakeWorkspace(source, calls, { head, reused: false });
+    const workspace: WorktreeOps = {
+      ...base,
+      async prepare(input) {
+        prepareInputs.push(input);
+        return base.prepare(input);
+      },
+    };
+    const claim = {
+      ...verify,
+      instruction: JSON.stringify({
+        kind: 'verify',
+        expectedHeadSha: head,
+        evidence: 'attachments',
+        evidenceDirectory: '.cairn-verify/1/',
+      }),
+    };
+    await setupWithBackend(
+      claim,
+      { workspace, gitCredentials: { username: 'x-access-token', password: 'step-git-secret' } },
+      capturingBackend,
+    );
+    expect(prepareInputs).toHaveLength(1);
+    expect(prepareInputs[0]!.credentials).toMatchObject({ password: 'step-git-secret' });
+    expect(prepareInputs[0]!.hookCredentials).toBeNull();
   });
 
   test.each([

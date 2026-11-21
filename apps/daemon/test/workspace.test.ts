@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import {
+  type BoundGitCredentials,
   BRAND,
   conversationBranch,
   ORPHAN_WORKTREE_TTL_MS,
@@ -432,6 +433,28 @@ describe('#1149 environment lifecycle hooks (two prepare mount points)', () => {
     });
     expect(prepared.hooks![0]!.output).toContain('setup-ran-marker');
     expect(logger.lines.some((l) => l.includes('setup hook: running'))).toBe(true);
+  }, 30_000);
+
+  test('verify shape: credentials feed clone/fetch while hookCredentials:null keeps them out of hook env', async () => {
+    const creds: BoundGitCredentials = {
+      username: 'x-access-token',
+      password: 'step-token-secret',
+      url: 'https://github.com/o/r.git',
+    };
+    seedHook(
+      'setup',
+      `#!/bin/sh\nif [ -z "$GIT_CONFIG_COUNT" ]; then echo "cred=unset"; else echo "cred=$GIT_CONFIG_COUNT"; fi\n`,
+    );
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const prepared = await ws.prepare({
+      ...prepareInput(CONV_A),
+      credentials: creds,
+      hookCredentials: null,
+    });
+    expect(prepared.hooks).toHaveLength(1);
+    expect(prepared.hooks![0]!.output).toContain('cred=unset');
   }, 30_000);
 
   test('repo without hooks: hooks default to [], zero hook log lines (behavior consistent with current)', async () => {

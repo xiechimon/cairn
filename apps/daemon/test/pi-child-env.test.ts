@@ -6,7 +6,12 @@ import type { SessionOpts } from '@cairn/shared';
 import { createAgentSession } from '@earendil-works/pi-coding-agent';
 import { afterEach, expect, test, vi } from 'vitest';
 import { daemonOtelFromEnv } from '../src/backend/otel.js';
-import { type AgentSessionEventLike, createPiBackend } from '../src/backend/pi.js';
+import {
+  type AgentSessionEventLike,
+  createPiBackend,
+  resolvePiCacheRetention,
+} from '../src/backend/pi.js';
+import { piHostEnv } from '../src/backend/pi-host-client.js';
 import { testTempDir } from './test-temp-dir.js';
 
 vi.mock('@earendil-works/pi-coding-agent', async (importOriginal) => {
@@ -97,6 +102,19 @@ test.each([undefined, { ...exporterEnv, FOO: 'step-value' }])(
     }
   },
 );
+
+test('the pi host child keeps operator pins but no daemon credentials', () => {
+  vi.stubEnv('CAIRN_PI_CACHE_RETENTION', 'long');
+  vi.stubEnv('CAIRN_CUSTOM_MODEL_REASONING', '1');
+  vi.stubEnv('GH_TOKEN', 'daemon-gh-token');
+  vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-anthropic-key');
+  const env = piHostEnv();
+  expect(env.CAIRN_PI_CACHE_RETENTION).toBe('long');
+  expect(env.CAIRN_CUSTOM_MODEL_REASONING).toBe('1');
+  expect(resolvePiCacheRetention(env)).toBe('long');
+  expect(env).not.toHaveProperty('GH_TOKEN');
+  expect(env).not.toHaveProperty('ANTHROPIC_API_KEY');
+});
 
 test('the embedded pi keeps its agent dir and pins out of task commands', async () => {
   const directory = testTempDir('cairn-pi-pins-');

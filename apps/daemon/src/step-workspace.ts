@@ -20,6 +20,7 @@ export interface StepWorkspaceInput {
   repo: StepRepo;
   workspacesRoot: string;
   credentials: BoundGitCredentials | null;
+  hookCredentials?: BoundGitCredentials | null;
   refresh: GitCredentialFallbackOpts['refresh'];
   machineName: string;
   env?: NodeJS.ProcessEnv;
@@ -41,6 +42,7 @@ export async function prepareStepWorkspace(
         baseBranch: repo.baseBranch,
         workspacesRoot: input.workspacesRoot,
         credentials: input.credentials,
+        hookCredentials: input.hookCredentials,
         machineCredentialFallback: repo.kind === 'github',
         env: input.env,
       });
@@ -112,6 +114,7 @@ export interface StepWorkspaceSetupInput {
   repo: StepRepo | null;
   workspacesRoot: string;
   credentials: BoundGitCredentials | null;
+  hookCredentials?: BoundGitCredentials | null;
   refresh: GitCredentialFallbackOpts['refresh'];
   machineName: string;
   attachmentVerify: boolean;
@@ -143,6 +146,7 @@ export async function setUpStepWorkspace(
       repo,
       workspacesRoot: input.workspacesRoot,
       credentials: input.credentials,
+      hookCredentials: input.hookCredentials,
       refresh: input.refresh,
       machineName: input.machineName,
       env: input.env,

@@ -247,7 +247,12 @@ export class WorkspaceManager implements WorktreeOps {
           if (remoteAhead > 0 && current !== branch) throw new RemoteBranchDivergedError(branch);
         }
         this.logger.workspace('Worktree reused');
-        const hooks = await this.runHookStage(convDir, 'resume', input.credentials, input.env);
+        const hooks = await this.runHookStage(
+          convDir,
+          'resume',
+          input.hookCredentials === undefined ? input.credentials : input.hookCredentials,
+          input.env,
+        );
         return {
           cwd: convDir,
           baseRepoDir,
@@ -276,7 +281,12 @@ export class WorkspaceManager implements WorktreeOps {
       }
       await gitPrim.worktreeAdd(baseRepoDir, branch, convDir, base);
       this.logger.workspace(`Worktree added (${branch} from ${base})`);
-      const hooks = await this.runHookStage(convDir, 'setup', input.credentials, input.env);
+      const hooks = await this.runHookStage(
+        convDir,
+        'setup',
+        input.hookCredentials === undefined ? input.credentials : input.hookCredentials,
+        input.env,
+      );
       return {
         cwd: convDir,
         baseRepoDir,
