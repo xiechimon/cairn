@@ -70,6 +70,7 @@ test.describe('wide screens', () => {
   test('the left screen edge opens the peek too', async ({ page }) => {
     await page.addInitScript((key) => localStorage.setItem(key, '1'), COLLAPSED);
     await page.goto(HOME);
+    await expect(reopen(page)).toBeVisible();
     await page.mouse.move(700, 500);
     await page.mouse.move(2, 500);
     await page.mouse.move(3, 501);
