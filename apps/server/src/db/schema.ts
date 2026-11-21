@@ -334,6 +334,7 @@ export const step = sqliteTable(
     holdUntil: epochMs('holdUntil'),
     holdCount: integer('holdCount').notNull().default(0),
     claimCount: integer('claimCount').notNull().default(0),
+    mcpGrant: json<string[]>('mcpGrant'),
     memoryTrace: json<ChiefMemoryTrace>('memoryTrace'),
     createdAt: epochMs('createdAt').notNull(),
   },

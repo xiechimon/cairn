@@ -2193,7 +2193,7 @@ export function sweepAbandonedChiefSteps(
       if (!stale) continue;
       deps.db
         .update(step)
-        .set({ status: 'pending', machineId: null })
+        .set({ status: 'pending', machineId: null, mcpGrant: null })
         .where(eq(step.id, row.id))
         .run();
       deps.convHub?.publishStep(thread.id, {

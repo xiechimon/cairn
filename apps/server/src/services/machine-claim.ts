@@ -264,7 +264,10 @@ export function stepMcpGrant(
 }
 
 export function chiefTurnLocked(stepRow: typeof step.$inferSelect): boolean {
-  return turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
+  return (
+    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true ||
+    memoryEditIdOfPrompt(stepRow.prompt) !== null
+  );
 }
 
 function claimLocalTools(agentTools: readonly string[]): string[] {
@@ -320,6 +323,7 @@ function buildChiefClaim(
             modelId: model.modelId,
             thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
           },
+    mcpGrant: stepMcpGrant(deps.db, machineRow, chiefTurnLocked(stepRow)) ?? null,
   });
   if (claimed === null) return null;
   return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
@@ -376,7 +380,7 @@ function chiefClaimPayload(
         ));
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const memoryEditTurn = memoryEditIdOfPrompt(stepRow.prompt) !== null;
-  const locked = mailTurn || memoryEditTurn;
+  const locked = chiefTurnLocked(stepRow);
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
   const chiefMcp = machineRow ? stepMcpGrant(deps.db, machineRow, locked) : locked ? [] : undefined;
   return {
@@ -648,6 +652,7 @@ async function tryClaim(
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     if (!stillAuthorized()) return null;
     const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+    const workerMcp = stepMcpGrant(db, machineRow, infoPlan !== null);
     let won = false;
     try {
       won = db.transaction((tx) => {
@@ -704,6 +709,7 @@ async function tryClaim(
             holdReason: null,
             holdUntil: null,
             ranModel: pinnedModel,
+            mcpGrant: workerMcp ?? null,
           })
           .where(
             and(
@@ -769,7 +775,6 @@ async function tryClaim(
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp = stepMcpGrant(db, machineRow, infoPlan !== null);
     const segmentsDaemon = cliVersionAtLeast(
       machineRow.latestCliVersion,
       TASK_SEGMENTS_MIN_CLI_VERSION,

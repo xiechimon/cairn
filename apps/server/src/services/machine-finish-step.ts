@@ -109,7 +109,14 @@ function holdStepForQuota(
   const holdCount = stepRow.holdCount + 1;
   const holdUntil = nowMs() + quotaHoldBackoffMs(holdCount);
   db.update(step)
-    .set({ status: 'pending', machineId: null, holdReason: 'quota', holdUntil, holdCount })
+    .set({
+      status: 'pending',
+      machineId: null,
+      holdReason: 'quota',
+      holdUntil,
+      holdCount,
+      mcpGrant: null,
+    })
     .where(eq(step.id, stepRow.id))
     .run();
   const note = quotaHoldNote(outcome.errorMessage ?? '', holdUntil);
@@ -723,6 +730,7 @@ function requeueStep(
       fallback,
       holdReason: null,
       holdUntil: null,
+      mcpGrant: null,
     })
     .where(eq(step.id, stepRow.id))
     .run();

@@ -72,13 +72,14 @@ export function claimPendingChiefStep(
     machineId: string | null;
     bind?: ChiefSubscriptionBind | string | null;
     model?: StepRanModel | null;
+    mcpGrant?: string[] | null;
   },
 ): StepRow | null {
   const bind =
     typeof options.bind === 'string'
       ? { runtime: 'claude-code' as const, teamId: options.bind }
       : (options.bind ?? null);
-  const claimedAt = nowMs();
+  const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
   const claimed = db.transaction(() => {
     const res = db
       .update(step)
@@ -108,6 +109,7 @@ export function claimPendingChiefStep(
         holdReason: null,
         holdUntil: null,
         ranModel: options.model ?? null,
+        mcpGrant: options.mcpGrant ?? null,
       })
       .where(
         and(

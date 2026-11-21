@@ -152,6 +152,7 @@ function world() {
         kind: 'chief',
         prompt,
         status: 'claimed',
+        mcpGrant: ['gmail'],
         createdAt: 2,
       })
       .run();

@@ -246,6 +246,7 @@ export async function executeRelayToolCall(
         teamId: threadRow.teamId,
         threadId,
         scopeProjectId: stepScopeProjectId(row),
+        mcpGrant: row.mcpGrant,
         ...(turnForcesOutboundApproval(deps.db, row.prompt) ? { untrustedTurn: true } : {}),
       },
       name,

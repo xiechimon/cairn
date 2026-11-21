@@ -116,6 +116,7 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
           holdReason: null,
           holdUntil: null,
           ranModel: { provider: plan.provider, modelId: plan.modelId },
+          mcpGrant: null,
         })
         .where(and(eq(step.id, stepRow.id), eq(step.status, 'pending')))
         .run();

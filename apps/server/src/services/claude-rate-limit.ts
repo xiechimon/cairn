@@ -80,6 +80,7 @@ function writeClaudeQuota(
       quotaBlock: next.quotaBlock,
       holdReason: null,
       holdUntil: null,
+      mcpGrant: null,
     })
     .where(
       and(
@@ -270,7 +271,13 @@ function handBackClaimed(deps: MachineDeps, stepId: string): boolean {
   return (
     deps.db
       .update(step)
-      .set({ status: 'pending', machineId: null, holdReason: null, holdUntil: null })
+      .set({
+        status: 'pending',
+        machineId: null,
+        holdReason: null,
+        holdUntil: null,
+        mcpGrant: null,
+      })
       .where(and(eq(step.id, stepId), eq(step.status, 'claimed')))
       .run().changes > 0
   );

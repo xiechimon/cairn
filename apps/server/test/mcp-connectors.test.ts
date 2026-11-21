@@ -700,7 +700,12 @@ describe('MCP connector OAuth', () => {
       const id = queueConnectorStep(t.s, projectId, runner.machineId);
       t.s.db
         .update(stepTable)
-        .set({ status: 'claimed', machineId: runner.machineId, claimedAt: Date.now() })
+        .set({
+          status: 'claimed',
+          machineId: runner.machineId,
+          claimedAt: Date.now(),
+          mcpGrant: ['linear'],
+        })
         .where(eq(stepTable.id, id))
         .run();
       return id;

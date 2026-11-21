@@ -46,6 +46,7 @@ export interface ConnectorCallContext {
   threadId: string;
   scopeProjectId: string | null;
   untrustedTurn?: boolean;
+  mcpGrant: readonly string[] | null;
 }
 
 type ConnectorRow = typeof mcpConnector.$inferSelect;
@@ -330,12 +331,16 @@ export async function executeConnectorToolCall(
     if (parsed.tool !== MAIL_SEND_TOOL) throw new HttpError(400, `unknown connector tool ${name}`);
     return executeMailSend(deps, ctx, params);
   }
+  const actionId = `connector.${parsed.slug}.${parsed.tool}`;
+  if (!(ctx.mcpGrant ?? []).includes(parsed.slug)) {
+    journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
+    throw new HttpError(403, `connector ${parsed.slug} is outside the step's grant`);
+  }
   const row = deps.db
     .select()
     .from(mcpConnector)
     .where(and(eq(mcpConnector.teamId, ctx.teamId), eq(mcpConnector.slug, parsed.slug)))
     .get();
-  const actionId = `connector.${parsed.slug}.${parsed.tool}`;
   if (row === undefined) {
     journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
     throw new HttpError(400, `unknown connector ${parsed.slug}`);

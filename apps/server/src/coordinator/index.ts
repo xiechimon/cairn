@@ -37,7 +37,7 @@ import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTurnModel } from '../services/machine-claim.js';
 import { teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
-import { localBrowserConnector } from '../services/mcp-servers.js';
+import { connectorSlugs, localBrowserConnector } from '../services/mcp-servers.js';
 import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
@@ -396,10 +396,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     if (STEER_HOLDS.includes(head.holdReason ?? '')) return null;
     if (head.holdUntil !== null && head.holdUntil > nowMs()) return null;
     const teamId = threadTeam(threadId);
-    const model = teamId === null ? null : serverTurnModel(db, teamId, head);
+    if (teamId === null) return null;
+    const model = serverTurnModel(db, teamId, head);
     if (model === null) return null;
     if (hasEarlierLiveChiefStep(db, head)) return null;
-    const claimed = claimPendingChiefStep(db, head, { machineId: null, model });
+    const claimed = claimPendingChiefStep(db, head, {
+      machineId: null,
+      model,
+      mcpGrant: connectorSlugs(db, teamId),
+    });
     if (claimed === null) return null;
     freshClaims.add(head.id);
     publishStepStatus(machine, head.id);
