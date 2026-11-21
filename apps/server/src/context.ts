@@ -61,6 +61,7 @@ export interface AppContext {
       code: string;
       createdAt: number;
       hostKey?: string;
+      fromLocalHost?: boolean;
       machine?: { machineId: string; token: string; teamId: string; serverUrl: string };
     }
   >;

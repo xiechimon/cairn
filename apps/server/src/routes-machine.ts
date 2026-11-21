@@ -74,6 +74,7 @@ import {
   findMachineByToken,
   finishStep,
   heartbeatStep,
+  localEnrollmentRefusal,
   machineAttachmentDownload,
   machineRunningCount,
   machineSkillFile,
@@ -283,6 +284,14 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   const ENROLL_CAP = 100;
   app.post('/api/machine/enroll/start', async (c) => {
     const body = parseWith(machineEnrollStartBodySchema, await jsonBody(c), 'body');
+    const fromLocalHost = isLoopbackPeer(c);
+    const refusal = localEnrollmentRefusal(ctx.db, {
+      teamId: body.teamId ?? ctx.team.id,
+      name: body.name,
+      hostKey: body.hostKey,
+      fromLocalHost,
+    });
+    if (refusal !== null) throw new HttpError(409, refusal);
     const now = Date.now();
     for (const [id, e] of ctx.enrollments) {
       if (now - e.createdAt > MACHINE_ENROLL_TTL_MS) ctx.enrollments.delete(id);
@@ -299,6 +308,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       name: body.name,
       code,
       createdAt: now,
+      fromLocalHost,
       ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
     });
     return c.json({
@@ -337,6 +347,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       name: entry.name ?? 'machine',
       serverUrl: originOf(c),
       ownerApproved: pairedDeviceIdOf(c) === null,
+      fromLocalHost: entry.fromLocalHost === true,
       ...(entry.hostKey !== undefined ? { hostKey: entry.hostKey } : {}),
     });
     entry.machine = machineJson;

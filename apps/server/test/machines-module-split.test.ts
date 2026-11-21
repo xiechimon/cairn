@@ -35,6 +35,7 @@ describe('machines.ts facade', () => {
       'finishStep',
       'heartbeatStep',
       'isChiefConversation',
+      'localEnrollmentRefusal',
       'machineAttachmentDownload',
       'machineRunningCount',
       'machineSkillFile',

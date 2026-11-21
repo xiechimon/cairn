@@ -38,17 +38,21 @@ function call(
   app: Hono,
   method: string,
   path: string,
-  opts: { cred?: string; body?: unknown } = {},
+  opts: { cred?: string; body?: unknown; peer?: string } = {},
 ): Promise<Response> {
   const headers: Record<string, string> = {};
   if (opts.cred) headers.authorization = `Bearer ${opts.cred}`;
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   return Promise.resolve(
-    app.request(path, {
-      method,
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    }),
+    app.request(
+      path,
+      {
+        method,
+        headers,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      },
+      opts.peer === undefined ? undefined : { incoming: { socket: { remoteAddress: opts.peer } } },
+    ),
   );
 }
 
@@ -79,9 +83,15 @@ async function enroll(
 /** The desktop path: enroll/start names the host, the owner approves, the host
  * gets a machine.json. Nothing here carries an api key, so only the hostKey can
  * tie this enrollment to the machine the host already had. */
-async function enrollThroughOwner(s: TestServer, name: string, hostKey: string): Promise<Enrolled> {
+async function enrollThroughOwner(
+  s: TestServer,
+  name: string,
+  hostKey: string,
+  opts: { peer?: string } = {},
+): Promise<Enrolled> {
   const start = await call(s.app, 'POST', '/api/machine/enroll/start', {
     body: { name, hostKey },
+    ...(opts.peer !== undefined ? { peer: opts.peer } : {}),
   });
   expect(start.status).toBe(200);
   const { enrollId } = (await start.json()) as { enrollId: string };
@@ -306,6 +316,139 @@ describe('adoption guards', () => {
       const restart = await enrollThroughOwner(w.s, 'host-a', HOST_KEY_A);
       expect(restart.machineId).toBe(w.a.machineId);
       expect(machineRow(w.s, w.a.machineId)?.apiKeyId).toBeNull();
+    } finally {
+      w.s.dispose();
+    }
+  });
+});
+
+describe('the server host name is not an enrollment credential', () => {
+  const HOST_KEY_LOCAL = 'f'.repeat(64);
+
+  async function enrollLocal(
+    s: TestServer,
+    hostKey: string,
+  ): Promise<{ machineId: string; token: string }> {
+    const enrolled = await enrollThroughOwner(s, hostname(), hostKey, { peer: '127.0.0.1' });
+    expect(machineRow(s, enrolled.machineId)?.kind).toBe('local');
+    return enrolled;
+  }
+
+  test('an anonymous enrollment named like the server host cannot re-key the local runner', async () => {
+    const w = await world();
+    try {
+      seedLocalMachine(w.s.db, w.s.team.id);
+      const local = await enrollLocal(w.s, HOST_KEY_LOCAL);
+      const tokenHashBefore = machineRow(w.s, local.machineId)?.tokenHash;
+      expect(tokenHashBefore).not.toBeNull();
+
+      const start = await call(w.s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: hostname() },
+      });
+      const enrollId =
+        start.status === 200 ? ((await start.json()) as { enrollId: string }).enrollId : undefined;
+      if (enrollId !== undefined) {
+        await call(w.s.app, 'POST', '/api/machine/enroll/confirm', { body: { enrollId } });
+      }
+      expect(start.status).toBe(409);
+      expect(machineRow(w.s, local.machineId)?.tokenHash).toBe(tokenHashBefore);
+      expect((await call(w.s.app, 'GET', '/api/machine/me', { cred: local.token })).status).toBe(
+        200,
+      );
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a remote enrollment carrying the local runner host key is refused at start', async () => {
+    const w = await world();
+    try {
+      seedLocalMachine(w.s.db, w.s.team.id);
+      const local = await enrollLocal(w.s, HOST_KEY_LOCAL);
+      const tokenHashBefore = machineRow(w.s, local.machineId)?.tokenHash;
+
+      const start = await call(w.s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: 'not-the-host', hostKey: HOST_KEY_LOCAL },
+      });
+      expect(start.status).toBe(409);
+      expect(machineRow(w.s, local.machineId)?.tokenHash).toBe(tokenHashBefore);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a loopback enrollment named like the host cannot re-key a local row whose host key it lacks', async () => {
+    const w = await world();
+    try {
+      seedLocalMachine(w.s.db, w.s.team.id);
+      const local = await enrollLocal(w.s, HOST_KEY_LOCAL);
+      const tokenHashBefore = machineRow(w.s, local.machineId)?.tokenHash;
+
+      const start = await call(w.s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: hostname(), hostKey: HOST_KEY_A },
+        peer: '127.0.0.1',
+      });
+      expect(start.status).toBe(409);
+      expect(machineRow(w.s, local.machineId)?.tokenHash).toBe(tokenHashBefore);
+      expect((await call(w.s.app, 'GET', '/api/machine/me', { cred: local.token })).status).toBe(
+        200,
+      );
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('an enrollment opened before the local row was keyed cannot claim it afterwards', async () => {
+    const w = await world();
+    try {
+      seedLocalMachine(w.s.db, w.s.team.id);
+      const early = await call(w.s.app, 'POST', '/api/machine/enroll/start', {
+        body: { name: hostname() },
+        peer: '127.0.0.1',
+      });
+      expect(early.status).toBe(200);
+      const { enrollId } = (await early.json()) as { enrollId: string };
+
+      const local = await enrollLocal(w.s, HOST_KEY_LOCAL);
+      const tokenHashBefore = machineRow(w.s, local.machineId)?.tokenHash;
+
+      const confirmed = await call(w.s.app, 'POST', '/api/machine/enroll/confirm', {
+        body: { enrollId },
+      });
+      expect(confirmed.status).toBe(403);
+      expect(machineRow(w.s, local.machineId)?.tokenHash).toBe(tokenHashBefore);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a loopback claim carrying the local host key cannot rename the local row', async () => {
+    const w = await world();
+    try {
+      seedLocalMachine(w.s.db, w.s.team.id);
+      const local = await enrollLocal(w.s, HOST_KEY_LOCAL);
+      const again = await enrollThroughOwner(w.s, 'renamed-host', HOST_KEY_LOCAL, {
+        peer: '127.0.0.1',
+      });
+      expect(again.machineId).toBe(local.machineId);
+      expect(machineRow(w.s, local.machineId)?.name).toBe(hostname());
+      expect(machineRows(w.s).filter((m) => m.kind === 'local')).toHaveLength(1);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('the local runner still re-keys its own row through loopback plus its host key', async () => {
+    const w = await world();
+    try {
+      seedLocalMachine(w.s.db, w.s.team.id);
+      const first = await enrollLocal(w.s, HOST_KEY_LOCAL);
+      const again = await enrollLocal(w.s, HOST_KEY_LOCAL);
+      expect(again.machineId).toBe(first.machineId);
+      expect(again.token).not.toBe(first.token);
+      expect((await call(w.s.app, 'GET', '/api/machine/me', { cred: again.token })).status).toBe(
+        200,
+      );
     } finally {
       w.s.dispose();
     }

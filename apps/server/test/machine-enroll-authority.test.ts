@@ -14,23 +14,28 @@ function call(
   app: Hono,
   method: string,
   path: string,
-  opts: { cred?: string; body?: unknown } = {},
+  opts: { cred?: string; body?: unknown; peer?: string } = {},
 ): Promise<Response> {
   const headers: Record<string, string> = {};
   if (opts.cred) headers.authorization = `Bearer ${opts.cred}`;
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
   return Promise.resolve(
-    app.request(path, {
-      method,
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    }),
+    app.request(
+      path,
+      {
+        method,
+        headers,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      },
+      opts.peer === undefined ? undefined : { incoming: { socket: { remoteAddress: opts.peer } } },
+    ),
   );
 }
 
 async function ownerClaimLocal(s: TestServer): Promise<{ machineId: string; token: string }> {
   const start = await call(s.app, 'POST', '/api/machine/enroll/start', {
     body: { name: HOST, teamId: s.team.id },
+    peer: '127.0.0.1',
   });
   expect(start.status).toBe(200);
   const { enrollId } = (await start.json()) as { enrollId: string };

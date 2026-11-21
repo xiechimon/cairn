@@ -470,6 +470,42 @@ export function enrollMachine(
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
 
+function enrollmentExistingRow(
+  db: Db,
+  teamId: string,
+  name: string | undefined,
+  hostKey: string | null,
+) {
+  const byHost = hostKey === null ? undefined : machineByHostKey(db, teamId, hostKey);
+  if (byHost !== undefined) return byHost;
+  return name === undefined ? undefined : localMachineRow(db, teamId, name);
+}
+
+/** Whether an enrollment may claim the server host's own runner identity. A
+ * machine name is self-reported and is not a credential: claiming the local
+ * runner (by name or by hostKey) needs proof that the enrollment was started on
+ * the host itself, and once the row knows a hostKey the enrollment must present
+ * that same one. */
+export function localEnrollmentRefusal(
+  db: Db,
+  input: { teamId: string; name?: string; hostKey?: string; fromLocalHost: boolean },
+): string | null {
+  const namesThisHost = input.name === hostname();
+  const hostKey = input.hostKey ?? null;
+  const row = enrollmentExistingRow(db, input.teamId, input.name, hostKey);
+  if (row?.kind !== 'local' && !namesThisHost) return null;
+  if (row !== undefined && row.kind !== 'local') {
+    return 'another enrolled machine already holds this host name';
+  }
+  if (
+    !input.fromLocalHost ||
+    (row !== undefined && row.hostKey !== null && hostKey !== row.hostKey)
+  ) {
+    return 'this enrollment does not prove it is the local host runner';
+  }
+  return null;
+}
+
 export function authorizeEnrollmentMachine(
   deps: MachineDeps,
   input: {
@@ -477,26 +513,33 @@ export function authorizeEnrollmentMachine(
     name: string;
     serverUrl: string;
     ownerApproved: boolean;
+    fromLocalHost: boolean;
     hostKey?: string;
   },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
   const isLocal = input.name === hostname();
-  if (isLocal && !input.ownerApproved) {
-    throw new HttpError(403, 'local machine requires owner approval');
-  }
   const hostKey = input.hostKey ?? null;
-  const byHost = hostKey === null ? undefined : machineByHostKey(db, input.teamId, hostKey);
-  if (byHost?.kind === 'local' && !input.ownerApproved) {
+  const existing = enrollmentExistingRow(db, input.teamId, input.name, hostKey);
+  const claimsLocal = existing?.kind === 'local' || isLocal;
+  if (claimsLocal && !input.ownerApproved) {
     throw new HttpError(403, 'local machine requires owner approval');
   }
-  const existing = byHost ?? (isLocal ? localMachineRow(db, input.teamId, input.name) : undefined);
+  const refusal = localEnrollmentRefusal(db, {
+    teamId: input.teamId,
+    name: input.name,
+    hostKey: input.hostKey,
+    fromLocalHost: input.fromLocalHost,
+  });
+  if (refusal !== null) {
+    throw new HttpError(403, refusal);
+  }
   if (existing) {
     db.update(machine)
       .set({
         tokenHash: token.hash,
-        name: input.name,
+        name: existing.kind === 'local' ? hostname() : input.name,
         apiKeyId: null,
         retiredAt: null,
         ...(existing.kind === 'local' || isLocal ? { kind: 'local' as const } : {}),
