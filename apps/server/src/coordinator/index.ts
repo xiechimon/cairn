@@ -766,12 +766,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       await infoCards.idle();
     },
-    close: async () => {
+    close: async (): Promise<void> => {
       closing = true;
       clearInterval(timer);
       try {
         await infoCards.close();
         await runtime.close();
+        while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       } finally {
         for (const lease of leases.values()) lease.release();
         leases.clear();

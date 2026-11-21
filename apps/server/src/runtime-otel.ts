@@ -43,6 +43,8 @@ import { storedStepRoute } from './services/step-route.js';
 const SCOPE = 'cairn.server';
 const COORDINATOR_TURN_SPAN = 'coordinator turn';
 const tracings = new Map<string, CairnTracing>();
+let sealed = false;
+let droppedAfterSeal = 0;
 
 function runtimeTarget(env: NodeJS.ProcessEnv): OtlpTarget | null {
   try {
@@ -54,6 +56,10 @@ function runtimeTarget(env: NodeJS.ProcessEnv): OtlpTarget | null {
 
 function push(target: OtlpTarget, env: NodeJS.ProcessEnv, spans: CairnSpan[]): void {
   if (spans.length === 0) return;
+  if (sealed) {
+    droppedAfterSeal += spans.length;
+    return;
+  }
   const environment = otelEnvironment(env);
   const key = JSON.stringify([target.url.href, target.headers, environment]);
   let tracing = tracings.get(key);
@@ -72,6 +78,15 @@ export async function shutdownRuntimeOtel(): Promise<void> {
   const open = [...tracings.values()];
   tracings.clear();
   await Promise.all(open.map((tracing) => tracing.shutdown()));
+}
+
+export async function sealRuntimeOtel(): Promise<void> {
+  sealed = true;
+  await shutdownRuntimeOtel();
+}
+
+export function spansDroppedBySeal(): number {
+  return droppedAfterSeal;
 }
 
 function stepFailureReason(db: Db, row: typeof step.$inferSelect): string | undefined {

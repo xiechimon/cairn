@@ -4,6 +4,7 @@ import { createConnection } from 'node:net';
 import { dirname } from 'node:path';
 import { getRequestListener } from '@hono/node-server';
 import type { Context, Hono } from 'hono';
+import { createHttpDrain } from '../shutdown-http.js';
 
 const LISTENER_ENV_KEY = 'cairnListener';
 const TAILNET_LISTENER = 'tailnet';
@@ -180,10 +181,6 @@ export async function listenOnTailnetSocket(
   }
   return {
     server,
-    close: () =>
-      new Promise<void>((resolve) => {
-        server.close(() => resolve());
-        server.closeAllConnections();
-      }),
+    close: createHttpDrain(server),
   };
 }

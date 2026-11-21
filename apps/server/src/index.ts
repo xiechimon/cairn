@@ -30,7 +30,7 @@ import { createServerLogger } from './lib/logger.js';
 import { loopbackOwnerFor } from './lib/loopback-owner.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
-import { shutdownRuntimeOtel } from './runtime-otel.js';
+import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
@@ -376,6 +376,8 @@ async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   scheduler.stop();
+  killInFlightPick();
+  computerScreens.close();
   await Promise.race([
     tailscale.withdraw().catch(() => {}),
     new Promise((resolve) => setTimeout(resolve, TAILSCALE_WITHDRAW_MS)),
@@ -384,14 +386,17 @@ async function shutdown(): Promise<void> {
     coordinator?.close(),
     new Promise((resolve) => setTimeout(resolve, COORDINATOR_CLOSE_MS)),
   ]);
-  killInFlightPick();
-  computerScreens.close();
+  await drainHttp();
+  await tailnetReady;
+  await tailnet.stop();
   await im.shutdown().catch(() => {});
   await mail.shutdown().catch(() => {});
   setImRuntime(null);
-  await drainHttp(shutdownRuntimeOtel);
-  await tailnetReady;
-  await tailnet.stop();
+  await sealRuntimeOtel();
+  const dropped = spansDroppedBySeal();
+  if (dropped > 0) {
+    logger.warn({ spans: dropped }, 'spans dropped after the final tracing shutdown');
+  }
   close();
   process.exit(0);
 }
