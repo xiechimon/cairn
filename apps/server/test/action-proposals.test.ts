@@ -33,11 +33,8 @@ import {
 } from '../src/services/action-proposals.js';
 import { executeAction } from '../src/services/action-registry.js';
 import { upsertChiefMessage } from '../src/services/chief.js';
-import {
-  answerQuestion,
-  askQuestionContentOf,
-  cancelQuestion,
-} from '../src/services/chief-questions.js';
+import { askQuestionContentOf, cancelQuestion } from '../src/services/chief-question-store.js';
+import { answerQuestion } from '../src/services/chief-questions.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { fakeMachineApi } from './coordinator/fake-machine-api.js';
 import { bootServer, req } from './helpers.js';

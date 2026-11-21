@@ -36,10 +36,10 @@ import {
 import {
   askQuestionContentOf,
   cancelQuestion,
-  parseAnswerBody,
   proposalIdOfCard,
   publishQuestion,
-} from './services/chief-questions.js';
+} from './services/chief-question-store.js';
+import { parseAnswerBody } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
 import { sendDesignComments } from './services/design-comments.js';

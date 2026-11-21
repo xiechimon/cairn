@@ -1,10 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, step as stepTable } from '../src/db/schema.js';
+import { ASK_PARKED_REASON, cancelPendingQuestions } from '../src/services/chief-question-store.js';
 import {
   ASK_PARK_MS,
-  ASK_PARKED_REASON,
-  cancelPendingQuestions,
   createOrGetQuestion,
   holdForQuestion,
 } from '../src/services/chief-questions.js';

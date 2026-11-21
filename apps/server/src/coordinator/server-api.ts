@@ -14,7 +14,7 @@ import {
 import { HttpError } from '../lib/errors.js';
 import { NotFoundError } from '../services/builds.js';
 import { chiefMessageStored } from '../services/chief.js';
-import { askQuestionContentOf } from '../services/chief-questions.js';
+import { askQuestionContentOf } from '../services/chief-question-store.js';
 import { storeQuickReplies } from '../services/chief-quick-replies.js';
 import { releaseUnconsumedSteer } from '../services/chief-turns.js';
 import {

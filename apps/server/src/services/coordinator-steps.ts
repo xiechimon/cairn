@@ -34,7 +34,7 @@ import {
   parseChiefTrigger,
   recoverGateWake,
 } from './chief.js';
-import { cancelPendingQuestions } from './chief-questions.js';
+import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
@@ -453,16 +453,7 @@ export function finishCoordinatorTurn(
     .run();
   if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
   publishStepStatus(deps, stepRow.id);
-  cancelPendingQuestions(
-    {
-      db: deps.db,
-      hub: deps.hub,
-      user: deps.user,
-      ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-    },
-    stepRow.buildId,
-    '回合已结束',
-  );
+  cancelPendingQuestions(deps, stepRow.buildId, CHIEF_TURN_END_REASON);
   finishChiefTurn(deps, stepRow.buildId, { ...outcome, sessionId: reportedSessionId });
   settleMemoryEditTurn(
     db,

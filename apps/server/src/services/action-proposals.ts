@@ -33,7 +33,7 @@ import {
   APPROVAL_CARD_ID_PREFIX,
   askQuestionContentOf,
   proposalIdOfCard,
-} from './chief-questions.js';
+} from './chief-question-store.js';
 import type { TeamStreamHub } from './events.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import { isOwner } from './instance-owner.js';

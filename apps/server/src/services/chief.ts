@@ -78,9 +78,11 @@ import { tidyText } from '../lib/tidy-text.js';
 import { deadEndBlocker } from './blockers.js';
 import {
   APPROVAL_CARD_ID_PREFIX,
-  answerQuestion,
   askQuestionContentOf,
-} from './chief-questions.js';
+  CHIEF_TURN_END_REASON,
+  cancelPendingQuestions,
+} from './chief-question-store.js';
+import { answerQuestion } from './chief-questions.js';
 import { chiefRowOf, existingCoordinatorThread } from './chief-rows.js';
 import {
   addTurnOwnerMessage,
@@ -2207,6 +2209,7 @@ export function sweepAbandonedChiefSteps(
         skillInjection: row.skillInjection ?? null,
       });
       deps.machineHub?.wake(thread.teamId);
+      cancelPendingQuestions(deps, thread.id, CHIEF_TURN_END_REASON);
     }
   }
 }

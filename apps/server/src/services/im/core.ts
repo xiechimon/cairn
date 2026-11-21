@@ -50,7 +50,11 @@ import {
   ensureChief,
   extractText,
 } from '../chief.js';
-import { askQuestionContentOf, proposalIdOfCard, publishQuestion } from '../chief-questions.js';
+import {
+  askQuestionContentOf,
+  proposalIdOfCard,
+  publishQuestion,
+} from '../chief-question-store.js';
 import {
   cancelPendingEffects,
   drainEffects,

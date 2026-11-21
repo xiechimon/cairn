@@ -23,6 +23,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { queueCoordinatorInput, STEER_WITHDRAW_HOLD } from './coordinator-inputs.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -670,6 +671,7 @@ function stopClaimedChiefStep(
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);
   recordChiefStop(deps, head);
+  cancelPendingQuestions(deps, threadId, CHIEF_TURN_END_REASON);
   return { delegated: false };
 }
 

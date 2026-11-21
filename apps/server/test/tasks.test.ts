@@ -2,11 +2,8 @@ import type { Phase, TasksQuery, TodoOwner } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
 import { chiefMessage, chiefThread, project, team, todo } from '../src/db/schema.js';
-import {
-  answerQuestion,
-  cancelQuestion,
-  createOrGetQuestion,
-} from '../src/services/chief-questions.js';
+import { cancelQuestion } from '../src/services/chief-question-store.js';
+import { answerQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import * as ownership from '../src/services/owner.js';
 import { createTodo, getTodo } from '../src/services/todos.js';
 import { bootServer, postProject, req, seedRoute } from './helpers.js';

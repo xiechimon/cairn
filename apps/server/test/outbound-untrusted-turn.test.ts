@@ -22,7 +22,7 @@ import {
   dispatchActionWakes,
   proposalCardId,
 } from '../src/services/action-proposals.js';
-import { askQuestionContentOf } from '../src/services/chief-questions.js';
+import { askQuestionContentOf } from '../src/services/chief-question-store.js';
 import { executeRelayToolCall, relayComputerTool } from '../src/services/machine-relay.js';
 import { refuseRestrictedTurnTool } from '../src/services/report-turn.js';
 import { bootServer } from './helpers.js';

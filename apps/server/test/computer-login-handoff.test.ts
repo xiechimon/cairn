@@ -19,7 +19,7 @@ import {
 } from '../src/db/schema.js';
 import { proposalCardId, sweepExpiredActionProposals } from '../src/services/action-proposals.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
-import { askQuestionContentOf } from '../src/services/chief-questions.js';
+import { askQuestionContentOf } from '../src/services/chief-question-store.js';
 import {
   acquireComputerControl,
   releaseComputerControl,

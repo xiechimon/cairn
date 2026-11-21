@@ -27,7 +27,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { attachmentIdsInUserText } from './attachment-authorization.js';
 import { taskLink } from './chief.js';
-import { askQuestionContentOf, isOwnerAnswered } from './chief-questions.js';
+import { askQuestionContentOf, isOwnerAnswered } from './chief-question-store.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { resolveTaskReplyContext } from './task-reply-context.js';
 import { createAutonomousTodo, type TodoDeps, updateAutonomousTodo } from './todos.js';

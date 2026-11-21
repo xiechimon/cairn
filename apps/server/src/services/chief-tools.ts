@@ -65,8 +65,8 @@ import {
   taskLink,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
+import { APPROVAL_CARD_ID_PREFIX } from './chief-question-store.js';
 import {
-  APPROVAL_CARD_ID_PREFIX,
   announceQuestion,
   askUserQuestionsOfParams,
   type ChiefQuestionDeps,
