@@ -91,7 +91,7 @@ export function VirtualStream({
     initialOffset: Number.MAX_SAFE_INTEGER,
     initialMeasurementsCache: restored?.items ?? [],
     ...(restored?.rect != null ? { initialRect: restored.rect } : {}),
-    scrollEndThreshold: FOLLOW_THRESHOLD,
+    scrollEndThreshold: readerLeft ? -1 : FOLLOW_THRESHOLD,
     scrollMargin,
   });
   const measureNewestRow = useCallback(

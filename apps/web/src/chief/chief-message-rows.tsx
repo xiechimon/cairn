@@ -60,7 +60,7 @@ import { TakeoverCard } from './takeover-card.js';
 import { growDelays, hoverTaskRef, markGrown, useTaskRefSignal } from './task-ref-signal.js';
 import type { ChannelMirror } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
-import { TurnFailureLine } from './turn-failure.js';
+import { CardFailureContext, TurnFailureMarker } from './turn-failure.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 
@@ -658,6 +658,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
+  const cardFailure = useContext(CardFailureContext);
   const highlight = (id: string | undefined) =>
     id !== undefined && id === highlightedSource?.sourceMessageId
       ? { [REPLY_HIGHLIGHT_ATTR]: '' }
@@ -668,9 +669,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;
   if (item.kind === 'error')
-    return (
+    return item.id !== undefined && item.id === cardFailure ? null : (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
-        <TurnFailureLine error={item.error ?? { message: item.text }} />
+        <TurnFailureMarker />
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;

@@ -88,7 +88,7 @@ import { SelectionReply } from './selection-reply.js';
 import { sideChatSeed } from './selection-reply-model.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
-import { QueueWaitCard, TurnFailureCard } from './turn-failure.js';
+import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
@@ -617,6 +617,7 @@ export function ChiefConversation({
     if (key === dismissedFailure) return null;
     return {
       key,
+      id: latestError.item.id ?? null,
       error: latestError.item.error ?? { message: latestError.item.text },
       retry: latestUser == null ? onRetryGreeting : retryLastUser,
     };
@@ -628,6 +629,8 @@ export function ChiefConversation({
     if (waitNow === null) setDismissedWait(null);
   }, [waitNow]);
   const queueWait = waitNow !== null && waitNow.kind !== dismissedWait ? waitNow : null;
+  const cardFailure =
+    connected && chief.outage == null && queueWait === null ? (failure?.id ?? null) : null;
   const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
@@ -781,24 +784,26 @@ export function ChiefConversation({
                   <ReplySourceHighlightContext.Provider
                     value={highlightedSource === replyQuote ? highlightedSource : null}
                   >
-                    {lead}
-                    {day == null ? (
-                      <VirtualStream
-                        cacheKey={chief.threadId ?? ''}
-                        keys={streamLayout.keys}
-                        renderRow={(n) => streamEntry(streamLayout, n)}
-                        viewportRef={viewportRef}
-                      />
-                    ) : (
-                      <>
-                        <div data-testid="chief-earlier" className="opacity-60">
-                          {renderRows(earlierLayout)}
-                        </div>
-                        {day.today}
-                        {renderRows(streamLayout)}
-                      </>
-                    )}
-                    <ChiefQuestion key={chief.threadId ?? ''} />
+                    <CardFailureContext.Provider value={cardFailure}>
+                      {lead}
+                      {day == null ? (
+                        <VirtualStream
+                          cacheKey={chief.threadId ?? ''}
+                          keys={streamLayout.keys}
+                          renderRow={(n) => streamEntry(streamLayout, n)}
+                          viewportRef={viewportRef}
+                        />
+                      ) : (
+                        <>
+                          <div data-testid="chief-earlier" className="opacity-60">
+                            {renderRows(earlierLayout)}
+                          </div>
+                          {day.today}
+                          {renderRows(streamLayout)}
+                        </>
+                      )}
+                      <ChiefQuestion key={chief.threadId ?? ''} />
+                    </CardFailureContext.Provider>
                   </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>

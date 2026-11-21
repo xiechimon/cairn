@@ -16,6 +16,25 @@ const DOWN_KEYS = new Set(['ArrowDown', 'PageDown', 'End', ' ']);
 
 const gapOf = (node: HTMLElement) => node.scrollHeight - node.scrollTop - node.clientHeight;
 
+const DISCLOSURE = '[aria-expanded]:not([aria-haspopup])';
+const SETTLED_FRAMES = 3;
+const MAX_SETTLE_FRAMES = 120;
+
+function whenHeightSettles(node: HTMLElement, then: () => void) {
+  let last = -1;
+  let still = 0;
+  let frames = 0;
+  const tick = () => {
+    const height = node.scrollHeight;
+    still = height === last ? still + 1 : 0;
+    last = height;
+    frames += 1;
+    if (still >= SETTLED_FRAMES || frames >= MAX_SETTLE_FRAMES) then();
+    else requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
 export function useReaderFollow() {
   const { setReaderLeft } = useContext(ReaderFollowContext);
   const returningRef = useRef(false);
@@ -56,6 +75,18 @@ export function useReaderFollow() {
           else if (DOWN_KEYS.has(event.key)) scrollDown();
         },
         onPointerDown: scrollDown,
+        onClickCapture: (event: React.MouseEvent<HTMLDivElement>) => {
+          const disclosure =
+            event.target instanceof Element ? event.target.closest(DISCLOSURE) : null;
+          if (disclosure === null) return;
+          const node = event.currentTarget;
+          returningRef.current = false;
+          flushSync(() => setReaderLeft(true));
+          if (disclosure.getAttribute('aria-expanded') !== 'true') return;
+          whenHeightSettles(node, () => {
+            if (gapOf(node) <= FOLLOW_THRESHOLD) setReaderLeft(false);
+          });
+        },
         onScroll: (event: React.UIEvent<HTMLDivElement>) => {
           if (!returningRef.current || gapOf(event.currentTarget) > FOLLOW_THRESHOLD) return;
           returningRef.current = false;

@@ -1878,6 +1878,8 @@ function archivedTodoIdsOf(call: ToolCallRecord): string[] {
     : [];
 }
 
+const RAW_API_ERROR_RE = /^API Error: /;
+
 export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
   return collectChiefStream(messages).items;
 }
@@ -1948,6 +1950,8 @@ function collectChiefStream(
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
+      const last = items.at(-1);
+      if (last?.kind === 'error' && last.error === undefined) items.pop();
       items.push({ kind: 'error', text: turnError.message, error: turnError, id: m.id });
       continue;
     }
@@ -2131,6 +2135,11 @@ function collectChiefStream(
       continue;
     }
     if (m.role === 'system') continue;
+    if (RAW_API_ERROR_RE.test(rawText)) {
+      pendingTools = [];
+      items.push({ kind: 'error', text: rawText, id: m.id });
+      continue;
+    }
     items.push({
       kind: 'robot',
       markdown: rawText,

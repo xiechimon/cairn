@@ -1559,7 +1559,7 @@ export const EN: Record<string, string> = {
   打开模型设置: 'Open model settings',
   模型服务: 'the model provider',
   复制原始错误: 'Copy original error',
-  '没完成：{title}': "Didn't finish: {title}",
+  没完成: 'Did not finish',
   '更新 Cairn': 'Update Cairn',
   '需要更新 Cairn': 'Needs a Cairn update',
   '{n} 个需要更新 Cairn': '{n} need a Cairn update',

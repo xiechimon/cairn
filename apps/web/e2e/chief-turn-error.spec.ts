@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
 });
 
-test('every failure is the same grey line in the conversation, and only the latest gets the card', async ({
+test('the card carries the latest failure alone; older failures are a bare 没完成 marker', async ({
   page,
 }) => {
   const sent: string[] = [];
@@ -56,9 +56,12 @@ test('every failure is the same grey line in the conversation, and only the late
     sent,
     rewound,
   );
-  const lines = page.getByTestId('chief-turn-error');
-  await expect(lines).toHaveText(['没完成：这一轮被打断了', '没完成：模型太久没有回应']);
-  await expect(page.getByTestId('chief-stream')).not.toContainText('Request timed out');
+  const stream = page.getByTestId('chief-stream');
+  const markers = page.getByTestId('chief-turn-error');
+  await expect(markers).toHaveText(['没完成']);
+  await expect(markers.getByRole('button')).toHaveCount(0);
+  await expect(stream).not.toContainText('Request timed out');
+  await expect(stream).not.toContainText('被打断');
   const card = page.getByTestId('chief-turn-error-card');
   await expect(card).toHaveCount(1);
   await expect(card).toContainText('模型太久没有回应');
@@ -69,23 +72,95 @@ test('every failure is the same grey line in the conversation, and only the late
   );
   await card.getByRole('button', { name: '详情' }).click();
   await expect(card.getByTestId('chief-turn-error-raw')).toContainText('Request timed out.');
-  await lines.first().click();
-  await expect(page.getByTestId('chief-turn-error-detail')).toContainText('Cairn 在回复途中重启');
   await card.getByTestId('chief-turn-retry').click();
   await expect.poll(() => rewound).toEqual(['m3']);
   expect(sent).toEqual([]);
 });
 
-test('closing the card leaves only the line', async ({ page }) => {
+test('closing the card leaves the bare marker', async ({ page }) => {
   await open(page, [
     { id: 'm1', role: 'user', content: '你好', createdAt: 10 },
     failure('m2', 11, TIMEOUT),
   ]);
   const card = page.getByTestId('chief-turn-error-card');
   await expect(card).toBeVisible();
+  await expect(page.getByTestId('chief-turn-error')).toHaveCount(0);
   await page.getByTestId('chief-turn-error-card-dismiss').click();
   await expect(card).toHaveCount(0);
-  await expect(page.getByTestId('chief-turn-error')).toHaveText('没完成：模型太久没有回应');
+  await expect(page.getByTestId('chief-turn-error')).toHaveText('没完成');
+});
+
+test('a stored raw API error reply renders as the marker, never as a chat bubble', async ({
+  page,
+}) => {
+  const raw =
+    "API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required. Run 'claude update', or update the Claude desktop app, then try again.";
+  await open(page, [
+    { id: 'm1', role: 'user', content: '#5393 现在进展到哪了？', createdAt: 10 },
+    { id: 'm2', role: 'assistant', content: raw, createdAt: 11 },
+    failure('m3', 12, { message: raw }),
+    { id: 'm4', role: 'user', content: '再看一下', createdAt: 13 },
+    failure('m5', 14, { message: raw }),
+  ]);
+  const stream = page.getByTestId('chief-stream');
+  await expect(page.getByTestId('chief-turn-error-card')).toHaveAttribute('data-kind', 'runtime-update');
+  await expect(page.getByTestId('chief-turn-error')).toHaveText(['没完成']);
+  await expect(stream).not.toContainText('API Error');
+  await expect(stream.getByTestId('chief-reply')).toHaveCount(0);
+});
+
+test('expanding a row in the history keeps it where it was and opens below it', async ({ page }) => {
+  const filler = '这一段是之前的回复，用来把对话撑到需要滚动的长度。'.repeat(6);
+  const messages: unknown[] = [];
+  for (let n = 0; n < 8; n++) {
+    messages.push({ id: `u${n}`, role: 'user', content: `第 ${n} 个问题`, createdAt: 10 + n * 2 });
+    messages.push({ id: `a${n}`, role: 'assistant', content: filler, createdAt: 11 + n * 2 });
+  }
+  messages.push({ id: 'u-last', role: 'user', content: '最后看一下凭证面', createdAt: 40 });
+  messages.push({
+    id: 'think',
+    role: 'assistant',
+    content: [
+      { type: 'thinking', thinking: ['先把凭证面捋一遍', ...Array(16).fill('逐条核对每个入口的鉴权。')].join('\n') },
+    ],
+    createdAt: 41,
+  });
+  messages.push({ id: 'a-last', role: 'assistant', content: '凭证面没有问题。', createdAt: 42 });
+  await open(page, messages);
+  const body = page.getByTestId('chief-body');
+  await expect(page.getByText('凭证面没有问题。')).toBeVisible();
+  await expect
+    .poll(() => body.evaluate((n) => n.scrollHeight - n.scrollTop - n.clientHeight))
+    .toBeLessThan(2);
+  const trigger = page.getByRole('button', { name: '展开思考' });
+  const before = await trigger.evaluate((n) => n.getBoundingClientRect().top);
+  await trigger.click();
+  const opened = page.getByRole('button', { name: '收起思考' });
+  await expect(opened).toBeVisible();
+  await page.evaluate(
+    () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+  );
+  await page.waitForTimeout(300);
+  const after = await opened.evaluate((n) => n.getBoundingClientRect());
+  expect(Math.abs(after.top - before), 'C23: the clicked header stays put').toBeLessThanOrEqual(1);
+  const detail = await page
+    .locator('pre', { hasText: '先把凭证面捋一遍' })
+    .evaluate((n) => n.getBoundingClientRect().top);
+  expect(detail).toBeGreaterThanOrEqual(after.bottom - 1);
+  await opened.click();
+  await expect(page.locator('pre', { hasText: '先把凭证面捋一遍' })).toHaveCount(0);
+  const gap = () => body.evaluate((n) => n.scrollHeight - n.scrollTop - n.clientHeight);
+  await expect.poll(gap).toBeLessThan(2);
+  await page.evaluate(
+    () =>
+      new Promise((done) => {
+        let left = 6;
+        const tick = () => (--left === 0 ? done(null) : requestAnimationFrame(tick));
+        requestAnimationFrame(tick);
+      }),
+  );
+  await page.setViewportSize({ width: 1440, height: 632 });
+  await expect.poll(gap, 'collapsing at the bottom follows the bottom again').toBeLessThan(2);
 });
 
 test('a failure followed by an owner message has no card', async ({ page }) => {
