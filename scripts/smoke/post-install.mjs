@@ -14,6 +14,7 @@ import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, _electron as electron } from '@playwright/test';
+import { mainWindow } from '../../apps/desktop/scripts/main-window.mjs';
 
 const DEFAULT_BASE = 'http://127.0.0.1:54400';
 const DEFAULT_USER_DATA = join(homedir(), 'Library', 'Application Support', '@cairn', 'desktop');
@@ -62,9 +63,10 @@ const PNG_BASE64 =
 const TXT_BODY = 'post-install smoke attachment body\nsecond line of the file\n';
 
 const SMOKE_LABEL = 'post-install-smoke';
-const MESSAGE_TEXT = (pngKey, txtKey) =>
+const IMAGE_NAMES = ['smoke.png', 'second.png'];
+const MESSAGE_TEXT = (pngKeys, txtKey) =>
   'Release notes draft — see [the spec](https://example.com/release-notes) for details.\n' +
-  `![smoke.png](attachment:${pngKey})\n` +
+  pngKeys.map((key, index) => `![${IMAGE_NAMES[index]}](attachment:${key})\n`).join('') +
   `![notes.txt](attachment:${txtKey})`;
 
 export function parseArgs(argv) {
@@ -438,7 +440,7 @@ function seedChiefMessage(ctx) {
     db.prepare(
       `INSERT INTO chief_message (id, threadId, role, content, projectId, delivery, createdAt)
        VALUES (?, ?, 'user', ?, NULL, NULL, ?)`,
-    ).run(messageId, threadId, JSON.stringify(MESSAGE_TEXT(ctx.pngKey, ctx.txtKey)), now);
+    ).run(messageId, threadId, JSON.stringify(MESSAGE_TEXT(ctx.pngKeys, ctx.txtKey)), now);
     ctx.cleanup.push(async () => {
       const cleanupDb = new DatabaseSync(dbPath);
       try {
@@ -686,24 +688,39 @@ async function checkAttachment(page, ctx) {
   await openCoordinator(page, ctx);
   const attachments = page.getByTestId('chief-sent-attachment');
   await attachments.first().waitFor({ timeout: UI_WAIT_MS });
-  assert.equal(await attachments.count(), 2, 'expected 2 seeded attachment tiles');
+  assert.equal(
+    await attachments.count(),
+    IMAGE_NAMES.length + 1,
+    'expected the seeded image and text tiles',
+  );
   const textTile = attachments.filter({ hasText: 'notes.txt' }).first();
   assert.ok(
     (await textTile.locator('svg, [data-file-icon]').count()) > 0,
     'text file tile does not show a type icon',
   );
-  await attachments.first().click();
+  await page.getByRole('button', { name: IMAGE_NAMES[0], exact: true }).first().click();
   const lightbox = page.getByTestId('file-lightbox');
   await lightbox.waitFor({ timeout: UI_WAIT_MS });
-  const position = await page.getByTestId('file-lightbox-position').textContent();
-  assert.ok(
-    position.includes('1') && position.includes('2'),
+  const position = await lightbox.getByTestId('file-lightbox-position').textContent();
+  assert.equal(
+    position.trim(),
+    `1 / ${IMAGE_NAMES.length}`,
     `lightbox pager position unexpected: ${position}`,
   );
-  await page.getByTestId('file-lightbox-next').waitFor({ timeout: UI_WAIT_MS });
-  await page.getByTestId('file-lightbox-prev').waitFor({ timeout: UI_WAIT_MS });
+  await lightbox.getByTestId('file-lightbox-next').click();
+  await lightbox
+    .getByTestId('file-preview-name')
+    .filter({ hasText: IMAGE_NAMES[1] })
+    .waitFor({ timeout: UI_WAIT_MS });
   await page.keyboard.press('Escape');
-  return `lightbox opened, pager at ${position.trim()}`;
+  await lightbox.waitFor({ state: 'detached', timeout: UI_WAIT_MS });
+  await page.getByRole('button', { name: 'notes.txt', exact: true }).first().click();
+  const panel = page.getByTestId('file-panel');
+  await panel
+    .getByTestId('file-preview-body')
+    .filter({ hasText: TXT_BODY.split('\n')[0] })
+    .waitFor({ timeout: UI_WAIT_MS });
+  return `lightbox paged ${position.trim()} to ${IMAGE_NAMES[1]}, notes.txt opened in the side panel`;
 }
 
 async function checkRemote(page, ctx) {
@@ -870,12 +887,7 @@ async function connectApp(appPath, prevAppPath) {
   const base = `http://127.0.0.1:${readFileSync(portFile, 'utf8').trim()}`;
   let page;
   try {
-    page = await Promise.race([
-      electronApp.firstWindow(),
-      delay(SERVER_WAIT_MS).then(() => {
-        throw new Error('main window did not open');
-      }),
-    ]);
+    page = await mainWindow(electronApp, SERVER_WAIT_MS);
   } catch (error) {
     const serverLog = join(scratch, 'logs', 'server.log');
     if (existsSync(serverLog)) {
@@ -962,12 +974,12 @@ async function main() {
     } else {
       await seedTopModels(ctx);
     }
-    ctx.pngKey = await uploadAttachment(
-      ctx,
-      'smoke.png',
-      'image/png',
-      Buffer.from(PNG_BASE64, 'base64'),
-    );
+    ctx.pngKeys = [];
+    for (const name of IMAGE_NAMES) {
+      ctx.pngKeys.push(
+        await uploadAttachment(ctx, name, 'image/png', Buffer.from(PNG_BASE64, 'base64')),
+      );
+    }
     ctx.txtKey = await uploadAttachment(ctx, 'notes.txt', 'text/plain', Buffer.from(TXT_BODY));
     await api(ctx, 'GET', `/api/teams/${ctx.teamId}/chief`);
     await waitForChief(ctx);
