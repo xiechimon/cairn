@@ -41,6 +41,11 @@ import {
   deliverableManifestFailure,
   publishDeliverables,
 } from './machine-deliverables.js';
+import {
+  announceMergeStepOutcome,
+  MERGE_LANDED_TEXT,
+  MERGE_UNCONFIRMED_TEXT,
+} from './merge-announcement.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planAutoConfirmation, planContractOfStep } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
@@ -323,7 +328,13 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上的状态为准，cairn 对账读到它合并后记录结果。`,
       createdAt: nowMs(),
     });
+    announceMergeStepOutcome(deps, {
+      stepId,
+      buildId: buildRow.id,
+      text: MERGE_UNCONFIRMED_TEXT,
+    });
     return;
   }
   finishTodoDone(deps, todoRow.id, buildRow.id);
+  announceMergeStepOutcome(deps, { stepId, buildId: buildRow.id, text: MERGE_LANDED_TEXT });
 }

@@ -421,7 +421,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   test('[2b-D1] review card, own open PR at the last checkpoint → one PUT with sha, squash and the PR title; rows; done', async () => {
     const w = makeWorld({ pendingVerify: true });
     const result = await requestMerge(w.deps, w.buildId, 'Xmon');
-    expect(result).toEqual({ delegated: true });
+    expect(result).toMatchObject({ state: 'merged', prNumber: 201, alreadyMerged: false });
     expect(w.fake.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       'GET https://api.github.com/repos/octo/demo/pulls/201',
       'GET https://api.github.com/repos/octo/demo/branches/main',
@@ -718,7 +718,10 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
       phase: 'failed',
       pull: { state: 'closed', merged: true, mergedBy: 'octo' },
     });
-    expect(await requestMerge(w.deps, w.buildId, 'Xmon')).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId, 'Xmon')).toMatchObject({
+      state: 'merged',
+      alreadyMerged: true,
+    });
     expect(w.fake.puts()).toEqual([]);
     expect(w.phase()).toBe('review');
     expect(w.userRows()).toEqual([]);
@@ -913,7 +916,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     w.fake.getAnswer = { status: 502, raw: 'Bad Gateway' };
     await refusal(requestMerge(w.deps, w.buildId));
     w.fake.getAnswer = null;
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId)).toMatchObject({ state: 'merged' });
     expect(w.fake.gets()).toHaveLength(2);
     expect(w.fake.puts()).toHaveLength(1);
     expect(w.phase()).toBe('done');
@@ -992,7 +995,10 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     async (_name, answer) => {
       const w = makeWorld();
       w.fake.mergeAnswer = answer as Answer;
-      expect(await requestMerge(w.deps, w.buildId, 'Xmon')).toEqual({ delegated: true });
+      expect(await requestMerge(w.deps, w.buildId, 'Xmon')).toMatchObject({
+        state: 'unconfirmed',
+        prNumber: 201,
+      });
       expect(w.userRows()).toEqual([{ content: MERGE_ANNOUNCEMENT, actor: 'Xmon' }]);
       expect(w.systemRows()).toHaveLength(1);
       expect(w.systemRows()[0]).toContain('PR #201');
@@ -1186,7 +1192,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     w.fake.onPut = () => {
       w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, w.todoId)).run();
     };
-    expect(await requestMerge(w.deps, w.buildId, 'Xmon')).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId, 'Xmon')).toMatchObject({ state: 'merged' });
     expect(w.userRows()).toEqual([{ content: MERGE_ANNOUNCEMENT, actor: 'Xmon' }]);
     expect(w.systemRows()).toEqual([MERGED_ROW]);
     expect(w.phase()).toBe('closed');
@@ -1194,7 +1200,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
 
   test('[2b-D18a] failed card that can be restored, GitHub merges → restored, then done', async () => {
     const w = makeWorld({ phase: 'failed' });
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId)).toMatchObject({ state: 'merged' });
     expect(w.phase()).toBe('done');
     expect(w.systemRows()).toEqual([MERGED_ROW, DONE_ROW]);
   });
@@ -1210,7 +1216,9 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
   test('[2b-D18c] failed card that can be restored, no clear answer → restored to review with the row', async () => {
     const w = makeWorld({ phase: 'failed' });
     w.fake.mergeAnswer = 'network';
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId)).toMatchObject({
+      state: 'unconfirmed',
+    });
     expect(w.phase()).toBe('review');
     expect(w.systemRows()).toHaveLength(1);
     expect(w.systemRows()[0]).toContain('没有明确答复');
@@ -1243,7 +1251,9 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
 
   test('[2b-D22] githubRepo with a ".." segment → the merge step as before; no request', async () => {
     const w = makeWorld({ githubRepo: 'octo/..' });
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId)).toMatchObject({
+      state: 'requested',
+    });
     expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([
       { kind: 'merge', status: 'pending' },
     ]);
@@ -1260,7 +1270,9 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
 
   test('[2b-D24] GitHub form without a recorded PR → the merge step as before; its done finishes the card', async () => {
     const w = makeWorld({ prNumber: null });
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId)).toMatchObject({
+      state: 'requested',
+    });
     expect(w.fake.requests).toEqual([]);
     const mergeStep = w.s.db
       .select()
@@ -1358,7 +1370,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         createdAt: Date.now(),
       })
       .run();
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId)).toMatchObject({ state: 'merged' });
     const put = w.fake.puts()[0] as Recorded;
     expect((JSON.parse(put.body ?? 'null') as { sha: string }).sha).toBe(merged);
     expect(w.phase()).toBe('done');
@@ -1426,7 +1438,9 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const projectId = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()
       ?.projectId as string;
     w.s.db.update(projectTable).set({ teamId: other }).where(eq(projectTable.id, projectId)).run();
-    expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(w.deps, w.buildId)).toMatchObject({
+      state: 'requested',
+    });
     expect(w.fake.requests).toEqual([]);
     expect(w.steps().filter((r) => r.kind === 'merge')).toEqual([
       { kind: 'merge', status: 'pending' },
@@ -1753,7 +1767,7 @@ test('a retired GitHub marker is never read when merging explicitly', async () =
   w.fake.onMarker = () => {
     read = true;
   };
-  expect(await requestMerge(w.deps, w.buildId)).toEqual({ delegated: true });
+  expect(await requestMerge(w.deps, w.buildId)).toMatchObject({ state: 'merged' });
   expect(read).toBe(false);
   expect(w.fake.puts()).toHaveLength(1);
   expect(w.phase()).toBe('done');

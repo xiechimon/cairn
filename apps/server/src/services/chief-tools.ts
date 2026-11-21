@@ -112,6 +112,7 @@ import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { listBuildStepRoutes } from './step-route.js';
+import { assertGroundedClaims, TerminalClaimError } from './terminal-claims.js';
 import { startThreadBuild } from './thread-message.js';
 import { getTodo, listTodos, setTodoArchived, setTodoPhase } from './todos.js';
 import { readTopModels } from './top-models.js';
@@ -1031,19 +1032,32 @@ export async function executeChiefTool(
       const buildIds = strArr(params, 'buildIds');
       const reason = str(params, 'reason');
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
-      for (const buildId of buildIds) {
-        cancelBuild(deps, buildId, { actor: 'coordinator', reason });
-      }
-      return json({ cancelled: buildIds });
+      const cancels: { buildId: string; state: string }[] = [];
+      for (const buildId of buildIds)
+        cancels.push({
+          buildId,
+          state: cancelBuild(deps, buildId, { actor: 'coordinator', reason }),
+        });
+      return json({
+        cancels,
+        note: '"stopped" means the step is no longer running; "delegated" means a stop signal was sent to the machine and the step keeps running until it acknowledges; "released" means there was no running step to stop.',
+      });
     }
     case 'merge_builds': {
       const buildIds = strArr(params, 'buildIds');
       if (parseChiefTrigger(ctx.turnPrompt ?? null) !== 'user')
         throw new HttpError(403, 'A user instruction is required to merge; events cannot merge');
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
+      const merges: { buildId: string }[] = [];
       for (const buildId of buildIds)
-        await requestMerge(buildDeps(deps), buildId, deps.user.displayName);
-      return json({ merged: buildIds });
+        merges.push({
+          buildId,
+          ...(await requestMerge(buildDeps(deps), buildId, deps.user.displayName)),
+        });
+      return json({
+        merges,
+        note: 'state "requested" means a machine runs the merge later: it is not merged yet, and the merge step reports the outcome. Only state "merged" confirms the change landed.',
+      });
     }
 
     case 'ask_user': {
@@ -1053,6 +1067,22 @@ export async function executeChiefTool(
         'ask_user',
       );
       const questions = askUserQuestionsOfParams(params);
+      try {
+        assertGroundedClaims(db, {
+          threadId: ctx.threadId,
+          turnPrompt,
+          text: questions
+            .flatMap((question) => [
+              question.header,
+              question.question,
+              ...question.options.flatMap((option) => [option.label, option.description ?? '']),
+            ])
+            .join('\n'),
+        });
+      } catch (error) {
+        if (error instanceof TerminalClaimError) throw new HttpError(409, error.message);
+        throw error;
+      }
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
       if (requestId.startsWith(APPROVAL_CARD_ID_PREFIX)) {
         throw new HttpError(
@@ -1095,6 +1125,12 @@ export async function executeChiefTool(
         report === null
           ? str(params, 'message')
           : str(params, 'message').replaceAll(report.attachmentId, '报告');
+      try {
+        assertGroundedClaims(db, { threadId: ctx.threadId, turnPrompt, text });
+      } catch (error) {
+        if (error instanceof TerminalClaimError) throw new HttpError(409, error.message);
+        throw error;
+      }
       const noticeId =
         report === null
           ? `notice-${effectDedupeKey(ctx.threadId, ctx.turnPrompt ?? '', provenance, text)}`

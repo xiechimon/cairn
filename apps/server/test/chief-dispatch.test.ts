@@ -106,7 +106,8 @@ describe('merge_builds follows explicit user requests', () => {
       }),
     ).rejects.toThrow('events cannot merge');
     expect(await relay('merge_builds', params, { turnPrompt: 'Merge this delivery' })).toEqual({
-      merged: [delivered.buildId],
+      merges: [{ buildId: delivered.buildId, state: 'requested', stepId: expect.any(String) }],
+      note: expect.any(String),
     });
     expect(H.s.db.select().from(todoTable).where(eq(todoTable.id, delivered.id)).get()?.phase).toBe(
       'done',

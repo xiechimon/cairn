@@ -18,6 +18,7 @@ import { projectOfTodo } from './git.js';
 import { softwareCommitIdentity } from './github-autonomous-token.js';
 import type { MachineDeps } from './machine-deps.js';
 import { publishStepStatus, upsertMessage } from './machine-deps.js';
+import { announceMergeStepOutcome } from './merge-announcement.js';
 import { computePatchDigest } from './merge-gate/digest.js';
 import { notifyTodo } from './notifications.js';
 import { projectMergeConfigOf } from './projects.js';
@@ -115,7 +116,14 @@ export function applyLocalMergeReport(
   const { result } = report;
   if (result.outcome === 'merged') settleAutonomousMerge(deps.db, row.buildId, 'merged');
   if (row.status !== 'claimed') return true;
-  if (result.outcome !== 'merged') settleAutonomousMerge(deps.db, row.buildId, 'refused');
+  if (result.outcome !== 'merged') {
+    settleAutonomousMerge(deps.db, row.buildId, 'refused');
+    announceMergeStepOutcome(deps, {
+      stepId: row.id,
+      buildId: row.buildId,
+      text: `合并没有成功：${result.reason}`,
+    });
+  }
   deps.db
     .update(step)
     .set({

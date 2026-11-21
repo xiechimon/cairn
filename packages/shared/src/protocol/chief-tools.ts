@@ -758,7 +758,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'merge_builds',
     description:
-      'Merge the current delivered builds only when the user explicitly instructed you to merge them. Completed tasks stay completed. Never call this on a completion, CI or other event, never decide to merge yourself, and never ask whether to merge. Branches and PRs stay unchanged unless the user requests a merge.',
+      'Request a merge of the current delivered builds, only when the user explicitly instructed you to merge them. The result carries the recorded merge state per build: "requested" means a machine still has to run the merge step, "merged" is the only state that means the change landed, and "unconfirmed" means GitHub gave no clear answer. Tell the user a merge is under way unless the result says "merged". Completed tasks stay completed. Never call this on a completion, CI or other event, never decide to merge yourself, and never ask whether to merge. Branches and PRs stay unchanged unless the user requests a merge.',
     parameters: obj({ buildIds: idArr('Build ids to merge.') }, ['buildIds']),
   },
   {

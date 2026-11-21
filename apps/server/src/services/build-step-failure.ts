@@ -16,6 +16,7 @@ import {
   settleAfterStopPhase,
 } from './build-stop.js';
 import { type BuildDeps, clearStop, publishBuild } from './builds.js';
+import { announceMergeStepOutcome } from './merge-announcement.js';
 import { canTransitionPhase } from './phase.js';
 import { publishStepRow } from './quota-wait.js';
 import { parkFailedBuild, retryIsParked } from './retry-parking.js';
@@ -134,6 +135,12 @@ export function applyStepFailure(
     .run();
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
+  if (stepRow.kind === 'merge')
+    announceMergeStepOutcome(deps, {
+      stepId: stepRow.id,
+      buildId: buildRow.id,
+      text: `合并没有成功：${errorMessage}`,
+    });
   if (
     noteDeliveredPlanResidual(
       deps,

@@ -61,6 +61,7 @@ import {
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
+import { flushShield, shieldFor, stepClaimFacts } from './terminal-claims.js';
 
 export { claimStep, meetsMcpVersionGate } from './machine-claim.js';
 export {
@@ -648,6 +649,8 @@ export function reportTool(
     createdAt: call.endedAt ?? nowMs(),
   };
   if (isChiefConversation(row.buildId)) {
+    const rest = flushShield(stepId);
+    if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
     upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });
     return;
   }
@@ -675,6 +678,8 @@ export function reportBackgroundTask(
     createdAt: task.startedAt,
   };
   if (isChiefConversation(row.buildId)) {
+    const rest = flushShield(stepId);
+    if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
     upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });
     return;
   }
@@ -690,7 +695,12 @@ export function reportTranscriptDelta(
   const row = ownedStep(deps, machineId, stepId);
   if (text === '') return;
   markProgress(deps, row);
-  deps.convHub?.publishTextDelta(row.buildId, text);
+  if (!isChiefConversation(row.buildId)) {
+    deps.convHub?.publishTextDelta(row.buildId, text);
+    return;
+  }
+  const shielded = shieldFor(stepId, () => stepClaimFacts(deps.db, row)).push(text);
+  if (shielded !== '') deps.convHub?.publishTextDelta(row.buildId, shielded);
 }
 
 export function reportThinkingDelta(
@@ -716,6 +726,8 @@ export function reportTranscriptRow(
   const origin =
     row.role === 'user' && row.id === transcriptPromptRowId(stepId) ? 'task-prompt' : null;
   if (isChiefConversation(owned.buildId)) {
+    const rest = flushShield(stepId);
+    if (rest !== '') deps.convHub?.publishTextDelta(owned.buildId, rest);
     upsertChiefRow(deps, {
       id: row.id,
       threadId: owned.buildId,
