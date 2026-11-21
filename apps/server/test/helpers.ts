@@ -460,13 +460,22 @@ export function insertAntigravitySubscription(
 export function deliverCodeStep(
   deps: BuildDeps,
   todoId: string,
-  opts: { hasChanges?: boolean } = {},
+  opts: { hasChanges?: boolean; attachPr?: { prNumber: number; prUrl: string } } = {},
 ): { buildId: string; stepId: string } {
   const buildId = newUuidv7();
   const stepId = newRecordId();
   deps.db
     .insert(buildTable)
-    .values({ id: buildId, todoId, withPlan: false, triggerSource: 'user', createdAt: nowMs() })
+    .values({
+      id: buildId,
+      todoId,
+      withPlan: false,
+      triggerSource: 'user',
+      createdAt: nowMs(),
+      ...(opts.attachPr === undefined
+        ? {}
+        : { prNumber: opts.attachPr.prNumber, prUrl: opts.attachPr.prUrl }),
+    })
     .run();
   deps.db
     .insert(stepTable)

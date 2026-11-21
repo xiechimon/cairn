@@ -1071,6 +1071,10 @@ export function selfIssueCreateInFlight(todoId: string): boolean {
   return selfIssueInFlight.has(todoId);
 }
 
+export function selfIssueCreatePending(todoId: string): Promise<unknown> | undefined {
+  return selfIssueInFlight.get(todoId);
+}
+
 export function noteTaskCodeDelivered(deps: TodoDeps, todoId: string): void {
   const row = getRow(deps, todoId);
   if (row?.sourceKind !== 'github-issue-self') return;

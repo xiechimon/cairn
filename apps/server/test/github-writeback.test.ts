@@ -154,7 +154,13 @@ async function getTodo(app: Hono, id: string) {
   return todoRecordSchema.parse(await (await call(app, 'GET', `/api/todos/${id}`)).json());
 }
 
-const deliver = (s: TestServer, fetch: FetchLike, todoId: string, hasChanges = true) =>
+const deliver = (
+  s: TestServer,
+  fetch: FetchLike,
+  todoId: string,
+  hasChanges = true,
+  attachPr?: { prNumber: number; prUrl: string },
+) =>
   deliverCodeStep(
     {
       ...s.svc,
@@ -164,7 +170,7 @@ const deliver = (s: TestServer, fetch: FetchLike, todoId: string, hasChanges = t
       githubFetch: fetch,
     },
     todoId,
-    { hasChanges },
+    { hasChanges, ...(attachPr === undefined ? {} : { attachPr }) },
   );
 
 const markIssued = (s: TestServer, todoId: string, ref: string | null = `github:${REPO}#101`) =>
@@ -574,6 +580,24 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
     expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#101`);
     expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(2);
     expect(s.db.select().from(externalEffectTable).all()[0]?.state).toBe('delivered');
+    s.dispose();
+  });
+
+  test('a delivery leg carrying a PR but reporting hasChanges:false still marks the task changed, opens its issue, and leaves the retry surface visible', async () => {
+    const mock = ghMock({ [`POST ${ISSUES_PATH}`]: { status: 201, body: CREATED_ISSUE } });
+    const s = bootServer({ githubFetch: mock.impl });
+    seedConnection(s);
+    const projectId = await postGithubProject(s.app);
+    const created = await createTask(s.app, projectId);
+    deliver(s, mock.impl, created.id, false, {
+      prNumber: 77,
+      prUrl: `https://github.com/${REPO}/pull/77`,
+    });
+    await flushSelfIssueWrites();
+    const after = await getTodo(s.app, created.id);
+    expect(after.hasChanges).toBe(true);
+    expect(after.sourceRef).toBe(`github:${REPO}#101`);
+    expect(mock.callsTo('POST', ISSUES_PATH)).toHaveLength(1);
     s.dispose();
   });
 });

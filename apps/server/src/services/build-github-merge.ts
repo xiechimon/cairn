@@ -32,7 +32,7 @@ import { githubText } from './github-text.js';
 import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { assertPhaseTransition } from './phase.js';
 import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
-import { setTodoPhase } from './todos.js';
+import { selfIssueCreatePending, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
 type BuildRow = typeof build.$inferSelect;
@@ -200,6 +200,7 @@ export async function mergeThroughGithub(
     }
     const titled = `${pull.title} (#${prNumber})`;
     await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
+    await selfIssueCreatePending(row.todoId);
     const closing = apiMergeGate(deps, row);
     await ensurePullClosesTaskIssue(
       fetchImpl,

@@ -229,11 +229,9 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
 
   finishScheduledStep(deps, stepRow);
 
-  if (
-    isBuildStepKind(stepRow.kind) &&
-    (outcome.hasChanges === true || buildRow.prNumber !== null || buildRow.prUrl !== null)
-  )
-    noteTaskCodeDelivered(deps, todoRow.id);
+  const deliveredCode =
+    outcome.hasChanges === true || buildRow.prNumber !== null || buildRow.prUrl !== null;
+  if (isBuildStepKind(stepRow.kind) && deliveredCode) noteTaskCodeDelivered(deps, todoRow.id);
 
   if (
     receivesAnswers(stepRow.kind) &&
@@ -299,12 +297,8 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0
   ) {
     if (isInfoOutput(todoRow.output)) keepInfoReport();
-    setTodoPhase(
-      deps,
-      todoRow.id,
-      'needs_input',
-      outcome.hasChanges !== undefined ? { hasChanges: outcome.hasChanges } : {},
-    );
+    const hasChanges = deliveredCode ? true : outcome.hasChanges;
+    setTodoPhase(deps, todoRow.id, 'needs_input', hasChanges !== undefined ? { hasChanges } : {});
     return;
   }
   if (isBuildStepKind(stepRow.kind) && isInfoOutput(todoRow.output)) {
@@ -321,7 +315,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
   }
   if (isBuildStepKind(stepRow.kind)) {
     finishTodoDone(deps, todoRow.id, buildRow.id, {
-      hasChanges: outcome.hasChanges ?? true,
+      hasChanges: outcome.hasChanges !== false || deliveredCode,
     });
     return;
   }

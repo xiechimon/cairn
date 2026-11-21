@@ -17,6 +17,7 @@ import { type BuildDeps, completeStep } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { DONE_ROW } from '../src/services/delivery-rows.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { flushSelfIssueWrites } from '../src/services/todos.js';
 import { type Answer, mergeGithubFake, type PullFake, type Recorded } from './fakes/github.js';
 import { stubGithubApp } from './github-identity-fixture.js';
 import {
@@ -593,6 +594,65 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     };
     await requestMerge(w.deps, w.buildId);
     expect(w.fake.bodyEdits()).toEqual(['Closes #88\n\n## What\n\nThe change.']);
+  });
+
+  test('[2b-D44] a merge waits on the in-flight self-issue create so the PR body can close the late issue', async () => {
+    const w = makeWorld({ phase: 'building' });
+    w.s.db
+      .update(todoTable)
+      .set({ sourceKind: 'github-issue-self', sourceRef: null })
+      .where(eq(todoTable.id, w.todoId))
+      .run();
+    let release = (): void => undefined;
+    let entered = (): void => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const posted = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    let issuePosts = 0;
+    w.deps.githubFetch = async (input, init) => {
+      if (
+        init?.method === 'POST' &&
+        new URL(String(input)).pathname === '/repos/octo/demo/issues'
+      ) {
+        issuePosts += 1;
+        entered();
+        await gate;
+        return {
+          ok: true,
+          status: 201,
+          headers: { get: () => null },
+          json: async () => ({ number: 101 }),
+          text: async () => '',
+        };
+      }
+      return w.fake.fetch(input, init);
+    };
+    const deliverStepId = `step-deliver-${w.buildId}`;
+    w.s.db
+      .insert(stepTable)
+      .values({
+        id: deliverStepId,
+        buildId: w.buildId,
+        kind: 'session',
+        status: 'claimed',
+        checkpointCommit: CP,
+        createdAt: Date.now(),
+      })
+      .run();
+    completeStep(w.deps, deliverStepId, { hasChanges: true });
+    const mergePromise = requestMerge(w.deps, w.buildId);
+    await posted;
+    release();
+    const outcome = await mergePromise;
+    await flushSelfIssueWrites();
+    expect(outcome.state).toBe('merged');
+    expect(issuePosts).toBe(1);
+    expect(w.fake.bodyEdits()).toEqual(['Closes #101\n\n## What\n\nThe change.']);
+    const row = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get();
+    expect(row?.sourceRef).toBe('github:octo/demo#101');
   });
 
   test('[2b-D42] no closing line → commit_message is still sent (cairn’s own line), so the repository default (the PR body) is not used', async () => {
