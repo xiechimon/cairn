@@ -485,6 +485,8 @@ export const EN: Record<string, string> = {
   更多: 'More',
   关闭: 'Close',
   滚动到最新: 'Scroll to latest',
+  滚动到最早: 'Scroll to earliest',
+  通知: 'Notifications',
   取消: 'Cancel',
   保存: 'Save',
   删除: 'Delete',

@@ -170,6 +170,16 @@ export function scanSource(
   /** latin mode: name of the user-facing attribute whose {…} container is
    *  open; literals inside flag unless they sit under a t( call. */
   let attrExpr: string | undefined;
+  /** latin mode: depth inside a JSX tag header — literals there are tag
+   *  names, attribute names or attribute values, never rendered children. */
+  let inTagHeader = 0;
+  /** latin mode: parenHeads.length at each open JSX child {…} container —
+   *  a literal directly inside (`{cond ? 'a' : 'b'}`, `{err || 'x'}`) is
+   *  rendered output; literals inside call parens there are not. */
+  const jsxExprBases: number[] = [];
+  /** latin mode: open `[` count inside a JSX child {…} — a literal under a
+   *  bracket is a member access (`{data['name']}`), not rendered text. */
+  let bracketDepth = 0;
   /** latin mode: the token right after a sink identifier must be `(` for the
    *  next literal to count; cleared on every token. */
   let expectSinkParen = false;
@@ -264,6 +274,18 @@ export function scanSource(
         const v = scanner.getTokenValue();
         if (LATIN.test(v)) found.push({ rel, text: v, kind: 'latin-attr' });
       }
+      if (
+        jsxExprBases.length > 0 &&
+        inTagHeader === 0 &&
+        bracketDepth === 0 &&
+        tParens.length === 0 &&
+        parenHeads.length === jsxExprBases[jsxExprBases.length - 1] &&
+        isStringy(tok) &&
+        !COMPARISON.has(lastTok)
+      ) {
+        const v = scanner.getTokenValue();
+        if (LATIN.test(v)) found.push({ rel, text: v, kind: 'latin-jsx' });
+      }
       if (tok === SyntaxKind.Identifier) {
         const name = scanner.getTokenText();
         if (toastDot) {
@@ -306,6 +328,10 @@ export function scanSource(
       parenHeads.push(prevTok);
     } else if (tok === SyntaxKind.CloseParenToken) {
       lastParenHead = parenHeads.pop() ?? SyntaxKind.Unknown;
+    } else if (tok === SyntaxKind.OpenBracketToken) {
+      bracketDepth++;
+    } else if (tok === SyntaxKind.CloseBracketToken) {
+      bracketDepth--;
     }
     if (tok === SyntaxKind.StringLiteral || tok === SyntaxKind.NoSubstitutionTemplateLiteral) {
       const v = scanner.getTokenValue();
@@ -342,10 +368,12 @@ export function scanSource(
   const scanJsxElement = (): void => {
     const outerAttrExpr = attrExpr;
     attrExpr = undefined;
+    inTagHeader++;
     try {
       let tok = advance();
       if (tok === SyntaxKind.EndOfFile) return;
       if (tok === SyntaxKind.GreaterThanToken) {
+        inTagHeader--;
         scanJsxChildren(); // <> fragment
         return;
       }
@@ -355,10 +383,12 @@ export function scanSource(
       for (;;) {
         if (tok === SyntaxKind.EndOfFile) return;
         if (tok === SyntaxKind.GreaterThanToken) {
+          inTagHeader--;
           scanJsxChildren();
           return;
         }
         if (tok === SyntaxKind.SlashToken) {
+          inTagHeader--;
           advance(); // self-closing: consume `>`
           return;
         }
@@ -442,7 +472,9 @@ export function scanSource(
       }
       if (tok === SyntaxKind.OpenBraceToken) {
         braceDepth++;
+        jsxExprBases.push(parenHeads.length);
         scanCodeUntilClose(); // { expression } container
+        jsxExprBases.pop();
         continue;
       }
       if (tok === SyntaxKind.LessThanToken) {

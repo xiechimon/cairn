@@ -56,9 +56,10 @@ describe('schedule editor wire values', () => {
     expect(schedule).toBeDefined();
     if (schedule === undefined) throw new Error('Mapped schedule missing');
     expect(schedule.nextRunAt).toBe(0);
-    expect(scheduleSummary(schedule, NOW, t)).toContain('No upcoming runs');
+    const en: TFunc = (source, vars) => translate('en', EN, source, vars);
+    expect(scheduleSummary(schedule, NOW, en)).toContain('No upcoming run');
     expect(scheduleSummary(schedule, NOW, t)).not.toContain('1月1日');
-    expect(scheduleSummary({ ...schedule, kind: 'daily' }, NOW, t)).toContain('Next run unavailable');
+    expect(scheduleSummary({ ...schedule, kind: 'daily' }, NOW, en)).toContain('Next run unavailable');
   });
   test('recognizes weekdays and retains a custom expression without rewriting it', () => {
     expect(scheduleDraft({ ...record, kind: 'cron', cron: '15 8 * * 1-5' }, NOW).trigger).toBe('weekdays');

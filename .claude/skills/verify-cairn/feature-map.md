@@ -20,7 +20,7 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | `vault` | `设置` (Settings) › `安全` (Security) › `保险库` (Vault) | [Secrets](#secrets) |
 | `api-keys` | `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys) | [API keys](#api-keys) |
 | `remote` | `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access) | [Remote access over the tailnet](#remote-access) |
-| `im` | `设置` (Settings) › `消息` (Messages) › `IM` | [IM connections](#im-connections) |
+| `im` | `设置` (Settings) › `消息` (Messages) › `聊天应用` (Chat apps) | [IM connections](#im-connections) |
 
 ## Features
 
@@ -865,7 +865,7 @@ Reach:
 5. `click testid:im-connect-imessage`
 
 - Web routes: none
-- Settings: `设置` (Settings) › `消息` (Messages) › `IM`
+- Settings: `设置` (Settings) › `消息` (Messages) › `聊天应用` (Chat apps)
 - Keyboard shortcuts in its code: `C`, `D`
 - Test ids in its code: `im-app-token-input`, `im-approve-*`, `im-bot-token-input`, `im-connect-*`, `im-connect-another-*`, `im-connect-submit`, `im-connection-*`, `im-delete-*`, `im-machine-select`, `im-menu-*`, `im-no-machines`, `im-pairing-*`, `im-platform-*`, `im-platforms`, `im-reconnect-*`, `im-reject-*`, `im-rescan-*`, `im-token-input`, `im-wechat-expired`, `im-wechat-retry`
 - Research: n/a: the binding contract is docs/design/im-connections.md; no reference product is copied

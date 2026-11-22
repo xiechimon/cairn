@@ -136,6 +136,18 @@ describe('latin bypass scan', () => {
       'Open',
       'latin-attr',
     ],
+    [
+      'JSX child ternary',
+      "const el = <span>{dir === 'end' ? 'Scroll to end' : 'Scroll to start'}</span>;",
+      'Scroll to end',
+      'latin-jsx',
+    ],
+    [
+      'JSX child fallback',
+      "const el = <li>{item.label || 'Unnamed'}</li>;",
+      'Unnamed',
+      'latin-jsx',
+    ],
     ['toast sink', "toastError('Update failed');", 'Update failed', 'latin-sink'],
     ['toast member sink', "toast.error('Update failed');", 'Update failed', 'latin-sink'],
     ['alert sink', "alert('Nope');", 'Nope', 'latin-sink'],
@@ -152,6 +164,10 @@ describe('latin bypass scan', () => {
     ['sink member on other object', "obj.alert('Nope');"],
     ['t() sink arg', "toastError(t('更新失败'));"],
     ['plain string in code', "const s = 'Loading';"],
+    ['call arg inside JSX child', "const el = <div>{cn('a b', on && 'c d')}</div>;"],
+    ['member access inside JSX child', "const el = <div>{data['name']}</div>;"],
+    ['t() inside JSX child ternary', "const el = <span>{dir === 'end' ? t('最新') : t('最早')}</span>;"],
+    ['attr literal inside JSX child element', "const el = <div>{on && <B foo={'bar'} />}</div>;"],
     ['component prop named like DOM attr on non-string value', 'const el = <Tooltip title={t(\'菜单\')} />;'],
   ])('ignores %s', (_label, src) => {
     expect(latin(src)).toEqual([]);

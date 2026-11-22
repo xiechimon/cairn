@@ -39,6 +39,7 @@ function Toaster({ ...props }: ToasterProps) {
     <Sonner
       theme={theme}
       closeButton
+      containerAriaLabel={t('通知')}
       position="top-center"
       offset={{ top: 16 }}
       mobileOffset={{ top: 66, left: 16, right: 16 }}

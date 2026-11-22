@@ -43,12 +43,14 @@ const ALLOWLIST: Record<string, string> = {
  *  name a format (owner/repo, a token shape, a URL), not a sentence. */
 const LATIN_ALLOWLIST: Record<string, string> = {
   'board/first-run-setup.tsx::Cairn': 'product name',
+  'chief/memory-edit-composer.tsx::MEMORY.md': 'memory file name fallback',
   'chief/queue-tabs.tsx::Esc': 'keycap label inside <Kbd>',
   'components/thread/pr-card.tsx::PR #': 'PR is a kept term; the issue number follows',
   'components/thread/pr-link.tsx::PR #': 'PR is a kept term; the issue number follows',
   'pages/dir-browser.tsx::git': 'tool name badge',
   'pages/project-new-page.tsx::owner/repo': 'input placeholder example',
   'pages/project-new-page.tsx::/path/to/repo': 'path placeholder example',
+  'pages/project-settings-page.tsx::main': 'default git branch name',
   'pages/project-settings-page.tsx::owner/repo': 'input placeholder example',
   "resources/bulk-secret-dialog.tsx::API_KEY='secret-value'\nNODE_ENV=development":
     '.env format example',

@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "2b2634e42305453daa9dea6494d6964bd3ca41de",
-    "date": "2026-11-20"
+    "sha": "1ecdbd9d7cfd4ce29a09933d15ce810d603fa413",
+    "date": "2026-11-22"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -81,8 +81,9 @@
     "dialog.tsx": {
       "kind": "registry",
       "upstreamItem": "dialog",
-      "status": "pristine",
-      "hash": "286d2087b0194b82446d417b94d7038648084447dd6ac68e85238ffecdf51fe4"
+      "status": "deviated",
+      "hash": "2b1730fecea64a157996a343aa0157ac10e23e2b7d5f50ec7403ac54698fedd0",
+      "reason": "zh i18n sweep: the built-in close button aria-label goes through t(关闭) instead of a raw English literal."
     },
     "dropdown-menu.tsx": {
       "kind": "registry",
@@ -141,8 +142,9 @@
     "message-scroller.tsx": {
       "kind": "registry",
       "upstreamItem": "message-scroller",
-      "status": "pristine",
-      "hash": "ed1dd557a9b8eda743c01077f35ea7d608595aef46461d1551cb88d2262de4bd"
+      "status": "deviated",
+      "hash": "792e03b17381902e95815b0a243ee877cd306e36c90b54035b33634d28ac4257",
+      "reason": "zh i18n sweep: viewport aria-label=t(消息) and the scroll button sr-only text uses t(滚动到最新)/t(滚动到最早) instead of upstream English literals."
     },
     "message.tsx": {
       "kind": "registry",
@@ -160,7 +162,7 @@
     "ring-spinner.tsx": {
       "kind": "adapter",
       "reason": "loading.dev Ring (jakubkrehel/loading@da6f2e6, MIT — attribution in spinner.NOTICE.md) as the shared busy indicator, adopted over the registry spinner item per the owner motion pick: 20% opacity track + 16/62.8 arc, round cap, 800ms linear turn via .spin-ring (--dur-spin), static under reduced motion. Keeps data-slot=\"spinner\" so Button context sizing applies (16px at sm, 20px at default; explicit size-* elsewhere). spinner.tsx itself stays pristine upstream; all busy call sites import this adapter.",
-      "hash": "e83a834c5691f32006e2821ce066b613ae4877dbd618a4bb1582816f5e124bd6"
+      "hash": "ce1a2796847e8642f39413a6fc11d2817e71767434442ffc76273efbe7d28a0f"
     },
     "seeded-avatar.tsx": {
       "kind": "adapter",
@@ -193,8 +195,9 @@
     "spinner.tsx": {
       "kind": "registry",
       "upstreamItem": "spinner",
-      "status": "pristine",
-      "hash": "8e45e91ea6a796d896605f971aa7fa8f803cfd1500825c1a935567f1cc47123c"
+      "status": "deviated",
+      "hash": "702a9cd798bb26b9da9719c75e0fe442ea7ef2b71b0854603d74f82ff5f36473",
+      "reason": "zh i18n sweep: aria-label goes through t(加载中…) instead of upstream raw English."
     },
     "status-chip.tsx": {
       "kind": "adapter",
@@ -223,7 +226,7 @@
     "toaster.tsx": {
       "kind": "adapter",
       "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer. Motion pick: the dormant loading icon is the shared RingSpinner (ring-spinner.tsx), not a lucide loader.",
-      "hash": "812519c34365f8ad0a11a6df8799e8c5d3da624985db3752bebaea48536b576b"
+      "hash": "a1495224e07809a2f932c2b1160bd41de06c632347cdac9f68f29a731a69ff00"
     },
     "tooltip.tsx": {
       "kind": "registry",
