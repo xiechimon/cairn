@@ -7,7 +7,7 @@ Status: reviewed (gpt-6.1-sol, read-only, two rounds: go after changes; all five
 The composer context ring reads `context` from `GET /api/teams/:id/chief` (`lastTurnContext` in `apps/server/src/services/coordinator-context.ts`). For a turn run on the Claude Code route (usage model `claude-code/<model>`) the server derives both limits from Cairn's own tables:
 
 - `contextWindow`: `contextWindowOf` looks up provider `claude-code` in the team's `provider` rows and the pi catalog. Neither knows `claude-code`, so it falls back to `DEFAULT_CONTEXT_WINDOW` (200K).
-- `compactAt`: `compactionWindow(contextWindow).backgroundAt`, the in-server pi runtime's background compaction point (91.8K for 200K).
+- `compactAt`: `compactionWindow(contextWindow).backgroundAt`, the in-server pi runtime's background compaction point (150K on a 200K window; a smaller window starts earlier, `min(150K, blocking − 32768)`).
 
 Claude Code compacts by its own rules. Probed on the deployment host with the installed SDK (0.3.278, `query().getContextUsage({ detail: 'summary' })`, no prompt sent) for `claude-sonnet-5-5` and `claude-opus-5-5`: `rawMaxTokens` 200000, `autoCompactThreshold` 167000, `isAutoCompactEnabled` true, an `Autocompact buffer` row of 33000. So today the tooltip says `Compacts at 91.8K` where the CLI compacts at 167K, and the 200K window is right only because the fallback happens to match. The window and threshold depend on the CLI version, model, plan and settings (`autoCompactWindow`, auto-compact off; the SDK documents a 200K compaction window on 1M-window models), so the server cannot compute them.
 

@@ -13,10 +13,12 @@ and the context meter shows the number the runtime reports.
 
 | Runtime | How it is told | What the meter shows |
 |---|---|---|
-| In-server (pi-durable) | `compactionWindow()` keeps `min(150K, blocking/2)` | `compactionWindow(window).backgroundAt` |
+| In-server (pi-durable) | `compactionWindow()` keeps `min(150K, blocking − 32768)` | `compactionWindow(window).backgroundAt` |
 | Claude Code | `CLAUDE_CODE_AUTO_COMPACT_WINDOW = compactAt + 33000` in the SDK `settings.env`; the CLI then reports `autoCompactThreshold` 150000 | `getContextUsage()` threshold and window, read after each turn |
 | Gemini CLI | `GEMINI_CLI_SYSTEM_SETTINGS_PATH` points at `<GEMINI_CLI_HOME>/.gemini/cairn-system/compress-*.json` holding `model.compressionThreshold = compactAt / tokenLimit(model)` | nothing: Gemini reports no usage over ACP |
 | Devin, Antigravity | not tellable; the server starts a new session at claim time when the thread's last turn reported `contextTokens >= COORDINATOR_COMPACT_AT` | `usage_update.used` as context tokens, `compactAt` 150K |
+
+`compactionWindow()` returns `backgroundAt = min(COORDINATOR_COMPACT_AT, blocking − MIN_COMPACTION_MARGIN_TOKENS)` (`MIN_COMPACTION_MARGIN_TOKENS` = 32768, taken from pi-durable 1.5.0's `DEFAULT_COMPACTION_POLICY.backgroundTokens`): every window that fits 150K below the blocking point compacts at exactly 150K; a smaller window starts the background fold early enough to finish before it. The 32768 margin is the room pi-durable itself leaves between the background trigger and the blocking threshold.
 
 `compactAt` reaches a backend only on Coordinator sessions
 (`composeStepSessionOpts`, `isChief`); worker steps keep each runtime's default.
