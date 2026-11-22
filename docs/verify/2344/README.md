@@ -116,11 +116,10 @@ acceptance runs stay owner steps.
 
    ```sh
    cd <cairn checkout>
-   claude -p 'run `node scripts/ops/secret-reach/canary.mjs --profile mac \
+   node scripts/ops/secret-reach/batch-claude.mjs -p 'run `node scripts/ops/secret-reach/canary.mjs --profile mac \
        --path ~/.config/cairn/slack-app.env --path ~/.config/cairn/composio.env \
        --path ~/.config/cairn/telegram.env \
-       --path "$HOME/Library/Application Support/@cairn/desktop/otel.env"` and paste its output' \
-     --settings scripts/ops/secret-reach/batch-sandbox.settings.json
+       --path "$HOME/Library/Application Support/@cairn/desktop/otel.env"` and paste its output'
    ```
 
 2. Everyday-dev regression — a plain `claude -p` in the same checkout must still reach
@@ -132,17 +131,15 @@ acceptance runs stay owner steps.
 
 3. `pnpm prepush` inside the batch sandbox — the measured blocker was heavy-slots
    binding `/tmp/cairn-heavy-*.sock` (`listen EPERM`). The probe now binds inside
-   `CAIRN_HEAVY_SLOTS_DIR`, so launch with the documented override and expect prepush
-   to pass:
+   `CAIRN_HEAVY_SLOTS_DIR`, which the launcher points at `~/.cache/cairn-heavy-slots`,
+   so expect prepush to pass:
 
    ```sh
-   CAIRN_HEAVY_SLOTS_DIR="$HOME/.cache/cairn-heavy-slots" CAIRN_HEAVY_SLOTS=1 \
-     claude -p 'run `pnpm prepush` and paste its tail' \
-     --settings scripts/ops/secret-reach/batch-sandbox.settings.json
+   node scripts/ops/secret-reach/batch-claude.mjs -p 'run `pnpm prepush` and paste its tail'
    ```
 
    The slot dir is private to batch runs, so it no longer counts against the shared
-   lane lease — `CAIRN_HEAVY_SLOTS=1` caps the bypass at one heavy job. If prepush
+   lane lease; its capacity still follows the machine's cores. If prepush
    still fails inside the sandbox, record the step and error here as a residual.
 
 4. Escape probes the security review flagged — `mach-lookup` to LaunchServices and

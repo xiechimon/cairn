@@ -140,7 +140,7 @@ The launcher always passes `--settings scripts/ops/secret-reach/batch-sandbox.se
 
 - It drops every credential-shaped variable before `claude` starts, so neither the session's Bash nor its hooks or MCP servers ever see one. That means any name with a `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `PASSPHRASE`, `CREDENTIAL`, `APIKEY`, `KEY`, `AUTH`, `COOKIE`, `HEADERS`, `PAT` or `BEARER` segment (`GH_TOKEN`, `GITHUB_TOKEN`, `NPM_TOKEN`, `AWS_SECRET_ACCESS_KEY`, `SSH_AUTH_SOCK`, `OTEL_EXPORTER_OTLP_HEADERS`, …), the `CAIRN_GIT_CRED_*` and `GIT_CONFIG_{COUNT,KEY_n,VALUE_n,PARAMETERS}` git credential plumbing, `GIT_ASKPASS`/`SSH_ASKPASS`, and any value that is a URL with a password.
 - `claude`'s own login moves off the environment: `ANTHROPIC_API_KEY` goes to `claude` on a pipe named by `CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR`, and `CLAUDE_CODE_OAUTH_TOKEN` on one named by `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`. `claude` reads the pipe once at start-up and does not pass the descriptor to its Bash. A keychain subscription login needs neither. `ANTHROPIC_AUTH_TOKEN` (gateway bearer) has no descriptor variant and is dropped, so gateway-authenticated batch runs are unsupported.
-- It sets `CAIRN_HEAVY_SLOTS_DIR=~/.cache/cairn-heavy-slots` and `CAIRN_HEAVY_SLOTS=1` unless the caller set them (see the caveats below).
+- It sets `CAIRN_HEAVY_SLOTS_DIR=~/.cache/cairn-heavy-slots` unless the caller set it (see the caveats below).
 
 `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB` is deliberately not used for this: it only strips Anthropic and cloud-provider credentials (`GH_TOKEN` survives it), and it forces the permission mode back to `default`, which turns away the file tools in a plain `claude -p` run. `scripts/ops/secret-reach/batch-claude.test.mjs` pins the scrub list and the launch shape.
 
@@ -151,9 +151,9 @@ The repository's `.claude/settings.json` deliberately carries no `sandbox` block
 Inside the sandbox a batch session cannot push or use `gh` (its credentials are denied and the proxy port is unreachable); PR creation, `push` and `push-queue` are the outer launcher script's job, outside the sandbox. It can still run tests, with two caveats:
 
 - The sandbox profile writes `TMPDIR=/tmp/claude` and allows writes only under the launch cwd, `/tmp/claude`, `~/.cache`, the package caches and `~/.cairn/plans`. The shared heavy-slot directory (`getconf DARWIN_USER_TEMP_DIR` on macOS) is *not* writable, so `batch-claude.mjs` points `CAIRN_HEAVY_SLOTS_DIR` at a writable dir — `~/.cache/cairn-heavy-slots` is already covered by `allowWrite`. `scripts/heavy-slots.mjs` keeps its liveness probe socket inside that directory, so no further path needs opening.
-- A private slot directory is a private lease: the batch session's heavy work no longer counts against the shared lane slots. `CAIRN_HEAVY_SLOTS=1` keeps the bypass at one heavy job.
+- A private slot directory is a private lease: the batch session's heavy work no longer counts against the shared lane slots. That directory's capacity still comes from the machine's cores (`max(1, floor(cores/4))`), so a 4-core runner keeps the bypass at one heavy job.
 
-Lane sessions (daemon `claude-code` runtime) are out of scope here; their credential isolation is tracked in #5393.
+Lane sessions (daemon `claude-code` runtime) are out of scope here; their credential isolation is tracked in #5006.
 
 Host acceptance on the owner Mac, from a cairn checkout — every channel must report `no` with 0 bytes (exit 0):
 

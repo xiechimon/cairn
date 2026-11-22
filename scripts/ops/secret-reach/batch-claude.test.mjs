@@ -50,7 +50,7 @@ const ORDINARY = {
   GIT_AUTHOR_EMAIL: 'someone@example.com',
   GIT_CONFIG_GLOBAL: '/Users/someone/.gitconfig',
   HTTPS_PROXY: 'http://127.0.0.1:8080',
-  CAIRN_HEAVY_SLOTS: '2',
+  CAIRN_LIVE_STACK_SLOTS: '2',
   KEYCHAIN_GROUP: 'none',
 };
 
@@ -98,14 +98,11 @@ test('a subscription login without env tokens passes no descriptors', () => {
 test('the batch env points heavy slots at a sandbox-writable private dir unless the launcher chose one', () => {
   const defaults = batchEnv({ HOME: '/Users/someone' }).env;
   assert.equal(defaults.CAIRN_HEAVY_SLOTS_DIR, '/Users/someone/.cache/cairn-heavy-slots');
-  assert.equal(defaults.CAIRN_HEAVY_SLOTS, '1');
   const chosen = batchEnv({
     HOME: '/Users/someone',
     CAIRN_HEAVY_SLOTS_DIR: '/Users/someone/.cache/other',
-    CAIRN_HEAVY_SLOTS: '2',
   }).env;
   assert.equal(chosen.CAIRN_HEAVY_SLOTS_DIR, '/Users/someone/.cache/other');
-  assert.equal(chosen.CAIRN_HEAVY_SLOTS, '2');
 });
 
 function fakeClaude() {

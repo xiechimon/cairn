@@ -69,7 +69,6 @@ export function batchEnv(inherited) {
     login.push(value);
   }
   env.CAIRN_HEAVY_SLOTS_DIR ??= join(env.HOME ?? homedir(), '.cache', 'cairn-heavy-slots');
-  env.CAIRN_HEAVY_SLOTS ??= '1';
   return { env, login };
 }
 
