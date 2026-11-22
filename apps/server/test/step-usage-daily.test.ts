@@ -215,7 +215,37 @@ describe('thread context on the todo payload', () => {
     return todoRecordSchema.parse(await res.json()).context;
   };
 
-  test('the latest context-bearing report wins, with catalog window and derived compact point', async () => {
+  test('a reported compact point wins; a row without one carries no invented marker', async () => {
+    addBuild('build-1', NOW);
+    vi.setSystemTime(NOW);
+    report(
+      's1',
+      'build-1',
+      [{ ...u('pi/m', 10), contextTokens: 62_000, contextWindow: 128_000, compactAt: 111_616 }],
+      'build',
+    );
+    expect(await contextOf('todo-build-1')).toEqual({
+      tokens: 62_000,
+      contextWindow: 128_000,
+      compactAt: 111_616,
+      cache: { read: 0, write: 0, input: 10 },
+    });
+    vi.setSystemTime(NOW + 1);
+    report(
+      's2',
+      'build-1',
+      [{ ...u('swe-2-high', 10), contextTokens: 70_000, contextWindow: 200_000 }],
+      'build',
+    );
+    const devin = await contextOf('todo-build-1');
+    expect(devin).toMatchObject({ tokens: 70_000, contextWindow: 200_000 });
+    expect(devin).not.toHaveProperty('compactAt');
+    vi.setSystemTime(NOW + 2);
+    report('s3', 'build-1', [{ ...u('m', 10), contextTokens: 80_000 }], 'build');
+    expect(await contextOf('todo-build-1')).not.toHaveProperty('compactAt');
+  });
+
+  test('the latest context-bearing report wins, with catalog window and its reported compact point', async () => {
     addBuild('build-1', NOW);
     vi.setSystemTime(YESTERDAY);
     report('s-old', 'build-1', [{ ...u('m', 10), contextTokens: 20_000 }], 'build');
@@ -223,7 +253,14 @@ describe('thread context on the todo payload', () => {
     report(
       's-new',
       'build-1',
-      [{ ...u('pi/m', 10), contextTokens: 62_000, contextWindow: 128_000 }],
+      [
+        {
+          ...u('pi/m', 10),
+          contextTokens: 62_000,
+          contextWindow: 128_000,
+          compactAt: 111_616,
+        },
+      ],
       'build',
     );
     expect(await contextOf('todo-build-1')).toEqual({
@@ -258,7 +295,7 @@ describe('thread context on the todo payload', () => {
     });
   });
 
-  test('a Pi-reported window reaches the stored row and the todo payload derives the worker compact point', async () => {
+  test('a Pi-reported window reaches the stored row; the compact point only appears when the runtime reported one', async () => {
     addBuild('build-1', NOW);
     vi.setSystemTime(NOW);
     report(
@@ -274,12 +311,9 @@ describe('thread context on the todo payload', () => {
         .where(eq(stepUsage.stepId, 's1'))
         .get(),
     ).toEqual({ contextWindow: 128_000 });
-    expect(await contextOf('todo-build-1')).toEqual({
-      tokens: 105_000,
-      contextWindow: 128_000,
-      compactAt: 111_616,
-      cache: { read: 0, write: 0, input: 10 },
-    });
+    const withoutMarker = await contextOf('todo-build-1');
+    expect(withoutMarker).toMatchObject({ tokens: 105_000, contextWindow: 128_000 });
+    expect(withoutMarker).not.toHaveProperty('compactAt');
   });
 
   test('a thread with no context reading carries no field, and a zero reading is ignored', async () => {

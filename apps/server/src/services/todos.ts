@@ -20,7 +20,6 @@ import {
   derivePlaceholderTitle,
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
-  isBackendRuntimeId,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
@@ -28,7 +27,6 @@ import {
 } from '@cairn/shared';
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, or, sql } from 'drizzle-orm';
 import { cacheTtlMsFor, resolveCacheRetentionTier } from '../coordinator/runtime/cold-slim.js';
-import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import type { Db } from '../db/client.js';
 import {
   build,
@@ -284,11 +282,7 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
     const teamId = teamOf.get(row.todoId);
     if (teamId === undefined) continue;
     const contextWindow = row.contextWindow ?? contextWindowOf(db, teamId, row.model);
-    const compactAt =
-      row.compactAt ??
-      (isBackendRuntimeId(row.model.slice(0, row.model.indexOf('/')))
-        ? undefined
-        : compactionWindow(contextWindow).blockingAt);
+    const compactAt = row.compactAt ?? undefined;
     const ttl = cacheTtlMsFor(resolveCacheRetentionTier(), row.model, {
       total: row.cacheWrite,
       oneHour: row.cacheWrite1h,

@@ -412,6 +412,40 @@ describe('the context meter under the in-server Coordinator', () => {
     expect(context).not.toHaveProperty('compactAt');
   });
 
+  test('a Runner Pi row shows the compact point the runtime reported, not the in-server fallback', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-runner-pi');
+    await finishStep(deps(), machineId, 'turn-runner-pi', {
+      status: 'success',
+      usage: [
+        usage('pi/custom', 10, 0, {
+          contextTokens: 100_000,
+          contextWindow: 128_000,
+          compactAt: 111_616,
+        }),
+      ],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 100_000,
+      contextWindow: 128_000,
+      compactAt: 111_616,
+    });
+  });
+
+  test('an in-server row without a reported compact point keeps the Coordinator fallback at 150K', async () => {
+    const machineId = insertMachine(H.s);
+    claimedStep(machineId, 'turn-in-server');
+    await finishStep(deps(), machineId, 'turn-in-server', {
+      status: 'success',
+      usage: [usage('stub-gw/stub-model', 10, 0, { contextTokens: 100_000 })],
+    });
+    expect(getChiefEnvelope(H.s.svc, H.teamId, H.threadId).context).toMatchObject({
+      tokens: 100_000,
+      contextWindow: DEFAULT_CONTEXT_WINDOW,
+      compactAt: 150_000,
+    });
+  });
+
   test('a reclaimed step reporting again replaces tokens and limits together', async () => {
     const machineId = insertMachine(H.s);
     const cc = 'claude-code/claude-sonnet-5-5';
