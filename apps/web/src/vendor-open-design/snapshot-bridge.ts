@@ -194,15 +194,8 @@ export function buildSnapshotBridgeScript(): string {
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     });
   }
-  var parsed = new Promise(function(resolve){
-    document.addEventListener('readystatechange', resolve, { once: true });
-  });
   window.__odCaptureSnapshot = function(opts){
-    var bodyReady = document.body ? Promise.resolve() : parsed;
-    return bodyReady.then(function(){
-      if (!document.body) throw new Error('missing preview body');
-      return waitForImages();
-    }).then(function(){ return captureSnapshot(opts || {}); });
+    return waitForImages().then(function(){ return captureSnapshot(opts || {}); });
   };
   window.addEventListener('message', function(ev){
     var data = ev && ev.data;

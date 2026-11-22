@@ -132,8 +132,6 @@ export function buildCommentBridgeScript(): string {
   }, true);
   document.addEventListener('scroll', postScroll, true);
   window.addEventListener('resize', postScroll);
-  document.addEventListener('readystatechange', function(){
-    window.parent.postMessage({ type: 'od:comment-ready' }, '*');
-  }, { once: true });
+  window.parent.postMessage({ type: 'od:comment-ready' }, '*');
 })();</script>`;
 }

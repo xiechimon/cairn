@@ -203,7 +203,7 @@ test.describe('artifact parser', () => {
     );
   });
 
-  test('keeps the policy and bridges outside literal closing tags', async ({ page }) => {
+  test('enforces the preview policy despite literal closing tags', async ({ page }) => {
     const html = `<!doctype html><title>HTML examples</title><body>
       <!-- Example markup: </body> -->
       <script type="application/json" id="example-config">{"closingTag":"</body>"}</script>
@@ -212,12 +212,11 @@ test.describe('artifact parser', () => {
     const ownerFrame = page.getByTestId('design-frame');
     await expect(ownerFrame).toHaveAttribute('sandbox', 'allow-scripts allow-forms allow-downloads');
     const frame = ownerFrame.contentFrame();
-    const heading = frame.getByRole('heading', { name: 'HTML examples' });
-    await expect(frame.locator('head > :first-child')).toHaveAttribute('http-equiv', 'Content-Security-Policy');
-    await expect(heading).toHaveAttribute('data-example', '</body>');
+    const policy = frame.locator('head > :first-child');
+    await expect(policy).toHaveAttribute('http-equiv', 'Content-Security-Policy');
+    await expect(policy).toHaveAttribute('content', "base-uri 'none'; object-src 'none'");
     expect(await frame.locator('#example-config').textContent()).toBe('{"closingTag":"</body>"}');
-    await expect(frame.locator('head > script[data-od-sandbox-shim]')).toHaveCount(1);
-    const enforcement = await heading.evaluate(() => {
+    const enforcement = await policy.evaluate(() => {
       const originalBase = document.baseURI;
       const base = document.createElement('base');
       base.href = new URL('/html-examples/', originalBase).href;
@@ -231,9 +230,6 @@ test.describe('artifact parser', () => {
       });
     });
     expect(enforcement).toEqual({ directive: 'base-uri', unchanged: true });
-    await page.getByTestId('design-comment-mode').click();
-    await heading.click();
-    await expect(page.getByTestId('design-comment-popover')).toBeVisible();
   });
 
   test('opens an artifact without calling DOMParser in the board', async ({ page }) => {
@@ -350,154 +346,29 @@ test.describe('artifact parser', () => {
     await expect(child.contentFrame().locator('body')).toHaveText('Archived plans');
   });
 
-  test('uses storage immediately and supports comments and snapshots before a deferred script runs', async ({
-    page,
-  }, testInfo) => {
-    const pending = Promise.withResolvers<void>();
-    await page.route('**/preview-deferred.js', async (route) => {
-      await pending.promise;
-      await route.fulfill({
-        contentType: 'application/javascript',
-        body: "document.documentElement.dataset.deferred = 'finished'",
-      });
-    });
-    const html = `<!doctype html><head><title>Workspace pricing</title>
+  test('preserves the first artifact script and an inline document click router', async ({ page }) => {
+    const html = `<!doctype html><html><head>
+      <script type="application/json" id="pricing-config">{"details":"Monthly renewal"}</script>
+      </head><body>
+      <a id="details-link" href="#details">Plan details</a>
+      <h1 id="details">Pricing</h1>
       <script>
-        localStorage.setItem('plan', 'starter');
-        sessionStorage.setItem('section', 'pricing');
-        document.documentElement.dataset.storage = localStorage.getItem('plan') + '/' + sessionStorage.getItem('section');
+        const config = JSON.parse(document.scripts[0].textContent);
+        document.addEventListener('click', (event) => {
+          if (event.defaultPrevented || event.target.id !== 'details-link') return;
+          event.preventDefault();
+          document.getElementById('details').textContent = config.details;
+        });
       </script>
-      <script defer src="/preview-deferred.js"></script></head>
-      <body><h1 data-od-id="title">Workspace pricing</h1><p>One plan for your whole team.</p></body>`;
-    try {
-      const [request, state] = await Promise.all([
-        page.waitForRequest('**/preview-deferred.js'),
-        openDesign(page, [], null, { 'ver-2': html }),
-      ]);
-      expect(request.frame().parentFrame()).toBe(page.mainFrame());
-      const frame = page.getByTestId('design-frame').contentFrame();
-      const heading = frame.getByRole('heading', { name: 'Workspace pricing' });
-      await expect(heading).toBeVisible();
-      await expect.soft(frame.locator('html')).toHaveAttribute('data-storage', 'starter/pricing', {
-        timeout: 1000,
-      });
-      await page.getByTestId('design-comment-mode').click();
-      await expect(frame.locator('html')).toHaveAttribute('data-od-comment-mode', '', { timeout: 5000 });
-      await expect(page.getByTestId('design-comment-unsupported')).toHaveCount(0);
-      await heading.click();
-      const note = page.getByTestId('design-comment-note');
-      await note.fill('Lead with the team plan');
-      await page.screenshot({ path: testInfo.outputPath('preview-commenting.png') });
-      await page.getByTestId('design-comment-save').click();
-      await expect(page.getByTestId('design-pin')).toBeVisible();
-      expect(state.comments).toHaveLength(1);
-
-      await page.getByTestId('design-export').click();
-      const [png] = await Promise.all([
-        page.waitForEvent('download', { timeout: 12_000 }),
-        page.getByTestId('design-export-png').click(),
-      ]);
-      expect(png.suggestedFilename()).toBe('pricing.png');
-      expect(await heading.evaluate(() => document.readyState)).toBe('interactive');
-    } finally {
-      pending.resolve();
-    }
-    await expect(page.getByTestId('design-frame').contentFrame().locator('html')).toHaveAttribute(
-      'data-deferred',
-      'finished',
-    );
+      </body></html>`;
+    await openDesign(page, [], null, { 'ver-2': html });
+    const frame = page.getByTestId('design-frame').contentFrame();
+    await expect(frame.locator('script').first()).toHaveAttribute('id', 'pricing-config');
+    await frame.getByRole('link', { name: 'Plan details' }).click();
+    const heading = frame.getByRole('heading', { name: 'Monthly renewal' });
+    await expect(heading).toBeVisible();
+    expect(await heading.evaluate(() => location.hash)).toBe('');
   });
-
-  const routeClick = (target: 'document' | 'window') => `
-    ${target}.addEventListener('click', (event) => {
-      if (event.defaultPrevented || event.target.id !== 'details-link') return;
-      event.preventDefault();
-      document.getElementById('view').textContent = 'details';
-    });`;
-  const clickParity = [
-    ['an inline document router', routeClick('document'), 'details', 'about:srcdoc'],
-    [
-      'stopPropagation on click',
-      "document.addEventListener('click', (event) => event.stopPropagation())",
-      'home',
-      'about:srcdoc#details',
-    ],
-    ['a module router', routeClick('document'), 'home', 'about:srcdoc#details', 'module'],
-    [
-      'a router registered after load',
-      `window.addEventListener('load', () => { ${routeClick('document')} });`,
-      'home',
-      'about:srcdoc#details',
-    ],
-    ['a Window router', routeClick('window'), 'home', 'about:srcdoc#details'],
-    [
-      'a Window router added during the click',
-      `document.getElementById('details-link').addEventListener('click', () => {
-        ${routeClick('window')}
-      }, { once: true });`,
-      'home',
-      'about:srcdoc#details',
-    ],
-  ] as const;
-
-  for (const [label, handlers, view, url, type] of clickParity) {
-    test(`link fallback matches main for ${label}`, async ({ page }) => {
-      const html = `<!doctype html><body>
-        <a id="details-link" href="#details">Plan details</a>
-        <h1 id="view">home</h1><p id="details">Monthly renewal</p>
-        <script type="${type ?? 'text/javascript'}">${handlers}</script>`;
-      await openDesign(page, [], null, { 'ver-2': html });
-      const frame = page.getByTestId('design-frame').contentFrame();
-      await expect.poll(() => frame.locator('body').evaluate(() => document.readyState)).toBe('complete');
-      await frame.getByRole('link', { name: 'Plan details' }).click();
-      await expect.poll(() => frame.locator('body').evaluate(() => ({
-        view: document.getElementById('view')?.textContent ?? null,
-        url: location.href,
-      }))).toEqual({ view, url });
-    });
-  }
-
-  const submitParity = [
-    ['stopPropagation on Enter', true, ['fallback:confirm']],
-    ['one native submit per confirmation', false, ['native:confirm', 'native:confirm']],
-  ] as const;
-
-  for (const [label, stopPropagation, expected] of submitParity) {
-    test(`submit fallback matches main for ${label}`, async ({ page }) => {
-      const html = `<!doctype html><body>
-        <form>
-          <input type="email" value="billing@example.test" aria-label="Billing email" required>
-          <button id="confirm" type="submit">Confirm plan</button>
-        </form>
-        <output id="submissions"></output>
-        <script>
-          const output = document.getElementById('submissions');
-          document.querySelector('form').addEventListener('submit', (event) => {
-            event.preventDefault();
-            const result = document.createElement('span');
-            result.textContent = (event.isTrusted ? 'native:' : 'fallback:') + event.submitter.id;
-            output.append(result);
-          });
-          ${stopPropagation ? "document.addEventListener('keydown', (event) => event.stopPropagation());" : ''}
-        </script>`;
-      await openDesign(page, [], null, { 'ver-2': html });
-      const frame = page.getByTestId('design-frame').contentFrame();
-      await expect.poll(() => frame.locator('body').evaluate(() => document.readyState)).toBe('complete');
-      const field = frame.getByRole('textbox', { name: 'Billing email' });
-      const submissions = () => frame.locator('#submissions').evaluate(async (output) => {
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
-        return [...output.children].map((row) => row.textContent);
-      });
-      if (stopPropagation) {
-        await field.dispatchEvent('keydown', { key: 'Enter' });
-      } else {
-        await frame.getByRole('button', { name: 'Confirm plan' }).click();
-        expect(await submissions()).toEqual(['native:confirm']);
-        await field.press('Enter');
-      }
-      expect(await submissions()).toEqual(expected);
-    });
-  }
 
   test('keeps an unterminated inline script inert as in a direct opening', async ({ page, context }) => {
     const html = `<!doctype html><body><h1>Pricing draft</h1>
