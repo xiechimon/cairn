@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import type { ApiKeyRow as SharedApiKeyRow } from '@cairn/shared';
 import { BRAND, maskApiKey } from '@cairn/shared';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { apiKey } from '../db/schema.js';
 import { hashCredential } from '../lib/hash.js';
@@ -96,4 +96,13 @@ export function verifyApiKey(
     .where(eq(apiKey.keyHash, hashCredential(plaintext)))
     .get();
   return row ? { ...toApiKeyRowView(row), teamId: row.teamId } : null;
+}
+
+export function deleteApiKey(deps: ApiKeyDeps, teamId: string, id: string): boolean {
+  const deleted = deps.db
+    .delete(apiKey)
+    .where(and(eq(apiKey.teamId, teamId), eq(apiKey.id, id)))
+    .returning({ id: apiKey.id })
+    .all();
+  return deleted.length > 0;
 }

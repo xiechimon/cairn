@@ -120,6 +120,7 @@ const INFERRED_ROUTES = [
   'DELETE /api/teams/{id}/browser-password-grants/{grantId}',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
+  'DELETE /api/teams/{id}/api-keys/{keyId}',
   'GET /api/remote/descriptor',
   'GET /api/remote/tailscale',
   'POST /api/remote/tailscale',
@@ -244,6 +245,7 @@ const M2C_ROUTES = [
   'DELETE /api/teams/{id}/browser-password-grants/{grantId}',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
+  'DELETE /api/teams/{id}/api-keys/{keyId}',
 ];
 
 const M5_ROUTES = [

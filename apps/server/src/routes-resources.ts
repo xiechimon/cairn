@@ -64,7 +64,7 @@ import {
   patchAntigravitySubscription,
   verifyAntigravitySubscriptionConnection,
 } from './services/antigravity-subscriptions.js';
-import { createApiKey, listApiKeys } from './services/api-keys.js';
+import { createApiKey, deleteApiKey, listApiKeys } from './services/api-keys.js';
 import {
   listBrowserPasswordGrants,
   revokeBrowserPasswordGrant,
@@ -1373,6 +1373,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       toolGrants: body.toolGrants,
     });
     return c.json(created, 201);
+  });
+
+  app.delete('/api/teams/:id/api-keys/:keyId', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const keyId = c.req.param('keyId');
+    const listed = listApiKeys(svc, teamId).find(
+      (key) => key.id === keyId && stepIdOfGitKey(key.name) === null,
+    );
+    if (listed === undefined || !deleteApiKey(svc, teamId, keyId)) {
+      throw notFound(`api key ${keyId}`);
+    }
+    return c.body(null, 204);
   });
 }
 
