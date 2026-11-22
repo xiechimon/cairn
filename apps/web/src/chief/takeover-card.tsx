@@ -15,7 +15,7 @@ import { useI18n } from '../i18n/provider.js';
 import {
   currentDeviceSubscription,
   pushDeviceSupported,
-  subscribeDevicePush,
+  turnOnNotifications,
 } from '../pwa/push-device.js';
 
 type TakeoverItem = Extract<ChiefStreamItem, { kind: 'takeover' }>;
@@ -54,8 +54,8 @@ function useDevicePushOff(teamId: string | undefined, active: boolean) {
   }, [active]);
   const turnOn = () => {
     if (teamId === undefined) return;
-    void subscribeDevicePush(teamId)
-      .then(() => setOff(false))
+    void turnOnNotifications(teamId)
+      .then((permission) => setOff(permission !== 'granted'))
       .catch(() => {});
   };
   return { off, turnOn };

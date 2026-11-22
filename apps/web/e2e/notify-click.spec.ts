@@ -444,7 +444,7 @@ test.describe('push notification click loop (XMON-106)', () => {
     page,
   }) => {
 
-    await page.addInitScript(() => localStorage.setItem('cairn.notifyEnabled', '0'));
+    await page.addInitScript(() => localStorage.setItem('cairn.notifications', '0'));
     await stubNotification(page);
     await stubEventSource(page);
     await hideDocument(page);
@@ -455,7 +455,7 @@ test.describe('push notification click loop (XMON-106)', () => {
 
     await fireTeamNotification(page, makeRecord({}));
 
-    await page.evaluate(() => localStorage.setItem('cairn.notifyEnabled', '1'));
+    await page.evaluate(() => localStorage.setItem('cairn.notifications', '1'));
     await fireTeamNotification(page, makeRecord({ entityId: 'todo-y', id: 'u1:todo-y' }));
     await expect.poll(() => page.evaluate(() => window.__swNotifs.length)).toBe(1);
     expect(await page.evaluate(() => window.__swNotifs[0].options.data)).toEqual({
@@ -518,7 +518,7 @@ test.describe('push notification click loop (XMON-106)', () => {
     await fireTeamNotification(page, makeRecord({}));
     await expect.poll(() => page.evaluate(() => window.__desktopNotifs.length)).toBe(1);
 
-    await page.evaluate(() => localStorage.setItem('cairn.notifyEnabled', '0'));
+    await page.evaluate(() => localStorage.setItem('cairn.notifications', '0'));
     await fireTeamNotification(page, makeRecord({ entityId: 'todo-y', id: 'u1:todo-y' }));
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => window.__desktopNotifs.length)).toBe(1);

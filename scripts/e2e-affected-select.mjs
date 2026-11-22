@@ -257,7 +257,7 @@ export const FILE_RULES = new Map([
   ['apps/web/src/routes/todo-detail-page.tsx', DETAIL],
   [
     'apps/web/src/routes/account-page.tsx',
-    ['account-', 'team-attribution-', 'user-menu-', 'cds-density', 'push-device-switch'],
+    ['account-', 'team-attribution-', 'user-menu-', 'cds-density'],
   ],
   ['apps/web/src/routes/agent-model-select.tsx', AGENT],
   ['apps/web/src/routes/api-key-create-dialog.tsx', ['user-menu-', 'api-key-']],
@@ -319,7 +319,7 @@ export const DIR_RULES = [
   { prefix: 'apps/web/src/resources/', specs: RESOURCES },
   { prefix: 'apps/web/src/settings/', specs: [...RESOURCES, ...SIDEBAR] },
   { prefix: 'apps/web/src/secondary/', specs: SECONDARY },
-  { prefix: 'apps/web/src/pwa/', specs: ['notify-', 'push-device-switch'] },
+  { prefix: 'apps/web/src/pwa/', specs: ['notify-', 'account-notifications-switch'] },
   { prefix: 'apps/web/src/components/texture/', specs: ['texture-'] },
   { prefix: 'docs/design/surfaces/', specs: ['design-rules-'] },
   { prefix: 'apps/web/src/design/', specs: ['texture-'] },

@@ -12,6 +12,7 @@ import {
   SCENARIOS_ENABLED,
 } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { useNotificationsSync } from '../pwa/push-device.js';
 import { useMachines, useSession, useTeams } from './hooks.js';
 import { isFixtureMode } from './mode.js';
 import { useTeamStream } from './sse.js';
@@ -76,6 +77,7 @@ export function LiveDataBridge() {
   const teamId = teams.data?.[0]?.id;
   const machines = useMachines(teamId, live);
   useTeamStream(teamId, live);
+  useNotificationsSync(teamId, live);
   const value = useMemo<LiveData>(
     () => ({
       live,

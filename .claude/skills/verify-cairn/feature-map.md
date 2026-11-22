@@ -278,7 +278,7 @@ Reach:
 - Research: [docs/research/ios-apns-push-2026-11-14.md](../../../docs/research/ios-apns-push-2026-11-14.md)
 - Frontend design: **gap**: the notify banner, device switch and push copy have no design
 - Backend design: **gap**: no design for subscriptions, presence suppression, receipts and the three push states
-- Evidence: `apps/web/e2e/push-device-switch.spec.ts`, `apps/web/e2e/notify-click.spec.ts`, `apps/server/test/push.test.ts`, `apps/server/test/apns.test.ts`
+- Evidence: `apps/web/e2e/account-notifications-switch.spec.ts`, `apps/web/e2e/notify-click.spec.ts`, `apps/server/test/push.test.ts`, `apps/server/test/apns.test.ts`
 
 ### questions
 
@@ -652,7 +652,7 @@ Reach:
 
 **Account and team** (shipped, centrality 3). The user's account, language, global external-actions tier and device notification preferences.
 
-States: Account details, language selection, the team-wide external-actions tier projects follow by default, and device push enabled or disabled.
+States: Account details, language selection, the team-wide external-actions tier projects follow by default, and push notifications on or off.
 
 Reach:
 
@@ -666,7 +666,7 @@ Reach:
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
 - Backend design: **gap**: no design for the single-user account and team record
-- Evidence: `apps/web/e2e/account-controls.spec.ts`, `apps/web/e2e/account-release-removal.spec.ts`, `apps/web/e2e/push-device-switch.spec.ts`, `apps/server/test/user-patch.test.ts`
+- Evidence: `apps/web/e2e/account-controls.spec.ts`, `apps/web/e2e/account-release-removal.spec.ts`, `apps/web/e2e/account-notifications-switch.spec.ts`, `apps/server/test/user-patch.test.ts`
 
 ### api-keys
 

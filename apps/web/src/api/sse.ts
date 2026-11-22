@@ -14,7 +14,7 @@ import {
 } from '@cairn/shared';
 import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { readNotifyPref } from '../board/notify-pref.js';
+import { readNotificationsChoice } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { desktopNotify } from '../desktop-shell.js';
 import { EN } from '../i18n/en.js';
@@ -168,7 +168,7 @@ async function showViaServiceWorker(
 function fireDesktopNotification(record: NotificationRecord): void {
   if (window.location.pathname === DESKTOP_TRAY_PATH) return;
   if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
-  if (readNotifyPref(safeLocalStorage()) === 'off') return;
+  if (readNotificationsChoice(safeLocalStorage()) === false) return;
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);
   const titleSource = NOTIFICATION_TITLES[record.type];
   const title = titleSource === undefined ? record.entityRef.title : t(titleSource);

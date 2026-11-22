@@ -155,7 +155,7 @@
   "providers-scope.spec.ts": 15525,
   "providers-subscription-picked-copy.spec.ts": 2500,
   "providers-subscription-verification.spec.ts": 11188,
-  "push-device-switch.spec.ts": 1211,
+  "account-notifications-switch.spec.ts": 1211,
   "quota-wait-board.spec.ts": 1400,
   "registry-focus-ring.spec.ts": 15532,
   "route-override-capabilities.spec.ts": 2400,

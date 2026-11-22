@@ -1,10 +1,14 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNotificationPermission } from '../board/notify-banner.js';
-import { type NotifyPref, persistNotifyPref, readNotifyPref } from '../board/notify-pref.js';
+import {
+  notificationsOn,
+  persistNotificationsChoice,
+  readNotificationsChoice,
+} from '../board/notify-pref.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -28,13 +32,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
-import {
-  currentDeviceSubscription,
-  ensureNotificationPermission,
-  pushDeviceSupported,
-  subscribeDevicePush,
-  unsubscribeDevicePush,
-} from '../pwa/push-device.js';
+import { syncDevicePush } from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
 
@@ -57,28 +55,24 @@ export function AccountPage() {
       { onError: (error) => toastError(t('保存失败，请重试。'), error) },
     );
   };
-  const [notifyPref, setNotifyPref] = useState<NotifyPref | null>(() =>
-    readNotifyPref(safeLocalStorage()),
+  const [notifyChoice, setNotifyChoice] = useState<boolean | null>(() =>
+    readNotificationsChoice(safeLocalStorage()),
   );
   const { permission, request } = useNotificationPermission(
     live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
   );
-  const notifyOn = notifyPref === null ? permission === 'granted' : notifyPref === 'on';
+  const notifyOn = notificationsOn(notifyChoice, permission);
   const notifyBlocked = notifyOn && permission === 'denied';
-  const devicePushLive = live && teamId !== undefined && pushDeviceSupported();
   const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
-  const [deviceSubscribed, setDeviceSubscribed] = useState<boolean | null>(null);
-  const [devicePushFailed, setDevicePushFailed] = useState(false);
-  useEffect(() => {
-    if (!devicePushLive) return;
-    let cancelled = false;
-    void currentDeviceSubscription().then((sub) => {
-      if (!cancelled) setDeviceSubscribed(sub !== null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [devicePushLive]);
+  const setNotifications = (checked: boolean) => {
+    setNotifyChoice(checked);
+    persistNotificationsChoice(checked, safeLocalStorage());
+    void (async () => {
+      const granted = checked && (permission === 'granted' || (await request()) === 'granted');
+      if (!live || teamId === undefined || (checked && !granted)) return;
+      await syncDevicePush(teamId, checked);
+    })().catch((error: unknown) => toastError(t('保存失败，请重试。'), error));
+  };
   return (
     <PageShell route="account" fixture={fixture} selected="none" title={t('账号')}>
       <div className="flex flex-col gap-6">
@@ -122,61 +116,16 @@ export function AccountPage() {
             hint={
               notifyBlocked
                 ? t('浏览器已拒绝通知权限，需到站点设置重新允许')
-                : t('任务需要你处理时，在系统通知中心提醒')
+                : t('任务需要你处理时提醒你，应用关着或锁屏时也能收到')
             }
             hintClassName={notifyBlocked ? 'account-notify-blocked' : undefined}
           >
             <ToggleSwitch
               aria-label={t('推送通知')}
               checked={notifyOn}
-              onCheckedChange={(checked) => {
-                const next: NotifyPref = checked ? 'on' : 'off';
-                setNotifyPref(next);
-                persistNotifyPref(next, safeLocalStorage());
-                if (checked && permission !== 'granted') request();
-              }}
+              onCheckedChange={setNotifications}
             />
           </SettingsRow>
-          {devicePushLive && (
-            <SettingsRow
-              label={t('在这台设备上接收推送')}
-              info={t('锁屏也能收到')}
-              hint={
-                devicePushFailed
-                  ? t('浏览器已拒绝通知权限，需到站点设置重新允许')
-                  : t('需要你决定时立即推送，其余进展并入每日两次简报')
-              }
-              hintClassName={devicePushFailed ? 'account-notify-blocked' : undefined}
-            >
-              <ToggleSwitch
-                aria-label={t('在这台设备上接收推送')}
-                checked={deviceSubscribed === true}
-                disabled={deviceSubscribed === null}
-                onCheckedChange={(checked) => {
-                  if (teamId === undefined) return;
-                  setDevicePushFailed(false);
-                  void (async () => {
-                    try {
-                      if (checked) {
-                        if ((await ensureNotificationPermission()) !== 'granted') {
-                          setDevicePushFailed(true);
-                          return;
-                        }
-                        await subscribeDevicePush(teamId);
-                        setDeviceSubscribed(true);
-                      } else {
-                        await unsubscribeDevicePush(teamId);
-                        setDeviceSubscribed(false);
-                      }
-                    } catch (error) {
-                      setDevicePushFailed(true);
-                      toastError(t('保存失败，请重试。'), error);
-                    }
-                  })();
-                }}
-              />
-            </SettingsRow>
-          )}
         </SettingsCard>
         <SettingsSection title={t('外观')} testId="account-appearance">
           <SettingsCard>

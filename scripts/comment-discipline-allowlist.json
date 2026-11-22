@@ -290,16 +290,6 @@
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
   },
   {
-    "path": "apps/web/src/routes/account-page.tsx",
-    "line": "// 推送通知 (#1031) is a stored preference (cairn.notifyEnabled, read by the",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
-    "path": "apps/web/src/routes/account-page.tsx",
-    "line": "  //  · 偏好档（cairn.notifyEnabled）：显示态主源。null（未表态）时跟随权限",
-    "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"
-  },
-  {
     "path": "apps/web/src/routes/agent-model-select.tsx",
     "line": "// cairn 是本地 BYOK，没有这个数据源，不编造；provider 位升去一级后二级行内",
     "reason": "改名 Pacman→Cairn：既有注释仅替换品牌词"

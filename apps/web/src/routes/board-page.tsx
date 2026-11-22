@@ -159,7 +159,7 @@ export function BoardPage() {
 
   const search = useSearchState(fixture.ui?.searchOpen === true, fixture.ui?.searchQuery ?? '');
   const searchResults = useSearchResults(search.query, live && search.open);
-  const notifyBanner = useNotificationBanner(fixture.ui?.notificationBanner === true, live);
+  const notifyBanner = useNotificationBanner(fixture.ui?.notificationBanner === true, live, teamId);
 
   const quotaInfos = quotaBannerInfo(todos);
   const backupWarning = backupQ.data ?? null;

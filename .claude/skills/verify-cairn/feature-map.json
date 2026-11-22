@@ -500,7 +500,7 @@
         "gap": "no design for subscriptions, presence suppression, receipts and the three push states"
       },
       "evidence": [
-        "apps/web/e2e/push-device-switch.spec.ts",
+        "apps/web/e2e/account-notifications-switch.spec.ts",
         "apps/web/e2e/notify-click.spec.ts",
         "apps/server/test/push.test.ts",
         "apps/server/test/apns.test.ts"
@@ -2401,7 +2401,7 @@
       "id": "account-and-team",
       "name": "Account and team",
       "summary": "The user's account, language, global external-actions tier and device notification preferences.",
-      "states": "Account details, language selection, the team-wide external-actions tier projects follow by default, and device push enabled or disabled.",
+      "states": "Account details, language selection, the team-wide external-actions tier projects follow by default, and push notifications on or off.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2442,7 +2442,7 @@
       "evidence": [
         "apps/web/e2e/account-controls.spec.ts",
         "apps/web/e2e/account-release-removal.spec.ts",
-        "apps/web/e2e/push-device-switch.spec.ts",
+        "apps/web/e2e/account-notifications-switch.spec.ts",
         "apps/server/test/user-patch.test.ts"
       ],
       "batch": "B10"

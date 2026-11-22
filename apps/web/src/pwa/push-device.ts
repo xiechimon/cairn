@@ -1,8 +1,18 @@
+import { useEffect } from 'react';
 import { api } from '../api/client.js';
+import {
+  migrateLegacyNotifications,
+  notificationsOn,
+  persistNotificationsChoice,
+  readNotificationsChoice,
+} from '../board/notify-pref.js';
+import { desktopNotify } from '../desktop-shell.js';
+import { safeLocalStorage } from '../safe-storage.js';
 
 export function pushDeviceSupported(): boolean {
   return (
     typeof window !== 'undefined' &&
+    desktopNotify() === null &&
     'serviceWorker' in navigator &&
     'PushManager' in window &&
     typeof Notification !== 'undefined'
@@ -58,4 +68,35 @@ export async function unsubscribeDevicePush(teamId: string): Promise<void> {
     endpoint: subscription.endpoint,
   });
   await subscription.unsubscribe();
+}
+
+export async function syncDevicePush(teamId: string, on: boolean): Promise<void> {
+  if (!pushDeviceSupported()) return;
+  const subscription = await currentDeviceSubscription();
+  if (on && subscription === null && Notification.permission === 'granted') {
+    await subscribeDevicePush(teamId);
+  } else if (!on && subscription !== null) {
+    await unsubscribeDevicePush(teamId);
+  }
+}
+
+export async function turnOnNotifications(teamId: string): Promise<NotificationPermission> {
+  persistNotificationsChoice(true, safeLocalStorage());
+  const permission = await ensureNotificationPermission();
+  if (permission === 'granted') await syncDevicePush(teamId, true);
+  return permission;
+}
+
+export function useNotificationsSync(teamId: string | undefined, live: boolean): void {
+  useEffect(() => {
+    if (!live || teamId === undefined) return;
+    void (async () => {
+      const storage = safeLocalStorage();
+      const subscription = await currentDeviceSubscription();
+      migrateLegacyNotifications(storage, subscription !== null);
+      const permission =
+        typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
+      await syncDevicePush(teamId, notificationsOn(readNotificationsChoice(storage), permission));
+    })().catch(() => {});
+  }, [teamId, live]);
 }
