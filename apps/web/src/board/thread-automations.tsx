@@ -29,7 +29,7 @@ export function ThreadAutomations({ todo, now }: { todo: TodoRecord; now: number
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label={t('Retry loading automations')}
+        aria-label={t('重试加载定时')}
         data-testid="automation-load-error"
         disabled={schedules.isFetching}
         onClick={() => void schedules.refetch()}
@@ -44,7 +44,7 @@ export function ThreadAutomations({ todo, now }: { todo: TodoRecord; now: number
         variant="ghost"
         size="icon-xs"
         disabled
-        aria-label={t('Loading automations…')}
+        aria-label={t('定时加载中…')}
         data-testid="automation-loading"
       >
         <Timer />
@@ -116,7 +116,7 @@ export function ThreadAutomationBadge({
             variant="secondary"
             size="xs"
             data-testid="automation-badge"
-            aria-label={t('{n} {n#automation|automations}', { n: schedules.length })}
+            aria-label={t('{n} 个定时', { n: schedules.length })}
             className={cn(
               'h-5 gap-1 rounded-full px-1.5 text-caption font-normal tabular-nums',
               muted && 'text-content-tertiary',
@@ -133,15 +133,15 @@ export function ThreadAutomationBadge({
         data-testid="automation-popover"
         className="max-h-120 w-80 max-w-(--available-width) overflow-y-auto p-3"
       >
-        <PopoverTitle className="sr-only">{t('Automations')}</PopoverTitle>
+        <PopoverTitle className="sr-only">{t('定时')}</PopoverTitle>
         {loadFailed && (
           <div
             role="alert"
             className="flex items-center justify-between gap-2 text-meta text-destructive"
           >
-            <span>{t('Automations could not refresh')}</span>
+            <span>{t('定时没能刷新')}</span>
             <Button variant="outline" size="xs" onClick={onRetry}>
-              {t('Retry')}
+              {t('重试')}
             </Button>
           </div>
         )}
@@ -184,7 +184,7 @@ function AutomationItem({
     try {
       await action();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : t('Automation update failed'));
+      setError(failure instanceof Error ? failure.message : t('定时更新失败'));
     } finally {
       setBusy(false);
     }
@@ -192,21 +192,21 @@ function AutomationItem({
   const lastRun =
     schedule.lastRunAt === null
       ? null
-      : t('Last run {age}', { age: automationLastRunAge(schedule.lastRunAt, now, locale) });
+      : t('上次运行 {age}', { age: automationLastRunAge(schedule.lastRunAt, now, locale) });
   const timing = finished
-    ? [lastRun, t('No upcoming runs')]
+    ? [lastRun, t('没有下一次')]
     : schedule.enabled
       ? [
           schedule.nextRunAt === null
             ? t(
                 schedule.kind === 'event' || schedule.kind === 'webhook'
-                  ? 'Waiting for trigger'
-                  : 'No upcoming runs',
+                  ? '等待触发'
+                  : '没有下一次',
               )
             : automationNextRun(schedule.nextRunAt, now, t),
           lastRun,
         ]
-      : [schedule.pausedReason === null ? t('Paused') : t('Auto-disabled'), lastRun];
+      : [schedule.pausedReason === null ? t('已暂停') : t('已自动暂停'), lastRun];
   return (
     <section
       className="flex min-w-0 flex-col gap-2.5 not-first:border-t not-first:border-border not-first:pt-3"
@@ -228,7 +228,7 @@ function AutomationItem({
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={t('Delete automation')}
+          aria-label={t('删除定时')}
           data-testid="automation-delete"
           disabled={busy}
           onClick={() => void change(() => onDelete(schedule.id))}
@@ -240,7 +240,7 @@ function AutomationItem({
         data-testid="automation-prompt"
         className="m-0 whitespace-pre-wrap break-words rounded-md bg-secondary px-2.5 py-2 text-meta text-content-secondary"
       >
-        {schedule.prompt.trim() === '' ? t('Uses the thread description') : schedule.prompt}
+        {schedule.prompt.trim() === '' ? t('使用任务描述') : schedule.prompt}
       </p>
       {schedule.pausedReason !== null && (
         <p className="m-0 break-words text-meta text-content-tertiary">{schedule.pausedReason}</p>
@@ -248,10 +248,10 @@ function AutomationItem({
       {!finished && (
         <div className="flex items-center justify-between gap-3">
           <span className="text-meta text-content-secondary">
-            {schedule.enabled ? t('Enabled') : t('Paused')}
+            {schedule.enabled ? t('已启用') : t('已暂停')}
           </span>
           <ToggleSwitch
-            aria-label={t('Enable automation')}
+            aria-label={t('启用定时')}
             data-testid="automation-enabled"
             checked={schedule.enabled}
             disabled={busy || (!allowEnable && !schedule.enabled)}

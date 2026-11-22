@@ -74,11 +74,11 @@ export function contextCacheState(
 }
 
 function cacheTooltip(t: TFunc, state: ContextCacheState): string {
-  if (state.kind === 'running') return t('Cache 回复中保持有效');
-  if (state.kind === 'cold') return t('Cache 换了模型，下一条不命中');
-  if (state.kind === 'expired') return t('Cache 已失效');
-  if (state.leftMs < 60_000) return t('Cache 不到 1 分钟后失效');
-  return t('Cache {n} 分钟后失效', { n: Math.ceil(state.leftMs / 60_000) });
+  if (state.kind === 'running') return t('缓存回复中保持有效');
+  if (state.kind === 'cold') return t('缓存换了模型，下一条不命中');
+  if (state.kind === 'expired') return t('缓存已失效');
+  if (state.leftMs < 60_000) return t('缓存不到 1 分钟后失效');
+  return t('缓存 {n} 分钟后失效', { n: Math.ceil(state.leftMs / 60_000) });
 }
 
 function cachePanelValue(t: TFunc, state: ContextCacheState): string {
@@ -97,7 +97,7 @@ export function contextMeterLines(
 ): string[] {
   if (context == null) return [t('上下文（示意）')];
   const lines = [
-    t('Context {used} / {window}', {
+    t('上下文 {used} / {window}', {
       used: formatContextTokens(context.tokens),
       window: formatContextTokens(context.contextWindow),
     }),
@@ -105,10 +105,10 @@ export function contextMeterLines(
   if (context.compactAt !== undefined) {
     lines.push(
       contextNearCompaction(context)
-        ? t('再用 {left} 就 auto-compact', {
+        ? t('再用 {left} 就自动压缩', {
             left: formatContextTokens(Math.max(0, context.compactAt - context.tokens)),
           })
-        : t('{at} 时 auto-compact', { at: formatContextTokens(context.compactAt) }),
+        : t('{at} 时自动压缩', { at: formatContextTokens(context.compactAt) }),
     );
   }
   const cache = contextCacheState(context, options.running ?? false, options.now ?? Date.now());
@@ -228,7 +228,7 @@ export function ContextMeterPanel({
       ? null
       : {
           id: 'compact',
-          label: 'Auto-compact',
+          label: t('自动压缩'),
           value: near
             ? t('{at} · 还剩 {left}', {
                 at: formatContextTokens(context.compactAt),
@@ -236,17 +236,17 @@ export function ContextMeterPanel({
               })
             : formatContextTokens(context.compactAt),
         },
-    cache === null ? null : { id: 'cache', label: 'Cache', value: cachePanelValue(t, cache) },
-    hit === null ? null : { id: 'hit', label: 'Hit rate', value: `${Math.round(hit * 100)}%` },
+    cache === null ? null : { id: 'cache', label: t('缓存'), value: cachePanelValue(t, cache) },
+    hit === null ? null : { id: 'hit', label: t('命中率'), value: `${Math.round(hit * 100)}%` },
   ].filter((row) => row !== null);
   return (
     <section
       data-testid="context-panel"
-      aria-label="Context"
+      aria-label={t('上下文')}
       className={cn('flex min-w-0 flex-col text-ui', className)}
     >
       <div className="flex items-baseline justify-between gap-4 font-medium text-foreground">
-        <h3 className="m-0 text-ui font-medium">Context</h3>
+        <h3 className="m-0 text-ui font-medium">{t('上下文')}</h3>
         <span data-testid="context-panel-reading" className="tabular-nums">
           {`${formatContextTokens(context.tokens)} / ${formatContextTokens(context.contextWindow)}`}
         </span>

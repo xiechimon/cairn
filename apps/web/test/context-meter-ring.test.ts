@@ -65,14 +65,14 @@ describe('ContextMeterRing', () => {
     });
     expect(html).toContain('data-percent="10"');
     expect(html).not.toContain('data-mock');
-    expect(html).toContain('aria-label="Context 49K / 500K, 150K 时 auto-compact"');
+    expect(html).toContain('aria-label="上下文 49K / 500K, 150K 时自动压缩"');
     expect(html).toContain('data-compact-tick');
     expect(html).not.toContain('%');
   });
 
   test('omits the compaction line and tick when the server sends no compaction point', () => {
     const html = renderRing({ context: { tokens: 18_885, contextWindow: 1_000_000 } });
-    expect(html).toContain('aria-label="Context 19K / 1M"');
+    expect(html).toContain('aria-label="上下文 19K / 1M"');
     expect(html).not.toContain('data-compact-tick');
   });
 
@@ -92,7 +92,7 @@ describe('ContextMeterRing', () => {
     expect(html).toContain('aria-busy="false"');
     expect(html).not.toContain('animate-spin');
     expect(html).toContain('data-slot="context-arc"');
-    expect(html).toContain('Cache 回复中保持有效');
+    expect(html).toContain('缓存回复中保持有效');
   });
 });
 
@@ -115,14 +115,14 @@ describe('contextCacheState and the tooltip cache line', () => {
   test('counts down from the server expiry and flips to expired at it', () => {
     const at = { ...base, resumeExpiresAt: now + 180_000 };
     expect(contextCacheState(at, false, now)).toEqual({ kind: 'warm', leftMs: 180_000 });
-    expect(contextMeterLines(t, at, { now })).toContain('Cache {n} 分钟后失效'.replace('{n}', '3'));
-    expect(contextMeterLines(t, at, { now: now + 179_001 })).toContain('Cache 不到 1 分钟后失效');
+    expect(contextMeterLines(t, at, { now })).toContain('缓存 {n} 分钟后失效'.replace('{n}', '3'));
+    expect(contextMeterLines(t, at, { now: now + 179_001 })).toContain('缓存不到 1 分钟后失效');
     expect(contextCacheState(at, false, now + 180_000)).toEqual({ kind: 'expired' });
   });
 
   test('shows no cache line when the provider guarantees no lifetime', () => {
     expect(contextCacheState(base, false, now)).toBeNull();
-    expect(contextMeterLines(t, base, { now })).toEqual(['Context 76K / 200K', '92K 时 auto-compact']);
+    expect(contextMeterLines(t, base, { now })).toEqual(['上下文 76K / 200K', '92K 时自动压缩']);
   });
 
   test('a model switch is a miss whatever the lifetime', () => {
@@ -131,6 +131,6 @@ describe('contextCacheState and the tooltip cache line', () => {
 
   test('names the room left once usage is within a tenth of the compaction point', () => {
     const near = { ...base, tokens: 88_400 };
-    expect(contextMeterLines(t, near, { now })[1]).toBe('再用 3.6K 就 auto-compact');
+    expect(contextMeterLines(t, near, { now })[1]).toBe('再用 3.6K 就自动压缩');
   });
 });

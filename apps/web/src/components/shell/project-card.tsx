@@ -3,6 +3,7 @@ import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { ProjectAvatar } from '../../board/project-avatar.js';
+import { useI18n } from '../../i18n/provider.js';
 import { ToneGlyph } from '../tone-glyph.js';
 import { Button } from '../ui/button.js';
 import { StatusChip } from '../ui/status-chip.js';
@@ -38,6 +39,7 @@ export function ProjectCard({
   onOpen,
   menu,
 }: ProjectCardProps) {
+  const { t } = useI18n();
   return (
     <article
       data-slot="project-card"
@@ -55,21 +57,21 @@ export function ProjectCard({
           </Button>
           {waiting > 0 && (
             <StatusChip tone="confirm" className="flex-none text-caption">
-              {waiting} waiting on you
+              {t('{n} 件等你', { n: waiting })}
             </StatusChip>
           )}
         </div>
         <p className="mt-0.5 mb-0 truncate text-meta text-content-tertiary">
-          {repo} · created {created}
+          {repo} · {t('创建于 {time}', { time: created })}
         </p>
         <p className="mt-2 mb-0 line-clamp-2 text-ui text-content-secondary">{goal}</p>
         <p className="mt-2.5 mb-0 flex gap-3 text-meta text-content-tertiary">
           <span className="inline-flex items-center gap-1.25">
             <ToneGlyph tone="working" still className="size-3" />
-            {running} running
+            {t('{n} 个运行中', { n: running })}
           </span>
-          <span>{threads} threads</span>
-          <span>{merged} merged</span>
+          <span>{t('{n} 条对话', { n: threads })}</span>
+          <span>{t('{n} 个已合并', { n: merged })}</span>
         </p>
       </div>
       <span className="relative z-10 flex-none">
@@ -77,7 +79,7 @@ export function ProjectCard({
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Project menu"
+            aria-label={t('{name} 的菜单', { name })}
             className="text-content-tertiary"
           >
             <Ellipsis />

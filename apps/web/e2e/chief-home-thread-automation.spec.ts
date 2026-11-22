@@ -52,7 +52,7 @@ async function setup(page: Page, options: { rows?: ScheduleRecord[]; failLoad?: 
 }
 
 const badge = (page: Page) => page.getByTestId('automation-badge');
-const popover = (page: Page) => page.getByRole('dialog', { name: 'Automations', exact: true });
+const popover = (page: Page) => page.getByRole('dialog', { name: 'Schedules', exact: true });
 
 async function refreshSchedules(page: Page) {
   await page.waitForFunction(() =>
@@ -85,17 +85,17 @@ test('a title chip opens the saved cadence, next run, prompt and enabled state',
   await page.goto('/app?thread=todo-1');
   await expect(badge(page)).toHaveText('1');
   await badge(page).click();
-  await expect(popover(page)).toContainText('Every day at 09:00');
+  await expect(popover(page)).toContainText('Daily at 09:00');
   await expect(popover(page)).toContainText('Next run in 1 hour');
   await expect(popover(page)).toContainText('Run the login suite and report failures.');
-  await expect(popover(page).getByRole('switch', { name: 'Enable automation' })).toBeChecked();
+  await expect(popover(page).getByRole('switch', { name: 'Enable schedule' })).toBeChecked();
 });
 
 test('pause and resume use the PATCH response and recomputed next run', async ({ page }) => {
   const state = await setup(page);
   await page.goto('/app?thread=todo-1');
   await badge(page).click();
-  const enabled = popover(page).getByRole('switch', { name: 'Enable automation' });
+  const enabled = popover(page).getByRole('switch', { name: 'Enable schedule' });
   await enabled.click();
   await expect(enabled).not.toBeChecked();
   await expect(popover(page)).toContainText('Paused');
@@ -120,7 +120,7 @@ test('a rejected enable leaves the schedule paused with a retryable error', asyn
   await setup(page, options);
   await page.goto('/app?thread=todo-1');
   await badge(page).click();
-  const enabled = popover(page).getByRole('switch', { name: 'Enable automation' });
+  const enabled = popover(page).getByRole('switch', { name: 'Enable schedule' });
   await enabled.click();
   await expect(popover(page).getByRole('alert')).toContainText('Cannot enable this schedule');
   await expect(enabled).not.toBeChecked();
@@ -134,7 +134,7 @@ test('delete removes only the matching automation after success', async ({ page 
   await page.goto('/app?thread=todo-1');
   await expect(badge(page)).toHaveText('1');
   await badge(page).click();
-  await popover(page).getByRole('button', { name: 'Delete automation' }).click();
+  await popover(page).getByRole('button', { name: 'Delete schedule' }).click();
   await expect(badge(page)).toHaveCount(0);
   expect(state.deleted).toEqual(['schedule-1']);
   expect(state.rows.map((row) => row.id)).toEqual(['other']);
@@ -145,11 +145,11 @@ test('a failed delete retains the chip and lets the user retry', async ({ page }
   await setup(page, options);
   await page.goto('/app?thread=todo-1');
   await badge(page).click();
-  await popover(page).getByRole('button', { name: 'Delete automation' }).click();
+  await popover(page).getByRole('button', { name: 'Delete schedule' }).click();
   await expect(popover(page).getByRole('alert')).toContainText('Delete failed');
   await expect(badge(page)).toHaveText('1');
   options.rejectDelete = false;
-  await popover(page).getByRole('button', { name: 'Delete automation' }).click();
+  await popover(page).getByRole('button', { name: 'Delete schedule' }).click();
   await expect(badge(page)).toHaveCount(0);
 });
 
@@ -158,7 +158,7 @@ test('a retained completed once record shows the last run and no switch', async 
   await page.goto('/app?thread=todo-1');
   await badge(page).click();
   await expect(popover(page)).toContainText('Last run');
-  await expect(popover(page)).toContainText('No upcoming runs');
+  await expect(popover(page)).toContainText('No upcoming run');
   await expect(popover(page).getByRole('switch')).toHaveCount(0);
 });
 
@@ -264,7 +264,7 @@ for (const theme of ['light', 'dark'] as const) {
       await badge(page).click();
       await expect(popover(page)).toContainText('Next run in 1 hour');
       await automationEvidenceShot(page, `automation-active-${suffix}.png`);
-      const enabled = popover(page).getByRole('switch', { name: 'Enable automation' });
+      const enabled = popover(page).getByRole('switch', { name: 'Enable schedule' });
       await enabled.click();
       await expect(enabled).not.toBeChecked();
       await expect(popover(page)).toContainText('Paused');
@@ -278,12 +278,12 @@ for (const theme of ['light', 'dark'] as const) {
       await expect(enabled).toBeChecked();
       state.rows = [schedule({ enabled: false, nextRunAt: null, pausedReason: 'Host was deleted' })];
       await refreshSchedules(page);
-      await expect(popover(page)).toContainText('Auto-disabled');
+      await expect(popover(page)).toContainText('Auto-paused');
       await expect(popover(page)).toContainText('Host was deleted');
       await automationEvidenceShot(page, `automation-disabled-${suffix}.png`);
       state.rows = [schedule({ kind: 'once', at: NOW - 86_400_000, enabled: true, nextRunAt: null })];
       await refreshSchedules(page);
-      await expect(popover(page)).toContainText('No upcoming runs');
+      await expect(popover(page)).toContainText('No upcoming run');
       await expect(popover(page).getByRole('switch')).toHaveCount(0);
       await automationEvidenceShot(page, `automation-retained-finished-${suffix}.png`);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBe(0);

@@ -572,7 +572,7 @@ export function ImConnectionsPage() {
   };
 
   return (
-    <PageShell route={IM_ROUTE} fixture={fixture} selected="none" title="IM">
+    <PageShell route={IM_ROUTE} fixture={fixture} selected="none" title={t('聊天应用')}>
       <SettingsSection
         className="mt-6"
         title={t('聊天应用')}

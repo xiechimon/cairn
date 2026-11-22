@@ -97,7 +97,7 @@ test('picked models render as chips with free badge, tier and context', async ({
   await expect(detail(page).getByTestId('subscription-usage')).toContainText('2 次运行');
   await expect(detail(page).getByTestId('subscription-usage-note')).toHaveText('Devin 不提供剩余用量');
   await expect(detail(page).getByTestId('subscription-models-summary')).toHaveText('2 个');
-  await expect(pickedChip(page, 'swe-2-flash-medium')).toContainText('Free');
+  await expect(pickedChip(page, 'swe-2-flash-medium')).toContainText('免费');
   await expect(pickedChip(page, 'swe-2-flash-medium')).toContainText('262K');
   await expect(pickedChip(page, 'claude-opus-5-5-medium')).toContainText('高价');
   await expect(pickedChip(page, 'claude-opus-5-5-medium')).toContainText('1M');

@@ -115,3 +115,45 @@ describe('translation call literals', () => {
     expect(scanSource(source, 'x.tsx', true).filter((item) => item.kind === 'translation')).toEqual([]);
   });
 });
+
+describe('latin bypass scan', () => {
+  const latin = (src: string, rel = 'x.tsx') =>
+    scanSource(src, rel, false, true).filter((item) => item.kind.startsWith('latin'));
+
+  it.each([
+    ['JSX text', 'const el = <span>Close</span>;', 'Close', 'latin-jsx'],
+    ['aria-label literal', 'const el = <button aria-label="Close" />;', 'Close', 'latin-attr'],
+    ['title literal', 'const el = <span title="Project menu" />;', 'Project menu', 'latin-attr'],
+    [
+      'placeholder literal',
+      'const el = <input placeholder="Search tasks" />;',
+      'Search tasks',
+      'latin-attr',
+    ],
+    [
+      'attr expression literal',
+      'const el = <button aria-label={cond ? \'Open\' : \'Shut\'} />;',
+      'Open',
+      'latin-attr',
+    ],
+    ['toast sink', "toastError('Update failed');", 'Update failed', 'latin-sink'],
+    ['toast member sink', "toast.error('Update failed');", 'Update failed', 'latin-sink'],
+    ['alert sink', "alert('Nope');", 'Nope', 'latin-sink'],
+  ])('flags %s', (_label, src, text, kind) => {
+    expect(latin(src)).toContainEqual({ rel: 'x.tsx', text, kind });
+  });
+
+  it.each([
+    ['t() JSX text', "const el = <span>{t('关闭')}</span>;"],
+    ['t() attr', "const el = <button aria-label={t('Close')} />;"],
+    ['non-user-facing attr', 'const el = <div data-testid="close-button" />;'],
+    ['enum comparison in attr', "const el = <nav title={pane === 'tasks' ? a : b} />;"],
+    ['generic JSX type args', 'const el = <Combobox.Root<PickOption> items={xs} />;'],
+    ['sink member on other object', "obj.alert('Nope');"],
+    ['t() sink arg', "toastError(t('更新失败'));"],
+    ['plain string in code', "const s = 'Loading';"],
+    ['component prop named like DOM attr on non-string value', 'const el = <Tooltip title={t(\'菜单\')} />;'],
+  ])('ignores %s', (_label, src) => {
+    expect(latin(src)).toEqual([]);
+  });
+});

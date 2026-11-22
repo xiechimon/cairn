@@ -89,7 +89,7 @@ export function scheduleWhen(at: number, tz: string, now: number, t: TFunc): str
 export function scheduleNext(schedule: ScheduleRecord, now: number, t: TFunc): string {
   if (schedule.nextRunAt === null || schedule.nextRunAt === 0) {
     if (schedule.kind === 'event' || schedule.kind === 'webhook') return t('等待触发');
-    return t(schedule.kind === 'once' ? 'No upcoming runs' : 'Next run unavailable');
+    return t(schedule.kind === 'once' ? '没有下一次' : '下次运行不可用');
   }
   return t('下次 {when}', { when: scheduleWhen(schedule.nextRunAt, schedule.tz, now, t) });
 }

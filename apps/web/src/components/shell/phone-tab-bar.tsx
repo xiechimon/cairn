@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import type { ReactNode } from 'react';
+import { useI18n } from '../../i18n/provider.js';
 import { Button } from '../ui/button.js';
 
 export interface PhoneTab {
@@ -16,9 +17,10 @@ export interface PhoneTabBarProps {
 }
 
 export function PhoneTabBar({ tabs, active, onChange }: PhoneTabBarProps) {
+  const { t } = useI18n();
   return (
     <nav
-      aria-label="Primary"
+      aria-label={t('主导航')}
       data-slot="phone-tab-bar"
       className="flex h-15.5 flex-none border-t border-border bg-background px-2 pb-1.5"
     >

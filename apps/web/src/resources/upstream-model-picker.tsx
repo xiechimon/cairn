@@ -178,7 +178,7 @@ export function UpstreamModelPicker({
             data-testid="upstream-model-free"
             className="flex-none rounded border border-border px-1 text-caption text-content-tertiary"
           >
-            Free
+            {t('免费')}
           </span>
         )}
         {model?.costTier !== undefined && model.costTier !== 'Free' && (

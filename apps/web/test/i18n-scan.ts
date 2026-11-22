@@ -19,11 +19,36 @@ import { relative } from 'node:path';
 import { createScanner, LanguageVariant, SyntaxKind } from 'typescript/unstable/ast';
 
 const CJK = /[一-鿿]/;
+const LATIN = /[A-Za-z]{2,}/;
+
+/** Attributes whose literal values reach the user (rendered text, tooltip,
+ *  accessible name or input hint). Component props with the same names
+ *  forward to the DOM or paint a dialog/page title, so they flag too. */
+const USER_FACING_ATTRS = new Set([
+  'aria-label',
+  'aria-description',
+  'aria-roledescription',
+  'title',
+  'placeholder',
+  'alt',
+]);
+
+/** Calls whose first argument is shown to the user. `toast` is tracked
+ *  separately so `toast.error(…)` and bare `toast(…)` both flag; a member
+ *  access (`obj.alert(…)`) never counts. */
+const SINK_IDENTS = new Set(['toast', 'toastError', 'toastSuccess', 'alert', 'confirm', 'prompt']);
 
 export interface Found {
   rel: string;
   text: string;
-  kind: 'literal' | 'template' | 'jsx-text' | 'translation';
+  kind:
+    | 'literal'
+    | 'template'
+    | 'jsx-text'
+    | 'translation'
+    | 'latin-jsx'
+    | 'latin-attr'
+    | 'latin-sink';
 }
 
 /** Tokens after which `<` continues an expression (comparison, generic
@@ -90,6 +115,20 @@ function tokenName(tok: SyntaxKind): string {
   return String(tok);
 }
 
+const isStringy = (tok: SyntaxKind): boolean =>
+  tok === SyntaxKind.StringLiteral ||
+  tok === SyntaxKind.NoSubstitutionTemplateLiteral ||
+  tok === SyntaxKind.TemplateHead;
+
+/** A literal right of `===`/`!==`/`==`/`!=` is an enum operand, not a value
+ *  the attribute or toast could render (`title={pane === 'tasks' ? …}`). */
+const COMPARISON = new Set<SyntaxKind>([
+  SyntaxKind.EqualsEqualsToken,
+  SyntaxKind.EqualsEqualsEqualsToken,
+  SyntaxKind.ExclamationEqualsToken,
+  SyntaxKind.ExclamationEqualsEqualsToken,
+]);
+
 /** 1-based `line:col` for `pos` in `text`. */
 function lineCol(text: string, pos: number): string {
   const before = text.slice(0, pos);
@@ -97,8 +136,16 @@ function lineCol(text: string, pos: number): string {
 }
 
 /** Walk `text` and collect every CJK-bearing literal / template / JSX text.
- *  `rel` is the src-relative path used in findings and guard errors. */
-export function scanSource(text: string, rel: string, includeTranslations = false): Found[] {
+ *  `rel` is the src-relative path used in findings and guard errors. With
+ *  `latin` on, the same walk also collects the bypass class the CJK gate
+ *  cannot see: Latin-script text and attribute literals that reach the user
+ *  without a t() call (kind latin-jsx / latin-attr / latin-sink). */
+export function scanSource(
+  text: string,
+  rel: string,
+  includeTranslations = false,
+  latin = false,
+): Found[] {
   const isTsx = rel.endsWith('.tsx');
   const scanner = createScanner(
     /* skipTrivia */ true,
@@ -117,6 +164,22 @@ export function scanSource(text: string, rel: string, includeTranslations = fals
   /** head token recorded at each open `(`, for the CloseParen regex rule. */
   const parenHeads: SyntaxKind[] = [];
   let lastParenHead = SyntaxKind.Unknown;
+  /** latin mode: paren-stack index of each open t( call inside a user-facing
+   *  attribute expression, so `aria-label={t('…')}` does not flag its key. */
+  const tParens: number[] = [];
+  /** latin mode: name of the user-facing attribute whose {…} container is
+   *  open; literals inside flag unless they sit under a t( call. */
+  let attrExpr: string | undefined;
+  /** latin mode: the token right after a sink identifier must be `(` for the
+   *  next literal to count; cleared on every token. */
+  let expectSinkParen = false;
+  /** latin mode: inside a sink call's first argument position. */
+  let sinkArg = false;
+  /** latin mode: `toast` / `toast.` seen, waiting for the method name. */
+  let toastIdent = false;
+  let toastDot = false;
+  /** latin mode: a `t` identifier that may open a t( call. */
+  let tIdent = false;
   let rescanTemplate = false;
   let lastTok = SyntaxKind.Unknown;
   let prevTok = SyntaxKind.Unknown;
@@ -170,6 +233,64 @@ export function scanSource(text: string, rel: string, includeTranslations = fals
           lastTok !== SyntaxKind.DotToken &&
           lastTok !== SyntaxKind.QuestionDotToken);
     }
+    if (latin) {
+      if (sinkArg) {
+        sinkArg = false;
+        if (isStringy(tok) && !COMPARISON.has(lastTok)) {
+          const v = scanner.getTokenValue();
+          if (LATIN.test(v)) found.push({ rel, text: v, kind: 'latin-sink' });
+        }
+      }
+      if (expectSinkParen) {
+        expectSinkParen = false;
+        if (tok === SyntaxKind.OpenParenToken) sinkArg = true;
+      }
+      if (tok === SyntaxKind.OpenParenToken && tIdent) {
+        tParens.push(parenHeads.length);
+      }
+      if (
+        tok === SyntaxKind.CloseParenToken &&
+        tParens[tParens.length - 1] === parenHeads.length - 1
+      ) {
+        tParens.pop();
+      }
+      tIdent = false;
+      if (
+        attrExpr !== undefined &&
+        tParens.length === 0 &&
+        isStringy(tok) &&
+        !COMPARISON.has(lastTok)
+      ) {
+        const v = scanner.getTokenValue();
+        if (LATIN.test(v)) found.push({ rel, text: v, kind: 'latin-attr' });
+      }
+      if (tok === SyntaxKind.Identifier) {
+        const name = scanner.getTokenText();
+        if (toastDot) {
+          expectSinkParen = true;
+          toastDot = false;
+        }
+        if (
+          name === 't' &&
+          lastTok !== SyntaxKind.DotToken &&
+          lastTok !== SyntaxKind.QuestionDotToken
+        ) {
+          tIdent = true;
+        }
+        if (
+          SINK_IDENTS.has(name) &&
+          lastTok !== SyntaxKind.DotToken &&
+          lastTok !== SyntaxKind.QuestionDotToken
+        ) {
+          expectSinkParen = true;
+          if (name === 'toast') toastIdent = true;
+        }
+      } else if (tok === SyntaxKind.DotToken || tok === SyntaxKind.QuestionDotToken) {
+        if (toastIdent) toastDot = true;
+      } else {
+        toastIdent = false;
+      }
+    }
     prevTok = lastTok;
     lastTok = tok;
     if (tok === SyntaxKind.OpenBraceToken) {
@@ -219,35 +340,87 @@ export function scanSource(text: string, rel: string, includeTranslations = fals
 
   /** LessThanToken just consumed in JSX position: eat tag + children. */
   const scanJsxElement = (): void => {
-    let tok = advance();
-    if (tok === SyntaxKind.EndOfFile) return;
-    if (tok === SyntaxKind.GreaterThanToken) {
-      scanJsxChildren(); // <> fragment
-      return;
-    }
-    for (;;) {
+    const outerAttrExpr = attrExpr;
+    attrExpr = undefined;
+    try {
+      let tok = advance();
       if (tok === SyntaxKind.EndOfFile) return;
       if (tok === SyntaxKind.GreaterThanToken) {
-        scanJsxChildren();
+        scanJsxChildren(); // <> fragment
         return;
       }
-      if (tok === SyntaxKind.SlashToken) {
-        advance(); // self-closing: consume `>`
-        return;
+      /** Attribute-name buffer: identifier pieces joined across `-` / `:`
+       *  (`aria-label`, `xlink:href`); read when `=` arrives. */
+      let pendingName = '';
+      for (;;) {
+        if (tok === SyntaxKind.EndOfFile) return;
+        if (tok === SyntaxKind.GreaterThanToken) {
+          scanJsxChildren();
+          return;
+        }
+        if (tok === SyntaxKind.SlashToken) {
+          advance(); // self-closing: consume `>`
+          return;
+        }
+        if (tok === SyntaxKind.OpenBraceToken) {
+          pendingName = '';
+          scanCodeUntilClose(); // spread attribute
+          tok = advance();
+          continue;
+        }
+        if (tok === SyntaxKind.LessThanToken) {
+          scanTypeArgs(); // generic args on the tag: <Combobox.Root<PickOption>
+          tok = advance();
+          continue;
+        }
+        if (tok === SyntaxKind.EqualsToken) {
+          const name = pendingName;
+          pendingName = '';
+          const v = advance();
+          if (v === SyntaxKind.OpenBraceToken) {
+            if (latin && USER_FACING_ATTRS.has(name)) attrExpr = name;
+            scanCodeUntilClose();
+            attrExpr = undefined;
+            tok = advance();
+            continue;
+          }
+          if (latin && v === SyntaxKind.StringLiteral && USER_FACING_ATTRS.has(name)) {
+            const value = scanner.getTokenValue();
+            if (LATIN.test(value)) found.push({ rel, text: value, kind: 'latin-attr' });
+          }
+          tok = advance();
+          continue;
+        }
+        if (latin && tok === SyntaxKind.Identifier) {
+          pendingName =
+            prevTok === SyntaxKind.MinusToken
+              ? `${pendingName}-${scanner.getTokenText()}`
+              : prevTok === SyntaxKind.ColonToken
+                ? `${pendingName}:${scanner.getTokenText()}`
+                : scanner.getTokenText();
+        } else if (tok !== SyntaxKind.MinusToken && tok !== SyntaxKind.ColonToken) {
+          pendingName = '';
+        }
+        tok = advance(); // tag-name part or attribute name
       }
-      if (tok === SyntaxKind.OpenBraceToken) {
-        scanCodeUntilClose(); // spread attribute
-        tok = advance();
-        continue;
-      }
-      if (tok === SyntaxKind.EqualsToken) {
-        const v = advance();
-        if (v === SyntaxKind.OpenBraceToken) scanCodeUntilClose();
-        // else attribute string literal — already recorded by advance()
-        tok = advance();
-        continue;
-      }
-      tok = advance(); // tag-name part or attribute name
+    } finally {
+      attrExpr = outerAttrExpr;
+    }
+  };
+
+  /** Consume a `<T…>` type-argument list in a tag header; `>` tokens close
+   *  one level each (`>>` two, `>=` one with `=` absorbed, `=>` none). */
+  const scanTypeArgs = (): void => {
+    let depth = 1;
+    for (;;) {
+      const tok = advance();
+      if (tok === SyntaxKind.EndOfFile) return;
+      if (tok === SyntaxKind.LessThanToken) depth++;
+      else if (tok === SyntaxKind.GreaterThanToken) depth--;
+      else if (tok === SyntaxKind.GreaterThanGreaterThanToken) depth -= 2;
+      else if (tok === SyntaxKind.GreaterThanGreaterThanGreaterThanToken) depth -= 3;
+      else if (tok === SyntaxKind.GreaterThanEqualsToken) depth--;
+      if (depth <= 0) return;
     }
   };
 
@@ -262,6 +435,9 @@ export function scanSource(text: string, rel: string, includeTranslations = fals
       if (tok === SyntaxKind.JsxText || tok === SyntaxKind.JsxTextAllWhiteSpaces) {
         const v = scanner.getTokenText();
         if (CJK.test(v)) found.push({ rel, text: v.trim(), kind: 'jsx-text' });
+        else if (latin && LATIN.test(v)) {
+          found.push({ rel, text: v.trim(), kind: 'latin-jsx' });
+        }
         continue;
       }
       if (tok === SyntaxKind.OpenBraceToken) {
@@ -293,10 +469,16 @@ export function scanSource(text: string, rel: string, includeTranslations = fals
 }
 
 /** Read `file` and walk it; `rel` is computed against `srcRoot`. */
-export function scanFile(file: string, srcRoot: string, includeTranslations = false): Found[] {
+export function scanFile(
+  file: string,
+  srcRoot: string,
+  includeTranslations = false,
+  latin = false,
+): Found[] {
   return scanSource(
     readFileSync(file, 'utf8'),
     relative(srcRoot, file).replaceAll('\\', '/'),
     includeTranslations,
+    latin,
   );
 }

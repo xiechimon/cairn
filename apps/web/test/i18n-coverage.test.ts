@@ -37,6 +37,61 @@ const ALLOWLIST: Record<string, string> = {
   'chief/approval-card-model.ts::正文': 'matches the server-generated approval card text verbatim, not UI copy',
 };
 
+/** Latin strings allowed to reach the user without t(), keyed `rel::text`:
+ *  brand and product names, glossary terms kept in English (CONTEXT.md),
+ *  protocol/header literals and keycap labels — plus input placeholders that
+ *  name a format (owner/repo, a token shape, a URL), not a sentence. */
+const LATIN_ALLOWLIST: Record<string, string> = {
+  'board/first-run-setup.tsx::Cairn': 'product name',
+  'chief/queue-tabs.tsx::Esc': 'keycap label inside <Kbd>',
+  'components/thread/pr-card.tsx::PR #': 'PR is a kept term; the issue number follows',
+  'components/thread/pr-link.tsx::PR #': 'PR is a kept term; the issue number follows',
+  'pages/dir-browser.tsx::git': 'tool name badge',
+  'pages/project-new-page.tsx::owner/repo': 'input placeholder example',
+  'pages/project-new-page.tsx::/path/to/repo': 'path placeholder example',
+  'pages/project-settings-page.tsx::owner/repo': 'input placeholder example',
+  "resources/bulk-secret-dialog.tsx::API_KEY='secret-value'\nNODE_ENV=development":
+    '.env format example',
+  'resources/composio-section.tsx::Composio': 'product name',
+  'resources/composio-section.tsx::ak_…': 'token shape example',
+  'resources/create-machine-dialog.tsx::XXXX-XXXX': 'pairing code shape',
+  'resources/create-provider-dialog.tsx::https://api.example.com/v1': 'URL placeholder',
+  'resources/mail-connectors.tsx::imap.example.com': 'hostname placeholder',
+  'resources/mail-connectors.tsx::smtp.example.com': 'hostname placeholder',
+  'resources/mail-connectors.tsx::boss@example.com': 'address placeholder',
+  'resources/mcp-connector-dialog.tsx::Authorization': 'HTTP header name',
+  'resources/mcp-connector-dialog.tsx::Bearer …': 'HTTP auth scheme',
+  'resources/secret-dialog.tsx::MY_VAR': 'env var example',
+  'resources/skill-dialog.tsx::deploy-to-prod': 'skill name example',
+  'resources/skill-import-dialog.tsx::/Users/you/skills/deploy-to-prod': 'path placeholder',
+  'resources/skill-import-dialog.tsx::https://github.com/anthropics/skills/tree/main/document-skills/pdf':
+    'URL placeholder',
+  'resources/upstream-model-picker.tsx::HTTP ': 'protocol literal in the `HTTP ${status}` tooltip',
+  'resources/vault-pair-dialog.tsx::github.com': 'hostname placeholder',
+  'resources/vault-pair-dialog.tsx::GITHUB_COM': 'env var example',
+  'resources/vault-pair-dialog.tsx::alice@example.com': 'address placeholder',
+  'routes/api-key-create-dialog.tsx::MY_KEY': 'env var example',
+  'routes/im-page.tsx::123456:ABC…': 'bot token shape',
+  'routes/im-page.tsx::xapp-…': 'token shape',
+  'routes/im-page.tsx::xoxb-…': 'token shape',
+  'tray/tray-page.tsx::Cairn': 'product name',
+};
+
+/** t() keys with no CJK that still render correctly in zh: product names and
+ *  kept terms identical in both locales, and pure-punctuation joins. */
+const LATIN_KEY_ALLOWLIST: Record<string, string> = {
+  Coordinator: 'product name kept in English (CONTEXT.md)',
+  PPT: 'file-type name',
+  'PR #{n}': 'PR is a kept term; the issue number is the variable',
+  '{n} tokens': 'technical unit suffix',
+  Tailscale: 'product name',
+  '，': 'punctuation passthrough',
+  '、': 'punctuation passthrough',
+  '{first}、{second}': 'punctuation joiner',
+  '{use}：{problem}': 'punctuation joiner',
+  'Cron：{expression}': 'Cron is a technical term',
+};
+
 /** Dict keys assembled at module scope (exact-value fixture chrome; the
  *  #114 banner copy keys live in the shared NOTIFICATION_BANNER_COPY canon
  *  — packages/shared, outside the src/ scan tree — and reach t() through
@@ -93,14 +148,14 @@ const NOTIFICATION_TITLE_SOURCES = Object.entries(NOTIFICATION_TITLES).flatMap(
 
 const EXCLUDED_DIRS = ['fixtures', 'api'];
 const EXCLUDED_FILES = ['i18n/en.ts'];
+const LATIN_EXCLUDED_DIRS = ['fixtures', 'api', 'design'];
 
-function sourceFiles(dir: string, includeExcluded = false): string[] {
+function sourceFiles(dir: string, includeExcluded = false, excluded = EXCLUDED_DIRS): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (statSync(full).isDirectory()) {
-      if (includeExcluded || !EXCLUDED_DIRS.includes(entry))
-        out.push(...sourceFiles(full, includeExcluded));
+      if (includeExcluded || !excluded.includes(entry)) out.push(...sourceFiles(full, includeExcluded, excluded));
     } else if (/\.tsx?$/.test(entry)) {
       out.push(full);
     }
@@ -181,6 +236,37 @@ describe('translation call coverage', () => {
       .filter((item) => !/[一-鿿]/.test(item.text) && !Object.hasOwn(EN, item.text))
       .map((item) => `${item.rel}: ${JSON.stringify(item.text)}`);
     expect([...new Set(missing)]).toEqual([]);
+  });
+
+  it('no literal t() key is raw English — zh renders the key verbatim', () => {
+    const latin = sourceFiles(SRC, true)
+      .flatMap((file) => scanFile(file, SRC, true))
+      .filter((item) => item.kind === 'translation')
+      .filter(
+        (item) =>
+          !/[一-鿿]/.test(item.text) &&
+          /[A-Za-z]{2,}/.test(item.text) &&
+          !Object.hasOwn(LATIN_KEY_ALLOWLIST, item.text),
+      )
+      .map((item) => `${item.rel}: ${JSON.stringify(item.text)}`);
+    expect([...new Set(latin)]).toEqual([]);
+  });
+});
+
+describe('Latin bypass coverage', () => {
+  it('no user-facing Latin literal bypasses t() outside the allowlist', () => {
+    const latinFiles = sourceFiles(SRC, false, LATIN_EXCLUDED_DIRS).filter(
+      (f) => !EXCLUDED_FILES.includes(relative(SRC, f).replaceAll('\\', '/')),
+    );
+    const latin = latinFiles
+      .flatMap((file) => scanFile(file, SRC, false, true))
+      .filter(
+        (item) =>
+          item.kind.startsWith('latin') &&
+          !(`${item.rel}::${item.text}` in LATIN_ALLOWLIST),
+      )
+      .map((item) => `${item.rel} [${item.kind}] ${JSON.stringify(item.text)}`);
+    expect([...new Set(latin)]).toEqual([]);
   });
 });
 

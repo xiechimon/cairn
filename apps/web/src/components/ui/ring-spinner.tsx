@@ -1,12 +1,14 @@
 import { cn } from 'cn';
 import type * as React from 'react';
+import { useI18n } from '../../i18n/provider.js';
 
 function RingSpinner({ className, ...props }: React.ComponentProps<'svg'>) {
+  const { t } = useI18n();
   return (
     <svg
       data-slot="spinner"
       role="status"
-      aria-label="Loading"
+      aria-label={t('加载中…')}
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

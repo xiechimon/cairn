@@ -11,12 +11,12 @@ test('the ring under the composer stays still while a turn runs and reads in K',
   expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
   await expect(meter.locator('[data-slot="context-arc"]')).toBeVisible();
   await expect(meter.locator('[data-compact-tick]')).toHaveCount(1);
-  await expect(meter).toHaveAttribute('aria-label', 'Context 24K / 200K, 70K 时 auto-compact');
+  await expect(meter).toHaveAttribute('aria-label', '上下文 24K / 200K, 70K 时自动压缩');
   await expect(line.getByText(/工作中 ·|Working ·/)).toHaveCount(0);
   await meter.hover();
   const tip = page.locator('[data-slot="tooltip-content"]');
-  await expect(tip).toContainText('Context 24K / 200K');
-  await expect(tip).toContainText('70K 时 auto-compact');
+  await expect(tip).toContainText('上下文 24K / 200K');
+  await expect(tip).toContainText('70K 时自动压缩');
 });
 
 test('clicking the ring opens the context panel with only the rows it can read', async ({ page }) => {
@@ -27,7 +27,7 @@ test('clicking the ring opens the context panel with only the rows it can read',
   await expect(panel.getByTestId('context-panel-reading')).toHaveText('24K / 200K');
   await expect(panel.getByTestId('context-panel-compact')).toContainText('70K');
   await expect(panel.getByTestId('context-panel-cache')).toHaveCount(0);
-  await expect(panel.getByTestId('context-panel-hit')).toHaveText(/Hit rate\s*90%/);
+  await expect(panel.getByTestId('context-panel-hit')).toHaveText(/命中率\s*90%/);
 });
 
 test('an idle coordinator shows the same still ring and no timer', async ({ page }) => {

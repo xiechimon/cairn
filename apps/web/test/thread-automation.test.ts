@@ -7,10 +7,11 @@ import {
   automationNextRun,
   automationsForThread,
 } from '../src/board/thread-automation-model.js';
+import { EN } from '../src/i18n/en.js';
 import { translate } from '../src/i18n/translate.js';
 
 const NOW = Date.UTC(2026, 10, 4, 8);
-const t = (source: string, vars?: Record<string, string | number>) => translate('en', {}, source, vars);
+const t = (source: string, vars?: Record<string, string | number>) => translate('en', EN, source, vars);
 
 function schedule(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
   return {
@@ -56,13 +57,13 @@ describe('automationFinished', () => {
 
 describe('automationCadence', () => {
   test('daily and weekly times use the schedule timezone', () => {
-    expect(automationCadence(schedule(), 'en', t)).toBe('Every day at 09:00');
-    expect(automationCadence(schedule({ kind: 'weekly' }), 'en', t)).toBe('Every Wednesday at 09:00');
-    expect(automationCadence(schedule({ kind: 'daily', tz: 'UTC' }), 'en', t)).toBe('Every day at 01:00');
+    expect(automationCadence(schedule(), 'en', t)).toBe('Daily at 09:00');
+    expect(automationCadence(schedule({ kind: 'weekly' }), 'en', t)).toBe('Wednesday weekly at 09:00');
+    expect(automationCadence(schedule({ kind: 'daily', tz: 'UTC' }), 'en', t)).toBe('Daily at 01:00');
   });
 
   test('weekday cron has a readable cadence and other expressions remain exact', () => {
-    expect(automationCadence(schedule({ kind: 'cron', at: null, cron: '30 9 * * 1-5' }), 'en', t)).toBe('Every weekday at 09:30');
+    expect(automationCadence(schedule({ kind: 'cron', at: null, cron: '30 9 * * 1-5' }), 'en', t)).toBe('Weekdays 09:30');
     expect(automationCadence(schedule({ kind: 'cron', at: null, cron: '15 */2 * * *' }), 'en', t)).toBe('Cron: 15 */2 * * *');
   });
 
