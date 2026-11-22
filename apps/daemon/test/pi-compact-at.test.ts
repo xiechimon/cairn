@@ -154,6 +154,7 @@ test('a model re-registered narrower under the same provider and id compacts for
   const settings = coordinatorSettings();
   const wide = runtimeModel('deepseek', 'deepseek-v4-pro', 1_000_000);
   const narrow = runtimeModel('deepseek', 'deepseek-v4-pro', 200_000);
+  expect(compacts(settings, wide, COORDINATOR_COMPACT_AT - 1)).toBe(false);
   expect(compacts(settings, wide, COORDINATOR_COMPACT_AT)).toBe(true);
   expect(compacts(settings, narrow, COORDINATOR_COMPACT_AT - 1)).toBe(false);
   expect(compacts(settings, narrow, COORDINATOR_COMPACT_AT)).toBe(true);
@@ -163,6 +164,7 @@ test('two models whose flattened keys collide each compact for their own window'
   const settings = coordinatorSettings();
   const large = runtimeModel('a/b', 'c', 1_000_000);
   const small = runtimeModel('a', 'b/c', 32_000);
+  expect(compacts(settings, large, COORDINATOR_COMPACT_AT - 1)).toBe(false);
   expect(compacts(settings, large, COORDINATOR_COMPACT_AT)).toBe(true);
   expect(settings.getCompactionSettings(small).reserveTokens).toBe(MAIN_RESERVE_TOKENS);
   expect(compacts(settings, small, 15_616)).toBe(false);
@@ -180,8 +182,10 @@ test('an oversized finite window keeps the cap instead of the base reserve', () 
   const settings = coordinatorSettings();
   const oversized = runtimeModel('synthetic', 'oversized', 1e16);
   const resolved = settings.getCompactionSettings(oversized);
+  const cutoff = 1e16 - resolved.reserveTokens;
   expect(resolved.reserveTokens).toBeGreaterThan(MAIN_RESERVE_TOKENS);
-  expect(1e16 - resolved.reserveTokens).toBeLessThanOrEqual(COORDINATOR_COMPACT_AT + 1);
+  expect(cutoff).toBeGreaterThanOrEqual(COORDINATOR_COMPACT_AT - 1);
+  expect(cutoff).toBeLessThanOrEqual(COORDINATOR_COMPACT_AT + 1);
   expect(compacts(settings, oversized, COORDINATOR_COMPACT_AT + 1)).toBe(true);
 });
 
