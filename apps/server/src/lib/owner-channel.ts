@@ -17,23 +17,6 @@ interface ParentPort {
   on(event: 'message', listener: (message: { data: unknown }) => void): void;
 }
 
-const DECISION_PATH_PATTERNS = [
-  /^\/api\/actions\/proposals\/[^/]+\/answer$/,
-  /^\/api\/teams\/[^/]+\/chief\/threads\/[^/]+\/questions\/[^/]+\/(?:answer|cancel)$/,
-  /^\/api\/teams\/[^/]+\/im\/pairing-requests\/[^/]+\/(?:approve|reject)$/,
-  /^\/api\/teams\/[^/]+\/api-keys$/,
-  /^\/api\/remote\/pairing(?:\/[^/]+)?$/,
-  /^\/api\/remote\/devices\/[^/]+$/,
-  /^\/api\/remote\/(?:tailnet|tailscale)$/,
-  /^\/api\/machine\/enroll\/confirm$/,
-  /^\/api\/machines\/[^/]+(?:\/revoke)?$/,
-  /^\/api\/machines\/[^/]+\/phones(?:\/[^/]+(?:\/(?:pair|handback))?)?$/,
-];
-
-export function isOwnerDecisionPath(pathname: string): boolean {
-  return DECISION_PATH_PATTERNS.some((pattern) => pattern.test(pathname));
-}
-
 export function ownerChannelFromEnv(env: NodeJS.ProcessEnv): OwnerChannel | undefined {
   return env[ENV_VARS.ownerChannel] === 'ipc' ? { key: null } : undefined;
 }
@@ -41,7 +24,11 @@ export function ownerChannelFromEnv(env: NodeJS.ProcessEnv): OwnerChannel | unde
 export function listenOwnerChannel(channel: OwnerChannel | undefined): void {
   if (channel === undefined) return;
   const parentPort = (process as unknown as { parentPort?: ParentPort }).parentPort;
-  if (parentPort === undefined) return;
+  if (parentPort === undefined) {
+    throw new Error(
+      `${ENV_VARS.ownerChannel}=ipc is set but process.parentPort is absent — the channel key can only arrive over the desktop utility-process fork, so refusing to boot with every owner write closed`,
+    );
+  }
   parentPort.on('message', (message) => {
     const data = message.data;
     if (
@@ -62,10 +49,14 @@ function matchesChannelKey(expected: string, provided: string): boolean {
   return left.byteLength === right.byteLength && timingSafeEqual(left, right);
 }
 
-export function ownerChannelAdmits(c: Context, channel: OwnerChannel | undefined): Response | null {
+export function ownerChannelAdmits(
+  c: Context,
+  channel: OwnerChannel | undefined,
+  accessExchange: boolean,
+): Response | null {
   if (channel === undefined) return null;
   if ((c.get('pairedDeviceId') ?? null) !== null) return null;
-  if (c.get('ownerIdentity')?.via === 'access') return null;
+  if (accessExchange && c.get('ownerIdentity')?.via === 'access') return null;
   if (channel.key === null) return c.json({ error: 'owner channel is not established' }, 503);
   const provided = c.req.header(OWNER_CHANNEL_HEADER);
   if (provided !== undefined && matchesChannelKey(channel.key, provided)) return null;

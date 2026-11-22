@@ -3,7 +3,7 @@ import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context, Hono } from 'hono';
 import { AUTH_COOKIE, type ResolvedBrowserSession } from '../services/browser-session.js';
 import { sha256Hex } from './crypto.js';
-import { isOwnerDecisionPath, type OwnerChannel, ownerChannelAdmits } from './owner-channel.js';
+import { type OwnerChannel, ownerChannelAdmits } from './owner-channel.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -93,6 +93,7 @@ export interface TokenAuthOptions {
   resolveSession?: (cookie: string) => ResolvedBrowserSession | null;
   redeemTicket?: (ticket: string) => ResolvedBrowserSession | null;
   ownerChannel?: OwnerChannel;
+  accessExchange?: boolean;
 }
 
 export type OwnerIdentity = { via: 'session' | 'access' };
@@ -168,8 +169,10 @@ export function registerTokenAuth(
       if (pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, c.req.path)) {
         return c.json({ error: 'only the owner token can do this' }, 403);
       }
-      if (!READ_METHODS.has(c.req.method.toUpperCase()) && isOwnerDecisionPath(pathname)) {
-        return ownerChannelAdmits(c, options.ownerChannel) ?? next();
+      if (!READ_METHODS.has(c.req.method.toUpperCase())) {
+        return (
+          ownerChannelAdmits(c, options.ownerChannel, options.accessExchange === true) ?? next()
+        );
       }
       return next();
     };

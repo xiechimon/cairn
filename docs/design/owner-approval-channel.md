@@ -1,6 +1,6 @@
 # Owner approval channel
 
-Status: implemented beside this document. Grounded on `origin/main b44f16a1b`. Issue #4948; related #4889, #4935, #4986, #4952. Prior art: `docs/research/owner-approval-channel-2026-11-22.md`.
+Status: implemented beside this document. Grounded on `origin/main b44f16a1b`. Issue #4948; related #4889, #4935, #4986, #4952. Prior art: `docs/research/owner-approval-channel-2026-11-22.md`. #4986 widened the check from the decision-route list to every non-read owner call: a stolen Bearer or owner-kind cookie can still read, but cannot mutate anything while the channel is configured.
 
 ## Newcomer
 
@@ -49,8 +49,8 @@ What the process can do today, each a path to a forged owner decision:
 - The Electron main process mints 32 random bytes in memory per launch — never on disk, never in any env or argv (env is same-uid readable on the unsigned build).
 - Main→server: the server fork (`utilityProcess`) posts `{type:'cairn-owner-channel-ready'}` on `process.parentPort` at module init when `CAIRN_OWNER_CHANNEL=ipc` is in its env; main answers `{type:'cairn-owner-channel', key}` over the same private channel. The env var carries a flag, not the secret.
 - Main→renderer: the existing `signOwnPagesIn` `webRequest` filter that injects `Authorization` for the app origin also injects `x-cairn-owner-channel`. `enrollLocalMachine` (a main-process fetch) adds it explicitly.
-- The server, when a channel is expected, requires the header on every route that turns an owner decision into effect — the table below. A paired-device identity is exempt (it is already out-of-band: the token lives on another device and grants hold only code hashes).
-- Fail closed: while a key is expected but has not arrived, the decision routes refuse with 503.
+- The server, when a channel is expected, requires the header on every non-read request an owner identity can make — the table below. A paired-device identity is exempt (it is already out-of-band: the token lives on another device and grants hold only code hashes).
+- Fail closed: while a key is expected but has not arrived, owner writes refuse with 503.
 
 ### The confined host shell
 
@@ -67,9 +67,9 @@ What the process can do today, each a path to a forged owner decision:
 | Path | Before | After |
 |---|---|---|
 | `POST /api/auth/bootstrap` | same-uid peer (+ optional `sec-fetch-site`) → owner cookie | **removed** |
-| `Authorization: Bearer <token>` | owner identity on all routes | unchanged for ordinary routes; not sufficient on decision routes when the channel is configured |
-| `cairn_auth` owner session (`kind: owner`) | owner identity | same as Bearer — needs the channel on decision routes |
-| `/api/auth/access` (Cloudflare) | owner cookie for a verified account | issues `kind: external` sessions — exempt from the channel check (the verified IdP exchange is itself a channel the model cannot mint or steal; keeps tailnet/phone approvals working) |
+| `Authorization: Bearer <token>` | owner identity on all routes | reads unchanged; not sufficient on any non-read route when the channel is configured |
+| `cairn_auth` owner session (`kind: owner`) | owner identity | same as Bearer — needs the channel on every non-read route |
+| `/api/auth/access` (Cloudflare) | owner cookie for a verified account | issues `kind: external` sessions — exempt from the channel check, but only where the access exchange is configured (the verified IdP exchange is itself a channel the model cannot mint or steal; keeps tailnet/phone approvals working) |
 | Paired-device token/session | `device:<id>` identity | unchanged; exempt from the channel check |
 | Card answer / cancel (`routes-chief`) | owner or device | + channel check for non-device callers |
 | `POST /api/actions/proposals/:id/answer` | owner or device | + channel check for non-device callers |
@@ -81,29 +81,31 @@ What the process can do today, each a path to a forged owner decision:
 
 ## States and transitions
 
-- `ctx.ownerChannel`: `undefined` (headless server — today's rules) → `{ key: null }` (flag set, handshake pending — decision routes refuse) → `{ key }` (configured). The key never rotates within a launch; a server restart re-shakes.
+- `ctx.ownerChannel`: `undefined` (headless server — today's rules) → `{ key: null }` (flag set, handshake pending — owner writes refuse) → `{ key }` (configured). The key never rotates within a launch; a server restart re-shakes.
 - Proposals keep the `pending → executed/refused/expired/superseded` machine; the new check sits at route admittance, before `answerProposal`.
 - Host-shell confinement is per-spawn; a profile that cannot express the denies fails the call instead of falling back to an unconfined spawn.
 
 ## Failure behavior
 
-- Decision route without/with wrong channel on a configured server → `403 owner channel required`.
+- Owner write without/with wrong channel on a configured server → `403 owner channel required`.
 - Channel expected but never arrived (fork handshake failed) → `503` — loud, closed.
 - Host file tool under a denied root → `ComputerRefusal`, "inside a protected Cairn directory".
 - `bwrap`/`sandbox-exec` unavailable or profile rejected → the exec call fails with a refusal; no unconfined fallback.
-- A forged `action_proposal` row is unreachable only where file confinement holds; on unconfined installs the db-write hole stays a documented residual of #4986.
+- A forged `action_proposal` row is unreachable only where file confinement holds; on unconfined installs the db-write hole stays a documented residual of #4986. A forged `browser_session` row gets less after #4986: `kind: 'external'` is admitted only where a Cloudflare access exchange is actually configured, and `kind: 'owner'` now needs the channel on every write — a forged `paired_device` row still gets device powers, inside the same residual.
+- A server started with `CAIRN_OWNER_CHANNEL=ipc` but no `parentPort` (env leaked outside the desktop fork) refuses to boot — the key can never arrive, so a silently half-dead server would be strictly worse.
 
 ## Residuals (named, not fixed here)
 
 - Same-uid `kill` on the server: macOS Seatbelt `signal (target others)` was probed and does not hold — the confined shell can still kill the server process. Rebinding the port is denied in both profiles, so a kill buys availability only (the desktop respawns the server); it cannot capture the channel. Linux `bwrap` has no signal isolation either — same class.
-- File-tool TOCTOU: `denied()` is checked before each fs operation, not pinned to a descriptor. A racing symlink swap could slip a read of a denied path through the file tools — its worst yield is the on-disk Bearer token, which still cannot reach a decision route without the channel key (never on disk). The spawned-command path is sealed by the OS sandbox, which has no check/use gap.
+- File-tool TOCTOU: `denied()` is checked before each fs operation, not pinned to a descriptor. A racing symlink swap could slip a read of a denied path through the file tools — its worst yield is the on-disk Bearer token, which still cannot mutate anything without the channel key (never on disk). The spawned-command path is sealed by the OS sandbox, which has no check/use gap.
 - `POST /api/machine/enroll` stays an API-key route (not an owner decision): what it mints is a machine identity — machine tokens answer to `/api/machine/*` only and cannot produce `pairedDeviceId` or reach approval routes. Enrolling a rogue machine needs a machine-access API key the owner created; a stolen key exercises only the capability the key already grants, outside this issue's goal.
 - Other session-server sockets: attaching to an already-running emacs/nvim daemon or a session server on a non-enumerated socket executes outside the sandbox. The known classes are closed — `~/.tmux`/`~/.screen` file-denied; `remote unix-socket` regex + bind + file-write denies cover the launchd/ssh/tmux/screen/zellij classes under `/tmp`, `/private/tmp`, `/var/tmp`, `/var/run` and per-user `$TMPDIR`; on linux `/tmp` and `/var/tmp` are fresh tmpfs and the runtime dir's agent/keyring/at-spi/dbus/container entries plus every root-level socket are masked — but arbitrary socket paths cannot be enumerated; class partially open.
 - Linux abstract sockets and X11 input: bwrap shares the network namespace, so abstract unix sockets (a `unix:abstract=` session bus, `/proc/net/unix`-enumerable) stay reachable — `systemd-run --user` over an abstract bus can still spawn outside the mount namespace; `--unshare-net` would close it but also cuts the shell's real work. Dropping `DBUS_SESSION_BUS_ADDRESS` removes the convenient path only. Likewise X11 display access (inherited `DISPLAY`) exposes XTEST input injection on X11 linux hosts — there is no linux analogue of the windowserver/mach deny; wayland compositor sockets are masked, so this residual is X11-class only.
 - Whole-screen observation: a `user_computer_observe` screenshot of an app that shares the screen with the Cairn window can leak the card's pixels into model context — information leak only; it cannot produce a click or a channel key.
 - `POST /api/computers/:id/actions` and a small set of mutators outside `OWNER_ONLY_PATTERNS` remain paired-device reachable — pre-existing, unchanged by this change; a decision-route audit table lives in the test.
 - On Linux there is no per-endpoint network deny in `bwrap`, so the session-level kill-and-rebind has no OS analogue there; the credential (never on disk/env) is what stops the header harvest on Linux.
-- Headless servers on a shared host (`cairn` self-host + same-box model processes): no broker process exists to hold a channel; the Bearer token file remains same-uid readable. Approval answers there keep today's credential rule until #4986's confinement precondition lands — the loopback mint is still removed.
+- Headless servers on a shared host (`cairn` self-host + same-box model processes): no broker process exists to hold a channel; the Bearer token file remains same-uid readable and there keeps full owner power (the documented residual #4986 accepts — confinement, not HTTP rules, is what binds an unconfined process there). The loopback mint is still removed.
+- Reads stay Bearer-only even on a configured server: a stolen token still exfiltrates anything a GET returns. Confinement owns that class — the channel covers decisions into effect, matching the issue's payload list.
 - Same-uid memory inspection: Seatbelt cannot deny `task_for_pid` — `vmmap`/`sample`/`lldb` against the same-uid server or desktop main process work inside the profile (measured), so the in-memory channel key is heap-readable in principle. On a hardened-runtime build without `get-task-allow`, same-uid `task_for_pid` is refused — worth verifying at packaging; on linux `ptrace_scope` is the analogue. Until then the key is "not on disk, not in env" — still strictly better than the file token it replaces, and harvesting it requires the confined process to locate a 43-char string in a large heap.
 - launchd mutation IPC: the inherited mach bootstrap port is not seatbelt-deniable, so `launchctl kickstart`/`bootstrap` verbs reach the user domain. Overwrite a loaded agent's `Program` under a profile-writable path (e.g. a user-dir helper) and `kickstart -k` respawns it outside the sandbox — measured to the answered-request stage; the spawned child itself was verified to stay confined only via `bsexec`, not via the agent path. Denying exec of `launchctl` is cosmetic (the IPC is reimplementable); closing this needs either a deny-list over every loaded agent's writable program path or a different-uid broker — future hardening.
 - Desktop on Linux: `ptrace_scope=1` (default on Ubuntu/Arch) keeps main memory safe; `=0` or a same-uid debugger degrades the credential to "not in env/disk", still strictly better than today's file token.

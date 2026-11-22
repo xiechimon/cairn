@@ -150,11 +150,11 @@ const SEEDED_MODELS = [
 ];
 
 async function seedModelSources(ctx) {
-  const created = await api(ctx, 'POST', `/api/teams/${ctx.teamId}/devin-subscriptions`, {
+  const created = await windowApi(ctx, 'POST', `/api/teams/${ctx.teamId}/devin-subscriptions`, {
     label: SMOKE_LABEL,
     token: 'post-install-smoke-devin-token',
   });
-  await api(ctx, 'PATCH', `/api/teams/${ctx.teamId}/devin-subscriptions/${created.id}`, {
+  await windowApi(ctx, 'PATCH', `/api/teams/${ctx.teamId}/devin-subscriptions/${created.id}`, {
     models: [
       {
         id: 'swe-2-high',
@@ -191,19 +191,19 @@ async function seedModelSources(ctx) {
     },
     machine.token,
   );
-  await api(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: SEEDED_MODELS });
+  await windowApi(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: SEEDED_MODELS });
 }
 
 async function ensureProject(ctx) {
   const projects = await api(ctx, 'GET', '/api/projects');
   const live = (projects.projects ?? projects).filter((p) => p.archivedAt == null);
   if (live.length > 0) return;
-  const created = await api(ctx, 'POST', '/api/projects', {
+  const created = await windowApi(ctx, 'POST', '/api/projects', {
     name: 'post-install-smoke',
     localPath: ctx.userData,
   });
   ctx.cleanup.push(async () => {
-    await api(ctx, 'DELETE', `/api/projects/${created.id}`).catch(() => {});
+    await windowApi(ctx, 'DELETE', `/api/projects/${created.id}`).catch(() => {});
   });
 }
 
@@ -217,11 +217,11 @@ async function seedTopModels(ctx) {
     }
   }
   if (merged.length === existing.length) return;
-  await api(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: merged });
+  await windowApi(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: merged });
   ctx.cleanup.push(async () => {
-    await api(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: existing }).catch(
-      () => {},
-    );
+    await windowApi(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, {
+      models: existing,
+    }).catch(() => {});
   });
 }
 
@@ -232,23 +232,33 @@ async function seedTsnet(userData) {
 }
 
 async function uploadAttachment(ctx, fileName, mimeType, bytes) {
-  const grant = await api(ctx, 'POST', '/api/uploads/grant', {
+  const grant = await windowApi(ctx, 'POST', '/api/uploads/grant', {
     kind: 'attachment',
     fileName,
     mimeType,
     size: bytes.byteLength,
     scope: 'message',
   });
-  const form = new FormData();
-  form.set('grant', grant.grant);
-  form.set('file', new Blob([bytes], { type: mimeType }), fileName);
-  const res = await fetch(`${ctx.base}${grant.uploadUrl}/upload`, {
-    method: 'POST',
-    signal: AbortSignal.timeout(30_000),
-    headers: { authorization: `Bearer ${ctx.token}`, 'sec-fetch-site': 'same-origin' },
-    body: form,
-  });
-  if (!res.ok) throw new Error(`attachment upload -> ${res.status}: ${await res.text()}`);
+  const uploaded = await ctx.page.evaluate(
+    async (request) => {
+      const form = new FormData();
+      form.set('grant', request.grant);
+      const bytes = Uint8Array.from(atob(request.b64), (ch) => ch.charCodeAt(0));
+      form.set('file', new Blob([bytes], { type: request.mimeType }), request.fileName);
+      const res = await fetch(request.url, { method: 'POST', body: form });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    },
+    {
+      url: `${grant.uploadUrl}/upload`,
+      grant: grant.grant,
+      fileName,
+      mimeType,
+      b64: bytes.toString('base64'),
+    },
+  );
+  if (!uploaded.ok) {
+    throw new Error(`attachment upload -> ${uploaded.status}: ${uploaded.text}`);
+  }
   return grant.key;
 }
 

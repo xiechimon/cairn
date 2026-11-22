@@ -24,8 +24,11 @@ const noted: ActionEntry = {
   targetOf: (input) => (input as { projectId: string }).projectId,
 };
 
-function world(ownerChannel: AppContext['ownerChannel']) {
-  const s = bootServer({ authToken: TOKEN, ownerChannel });
+function world(
+  ownerChannel: AppContext['ownerChannel'],
+  opts: { accessVerifier?: AppContext['accessVerifier'] } = {},
+) {
+  const s = bootServer({ authToken: TOKEN, ownerChannel, ...opts });
   s.db.insert(projectTable).values({ id: 'project-a', teamId: s.team.id, name: 'Alpha' }).run();
   s.db
     .insert(chief)
@@ -191,7 +194,7 @@ describe('owner channel gate', () => {
   });
 
   test('an access-exchanged owner session answers without the channel', async () => {
-    const s = world({ key: KEY });
+    const s = world({ key: KEY }, { accessVerifier: async () => ({ kind: 'invalid' }) });
     const proposalId = pendingProposal(s);
     const session = issueBrowserSession(s.db, 'external');
     const res = await answer(s, proposalId, {
@@ -200,6 +203,23 @@ describe('owner channel gate', () => {
     });
     expect(res.status).toBe(200);
     expect(proposalById(s.db, proposalId)?.status).toBe('executed');
+    s.dispose();
+  });
+
+  test('a forged external session is refused where no access exchange exists', async () => {
+    const s = world({ key: KEY });
+    const session = issueBrowserSession(s.db, 'external');
+    const res = await s.app.request(`/api/teams/${s.team.id}/top-models`, {
+      method: 'PUT',
+      headers: {
+        cookie: `cairn_auth=${session.token}`,
+        'sec-fetch-site': 'same-origin',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ models: [] }),
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'owner channel required' });
     s.dispose();
   });
 
@@ -260,6 +280,149 @@ describe('owner channel gate', () => {
     const admitted = await answerDirect(s, proposalId, channelHeaders());
     expect(admitted.status).toBe(409);
     expect(proposalById(s.db, proposalId)?.status).toBe('pending');
+    s.dispose();
+  });
+
+  test('a stolen owner token cannot mutate the ordinary routes #4986 names', async () => {
+    const s = world({ key: KEY });
+    const team = s.team.id;
+    const writes: Array<[string, string, unknown?]> = [
+      ['DELETE', '/api/todos/todo-x', undefined],
+      ['PATCH', '/api/todos/todo-x', { title: 'x' }],
+      ['DELETE', '/api/projects/project-a', undefined],
+      ['POST', '/api/projects', { name: 'forged', localPath: '/tmp/forged' }],
+      ['POST', '/api/builds/build-x/merge', {}],
+      ['DELETE', `/api/teams/${team}/secrets/sec-x`, undefined],
+      ['POST', `/api/teams/${team}/secrets`, { name: 'x', value: 'y' }],
+      ['PUT', `/api/teams/${team}/top-models`, { models: [] }],
+      ['PATCH', `/api/teams/${team}`, { maxAutonomousMergesPerDay: 99 }],
+      ['PATCH', '/api/user/me', { displayName: 'forged' }],
+      ['POST', `/api/teams/${team}/devin-subscriptions`, { label: 'x', token: 'y' }],
+      [
+        'POST',
+        '/api/uploads/grant',
+        { kind: 'attachment', fileName: 'x', mimeType: 'text/plain', size: 1, scope: 'message' },
+      ],
+      ['POST', '/api/auth/stream-ticket', undefined],
+      ['POST', '/api/schedules', { name: 'x', prompt: 'y', cron: '0 0 * * *' }],
+      ['POST', '/api/actions/journal/journal-x/undo', {}],
+      ['PUT', '/api/server/deploy/lease', { owner: crypto.randomUUID(), ttlMs: 1000 }],
+    ];
+    for (const [method, path, body] of writes) {
+      const res = await s.app.request(path, {
+        method,
+        headers: {
+          ...ownerHeaders({ 'sec-fetch-site': 'same-origin' }),
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+      expect(res.status, `${method} ${path} admitted a bearer-only same-uid caller`).toBe(403);
+      expect(await res.json()).toEqual({ error: 'owner channel required' });
+    }
+    s.dispose();
+  });
+
+  test('a bearer-only project delete leaves its pending proposal untouched', async () => {
+    const s = world({ key: KEY });
+    const proposalId = pendingProposal(s);
+    const res = await s.app.request('/api/projects/project-a', {
+      method: 'DELETE',
+      headers: ownerHeaders(),
+    });
+    expect(res.status).toBe(403);
+    expect(proposalById(s.db, proposalId)?.status).toBe('pending');
+    const admitted = await s.app.request('/api/projects/project-a', {
+      method: 'DELETE',
+      headers: channelHeaders(),
+    });
+    expect(admitted.status).toBe(204);
+    expect(proposalById(s.db, proposalId)?.status).toBe('executed');
+    s.dispose();
+  });
+
+  test('the channel admits ordinary mutations; devices and access sessions stay exempt', async () => {
+    const s = world({ key: KEY }, { accessVerifier: async () => ({ kind: 'invalid' }) });
+    const ticket = await post(s, '/api/auth/stream-ticket', undefined, channelHeaders());
+    expect(ticket.status).toBe(200);
+    const topModels = await s.app.request(`/api/teams/${s.team.id}/top-models`, {
+      method: 'PUT',
+      headers: channelHeaders({
+        'sec-fetch-site': 'same-origin',
+        'content-type': 'application/json',
+      }),
+      body: JSON.stringify({ models: [] }),
+    });
+    expect(topModels.status).toBe(200);
+    const issued = await post(s, '/api/remote/pairing', {}, channelHeaders());
+    const { code } = (await issued.json()) as { code: string };
+    const paired = await post(s, '/api/remote/pair', { code, name: 'Test phone' });
+    const { token: deviceToken } = (await paired.json()) as { token: string };
+    const deviceTicket = await post(s, '/api/auth/stream-ticket', undefined, {
+      authorization: `Bearer ${deviceToken}`,
+    });
+    expect(deviceTicket.status).toBe(200);
+    const deviceOnOwnerOnly = await post(
+      s,
+      '/api/remote/pairing',
+      {},
+      {
+        authorization: `Bearer ${deviceToken}`,
+      },
+    );
+    expect(deviceOnOwnerOnly.status).toBe(403);
+    expect(await deviceOnOwnerOnly.json()).toEqual({
+      error: 'only the owner token can do this',
+    });
+    const access = issueBrowserSession(s.db, 'external');
+    const accessWrite = await s.app.request(`/api/teams/${s.team.id}/top-models`, {
+      method: 'PUT',
+      headers: {
+        cookie: `cairn_auth=${access.token}`,
+        'sec-fetch-site': 'same-origin',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ models: [] }),
+    });
+    expect(accessWrite.status).toBe(200);
+    s.dispose();
+  });
+
+  test('a stolen owner cookie cannot mutate ordinary routes either', async () => {
+    const s = world({ key: KEY });
+    const session = issueBrowserSession(s.db, 'owner');
+    const res = await s.app.request('/api/todos/todo-x', {
+      method: 'DELETE',
+      headers: {
+        cookie: `cairn_auth=${session.token}`,
+        'sec-fetch-site': 'same-origin',
+      },
+    });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: 'owner channel required' });
+    s.dispose();
+  });
+
+  test('reads stay open to bearer on a configured server', async () => {
+    const s = world({ key: KEY });
+    for (const path of ['/api/teams', '/api/projects', `/api/teams/${s.team.id}/top-models`]) {
+      const res = await s.app.request(path, { headers: ownerHeaders() });
+      expect(res.status, `GET ${path}`).toBe(200);
+    }
+    s.dispose();
+  });
+
+  test('a channel-less server keeps ordinary bearer writes working', async () => {
+    const s = world(undefined);
+    const res = await s.app.request(`/api/teams/${s.team.id}/top-models`, {
+      method: 'PUT',
+      headers: ownerHeaders({
+        'sec-fetch-site': 'same-origin',
+        'content-type': 'application/json',
+      }),
+      body: JSON.stringify({ models: [] }),
+    });
+    expect(res.status).toBe(200);
     s.dispose();
   });
 
