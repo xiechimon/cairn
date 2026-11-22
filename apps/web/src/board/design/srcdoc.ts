@@ -3,32 +3,47 @@ import { buildCommentBridgeScript } from '../../vendor-open-design/comment-bridg
 import { buildPreviewSandboxShim } from '../../vendor-open-design/preview-guards.js';
 import { buildSnapshotBridgeScript } from '../../vendor-open-design/snapshot-bridge.js';
 
-const BODY_CLOSE = /<\/body\s*>/gi;
-const HTML_SPACE = String.raw`[\t\n\f\r ]`;
-const HTML_TRIVIA = `(?:${HTML_SPACE}|<!--(?!>|->)(?:[^-]|-(?!-))*-->)*`;
-const HTML_ATTRIBUTES = String.raw`(?:${HTML_SPACE}+[^\s"'<>/=\x00]+(?:${HTML_SPACE}*=${HTML_SPACE}*(?:"[^"]*"|'[^']*'|[^\s"'=<>\x60\x00]+))?)*${HTML_SPACE}*`;
-const DOCUMENT_PREAMBLE = new RegExp(
-  `^\uFEFF?${HTML_TRIVIA}(?:<!doctype${HTML_SPACE}+html(?:${HTML_SPACE}[^<>]*)?>${HTML_TRIVIA})?`,
-  'i',
-);
-const DOCUMENT_HEAD_OPEN = new RegExp(
-  `^(?:<html${HTML_ATTRIBUTES}>${HTML_TRIVIA})?<head${HTML_ATTRIBUTES}>`,
-  'i',
-);
-const CSP_META = `<meta http-equiv="Content-Security-Policy" content="${DESIGN_ARTIFACT_CSP}">`;
-
-export function injectBeforeBodyEnd(html: string, payload: string): string {
-  let at = -1;
-  for (const match of html.matchAll(BODY_CLOSE)) at = match.index;
-  return at < 0 ? html + payload : html.slice(0, at) + payload + html.slice(at);
+function keepRoundTrippablePreamble(
+  boundaries: readonly Node[],
+  template: HTMLTemplateElement,
+  serializer: XMLSerializer,
+): void {
+  for (const boundary of boundaries) {
+    for (let node = boundary.previousSibling; node !== null; ) {
+      const previous = node.previousSibling;
+      if (node instanceof Comment) {
+        template.innerHTML = serializer.serializeToString(node);
+        const first = template.content.firstChild;
+        if (!(first instanceof Comment) || first.nextSibling !== null || first.data !== node.data) {
+          node.remove();
+        }
+      }
+      node = previous;
+    }
+  }
 }
 
 export function designSrcdoc(html: string): string {
-  const preambleEnd = DOCUMENT_PREAMBLE.exec(html)?.[0].length ?? 0;
-  const headEnd = DOCUMENT_HEAD_OPEN.exec(html.slice(preambleEnd))?.[0].length ?? 0;
-  const at = preambleEnd + headEnd;
-  return injectBeforeBodyEnd(
-    html.slice(0, at) + CSP_META + html.slice(at),
-    buildPreviewSandboxShim() + buildCommentBridgeScript() + buildSnapshotBridgeScript(),
+  const bom = html.startsWith('\uFEFF') ? '\uFEFF' : '';
+  const doc = new DOMParser().parseFromString(html.slice(bom.length), 'text/html');
+  const template = doc.createElement('template');
+  const serializer = new XMLSerializer();
+  keepRoundTrippablePreamble([doc.documentElement, doc.head], template, serializer);
+
+  const policy = doc.createElement('meta');
+  policy.httpEquiv = 'Content-Security-Policy';
+  policy.content = DESIGN_ARTIFACT_CSP;
+  template.innerHTML =
+    buildPreviewSandboxShim() + buildCommentBridgeScript() + buildSnapshotBridgeScript();
+  for (const script of template.content.querySelectorAll('script')) {
+    script.textContent = `document.addEventListener('DOMContentLoaded', () => {\n${script.textContent}\n}, { once: true });`;
+  }
+  doc.head.prepend(policy, template.content);
+
+  return (
+    bom +
+    Array.from(doc.childNodes, (node) =>
+      node instanceof Element ? node.outerHTML : serializer.serializeToString(node),
+    ).join('')
   );
 }

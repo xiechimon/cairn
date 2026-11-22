@@ -64,7 +64,12 @@ function lostComment(): Comment {
   };
 }
 
-async function openDesign(page: Page, seeded: Comment[] = [], shareOrigin: string | null = null) {
+async function openDesign(
+  page: Page,
+  seeded: Comment[] = [],
+  shareOrigin: string | null = null,
+  html = { ...HTML },
+) {
   const state = {
     versions: [version(1), version(2)],
     restored: [] as string[],
@@ -173,20 +178,116 @@ async function openDesign(page: Page, seeded: Comment[] = [], shareOrigin: strin
         restoredFromSeq: from?.seq ?? null,
         attachmentId: from?.attachmentId ?? '',
       });
-      HTML[next.id] = HTML[restore] ?? '';
+      html[next.id] = html[restore] ?? '';
       state.versions = [...state.versions, next];
       state.restored.push(restore);
       return json(next, 201);
     }
     const pageId = /^\/api\/design\/versions\/([^/]+)\/page$/.exec(path)?.[1];
     if (pageId !== undefined) {
-      return route.fulfill({ status: 200, contentType: 'text/html', body: HTML[pageId] ?? '' });
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html[pageId] ?? '' });
     }
     return undefined;
   });
   await page.goto(`/app?view=design&thread=${PAGE_TASK.id}&page=pricing.html`);
   return state;
 }
+
+test.describe('artifact parser', () => {
+  test.describe.configure({ timeout: 90_000 });
+  test.beforeEach(async ({ context, baseURL }) => {
+    await context.route('**/*', (route) =>
+      new URL(route.request().url()).origin === baseURL ? route.continue() : route.abort(),
+    );
+  });
+
+  test('keeps the policy and bridges outside literal closing tags', async ({ page }) => {
+    const html = `<!doctype html><title>HTML examples</title><body>
+      <!-- Example markup: </body> -->
+      <script type="application/json" id="example-config">{"closingTag":"</body>"}</script>
+      <h1 data-example="</body>">HTML examples</h1>`;
+    await openDesign(page, [], null, { 'ver-2': html });
+    const ownerFrame = page.getByTestId('design-frame');
+    await expect(ownerFrame).toHaveAttribute('sandbox', 'allow-scripts allow-forms allow-downloads');
+    const frame = ownerFrame.contentFrame();
+    const heading = frame.getByRole('heading', { name: 'HTML examples' });
+    await expect(frame.locator('head > :first-child')).toHaveAttribute('http-equiv', 'Content-Security-Policy');
+    await expect(heading).toHaveAttribute('data-example', '</body>');
+    expect(await frame.locator('#example-config').textContent()).toBe('{"closingTag":"</body>"}');
+    await expect(frame.locator('head > script[data-od-sandbox-shim]')).toHaveCount(1);
+    const enforcement = await heading.evaluate(() => {
+      const originalBase = document.baseURI;
+      const base = document.createElement('base');
+      base.href = new URL('/html-examples/', originalBase).href;
+      return new Promise((resolve) => {
+        const timer = window.setTimeout(() => resolve(null), 1500);
+        document.addEventListener('securitypolicyviolation', (event) => {
+          window.clearTimeout(timer);
+          resolve({ directive: event.effectiveDirective, unchanged: document.baseURI === originalBase });
+        }, { once: true });
+        document.head.append(base);
+      });
+    });
+    expect(enforcement).toEqual({ directive: 'base-uri', unchanged: true });
+    await page.getByTestId('design-comment-mode').click();
+    await heading.click();
+    await expect(page.getByTestId('design-comment-popover')).toBeVisible();
+  });
+
+  test('renders 10 MiB documents with leading whitespace or a leading comment', async ({ page }) => {
+    const size = 10 * 1024 * 1024;
+    const whitespacePage = '<!doctype html><h1>Whitespace report</h1>';
+    const commentPage = '<!doctype html><h1>Comment report</h1>';
+    const commentOpen = '<!--';
+    const commentClose = '-->';
+    await openDesign(page, [], null, {
+      'ver-2': ' '.repeat(size - whitespacePage.length) + whitespacePage,
+      'ver-1': `${commentOpen}${'x'.repeat(size - commentPage.length - commentOpen.length - commentClose.length)}${commentClose}${commentPage}`,
+    });
+    const frame = page.getByTestId('design-frame').contentFrame();
+    await expect(frame.getByRole('heading', { name: 'Whitespace report' })).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId('design-versions').click();
+    await page.getByTestId('design-version-item').filter({ hasText: 'v1' }).click();
+    await expect(frame.getByRole('heading', { name: 'Comment report' })).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('matches direct opening for document metadata and active HTML', async ({ page, context }) => {
+    const html = `\uFEFF<!-- Opening -- note --><!doctype html SYSTEM "about:legacy-compat">
+      <html lang="en"><!-- Inside the root --><head id="pricing" data-label=A\u00a0B>
+      <noscript><style>.fallback { color: red }</style></noscript><title>Pricing</title></head>
+      <body><h1>Pending</h1><noscript><p>Pricing &amp; plans</p></noscript>
+      <template><p data-label="A > B">Starter &amp; Pro</p></template>
+      <script>document.querySelector('h1').textContent = 'Pricing is ready'</script>
+      </body></html><!-- Closing note -->`;
+    const metadata = () => ({
+      doctype: document.doctype?.systemId ?? null,
+      charset: document.characterSet,
+      compatMode: document.compatMode,
+      lang: document.documentElement.lang,
+      head: [document.head.id, document.head.dataset.label],
+      comments: [...document.childNodes, ...document.documentElement.childNodes]
+        .filter((node) => node instanceof Comment)
+        .map((node) => node.data),
+      noscript: [...document.querySelectorAll('noscript')].map((node) => [
+        node.parentElement?.tagName,
+        node.textContent,
+        node.childElementCount,
+      ]),
+      template: document.querySelector('template')?.content.firstElementChild?.outerHTML,
+      heading: document.querySelector('h1')?.textContent,
+    });
+    const direct = await context.newPage();
+    await direct.goto(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    const expected = await direct.locator('html').evaluate(metadata);
+    await direct.close();
+    expect(expected).toMatchObject({ doctype: 'about:legacy-compat', heading: 'Pricing is ready' });
+
+    await openDesign(page, [], null, { 'ver-2': html });
+    const frame = page.getByTestId('design-frame').contentFrame();
+    await expect(frame.getByRole('heading', { name: 'Pricing is ready' })).toBeVisible();
+    expect(await frame.locator('html').evaluate(metadata)).toEqual(expected);
+  });
+});
 
 test('the design view runs the page in a sandboxed frame beside the Coordinator, fits each viewport, and switches and restores versions', async ({
   page,
