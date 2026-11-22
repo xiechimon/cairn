@@ -28,8 +28,10 @@ function fixture() {
     readable: [skills],
     handoffDirectories: [],
     serverUrl: 'http://127.0.0.1:1',
+    workspacesDir: join(home, 'projects'),
     platform: 'darwin',
     home,
+    systemTempDirectory: null,
     environment: { TMPDIR: temp, CLAUDE_CONFIG_DIR: join(runnerHome, 'claude') },
   });
   return {
@@ -379,6 +381,39 @@ describe('session confiner', () => {
       )({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] });
     confine(join(home, '.claude', 'ok', 'x'));
     expect(() => confine(join(home, '.claude', 'inner', 'x'))).toThrow(
+      'Unsafe confinement symlink',
+    );
+  });
+
+  test('a user link pointing into another session workspace fails closed', () => {
+    const { confine, worktree, root } = fixture();
+    const home = join(root, 'user');
+    const projects = join(home, 'projects');
+    const storage = join(home, 'project-storage');
+    const state = join(storage, 'other', 'state');
+    mkdirSync(state, { recursive: true });
+    symlinkSync(storage, projects);
+    symlinkSync(state, join(home, '.claude'));
+    expect(() =>
+      confine({ cwd: worktree }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test.each([
+    ['another session workspace', 'projects/other', '.claude', 'claude-code'],
+    ['another harness state directory', '.gemini', '.claude', 'claude-code'],
+    ['another session workspace via the Git config grant', 'projects/other', '.config/git', 'pi'],
+  ] as const)('rejects a user link traversing %s', (_label, parent, grant, harness) => {
+    const { confine, worktree, root } = fixture();
+    const home = join(root, 'user');
+    const dotfiles = join(home, 'dotfiles');
+    const targetParent = join(home, parent);
+    for (const path of [dotfiles, targetParent, join(home, '.config')]) {
+      mkdirSync(path, { recursive: true });
+    }
+    symlinkSync(dotfiles, join(targetParent, 'linked-directory'));
+    symlinkSync(join(targetParent, 'linked-directory'), join(home, grant));
+    expect(() => confine({ cwd: worktree }, harness, { command: '/bin/true', args: [] })).toThrow(
       'Unsafe confinement symlink',
     );
   });

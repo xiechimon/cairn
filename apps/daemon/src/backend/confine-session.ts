@@ -45,6 +45,7 @@ export interface SessionConfinerOptions {
   readable: string[];
   handoffDirectories: string[];
   serverUrl: string;
+  workspacesDir?: string;
   platform?: string;
   systemTempDirectory?: string | null;
   home?: string;
@@ -235,6 +236,11 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       throw new Error(`Unsafe confinement denied root: ${path}`);
     return path;
   });
+  if (
+    options.workspacesDir !== undefined &&
+    (!isAbsolute(options.workspacesDir) || resolve(options.workspacesDir) !== options.workspacesDir)
+  )
+    throw new Error(`Unsafe confinement workspaces root: ${options.workspacesDir}`);
   const daemonHomeLexical = existsSync(options.daemonHome)
     ? realpathSync(options.daemonHome)
     : canonicalDeny(options.daemonHome);
@@ -256,8 +262,8 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const stateEntries = ownState(harness, home, env).filter(
       (entry) => !isStateFile(home, entry.path) || existsSync(entry.path),
     );
-    const harnessTemp =
-      harness === 'claude-code' ? join(realpathSync('/tmp'), `claude-${userInfo().uid}`) : null;
+    const claudeTemp = join(realpathSync('/tmp'), `claude-${userInfo().uid}`);
+    const harnessTemp = harness === 'claude-code' ? claudeTemp : null;
     const sharedCaches = SHARED_CACHES.map((path) => join(home, path)).filter((path) =>
       existsSync(path),
     );
@@ -299,33 +305,38 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       return false;
     };
     const daemonHome = daemonHomeLexical;
-    const realOrFallback = (path: string): string => {
-      try {
-        return realpathSync(path);
-      } catch {
-        return canonicalDeny(path);
-      }
-    };
+    const pathPair = (lexical: string) => ({ lexical, real: canonicalDeny(lexical) });
+    const userConfig = pathPair(join(home, '.config'));
     const deniedPairs = [
       { lexical: resolve(options.daemonHome), real: daemonHome },
-      ...[join(home, '.config'), join(home, '.cairn'), ...extraDeniedRoots].map((path) => ({
-        lexical: resolve(path),
-        real: realOrFallback(path),
-      })),
+      userConfig,
+      ...[join(home, '.cairn'), ...extraDeniedRoots].map(pathPair),
     ];
     const deniedRoots = deniedPairs.map((pair) => pair.real);
-    const unsafeDeniedRoots = new Set(
-      deniedPairs.filter((pair) => pair.lexical !== join(home, '.config')).map((pair) => pair.real),
+    const legacyState = (['claude-code', 'gemini', 'devin', 'antigravity'] as const).flatMap(
+      (other) => ownState(other, home, {}).map((entry) => entry.path),
     );
-    const unsafeParent = (directory: string): boolean =>
-      taskWritable(directory) || [...unsafeDeniedRoots].some((root) => contains(root, directory));
+    const crossSessionPairs = [
+      ...(options.workspacesDir === undefined ? [] : [options.workspacesDir]),
+      ...legacyState,
+      claudeTemp,
+    ].map(pathPair);
     const deniedGuards = [
-      ...[...DENIED_DIRECTORIES, ...MAC_DENIED_DIRECTORIES, ...DENIED_FILES].map((name) => {
-        const lexical = join(home, name);
-        return { lexical, real: canonicalDeny(lexical) };
-      }),
+      ...[...DENIED_DIRECTORIES, ...MAC_DENIED_DIRECTORIES, ...DENIED_FILES].map((name) =>
+        pathPair(join(home, name)),
+      ),
       ...deniedPairs,
+      ...crossSessionPairs,
     ];
+    const unsafeRoots = [
+      ...new Set(
+        deniedGuards
+          .filter((pair) => pair !== userConfig)
+          .flatMap(({ lexical, real }) => [lexical, real]),
+      ),
+    ];
+    const unsafeParent = (directory: string): boolean =>
+      taskWritable(directory) || unsafeRoots.some((root) => contains(root, directory));
     const links = new Set<string>();
     const escapeGuard = (lexical: string, granted: string): void => {
       for (const denied of deniedGuards) {
@@ -441,12 +452,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
           : []),
       ]
         .filter((path) => existsSync(path))
-        .map((path) => {
-          const lexical = resolve(path);
-          const real = canonicalDeny(lexical);
-          escapeGuard(lexical, real);
-          return real;
-        }),
+        .map((path) => grantPath(path)),
       readableDeniedAllowed:
         harness === 'antigravity' && env.GEMINI_API_KEY === undefined
           ? deniedVariants(join(home, 'Library', 'Keychains'))

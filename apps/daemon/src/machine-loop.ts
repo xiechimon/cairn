@@ -205,6 +205,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     readable: [config.skillsDir, paths.teamSkillsCacheDir, join(paths.home, 'tools')],
     handoffDirectories: [paths.plansDir],
     serverUrl: config.serverUrl,
+    workspacesDir: config.workspacesDir,
   });
   loadOrCreateDeviceJson(paths);
   const proxyHandle = setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
