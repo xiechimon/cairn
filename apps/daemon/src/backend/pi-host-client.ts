@@ -366,7 +366,10 @@ function serializableSession(opts: SessionOpts) {
 
 export async function openPiHostSession(args: PiHostOpen): Promise<AgentSessionHandle> {
   const privateDirectory = realpathSync(mkdtempSync(join(args.backend.sessionDir, 'host-')));
-  const allowedFiles = args.resumeFile !== null ? [realpathSync(args.resumeFile)] : [];
+  const allowedFiles =
+    args.resumeFile !== null
+      ? [join(realpathSync(dirname(args.resumeFile)), basename(args.resumeFile))]
+      : [];
   let confined: Launch;
   try {
     confined = args.confine({ cwd: args.opts.cwd, env: args.opts.env ?? {} }, 'pi', args.launch, [

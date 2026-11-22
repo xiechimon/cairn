@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { createRequire } from 'node:module';
 import type { AddressInfo } from 'node:net';
@@ -8,6 +15,7 @@ import type { StepEvent } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createSessionConfiner } from '../src/backend/confine-session.js';
 import { createPiBackend } from '../src/backend/pi.js';
+import { openPiHostSession } from '../src/backend/pi-host-client.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const SENTINEL = 'PI-HOST-SENTINEL-OWNER-TOKEN';
@@ -227,4 +235,43 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
     expect(events.at(-1)?.type).toBe('done');
     expect(readFileSync(file, 'utf8').length).toBeGreaterThan(before);
   }, 120_000);
+
+  test('a resume file replaced by a symlink is refused instead of exposing its target', async () => {
+    const root = realpathSync(testTempDir('pi-host-resume-link-'));
+    const home = join(root, 'user');
+    const runnerHome = join(root, 'support', 'runner');
+    const worktree = join(runnerHome, 'workspaces', 'a');
+    const temp = join(root, 'tmp-user', 'T');
+    const sessionDir = join(runnerHome, 'chat-sessions');
+    const pivot = join(root, 'pivot');
+    for (const path of [home, worktree, temp, sessionDir, pivot])
+      mkdirSync(path, { recursive: true });
+    const resumeFile = join(sessionDir, 'session.jsonl');
+    writeFileSync(join(pivot, 'session.jsonl'), 'x');
+    symlinkSync(join(pivot, 'session.jsonl'), resumeFile);
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home,
+      environment: { TMPDIR: temp },
+    });
+    await expect(
+      openPiHostSession({
+        backend: { agentDir: join(runnerHome, 'homes', 'pi'), sessionDir },
+        confine: confine as NonNullable<typeof confine>,
+        launch: { command: '/bin/true', args: [] },
+        opts: {
+          cwd: worktree,
+          env: {},
+          provider: { kind: 'http', providerId: 'x' },
+          modelId: 'm',
+        },
+        resumeFile,
+      } as Parameters<typeof openPiHostSession>[0]),
+    ).rejects.toThrow('Pi session confinement failed: Unsafe confinement symlink');
+  });
 });

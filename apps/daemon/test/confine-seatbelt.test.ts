@@ -258,4 +258,11 @@ describe.runIf(process.platform === 'darwin')('seatbelt startup probe', () => {
   test('the real probe passes on this Mac', async () => {
     await expect(runSeatbeltProbe(testTempDir('seatbelt-probe-'))).resolves.toBeUndefined();
   });
+
+  test('a probe directory containing a single quote still probes correctly', async () => {
+    const directory = join(testTempDir('seatbelt-probe-'), "it's-here");
+    mkdirSync(directory, { recursive: true });
+    await expect(runSeatbeltProbe(directory)).resolves.toBeUndefined();
+    expect(readFileSync(join(directory, 'probe-scratch', 'written'), 'utf8')).toBe('ok\n');
+  });
 });

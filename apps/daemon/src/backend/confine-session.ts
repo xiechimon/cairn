@@ -41,10 +41,25 @@ function systemTempDirectory(): string | null {
       encoding: 'utf8',
       timeout: 2000,
     }).trim();
-    return output === '' ? null : realpathSync(output);
+    return output === '' || !existsSync(output) ? null : resolvedTail(resolve(output));
   } catch {
     return null;
   }
+}
+
+function resolvedTail(path: string): string {
+  let cursor = path;
+  const missing: string[] = [];
+  while (true) {
+    const stat = lstatSync(cursor, { throwIfNoEntry: false });
+    if (stat !== undefined) {
+      if (stat.isSymbolicLink()) throw new Error('Unsafe confinement symlink');
+      break;
+    }
+    missing.unshift(basename(cursor));
+    cursor = dirname(cursor);
+  }
+  return join(realpathSync(cursor), ...missing);
 }
 
 function gitDirectoriesOf(workspace: string): string[] {
@@ -152,15 +167,17 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const state = ownState(harness, home, env)
       .filter((path) => !isStateFile(home, path) || existsSync(path))
       .map((path) => {
-        if (!isStateFile(home, path)) mkdirSync(path, { recursive: true, mode: 0o700 });
-        return realpathSync(path);
+        const lexical = resolvedTail(resolve(path));
+        if (!isStateFile(home, path)) mkdirSync(lexical, { recursive: true, mode: 0o700 });
+        return lexical;
       });
     const handoff = options.handoffDirectories.map((path) => {
-      mkdirSync(path, { recursive: true });
-      return realpathSync(path);
+      const lexical = resolvedTail(resolve(path));
+      mkdirSync(lexical, { recursive: true });
+      return lexical;
     });
-    const explicitState = [...handoff, ...extraState.map((path) => realpathSync(path))];
-    const temp = realpathSync(env.TMPDIR ?? tmpdir());
+    const explicitState = [...handoff, ...extraState.map((path) => resolvedTail(resolve(path)))];
+    const temp = resolvedTail(resolve(env.TMPDIR ?? tmpdir()));
     const daemonHome = existsSync(options.daemonHome)
       ? realpathSync(options.daemonHome)
       : options.daemonHome;
@@ -172,7 +189,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         ? systemTempDirectory()
         : options.systemTempDirectory === null
           ? null
-          : realpathSync(options.systemTempDirectory);
+          : resolvedTail(resolve(options.systemTempDirectory));
     const systemUserDirectory =
       systemTemp === null || deniedRoots.some((root) => contains(dirname(systemTemp), root))
         ? null
@@ -182,7 +199,8 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     );
     const harnessTemp =
       harness === 'claude-code' ? join(realpathSync('/tmp'), `claude-${userInfo().uid}`) : null;
-    if (harnessTemp !== null) mkdirSync(harnessTemp, { recursive: true, mode: 0o700 });
+    if (harnessTemp !== null && !existsSync(harnessTemp))
+      mkdirSync(harnessTemp, { recursive: true, mode: 0o700 });
     const policy: SeatbeltPolicy = {
       home,
       daemonHome,

@@ -263,7 +263,10 @@ export async function runSeatbeltProbe(directory: string): Promise<void> {
     '/bin/sh',
     [
       '-c',
-      `if cat '${join(denied, 'sentinel')}' >/dev/null 2>&1; then exit 3; fi; echo ok > '${join(scratch, 'written')}' || exit 4`,
+      'if cat "$1" >/dev/null 2>&1; then exit 3; fi; echo ok > "$2" || exit 4',
+      'probe',
+      join(denied, 'sentinel'),
+      join(scratch, 'written'),
     ],
   );
   try {

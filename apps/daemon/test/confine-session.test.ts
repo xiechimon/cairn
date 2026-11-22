@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { userInfo } from 'node:os';
 import { basename, join } from 'node:path';
 import { describe, expect, test } from 'vitest';
@@ -169,6 +169,109 @@ describe('session confiner', () => {
     expect(() => confine({ cwd: ws }, 'claude-code', { command: '/bin/true', args: [] })).toThrow(
       'Unsafe confinement',
     );
+  });
+
+  test('a symlinked credential file fails closed instead of widening the state grant to its target', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const home = join(root, 'user');
+    const agentHome = join(runnerHome, 'homes', 'antigravity');
+    const credDir = join(home, '.gemini', 'antigravity-acp');
+    const pivot = join(root, 'pivot');
+    mkdirSync(agentHome, { recursive: true });
+    mkdirSync(credDir, { recursive: true });
+    mkdirSync(pivot, { recursive: true });
+    symlinkSync(pivot, join(credDir, 'acp_token.json'));
+    expect(() =>
+      confine({ cwd: worktree, env: { HOME: agentHome } }, 'antigravity', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement symlink');
+
+    writeFileSync(join(credDir, 'acp_business_token.json'), 't');
+    rmSync(join(credDir, 'acp_token.json'));
+    writeFileSync(join(credDir, 'acp_token.json'), 't');
+    const launch = confine({ cwd: worktree, env: { HOME: agentHome } }, 'antigravity', {
+      command: '/bin/true',
+      args: [],
+    });
+    expect(launch.args[1]).toContain(`(subpath "${join(credDir, 'acp_token.json')}")`);
+    expect(launch.args[1]).not.toContain(`(subpath "${pivot}")`);
+  });
+
+  test('a symlinked devin state directory fails closed instead of widening the grant', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const agentHome = join(runnerHome, 'homes', 'devin');
+    const pivot = join(root, 'devin-pivot');
+    mkdirSync(join(agentHome, '.config'), { recursive: true });
+    mkdirSync(pivot, { recursive: true });
+    symlinkSync(pivot, join(agentHome, '.config', 'devin'));
+    expect(() =>
+      confine({ cwd: worktree, env: { HOME: agentHome } }, 'devin', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement symlink');
+
+    rmSync(join(agentHome, '.config'), { recursive: true });
+    symlinkSync(join(root, 'devin-mid'), join(agentHome, '.config'));
+    expect(() =>
+      confine({ cwd: worktree, env: { HOME: agentHome } }, 'devin', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a symlinked task temp leaf fails closed instead of pivoting the temp grant', () => {
+    const { confine, worktree, root } = fixture();
+    const tempParent = join(root, 'tmp-user');
+    mkdirSync(join(tempParent, 'temp-pivot'), { recursive: true });
+    rmSync(join(tempParent, 'T'), { recursive: true });
+    symlinkSync(join(tempParent, 'temp-pivot'), join(tempParent, 'T'));
+    expect(() =>
+      confine({ cwd: worktree, env: {} }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a symlinked system temp directory fails closed instead of pivoting the cache grant', () => {
+    const { worktree, runnerHome, root, serverHome } = fixture();
+    const systemTempParent = join(root, 'system-temp');
+    mkdirSync(join(systemTempParent, 'pivot-dir'), { recursive: true });
+    symlinkSync(join(systemTempParent, 'pivot-dir'), join(systemTempParent, 'T'));
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [serverHome],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home: join(root, 'user'),
+      systemTempDirectory: join(systemTempParent, 'T'),
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    expect(() =>
+      confine({ cwd: worktree, env: {} }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a symlinked extra-state session file fails closed instead of exposing its target', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const agentDir = join(runnerHome, 'homes', 'pi');
+    const privateDirectory = join(runnerHome, 'chat-sessions', 'host-x');
+    const pivot = join(root, 'session-pivot');
+    mkdirSync(agentDir, { recursive: true });
+    mkdirSync(privateDirectory, { recursive: true });
+    mkdirSync(pivot, { recursive: true });
+    writeFileSync(join(pivot, 'session.jsonl'), 'x');
+    symlinkSync(join(pivot, 'session.jsonl'), join(privateDirectory, 'session.jsonl'));
+    expect(() =>
+      confine({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] }, [
+        agentDir,
+        privateDirectory,
+        join(privateDirectory, 'session.jsonl'),
+      ]),
+    ).toThrow('Unsafe confinement symlink');
   });
 
   test('a crafted .git pointer cannot re-expose denied or arbitrary directories', () => {
