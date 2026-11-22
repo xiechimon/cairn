@@ -36,21 +36,17 @@ export function buildPreviewSandboxShim(): string {
   }
   shimHistoryMethod('pushState');
   shimHistoryMethod('replaceState');
-  var localSubmitActivations = new WeakMap();
-  var localSubmitCounts = new WeakMap();
+  var submitCount = 0;
+  var lastSubmitByForm = new WeakMap();
   document.addEventListener('submit', function(e){
-    if (e.target instanceof HTMLFormElement) {
-      localSubmitCounts.set(e.target, (localSubmitCounts.get(e.target) || 0) + 1);
-    }
+    if (e.target instanceof HTMLFormElement) lastSubmitByForm.set(e.target, ++submitCount);
   }, true);
-  function rememberLocalSubmit(e){
-    if (!(e.target instanceof Element)) return;
+  function queueLocalSubmit(e, submitCountBefore){
     var control;
     if (e.type === 'click') {
       control = e.target.closest('button, input');
       if (!control || control.type !== 'submit') return;
     } else {
-      if (e.key !== 'Enter' || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
       var input = e.target;
       if (!(input instanceof HTMLInputElement) || !/^(text|email|tel|url|search|password|number)$/.test(input.type)) return;
       var inputForm = input.form;
@@ -60,24 +56,14 @@ export function buildPreviewSandboxShim(): string {
       });
     }
     if (!control || control.matches(':disabled') || !control.form) return;
-    localSubmitActivations.set(e, { form: control.form, submitter: control, count: localSubmitCounts.get(control.form) || 0 });
-  }
-  function finishLocalSubmit(e){
-    var activation = localSubmitActivations.get(e);
-    if (!activation) return;
+    var form = control.form;
     setTimeout(function(){
-      var form = activation.form;
-      var submitter = activation.submitter;
-      if (e.defaultPrevented || !form.isConnected || submitter.matches(':disabled')) return;
-      if ((localSubmitCounts.get(form) || 0) !== activation.count) return;
-      if (!form.noValidate && !submitter.formNoValidate && !form.reportValidity()) return;
-      form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true, submitter: submitter }));
+      if (e.defaultPrevented || !form.isConnected || control.form !== form || control.type !== 'submit' || control.matches(':disabled')) return;
+      if ((lastSubmitByForm.get(form) || 0) > submitCountBefore) return;
+      if (!form.noValidate && !control.formNoValidate && !form.reportValidity()) return;
+      form.dispatchEvent(new SubmitEvent('submit', { bubbles: true, cancelable: true, submitter: control }));
     }, 0);
   }
-  ['click', 'keydown'].forEach(function(type){
-    document.addEventListener(type, rememberLocalSubmit, true);
-    document.addEventListener(type, finishLocalSubmit);
-  });
   function setLocalHash(hash){
     if (location.hash === hash) return;
     if (location.protocol === 'blob:') {
@@ -92,9 +78,7 @@ export function buildPreviewSandboxShim(): string {
     }
     location.hash = hash;
   }
-  document.addEventListener('click', function(e){
-    if (e.defaultPrevented) return;
-    if (!e.target || !(e.target instanceof Element)) return;
+  function followLocalLink(e){
     var link = e.target.closest('a[href]');
     if (!link) return;
     var href = link.getAttribute('href');
@@ -125,6 +109,24 @@ export function buildPreviewSandboxShim(): string {
       } catch (_) {}
       if (safe) window.open(href, '_blank', 'noopener,noreferrer');
     }
-  });
+  }
+  function queueAfterArtifactHandlers(e){
+    if (!e.bubbles || !(e.target instanceof Element)) return;
+    if (e.type === 'keydown' && (e.key !== 'Enter' || e.isComposing || e.altKey || e.ctrlKey || e.metaKey || e.shiftKey)) return;
+    var submitCountBefore = submitCount;
+    function remove(){ window.removeEventListener(e.type, finish); }
+    function finish(event){
+      if (event !== e) return;
+      clearTimeout(expiry);
+      remove();
+      if (e.defaultPrevented) return;
+      queueLocalSubmit(e, submitCountBefore);
+      if (e.type === 'click') followLocalLink(e);
+    }
+    var expiry = setTimeout(remove, 0);
+    window.addEventListener(e.type, finish);
+  }
+  document.addEventListener('click', queueAfterArtifactHandlers, true);
+  document.addEventListener('keydown', queueAfterArtifactHandlers, true);
 })();</script>`;
 }

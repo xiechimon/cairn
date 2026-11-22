@@ -408,6 +408,85 @@ test.describe('artifact parser', () => {
     );
   });
 
+  for (const registration of ['inline', 'deferred', 'module', 'late'] as const) {
+    test(`artifact activation fallbacks yield to ${registration} handlers`, async ({ page }) => {
+      const handlers = `
+        const view = document.getElementById('view');
+        const submissions = [];
+        function routeLink(event, linkId, title) {
+          if (event.defaultPrevented || event.target.id !== linkId) return;
+          event.preventDefault();
+          view.textContent = title;
+        }
+        document.addEventListener('click', (event) => routeLink(event, 'details', 'details'));
+        window.addEventListener('click', (event) => routeLink(event, 'billing', 'billing'));
+        document.addEventListener('click', (event) => {
+          if (event.target.id === 'send') event.target.setAttribute('form', 'details-form');
+        }, true);
+        document.addEventListener('submit', (event) => {
+          event.preventDefault();
+          submissions.push(event.target.id + ':' + event.submitter.id);
+          document.getElementById('last-submitter').textContent = event.submitter.id;
+        });
+        window.addEventListener('click', (event) => {
+          if (event.target.id === 'send') setTimeout(() => setTimeout(() => {
+            document.getElementById('submissions').textContent = submissions.join(', ');
+          }, 0), 0);
+        });
+        document.documentElement.dataset.handlers = 'ready';`;
+      const pending = Promise.withResolvers<void>();
+      await page.route('**/preview-activation.js', async (route) => {
+        if (registration === 'inline') await pending.promise;
+        await route.fulfill({
+          contentType: 'application/javascript',
+          body: registration === 'deferred' ? handlers : '',
+        });
+      });
+      const script = {
+        inline: `<script>${handlers}</script><script defer src="/preview-activation.js"></script>`,
+        deferred: '<script defer src="/preview-activation.js"></script>',
+        module: `<script type="module">${handlers}</script>`,
+        late: `<script>window.addEventListener('load', () => setTimeout(() => {${handlers}}, 0))</script>`,
+      }[registration];
+      const html = `<!doctype html><body>
+        <a id="details" href="#details">Plan details</a>
+        <a id="billing" href="#billing">Billing details</a>
+        <a href="#terms">Terms</a><p id="terms">Monthly renewal</p>
+        <h1 id="view">home</h1>
+        <form id="account-form"></form><form id="details-form"></form>
+        <button id="send" type="submit" form="account-form">Confirm plan</button>
+        <form><input aria-label="Billing email" type="email"><button id="save-email" type="submit">Save email</button></form>
+        <output id="submissions"></output><output id="last-submitter"></output>${script}`;
+      try {
+        await openDesign(page, [], null, { 'ver-2': html });
+        const frame = page.getByTestId('design-frame').contentFrame();
+        await expect(frame.locator('html')).toHaveAttribute('data-handlers', 'ready');
+        const view = frame.getByRole('heading');
+        await frame.getByRole('link', { name: 'Plan details' }).click();
+        expect.soft(await view.textContent(), 'document router').toBe('details');
+        await frame.getByRole('link', { name: 'Billing details' }).click();
+        expect.soft(await view.textContent(), 'window router').toBe('billing');
+        await frame.getByRole('button', { name: 'Confirm plan' }).click();
+        const submissions = frame.locator('#submissions');
+        await expect(submissions).not.toBeEmpty();
+        expect.soft(await submissions.textContent(), 'form selected by the artifact').toBe(
+          'details-form:send',
+        );
+        await frame.getByRole('textbox', { name: 'Billing email' }).dispatchEvent('keydown', {
+          key: 'Enter',
+        });
+        await expect(frame.locator('#last-submitter')).toHaveText('save-email');
+        await frame.getByRole('link', { name: 'Terms' }).click();
+        await expect.poll(() => view.evaluate(() => location.hash)).toBe('#terms');
+        if (registration === 'inline') {
+          expect(await view.evaluate(() => document.readyState)).toBe('interactive');
+        }
+      } finally {
+        pending.resolve();
+      }
+    });
+  }
+
   test('keeps an unterminated inline script inert as in a direct opening', async ({ page, context }) => {
     const html = `<!doctype html><body><h1>Pricing draft</h1>
       <script>document.querySelector('h1').textContent = 'Pricing published'`;
