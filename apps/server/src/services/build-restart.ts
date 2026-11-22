@@ -27,7 +27,11 @@ import {
 import { rewatchCreatingThread } from './chief.js';
 import { claimClientMessage, completeClientMessage } from './client-message.js';
 import { retryLessonsOf } from './retry-lessons.js';
-import { AUTOMATIC_RETRY_LIMIT, assertAutomaticRetryAllowed } from './retry-parking.js';
+import {
+  AUTOMATIC_RETRY_LIMIT,
+  assertAutomaticRetryAllowed,
+  retryIsParked,
+} from './retry-parking.js';
 import { getTodo, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 
@@ -35,6 +39,7 @@ const RESTART_TRIGGER_SOURCE: Record<StepActionOrigin, TriggerSource> = {
   person: 'user',
   coordinator: 'chief',
   retry: 'retry',
+  runtime: 'retry',
 };
 
 export async function restartFailedBuild(
@@ -51,6 +56,7 @@ export async function restartFailedBuild(
   if (todoRecord.phase !== 'failed') {
     throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
   }
+  const resuming = retryIsParked(row.errorMessage ?? '');
   const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
   const preservedStep = deps.db
     .select({ id: step.id })
@@ -101,7 +107,8 @@ export async function restartFailedBuild(
         'Task changed while restart was being prepared; retry from its current state.',
       );
     todoRecord = current;
-    if (origin !== 'person') assertAutomaticRetryAllowed(deps, current.id);
+    if (origin === 'retry') assertAutomaticRetryAllowed(deps, current.id);
+    else assertParkedBuildIdle(deps, row);
     rewatchCreatingThread(deps, current);
     if (reworkTarget !== null && prClosed === null) {
       const currentTarget = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
@@ -143,7 +150,7 @@ export async function restartFailedBuild(
         content: buildReworkReuseNote({ prNumber: reworkTarget.prNumber }),
         createdAt: now,
       });
-      if (origin !== 'person') {
+      if (origin !== 'person' && !resuming) {
         insertMessageRow(transcriptDeps, reworkTarget.id, {
           id: newRecordId(),
           role: 'system',
@@ -157,6 +164,15 @@ export async function restartFailedBuild(
         : reworkTarget.withPlan
           ? 'plan'
           : 'build';
+      deps.db
+        .update(build)
+        .set({
+          errorMessage: null,
+          prevPhase: 'failed',
+          retryAttempt: origin === 'person' || resuming ? 0 : row.retryAttempt + 1,
+        })
+        .where(eq(build.id, reworkTarget.id))
+        .run();
       recordRestartConversation(reworkTarget.id);
       enqueueStep(
         deps,
@@ -172,15 +188,6 @@ export async function restartFailedBuild(
         origin === 'person',
         { kind: 'restart' },
       );
-      deps.db
-        .update(build)
-        .set({
-          errorMessage: null,
-          prevPhase: 'failed',
-          retryAttempt: origin === 'person' ? 0 : row.retryAttempt + 1,
-        })
-        .where(eq(build.id, reworkTarget.id))
-        .run();
       setTodoPhase(deps, todoRecord.id, 'queued', {
         latestBuildId: reworkTarget.id,
         lastRunAt: now,
@@ -202,7 +209,7 @@ export async function restartFailedBuild(
         withPlan: false,
         prevPhase: todoRecord.phase,
         triggerSource: RESTART_TRIGGER_SOURCE[origin],
-        retryAttempt: origin === 'person' ? 0 : row.retryAttempt + 1,
+        retryAttempt: origin === 'person' || resuming ? 0 : row.retryAttempt + 1,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -234,7 +241,7 @@ export async function restartFailedBuild(
         createdAt,
       });
     }
-    if (origin !== 'person') {
+    if (origin !== 'person' && !resuming) {
       insertMessageRow(transcriptDeps, newId, {
         id: newRecordId(),
         role: 'system',

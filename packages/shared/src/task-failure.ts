@@ -1,3 +1,5 @@
+import semver from 'semver';
+
 export const STEP_FAILURE_KINDS = [
   'quota',
   'capacity',
@@ -37,6 +39,15 @@ export function runtimeUpdateRequired(rawError: string): RuntimeUpdateRequired |
     current: match[2] ?? null,
     required: match[3],
   };
+}
+
+export function runtimeReportSatisfies(
+  current: string | null | undefined,
+  required: string,
+): boolean {
+  const version = semver.coerce(current ?? '')?.version;
+  const floor = semver.coerce(required)?.version;
+  return version !== undefined && floor !== undefined && semver.gte(version, floor);
 }
 
 export function failureEndsStepNow(rawError: string): boolean {

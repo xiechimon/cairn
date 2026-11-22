@@ -54,9 +54,11 @@ export function retryIsParked(error: string): boolean {
 function runtimeUpdateReason(
   update: NonNullable<ReturnType<typeof runtimeUpdateRequired>>,
 ): string {
-  const runtime = update.runtime ?? 'agent runtime';
-  const current = update.current === null ? '' : ` ships ${runtime} ${update.current}, but`;
-  return `${RETRY_PARKED_MARK}: this Cairn${current} the model needs ${runtime} ${update.required} or newer. Update Cairn, then retry.`;
+  const runtime = update.runtime ?? 'the agent runtime';
+  const need = `this model needs ${runtime} ${update.required} or newer`;
+  return update.current === null
+    ? `${RETRY_PARKED_MARK}: ${need}. Update Cairn, then retry.`
+    : `${RETRY_PARKED_MARK}: Cairn's built-in ${runtime} ${update.current} is too old: ${need}. Update Cairn, then retry.`;
 }
 
 export function failureNeedsHuman(errorMessage: string): boolean {
@@ -108,11 +110,14 @@ export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): vo
   if (row.phase === 'failed') parkFailedBuild(deps, row.latestBuildId);
   const latest = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
   if (latest && retryIsParked(latest.errorMessage ?? '')) {
+    const update = runtimeUpdateRequired(latest.errorMessage ?? '');
     throw new HttpError(
       409,
-      latest.errorMessage?.startsWith(RETRY_PARKED_MARK)
-        ? latest.errorMessage
-        : `${RETRY_PARKED_MARK}: ${latest.errorMessage}`,
+      update !== null
+        ? runtimeUpdateReason(update)
+        : latest.errorMessage?.startsWith(RETRY_PARKED_MARK)
+          ? latest.errorMessage
+          : `${RETRY_PARKED_MARK}: ${latest.errorMessage}`,
     );
   }
 }

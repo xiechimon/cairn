@@ -94,6 +94,7 @@ import {
   toMachineRecord,
 } from './services/machines.js';
 import { phoneRowsForPresence } from './services/phone-computer.js';
+import { resumeRuntimeHeldBuilds } from './services/runtime-holds.js';
 
 function isComputerRelayBody(raw: unknown): boolean {
   return raw !== null && typeof raw === 'object' && 'computer' in raw && raw.computer === true;
@@ -278,6 +279,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
       serverUrl: originOf(c),
     });
+    if (body.claudeCode !== undefined) await resumeRuntimeHeldBuilds(deps, body.teamId);
     return c.json(result);
   });
 
@@ -399,7 +401,10 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       async (row, decoded) => {
         const body = parseWith(machinePresenceBodySchema, decoded ?? {}, 'body');
         const admission = ctx.machineHub.admitPresence(row.id, body.connectionId);
-        if (admission !== 'ignore') markPresence(deps, row.id, body, admission === 'online');
+        if (admission !== 'ignore') {
+          markPresence(deps, row.id, body, admission === 'online');
+          if (body.claudeCode !== undefined) await resumeRuntimeHeldBuilds(deps, row.teamId);
+        }
         const phones = phoneRowsForPresence(ctx.db, row.id);
         return c.json({
           ok: true as const,

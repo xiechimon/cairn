@@ -46,7 +46,7 @@ export async function applyBuildStepAction(
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
-  if (origin !== 'person') assertAutomaticRetryAllowed(deps, row.todoId);
+  if (origin === 'retry') assertAutomaticRetryAllowed(deps, row.todoId);
   else assertParkedBuildIdle(deps, row);
 
   if (body.action === 'restart') {

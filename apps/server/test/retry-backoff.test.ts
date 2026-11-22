@@ -280,7 +280,7 @@ describe('automatic retry backoff and cap', () => {
     expect(latestBuild(w)?.errorMessage).toMatch(/automatic retries exhausted/);
   });
 
-  test('coordinator restarts share the episode budget and end parked', async () => {
+  test('coordinator restarts share the episode budget and resume a parked task with a fresh episode', async () => {
     const w = openWorld();
     let stepId = w.stepId;
     let buildId = w.buildId;
@@ -303,16 +303,17 @@ describe('automatic retry backoff and cap', () => {
     }
     failStep(w, stepId);
     expect(latestBuild(w)?.errorMessage).toMatch(/automatic retries exhausted/);
-    await expect(
-      applyBuildStepAction(
-        w.deps,
-        buildId,
-        { action: 'restart', feedback: '', clientMessageId: 'chief-late' },
-        'Coordinator',
-        'coordinator',
-      ),
-    ).rejects.toThrow(/Task parked/);
-    expect(buildCount(w)).toBe(RETRY_LIMIT + 1);
+    await applyBuildStepAction(
+      w.deps,
+      buildId,
+      { action: 'restart', feedback: '', clientMessageId: 'chief-late' },
+      'Coordinator',
+      'coordinator',
+    );
+    expect(phaseOf(w)).toBe('queued');
+    expect(latestBuild(w)?.retryAttempt).toBe(0);
+    expect(latestBuild(w)?.triggerSource).toBe('chief');
+    expect(buildCount(w)).toBe(RETRY_LIMIT + 2);
   });
 
   test('a person restart is immediate and opens a fresh episode', async () => {
