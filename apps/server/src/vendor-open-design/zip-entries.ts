@@ -17,6 +17,11 @@ export interface ZipEntry {
   localHeaderOffset: number;
 }
 
+export interface ZipReadBudget {
+  maxEntryBytes: number;
+  remainingBytes: number;
+}
+
 const EOCD_SIGNATURE = 0x06054b50;
 const CENTRAL_SIGNATURE = 0x02014b50;
 const LOCAL_SIGNATURE = 0x04034b50;
@@ -55,16 +60,33 @@ export function readZipEntries(buffer: Buffer): Map<string, ZipEntry> {
   return entries;
 }
 
-export function readZipEntryText(buffer: Buffer, entry: ZipEntry): string {
+export function readZipEntryText(buffer: Buffer, entry: ZipEntry, budget: ZipReadBudget): string {
+  const limit = Math.min(budget.maxEntryBytes, budget.remainingBytes);
+  if (entry.uncompressedSize > limit) {
+    throw new ZipReadError('document section too large to preview', 413);
+  }
   const at = entry.localHeaderOffset;
   if (at + 30 > buffer.length || buffer.readUInt32LE(at) !== LOCAL_SIGNATURE) {
     throw new ZipReadError('corrupt zip entry', 415);
   }
   const start = at + 30 + buffer.readUInt16LE(at + 26) + buffer.readUInt16LE(at + 28);
-  const raw = buffer.subarray(start, start + entry.compressedSize);
-  if (entry.method === 0) return raw.toString('utf8');
-  if (entry.method === 8) {
-    return inflateRawSync(raw, { maxOutputLength: entry.uncompressedSize + 1 }).toString('utf8');
+  const end = start + entry.compressedSize;
+  if (end > buffer.length) throw new ZipReadError('corrupt zip entry', 415);
+  const raw = buffer.subarray(start, end);
+  let decoded: Buffer;
+  if (entry.method === 0) {
+    decoded = raw;
+  } else if (entry.method === 8) {
+    decoded = inflateRawSync(raw, { maxOutputLength: Math.max(1, entry.uncompressedSize) });
+  } else {
+    throw new ZipReadError('unsupported zip compression', 415);
   }
-  throw new ZipReadError('unsupported zip compression', 415);
+  if (decoded.byteLength > limit) {
+    throw new ZipReadError('document section too large to preview', 413);
+  }
+  if (decoded.byteLength !== entry.uncompressedSize) {
+    throw new ZipReadError('corrupt zip entry', 415);
+  }
+  budget.remainingBytes -= decoded.byteLength;
+  return decoded.toString('utf8');
 }

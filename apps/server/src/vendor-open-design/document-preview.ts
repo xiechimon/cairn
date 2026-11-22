@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/daemon/src/document-preview.ts
 import { basename } from 'node:path';
-import { readZipEntries, readZipEntryText, type ZipEntry, ZipReadError } from './zip-entries.js';
+import {
+  readZipEntries,
+  readZipEntryText,
+  type ZipEntry,
+  type ZipReadBudget,
+  ZipReadError,
+} from './zip-entries.js';
 
 const MAX_COMPRESSED_PREVIEW_BYTES = 10 * 1024 * 1024;
 const MAX_UNCOMPRESSED_PREVIEW_BYTES = 50 * 1024 * 1024;
@@ -18,7 +24,7 @@ export interface DocumentPreview {
 }
 type XmlAttrs = Record<string, string>;
 type WorkbookSheet = { name: string; path: string };
-type Zip = { buffer: Buffer; entries: Map<string, ZipEntry> };
+type Zip = { buffer: Buffer; entries: Map<string, ZipEntry>; budget: ZipReadBudget };
 
 export class DocumentPreviewError extends Error {
   readonly statusCode: number;
@@ -45,7 +51,14 @@ export function buildDocumentPreview(file: { name: string; buffer: Buffer }): Do
   }
   let zip: Zip;
   try {
-    zip = { buffer: file.buffer, entries: readZipEntries(file.buffer) };
+    zip = {
+      buffer: file.buffer,
+      entries: readZipEntries(file.buffer),
+      budget: {
+        maxEntryBytes: MAX_XML_ENTRY_BYTES,
+        remainingBytes: MAX_UNCOMPRESSED_PREVIEW_BYTES,
+      },
+    };
   } catch (error) {
     if (error instanceof ZipReadError)
       throw new DocumentPreviewError(error.message, error.statusCode);
@@ -187,12 +200,9 @@ function firstBody(xml: string, tag: string): string {
 function readZipText(zip: Zip, name: string): string {
   const entry = zip.entries.get(name);
   if (!entry) throw new DocumentPreviewError(`missing ${name}`, 422);
-  if (entry.uncompressedSize > MAX_XML_ENTRY_BYTES) {
-    throw new DocumentPreviewError('document section too large to preview', 413);
-  }
   let xml: string;
   try {
-    xml = readZipEntryText(zip.buffer, entry);
+    xml = readZipEntryText(zip.buffer, entry, zip.budget);
   } catch (error) {
     if (error instanceof ZipReadError)
       throw new DocumentPreviewError(error.message, error.statusCode);
