@@ -232,7 +232,12 @@ case "$1" in
   rev-parse)
     case "$2" in
       --show-toplevel) echo "$FAKE_TOPLEVEL" ;;
-      HEAD) echo "$FAKE_HEAD" ;;
+      HEAD)
+        if [ "$FAKE_HEAD_EXIT" != 0 ]; then
+          echo 'fatal: not a git repository' >&2
+          exit "$FAKE_HEAD_EXIT"
+        fi
+        echo "$FAKE_HEAD" ;;
       *) echo T ;;
     esac ;;
   ls-remote)
@@ -426,6 +431,25 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       matches: [/\[preflight\] green/],
       watchCount: 1,
     },
+    {
+      name: 'push-queue checks the deadline before it pushes, so stamping and the push cannot follow it',
+      script: 'push-queue.mjs',
+      args: ['--wait'],
+      status: 2,
+      matches: [/still waiting on green evidence after 0 minutes/],
+      calls: /HEAD:refs\/heads\/queue\/main/,
+      env: { PUSH_QUEUE_WAIT_MINUTES: '0', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
+    {
+      name: 'push-queue fails fast when local HEAD cannot be read instead of waiting out the deadline',
+      script: 'push-queue.mjs',
+      args: ['--wait'],
+      status: 1,
+      headExit: 128,
+      matches: [/Command failed: git rev-parse HEAD/],
+      misses: [/still waiting on/],
+      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
   ];
   for (const row of rows) {
     const dir = sandbox({
@@ -457,6 +481,7 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
             FAKE_DIR: dir,
             FAKE_TOPLEVEL: '/tmp/fake-wt',
             FAKE_HEAD: X,
+            FAKE_HEAD_EXIT: String(row.headExit ?? 0),
             FAKE_LIVE: row.live ?? '',
             FAKE_ANCESTOR: String(row.ancestor ?? 0),
             FAKE_WATCH_EXIT: String(row.watchExit ?? 1),

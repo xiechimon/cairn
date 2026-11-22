@@ -149,14 +149,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     let armedTree = null;
     let lastBase = null;
     for (;;) {
+      const head = git(['rev-parse', 'HEAD']);
+      const headTree = treeOf(head);
       let current = null;
-      let head = null;
-      let headTree = null;
       let step = { action: 'poll' };
       try {
         ({ live: current } = findLive());
-        head = git(['rev-parse', 'HEAD']);
-        headTree = treeOf(head);
         const headOnLive = current !== null && ancestor(current, 'HEAD');
         const deadBase =
           current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
@@ -178,7 +176,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       } catch {
         console.error('[push-queue] could not read the queue state or its check runs; retrying');
       }
-      if (step.action === 'push') break;
       if (step.action === 'fail') {
         console.error(
           `[push-queue] not pushed: the preflight run for ${head.slice(0, 9)} went red in ${step.contexts.join(', ')}. Rerun its failed jobs or fix and push again.`,
@@ -191,6 +188,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         );
         process.exit(2);
       }
+      if (step.action === 'push') break;
       if (step.action === 'rebase') {
         const upstream = lastBase ?? 'origin/main';
         console.log(`[push-queue] rebasing ${upstream}..HEAD onto ${step.onto.slice(0, 9)}`);
