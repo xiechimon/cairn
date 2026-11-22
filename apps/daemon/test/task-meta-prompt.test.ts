@@ -61,6 +61,16 @@ describe('the taskMeta switch of composeWorkerSystemPrompt', () => {
   });
 });
 
+describe('the attachments block of composeWorkerSystemPrompt', () => {
+  it('carries the design-options convention: question id, side-by-side options, ★ pick with a one-line reason, nothing that saves a choice', () => {
+    const text = composeWorkerSystemPrompt('builder', undefined, { attachments: true });
+    expect(text).toContain('question a short id');
+    expect(text).toContain('side by side');
+    expect(text).toContain('★ and a one-line reason');
+    expect(text).toContain('the page cannot save a choice');
+  });
+});
+
 describe('composeWorkerSystemPrompt project instructions (D74 P1)', () => {
   it('adds the project instructions after the agent description and before memories', () => {
     const text = composeWorkerSystemPrompt('builder', [{ title: 'm', content: 'remembered' }], {
