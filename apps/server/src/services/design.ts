@@ -248,8 +248,8 @@ export function designPageResponse(html: Buffer, opts: { print: boolean }): Resp
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
       'content-security-policy': opts.print
-        ? `${DESIGN_PAGE_SANDBOX} allow-modals`
-        : DESIGN_PAGE_SANDBOX,
+        ? `${DESIGN_PAGE_SANDBOX} allow-modals; frame-ancestors 'none'`
+        : `${DESIGN_PAGE_SANDBOX}; frame-ancestors 'none'`,
     },
   });
 }
