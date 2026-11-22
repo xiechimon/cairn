@@ -28,6 +28,7 @@ const sessionSchema = z.object({
   cwd: z.string(),
   provider: providerConfigSchema,
   modelId: z.string(),
+  compactAt: z.number().int().positive().optional(),
   thinkingLevel: z.string().optional(),
   systemPrompt: z.string().optional(),
   remoteTools: z.array(remoteToolDefSchema).optional(),

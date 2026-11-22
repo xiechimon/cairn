@@ -337,6 +337,7 @@ function serializableSession(opts: SessionOpts) {
     cwd: opts.cwd,
     provider: opts.provider,
     modelId: opts.modelId,
+    ...(opts.compactAt !== undefined ? { compactAt: opts.compactAt } : {}),
     ...(opts.thinkingLevel !== undefined ? { thinkingLevel: opts.thinkingLevel } : {}),
     ...(opts.systemPrompt !== undefined ? { systemPrompt: opts.systemPrompt } : {}),
     ...(opts.remoteTools !== undefined ? { remoteTools: opts.remoteTools } : {}),

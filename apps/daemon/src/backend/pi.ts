@@ -131,6 +131,21 @@ export function daemonSettingsManager(): SettingsManager {
   );
 }
 
+export function compactAtSettingsSeed(
+  provider: string,
+  models: readonly { id: string; contextWindow: number | undefined }[],
+  compactAt: number | undefined,
+): PiSettingsSeed {
+  if (compactAt === undefined) return {};
+  const overrides: Record<string, { reserveTokens: number }> = {};
+  for (const model of models) {
+    if (model.contextWindow === undefined || model.contextWindow <= compactAt) continue;
+    overrides[`${provider}/${model.id}`] = { reserveTokens: model.contextWindow - compactAt };
+  }
+  if (Object.keys(overrides).length === 0) return {};
+  return { compaction: { modelOverrides: overrides } };
+}
+
 export const PI_SETTINGS_BYPASS = [
   {
     setting: 'defaultProjectTrust',
@@ -1123,7 +1138,26 @@ export class PiBackend implements AgentBackend {
           : { machineName: hostname() }),
         ...(opts.provider.baseUrl !== undefined ? { providerBaseUrl: opts.provider.baseUrl } : {}),
       });
-    const settingsManager = daemonSettingsManager();
+    const settingsManager = SettingsManager.inMemory(
+      {
+        ...buildPiSessionSettings(),
+        ...PI_DAEMON_SETTINGS,
+        ...compactAtSettingsSeed(
+          opts.provider.providerId,
+          [
+            ...(opts.provider.models ?? []).map((m) => ({
+              id: m.id,
+              contextWindow: m.contextWindow,
+            })),
+            ...(opts.provider.models?.some((m) => m.id === opts.modelId)
+              ? []
+              : [{ id: opts.modelId, contextWindow: model.contextWindow }]),
+          ],
+          opts.compactAt,
+        ),
+      },
+      { projectTrusted: false },
+    );
     const protectedPresent = detectTrustProtectedResources(opts.cwd);
     if (protectedPresent.length > 0) {
       log.trust?.(
