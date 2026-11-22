@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { SessionOpts } from '@cairn/shared';
+import type { ProviderConfig, SessionOpts } from '@cairn/shared';
 import { COORDINATOR_COMPACT_AT } from '@cairn/shared';
 import { createAgentSession, type SettingsManager } from '@earendil-works/pi-coding-agent';
 import { expect, test, vi } from 'vitest';
@@ -14,21 +14,30 @@ vi.mock('@earendil-works/pi-coding-agent', async (importOriginal) => {
   return { ...actual, createAgentSession: vi.fn(actual.createAgentSession) };
 });
 
-const UPSTREAM_RESERVE_TOKENS = 16_384;
-const UPSTREAM_KEEP_RECENT_TOKENS = 20_000;
+const MAIN_RESERVE_TOKENS = 16_384;
+const MAIN_KEEP_RECENT_TOKENS = 20_000;
 
-function sessionOpts(directory: string, contextWindow: number): SessionOpts {
+function sessionOpts(
+  directory: string,
+  provider: ProviderConfig,
+  modelId: string,
+  compactAt?: number,
+): SessionOpts {
   return {
     cwd: directory,
-    compactAt: COORDINATOR_COMPACT_AT,
-    provider: {
-      kind: 'http',
-      providerId: 'synthetic',
-      baseUrl: 'http://127.0.0.1:9/v1',
-      api: 'openai-completions',
-      models: [{ id: 'synthetic', name: 'Synthetic', contextWindow, maxTokens: 16_384 }],
-    },
-    modelId: 'synthetic',
+    provider,
+    modelId,
+    ...(compactAt === undefined ? {} : { compactAt }),
+  };
+}
+
+function listedProvider(providerId: string, models: ProviderConfig['models']): ProviderConfig {
+  return {
+    kind: 'http',
+    providerId,
+    baseUrl: 'http://127.0.0.1:9/v1',
+    api: 'openai-completions',
+    ...(models === undefined ? {} : { models }),
   };
 }
 
@@ -40,9 +49,9 @@ async function openSession(directory: string, opts: SessionOpts) {
   return backend.createSession(opts);
 }
 
-function lastSessionSettings(): {
+function sessionSettings(): {
   settings: SettingsManager;
-  model: { provider: string; id: string };
+  model: { provider: string; id: string; contextWindow: number };
 } {
   const options = vi.mocked(createAgentSession).mock.calls.at(-1)?.[0];
   if (options?.settingsManager === undefined || options.model === undefined) {
@@ -51,70 +60,112 @@ function lastSessionSettings(): {
   return { settings: options.settingsManager, model: options.model };
 }
 
-test('a 1M-window Coordinator session compacts at the coordinator point, not near the window', async () => {
-  const directory = testTempDir('pi-compact-at-1m-');
-  const handle = await openSession(directory, sessionOpts(directory, 1_000_000));
+test('a listed model with no declared window compacts at the coordinator point', async () => {
+  const directory = testTempDir('pi-compact-at-listed-');
+  const handle = await openSession(
+    directory,
+    sessionOpts(
+      directory,
+      listedProvider('deepseek', [{ id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }]),
+      'deepseek-v4-pro',
+      COORDINATOR_COMPACT_AT,
+    ),
+  );
   try {
-    const { settings, model } = lastSessionSettings();
+    const { settings, model } = sessionSettings();
+    expect(model.contextWindow).toBe(1_000_000);
     const resolved = settings.getCompactionSettings(model);
-    expect(resolved.reserveTokens).toBe(1_000_000 - COORDINATOR_COMPACT_AT);
     expect(1_000_000 - resolved.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
-    const other = settings.getCompactionSettings({ provider: 'other', id: 'other' });
-    expect(other.reserveTokens).toBe(UPSTREAM_RESERVE_TOKENS);
-    expect(1_000_000 - other.reserveTokens).toBe(983_616);
-    const summary = settings.getCompactionSettings();
-    expect(summary.reserveTokens).toBe(UPSTREAM_RESERVE_TOKENS);
-    expect(summary.enabled).toBe(true);
-    expect(summary.keepRecentTokens).toBe(UPSTREAM_KEEP_RECENT_TOKENS);
   } finally {
     await handle.stop();
   }
 });
 
-test('a small-window Coordinator session never compacts past the window', async () => {
-  const directory = testTempDir('pi-compact-at-small-');
-  const handle = await openSession(directory, sessionOpts(directory, 32_000));
+test('a built-in model declared wider than it resolves keeps a positive threshold', async () => {
+  const directory = testTempDir('pi-compact-at-builtin-');
+  const handle = await openSession(
+    directory,
+    sessionOpts(
+      directory,
+      listedProvider('zai', [
+        { id: 'glm-5-turbo', name: 'GLM 5 Turbo', contextWindow: 1_000_000, maxTokens: 16_384 },
+      ]),
+      'glm-5-turbo',
+      COORDINATOR_COMPACT_AT,
+    ),
+  );
   try {
-    const { settings, model } = lastSessionSettings();
+    const { settings, model } = sessionSettings();
+    expect(model.contextWindow).toBe(200_000);
     const resolved = settings.getCompactionSettings(model);
-    expect(resolved.reserveTokens).toBe(UPSTREAM_RESERVE_TOKENS);
-    expect(32_000 - resolved.reserveTokens).toBe(15_616);
-    expect(32_000 - resolved.reserveTokens).toBeLessThan(COORDINATOR_COMPACT_AT);
+    expect(200_000 - resolved.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
     expect(resolved.reserveTokens).toBeGreaterThan(0);
   } finally {
     await handle.stop();
   }
 });
 
-test('a session without compactAt keeps the upstream compaction settings untouched', async () => {
-  const directory = testTempDir('pi-compact-at-worker-');
-  const opts = sessionOpts(directory, 1_000_000);
-  delete (opts as Partial<SessionOpts>).compactAt;
-  const handle = await openSession(directory, opts);
+test('a switch to a model outside the provider list compacts at the coordinator point', async () => {
+  const directory = testTempDir('pi-compact-at-switch-');
+  const handle = await openSession(
+    directory,
+    sessionOpts(
+      directory,
+      listedProvider('deepseek', [{ id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }]),
+      'deepseek-v4-pro',
+      COORDINATOR_COMPACT_AT,
+    ),
+  );
   try {
-    const { settings, model } = lastSessionSettings();
-    const resolved = settings.getCompactionSettings(model);
-    expect(resolved).toEqual({
-      enabled: true,
-      reserveTokens: UPSTREAM_RESERVE_TOKENS,
-      keepRecentTokens: UPSTREAM_KEEP_RECENT_TOKENS,
-    });
-    expect(settings.getSettings().compaction?.modelOverrides).toBeUndefined();
+    const { settings } = sessionSettings();
+    const switched = settings.getCompactionSettings({ provider: 'deepseek', id: 'deepseek-flash' });
+    expect(1_000_000 - switched.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
   } finally {
     await handle.stop();
   }
 });
 
-test('a window just above compactAt never reserves less than the model gets on main', async () => {
-  const directory = testTempDir('pi-compact-at-160k-');
-  const handle = await openSession(directory, sessionOpts(directory, 160_000));
+test('a window at or below compactAt never reserves below what that model gets on main', async () => {
+  const directory = testTempDir('pi-compact-at-small-');
+  const handle = await openSession(
+    directory,
+    sessionOpts(
+      directory,
+      listedProvider('synthetic', [
+        { id: 'synthetic', name: 'Synthetic', contextWindow: 32_000, maxTokens: 16_384 },
+      ]),
+      'synthetic',
+      COORDINATOR_COMPACT_AT,
+    ),
+  );
   try {
-    const { settings, model } = lastSessionSettings();
+    const { settings, model } = sessionSettings();
     const resolved = settings.getCompactionSettings(model);
-    expect(160_000 - resolved.reserveTokens).toBeLessThanOrEqual(COORDINATOR_COMPACT_AT);
-    expect(resolved.reserveTokens).toBeGreaterThanOrEqual(
-      settings.getCompactionSettings().reserveTokens,
-    );
+    expect(resolved.reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+    expect(32_000 - resolved.reserveTokens).toBe(15_616);
+  } finally {
+    await handle.stop();
+  }
+});
+
+test('a worker session without compactAt keeps origin/main compaction settings', async () => {
+  const directory = testTempDir('pi-compact-at-worker-');
+  const handle = await openSession(
+    directory,
+    sessionOpts(
+      directory,
+      listedProvider('deepseek', [{ id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }]),
+      'deepseek-v4-pro',
+    ),
+  );
+  try {
+    const { settings, model } = sessionSettings();
+    expect(settings.getCompactionSettings(model)).toEqual({
+      enabled: true,
+      reserveTokens: MAIN_RESERVE_TOKENS,
+      keepRecentTokens: MAIN_KEEP_RECENT_TOKENS,
+    });
+    expect(settings.getSettings().compaction?.modelOverrides).toBeUndefined();
   } finally {
     await handle.stop();
   }
@@ -159,7 +210,14 @@ test('the pi host wire carries compactAt to the confined child session', async (
     },
     confine: (_opts, _harness, launch) => launch,
     launch: piHostLaunch(hostScript),
-    opts: sessionOpts(directory, 1_000_000),
+    opts: sessionOpts(
+      directory,
+      listedProvider('synthetic', [
+        { id: 'synthetic', name: 'Synthetic', contextWindow: 1_000_000, maxTokens: 16_384 },
+      ]),
+      'synthetic',
+      COORDINATOR_COMPACT_AT,
+    ),
     resumeFile: null,
   });
   await handle.stop();
