@@ -22,16 +22,12 @@ import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { type CoordinatorRouteRefusal, coordinatorRouteVerdict } from './coordinator-route.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
-import {
-  type MachineIneligibility,
-  missingCapabilities,
-  runtimeGatePasses,
-  stepRuntimeFor,
-} from './dispatch-eligibility.js';
+import { type MachineIneligibility, stepRuntimeFor } from './dispatch-eligibility.js';
 import { projectOfTodo } from './git.js';
 import { infoCardPlan } from './info-card.js';
 import {
-  liveMachineId,
+  chiefIneligibility,
+  chiefMachineId,
   machineCanReturn,
   platformFallbackMachineId,
   priorSessionOf,
@@ -277,26 +273,18 @@ export function stepQueueProjector(db: Db, teamId: string) {
         }
       }
     }
-    const homeMachineId = liveMachineId(db, target.homeMachineId);
-    if (homeMachineId === null) {
-      return { kind: 'machine-offline', missing: [] };
-    }
+    const homeMachineId = chiefMachineId(db, teamId, target.homeMachineId);
     const home = teamMachines.find((m) => m.id === homeMachineId);
     if (home === undefined || !home.online) {
       return { kind: 'machine-offline', missing: [] };
     }
     const agentRow = agentForRow(row);
-    const provider =
-      ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow?.provider;
     if (agentRow?.modelId != null) {
-      if (!runtimeGatePasses(home, provider)) {
-        return {
-          kind: 'runtime-disabled',
-          missing: [MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)]],
-        };
-      }
-      const missing = missingCapabilities(home, agentRow);
-      if (missing.length > 0) return { kind: 'capability-missing', missing };
+      const provider =
+        ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow.provider;
+      const gap = chiefIneligibility(db, home, agentRow, provider, nowMs());
+      if (gap !== null)
+        return ineligibleBlocked(gap, MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)]);
     }
     if (!confinementDispatchReady(home.capabilities)) {
       return { kind: 'sandbox-unavailable', missing: [] };

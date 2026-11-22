@@ -15,6 +15,8 @@ import {
   type MachineIneligibility,
   machineEligibility,
   machineRunningCount,
+  machineRuntimeClaimable,
+  missingCapabilities,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
 import type { RouteProfile } from './routing-rules.js';
@@ -56,6 +58,58 @@ export function workerIneligibility(
           machineRow.capabilities?.antigravity?.authenticated !== true)),
   });
   return ineligible;
+}
+
+export function chiefIneligibility(
+  db: Pick<Db, 'select'>,
+  machineRow: MachineRow,
+  agentRow: Pick<RouteProfile, 'requiredCapabilities'>,
+  provider: string | null | undefined,
+  now: number,
+): MachineIneligibility | null {
+  const runtime = stepRuntimeFor(provider);
+  if (!machineRuntimeClaimable(machineRow, runtime)) return { kind: 'runtime' };
+  if (runtime === 'claude-code' && claudeRateBlock(machineRow.claudeRateLimits ?? [], now) !== null)
+    return { kind: 'claude-blocked' };
+  if (runtime === 'claude-code' && !hasActiveClaudeSubscription({ db }, machineRow.teamId))
+    return { kind: 'claude-login' };
+  if (runtime === 'devin' && !hasActiveDevinSubscription({ db }, machineRow.teamId))
+    return { kind: 'devin-subscription' };
+  if (runtime === 'antigravity') {
+    const mode = activeAntigravitySubscriptionMode({ db }, machineRow.teamId);
+    if (
+      mode === 'none' ||
+      (mode === 'host' && machineRow.capabilities?.antigravity?.authenticated !== true)
+    )
+      return { kind: 'antigravity-subscription' };
+  }
+  const missing = missingCapabilities(machineRow, agentRow);
+  if (missing.length > 0) return { kind: 'capability', missing };
+  return null;
+}
+
+export function chiefMachineId(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  pinnedMachineId: string | null,
+): string | null {
+  return (
+    liveMachineId(db, pinnedMachineId) ??
+    fallbackMachineId(
+      db
+        .select({
+          id: machine.id,
+          online: machine.online,
+          kind: machine.kind,
+          lastSeenAt: machine.lastSeenAt,
+          retiredAt: machine.retiredAt,
+        })
+        .from(machine)
+        .where(eq(machine.teamId, teamId))
+        .all(),
+      teamDefaultMachineId(db, teamId),
+    )
+  );
 }
 
 export function targetUnavailable(

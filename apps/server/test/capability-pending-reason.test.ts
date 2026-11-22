@@ -466,6 +466,35 @@ describe('in-server Coordinator turns', () => {
     }
   });
 
+  test.each([
+    ['unpinned', null],
+    ['pinned', 'm-login'],
+  ] as const)(
+    'a %s Claude Code Coordinator on an online Runner with no Claude login waits as logged out, not offline',
+    (_name, homeMachineId) => {
+      setCoordinatorInServer(true);
+      try {
+        const w = makeWorld();
+        insertMachine(w, {
+          id: 'm-login',
+          capabilities: { mcpServers: [], skills: [] },
+          claudeModels: ['claude-haiku-5-5'],
+        });
+        const target = insertPendingChiefStep(w, {
+          homeMachineId,
+          route: { provider: 'claude-code', modelId: 'claude-haiku-5-5' },
+        });
+        const projector = stepQueueProjector(w.s.db, w.teamId);
+        expect(projector.chiefTurnQueueOf(target.threadId)?.blocked).toEqual({
+          kind: 'claude-logged-out',
+          missing: [],
+        });
+      } finally {
+        setCoordinatorInServer(false);
+      }
+    },
+  );
+
   test('a routable rule leaves the turn to the server with no blocked reason', () => {
     setCoordinatorInServer(true);
     try {

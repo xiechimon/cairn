@@ -6,7 +6,6 @@ import {
   buildMergedPrGuardNote,
   buildTaskPromptText,
   CORE_COORDINATOR_TOOLS,
-  claudeRateBlock,
   confinementDispatchReady,
   confinementEnforced,
   fencedTitle,
@@ -43,10 +42,7 @@ import {
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
-import {
-  activeAntigravitySubscriptionMode,
-  enabledAntigravitySubscriptionId,
-} from './antigravity-subscriptions.js';
+import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
@@ -54,19 +50,17 @@ import { chiefHistoryFor } from './chief-claim-history.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
-import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
+import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { connectorToolDefsForTeam } from './connector-broker.js';
 import { coordinatorInServerEnabled, rotatesPastCompaction } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import { readDeployLease } from './deploy-lease.js';
-import { enabledDevinSubscriptionId, hasActiveDevinSubscription } from './devin-subscriptions.js';
+import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import {
-  capabilityGatePasses,
   machineRunningCount,
   projectRunningCount,
-  runtimeGatePasses,
   stepRuntimeFor,
   unassignedStepReason,
 } from './dispatch-eligibility.js';
@@ -86,7 +80,8 @@ import {
   upsertMessage,
 } from './machine-deps.js';
 import {
-  fallbackMachineId,
+  chiefIneligibility,
+  chiefMachineId,
   liveMachineId,
   platformFallbackMachineId,
   priorSessionOf,
@@ -278,22 +273,6 @@ function claimLocalTools(agentTools: readonly string[]): string[] {
   return tools;
 }
 
-function chiefSubscriptionMissing(
-  deps: MachineDeps,
-  machineRow: typeof machine.$inferSelect,
-  provider: string | null | undefined,
-): boolean {
-  const runtime = stepRuntimeFor(provider);
-  if (runtime === 'claude-code') return !hasActiveClaudeSubscription(deps, machineRow.teamId);
-  if (runtime === 'devin') return !hasActiveDevinSubscription(deps, machineRow.teamId);
-  if (runtime === 'antigravity') {
-    const mode = activeAntigravitySubscriptionMode(deps, machineRow.teamId);
-    if (mode === 'none') return true;
-    return mode === 'host' && machineRow.capabilities?.antigravity?.authenticated !== true;
-  }
-  return false;
-}
-
 function buildChiefClaim(
   deps: MachineDeps,
   machineId: string,
@@ -304,9 +283,11 @@ function buildChiefClaim(
 ): ClaimedStep | null {
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
-  if (!machineRow || !runtimeGatePasses(machineRow, model.provider)) return null;
-  if (chiefSubscriptionMissing(deps, machineRow, model.provider)) return null;
-  if (!capabilityGatePasses(machineRow, agentRow)) return null;
+  if (
+    !machineRow ||
+    chiefIneligibility(deps.db, machineRow, agentRow, model.provider, nowMs()) !== null
+  )
+    return null;
   const runtime = stepRuntimeFor(model.provider);
   const bindSubscription =
     runtime === 'claude-code' || runtime === 'devin' || runtime === 'antigravity'
@@ -442,19 +423,6 @@ function chiefClaimPayload(
   };
 }
 
-function claudeBlockedReader(db: MachineDeps['db']): (id: string | null) => boolean {
-  const cache = new Map<string, boolean>();
-  return (id) => {
-    if (id === null) return false;
-    const cached = cache.get(id);
-    if (cached !== undefined) return cached;
-    const row = db.select().from(machine).where(eq(machine.id, id)).get();
-    const blocked = claudeRateBlock(row?.claudeRateLimits ?? [], nowMs()) !== null;
-    cache.set(id, blocked);
-    return blocked;
-  };
-}
-
 function runnerFull(
   db: MachineDeps['db'],
   machineId: string,
@@ -474,7 +442,6 @@ function claimChiefTurn(
   const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
   if (runnerFull(db, machineId, maxWorkers)) return null;
-  const claudeBlocked = claudeBlockedReader(db);
   const cands = claimChiefCandidates(deps, machineId, teamId).filter(
     (cand) => cand.stepRow.createdAt <= createdUpTo,
   );
@@ -486,23 +453,7 @@ function claimChiefTurn(
     ) {
       continue;
     }
-    const chiefRuntime = stepRuntimeFor(effectiveModel(cand.agentRow, cand.stepRow).provider);
-    if (chiefRuntime === 'claude-code' && claudeBlocked(machineId)) continue;
-    const sole = fallbackMachineId(
-      db
-        .select({
-          id: machine.id,
-          online: machine.online,
-          kind: machine.kind,
-          lastSeenAt: machine.lastSeenAt,
-          retiredAt: machine.retiredAt,
-        })
-        .from(machine)
-        .where(eq(machine.teamId, teamId))
-        .all(),
-      teamDefaultMachineId(db, teamId),
-    );
-    const chiefMachine = liveMachineId(db, cand.agentRow.machineId) ?? sole;
+    const chiefMachine = chiefMachineId(db, teamId, cand.agentRow.machineId);
     if (chiefMachine !== machineId) continue;
     const claimed = buildChiefClaim(
       deps,

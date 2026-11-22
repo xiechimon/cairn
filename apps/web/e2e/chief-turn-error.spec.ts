@@ -294,6 +294,34 @@ test('a turn waiting for a computer or an offline Runner shows the card and leav
   await expect(page.getByTestId('chief-turn-error')).toHaveCount(0);
 });
 
+test('a turn on an online Runner whose Claude Code has no login says so and links to adding one, never offline', async ({
+  page,
+}) => {
+  await mockLive(page, {
+    threads: [
+      {
+        ...THREAD,
+        activeRun: { phase: 'chief' },
+        turnQueue: {
+          position: 1,
+          waitingFor: { machineId: 'mx', name: 'xmon-mbp', running: 0, capacity: 1 },
+          blocked: { kind: 'claude-logged-out', missing: [] },
+        },
+      },
+    ],
+    messages: [{ id: 'm1', role: 'user', content: '你好', createdAt: 10 }],
+  } as Parameters<typeof mockLive>[1]);
+  await page.goto('/app');
+  await expect(page.getByText('团队还没有可用的 Claude 订阅', { exact: false })).toBeVisible();
+  await expect(page.getByRole('link', { name: '添加 Claude 订阅' })).toHaveAttribute(
+    'href',
+    /\/app\/settings\/routing/,
+  );
+  await expect(page.getByTestId('chief-queue-wait-card')).toHaveCount(0);
+  await expect(page.getByText('离线')).toHaveCount(0);
+  await expect(page.getByText('等待执行机上线')).toHaveCount(0);
+});
+
 test('an outdated built-in Claude Code says so in English, offers only Update Cairn, and updates in place', async ({
   page,
 }) => {
