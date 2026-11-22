@@ -1,7 +1,21 @@
 import { expect, type Page, test } from '@playwright/test';
+import { mockLive, type Row, THREAD } from './chief-home-mock';
 import { evidencePanelShot } from './evidence';
 
+declare global {
+  interface Window {
+    __notices?: number;
+  }
+}
+
 const ROUTE = '/app?scenario=chief-mermaid';
+const STREAM_URL = `/api/conversations/${THREAD.id}/stream`;
+
+const emit = (page: Page, ev: unknown) =>
+  page.evaluate(
+    ([u, e]) => window.__es.find((es) => es.url.includes(u as string))?.emit(e),
+    [STREAM_URL, ev] as const,
+  );
 
 function peleScripts(page: Page): string[] {
   const hits: string[] = [];
@@ -69,4 +83,51 @@ test('a chat without a mermaid fence loads no diagram code', async ({ page }) =>
   ).toHaveAttribute('data-state', 'drawn');
   await page.waitForLoadState('networkidle');
   expect(peleLoaded.length).toBeGreaterThan(0);
+});
+
+test('a streaming reply keeps an unfinished mermaid fence as code with no notice', async ({
+  page,
+}) => {
+  const messages: Row[] = [{ id: 'ask', role: 'user', content: '画一下登录流程', createdAt: 10 }];
+  let running = true;
+  await mockLive(page, { threads: [THREAD], messages }, (path, _route, json) =>
+    path === '/api/teams/t1/chief/threads'
+      ? json([{ ...THREAD, activeRun: running ? { phase: 'chief' } : null }])
+      : undefined,
+  );
+  await page.goto('/app');
+  const home = page.getByTestId('home-c');
+  await page.waitForFunction((u) => window.__es.some((es) => es.url.includes(u)), STREAM_URL);
+  await page.evaluate(() => {
+    window.__notices = 0;
+    new MutationObserver(() => {
+      if (document.querySelector('[data-testid="md-mermaid-notice"]') !== null)
+        window.__notices = (window.__notices ?? 0) + 1;
+    }).observe(document.body, { childList: true, subtree: true, attributes: true });
+  });
+  const blocks = home.getByTestId('md-mermaid');
+
+  const closed = '```mermaid\nflowchart LR\n  a[开始] --> b[结束]\n```\n\n';
+  await emit(page, { type: 'text_delta', text: `先看总览：\n\n${closed}再看细节：\n\n` });
+  await emit(page, { type: 'text_delta', text: '```mermaid\nflowchart LR\n  open[打开 Cairn' });
+  await expect(blocks).toHaveCount(2);
+  await expect(blocks.nth(0)).toHaveAttribute('data-state', 'drawn');
+  const open = blocks.nth(1);
+  await expect(open).toHaveAttribute('data-state', 'streaming');
+  await expect(open.getByTestId('md-code')).toContainText('open[打开 Cairn');
+  await evidencePanelShot(page, 'mermaid-streaming-open-fence.png', open);
+
+  await emit(page, { type: 'text_delta', text: '] --> home[进入首页' });
+  await expect(open.getByTestId('md-code')).toContainText('home[进入首页');
+  await expect(open).toHaveAttribute('data-state', 'streaming');
+
+  const content = `先看总览：\n\n${closed}再看细节：\n\n\`\`\`mermaid\nflowchart LR\n  open[打开 Cairn] --> home[进入首页]`;
+  const answer: Row = { id: 'answer', role: 'assistant', content, createdAt: 40 };
+  messages.push(answer);
+  running = false;
+  await emit(page, { type: 'message', message: answer });
+  await emit(page, { type: 'step', step: { id: 'ask', status: 'done' } });
+  await expect(home.getByTestId('typing-dots')).toHaveCount(0);
+  await expect(blocks.nth(1)).toHaveAttribute('data-state', 'drawn');
+  expect(await page.evaluate(() => window.__notices)).toBe(0);
 });

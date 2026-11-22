@@ -318,7 +318,10 @@ const FLOW_GAP: Record<Flow, string> = {
 
 const BUBBLE_SPACED_GAP = 'mt-2.5';
 
+const StreamingContext = createContext(false);
+
 function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
+  const streaming = useContext(StreamingContext);
   switch (block.kind) {
     case 'head':
       return <HeadingTag level={block.level} segments={block.segments} />;
@@ -328,7 +331,11 @@ function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
       const code = (
         <CodeBlock {...(block.lang !== undefined ? { lang: block.lang } : {})} text={block.text} />
       );
-      return block.lang === 'mermaid' ? <MermaidBlock text={block.text} source={code} /> : code;
+      return block.lang === 'mermaid' ? (
+        <MermaidBlock text={block.text} source={code} final={!streaming || block.open !== true} />
+      ) : (
+        code
+      );
     }
     case 'attachment':
       return <AttachmentBlock name={block.name} attachmentKey={block.key} />;
@@ -598,8 +605,10 @@ export function ChatMarkdown({
   bubbleTools,
   bubbleFooter,
   highlight,
+  streaming = false,
 }: {
   text: string;
+  streaming?: boolean;
   bubbles?: boolean;
   bubbleTools?: (group: ChatBubbleGroup, index: number) => ReactNode;
   bubbleFooter?: ReactNode;
@@ -624,5 +633,9 @@ export function ChatMarkdown({
     ) : (
       <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
     );
-  return <FileSetContext.Provider value={files}>{body}</FileSetContext.Provider>;
+  return (
+    <FileSetContext.Provider value={files}>
+      <StreamingContext.Provider value={streaming}>{body}</StreamingContext.Provider>
+    </FileSetContext.Provider>
+  );
 }

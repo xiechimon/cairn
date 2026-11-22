@@ -66,12 +66,12 @@ async function draw(element: HTMLElement, text: string, drawing: Drawing): Promi
   }
 }
 
-function useDiagram(text: string) {
+function useDiagram(text: string, final: boolean) {
   const host = useRef<HTMLDivElement>(null);
   const [outcome, setOutcome] = useState<{ text: string; result: Outcome } | null>(null);
   useEffect(() => {
     const element = host.current;
-    if (element === null) return;
+    if (element === null || !final) return;
     const drawing: Drawing = {
       live: true,
       mounted: null,
@@ -85,20 +85,28 @@ function useDiagram(text: string) {
       drawing.mounted?.destroy();
       element.replaceChildren();
     };
-  }, [text]);
+  }, [text, final]);
   return { host, outcome: outcome !== null && outcome.text === text ? outcome.result : null };
 }
 
-export function MermaidBlock({ text, source }: { text: string; source: ReactNode }) {
+export function MermaidBlock({
+  text,
+  source,
+  final,
+}: {
+  text: string;
+  source: ReactNode;
+  final: boolean;
+}) {
   const { t } = useI18n();
-  const { host, outcome } = useDiagram(text);
+  const { host, outcome } = useDiagram(text, final);
   const failure: Failure | null = outcome !== null && outcome !== 'drawn' ? outcome : null;
   const drawn = outcome === 'drawn';
   return (
     <div
       className="relative flex min-w-0 flex-col gap-1.5"
       data-testid="md-mermaid"
-      data-state={failure ?? (drawn ? 'drawn' : 'pending')}
+      data-state={final ? (failure ?? (drawn ? 'drawn' : 'pending')) : 'streaming'}
     >
       <div
         ref={host}

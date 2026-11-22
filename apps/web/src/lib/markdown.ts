@@ -20,7 +20,7 @@ export type ChatBlock =
   | { kind: 'list'; ordered: boolean; start: number; items: ListItem[] }
   | { kind: 'tasks'; items: TaskItem[] }
   | { kind: 'quote'; blocks: ChatBlock[] }
-  | { kind: 'code'; lang?: string; text: string }
+  | { kind: 'code'; lang?: string; text: string; open?: true }
   | { kind: 'attachment'; name: string; key: string }
   | { kind: 'rule' }
   | {
@@ -45,6 +45,7 @@ const ATTACHMENT_TARGET = /^attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]
 const AGENT_PROGRESS = /^\[([~/])\]\s+/;
 const ITEM_MARKER = /^\[[ xX~/]\]\s+/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;
+const CLOSING_FENCE = /^ {0,3}(`{3,}|~{3,})\s*$/;
 const TABLE_ROW = /^\s*\|.*\|\s*$/;
 const TABLE_SEP_CELL = /^:?-{1,}:?$/;
 
@@ -95,6 +96,15 @@ function normalizeSource(text: string): string {
     out.push(...(expandCollapsedTableLine(line) ?? [line]));
   }
   return out.join('\n');
+}
+
+function fenceOpen(code: Tokens.Code): boolean {
+  if (code.codeBlockStyle === 'indented') return false;
+  const opener = FENCE.exec(code.raw)?.[1];
+  if (opener === undefined) return false;
+  const lines = code.raw.trimEnd().split('\n');
+  const closer = lines.length > 1 ? CLOSING_FENCE.exec(lines.at(-1) ?? '')?.[1] : undefined;
+  return closer === undefined || closer[0] !== opener[0] || closer.length < opener.length;
 }
 
 function plainText(tokens: Token[] | undefined): string {
@@ -331,7 +341,14 @@ function blockOf(token: Token): ChatBlock[] {
     case 'code': {
       const code = token as Tokens.Code;
       const lang = code.lang?.trim().split(/\s+/)[0] ?? '';
-      return [{ kind: 'code', ...(lang !== '' ? { lang } : {}), text: code.text }];
+      return [
+        {
+          kind: 'code',
+          ...(lang !== '' ? { lang } : {}),
+          text: code.text,
+          ...(fenceOpen(code) ? { open: true as const } : {}),
+        },
+      ];
     }
     case 'blockquote':
       return [{ kind: 'quote', blocks: blocksOf((token as Tokens.Blockquote).tokens) }];

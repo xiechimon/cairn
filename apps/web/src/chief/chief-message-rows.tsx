@@ -918,6 +918,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {markdown != null ? (
               <ChatMarkdown
                 text={markdown}
+                streaming={!settled}
                 bubbles
                 bubbleFooter={<BubbleReports todoIds={reports} />}
                 bubbleTools={(group, n) =>
