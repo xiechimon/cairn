@@ -83,6 +83,15 @@ test('a release that is not strictly newer never replaces the staged one', () =>
   assert.equal(shouldStage(stagedWith('0.2.0'), '0.1.999'), false);
 });
 
+test('a blocked release is not staged when nothing is staged', () => {
+  const blocked = {
+    ...emptyUpdateState(),
+    blocked: { version: '0.1.536', at: 1, reason: 'x', attempts: 1 },
+  };
+  assert.equal(shouldStage(blocked, '0.1.536'), false);
+  assert.equal(shouldStage(blocked, '0.1.537'), true);
+});
+
 test('a blocked release is never staged, even over an older staged one', () => {
   const blocked = {
     ...stagedWith('0.1.674'),
