@@ -189,7 +189,9 @@ async function openDesign(
     }
     return undefined;
   });
-  await page.goto(`/app?view=design&thread=${PAGE_TASK.id}&page=pricing.html`);
+  await page.goto(`/app?view=design&thread=${PAGE_TASK.id}&page=pricing.html`, {
+    waitUntil: 'domcontentloaded',
+  });
   return state;
 }
 
@@ -234,6 +236,46 @@ test.describe('artifact parser', () => {
     await expect(page.getByTestId('design-comment-popover')).toBeVisible();
   });
 
+  test('opens an artifact without calling DOMParser in the board', async ({ page }) => {
+    await page.addInitScript(() => {
+      if (window !== window.top) return;
+      const calls: string[] = [];
+      Object.assign(window, { previewParserCalls: calls });
+      const parse = DOMParser.prototype.parseFromString;
+      DOMParser.prototype.parseFromString = function (source, type) {
+        calls.push(type);
+        return parse.call(this, source, type);
+      };
+    });
+    await openDesign(page, [], null, { 'ver-2': '<h1>Quarterly pricing</h1>' });
+    const frame = page.getByTestId('design-frame').contentFrame();
+    await expect(frame.getByRole('heading', { name: 'Quarterly pricing' })).toBeVisible();
+    expect(await page.evaluate(() => Reflect.get(window, 'previewParserCalls'))).toEqual([]);
+  });
+
+  test('renders dense short comments without parsing fragments in the board', async ({ page }) => {
+    const comment = '<!--x-->';
+    const html = comment.repeat(8192) + '<h1>Dense comment report</h1>';
+    await page.addInitScript((comment) => {
+      if (window !== window.top) return;
+      const innerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
+      Object.assign(window, { previewFragmentParses: 0 });
+      Object.defineProperty(Element.prototype, 'innerHTML', {
+        ...innerHTML,
+        set(this: Element, value: string) {
+          if (this instanceof HTMLTemplateElement && value === comment) {
+            Reflect.set(window, 'previewFragmentParses', Reflect.get(window, 'previewFragmentParses') + 1);
+          }
+          innerHTML?.set?.call(this, value);
+        },
+      });
+    }, comment);
+    await openDesign(page, [], null, { 'ver-2': html });
+    const frame = page.getByTestId('design-frame').contentFrame();
+    await expect(frame.getByRole('heading', { name: 'Dense comment report' })).toBeVisible();
+    expect(await page.evaluate(() => Reflect.get(window, 'previewFragmentParses'))).toBe(0);
+  });
+
   test('renders 10 MiB documents with leading whitespace or a leading comment', async ({ page }) => {
     const size = 10 * 1024 * 1024;
     const whitespacePage = '<!doctype html><h1>Whitespace report</h1>';
@@ -251,7 +293,7 @@ test.describe('artifact parser', () => {
     await expect(frame.getByRole('heading', { name: 'Comment report' })).toBeVisible({ timeout: 20_000 });
   });
 
-  test('matches direct opening for document metadata and active HTML', async ({ page, context }) => {
+  test('preserves active HTML and metadata outside the documented prefix differences', async ({ page, context }) => {
     const html = `\uFEFF<!-- Opening -- note --><!doctype html SYSTEM "about:legacy-compat">
       <html lang="en"><!-- Inside the root --><head id="pricing" data-label=A\u00a0B>
       <noscript><style>.fallback { color: red }</style></noscript><title>Pricing</title></head>
@@ -265,9 +307,9 @@ test.describe('artifact parser', () => {
       compatMode: document.compatMode,
       lang: document.documentElement.lang,
       head: [document.head.id, document.head.dataset.label],
-      comments: [...document.childNodes, ...document.documentElement.childNodes]
-        .filter((node) => node instanceof Comment)
-        .map((node) => node.data),
+      comments: [document, document.documentElement, document.head].map((parent) =>
+        [...parent.childNodes].filter((node) => node instanceof Comment).map((node) => node.data),
+      ),
       noscript: [...document.querySelectorAll('noscript')].map((node) => [
         node.parentElement?.tagName,
         node.textContent,
@@ -281,11 +323,104 @@ test.describe('artifact parser', () => {
     const expected = await direct.locator('html').evaluate(metadata);
     await direct.close();
     expect(expected).toMatchObject({ doctype: 'about:legacy-compat', heading: 'Pricing is ready' });
+    const [[opening, closing], rootComments, headComments] = expected.comments;
 
     await openDesign(page, [], null, { 'ver-2': html });
     const frame = page.getByTestId('design-frame').contentFrame();
     await expect(frame.getByRole('heading', { name: 'Pricing is ready' })).toBeVisible();
-    expect(await frame.locator('html').evaluate(metadata)).toEqual(expected);
+    expect(await frame.locator('html').evaluate(metadata)).toEqual({
+      ...expected,
+      doctype: '',
+      head: ['', undefined],
+      comments: [[closing], [], [opening, ...rootComments, ...headComments]],
+    });
+  });
+
+  test('previews plaintext in standards mode and preserves a frameset', async ({ page }) => {
+    await openDesign(page, [], null, {
+      'ver-2': 'Pricing is being drafted.',
+      'ver-1': '<!doctype html><title>Archived plans</title><frameset cols="100%"><frame title="Archived plans" src="data:text/html,Archived%20plans"></frameset>',
+    });
+    const frame = page.getByTestId('design-frame').contentFrame();
+    await expect(frame.locator('body')).toHaveText('Pricing is being drafted.');
+    expect(await frame.locator('html').evaluate(() => document.compatMode)).toBe('CSS1Compat');
+    await page.getByTestId('design-versions').click();
+    await page.getByTestId('design-version-item').filter({ hasText: 'v1' }).click();
+    const child = frame.locator('frameset > frame[title="Archived plans"]');
+    await expect(child.contentFrame().locator('body')).toHaveText('Archived plans');
+  });
+
+  test('uses storage immediately and supports comments and snapshots before a deferred script runs', async ({
+    page,
+  }, testInfo) => {
+    const pending = Promise.withResolvers<void>();
+    await page.route('**/preview-deferred.js', async (route) => {
+      await pending.promise;
+      await route.fulfill({
+        contentType: 'application/javascript',
+        body: "document.documentElement.dataset.deferred = 'finished'",
+      });
+    });
+    const html = `<!doctype html><head><title>Workspace pricing</title>
+      <script>
+        localStorage.setItem('plan', 'starter');
+        sessionStorage.setItem('section', 'pricing');
+        document.documentElement.dataset.storage = localStorage.getItem('plan') + '/' + sessionStorage.getItem('section');
+      </script>
+      <script defer src="/preview-deferred.js"></script></head>
+      <body><h1 data-od-id="title">Workspace pricing</h1><p>One plan for your whole team.</p></body>`;
+    try {
+      const [request, state] = await Promise.all([
+        page.waitForRequest('**/preview-deferred.js'),
+        openDesign(page, [], null, { 'ver-2': html }),
+      ]);
+      expect(request.frame().parentFrame()).toBe(page.mainFrame());
+      const frame = page.getByTestId('design-frame').contentFrame();
+      const heading = frame.getByRole('heading', { name: 'Workspace pricing' });
+      await expect(heading).toBeVisible();
+      await expect.soft(frame.locator('html')).toHaveAttribute('data-storage', 'starter/pricing', {
+        timeout: 1000,
+      });
+      await page.getByTestId('design-comment-mode').click();
+      await expect(frame.locator('html')).toHaveAttribute('data-od-comment-mode', '', { timeout: 5000 });
+      await expect(page.getByTestId('design-comment-unsupported')).toHaveCount(0);
+      await heading.click();
+      const note = page.getByTestId('design-comment-note');
+      await note.fill('Lead with the team plan');
+      await page.screenshot({ path: testInfo.outputPath('preview-commenting.png') });
+      await page.getByTestId('design-comment-save').click();
+      await expect(page.getByTestId('design-pin')).toBeVisible();
+      expect(state.comments).toHaveLength(1);
+
+      await page.getByTestId('design-export').click();
+      const [png] = await Promise.all([
+        page.waitForEvent('download', { timeout: 12_000 }),
+        page.getByTestId('design-export-png').click(),
+      ]);
+      expect(png.suggestedFilename()).toBe('pricing.png');
+      expect(await heading.evaluate(() => document.readyState)).toBe('interactive');
+    } finally {
+      pending.resolve();
+    }
+    await expect(page.getByTestId('design-frame').contentFrame().locator('html')).toHaveAttribute(
+      'data-deferred',
+      'finished',
+    );
+  });
+
+  test('keeps an unterminated inline script inert as in a direct opening', async ({ page, context }) => {
+    const html = `<!doctype html><body><h1>Pricing draft</h1>
+      <script>document.querySelector('h1').textContent = 'Pricing published'`;
+    const direct = await context.newPage();
+    await direct.goto(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+    await expect(direct.getByRole('heading')).toHaveText('Pricing draft');
+    await direct.close();
+    await openDesign(page, [], null, { 'ver-2': html });
+    const frame = page.getByTestId('design-frame').contentFrame();
+    await expect.poll(() => frame.locator('body').evaluate(() => ({
+      readyState: document.readyState,
+      title: document.querySelector('h1')?.textContent,
+    }))).toEqual({ readyState: 'complete', title: 'Pricing draft' });
   });
 });
 
