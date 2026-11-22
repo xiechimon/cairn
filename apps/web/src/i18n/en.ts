@@ -564,7 +564,6 @@ export const EN: Record<string, string> = {
   已复制: 'Copied',
   '没能复制，再试一次': 'Could not copy. Try again',
   '复制为 Markdown': 'Copy as Markdown',
-  '已复制为 Markdown': 'Copied as Markdown',
   正在加载文件: 'Loading the file',
   文件没能加载: 'The file did not load',
   查看源码: 'View source',

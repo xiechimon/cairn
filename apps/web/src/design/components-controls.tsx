@@ -1,6 +1,6 @@
 import { cn } from 'cn';
 import { type ReactNode, useId, useState } from 'react';
-import { CopyMarkdownButton } from '../components/copy-markdown-button.js';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { SegmentedRadio, SegmentedTabs } from '../components/segmented.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
@@ -121,14 +121,16 @@ export function ButtonSection() {
         ))}
       </Specimen>
       <Specimen
-        id="copy-markdown"
-        title="Copy as Markdown"
-        note="Puts a document's Markdown source on the clipboard and confirms with a toast"
-        code={`<CopyMarkdownButton markdown={report.content} />`}
+        id="copy-icon"
+        title="Copy icon button"
+        note="Copies text and shows a check; a document's copy sits in the dialog head beside close (C27)"
+        code={`<CopyIconButton text={report.content} label={t('复制为 Markdown')} testId="copy-markdown" />`}
       >
-        <Cell label="document header">
-          <CopyMarkdownButton
-            markdown={'## Export formats\n\nParquet halves the file size of CSV.'}
+        <Cell label="dialog head">
+          <CopyIconButton
+            text={'## Export formats\n\nParquet halves the file size of CSV.'}
+            label="Copy as Markdown"
+            testId="copy-markdown-specimen"
           />
         </Cell>
       </Specimen>

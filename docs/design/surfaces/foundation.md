@@ -24,6 +24,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | C23 | What the user already sees stays put while a live surface updates: no remount and no offset change until it settles. | G `e2e/chief-live-stability.spec.ts` |
 | C24 | A change the user makes shows in the same frame; a failure puts the row back and says so. | M `e2e/chief-home-tasks-panel.spec.ts` (Mark done lands / fails) |
 | C25 | No inert UI: a control offering fewer than two real choices, or a label that only says something cannot be done, is not rendered. | M `e2e/settings-routing.spec.ts` (C25 test) |
+| C27 | An action on a whole document or dialog (copy, download, view source) is an icon-only ghost button with a tooltip in the dialog head beside close (`DialogShell` `headerAction`), never a text button under the title; it confirms in place. | M `e2e/chief-thread-report.spec.ts` |
 | V1 | Colors, sizes, radii and shadows come from tokens; no hex, no arbitrary pixel values. | G `ui-drift-gate`, `ui-debt-gate` |
 | V2 | Fonts are Source Serif 4, Instrument Sans and JetBrains Mono only. | M `e2e/design-rules-measure.spec.ts`: computed `font-family` of every text node is in the set (CJK fallbacks allowed) |
 | V3 | No AI-default styling: no gradients, glow, gradient text, frosted blur panels, decorative blobs, emoji as icons or labels, or one radius and shadow stamped on every block. | M no `linear-gradient`, `radial-gradient` or `conic-gradient` in new CSS; G `test/anti-slop-foundations.test.ts`, `test/unslop-signs.test.ts` |

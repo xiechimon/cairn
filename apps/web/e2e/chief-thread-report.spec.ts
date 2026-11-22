@@ -549,7 +549,7 @@ test('a task archived in the same turn leaves no card and the next task folds in
   expect((ref?.y ?? 0) + (ref?.height ?? 0)).toBeLessThanOrEqual(bubble?.y ?? 0);
 });
 
-test('a research report copies as its Markdown source and says so', async ({ page }) => {
+test('C27: a research report copies as its Markdown source from an icon button beside close', async ({ page }) => {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   const research = {
     ...TASK,
@@ -593,7 +593,19 @@ test('a research report copies as its Markdown source and says so', async ({ pag
   await page.goto('/app?pane=made');
   await page.getByRole('complementary', { name: '成果' }).getByRole('button', { name: 'Research export formats' }).click();
   const dialog = page.getByRole('dialog', { name: 'Research export formats' });
-  await dialog.getByRole('button', { name: '复制为 Markdown' }).click();
-  await expect(page.getByText('已复制为 Markdown')).toBeVisible();
+  const copy = dialog.getByRole('button', { name: '复制为 Markdown', exact: true });
+  await expect(copy, 'C27: one copy action on the report').toHaveCount(1);
+  await expect(
+    dialog.locator('[data-slot="dialog-head-action"]').getByRole('button', { name: '复制为 Markdown' }),
+    'C27: the document action sits in the dialog head beside close',
+  ).toBeVisible();
+  await expect(copy, 'C27: the document action is icon-only').toHaveText('');
+  const close = await dialog.getByRole('button', { name: '关闭', exact: true }).boundingBox();
+  const copyBox = await copy.boundingBox();
+  expect(Math.abs((copyBox?.y ?? 0) - (close?.y ?? 0)), 'C27: copy shares the close row').toBeLessThanOrEqual(4);
+  await copy.hover();
+  await expect(page.locator('[data-slot="tooltip-content"]'), 'C4: the icon button names itself').toHaveText('复制为 Markdown');
+  await copy.click();
+  await expect(copy).toHaveAttribute('data-copied', '');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(source);
 });

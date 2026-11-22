@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { useConversationMessages } from '../api/hooks.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
-import { CopyMarkdownButton } from '../components/copy-markdown-button.js';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { GrowText } from '../components/growth.js';
 import { Button } from '../components/ui/button.js';
 import { DialogTitle } from '../components/ui/dialog.js';
@@ -202,6 +202,14 @@ export function ResearchReportDialog({
       initialFocus={contentRef}
       width="var(--settings-w)"
       className="h-(--settings-h)"
+      headerAction={
+        <CopyIconButton
+          text={report.content}
+          label={t('复制为 Markdown')}
+          testId="copy-markdown"
+          className="text-content-tertiary hover:text-foreground pointer-coarse:size-11"
+        />
+      }
     >
       <article
         ref={contentRef}
@@ -231,7 +239,6 @@ export function ResearchReportDialog({
           <DialogTitle className="mt-3 voice-title text-page text-foreground">
             {report.title}
           </DialogTitle>
-          <CopyMarkdownButton markdown={report.content} className="mt-2 -ml-2.5" />
           {children}
         </header>
         <div
