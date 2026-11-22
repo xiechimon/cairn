@@ -18,6 +18,19 @@ function scratch() {
   return mkdtempSync(join(tmpdir(), 'cairn-update-state-'));
 }
 
+function stagedWith(version) {
+  return {
+    ...emptyUpdateState(),
+    staged: {
+      version,
+      zip: `/Applications/.cairn-update-a/Cairn-${version}.zip`,
+      app: '/Applications/.cairn-update-a/Cairn.app',
+      previousVersion: '0.1.535',
+      at: 1,
+    },
+  };
+}
+
 test('a missing or unreadable state file reads as empty', () => {
   const dir = scratch();
   assert.deepEqual(readUpdateState(join(dir, 'update-state.json')), emptyUpdateState());
@@ -57,25 +70,27 @@ test('a version that failed a first start is not auto-installed again', () => {
   assert.equal(isAutoInstallBlocked(state, '0.1.537'), false);
 });
 
-test('a checkout that already holds a verified staged update does not download another', () => {
-  const staged = {
-    ...emptyUpdateState(),
-    staged: {
-      version: '0.1.545',
-      zip: '/Applications/.cairn-update-a/Cairn-0.1.545.zip',
-      app: '/Applications/.cairn-update-a/Cairn.app',
-      previousVersion: '0.1.544',
-      at: 1,
-    },
-  };
-  assert.equal(shouldStage(staged, '0.1.545'), false);
-  assert.equal(shouldStage(staged, '0.1.546'), false);
+test('a strictly newer release supersedes the staged one', () => {
+  assert.equal(shouldStage(stagedWith('0.1.674'), '0.1.688'), true);
+  assert.equal(shouldStage(stagedWith('0.1.674'), '0.1.675'), true);
   assert.equal(shouldStage(emptyUpdateState(), '0.1.546'), true);
+});
+
+test('a release that is not strictly newer never replaces the staged one', () => {
+  assert.equal(shouldStage(stagedWith('0.1.688'), '0.1.688'), false);
+  assert.equal(shouldStage(stagedWith('0.1.688'), '0.1.674'), false);
+  assert.equal(shouldStage(stagedWith('0.1.688'), '0.1.6'), false);
+  assert.equal(shouldStage(stagedWith('0.2.0'), '0.1.999'), false);
+});
+
+test('a blocked release is never staged, even over an older staged one', () => {
   const blocked = {
-    ...emptyUpdateState(),
-    blocked: { version: '0.1.536', at: 1, reason: 'x', attempts: 1 },
+    ...stagedWith('0.1.674'),
+    blocked: { version: '0.1.688', at: 1, reason: 'server exited with code 1', attempts: 1 },
   };
-  assert.equal(shouldStage(blocked, '0.1.536'), false);
+  assert.equal(shouldStage(blocked, '0.1.688'), false);
+  assert.equal(shouldStage(blocked, '0.1.674'), false);
+  assert.equal(shouldStage(blocked, '0.1.689'), true);
 });
 
 test('a staged update is only usable by the version that staged it', () => {

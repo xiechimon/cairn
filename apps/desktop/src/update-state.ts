@@ -138,8 +138,24 @@ export function isAutoInstallBlocked(state: UpdateState, version: string): boole
   return state.blocked !== null && state.blocked.version === version;
 }
 
+function releaseNumbers(version: string): number[] {
+  return version.split('.').map((part) => Number.parseInt(part, 10) || 0);
+}
+
+export function isNewerVersion(offered: string, staged: string): boolean {
+  const left = releaseNumbers(offered);
+  const right = releaseNumbers(staged);
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference > 0;
+  }
+  return false;
+}
+
 export function shouldStage(state: UpdateState, version: string): boolean {
-  return state.staged === null && !isAutoInstallBlocked(state, version);
+  if (isAutoInstallBlocked(state, version)) return false;
+  const staged = state.staged;
+  return staged === null || isNewerVersion(version, staged.version);
 }
 
 export function stagedFor(state: UpdateState, runningVersion: string): StagedUpdate | null {

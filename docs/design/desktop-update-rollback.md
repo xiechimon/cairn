@@ -8,6 +8,8 @@ You have a Cairn icon in your Dock and a Cairn icon in the menu bar. Cairn keeps
 
 When a new version is published, Cairn downloads it while you work — no dialog, no progress take-over, no window coming forward. Your Cairn does not restart by itself in the middle of something. It swaps in the new version when you quit Cairn, or when Cairn has been sitting in the menu bar with no window open for ten minutes, or when you explicitly say "restart to update".
 
+If two releases are published while you are away, you get the newest one, not whichever finished downloading first: the newer release replaces the copy already waiting, and only once it is downloaded and verified in full.
+
 If that new version cannot start — its bundled server crashes on a database migration, which is exactly what happened to 0.1.536 — you do not have to find a download and drag it into Applications. Cairn puts the version you were running a minute ago back, starts it, and tells you in one line that the update was rolled back. The failure itself (what the new version printed before it died) is in `~/Library/Application Support/@cairn/desktop/logs/`, and the line names the version that failed.
 
 What you need to know: your data lives in the Cairn home directory, not in the app bundle, so a rollback never touches your tasks. A rolled-back version is not offered to you again automatically; the next release is. Nothing asks you for an account, a password or a payment — the update downloads from Cairn's public GitHub releases, the same place you installed it from.
@@ -24,6 +26,7 @@ Where you can still get stuck: if the new version's *own launcher* (not the serv
 |---|---|---|---|
 | You installed a newer Cairn by hand while an older update was staged | Nothing extra; the older staged copy is dropped | Discards the staged record and its folder because it was staged for a different running version | The staged download is wasted |
 | A new version is published while you are working | Nothing; the update arrow in the header turns into "restart to update" | Downloads and verifies the zip, extracts it beside the app, records it as staged | A few MB of disk next to the app; no interruption |
+| A newer version is published while an older update is already staged | Nothing; "restart to update" names the newer version once it is ready | Downloads and verifies the newer zip in its own staging folder, then replaces the staged record in one write and deletes the superseded folder; until that write the older staged copy is the one a quit installs | The older download is wasted; no interruption |
 | You quit Cairn | Nothing | Renames the staged app into place, then exits | Under a second on top of the normal quit |
 | Cairn sits in the menu bar with no window for ten minutes | Nothing | Same swap, relaunch hidden (menu bar icon only) | In-flight agent work in the server is interrupted; the design accepts this only while no window is open |
 | You choose "Restart to Update" in the menu or the header | The app restarts | Swaps in the staged version and relaunches with its window | A normal restart |
@@ -66,6 +69,7 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 `idle` → `checking` → (`available` → `downloading` → `ready`) | `current` | `unsupported` | `error`.
 
 - `ready` means: zip downloaded, SHA-256 matches the manifest, extracted bundle carries the manifest's version in its `Info.plist` and an executable next to it, and `staged` is written. Nothing has changed on disk yet that the running app depends on.
+- `shouldStage` stages when nothing is staged, and otherwise only when the offered version is strictly newer than the staged one. A strictly newer release therefore supersedes a staged copy instead of being refused; an offered version that is equal to or older than the staged one is not downloaded, so a manifest that goes backwards never downgrades what is waiting, and a blocked version is never staged however old the staged copy is.
 - A staged record is only usable by the exact version that staged it (`staged.previousVersion` must equal the running version) and only from a folder the updater itself created beside the bundle (`<bundle dir>/.cairn-update-*/<the bundle's own name>`). Anything else in that record is discarded and its folder removed, so a stale or hand-edited record can never install over a newer copy, and `rm -rf` only ever runs on a staging folder derived from the running bundle's directory.
 - Before the swap, the staged bundle is checked against the running app's code signature (`codesign --verify --strict`, same signing authority and bundle identifier). A copy that is not signed the way this copy of Cairn is refuses to install. When the running app itself has no verifiable signature — a development copy — there is nothing to compare, and the check is skipped with a line in the log.
 - `ready` → swap on one of three triggers: quit (`app.before-quit`, after the server and Runner are stopped), idle (no window open and not focused for ten minutes), or explicit install (`install({ relaunch: 'foreground' })`).
@@ -82,7 +86,7 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 | Path | Reads | Writes |
 |---|---|---|
 | `updater.check()` | `blocked` (to decide whether to auto-stage) | — |
-| `updater.stage()` | — | `staged` |
+| `updater.stage()` | `staged` (to keep it usable until the new copy is verified, and to fall back to it on failure) | `staged`, replacing a superseded record and removing its folder |
 | `updater.apply()`, quit hook, idle hook | `staged` | `installed`, clears `staged` |
 | boot, no `installed` record or a different running version | `installed` | clears `installed`, removes the kept previous bundle |
 | boot, guard armed | `installed` | — |
@@ -96,8 +100,8 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 | Failure | Behaviour |
 |---|---|
 | Manifest fetch fails / no network | `error`; retried on the next hourly check; nothing staged |
-| Download truncated or wrong hash | staging folder removed, `error`; previous bundle untouched |
-| Extracted bundle missing or wrong version | staging folder removed, `error` |
+| Download truncated or wrong hash | the new staging folder is removed and the previously staged record and folder are left as they were; `error` when nothing was staged before, `ready` on the older staged version when there was |
+| Extracted bundle missing or wrong version | the new staging folder is removed and the previously staged record and folder are left as they were |
 | Rename across filesystems | cannot happen by construction (staging is beside the bundle) |
 | `staged.app` points anywhere but a staging folder beside the bundle | refused, record and folder discarded, `error` published |
 | The staged bundle is not signed like the running app | refused, `error` published, previous bundle untouched |

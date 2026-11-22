@@ -1,7 +1,6 @@
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { constants, createWriteStream, existsSync } from 'node:fs';
-import { access, mkdtemp } from 'node:fs/promises';
+import { constants, existsSync } from 'node:fs';
+import { access } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
@@ -14,13 +13,13 @@ import {
 } from '@cairn/shared';
 import { app } from 'electron';
 import { parseSigningIdentity, signatureMatches } from './signature.js';
+import { stageUpdate, UPDATE_REQUEST_HEADERS } from './update-stage.js';
 import {
   canonicalPath,
   isStagedBundleFor,
   removeFolder,
   removeFolderAfterExit,
   removeStagingFolders,
-  STAGING_PREFIX,
 } from './update-staging.js';
 import {
   readUpdateState,
@@ -30,7 +29,6 @@ import {
   writeUpdateState,
 } from './update-state.js';
 import {
-  APP_BUNDLE_NAME,
   APP_EXECUTABLE,
   applyStagedUpdate,
   previousAppPath,
@@ -38,7 +36,6 @@ import {
 } from './update-swap.js';
 
 const run = promisify(execFile);
-const REQUEST_HEADERS = { 'User-Agent': 'Cairn-Desktop' };
 const NO_MANIFEST = 404;
 const QUIT_FALLBACK_MS = 30_000;
 export const BACKGROUND_LAUNCH_FLAG = '--cairn-background-launch';
@@ -76,36 +73,6 @@ export async function removeLeftoverUpdates(): Promise<void> {
 
 export function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
-}
-
-async function download(
-  update: DesktopUpdate,
-  target: string,
-  onPercent: (percent: number) => void,
-): Promise<void> {
-  const response = await fetch(update.url, { headers: REQUEST_HEADERS });
-  if (!response.ok || response.body === null) {
-    throw new Error(`download failed with HTTP ${response.status}`);
-  }
-  const hash = createHash('sha256');
-  const file = createWriteStream(target);
-  let received = 0;
-  let reported = -1;
-  for await (const chunk of response.body) {
-    hash.update(chunk);
-    received += chunk.byteLength;
-    if (!file.write(chunk)) await new Promise((drained) => file.once('drain', drained));
-    const percent = Math.min(99, Math.floor((received / update.size) * 100));
-    if (percent !== reported) {
-      reported = percent;
-      onPercent(percent);
-    }
-  }
-  await new Promise<void>((closed, failed) =>
-    file.end((error?: Error | null) => (error ? failed(error) : closed())),
-  );
-  if (hash.digest('hex') !== update.sha256)
-    throw new Error('the download does not match its SHA-256 digest');
 }
 
 export function relaunchArgs(background: boolean): string[] {
@@ -168,37 +135,22 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
     current.status === 'restarting';
 
   async function stage(update: DesktopUpdate): Promise<void> {
-    const bundle = runningBundle();
-    const staging = await mkdtemp(join(dirname(bundle), STAGING_PREFIX));
     try {
       set({ status: 'downloading', version: update.version, percent: 0 });
-      const zip = join(staging, `Cairn-${update.version}.zip`);
-      await download(update, zip, (percent) =>
-        set({ status: 'downloading', version: update.version, percent }),
-      );
-      set({ status: 'installing', version: update.version });
-      await run('/usr/bin/ditto', ['-x', '-k', zip, staging]);
-      const stagedApp = join(staging, APP_BUNDLE_NAME);
-      const version = await readBundleVersion(stagedApp);
-      if (version !== update.version) {
-        throw new Error(
-          `the downloaded app is version ${version ?? 'unknown'}, not ${update.version}`,
-        );
-      }
-      const previous = readUpdateState(statePath());
-      writeUpdateState(statePath(), {
-        ...previous,
-        staged: {
-          version: update.version,
-          zip,
-          app: stagedApp,
-          previousVersion: app.getVersion(),
-          at: Date.now(),
-        },
+      const staged = await stageUpdate({
+        statePath: statePath(),
+        bundleFolder: dirname(runningBundle()),
+        runningVersion: app.getVersion(),
+        update,
+        onProgress: (phase, percent) => set({ status: phase, version: update.version, percent }),
       });
-      set({ status: 'ready', version: update.version });
+      set({ status: 'ready', version: staged.version });
     } catch (error) {
-      await removeFolder(staging).catch(() => {});
+      const kept = stagedFor(readUpdateState(statePath()), app.getVersion());
+      if (kept !== null && existsSync(join(kept.app, APP_EXECUTABLE))) {
+        set({ status: 'ready', version: kept.version });
+        return;
+      }
       set({ status: 'error', message: messageOf(error) });
     }
   }
@@ -212,7 +164,7 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
     }
     set({ status: 'checking' });
     try {
-      const response = await fetch(DESKTOP_MANIFEST_URL, { headers: REQUEST_HEADERS });
+      const response = await fetch(DESKTOP_MANIFEST_URL, { headers: UPDATE_REQUEST_HEADERS });
       if (!response.ok && response.status !== NO_MANIFEST) {
         throw new Error(`GitHub answered HTTP ${response.status}`);
       }
