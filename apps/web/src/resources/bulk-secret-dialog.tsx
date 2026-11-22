@@ -45,6 +45,7 @@ export function BulkSecretDialog({
   const [text, setText] = useState('');
   const [secret, setSecret] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [touched, setTouched] = useState(false);
   const { entries, badLines } = parseAssignments(text);
   const storesSecret = (name: string) => secret || isCredentialSecretName(name);
   const emptySecrets = entries.filter((entry) => storesSecret(entry.name) && entry.value === '');
@@ -53,6 +54,7 @@ export function BulkSecretDialog({
   const close = () => {
     setText('');
     setSecret(false);
+    setTouched(false);
     onClose();
   };
 
@@ -116,6 +118,7 @@ export function BulkSecretDialog({
             className={`${FORM_TEXTAREA_CLS} min-h-36 resize-none font-mono placeholder:text-content-tertiary`}
             value={text}
             onChange={(event) => setText(event.target.value)}
+            onBlur={() => setTouched(true)}
             placeholder={"API_KEY='secret-value'\nNODE_ENV=development"}
             autoComplete="off"
             spellCheck={false}
@@ -140,7 +143,7 @@ export function BulkSecretDialog({
             {t('第 {lines} 行要写成 NAME=VALUE', { lines: badLines.join('、') })}
           </p>
         )}
-        {badLines.length === 0 && emptySecrets.length > 0 && (
+        {badLines.length === 0 && emptySecrets.length > 0 && touched && (
           <p role="alert" className="m-0 text-meta text-destructive">
             {t('机密的值不能为空：{names}', {
               names: emptySecrets.map((entry) => entry.name).join('、'),

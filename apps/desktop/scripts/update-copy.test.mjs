@@ -28,10 +28,7 @@ test('the install dialog speaks Chinese on a Chinese desktop', () => {
 
 test('a version that already failed once says so when asked to install again', () => {
   const copy = installUpdateCopy('zh', '0.44.0', '0.43.2', true);
-  assert.equal(
-    copy.detail,
-    '0.44.0 上次在这里没能启动。你点了安装，Cairn 会再装一次。',
-  );
+  assert.equal(copy.detail, '0.44.0 上次在这里没能启动。你点了安装，Cairn 会再装一次。');
   const en = installUpdateCopy('en', '0.44.0', '0.43.2', true);
   assert.match(en.detail, /0\.44\.0/);
   assert.match(en.detail, /did not start/);
@@ -45,7 +42,10 @@ test('the up-to-date and check-failed dialogs are localized', () => {
 });
 
 test('each unsupported blocker has its own localized detail', () => {
-  assert.equal(unsupportedUpdateCopy('zh', 'not-in-applications').detail, '把 Cairn 移到「应用程序」文件夹后再检查。');
+  assert.equal(
+    unsupportedUpdateCopy('zh', 'not-in-applications').detail,
+    '把 Cairn 移到「应用程序」文件夹后再检查。',
+  );
   assert.equal(
     unsupportedUpdateCopy('zh', 'read-only').detail,
     'Cairn 在只读位置运行。把它拷到「应用程序」文件夹后再检查。',

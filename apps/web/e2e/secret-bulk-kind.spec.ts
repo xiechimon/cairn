@@ -45,3 +45,16 @@ test('bulk add stores credential-looking names as secret and the rest as env', a
     { name: 'LANGFUSE_BASE_URL', value: 'https://cloud.langfuse.com', kind: 'env' },
   ]);
 });
+
+test('an empty secret line is not scolded until the paste field loses focus', async ({ page }) => {
+  await page.goto('/app/resources/secrets?scenario=secrets-list');
+  await page.getByTestId('secret-bulk').click();
+  const dialog = page.getByRole('dialog', { name: '批量添加密钥和环境变量' });
+  const alert = dialog.getByRole('alert');
+  await dialog.getByLabel('内容', { exact: true }).fill('STRIPE_API_KEY=');
+  await expect(alert).toHaveCount(0);
+  await dialog.getByRole('button', { name: '取消' }).focus();
+  await expect(alert).toHaveText('机密的值不能为空：STRIPE_API_KEY');
+  await dialog.getByLabel('内容', { exact: true }).fill('STRIPE_API_KEY=sk-live');
+  await expect(alert).toHaveCount(0);
+});

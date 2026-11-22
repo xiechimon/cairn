@@ -61,6 +61,24 @@ test('a lowercase name shows the format line and blocks submit; an env var may b
   await expect(submit).toBeEnabled();
 });
 
+test('a secret-looking name does not scold about the empty value until the field was blurred', async ({
+  page,
+}) => {
+  const dialog = await openDialog(page);
+  const alert = dialog.getByRole('alert');
+  const submit = dialog.getByRole('button', { name: '添加', exact: true });
+  await dialog.getByLabel('名称', { exact: true }).fill('LANGFUSE_SECRET_KEY');
+  await expect(dialog.getByRole('checkbox', { name: /机密/ })).toBeChecked();
+  await expect(alert).toHaveCount(0);
+  await expect(submit).toBeDisabled();
+  await dialog.getByLabel('值', { exact: true }).focus();
+  await dialog.getByLabel('名称', { exact: true }).focus();
+  await expect(alert).toHaveText('机密的值不能为空');
+  await dialog.getByLabel('值', { exact: true }).fill('sk-live');
+  await expect(alert).toHaveCount(0);
+  await expect(submit).toBeEnabled();
+});
+
 test('a credential-looking name ticks `机密` on its own; a manual toggle wins over later names', async ({
   page,
 }) => {
