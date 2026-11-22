@@ -4,7 +4,7 @@ import type { ProviderConfig, SessionOpts } from '@cairn/shared';
 import { COORDINATOR_COMPACT_AT } from '@cairn/shared';
 import { createAgentSession, type SettingsManager } from '@earendil-works/pi-coding-agent';
 import { expect, test, vi } from 'vitest';
-import { createPiBackend, piHostLaunch } from '../src/backend/pi.js';
+import { createPiBackend, daemonSettingsManager, piHostLaunch } from '../src/backend/pi.js';
 import { openPiHostSession } from '../src/backend/pi-host-client.js';
 import { PI_HOST_PROTOCOL_VERSION } from '../src/backend/pi-host-protocol.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -16,6 +16,26 @@ vi.mock('@earendil-works/pi-coding-agent', async (importOriginal) => {
 
 const MAIN_RESERVE_TOKENS = 16_384;
 const MAIN_KEEP_RECENT_TOKENS = 20_000;
+
+interface RuntimeModel {
+  provider: string;
+  id: string;
+  contextWindow: number;
+  api: string;
+}
+
+function runtimeModel(
+  provider: string,
+  id: string,
+  contextWindow: number,
+  api = 'openai-completions',
+): RuntimeModel {
+  return { provider, id, contextWindow, api };
+}
+
+function coordinatorSettings(): SettingsManager {
+  return daemonSettingsManager({ compactAt: COORDINATOR_COMPACT_AT });
+}
 
 function sessionOpts(
   directory: string,
@@ -105,24 +125,55 @@ test('a built-in model declared wider than it resolves keeps a positive threshol
   }
 });
 
-test('a switch to a model outside the provider list compacts at the coordinator point', async () => {
-  const directory = testTempDir('pi-compact-at-switch-');
-  const handle = await openSession(
-    directory,
-    sessionOpts(
-      directory,
-      listedProvider('deepseek', [{ id: 'deepseek-v4-pro', name: 'DeepSeek V4 Pro' }]),
-      'deepseek-v4-pro',
-      COORDINATOR_COMPACT_AT,
-    ),
+test('a switch to a model outside the provider list compacts at the coordinator point', () => {
+  const switched = coordinatorSettings().getCompactionSettings(
+    runtimeModel('deepseek', 'deepseek-flash', 1_000_000),
   );
-  try {
-    const { settings } = sessionSettings();
-    const switched = settings.getCompactionSettings({ provider: 'deepseek', id: 'deepseek-flash' });
-    expect(1_000_000 - switched.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
-  } finally {
-    await handle.stop();
-  }
+  expect(1_000_000 - switched.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
+});
+
+test('a model re-registered narrower under the same provider and id reserves for the new window', () => {
+  const settings = coordinatorSettings();
+  const wide = settings.getCompactionSettings(
+    runtimeModel('deepseek', 'deepseek-v4-pro', 1_000_000),
+  );
+  const narrow = settings.getCompactionSettings(
+    runtimeModel('deepseek', 'deepseek-v4-pro', 200_000),
+  );
+  expect(1_000_000 - wide.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
+  expect(200_000 - narrow.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
+});
+
+test('two models whose flattened keys collide each reserve for their own window', () => {
+  const settings = coordinatorSettings();
+  const small = settings.getCompactionSettings(runtimeModel('a', 'b/c', 32_000));
+  const large = settings.getCompactionSettings(runtimeModel('a/b', 'c', 1_000_000));
+  expect(small.reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+  expect(1_000_000 - large.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
+});
+
+test('a fractional window raises the reserve to a whole token instead of throwing', () => {
+  const resolved = coordinatorSettings().getCompactionSettings(
+    runtimeModel('synthetic', 'fractional', 200_000.5),
+  );
+  expect(resolved.reserveTokens).toBe(50_001);
+  expect(200_000.5 - resolved.reserveTokens).toBeLessThanOrEqual(COORDINATOR_COMPACT_AT);
+});
+
+test('a virtual model keeps the base reserve', () => {
+  const resolved = coordinatorSettings().getCompactionSettings(
+    runtimeModel('radius', 'balanced', 1_048_576, 'pi-virtual'),
+  );
+  expect(resolved.reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+});
+
+test('no model or no finite window keeps the base reserve', () => {
+  const settings = coordinatorSettings();
+  expect(settings.getCompactionSettings().reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+  expect(
+    settings.getCompactionSettings(runtimeModel('synthetic', 'infinite', Number.POSITIVE_INFINITY))
+      .reserveTokens,
+  ).toBe(MAIN_RESERVE_TOKENS);
 });
 
 test('a window at or below compactAt never reserves below what that model gets on main', async () => {

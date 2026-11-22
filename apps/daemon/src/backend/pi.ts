@@ -124,41 +124,35 @@ export const PI_DAEMON_SETTINGS: PiSettingsSeed = {
   steeringMode: 'all',
 };
 
-interface CompactAtReserves {
-  models: readonly { provider: string; id: string; contextWindow: number }[];
+interface CompactAt {
   compactAt: number;
 }
 
-export function daemonSettingsManager(options?: CompactAtReserves): SettingsManager {
-  const seed: PiSettingsSeed = {
-    ...buildPiSessionSettings(),
-    ...PI_DAEMON_SETTINGS,
-    compaction: { ...buildPiSessionSettings().compaction, ...PI_DAEMON_SETTINGS.compaction },
-  };
-  const base = SettingsManager.inMemory(seed, { projectTrusted: false });
-  if (options === undefined) return base;
-  const floor = base.getCompactionSettings().reserveTokens;
-  return SettingsManager.inMemory(
-    {
-      ...seed,
-      compaction: { ...seed.compaction, modelOverrides: compactAtOverrides(options, floor) },
-    },
+export function daemonSettingsManager(options?: CompactAt): SettingsManager {
+  const settings = SettingsManager.inMemory(
+    { ...buildPiSessionSettings(), ...PI_DAEMON_SETTINGS },
     { projectTrusted: false },
   );
+  if (options === undefined) return settings;
+  const compactAt = options.compactAt;
+  const base = settings.getCompactionSettings.bind(settings);
+  settings.getCompactionSettings = (model) => {
+    const resolved = base(model);
+    const window = runningWindow(model);
+    if (window === undefined) return resolved;
+    const raised = Math.ceil(window - compactAt);
+    if (!Number.isSafeInteger(raised) || raised <= resolved.reserveTokens) return resolved;
+    return { ...resolved, reserveTokens: raised };
+  };
+  return settings;
 }
 
-function compactAtOverrides(
-  options: CompactAtReserves,
-  floor: number,
-): Record<string, { reserveTokens: number }> {
-  const overrides: Record<string, { reserveTokens: number }> = {};
-  for (const model of options.models) {
-    if (model.contextWindow <= options.compactAt) continue;
-    const reserve = Math.max(model.contextWindow - options.compactAt, floor);
-    if (reserve === floor) continue;
-    overrides[`${model.provider}/${model.id}`] = { reserveTokens: reserve };
-  }
-  return overrides;
+function runningWindow(model: unknown): number | undefined {
+  if (typeof model !== 'object' || model === null) return undefined;
+  if ('api' in model && model.api === 'pi-virtual') return undefined;
+  if (!('contextWindow' in model)) return undefined;
+  const window = model.contextWindow;
+  return typeof window === 'number' && Number.isFinite(window) ? window : undefined;
 }
 
 export const PI_SETTINGS_BYPASS = [
@@ -1156,7 +1150,7 @@ export class PiBackend implements AgentBackend {
     const settingsManager =
       opts.compactAt === undefined
         ? daemonSettingsManager()
-        : daemonSettingsManager({ models: runtime.getModels(), compactAt: opts.compactAt });
+        : daemonSettingsManager({ compactAt: opts.compactAt });
     const protectedPresent = detectTrustProtectedResources(opts.cwd);
     if (protectedPresent.length > 0) {
       log.trust?.(
