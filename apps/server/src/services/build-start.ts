@@ -1,7 +1,7 @@
 import type { BuildRecord, TriggerSource } from '@cairn/shared';
 import { isRegisteredMachine, type RouteOverride, SESSION_BRIEF } from '@cairn/shared';
-import { and, eq } from 'drizzle-orm';
-import { build, machine, project } from '../db/schema.js';
+import { and, eq, isNull } from 'drizzle-orm';
+import { build, machine, project, schedule, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newUuidv7, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep, NotFoundError, publishBuild } from './builds.js';
@@ -12,6 +12,7 @@ import { assertAutomaticRetryAllowed } from './retry-parking.js';
 import { profileForStep } from './routing-rules.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { childrenOfTodo, getTodo, setTodoPhase } from './todos.js';
+import { insertMessageRow } from './transcript.js';
 
 export function assertNamedMachineForNewTask(deps: BuildDeps, teamId: string): void {
   namedMachineForStart(deps, { teamId }, undefined);
@@ -63,6 +64,13 @@ export function startBuilds(
     triggerSource?: TriggerSource;
     scheduledBy?: string;
     prompt?: string;
+    schedule?: {
+      id: string;
+      expected: number | null;
+      at: number;
+      next: number | null;
+      triggered: boolean;
+    };
   },
 ): BuildRecord[] {
   const triggerSource = input.triggerSource ?? 'user';
@@ -126,6 +134,7 @@ export function startBuilds(
             .where(eq(build.id, todoRecord.latestBuildId))
             .get()?.retryAttempt
         : undefined;
+    const afterCommit: (() => void)[] = [];
     deps.db.transaction(() => {
       deps.db
         .insert(build)
@@ -150,7 +159,7 @@ export function startBuilds(
         todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
           ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
           : null;
-      enqueueStep(
+      const scheduledStep = enqueueStep(
         deps,
         id,
         'session',
@@ -160,12 +169,64 @@ export function startBuilds(
         undefined,
         { kind: 'first-task' },
       );
+      if (input.schedule !== undefined) {
+        const wake = input.schedule;
+        deps.db
+          .update(step)
+          .set({ scheduleId: wake.id })
+          .where(eq(step.id, scheduledStep.id))
+          .run();
+        insertMessageRow({ ...deps, afterCommit }, id, {
+          id: `schedule-wake-${scheduledStep.id}`,
+          role: 'system',
+          content: JSON.stringify({ kind: 'schedule-wake', stepId: scheduledStep.id }),
+          createdAt: wake.at,
+        });
+        const marked = deps.db
+          .update(schedule)
+          .set({
+            lastRunAt: wake.at,
+            lastRunStatus: 'started',
+            lastRunError: null,
+            retryNotBefore: null,
+            lastRunStepId: scheduledStep.id,
+            nextRunAt: wake.next,
+          })
+          .where(
+            and(
+              eq(schedule.id, wake.id),
+              eq(schedule.enabled, true),
+              wake.expected === null
+                ? isNull(schedule.nextRunAt)
+                : eq(schedule.nextRunAt, wake.expected),
+            ),
+          )
+          .run().changes;
+        if (marked === 0) {
+          if (!wake.triggered) {
+            throw new HttpError(409, 'Scheduled wake is no longer due');
+          }
+          const queued = deps.db
+            .update(schedule)
+            .set({
+              lastRunAt: wake.at,
+              lastRunStatus: 'started',
+              lastRunError: null,
+              retryNotBefore: null,
+              lastRunStepId: scheduledStep.id,
+            })
+            .where(and(eq(schedule.id, wake.id), eq(schedule.enabled, true)))
+            .run().changes;
+          if (queued === 0) throw new HttpError(409, 'Scheduled wake is no longer due');
+        }
+      }
       setTodoPhase(deps, todoId, 'queued', {
         ...(routeOverride !== undefined ? { routeOverride } : {}),
         latestBuildId: id,
         lastRunAt: createdAt,
       });
     });
+    for (const publish of afterCommit) publish();
     const row = deps.db.select().from(build).where(eq(build.id, id)).get();
     if (!row) throw new Error('build missing after insert');
     created.push(publishBuild(deps, row));

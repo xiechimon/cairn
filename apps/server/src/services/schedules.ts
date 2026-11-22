@@ -305,7 +305,7 @@ export function setScheduleClockListener(listener: (() => void) | null): void {
   scheduleClockListener = listener;
 }
 
-function notifyScheduleClock(): void {
+export function notifyScheduleClock(): void {
   scheduleClockListener?.();
 }
 

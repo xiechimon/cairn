@@ -151,7 +151,14 @@ export interface BuildSteerOptions {
   human?: boolean;
   actor?: string;
   origin?: 'user' | 'synthetic';
-  schedule?: { id: string; createdBy: string; at: number };
+  schedule?: {
+    id: string;
+    createdBy: string;
+    at: number;
+    expected: number | null;
+    next: number | null;
+    triggered: boolean;
+  };
   answer?: QuestionAnswer;
   beforeCommit?: () => void;
 }

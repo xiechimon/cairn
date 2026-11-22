@@ -6,7 +6,7 @@ import {
   isWaitingPhase,
   prNumberFromUrl,
 } from '@cairn/shared';
-import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 import {
   autonomousMergeAdmission,
   build,
@@ -352,6 +352,43 @@ export async function sendBuildSteer(
               content: JSON.stringify({ kind: 'schedule-wake', stepId: continuedStep.id }),
               createdAt: wake.at,
             });
+            const marked = db
+              .update(schedule)
+              .set({
+                lastRunAt: wake.at,
+                lastRunStatus: 'started',
+                lastRunError: null,
+                retryNotBefore: null,
+                lastRunStepId: continuedStep.id,
+                nextRunAt: wake.next,
+              })
+              .where(
+                and(
+                  eq(schedule.id, wake.id),
+                  eq(schedule.enabled, true),
+                  wake.expected === null
+                    ? isNull(schedule.nextRunAt)
+                    : eq(schedule.nextRunAt, wake.expected),
+                ),
+              )
+              .run().changes;
+            if (marked === 0) {
+              if (!wake.triggered) {
+                throw new HttpError(409, 'Scheduled wake is no longer due');
+              }
+              const queued = db
+                .update(schedule)
+                .set({
+                  lastRunAt: wake.at,
+                  lastRunStatus: 'started',
+                  lastRunError: null,
+                  retryNotBefore: null,
+                  lastRunStepId: continuedStep.id,
+                })
+                .where(and(eq(schedule.id, wake.id), eq(schedule.enabled, true)))
+                .run().changes;
+              if (queued === 0) throw new HttpError(409, 'Scheduled wake is no longer due');
+            }
           }
           const continued = db.select().from(build).where(eq(build.id, targetBuildId)).get();
           if (continued) publishBuild(deps, continued);

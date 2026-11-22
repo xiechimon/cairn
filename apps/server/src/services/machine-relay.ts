@@ -565,10 +565,15 @@ async function setTaskMetaGithubForm(
     githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const record = updateAutonomousTodo(todoDeps, todoRow.id, {
-    ...(title !== undefined ? { title } : {}),
-    ...(githubLabelIds !== undefined ? { githubLabelIds } : {}),
-  });
+  const record = updateAutonomousTodo(
+    todoDeps,
+    todoRow.id,
+    {
+      ...(title !== undefined ? { title } : {}),
+      ...(githubLabelIds !== undefined ? { githubLabelIds } : {}),
+    },
+    { issueTitleWriteback: true },
+  );
   if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
   if (title !== undefined && record.sourceKind === 'github-issue-self') {
     await writebackSelfIssueTitle(todoDeps, todoRow.id, record.title).catch(() => undefined);

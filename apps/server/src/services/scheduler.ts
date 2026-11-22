@@ -1,5 +1,5 @@
 import { ACTIVE_STEP_STATUSES, type Scheduler, WAITING_PHASES } from '@cairn/shared';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { build, chief, dueEvent, project, schedule, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
@@ -57,17 +57,16 @@ import {
   isRecurring,
   isTriggerKind,
   isWorkerSchedule,
+  notifyScheduleClock,
   pauseSchedule,
   recordScheduleFailure,
   setScheduleClockListener,
   updateNextRunAt,
-  updateNextRunAtIfUnmoved,
   WORKER_SCHEDULE_MIN_INTERVAL_MS,
   WORKER_SCHEDULE_RUN_LIMIT,
   workerScheduleRunHistory,
 } from './schedules.js';
 import { createTaskIssueSync } from './task-issue-sync.js';
-import { insertMessageRow } from './transcript.js';
 import { sweepUnplaceableSteps } from './unplaceable-steps.js';
 import { sweepWorkerWatchdog } from './worker-watchdog.js';
 
@@ -225,16 +224,20 @@ export function createScheduler(
       : row.prompt || 'Continue this task.';
     let buildId = todoRow.latestBuildId;
     const freshAtConfirm = !workerCreated && todoRow.phase === 'confirm';
+    const wake = {
+      id: row.id,
+      createdBy: row.createdBy,
+      at: now,
+      expected: row.nextRunAt,
+      next: isRecurring(row.kind) ? nextRunAt : null,
+      triggered: isTriggerKind(row.kind),
+    };
     if (buildId !== null && !freshAtConfirm) {
       await sendBuildSteer(
         deps,
         buildId,
         { content: prompt },
-        {
-          afterTurn: true,
-          human: false,
-          schedule: { id: row.id, createdBy: row.createdBy, at: now },
-        },
+        { afterTurn: true, human: false, schedule: wake },
       );
     } else {
       if (freshAtConfirm && buildId !== null) {
@@ -248,40 +251,17 @@ export function createScheduler(
         triggerSource: 'schedule',
         scheduledBy: row.createdBy,
         prompt: workerCreated ? prompt : row.prompt || undefined,
+        schedule: {
+          id: wake.id,
+          expected: wake.expected,
+          at: wake.at,
+          next: wake.next,
+          triggered: wake.triggered,
+        },
       });
       buildId = started?.id ?? null;
     }
-    const fired =
-      buildId === null
-        ? undefined
-        : deps.db
-            .select()
-            .from(step)
-            .where(and(eq(step.buildId, buildId), eq(step.status, 'pending')))
-            .orderBy(desc(step.createdAt))
-            .get();
-    if (!fired) throw new Error('Scheduled continuation did not enqueue a step');
-    deps.db.update(step).set({ scheduleId: row.id }).where(eq(step.id, fired.id)).run();
-    if (todoRow.latestBuildId === null || freshAtConfirm) {
-      insertMessageRow(deps, fired.buildId, {
-        id: `schedule-wake-${fired.id}`,
-        role: 'system',
-        content: JSON.stringify({ kind: 'schedule-wake', stepId: fired.id }),
-        createdAt: fired.createdAt,
-      });
-    }
-    deps.db
-      .update(schedule)
-      .set({
-        lastRunAt: now,
-        lastRunStatus: 'started',
-        lastRunError: null,
-        retryNotBefore: null,
-        lastRunStepId: fired.id,
-      })
-      .where(eq(schedule.id, row.id))
-      .run();
-    updateNextRunAtIfUnmoved(deps, row.id, row.nextRunAt, isRecurring(row.kind) ? nextRunAt : null);
+    notifyScheduleClock();
   }
 
   function runSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): Promise<void> {
