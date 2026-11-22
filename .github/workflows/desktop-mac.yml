@@ -54,7 +54,9 @@ jobs:
           security find-identity -p codesigning "$keychain"
 
       - name: Test the updater with real macOS signatures
-        run: node --test --test-reporter=spec apps/desktop/scripts/signature-mac.test.mjs
+        env:
+          NODE_OPTIONS: --test-reporter=spec
+        run: node --test apps/desktop/scripts/signature-mac.test.mjs
 
   package:
     runs-on: macos-latest
