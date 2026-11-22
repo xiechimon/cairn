@@ -6,9 +6,10 @@ import {
   mcpCatalogEntry,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { type Ref, useRef, useState } from 'react';
+import { type MouseEvent, type Ref, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
+import { relativeTime } from '../board/rel-time.js';
 import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -21,6 +22,7 @@ import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
 import { Plus, X } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { CheckResultPopover } from './provider-editors.js';
 
 export const PALE_DISABLED =
   'disabled:bg-secondary/50 disabled:text-content-dim disabled:opacity-100';
@@ -154,7 +156,7 @@ function DialogError({ message }: { message: string | null }) {
 
 interface FootAction {
   label: string;
-  onClick: () => void;
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   disabled?: boolean;
 }
 
@@ -569,6 +571,8 @@ function ManageConnectorDialog({
   const [token, setToken] = useState('');
   const [current, setCurrent] = useState(connector);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedProblem, setSavedProblem] = useState(false);
+  const [report, setReport] = useState<RecheckReport | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
   const github = current.authKind === 'github-app';
@@ -579,20 +583,38 @@ function ManageConnectorDialog({
     mutations.patchMcpConnector.isPending ||
     mutations.checkMcpConnector.isPending ||
     mutations.deleteMcpConnector.isPending;
-  const after = {
-    onSuccess: (record: McpConnectorRecord) => {
-      setCurrent(record);
-      setToken('');
-    },
-    onError: (error: unknown) => setSaveError(submitError(t, error)),
-  };
-  const recheckOrSave = () => {
+  const recheckOrSave = (event: MouseEvent<HTMLButtonElement>) => {
     if (!live) return onClose();
     setSaveError(null);
-    if (token !== '')
-      mutations.patchMcpConnector.mutate({ id: current.id, body: { token } }, after);
-    else mutations.checkMcpConnector.mutate(current.id, after);
+    if (token !== '') {
+      setReport(null);
+      mutations.patchMcpConnector.mutate(
+        { id: current.id, body: { token } },
+        {
+          onSuccess: (record) => {
+            setCurrent(record);
+            setToken('');
+            setSavedProblem(true);
+          },
+          onError: (error) => setSaveError(submitError(t, error)),
+        },
+      );
+      return;
+    }
+    const anchor = event.currentTarget;
+    setSavedProblem(false);
+    setReport({ phase: 'checking', anchor, open: true });
+    mutations.checkMcpConnector.mutate(current.id, {
+      onSuccess: (record) => {
+        setCurrent(record);
+        setReport({ phase: 'done', record, anchor, open: true });
+      },
+      onError: () => setReport({ phase: 'unfinished', anchor, open: true }),
+    });
   };
+  const closeReport = () => setReport((prev) => (prev === null ? null : { ...prev, open: false }));
+  const showProblem = () =>
+    setReport({ phase: 'done', record: current, anchor: primaryRef.current, open: true });
   const remove = () => {
     setConfirmDelete(false);
     if (!live) return onClose();
@@ -625,10 +647,32 @@ function ManageConnectorDialog({
   return (
     <DialogShell
       title={current.label}
-      subtitle={<ConnectorStatus record={current} />}
+      subtitle={
+        current.status === 'error' && !local ? (
+          <Button
+            variant="ghost"
+            aria-haspopup="dialog"
+            aria-expanded={report?.open === true}
+            onClick={showProblem}
+            className="relative h-auto min-h-0 rounded-sm border-0 p-0 text-meta font-normal after:absolute aria-expanded:bg-transparent after:-inset-1 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-(--focus-ring) dark:hover:bg-transparent pointer-coarse:after:-inset-3"
+          >
+            <ConnectorStatus record={current} />
+          </Button>
+        ) : (
+          <ConnectorStatus record={current} />
+        )
+      }
       size="s"
       initialFocus={primaryRef}
       onClose={onClose}
+      {...(report?.open === true
+        ? {
+            onEscapeWhileNested: () => {
+              closeReport();
+              if (report.anchor instanceof HTMLElement) report.anchor.focus();
+            },
+          }
+        : {})}
       footer={
         <DialogFoot
           primaryRef={primaryRef}
@@ -641,7 +685,7 @@ function ManageConnectorDialog({
       }
     >
       <FormStack className={DIALOG_FORM_CLS}>
-        {!needsAuth && <DialogError message={connectorProblem(t, current)} />}
+        {savedProblem && !needsAuth && <DialogError message={connectorProblem(t, current)} />}
         {local && entry !== undefined ? (
           <>
             <SetupSteps entry={entry} />
@@ -688,7 +732,55 @@ function ManageConnectorDialog({
         )}
         <DialogError message={saveError} />
       </FormStack>
+      {report !== null && (
+        <RecheckResult name={current.label} report={report} onClose={closeReport} />
+      )}
     </DialogShell>
+  );
+}
+
+type RecheckReport = { anchor: Element | null; open: boolean } & (
+  | { phase: 'checking' }
+  | { phase: 'done'; record: McpConnectorRecord }
+  | { phase: 'unfinished' }
+);
+
+function RecheckResult({
+  name,
+  report,
+  onClose,
+}: {
+  name: string;
+  report: RecheckReport;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const record = report.phase === 'done' ? report.record : null;
+  const problem = record === null ? null : connectorProblem(t, record);
+  const ok = record?.status === 'connected' && problem === null;
+  const sentence =
+    report.phase === 'checking'
+      ? t('正在检查 {name} 能不能连上…', { name })
+      : ok
+        ? t('{name} 回应了，能用。', { name })
+        : (problem ?? t('没能完成检查，稍后重试。'));
+  const detail =
+    record === null || (!ok && problem === null)
+      ? null
+      : [
+          { label: t('检查内容'), value: 'tools/list', code: true },
+          { label: t('时间'), value: relativeTime(record.checkedAt, Date.now(), t) },
+        ];
+  return (
+    <CheckResultPopover
+      anchor={report.anchor}
+      open={report.open}
+      onClose={onClose}
+      tone={report.phase === 'checking' ? 'checking' : ok ? 'ok' : 'fail'}
+      sentence={sentence}
+      detail={detail}
+      testId="mcp-recheck-result"
+    />
   );
 }
 
