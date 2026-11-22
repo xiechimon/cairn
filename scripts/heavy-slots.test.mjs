@@ -47,16 +47,18 @@ test.afterEach(() => {
   children.clear();
 });
 
+const capacities = new WeakMap();
+
 function sandbox(slots) {
   const dir = mkdtempSync(join(tmpdir(), 'heavy-slots-test-'));
   const env = {
     ...scrubGateEnv(),
     CAIRN_OWNED_MODE: 'group',
-    CAIRN_HEAVY_SLOTS: String(slots),
     CAIRN_HEAVY_SLOTS_DIR: join(dir, 'locks'),
     CAIRN_CPU_SATURATION_PERCENT: '0',
     TMPDIR: join(dir, 'tmp'),
   };
+  capacities.set(env, slots);
   mkdirSync(env.TMPDIR, { recursive: true });
   delete env.CI;
   delete env.CAIRN_HEAVY_SLOT;
@@ -101,6 +103,24 @@ async function until(watched, stream, pattern, timeoutMs = 40_000) {
   }
 }
 
+const capacityOf = (env) => capacities.get(env) ?? defaultSlotCount();
+
+const admit = (options = {}) =>
+  acquireSlot({
+    ...options,
+    pool: options.pool ?? { defaultCount: capacityOf(options.env ?? process.env) },
+  });
+
+const pinSingleSlot = (file) => {
+  const source = readFileSync(file, 'utf8');
+  const pinned = source.replace(
+    'const CORES_PER_HEAVY_SLOT = 4;',
+    'const CORES_PER_HEAVY_SLOT = 4096;',
+  );
+  assert.notEqual(pinned, source, `${file} still states the cores per heavy slot`);
+  writeFileSync(file, pinned);
+};
+
 const startSquatter = (env, cwd) =>
   watch(
     process.execPath,
@@ -118,7 +138,7 @@ const startSquatter = (env, cwd) =>
     { env, cwd },
   );
 
-const startHolder = (env, { wait = true, lingerMs = 60_000 } = {}) =>
+const startHolder = (env, { wait = true, lingerMs = 60_000, capacity = capacityOf(env) } = {}) =>
   watch(
     process.execPath,
     [
@@ -130,7 +150,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { acquireSlot } from ${JSON.stringify(moduleUrl)};
 if (process.env.START_GATE) console.log('READY');
 while (process.env.START_GATE && !existsSync(process.env.START_GATE)) await sleep(20);
-const lease = await acquireSlot({ env: process.env, wait: ${wait} });
+const lease = await acquireSlot({ env: process.env, wait: ${wait}, pool: { defaultCount: ${capacity} } });
 console.log(lease ? 'SLOT ' + lease.slot : 'NONE');
 while (process.env.START_GATE && !existsSync(process.env.START_GATE + '.release')) await sleep(20);
 setTimeout(() => process.exit(0), ${lingerMs});
@@ -138,6 +158,14 @@ setTimeout(() => process.exit(0), ${lingerMs});
     ],
     { env },
   );
+
+const fillSlots = async (env) => {
+  const holders = Array.from({ length: defaultSlotCount() }, () =>
+    startHolder(env, { capacity: defaultSlotCount() }),
+  );
+  await Promise.all(holders.map((holder) => until(holder, 'out', /SLOT \d/)));
+  return holders;
+};
 
 test('an overridden TMPDIR on macOS does not move the shared lock directory', () => {
   const failed = () => ({ status: 71, stdout: '' });
@@ -166,18 +194,8 @@ test('slot count comes from the core count, one heavy slot per four cores', () =
   assert.equal(defaultSlotCount(4), 1);
   assert.equal(defaultSlotCount(2), 1);
   assert.equal(defaultSlotCount(1), 1);
-  assert.deepEqual(slotCount({}), { count: defaultSlotCount() });
-  assert.deepEqual(slotCount({}, 'CAIRN_HEAVY_SLOTS', defaultSlotCount(16)), { count: 4 });
-  assert.deepEqual(
-    slotCount({ CAIRN_HEAVY_SLOTS: '3' }, 'CAIRN_HEAVY_SLOTS', defaultSlotCount(16)),
-    { count: 3 },
-  );
-  assert.deepEqual(slotCount({ CAIRN_HEAVY_SLOTS: '' }), { count: defaultSlotCount() });
-  for (const bad of ['0', 'abc', '-2', '2.5', 'NaN']) {
-    const { count, warning } = slotCount({ CAIRN_HEAVY_SLOTS: bad });
-    assert.equal(count, 1, bad);
-    assert.match(warning, /CAIRN_HEAVY_SLOTS/, bad);
-  }
+  assert.equal(defaultSlotCount(3), 1);
+  assert.equal(defaultSlotCount(7), 1);
 });
 
 test('cpu utilisation comes from os.cpus() deltas, never from load average', async () => {
@@ -201,7 +219,7 @@ test('a saturated cpu keeps a waiter queued until the machine drains', async () 
   const readings = [99, 99, 40];
   let lease;
   try {
-    lease = await acquireSlot({
+    lease = await admit({
       env: { ...env, CAIRN_CPU_SATURATION_PERCENT: '90' },
       log: (line) => lines.push(line),
       cpuProbe: async () => readings.shift() ?? 40,
@@ -224,14 +242,14 @@ test('a cpu saturation probe refuses a non-waiting admission and a disabled limi
   const { env, cleanup } = sandbox(1);
   try {
     assert.equal(
-      await acquireSlot({
+      await admit({
         env: { ...env, CAIRN_CPU_SATURATION_PERCENT: '90' },
         wait: false,
         cpuProbe: async () => 99,
       }),
       null,
     );
-    const lease = await acquireSlot({
+    const lease = await admit({
       env: { ...env, CAIRN_CPU_SATURATION_PERCENT: '0' },
       wait: false,
       cpuProbe: async () => 99,
@@ -248,7 +266,7 @@ test('a cpu that stays saturated past the max wait starts anyway and says so', a
   const lines = [];
   let lease;
   try {
-    lease = await acquireSlot({
+    lease = await admit({
       env: {
         ...env,
         CAIRN_CPU_SATURATION_PERCENT: '90',
@@ -267,11 +285,12 @@ test('a cpu that stays saturated past the max wait starts anyway and says so', a
 
 test('a lease caps its holder to the cores that slot owns', () => {
   assert.equal(slotWorkerBudget(null), null);
-  assert.equal(slotWorkerBudget({ slot: 1 }, { CAIRN_HEAVY_SLOTS: '2' }, 8), 4);
-  assert.equal(slotWorkerBudget({ slot: 1 }, { CAIRN_HEAVY_SLOTS: '8' }, 8), 1);
-  assert.equal(slotWorkerBudget({ slot: 1 }, { CAIRN_HEAVY_SLOTS: '99' }, 8), 1);
-  assert.equal(slotWorkerBudget({ slot: 1 }, { CAIRN_HEAVY_SLOTS: '4' }, 16), 4);
-  assert.equal(slotWorkerBudget({ slot: 1 }, {}, 16), 16 / defaultSlotCount());
+  assert.equal(slotWorkerBudget({ slot: 1 }), 4);
+  assert.equal(slotWorkerBudget({ slot: 1 }, 8), 4);
+  assert.equal(slotWorkerBudget({ slot: 1 }, 16), 4);
+  assert.equal(slotWorkerBudget({ slot: 1 }, 4), 4);
+  assert.equal(slotWorkerBudget({ slot: 1 }, 2), 2);
+  assert.equal(slotWorkerBudget({ slot: 1 }, 1), 1);
 });
 
 test('only the explicit bypass flag skips admission, and it names itself in the log', async () => {
@@ -303,7 +322,7 @@ test('CI takes a slot unless it sets the bypass flag', async () => {
       { env: { ...env, CI: 'true', CAIRN_HEAVY_SLOTS_DIR: absent } },
     );
     assert.equal(await queued.exited, 0, queued.err);
-    assert.match(queued.err, /acquired slot 1\/1/);
+    assert.match(queued.err, /acquired slot 1\/\d+/);
     assert.equal(existsSync(join(absent, 'slot-1.lock')), false, 'released on exit');
     const kept = watch(
       process.execPath,
@@ -411,20 +430,6 @@ test('foreignPortHolderReport rejects a holder whose checkout cannot be resolved
   assert.match(neitherInGit, /not a git checkout/);
 });
 
-test('a bad slot count gets a warning and a single slot', async () => {
-  const { env, cleanup } = sandbox('abc');
-  try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
-    assert.match(holder.err, /CAIRN_HEAVY_SLOTS.*positive integer/);
-    const second = startHolder(env);
-    await until(second, 'err', /queued, position 1/);
-    assert.doesNotMatch(second.out, /SLOT/);
-  } finally {
-    cleanup();
-  }
-});
-
 test('waiters see their queue position and are served first-come first-served', async () => {
   const { env, cleanup } = sandbox(1);
   try {
@@ -446,12 +451,11 @@ test('waiters see their queue position and are served first-come first-served', 
 test('a queued waiter that can never use a free higher slot does not head-block the queue', async () => {
   const { env, cleanup } = sandbox(2);
   try {
-    const narrow = { ...env, CAIRN_HEAVY_SLOTS: '1' };
-    const holder = startHolder(narrow);
+    const holder = startHolder(env, { capacity: 1 });
     await until(holder, 'out', /SLOT 1/);
-    const narrowWaiter = startHolder(narrow, { lingerMs: 15_000 });
+    const narrowWaiter = startHolder(env, { capacity: 1, lingerMs: 15_000 });
     await until(narrowWaiter, 'err', /queued, position 1/);
-    const wideWaiter = startHolder(env, { lingerMs: 15_000 });
+    const wideWaiter = startHolder(env, { capacity: 2, lingerMs: 15_000 });
     await until(wideWaiter, 'out', /SLOT 2/, 5_000);
     assert.doesNotMatch(narrowWaiter.out, /SLOT/);
     await until(narrowWaiter, 'err', /queued, position 1/);
@@ -499,7 +503,7 @@ test('simultaneous grabs for the last slot: exactly one wins, every round', asyn
         START_GATE: gate,
       };
       const racers = Array.from({ length: 8 }, () =>
-        startHolder(roundEnv, { wait: false, lingerMs: 0 }),
+        startHolder(roundEnv, { wait: false, lingerMs: 0, capacity: 1 }),
       );
       await Promise.all(racers.map((racer) => until(racer, 'out', /READY/)));
       writeFileSync(gate, '');
@@ -539,7 +543,7 @@ test('simultaneous reclaim of one dead holder: exactly one process inherits the 
       assert.equal(probe.slots, locks);
       writeFileSync(join(locks, 'slot-1.lock'), JSON.stringify({ pid: probe.pid }));
       const racers = Array.from({ length: 8 }, () =>
-        startHolder(roundEnv, { wait: false, lingerMs: 0 }),
+        startHolder(roundEnv, { wait: false, lingerMs: 0, capacity: 1 }),
       );
       await Promise.all(racers.map((racer) => until(racer, 'out', /READY/)));
       writeFileSync(gate, '');
@@ -789,8 +793,9 @@ test('a planted probe path that is not a socket is reclaimed, not crashed', asyn
   }
 });
 
-test('three runs at capacity 1 never overlap', async () => {
+test('runs never exceed the machine capacity, and every run finishes', async () => {
   const { dir, env, cleanup } = sandbox(1);
+  const capacity = defaultSlotCount();
   try {
     const events = join(dir, 'events.log');
     const job = `
@@ -800,24 +805,31 @@ test('three runs at capacity 1 never overlap', async () => {
         appendFileSync(${JSON.stringify(events)}, 'end ' + process.pid + ' ' + Date.now() + '\\n');
       }, 600);
     `;
-    const jobs = Array.from({ length: 3 }, () =>
+    const jobs = Array.from({ length: capacity * 2 }, () =>
       watch(process.execPath, [cli, 'run', '--', process.execPath, '-e', job], { env }),
     );
     const codes = await Promise.all(jobs.map((job) => job.exited));
-    assert.deepEqual(codes, [0, 0, 0], jobs.map((job) => job.out + job.err).join('|'));
-    const spans = new Map();
+    assert.deepEqual(
+      codes,
+      Array(capacity * 2).fill(0),
+      jobs.map((job) => job.out + job.err).join('|'),
+    );
+    const starts = new Set();
+    const marks = [];
     for (const line of readFileSync(events, 'utf8').trim().split('\n')) {
       const [kind, pid, at] = line.split(' ');
-      if (kind === 'start') spans.set(pid, { start: Number(at) });
-      else spans.get(pid).end = Number(at);
+      if (kind === 'start') starts.add(pid);
+      marks.push({ at: Number(at), delta: kind === 'start' ? 1 : -1 });
     }
-    assert.equal(spans.size, 3);
-    const ordered = [...spans.values()].sort((a, b) => a.start - b.start);
-    for (let index = 1; index < ordered.length; index++)
-      assert.ok(
-        ordered[index - 1].end <= ordered[index].start,
-        `run ${index} started at ${ordered[index].start}, before the previous run ended at ${ordered[index - 1].end}`,
-      );
+    assert.equal(starts.size, capacity * 2);
+    marks.sort((a, b) => a.at - b.at || a.delta - b.delta);
+    let active = 0;
+    let peak = 0;
+    for (const mark of marks) {
+      active += mark.delta;
+      peak = Math.max(peak, active);
+    }
+    assert.ok(peak <= capacity, `peak of ${peak} runs exceeds the capacity of ${capacity}`);
   } finally {
     cleanup();
   }
@@ -846,6 +858,7 @@ appendFileSync(${JSON.stringify(events)}, 'end ' + process.pid + ' ' + Date.now(
         mkdirSync(dirname(join(repo, file)), { recursive: true });
         copyFileSync(file, join(repo, file));
       }
+      pinSingleSlot(join(repo, 'scripts/heavy-slots.mjs'));
       writeFileSync(join(repo, 'scripts/english-only-gate.mjs'), stub);
       writeFileSync(join(repo, 'scripts/public-content-gate.mjs'), 'process.exit(1);\n');
       git('init');
@@ -893,6 +906,7 @@ test('test:changed waits for a slot before it starts Vitest', async () => {
     mkdirSync(join(repo, 'scripts'), { recursive: true });
     copyFileSync('scripts/test-changed.mjs', join(repo, 'scripts/test-changed.mjs'));
     copyFileSync('scripts/heavy-slots.mjs', join(repo, 'scripts/heavy-slots.mjs'));
+    pinSingleSlot(join(repo, 'scripts/heavy-slots.mjs'));
     copyFileSync('scripts/owned-process.mjs', join(repo, 'scripts/owned-process.mjs'));
     const git = (...args) =>
       execFileSync(
@@ -965,7 +979,7 @@ test('a waiter names the lane, command and age of every holder and repeats while
   try {
     const holder = startHolder(env);
     await until(holder, 'out', /SLOT 1/);
-    const waiter = startHolder({ ...env, CAIRN_HEAVY_QUEUE_REPRINT_MS: '300' });
+    const waiter = startHolder({ ...env, CAIRN_HEAVY_QUEUE_REPRINT_MS: '300' }, { capacity: 1 });
     await until(waiter, 'err', /queued, position 1 of 1 slot/);
     assert.match(waiter.err, new RegExp(`lane [^,]+, pid ${holder.child.pid}, `));
     assert.match(waiter.err, /node /);
@@ -987,8 +1001,7 @@ test('a desktop pack waits for a slot before it builds anything', async () => {
     const scripts = JSON.parse(readFileSync('apps/desktop/package.json', 'utf8')).scripts;
     for (const name of ['start', 'dist:mac', 'dist:linux'])
       assert.match(scripts[name], /node scripts\/pack\.mjs/, name);
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
+    await fillSlots(env);
     const pack = watch(process.execPath, ['scripts/pack.mjs', '--mac'], {
       cwd: resolve('apps/desktop'),
       env: { ...env, CAIRN_TEST_TEMP_ROOT: join(env.TMPDIR, 'tmp-root') },
@@ -1000,8 +1013,9 @@ test('a desktop pack waits for a slot before it builds anything', async () => {
   }
 });
 
-test('run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass', async () => {
+test('run wrapper: at most the machine capacity runs at once, no slot twice, all pass', async () => {
   const { dir, env, cleanup } = sandbox(2);
+  const capacity = defaultSlotCount();
   try {
     const events = join(dir, 'events.log');
     const job = `
@@ -1011,11 +1025,11 @@ test('run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass', 
         appendFileSync(${JSON.stringify(events)}, 'end ' + process.env.CAIRN_HEAVY_SLOT + '\\n');
       }, 700);
     `;
-    const jobs = Array.from({ length: 4 }, () =>
+    const jobs = Array.from({ length: capacity * 2 }, () =>
       watch(process.execPath, [cli, 'run', '--', process.execPath, '-e', job], { env }),
     );
     const codes = await Promise.all(jobs.map((j) => j.exited));
-    assert.deepEqual(codes, [0, 0, 0, 0], jobs.map((j) => j.out + j.err).join('|'));
+    assert.deepEqual(codes, Array(capacity * 2).fill(0), jobs.map((j) => j.out + j.err).join('|'));
     const active = new Set();
     let peak = 0;
     for (const line of readFileSync(events, 'utf8').trim().split('\n')) {
@@ -1026,8 +1040,11 @@ test('run wrapper: with 2 slots and 4 jobs at most 2 run at once and all pass', 
       } else active.delete(slot);
       peak = Math.max(peak, active.size);
     }
-    assert.equal(peak, 2);
-    assert.ok(jobs.filter((j) => /queued, position/.test(j.err)).length >= 2);
+    assert.equal(peak, capacity);
+    assert.ok(
+      jobs.filter((j) => /queued, position/.test(j.err)).length >= capacity,
+      jobs.map((j) => j.err).join('|'),
+    );
   } finally {
     cleanup();
   }
@@ -1085,8 +1102,7 @@ test('an inherited slot variable that no live process holds is ignored', () => {
 test('an inherited slot whose lock belongs to someone else is not reused', async () => {
   const { env, cleanup } = sandbox(1);
   try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
+    await fillSlots(env);
     const borrower = watch(
       process.execPath,
       [cli, 'run', '--', process.execPath, '-e', 'console.log("ran")'],
@@ -1121,8 +1137,7 @@ test('run wrapper passes the exit code through and frees the slot', async () => 
 test('e2e:affected queues for a slot, but a dry run never waits', async () => {
   const { env, cleanup } = sandbox(1);
   try {
-    const holder = startHolder(env);
-    await until(holder, 'out', /SLOT 1/);
+    await fillSlots(env);
     const spec = 'apps/web/e2e/dialog-viewport.spec.ts';
     const dry = spawnSync(process.execPath, ['scripts/e2e-affected.mjs', '--dry-run', spec], {
       env,
@@ -1150,6 +1165,7 @@ test('local prepush waits for the heavy slot before it runs a single check', asy
     );
   try {
     for (const file of prepushModules) copyFileSync(file, join(repo, file));
+    pinSingleSlot(join(repo, 'scripts/heavy-slots.mjs'));
     git('init');
     writeFileSync(join(repo, 'README.md'), 'first\n');
     git('add', 'README.md');
@@ -1194,6 +1210,7 @@ test('local prepush ignores a squatted slot port because fast checks do not bind
     );
   try {
     for (const file of prepushModules) copyFileSync(file, join(repo, file));
+    pinSingleSlot(join(repo, 'scripts/heavy-slots.mjs'));
     git('init');
     writeFileSync(join(repo, 'README.md'), 'first\n');
     git('add', 'README.md');
@@ -1222,7 +1239,7 @@ test('local prepush ignores a squatted slot port because fast checks do not bind
 test('stale owner metadata cannot grant a second lease while the first run is alive', async () => {
   const { env, cleanup } = sandbox(1);
   try {
-    const holder = startHolder(env);
+    const holder = startHolder(env, { capacity: 1 });
     await until(holder, 'out', /SLOT 1/);
     const dead = spawnSync(process.execPath, ['-p', 'process.pid'], { env, encoding: 'utf8' });
     assert.equal(dead.status, 0, dead.stderr);
@@ -1230,7 +1247,7 @@ test('stale owner metadata cannot grant a second lease while the first run is al
       join(env.CAIRN_HEAVY_SLOTS_DIR, 'slot-1.lock'),
       JSON.stringify({ pid: Number(dead.stdout) }),
     );
-    const contender = startHolder(env, { wait: false, lingerMs: 0 });
+    const contender = startHolder(env, { wait: false, lingerMs: 0, capacity: 1 });
     assert.equal(await contender.exited, 0, contender.err);
     assert.match(contender.out, /NONE/);
   } finally {

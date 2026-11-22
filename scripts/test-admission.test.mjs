@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
@@ -11,6 +19,16 @@ import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const repo = resolve('.');
 const require = createRequire(import.meta.url);
+
+function pinSingleSlot(file) {
+  const source = readFileSync(file, 'utf8');
+  const pinned = source.replace(
+    'const CORES_PER_HEAVY_SLOT = 4;',
+    'const CORES_PER_HEAVY_SLOT = 4096;',
+  );
+  assert.notEqual(pinned, source, `${file} still states the cores per heavy slot`);
+  writeFileSync(file, pinned);
+}
 const runners = {
   vitest: join(require.resolve('vitest/package.json'), '../vitest.mjs'),
   playwright: join(require.resolve('@playwright/test/package.json'), '../cli.js'),
@@ -52,6 +70,7 @@ function fixture(t) {
     if (existsSync(join(repo, 'scripts', name)))
       cpSync(join(repo, 'scripts', name), join(root, 'scripts', name));
   }
+  pinSingleSlot(join(root, 'scripts/heavy-slots.mjs'));
   cpSync('vitest.config.ts', join(root, 'vitest.config.ts'));
   symlinkSync(join(repo, 'node_modules'), join(root, 'node_modules'));
   writeFileSync(join(root, 'package.json'), '{"type":"module"}');
@@ -79,7 +98,6 @@ test('actual worker admission', async () => {
     ...process.env,
     CAIRN_OWNED_MODE: 'group',
     CI: '',
-    CAIRN_HEAVY_SLOTS: '1',
     CAIRN_HEAVY_SLOTS_DIR: join(root, 'locks'),
     CAIRN_CPU_SATURATION_PERCENT: '0',
   };

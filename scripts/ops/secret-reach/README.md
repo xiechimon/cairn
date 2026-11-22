@@ -133,7 +133,7 @@ Keep only the two status lines and their exit status as evidence; never log the 
 `scripts/ops/secret-reach/batch-sandbox.settings.json` is a standalone Claude Code settings file for **batch** `claude -p` runs on the owner's Mac. Launch batch sessions with:
 
 ```sh
-CAIRN_HEAVY_SLOTS_DIR="$HOME/.cache/cairn-heavy-slots" CAIRN_HEAVY_SLOTS=1 \
+CAIRN_HEAVY_SLOTS_DIR="$HOME/.cache/cairn-heavy-slots" \
   claude -p '<prompt>' --settings scripts/ops/secret-reach/batch-sandbox.settings.json
 ```
 
@@ -144,7 +144,7 @@ The repository's `.claude/settings.json` deliberately carries no `sandbox` block
 Inside the sandbox a batch session cannot push or use `gh` (its credentials are denied and the proxy port is unreachable); PR creation, `push` and `push-queue` are the outer launcher script's job, outside the sandbox. It can still run tests, with two caveats:
 
 - The sandbox profile writes `TMPDIR=/tmp/claude` and allows writes only under the launch cwd, `/tmp/claude`, `~/.cache`, the package caches and `~/.cairn/plans`. The shared heavy-slot directory (`getconf DARWIN_USER_TEMP_DIR` on macOS) is *not* writable, so the launcher must point `CAIRN_HEAVY_SLOTS_DIR` at a writable dir — `~/.cache/cairn-heavy-slots` is already covered by `allowWrite`. `scripts/heavy-slots.mjs` keeps its liveness probe socket inside that directory, so no further path needs opening.
-- A private slot directory is a private lease: the batch session's heavy work no longer counts against the shared lane slots. `CAIRN_HEAVY_SLOTS=1` keeps the bypass at one heavy job.
+- A private slot directory is a private lease: the batch session's heavy work no longer counts against the shared lane slots. That directory's capacity still comes from the machine's cores (`max(1, floor(cores/4))`), so a 4-core runner keeps the bypass at one heavy job.
 
 Lane sessions (daemon `claude-code` runtime) are out of scope here; their isolation is tracked separately.
 

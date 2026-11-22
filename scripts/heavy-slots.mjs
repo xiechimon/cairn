@@ -107,7 +107,7 @@ function bypassName(env) {
   return `CAIRN_HEAVY_GATE_BYPASS=${raw}`;
 }
 
-export function slotCount(env, countEnv = 'CAIRN_HEAVY_SLOTS', defaultCount = defaultSlotCount()) {
+export function slotCount(env, countEnv, defaultCount) {
   const raw = env[countEnv];
   if (raw === undefined || raw === '') return { count: defaultCount };
   if (/^[1-9]\d*$/.test(raw.trim())) return { count: Number(raw) };
@@ -117,10 +117,9 @@ export function slotCount(env, countEnv = 'CAIRN_HEAVY_SLOTS', defaultCount = de
   };
 }
 
-export function slotWorkerBudget(lease, env = process.env, cores = availableParallelism()) {
+export function slotWorkerBudget(lease, cores = availableParallelism()) {
   if (lease === null) return null;
-  const { count } = slotCount(env);
-  return Math.max(1, Math.floor(cores / Math.max(1, count)));
+  return Math.max(1, Math.floor(cores / Math.max(1, defaultSlotCount(cores))));
 }
 
 function processCommand(pid) {
@@ -355,12 +354,7 @@ export async function acquireSlot({
   cpuProbe = cpuUtilizationPercent,
   light = null,
 } = {}) {
-  const {
-    countEnv = 'CAIRN_HEAVY_SLOTS',
-    defaultCount = defaultSlotCount(),
-    dirName = '',
-    label = 'heavy-slots',
-  } = pool;
+  const { countEnv, defaultCount = defaultSlotCount(), dirName = '', label = 'heavy-slots' } = pool;
   const dir = join(slotLockDir(env), dirName);
   const bypass = bypassName(env);
   if (bypass) {
@@ -369,7 +363,8 @@ export async function acquireSlot({
     );
     return null;
   }
-  const { count, warning } = slotCount(env, countEnv, defaultCount);
+  const { count, warning } =
+    countEnv === undefined ? { count: defaultCount } : slotCount(env, countEnv, defaultCount);
   if (warning) log(`[${label}] ${warning}`);
   const saturation = cpuSaturationPercent(env);
   if (saturation.warning) log(`[${label}] ${saturation.warning}`);

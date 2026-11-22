@@ -15,9 +15,10 @@ One directory (`CAIRN_HEAVY_SLOTS_DIR`, else the Darwin user temp directory or `
 | `queue-<ts>-<pid>-<token>` | a waiting ticket, oldest name first. |
 | `live-stack/slot-<n>.lock` | the same protocol for one verify-cairn live stack (`CAIRN_LIVE_STACK_SLOTS`, default 1). |
 
-Capacity is `max(1, floor(cores/4))` (`CAIRN_HEAVY_SLOTS` overrides it). The probe socket is a unix
-listener bound at `probePath(token)`, which keeps the path under 100 bytes: connecting to it proves
-the holder is alive even when its pid was recycled.
+Capacity is `max(1, floor(cores/4))`, derived from the machine's core count at admission time; no
+setting overrides it. The probe socket is a unix listener bound at `probePath(token)`, which keeps
+the path under 100 bytes: connecting to it proves the holder is alive even when its pid was
+recycled.
 
 ## Transitions
 
@@ -48,9 +49,10 @@ leave stale state behind.
 - **Two processes race for the last slot**: both take the guard flock in turn; only the one that
   finds the lock absent writes it. Test: `simultaneous grabs for the last slot: exactly one wins,
   every round`.
-- **A waiter's ticket cannot use the only free slot** (a ticket queued when capacity was larger):
-  it is skipped by the free-slot walk instead of head-blocking everyone behind it. Test: `a queued
-  waiter that can never use a free higher slot does not head-block the queue`.
+- **A waiter's ticket cannot use the only free slot** (a ticket written by a run that saw a larger
+  capacity, e.g. before a core-count change): it is skipped by the free-slot walk instead of
+  head-blocking everyone behind it. Test: `a queued waiter that can never use a free higher slot
+  does not head-block the queue`.
 - **CPU is saturated** (≥ `CAIRN_CPU_SATURATION_PERCENT`, default 90, sampled from `os.cpus()`
   deltas — macOS load average counts IO waits, so it is never used): a free slot stays unclaimed and
   the waiter logs the measured percentage. A non-waiting probe returns null. After

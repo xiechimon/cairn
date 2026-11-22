@@ -24,7 +24,7 @@ Units are the host's `cairn-<name>.service` user units. "Called by" lists script
 | `tools/plan/plan-issues.sh` | `cairn-plan-issues.service` (under `flock`), called by `lanes/run-worker.sh` | Writes an implementation plan into issues that lack one |
 | `tools/schedule/issue-schedule.mjs` | `cairn-issue-schedule.service` | Rewrites the scheduling issue from `batch:*` labels |
 | `tools/ci-speed.sh` | by hand, coordinator check-ins | One line of PR and push CI wall time (median, p90, max over the last 60 completed `ci.yml` runs) |
-| `bin/cairn-heavy` | every lane, before a whole-repo check | Delegates to the current checkout's shared heavy-slot CLI (`max(1, floor(cores/4))` slots, `CAIRN_HEAVY_SLOTS` override); defaults `CAIRN_TEST_TEMP_ROOT` to disk at `~/.cache/cairn-test-tmp` |
+| `bin/cairn-heavy` | every lane, before a whole-repo check | Delegates to the current checkout's shared heavy-slot CLI (`max(1, floor(cores/4))` slots, no override); defaults `CAIRN_TEST_TEMP_ROOT` to disk at `~/.cache/cairn-test-tmp` |
 | `tools/test-temp-guard.mjs`, `tools/test-temp-policy.json`, `units/test-temp-guard.{service,timer}` | every 15 min, also started by `main-watch/tmp-clean.sh` | Removes idle stale test entries from `/tmp`, `~/.cache/cairn-test-tmp` and `~/.cache/lane-tmp`; caps lane temp at 5 GiB and warns about pressure |
 | `tools/main-watch/main-watch.sh` | `cairn-main-watch.service` | Opens `main-red` issues for failing main checks and runs the scripts below each tick |
 | `tools/main-watch/{codex-watch,gh-health,model-health,tmp-clean}.sh` | `main-watch.sh` | Quota, GitHub API, model and temp-directory health |
