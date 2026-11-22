@@ -12,6 +12,7 @@ import {
 import { useChief } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useNarrow } from '../board/use-narrow.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -379,47 +380,51 @@ export function ComposerSurface({
               listboxId={inlineListboxId}
             />
           </div>
-          <Button
-            ref={sendRef}
-            variant="ghost"
-            size={send?.text !== undefined ? 'sm' : 'icon'}
-            aria-label={send?.label ?? t('发送')}
-            data-testid={send?.testId}
-            disabled={send !== undefined && !send.enabled}
-            className={
-              send?.text !== undefined
-                ? cn(
-                    'ml-auto h-7 flex-none cursor-pointer gap-1 px-2 text-meta font-normal pointer-coarse:h-11',
-                    hasDraft ? 'text-foreground' : 'text-content-tertiary',
-                  )
-                : narrow
-                  ? cn(ROUND_HIT_CLS, 'ml-auto')
-                  : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
-            }
-            onPointerDown={
-              holdToQueue
-                ? (event) => {
-                    if (event.pointerType === 'mouse' || !hasDraft) return;
+          <IconTooltip
+            label={send?.label ?? t('发送')}
+            trigger={
+              <Button
+                ref={sendRef}
+                variant="ghost"
+                size={send?.text !== undefined ? 'sm' : 'icon'}
+                data-testid={send?.testId}
+                disabled={send !== undefined && !send.enabled}
+                className={
+                  send?.text !== undefined
+                    ? cn(
+                        'ml-auto h-7 flex-none cursor-pointer gap-1 px-2 text-meta font-normal pointer-coarse:h-11',
+                        hasDraft ? 'text-foreground' : 'text-content-tertiary',
+                      )
+                    : narrow
+                      ? cn(ROUND_HIT_CLS, 'ml-auto')
+                      : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
+                }
+                onPointerDown={
+                  holdToQueue
+                    ? (event) => {
+                        if (event.pointerType === 'mouse' || !hasDraft) return;
+                        longPressed.current = false;
+                        clearPress();
+                        pressTimer.current = window.setTimeout(() => {
+                          longPressed.current = true;
+                          setQueueMenuOpen(true);
+                        }, 450);
+                      }
+                    : undefined
+                }
+                onPointerUp={holdToQueue ? clearPress : undefined}
+                onPointerLeave={holdToQueue ? clearPress : undefined}
+                onPointerCancel={holdToQueue ? clearPress : undefined}
+                onContextMenu={holdToQueue ? (event) => event.preventDefault() : undefined}
+                onClick={() => {
+                  if (longPressed.current) {
                     longPressed.current = false;
-                    clearPress();
-                    pressTimer.current = window.setTimeout(() => {
-                      longPressed.current = true;
-                      setQueueMenuOpen(true);
-                    }, 450);
+                    return;
                   }
-                : undefined
+                  (send?.onClick ?? wire.send)();
+                }}
+              />
             }
-            onPointerUp={holdToQueue ? clearPress : undefined}
-            onPointerLeave={holdToQueue ? clearPress : undefined}
-            onPointerCancel={holdToQueue ? clearPress : undefined}
-            onContextMenu={holdToQueue ? (event) => event.preventDefault() : undefined}
-            onClick={() => {
-              if (longPressed.current) {
-                longPressed.current = false;
-                return;
-              }
-              (send?.onClick ?? wire.send)();
-            }}
           >
             {send?.text !== undefined ? (
               <>
@@ -439,7 +444,7 @@ export function ComposerSurface({
             ) : (
               <CornerDownLeft width={20} height={20} />
             )}
-          </Button>
+          </IconTooltip>
         </div>
         {holdToQueue && (
           <DropdownMenu open={queueMenuOpen} onOpenChange={setQueueMenuOpen}>

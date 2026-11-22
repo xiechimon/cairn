@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
+import { IconTooltip } from './icon-tooltip.js';
 import {
   clampPanelWidth,
   dockedThreadLayout,
@@ -242,19 +243,23 @@ export function SidePanelHead({
       className={cn('flex h-12 flex-none items-center gap-2 px-4', className)}
     >
       {children}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        data-panel-close=""
-        className={cn(
-          'text-content-secondary hover:text-foreground pointer-coarse:size-11',
-          closeClassName,
-        )}
-        aria-label={closeLabel}
-        onClick={onClose}
+      <IconTooltip
+        label={closeLabel}
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            data-panel-close=""
+            className={cn(
+              'text-content-secondary hover:text-foreground pointer-coarse:size-11',
+              closeClassName,
+            )}
+            onClick={onClose}
+          />
+        }
       >
         <X aria-hidden strokeWidth={1.75} className="size-5.5" />
-      </Button>
+      </IconTooltip>
     </div>
   );
 }
