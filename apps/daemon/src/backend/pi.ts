@@ -124,26 +124,45 @@ export const PI_DAEMON_SETTINGS: PiSettingsSeed = {
   steeringMode: 'all',
 };
 
-export function daemonSettingsManager(): SettingsManager {
+export function daemonSettingsManager(
+  ...compactAt:
+    | []
+    | [
+        provider: string,
+        models: readonly { id: string; contextWindow: number | undefined }[],
+        compactAt: number | undefined,
+      ]
+): SettingsManager {
   return SettingsManager.inMemory(
-    { ...buildPiSessionSettings(), ...PI_DAEMON_SETTINGS },
+    {
+      ...buildPiSessionSettings(),
+      ...PI_DAEMON_SETTINGS,
+      compaction: {
+        ...buildPiSessionSettings().compaction,
+        ...PI_DAEMON_SETTINGS.compaction,
+        ...compactAtOverrides(...(compactAt as Parameters<typeof compactAtOverrides>)),
+      },
+    },
     { projectTrusted: false },
   );
 }
 
-export function compactAtSettingsSeed(
+function compactAtOverrides(
   provider: string,
   models: readonly { id: string; contextWindow: number | undefined }[],
   compactAt: number | undefined,
-): PiSettingsSeed {
+): PiSettingsSeed['compaction'] {
   if (compactAt === undefined) return {};
-  const overrides: Record<string, { reserveTokens: number }> = {};
+  const mainReserve = daemonSettingsManager().getCompactionSettings().reserveTokens;
+  const modelOverrides: Record<string, { reserveTokens: number }> = {};
   for (const model of models) {
     if (model.contextWindow === undefined || model.contextWindow <= compactAt) continue;
-    overrides[`${provider}/${model.id}`] = { reserveTokens: model.contextWindow - compactAt };
+    const reserve = Math.max(model.contextWindow - compactAt, mainReserve);
+    if (reserve === mainReserve) continue;
+    modelOverrides[`${provider}/${model.id}`] = { reserveTokens: reserve };
   }
-  if (Object.keys(overrides).length === 0) return {};
-  return { compaction: { modelOverrides: overrides } };
+  if (Object.keys(modelOverrides).length === 0) return {};
+  return { modelOverrides };
 }
 
 export const PI_SETTINGS_BYPASS = [
@@ -1138,25 +1157,18 @@ export class PiBackend implements AgentBackend {
           : { machineName: hostname() }),
         ...(opts.provider.baseUrl !== undefined ? { providerBaseUrl: opts.provider.baseUrl } : {}),
       });
-    const settingsManager = SettingsManager.inMemory(
-      {
-        ...buildPiSessionSettings(),
-        ...PI_DAEMON_SETTINGS,
-        ...compactAtSettingsSeed(
-          opts.provider.providerId,
-          [
-            ...(opts.provider.models ?? []).map((m) => ({
-              id: m.id,
-              contextWindow: m.contextWindow,
-            })),
-            ...(opts.provider.models?.some((m) => m.id === opts.modelId)
-              ? []
-              : [{ id: opts.modelId, contextWindow: model.contextWindow }]),
-          ],
-          opts.compactAt,
-        ),
-      },
-      { projectTrusted: false },
+    const settingsManager = daemonSettingsManager(
+      opts.provider.providerId,
+      [
+        ...(opts.provider.models ?? []).map((m) => ({
+          id: m.id,
+          contextWindow: m.contextWindow,
+        })),
+        ...(opts.provider.models?.some((m) => m.id === opts.modelId)
+          ? []
+          : [{ id: opts.modelId, contextWindow: model.contextWindow }]),
+      ],
+      opts.compactAt,
     );
     const protectedPresent = detectTrustProtectedResources(opts.cwd);
     if (protectedPresent.length > 0) {

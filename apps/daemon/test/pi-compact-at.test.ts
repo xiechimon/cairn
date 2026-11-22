@@ -105,6 +105,21 @@ test('a session without compactAt keeps the upstream compaction settings untouch
   }
 });
 
+test('a window just above compactAt never reserves less than the model gets on main', async () => {
+  const directory = testTempDir('pi-compact-at-160k-');
+  const handle = await openSession(directory, sessionOpts(directory, 160_000));
+  try {
+    const { settings, model } = lastSessionSettings();
+    const resolved = settings.getCompactionSettings(model);
+    expect(160_000 - resolved.reserveTokens).toBeLessThanOrEqual(COORDINATOR_COMPACT_AT);
+    expect(resolved.reserveTokens).toBeGreaterThanOrEqual(
+      settings.getCompactionSettings().reserveTokens,
+    );
+  } finally {
+    await handle.stop();
+  }
+});
+
 test('the pi host wire carries compactAt to the confined child session', async () => {
   const directory = testTempDir('pi-compact-at-host-');
   const probe = join(directory, 'probe', 'session.json');
