@@ -183,272 +183,271 @@ async function request(
   return json;
 }
 
-const logins = new Map<string, { qrcode: string; expiresAt: number }>();
+export function createWechatAdapter(): ImAdapter {
+  const logins = new Map<string, { qrcode: string; expiresAt: number }>();
+  return {
+    platform: 'wechat',
 
-export const wechatAdapter: ImAdapter = {
-  platform: 'wechat',
-
-  async check(fields) {
-    const token = fields.token?.trim() ?? '';
-    if (token === '') return { ok: false, reason: 'missing iLink bot token' };
-    const baseUrl = fields.baseUrl?.trim() ?? '';
-    if (baseUrl !== '') {
-      try {
-        const url = new URL(baseUrl);
-        if (url.protocol !== 'https:' && url.protocol !== 'http:') {
-          return { ok: false, reason: 'baseUrl must be an http(s) URL' };
-        }
-      } catch {
-        return { ok: false, reason: 'baseUrl is not a URL' };
-      }
-    }
-    const botId = fields.ilinkBotId?.trim() ?? '';
-    const userId = fields.ilinkUserId?.trim() ?? '';
-    const label = botId !== '' ? botId : userId;
-    return { ok: true, accountLabel: label === '' ? 'WeChat' : `WeChat ${label}` };
-  },
-
-  async loginStart(env) {
-    const response = await env.fetch(`${QR_BASE}ilink/bot/get_bot_qrcode?bot_type=${BOT_TYPE}`, {
-      method: 'POST',
-      headers: { ...clientHeaders(), 'content-type': 'application/json' },
-      body: JSON.stringify({ local_token_list: [] }),
-    });
-    const body = (await response.json().catch(() => ({}))) as IlinkObject;
-    if (body.qrcode === undefined) {
-      throw new Error(String(body.errmsg ?? 'WeChat did not return a code'));
-    }
-    const expiresAt = env.now() + 5 * 60_000;
-    const loginId = `wx_${randomBytes(8).toString('hex')}`;
-    logins.set(loginId, { qrcode: String(body.qrcode), expiresAt });
-    for (const [id, held] of logins) if (held.expiresAt < env.now()) logins.delete(id);
-    return { loginId, qr: String(body.qrcode_img_content ?? body.qrcode), expiresAt };
-  },
-
-  async loginWait(loginId, env) {
-    const held = logins.get(String(loginId));
-    if (held === undefined) return { status: 'expired' };
-    if (held.expiresAt < env.now()) {
-      logins.delete(String(loginId));
-      return { status: 'expired' };
-    }
-    const response = await env
-      .fetch(`${QR_BASE}ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(held.qrcode)}`, {
-        headers: clientHeaders(),
-        signal: AbortSignal.timeout(POLL_TIMEOUT_MS),
-      })
-      .catch(() => undefined);
-    const body = ((await response?.json().catch(() => ({}))) ?? {}) as IlinkObject;
-    const status = String(body.status ?? 'wait');
-    if (status === 'expired' || status === 'invalid') {
-      logins.delete(String(loginId));
-      return { status: 'expired' };
-    }
-    if (status !== 'confirmed') return { status: 'pending' };
-    logins.delete(String(loginId));
-    return {
-      status: 'done',
-      fields: {
-        token: String(body.bot_token ?? ''),
-        ilinkBotId: String(body.ilink_bot_id ?? ''),
-        ilinkUserId: String(body.ilink_user_id ?? ''),
-        baseUrl: String(body.baseurl ?? QR_BASE),
-      },
-    };
-  },
-
-  async connect(fields, handlers, env) {
-    const token = fields.token ?? '';
-    const baseUrl = withSlash(
-      fields.baseUrl !== undefined && fields.baseUrl !== '' ? fields.baseUrl : QR_BASE,
-    );
-    const contextTokens = new Map<string, string>();
-    let cursor = '';
-    let stopped = false;
-    let readyOnce = false;
-    const stopping = new AbortController();
-
-    const call = (endpoint: string, body: IlinkObject, timeoutMs: number, requireJson = false) =>
-      request(env, baseUrl, token, endpoint, body, timeoutMs, {
-        requireJson,
-        signal: stopping.signal,
-      });
-
-    const degraded = (reason: string) =>
-      handlers.onStatus(readyOnce ? 'degraded' : 'connecting', reason);
-
-    const deliver = async (message: WireMessage) => {
-      const userId = String(message.from_user_id ?? '');
-      if (userId === '') return;
-      const contextToken = String(message.context_token ?? '');
-      if (contextToken !== '') contextTokens.set(userId, contextToken);
-      const texts: string[] = [];
-      const images: ImInboundFile[] = [];
-      for (const raw of Array.isArray(message.item_list) ? message.item_list : []) {
-        const item =
-          raw !== null && typeof raw === 'object' ? (raw as IlinkObject) : ({} as IlinkObject);
-        const type = Number(item.type);
-        if (type === 1 && objectAt(item, 'text_item')?.text !== undefined) {
-          texts.push(String(objectAt(item, 'text_item')?.text));
-        } else if (type === 3 && objectAt(item, 'voice_item')?.text !== undefined) {
-          texts.push(String(objectAt(item, 'voice_item')?.text));
-        } else if (type === 2 && objectAt(item, 'image_item') !== undefined) {
-          images.push({ name: 'image', mimeType: null, dataBase64: null });
-        }
-      }
-      handlers.onMessage({
-        chat: { key: userId, kind: 'direct', title: null },
-        sender: { id: userId, name: null },
-        text: texts.join('\n').trim(),
-        images,
-        files: [],
-        messageId: String(message.client_id ?? message.message_id ?? ''),
-        mentioned: false,
-      });
-    };
-
-    const notifyStart = async () => {
-      const answer = await call('msg/notifystart', {}, START_TIMEOUT_MS);
-      const code = answer.errcode ?? answer.ret;
-      if (code === undefined || Number(code) === 0) return;
-      if (Number(code) === SESSION_EXPIRED) {
-        throw fail('WeChat session expired; scan the QR code again', {
-          permanent: true,
-          expired: true,
-        });
-      }
-      throw fail(`WeChat did not start the session (${String(code)})`, { permanent: true });
-    };
-
-    const poll = async () => {
-      while (!stopped) {
-        let answer: IlinkObject;
+    async check(fields) {
+      const token = fields.token?.trim() ?? '';
+      if (token === '') return { ok: false, reason: 'missing iLink bot token' };
+      const baseUrl = fields.baseUrl?.trim() ?? '';
+      if (baseUrl !== '') {
         try {
-          answer = await call(
-            'getupdates',
-            { get_updates_buf: cursor },
-            POLL_TIMEOUT_MS + 15_000,
-            true,
-          );
-        } catch (error) {
-          if (stopped) return;
-          const failure = error as Failure;
-          if (failure.timeout === true) continue;
-          if (failure.permanent === true) {
-            handlers.onStatus('error', reasonOf(error));
-            return;
+          const url = new URL(baseUrl);
+          if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+            return { ok: false, reason: 'baseUrl must be an http(s) URL' };
           }
-          degraded(reasonOf(error));
-          await env.sleep(3_000);
-          continue;
-        }
-        if (stopped) return;
-        const code = answer.ret ?? answer.errcode;
-        if (Number(code) === SESSION_EXPIRED) {
-          handlers.onStatus('expired', 'WeChat session expired; scan the QR code again');
-          return;
-        }
-        if (answer.ret !== undefined && Number(answer.ret) !== 0) {
-          if (Number(answer.ret) === 401 || Number(answer.ret) === 403) {
-            handlers.onStatus('error', `WeChat answered ${String(answer.ret)}`);
-            return;
-          }
-          degraded(`WeChat answered ${String(answer.ret)}`);
-          await env.sleep(3_000);
-          continue;
-        }
-        if (answer.ret === undefined && !isUpdatesAnswer(answer)) {
-          degraded('WeChat answered an unreadable response');
-          await env.sleep(3_000);
-          continue;
-        }
-        readyOnce = true;
-        handlers.onStatus('ready');
-        for (const message of orderMessages(answer.msgs)) {
-          if (stopped) return;
-          await deliver(message).catch(() => undefined);
-        }
-        if (
-          typeof answer.get_updates_buf === 'string' &&
-          answer.get_updates_buf !== '' &&
-          answer.get_updates_buf !== cursor
-        ) {
-          cursor = answer.get_updates_buf;
+        } catch {
+          return { ok: false, reason: 'baseUrl is not a URL' };
         }
       }
-    };
+      const botId = fields.ilinkBotId?.trim() ?? '';
+      const userId = fields.ilinkUserId?.trim() ?? '';
+      const label = botId !== '' ? botId : userId;
+      return { ok: true, accountLabel: label === '' ? 'WeChat' : `WeChat ${label}` };
+    },
 
-    const run = async () => {
-      try {
-        let shown = false;
-        for (let attempt = 0; !stopped; attempt += 1) {
+    async loginStart(env) {
+      const response = await env.fetch(`${QR_BASE}ilink/bot/get_bot_qrcode?bot_type=${BOT_TYPE}`, {
+        method: 'POST',
+        headers: { ...clientHeaders(), 'content-type': 'application/json' },
+        body: JSON.stringify({ local_token_list: [] }),
+      });
+      const body = (await response.json().catch(() => ({}))) as IlinkObject;
+      if (body.qrcode === undefined) {
+        throw new Error(String(body.errmsg ?? 'WeChat did not return a code'));
+      }
+      const expiresAt = env.now() + 5 * 60_000;
+      const loginId = `wx_${randomBytes(8).toString('hex')}`;
+      logins.set(loginId, { qrcode: String(body.qrcode), expiresAt });
+      for (const [id, held] of logins) if (held.expiresAt < env.now()) logins.delete(id);
+      return { loginId, qr: String(body.qrcode_img_content ?? body.qrcode), expiresAt };
+    },
+
+    async loginWait(loginId, env) {
+      const held = logins.get(String(loginId));
+      if (held === undefined) return { status: 'expired' };
+      if (held.expiresAt < env.now()) {
+        logins.delete(String(loginId));
+        return { status: 'expired' };
+      }
+      const response = await env
+        .fetch(`${QR_BASE}ilink/bot/get_qrcode_status?qrcode=${encodeURIComponent(held.qrcode)}`, {
+          headers: clientHeaders(),
+          signal: AbortSignal.timeout(POLL_TIMEOUT_MS),
+        })
+        .catch(() => undefined);
+      const body = ((await response?.json().catch(() => ({}))) ?? {}) as IlinkObject;
+      const status = String(body.status ?? 'wait');
+      if (status === 'expired' || status === 'invalid') {
+        logins.delete(String(loginId));
+        return { status: 'expired' };
+      }
+      if (status !== 'confirmed') return { status: 'pending' };
+      logins.delete(String(loginId));
+      return {
+        status: 'done',
+        fields: {
+          token: String(body.bot_token ?? ''),
+          ilinkBotId: String(body.ilink_bot_id ?? ''),
+          ilinkUserId: String(body.ilink_user_id ?? ''),
+          baseUrl: String(body.baseurl ?? QR_BASE),
+        },
+      };
+    },
+
+    async connect(fields, handlers, env) {
+      const token = fields.token ?? '';
+      const baseUrl = withSlash(
+        fields.baseUrl !== undefined && fields.baseUrl !== '' ? fields.baseUrl : QR_BASE,
+      );
+      const contextTokens = new Map<string, string>();
+      let cursor = '';
+      let stopped = false;
+      let readyOnce = false;
+      const stopping = new AbortController();
+
+      const call = (endpoint: string, body: IlinkObject, timeoutMs: number, requireJson = false) =>
+        request(env, baseUrl, token, endpoint, body, timeoutMs, {
+          requireJson,
+          signal: stopping.signal,
+        });
+
+      const degraded = (reason: string) =>
+        handlers.onStatus(readyOnce ? 'degraded' : 'connecting', reason);
+
+      const deliver = async (message: WireMessage) => {
+        const userId = String(message.from_user_id ?? '');
+        if (userId === '') return;
+        const contextToken = String(message.context_token ?? '');
+        if (contextToken !== '') contextTokens.set(userId, contextToken);
+        const texts: string[] = [];
+        const images: ImInboundFile[] = [];
+        for (const raw of Array.isArray(message.item_list) ? message.item_list : []) {
+          const item =
+            raw !== null && typeof raw === 'object' ? (raw as IlinkObject) : ({} as IlinkObject);
+          const type = Number(item.type);
+          if (type === 1 && objectAt(item, 'text_item')?.text !== undefined) {
+            texts.push(String(objectAt(item, 'text_item')?.text));
+          } else if (type === 3 && objectAt(item, 'voice_item')?.text !== undefined) {
+            texts.push(String(objectAt(item, 'voice_item')?.text));
+          } else if (type === 2 && objectAt(item, 'image_item') !== undefined) {
+            images.push({ name: 'image', mimeType: null, dataBase64: null });
+          }
+        }
+        handlers.onMessage({
+          chat: { key: userId, kind: 'direct', title: null },
+          sender: { id: userId, name: null },
+          text: texts.join('\n').trim(),
+          images,
+          files: [],
+          messageId: String(message.client_id ?? message.message_id ?? ''),
+          mentioned: false,
+        });
+      };
+
+      const notifyStart = async () => {
+        const answer = await call('msg/notifystart', {}, START_TIMEOUT_MS);
+        const code = answer.errcode ?? answer.ret;
+        if (code === undefined || Number(code) === 0) return;
+        if (Number(code) === SESSION_EXPIRED) {
+          throw fail('WeChat session expired; scan the QR code again', {
+            permanent: true,
+            expired: true,
+          });
+        }
+        throw fail(`WeChat did not start the session (${String(code)})`, { permanent: true });
+      };
+
+      const poll = async () => {
+        while (!stopped) {
+          let answer: IlinkObject;
           try {
-            await notifyStart();
-            break;
+            answer = await call(
+              'getupdates',
+              { get_updates_buf: cursor },
+              POLL_TIMEOUT_MS + 15_000,
+              true,
+            );
           } catch (error) {
             if (stopped) return;
             const failure = error as Failure;
+            if (failure.timeout === true) continue;
             if (failure.permanent === true) {
-              handlers.onStatus(failure.expired === true ? 'expired' : 'error', reasonOf(error));
+              handlers.onStatus('error', reasonOf(error));
               return;
             }
-            const wait = START_RETRY_DELAYS_MS[attempt];
-            if (wait === undefined) {
-              if (!shown) {
-                shown = true;
-                degraded(reasonOf(error));
+            degraded(reasonOf(error));
+            await env.sleep(3_000);
+            continue;
+          }
+          if (stopped) return;
+          const code = answer.ret ?? answer.errcode;
+          if (Number(code) === SESSION_EXPIRED) {
+            handlers.onStatus('expired', 'WeChat session expired; scan the QR code again');
+            return;
+          }
+          if (answer.ret !== undefined && Number(answer.ret) !== 0) {
+            if (Number(answer.ret) === 401 || Number(answer.ret) === 403) {
+              handlers.onStatus('error', `WeChat answered ${String(answer.ret)}`);
+              return;
+            }
+            degraded(`WeChat answered ${String(answer.ret)}`);
+            await env.sleep(3_000);
+            continue;
+          }
+          if (answer.ret === undefined && !isUpdatesAnswer(answer)) {
+            degraded('WeChat answered an unreadable response');
+            await env.sleep(3_000);
+            continue;
+          }
+          readyOnce = true;
+          handlers.onStatus('ready');
+          for (const message of orderMessages(answer.msgs)) {
+            if (stopped) return;
+            await deliver(message).catch(() => undefined);
+          }
+          if (
+            typeof answer.get_updates_buf === 'string' &&
+            answer.get_updates_buf !== '' &&
+            answer.get_updates_buf !== cursor
+          ) {
+            cursor = answer.get_updates_buf;
+          }
+        }
+      };
+
+      const run = async () => {
+        try {
+          let shown = false;
+          for (let attempt = 0; !stopped; attempt += 1) {
+            try {
+              await notifyStart();
+              break;
+            } catch (error) {
+              if (stopped) return;
+              const failure = error as Failure;
+              if (failure.permanent === true) {
+                handlers.onStatus(failure.expired === true ? 'expired' : 'error', reasonOf(error));
+                return;
               }
-              await env.sleep(3_000);
-            } else {
-              await env.sleep(wait);
+              const wait = START_RETRY_DELAYS_MS[attempt];
+              if (wait === undefined) {
+                if (!shown) {
+                  shown = true;
+                  degraded(reasonOf(error));
+                }
+                await env.sleep(3_000);
+              } else {
+                await env.sleep(wait);
+              }
             }
           }
+          if (!stopped) await poll();
+        } catch (error) {
+          if (!stopped) handlers.onStatus('error', reasonOf(error));
         }
-        if (!stopped) await poll();
-      } catch (error) {
-        if (!stopped) handlers.onStatus('error', reasonOf(error));
-      }
-    };
+      };
 
-    handlers.onStatus('connecting');
-    const worker = run();
+      handlers.onStatus('connecting');
+      const worker = run();
 
-    return {
-      send: async (msg: ImOutboundMessage) => {
-        const contextToken = contextTokens.get(msg.chatKey);
-        for (const text of chunk(msg.text, TEXT_LIMIT)) {
-          const answer = await call(
-            'sendmessage',
-            {
-              msg: {
-                from_user_id: '',
-                to_user_id: msg.chatKey,
-                client_id: `cairn-${randomBytes(8).toString('hex')}`,
-                message_type: 2,
-                message_state: 2,
-                item_list: [{ type: 1, text_item: { text } }],
-                ...(contextToken !== undefined && contextToken !== ''
-                  ? { context_token: contextToken }
-                  : {}),
+      return {
+        send: async (msg: ImOutboundMessage) => {
+          const contextToken = contextTokens.get(msg.chatKey);
+          for (const text of chunk(msg.text, TEXT_LIMIT)) {
+            const answer = await call(
+              'sendmessage',
+              {
+                msg: {
+                  from_user_id: '',
+                  to_user_id: msg.chatKey,
+                  client_id: `cairn-${randomBytes(8).toString('hex')}`,
+                  message_type: 2,
+                  message_state: 2,
+                  item_list: [{ type: 1, text_item: { text } }],
+                  ...(contextToken !== undefined && contextToken !== ''
+                    ? { context_token: contextToken }
+                    : {}),
+                },
               },
-            },
-            SEND_TIMEOUT_MS,
-          );
-          if (answer.ret !== undefined && Number(answer.ret) !== 0) {
-            throw fail(`WeChat refused the reply (${String(answer.errmsg ?? answer.ret)})`, {
-              permanent: true,
-            });
+              SEND_TIMEOUT_MS,
+            );
+            if (answer.ret !== undefined && Number(answer.ret) !== 0) {
+              throw fail(`WeChat refused the reply (${String(answer.errmsg ?? answer.ret)})`, {
+                permanent: true,
+              });
+            }
           }
-        }
-      },
-      stop: async () => {
-        if (stopped) return;
-        stopped = true;
-        stopping.abort(new Error('stopped'));
-        await worker.catch(() => undefined);
-      },
-    };
-  },
-};
-
-export default wechatAdapter;
+        },
+        stop: async () => {
+          if (stopped) return;
+          stopped = true;
+          stopping.abort(new Error('stopped'));
+          await worker.catch(() => undefined);
+        },
+      };
+    },
+  };
+}

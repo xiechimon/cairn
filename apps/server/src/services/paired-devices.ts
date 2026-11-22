@@ -8,11 +8,13 @@ import {
   type PairedDevice,
 } from '@cairn/shared';
 import { and, asc, count, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import type { Context } from 'hono';
 import type { Db } from '../db/client.js';
 import { apnsDevice, pairedDevice, pairingGrant, pushSubscription } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { pairedDeviceIdOf } from '../lib/token-auth.js';
 import { issueBrowserSession } from './browser-session.js';
 
 const LAST_SEEN_RESOLUTION_MS = 60_000;
@@ -144,10 +146,31 @@ export function createDeviceStreamRegistry(): DeviceStreamRegistry {
   };
 }
 
-export const deviceStreams = createDeviceStreamRegistry();
+const deviceStreamRegistries = new WeakMap<Db, DeviceStreamRegistry>();
 
-export function assertDeviceActive(deviceId: string | null): void {
-  if (deviceStreams.isRevoked(deviceId)) throw new HttpError(401, 'this device was revoked');
+export function deviceStreamsOf(db: Db): DeviceStreamRegistry {
+  let registry = deviceStreamRegistries.get(db);
+  if (registry === undefined) {
+    registry = createDeviceStreamRegistry();
+    deviceStreamRegistries.set(db, registry);
+  }
+  return registry;
+}
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    deviceStreams: DeviceStreamRegistry;
+  }
+}
+
+export function assertDeviceActive(c: Context): void {
+  const streams = c.get('deviceStreams');
+  if (streams === undefined) {
+    throw new HttpError(500, 'device stream registry unavailable');
+  }
+  if (streams.isRevoked(pairedDeviceIdOf(c))) {
+    throw new HttpError(401, 'this device was revoked');
+  }
 }
 
 export function pairedDeviceExists(db: Db, id: string): boolean {
@@ -267,7 +290,7 @@ export function revokePairedDevice(db: Db, teamId: string, id: string): boolean 
     tx.delete(apnsDevice).where(eq(apnsDevice.pairedDeviceId, id)).run();
     tx.delete(pairedDevice).where(eq(pairedDevice.id, id)).run();
   });
-  deviceStreams.closeAll(id);
+  deviceStreamsOf(db).closeAll(id);
   return true;
 }
 

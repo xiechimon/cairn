@@ -84,30 +84,37 @@ interface Ticket {
   expiresAt: number;
 }
 
-const tickets = new Map<string, Ticket>();
-
-export function issueStreamTicket(
-  session: ResolvedBrowserSession,
-  now = nowMs(),
-): {
-  ticket: string;
-  expiresAt: number;
-} {
-  for (const [key, row] of tickets) {
-    if (row.expiresAt <= now) tickets.delete(key);
-  }
-  const ticket = randomBytes(24).toString('base64url');
-  const expiresAt = now + TICKET_TTL_MS;
-  tickets.set(ticket, { session, expiresAt });
-  return { ticket, expiresAt };
+export interface StreamTicketBook {
+  issue(
+    session: ResolvedBrowserSession,
+    now?: number,
+  ): {
+    ticket: string;
+    expiresAt: number;
+  };
+  redeem(ticket: string, now?: number): ResolvedBrowserSession | null;
 }
 
-export function redeemStreamTicket(ticket: string, now = nowMs()): ResolvedBrowserSession | null {
-  const row = tickets.get(ticket);
-  if (row === undefined) return null;
-  tickets.delete(ticket);
-  if (row.expiresAt <= now) return null;
-  return row.session;
+export function createStreamTicketBook(): StreamTicketBook {
+  const tickets = new Map<string, Ticket>();
+  return {
+    issue(session, now = nowMs()) {
+      for (const [key, row] of tickets) {
+        if (row.expiresAt <= now) tickets.delete(key);
+      }
+      const ticket = randomBytes(24).toString('base64url');
+      const expiresAt = now + TICKET_TTL_MS;
+      tickets.set(ticket, { session, expiresAt });
+      return { ticket, expiresAt };
+    },
+    redeem(ticket, now = nowMs()) {
+      const row = tickets.get(ticket);
+      if (row === undefined) return null;
+      tickets.delete(ticket);
+      if (row.expiresAt <= now) return null;
+      return row.session;
+    },
+  };
 }
 
 export function sessionFromRequest(

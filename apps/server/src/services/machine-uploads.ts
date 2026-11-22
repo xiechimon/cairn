@@ -43,7 +43,7 @@ export function createUploadUrls(
     if (!files.every((f) => archiveNames.includes(f.name))) {
       throw new HttpError(400, 'repository snapshot uploads cannot be mixed with other files');
     }
-    authorizeRepoArchiveUpload(machineId, stepId);
+    authorizeRepoArchiveUpload(deps.machineHub, machineId, stepId);
   } else {
     ownedStepRow(deps, machineId, stepId);
   }

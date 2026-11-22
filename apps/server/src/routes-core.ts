@@ -22,12 +22,7 @@ import { openSseStream } from './lib/sse-headers.js';
 import { isOpenRemotePath, pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
-import {
-  issueBrowserSession,
-  issueStreamTicket,
-  requestIsSecure,
-  setAuthCookie,
-} from './services/browser-session.js';
+import { issueBrowserSession, requestIsSecure, setAuthCookie } from './services/browser-session.js';
 import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection, StreamSessionRegistry } from './services/events.js';
@@ -43,7 +38,7 @@ import {
   markNotificationRead,
   markNotificationUnread,
 } from './services/notifications.js';
-import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
+import { deviceStreamsOf, pairedDeviceExists } from './services/paired-devices.js';
 import { routingRuleIssues } from './services/routing-rule-issues.js';
 import {
   listRoutingSettings,
@@ -93,7 +88,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (ctx.authToken !== null && owner === undefined && deviceId === null) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    const ticket = issueStreamTicket(
+    const ticket = ctx.streamTickets.issue(
       owner !== undefined
         ? { kind: owner.via === 'access' ? 'external' : 'owner', deviceId: null }
         : deviceId !== null
@@ -285,7 +280,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       const held = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const unbindDevice = deviceStreams.bind(deviceId, () => stream.abort());
+      const unbindDevice = deviceStreamsOf(ctx.db).bind(deviceId, () => stream.abort());
       stream.onAbort(() => {
         clearInterval(timer);
         unsubscribe();

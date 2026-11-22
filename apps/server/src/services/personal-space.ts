@@ -1,5 +1,6 @@
 import { ATTACHMENT_MAX_BYTES } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import { project } from '../db/schema.js';
 import { conflict, HttpError, notFound } from '../lib/errors.js';
 import {
@@ -42,7 +43,16 @@ export function listedProjects(teamId: string) {
 
 const SPACE_PUSH_DENIED_REFS = [`refs/heads/${DEFAULT_HEAD_BRANCH}`];
 
-const creating = new Map<string, Promise<ProjectRow>>();
+const creatingByDb = new WeakMap<Db, Map<string, Promise<ProjectRow>>>();
+
+function creatingOf(db: Db): Map<string, Promise<ProjectRow>> {
+  let map = creatingByDb.get(db);
+  if (map === undefined) {
+    map = new Map<string, Promise<ProjectRow>>();
+    creatingByDb.set(db, map);
+  }
+  return map;
+}
 
 export function ensurePersonalSpace(
   ctx: RepoCtx,
@@ -50,6 +60,7 @@ export function ensurePersonalSpace(
   userId: string,
 ): Promise<ProjectRow> {
   const id = personalSpaceId(teamId, userId);
+  const creating = creatingOf(ctx.db);
   const inFlight = creating.get(id);
   if (inFlight !== undefined) return inFlight;
   const run = createPersonalSpace(ctx, teamId, userId, id).finally(() => creating.delete(id));

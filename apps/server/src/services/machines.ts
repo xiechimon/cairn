@@ -758,7 +758,7 @@ export function reportTool(
     createdAt: call.endedAt ?? nowMs(),
   };
   if (isChiefConversation(row.buildId)) {
-    const rest = flushShield(stepId);
+    const rest = flushShield(deps.db, stepId);
     if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
     upsertChiefRow(deps, {
       ...messageRow,
@@ -791,7 +791,7 @@ export function reportBackgroundTask(
     createdAt: task.startedAt,
   };
   if (isChiefConversation(row.buildId)) {
-    const rest = flushShield(stepId);
+    const rest = flushShield(deps.db, stepId);
     if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
     upsertChiefRow(deps, {
       ...messageRow,
@@ -816,7 +816,7 @@ export function reportTranscriptDelta(
     deps.convHub?.publishTextDelta(row.buildId, text);
     return;
   }
-  const shielded = shieldFor(stepId, () => stepClaimFacts(deps.db, row)).push(text);
+  const shielded = shieldFor(deps.db, stepId, () => stepClaimFacts(deps.db, row)).push(text);
   if (shielded !== '') deps.convHub?.publishTextDelta(row.buildId, shielded);
 }
 
@@ -842,7 +842,7 @@ export function storeTranscriptRow(
   const origin =
     row.role === 'user' && row.id === transcriptPromptRowId(stepId) ? 'task-prompt' : null;
   if (isChiefConversation(owned.buildId)) {
-    const rest = flushShield(stepId);
+    const rest = flushShield(deps.db, stepId);
     if (rest !== '') deps.convHub?.publishTextDelta(owned.buildId, rest);
     upsertChiefRow(deps, {
       id: row.id,

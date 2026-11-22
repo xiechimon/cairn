@@ -22,7 +22,7 @@ import {
   finishTodoDone,
   lastPushedCheckpoint,
   type MergeRequestOutcome,
-  mergingBuilds,
+  mergingBuildsOf,
   NotFoundError,
   STEP_KIND_TEXT,
 } from './builds.js';
@@ -128,10 +128,11 @@ export async function mergeThroughGithub(
     );
   }
   const token = access.token;
-  if (mergingBuilds.has(row.id)) {
+  const merging = mergingBuildsOf(deps.db);
+  if (merging.has(row.id)) {
     throw new HttpError(409, `PR #${prNumber} 的合并请求正在进行，等它返回后再试。`);
   }
-  mergingBuilds.add(row.id);
+  merging.add(row.id);
   try {
     const fetchImpl = deps.githubFetch ?? fetch;
     const page = await githubPull(fetchImpl, token, repoRef.owner, repoRef.repo, prNumber);
@@ -276,6 +277,6 @@ export async function mergeThroughGithub(
       ? { state: 'merged', prNumber, commit: result.sha, alreadyMerged: false }
       : { state: 'unconfirmed', prNumber };
   } finally {
-    mergingBuilds.delete(row.id);
+    merging.delete(row.id);
   }
 }

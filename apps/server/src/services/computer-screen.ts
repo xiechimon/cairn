@@ -27,7 +27,7 @@ import {
 } from './computer-control.js';
 import { browserScopeFor, computerThreadOf } from './computer-thread.js';
 import { findMachineByToken } from './machines.js';
-import { assertDeviceActive, deviceStreams } from './paired-devices.js';
+import { deviceStreamsOf } from './paired-devices.js';
 import { screenUpgradePath } from './screen-upgrade-paths.js';
 
 const MAX_CHANNELS = 128;
@@ -141,7 +141,9 @@ export class ComputerScreenGateway {
     deviceId: string | null = null,
   ) {
     if (this.closed) throw new HttpError(503, 'computer screen gateway is closed');
-    assertDeviceActive(deviceId);
+    if (deviceStreamsOf(this.deps.db).isRevoked(deviceId)) {
+      throw new HttpError(401, 'this device was revoked');
+    }
     const parsed = openComputerScreenSchema.safeParse(input);
     if (!parsed.success) throw new HttpError(400, 'invalid screen request');
     const { kind, leaseId } = parsed.data;
@@ -204,7 +206,7 @@ export class ComputerScreenGateway {
       unbindDevice: () => {},
     };
     this.channels.set(request.id, channel);
-    channel.unbindDevice = deviceStreams.bind(deviceId, () =>
+    channel.unbindDevice = deviceStreamsOf(this.deps.db).bind(deviceId, () =>
       this.revoke(channel, 'device revoked'),
     );
     if (!this.deps.machineHub.pushComputerScreen(row.machineId, request)) {

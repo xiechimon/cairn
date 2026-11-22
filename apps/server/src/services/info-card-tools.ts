@@ -13,6 +13,7 @@ import {
   isInfoCardComputerTool,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import type { step, todo } from '../db/schema.js';
 import { build } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -35,7 +36,16 @@ const REPORT_CHUNK_BYTES = 40 * 1024;
 const SNAPSHOT_CHUNK_CHARS = 192 * 1024;
 const APPEND_MAX_CHARS = 48_000;
 
-const ensured = new Set<string>();
+const ensuredByDb = new WeakMap<Db, Set<string>>();
+
+function ensuredOf(db: Db): Set<string> {
+  let set = ensuredByDb.get(db);
+  if (set === undefined) {
+    set = new Set<string>();
+    ensuredByDb.set(db, set);
+  }
+  return set;
+}
 
 function shellQuote(value: string): string {
   return `'${value.replaceAll("'", `'\\''`)}'`;
@@ -96,7 +106,7 @@ async function ensureTaskDir(
   row: StepRow,
   signal: AbortSignal | undefined,
 ): Promise<void> {
-  if (ensured.has(row.id)) return;
+  if (ensuredOf(deps.db).has(row.id)) return;
   const dir = infoTaskDir(row.buildId);
   const made = await computerCall(
     deps,
@@ -109,7 +119,7 @@ async function ensureTaskDir(
   );
   if (made.text.includes('computer error:')) throw new HttpError(409, made.text);
   await seedRepoSnapshot(deps, machineId, row, signal);
-  ensured.add(row.id);
+  ensuredOf(deps.db).add(row.id);
 }
 
 async function seedRepoSnapshot(

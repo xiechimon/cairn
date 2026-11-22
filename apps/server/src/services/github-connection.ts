@@ -128,7 +128,16 @@ export function openGithubToken(deps: GithubConnectionDeps, teamId: string): str
   return deps.box.open(row.accessTokenCipher);
 }
 
-const refreshChains = new Map<string, Promise<GithubTokenAccess>>();
+const refreshChainsByDb = new WeakMap<Db, Map<string, Promise<GithubTokenAccess>>>();
+
+function refreshChainsOf(db: Db): Map<string, Promise<GithubTokenAccess>> {
+  let map = refreshChainsByDb.get(db);
+  if (map === undefined) {
+    map = new Map<string, Promise<GithubTokenAccess>>();
+    refreshChainsByDb.set(db, map);
+  }
+  return map;
+}
 
 export async function connectionToken(
   deps: GithubTokenDeps,
@@ -163,6 +172,7 @@ function refreshConnectionToken(
 ): Promise<GithubTokenAccess> {
   const { box } = connectionDeps;
   const teamId = row.teamId;
+  const refreshChains = refreshChainsOf(connectionDeps.db);
   const chained = refreshChains.get(teamId);
   if (chained !== undefined) return chained;
   const refresh = (async (): Promise<GithubTokenAccess> => {

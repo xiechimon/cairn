@@ -719,9 +719,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
         () => c.req.text(),
         (_row, body) => {
           if (upload.name === REPO_ARCHIVE_FILE_NAME) {
-            receiveRepoArchive(upload.machineId, upload.stepId, body);
+            receiveRepoArchive(ctx.machineHub, upload.machineId, upload.stepId, body);
           } else {
-            receiveRepoArchiveFailure(upload.machineId, upload.stepId, body);
+            receiveRepoArchiveFailure(ctx.machineHub, upload.machineId, upload.stepId, body);
           }
           return completeUpload();
         },

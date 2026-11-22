@@ -105,7 +105,7 @@ export {
   dispatchHeadSha,
   hasActiveStep,
   lastPushedCheckpoint,
-  mergingBuilds,
+  mergingBuildsOf,
   stepKindInFlight,
 } from './build-step-state.js';
 export { mergedPrElsewhere, planAutoApproveAt, planAwaitsAutoConfirm };

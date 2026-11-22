@@ -56,7 +56,16 @@ interface TokenResponse {
   body: Record<string, unknown>;
 }
 
-const refreshInflight = new Map<string, Promise<string>>();
+const refreshInflights = new WeakMap<Db, Map<string, Promise<string>>>();
+
+function refreshInflightOf(db: Db): Map<string, Promise<string>> {
+  let map = refreshInflights.get(db);
+  if (map === undefined) {
+    map = new Map<string, Promise<string>>();
+    refreshInflights.set(db, map);
+  }
+  return map;
+}
 
 function requiredString(body: Record<string, unknown>, field: string): string {
   const value = body[field];
@@ -404,11 +413,12 @@ export async function materializeXaiAccessToken(
   const secret = secretOf(raw);
   if (!secret) return raw;
   const lockKey = `${teamId}/${providerId}`;
-  const inflight = refreshInflight.get(lockKey);
+  const inflights = refreshInflightOf(deps.db);
+  const inflight = inflights.get(lockKey);
   if (inflight) return inflight;
   const pending = refreshAccess(deps, teamId, providerId, secret).finally(() => {
-    refreshInflight.delete(lockKey);
+    inflights.delete(lockKey);
   });
-  refreshInflight.set(lockKey, pending);
+  inflights.set(lockKey, pending);
   return pending;
 }

@@ -37,7 +37,7 @@ import { createSerialConnection } from './services/events.js';
 import { readBuildChangeFile, readBuildChanges } from './services/git.js';
 import { isChiefConversation } from './services/machines.js';
 import { latestAgentTodo, newestMessagePage } from './services/message-page.js';
-import { deviceStreams, pairedDeviceExists } from './services/paired-devices.js';
+import { deviceStreamsOf, pairedDeviceExists } from './services/paired-devices.js';
 import { PhaseTransitionError } from './services/phase.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
 import { listThreadPrs } from './services/thread-pr.js';
@@ -133,7 +133,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       const held = new Promise<void>((resolve) => {
         release = resolve;
       });
-      const unbindDevice = deviceStreams.bind(deviceId, () => stream.abort());
+      const unbindDevice = deviceStreamsOf(ctx.db).bind(deviceId, () => stream.abort());
       stream.onAbort(() => {
         clearInterval(timer);
         unsubscribe();

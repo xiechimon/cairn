@@ -5,7 +5,9 @@ import type {
   ImInboundMessage,
   ImOutboundMessage,
 } from '../src/services/im/wechat.js';
-import { wechatAdapter } from '../src/services/im/wechat.js';
+import { createWechatAdapter } from '../src/services/im/wechat.js';
+
+const wechatAdapter = createWechatAdapter();
 
 const HANG = Symbol('hang');
 

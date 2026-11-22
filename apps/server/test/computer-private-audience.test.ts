@@ -4,6 +4,7 @@ import type { Hono } from 'hono';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createApp } from '../src/app.js';
 import { chief, chiefThread, computer, machine, step, user } from '../src/db/schema.js';
+import { createStreamTicketBook } from '../src/services/browser-session.js';
 import { TeamStreamHub } from '../src/services/events.js';
 import {
   dropComputerWaiters,
@@ -48,6 +49,7 @@ function principalApp(s: TestServer, principal: UserRecord) {
     pingIntervalMs: 3_600_000,
     claimHoldMs: 250,
     uploads: new Map(),
+    streamTickets: createStreamTicketBook(),
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),

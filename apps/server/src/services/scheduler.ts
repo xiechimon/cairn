@@ -261,7 +261,7 @@ export function createScheduler(
       });
       buildId = started?.id ?? null;
     }
-    notifyScheduleClock();
+    notifyScheduleClock(deps.db);
   }
 
   function runSchedule(row: ReturnType<typeof dueSchedules>[number], now: number): Promise<void> {
@@ -573,7 +573,7 @@ export function createScheduler(
       sweepExpiredActionProposals(deps.db);
       dispatchActionWakes(deps);
       if (deps.reposDir) dispatchHostedCleanup(deps.db, deps.reposDir);
-      setScheduleClockListener(() => dueRunner.arm());
+      setScheduleClockListener(deps.db, () => dueRunner.arm());
       ensureDue('sweep:main', 'sweep', opts.tickMs);
       ensureDue(
         'gc:coordinator-snapshots',
@@ -586,7 +586,7 @@ export function createScheduler(
     },
     stop() {
       dueStarted = false;
-      setScheduleClockListener(null);
+      setScheduleClockListener(deps.db, null);
       dueRunner.stop();
       if (gcImmediate !== null) clearImmediate(gcImmediate);
       gcImmediate = null;

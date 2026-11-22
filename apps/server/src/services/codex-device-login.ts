@@ -61,7 +61,16 @@ interface JsonResponse {
   body: Record<string, unknown>;
 }
 
-const refreshInflight = new Map<string, Promise<string>>();
+const refreshInflights = new WeakMap<Db, Map<string, Promise<string>>>();
+
+function refreshInflightOf(db: Db): Map<string, Promise<string>> {
+  let map = refreshInflights.get(db);
+  if (map === undefined) {
+    map = new Map<string, Promise<string>>();
+    refreshInflights.set(db, map);
+  }
+  return map;
+}
 
 function requiredString(body: Record<string, unknown>, field: string): string {
   const value = body[field];
@@ -411,11 +420,12 @@ export async function materializeCodexAccessToken(
   const raw = deps.box.open(stored.apiKeyCipher);
   const secret = secretOf(raw);
   if (!secret) return raw;
-  const inflight = refreshInflight.get(teamId);
+  const inflights = refreshInflightOf(deps.db);
+  const inflight = inflights.get(teamId);
   if (inflight) return inflight;
   const pending = refreshAccess(deps, teamId, secret).finally(() => {
-    refreshInflight.delete(teamId);
+    inflights.delete(teamId);
   });
-  refreshInflight.set(teamId, pending);
+  inflights.set(teamId, pending);
   return pending;
 }

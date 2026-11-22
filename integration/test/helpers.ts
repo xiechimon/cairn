@@ -26,6 +26,7 @@ import { seed } from '../../apps/server/src/db/seed.js';
 import { newUuidv7 } from '../../apps/server/src/lib/ids.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
+import { createStreamTicketBook } from '../../apps/server/src/services/browser-session.js';
 import { type BuildDeps, enqueueStep } from '../../apps/server/src/services/builds.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
@@ -170,6 +171,7 @@ export async function bootRealServer(opts: {
       pingIntervalMs: 15_000,
       claimHoldMs: opts.claimHoldMs ?? 1_000,
       uploads: new Map(),
+      streamTickets: createStreamTicketBook(),
       enrollments: new Map(),
       oauthStates: new Map(),
       xaiDeviceStates: new Map(),

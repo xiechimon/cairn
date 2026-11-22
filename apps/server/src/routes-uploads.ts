@@ -6,7 +6,6 @@ import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { attachmentDownloadDisposition } from './lib/attachment-disposition.js';
 import { HttpError, parseWith } from './lib/errors.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import {
   grantUpload as grantAttachmentUpload,
@@ -63,7 +62,7 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(400, 'file missing');
     }
     const bytes = new Uint8Array(await file.arrayBuffer());
-    assertDeviceActive(pairedDeviceIdOf(c));
+    assertDeviceActive(c);
     const out = uploadAttachmentFile(
       {
         db: ctx.db,

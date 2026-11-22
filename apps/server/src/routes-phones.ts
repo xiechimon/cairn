@@ -21,19 +21,18 @@ import {
 
 const phoneCreateBodySchema = z.union([phonePairBodySchema, phoneUsbAuthorizeBodySchema]);
 
-const pairLocks = new Map<string, Promise<unknown>>();
-async function withPairLock<T>(machineId: string, work: () => Promise<T>): Promise<T> {
-  const prior = pairLocks.get(machineId) ?? Promise.resolve();
-  const next = prior.then(work, work);
-  pairLocks.set(machineId, next);
-  try {
-    return await next;
-  } finally {
-    if (pairLocks.get(machineId) === next) pairLocks.delete(machineId);
-  }
-}
-
 export function registerPhoneRoutes(app: Hono, ctx: AppContext): void {
+  const pairLocks = new Map<string, Promise<unknown>>();
+  const withPairLock = async <T>(machineId: string, work: () => Promise<T>): Promise<T> => {
+    const prior = pairLocks.get(machineId) ?? Promise.resolve();
+    const next = prior.then(work, work);
+    pairLocks.set(machineId, next);
+    try {
+      return await next;
+    } finally {
+      if (pairLocks.get(machineId) === next) pairLocks.delete(machineId);
+    }
+  };
   const isOwnerSession = (c: Context): boolean =>
     pairedDeviceIdOf(c) === null &&
     (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&

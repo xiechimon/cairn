@@ -70,7 +70,16 @@ function claimedSourceRefs(db: Db, teamId: string, refs: string[]): Set<string> 
 
 export type ImportGithubIssueDeps = GithubIssueFaceDeps & Omit<TodoDeps, 'box'>;
 
-const importsInFlight = new Set<string>();
+const importsInFlightByDb = new WeakMap<Db, Set<string>>();
+
+function importsInFlightOf(db: Db): Set<string> {
+  let set = importsInFlightByDb.get(db);
+  if (set === undefined) {
+    set = new Set<string>();
+    importsInFlightByDb.set(db, set);
+  }
+  return set;
+}
 
 export async function importGithubIssue(
   deps: ImportGithubIssueDeps,
@@ -84,6 +93,7 @@ export async function importGithubIssue(
     throw new HttpError(409, `issue ${ref} already has a task`);
   }
   const claim = `${row.teamId}\u0000${ref.toLowerCase()}`;
+  const importsInFlight = importsInFlightOf(deps.db);
   if (importsInFlight.has(claim)) {
     throw new HttpError(409, `issue ${ref} is being imported`);
   }

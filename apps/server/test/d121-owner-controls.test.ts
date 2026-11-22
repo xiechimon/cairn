@@ -17,6 +17,7 @@ import {
 } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
+import { createStreamTicketBook } from '../src/services/browser-session.js';
 import { applyBuildStepAction, sweepPlanAutoConfirm } from '../src/services/builds.js';
 import { confirmBuild } from '../src/services/chief-tools.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
@@ -51,6 +52,7 @@ function world() {
     pingIntervalMs: 3_600_000,
     claimHoldMs: 1,
     uploads: new Map(),
+    streamTickets: createStreamTicketBook(),
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),

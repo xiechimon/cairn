@@ -34,6 +34,7 @@ import { sha256Hex } from '../src/lib/crypto.js';
 import { newRecordId, newUuidv7, nowMs } from '../src/lib/ids.js';
 import { createEphemeralSecretBox } from '../src/lib/secret-box.js';
 import { createAntigravitySubscription } from '../src/services/antigravity-subscriptions.js';
+import { createStreamTicketBook } from '../src/services/browser-session.js';
 import { type BuildDeps, completeStep, enqueueStep } from '../src/services/builds.js';
 import { createClaudeSubscription } from '../src/services/claude-subscriptions.js';
 import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
@@ -181,6 +182,7 @@ export function bootServer(
       pingIntervalMs: opts.pingIntervalMs ?? 3_600_000,
       claimHoldMs: opts.claimHoldMs ?? 250,
       uploads: new Map(),
+      streamTickets: createStreamTicketBook(),
       enrollments: new Map(),
       oauthStates,
       xaiDeviceStates,

@@ -12,7 +12,7 @@ import WebSocket from 'ws';
 import { chief, computer, computerCall, machine } from '../src/db/schema.js';
 import { hashCredential } from '../src/lib/hash.js';
 import { ComputerScreenGateway } from '../src/services/computer-screen.js';
-import { deviceStreams } from '../src/services/paired-devices.js';
+import { deviceStreamsOf } from '../src/services/paired-devices.js';
 import { bootServer, type TestServer } from './helpers.js';
 
 const MACHINE_TOKEN = 'screen-test-machine-token';
@@ -305,7 +305,7 @@ describe('real websocket screen bridge', () => {
     );
     const viewer = await connect(base + cap.path, undefined, cap.wsProtocols);
     const closed = once(viewer, 'close');
-    deviceStreams.closeAll('device-a');
+    deviceStreamsOf(s.db).closeAll('device-a');
     await closed;
     expect(daemon.readyState).not.toBe(WebSocket.OPEN);
     await expect(connect(base + other.path, undefined, other.wsProtocols)).resolves.toBeDefined();
@@ -313,15 +313,15 @@ describe('real websocket screen bridge', () => {
 
   test('a revoked device cannot open a screen, and a closed channel leaves no binding behind', () => {
     boot();
-    deviceStreams.closeAll('device-gone');
+    deviceStreamsOf(s.db).closeAll('device-gone');
     expect(() =>
       gateway.open(s.team.id, s.user.id, 'computer-screen', { kind: 'view' }, 'device-gone'),
     ).toThrow(/revoked/);
-    const before = deviceStreams.size();
+    const before = deviceStreamsOf(s.db).size();
     gateway.open(s.team.id, s.user.id, 'computer-screen', { kind: 'view' }, 'device-live');
-    expect(deviceStreams.size()).toBe(before + 1);
+    expect(deviceStreamsOf(s.db).size()).toBe(before + 1);
     gateway.invalidateComputer('computer-screen');
-    expect(deviceStreams.size()).toBe(before);
+    expect(deviceStreamsOf(s.db).size()).toBe(before);
   });
 
   test('the daemon greeting is buffered until the viewer attaches', async () => {

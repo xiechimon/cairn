@@ -1,6 +1,7 @@
 import type { StepKind } from '@cairn/shared';
 import { UNSTARTED_STEP_STATUSES } from '@cairn/shared';
 import { and, desc, eq, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
+import type { Db } from '../db/client.js';
 import { type build, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { isFullSha } from '../lib/github.js';
@@ -9,7 +10,16 @@ import { retryIsParked } from './retry-parking.js';
 
 type BuildRow = typeof build.$inferSelect;
 
-export const mergingBuilds = new Set<string>();
+const mergingBuildsByDb = new WeakMap<Db, Set<string>>();
+
+export function mergingBuildsOf(db: Db): Set<string> {
+  let set = mergingBuildsByDb.get(db);
+  if (set === undefined) {
+    set = new Set<string>();
+    mergingBuildsByDb.set(db, set);
+  }
+  return set;
+}
 
 export function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | null {
   return (
@@ -33,7 +43,7 @@ export function stepKindInFlight(deps: BuildDeps, buildId: string): StepKind | n
 }
 
 export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
-  return mergingBuilds.has(buildId) || stepKindInFlight(deps, buildId) !== null;
+  return mergingBuildsOf(deps.db).has(buildId) || stepKindInFlight(deps, buildId) !== null;
 }
 
 export function assertParkedBuildIdle(deps: BuildDeps, row: BuildRow): void {

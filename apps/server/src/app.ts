@@ -10,10 +10,10 @@ import { registerTokenAuth } from './lib/token-auth.js';
 import { registerRoutes } from './routes.js';
 import { registerMachineRoutes } from './routes-machine.js';
 import { registerRemoteRoutes } from './routes-remote.js';
-import { redeemStreamTicket, resolveBrowserSession } from './services/browser-session.js';
+import { resolveBrowserSession } from './services/browser-session.js';
 import { NotFoundError } from './services/builds.js';
 import {
-  deviceStreams,
+  deviceStreamsOf,
   pairedDeviceExists,
   pairedDeviceIdOfToken,
 } from './services/paired-devices.js';
@@ -95,17 +95,22 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
     resolveSession: (cookie) => resolveBrowserSession(ctx.db, cookie),
     redeemTicket: (ticket) => {
-      const session = redeemStreamTicket(ticket);
+      const session = ctx.streamTickets.redeem(ticket);
       if (session?.kind !== 'device') return session;
       if (
         session.deviceId === null ||
-        deviceStreams.isRevoked(session.deviceId) ||
+        deviceStreamsOf(ctx.db).isRevoked(session.deviceId) ||
         !pairedDeviceExists(ctx.db, session.deviceId)
       ) {
         return null;
       }
       return session;
     },
+  });
+  const deviceStreams = deviceStreamsOf(ctx.db);
+  app.use('/api/*', async (c, next) => {
+    c.set('deviceStreams', deviceStreams);
+    await next();
   });
   app.use('/api/*', compress());
   registerRoutes(app, ctx);

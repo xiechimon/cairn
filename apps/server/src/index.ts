@@ -33,6 +33,7 @@ import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
+import { createStreamTicketBook } from './services/browser-session.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
@@ -48,7 +49,7 @@ import { createImBridge, createImessageAdapter } from './services/im/imessage.js
 import { setImRuntime } from './services/im/runtime.js';
 import { createSlackAdapter } from './services/im/slack.js';
 import { createTelegramAdapter } from './services/im/telegram.js';
-import { wechatAdapter } from './services/im/wechat.js';
+import { createWechatAdapter } from './services/im/wechat.js';
 import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { seedLocalMachine } from './services/machines.js';
 import { createMailConnector } from './services/mail-connector.js';
@@ -196,7 +197,7 @@ const im = createImService({
   reposDir,
   adapters: {
     telegram: createTelegramAdapter(),
-    wechat: wechatAdapter,
+    wechat: createWechatAdapter(),
     slack: createSlackAdapter(),
     imessage: createImessageAdapter({ db, bridge: imBridge }),
   },
@@ -247,6 +248,7 @@ const app = createApp(
     pingIntervalMs: config.pingIntervalMs,
     claimHoldMs: config.claimHoldMs,
     uploads: new Map(),
+    streamTickets: createStreamTicketBook(),
     enrollments: new Map(),
     oauthStates: new Map(),
     xaiDeviceStates: new Map(),

@@ -231,7 +231,7 @@ export function createSchedule(
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) throw new Error('schedule missing after insert');
-  notifyScheduleClock();
+  notifyScheduleClock(deps.db);
   return record;
 }
 
@@ -243,7 +243,7 @@ export function deleteSchedule(
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   if (!row || row.teamId !== teamId) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
-  notifyScheduleClock();
+  notifyScheduleClock(deps.db);
   return true;
 }
 
@@ -277,7 +277,7 @@ export function setScheduleEnabled(
     }
   }
   const updated = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
-  notifyScheduleClock();
+  notifyScheduleClock(deps.db);
   return updated ? toScheduleRecord(deps, updated) : null;
 }
 
@@ -299,19 +299,20 @@ export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRo
     .map((r) => r.schedule);
 }
 
-let scheduleClockListener: (() => void) | null = null;
+const scheduleClocks = new WeakMap<Db, () => void>();
 
-export function setScheduleClockListener(listener: (() => void) | null): void {
-  scheduleClockListener = listener;
+export function setScheduleClockListener(db: Db, listener: (() => void) | null): void {
+  if (listener === null) scheduleClocks.delete(db);
+  else scheduleClocks.set(db, listener);
 }
 
-export function notifyScheduleClock(): void {
-  scheduleClockListener?.();
+export function notifyScheduleClock(db: Db): void {
+  scheduleClocks.get(db)?.();
 }
 
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {
   deps.db.update(schedule).set({ nextRunAt }).where(eq(schedule.id, id)).run();
-  notifyScheduleClock();
+  notifyScheduleClock(deps.db);
 }
 
 export function updateNextRunAtIfUnmoved(
@@ -330,7 +331,7 @@ export function updateNextRunAtIfUnmoved(
       ),
     )
     .run();
-  notifyScheduleClock();
+  notifyScheduleClock(deps.db);
 }
 
 export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): void {
@@ -339,7 +340,7 @@ export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): v
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.id, id))
     .run();
-  notifyScheduleClock();
+  notifyScheduleClock(deps.db);
 }
 
 export const ARCHIVED_SCHEDULE_PAUSE_REASON = 'Task archived';
@@ -350,7 +351,7 @@ export function pauseTodoSchedule(deps: ScheduleDeps, todoId: string, reason: st
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.todoId, todoId))
     .run();
-  notifyScheduleClock();
+  notifyScheduleClock(deps.db);
 }
 
 export function parseThreadCadence(

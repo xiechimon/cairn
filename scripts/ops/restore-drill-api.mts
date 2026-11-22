@@ -5,6 +5,7 @@ import { openDbWithHandle } from '../../apps/server/src/db/client.js';
 import { chiefMessage, chiefThread, team, todo } from '../../apps/server/src/db/schema.js';
 import { seed } from '../../apps/server/src/db/seed.js';
 import { createEphemeralSecretBox } from '../../apps/server/src/lib/secret-box.js';
+import { createStreamTicketBook } from '../../apps/server/src/services/browser-session.js';
 import { ConversationStreamHub, TeamStreamHub } from '../../apps/server/src/services/events.js';
 import { MachineWakeHub } from '../../apps/server/src/services/machine-wake-hub.js';
 import { newMcpOAuthState } from '../../apps/server/src/services/mcp-servers.js';
@@ -26,6 +27,7 @@ const app = createApp({
   pingIntervalMs: 3600000,
   claimHoldMs: 250,
   uploads: new Map(),
+  streamTickets: createStreamTicketBook(),
   enrollments: new Map(),
   oauthStates: new Map(),
   xaiDeviceStates: new Map(),

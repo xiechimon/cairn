@@ -170,7 +170,7 @@ export function registerPushRoutes(app: Hono, ctx: AppContext): void {
     ) {
       return c.json({ error: 'push endpoint already belongs to another account' }, 409);
     }
-    assertDeviceActive(pairedDeviceIdOf(c));
+    assertDeviceActive(c);
     const createdAt = nowMs();
     ctx.db
       .insert(pushSubscription)
@@ -247,7 +247,7 @@ export function registerPushRoutes(app: Hono, ctx: AppContext): void {
     ) {
       return c.json({ error: 'push endpoint already belongs to another account' }, 409);
     }
-    assertDeviceActive(pairedDeviceIdOf(c));
+    assertDeviceActive(c);
     const createdAt = nowMs();
     ctx.db
       .insert(apnsDevice)

@@ -6,6 +6,7 @@ import type { AccessVerifier } from './lib/cloudflare-access.js';
 import type { FetchLike } from './lib/github.js';
 import type { OwnerChannel } from './lib/owner-channel.js';
 import type { KeySecretBox } from './lib/secret-box.js';
+import type { StreamTicketBook } from './services/browser-session.js';
 import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
 import type { GithubConnectionDeviceAttempt } from './services/github-connection-device.js';
@@ -54,6 +55,7 @@ export interface AppContext {
   pingIntervalMs: number;
   claimHoldMs: number;
   uploads: Map<string, PendingUpload>;
+  streamTickets: StreamTicketBook;
   enrollments: Map<
     string,
     {

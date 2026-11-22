@@ -224,9 +224,19 @@ export function stepClaimFacts(
   return found === undefined ? NO_TERMINAL_CLAIM_FACTS : terminalClaimFacts(db, [found.todoId]);
 }
 
-const shields = new Map<string, ClaimShield>();
+const shieldsByDb = new WeakMap<Db, Map<string, ClaimShield>>();
 
-export function shieldFor(stepId: string, facts: () => TerminalClaimFacts): ClaimShield {
+function shieldsOf(db: Db): Map<string, ClaimShield> {
+  let map = shieldsByDb.get(db);
+  if (map === undefined) {
+    map = new Map<string, ClaimShield>();
+    shieldsByDb.set(db, map);
+  }
+  return map;
+}
+
+export function shieldFor(db: Db, stepId: string, facts: () => TerminalClaimFacts): ClaimShield {
+  const shields = shieldsOf(db);
   const existing = shields.get(stepId);
   if (existing !== undefined) return existing;
   const created = createClaimShield(facts());
@@ -234,7 +244,8 @@ export function shieldFor(stepId: string, facts: () => TerminalClaimFacts): Clai
   return created;
 }
 
-export function flushShield(stepId: string): string {
+export function flushShield(db: Db, stepId: string): string {
+  const shields = shieldsOf(db);
   const shield = shields.get(stepId);
   if (shield === undefined) return '';
   shields.delete(stepId);

@@ -27,9 +27,23 @@ interface WaitingRequest {
   outcome: Outcome | null;
 }
 
-const waiting = new Set<WaitingRequest>();
+const waitingRequests = new WeakMap<Db, Set<WaitingRequest>>();
 
-function matching(teamId: string, projectId: string | null, name: string): WaitingRequest[] {
+function waitingRequestsOf(db: Db): Set<WaitingRequest> {
+  let set = waitingRequests.get(db);
+  if (set === undefined) {
+    set = new Set<WaitingRequest>();
+    waitingRequests.set(db, set);
+  }
+  return set;
+}
+
+function matching(
+  waiting: Set<WaitingRequest>,
+  teamId: string,
+  projectId: string | null,
+  name: string,
+): WaitingRequest[] {
   return [...waiting].filter(
     (entry) =>
       entry.outcome === null &&
@@ -66,6 +80,7 @@ export async function holdSecretRequest(
     name,
     outcome: null,
   };
+  const waiting = waitingRequestsOf(db);
   waiting.add(entry);
   const deadline = Date.now() + (opts.timeoutMs ?? COMPUTER_HANDOFF_TIMEOUT_MS);
   const pollMs = opts.pollMs ?? COMPUTER_HANDOFF_POLL_MS;
@@ -106,7 +121,7 @@ export function answerSecretRequest(
   teamId: string,
   answer: SecretRequestAnswer,
 ): SecretRequestAnswered {
-  const entries = matching(teamId, answer.projectId, answer.name);
+  const entries = matching(waitingRequestsOf(deps.db), teamId, answer.projectId, answer.name);
   if (entries.length === 0) throw new HttpError(409, NO_WAITING_SECRET_REQUEST);
   if (answer.decision === 'save') {
     const existing = existingSecret(deps.db, teamId, answer.projectId, answer.name);

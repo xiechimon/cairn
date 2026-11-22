@@ -77,14 +77,19 @@ function alreadyInjected(candidate: Candidate, injectedTexts: readonly string[])
   return injectedTexts.some((text) => forms.some((form) => form !== '' && text.includes(form)));
 }
 
-const recalledByThread = new Map<string, Set<string>>();
+const recalledByThread = new WeakMap<Db, Map<string, Set<string>>>();
 
-function recalledSet(teamId: string, threadId: string): Set<string> {
+function recalledSet(db: Db, teamId: string, threadId: string): Set<string> {
   const key = `${teamId}${threadId}`;
-  let set = recalledByThread.get(key);
+  let map = recalledByThread.get(db);
+  if (map === undefined) {
+    map = new Map<string, Set<string>>();
+    recalledByThread.set(db, map);
+  }
+  let set = map.get(key);
   if (set === undefined) {
     set = new Set();
-    recalledByThread.set(key, set);
+    map.set(key, set);
   }
   return set;
 }
@@ -115,7 +120,7 @@ export function recallMemorySection(
 ): { text: string; memoryIds: string[] } | null {
   const queryTerms = recallTerms(query);
   if (queryTerms.size === 0) return null;
-  const seen = recalledSet(scope.teamId, scope.threadId);
+  const seen = recalledSet(db, scope.teamId, scope.threadId);
   const projectNames = new Map(
     db
       .select({ id: project.id, name: project.name })

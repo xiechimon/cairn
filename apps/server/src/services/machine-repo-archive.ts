@@ -1,6 +1,7 @@
 import type { MachineRepoArchiveCommand } from '@cairn/shared';
 import { HttpError } from '../lib/errors.js';
 import type { MachineDeps } from './machine-deps.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 
 export type RepoArchiveResult = { tarGz: Buffer } | { reason: string };
 
@@ -11,7 +12,16 @@ interface PendingArchive {
 }
 
 const ARCHIVE_TIMEOUT_MS = 90_000;
-const pending = new Map<string, PendingArchive>();
+const pendingByHub = new WeakMap<MachineWakeHub, Map<string, PendingArchive>>();
+
+function pendingOf(hub: MachineWakeHub): Map<string, PendingArchive> {
+  let map = pendingByHub.get(hub);
+  if (map === undefined) {
+    map = new Map<string, PendingArchive>();
+    pendingByHub.set(hub, map);
+  }
+  return map;
+}
 
 export function requestRepoArchive(
   deps: Pick<MachineDeps, 'machineHub'>,
@@ -19,6 +29,7 @@ export function requestRepoArchive(
   command: MachineRepoArchiveCommand,
   signal: AbortSignal | undefined,
 ): Promise<RepoArchiveResult> {
+  const pending = pendingOf(deps.machineHub);
   if (pending.has(command.stepId)) {
     return Promise.resolve({ reason: 'a repository snapshot is already being prepared' });
   }
@@ -42,20 +53,29 @@ export function requestRepoArchive(
   });
 }
 
-function requested(machineId: string, stepId: string): PendingArchive {
-  const request = pending.get(stepId);
+function requested(hub: MachineWakeHub, machineId: string, stepId: string): PendingArchive {
+  const request = pendingOf(hub).get(stepId);
   if (request?.machineId !== machineId) {
     throw new HttpError(404, `no repository snapshot requested for step ${stepId}`);
   }
   return request;
 }
 
-export function authorizeRepoArchiveUpload(machineId: string, stepId: string): void {
-  requested(machineId, stepId);
+export function authorizeRepoArchiveUpload(
+  hub: MachineWakeHub,
+  machineId: string,
+  stepId: string,
+): void {
+  requested(hub, machineId, stepId);
 }
 
-export function receiveRepoArchive(machineId: string, stepId: string, base64: string): void {
-  const request = requested(machineId, stepId);
+export function receiveRepoArchive(
+  hub: MachineWakeHub,
+  machineId: string,
+  stepId: string,
+  base64: string,
+): void {
+  const request = requested(hub, machineId, stepId);
   const tarGz = Buffer.from(base64, 'base64');
   request.settle(
     tarGz.length > request.maxBytes
@@ -64,6 +84,13 @@ export function receiveRepoArchive(machineId: string, stepId: string, base64: st
   );
 }
 
-export function receiveRepoArchiveFailure(machineId: string, stepId: string, reason: string): void {
-  requested(machineId, stepId).settle({ reason: reason.slice(0, 300) || 'git archive failed' });
+export function receiveRepoArchiveFailure(
+  hub: MachineWakeHub,
+  machineId: string,
+  stepId: string,
+  reason: string,
+): void {
+  requested(hub, machineId, stepId).settle({
+    reason: reason.slice(0, 300) || 'git archive failed',
+  });
 }

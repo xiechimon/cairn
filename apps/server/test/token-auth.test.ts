@@ -6,6 +6,7 @@ import {
   formatAccessTokenFile,
   MCP_TOOL_REGISTRY,
 } from '@cairn/shared';
+import { Hono } from 'hono';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
@@ -15,6 +16,8 @@ import {
   tokenAuthStartupLines,
   warnInsecureBind,
 } from '../src/config.js';
+import { HttpError } from '../src/lib/errors.js';
+import { assertDeviceActive } from '../src/services/paired-devices.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
 const TOKEN = 'cairn-test-token-0123456789abcdef';
@@ -244,6 +247,17 @@ describe('token auth: SSE uses a short ticket, not the owner token', () => {
     const s = bootServer({ authToken: TOKEN });
     const res = await req(s.app, 'POST', '/api/auth/stream-ticket');
     expect(res.status).toBe(401);
+  });
+
+  test('a ticket minted on one app instance does not open the stream on another', async () => {
+    const a = bootServer({ authToken: TOKEN, pingIntervalMs: 50 });
+    const b = bootServer({ authToken: TOKEN, pingIntervalMs: 50 });
+    const ticket = await streamTicket(a);
+    const res = await Promise.resolve(
+      b.app.request(`/api/teams/${b.team.id}/stream?ticket=${ticket}`),
+    );
+    expect(res.status).toBe(401);
+    void res.body?.cancel().catch(() => {});
   });
 
   test('on + the team stream refuses ?token= and opens with a ticket', async () => {
@@ -503,5 +517,24 @@ describe('the bare-bind WARN (failure modes 9/10)', () => {
     expect(loadConfig().authToken).toBeNull();
     expect(loadConfig().host).toBe('127.0.0.1');
     vi.unstubAllEnvs();
+  });
+});
+
+describe('device revocation guard (assertDeviceActive)', () => {
+  test('fails closed when the context carries no device stream registry', async () => {
+    const app = new Hono();
+    let thrown: unknown;
+    app.get('/probe', (c) => {
+      try {
+        assertDeviceActive(c);
+      } catch (err) {
+        thrown = err;
+        throw err;
+      }
+      return c.body(null, 204);
+    });
+    const res = await app.request('/probe');
+    expect(thrown).toBeInstanceOf(HttpError);
+    expect(res.status).not.toBe(204);
   });
 });
