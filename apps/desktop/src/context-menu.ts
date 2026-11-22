@@ -5,8 +5,7 @@ import type {
   MenuItemConstructorOptions,
   WebContents,
 } from 'electron';
-
-export type ContextMenuLocale = 'zh' | 'en';
+import type { DesktopLocale } from './locale.js';
 
 type ContextMenuTarget = Pick<
   ContextMenuParams,
@@ -52,13 +51,9 @@ function preview(text: string): string {
   return flat.length > LOOK_UP_PREVIEW_LENGTH ? `${flat.slice(0, LOOK_UP_PREVIEW_LENGTH)}…` : flat;
 }
 
-export function contextMenuLocale(htmlLang: unknown): ContextMenuLocale {
-  return typeof htmlLang === 'string' && htmlLang.toLowerCase().startsWith('zh') ? 'zh' : 'en';
-}
-
 export function contextMenuTemplate(
   target: ContextMenuTarget,
-  locale: ContextMenuLocale,
+  locale: DesktopLocale,
   actions: ContextMenuActions,
   platform: NodeJS.Platform = process.platform,
 ): MenuItemConstructorOptions[] {
@@ -105,14 +100,18 @@ export interface ContextMenuElectron {
   Menu: Pick<typeof Menu, 'buildFromTemplate'>;
 }
 
-export function installContextMenu(contents: WebContents, electron: ContextMenuElectron): void {
+export function installContextMenu(
+  contents: WebContents,
+  electron: ContextMenuElectron,
+  locale: (lang: unknown) => DesktopLocale,
+): void {
   contents.on('context-menu', (_event, params) => {
     void contents
       .executeJavaScript('document.documentElement.lang')
       .catch(() => null)
       .then((lang) => {
         if (contents.isDestroyed()) return;
-        const template = contextMenuTemplate(params, contextMenuLocale(lang), {
+        const template = contextMenuTemplate(params, locale(lang), {
           copyImage: (x, y) => contents.copyImageAt(x, y),
           saveImage: (url) => contents.downloadURL(url),
           copyText: (text) => electron.clipboard.writeText(text),

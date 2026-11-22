@@ -2501,6 +2501,10 @@ export const EN: Record<string, string> = {
   '正在重启…': 'Restarting…',
   '重新启动以更新到 {version}': 'Restart to update to {version}',
   '更新失败：{message}': 'Update failed: {message}',
+  'Cairn 回滚了更新': 'Cairn rolled back an update',
+  '{failed} 没能启动，Cairn 装回了 {restored}。':
+    '{failed} did not start. Cairn went back to {restored}.',
+  '失败记录在 {path}。': 'The failure is logged in {path}.',
   开发版不检查更新: 'Development builds do not check for updates',
   '把 Cairn 移到「应用程序」后才能自动更新':
     'Move Cairn to Applications to update it automatically',
