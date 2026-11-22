@@ -14,6 +14,10 @@ export function certificateFingerprint(pem) {
   return new X509Certificate(pem).fingerprint.replaceAll(':', '').toUpperCase();
 }
 
+export function cairnRequirement(fingerprint) {
+  return `identifier "${CAIRN_BUNDLE_ID}" and certificate leaf = H"${fingerprint}"`;
+}
+
 export function signedBy(requirement, bundleId, fingerprint) {
   const match = /^identifier "([^"]+)" and certificate (?:leaf|root) = H"([0-9a-fA-F]{40})"$/.exec(
     requirement ?? '',
@@ -48,11 +52,21 @@ function check(app, certPath) {
   const requirement = designatedRequirement(run('codesign', ['-d', '-r-', app]).output);
   const fingerprint = certificateFingerprint(readFileSync(certPath, 'utf8'));
   console.log(`${app}: designated => ${requirement}`);
-  if (signedBy(requirement, CAIRN_BUNDLE_ID, fingerprint)) return true;
-  console.error(
-    `${app} is not signed by the certificate ${fingerprint} for ${CAIRN_BUNDLE_ID}; macOS would drop its permissions on the next update`,
-  );
-  return false;
+  if (!signedBy(requirement, CAIRN_BUNDLE_ID, fingerprint)) {
+    console.error(
+      `${app} is not signed by the certificate ${fingerprint} for ${CAIRN_BUNDLE_ID}; macOS would drop its permissions on the next update`,
+    );
+    return false;
+  }
+  const pinned = cairnRequirement(fingerprint);
+  const pinnedCheck = run('codesign', ['--verify', '--strict', `-R=${pinned}`, app]);
+  if (pinnedCheck.status !== 0) {
+    console.error(
+      `${app} does not satisfy ${pinned}, the requirement the updater installs against:\n${pinnedCheck.output}`,
+    );
+    return false;
+  }
+  return true;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

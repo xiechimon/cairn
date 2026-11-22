@@ -4,13 +4,20 @@ import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { certificateFingerprint, designatedRequirement, signedBy } from './check-signature.mjs';
+import {
+  cairnRequirement,
+  certificateFingerprint,
+  designatedRequirement,
+  signedBy,
+} from './check-signature.mjs';
+
+const { CAIRN_REQUIREMENT } = await import('../src/signature.ts');
 
 const BUNDLE = 'io.github.xiechimon.cairn';
 const RELEASE_FINGERPRINT = '19AA592374DC19928A4C5494BCAC5A984182EA8A';
 const CERT = join(import.meta.dirname, '..', 'signing', 'cairn-mac-self-signed.crt');
 
-function runCli({ plistId, requirement }) {
+function runCli({ plistId, requirement, pinned = 0 }) {
   const bin = makeTestTempDir('check-signature-');
   const tool = (name, body) => {
     writeFileSync(join(bin, name), `#!/bin/sh\n${body}\n`);
@@ -19,7 +26,12 @@ function runCli({ plistId, requirement }) {
   tool('plutil', `echo '${plistId}'`);
   tool(
     'codesign',
-    `[ "$1" = "--verify" ] && exit 0\necho 'Executable=/tmp/Cairn.app/Contents/MacOS/Cairn' >&2\necho 'designated => ${requirement}'`,
+    `case "$*" in
+  *"-R="*) exit ${pinned} ;;
+  --verify*) exit 0 ;;
+esac
+echo 'Executable=/tmp/Cairn.app/Contents/MacOS/Cairn' >&2
+echo 'designated => ${requirement}'`,
   );
   return spawnSync(
     process.execPath,
@@ -71,5 +83,18 @@ test('the CLI pins the Cairn bundle identifier instead of trusting the app', () 
   assert.equal(
     runCli({ plistId: BUNDLE, requirement: 'cdhash H"c7c7d57dd2c79218fd0e3db03a84690e825d8629"' }),
     1,
+  );
+});
+
+test('the release check requires the requirement the updater installs against', () => {
+  const signed = `identifier "${BUNDLE}" and certificate leaf = H"${RELEASE_FINGERPRINT}"`;
+  assert.equal(runCli({ plistId: BUNDLE, requirement: signed }), 0);
+  assert.equal(runCli({ plistId: BUNDLE, requirement: signed, pinned: 1 }), 1);
+});
+
+test('the release check builds the same requirement the updater uses', () => {
+  assert.equal(
+    cairnRequirement(certificateFingerprint(readFileSync(CERT, 'utf8'))),
+    CAIRN_REQUIREMENT,
   );
 });

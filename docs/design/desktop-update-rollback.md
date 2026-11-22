@@ -67,7 +67,7 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 
 - `ready` means: zip downloaded, SHA-256 matches the manifest, extracted bundle carries the manifest's version in its `Info.plist` and an executable next to it, and `staged` is written. Nothing has changed on disk yet that the running app depends on.
 - A staged record is only usable by the exact version that staged it (`staged.previousVersion` must equal the running version) and only from a folder the updater itself created beside the bundle (`<bundle dir>/.cairn-update-*/<the bundle's own name>`). Anything else in that record is discarded and its folder removed, so a stale or hand-edited record can never install over a newer copy, and `rm -rf` only ever runs on a staging folder derived from the running bundle's directory.
-- Before the swap, the staged bundle is checked against the running app's code signature (`codesign --verify --strict`, same signing authority and bundle identifier). A copy that is not signed the way this copy of Cairn is refuses to install. When the running app itself has no verifiable signature — a development copy — there is nothing to compare, and the check is skipped with a line in the log.
+- Before the swap, the staged bundle must pass `codesign --verify --strict` with Cairn's pinned certificate and bundle identifier (see `docs/ops/desktop-signing.md`), regardless of what signs the running copy. If verification refuses the update, only exit 3 (valid signature, requirement not met) allows `apply()` to clear the staged record: it re-reads the file after verification and writes only `staged: null` over that state if the record still names the same app. It leaves the folder for the existing startup sweep. The next ordinary check can stage a newer release as usual.
 - `ready` → swap on one of three triggers: quit (`app.before-quit`, after the server and Runner are stopped), idle (no window open and not focused for ten minutes), or explicit install (`install({ relaunch: 'foreground' })`).
 - Swap: `rename(bundle → previousApp)`, `rename(staged.app → bundle)`. If the second rename fails, the first is undone and the state stays `staged` with an `error` published.
 - Swap success writes `installed` and clears `staged`. The swap deletes nothing: the previous bundle is now `previousApp`.
@@ -83,7 +83,7 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 |---|---|---|
 | `updater.check()` | `blocked` (to decide whether to auto-stage) | — |
 | `updater.stage()` | — | `staged` |
-| `updater.apply()`, quit hook, idle hook | `staged` | `installed`, clears `staged` |
+| `updater.apply()`, quit hook, idle hook | `staged`; re-reads the state on signature requirement mismatch | On swap, `installed` and clears `staged`; on requirement mismatch, clears only `staged` if it still names the same app |
 | boot, no `installed` record or a different running version | `installed` | clears `installed`, removes the kept previous bundle |
 | boot, guard armed | `installed` | — |
 | boot, guard healthy | `installed` | clears `installed` |
@@ -100,7 +100,8 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 | Extracted bundle missing or wrong version | staging folder removed, `error` |
 | Rename across filesystems | cannot happen by construction (staging is beside the bundle) |
 | `staged.app` points anywhere but a staging folder beside the bundle | refused, record and folder discarded, `error` published |
-| The staged bundle is not signed like the running app | refused, `error` published, previous bundle untouched |
+| Staged signature is valid but does not meet Cairn's requirement (exit 3) | refused, `error` published, staged record cleared only if it still names the same app, all folders untouched. Automatic checks and manual installs skip that version for the rest of the process; newer releases are still eligible. Refusals are not persisted, so restarting allows one download of that version per launch before it is refused again. |
+| Staged signature verification fails for any other reason (including exit 1, a signal or a spawn error) | refused, `error` published, staged record and all folders untouched |
 | The bundle is missing at launch but a kept previous copy is there | the previous copy is renamed back before anything else runs |
 | Second rename fails after the first | first rename undone, `error`, app keeps running on the old bundle |
 | Process dies between the two renames | boot sees `installed.version` ≠ running version, clears the record; the moved-aside bundle is restored by name if it is the only one there |

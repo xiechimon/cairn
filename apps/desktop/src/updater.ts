@@ -13,7 +13,7 @@ import {
   desktopUpdateFrom,
 } from '@cairn/shared';
 import { app } from 'electron';
-import { parseSigningIdentity, signatureMatches } from './signature.js';
+import { verifyCairnSignature } from './signature.js';
 import {
   canonicalPath,
   isStagedBundleFor,
@@ -40,6 +40,7 @@ import {
 const run = promisify(execFile);
 const REQUEST_HEADERS = { 'User-Agent': 'Cairn-Desktop' };
 const NO_MANIFEST = 404;
+const SIGNATURE_REFUSAL = 'the staged update is not signed by the Cairn certificate';
 const QUIT_FALLBACK_MS = 30_000;
 export const BACKGROUND_LAUNCH_FLAG = '--cairn-background-launch';
 
@@ -113,32 +114,6 @@ export function relaunchArgs(background: boolean): string[] {
   return background ? [...args, BACKGROUND_LAUNCH_FLAG] : args;
 }
 
-async function codesignIdentity(appPath: string): Promise<{ verified: boolean; identity: string }> {
-  const [details, verified] = await Promise.all([
-    run('/usr/bin/codesign', ['-d', '--verbose=4', appPath]).then(
-      (result) => result.stdout,
-      () => '',
-    ),
-    run('/usr/bin/codesign', ['--verify', '--strict', appPath]).then(
-      () => true,
-      () => false,
-    ),
-  ]);
-  return { verified, identity: details };
-}
-
-async function signedLikeRunningApp(bundle: string, stagedApp: string): Promise<boolean> {
-  const [running, staged] = await Promise.all([
-    codesignIdentity(bundle),
-    codesignIdentity(stagedApp),
-  ]);
-  if (!running.verified) return true;
-  return (
-    staged.verified &&
-    signatureMatches(parseSigningIdentity(running.identity), parseSigningIdentity(staged.identity))
-  );
-}
-
 function relaunch(when: Exclude<ApplyWhen, 'none'>): void {
   app.relaunch({ args: relaunchArgs(when === 'background') });
   setTimeout(() => app.exit(0), QUIT_FALLBACK_MS).unref();
@@ -157,6 +132,7 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
   let current: DesktopUpdateState =
     stagedNow === null ? { status: 'idle' } : { status: 'ready', version: stagedNow.version };
   let pending: DesktopUpdate | null = null;
+  const signatureRefusedVersions = new Set<string>();
   const set = (next: DesktopUpdateState): void => {
     current = next;
     publish(next);
@@ -228,6 +204,10 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
         return;
       }
       const record = readUpdateState(statePath());
+      if (record.staged === null && signatureRefusedVersions.has(pending.version)) {
+        set({ status: 'error', message: SIGNATURE_REFUSAL });
+        return;
+      }
       if (shouldStage(record, pending.version)) {
         set({ status: 'available', version: pending.version });
         await stage(pending);
@@ -245,7 +225,14 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
 
   async function install(): Promise<void> {
     const update = pending;
-    if (update === null || busy() || current.status === 'ready') return;
+    if (
+      update === null ||
+      busy() ||
+      current.status === 'ready' ||
+      signatureRefusedVersions.has(update.version)
+    ) {
+      return;
+    }
     await stage(update);
   }
 
@@ -270,8 +257,17 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
         throw new Error('the staged update is not where Cairn put it');
       }
       set({ status: 'installing', version: staged.version });
-      if (!(await signedLikeRunningApp(bundle, staged.app))) {
-        throw new Error('the staged update is not signed the way this copy of Cairn is');
+      const signature = await verifyCairnSignature(staged.app);
+      if (signature !== 'accepted') {
+        if (signature === 'requirement-mismatch') {
+          signatureRefusedVersions.add(staged.version);
+          const path = statePath();
+          const latest = readUpdateState(path);
+          if (latest.staged?.app === staged.app) {
+            writeUpdateState(path, { ...latest, staged: null });
+          }
+        }
+        throw new Error(SIGNATURE_REFUSAL);
       }
       const version = await readBundleVersion(staged.app);
       if (version !== staged.version) {

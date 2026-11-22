@@ -1,15 +1,23 @@
-export interface SigningIdentity {
-  identifier: string | null;
-  authority: string | null;
-}
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
-export function parseSigningIdentity(output: string): SigningIdentity {
-  const identifier = /^Identifier=(.+)$/m.exec(output)?.[1]?.trim() ?? null;
-  const authority = /^Authority=(.+)$/m.exec(output)?.[1]?.trim() ?? null;
-  return { identifier, authority };
-}
+const run = promisify(execFile);
+const CODESIGN = '/usr/bin/codesign';
+const VERIFY = ['--verify', '--strict'];
+const BUNDLE_ID = 'io.github.xiechimon.cairn';
+const FINGERPRINT = '19AA592374DC19928A4C5494BCAC5A984182EA8A';
 
-export function signatureMatches(running: SigningIdentity, staged: SigningIdentity): boolean {
-  if (running.authority === null) return true;
-  return staged.authority === running.authority && staged.identifier === running.identifier;
+export const CAIRN_REQUIREMENT = `identifier "${BUNDLE_ID}" and certificate leaf = H"${FINGERPRINT}"`;
+
+export async function verifyCairnSignature(
+  stagedApp: string,
+): Promise<'accepted' | 'requirement-mismatch' | 'verification-failed'> {
+  try {
+    await run(CODESIGN, [...VERIFY, `-R=${CAIRN_REQUIREMENT}`, stagedApp]);
+    return 'accepted';
+  } catch (error) {
+    return error instanceof Error && 'code' in error && error.code === 3
+      ? 'requirement-mismatch'
+      : 'verification-failed';
+  }
 }
