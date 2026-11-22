@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { chmodSync, mkdtempSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { chmodSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { makeTestTempDir } from '../../test-tmpdir.mjs';
 import { batchEnv, isCredentialEnv } from './batch-claude.mjs';
 
 const launcher = fileURLToPath(new URL('./batch-claude.mjs', import.meta.url));
@@ -106,7 +106,7 @@ test('the batch env points heavy slots at a sandbox-writable private dir unless 
 });
 
 function fakeClaude() {
-  const dir = mkdtempSync(join(tmpdir(), 'batch-claude-'));
+  const dir = makeTestTempDir('batch-claude-');
   const bin = join(dir, 'claude');
   writeFileSync(
     bin,
@@ -124,6 +124,8 @@ function fakeClaude() {
   return bin;
 }
 
+const fakeClaudeBin = fakeClaude();
+
 function launch(args, extraEnv = {}) {
   return spawnSync(process.execPath, [launcher, ...args], {
     encoding: 'utf8',
@@ -131,7 +133,7 @@ function launch(args, extraEnv = {}) {
       ...process.env,
       ...CREDENTIALS,
       ANTHROPIC_API_KEY: 'sk-ant-sentinel',
-      CAIRN_BATCH_CLAUDE: fakeClaude(),
+      CAIRN_BATCH_CLAUDE: fakeClaudeBin,
       ...extraEnv,
     },
   });
