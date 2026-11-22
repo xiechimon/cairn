@@ -39,6 +39,7 @@ export const COST_TIER_LABEL: Record<string, string> = {
   'Low cost': '低价',
   'Med cost': '中价',
   'High cost': '高价',
+  Free: '免费',
 };
 
 const LIST_FAILURE: Record<ProviderFailure | 'unavailable', string> = {

@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "1ecdbd9d7cfd4ce29a09933d15ce810d603fa413",
+    "sha": "65b7b564beaa6efd8d009d6e4f2eca0fe81c1a31",
     "date": "2026-11-22"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -143,7 +143,7 @@
       "kind": "registry",
       "upstreamItem": "message-scroller",
       "status": "deviated",
-      "hash": "792e03b17381902e95815b0a243ee877cd306e36c90b54035b33634d28ac4257",
+      "hash": "034bdb7b1efd6699e7b5177a3bf7b5d642290e465f1fe6d30f1acce39ccb4b81",
       "reason": "zh i18n sweep: viewport aria-label=t(消息) and the scroll button sr-only text uses t(滚动到最新)/t(滚动到最早) instead of upstream English literals."
     },
     "message.tsx": {

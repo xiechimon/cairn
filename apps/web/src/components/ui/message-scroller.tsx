@@ -109,9 +109,7 @@ function MessageScrollerButton({
       {children ?? (
         <>
           <ArrowDownIcon />
-          <span className="sr-only">
-            {direction === 'end' ? t('滚动到最新') : t('滚动到最早')}
-          </span>
+          <span className="sr-only">{direction === 'end' ? t('滚动到最新') : t('滚动到最早')}</span>
         </>
       )}
     </MessageScrollerPrimitive.Button>
