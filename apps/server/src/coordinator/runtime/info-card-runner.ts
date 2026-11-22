@@ -30,6 +30,7 @@ import { setTodoPhase } from '../../services/todos.js';
 import { routeOf, scrubProviderError } from '../credentials.js';
 import { providerBinding } from '../provider-binding.js';
 import { createCoordinatorServerApi } from '../server-api.js';
+import { thrownErrorText } from './error-text.js';
 import { openCoordinatorHarness } from './harness.js';
 import { createInfoCardRunGuard } from './info-card-guard.js';
 import type { MachineApi } from './machine-api.js';
@@ -274,7 +275,7 @@ export function startInfoCardRunner(options: InfoCardRunnerOptions): InfoCardRun
         claimedStepOf(stepRow, todoRow, plan),
       );
     } catch (error) {
-      const message = scrub(error instanceof Error ? error.message : String(error));
+      const message = scrub(thrownErrorText(error));
       logger.error({ stepId: stepRow.id, error: message }, 'info card run failed');
       const current = db.select().from(step).where(eq(step.id, stepRow.id)).get();
       if (!closing && current?.status === 'claimed') {

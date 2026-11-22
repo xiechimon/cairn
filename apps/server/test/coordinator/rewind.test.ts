@@ -1,5 +1,5 @@
 import { fauxAssistantMessage } from '@earendil-works/pi-ai';
-import { asc } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { SUGGEST_REPLIES_ASK } from '../../src/coordinator/runtime/suggest-replies.js';
 import { chiefMessage, coordinatorConversation, coordinatorEntry } from '../../src/db/schema.js';
@@ -109,6 +109,35 @@ describe('Coordinator rewind', () => {
     expect(last).toContain('after restart');
     expect(last).not.toContain('beta answer');
     expect(last).not.toContain('third question');
+  });
+
+  it('keeps the recorded reason of a failed turn through the rewind', async () => {
+    const w = await world('first question');
+    const { faux } = stub('unused');
+    faux.setResponses(
+      Array(16).fill(() =>
+        fauxAssistantMessage([], {
+          stopReason: 'error',
+          errorMessage: 'Request timed out.',
+        }),
+      ),
+    );
+    const coordinator = boot(w, faux);
+    coordinator.wake(w.threadId);
+    await coordinator.idle();
+
+    const rowId = `chief-err-${w.stepId}`;
+    const reasonOf = () => {
+      const row = w.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, rowId)).get();
+      if (row === undefined) return undefined;
+      const parsed: unknown = JSON.parse(String(row.content));
+      const content = typeof parsed === 'string' ? (JSON.parse(parsed) as unknown) : parsed;
+      return (content as { message?: string }).message;
+    };
+    expect(reasonOf()).toContain('Request timed out.');
+
+    await rewindTo(w, 'first question');
+    expect(reasonOf()).toContain('Request timed out.');
   });
 
   it('reseeds from the thread rows when the anchor opens the conversation', async () => {

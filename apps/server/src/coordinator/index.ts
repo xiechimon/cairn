@@ -54,6 +54,7 @@ import { settleInterruptedMailConversation } from './mail-owner.js';
 import { createMemoryFlush } from './memory-flush.js';
 import { providerBinding } from './provider-binding.js';
 import { cacheTtlMsFor, isColdResume, resolveCacheRetentionTier } from './runtime/cold-slim.js';
+import { thrownErrorText } from './runtime/error-text.js';
 import { setFailureSink } from './runtime/failure-report.js';
 import { startInfoCardRunner } from './runtime/info-card-runner.js';
 import type { MachineApi } from './runtime/machine-api.js';
@@ -622,7 +623,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         summary: binding(teamId, providers.summary),
       });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = thrownErrorText(error);
       const scrubbed = scrubProviderError({ db, box: machine.box }, teamId, keyed, message);
       logger.error({ stepId: row.id, error: scrubbed }, 'coordinator turn failed');
       const current = db.select().from(step).where(eq(step.id, row.id)).get();
