@@ -7,6 +7,7 @@ import {
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
   COMPUTER_REMOTE_TOOLS,
+  REQUEST_SECRET_TOOL_DEF,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import {
@@ -160,6 +161,7 @@ describe('coordinator tools', () => {
       ...CHIEF_REMOTE_TOOLS,
       ...CHIEF_ROUTER_TOOLS,
       ...CHIEF_REPLY_TOOLS,
+      REQUEST_SECRET_TOOL_DEF,
       ...COMPUTER_REMOTE_TOOLS,
     ];
     const actionNames = ['archive_project', 'unarchive_project', 'delete_project'];

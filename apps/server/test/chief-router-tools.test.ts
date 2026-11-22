@@ -7,6 +7,7 @@ import {
   CHIEF_TOOL_COUNT,
   CHIEF_TOOLS_REMOVED_UNDER_D60,
   COMPUTER_REMOTE_TOOLS,
+  REQUEST_SECRET_TOOL,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
@@ -122,6 +123,7 @@ describe('router tool vocabulary', () => {
       ...CHIEF_REMOTE_TOOLS.map((t) => t.name),
       ...CHIEF_ROUTER_TOOL_NAMES,
       ...CHIEF_REPLY_TOOLS.map((t) => t.name),
+      REQUEST_SECRET_TOOL,
       ...COMPUTER_REMOTE_TOOLS.map((t) => t.name),
       'archive_project',
       'unarchive_project',
@@ -131,6 +133,7 @@ describe('router tool vocabulary', () => {
       CHIEF_TOOL_COUNT +
         CHIEF_ROUTER_TOOL_NAMES.length +
         CHIEF_REPLY_TOOLS.length +
+        1 +
         COMPUTER_REMOTE_TOOLS.length +
         3,
     );

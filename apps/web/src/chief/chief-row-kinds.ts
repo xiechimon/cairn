@@ -14,7 +14,7 @@ export const CHIEF_ROW_CLASS: Readonly<Record<ChiefRowKind, ChiefRowClass | 'hid
   stopped: 'message',
   question: 'card',
   takeover: 'card',
-  'cloak-license': 'card',
+  'secret-request': 'card',
   'package-install': 'card',
   'task-card': 'card',
   error: 'exception-alert',

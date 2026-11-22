@@ -41,7 +41,8 @@ import {
 import { COMPUTER_IMAGE_MANIFEST, runVmCommand, type VmCommandRunner } from './vm-runtime.js';
 
 export const COMPUTER_IMAGE_ENV = 'CAIRN_COMPUTER_IMAGE';
-export const NO_CLOAK_LICENSE = 'No CloakBrowser license; set team secret CLOAKBROWSER_LICENSE_KEY';
+export const NO_CLOAK_LICENSE =
+  'No CloakBrowser license; ask the owner for team secret CLOAKBROWSER_LICENSE_KEY with request_secret';
 export const VM_DESKTOP_READY_MS = 30_000;
 export const VM_HOME = '/home/agent';
 export const VM_INIT_IMAGE = 'ghcr.io/apple/containerization/vminit:0.54.0';

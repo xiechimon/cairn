@@ -8,8 +8,6 @@ import type {
   ChiefGetResponse,
   ChiefMemoryUsageResponse,
   ChiefThread,
-  CloakLicenseBody,
-  CloakLicenseSaved,
   CodexDevicePollResponse,
   CodexDeviceStartResponse,
   ComposioApps,
@@ -91,6 +89,8 @@ import type {
   SearchResponse,
   SecretListEntry,
   SecretRecord,
+  SecretRequestAnswer,
+  SecretRequestAnswered,
   SetSecretBody,
   SkillImportCandidatesResponse,
   SkillRecord,
@@ -1687,9 +1687,9 @@ export function useApiMutations(teamId: string | undefined) {
         api.del<void>(`/api/teams/${teamId}/browser-password-grants/${grantId}`),
       onSuccess: invalidateAll,
     }),
-    saveCloakLicense: useMutation({
-      mutationFn: (body: CloakLicenseBody) =>
-        api.put<CloakLicenseSaved>(`/api/teams/${teamId}/cloak-license`, body),
+    answerSecretRequest: useMutation({
+      mutationFn: (body: SecretRequestAnswer) =>
+        api.post<SecretRequestAnswered>(`/api/teams/${teamId}/secret-requests`, body),
       onSuccess: invalidateAll,
     }),
     decidePackageInstall: useMutation({

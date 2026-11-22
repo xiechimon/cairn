@@ -167,7 +167,6 @@ export const COMPUTER_HANDOFF_TIMEOUT_MS = 15 * 60_000;
 export const TAKEOVER_HANDED_BACK =
   'The owner handed the computer back. Take a fresh browser_snapshot before acting.';
 
-export const REQUEST_CLOAK_LICENSE_TOOL = 'request_cloak_license';
 export const INSTALL_PACKAGES_TOOL = 'install_packages';
 
 export const SHELL_TOOL_PARAMETERS = obj(
@@ -178,17 +177,6 @@ export const SHELL_TOOL_PARAMETERS = obj(
   ['command'],
 );
 
-export const CLOAK_LICENSE_TOOL: RemoteToolDef = {
-  name: REQUEST_CLOAK_LICENSE_TOOL,
-  description:
-    'Post a CloakBrowser license card in the chat so the owner can paste the key, which is saved as a team secret you never see. Call it when a stealth browser call says there is no CloakBrowser license, instead of sending the owner to settings or asking for the key in chat; when CloakBrowser rejected the saved key, pass its reason. Waits until the owner saves it, then retry the stealth browser call that needed it.',
-  parameters: obj({
-    reason: str(
-      'Why the key is needed. When CloakBrowser rejected the saved key, its reason as the tool reported it.',
-    ),
-  }),
-};
-
 export const COMPUTER_VM_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'shell',
@@ -196,7 +184,6 @@ export const COMPUTER_VM_TOOLS: readonly RemoteToolDef[] = [
       "Your VM computer, not the user's Mac (user_computer_shell is the Mac). Run a shell command in the Coordinator computer: scripts, downloads, checking files, starting apps. Output is bounded: the first 16 KiB and last 48 KiB are kept. For apps with a window, desktop_snapshot reads them afterwards.",
     parameters: SHELL_TOOL_PARAMETERS,
   },
-  CLOAK_LICENSE_TOOL,
   {
     name: INSTALL_PACKAGES_TOOL,
     description:
@@ -220,8 +207,3 @@ export const PACKAGES_NOT_ANSWERED =
   'The owner did not answer the install request. Nothing was installed. Stop and tell the owner.';
 export const PACKAGES_NO_VM_COMPUTER =
   'Only the Coordinator VM computer can install system packages, and this team has none connected. Nothing was installed.';
-
-export const CLOAK_LICENSE_SAVED =
-  'The owner saved the CloakBrowser license. Retry the stealth browser call that needed it, unchanged.';
-export const CLOAK_LICENSE_NOT_SAVED =
-  'The owner did not save a CloakBrowser license. Stop and tell the owner the stealth browser needs it.';

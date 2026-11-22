@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { Box, CircleAlert, Mail, Send } from 'lucide-react';
+import { Box, CircleAlert, KeyRound, Mail, Send } from 'lucide-react';
 import { type ComponentType, Fragment, type ReactNode, type SVGProps, useState } from 'react';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
@@ -22,6 +22,7 @@ export interface ApprovalCardProps {
   problem?: string | null;
   testId?: string;
   outcome?: string;
+  children?: ReactNode;
 }
 
 const KIND_ICON: Record<ApprovalKind, ComponentType<SVGProps<SVGSVGElement>>> = {
@@ -30,6 +31,7 @@ const KIND_ICON: Record<ApprovalKind, ComponentType<SVGProps<SVGSVGElement>>> = 
   install: Box,
   shell: Terminal,
   app: Monitor,
+  secret: KeyRound,
   other: CircleAlert,
 };
 
@@ -109,6 +111,7 @@ export function ApprovalCard({
   problem = null,
   testId = 'approval-card',
   outcome,
+  children,
 }: ApprovalCardProps) {
   const { t } = useI18n();
   const [raw, setRaw] = useState(false);
@@ -179,6 +182,7 @@ export function ApprovalCard({
       }
     >
       {card.preview !== null && <Preview value={card.preview} mono={card.mono} />}
+      {children}
       {raw && <RawArguments fields={card.details} />}
       {problem !== null && (
         <p

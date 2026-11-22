@@ -2,13 +2,13 @@ import {
   CHIEF_REMOTE_TOOLS,
   CHIEF_REPLY_TOOLS,
   CHIEF_ROUTER_TOOLS,
-  CLOAK_LICENSE_TOOL,
   COMPUTER_DESKTOP_TOOLS,
   COMPUTER_REMOTE_TOOLS,
   COMPUTER_VM_TOOLS,
   type ComputerTool,
   OWN_COMPUTER_TOOLS,
   PHONE_TOOLS,
+  REQUEST_SECRET_TOOL_DEF,
   type RemoteToolDef,
   SLICE1_ACTIONS,
 } from '@cairn/shared';
@@ -109,7 +109,6 @@ export function coordinatorToolDefs(
     routerTools?: boolean;
     desktopTools?: boolean;
     vmComputer?: boolean;
-    vmBrowser?: boolean;
     ownComputer?: boolean;
     ownerChrome?: boolean;
     phoneComputer?: readonly string[];
@@ -127,13 +126,10 @@ export function coordinatorToolDefs(
     ...CHIEF_REMOTE_TOOLS,
     ...(options.routerTools === false ? [] : CHIEF_ROUTER_TOOLS),
     ...CHIEF_REPLY_TOOLS,
+    REQUEST_SECRET_TOOL_DEF,
     ...browserTools,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
-    ...(options.vmComputer === true
-      ? COMPUTER_VM_TOOLS
-      : options.vmBrowser === true
-        ? [CLOAK_LICENSE_TOOL]
-        : []),
+    ...(options.vmComputer === true ? COMPUTER_VM_TOOLS : []),
     ...(options.ownComputer === true ? OWN_COMPUTER_TOOLS : []),
     ...(options.phoneComputer !== undefined && options.phoneComputer.length > 0
       ? phoneToolDefs(options.phoneComputer)

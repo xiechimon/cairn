@@ -994,7 +994,7 @@
       "id": "agent-computer",
       "name": "The agent's computer",
       "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser and desktop control are always on wherever the machine reports the capability; there is no setting.",
-      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; CloakBrowser license card waiting, rejected key reason, saved, not saved, owner-only refusal; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line — finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready adds nothing to the row (no action log in the product); own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser unsupported (no capabilities.browser) and offline machine. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
+      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line — finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready adds nothing to the row (no action log in the product); own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser unsupported (no capabilities.browser) and offline machine. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1003,7 +1003,6 @@
           "apps/web/src/board/machines-panel.tsx",
           "apps/web/src/board/computer-screen-dialog.tsx",
           "apps/web/src/chief/takeover-card.tsx",
-          "apps/web/src/chief/cloak-license-card.tsx",
           "apps/web/src/chief/package-install-card.tsx",
           "apps/web/src/board/computer-actions-menu.tsx",
           "apps/web/src/board/machine-capabilities.ts",
@@ -1015,7 +1014,6 @@
           "apps/server/src/services/computer-control.ts",
           "apps/server/src/services/computer-screen.ts",
           "apps/server/src/services/computer-feed.ts",
-          "apps/server/src/services/cloak-license.ts",
           "apps/server/src/services/machine-computer.ts",
           "apps/server/src/services/machine-claim.ts",
           "apps/server/src/services/own-computer.ts"
@@ -1029,7 +1027,6 @@
         "server": [
           "/api/computers",
           "/api/teams/:teamId/computers/**",
-          "/api/teams/:id/cloak-license",
           "/api/computers/package-install",
           "/api/computers/:id/actions"
         ]
@@ -1058,7 +1055,6 @@
         "apps/web/e2e/machines-own-computer.spec.ts",
         "apps/server/test/computer-control-open-migration.test.ts",
         "apps/server/test/own-computer.test.ts",
-        "apps/server/test/cloak-license.test.ts",
         "apps/server/test/chief-claim-computer-tools.test.ts",
         "apps/server/test/machine-computer-forward.test.ts",
         "apps/daemon/test/computer-orb-dispatch.test.ts",
@@ -2274,7 +2270,7 @@
       "id": "secrets",
       "name": "Secrets",
       "summary": "Encrypted secrets and readable environment variables; first-use browser passwords ask for website approval in chat; the vault settings section lists saved site logins and per-site fill authorizations.",
-      "states": "Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes; vault section lists login pairs masked, empty state, and grants active/stale/revoked with revoke.",
+      "states": "Original add/edit form with name, value and secret checkbox; browser website approval pending, refused or approved; subsequent same-site fills; reapproval after password, website or machine changes; vault section lists login pairs masked, empty state, and grants active/stale/revoked with revoke. In-chat secret card from the Coordinator (request_secret): pending with the value field, saved, not provided, request ended, replaces-existing note, project scope, ended-request and owner-only refusals.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2283,10 +2279,12 @@
           "apps/web/src/resources/secret-dialog.tsx",
           "apps/web/src/resources/bulk-secret-dialog.tsx",
           "apps/web/src/resources/vault-page.tsx",
-          "apps/web/src/resources/vault-pair-dialog.tsx"
+          "apps/web/src/resources/vault-pair-dialog.tsx",
+          "apps/web/src/chief/secret-request-card.tsx"
         ],
         "server": [
-          "apps/server/src/services/secrets.ts"
+          "apps/server/src/services/secrets.ts",
+          "apps/server/src/services/secret-requests.ts"
         ]
       },
       "routes": {
@@ -2298,7 +2296,8 @@
         "server": [
           "/api/teams/:id/secrets**",
           "/api/teams/:id/browser-password-grants",
-          "/api/teams/:id/browser-password-grants/:grantId"
+          "/api/teams/:id/browser-password-grants/:grantId",
+          "/api/teams/:id/secret-requests"
         ]
       },
       "reach": [
@@ -2317,7 +2316,8 @@
       ],
       "backendDesign": [
         "docs/research/1775-secret-gateway-design.md",
-        "docs/design/browser-secret-fill.md"
+        "docs/design/browser-secret-fill.md",
+        "docs/design/secret-request-card.md"
       ],
       "evidence": [
         "apps/web/e2e/secret-add-dialog.spec.ts",
@@ -2327,7 +2327,11 @@
         "apps/server/test/computer-login-handoff.test.ts",
         "apps/server/test/browser-password-vault.test.ts",
         "apps/daemon/test/browser-secret-fill.test.ts",
-        "apps/web/e2e/vault.spec.ts"
+        "apps/web/e2e/vault.spec.ts",
+        "apps/web/e2e/chief-secret-request-card.spec.ts",
+        "apps/web/test/chief-secret-request-card.test.ts",
+        "apps/server/test/secret-request.test.ts",
+        "apps/server/test/coordinator/secret-request.test.ts"
       ]
     },
     {

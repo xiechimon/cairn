@@ -123,7 +123,7 @@ export const COMPUTER_USER_CONTROL =
   'the owner is using this computer right now; wait a few seconds and retry the same call';
 export const COMPUTER_INTERRUPTED = 'interrupted, may have partially run; it was not retried';
 export const COMPUTER_CANCELLED = 'cancelled because the Coordinator turn was stopped';
-export const COMPUTER_NO_CLOAK_LICENSE = `No CloakBrowser license; set team secret ${CLOAK_LICENSE_SECRET}`;
+export const COMPUTER_NO_CLOAK_LICENSE = `No CloakBrowser license; ask the owner for team secret ${CLOAK_LICENSE_SECRET} with request_secret`;
 export const COMPUTER_BROWSER_UNAVAILABLE =
   'this machine no longer reports browser capability; rebuild the computer image';
 

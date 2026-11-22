@@ -1034,7 +1034,9 @@ describe('CloakBrowser license for VM computers', () => {
     const { s, deps, calls } = boot();
     kind(s, 'vm');
     const result = await forwardComputerCall(deps, 'sidecar', 'step-a', stealth('no-license'));
-    expect(result.text).toBe('No CloakBrowser license; set team secret CLOAKBROWSER_LICENSE_KEY');
+    expect(result.text).toBe(
+      'No CloakBrowser license; ask the owner for team secret CLOAKBROWSER_LICENSE_KEY with request_secret',
+    );
     expect(calls).toHaveLength(0);
   });
 

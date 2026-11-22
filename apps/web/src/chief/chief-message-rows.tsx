@@ -39,7 +39,6 @@ import { ChiefReportMessage } from './chief-report-row.js';
 import { chiefRowRenders } from './chief-row-kinds.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import type { TaskRef } from './chief-task-refs.js';
-import { CloakLicenseCard } from './cloak-license-card.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { PackageInstallCard } from './package-install-card.js';
@@ -55,6 +54,7 @@ import {
 } from './reply-source-highlight.js';
 import { channelHref, useChannelOf } from './report-route.js';
 import { ResearchReportLine, ResearchReportRow } from './research-report.js';
+import { SecretRequestCard } from './secret-request-card.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
 import { growDelays, hoverTaskRef, markGrown, useTaskRefSignal } from './task-ref-signal.js';
@@ -461,7 +461,7 @@ export function chiefStreamRowKey(
     case 'question':
     case 'handoff':
     case 'takeover':
-    case 'cloak-license':
+    case 'secret-request':
     case 'package-install':
     case 'task-card':
     case 'runner-offline':
@@ -676,7 +676,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
-  if (item.kind === 'cloak-license') return <CloakLicenseCard item={item} />;
+  if (item.kind === 'secret-request') return <SecretRequestCard item={item} />;
   if (item.kind === 'package-install') return <PackageInstallCard item={item} />;
   if (item.kind === 'task-card')
     return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;

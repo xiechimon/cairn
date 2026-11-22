@@ -99,9 +99,13 @@ describe('stepRemoteToolExecutor', () => {
     expect(h.relayed[0]?.opts?.toolCallId).toBeTruthy();
   });
 
-  test('request_cloak_license waits as long as a handoff', async () => {
+  test('request_secret waits as long as a handoff', async () => {
     const h = harness({});
-    await h.execute('request_cloak_license', { reason: 'no license' });
+    await h.execute('request_secret', {
+      name: 'ACME_API_KEY',
+      scope: 'team',
+      description: 'The Acme API key.',
+    });
     expect(h.relayed[0]?.opts?.timeoutMs).toBe(TAKEOVER_RELAY_TIMEOUT_MS);
     expect(h.relayed[0]?.opts?.toolCallId).toBeTruthy();
   });

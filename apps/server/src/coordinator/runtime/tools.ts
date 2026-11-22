@@ -432,7 +432,6 @@ export function coordinatorToolsExtension(
     routerTools?: boolean;
     desktopTools?: boolean;
     vmComputer?: boolean;
-    vmBrowser?: boolean;
     ownComputer?: boolean;
     ownerChrome?: boolean;
     phoneComputer?: readonly string[];

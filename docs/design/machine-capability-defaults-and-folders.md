@@ -28,9 +28,9 @@ These are separate mechanisms, not one switch.
 
 ## Tool surface
 
-`coordinatorToolDefs(options)` is the single definition. `COMPUTER_REMOTE_TOOLS` (browser + `request_takeover`) is always offered; `COMPUTER_DESKTOP_TOOLS` needs `desktopTools`, `COMPUTER_VM_TOOLS` needs `vmComputer`, `request_cloak_license` alone is offered when `vmBrowser` holds but `vmComputer` does not, `OWN_COMPUTER_TOOLS` needs `ownComputer`. Both chief-turn constructors compute the same options:
+`coordinatorToolDefs(options)` is the single definition. `COMPUTER_REMOTE_TOOLS` (browser + `request_takeover`) is always offered; `COMPUTER_DESKTOP_TOOLS` needs `desktopTools`, `COMPUTER_VM_TOOLS` needs `vmComputer`, `request_secret` is always offered (`docs/design/secret-request-card.md`), `OWN_COMPUTER_TOOLS` needs `ownComputer`. Both chief-turn constructors compute the same options:
 
-- In-server turn (`apps/server/src/coordinator/index.ts`, `claimedPayload`) and Runner claim (`apps/server/src/services/machine-claim.ts`, `chiefClaimPayload`): `desktopTools: teamOffersDesktop(db, teamId)`, `vmComputer: teamHasVmComputer(db, teamId)`, `vmBrowser: teamHasVmBrowser(db, teamId)`, `ownComputer: ownComputerOffered(db, threadId, stepId)`.
+- In-server turn (`apps/server/src/coordinator/index.ts`, `claimedPayload`) and Runner claim (`apps/server/src/services/machine-claim.ts`, `chiefClaimPayload`): `desktopTools: teamOffersDesktop(db, teamId)`, `vmComputer: teamHasVmComputer(db, teamId)`, `ownComputer: ownComputerOffered(db, threadId, stepId)`.
 - `teamHasVmComputer` means a machine reports `capabilities.computer === true` and `capabilities.computerKind === 'vm'` and has not `desktopOverride === false`, so the VM tools are offered exactly when their calls can run.
 - `teamHasVmBrowser` means a VM-kind machine keeps `capabilities.computer === true` and `capabilities.browser === true` with `browserOverride !== false`: stealth browser calls can still need a CloakBrowser license there, so the license card stays offered even when the desktop grant is off.
 - `chiefRemoteTools` in `routing-rules.ts` keeps the bare `coordinatorToolDefs()` list on purpose: it feeds `toolDefHashes`, which must name every tool a thread could ever see, not the subset of this turn.
