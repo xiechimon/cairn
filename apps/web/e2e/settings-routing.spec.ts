@@ -187,7 +187,7 @@ test('a rule changed since it was read reloads the settings and says so', async 
   const row = page.getByRole('dialog', { name: '设置' }).getByTestId('routing-rule-issue-session');
   await row.getByTestId('routing-rule-fix-session').click();
   await expect(page.locator('[data-sonner-toast]').first()).toContainText(
-    '这条规则刚被改过，已重新读取，请再看一眼。',
+    '这条规则刚被修改，已重新读取，请再次确认。',
   );
   await expect.poll(() => seen.gets).toBeGreaterThan(1);
 });

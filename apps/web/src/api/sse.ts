@@ -136,7 +136,7 @@ export const NOTIFICATION_TITLES: Partial<Record<NotificationRecord['type'], str
   build_review: '构建待审核',
   quota_wait: '等额度',
   model_fallback: '已换备用模型',
-  no_machine: '没有执行机能跑',
+  no_machine: '没有可运行的执行机',
 };
 
 function notificationHref(record: NotificationRecord): string {

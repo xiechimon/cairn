@@ -358,7 +358,7 @@ describe('runner Claude Code subscription preflight', () => {
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     const msg = client.doneBodies[0]?.body.errorMessage ?? '';
     expect(msg).toContain('claude setup-token');
-    expect(msg).toContain('设置 → 模型服务');
+    expect(msg).toContain('设置 → 模型路由');
   });
 
   test('a pi step runs without a subscription token', async () => {

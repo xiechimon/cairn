@@ -23,7 +23,7 @@ async function expectBodyOverflows(dialog: Locator) {
 test('provider: 3 model chips overflow the body, submit pinned to the bottom and does not move on scroll', async ({ page }) => {
   await page.goto('/app/resources/providers?scenario=01');
   await page.getByTestId('routing-add-provider').click();
-  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  const dialog = page.getByRole('dialog', { name: '添加服务商' });
   await expect(dialog).toBeVisible();
 
   await expectBodyOverflows(dialog);
@@ -38,7 +38,7 @@ test('provider: 3 model chips overflow the body, submit pinned to the bottom and
   await expect(dialog.locator('[data-model-chip]')).toHaveCount(3);
   await expectBodyOverflows(dialog);
   await expectShellCapped(dialog);
-  const submit = dialog.getByRole('button', { name: '添加模型服务' });
+  const submit = dialog.getByRole('button', { name: '添加服务商' });
   await expect(submit).toBeInViewport();
 
   const before = await submit.boundingBox();

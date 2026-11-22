@@ -15,7 +15,7 @@ export type ThreadReplyDelivery = 'steer' | 'revision' | 'restart';
 const THREAD_REPLY_HINT: Record<ThreadReplyDelivery, string> = {
   steer: '直接发给这个任务，插进它这一轮。',
   revision: '作为改计划的意见发给这个任务，不算批准。',
-  restart: '这个任务会带着这句话重跑。',
+  restart: '这个任务会带着这句话重新运行。',
 };
 
 export interface ThreadReplyProps {
@@ -54,7 +54,7 @@ export function ThreadReply({ delivery, onSend, autoFocus, className }: ThreadRe
     state === 'sent'
       ? t('已发出。')
       : state === 'failed'
-        ? t('没发出去，再试一次。')
+        ? t('未能发送，请重试。')
         : t(THREAD_REPLY_HINT[delivery]);
 
   return (

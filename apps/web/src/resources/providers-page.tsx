@@ -84,8 +84,8 @@ import { groupAntigravityUpstream, groupDevinUpstream } from './upstream-model-g
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const ANTIGRAVITY_FALLBACK_REASONS = {
-  auth: '执行机上的 Antigravity 还没登录，没拿到它的模型清单。登录后重试。',
-  'not-found': '没有在线的执行机装着 Antigravity，没拿到它的模型清单。',
+  auth: '执行机上的 Antigravity 尚未登录，未能获取它的模型清单。请登录后重试。',
+  'not-found': '没有已安装 Antigravity 的在线执行机，未能获取它的模型清单。',
 } as const;
 
 interface Entry {
@@ -459,7 +459,7 @@ export function ProvidersSection() {
       return;
     }
     saveOrder.mutate(ids, {
-      onError: (error) => toastError(t('顺序没能保存，已恢复原来的顺序。'), error),
+      onError: (error) => toastError(t('顺序未能保存，已恢复原来的顺序。'), error),
     });
   };
   const defaultEntries = [
@@ -500,7 +500,7 @@ export function ProvidersSection() {
             role="alert"
             className="m-0 flex items-center gap-2 px-1 text-meta text-content-tertiary"
           >
-            {partialFailure === 'subscriptions' ? t('订阅账户没能加载') : t('模型服务没能加载')}
+            {partialFailure === 'subscriptions' ? t('订阅账户未能加载') : t('服务商未能加载')}
             <Button
               variant="ghost"
               size="sm"
@@ -536,8 +536,8 @@ export function ProvidersSection() {
                   : undefined
               }
               isEmpty
-              loadingLabel={t('正在加载模型服务')}
-              errorTitle={t('模型服务没能加载')}
+              loadingLabel={t('正在加载服务商')}
+              errorTitle={t('服务商未能加载')}
               empty={
                 <EmptyState
                   testId="providers-empty"

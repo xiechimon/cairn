@@ -12,11 +12,11 @@ export function devinSubscriptionLoginWarning(
     return null;
   if (subscription.expiresAt <= now)
     return t(
-      '{name}：已过期，Coordinator 和任务都暂时用不了。在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个添加到「设置 → 模型路由」。',
+      '{name}：已过期，Coordinator 和任务暂时无法使用。在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型路由」。',
       { name: subscription.label },
     );
   return t(
-    '{name}：将在 {days} 天后过期。到期前在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个添加到「设置 → 模型路由」。',
+    '{name}：将在 {days} 天后过期。到期前在已登录 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出添加到「设置 → 模型路由」。',
     {
       name: subscription.label,
       days: Math.ceil((subscription.expiresAt - now) / (24 * 60 * 60 * 1000)),

@@ -10,13 +10,13 @@ import { type AttachmentDownloader, resolveDeliveredPrompt } from './step-attach
 
 export function devinSubscriptionMissingMessage(): string {
   return (
-    '团队还没有可用的 Devin 订阅：在已登录机器上运行 cat ' +
-    '~/.local/share/devin/credentials.toml，把输出整个贴到「我的订阅」，然后重跑这个任务。'
+    '团队暂无可用的 Devin 订阅：在已登录 Devin 的电脑上运行 cat ' +
+    '~/.local/share/devin/credentials.toml，把完整输出粘贴到「我的订阅」，然后重新运行这个任务。'
   );
 }
 
 export function antigravitySubscriptionMissingMessage(): string {
-  return '团队还没有可用的 Antigravity 订阅：请在桌面端登录本机 agy，或在「我的订阅」中填入 GEMINI_API_KEY 后重试。';
+  return '团队暂无可用的 Antigravity 订阅：请在桌面端登录本机 agy，或在「我的订阅」中填入 GEMINI_API_KEY 后重试。';
 }
 
 export function agentStepRefusal(input: {

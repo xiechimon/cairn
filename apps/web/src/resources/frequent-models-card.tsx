@@ -190,8 +190,8 @@ export function FrequentModelsCard({
             className={cn(SETTINGS_ROW_CLS, 'm-0 text-meta text-pretty text-content-tertiary')}
           >
             {addable.length === 0
-              ? t('还没有常用模型。先接入服务商，再回来添加。')
-              : t('还没有常用模型，所有任务都用 Coordinator 的模型。')}
+              ? t('暂无常用模型。先接入服务商，再返回添加。')
+              : t('暂无常用模型，所有任务都使用 Coordinator 的模型。')}
           </p>
         ) : (
           models.map((model, index) => (

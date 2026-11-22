@@ -85,13 +85,13 @@ function startFailure(t: Translate, error: unknown): Step {
   const status = error instanceof ApiError ? error.status : null;
   return {
     kind: 'ended',
-    title: t('没能开始连接 GitHub'),
+    title: t('未能开始连接 GitHub'),
     body:
       status === 400
-        ? t('这台服务器还没有设置 GitHub 登录，改用令牌连接。')
+        ? t('这台服务器尚未设置 GitHub 登录，请改用令牌连接。')
         : status === 409
           ? t('GitHub 连接的名字都被占用了，先删掉一个旧的连接。')
-          : t('暂时连不上 GitHub，稍后再试。'),
+          : t('暂时无法连接 GitHub，请稍后重试。'),
   };
 }
 
@@ -245,7 +245,7 @@ export function GithubDeviceDialog({
       <>
         {step.missing ? (
           <p role="status" className="m-0 text-ui text-foreground">
-            {t('还没有选择仓库；组织仓库可能要等组织管理员批准。')}
+            {t('尚未选择仓库；组织仓库可能需要组织管理员批准。')}
           </p>
         ) : (
           <ConnectorStatus record={step.connector} />

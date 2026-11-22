@@ -59,8 +59,8 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
       state: STATUS_WORDS.running,
       reason:
         todo.quotaWait.kind === 'quota'
-          ? '额度空了，等额度恢复后自动续跑。'
-          : '被限流，等恢复后自动续跑。',
+          ? '额度已用完，额度恢复后自动继续运行。'
+          : '被限流，恢复后自动继续运行。',
     };
   }
   switch (todo.phase) {
@@ -91,6 +91,6 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
     case 'closed':
       return { state: STATUS_WORDS.archived, reason: '任务已归档。' };
     case 'todo':
-      return { state: STATUS_WORDS.idle, reason: '还没开始。' };
+      return { state: STATUS_WORDS.idle, reason: '尚未开始。' };
   }
 }

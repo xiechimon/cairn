@@ -122,7 +122,7 @@ function landingNotice(t: Translate, reason: string | null, attempt: SignInAttem
           ? t('授权期间这个连接有了变动，这次授权没有保存。')
           : t('登录没有完成，在下面重新接入一次。');
   return {
-    title: attempt !== null ? t('没能连上 {name}', { name: attempt.name }) : t('没能完成登录'),
+    title: attempt !== null ? t('未能连接 {name}', { name: attempt.name }) : t('未能完成登录'),
     body,
     ...(attempt !== null ? { retry: attempt } : {}),
   };
@@ -239,11 +239,11 @@ export function McpServersPage() {
         ...(record.status === 'needs_auth'
           ? { status: <RowNote>{t('需要重新授权')}</RowNote> }
           : record.status === 'error'
-            ? { status: <RowNote danger>{t('连不上')}</RowNote> }
+            ? { status: <RowNote danger>{t('无法连接')}</RowNote> }
             : record.status === 'local'
               ? { status: <RowNote>{t('在你的 Chrome 里')}</RowNote> }
               : record.status === 'unchecked'
-                ? { status: <RowNote>{t('还没检查')}</RowNote> }
+                ? { status: <RowNote>{t('未检查')}</RowNote> }
                 : {}),
         action: manageButton(record.label, () => setDialog({ kind: 'manage', connector: record })),
       };
@@ -314,7 +314,7 @@ export function McpServersPage() {
     }
     const failed = (body: string, retry: boolean) =>
       setNotice({
-        title: t('没能连上 {name}', { name }),
+        title: t('未能连接 {name}', { name }),
         body,
         ...(retry ? { retry: attempt } : {}),
       });
@@ -329,7 +329,7 @@ export function McpServersPage() {
               attempt,
               ...withEntry,
             })
-          : failed(t('没能开始登录，稍后再试。'), true),
+          : failed(t('未能开始登录，请稍后重试。'), true),
       onError: (error) => {
         const status = error instanceof ApiError ? error.status : null;
         failed(signInError(t, status, name), status !== 400 && status !== 409);
@@ -406,7 +406,7 @@ export function McpServersPage() {
         isEmpty={false}
         errorWins
         loadingLabel={t('正在加载 MCP 服务器')}
-        errorTitle={t('MCP 服务器没能加载')}
+        errorTitle={t('MCP 服务器未能加载')}
         className="mt-6"
         empty={null}
       >
@@ -517,10 +517,10 @@ export function McpServersPage() {
 }
 
 function signInError(t: Translate, status: number | null, name: string): string {
-  if (status === 409) return t('这个标识已经被占用，先删掉旧的连接或换个名字。');
+  if (status === 409) return t('这个标识已被占用，请先删除旧的连接或更换名称。');
   if (status === 400) return t('{name} 不支持浏览器登录，改用令牌或请求头连接。', { name });
-  if (status === 502) return t('{name} 的登录服务没有接受 Cairn 的注册，稍后再试。', { name });
-  return t('没能开始登录，稍后再试。');
+  if (status === 502) return t('{name} 的登录服务没有接受 Cairn 的注册，请稍后重试。', { name });
+  return t('未能开始登录，请稍后重试。');
 }
 
 function catalogAttempt(entry: McpCatalogEntry): SignInAttempt {

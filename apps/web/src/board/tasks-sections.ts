@@ -94,7 +94,7 @@ export function taskRowCopy(
         return { ...base, word: '待回答', what: { key: '在问你一个问题' }, where: '到任务里回答' };
       const what: Phrase =
         (todo.blockedBy?.length ?? 0) > 0
-          ? { key: '被阻塞了，等你处理。' }
+          ? { key: '已阻塞，等待你处理。' }
           : { key: threadCopy(todo).reason };
       return { ...base, word: '待处理', what, where: '到任务里处理' };
     }
@@ -123,7 +123,7 @@ export function taskRowCopy(
       return {
         ...base,
         word: '待开始',
-        what: waitsForPhrase(todo, lookup) ?? { key: '还没开始' },
+        what: waitsForPhrase(todo, lookup) ?? { key: '尚未开始' },
         where: null,
       };
   }

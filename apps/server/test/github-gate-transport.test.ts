@@ -654,7 +654,7 @@ describe('#1404 S4a gate transport: what is sent', () => {
       id: 1,
       state: 'failure',
       context: 'cairn/merge-gate',
-      description: '必需检查还在跑 (required-check-pending)',
+      description: '必需检查仍在运行 (required-check-pending)',
     };
     const { fetch, calls } = stub({ status: 201, headers: { etag: '"s1"' }, body: created });
     const result = await githubCreateCommitStatus(
@@ -666,7 +666,7 @@ describe('#1404 S4a gate transport: what is sent', () => {
       {
         state: 'failure',
         context: 'cairn/merge-gate',
-        description: '必需检查还在跑 (required-check-pending)',
+        description: '必需检查仍在运行 (required-check-pending)',
       },
       { timeoutMs: T },
     );
@@ -679,7 +679,7 @@ describe('#1404 S4a gate transport: what is sent', () => {
     expect(JSON.parse(c?.init.body ?? 'null')).toEqual({
       state: 'failure',
       context: 'cairn/merge-gate',
-      description: '必需检查还在跑 (required-check-pending)',
+      description: '必需检查仍在运行 (required-check-pending)',
     });
     expect(Object.keys(JSON.parse(c?.init.body ?? '{}')).sort()).toEqual([
       'context',

@@ -134,7 +134,7 @@ export function MachineAuthorizePage() {
               </Button>
               {pollFailed && !polled && (
                 <p className="m-0 text-meta text-content-secondary" role="status">
-                  {t('连不上服务器，正在重试。请检查网络。')}
+                  {t('无法连接服务器，正在重试。请检查网络。')}
                 </p>
               )}
               {failed !== null && (
@@ -144,7 +144,7 @@ export function MachineAuthorizePage() {
                   title={failed}
                 >
                   {withCodeSpans(
-                    t('授权没成功，请再试一次。还不行就在执行机上重新运行 `cairn start`。'),
+                    t('授权未成功，请重试。仍然失败时，在执行机上重新运行 `cairn start`。'),
                   )}
                 </p>
               )}
@@ -153,15 +153,15 @@ export function MachineAuthorizePage() {
           {phase === 'authorized' && (
             <p className={DESC_CLASS}>
               {name !== null
-                ? t('授权完成，{name} 已注册为执行机。终端那边会自己连上，这一页可以关掉。', {
+                ? t('授权完成，{name} 已注册为执行机。终端会自动连接，可以关闭这一页。', {
                     name,
                   })
-                : t('授权完成，执行机已注册。终端那边会自己连上，这一页可以关掉。')}
+                : t('授权完成，执行机已注册。终端会自动连接，可以关闭这一页。')}
             </p>
           )}
           {phase === 'expired' && (
             <p className={`${DESC_CLASS} [&_code]:whitespace-nowrap`}>
-              {withCodeSpans(t('授权链接过期了。在执行机上重新运行 `cairn start` 拿新链接。'))}
+              {withCodeSpans(t('授权链接已过期。在执行机上重新运行 `cairn start` 获取新链接。'))}
             </p>
           )}
         </Card>

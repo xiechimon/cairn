@@ -143,7 +143,7 @@ function TaskRefPlace({ taskRef }: { taskRef: TaskRef }) {
     ...(project !== undefined
       ? [['project', t('项目'), project.name] as [string, string, string]]
       : []),
-    ['machine', t('运行机器'), machine ?? t('还没分配机器')],
+    ['machine', t('运行的执行机'), machine ?? t('尚未分配执行机')],
     ...(folder !== undefined ? [['folder', t('目录'), folder] as [string, string, string]] : []),
     ...(startsAfter !== undefined
       ? [['starts-after', t('开始条件'), startsAfter] as [string, string, string]]

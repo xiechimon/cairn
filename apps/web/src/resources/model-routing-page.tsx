@@ -153,7 +153,7 @@ function RoutingContent() {
           query={live ? routingQ : undefined}
           isEmpty={live && routingQ.data === undefined}
           loadingLabel={t('正在加载模型路由')}
-          errorTitle={t('模型路由没能加载')}
+          errorTitle={t('模型路由未能加载')}
           empty={null}
         >
           {groups.length > 0 && (

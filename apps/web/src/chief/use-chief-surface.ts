@@ -337,7 +337,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
             onError: (e) => {
               questionSubmitStore.patch(key, {
                 submitting: false,
-                error: t('提交回答失败，草稿还在，请再试一次。'),
+                error: t('提交回答失败，草稿已保留，请重试。'),
               });
               toastError(t('提交回答失败，请重试。'), e);
             },

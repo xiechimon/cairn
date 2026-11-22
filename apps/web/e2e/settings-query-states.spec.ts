@@ -6,14 +6,14 @@ const PANES = [
   {
     section: 'routing',
     endpoint: 'providers',
-    errText: '模型服务没能加载',
+    errText: '服务商未能加载',
     empty: '[data-testid="providers-empty"]',
     ok: { providers: [] },
   },
   {
     section: 'routing',
     endpoint: 'model-routing',
-    errText: '模型路由没能加载',
+    errText: '模型路由未能加载',
     empty: '[data-testid="routing-section"]',
     ok: { edges: [], connections: [], quota: [] },
   },
@@ -66,7 +66,7 @@ for (const pane of PANES) {
       ? settings.getByTestId('query-error').filter({ hasText: pane.errText })
       : settings.getByTestId('query-error');
     await expect(err).toBeVisible();
-    await expect(err).toContainText('没能加载');
+    await expect(err).toContainText('未能加载');
     await expect(settings.locator(pane.empty)).toHaveCount(0);
     await expect(settings.getByTestId('query-loading')).toHaveCount(0);
 
@@ -120,7 +120,7 @@ test('providers: a failed Claude subscriptions fetch still lists the API provide
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('provider-instance')).toContainText('Codex main');
   await expect(settings.getByTestId('provider-instance')).toContainText('订阅');
-  await expect(settings.getByTestId('providers-partial-error')).toContainText('订阅账户没能加载');
+  await expect(settings.getByTestId('providers-partial-error')).toContainText('订阅账户未能加载');
   state.fail = false;
   await settings.getByTestId('providers-partial-error').getByRole('button', { name: '重试' }).click();
   await expect(settings.getByTestId('providers-partial-error')).toHaveCount(0);
@@ -150,7 +150,7 @@ test('providers: a failed API providers fetch next to a loaded subscription stil
   await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByTestId('provider-instance')).toContainText('Fresh');
-  await expect(settings.getByTestId('providers-partial-error')).toContainText('模型服务没能加载');
+  await expect(settings.getByTestId('providers-partial-error')).toContainText('服务商未能加载');
   state.fail = false;
   await settings.getByTestId('providers-partial-error').getByRole('button', { name: '重试' }).click();
   await expect(settings.getByTestId('providers-partial-error')).toHaveCount(0);
@@ -170,7 +170,7 @@ test('providers: a team whose only data is a failed subscriptions fetch sees an 
   await page.goto('/app/settings/routing');
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(
-    settings.getByTestId('query-error').filter({ hasText: '模型服务没能加载' }),
+    settings.getByTestId('query-error').filter({ hasText: '服务商未能加载' }),
   ).toBeVisible();
   await expect(settings.getByTestId('providers-empty')).toHaveCount(0);
 });

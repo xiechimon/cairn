@@ -22,5 +22,5 @@ export function quotaHoldNote(message: string, retryAt: number): string {
     minute: '2-digit',
     hour12: false,
   });
-  return `等额度：模型额度用尽，已挂起等待恢复（${message}）。下次尝试 ${when}，额度恢复后将自动继续，无需人工重跑。`;
+  return `等额度：模型额度用尽，已挂起等待恢复（${message}）。下次尝试 ${when}，额度恢复后将自动继续，无需人工重新运行。`;
 }

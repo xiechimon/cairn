@@ -445,7 +445,7 @@ test.describe('on a touch phone', () => {
     const bar = page.getByTestId('machine-screen-bar');
     await expect(bar).toBeVisible();
     await expect.poll(() => bar.evaluate((element) => getComputedStyle(element).opacity)).toBe('1');
-    await expect(bar).toContainText('点一下画面就能操作');
+    await expect(bar).toContainText('点击画面即可操作');
     const close = await bar.getByRole('button', { name: '缩小' }).boundingBox();
     expect(close).not.toBeNull();
     if (!close) return;

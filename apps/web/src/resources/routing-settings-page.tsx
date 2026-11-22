@@ -388,7 +388,7 @@ export function ModelRulesSection() {
         onError: (error) =>
           toastError(
             error instanceof ApiError && error.status === 409
-              ? t('这条规则刚被改过，已重新读取，请再看一眼。')
+              ? t('这条规则刚被修改，已重新读取，请再次确认。')
               : t('修复失败，请重试。'),
             error,
           ),
@@ -400,7 +400,7 @@ export function ModelRulesSection() {
       query={live ? settingsQ : undefined}
       isEmpty={live && settingsQ.data === undefined}
       loadingLabel={t('正在加载模型')}
-      errorTitle={t('模型没能加载')}
+      errorTitle={t('模型未能加载')}
       empty={null}
     >
       <div className="flex flex-col gap-8">

@@ -46,7 +46,7 @@ test('the empty vault shows one add action for logins and the empty grant line',
     page.getByTestId('vault-empty').getByRole('button', { name: '添加登录', exact: true }),
   ).toBeVisible();
   await expect(page.getByTestId('vault-new')).toHaveCount(0);
-  await expect(page.getByText('还没有批准过的网站', { exact: true })).toBeVisible();
+  await expect(page.getByText('暂无已批准的网站', { exact: true })).toBeVisible();
 });
 
 async function openAddDialog(page: Page) {

@@ -393,7 +393,7 @@ export function SearchPanel({
             className="flex flex-none items-center gap-3 border-b border-border px-4 py-2.5 text-ui text-content-secondary"
           >
             <TriangleAlert aria-hidden="true" className="size-5 flex-none text-destructive" />
-            <span className="min-w-0 flex-1">{t('搜索没能完成，下面只是本地匹配的结果。')}</span>
+            <span className="min-w-0 flex-1">{t('搜索未能完成，下方仅为本地匹配的结果。')}</span>
             <Button
               size="sm"
               variant="ghost"

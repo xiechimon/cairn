@@ -64,7 +64,7 @@ export function useDesignComposer(
                   className="size-5 flex-none rounded-full text-content-tertiary hover:bg-(--hover-1) hover:text-foreground"
                   onClick={() =>
                     deleteComment.mutate(comment.id, {
-                      onError: (error) => toastError(t('评论没删掉'), error),
+                      onError: (error) => toastError(t('评论未能删除'), error),
                     })
                   }
                 />

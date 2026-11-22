@@ -75,7 +75,7 @@ export function ExportMenu({
     const frame = frameRef.current;
     const result = frame === null ? null : await requestPreviewSnapshot(frame);
     if (result?.ok !== true) {
-      toastError(t('页面截图没拍下来'), null);
+      toastError(t('页面截图未能截取'), null);
       return;
     }
     downloadHref(result.snapshot.dataUrl, `${pageSlug(fileName)}.png`);

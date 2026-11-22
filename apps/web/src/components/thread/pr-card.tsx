@@ -128,7 +128,7 @@ function verdictText(pr: PrCardModel, t: TFunc): string | null {
   if (pr.state === 'behind') return t('分支落后，更新后才能合并');
   if (pr.state === 'merge-blocked') return t('审核已通过，GitHub 还不允许合并');
   if (verdict == null) {
-    return pr.state === 'draft' || pr.state === 'closed' ? null : t('还没有审核');
+    return pr.state === 'draft' || pr.state === 'closed' ? null : t('暂无审核');
   }
   if (isVerdictStale(pr)) {
     return `${t('审核结论已过期')} (${t('评审于')} ${verdict.judgedHead} → ${pr.currentHead})`;

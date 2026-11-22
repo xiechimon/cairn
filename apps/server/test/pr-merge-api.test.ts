@@ -844,7 +844,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     expect(err.status).toBe(409);
     expect(err.message).toContain(head.slice(0, 7));
     expect(err.message).toContain(CP.slice(0, 7));
-    expect(err.message).toContain('还没同步');
+    expect(err.message).toContain('尚未同步');
     expect(w.fake.gets()).toHaveLength(1);
     expect(w.fake.puts()).toEqual([]);
     expectUntouched(w);

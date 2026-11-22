@@ -54,7 +54,7 @@ export function ApiKeysPage() {
           next.delete(id);
           return next;
         });
-        toastError(t('没能删除，请重试。'), error);
+        toastError(t('未能删除，请重试。'), error);
       },
     });
   };
@@ -77,7 +77,7 @@ export function ApiKeysPage() {
         query={live ? keysQ : undefined}
         isEmpty={keys.length === 0}
         loadingLabel={t('正在加载 API 密钥')}
-        errorTitle={t('API 密钥没能加载')}
+        errorTitle={t('API 密钥未能加载')}
         className="mt-6"
         empty={
           <EmptyState

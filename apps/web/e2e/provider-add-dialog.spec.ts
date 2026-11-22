@@ -5,7 +5,7 @@ const PROVIDERS = '/app/resources/providers?scenario=01';
 async function openPicker(page: Page) {
   await page.goto(PROVIDERS);
   await page.getByTestId('routing-add-provider').click();
-  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  const dialog = page.getByRole('dialog', { name: '添加服务商' });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -28,14 +28,14 @@ test('topbar `新建` opens the picker: 38 preset rows, search, `自定义端点
   page,
 }) => {
   const dialog = await openPicker(page);
-  await expect(dialog).toHaveAccessibleName('添加模型服务');
+  await expect(dialog).toHaveAccessibleName('添加服务商');
   await expect(dialog.getByLabel('搜索服务商...')).toBeVisible();
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
   await expect(dialog.getByRole('button', { name: '自定义端点' })).toHaveText('自定义端点');
 
   await expect(dialog.locator('[data-preset-id]').first()).toContainText('ChatGPT 订阅');
 
-  await expect(dialog.getByRole('button', { name: '添加模型服务' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '添加服务商' })).toHaveCount(0);
 });
 
 test('search filters by display name and id, case-insensitive; empty query restores 38', async ({
@@ -90,7 +90,7 @@ test('`自定义端点` opens the existing form (fields and defaults unchanged);
     'OpenAI Completions',
   );
   await expect(dialog.locator('#dlg-provider-authheader')).toBeChecked();
-  await expect(dialog.getByRole('button', { name: '添加模型服务' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: '添加服务商' })).toBeDisabled();
 
   await dialog.getByRole('button', { name: '返回' }).click();
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
@@ -158,7 +158,7 @@ test('Anthropic folds its pi route behind a summary and picks the newest Claude 
   await expect(dialog.locator('#dlg-provider-authheader')).not.toBeChecked();
   await dialog.locator('#dlg-provider-baseurl').fill('https://relay.example.com');
   await expect(connection).toContainText('relay.example.com');
-  await expect(dialog.getByRole('button', { name: '添加模型服务' })).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: '添加服务商' })).toBeEnabled();
 });
 
 test('a gateway preset starts with no models and finds them by search', async ({ page }) => {
@@ -178,7 +178,7 @@ test('a templated base URL blocks the submit until its placeholders are replaced
   await dialog.locator('[data-preset-id="cloudflare-workers-ai"]').click();
   const baseUrl = dialog.locator('#dlg-provider-baseurl');
   await expect(baseUrl).toHaveValue(/\{CLOUDFLARE_ACCOUNT_ID\}/);
-  const submit = dialog.getByRole('button', { name: '添加模型服务' });
+  const submit = dialog.getByRole('button', { name: '添加服务商' });
   await expect(submit).toBeDisabled();
   await expect(dialog.getByText('把 Base URL 中的占位符换成你的账户值')).toBeVisible();
   await baseUrl.fill('https://api.cloudflare.com/client/v4/accounts/acc-1/ai/v1');
@@ -189,22 +189,22 @@ test('a templated base URL blocks the submit until its placeholders are replaced
 test('family law: X, Escape and backdrop dismiss; panel clicks do not', async ({ page }) => {
   let dialog = await openPicker(page);
   await dialog.getByRole('button', { name: '关闭' }).click();
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '添加服务商' })).toBeHidden();
 
   dialog = await openPicker(page);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '添加服务商' })).toBeHidden();
 
   dialog = await openPicker(page);
   await dialog.getByTestId('dialog-head').click();
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '添加服务商' })).toBeVisible();
   await page.mouse.click(20, 20);
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '添加服务商' })).toBeHidden();
 });
 
 test('providerId/label/baseUrl and one model gate the submit; protocol select swaps', async ({ page }) => {
   const dialog = await openCustomForm(page);
-  const submit = dialog.getByRole('button', { name: '添加模型服务' });
+  const submit = dialog.getByRole('button', { name: '添加服务商' });
   await expect(submit).toBeDisabled();
   await dialog.locator('#dlg-provider-id').fill('relay-355');
   await expect(submit).toBeDisabled();
@@ -235,8 +235,8 @@ test('fixture submit closes the dialog (accept law) and reopens a clean picker',
   await dialog.locator('#dlg-provider-label').fill('R 355 网关');
   await dialog.locator('#dlg-provider-baseurl').fill('https://relay-355.example.com/v1');
   await addTypedModel(page, dialog, 'relay-small');
-  await dialog.getByRole('button', { name: '添加模型服务' }).click();
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
+  await dialog.getByRole('button', { name: '添加服务商' }).click();
+  await expect(page.getByRole('dialog', { name: '添加服务商' })).toBeHidden();
 
   const again = await openPicker(page);
   await expect(again.locator('[data-preset-id]')).toHaveCount(38);
@@ -246,7 +246,7 @@ test('fixture submit closes the dialog (accept law) and reopens a clean picker',
   await expect(again.locator('#dlg-provider-label')).toHaveValue('');
   await expect(again.locator('#dlg-provider-baseurl')).toHaveValue('');
   await expect(again.locator('#dlg-provider-apikey')).toHaveValue('');
-  await expect(again.getByRole('button', { name: '添加模型服务' })).toBeDisabled();
+  await expect(again.getByRole('button', { name: '添加服务商' })).toBeDisabled();
 });
 
 test('model rows keep the submit reachable (dialog body scrolls)', async ({ page }) => {
@@ -260,10 +260,10 @@ test('model rows keep the submit reachable (dialog body scrolls)', async ({ page
     await page.keyboard.press('Enter');
   }
   await expect(dialog.locator('[data-model-chip]')).toHaveCount(3);
-  const submit = dialog.getByRole('button', { name: '添加模型服务' });
+  const submit = dialog.getByRole('button', { name: '添加服务商' });
   // the panel is overflow:hidden with no max-height — the body must scroll so a
   // tall form never pushes the submit out of the viewport (live finding)
   await expect(submit).toBeInViewport();
   await submit.click();
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeHidden();
+  await expect(page.getByRole('dialog', { name: '添加服务商' })).toBeHidden();
 });

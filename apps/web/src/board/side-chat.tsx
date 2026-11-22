@@ -119,7 +119,7 @@ function StatusLine({
         {platformWait !== null
           ? platformWait.machine !== null
             ? t('等 {machine} 上线', { machine: platformWait.machine })
-            : t('还没有 {platform} 执行机', { platform: RUNNER_OS_LABELS[platformWait.platform] })
+            : t('暂无 {platform} 执行机', { platform: RUNNER_OS_LABELS[platformWait.platform] })
           : todo.quotaWait != null
             ? t('等额度')
             : waitingOnChecks
@@ -191,7 +191,7 @@ function SourceLine({
       todo={wire}
       onRetry={() =>
         mutations.retryGithubIssue.mutate(wire.id, {
-          onError: (error) => toastError(t('重试失败，请稍后再试。'), error),
+          onError: (error) => toastError(t('重试失败，请稍后重试。'), error),
         })
       }
       retryPending={mutations.retryGithubIssue.isPending}
@@ -277,7 +277,7 @@ function ChangesCard({
       <TraceCard className="mt-5" data-testid="side-chat-changes" data-state="error">
         <div className={cn(CHANGES_ROW, 'gap-2 pl-3 text-ui')}>
           <CircleAlert aria-hidden="true" className="size-4 flex-none text-destructive" />
-          <span className="min-w-0 flex-1 truncate text-foreground">{t('改动没加载出来')}</span>
+          <span className="min-w-0 flex-1 truncate text-foreground">{t('改动未能加载')}</span>
           <Button
             variant="ghost"
             size="sm"

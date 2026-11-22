@@ -84,7 +84,7 @@ export function SecretsPage() {
           kind: draft.secret ? 'secret' : 'env',
           ...(draft.projectId !== undefined ? { projectId: draft.projectId } : {}),
         },
-        { ...done, onError: (error) => toastError(t('没能添加，请重试。'), error) },
+        { ...done, onError: (error) => toastError(t('未能添加，请重试。'), error) },
       );
       return;
     }
@@ -98,7 +98,7 @@ export function SecretsPage() {
           ...(draft.secret && editing.kind === 'env' ? { kind: 'secret' as const } : {}),
         },
       },
-      { ...done, onError: (error) => toastError(t('没能保存，请重试。'), error) },
+      { ...done, onError: (error) => toastError(t('未能保存，请重试。'), error) },
     );
   };
 
@@ -109,7 +109,7 @@ export function SecretsPage() {
     if (!live) return;
     mutations.updateSecret.mutate(
       { id, body: { kind: 'secret' } },
-      { onError: (error) => toastError(t('没能转为机密，请重试。'), error) },
+      { onError: (error) => toastError(t('未能转为机密，请重试。'), error) },
     );
   };
 
@@ -119,7 +119,7 @@ export function SecretsPage() {
     setDeleting(null);
     if (!live) return;
     mutations.deleteSecret.mutate(id, {
-      onError: (error) => toastError(t('没能删除，请重试。'), error),
+      onError: (error) => toastError(t('未能删除，请重试。'), error),
     });
   };
 
@@ -156,15 +156,15 @@ export function SecretsPage() {
         query={live ? secretsQ : undefined}
         isEmpty={secrets.length === 0}
         loadingLabel={t('正在加载密钥')}
-        errorTitle={t('密钥没能加载')}
+        errorTitle={t('密钥未能加载')}
         className="mt-6"
         empty={
           <EmptyState
             testId="resource-empty"
             className="mt-6"
             icon={ShieldEllipsis}
-            title={t('还没有密钥或环境变量')}
-            description={t('执行机跑任务时会拿到它们。')}
+            title={t('暂无密钥或环境变量')}
+            description={t('执行机运行任务时会获取它们。')}
             action={{ label: t('添加'), onClick: () => openDialog(null) }}
           />
         }
@@ -376,7 +376,7 @@ export function SecretsPage() {
       </AlertDialogShell>
       <DeleteConfirm
         open={deleting !== null}
-        title={t('删除后，用到它的任务就拿不到这个值了')}
+        title={t('删除后，使用它的任务将无法获取这个值')}
         summary={deleting?.name ?? ''}
         ariaLabel={t('删除 {name}', { name: deleting?.name ?? '' })}
         onClose={() => setDeleting(null)}

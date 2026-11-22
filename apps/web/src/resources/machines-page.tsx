@@ -56,7 +56,7 @@ export function MachinesPage() {
           query={live ? machinesQ : undefined}
           isEmpty={machines.length === 0}
           loadingLabel={t('正在加载执行机')}
-          errorTitle={t('执行机没能加载')}
+          errorTitle={t('执行机未能加载')}
           className="mt-6"
           empty={noMachines}
         >

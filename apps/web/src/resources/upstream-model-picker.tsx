@@ -43,26 +43,26 @@ export const COST_TIER_LABEL: Record<string, string> = {
 };
 
 const LIST_FAILURE: Record<ProviderFailure | 'unavailable', string> = {
-  auth: '上游拒绝了 API key。检查 key 后重试。',
+  auth: '上游拒绝了 API key。请检查 API key 后重试。',
   'not-found': '上游没有提供模型清单。',
   'rate-limit': '上游限流了，稍后重试。',
-  timeout: '上游 10 秒内没回。',
+  timeout: '上游 10 秒内未响应。',
   upstream: '上游返回了错误，稍后重试。',
   invalid: '上游返回的不是模型清单。',
-  network: '连不上上游。检查地址后重试。',
+  network: '无法连接上游。请检查地址后重试。',
   'no-model': '上游没有提供模型清单。',
-  unavailable: '没能获取上游模型，请重试。',
+  unavailable: '未能获取上游模型，请重试。',
 };
 
 const FALLBACK_REASON: Record<ProviderFailure, string> = {
-  auth: '上游拒绝了这个订阅的登录，没拿到模型清单。重新登录后重试。',
-  'not-found': '上游没给出模型清单，稍后重试。',
-  'rate-limit': '上游限流了，没拿到模型清单，稍后重试。',
-  timeout: '上游 10 秒内没回，没拿到模型清单。',
-  upstream: '上游没给出模型清单，稍后重试。',
-  invalid: '上游没给出模型清单，稍后重试。',
-  network: '连不上上游，没拿到模型清单。检查网络后重试。',
-  'no-model': '上游没给出模型清单，稍后重试。',
+  auth: '上游拒绝了这个订阅的登录，未能获取模型清单。请重新登录后重试。',
+  'not-found': '上游未返回模型清单，请稍后重试。',
+  'rate-limit': '上游已限流，未能获取模型清单，请稍后重试。',
+  timeout: '上游 10 秒内未响应，未能获取模型清单。',
+  upstream: '上游未返回模型清单，请稍后重试。',
+  invalid: '上游未返回模型清单，请稍后重试。',
+  network: '无法连接上游，未能获取模型清单。请检查网络后重试。',
+  'no-model': '上游未返回模型清单，请稍后重试。',
 };
 
 export function UpstreamModelPicker({

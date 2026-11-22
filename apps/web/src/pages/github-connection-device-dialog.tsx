@@ -30,8 +30,8 @@ function ended(
   if (reason === 'start')
     return {
       kind: 'ended',
-      title: t('没能开始连接 GitHub'),
-      body: t('暂时连不上 GitHub，稍后再试。'),
+      title: t('未能开始连接 GitHub'),
+      body: t('暂时无法连接 GitHub，请稍后重试。'),
     };
   return {
     kind: 'ended',

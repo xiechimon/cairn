@@ -123,7 +123,7 @@ test('the upstream picker groups by vendor, filters free models and saves the pi
   await mount(page, subscription([]), UPSTREAM, patches);
   await page.goto('/app/resources/providers');
   await expect(pickedChip(page, 'swe-2-high')).toBeVisible();
-  await expect(detail(page)).not.toContainText('还没勾选模型');
+  await expect(detail(page)).not.toContainText('尚未勾选模型');
   await detail(page).getByTestId('subscription-pick-upstream').click();
   const picker = page.getByRole('dialog', { name: '从上游选择模型' });
   const groupLabels = picker.getByTestId('upstream-group');

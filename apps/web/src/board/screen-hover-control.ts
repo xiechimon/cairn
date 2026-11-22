@@ -180,9 +180,9 @@ export function useScreenHoverControl(control: ComputerControl, loginPending = f
 const COARSE_QUERY = '(pointer: coarse)';
 
 export function screenControlStatus(control: ComputerControl, t: TFunc): string {
-  if (control.failed) return t('没能接管，电脑没有响应');
+  if (control.failed) return t('未能接管，电脑没有响应');
   if (control.leaseId !== null) return t('你在操作，Coordinator 先等着');
   return window.matchMedia(COARSE_QUERY).matches
-    ? t('点一下画面就能操作')
+    ? t('点击画面即可操作')
     : t('鼠标移进画面就能操作');
 }

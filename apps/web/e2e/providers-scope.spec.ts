@@ -71,7 +71,7 @@ test('empty team: the list offers to add a provider and opens the picker', async
   await expect(page.getByTestId('provider-instance')).toHaveCount(0);
   await expect(page.getByTestId('providers-empty')).toBeVisible();
   await page.getByTestId('routing-add-provider').click();
-  await expect(page.getByRole('dialog', { name: '添加模型服务' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '添加服务商' })).toBeVisible();
 });
 
 test('phone width: the list sits above the editor and nothing overflows sideways', async ({

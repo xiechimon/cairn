@@ -87,7 +87,7 @@ export function BulkSecretDialog({
         .join('\n'),
     );
     toastError(
-      t('{names} 没能添加（可能已有同名条目），其余已添加。', { names: failed.join('、') }),
+      t('{names} 未能添加（可能已有同名条目），其余已添加。', { names: failed.join('、') }),
       lastError,
     );
   };

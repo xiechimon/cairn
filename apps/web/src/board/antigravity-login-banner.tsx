@@ -88,8 +88,8 @@ export function AntigravityLoginBanner({
             .join('，');
   const body =
     expired === 0 && signedOut === 0
-      ? t('到期前更新登录或 API Key，任务才不会中断。')
-      : t('更新登录或 API Key 之前，这些订阅不会接新任务。');
+      ? t('到期前更新登录或 API key，任务才不会中断。')
+      : t('更新登录或 API key 之前，这些订阅不会接收新任务。');
   return (
     <NoticeBanner
       data-testid="antigravity-login-banner"

@@ -21,7 +21,7 @@ test('the empty schedules tab has no docs button; its `新建定时` really open
   await emptyNew.click();
   const popover = page.getByTestId('schedule-popover');
   await expect(popover).toContainText('新建定时');
-  await expect(popover).toContainText('这里还没有可以定时的任务');
+  await expect(popover).toContainText('这里暂无可以定时的任务');
   await popover.getByRole('button', { name: '取消' }).click();
   await expect(popover).toBeHidden();
 });
@@ -162,7 +162,7 @@ test('mcp page: catalog cards connect, add-server opens a form, local rows stay 
 
   await page.goto('/app/resources/mcp-servers?scenario=mcp-oauth-denied');
   const banner = page.getByTestId('mcp-oauth-error');
-  await expect(banner).toContainText('没能连上 Linear');
+  await expect(banner).toContainText('未能连接 Linear');
   await expect(banner.getByRole('button', { name: '重试' })).toBeVisible();
 
   await page.goto('/app/resources/mcp-servers?scenario=07');

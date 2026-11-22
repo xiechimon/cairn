@@ -284,7 +284,7 @@ export function notifyQuotaWait(
     entityId: todoRow.id,
     entityRef: { title: todoRow.title, projectId: todoRow.projectId, seqNum: todoRow.seqNum },
     agent: todoNoticeAgent(deps),
-    snippet: `${lane} ${kindText}：任务挂起等额度，额度恢复后自动续跑`,
+    snippet: `${lane} ${kindText}：任务挂起等额度，额度恢复后自动继续运行`,
   });
 }
 

@@ -54,7 +54,7 @@ function FileDocPanelView({ target, onClose }: { target: FileTarget; onClose: ()
     if (text === undefined) return;
     navigator.clipboard.writeText(text).then(
       () => setCopied(true),
-      (error: unknown) => toastError(t('没能复制，再试一次'), error),
+      (error: unknown) => toastError(t('未能复制，请重试'), error),
     );
   };
   const withText = (render: (value: string) => ReactNode) => (
@@ -64,7 +64,7 @@ function FileDocPanelView({ target, onClose }: { target: FileTarget; onClose: ()
       errorWins
       empty={null}
       loadingLabel={t('正在加载文件')}
-      errorTitle={t('文件没能加载')}
+      errorTitle={t('文件未能加载')}
       className="px-2"
     >
       {render(text ?? '')}
@@ -95,7 +95,7 @@ function FileDocPanelView({ target, onClose }: { target: FileTarget; onClose: ()
           errorWins
           empty={null}
           loadingLabel={t('正在加载文件')}
-          errorTitle={t('文件没能加载')}
+          errorTitle={t('文件未能加载')}
           className="px-2"
         >
           {documentQ.data !== undefined && (

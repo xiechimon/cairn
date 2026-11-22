@@ -74,7 +74,7 @@ export function VaultPage() {
           username: draft.username,
           kind: 'pair',
         },
-        { ...done, onError: (error) => toastError(t('没能添加，请重试。'), error) },
+        { ...done, onError: (error) => toastError(t('未能添加，请重试。'), error) },
       );
       return;
     }
@@ -88,7 +88,7 @@ export function VaultPage() {
           ...(draft.password !== '' ? { value: draft.password } : {}),
         },
       },
-      { ...done, onError: (error) => toastError(t('没能保存，请重试。'), error) },
+      { ...done, onError: (error) => toastError(t('未能保存，请重试。'), error) },
     );
   };
 
@@ -98,7 +98,7 @@ export function VaultPage() {
     setDeleting(null);
     if (!live) return;
     mutations.deleteSecret.mutate(id, {
-      onError: (error) => toastError(t('没能删除，请重试。'), error),
+      onError: (error) => toastError(t('未能删除，请重试。'), error),
     });
   };
 
@@ -137,14 +137,14 @@ export function VaultPage() {
             query={live ? secretsQ : undefined}
             isEmpty={pairs.length === 0}
             loadingLabel={t('正在加载网站登录')}
-            errorTitle={t('网站登录没能加载')}
+            errorTitle={t('网站登录未能加载')}
             className="mt-3"
             empty={
               <EmptyState
                 testId="vault-empty"
                 className="mt-3"
                 icon={UserKey}
-                title={t('还没有保存的网站登录')}
+                title={t('暂无保存的网站登录')}
                 description={t('保存网站的用户名和密码后，Coordinator 可以在浏览器里代填。')}
                 action={{
                   label: t('添加登录'),
@@ -254,7 +254,7 @@ export function VaultPage() {
             query={live ? grantsQ : undefined}
             isEmpty={grants.length === 0}
             loadingLabel={t('正在加载网站授权')}
-            errorTitle={t('网站授权没能加载')}
+            errorTitle={t('网站授权未能加载')}
             className="mt-3"
             empty={
               <div
@@ -263,7 +263,7 @@ export function VaultPage() {
                   'mt-3 rounded-(--radius-card) bg-card ring-1 ring-border text-ui text-content-tertiary',
                 )}
               >
-                <span className="min-w-0 truncate">{t('还没有批准过的网站')}</span>
+                <span className="min-w-0 truncate">{t('暂无已批准的网站')}</span>
               </div>
             }
           >
@@ -317,7 +317,7 @@ export function VaultPage() {
                           onClick={() => {
                             if (!live) return;
                             mutations.revokeBrowserPasswordGrant.mutate(grant.grantId, {
-                              onError: (error) => toastError(t('没能撤销授权，请重试。'), error),
+                              onError: (error) => toastError(t('未能撤销授权，请重试。'), error),
                             });
                           }}
                         >
@@ -345,7 +345,7 @@ export function VaultPage() {
       />
       <DeleteConfirm
         open={deleting !== null}
-        title={t('删除后，用到它的任务和网站代填就拿不到这条登录了')}
+        title={t('删除后，使用它的任务和网站代填将无法获取这条登录')}
         summary={deleting?.name ?? ''}
         ariaLabel={t('删除 {name}', { name: deleting?.name ?? '' })}
         onClose={() => setDeleting(null)}

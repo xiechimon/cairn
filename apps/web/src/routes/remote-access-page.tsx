@@ -132,7 +132,7 @@ export function RemoteAccessPage() {
   const tailnetHint: ReactNode = (() => {
     if (!tailnetOn)
       return toggleFailed
-        ? t('远程访问没有打开，请再试一次')
+        ? t('远程访问未能打开，请重试')
         : t('打开后，手机和其他电脑能通过你的 Tailscale 网络连到这台电脑');
     if (tailnetFailed) {
       const kind = tailnet?.error;
@@ -235,7 +235,7 @@ export function RemoteAccessPage() {
       {live && routesQ.data === undefined ? null : pairingBlocked && !awaitingTailnetLogin ? (
         devices.length === 0 && (
           <p className="m-0 mt-3 text-meta text-content-tertiary" data-testid="remote-routes-empty">
-            {t('还没有配对的设备')}
+            {t('暂无已配对的设备')}
           </p>
         )
       ) : routes.length === 0 ? (
@@ -243,11 +243,11 @@ export function RemoteAccessPage() {
           testId="remote-routes-empty"
           className="mt-6"
           icon={Smartphone}
-          title={t('手机还连不上这台电脑')}
+          title={t('手机尚无法连接这台电脑')}
           description={
             awaitingTailnetLogin
               ? t('请先登录 Tailscale。')
-              : t('打开上面的开关，手机在外面也能连上这台电脑。')
+              : t('打开上方的开关，手机在外部网络也能连接这台电脑。')
           }
         />
       ) : (

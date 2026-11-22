@@ -47,7 +47,7 @@ export function ScheduleRowMenu({
       { id: schedule.id, body: { enabled: !enabled } },
       {
         onSuccess: () => toastSuccess(enabled ? t('定时已暂停。') : t('定时已恢复。')),
-        onError: (error) => toastError(t('定时没能更新，请重试。'), error),
+        onError: (error) => toastError(t('定时未能更新，请重试。'), error),
       },
     ),
   );

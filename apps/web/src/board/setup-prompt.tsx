@@ -87,7 +87,7 @@ export function runnerStep(
   if (only === undefined) {
     return {
       label: t('连接一台执行机'),
-      hint: withCode(t('在要干活的电脑上运行 `{command}`', { command })),
+      hint: withCode(t('在要执行任务的电脑上运行 `{command}`', { command })),
       reconnect: false,
     };
   }
@@ -116,8 +116,8 @@ function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean })
   const { t } = useI18n();
   const href = settingsHref('routing');
   const hint = models.tasks
-    ? t('添加一个 Coordinator 能用的服务商，或 Claude 订阅加装好 Claude Code 的执行机')
-    : t('添加模型服务商，或添加 Claude 订阅');
+    ? t('添加一个 Coordinator 可用的服务商，或添加 Claude 订阅和已安装 Claude Code 的执行机')
+    : t('添加服务商，或添加 Claude 订阅');
   if (empty) {
     return (
       <div

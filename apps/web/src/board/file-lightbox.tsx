@@ -375,7 +375,7 @@ function FileLightboxView({ target, onClose }: { target: FileTarget; onClose: ()
             errorWins
             empty={null}
             loadingLabel={t('正在加载文件')}
-            errorTitle={t('文件没能加载')}
+            errorTitle={t('文件未能加载')}
             className="px-2"
           >
             <SvgViewer

@@ -40,7 +40,7 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('cairn.locale', 'zh'));
 });
 
-test('the card carries the latest failure alone; older failures are a bare 没完成 marker', async ({
+test('the card carries the latest failure alone; older failures are a bare 未完成 marker', async ({
   page,
 }) => {
   const sent: string[] = [];
@@ -58,14 +58,14 @@ test('the card carries the latest failure alone; older failures are a bare 没�
   );
   const stream = page.getByTestId('chief-stream');
   const markers = page.getByTestId('chief-turn-error');
-  await expect(markers).toHaveText(['没完成']);
+  await expect(markers).toHaveText(['未完成']);
   await expect(markers.getByRole('button')).toHaveCount(0);
   await expect(stream).not.toContainText('Request timed out');
   await expect(stream).not.toContainText('被打断');
   const card = page.getByTestId('chief-turn-error-card');
   await expect(card).toHaveCount(1);
-  await expect(card).toContainText('模型太久没有回应');
-  await expect(card).toContainText('DeepSeek V4.1 Flash（WorkBuddy）3 分钟没有回应');
+  await expect(card).toContainText('模型响应超时');
+  await expect(card).toContainText('DeepSeek V4.1 Flash（WorkBuddy）3 分钟没有响应');
   await expect(card.getByRole('link', { name: '换 Coordinator 模型' })).toHaveAttribute(
     'href',
     /\/app\/settings\/routing#route-coordinator/,
@@ -87,7 +87,7 @@ test('closing the card leaves the bare marker', async ({ page }) => {
   await expect(page.getByTestId('chief-turn-error')).toHaveCount(0);
   await page.getByTestId('chief-turn-error-card-dismiss').click();
   await expect(card).toHaveCount(0);
-  await expect(page.getByTestId('chief-turn-error')).toHaveText('没完成');
+  await expect(page.getByTestId('chief-turn-error')).toHaveText('未完成');
 });
 
 test('a stored raw API error reply renders as the marker, never as a chat bubble', async ({
@@ -104,7 +104,7 @@ test('a stored raw API error reply renders as the marker, never as a chat bubble
   ]);
   const stream = page.getByTestId('chief-stream');
   await expect(page.getByTestId('chief-turn-error-card')).toHaveAttribute('data-kind', 'runtime-update');
-  await expect(page.getByTestId('chief-turn-error')).toHaveText(['没完成']);
+  await expect(page.getByTestId('chief-turn-error')).toHaveText(['未完成']);
   await expect(stream).not.toContainText('API Error');
   await expect(stream.getByTestId('chief-reply')).toHaveCount(0);
 });
@@ -134,7 +134,7 @@ test('a turn that failed shows only its marker: no thinking and no second failur
   ]);
   const stream = page.getByTestId('chief-stream');
   await expect(page.getByTestId('chief-turn-error-card')).toHaveCount(1);
-  await expect(page.getByTestId('chief-turn-error')).toHaveText(['没完成']);
+  await expect(page.getByTestId('chief-turn-error')).toHaveText(['未完成']);
   await expect(page.getByRole('button', { name: '展开思考' })).toHaveCount(0);
   await expect(stream).not.toContainText('先查 #5393');
   await expect(stream).not.toContainText('逐条核对');
@@ -234,7 +234,7 @@ test('a missing model offers no retry', async ({ page }) => {
     }),
   ]);
   const card = page.getByTestId('chief-turn-error-card');
-  await expect(card).toContainText('用不了 GLM-5.3 这个模型');
+  await expect(card).toContainText('GLM-5.3 不可用');
   await expect(card.getByTestId('chief-turn-retry')).toHaveCount(0);
 });
 
@@ -284,7 +284,7 @@ test('a turn waiting for a computer or an offline Runner shows the card and leav
   );
   state.threads = [waiting('no-computer', null)];
   await page.reload();
-  await expect(card).toContainText('Coordinator 的电脑还没准备好');
+  await expect(card).toContainText('Coordinator 的电脑尚未就绪');
   await expect(card.getByRole('link', { name: '打开电脑' })).toHaveAttribute('href', /pane=machines/);
   await page.getByTestId('chief-queue-wait-card-dismiss').click();
   await expect(card).toHaveCount(0);
@@ -312,7 +312,7 @@ test('a turn on an online Runner whose Claude Code has no login says so and link
     messages: [{ id: 'm1', role: 'user', content: '你好', createdAt: 10 }],
   } as Parameters<typeof mockLive>[1]);
   await page.goto('/app');
-  await expect(page.getByText('团队还没有可用的 Claude 订阅', { exact: false })).toBeVisible();
+  await expect(page.getByText('团队暂无可用的 Claude 订阅', { exact: false })).toBeVisible();
   await expect(page.getByRole('link', { name: '添加 Claude 订阅' })).toHaveAttribute(
     'href',
     /\/app\/settings\/routing/,

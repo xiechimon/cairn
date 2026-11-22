@@ -175,7 +175,7 @@ export function createReviewReconciler(
     if (pull.baseRef !== (target.baseBranch ?? pull.defaultBranch)) {
       rows.hint(
         cand.buildId,
-        `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」，改动还没进默认分支。任务留在审核关口，由人决定下一步。`,
+        `PR #${prNumber} 合并进了分支「${githubText(pull.baseRef)}」，不是默认分支「${githubText(target.baseBranch ?? pull.defaultBranch)}」，改动尚未进入默认分支。任务留在审核关口，由人决定下一步。`,
         since,
       );
       tally.hinted += 1;

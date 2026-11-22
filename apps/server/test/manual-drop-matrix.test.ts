@@ -104,7 +104,7 @@ describe('manual drop matrix (#753): awaiting source', () => {
     const res = await patchPhase(s, id, 'review');
     expect(res.status).toBe(409);
     const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('恢复由合并/审核重跑动作发起');
+    expect(body.error).toContain('恢复由合并/审核重新运行动作发起');
   });
 
   test('same-column migration (confirm->review) = 409 (drag produces no intra-column phase rewrite)', async () => {

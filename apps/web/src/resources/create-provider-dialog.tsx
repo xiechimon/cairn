@@ -327,7 +327,7 @@ export function CreateProviderDialog({
       <FormActions
         className="pt-0"
         primary={{
-          label: t('添加模型服务'),
+          label: t('添加服务商'),
           onClick: submit,
           disabled: !ready || pending === true,
         }}
@@ -591,14 +591,14 @@ export function CreateProviderDialog({
     );
   if (inline) {
     return (
-      <section data-testid={testId} aria-label={t('添加模型服务')} className="flex flex-col gap-4">
+      <section data-testid={testId} aria-label={t('添加服务商')} className="flex flex-col gap-4">
         {body}
         {footer}
       </section>
     );
   }
   return (
-    <DialogShell title={t('添加模型服务')} open={open} onClose={onClose} size="l" footer={footer}>
+    <DialogShell title={t('添加服务商')} open={open} onClose={onClose} size="l" footer={footer}>
       {body}
     </DialogShell>
   );

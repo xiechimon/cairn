@@ -30,7 +30,7 @@ export function CopyIconButton({
     return () => window.clearTimeout(timer);
   }, [copied]);
   const copy = () => {
-    const failed = (error: unknown) => toastError(t('没能复制，再试一次'), error);
+    const failed = (error: unknown) => toastError(t('未能复制，请重试'), error);
     const clip = navigator.clipboard;
     if (clip === undefined) {
       failed(null);

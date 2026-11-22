@@ -90,7 +90,7 @@ export const MERGE_BLOCKERS = [
   { code: 'not-applicable', class: 'policy', label: '不是 GitHub PR 形态的构建' },
   { code: 'not-current-build', class: 'transient', label: '不是任务的当前构建' },
   { code: 'phase-not-review', class: 'transient', label: '任务不在审核关口' },
-  { code: 'work-in-flight', class: 'transient', label: '还有步骤在跑' },
+  { code: 'work-in-flight', class: 'transient', label: '仍有步骤正在运行' },
   {
     code: 'pr-unreadable',
     class: 'transient',
@@ -109,7 +109,7 @@ export const MERGE_BLOCKERS = [
   },
   { code: 'required-checks-none', class: 'human', label: '默认分支没有必需检查' },
   { code: 'required-check-missing', class: 'transient', label: '必需检查在当前 head 上缺席' },
-  { code: 'required-check-pending', class: 'transient', label: '必需检查还在跑' },
+  { code: 'required-check-pending', class: 'transient', label: '必需检查仍在运行' },
   { code: 'required-check-failed', class: 'transient', label: '必需检查未通过' },
   { code: 'pr-evidence-not-green', class: 'transient', label: 'pr-evidence 未通过' },
   {
@@ -120,7 +120,7 @@ export const MERGE_BLOCKERS = [
   {
     code: 'compare-malformed',
     class: 'human',
-    label: 'compare 的响应形状不对，或它的 SHA（请求的 head、提交、父提交）写错',
+    label: 'compare 的响应形状有误，或它的 SHA（请求的 head、提交、父提交）有误',
   },
   { code: 'compare-truncated', class: 'human', label: 'compare 文件列表被截断' },
   {
@@ -153,11 +153,11 @@ export const MERGE_BLOCKERS = [
   { code: 'verify-extraction-failed', class: 'transient', label: '验证判定提取失败' },
   { code: 'verify-evidence-invalid', class: 'transient', label: '验证证据不在本票目录' },
   { code: 'verify-tampered', class: 'human', label: '验证者改了代码' },
-  { code: 'review-missing', class: 'transient', label: '有视角还没有审核判定' },
+  { code: 'review-missing', class: 'transient', label: '有视角尚未给出审核判定' },
   { code: 'review-blocking', class: 'transient', label: '审核有 blocking 发现' },
   { code: 'review-extraction-failed', class: 'transient', label: '审核判定提取失败' },
   { code: 'perspective-timed-out', class: 'human', label: '审核视角超时' },
-  { code: 'decision-missing', class: 'transient', label: 'chief 还没有出 go/no-go' },
+  { code: 'decision-missing', class: 'transient', label: 'Coordinator 尚未给出 go/no-go' },
   { code: 'decision-no-go', class: 'transient', label: 'chief 判 no-go' },
   { code: 'decision-extraction-failed', class: 'transient', label: 'chief 判定提取失败' },
   { code: 'fix-rounds-exhausted', class: 'human', label: '修复轮用完' },

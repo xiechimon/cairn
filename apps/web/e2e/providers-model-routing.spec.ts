@@ -64,7 +64,7 @@ test('the settings nav lists one Model page, not Providers or the old selector',
   const settings = page.getByRole('dialog', { name: '设置' });
   await expect(settings.getByRole('link', { name: '用量与连接' })).toHaveCount(0);
   await expect(settings.getByRole('link', { name: '规则与策略' })).toHaveCount(0);
-  await expect(settings.getByRole('link', { name: '模型服务', exact: true })).toHaveCount(0);
+  await expect(settings.getByRole('link', { name: '服务商', exact: true })).toHaveCount(0);
   await expect(settings.getByRole('link', { name: '模型路由', exact: true })).toHaveCount(0);
   await expect(settings.getByRole('link', { name: '模型选择', exact: true })).toHaveCount(0);
   await settings.getByRole('link', { name: '模型', exact: true }).click();

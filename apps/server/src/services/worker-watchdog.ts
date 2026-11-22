@@ -39,7 +39,7 @@ function stuckReason(db: NotificationDeps['db'], buildId: string, now: number): 
   if (silent.length === 0) return null;
   if (pendingWorkerQuestions(db, buildId).length > 0) return null;
   const longest = silent.reduce((a, b) => (stepProgressAt(a) <= stepProgressAt(b) ? a : b));
-  return `步骤 ${longest.kind} 自 ${clockTime(stepProgressAt(longest))} 起没有任何新进展，任务疑似卡住`;
+  return `步骤 ${longest.kind} 自 ${clockTime(stepProgressAt(longest))} 起没有任何新进展，任务可能已停滞`;
 }
 
 function gateReason(db: NotificationDeps['db'], todoId: string, buildId: string): string | null {

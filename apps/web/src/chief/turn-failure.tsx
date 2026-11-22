@@ -46,7 +46,7 @@ function actionHref(action: TurnFailureAction, error: TurnErrorFacts): string | 
 function useCopyText() {
   const { t } = useI18n();
   return (copy: TurnErrorCopy) => {
-    const vars = { ...copy.vars, provider: copy.vars.provider || t('模型服务') };
+    const vars = { ...copy.vars, provider: copy.vars.provider || t('该服务商') };
     return { title: t(copy.title, vars), why: t(copy.why, vars), vars };
   };
 }
@@ -90,7 +90,7 @@ export function TurnFailureMarker() {
       <MarkerIcon>
         <CircleAlert />
       </MarkerIcon>
-      <MarkerContent>{t('没完成')}</MarkerContent>
+      <MarkerContent>{t('未完成')}</MarkerContent>
     </Marker>
   );
 }
@@ -238,14 +238,14 @@ export function QueueWaitCard({
   const { t } = useI18n();
   const computer = wait.kind === 'no-computer';
   const title = computer
-    ? t('Coordinator 的电脑还没准备好')
+    ? t('Coordinator 的电脑尚未就绪')
     : wait.machine !== undefined
       ? t('执行机 {machine} 离线', { machine: wait.machine })
       : t('执行机离线');
   const why = computer
-    ? t('这一步要用电脑，但还没有能用的电脑。打开执行机面板启动它，就绪后这一轮会自动接着跑。')
+    ? t('这一步需要电脑，但暂无可用的电脑。打开执行机面板启动它，就绪后本轮会自动继续。')
     : t(
-        '这一步要在执行机上跑，但它现在不在线。确认电脑开着、Cairn 在运行，它一上线这一轮就会自动接着跑。',
+        '这一步要在执行机上运行，但它当前离线。确认电脑已开机、Cairn 正在运行，执行机上线后本轮会自动继续。',
       );
   return (
     <NoticeCard

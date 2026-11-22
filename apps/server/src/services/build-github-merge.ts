@@ -54,7 +54,7 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
   if (todoRow.latestBuildId !== row.id) {
     throw new HttpError(
       409,
-      `这次运行已不是任务的当前运行（任务重跑过），cairn 不经它合并 PR #${row.prNumber}`,
+      `这次运行已不是任务的当前运行（任务重新运行过），cairn 不经它合并 PR #${row.prNumber}`,
     );
   }
   const busy = deps.db
@@ -71,7 +71,7 @@ function apiMergeGate(deps: BuildDeps, row: BuildRow): { todoRow: TodoRow; faile
   if (busy !== undefined) {
     throw new HttpError(
       409,
-      `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或在跑，它收尾时还会推送提交：等它跑完再合并。`,
+      `本任务还有一个${STEP_KIND_TEXT[busy]}步在排队或正在运行，它收尾时还会推送提交：等它运行完成再合并。`,
     );
   }
   return { todoRow, failed };
@@ -145,7 +145,7 @@ export async function mergeThroughGithub(
     if (pull === null || !hasPullFields(pull) || pull.title === null || pull.headSha === null) {
       throw new HttpError(
         409,
-        `读不到 PR #${prNumber} 在 GitHub 上的状态（网络、限流或 GitHub 连接失效），没有发起合并：稍后再试。`,
+        `读不到 PR #${prNumber} 在 GitHub 上的状态（网络、限流或 GitHub 连接失效），没有发起合并：请稍后重试。`,
       );
     }
     if (pull.state === 'closed' && !pull.merged) {
@@ -190,13 +190,13 @@ export async function mergeThroughGithub(
     if (checkpoint === null || !isFullSha(checkpoint)) {
       throw new HttpError(
         409,
-        `本任务没有可核对的推送提交（执行步没回报有效的提交 SHA），cairn 不经 GitHub 合并 PR #${prNumber}：请在 GitHub 上核对后合并（${hint}），或重新运行任务。`,
+        `本任务没有可核对的推送提交（执行步未回报有效的提交 SHA），cairn 不经 GitHub 合并 PR #${prNumber}：请在 GitHub 上核对后合并（${hint}），或重新运行任务。`,
       );
     }
     if (pull.headSha !== checkpoint) {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能还没同步刚推的提交（稍后再点），或分支上有了别的提交（有人推送，或点了 Update branch）。cairn 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
+        `PR #${prNumber} 的 head 是 ${githubText(pull.headSha).slice(0, 7)}，不是本任务最后推送的提交 ${checkpoint.slice(0, 7)}：GitHub 可能尚未同步刚推送的提交（稍后重试），或分支上有了别的提交（有人推送，或点了 Update branch）。cairn 只合并它推送过的提交；请在 GitHub 上核对后合并（${hint}），或让任务再跑一轮。`,
       );
     }
     const titled = `${pull.title} (#${prNumber})`;
@@ -213,7 +213,7 @@ export async function mergeThroughGithub(
     ).catch((error: unknown) => {
       throw new HttpError(
         409,
-        `PR #${prNumber} 的描述里补不上关闭本任务 issue 的那一行（${error instanceof Error ? githubText(error.message) : '未知错误'}），没有发起合并：稍后再试。`,
+        `PR #${prNumber} 的描述里补不上关闭本任务 issue 的那一行（${error instanceof Error ? githubText(error.message) : '未知错误'}），没有发起合并：请稍后重试。`,
       );
     });
     const current = apiMergeGate(deps, row);

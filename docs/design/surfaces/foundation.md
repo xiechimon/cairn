@@ -59,6 +59,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | T2 | Copy says what happened and what to do, in the user's words; errors say how to fix, empty states what is missing. | H |
 | T3 | No text node contains a backtick; code renders as `<code>`. | M; G `e2e/design-rules-measure.spec.ts` |
 | T4 | Copy is plain: no exclamation mark, emoji or hype word in UI strings; a one-sentence title ends without a period; visible copy states what is, never why (no `因为`, `所以`, `because`); a reason or background sentence goes behind an `InfoTip` (the `info` prop on `SettingsSection`, `SettingsRow`, `IntegrationRow` or `DialogShell`), shown on hover and focus. | M; G `test/unslop-signs.test.ts` |
+| T5 | One word per state and one name per concept: copy uses the status words and the register of `CONTEXT.md` (`## Status words`, `## Copy register`) — neutral written Chinese, no spoken softeners, no English contractions. | M; G `test/unslop-signs.test.ts` reads the Avoid columns |
 | A1 | Click targets are at least 24px on desktop and 44px on touch. | M hit area, also under `pointer: coarse`; `e2e/design-rules-measure.spec.ts` measures the Tasks panel checkbox |
 | A2 | Keyboard focus is visible (`--focus-ring`); `prefers-reduced-motion` respected; animate only `opacity` and `transform` except the named Growth utilities. | M |
 | A3 | axe reports 0 violations at `wcag2a/aa/21aa/22aa` in light and dark. | M `e2e/a11y-axe.spec.ts` |

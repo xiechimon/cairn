@@ -131,7 +131,7 @@ function TailscaleStatus({
         <>
           <p className={STEP_NOTE_CLS}>
             {t(
-              '这台电脑还没装 Tailscale。下载安装并登录，另一台电脑也装上、登录同一个账号，装好后点「重新检查」。',
+              '这台电脑尚未安装 Tailscale。下载安装并登录，在另一台电脑上也安装并登录同一个账号，完成后点击「重新检查」。',
             )}
           </p>
           <a
@@ -147,7 +147,9 @@ function TailscaleStatus({
     case 'not-connected':
       return (
         <p className={STEP_NOTE_CLS}>
-          {t('Tailscale 装好了，但还没登录或没连上。打开 Tailscale 登录并连接，再点「重新检查」。')}
+          {t(
+            'Tailscale 已安装，但尚未登录或未连接。打开 Tailscale 登录并连接，再点击「重新检查」。',
+          )}
         </p>
       );
     case 'needs-operator':
@@ -165,7 +167,9 @@ function TailscaleStatus({
       return (
         <>
           <p className={STEP_NOTE_CLS}>
-            {t('你的 Tailscale 网络还没开 HTTPS 证书。在 Tailscale 网页上开启后，回来点「重试」。')}
+            {t(
+              '你的 Tailscale 网络尚未开启 HTTPS 证书。在 Tailscale 网页上开启后，返回此处点击「重试」。',
+            )}
           </p>
           {access.consentUrl !== null && (
             <a
@@ -234,10 +238,10 @@ function ApproveByCode({ teamId }: { teamId: string | undefined }) {
         approve.mutate(code, {
           onSuccess: () => {
             setCode('');
-            toastSuccess(t('已批准，执行机马上上线'));
+            toastSuccess(t('已批准，执行机即将上线'));
           },
           onError: (error) =>
-            toastError(t('批准码不对或已过期。看一下终端里的码，再试一次。'), error),
+            toastError(t('批准码有误或已过期。请核对终端里的批准码后重试。'), error),
         });
       }}
     >
@@ -285,7 +289,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
           disabled={enable.isPending}
           onClick={() =>
             enable.mutate(undefined, {
-              onError: (error) => toastError(t('没能开启 Tailscale 访问，请重试。'), error),
+              onError: (error) => toastError(t('未能开启 Tailscale 访问，请重试。'), error),
             })
           }
         >
@@ -314,7 +318,7 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
   return (
     <DialogShell
       title={t('添加执行机')}
-      info={t('让另一台电脑帮你跑任务')}
+      info={t('让另一台电脑帮你运行任务')}
       open={open}
       onClose={onClose}
       size="l"

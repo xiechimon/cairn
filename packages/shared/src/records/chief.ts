@@ -248,7 +248,7 @@ export const CHIEF_REBIND_CONFIRM_COPY =
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
 export const CHIEF_INPUT_PLACEHOLDER_STEERING = '插进这一轮 · ⌘↵ 排队';
 export const CHIEF_INPUT_PLACEHOLDER_STEERING_TOUCH = '插进这一轮 · 长按排队';
-export const CHIEF_INPUT_PLACEHOLDER_QUEUED = '还没开始，新消息会排在后面';
+export const CHIEF_INPUT_PLACEHOLDER_QUEUED = '尚未开始，新消息会排在后面';
 
 export const COORDINATOR_SUMMARY_MAX_CHARS = 20_000;
 export const COORDINATOR_SUMMARY_TRANSCRIPT_MAX_CHARS = 40_000;

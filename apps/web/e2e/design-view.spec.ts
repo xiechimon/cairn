@@ -302,7 +302,7 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await expect(rows).toHaveCount(3);
   const lost = rows.filter({ has: page.getByTestId('design-comment-lost') });
   await expect(lost).toHaveAttribute('data-anchor', 'lost');
-  await expect(lost).toContainText('在 v1 上提的，这一版没找到');
+  await expect(lost).toContainText('在 v1 上提出，这一版中未找到');
   await expect(pane.locator('[data-testid="design-pin"][data-pin="1"]')).toHaveCount(0);
   const second = pane.locator('[data-testid="design-comment-row"][data-pin="2"]');
   await expect(second).toContainText('未发送');

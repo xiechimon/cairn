@@ -19,7 +19,7 @@ export function canMarkDone(todo: TodoRecord): boolean {
 function stopAndDoneErrorCopy(error: unknown, t: TFunc): string {
   if (error instanceof ApiError && error.status === 404) return t('这个任务已经不存在。');
   if (error instanceof ApiError && error.status === 409)
-    return t('任务状态刚刚变了，请刷新后再试。');
+    return t('任务状态刚刚改变，请刷新后重试。');
   return t('标记完成没有成功，请重试。');
 }
 

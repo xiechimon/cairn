@@ -37,7 +37,7 @@ function serverErrorCopy(
   if (err instanceof ApiError) {
     if (err.status === 409) {
       return {
-        headline: t('同名技能已存在——换个名称，或从列表打开它编辑。'),
+        headline: t('同名技能已存在——请更换名称，或从列表打开它编辑。'),
         detail: err.message,
       };
     }

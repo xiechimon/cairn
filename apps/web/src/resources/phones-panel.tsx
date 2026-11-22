@@ -109,7 +109,7 @@ function stateText(view: PhoneView, t: TFunc): string {
     case 'signing_expired':
       return t('签名已过期');
     case 'unreachable':
-      return t('不可达');
+      return t('无法连接');
   }
 }
 
@@ -237,7 +237,7 @@ export function PhonePairDialog({
             />
             <span>
               {t(
-                '我了解配对后 Coordinator 可以像使用电脑一样查看和操作这台手机：屏幕截图和元素文字会发给模型提供方。发消息、付款、改设置前会先问我。',
+                '我了解配对后 Coordinator 可以像使用电脑一样查看和操作这台手机：屏幕截图和元素文字会发送给服务商。发消息、付款、改设置前会先询问我。',
               )}
             </span>
           </label>

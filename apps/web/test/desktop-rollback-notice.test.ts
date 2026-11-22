@@ -46,7 +46,7 @@ async function delivered(locale: Locale): Promise<DesktopNotifyPayload> {
 test('a rolled-back update tells a Chinese desktop in Chinese, with a dialog fallback', async () => {
   const payload = await delivered('zh');
   expect(payload.title).toBe('Cairn 回滚了更新');
-  expect(payload.body).toBe('0.44.0 没能启动，Cairn 装回了 0.43.2。');
+  expect(payload.body).toBe('0.44.0 未能启动，Cairn 已恢复到 0.43.2。');
   expect(payload.dialog?.title).toBe(payload.title);
   expect(payload.dialog?.detail).toContain(NOTICE.logPath);
   expect(payload.href).toBe('/app');

@@ -38,18 +38,18 @@ export function computerActionNoteText(note: ComputerActionNote, t: TFunc): stri
     return t('找不到虚拟机磁盘，请重启 Cairn 再试。');
   if (note.kind === 'failed')
     return {
-      stop: t('没能停止虚拟机，请稍后重试。'),
-      update: t('没能更新虚拟机，请稍后重试。'),
-      recover: t('没能恢复虚拟机，请稍后重试。'),
-      reset: t('没能重置虚拟机，请稍后重试。'),
-      install: t('没能下载 Linux 虚拟机，请稍后重试。'),
+      stop: t('未能停止虚拟机，请稍后重试。'),
+      update: t('未能更新虚拟机，请稍后重试。'),
+      recover: t('未能恢复虚拟机，请稍后重试。'),
+      reset: t('未能重置虚拟机，请稍后重试。'),
+      install: t('未能下载 Linux 虚拟机，请稍后重试。'),
     }[note.action];
   return {
-    stopped: t('虚拟机已停止，文件都还在，下次使用时会自动启动。'),
+    stopped: t('虚拟机已停止，文件均保留，下次使用时会自动启动。'),
     already_stopped: t('虚拟机本来就是停止的。'),
-    updated: t('虚拟机已更新到最新版本，文件都还在。'),
+    updated: t('虚拟机已更新到最新版本，文件均保留。'),
     current: t('虚拟机已经是最新版本。'),
-    recovered: t('虚拟机已恢复，文件都还在。'),
+    recovered: t('虚拟机已恢复，文件均保留。'),
     reset: t('虚拟机已重置，现在是一台全新的虚拟机。'),
     installed: t('Linux 虚拟机已下载。'),
   }[note.outcome];
@@ -155,7 +155,7 @@ export function MachineMenu({
                 shortcut="R"
                 data-testid="computer-action-recover"
                 disabled={vm.disabled}
-                title={t('虚拟机卡住或黑屏时重建它，文件和浏览器登录都保留')}
+                title={t('虚拟机无响应或黑屏时重建它，文件和浏览器登录均保留')}
                 onClick={() => vm.onAction('recover')}
               >
                 {t('恢复虚拟机')}

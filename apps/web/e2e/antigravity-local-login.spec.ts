@@ -138,7 +138,7 @@ test('logged-in Mac creates a host-keyring subscription with no token and shows 
   await expect(row).toContainText('Antigravity 订阅');
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByTestId('provider-rename')).toHaveText('Antigravity 订阅');
-  await expect(detail).not.toContainText('还没勾选模型');
+  await expect(detail).not.toContainText('尚未勾选模型');
   await expect(detail.getByTestId('subscription-pick-upstream')).toBeVisible();
   await expect(row).toContainText('2 个模型');
   await expect(detail).not.toContainText('额度');
@@ -243,7 +243,7 @@ test('a failed install says why in plain words and offers a retry', async ({ pag
     const w = window as Window & { __antigravity?: AntigravityCalls };
     w.__antigravity?.resolve?.({ ok: false, reason: 'no-binary' });
   });
-  await expect(dialog).toContainText('Antigravity 没能装上');
+  await expect(dialog).toContainText('Antigravity 未能安装');
   await expect(dialog.getByTestId('antigravity-local-login')).toBeVisible();
 });
 

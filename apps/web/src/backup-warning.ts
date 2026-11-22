@@ -8,25 +8,25 @@ export function formatBackupWarning(notice: BackupNotice, t: Translate): string 
   }
   if (notice.kind === 'stale') {
     return t(
-      '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该机器上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。',
+      '{host} 上的服务器数据库备份已有 {hours} 小时没有成功，备份可能已停止。在该主机上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。',
       { host: notice.host, hours: notice.hours },
     );
   }
   const params = { host: notice.host, detail: notice.detail };
   if (notice.hours === null) {
     return t(
-      '{host} 上的服务器数据库备份最近一次运行失败（{detail}），还没有成功过的备份。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
+      '{host} 上的服务器数据库备份最近一次运行失败（{detail}），尚无成功的备份。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
       params,
     );
   }
   if (notice.hours === 0) {
     return t(
-      '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在不到 1 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
+      '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在不到 1 小时前。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
       params,
     );
   }
   return t(
-    '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
+    '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。',
     { ...params, hours: notice.hours },
   );
 }

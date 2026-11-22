@@ -100,7 +100,7 @@ export function QueryBoundary({
         testId="query-error"
         icon={TriangleAlert}
         title={errorTitle}
-        description={t('检查网络后再试一次。')}
+        description={t('请检查网络后重试。')}
         action={{
           label: t('重试'),
           disabled: effective?.isFetching,

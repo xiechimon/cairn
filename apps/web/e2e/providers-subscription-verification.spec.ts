@@ -115,7 +115,7 @@ const verify = (page: Page) => page.getByTestId('subscription-verify');
 const result = (page: Page) => page.getByTestId('subscription-verify-feedback');
 const below = (page: Page) => page.getByTestId('subscription-models');
 
-const CHECK_WORDS = ['未验证', '可用', '验证中', '验证失败', '登录失效', '验证超时', '没法验证', '连接中断', '验证太频繁'];
+const CHECK_WORDS = ['未验证', '可用', '验证中', '验证失败', '登录失效', '验证超时', '无法验证', '连接中断', '验证太频繁'];
 
 async function expectNoCheckStatus(page: Page) {
   for (const word of CHECK_WORDS) {
@@ -179,7 +179,7 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
 const FAILURES: { mode: Verify; reason: string; shot: string }[] = [
   { mode: 'auth', reason: '这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token，把新的 token 添加回来。', shot: 'failed-auth' },
   { mode: 'timeout', reason: '验证超时，请重试', shot: 'failed-timeout' },
-  { mode: 'unavailable', reason: '暂时连不上 Claude 服务，请检查网络后重试。', shot: 'failed-unavailable' },
+  { mode: 'unavailable', reason: '暂时无法连接 Claude 服务，请检查网络后重试。', shot: 'failed-unavailable' },
   { mode: 'quota', reason: '模型额度已用尽，请等待额度恢复后重试。', shot: 'failed-quota' },
 ];
 
@@ -234,12 +234,12 @@ const NOT_RUN: { mode: Verify; reason: string; shot: string }[] = [
   { mode: 'rate-limited', reason: '验证太频繁，这次没有运行。', shot: 'not-run-rate-limited' },
   {
     mode: 'reset',
-    reason: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
+    reason: '未连接到服务器，本次未验证，订阅状态未改变。服务器可能正在重启，请稍后重试。',
     shot: 'not-run-connection-dropped',
   },
   {
     mode: 'restart',
-    reason: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
+    reason: '未连接到服务器，本次未验证，订阅状态未改变。服务器可能正在重启，请稍后重试。',
     shot: 'not-run-server-restarting',
   },
 ];
@@ -297,7 +297,7 @@ test('an account nobody has used shows one muted line instead of dashes', async 
   await open(page, mode, [
     { id: 's1', kind: 'claude-subscription', label: 'Spare laptop', expiresAt: null, createdAt: NOW - 60_000 },
   ]);
-  await expect(page.getByTestId('subscription-detail').getByText('还没用过')).toHaveCount(1);
+  await expect(page.getByTestId('subscription-detail').getByText('尚未使用')).toHaveCount(1);
   await expect(page.getByTestId('subscription-detail')).not.toContainText('—');
   await shot(page, 'never-used');
 });

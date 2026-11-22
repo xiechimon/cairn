@@ -20,7 +20,7 @@ export function AudioViewer({
       <EmptyState
         testId="file-preview-broken"
         icon={AudioLines}
-        title={t('音频没能加载，下载查看')}
+        title={t('音频未能加载，请下载查看')}
         action={{ label: t('下载'), onClick: onDownload }}
         className="mt-[10vh]"
       />

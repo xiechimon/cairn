@@ -556,8 +556,8 @@ export function CoordinatorFixLinks({ kind }: { kind: StepQueueBlocked['kind'] |
 const RUNNER_CHECKS_MD = [
   '1. 电脑开着，没有休眠',
   '2. 能打开 Cairn 网页（网络和到服务器的线路正常）',
-  '3. 运行 `cairn status`，没在运行就运行 `cairn start`',
-  '4. 还不行就运行 `cairn logs -f`，把最后几行发给我，我帮你看',
+  '3. 运行 `cairn status`，未在运行时运行 `cairn start`',
+  '4. 仍然失败时运行 `cairn logs -f`，把最后几行发给 Coordinator 分析',
 ];
 
 function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
@@ -595,7 +595,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
         await mutations.runTodoOn.mutateAsync({ todoId, machineId: alternative.machineId });
         moved += 1;
       }
-      toastSuccess(t('已改在 {name} 上跑 {n} 个任务', { name: alternative.name, n: moved }));
+      toastSuccess(t('已改在 {name} 上运行 {n} 个任务', { name: alternative.name, n: moved }));
     } catch (error) {
       toastError(t('改到 {name} 失败', { name: alternative.name }), error);
     } finally {
@@ -608,7 +608,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
         <span className="font-medium">
           {notice.lastSeenAt > 0
             ? t('{name} 离线了。', { name })
-            : t('{name} 还没连上过。', { name })}
+            : t('{name} 从未连接。', { name })}
           {waiting > 0
             ? t('{n} 个任务在等它。', { n: waiting })
             : t('等它的任务都已改到其他执行机。')}
@@ -638,7 +638,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
           disabled={moving}
           onClick={() => void move()}
         >
-          {t('这次改在 {name} 上跑', { name: alternative.name })}
+          {t('本次改在 {name} 上运行', { name: alternative.name })}
         </Button>
       )}
     </CoordinatorSaid>

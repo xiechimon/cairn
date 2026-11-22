@@ -89,7 +89,7 @@ export function SkillsPage() {
         query={live ? skillsQ : undefined}
         isEmpty={rows.length === 0}
         loadingLabel={t('正在加载技能')}
-        errorTitle={t('技能没能加载')}
+        errorTitle={t('技能未能加载')}
         className="mt-6"
         empty={
           <EmptyState

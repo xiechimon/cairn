@@ -379,7 +379,7 @@ export function ProjectSettingsPage() {
                       />
                     </span>
                     <span className={SETTINGS_HINT_CLS}>
-                      {t('转换后以 GitHub 仓为准；有构建在跑时不能转换')}
+                      {t('转换后以 GitHub 仓库为准；有构建正在运行时不能转换')}
                     </span>
                   </div>
                   <Input

@@ -137,7 +137,7 @@ function CommentRow({
         </p>
         {located?.state === 'lost' && (
           <p data-testid="design-comment-lost" className="m-0 text-meta text-content-secondary">
-            {t('在 v{n} 上提的，这一版没找到', { n: comment.versionSeq })}
+            {t('在 v{n} 上提出，这一版中未找到', { n: comment.versionSeq })}
           </p>
         )}
         {located?.state === 'moved' && (
@@ -242,7 +242,7 @@ export function CommentList({
           data-testid="design-comments-empty"
           className="m-0 px-3 py-4 text-ui text-content-secondary"
         >
-          {t('还没有评论。点「评论」后在页面上点一个元素。')}
+          {t('暂无评论。点击「评论」后在页面上点击一个元素。')}
         </p>
       ) : (
         <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">

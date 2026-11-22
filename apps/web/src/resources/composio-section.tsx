@@ -27,15 +27,15 @@ function appNote(t: Translate, record: McpConnectorRecord, authorizing: boolean)
   if (authorizing || (record.status === 'needs_auth' && record.statusReason === 'authorizing'))
     return <RowNote>{t('等待授权')}</RowNote>;
   if (record.status === 'needs_auth') return <RowNote>{t('需要授权')}</RowNote>;
-  if (record.status === 'revoked') return <RowNote danger>{t('授权已收回')}</RowNote>;
-  if (record.status === 'error') return <RowNote danger>{t('连不上')}</RowNote>;
+  if (record.status === 'revoked') return <RowNote danger>{t('授权已撤销')}</RowNote>;
+  if (record.status === 'error') return <RowNote danger>{t('无法连接')}</RowNote>;
   return undefined;
 }
 
 function keyError(t: Translate, error: unknown): string {
   if (error instanceof ApiError && error.status === 400)
-    return t('这把 key 没有通过检查，确认完整复制后再保存。');
-  return t('没能保存，稍后重试。');
+    return t('这个 API key 未通过检查，请确认完整复制后再保存。');
+  return t('未能保存，请稍后重试。');
 }
 
 export function ComposioMark() {
@@ -127,21 +127,21 @@ export function useComposioRows({
         const record = await connectComposioApp.mutateAsync({ slug: app.slug });
         if (record.status === 'needs_auth') await openAuth(record.id, false);
       },
-      t('没能接入 {name}，稍后重试。', { name: app.name }),
+      t('未能接入 {name}，请稍后重试。', { name: app.name }),
     );
 
   const authorize = (connector: McpConnectorRecord, reconnect: boolean) =>
     run(
       connector.id,
       () => openAuth(connector.id, reconnect),
-      t('没能开始 {name} 的授权，稍后重试。', { name: connector.label }),
+      t('未能开始 {name} 的授权，请稍后重试。', { name: connector.label }),
     );
 
   const remove = (connector: McpConnectorRecord) => {
     if (!live) return;
     deleteMcpConnector.mutate(connector.id, {
       onError: (error) =>
-        toastError(t('没能断开 {name}，稍后重试。', { name: connector.label }), error),
+        toastError(t('未能断开 {name}，请稍后重试。', { name: connector.label }), error),
     });
   };
 
@@ -205,7 +205,7 @@ export function useComposioRows({
     icon: <ComposioMark />,
     name: 'Composio',
     info: t('经 Composio 接入的应用都用它授权'),
-    description: t('key 已保存'),
+    description: t('API key 已保存'),
     action: (
       <Button
         variant="outline"
@@ -309,7 +309,7 @@ function ComposioKeyDialog({
     setError(null);
     deleteComposioKey.mutate(undefined, {
       onSuccess: onClose,
-      onError: () => setError(t('没能移除，稍后重试。')),
+      onError: () => setError(t('未能移除，请稍后重试。')),
     });
   };
   return (
@@ -317,14 +317,14 @@ function ComposioKeyDialog({
       title={configured ? 'Composio' : t('用 Composio 接入更多应用')}
       info={
         configured
-          ? t('key 加密存储，经 Composio 接入的应用都用它授权')
+          ? t('API key 加密存储，经 Composio 接入的应用都用它授权')
           : t(
               'Slack、Google 日历、Todoist 等上千个应用，经你自己的 Composio 账号交给 Coordinator。',
             )
       }
       subtitle={
         configured
-          ? t('key 已保存，不会再显示。')
+          ? t('API key 已保存，不会再显示。')
           : t('用你自己的 Composio 账号接入 Slack、Google 日历等应用')
       }
       onClose={onClose}
@@ -338,7 +338,7 @@ function ComposioKeyDialog({
               disabled={deleteComposioKey.isPending}
               data-testid="composio-key-remove"
             >
-              {t('移除 key')}
+              {t('移除 API key')}
             </Button>
           )}
           <span className="flex-1" />
@@ -348,7 +348,7 @@ function ComposioKeyDialog({
             onClick={save}
             data-testid="composio-key-save"
           >
-            {configured ? t('更换 key') : t('保存并列出应用')}
+            {configured ? t('更换 API key') : t('保存并列出应用')}
           </Button>
         </div>
       }
@@ -356,7 +356,7 @@ function ComposioKeyDialog({
       <FormStack>
         {!configured && (
           <ul className="m-0 flex list-disc flex-col gap-2 pl-5 text-ui text-content-secondary">
-            <li>{t('列表里其他应用不需要它，直接点「接入」。')}</li>
+            <li>{t('列表里其他应用不需要它，点击「接入」即可。')}</li>
             <li>
               {t('要另注册一个 Composio 账号。免费版每月可调用托管应用 2 万次，个人用一般够。')}
             </li>
@@ -370,7 +370,7 @@ function ComposioKeyDialog({
           htmlFor="composio-key"
           help={
             <>
-              {t('在 Composio 控制台的 Settings → API Keys 新建一把，以 ak_ 开头。')}{' '}
+              {t('在 Composio 控制台的 Settings → API Keys 新建一个，以 ak_ 开头。')}{' '}
               <a
                 href="https://dashboard.composio.dev"
                 target="_blank"

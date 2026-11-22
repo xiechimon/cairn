@@ -118,7 +118,7 @@ export interface ImService {
 const PAIRING_REQUESTED_TEXT =
   '你的配对请求已记录：等 Cairn 主人在设置里批准之后，这里发的消息才会被处理。';
 const PAIRING_APPROVED_TEXT = '已通过配对：现在可以直接在这里和 Cairn 对话。';
-const TURN_FAILED_TEXT = '这一轮处理失败了，请稍后再试。';
+const TURN_FAILED_TEXT = '本轮处理失败，请稍后重试。';
 const SEND_ATTEMPTS = 4;
 
 interface Origin {

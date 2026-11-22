@@ -9,7 +9,7 @@ function t(key: string, params?: Record<string, string | number>): string {
   );
 }
 
-const STATUS_HINT = '在该机器上运行 `systemctl --user status cairn-db-backup.service` 查看原因。';
+const STATUS_HINT = '在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。';
 
 describe('formatBackupWarning', () => {
   test('a failing run names the host, the systemd result and the last success', () => {
@@ -28,12 +28,12 @@ describe('formatBackupWarning', () => {
     );
     expect(
       formatBackupWarning({ kind: 'failing', host: 'omarchy', detail: 'signal', hours: null }, t),
-    ).toBe(`omarchy 上的服务器数据库备份最近一次运行失败（signal），还没有成功过的备份。${STATUS_HINT}`);
+    ).toBe(`omarchy 上的服务器数据库备份最近一次运行失败（signal），尚无成功的备份。${STATUS_HINT}`);
   });
 
   test('a stale backup says how long and points at the timer', () => {
     expect(formatBackupWarning({ kind: 'stale', host: 'omarchy', hours: 5 }, t)).toBe(
-      'omarchy 上的服务器数据库备份已有 5 小时没有成功，备份可能已停止。在该机器上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。',
+      'omarchy 上的服务器数据库备份已有 5 小时没有成功，备份可能已停止。在该主机上运行 `systemctl --user list-timers cairn-db-backup.timer` 检查定时器。',
     );
   });
 

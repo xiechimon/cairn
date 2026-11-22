@@ -52,9 +52,9 @@ export function RuleIssueNotices({
       case 'machine-unusable':
         return issue.machineId === undefined
           ? t('没有执行机满足它的要求')
-          : t('固定的执行机 {machine} 用不了', { machine: machineName(issue.machineId) });
+          : t('固定的执行机 {machine} 不可用', { machine: machineName(issue.machineId) });
       case 'provider-missing':
-        return t('服务商 {provider} 已经不在了', { provider: providerLabel(issue.provider ?? '') });
+        return t('服务商 {provider} 已不存在', { provider: providerLabel(issue.provider ?? '') });
       case 'provider-no-key':
         return t('服务商 {provider} 没有 API key', {
           provider: providerLabel(issue.provider ?? ''),

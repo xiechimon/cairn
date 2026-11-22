@@ -203,7 +203,7 @@ function ModelsBody({
     ? t('已添加，Coordinator 能用')
     : subscriptionSaved && !setup.claudeCodeFound
       ? t(
-          '订阅已保存，这台电脑装好 Claude\u00a0Code 后会自动用上。现在先添加一个服务商，Coordinator 就能开始工作。',
+          '订阅已保存，这台电脑安装 Claude\u00a0Code 后会自动使用。现在先添加一个服务商，Coordinator 即可开始工作。',
         )
       : t('Claude 订阅、API key 或本地模型');
   if (hasProvider) {
@@ -371,7 +371,7 @@ function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
         >
           <span className="w-28 flex-none font-title text-foreground">{t('Coordinator')}</span>
           {pick == null ? (
-            <span className="text-meta text-destructive">{t('还没有能用的模型')}</span>
+            <span className="text-meta text-destructive">{t('暂无可用的模型')}</span>
           ) : (
             <span className="min-w-0 truncate text-foreground">
               {modelName(pick, setup.options)}

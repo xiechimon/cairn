@@ -198,7 +198,7 @@ function VmDownloadRow({
           {state === 'downloading'
             ? `${formatDownloadBytes(download.doneBytes)} / ${total}`
             : state === 'failed'
-              ? t('下载没完成')
+              ? t('下载未完成')
               : t('{size}，Coordinator 用它上网和操作软件', { size: total })}
         </span>
       </span>
@@ -322,8 +322,8 @@ function useCardLine({
       ),
       ...(note.kind === 'failed' ? { title: note.detail } : {}),
     };
-  if (controlFailed) return { kind: 'fail', node: t('没能接管，电脑没有响应') };
-  if (computer?.state === 'failed') return { kind: 'fail', node: t('电脑卡住了，文件都还在') };
+  if (controlFailed) return { kind: 'fail', node: t('未能接管，电脑没有响应') };
+  if (computer?.state === 'failed') return { kind: 'fail', node: t('电脑无响应，文件均保留') };
   if (computer?.handoffReason != null)
     return {
       kind: 'wait',
@@ -541,7 +541,7 @@ export function MachinesPanel({
           query={query}
           isEmpty={machines.length === 0}
           loadingLabel={t('正在加载执行机')}
-          errorTitle={t('执行机没能加载')}
+          errorTitle={t('执行机未能加载')}
           empty={
             <ListCard outlined className="flex-none">
               {addRow}

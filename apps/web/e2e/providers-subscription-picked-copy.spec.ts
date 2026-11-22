@@ -43,7 +43,7 @@ test('runner-reported chips show without claiming nothing is picked', async ({ p
   };
   const detail = await openPage(page, record);
   await expect(detail.locator('[data-testid="subscription-model"]')).toHaveCount(3);
-  await expect(detail).not.toContainText('还没勾选模型');
+  await expect(detail).not.toContainText('尚未勾选模型');
 });
 
 test('saved picks show without the no-picks claim either', async ({ page }) => {
@@ -57,5 +57,5 @@ test('saved picks show without the no-picks claim either', async ({ page }) => {
   };
   const detail = await openPage(page, record);
   await expect(detail.locator('[data-testid="subscription-model"]')).toHaveCount(3);
-  await expect(detail).not.toContainText('还没勾选模型');
+  await expect(detail).not.toContainText('尚未勾选模型');
 });

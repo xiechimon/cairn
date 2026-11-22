@@ -230,9 +230,7 @@ export function MemoryPanel({
     if (live && memoriesQ.data === undefined && memoriesQ.isError) {
       return (
         <div role="alert" className="mt-4 flex items-center gap-3 border-y border-border py-3">
-          <p className="min-w-0 flex-1 text-ui text-foreground">
-            {t('记忆没有加载出来，请重试。')}
-          </p>
+          <p className="min-w-0 flex-1 text-ui text-foreground">{t('记忆未能加载，请重试。')}</p>
           <Button
             variant="outline"
             disabled={memoriesQ.isFetching}
@@ -365,10 +363,10 @@ export function MemoryPanel({
         <p className={HINT_CLS}>
           {project === null
             ? empty
-              ? t('Coordinator 还没有记下团队笔记。')
+              ? t('Coordinator 尚未记录团队笔记。')
               : t('Coordinator 在所有项目里都会用到的笔记。')
             : empty
-              ? t('Coordinator 还没有在这个项目里记下笔记。')
+              ? t('Coordinator 尚未在这个项目里记录笔记。')
               : t('Coordinator 在这个项目里工作时自己写下的笔记。')}
         </p>
         {!connected && (

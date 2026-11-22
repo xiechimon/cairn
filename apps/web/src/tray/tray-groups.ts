@@ -93,7 +93,7 @@ function runningRow(thread: MachineRunningThread, now: number): TrayRow {
     return {
       ...base,
       glyph: 'attention',
-      hint: { key: '{n} 分没进展', vars: { n } },
+      hint: { key: '{n} 分钟无进展', vars: { n } },
       warn: true,
       tip: { key: '还在运行，但 {n} 分钟没有新输出或工具结果', vars: { n } },
     };
@@ -107,7 +107,7 @@ function runningRow(thread: MachineRunningThread, now: number): TrayRow {
 
 const QUEUED_TIP: Record<MachineQueuedThread['reason'], string> = {
   quota: '额度用完了，到点自动开始',
-  waiting: '等这台执行机空出来',
+  waiting: '等待这台执行机空闲',
 };
 
 function queuedRow(thread: MachineQueuedThread): TrayRow {

@@ -118,7 +118,7 @@ export async function showPendingRollbackNotice(): Promise<void> {
   const t = (source: string, vars?: TVars) =>
     translate(readStoredLocale(safeLocalStorage()), EN, source, vars);
   const title = t('Cairn 回滚了更新');
-  const line = t('{failed} 没能启动，Cairn 装回了 {restored}。', {
+  const line = t('{failed} 未能启动，Cairn 已恢复到 {restored}。', {
     failed: notice.failedVersion,
     restored: notice.restoredVersion,
   });

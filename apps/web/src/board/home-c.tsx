@@ -538,7 +538,7 @@ export function HomeC({
                 testId="home-c-error"
                 icon={MessageSquareWarning}
                 title={t('对话加载失败')}
-                description={t('对话记录还在，重试一下。')}
+                description={t('对话记录已保留，请重试。')}
                 action={{
                   label: t('重试'),
                   onClick: teamId === undefined ? () => void teamsQuery?.refetch() : surface.retry,

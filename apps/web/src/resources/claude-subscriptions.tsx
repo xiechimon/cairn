@@ -48,7 +48,7 @@ export function AddClaudeSubscriptionDialog({
     >
       <FormStack className="max-w-none">
         <p>
-          {withCodeSpans(t('在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下面。'))}
+          {withCodeSpans(t('在你的电脑上运行 `claude setup-token`，把输出的 token 粘贴到下方。'))}
         </p>
         <p>
           {t('Coordinator 和任务都会用这个订阅。保存后无法再查看。')}{' '}

@@ -28,7 +28,7 @@ test('the install dialog speaks Chinese on a Chinese desktop', () => {
 
 test('a version that already failed once says so when asked to install again', () => {
   const copy = installUpdateCopy('zh', '0.44.0', '0.43.2', true);
-  assert.equal(copy.detail, '0.44.0 上次在这里没能启动。你点了安装，Cairn 会再装一次。');
+  assert.equal(copy.detail, '0.44.0 上次在这台 Mac 上未能启动。你已选择安装，Cairn 会重新安装。');
   const en = installUpdateCopy('en', '0.44.0', '0.43.2', true);
   assert.match(en.detail, /0\.44\.0/);
   assert.match(en.detail, /did not start/);
@@ -37,7 +37,7 @@ test('a version that already failed once says so when asked to install again', (
 test('the up-to-date and check-failed dialogs are localized', () => {
   assert.equal(upToDateCopy('zh', '0.44.0').title, 'Cairn 已是最新');
   assert.equal(upToDateCopy('zh', '0.44.0').detail, '当前版本 0.44.0 已是最新。');
-  assert.equal(updateCheckFailedCopy('zh', 'offline').title, 'Cairn 没能检查更新');
+  assert.equal(updateCheckFailedCopy('zh', 'offline').title, 'Cairn 未能检查更新');
   assert.equal(updateCheckFailedCopy('zh', 'offline').detail, 'offline');
 });
 
@@ -48,7 +48,7 @@ test('each unsupported blocker has its own localized detail', () => {
   );
   assert.equal(
     unsupportedUpdateCopy('zh', 'read-only').detail,
-    'Cairn 在只读位置运行。把它拷到「应用程序」文件夹后再检查。',
+    'Cairn 在只读位置运行。把它拷贝到「应用程序」文件夹后再检查。',
   );
   assert.equal(unsupportedUpdateCopy('zh', 'development').detail, '这是开发版。');
   assert.equal(unsupportedUpdateCopy('en', 'development').detail, 'This is a development build.');
@@ -57,6 +57,6 @@ test('each unsupported blocker has its own localized detail', () => {
 test('the fatal error boxes are localized too', () => {
   assert.equal(serverStoppedCopy('zh', 1).title, 'Cairn 服务已停止');
   assert.equal(serverStoppedCopy('zh', 1).detail, 'Cairn 服务以代码 1 退出。');
-  assert.equal(couldNotStartCopy('zh', 'disk full').title, 'Cairn 没能启动');
+  assert.equal(couldNotStartCopy('zh', 'disk full').title, 'Cairn 未能启动');
   assert.equal(couldNotStartCopy('zh', 'disk full').detail, 'disk full');
 });

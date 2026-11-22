@@ -60,7 +60,7 @@ export function PackageInstallCard({ item }: { item: PackageInstallItem }) {
       : problem === 'closed'
         ? t('这次安装请求已经结束。')
         : problem === 'failed'
-          ? t('没能提交，请稍后重试。')
+          ? t('未能提交，请稍后重试。')
           : null;
 
   const outcome = waiting && decided !== null ? `${decided}d` : item.outcome;

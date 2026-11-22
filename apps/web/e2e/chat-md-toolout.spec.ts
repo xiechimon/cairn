@@ -3,7 +3,7 @@ import { expect, type Page, test } from '@playwright/test';
 const ROUTE = '/app/todo/7ve0iOkQ-JBpSL98zSiGc?scenario=md-toolout';
 
 const toggle = (page: Page) =>
-  page.getByRole('button', { name: /跑了 2 条命令/ });
+  page.getByRole('button', { name: /运行了 2 条命令/ });
 
 
 test('A1: tool output is collapsed behind individual calls by default', async ({ page }) => {

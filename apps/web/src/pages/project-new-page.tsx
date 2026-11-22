@@ -225,7 +225,7 @@ export function ProjectNewPage() {
     } else if (live) {
       mutations.startGithubOAuth.mutate(undefined, {
         onSuccess: (data) => window.location.assign(data.authorizationUrl),
-        onError: () => setOauthError(t('暂时连不上 GitHub，稍后再试。')),
+        onError: () => setOauthError(t('暂时无法连接 GitHub，请稍后重试。')),
       });
     } else if (!blockDemoWrite()) {
       setFixtureAuth(true);
@@ -388,7 +388,7 @@ export function ProjectNewPage() {
         if (icon !== null) {
           mutations.patchProject.mutate(
             { id: p.id, body: { icon } },
-            { onError: (error) => toastError(t('图标没能保存，请在项目设置里重试。'), error) },
+            { onError: (error) => toastError(t('图标未能保存，请在项目设置里重试。'), error) },
           );
         }
         navigate(`/app/project/${p.id}`);
@@ -699,7 +699,7 @@ export function ProjectNewPage() {
           {repoSel === 'local' && (
             <div className={`${FIELD_NOTE_CLS} text-content-tertiary`}>
               {t(
-                '单执行机形态：这台执行机损坏时进度随之丢失。需要在任意执行机上续跑，请用 GitHub 接入。',
+                '单执行机形态：这台执行机损坏时进度随之丢失。需要在任意执行机上继续运行，请用 GitHub 接入。',
               )}
             </div>
           )}

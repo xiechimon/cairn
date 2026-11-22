@@ -41,6 +41,7 @@ Boundary rulings:
 |---|---|---|---|
 | `执行机` | Runner | `machine` | A registered execution host (`cairn` daemon + embedded pi runtime) that claims and runs build steps. The Chinese UI says `执行机` and the English UI says `Runner` (owner, 2026-11-15); code, tables and the wire keep `machine`. One Runner is the default Runner (`team.defaultMachineId`). |
 | `Agent` | Agent | `agent` | Retired (#5347). The configured execution role is replaced by two team-level records: `routing_rule` (per route use: provider, modelId, thinkingLevel, fallbackModels, home `machineId`, requiredCapabilities) picks model and machine, and `work_policy` (per route use: tools, mcpServers, skillsAllowlist, defaultSkill, secrets) grants capabilities; `GET /api/teams/:id/routing-settings` is the surface, and every `/api/teams/:id/agents` route returns 410. Do not reintroduce per-agent configuration. |
+| `电脑` | Computer | `computer` | The Coordinator's own computer (a Linux virtual machine; its maintenance actions say `虚拟机` / VM), and any physical computer named in setup steps (`在你的电脑上运行…`). A registered host is never called `电脑` or `机器`: it is `执行机`. |
 | `Coordinator` | Coordinator | `chief` | The dispatch-and-conversation agent, one per "user × team", responsible for assigning tasks; domain-wise distinct from the builds it dispatches. |
 | `主力机` | Primary machine | `chief.machineId` | Retired with agents and pinning: the `chief` row carries no `machineId`, and Coordinator steps route through routing rules like any other step. |
 | `记忆` | Memory | `memory` | Experience entries written by the Coordinator while working and injected into later turns. Direct in-place edits of memory files are planned in `docs/design/memory-inplace-edit.md`. |
@@ -52,7 +53,7 @@ Boundary: routing rule ≠ machine (one names model, home machine and constraint
 | Chinese UI word | English word | Internal name | Definition / boundary |
 |---|---|---|---|
 | `技能` | Skill | `skill` | A reusable-process folder containing `SKILL.md`; a work policy grants it through `skillsAllowlist` or names it as `defaultSkill`. |
-| `模型服务` | Provider | `provider` | A credential-configured model source (three protocols: api_key / oauth / custom endpoint). |
+| `服务商` | Provider | `provider` | A credential-configured model source (three protocols: api_key / oauth / custom endpoint). The settings section and every string say `服务商`; `模型服务` and `模型提供方` are retired copy. |
 | `模型` | Model | `model` | One named selectable option under a Provider. |
 | `MCP 服务器` | MCP server | `mcpServer` | An external MCP server connected by the team and granted to steps through a work policy (direction: external → step); tool names `mcp__<identifier>__<tool>`. |
 | `团队密钥` | Secret | `secret` | A key-value pair authorized through a work policy and issued per step, write-only; the plaintext is not pre-placed in the task shell environment (the agent takes it explicitly through the retrieval channel, and retrieval leaves an audit row). |
@@ -85,3 +86,59 @@ Moved from the former `GLOSSARY.md`. Each entry names the canonical UI word and 
 | `换绑` | Rebind | Historical (retired with agents): moving an agent's home machine to another machine. No route serves it now; changing where a step runs means editing the routing rule. | `迁移`, `改派` |
 | `整机迁移` | Machine migration | Historical (retired with agents): rebinding every agent of one machine to another in one go. No route serves it now. | `撤离`, evacuate (kept in code identifiers, not in copy) |
 | `钉选` | Pin | Historical (retired): four separate ways to name an execution machine on a task, build, Coordinator thread or schedule. All retired when home machines landed; appears in old tickets. | |
+
+## Status words
+
+One word per state, in every surface that shows that state (row notes, badges, dialogs, toasts). The gate in `apps/web/test/unslop-signs.test.ts` (rule T5) reads the Avoid column of this table and of the register table below and fails on any listed form in the zh/en tables, `t()` literals and the desktop dialog copy. A backticked cell starting with `/` is a regular expression; any other backticked cell is a literal.
+
+| State | Chinese | English | Avoid |
+|---|---|---|---|
+| connected | `已连接` | Connected | |
+| not connected | `未连接` | Not connected | `没连上` |
+| connecting | `正在连接` | Connecting | |
+| cannot connect | `无法连接` | Cannot connect | `连不上`, `不可达`, `/\b[Uu]nreachable\b/`, `/\b[Bb]roken\b/` |
+| online / offline (Runner) | `在线` / `离线` | Online / Offline | `掉线` |
+| needs sign-in | `需要登录` | Needs sign-in | |
+| needs authorization | `需要授权` | Needs authorization | |
+| waiting for authorization | `等待授权` | Waiting for authorization | |
+| authorization revoked | `授权已撤销` | Authorization revoked | `授权已收回` |
+| checking | `正在检查` | Checking | |
+| not checked | `未检查` | Not checked | `还没检查`, `Not checked yet` |
+| not started | `尚未开始` | Not started | |
+| expired | `已过期` | Expired | |
+| unavailable | `不可用` | Unavailable | `用不了` |
+| needs attention | `需要处理` | Needs attention | |
+| failed to load | `未能加载` | did not load | `没加载`, `没能加载` |
+| empty list | `暂无…` | No … | `还没有` |
+
+## Copy register
+
+Copy is neutral and precise: written Chinese, no spoken softeners, no slang, no jokes. Name the party (`服务商`, `执行机`, `Coordinator`), never `那边`. English has no contractions.
+
+| Write | Instead of (Avoid) |
+|---|---|
+| `未能保存` / Could not save | `没能`, `没保存`, `没生成`, `没完成`, `没通过`, `没成功`, `没找到`, `没删`, `没改`, `没复制`, `没拍`, `没发` |
+| `尚未` / `暂无` | `还没` |
+| `运行`, `重新运行`, `继续运行` | `跑` |
+| `获取` | `拿到`, `拿不到`, `没拿到`, `拿新` |
+| `无法使用`, `无法运行`, `无法接收` | `接不了`, `跑不了` |
+| `安装` | `装好`, `装上` |
+| `无响应` | `卡住` |
+| `未响应` | `没回` |
+| `有误`, `填写有误` | `不对`, `填错` |
+| `更换` | `换个` |
+| `当前` | `这会儿` |
+| `通常` | `多半`, `一般就好` |
+| `即将` | `马上` |
+| `均保留` | `都还在` |
+| `已不存在` | `已经不在了` |
+| `粘贴到` | `粘到`, `/(?<!粘)贴到/` |
+| `执行任务` | `干活` |
+| `请重试`, `请稍后重试` | `再试一次`, `稍后再试`, `重试一下` |
+| `点击` | `点一下` |
+| `API key` (a provider or app key) | `/API Key\b/`, `/(?<!API )\bkey\b(?=[^A-Za-z]*[\u4e00-\u9fff])/` |
+| `执行机` / Runner, `this computer` for `本机` | `/机器(?!人)/`, `/(?<!\{)\b[Mm]achines?\b(?![}：:])/` |
+| `服务商` / provider | `模型服务`, `模型提供方` |
+| `cannot`, `did not`, `it is` | `/\b[A-Za-z]+n['’]t\b/`, `/\b[Ii]t['’]s\b/`, `/\b[Yy]ou['’]re\b/`, `/\b[Ww]e['’]re\b/`, `/\b[Tt]hat['’]s\b/`, `/\b[Tt]here['’]s\b/`, `/\b[Ll]et['’]s\b/` |
+| (drop the filler) | `/\bjust\b(?! now)/` |
+

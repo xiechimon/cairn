@@ -55,7 +55,7 @@ export function ChiefOutageBanner({
           {t('Coordinator 暂时不可用')}
         </b>
         <span className={`block ${open ? '' : 'max-sm:hidden'}`}>
-          {t('{why}，{when}。任务照常在跑；你说的话先存下，恢复后按顺序处理。', { why, when })}
+          {t('{why}，{when}。任务照常运行；你的消息已保存，恢复后按顺序处理。', { why, when })}
         </span>
       </span>
       <span className="ml-auto flex flex-none items-center gap-3 self-center">
@@ -93,7 +93,7 @@ export function ChiefFallbackBanner({
     >
       <Info aria-hidden="true" className="size-5.5 flex-none text-icon" />
       <span className="min-w-0 flex-1">
-        {t('Coordinator 的主模型暂时用不了，这次改用备用模型 {model} 回复，判断可能没那么准。', {
+        {t('Coordinator 的主模型暂时不可用，本次改用备用模型 {model} 回复，判断可能不够准确。', {
           model,
         })}
       </span>

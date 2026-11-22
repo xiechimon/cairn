@@ -5,7 +5,7 @@ import { bootLiveServer, type LiveServer } from './live-server';
 async function openPicker(page: Page, server: LiveServer) {
   await page.goto(`${server.base}/app/settings/routing`);
   await page.getByRole('dialog', { name: '设置' }).getByRole('button', { name: '添加服务商' }).click();
-  const picker = page.getByRole('dialog', { name: '添加模型服务' });
+  const picker = page.getByRole('dialog', { name: '添加服务商' });
   await expect(picker.locator('[data-preset-id="anthropic"]')).toBeVisible();
   return picker;
 }

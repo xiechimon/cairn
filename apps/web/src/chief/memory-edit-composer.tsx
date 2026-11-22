@@ -110,13 +110,13 @@ function statusLine(
         showDiffs: changes > 0,
       };
     case 'awaiting_input':
-      return { head: edit.reply ?? t('Coordinator 想确认一下再改。'), showDiffs: false };
+      return { head: edit.reply ?? t('Coordinator 需要确认后再修改。'), showDiffs: false };
     case 'partial':
       return { head: t('已修改 {count} 处，其余未完成', { count: changes }), showDiffs: true };
     case 'stopped':
       return { head: t('已停止，记忆没有变'), showDiffs: false };
     case 'failed':
-      return { head: t('Coordinator 这次没有改成，记忆没有变。'), showDiffs: false };
+      return { head: t('Coordinator 本次未能修改，记忆未改变。'), showDiffs: false };
   }
 }
 
@@ -297,7 +297,7 @@ export function MemoryEditComposer({
         </div>
         {mutations.submitMemoryEdit.isError && (
           <p role="alert" className="mt-1.5 text-meta text-content-secondary">
-            {t('没有发出去，内容还在输入框里，再试一次。')}
+            {t('未能发送，内容仍在输入框里，请重试。')}
           </p>
         )}
       </div>

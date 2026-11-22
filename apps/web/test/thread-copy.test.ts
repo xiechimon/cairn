@@ -18,12 +18,12 @@ const DONE = { state: '已完成', reason: '任务已完成，发送消息即可
 
 describe('threadCopy', () => {
   it('a building task blocked on quota says it waits for quota, not that it is working', () => {
-    expect(threadCopy(todo({ quotaWait: WAIT })).reason).toBe('额度空了，等额度恢复后自动续跑。');
+    expect(threadCopy(todo({ quotaWait: WAIT })).reason).toBe('额度已用完，额度恢复后自动继续运行。');
   });
 
   it('a rate-limited task says it is rate limited', () => {
     expect(threadCopy(todo({ quotaWait: { ...WAIT, kind: 'capacity' as const } })).reason).toBe(
-      '被限流，等恢复后自动续跑。',
+      '被限流，恢复后自动继续运行。',
     );
   });
 

@@ -117,5 +117,5 @@ function assertNoMergeStepInFlight(deps: BuildDeps, buildId: string): void {
       ),
     )
     .get();
-  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或在跑，等它结束再发起');
+  if (inFlight) throw new HttpError(409, '这个构建已有一个合并步在排队或正在运行，等它结束再发起');
 }

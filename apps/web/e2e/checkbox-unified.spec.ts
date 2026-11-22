@@ -4,7 +4,7 @@ import { evidenceShot } from './evidence';
 async function openProviderForm(page: Page) {
   await page.goto('/app/resources/providers?scenario=01');
   await page.getByTestId('routing-add-provider').click();
-  const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+  const dialog = page.getByRole('dialog', { name: '添加服务商' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: '自定义端点' }).click();
   await expect(dialog.locator('#dlg-provider-id')).toBeVisible();

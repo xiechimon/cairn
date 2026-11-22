@@ -192,7 +192,7 @@ function FolderList({
         ))}
         {groups.length === 0 && typedPath === null && (
           <div className="px-2.5 py-2 text-meta text-content-tertiary">
-            {q === '' ? t('还没有用过的文件夹') : t('没有匹配的文件夹')}
+            {q === '' ? t('暂无用过的文件夹') : t('没有匹配的文件夹')}
           </div>
         )}
       </div>

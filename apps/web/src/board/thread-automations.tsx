@@ -143,7 +143,7 @@ export function ThreadAutomationBadge({
             role="alert"
             className="flex items-center justify-between gap-2 text-meta text-destructive"
           >
-            <span>{t('定时没能刷新')}</span>
+            <span>{t('定时未能刷新')}</span>
             <Button variant="outline" size="xs" onClick={onRetry}>
               {t('重试')}
             </Button>

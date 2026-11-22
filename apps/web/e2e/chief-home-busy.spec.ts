@@ -208,7 +208,7 @@ test.describe('chief unavailable (T4)', () => {
     const banner = home.getByTestId('chief-outage');
     await expect(banner).toContainText('Coordinator 暂时不可用');
     await expect(banner).toContainText('relay-a/claude-opus');
-    await expect(banner).toContainText('任务照常在跑');
+    await expect(banner).toContainText('任务照常运行');
     await expect(banner.getByRole('button', { name: '给 Coordinator 换模型' })).toBeVisible();
     const held = home.getByTestId('chief-queued-message');
     await expect(held).toHaveCount(2);
@@ -245,12 +245,12 @@ test.describe('chief unavailable (T4)', () => {
     const banner = page.getByTestId('chief-outage');
     const details = banner.getByRole('button', { name: '详情' });
     await expect(details).toBeVisible();
-    await expect(banner.getByText('任务照常在跑', { exact: false })).toBeHidden();
+    await expect(banner.getByText('任务照常运行', { exact: false })).toBeHidden();
     const collapsed = await banner.boundingBox();
     expect(collapsed?.height ?? 0).toBeLessThan(72);
     await evidenceShot(page, 'outage-phone.png');
     await details.click();
-    await expect(banner.getByText('任务照常在跑', { exact: false })).toBeVisible();
+    await expect(banner.getByText('任务照常运行', { exact: false })).toBeVisible();
     await expect(banner.getByRole('button', { name: '收起' })).toHaveAttribute(
       'aria-expanded',
       'true',
@@ -523,7 +523,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     });
     await page.goto('/app');
     const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
-    await expect(input).toHaveAttribute('placeholder', '还没开始，新消息会排在后面');
+    await expect(input).toHaveAttribute('placeholder', '尚未开始，新消息会排在后面');
   });
 
   test('a running turn takes new messages into itself and the composer says so', async ({

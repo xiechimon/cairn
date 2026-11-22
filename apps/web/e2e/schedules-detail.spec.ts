@@ -397,7 +397,7 @@ test('ended one-time schedules fold into a collapsed 已结束 group with plain 
   await expect(page.getByText('Stop retry storms')).toHaveCount(0);
   await header.click();
   await expect(ended.getByText('任务已归档，定时随之停用')).toBeVisible();
-  const commit = ended.getByText('提交代码时被仓库检查拦下，这一轮没能完成');
+  const commit = ended.getByText('提交代码时被仓库检查拦下，本轮未能完成');
   await expect(commit).toBeVisible();
   await expect(commit).toHaveAttribute('title', /^git commit failed/);
   await expect(page.locator('[data-slot="schedule-row"]').first()).toContainText('Nightly release checks');

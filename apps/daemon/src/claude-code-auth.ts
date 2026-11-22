@@ -143,16 +143,16 @@ export function readDefaultClaudeOauthExpiresAt(configDir: string): number | nul
 export function claudeCodeSubscriptionMissingMessage(): string {
   return [
     `${CLAUDE_CODE_AUTH_FAILURE_MARKER} `,
-    'claude-code 步骤没有启动：团队还没有可用的 Claude 订阅。执行机自己的 Claude 登录不会被使用。',
-    '补法：在终端运行 `claude setup-token`，把 token 添加到 cairn 的「设置 → 模型服务」。',
+    'claude-code 步骤没有启动：团队暂无可用的 Claude 订阅。执行机自己的 Claude 登录不会被使用。',
+    '补法：在终端运行 `claude setup-token`，把 token 添加到 cairn 的「设置 → 模型路由」。',
   ].join('');
 }
 
 export function claudeCodeTeamSubscriptionAuthFailureMessage(cliMessage: string): string {
   return [
     `${CLAUDE_CODE_AUTH_FAILURE_MARKER} `,
-    '你的 Claude 订阅登录已失效（token 被拒绝或已撤销），Coordinator 和任务暂时用不了。',
-    '补法：在 cairn 的「设置 → 模型服务」里移除这个失效的订阅，',
+    '你的 Claude 订阅登录已失效（token 被拒绝或已撤销），Coordinator 和任务暂时无法使用。',
+    '补法：在 cairn 的「设置 → 模型路由」里移除这个失效的订阅，',
     '再在终端运行 `claude setup-token` 拿一个新 token 添加回来。',
     `CLI 原因：${cliMessage}`,
   ].join('');

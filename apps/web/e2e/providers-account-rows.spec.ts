@@ -67,7 +67,7 @@ test('subscriptions whose Runner reports nothing: Claude reads 0 models and warn
   await expect(row).toHaveAttribute('data-tone', 'warn');
   await row.click();
   const detail = page.getByTestId('subscription-detail');
-  await expect(detail).toContainText('还没勾选模型。从上游拉一份清单来勾选。');
+  await expect(detail).toContainText('尚未勾选模型。从上游获取模型清单后勾选。');
   const devin = page.locator('[data-instance-id="subscription:sub-devin"]');
   await expect(devin).toContainText('订阅 · 5 个模型 · 最近使用');
   await expect(devin).toHaveAttribute('data-tone', 'ok');
@@ -100,8 +100,8 @@ test('an account nobody has used says so once, and still has a quota line of its
   await expect(row).not.toContainText('未验证');
   await expect(row).not.toContainText('最近使用');
   const detail = page.getByTestId('subscription-detail');
-  await expect(detail.getByText('还没用过')).toHaveCount(1);
-  await expect(detail).toContainText('还没勾选模型。从上游拉一份清单来勾选。');
+  await expect(detail.getByText('尚未使用')).toHaveCount(1);
+  await expect(detail).toContainText('尚未勾选模型。从上游获取模型清单后勾选。');
   await expect(detail.getByTestId('subscription-status')).toHaveCount(0);
   await expect(detail.getByTestId('subscription-verify-feedback')).toHaveCount(0);
   await expect(detail.getByTestId('subscription-quota')).toHaveCount(0);

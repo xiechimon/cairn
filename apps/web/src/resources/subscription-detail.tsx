@@ -55,9 +55,9 @@ const AUTH_RENEWAL: Record<AccountVendor, string> = {
   codex: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
   grok: '这个订阅的登录已失效。先移除它，再重新添加新的 token。',
   devin:
-    '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。',
+    '这个订阅的登录已失效。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出重新添加。',
   antigravity:
-    '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。',
+    '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。',
 };
 
 const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
@@ -65,12 +65,12 @@ const EXPIRED_RENEWAL: Record<AccountVendor, string> = {
   codex: '这个订阅已过期。先移除它，再重新添加新的 token。',
   grok: '这个订阅已过期。先移除它，再重新添加新的 token。',
   devin:
-    '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml` 把输出整个添加回来。',
-  antigravity: '这个订阅已过期。在执行机重新登录 Google 账号或更新 API Key 后，移除并重新添加。',
+    '这个订阅已过期。先移除它，再运行 `cat ~/.local/share/devin/credentials.toml`，把完整输出重新添加。',
+  antigravity: '这个订阅已过期。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。',
 };
 
 const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
-  claude: '暂时连不上 Claude 服务，请检查网络后重试。',
+  claude: '暂时无法连接 Claude 服务，请检查网络后重试。',
   codex: '服务器上找不到 codex 命令',
   grok: '服务器上找不到可执行的 agent',
   devin: '服务器上找不到 devin 命令',
@@ -84,8 +84,7 @@ function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
     unavailable: UNAVAILABLE_COPY[vendor],
     quota: '模型额度已用尽，请等待额度恢复后重试。',
     failed: '验证没有通过，请重试',
-    missing_local_login:
-      '执行机上还没有登录 Antigravity，请先运行 `agy acp --login` 或改用 API Key',
+    missing_local_login: '执行机尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
   };
 }
 
@@ -115,7 +114,7 @@ const modelFailureSentence = (vendor: AccountVendor): Record<ProviderFailure, st
 const FAILED_LABEL: Record<VerifyFailure, string> = {
   auth: '登录失效',
   timeout: '验证超时',
-  unavailable: '没法验证',
+  unavailable: '无法验证',
   quota: '额度用尽',
   failed: '验证失败',
   missing_local_login: '执行机未登录',
@@ -124,9 +123,9 @@ const FAILED_LABEL: Record<VerifyFailure, string> = {
 const NOT_RUN_COPY: Record<VerifyNotRun, string> = {
   'signed-out':
     '这台设备的登录已失效，这次没有验证，订阅状态没有改变。请重新配对或在运行 Cairn 的电脑上验证。',
-  network: '没连上服务器，这次没有验证，订阅状态没有改变。服务器可能正在重启，请稍后重试。',
+  network: '未连接到服务器，本次未验证，订阅状态未改变。服务器可能正在重启，请稍后重试。',
   'rate-limited': '验证太频繁，这次没有运行。',
-  error: '服务器没能运行这次验证，订阅状态没有改变。请重试。',
+  error: '服务器未能运行本次验证，订阅状态未改变。请重试。',
 };
 
 const STATUS_CLS = 'flex items-center gap-1.5 text-meta text-content-secondary';
@@ -394,7 +393,7 @@ function verifyDetail(
       ? t('通过')
       : verification.phase === 'not-run'
         ? t('没有运行')
-        : t('没通过 · {reason}', { reason: t(FAILED_LABEL[verification.reason]) });
+        : t('未通过 · {reason}', { reason: t(FAILED_LABEL[verification.reason]) });
   return [
     { label: t('结果'), value: outcome },
     ...(check === undefined
@@ -546,7 +545,7 @@ export function SubscriptionDetail({
           t('订阅'),
           ...(account.plan === null ? [] : [account.plan]),
           account.lastUsedAt === null
-            ? t('还没用过')
+            ? t('尚未使用')
             : t('最近使用 {ago}', { ago: relativeTime(account.lastUsedAt, now, t) }),
         ].join(' · ')}
         {...(actions.onRename === undefined ? {} : { onRename: actions.onRename })}
@@ -636,8 +635,8 @@ export function SubscriptionDetail({
         {models.length === 0 ? (
           <p className="m-0 py-1 text-ui text-content-secondary">
             {actions.onPickUpstream === undefined
-              ? t('还没有执行机上报 {runtime} 模型', { runtime: runtimeLabel })
-              : t('还没勾选模型。从上游拉一份清单来勾选。')}
+              ? t('暂无执行机上报 {runtime} 模型', { runtime: runtimeLabel })
+              : t('尚未勾选模型。从上游获取模型清单后勾选。')}
           </p>
         ) : (
           <div className="flex flex-wrap gap-1.5">

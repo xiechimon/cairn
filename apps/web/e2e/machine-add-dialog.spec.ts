@@ -108,7 +108,7 @@ test('until Tailscale reaches this computer no command is shown, only the next s
   page,
 }) => {
   const missing = await openDialog(page, `${MACHINES}&tailscale=not-installed`);
-  await expect(missing.getByText('这台电脑还没装 Tailscale。', { exact: false })).toBeVisible();
+  await expect(missing.getByText('这台电脑尚未安装 Tailscale。', { exact: false })).toBeVisible();
   await expect(missing.getByRole('link', { name: '下载 Tailscale →' })).toHaveAttribute(
     'href',
     'https://tailscale.com/download',

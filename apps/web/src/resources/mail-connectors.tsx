@@ -270,7 +270,7 @@ function RulesDialog({
         ) : (
           <>
             <p className="m-0 text-meta text-content-tertiary">
-              {t('只有匹配下面任一规则的邮件才唤醒 Coordinator，其余的只在摘要推送里提一下。')}
+              {t('只有匹配下方任一规则的邮件才唤醒 Coordinator，其余邮件只在摘要推送中列出。')}
             </p>
             {account.rules.length > 0 && (
               <ResourceList>
@@ -349,7 +349,7 @@ function describeAccount(
       : t('仅匹配 {count} 条规则', { count: account.rules.length });
   const last =
     account.lastMailAt === null
-      ? t('还没有收到新邮件')
+      ? t('暂无新邮件')
       : t('最近一封 {time}', {
           time: new Date(account.lastMailAt).toLocaleString(undefined, {
             month: 'numeric',
@@ -407,7 +407,7 @@ export interface MailProviderCard {
 function summarize(accounts: readonly MailAccountRecord[], t: Translate): string {
   const last = Math.max(0, ...accounts.map((account) => account.lastMailAt ?? 0));
   const lastText =
-    last === 0 ? t('还没有收到新邮件') : t('最近一封 {time}', { time: formatMailTime(last) });
+    last === 0 ? t('暂无新邮件') : t('最近一封 {time}', { time: formatMailTime(last) });
   const head =
     accounts.length === 1 ? (accounts[0]?.address ?? '') : t('{n} 个邮箱', { n: accounts.length });
   return `${head} · ${lastText}`;

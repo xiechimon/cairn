@@ -2,9 +2,12 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { EN } from '../src/i18n/en.js';
+import { scanFile } from './i18n-scan.js';
 
 const SRC = new URL('../src/', import.meta.url).pathname;
 const SHARED_SRC = new URL('../../../packages/shared/src/', import.meta.url).pathname;
+const DESKTOP_SRC = new URL('../../desktop/src/', import.meta.url).pathname;
+const GLOSSARY = new URL('../../../CONTEXT.md', import.meta.url).pathname;
 
 interface Sign {
   id: string;
@@ -254,6 +257,47 @@ const uiStrings = [
   ]),
 ];
 
+const REGISTER_SECTIONS = ['## Status words', '## Copy register'];
+
+function avoidFormsIn(glossary: string): RegExp[] {
+  return REGISTER_SECTIONS.flatMap((heading) => {
+    const from = glossary.indexOf(heading);
+    if (from < 0) throw new Error(`CONTEXT.md has no ${heading} section`);
+    const next = glossary.indexOf('\n## ', from + heading.length);
+    const rows = glossary
+      .slice(from, next < 0 ? undefined : next)
+      .split('\n')
+      .filter((line) => line.startsWith('|') && !/^\|\s*-/.test(line));
+    return rows.slice(1).flatMap((row) => {
+      const cells = row.split(' | ');
+      const avoid = cells[cells.length - 1] ?? '';
+      return [...avoid.matchAll(/`([^`]+)`/g)].map(({ 1: form = '' }) =>
+        form.startsWith('/') && form.endsWith('/')
+          ? new RegExp(form.slice(1, -1), 'u')
+          : new RegExp(form.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'u'),
+      );
+    });
+  });
+}
+
+const AVOID_FORMS = avoidFormsIn(readFileSync(GLOSSARY, 'utf8'));
+
+const registerOffenders = (strings: string[], forms: RegExp[] = AVOID_FORMS) =>
+  strings.flatMap((text) => forms.filter((form) => form.test(text)).map((form) => `${form.source}: ${text}`));
+
+const STRING_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+const CJK = /[\u4e00-\u9fff]/;
+
+const sourceCjkStrings = walk(SRC)
+  .filter((path) => /\.tsx?$/.test(path) && !path.startsWith(join(SRC, 'fixtures')))
+  .flatMap((path) => scanFile(path, SRC))
+  .map(({ text }) => text);
+
+const desktopStrings = walk(DESKTOP_SRC)
+  .filter((path) => /\.ts$/.test(path))
+  .flatMap((path) => [...readFileSync(path, 'utf8').matchAll(STRING_LITERAL)].map((m) => m[2] ?? ''))
+  .filter((text) => CJK.test(text) || /\b(?:Cairn|Install|update)\b/.test(text));
+
 describe('unslop signs: the scanner catches a seeded violation', () => {
   test.each([
     ['uppercase label', '<span className="text-meta uppercase tracking-wide">Paid this month</span>'],
@@ -374,6 +418,34 @@ describe('unslop signs: the scanner catches a seeded violation', () => {
     ]);
   });
 
+  test.each([
+    ['连不上'],
+    ['没能保存，请稍后重试。'],
+    ['还没有定时任务'],
+    ['执行机跑任务时会拿到它们。'],
+    ['这把 key 没有通过检查'],
+    ['Unreachable'],
+    ['Broken'],
+    ["Can't reach the model provider"],
+    ['选择机器'],
+    ['多半是服务商那边慢，重试一般就好'],
+  ])('T5 register catches %s', (text) => {
+    expect(registerOffenders([text])).not.toEqual([]);
+  });
+
+  test.each([
+    ['无法连接'],
+    ['未能保存，请稍后重试。'],
+    ['暂无定时任务'],
+    ['连接 Telegram 机器人'],
+    ['API key 无效'],
+    ['Cannot connect'],
+    ['just now'],
+    ['Connecting to {machine}...'],
+  ])('T5 register passes %s', (text) => {
+    expect(registerOffenders([text])).toEqual([]);
+  });
+
   test('plain copy passes', () => {
     expect(copySignsIn('Queued: no machine meets the capability requirements')).toEqual([]);
     expect(copySignsIn('⌘K 搜索 · ✕ 已挡下')).toEqual([]);
@@ -433,5 +505,13 @@ describe('unslop signs: the source carries none outside the named exceptions', (
         EN,
       ),
     ).toEqual([]);
+  });
+
+  test('T5 the zh/en tables and t() strings use the CONTEXT.md status words and register', () => {
+    expect(registerOffenders([...new Set([...uiStrings, ...sourceCjkStrings])])).toEqual([]);
+  });
+
+  test('T5 the desktop dialog copy uses the CONTEXT.md status words and register', () => {
+    expect(registerOffenders(desktopStrings)).toEqual([]);
   });
 });

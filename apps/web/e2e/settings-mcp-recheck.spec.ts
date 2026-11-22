@@ -210,7 +210,7 @@ const FAILURES: { reason: string; text: string }[] = [
   { reason: 'unauthorized', text: 'Context7 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。' },
   { reason: 'forbidden', text: '令牌有效，但权限不够。给令牌加上需要的权限后重新连接。' },
   { reason: 'timeout', text: 'Context7 10 秒内没有响应。稍后重新连接。' },
-  { reason: 'unreachable', text: '连不上这个地址。检查地址是否正确、服务器是否在线。' },
+  { reason: 'unreachable', text: '无法连接这个地址。请检查地址是否正确、服务器是否在线。' },
   { reason: 'refresh_failed', text: '刷新 Context7 的授权时出错，稍后重新连接。' },
   { reason: 'upstream', text: 'Context7 返回了错误。稍后重新连接。' },
 ];
@@ -236,7 +236,7 @@ for (const { reason, text } of FAILURES) {
     await expect(result(page)).toHaveCount(0);
     await expect(dialog).toBeVisible();
 
-    await dialog.getByRole('button', { name: '连不上' }).click();
+    await dialog.getByRole('button', { name: '无法连接' }).click();
     await expect(result(page)).toContainText(text);
     expect(await fieldTop(page)).toBe(before);
   });
@@ -247,7 +247,7 @@ test('C22: a reconnect request that does not finish says so in the popover', asy
   const before = await fieldTop(page);
   await button(page, '重新连接').click();
   await expect(result(page)).toHaveAttribute('data-phase', 'failed');
-  await expect(result(page)).toContainText('没能完成检查，稍后重试。');
+  await expect(result(page)).toContainText('未能完成检查，请稍后重试。');
   await expect(dialog.getByRole('alert')).toHaveCount(0);
   expect(await fieldTop(page)).toBe(before);
 });
@@ -257,6 +257,6 @@ test('a connector opened in error shows its cause from the status, not inline', 
   const dialog = await open(page, {}, FAILING);
   await expect(dialog.getByText(text)).toHaveCount(0);
   await expect(result(page)).toHaveCount(0);
-  await dialog.getByRole('button', { name: '连不上' }).click();
+  await dialog.getByRole('button', { name: '无法连接' }).click();
   await expect(result(page)).toContainText(text);
 });

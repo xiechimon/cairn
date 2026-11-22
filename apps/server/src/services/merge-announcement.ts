@@ -8,7 +8,7 @@ import type { ConversationStreamHub } from './events.js';
 
 export const MERGE_LANDED_TEXT = '合并完成：改动已并入默认分支。';
 export const MERGE_UNCONFIRMED_TEXT =
-  '合并步跑完了；PR 的合并状态以 GitHub 对账结果为准，cairn 读到合并后再记录。';
+  '合并步已完成；PR 的合并状态以 GitHub 对账结果为准，cairn 读到合并后再记录。';
 
 type AnnounceDeps = {
   db: Db;

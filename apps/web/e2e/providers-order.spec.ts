@@ -129,7 +129,7 @@ test('a failed save puts the previous order back and says so', async ({ page }) 
     .toMatch(/translate3d\(0px, [1-9]/);
   await page.keyboard.press('Space');
 
-  await expect(page.getByText('顺序没能保存，已恢复原来的顺序。')).toBeVisible();
+  await expect(page.getByText('顺序未能保存，已恢复原来的顺序。')).toBeVisible();
   await expect.poll(() => names(page)).toEqual(DEFAULT);
   expect(saved).toHaveLength(1);
 });

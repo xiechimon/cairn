@@ -123,41 +123,41 @@ import type { MachineProvider } from './claude-accounts.js';
 import type { ApiKeyRow, StepRow } from './hooks.js';
 
 const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable': '排队中：{machine} 的任务沙箱没就绪，接不了任务',
-  'runtime-disabled': '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机',
-  'model-unavailable': '排队中：{machine} 用不了这一步的模型——在工作路由里换模型',
-  'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了',
+  'sandbox-unavailable': '排队中：{machine} 的任务沙箱未就绪，无法接收任务',
+  'runtime-disabled': '排队中：{machine} 上未检测到 {runtime}，安装后重启执行机',
+  'model-unavailable': '排队中：{machine} 无法使用这一步的模型——在工作路由里更换模型',
+  'local-path': '排队中：本地项目只在它所在的执行机上运行，{machine} 无法运行',
   'machine-retired':
     '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
-    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
+    '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
   'devin-subscription':
-    '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由',
+    '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到模型路由',
   'antigravity-subscription':
-    '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
+    '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
   'account-switched':
     '排队中：Claude 账号已切换，这一步保留旧账号的进度——先停止，再点继续，会用新账号重新开始',
-  'coordinator-provider-missing': 'Coordinator 规则用的服务商「{name}」还没添加',
+  'coordinator-provider-missing': 'Coordinator 规则使用的服务商「{name}」尚未添加',
   'coordinator-provider-no-key': 'Coordinator 规则用的服务商「{name}」没有 API key',
   'no-computer':
-    '排队中：信息卡要在智能体的电脑里跑，团队里还没有可用的电脑（需要 macOS 26 以上的 Apple 芯片 Mac，并开启 Linux 虚拟机）',
+    '排队中：信息卡要在 Coordinator 的电脑里运行，团队暂无可用的电脑（需要 macOS 26 以上的 Apple 芯片 Mac，并开启 Linux 虚拟机）',
 };
 
 const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> = {
-  'sandbox-unavailable': '排队中：执行机的任务沙箱没就绪，接不了任务',
-  'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机',
-  'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型',
-  'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了',
+  'sandbox-unavailable': '排队中：执行机的任务沙箱未就绪，无法接收任务',
+  'runtime-disabled': '排队中：执行机上未检测到 {runtime}，安装后重启执行机',
+  'model-unavailable': '排队中：执行机无法使用这一步的模型——在工作路由里更换模型',
+  'local-path': '排队中：本地项目只在它所在的执行机上运行，这台执行机无法运行',
   'machine-retired':
     '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在工作路由里改派',
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
-    '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
+    '排队中：团队暂无可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
   'devin-subscription':
-    '排队中：团队还没有可用的 Devin 订阅——在登录过 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把输出整个添加到模型路由',
+    '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到模型路由',
   'antigravity-subscription':
-    '排队中：团队还没有可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
+    '排队中：团队暂无可用的 Antigravity 订阅——在执行机运行 agy acp --login 登录 Google 账号，并在模型路由添加 Antigravity 订阅',
 };
 
 function queueLabel(queue: NonNullable<StepRow['queue']>): {
@@ -181,7 +181,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
   if (blocked.kind === 'capability-missing') {
     return blocked.platform !== undefined && queue.waitingFor == null
       ? {
-          label: '排队中：还没有 {platform} 执行机 · 需要 {platform}',
+          label: '排队中：暂无 {platform} 执行机 · 需要 {platform}',
           vars: { platform: RUNNER_OS_LABELS[blocked.platform] },
         }
       : {
@@ -220,7 +220,7 @@ function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
   vars: Record<string, string | number>;
 } {
   return {
-    label: '等额度：{lane} {kind}，{probe} 自动探测续跑',
+    label: '等额度：{lane} {kind}，{probe} 自动探测后继续运行',
     vars: {
       lane: q.label ?? q.providerId,
       kind: q.kind === 'quota' ? '额度空' : '限流',
@@ -1255,9 +1255,9 @@ export function runtimeUpdatePlain(
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
     case 'runtime_outdated':
-      return '更新 Cairn 后再重跑这个任务。';
+      return '更新 Cairn 后重新运行这个任务。';
     case 'network':
-      return '连接模型服务时超时或断开，通常是暂时的，重跑即可。';
+      return '连接服务商时超时或断开，通常是暂时的，重新运行即可。';
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':
@@ -1614,72 +1614,72 @@ export function turnErrorCopy(error: TurnErrorFacts, onMac: boolean): TurnErrorC
   switch (kind) {
     case 'timeout':
       return copy(
-        '模型太久没有回应',
+        '模型响应超时',
         (error.elapsedMs ?? 0) < 60_000
-          ? '模型没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。'
+          ? '模型没有响应，本轮已停止。通常是服务商响应慢，重试即可；频繁出现时，请为 Coordinator 更换模型。'
           : named && error.model !== undefined
-            ? '{model}（{provider}）{minutes} 分钟没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。'
-            : '模型 {minutes} 分钟没有回应，这一轮停下了。多半是服务商那边慢，重试一般就好；经常这样的话，给 Coordinator 换个模型。',
+            ? '{model}（{provider}）{minutes} 分钟没有响应，本轮已停止。通常是服务商响应慢，重试即可；频繁出现时，请为 Coordinator 更换模型。'
+            : '模型 {minutes} 分钟没有响应，本轮已停止。通常是服务商响应慢，重试即可；频繁出现时，请为 Coordinator 更换模型。',
         ['retry', 'swap'],
       );
     case 'connect':
       return copy(
-        '连不上模型服务',
+        '无法连接服务商',
         named
           ? onMac
-            ? 'Cairn 连不上 {provider}。可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
-            : 'Cairn 连不上 {provider}。可能是地址填错了、网络或代理不通，或者本地模型没有开。'
+            ? 'Cairn 无法连接 {provider}。可能是地址填写有误、网络或代理不可用，或本地模型未启动。模型在这台 Mac 或局域网里时，还需在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
+            : 'Cairn 无法连接 {provider}。可能是地址填写有误、网络或代理不可用，或本地模型未启动。'
           : onMac
-            ? '可能是地址填错了、网络或代理不通，或者本地模型没有开。模型在这台 Mac 或局域网里的话，还要在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
-            : '可能是地址填错了、网络或代理不通，或者本地模型没有开。',
+            ? '可能是地址填写有误、网络或代理不可用，或本地模型未启动。模型在这台 Mac 或局域网里时，还需在「系统设置 → 隐私与安全性 → 本地网络」里打开 Cairn。'
+            : '可能是地址填写有误、网络或代理不可用，或本地模型未启动。',
         ['provider', 'retry'],
       );
     case 'key':
       return copy(
-        named ? '{provider} 不接受这个 API key' : '模型服务不接受这个 API key',
-        'API key 填错了或已经失效。重新填一个，再重试。',
+        named ? '{provider} 不接受这个 API key' : '服务商不接受这个 API key',
+        'API key 填写有误或已失效。请重新填写后重试。',
         ['key', 'retry'],
       );
     case 'quota':
       return copy(
         named ? '{provider} 的额度用完了' : '模型额度用完了',
-        '这个账号的额度已经用完。充值或等额度恢复后再试，或者先给 Coordinator 换个模型。',
+        '这个账号的额度已用完。请充值或等待额度恢复后重试，或为 Coordinator 更换模型。',
         ['swap', 'retry'],
       );
     case 'busy':
       return copy(
-        named ? '{provider} 这会儿太忙' : '模型服务这会儿太忙',
-        '服务商暂时接不了这个请求，不是你的设置问题。过几分钟重试；急的话先给 Coordinator 换个模型。',
+        named ? '{provider} 当前繁忙' : '服务商当前繁忙',
+        '服务商暂时无法处理这个请求，与你的设置无关。请几分钟后重试，或为 Coordinator 更换模型。',
         ['retry', 'swap'],
       );
     case 'model':
       return copy(
-        error.model !== undefined ? '用不了 {model} 这个模型' : '用不了这个模型',
-        '服务商下线了这个模型，或者这个账号用不了它。给 Coordinator 换一个能用的模型。',
+        error.model !== undefined ? '{model} 不可用' : '这个模型不可用',
+        '服务商已下线这个模型，或这个账号无法使用它。请为 Coordinator 更换一个可用的模型。',
         ['swap'],
       );
     case 'context':
       return copy(
         '对话太长，模型读不下了',
-        '这段对话超过了模型能读的长度，自动压缩也没压下来。换一个上下文更长的模型再重试。',
+        '这段对话超过了模型可读取的长度，自动压缩后仍然超出。请更换上下文更长的模型后重试。',
         ['swap', 'retry'],
       );
     case 'provider':
       return copy(
-        named ? '{provider} 这次出错了' : '模型服务这次出错了',
-        '服务商返回了错误，这一轮没有完成。稍后重试；经常这样的话，给 Coordinator 换个模型。',
+        named ? '{provider} 这次出错了' : '服务商返回了错误',
+        '服务商返回了错误，本轮未完成。请稍后重试；频繁出现时，请为 Coordinator 更换模型。',
         ['retry', 'swap'],
       );
     case 'no-model':
       return copy(
-        'Coordinator 还没有能用的模型',
+        'Coordinator 暂无可用的模型',
         'Coordinator 的模型没有选，或者它的服务商已经删掉了。选一个模型后再重试。',
         ['pick', 'retry'],
       );
     case 'interrupted':
       return copy(
         '这一轮被打断了',
-        'Cairn 在回复途中重启或断开了，这一轮没跑完。已经做完的操作不会撤回；重试会把刚才的话再发一次。',
+        'Cairn 在回复途中重启或断开，本轮未完成。已完成的操作不会撤回；重试会重新发送刚才的消息。',
         ['retry'],
       );
     case 'runtime-update': {
@@ -1692,13 +1692,13 @@ export function turnErrorCopy(error: TurnErrorFacts, onMac: boolean): TurnErrorC
     case 'turn-limit':
       return copy(
         '这一轮的步数用完了',
-        'Coordinator 连着做了很多步还没收尾，先停下了。点「继续」让它接着做。',
+        'Coordinator 连续执行了很多步仍未完成，已暂停。点击「继续」让它继续执行。',
         ['continue'],
       );
     case 'unknown':
       return copy(
         '这一轮没有完成',
-        '没能认出具体原因。重试一般就好；一直这样的话，点「详情」看原话。',
+        '未能识别具体原因。通常重试即可；持续出现时，点击「详情」查看原始错误。',
         ['retry', 'settings'],
       );
   }
@@ -2429,8 +2429,8 @@ export function mapOrchestrationFeedback(
   items.push({
     kind: 'note',
     text: replied
-      ? 'Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。'
-      : 'Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。',
+      ? 'Coordinator 没有派发这个任务，原因见上方的回复。点击「开始」重试。'
+      : 'Coordinator 没有派发这个任务，也没有说明原因。点击「开始」重试。',
   });
   return items;
 }

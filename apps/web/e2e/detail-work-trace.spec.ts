@@ -184,7 +184,7 @@ test('a run folds its thinking, calls and narration into one block that stays co
   await expect(summary.locator('[data-trace-summary]')).toHaveText('正在运行 Check formatting');
   await expect(summary).toHaveAttribute('data-trace-state', 'running');
   await expect(summary).toHaveAttribute('aria-expanded', 'false');
-  for (const count of ['正在思考', '正在读 1 个文件', '正在搜索 1 次', '正在跑 2 条命令', '正在改 2 个文件', '正在调用 1 个工具'])
+  for (const count of ['正在思考', '正在读 1 个文件', '正在搜索 1 次', '正在运行 2 条命令', '正在改 2 个文件', '正在调用 1 个工具'])
     await expect(summary.locator('[data-trace-summary]')).toHaveAttribute('title', new RegExp(count));
   await expect(summary.locator('[data-trace-summary]')).not.toHaveAttribute('title', /失败/);
   await summary.click();

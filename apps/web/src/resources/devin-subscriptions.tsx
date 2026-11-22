@@ -28,8 +28,8 @@ function devinBridge(): DevinBridge | null {
 
 function loginFailCopy(reason: string, t: TFunc): string {
   return reason === 'timeout'
-    ? t('等待 Devin 登录超时，可以再试一次，或改用下方粘贴。')
-    : t('Devin 登录没有完成，可以再试一次，或改用下方粘贴。');
+    ? t('等待 Devin 登录超时。请重试，或改用下方粘贴。')
+    : t('Devin 登录未完成。请重试，或改用下方粘贴。');
 }
 
 export function AddDevinSubscriptionDialog({

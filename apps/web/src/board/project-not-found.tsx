@@ -103,13 +103,13 @@ export function ProjectsFailed({
   return (
     <section
       data-testid="project-load-error"
-      aria-label={t('项目没能加载')}
+      aria-label={t('项目未能加载')}
       className="flex min-h-0 min-w-0 flex-1 flex-col items-center gap-4 overflow-y-auto px-6 py-16 max-[640px]:px-4"
     >
       <EmptyState
         icon={TriangleAlert}
-        title={t('项目没能加载')}
-        description={t('检查网络后再试一次。')}
+        title={t('项目未能加载')}
+        description={t('请检查网络后重试。')}
         action={{ label: t('重试'), onClick: onRetry, disabled: retrying }}
         className="p-0"
       />

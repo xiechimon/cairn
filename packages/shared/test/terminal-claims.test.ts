@@ -102,7 +102,7 @@ describe('createClaimShield', () => {
   it('holds a phrase prefix at the tail until it resolves', () => {
     const shield = createClaimShield(facts());
     expect(shield.push('任务已')).toBe('任务');
-    expect(shield.push('经合并')).toBe('还没合并');
+    expect(shield.push('经合并')).toBe('尚未合并');
     expect(shield.flush()).toBe('');
   });
 

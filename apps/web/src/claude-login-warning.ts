@@ -12,7 +12,7 @@ export function subscriptionLoginWarning(
     return null;
   if (connection.expiresAt <= now)
     return t(
-      '{name}：已过期，Coordinator 和任务都暂时用不了。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。',
+      '{name}：已过期，Coordinator 和任务暂时无法使用。在终端运行 `claude setup-token`，把新的 token 添加到「设置 → 模型路由」。',
       { name: connection.label },
     );
   return t(

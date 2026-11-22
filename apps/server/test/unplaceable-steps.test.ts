@@ -297,7 +297,7 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     sweepUnplaceableSteps(w.s.svc, start + 45_000);
     expect(published).toHaveLength(2);
     expect(published[0]).toContain('MCP server "figma"');
-    expect(published[1]).toContain('任务沙箱没就绪');
+    expect(published[1]).toContain('任务沙箱未就绪');
   });
 });
 

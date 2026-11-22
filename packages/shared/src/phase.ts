@@ -16,7 +16,7 @@ export type Phase = (typeof PHASE_VALUES)[number];
 
 export const PHASE_SEMANTICS: Readonly<Record<Phase, string>> = {
   todo: '已建档未开始',
-  queued: '已启动，等空闲机器',
+  queued: '已启动，等待空闲执行机',
   planning: '读仓库写计划',
   confirm: '计划就绪等你',
   building: '在改',

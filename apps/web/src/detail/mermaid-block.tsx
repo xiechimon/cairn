@@ -38,7 +38,7 @@ const FAILURE_NOTICE: Record<Failure, string> = {
   unsupported: '暂不支持这种图表，显示源码',
   syntax: '图表语法有误，显示源码',
   limit: '图表太大，显示源码',
-  load: '图表没能加载，显示源码',
+  load: '图表未能加载，显示源码',
 };
 
 interface Drawing {

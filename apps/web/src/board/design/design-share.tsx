@@ -78,7 +78,7 @@ export function SharePopover({
         ) : link !== null ? (
           <div data-testid="design-share-live" className="flex flex-col gap-2">
             <p className="m-0 text-meta text-content-secondary">
-              {t('拿到链接的人都能看这个页面的当前版本。')}
+              {t('获得链接的人都能查看这个页面的当前版本。')}
             </p>
             <div className="flex items-center gap-2 rounded-(--radius-control) bg-muted px-3 py-2">
               <code
@@ -95,7 +95,7 @@ export function SharePopover({
                 onClick={() =>
                   void navigator.clipboard.writeText(link).then(
                     () => toastSuccess(t('已复制')),
-                    (error: unknown) => toastError(t('没复制上'), error),
+                    (error: unknown) => toastError(t('未能复制'), error),
                   )
                 }
               >
@@ -109,7 +109,7 @@ export function SharePopover({
                 data-testid="design-share-stop"
                 disabled={control.busy}
                 className="self-start text-content-secondary"
-                onClick={() => control.stop((error) => toastError(t('没能停止分享'), error))}
+                onClick={() => control.stop((error) => toastError(t('未能停止分享'), error))}
               >
                 {t('停止分享')}
               </Button>
@@ -120,7 +120,7 @@ export function SharePopover({
             <p className="m-0 text-ui text-foreground">
               {readOnly
                 ? t('任务已归档，不能再生成分享链接。')
-                : t('生成一个公开链接，拿到链接的人都能看这个页面的当前版本。')}
+                : t('生成一个公开链接，获得链接的人都能查看这个页面的当前版本。')}
             </p>
             {!readOnly && (
               <Button
@@ -128,7 +128,7 @@ export function SharePopover({
                 data-testid="design-share-create"
                 disabled={control.busy}
                 className="self-start"
-                onClick={() => control.create((error) => toastError(t('链接没生成'), error))}
+                onClick={() => control.create((error) => toastError(t('链接未能生成'), error))}
               >
                 {t('生成链接')}
               </Button>

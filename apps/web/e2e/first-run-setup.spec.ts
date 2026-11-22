@@ -360,7 +360,7 @@ test('a saved Claude subscription with Claude Code found is the Coordinator pick
 test('a saved subscription without Claude Code on this computer says what is missing', async ({ page }) => {
   await open(page, { ...fresh(), bound: false, subscription: true });
   await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
-  await expect(page.getByTestId('first-run-setup')).toContainText('现在先添加一个服务商，Coordinator 就能开始工作');
+  await expect(page.getByTestId('first-run-setup')).toContainText('现在先添加一个服务商，Coordinator 即可开始工作');
 });
 
 const TWO = [
@@ -450,7 +450,7 @@ test('confirming tries the picked model first and saves nothing when it does not
   };
   await open(page, world);
   await page.getByTestId('first-run-confirm').click();
-  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('服务商暂时没响应或额度用完');
+  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('服务商暂时未响应或额度已用完');
   await expect.poll(() => world.tests).toContain('p1/claude-opus-5-5');
   expect(world.patches).toEqual([]);
 });

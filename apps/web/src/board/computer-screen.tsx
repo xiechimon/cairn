@@ -194,7 +194,7 @@ export function MachineScreenSurface({
             {status === 'connecting'
               ? t('正在连接屏幕')
               : status === 'failed'
-                ? t('屏幕暂时连不上')
+                ? t('暂时无法连接屏幕')
                 : t('桌面控制已上线，屏幕显示在这里')}
           </span>
         </div>

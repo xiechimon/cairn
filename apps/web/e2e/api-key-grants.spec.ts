@@ -169,6 +169,6 @@ test('deleting a key asks first, sends DELETE for that key, and drops its row; a
     .getByRole('alertdialog', { name: '删除 MCP_CLIENT' })
     .getByRole('button', { name: '删除', exact: true })
     .click();
-  await expect(page.getByText('没能删除，请重试。')).toBeVisible();
+  await expect(page.getByText('未能删除，请重试。')).toBeVisible();
   await expect(page.getByText('MCP_CLIENT', { exact: true })).toBeVisible();
 });

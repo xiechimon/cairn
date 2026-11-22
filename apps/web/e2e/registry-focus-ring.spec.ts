@@ -165,7 +165,7 @@ test.describe('#1244 registry focus: outline on buttons, field ring on text fiel
   test('checkbox, switch, and badge use the global outline', async ({ page }) => {
     await themed(page, 'dark', PROVIDERS);
     await page.getByTestId('routing-add-provider').click();
-    const dialog = page.getByRole('dialog', { name: '添加模型服务' });
+    const dialog = page.getByRole('dialog', { name: '添加服务商' });
     await dialog.getByRole('button', { name: '自定义端点' }).click();
     const checkbox = dialog.locator('[data-slot="checkbox"]');
     await expect(checkbox).toBeVisible();

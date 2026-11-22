@@ -134,9 +134,9 @@ test('a Claude subscription picks Opus 5.5 from upstream and a failed model test
   await expect(chip('claude-opus-5-5')).toHaveAttribute('data-check', 'ok');
   await expect(chip('claude-sonnet-5-5')).toHaveAttribute('data-check', 'failed');
   const report = page.getByTestId('model-test-result');
-  await expect(report).toContainText('1/2 个模型没连上：这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token');
-  await expect(page.getByTestId('model-test-detail').locator('dt:text-is("claude-sonnet-5-5") + dd')).toContainText('没通过 · 登录失效');
-  await expect(report).not.toContainText('key 无效');
+  await expect(report).toContainText('1/2 个模型未能连接：这个订阅的登录已失效。先移除它，再在终端运行 claude setup-token');
+  await expect(page.getByTestId('model-test-detail').locator('dt:text-is("claude-sonnet-5-5") + dd')).toContainText('未通过 · 登录失效');
+  await expect(report).not.toContainText('API key 无效');
   await expect(detail).not.toContainText('登录失效');
 });
 
@@ -181,7 +181,7 @@ test('a failed upstream model list says why and labels the fallback list', async
   await page.getByTestId('subscription-detail').getByTestId('subscription-pick-upstream').click();
   const picker = page.getByRole('dialog', { name: '从上游选择模型' });
   await expect(picker.getByTestId('upstream-fallback').getByRole('alert')).toHaveText(
-    '上游拒绝了这个订阅的登录，没拿到模型清单。重新登录后重试。',
+    '上游拒绝了这个订阅的登录，未能获取模型清单。请重新登录后重试。',
   );
   await expect(picker.getByTestId('upstream-group')).toHaveText('备用清单，不是上游返回的');
   await expect(picker.getByTestId('upstream-model')).toHaveCount(2);

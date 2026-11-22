@@ -11,7 +11,7 @@ const FIELDS = {
   instructions: {
     max: PROJECT_INSTRUCTIONS_MAX,
     label: '项目说明',
-    placeholder: '例如：仓库内容用英文；改动后跑 pnpm lint；不要 force push。',
+    placeholder: '例如：仓库内容用英文；改动后运行 pnpm lint；不要 force push。',
     saveLabel: '保存项目说明',
     failed: '项目说明保存失败，请重试。',
   },

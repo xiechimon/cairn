@@ -32,7 +32,7 @@ describe('devin subscription brief warning', () => {
       t,
     );
     expect(expired).toContain('已过期');
-    expect(expired).toContain('Coordinator 和任务都暂时用不了');
+    expect(expired).toContain('Coordinator 和任务暂时无法使用');
     expect(expired).toContain('credentials.toml');
     expect(expired).toContain('设置 → 模型路由');
   });

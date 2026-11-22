@@ -370,7 +370,7 @@ export function runnerOverrideFor(
   }
   const now = nowMs();
   if (!pending.every((row) => canRunOn(db, row, target, now))) {
-    throw conflict(`${target.name} 现在不能跑这个任务`);
+    throw conflict(`${target.name} 现在无法运行这个任务`);
   }
   return { ...(todoRow.routeOverride ?? {}), machineId };
 }

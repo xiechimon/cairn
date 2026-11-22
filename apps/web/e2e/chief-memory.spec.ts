@@ -496,7 +496,7 @@ test('loading shows row-shaped skeletons, not an empty list', async ({ page }) =
 test('a failed read says so and retries, never claiming the list is empty', async ({ page }) => {
   const control = await openMemory(page, { list: 'fail' });
   const alert = page.getByRole('alert');
-  await expect(alert).toContainText('记忆没有加载出来，请重试。', { timeout: 15_000 });
+  await expect(alert).toContainText('记忆未能加载，请重试。', { timeout: 15_000 });
   await expect(page.getByText(/还没有/)).toHaveCount(0);
   await settled(page);
   await evidenceShot(page, 'memory-error.png');
@@ -507,7 +507,7 @@ test('a failed read says so and retries, never claiming the list is empty', asyn
 
 test('with no team memory the Coordinator tab says so in one line', async ({ page }) => {
   await openMemory(page, { memories: MEMORIES.filter((memory) => memory.projectId !== null) });
-  await expect(page.getByText('Coordinator 还没有记下团队笔记。')).toBeVisible();
+  await expect(page.getByText('Coordinator 尚未记录团队笔记。')).toBeVisible();
   await expect(page.getByRole('button', { name: /打开记忆/ })).toHaveCount(0);
   await settled(page);
   await evidenceShot(page, 'memory-empty.png');
@@ -519,7 +519,7 @@ test('a project with no memory still shows its instructions and one empty line',
   await openProjectMemory(page, { memories: [] });
   const list = page.getByTestId('memory-list');
   await expect(list.getByRole('textbox', { name: '项目说明' })).toBeVisible();
-  await expect(list.getByText('Coordinator 还没有在这个项目里记下笔记。')).toBeVisible();
+  await expect(list.getByText('Coordinator 尚未在这个项目里记录笔记。')).toBeVisible();
   await expect(list.getByRole('heading')).toHaveText(['项目说明', '自动记忆']);
 });
 
@@ -582,7 +582,7 @@ for (const last of [false, true]) {
 for (const projects of ['hang', 'fail'] as const) {
   test(`project instructions wait for the real project when lookup is ${projects}`, async ({ page }) => {
     const control = await openProjectMemory(page, { projects });
-    if (projects === 'fail') await expect(page.getByRole('heading', { name: '项目没能加载' })).toBeVisible({ timeout: 15000 });
+    if (projects === 'fail') await expect(page.getByRole('heading', { name: '项目未能加载' })).toBeVisible({ timeout: 15000 });
     else await expect(page.getByLabel('正在加载项目').last()).toBeVisible();
     await expect(page.getByRole('textbox', { name: '项目说明' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '保存项目说明' })).toHaveCount(0);
@@ -660,7 +660,7 @@ test('memory edit composer keeps the draft when the post fails', async ({ page }
   const input = page.getByPlaceholder('告诉 Coordinator 要记住或改什么');
   await input.fill('这条会失败');
   await page.getByRole('button', { name: '发送' }).click();
-  await expect(page.getByText('没有发出去，内容还在输入框里，再试一次。')).toBeVisible();
+  await expect(page.getByText('未能发送，内容仍在输入框里，请重试。')).toBeVisible();
   await expect(input).toHaveValue('这条会失败');
 });
 

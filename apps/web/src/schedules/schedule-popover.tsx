@@ -165,7 +165,7 @@ function ScheduleEditor({
       if (created.webhookUrl === undefined) onDone();
       else setWebhookUrl(created.webhookUrl);
     } catch (failure) {
-      setError(failure instanceof Error ? t(failure.message) : t('定时没能保存，请重试。'));
+      setError(failure instanceof Error ? t(failure.message) : t('定时未能保存，请重试。'));
     }
   };
   const state = record === null ? null : scheduleViewState(record);
@@ -184,7 +184,7 @@ function ScheduleEditor({
     record === null
       ? null
       : record.lastRunAt === null
-        ? t('还没运行过')
+        ? t('尚未运行')
         : joinMeta([
             relativeTime(record.lastRunAt, now, t),
             record.lastRunStatus === null
@@ -228,7 +228,7 @@ function ScheduleEditor({
         {schedule === null ? (
           candidates.length === 0 ? (
             <p className="m-0 text-meta text-content-secondary">
-              {t('这里还没有可以定时的任务。先建一个任务，或者直接让 Coordinator 帮你建定时。')}
+              {t('这里暂无可以定时的任务。先新建一个任务，或让 Coordinator 帮你新建定时。')}
             </p>
           ) : (
             <FormField label={t('任务')} htmlFor={taskId}>

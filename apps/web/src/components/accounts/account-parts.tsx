@@ -121,7 +121,7 @@ export function MachineProvidersCard({
       <SettingsCard>
         {providers.length === 0 ? (
           <div className={cn(SETTINGS_ROW_CLS, 'text-meta text-content-tertiary')}>
-            {t('这台执行机还没有上报模型服务状态')}
+            {t('这台执行机尚未上报服务商状态')}
           </div>
         ) : (
           providers.map((provider) => <ProviderRow key={provider.runtime} provider={provider} />)

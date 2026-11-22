@@ -340,7 +340,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     insertMessageRow(deps, buildRow.id, {
       id: newRecordId(),
       role: 'system',
-      content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上的状态为准，cairn 对账读到它合并后记录结果。`,
+      content: `合并步已完成；本任务以 PR #${pr.prNumber} 在 GitHub 上的状态为准，cairn 对账读到它合并后记录结果。`,
       createdAt: nowMs(),
     });
     announceMergeStepOutcome(deps, {

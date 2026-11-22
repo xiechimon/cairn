@@ -43,7 +43,7 @@ export function threadActionOf(todo: TodoRecord, running: boolean): ThreadAction
 }
 
 const ACTION_COPY: Record<ThreadActionKind, { reason: string; primary: string }> = {
-  start: { reason: '还没开始。', primary: '开始' },
+  start: { reason: '尚未开始。', primary: '开始' },
   approve: { reason: '计划已就绪。要改计划，直接在下面回复。', primary: '批准计划' },
   retry: { reason: '失败了。可以重试，或在下面回复说明怎么改。', primary: '重试' },
   unarchive: { reason: '这个任务已归档。取消归档后才能发消息。', primary: '取消归档' },

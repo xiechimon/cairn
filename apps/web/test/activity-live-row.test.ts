@@ -372,7 +372,7 @@ describe('mapTranscript queue projection (#1108 Q1–Q5)', () => {
     expect(row.blocked).toBe(true);
     expect(row.blockedKind).toBe('runtime-disabled');
     expect(translate('zh', EN, row.label, row.labelVars)).toBe(
-      '排队中：执行机上没有检测到 codex，装好后重启执行机',
+      '排队中：执行机上未检测到 codex，安装后重启执行机',
     );
     expect(translate('en', EN, row.label, row.labelVars)).toBe(
       'Queued: the Runner has not detected codex. Install it, then restart the Runner',

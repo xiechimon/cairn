@@ -104,7 +104,7 @@ const GROUPS: Group[] = [
         id: 'machines',
         label: '执行机',
         Icon: Server,
-        keywords: ['机器', 'runner', 'machine', 'computer'],
+        keywords: ['runner', 'machine', 'computer'],
         element: () => <MachinesPage />,
       },
       { id: 'skills', label: '技能', Icon: Puzzle, element: () => <SkillsPage /> },

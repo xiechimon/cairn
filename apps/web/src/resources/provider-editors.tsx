@@ -162,13 +162,13 @@ export type ModelCheck =
   | { phase: 'unavailable'; at: number };
 
 export const FAILURE_SHORT: Record<ProviderFailure, string> = {
-  auth: 'key 无效',
+  auth: 'API key 无效',
   'not-found': '模型不存在',
   'rate-limit': '限流',
   timeout: '超时',
   upstream: '上游出错',
   invalid: '响应异常',
-  network: '连不上',
+  network: '无法连接',
   'no-model': '没有模型',
 };
 
@@ -176,16 +176,16 @@ export const FAILURE_SENTENCE: Record<ProviderFailure, string> = {
   auth: 'API key 无效或没有这个模型的权限',
   'not-found': '上游没有这个模型',
   'rate-limit': '上游限流了，稍后再测',
-  timeout: '10 秒内没回',
+  timeout: '10 秒内未响应',
   upstream: '上游返回了错误',
   invalid: '上游返回的内容不像模型回复',
-  network: '连不上上游，检查地址',
+  network: '无法连接上游，请检查地址',
   'no-model': '没有可测的模型',
 };
 
 const TEST_CONCURRENCY = 3;
 
-const UNFINISHED_SENTENCE = '测试没能跑完，请重试';
+const UNFINISHED_SENTENCE = '测试未能完成，请重试';
 
 export function failureOf(check: ModelCheck | undefined): ProviderFailure | 'unavailable' | null {
   if (check?.phase === 'unavailable') return 'unavailable';
@@ -404,14 +404,14 @@ export function ModelTestReport({
         ? t('{id} 回复了，能用。', { id: done[0]?.id ?? '' })
         : t('{n} 个模型都回复了，能用。', { n: done.length })
       : done.length === 1
-        ? t('{id} 没连上：{reason}。', { id: first.id, reason: reasonOf(first.failure) })
+        ? t('{id} 未能连接：{reason}。', { id: first.id, reason: reasonOf(first.failure) })
         : kinds.size === 1
-          ? t('{failed}/{n} 个模型没连上：{reason}。', {
+          ? t('{failed}/{n} 个模型未能连接：{reason}。', {
               failed: failures.length,
               n: done.length,
               reason: reasonOf(first.failure),
             })
-          : t('{failed}/{n} 个模型没连上，按每行的原因处理后再测。', {
+          : t('{failed}/{n} 个模型未能连接，按每行的原因处理后重新测试。', {
               failed: failures.length,
               n: done.length,
             });
@@ -422,8 +422,8 @@ export function ModelTestReport({
       failure === null
         ? `${t('通过')} · ${check.phase === 'done' ? (check.result.latencyMs ?? 0) : 0} ms`
         : failure === 'unavailable'
-          ? t('没测完')
-          : t('没通过 · {reason}', { reason: t(failureShort[failure]) });
+          ? t('测试未完成')
+          : t('未通过 · {reason}', { reason: t(failureShort[failure]) });
     return { label: id, value: `${outcome} · ${relativeTime(check.at, now, t)}`, code: true };
   });
   return (
@@ -660,7 +660,7 @@ export function TeamProviderEditor({
         </div>
         {ids.length === 0 ? (
           <p className="m-0 py-1 text-ui text-content-secondary">
-            {t('还没选模型。从上游拉一份清单来勾选。')}
+            {t('尚未选择模型。从上游获取模型清单后勾选。')}
           </p>
         ) : (
           <div className="flex flex-wrap gap-1.5">

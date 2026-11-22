@@ -159,7 +159,7 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
         )}
         {waiting && push.off && (
           <p className="m-0 text-meta text-content-tertiary">
-            {t('这台设备没开推送，下次可能收不到提醒。')}{' '}
+            {t('这台设备未开启推送，可能无法收到下次提醒。')}{' '}
             <Button
               type="button"
               variant="link"
@@ -187,12 +187,12 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
             </Button>
             {!online ? (
               <span className="text-meta text-content-tertiary">
-                {computer === null ? t('还没有连上电脑') : t('电脑离线')}
+                {computer === null ? t('尚未连接电脑') : t('电脑离线')}
               </span>
             ) : (
               control.failed && (
                 <span className="text-meta text-destructive" data-testid="chief-takeover-failed">
-                  {t('没能接管，电脑没有响应')}
+                  {t('未能接管，电脑没有响应')}
                 </span>
               )
             )}

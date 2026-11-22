@@ -144,7 +144,7 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     id: 'browsermcp',
     name: 'Browser MCP',
     description:
-      '让 Agent 在你自己的 Chrome 里干活：已登录的站点直接可用，标签页在后台打开，不会把窗口弹到前面',
+      '让 Agent 在你自己的 Chrome 里执行任务：已登录的站点可直接使用，标签页在后台打开，窗口不会切到前台',
     docsUrl: 'https://browsermcp.io/docs',
     auth: ['none'],
     transport: 'stdio',

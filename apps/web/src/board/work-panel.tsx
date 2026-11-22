@@ -163,13 +163,13 @@ export function WorkPanel({
           data-testid="made-archived-empty"
           className="m-0 px-4 pt-8 text-ui text-content-tertiary"
         >
-          {t('还没有已归档的成果')}
+          {t('暂无已归档的成果')}
         </p>
       ) : (
         <EmptyState
           testId="made-empty"
           icon={PackageCheck}
-          title={t('还没有完成的文档')}
+          title={t('暂无已完成的文档')}
           description={t('调研报告等文档完成后会出现在这里。')}
           className="mt-[10vh]"
         />
@@ -278,7 +278,7 @@ export function WorkPanel({
           query={activeQuery}
           isEmpty={made.length === 0}
           loadingLabel={t('正在加载成果')}
-          errorTitle={t('成果没能加载')}
+          errorTitle={t('成果未能加载')}
           skeleton={<MadeSkeleton />}
           empty={body}
         >

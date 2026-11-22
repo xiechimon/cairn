@@ -326,7 +326,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     expect(api.doneBodies[0]?.body.status).toBe('failed');
     const msg = api.doneBodies[0]?.body.errorMessage ?? '';
     expect(msg).toContain('claude setup-token');
-    expect(msg).toContain('设置 → 模型服务');
+    expect(msg).toContain('设置 → 模型路由');
     expect(claudeCreated).toHaveLength(0);
     expect(piCreated).toHaveLength(0);
     expect(lines.some((l) => l === 'Loading claude-code runtime…')).toBe(false);

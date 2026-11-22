@@ -132,6 +132,6 @@ test('a new team sees an empty state instead of a blank chart', async ({ page })
     path === '/api/teams/t1/usage/daily' ? json({ days: [], models: [], projects: [] }) : undefined,
   );
   await page.goto('/app/usage');
-  await expect(page.getByTestId('usage-empty')).toContainText('No usage yet');
+  await expect(page.getByTestId('usage-empty')).toContainText('No usage');
   await expect(page.getByTestId('usage-heatmap')).toHaveCount(0);
 });

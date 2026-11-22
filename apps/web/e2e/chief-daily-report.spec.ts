@@ -95,7 +95,7 @@ test.describe('read-only historical daily reports', () => {
     await expect(page.getByTestId('research-report-meta')).not.toContainText('定稿');
     await expect(doc).toContainText('昨天（2026-10-26）的进展');
     await expect(doc).toContainText(
-      '完成 1 · 合并 1 · 失败 1 · 重跑 2 · 等额度 0 · 审查通过 3 / 拦下 1',
+      '完成 1 · 合并 1 · 失败 1 · 重新运行 2 · 等额度 0 · 审查通过 3 / 拦下 1',
     );
     await expect(doc.getByRole('link', { name: 'PR 77 · 修复看板拖拽后计数不刷新' })).toHaveAttribute(
       'href',

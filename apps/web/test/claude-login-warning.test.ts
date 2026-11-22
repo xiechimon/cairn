@@ -21,7 +21,7 @@ describe('subscription brief warning', () => {
     const expired = subscriptionLoginWarning({ ...subscription, expiresAt: NOW - DAY }, NOW, t);
     expect(expired).toContain('已过期');
     expect(expired).not.toContain('Claude 订阅已过期');
-    expect(expired).toContain('Coordinator 和任务都暂时用不了');
+    expect(expired).toContain('Coordinator 和任务暂时无法使用');
     expect(expired).toContain('claude setup-token');
     expect(expired).toContain('设置 → 模型路由');
   });

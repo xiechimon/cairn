@@ -54,8 +54,8 @@ export function QuotaBanner({ infos }: { infos: QuotaBannerInfo[] }) {
       }
       body={
         single != null
-          ? t('额度恢复后自动续跑；{probe} 自动探测', { probe: single.probe })
-          : t('额度恢复后自动续跑，无需人工操作')
+          ? t('额度恢复后自动继续运行；{probe} 自动探测', { probe: single.probe })
+          : t('额度恢复后自动继续运行，无需人工操作')
       }
     />
   );

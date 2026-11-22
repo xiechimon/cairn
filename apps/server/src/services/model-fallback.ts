@@ -168,7 +168,7 @@ export function planModelFallback(
     trigger,
     from,
     to,
-    note: `已换备用模型：${modelKey(from)} ${TRIGGER_TEXT[trigger]}，改用 ${modelKey(to)} 接着跑。换了 provider 不续旧会话，任务说明会重新带上。`,
+    note: `已换备用模型：${modelKey(from)} ${TRIGGER_TEXT[trigger]}，改用 ${modelKey(to)} 继续运行。换了服务商不续旧会话，任务说明会重新带上。`,
     row: {
       model: { provider: to.provider, modelId: to.modelId },
       tried: [...tried, modelKey(to)],

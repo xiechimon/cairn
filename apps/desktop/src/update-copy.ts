@@ -13,27 +13,27 @@ const COPY = {
     installDetail: (current: string) =>
       `当前版本是 ${current}。Cairn 会下载更新，然后重启完成安装。`,
     installBlockedDetail: (version: string) =>
-      `${version} 上次在这里没能启动。你点了安装，Cairn 会再装一次。`,
+      `${version} 上次在这台 Mac 上未能启动。你已选择安装，Cairn 会重新安装。`,
     installButtons: ['安装并重启', '稍后'],
     upToDateTitle: 'Cairn 已是最新',
     upToDateDetail: (version: string) => `当前版本 ${version} 已是最新。`,
-    unsupportedTitle: 'Cairn 在这里不能自己更新',
+    unsupportedTitle: 'Cairn 无法在此位置自动更新',
     unsupportedDetail: {
       'not-in-applications': '把 Cairn 移到「应用程序」文件夹后再检查。',
-      'read-only': 'Cairn 在只读位置运行。把它拷到「应用程序」文件夹后再检查。',
+      'read-only': 'Cairn 在只读位置运行。把它拷贝到「应用程序」文件夹后再检查。',
       development: '这是开发版。',
     },
-    checkFailedTitle: 'Cairn 没能检查更新',
+    checkFailedTitle: 'Cairn 未能检查更新',
     serverStoppedTitle: 'Cairn 服务已停止',
     serverStoppedDetail: (code: number | null) => `Cairn 服务以代码 ${code} 退出。`,
-    couldNotStartTitle: 'Cairn 没能启动',
+    couldNotStartTitle: 'Cairn 未能启动',
   },
   en: {
     installTitle: (version: string) => `Cairn ${version} is available`,
     installDetail: (current: string) =>
       `You have ${current}. Cairn downloads the update and restarts to install it.`,
     installBlockedDetail: (version: string) =>
-      `${version} did not start here last time. Cairn will install it again because you asked.`,
+      `${version} did not start on this Mac last time. You chose to install, so Cairn installs it again.`,
     installButtons: ['Install and Restart', 'Later'],
     upToDateTitle: 'Cairn is up to date',
     upToDateDetail: (version: string) => `You have the latest version, ${version}.`,

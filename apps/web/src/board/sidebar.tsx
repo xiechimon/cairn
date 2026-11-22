@@ -554,7 +554,7 @@ export function BoardSidebar({
             data-testid="sidebar-projects-error"
             className="ml-5.5 flex items-center gap-2 py-1 pr-1 pl-2.5 text-meta text-content-secondary"
           >
-            <span className="min-w-0 flex-1">{t('项目没能加载')}</span>
+            <span className="min-w-0 flex-1">{t('项目未能加载')}</span>
             <Button
               variant="ghost"
               size="sm"

@@ -77,13 +77,13 @@ function useAntigravityLogin(bridge: AntigravityBridge | null) {
 function loginFailCopy(reason: string, t: TFunc): string {
   switch (reason) {
     case 'no-binary':
-      return t('Antigravity 没能装上，可以再试一次，或改用下方粘贴。');
+      return t('Antigravity 未能安装。请重试，或改用下方粘贴。');
     case 'busy':
-      return t('还有一个 Antigravity 登录在进行，等它结束后再试。');
+      return t('另一个 Antigravity 登录正在进行，结束后请重试。');
     case 'timeout':
-      return t('等待 Antigravity 登录超时，可以再试一次，或改用下方粘贴。');
+      return t('等待 Antigravity 登录超时。请重试，或改用下方粘贴。');
     default:
-      return t('Antigravity 登录没有完成，可以再试一次，或改用下方粘贴。');
+      return t('Antigravity 登录未完成。请重试，或改用下方粘贴。');
   }
 }
 
@@ -263,7 +263,7 @@ export function AddAntigravitySubscriptionDialog({
             data-testid="antigravity-paste-toggle"
             onClick={() => setPasteOpen(true)}
           >
-            {t('也可以粘贴 API Key')}
+            {t('也可以粘贴 API key')}
           </Button>
         ) : (
           <>
@@ -342,7 +342,7 @@ export function AntigravityRelogin({ onLoggedIn }: { onLoggedIn: () => void }) {
               {local.installed ? t('在这台 Mac 上登录 Antigravity') : t('安装并登录 Antigravity')}
             </Button>
             <span className="min-w-0 flex-1 text-meta text-content-tertiary">
-              {t('登录完成后会重新验证；如果执行机是另一台机器，请在那台机器上登录。')}
+              {t('登录完成后会重新验证；如果执行机是另一台电脑，请在那台电脑上登录。')}
             </span>
           </>
         )}

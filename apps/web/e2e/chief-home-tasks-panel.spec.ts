@@ -148,11 +148,11 @@ test('every row leads with the same 28px box and no tile: a checkbox when it can
     }),
   );
   await expect(failed.locator('[data-slot="task-row-why"]')).toHaveAccessibleName(
-    '运行失败了，先重跑才能完成',
+    '运行失败，重新运行后才能完成',
   );
   await failed.locator('[data-slot="task-row-why"]').hover();
   await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText(
-    '运行失败了，先重跑才能完成',
+    '运行失败，重新运行后才能完成',
   );
   await expect(failed.locator('[data-slot="task-row-why"]')).toHaveCSS(
     'background-color',
@@ -489,8 +489,8 @@ test('every empty tab, with or without tasks elsewhere, is the same centred note
   await expect(empty.getByRole('button', { name: '添加任务' })).toBeVisible();
   shapes.push(await emptyShape(page));
   await panel(page).getByRole('tab', { name: '定时' }).click();
-  await expect(empty).toContainText('还没有定时任务');
-  await expect(empty).toContainText('也可以直接告诉 Coordinator');
+  await expect(empty).toContainText('暂无定时任务');
+  await expect(empty).toContainText('也可以告诉 Coordinator');
   await expect(empty.getByRole('button', { name: '新建定时' })).toBeVisible();
   shapes.push(await emptyShape(page));
   for (const shape of shapes) expect(shape).toEqual(firstRun);
@@ -733,7 +733,7 @@ test('Made archived tab says so when nothing is archived', async ({ page }) => {
   await page.goto(`${HOME}&pane=made`);
   await madePanel(page).getByRole('tab', { name: '已归档' }).click();
   const empty = madePanel(page).getByTestId('made-archived-empty');
-  await expect(empty).toHaveText('还没有已归档的成果');
+  await expect(empty).toHaveText('暂无已归档的成果');
   await expect(madePanel(page).getByTestId('made-empty')).toHaveCount(0);
   const note = madePanel(page).getByTestId('made-archived-note');
   const noteBox = await note.boundingBox();

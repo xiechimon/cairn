@@ -102,7 +102,7 @@ export const SYNTAX_ROWS = [
 ] as const;
 
 export const CHIP_PROBLEM_COPY: Record<ChipProblem, string> = {
-  empty: '这个筛选还没有值',
+  empty: '这个筛选暂无值',
   unknown_state: '状态只能是 failed、waiting、review、running 或 done',
   bad_pr: '请写 PR 编号，或 any',
   bad_date: '请写日期如 2026-11-01，或时间段如 7d',

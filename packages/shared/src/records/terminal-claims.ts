@@ -211,11 +211,11 @@ export function groundedPhrase(claim: TerminalClaim, facts: TerminalClaimFacts):
         case 'done':
           return claim.phrase;
         case 'none':
-          return '还没合并';
+          return '尚未合并';
       }
       break;
     case 'pushed':
-      return facts.pushed ? claim.phrase : '推送还没确认';
+      return facts.pushed ? claim.phrase : '推送尚未确认';
     case 'deployed':
       return facts.deployed ? claim.phrase : '部署没有记录';
     case 'tests':

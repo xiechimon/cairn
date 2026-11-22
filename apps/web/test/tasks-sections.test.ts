@@ -129,7 +129,7 @@ describe('a needs-you row says what is waiting and where to act', () => {
       taskRowCopy(entry(1, 'building', 'needs_input', { blockedBy: ['todo-blocker'] })),
     ).toMatchObject({
       word: '待处理',
-      what: { key: '被阻塞了，等你处理。' },
+      what: { key: '已阻塞，等待你处理。' },
       where: '到任务里处理',
     });
   });

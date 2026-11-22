@@ -96,7 +96,7 @@ export function SecretRequestCard({ item }: { item: SecretRequestItem }) {
         : problem === 'closed'
           ? t('这个请求已经结束。')
           : problem === 'failed'
-            ? t('没能保存，请稍后重试。')
+            ? t('未能保存，请稍后重试。')
             : null;
 
   const outcome =

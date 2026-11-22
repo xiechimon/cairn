@@ -109,7 +109,7 @@ function ConnectDialog({
   return (
     <DialogShell
       title={t('连接 Telegram 机器人')}
-      subtitle={t('在 @BotFather 里创建机器人，把 bot token 粘到这里。')}
+      subtitle={t('在 @BotFather 里创建机器人，把 bot token 粘贴到这里。')}
       onClose={onClose}
       footer={
         <Button
@@ -149,7 +149,7 @@ function SlackConnectDialog({
   return (
     <DialogShell
       title={t('连接 Slack')}
-      subtitle={t('建一个 Slack App 并打开 Socket Mode，把两个 token 粘到这里。')}
+      subtitle={t('新建一个 Slack App 并打开 Socket Mode，把两个 token 粘贴到这里。')}
       onClose={onClose}
       footer={
         <Button
@@ -213,7 +213,7 @@ function ImessageConnectDialog({
   return (
     <DialogShell
       title={t('连接 iMessage')}
-      subtitle={t('桥接跑在选中的 Mac 上，和你已有的 Cairn Runner 共用一条通道，不需要开端口。')}
+      subtitle={t('桥接运行在选中的 Mac 上，和已有的执行机共用一条通道，无需开放端口。')}
       onClose={onClose}
       footer={
         <Button
@@ -231,12 +231,12 @@ function ImessageConnectDialog({
           label={t('运行桥接的 Mac')}
           htmlFor="im-imessage-machine"
           help={t(
-            '选一台一直开机的 Mac。这台机器上要装好 imsg 并给 iMessage 读取权限；第一次连接时会自动安装受管版本。',
+            '选择一台始终开机的 Mac。这台 Mac 需要安装 imsg 并授予 iMessage 读取权限；首次连接时会自动安装受管版本。',
           )}
         >
           {machines.length === 0 ? (
             <p className="m-0 text-meta text-content-secondary" data-testid="im-no-machines">
-              {t('还没有已注册的机器。先在一台 Mac 上启动 Cairn Runner。')}
+              {t('暂无已注册的执行机。请先在一台 Mac 上启动执行机。')}
             </p>
           ) : (
             <Select
@@ -252,7 +252,7 @@ function ImessageConnectDialog({
                 data-testid="im-machine-select"
               >
                 <SelectValue>
-                  {machines.find((m) => m.id === machineId)?.name ?? t('选择机器')}
+                  {machines.find((m) => m.id === machineId)?.name ?? t('选择执行机')}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>

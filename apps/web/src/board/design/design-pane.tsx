@@ -109,7 +109,7 @@ export function DesignPane({
       <EmptyState
         testId="design-empty"
         icon={Globe}
-        title={t('这个任务还没有网页')}
+        title={t('这个任务暂无网页')}
         className="mt-[12vh]"
       />
     )
@@ -117,8 +117,8 @@ export function DesignPane({
     <EmptyState
       testId="design-error"
       icon={FileWarning}
-      title={t('网页没加载出来')}
-      description={t('检查网络后再试一次。')}
+      title={t('网页未能加载')}
+      description={t('请检查网络后重试。')}
       action={{ label: t('重试'), onClick: () => void pagesQ.refetch() }}
       className="mt-[12vh]"
     />
@@ -126,7 +126,7 @@ export function DesignPane({
     <EmptyState
       testId="design-empty"
       icon={Globe}
-      title={t('这个任务还没有网页')}
+      title={t('这个任务暂无网页')}
       className="mt-[12vh]"
     />
   ) : (
@@ -216,17 +216,17 @@ function DesignPage({
   const commentFailed = (message: string) => (error: unknown) => toastError(t(message), error);
   const actions: CommentActions = {
     edit: (id, note) =>
-      patchComment.mutate({ id, patch: { note } }, { onError: commentFailed('评论没改成') }),
-    remove: (id) => deleteComment.mutate(id, { onError: commentFailed('评论没删掉') }),
+      patchComment.mutate({ id, patch: { note } }, { onError: commentFailed('评论未能修改') }),
+    remove: (id) => deleteComment.mutate(id, { onError: commentFailed('评论未能删除') }),
     resolve: (id) =>
       patchComment.mutate(
         { id, patch: { status: 'resolved' } },
-        { onError: commentFailed('评论没改成') },
+        { onError: commentFailed('评论未能修改') },
       ),
     reopen: (id) =>
       patchComment.mutate(
         { id, patch: { status: 'open' } },
-        { onError: commentFailed('评论没改成') },
+        { onError: commentFailed('评论未能修改') },
       ),
   };
   const createFrom = (
@@ -238,7 +238,7 @@ function DesignPage({
       { ...target, versionId: shown.id, viewport, note },
       {
         onSuccess: (row) => then(row.id),
-        onError: commentFailed('评论没保存上'),
+        onError: commentFailed('评论未能保存'),
       },
     );
   const draft: CommentDraftHandlers = {
@@ -270,9 +270,9 @@ function DesignPage({
       toastError(
         error instanceof MarkError
           ? error.reason === 'snapshot'
-            ? t('页面截图没拍下来，标注没保存')
-            : t('标注图超过 5 MB，没保存')
-          : t('标注没保存上'),
+            ? t('页面截图未能截取，标注未保存')
+            : t('标注图超过 5 MB，未保存')
+          : t('标注未能保存'),
         error,
       );
     } finally {
@@ -304,7 +304,7 @@ function DesignPage({
   const restoreShown = () =>
     restore.mutate(shown.id, {
       onSuccess: () => setPicked(null),
-      onError: (error) => toastError(t('没能切回这个版本'), error),
+      onError: (error) => toastError(t('未能切回这个版本'), error),
     });
   const missing = htmlQ.error instanceof ApiError && htmlQ.error.status === 404;
   return (
@@ -579,15 +579,15 @@ function DesignPage({
         <EmptyState
           testId="design-missing"
           icon={FileWarning}
-          title={t('这一版的文件已经不在了')}
+          title={t('这一版的文件已不存在')}
           className="mt-[12vh]"
         />
       ) : htmlQ.isError ? (
         <EmptyState
           testId="design-error"
           icon={FileWarning}
-          title={t('网页没加载出来')}
-          description={t('检查网络后再试一次。')}
+          title={t('网页未能加载')}
+          description={t('请检查网络后重试。')}
           action={{ label: t('重试'), onClick: () => void htmlQ.refetch() }}
           className="mt-[12vh]"
         />

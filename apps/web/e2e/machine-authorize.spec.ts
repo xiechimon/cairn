@@ -58,7 +58,7 @@ test('a failed confirm says what to do in a sentence and keeps the server text o
   await page.getByRole('button', { name: '确认授权' }).click();
   const alert = card(page).getByRole('alert');
   await expect(alert).toHaveText(
-    '授权没成功，请再试一次。还不行就在执行机上重新运行 cairn start。',
+    '授权未成功，请重试。仍然失败时，在执行机上重新运行 cairn start。',
   );
   await expect(alert).toHaveAttribute('title', 'enrollment team mismatch');
   await expect(page.getByRole('button', { name: '确认授权' })).toBeEnabled();
@@ -79,14 +79,14 @@ test('a confirm that lost a race to another tab shows the authorized face, and a
   status = 404;
   await page.goto(`${AUTHORIZE}?enroll=e2e-other`);
   await page.getByRole('button', { name: '确认授权' }).click();
-  await expect(card(page)).toContainText('授权链接过期了');
+  await expect(card(page)).toContainText('授权链接已过期');
 });
 
 test('a poll that cannot reach the server says so under the disabled button', async ({ page }) => {
   await page.route(POLL, (route) => route.abort());
   await page.goto(`${AUTHORIZE}?enroll=e2e-enroll`);
   await expect(page.getByRole('button', { name: '正在连接执行机…' })).toBeDisabled();
-  await expect(card(page).getByRole('status')).toHaveText('连不上服务器，正在重试。请检查网络。');
+  await expect(card(page).getByRole('status')).toHaveText('无法连接服务器，正在重试。请检查网络。');
 });
 
 test('?enroll=<id> + poll=pending → pending face (copy + confirm-authorization button)', async ({ page }) => {
@@ -99,7 +99,7 @@ test('?enroll=<id> + poll=pending → pending face (copy + confirm-authorization
 test('?enroll=<id> + poll=expired → expired face (copy, no button)', async ({ page }) => {
   await pollSays(page, { status: 'expired' });
   await page.goto(`${AUTHORIZE}?enroll=e2e-enroll`);
-  await expect(card(page)).toContainText('授权链接过期了。在执行机上重新运行 cairn start 拿新链接。');
+  await expect(card(page)).toContainText('授权链接已过期。在执行机上重新运行 cairn start 获取新链接。');
   await expect(card(page).getByRole('button')).toHaveCount(0);
 });
 

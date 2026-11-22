@@ -56,14 +56,14 @@ test('a finished turn that did not dispatch shows the reply and says it was not 
   expect(kinds(items)).toEqual([
     'note:已交给 Coordinator 安排',
     'robot',
-    'note:Coordinator 没有派发这个任务，原因见上面的回复。点「开始」再试一次。',
+    'note:Coordinator 没有派发这个任务，原因见上方的回复。点击「开始」重试。',
   ]);
   expect(items[1]).toMatchObject({ markdown: '这个任务需要先选一个仓库。' });
 });
 
 test('a finished turn with no text says no reason was given', () => {
   expect(kinds(mapOrchestrationFeedback(todo, thread, [request('m1', 150)])).at(-1)).toBe(
-    'note:Coordinator 没有派发这个任务，也没有说明原因。点「开始」再试一次。',
+    'note:Coordinator 没有派发这个任务，也没有说明原因。点击「开始」重试。',
   );
 });
 

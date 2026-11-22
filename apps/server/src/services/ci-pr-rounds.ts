@@ -153,7 +153,7 @@ export function outdatedPullRound(
   }
   rows.hint(
     cand.buildId,
-    `PR #${pr.prNumber} 落后于默认分支「${githubText(defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${pr.prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重跑后再合并。`,
+    `PR #${pr.prNumber} 落后于默认分支「${githubText(defaultBranch)}」。cairn 不替人更新分支，合并由人做：在 GitHub 上点 Update branch（即 PUT pulls/${pr.prNumber}/update-branch，带 expected_head_sha 为当前 head），CI 重新运行后再合并。`,
     roundStart(deps, cand.buildId),
   );
   return 'hinted';

@@ -119,12 +119,12 @@ export function codexProviderKeyed(db: Pick<Db, 'select'>, teamId: string): bool
 
 function runtimeMissingReason(name: string, runtime: MachineRuntime): string {
   if (runtime === 'devin') {
-    return `执行机 ${name} 还没装好 Devin（托管下载失败或未上线）：等它上线或重启执行机。`;
+    return `执行机 ${name} 尚未安装 Devin（托管下载失败或未上线）：等它上线或重启执行机。`;
   }
   if (runtime === 'antigravity') {
-    return `执行机 ${name} 还没装好 Antigravity（agy 未检测到且托管下载失败或未上线）：请安装 agy 或重启执行机。`;
+    return `执行机 ${name} 尚未安装 Antigravity（agy 未检测到且托管下载失败或未上线）：请安装 agy 或重启执行机。`;
   }
-  return `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：装好后重启执行机。`;
+  return `执行机 ${name} 上没有检测到 ${MODEL_SOURCE_RUNTIME_LABELS[runtime]}：安装后重启执行机。`;
 }
 
 export interface MachineCapabilityFacts {

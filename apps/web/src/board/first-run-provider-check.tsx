@@ -10,12 +10,12 @@ export function failureCopy(failure: ProviderFailure, t: TFunc): string {
   return failure === 'auth'
     ? t('密钥被拒绝，检查密钥后重新添加')
     : failure === 'network'
-      ? t('连不上这个服务商，检查地址和网络')
+      ? t('无法连接这个服务商，请检查地址和网络')
       : failure === 'not-found' || failure === 'no-model'
         ? t('服务商没有这个模型，或不支持它')
         : failure === 'rate-limit' || failure === 'timeout' || failure === 'upstream'
-          ? t('服务商暂时没响应或额度用完，稍后再试')
-          : t('服务商的回复不对，检查连接设置');
+          ? t('服务商暂时未响应或额度已用完，请稍后重试')
+          : t('服务商的回复无效，请检查连接设置');
 }
 
 type Verdict =

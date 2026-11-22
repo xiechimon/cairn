@@ -104,7 +104,7 @@ test('a computer groups its tasks: stalled first, then running oldest first, the
   expect(groups.map((g) => g.label)).toEqual(['xmon 的 MacBook Pro', '进行中']);
   const rows = groups[0]?.rows ?? [];
   expect(rows.map((r) => [r.title, r.hint?.key, r.hint?.vars?.n, r.warn ?? false])).toEqual([
-    ['hung', '{n} 分没进展', 16, true],
+    ['hung', '{n} 分钟无进展', 16, true],
     ['old', '{n} 分', 30, false],
     ['fresh', '{n} 分', 2, false],
     ['full', '运行中', undefined, false],

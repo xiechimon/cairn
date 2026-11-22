@@ -50,7 +50,7 @@ test('authentication_failed identifies the team subscription and keeps the CLI r
   expect(failure.error.message).not.toContain(token);
   expect(failure.error.retryable).toBe(false);
   expect(failure.error.message).toContain('你的 Claude 订阅登录已失效');
-  expect(failure.error.message).toContain('设置 → 模型服务');
+  expect(failure.error.message).toContain('设置 → 模型路由');
   expect(failure.error.message).toContain('claude setup-token');
   expect(failure.error.message).not.toContain('claude auth status');
 });

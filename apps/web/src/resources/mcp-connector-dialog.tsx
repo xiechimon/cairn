@@ -66,7 +66,7 @@ export function connectorProblem(t: Translate, record: McpConnectorRecord): stri
     case 'timeout':
       return t('{name} 10 秒内没有响应。稍后重新连接。', { name });
     case 'unreachable':
-      return t('连不上这个地址。检查地址是否正确、服务器是否在线。');
+      return t('无法连接这个地址。请检查地址是否正确、服务器是否在线。');
     case 'reconnect':
     case 'expired':
       return t('{name} 的授权已失效，重新连接一次。', { name });
@@ -92,8 +92,8 @@ function submitError(t: Translate, error: unknown): string {
   if (error instanceof ApiError && error.status === 409)
     return t('这个标识已经被占用了，换一个标识再试。');
   if (error instanceof ApiError && error.status === 400)
-    return t('有字段格式不对。地址要以 https:// 开头，标识只能用小写字母、数字和连字符（-）。');
-  return t('没能保存，稍后重试。');
+    return t('有字段格式有误。地址需以 https:// 开头，标识只能使用小写字母、数字和连字符（-）。');
+  return t('未能保存，请稍后重试。');
 }
 
 interface McpConnectorDialogProps {
@@ -337,7 +337,7 @@ function CatalogConnectDialog({
         title={t('连接 {name}', { name: entry.name })}
         subtitle={t(entry.description)}
         info={t(
-          'Chrome 没开、扩展没连上或被暂停时，Agent 会退回 Cairn 自己的浏览器，并在结果里说明原因。',
+          'Chrome 未打开、扩展未连接或被暂停时，Agent 会改用 Cairn 自带的浏览器，并在结果里说明原因。',
         )}
         size="s"
         onClose={onClose}
@@ -731,7 +731,7 @@ function ManageConnectorDialog({
         {oauth && !github && (
           <p className="m-0 text-meta text-content-tertiary">
             {t(
-              '用浏览器登录连接。删除只移除本机保存的令牌，{name} 那边的授权要在它的设置里撤销。',
+              '用浏览器登录连接。删除只移除本机保存的令牌，{name} 中的授权需要在它的设置里撤销。',
               {
                 name: current.label,
               },
@@ -790,7 +790,7 @@ function RecheckResult({
         ? t('{name} 回应了，能用。', { name })
         : (problem ??
           (report.phase === 'unfinished' ? report.message : null) ??
-          t('没能完成检查，稍后重试。'));
+          t('未能完成检查，请稍后重试。'));
   const detail =
     record === null || (!ok && problem === null)
       ? null
@@ -842,10 +842,10 @@ export function ConnectorStatus({ record }: { record: McpConnectorRecord }) {
     return (
       <span className="inline-flex items-center gap-1.5 text-meta text-destructive">
         <span aria-hidden className="size-1.5 flex-none rounded-full bg-destructive" />
-        {t('连不上')}
+        {t('无法连接')}
       </span>
     );
-  return <span className="text-meta text-content-tertiary">{t('还没检查')}</span>;
+  return <span className="text-meta text-content-tertiary">{t('未检查')}</span>;
 }
 
 export function McpSignInDialog({

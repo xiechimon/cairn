@@ -194,7 +194,7 @@ export function AddProviderFlow({
               ? (body) =>
                   mutations.createProvider.mutate(body, {
                     onSuccess: () => onViewChange('closed'),
-                    onError: (error) => toastError(t('添加模型服务失败，请重试。'), error),
+                    onError: (error) => toastError(t('添加服务商失败，请重试。'), error),
                   })
               : undefined
           }

@@ -779,7 +779,7 @@ export function updateAutonomousTodo(
     if (row.phase === 'failed' && patch.phase === 'review') {
       throw new HttpError(
         409,
-        'failed 任务的审核关口恢复由合并/审核重跑动作发起（build 腿已交付时），手动改相不收',
+        'failed 任务的审核关口恢复由合并/审核重新运行动作发起（build 腿已交付时），手动改相不收',
       );
     }
     if (row.phase === 'done' && patch.phase === 'review' && !row.hasChanges) {

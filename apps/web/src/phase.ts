@@ -39,13 +39,13 @@ export const PHASE_UI: Record<Phase, PhaseUi> = {
   failed: {
     chip: '失败',
     tone: 'failed',
-    action: '重跑',
+    action: '重新运行',
     placeholder: '请求修改…',
   },
   stopped: {
     chip: '已停止',
     tone: 'idle',
-    action: '重跑',
+    action: '重新运行',
     placeholder: '发送消息以重新开始…',
   },
   closed: { chip: '已归档', tone: 'idle', action: null, placeholder: null },

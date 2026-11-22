@@ -334,7 +334,7 @@ export function AccountsSection() {
               query={query}
               isEmpty
               loadingLabel={t('正在加载执行机')}
-              errorTitle={t('执行机没能加载')}
+              errorTitle={t('执行机未能加载')}
               skeletonRows={2}
               empty={
                 <EmptyState

@@ -101,7 +101,7 @@ describe('schedule editor wire values', () => {
   test('pause reasons read as plain Chinese and an agent-written reason is kept', () => {
     const t = ((key: string) => key) as TFunc;
     expect(schedulePauseReason('Task archived', t)).toBe('任务已归档，定时随之停用');
-    expect(schedulePauseReason('git commit failed (1): pnpm-lock.yaml is staged\nhusky - pre-commit script failed (code 1)', t)).toBe('提交代码时被仓库检查拦下，这一轮没能完成');
+    expect(schedulePauseReason('git commit failed (1): pnpm-lock.yaml is staged\nhusky - pre-commit script failed (code 1)', t)).toBe('提交代码时被仓库检查拦下，本轮未能完成');
     expect(schedulePauseReason('Invalid cron expression: error at field 2', t)).toBe('运行出错，已停用');
     expect(schedulePauseReason('等 PR 合并后再继续', t)).toBe('等 PR 合并后再继续');
   });

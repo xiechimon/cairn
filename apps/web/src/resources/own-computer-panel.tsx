@@ -54,7 +54,7 @@ function stateText(state: NeedsAttention, t: TFunc): string {
       return t('在这台 Mac 上打开 Cairn 应用后，Coordinator 才能使用它的应用');
     case 'no-accessibility':
       return t(
-        'Cairn 还没有“辅助功能”权限：Coordinator 能在这台 Mac 上运行命令，但不能读取或操作应用',
+        'Cairn 尚未获得“辅助功能”权限：Coordinator 能在这台 Mac 上运行命令，但不能读取或操作应用',
       );
     case 'no-screen-recording':
       return t('Cairn 没有“屏幕录制”权限：Coordinator 只能以文字读取应用');

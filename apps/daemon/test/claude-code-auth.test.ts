@@ -113,7 +113,7 @@ describe('claudeCodeSubscriptionMissingMessage', () => {
     expect(msg).toContain(CLAUDE_CODE_AUTH_FAILURE_MARKER);
     expect(isProviderAuthFailure(msg)).toBe(true);
     expect(msg).toContain('claude setup-token');
-    expect(msg).toContain('设置 → 模型服务');
+    expect(msg).toContain('设置 → 模型路由');
     expect(msg).not.toContain('/login');
   });
 });
@@ -126,7 +126,7 @@ describe('claudeCodeTeamSubscriptionAuthFailureMessage', () => {
     expect(msg).toContain('你的 Claude 订阅登录已失效');
     expect(msg).toContain('Coordinator 和任务');
     expect(msg).toContain('OAuth token revoked');
-    expect(msg).toContain('设置 → 模型服务');
+    expect(msg).toContain('设置 → 模型路由');
     expect(msg).toContain('移除');
     expect(msg).toContain('claude setup-token');
     expect(msg).not.toContain('claude auth status');

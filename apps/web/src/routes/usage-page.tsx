@@ -618,7 +618,7 @@ export function UsagePage() {
           testId="usage-error"
           icon={TriangleAlert}
           title={t('用量加载失败')}
-          description={t('检查网络后再试一次。')}
+          description={t('请检查网络后重试。')}
           action={{
             label: t('重试'),
             onClick: () => void (teams.isError ? teams.refetch() : query.refetch()),
@@ -638,7 +638,7 @@ export function UsagePage() {
         <EmptyState
           testId="usage-empty"
           icon={ChartColumn}
-          title={t('还没有用量')}
+          title={t('暂无用量')}
           description={t('和 Coordinator 说第一句话后，这里会按天显示用了多少 token。')}
           className="h-full"
         />

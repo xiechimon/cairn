@@ -177,7 +177,7 @@ test('a text file that fails to load shows the error state with retry', async ({
     '/app?scenario=chief-files&file=team-files/att-missing.txt&fileName=missing.txt',
   );
   const panel = page.getByTestId('file-panel');
-  await expect(panel.getByTestId('query-error')).toContainText('文件没能加载');
+  await expect(panel.getByTestId('query-error')).toContainText('文件未能加载');
   await expect(panel.getByRole('button', { name: '重试' })).toBeVisible();
 });
 

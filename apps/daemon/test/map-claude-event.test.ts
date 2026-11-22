@@ -522,7 +522,7 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     const { events } = feed([ASSISTANT_AUTH_ERROR, RESULT_AUTH_ERROR]);
     const err = events.find((e) => e.type === 'error') as { error: { message: string } };
     expect(err.error.message).toContain('claude setup-token');
-    expect(err.error.message).toContain('设置 → 模型服务');
+    expect(err.error.message).toContain('设置 → 模型路由');
     expect(err.error.message).not.toContain('ANTHROPIC_API_KEY');
   });
 

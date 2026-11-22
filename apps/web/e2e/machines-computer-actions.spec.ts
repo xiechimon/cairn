@@ -64,10 +64,10 @@ test.describe('Coordinator computer actions menu', () => {
   });
 
   for (const [action, outcome, text] of [
-    ['stop', 'stopped', '虚拟机已停止，文件都还在，下次使用时会自动启动。'],
+    ['stop', 'stopped', '虚拟机已停止，文件均保留，下次使用时会自动启动。'],
     ['update', 'current', '虚拟机已经是最新版本。'],
-    ['update', 'updated', '虚拟机已更新到最新版本，文件都还在。'],
-    ['recover', 'recovered', '虚拟机已恢复，文件都还在。'],
+    ['update', 'updated', '虚拟机已更新到最新版本，文件均保留。'],
+    ['recover', 'recovered', '虚拟机已恢复，文件均保留。'],
   ] as const)
     test(`${action} answering ${outcome} says so under the computer`, async ({ page }) => {
       const { panel, actions } = await open(page, 'vm', () => ({ outcome }));
@@ -132,7 +132,7 @@ test.describe('Coordinator computer actions menu', () => {
       () => ({ state: 'failed', doneBytes: 0, totalBytes: TOTAL }),
     );
     const surface = panel.getByTestId('vm-download');
-    await expect(surface).toContainText('下载没完成');
+    await expect(surface).toContainText('下载未完成');
     await expect(surface.getByTestId('vm-download-start')).toHaveText('重试');
   });
 
@@ -159,7 +159,7 @@ test.describe('Coordinator computer actions menu', () => {
     await panel.getByTestId('machine-menu').click();
     await page.getByTestId('computer-action-recover').click();
     const note = panel.getByTestId('computer-action-note');
-    await expect(note).toHaveText('没能恢复虚拟机，请稍后重试。');
+    await expect(note).toHaveText('未能恢复虚拟机，请稍后重试。');
     await expect(note).toHaveAttribute('data-note', 'failed');
   });
 

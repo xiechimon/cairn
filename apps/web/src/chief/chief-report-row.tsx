@@ -37,7 +37,7 @@ function suggestionLines(p: RetroProposal, n: number, t: Translate): string[] {
   return [
     `${n}. **${title}** · ${state}`,
     `${pad}${mdText(p.what)}`,
-    `${pad}- ${t('为什么没拦住：{why}', { why: mdText(p.why) })}`,
+    `${pad}- ${t('未能拦截的原因：{why}', { why: mdText(p.why) })}`,
     `${pad}- ${t('防护：{safeguard}', { safeguard: mdText(p.safeguard) })}`,
     `${pad}- ${t('出处：')}${source}`,
   ];
@@ -68,7 +68,7 @@ export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): s
   out.push('', `## ${t('昨天（{day}）的进展', { day: report.covers })}`, '');
   out.push(
     t(
-      '完成 {done} · 合并 {merged} · 失败 {failed} · 重跑 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}',
+      '完成 {done} · 合并 {merged} · 失败 {failed} · 重新运行 {retries} · 等额度 {quota} · 审查通过 {pass} / 拦下 {block}',
       {
         done: y.finishedCount,
         merged: y.mergedCount,
@@ -102,7 +102,7 @@ export function chiefReportMarkdown(report: ChiefReportContent, t: Translate): s
   );
   if (report.status === 'posted' && report.retroRan) {
     out.push('', `## ${t('复盘建议')}`, '');
-    if (suggestions.length === 0) out.push(t('昨天的对话里没找到值得改的地方'));
+    if (suggestions.length === 0) out.push(t('昨天的对话里未发现需要改进的地方'));
     else
       suggestions.forEach((entry, index) => {
         out.push(...suggestionLines(entry, index + 1, t));

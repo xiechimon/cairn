@@ -193,7 +193,7 @@ export function MadeFiles({
       {skipped.length > 0 && (
         <p data-testid="made-skipped" className="m-0 mt-2.5 text-meta text-content-tertiary">
           {t('未收录 {n} 个文件：', { n: skipped.length })}
-          {skipped.map((s) => `${s.name}（${t(SKIP_REASON[s.reason] ?? '没能读取')}）`).join('、')}
+          {skipped.map((s) => `${s.name}（${t(SKIP_REASON[s.reason] ?? '未能读取')}）`).join('、')}
         </p>
       )}
     </div>

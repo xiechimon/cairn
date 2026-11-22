@@ -143,7 +143,7 @@ export function createGrindPoller(
         .join('、');
       rows.hint(
         cand.buildId,
-        `PR #${buildRow.prNumber} 的 head ${own ? ref.slice(0, 7) : `分支「${githubText(branch)}」`} 上，检查 ${names} 的结论不算通过：磨绿不推进、也不派修复步。等它重跑，或由人处理。`,
+        `PR #${buildRow.prNumber} 的 head ${own ? ref.slice(0, 7) : `分支「${githubText(branch)}」`} 上，检查 ${names} 的结论不算通过：磨绿不推进、也不派修复步。等它重新运行，或由人处理。`,
         roundStart(deps, cand.buildId),
       );
       tally.pending += 1;

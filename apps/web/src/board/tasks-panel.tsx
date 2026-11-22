@@ -145,7 +145,7 @@ function SelectionBar({
       todos.map((todo) => stopAndDoneTodo.mutateAsync(todo.id)),
     );
     const failed = results.filter((result) => result.status === 'rejected').length;
-    if (failed > 0) toastError(t('{n} 个任务没能标记完成，请重试。', { n: failed }), null);
+    if (failed > 0) toastError(t('{n} 个任务未能标记完成，请重试。', { n: failed }), null);
     else toastSuccess(t('{n} 个任务已标记完成。', { n: todos.length }));
     onClear();
   };
@@ -193,7 +193,7 @@ function SelectionBar({
 }
 
 function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: string } {
-  if (todo.phase === 'failed') return { glyph: 'failed', why: '运行失败了，先重跑才能完成' };
+  if (todo.phase === 'failed') return { glyph: 'failed', why: '运行失败，重新运行后才能完成' };
   if (todo.phase === 'closed') return { glyph: 'closed', why: '已归档' };
   if (todo.phase === 'done') return { glyph: 'done', why: '已完成' };
   return { glyph: 'todo', why: '已归档，不能标记完成' };
@@ -498,7 +498,7 @@ export function TasksPanel({
         : listOf(
             'resolved',
             <TasksEmpty
-              title={t('还没有完成的任务')}
+              title={t('暂无已完成的任务')}
               hint={t('任务完成后会出现在这里。')}
               action={null}
             />,
@@ -591,7 +591,7 @@ export function TasksPanel({
             isEmpty={nothingAtAll}
             loadingLabel={t('正在加载任务')}
             skeleton={<TasksSkeleton />}
-            errorTitle={t('任务没能加载')}
+            errorTitle={t('任务未能加载')}
             empty={body}
           >
             {body}
