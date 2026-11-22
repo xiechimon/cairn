@@ -24,9 +24,9 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
 
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
           node-version: 24
           package-manager-cache: false
@@ -38,7 +38,9 @@ jobs:
           keychain="$signing_dir/updater.keychain-db"
           password=$(openssl rand -hex 24)
           security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
+          security list-keychains -d user -s "$keychain"
           echo "CAIRN_TEST_SIGNING_KEYCHAIN=$keychain" >> "$GITHUB_ENV"
           for signer in SIGNER OTHER_SIGNER; do
             dir="$signing_dir/$signer"
@@ -48,7 +50,8 @@ jobs:
             fingerprint=$(openssl x509 -in "$dir/signing.cert.pem" -noout -fingerprint -sha1 | cut -d= -f2 | tr -d ':')
             echo "CAIRN_TEST_$signer=$fingerprint" >> "$GITHUB_ENV"
           done
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain" >/dev/null
+          security find-identity -p codesigning "$keychain"
 
       - name: Test the updater with real macOS signatures
         run: node --test --test-reporter=spec apps/desktop/scripts/signature-mac.test.mjs
