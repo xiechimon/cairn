@@ -149,54 +149,30 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     let armedTree = null;
     let lastBase = null;
     for (;;) {
-      let current;
-      if (Date.now() > deadline) {
-        console.error(
-          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
-        );
-        process.exit(2);
-      }
+      let current = null;
+      let head = null;
+      let headTree = null;
+      let step = { action: 'poll' };
       try {
         ({ live: current } = findLive());
+        head = git(['rev-parse', 'HEAD']);
+        headTree = treeOf(head);
+        const headOnLive = current !== null && ancestor(current, 'HEAD');
+        const deadBase =
+          current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
+        const runs = checkRunsOf(head);
+        step = nextWaitAction({
+          live: current,
+          headOnLive,
+          deadBase,
+          headTree,
+          armedTree,
+          evidence: preflightEvidence({ shas: [head], pushedTree: headTree, treeOf, checkRunsOf }),
+          failed: failedGreenContexts(runs ?? []),
+        });
       } catch {
-        console.error('[push-queue] could not read the queue state; retrying');
-        sleep(POLL_SECONDS);
-        continue;
+        console.error('[push-queue] could not read the queue state or its check runs; retrying');
       }
-      const head = git(['rev-parse', 'HEAD']);
-      const headTree = treeOf(head);
-      const headOnLive = current !== null && ancestor(current, 'HEAD');
-      const deadBase = current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
-      let runs;
-      try {
-        runs = checkRunsOf(head);
-      } catch {
-        console.error('[push-queue] could not read the check runs; retrying');
-        sleep(POLL_SECONDS);
-        continue;
-      }
-      const runsOrEmpty = runs ?? [];
-      const quietCheckRunsOf = (sha) => {
-        try {
-          return checkRunsOf(sha);
-        } catch {
-          return null;
-        }
-      };
-      const step = nextWaitAction({
-        live: current,
-        headOnLive,
-        deadBase,
-        headTree,
-        armedTree,
-        evidence: preflightEvidence({
-          shas: [head],
-          pushedTree: headTree,
-          treeOf,
-          checkRunsOf: quietCheckRunsOf,
-        }),
-        failed: failedGreenContexts(runsOrEmpty),
-      });
       if (step.action === 'push') break;
       if (step.action === 'fail') {
         console.error(
@@ -230,6 +206,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         }
         armedTree = headTree;
         continue;
+      }
+      if (Date.now() > deadline) {
+        console.error(
+          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
+        );
+        process.exit(2);
       }
       sleep(POLL_SECONDS);
     }

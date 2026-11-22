@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
+import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
 import {
   failedGreenContexts,
@@ -218,4 +223,201 @@ test('failedGreenContexts flags only required contexts that went red', () => {
   );
   assert.deepEqual(failedGreenContexts([run('check', 'cancelled')]), ['check']);
   assert.deepEqual(failedGreenContexts([run('check', 'in_progress')]), []);
+});
+
+const GIT_FAKE = String.raw`#!/bin/sh
+echo "git $*" >> "$FAKE_DIR/calls.log"
+for last; do :; done
+case "$1" in
+  rev-parse)
+    case "$2" in
+      --show-toplevel) echo "$FAKE_TOPLEVEL" ;;
+      HEAD) echo "$FAKE_HEAD" ;;
+      *) echo T ;;
+    esac ;;
+  ls-remote)
+    if [ -n "$FAKE_LIVE" ]; then printf '%s\t%s\n' "$FAKE_LIVE" "$last"; fi ;;
+  merge-base)
+    if [ "$last" = origin/main ]; then exit 1; fi
+    exit "$FAKE_ANCESTOR" ;;
+esac
+exit 0
+`;
+
+const GH_FAKE = String.raw`#!/bin/sh
+echo "gh $*" >> "$FAKE_DIR/calls.log"
+if [ "$1" = run ] && [ "$2" = watch ]; then exit "$FAKE_WATCH_EXIT"; fi
+if [ "$1" != api ]; then exit 1; fi
+pick() {
+  n=$(cat "$FAKE_DIR/$1.count" 2>/dev/null || echo 0)
+  echo $((n + 1)) > "$FAKE_DIR/$1.count"
+  i=$n
+  while [ ! -f "$FAKE_DIR/$1.$i" ] && [ "$i" -gt 0 ]; do i=$((i - 1)); done
+  echo "$FAKE_DIR/$1.$i"
+}
+answer() {
+  file=$(pick "$1")
+  code=$(head -n 1 "$file")
+  if [ "$code" = 0 ]; then
+    tail -n +2 "$file"
+  else
+    tail -n +2 "$file" >&2
+  fi
+  exit "$code"
+}
+case "$2" in
+  *actions/runs\?*) answer search ;;
+  *actions/runs/*) answer byId ;;
+  *check-runs*) answer checkRuns ;;
+  *comments*) echo '[]' ;;
+  *) exit 1 ;;
+esac
+exit 0
+`;
+
+const LIVE = 'b'.repeat(40);
+const LANE = laneName(hostname(), 'fake-wt');
+const GREEN_RUNS = [
+  { name: 'check', conclusion: 'success' },
+  { name: 'pack-smoke', conclusion: 'success' },
+  { name: 'e2e-gate', conclusion: 'success' },
+];
+const ciRun = (status, conclusion) => ({
+  id: 4242,
+  name: 'ci',
+  head_sha: X,
+  head_branch: `preflight/${LANE}`,
+  html_url: 'https://example.invalid/actions/runs/4242',
+  status,
+  conclusion,
+});
+const answer = (code, body) =>
+  `${code}\n${typeof body === 'string' ? body : JSON.stringify(body)}\n`;
+
+const sandbox = (files) => {
+  const dir = makeTestTempDir('cairn-ops-');
+  const tools = { git: GIT_FAKE, gh: GH_FAKE, sleep: '#!/bin/sh\nexit 0\n' };
+  for (const [name, content] of Object.entries(tools)) {
+    writeFileSync(join(dir, name), content);
+    chmodSync(join(dir, name), 0o755);
+  }
+  for (const [name, content] of Object.entries(files)) writeFileSync(join(dir, name), content);
+  return dir;
+};
+
+test('the scripts read the run by id, never judge by a watch, and retry an unreadable answer', () => {
+  const rows = [
+    {
+      name: 'preflight takes green from the completed success of that run id, not from the watch',
+      script: 'preflight.mjs',
+      args: ['--wait'],
+      status: 0,
+      search: ciRun('in_progress', null),
+      byId: [ciRun('completed', 'success')],
+      matches: [/\[preflight\] green/],
+    },
+    {
+      name: 'preflight uses the last read of that run id for the verdict',
+      script: 'preflight.mjs',
+      args: ['--wait'],
+      status: 0,
+      search: ciRun('in_progress', null),
+      byId: [ciRun('in_progress', null), ciRun('completed', 'success')],
+      matches: [/\[preflight\] green/],
+    },
+    {
+      name: 'preflight never calls a completed run with no conclusion red',
+      script: 'preflight.mjs',
+      args: ['--wait'],
+      status: 1,
+      search: ciRun('completed', null),
+      byId: [ciRun('completed', null)],
+      matches: [/could not read the run at/],
+      misses: [/the run went/],
+    },
+    {
+      name: 'preflight logs a pending run as pending, not as a failed query',
+      script: 'preflight.mjs',
+      args: ['--wait'],
+      status: 1,
+      search: ciRun('pending', null),
+      byId: [ciRun('pending', null)],
+      matches: [/the run is pending/],
+      misses: [/query failed/],
+    },
+    {
+      name: 'push-queue retries an unreadable check-runs answer and never arms a preflight push',
+      script: 'push-queue.mjs',
+      args: ['--wait'],
+      status: 2,
+      checkRuns: [
+        [0, { check_runs: [] }],
+        [1, 'gh: HTTP 500'],
+      ],
+      matches: [/could not read the queue state or its check runs/],
+      calls: /push --force-with-lease/,
+      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
+    {
+      name: 'push-queue names the live candidate it read when the deadline passes',
+      script: 'push-queue.mjs',
+      args: ['--wait'],
+      status: 2,
+      live: LIVE,
+      ancestor: 0,
+      matches: [new RegExp(`still waiting on ${LIVE.slice(0, 9)}`)],
+      misses: [/still waiting on green evidence/],
+      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
+  ];
+  for (const row of rows) {
+    const dir = sandbox({
+      'search.0': answer(0, { workflow_runs: [row.search ?? ciRun('completed', 'success')] }),
+      ...Object.fromEntries(
+        (row.byId ?? [ciRun('completed', 'success')]).map((run, index) => [
+          `byId.${index}`,
+          answer(0, run),
+        ]),
+      ),
+      ...Object.fromEntries(
+        (row.checkRuns ?? [[0, { check_runs: GREEN_RUNS }]]).map((entry, index) => [
+          `checkRuns.${index}`,
+          answer(entry[0], entry[1]),
+        ]),
+      ),
+    });
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [join(import.meta.dirname, row.script), ...row.args],
+        {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            FAKE_DIR: dir,
+            FAKE_TOPLEVEL: '/tmp/fake-wt',
+            FAKE_HEAD: X,
+            FAKE_LIVE: row.live ?? '',
+            FAKE_ANCESTOR: String(row.ancestor ?? 0),
+            FAKE_WATCH_EXIT: String(row.watchExit ?? 1),
+            ...row.env,
+          },
+        },
+      );
+      const output = `${result.stdout}${result.stderr}`;
+      assert.equal(result.status, row.status, `${row.name}\n${output}`);
+      for (const pattern of row.matches ?? []) assert.match(output, pattern, row.name);
+      for (const pattern of row.misses ?? []) assert.doesNotMatch(output, pattern, row.name);
+      if (row.calls) {
+        const calls = existsSync(join(dir, 'calls.log'))
+          ? readFileSync(join(dir, 'calls.log'), 'utf8')
+          : '';
+        assert.doesNotMatch(calls, row.calls, row.name);
+      }
+    } finally {
+      releaseTestTempDir(dir);
+    }
+  }
 });

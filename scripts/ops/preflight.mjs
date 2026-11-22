@@ -15,10 +15,9 @@ export function preflightRun(runs, sha, ref) {
   );
 }
 
-export function watchVerdict(status, conclusion, watchStatus) {
-  if (status === 'completed')
-    return { verdict: conclusion === 'success' ? 'green' : 'red', conclusion };
-  return watchStatus === 0 ? { verdict: 'unreadable' } : { verdict: 'unreadable', watchStatus };
+export function watchVerdict(status, conclusion) {
+  if (status !== 'completed' || !conclusion) return { verdict: 'unreadable' };
+  return { verdict: conclusion === 'success' ? 'green' : 'red', conclusion };
 }
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
@@ -69,53 +68,43 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   }
   const currentStatus = () => {
     try {
-      const latest = readRun();
-      return { status: latest?.status ?? null, conclusion: latest?.conclusion ?? null };
+      const latest = JSON.parse(
+        execFileSync('gh', ['api', `repos/${repo}/actions/runs/${run.id}`], { encoding: 'utf8' }),
+      );
+      return { status: latest.status ?? null, conclusion: latest.conclusion ?? null };
     } catch {
       return null;
     }
   };
-  const watched = spawnSync(
-    'gh',
-    ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'],
-    {
-      stdio: 'inherit',
-    },
-  );
+  spawnSync('gh', ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'], {
+    stdio: 'inherit',
+  });
   let state = currentStatus();
   const WATCH_RETRIES = 5;
   for (let attempt = 0; attempt < WATCH_RETRIES; attempt++) {
-    const outcome = watchVerdict(state?.status ?? null, state?.conclusion ?? null, watched.status);
-    if (outcome.verdict !== 'unreadable') {
-      if (outcome.verdict === 'green') {
-        console.log('[preflight] green — push-queue will accept this head');
-        process.exit(0);
-      }
+    const outcome = watchVerdict(state?.status ?? null, state?.conclusion ?? null);
+    if (outcome.verdict === 'green') {
+      console.log('[preflight] green — push-queue will accept this head');
+      process.exit(0);
+    }
+    if (outcome.verdict === 'red') {
       console.error(
         `[preflight] the run went ${outcome.conclusion}: ${run.html_url}; fix the failing jobs and push again`,
       );
       process.exit(1);
     }
     console.error(
-      `[preflight] could not read the run (watch exited ${watched.status ?? 'signal'}, state query failed); retrying ${WATCH_RETRIES - attempt} more time(s)`,
+      state
+        ? `[preflight] no verdict yet: the run is ${state.status}; waiting for it to finish`
+        : '[preflight] no verdict yet: could not read the run; retrying',
     );
     sleep(5);
-    state = currentStatus();
-    if (state && state.status !== 'completed') {
-      const again = spawnSync(
-        'gh',
-        ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'],
-        {
-          stdio: 'inherit',
-        },
-      );
-      if (again.status === 0) {
-        console.log('[preflight] green — push-queue will accept this head');
-        process.exit(0);
-      }
-      state = currentStatus();
-      if (state && state.status === 'completed') continue;
+    if (state?.status !== 'completed') {
+      spawnSync('gh', ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'], {
+        stdio: 'inherit',
+      });
     }
+    state = currentStatus();
   }
   console.error(
     `[preflight] could not read the run at ${run.html_url}; rerun node scripts/ops/preflight.mjs --wait`,
