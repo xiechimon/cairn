@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "65b7b564beaa6efd8d009d6e4f2eca0fe81c1a31",
+    "sha": "58f85bd8c732a2f014023e17e950cc83ebbeb37a",
     "date": "2026-11-22"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -13,7 +13,7 @@
     "alert-dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "#425 B1: shared confirm-surface base over Base UI AlertDialog; restores the repo three-path close contract (X/Esc/backdrop) that the stock blocking AlertDialog semantics do not provide. Paper face shared with DialogShell (S width by default, same head/body/split footer). Optional finalFocus forwards the Base UI focus target so memory deletion can return to a surviving row or its stable summary after the refreshed list settles (#3666). The backdrop force-renders so a confirm nested in a route dialog (Project settings delete) keeps its own backdrop close.",
-      "hash": "f869abf6c3ac4223db4acc689d1ae5bb7b797a1ca795599e19a4915ad0ccaa62"
+      "hash": "9c04cb6c47361770425b62eee0ee47b954c90d3fd69f144cd513b53e2c368a05"
     },
     "alert-dialog.tsx": {
       "kind": "registry",
@@ -76,14 +76,14 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (docs/design/surfaces/chrome.md dialogs) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces. info puts an InfoTip beside the title for a background sentence that is not visible copy. stacked forces the registry overlay for a regular face opened over another dialog, as AlertDialogShell does, so the dialog underneath is dimmed.",
-      "hash": "c745d79a3b9a8e8c05d41d034f9c566a8245b73c934e4acf512652d6fa9ca539"
+      "hash": "2013fae16b0b1307d6e1d83e7919b2899c4b811a522ba0724d91f6d1a26e1c4d"
     },
     "dialog.tsx": {
       "kind": "registry",
       "upstreamItem": "dialog",
       "status": "deviated",
-      "hash": "2b1730fecea64a157996a343aa0157ac10e23e2b7d5f50ec7403ac54698fedd0",
-      "reason": "zh i18n sweep: the built-in close button aria-label goes through t(关闭) instead of a raw English literal."
+      "hash": "4bc294160aaec11ea674395ab72e5e648f97205156654a1e5e4684b442359dee",
+      "reason": "a11y C4: the built-in close button is wrapped in IconTooltip so it carries a translated aria-label and a visible tooltip with the same wording (t('关闭')); extends the earlier zh i18n deviation of the raw English literal."
     },
     "dropdown-menu.tsx": {
       "kind": "registry",

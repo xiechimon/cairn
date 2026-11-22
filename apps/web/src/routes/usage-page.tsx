@@ -418,38 +418,36 @@ function Heatmap({
             <path d={outline} fill="none" stroke="currentColor" />
           </svg>
         )}
-        {grid.weeks
-          .flat()
-          .map((cell) =>
-            cell.future ? (
-              <span key={cell.date} />
-            ) : (
-              <Button
-                key={cell.date}
-                type="button"
-                variant="link"
-                size="icon"
-                data-day={cell.date}
-                data-level={cell.level}
-                aria-pressed={cell.date === selected}
-                aria-label={
-                  cell.total === 0
-                    ? `${labels.day(cell.date)}，${t('没有用量')}`
-                    : `${labels.day(cell.date)}，${formatTokens(cell.total)} token`
-                }
-                tabIndex={cell.date === focusDate ? 0 : -1}
-                className={cn(
-                  'size-(--cell) rounded-(--cds-radius-xs) border-0 p-0 hover:outline-solid hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
-                  LEVEL_BG[cell.level],
-                  cell.date === selected &&
-                    'outline-solid outline-2 outline-offset-1 outline-foreground hover:outline-foreground',
-                )}
-                onPointerEnter={() => onHover(cell.date)}
-                onClick={() => onSelect(cell.date === selected ? null : cell.date)}
-                onKeyDown={(event) => move(event, cell.date)}
-              />
-            ),
-          )}
+        {grid.weeks.flat().map((cell) => {
+          if (cell.future) return <span key={cell.date} />;
+          const label =
+            cell.total === 0
+              ? `${labels.day(cell.date)}，${t('没有用量')}`
+              : `${labels.day(cell.date)}，${formatTokens(cell.total)} token`;
+          return (
+            <Button
+              key={cell.date}
+              type="button"
+              variant="link"
+              size="icon"
+              data-day={cell.date}
+              data-level={cell.level}
+              aria-pressed={cell.date === selected}
+              aria-label={label}
+              title={label}
+              tabIndex={cell.date === focusDate ? 0 : -1}
+              className={cn(
+                'size-(--cell) rounded-(--cds-radius-xs) border-0 p-0 hover:outline-solid hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
+                LEVEL_BG[cell.level],
+                cell.date === selected &&
+                  'outline-solid outline-2 outline-offset-1 outline-foreground hover:outline-foreground',
+              )}
+              onPointerEnter={() => onHover(cell.date)}
+              onClick={() => onSelect(cell.date === selected ? null : cell.date)}
+              onKeyDown={(event) => move(event, cell.date)}
+            />
+          );
+        })}
       </div>
     </div>
   );

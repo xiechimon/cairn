@@ -2,6 +2,7 @@ import { Dialog as DialogPrimitive } from '@base-ui/react/dialog';
 import { cn } from 'cn';
 import { XIcon } from 'lucide-react';
 import type * as React from 'react';
+import { IconTooltip } from '@/components/icon-tooltip.js';
 import { Button } from '@/components/ui/button.js';
 import { useI18n } from '@/i18n/provider.js';
 
@@ -56,13 +57,20 @@ function DialogContent({
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close
-            data-slot="dialog-close"
-            render={<Button variant="ghost" className="absolute top-2 right-2" size="icon-sm" />}
+          <IconTooltip
+            label={t('关闭')}
+            side="bottom"
+            trigger={
+              <DialogPrimitive.Close
+                data-slot="dialog-close"
+                render={
+                  <Button variant="ghost" className="absolute top-2 right-2" size="icon-sm" />
+                }
+              />
+            }
           >
             <XIcon />
-            <span className="sr-only">{t('关闭')}</span>
-          </DialogPrimitive.Close>
+          </IconTooltip>
         )}
       </DialogPrimitive.Popup>
     </DialogPortal>

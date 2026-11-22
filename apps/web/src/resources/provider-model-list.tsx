@@ -1,6 +1,7 @@
 import type { ProviderModel } from '@cairn/shared';
 import { cn } from 'cn';
 import { useState } from 'react';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -75,15 +76,19 @@ export function ProviderModelChips({
             {model !== undefined && (
               <span className={CONTEXT_CLS}>{contextWindowLabel(model.contextWindow)}</span>
             )}
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label={t('移除模型')}
-              className="size-5 text-content-tertiary"
-              onClick={() => onSelectedChange(selected.filter((entry) => entry !== id))}
+            <IconTooltip
+              label={t('移除模型')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="size-5 text-content-tertiary"
+                  onClick={() => onSelectedChange(selected.filter((entry) => entry !== id))}
+                />
+              }
             >
               <X />
-            </Button>
+            </IconTooltip>
           </span>
         );
       })}

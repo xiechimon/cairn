@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
 import { useEscClose } from '../../overlay/use-esc.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import { Button } from './button.js';
 import {
   DIALOG_BODY_CLS,
@@ -90,13 +91,18 @@ export function AlertDialogShell({
             {children}
           </div>
           <DialogFootRow hint={hint}>{footer}</DialogFootRow>
-          <AlertDialogPrimitive.Close
-            render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
-            aria-label={t('关闭')}
-            onClick={onClose}
+          <IconTooltip
+            label={t('关闭')}
+            side="bottom"
+            trigger={
+              <AlertDialogPrimitive.Close
+                render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
+                onClick={onClose}
+              />
+            }
           >
             <X width={20} height={20} />
-          </AlertDialogPrimitive.Close>
+          </IconTooltip>
         </AlertDialogPrimitive.Popup>
       </AlertDialogPrimitive.Portal>
     </AlertDialogPrimitive.Root>

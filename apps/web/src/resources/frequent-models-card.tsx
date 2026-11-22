@@ -11,6 +11,7 @@ import {
   OpenAIMark,
 } from '../components/brand-marks.js';
 import { FilterPicker } from '../components/filter-picker.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { modelGroupKey, modelGroupName } from '../components/model-select-core.js';
 import { SETTINGS_ROW_CLS, SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -97,15 +98,19 @@ function FrequentModelRow({
             className="frequent-model-level"
           />
         )}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('删除 {model}', { model: name })}
-          className="flex-none text-content-tertiary pointer-coarse:size-11"
-          onClick={onRemove}
+        <IconTooltip
+          label={t('删除 {model}', { model: name })}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="flex-none text-content-tertiary pointer-coarse:size-11"
+              onClick={onRemove}
+            />
+          }
         >
           <X aria-hidden />
-        </Button>
+        </IconTooltip>
       </span>
     </div>
   );

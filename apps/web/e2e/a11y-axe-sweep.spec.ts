@@ -98,3 +98,105 @@ test('the panel close and the chief send show their names on hover', async ({ pa
   await expectTip(page, panel(page).locator('[data-panel-close]'), '关闭');
   await expectTip(page, page.getByRole('button', { name: '发送' }), '发送');
 });
+
+interface IconButtonGap {
+  testid: string;
+  html: string;
+  missing: string[];
+}
+
+async function iconButtonGaps(page: Page): Promise<IconButtonGap[]> {
+  return page.evaluate(() => {
+    const gaps: { testid: string; html: string; missing: string[] }[] = [];
+    for (const b of document.querySelectorAll('button')) {
+      const box = b.getBoundingClientRect();
+      if (box.width === 0 || box.height === 0) continue;
+      const clone = b.cloneNode(true) as HTMLElement;
+      for (const el of clone.querySelectorAll('.sr-only')) el.remove();
+      if ((clone.textContent ?? '').trim() !== '') continue;
+      const named =
+        (b.getAttribute('aria-label') ?? '').trim() !== '' ||
+        (b.getAttribute('aria-labelledby') ?? '').trim() !== '' ||
+        (b.getAttribute('title') ?? '').trim() !== '' ||
+        (b.textContent ?? '').trim() !== '';
+      const tipped =
+        b.hasAttribute('data-base-ui-tooltip-trigger') ||
+        (b.getAttribute('title') ?? '').trim() !== '' ||
+        b.closest('[data-slot="message-toolbar-tools"][data-unarmed]') !== null;
+      const missing: string[] = [];
+      if (!named) missing.push('accessible name');
+      if (!tipped) missing.push('visible tooltip');
+      if (missing.length > 0) {
+        gaps.push({
+          testid: b.getAttribute('data-testid') ?? '',
+          html: b.outerHTML.slice(0, 120),
+          missing,
+        });
+      }
+    }
+    return gaps;
+  });
+}
+
+test('icon-only buttons on the swept pages carry a name and a tooltip', async ({ page }) => {
+  const surfaces: [string, string, () => Promise<void>][] = [
+    [
+      'home tasks pane',
+      `${HOME}&pane=tasks`,
+      async () => {
+        await expect(page.getByTestId('tasks-toggle')).toBeVisible();
+      },
+    ],
+    [
+      'model routing settings',
+      '/app/settings/routing?scenario=model-routing',
+      async () => {
+        await expect(page.locator('[data-instance-id]').first()).toBeVisible();
+      },
+    ],
+    [
+      'usage',
+      '/app/usage?scenario=home-c',
+      async () => {
+        await expect(page.locator('[data-day]').first()).toBeVisible();
+      },
+    ],
+  ];
+  for (const [name, url, ready] of surfaces) {
+    await page.goto(url);
+    await ready();
+    expect(await iconButtonGaps(page), `C4: icon buttons on ${name}`).toEqual([]);
+  }
+});
+
+test('the new-project form names every icon button and shows it on hover', async ({ page }) => {
+  await page.route('**/api/fs/pick', (route, request) => {
+    if (request.method() !== 'POST') return route.fallback();
+    return route.fulfill({
+      status: 422,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'folder picker unavailable', reason: 'unavailable' }),
+    });
+  });
+  await page.route('**/api/fs/list*', (route) =>
+    route.fulfill({
+      json: {
+        path: '/Users/e2e',
+        entries: [
+          { name: 'demo', git: true },
+          { name: 'plain', git: false },
+        ],
+        truncated: false,
+      },
+    }),
+  );
+  await page.goto('/app/project/new?scenario=01');
+  await page.locator('#prj-new-repo').click();
+  await page.getByRole('menuitemradio', { name: '本地文件夹' }).click();
+  await expect(page.getByRole('button', { name: '浏览' })).toBeVisible();
+  expect(await iconButtonGaps(page), 'C4: project form icon buttons').toEqual([]);
+  await expectTip(page, page.getByRole('button', { name: '切换仓库来源' }), '切换仓库来源');
+  await page.getByRole('button', { name: '浏览' }).click();
+  await expect(page.getByRole('dialog', { name: '浏览本地文件夹' })).toBeVisible();
+  expect(await iconButtonGaps(page), 'C4: directory browser icon buttons').toEqual([]);
+});

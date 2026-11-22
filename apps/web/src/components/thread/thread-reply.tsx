@@ -2,6 +2,7 @@ import { cn } from 'cn';
 import { type KeyboardEvent, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { ArrowUp } from '../../icons/index.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import {
   InputGroup,
   InputGroupAddon,
@@ -85,15 +86,19 @@ export function ThreadReply({ delivery, onSend, autoFocus, className }: ThreadRe
         >
           {note}
         </span>
-        <InputGroupButton
-          size="icon-xs"
-          variant="default"
-          aria-label={t('发送')}
-          disabled={text === '' || state === 'sending'}
-          onClick={submit}
+        <IconTooltip
+          label={t('发送')}
+          trigger={
+            <InputGroupButton
+              size="icon-xs"
+              variant="default"
+              disabled={text === '' || state === 'sending'}
+              onClick={submit}
+            />
+          }
         >
           <ArrowUp aria-hidden="true" />
-        </InputGroupButton>
+        </IconTooltip>
       </InputGroupAddon>
     </InputGroup>
   );

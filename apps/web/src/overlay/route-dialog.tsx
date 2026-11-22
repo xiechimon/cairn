@@ -1,5 +1,6 @@
 import { cn } from 'cn';
 import { createContext, type ReactNode, type RefObject, useContext, useRef } from 'react';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { DialogClose, DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell, dialogWidth } from '../components/ui/dialog-shell.js';
@@ -63,18 +64,23 @@ export function RouteDialog({
       >
         {bleed ? children : <div className="mx-auto w-full max-w-192">{children}</div>}
       </div>
-      <DialogClose
-        render={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="absolute top-2 right-3 text-content-tertiary hover:text-foreground pointer-coarse:top-0 pointer-coarse:right-1 pointer-coarse:size-11"
+      <IconTooltip
+        label={t('关闭')}
+        side="bottom"
+        trigger={
+          <DialogClose
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="absolute top-2 right-3 text-content-tertiary hover:text-foreground pointer-coarse:top-0 pointer-coarse:right-1 pointer-coarse:size-11"
+              />
+            }
           />
         }
-        aria-label={t('关闭')}
       >
         <X width={20} height={20} />
-      </DialogClose>
+      </IconTooltip>
     </DialogShell>
   );
 }

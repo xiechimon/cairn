@@ -190,7 +190,7 @@ export function MessageToolbar({
   );
   const hasMenu = onRewind !== undefined || onDismiss !== undefined;
   const pill = !armed ? (
-    <div className={TOOLS_CLS} data-slot="message-toolbar-tools">
+    <div className={TOOLS_CLS} data-slot="message-toolbar-tools" data-unarmed>
       {withdraw}
       {onReply !== undefined && (
         <PlainButton

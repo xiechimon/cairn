@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useApiMutations, useProjects, useSearchResults, useTodos } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
@@ -270,16 +271,21 @@ export function AppSidebar({
       {narrow ? (
         <>
           {menuTrigger && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
-              aria-label={t('展开侧边栏')}
-              aria-expanded={drawerOpen}
-              onClick={() => setDrawerOpen(true)}
+            <IconTooltip
+              label={t('展开侧边栏')}
+              side="bottom"
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="app-menu-trigger fixed top-1.5 left-1 z-(--z-floating) size-11 text-content-secondary"
+                  aria-expanded={drawerOpen}
+                  onClick={() => setDrawerOpen(true)}
+                />
+              }
             >
               <PanelLeft className="size-5.5" strokeWidth={1.75} />
-            </Button>
+            </IconTooltip>
           )}
           <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
             <DialogContent

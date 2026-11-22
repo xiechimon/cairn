@@ -7,6 +7,7 @@ import {
 import { cn } from 'cn';
 import { Search } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
@@ -37,14 +38,19 @@ export function ProjectIconPicker({
   const shown = searchProjectIcons(query);
   return (
     <Popover onOpenChange={() => setQuery('')}>
-      <PopoverTrigger
-        disabled={disabled}
-        aria-label={t('更换项目图标')}
-        data-testid="project-icon-trigger"
-        className={cn('block size-full cursor-pointer', FOCUS, triggerClassName)}
+      <IconTooltip
+        label={t('更换项目图标')}
+        side="bottom"
+        trigger={
+          <PopoverTrigger
+            disabled={disabled}
+            data-testid="project-icon-trigger"
+            className={cn('block size-full cursor-pointer', FOCUS, triggerClassName)}
+          />
+        }
       >
         {trigger}
-      </PopoverTrigger>
+      </IconTooltip>
       <PopoverContent
         align="start"
         sideOffset={8}

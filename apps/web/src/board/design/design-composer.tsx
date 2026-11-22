@@ -2,6 +2,7 @@ import type { DesignCommentRecord } from '@cairn/shared';
 import type { ReactNode } from 'react';
 import { useDesignComments, useDesignMutations, useDesignPages } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
+import { IconTooltip } from '../../components/icon-tooltip.js';
 import { Button } from '../../components/ui/button.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
@@ -53,20 +54,24 @@ export function useDesignComposer(
             <span className="min-w-0 max-w-88 truncate">
               {commentSubject(comment)} · {comment.note}
             </span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              data-testid="design-comment-chip-remove"
-              aria-label={t('删除评论 {n}', { n: comment.pin })}
-              className="size-5 flex-none rounded-full text-content-tertiary hover:bg-(--hover-1) hover:text-foreground"
-              onClick={() =>
-                deleteComment.mutate(comment.id, {
-                  onError: (error) => toastError(t('评论没删掉'), error),
-                })
+            <IconTooltip
+              label={t('删除评论 {n}', { n: comment.pin })}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  data-testid="design-comment-chip-remove"
+                  className="size-5 flex-none rounded-full text-content-tertiary hover:bg-(--hover-1) hover:text-foreground"
+                  onClick={() =>
+                    deleteComment.mutate(comment.id, {
+                      onError: (error) => toastError(t('评论没删掉'), error),
+                    })
+                  }
+                />
               }
             >
               <X aria-hidden className="size-3.5" />
-            </Button>
+            </IconTooltip>
           </span>
         ))}
       </div>

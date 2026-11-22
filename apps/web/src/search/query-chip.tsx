@@ -1,6 +1,7 @@
 import type { ParsedSearchFilter } from '@cairn/shared';
 import { cn } from 'cn';
 import { X } from 'lucide-react';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { MENU_SURFACE_CLS } from '../components/ui/menu.js';
 import { useI18n } from '../i18n/provider.js';
@@ -31,15 +32,19 @@ export function QueryChip({
       <span className={cn('min-w-0 truncate font-medium', problem === null && 'text-foreground')}>
         {chip.value}
       </span>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        aria-label={t('移除筛选 {filter}', { filter: chip.raw })}
-        className="text-content-tertiary"
-        onClick={onRemove}
+      <IconTooltip
+        label={t('移除筛选 {filter}', { filter: chip.raw })}
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="text-content-tertiary"
+            onClick={onRemove}
+          />
+        }
       >
         <X />
-      </Button>
+      </IconTooltip>
     </span>
   );
 }
@@ -84,9 +89,12 @@ export function SyntaxHelp({ className, onClose }: { className?: string; onClose
         <h3 className="m-0 flex-1 text-ui font-medium text-foreground">{t('搜索筛选')}</h3>
         <span className="text-caption text-content-tertiary">{t('可以任意组合，需同时满足')}</span>
         {onClose !== undefined && (
-          <Button variant="ghost" size="icon-xs" aria-label={t('关闭')} onClick={onClose}>
+          <IconTooltip
+            label={t('关闭')}
+            trigger={<Button variant="ghost" size="icon-xs" onClick={onClose} />}
+          >
             <X />
-          </Button>
+          </IconTooltip>
         )}
       </div>
       <dl className="m-0 grid grid-cols-[4.5rem_minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1.5 max-[640px]:grid-cols-[4.5rem_minmax(0,1fr)]">

@@ -85,16 +85,21 @@ export function DesignPane({
       <h2 className="m-0 min-w-0 flex-1 truncate text-ui font-medium text-foreground">
         {todoQ.data?.title ?? page?.fileName ?? t('设计')}
       </h2>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        data-testid="design-close"
-        aria-label={t('关闭设计视图')}
-        onClick={onClose}
-        className={`${HEAD_ICON} pointer-coarse:size-11`}
+      <IconTooltip
+        label={t('关闭设计视图')}
+        side="bottom"
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            data-testid="design-close"
+            onClick={onClose}
+            className={`${HEAD_ICON} pointer-coarse:size-11`}
+          />
+        }
       >
         <X aria-hidden className="size-5.5" />
-      </Button>
+      </IconTooltip>
     </div>
   );
   const body = pagesQ.isPending ? (

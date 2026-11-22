@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useFsList, useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { PopoverContent } from '../components/ui/popover.js';
@@ -279,15 +280,19 @@ function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack
   return (
     <>
       <div className="flex items-center gap-1 px-1">
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={t('返回列表')}
-          className="flex-none self-start text-content-tertiary"
-          onClick={onBack}
+        <IconTooltip
+          label={t('返回列表')}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="flex-none self-start text-content-tertiary"
+              onClick={onBack}
+            />
+          }
         >
           <ChevronLeft width={16} height={16} />
-        </Button>
+        </IconTooltip>
         <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 border-b border-border pb-1.5">
           {crumbs.map((seg, i) => (
             <span key={seg.path} className="inline-flex min-w-0 items-center gap-0.5">

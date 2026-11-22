@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useConnected } from '../api/connection-state.js';
 import { useApiMutations, useCurrentMemoryEdit } from '../api/hooks.js';
 import { formatClock } from '../components/chat/live-row.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { useI18n } from '../i18n/provider.js';
@@ -258,32 +259,40 @@ export function MemoryEditComposer({
             />
           </div>
           {working ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t('停止')}
-              data-testid="memory-edit-stop"
-              disabled={stopping}
-              className="ml-auto size-7 cursor-pointer rounded-(--radius-control) text-foreground hover:bg-(--menu-hover)"
-              onClick={stop}
+            <IconTooltip
+              label={t('停止')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid="memory-edit-stop"
+                  disabled={stopping}
+                  className="ml-auto size-7 cursor-pointer rounded-(--radius-control) text-foreground hover:bg-(--menu-hover)"
+                  onClick={stop}
+                />
+              }
             >
               <Square width={14} height={14} fill="currentColor" />
-            </Button>
+            </IconTooltip>
           ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t('发送')}
-              data-testid="memory-edit-send"
-              disabled={!canSend}
-              className={cn(
-                'ml-auto size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover)',
-                draft.trim() !== '' && 'text-foreground',
-              )}
-              onClick={send}
+            <IconTooltip
+              label={t('发送')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid="memory-edit-send"
+                  disabled={!canSend}
+                  className={cn(
+                    'ml-auto size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover)',
+                    draft.trim() !== '' && 'text-foreground',
+                  )}
+                  onClick={send}
+                />
+              }
             >
               <ArrowUp width={20} height={20} />
-            </Button>
+            </IconTooltip>
           )}
         </div>
         {mutations.submitMemoryEdit.isError && (

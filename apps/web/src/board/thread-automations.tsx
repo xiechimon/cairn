@@ -4,6 +4,7 @@ import { Pause, Timer, Trash2, TriangleAlert } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useApiMutations, useSchedules } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../components/ui/popover.js';
@@ -26,29 +27,32 @@ export function ThreadAutomations({ todo, now }: { todo: TodoRecord; now: number
   const own = automationsForThread(schedules.data ?? [], todo.id);
   if (schedules.isError && own.length === 0) {
     return (
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        aria-label={t('重试加载定时')}
-        data-testid="automation-load-error"
-        disabled={schedules.isFetching}
-        onClick={() => void schedules.refetch()}
+      <IconTooltip
+        label={t('重试加载定时')}
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            data-testid="automation-load-error"
+            disabled={schedules.isFetching}
+            onClick={() => void schedules.refetch()}
+          />
+        }
       >
         <TriangleAlert />
-      </Button>
+      </IconTooltip>
     );
   }
   if (schedules.data === undefined) {
     return (
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        disabled
-        aria-label={t('定时加载中…')}
-        data-testid="automation-loading"
+      <IconTooltip
+        label={t('定时加载中…')}
+        trigger={
+          <Button variant="ghost" size="icon-xs" disabled data-testid="automation-loading" />
+        }
       >
         <Timer />
-      </Button>
+      </IconTooltip>
     );
   }
   if (own.length === 0) return null;
@@ -225,16 +229,20 @@ function AutomationItem({
           </p>
           <p className="m-0 mt-0.5 text-caption text-content-tertiary">{schedule.tz}</p>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          aria-label={t('删除定时')}
-          data-testid="automation-delete"
-          disabled={busy}
-          onClick={() => void change(() => onDelete(schedule.id))}
+        <IconTooltip
+          label={t('删除定时')}
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              data-testid="automation-delete"
+              disabled={busy}
+              onClick={() => void change(() => onDelete(schedule.id))}
+            />
+          }
         >
           <Trash2 />
-        </Button>
+        </IconTooltip>
       </div>
       <p
         data-testid="automation-prompt"

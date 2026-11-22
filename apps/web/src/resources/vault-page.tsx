@@ -8,6 +8,7 @@ import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
 import { relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { InfoTip } from '../components/info-tip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QueryBoundary } from '../components/query-state.js';
@@ -196,19 +197,23 @@ export function VaultPage() {
                     </span>
                     <span className="flex justify-end max-sm:col-start-2 max-sm:row-span-3 max-sm:row-start-1">
                       <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              data-testid="vault-entry-menu"
-                              className="text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-menu-hover aria-expanded:text-foreground pointer-coarse:size-11 dark:hover:bg-transparent dark:aria-expanded:bg-menu-hover"
-                              aria-label={t('{name} 的菜单', { name: entry.name })}
+                        <IconTooltip
+                          label={t('{name} 的菜单', { name: entry.name })}
+                          trigger={
+                            <DropdownMenuTrigger
+                              render={
+                                <Button
+                                  variant="ghost"
+                                  size="icon-sm"
+                                  data-testid="vault-entry-menu"
+                                  className="text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-menu-hover aria-expanded:text-foreground pointer-coarse:size-11 dark:hover:bg-transparent dark:aria-expanded:bg-menu-hover"
+                                />
+                              }
                             />
                           }
                         >
                           <Ellipsis aria-hidden strokeWidth={1.75} />
-                        </DropdownMenuTrigger>
+                        </IconTooltip>
                         <KeyedMenuContent
                           side="bottom"
                           align="end"

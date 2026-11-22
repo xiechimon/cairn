@@ -18,6 +18,7 @@ import {
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FormField, FormStack } from '../components/form-layout.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QrCode } from '../components/qr-code.js';
 import {
@@ -485,19 +486,23 @@ export function ImConnectionsPage() {
           <>
             {repairButton(conn)}
             <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    data-testid={`im-menu-${conn.id}`}
-                    className="text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-menu-hover aria-expanded:text-foreground pointer-coarse:size-11 dark:hover:bg-transparent dark:aria-expanded:bg-menu-hover"
-                    aria-label={t('{name} 的菜单', { name })}
+              <IconTooltip
+                label={t('{name} 的菜单', { name })}
+                trigger={
+                  <DropdownMenuTrigger
+                    render={
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        data-testid={`im-menu-${conn.id}`}
+                        className="text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-menu-hover aria-expanded:text-foreground pointer-coarse:size-11 dark:hover:bg-transparent dark:aria-expanded:bg-menu-hover"
+                      />
+                    }
                   />
                 }
               >
                 <Ellipsis aria-hidden strokeWidth={1.75} />
-              </DropdownMenuTrigger>
+              </IconTooltip>
               <KeyedMenuContent
                 side="bottom"
                 align="end"

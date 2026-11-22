@@ -1,5 +1,6 @@
 import { DESIGN_LIMITS, type DesignCommentRecord, type DesignCommentStatus } from '@cairn/shared';
 import { useState } from 'react';
+import { IconTooltip } from '../../components/icon-tooltip.js';
 import { Button } from '../../components/ui/button.js';
 import { Textarea } from '../../components/ui/textarea.js';
 import { useI18n } from '../../i18n/provider.js';
@@ -220,16 +221,21 @@ export function CommentList({
     >
       <div className="flex h-10 flex-none items-center justify-between border-b border-border pr-1 pl-3">
         <h3 className="m-0 text-ui font-medium text-foreground">{t('评论')}</h3>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t('关闭评论列表')}
-          data-testid="design-comment-list-close"
-          className="text-content-secondary"
-          onClick={onClose}
+        <IconTooltip
+          label={t('关闭评论列表')}
+          side="bottom"
+          trigger={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              data-testid="design-comment-list-close"
+              className="text-content-secondary"
+              onClick={onClose}
+            />
+          }
         >
           <X aria-hidden className="size-4" />
-        </Button>
+        </IconTooltip>
       </div>
       {comments.length === 0 ? (
         <p

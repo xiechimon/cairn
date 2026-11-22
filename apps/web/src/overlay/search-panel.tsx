@@ -7,6 +7,7 @@ import { useLiveData } from '../api/provider.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { threadHrefFrom } from '../board/thread-copy.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import type { QueryLike } from '../components/query-state.js';
 import { ShortcutHint } from '../components/shortcut-hint.js';
 import { StatusGlyph } from '../components/status-glyph.js';
@@ -303,14 +304,18 @@ export function SearchPanel({
           <div className="flex flex-none px-3.5 pt-3" data-testid="search-context">
             <span className="inline-flex h-6 max-w-full items-center gap-1.5 rounded-(--cds-radius-md) bg-secondary pr-1 pl-2 text-meta text-content-secondary">
               <span className="truncate">{activeContext.title}</span>
-              <button
-                type="button"
-                aria-label={t('移除上下文')}
-                className="flex size-4.5 flex-none items-center justify-center rounded-sm text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground"
-                onClick={dropContext}
+              <IconTooltip
+                label={t('移除上下文')}
+                trigger={
+                  <button
+                    type="button"
+                    className="flex size-4.5 flex-none items-center justify-center rounded-sm text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground"
+                    onClick={dropContext}
+                  />
+                }
               >
                 <X width={12} height={12} />
-              </button>
+              </IconTooltip>
             </span>
           </div>
         )}

@@ -1,5 +1,6 @@
 import { Ellipsis } from 'lucide-react';
 import { useI18n } from '../../i18n/provider.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../menu-keys.js';
 import { Button } from '../ui/button.js';
 import { DropdownMenu, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu.js';
@@ -16,18 +17,16 @@ export function PrRowMenu({ number, url, onViewChanges, onResolve }: PrRowMenuPr
   const { t } = useI18n();
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="size-6 flex-none"
-            aria-label={t('PR #{n} 的菜单', { n: number })}
+      <IconTooltip
+        label={t('PR #{n} 的菜单', { n: number })}
+        trigger={
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon-xs" className="size-6 flex-none" />}
           />
         }
       >
         <Ellipsis />
-      </DropdownMenuTrigger>
+      </IconTooltip>
       <KeyedMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-44">
         <KeyedMenuItem
           shortcut="O"

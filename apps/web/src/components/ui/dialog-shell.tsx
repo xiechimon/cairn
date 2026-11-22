@@ -3,6 +3,7 @@ import { cn } from 'cn';
 import { type ReactNode, useCallback, useEffect, useId, useRef } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { X } from '../../icons/index.js';
+import { IconTooltip } from '../icon-tooltip.js';
 import { InfoTip } from '../info-tip.js';
 import { Button } from './button.js';
 import {
@@ -259,12 +260,17 @@ export function DialogShell({
           {children}
         </div>
         {(footer != null || hint != null) && <DialogFootRow hint={hint}>{footer}</DialogFootRow>}
-        <DialogClose
-          render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
-          aria-label={t('关闭')}
+        <IconTooltip
+          label={t('关闭')}
+          side="bottom"
+          trigger={
+            <DialogClose
+              render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
+            />
+          }
         >
           <X width={20} height={20} />
-        </DialogClose>
+        </IconTooltip>
       </DialogContent>
     </Dialog>
   );

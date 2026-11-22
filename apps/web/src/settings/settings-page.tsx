@@ -30,6 +30,7 @@ import { type To, useLocation, useNavigate, useSearchParams } from 'react-router
 import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useMediaQuery } from '../board/use-narrow.js';
+import { IconTooltip } from '../components/icon-tooltip.js';
 import {
   SettingsNav,
   type SettingsNavGroup,
@@ -390,15 +391,20 @@ export function SettingsDialog({
           <h1 id={titleId} className="m-0 text-card-title font-semibold text-foreground">
             {t('设置')}
           </h1>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="pointer-coarse:-mr-2 pointer-coarse:size-11"
-            aria-label={t('关闭设置')}
-            onClick={onClose}
+          <IconTooltip
+            label={t('关闭设置')}
+            side="bottom"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="pointer-coarse:-mr-2 pointer-coarse:size-11"
+                onClick={onClose}
+              />
+            }
           >
             <X />
-          </Button>
+          </IconTooltip>
         </header>
         <div className="flex min-h-0 flex-auto">
           {!tabs && (
