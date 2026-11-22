@@ -1,6 +1,6 @@
 import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema, stripTurnContext } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -711,7 +711,62 @@ describe('chief unavailable (T4)', () => {
       from: 'relay-a/model-a',
       to: 'relay-b/model-b',
       stepId: running!.step.id,
+      announced: true,
     });
+  });
+
+  test('the thread says once when a turn runs on the backup and when the primary is back, and a flapping provider adds no lines', async () => {
+    const w = await setupWorld([{ provider: 'relay-b', modelId: 'model-b' }]);
+    const shownSwitches = () =>
+      w.s.db
+        .select()
+        .from(chiefMessage)
+        .where(eq(chiefMessage.threadId, w.threadId))
+        .orderBy(chiefMessage.createdAt, sql`rowid`)
+        .all()
+        .filter((m) => m.role === 'system' && m.id.startsWith('chief-'))
+        .map((m) => JSON.parse(m.content as string) as Record<string, unknown>)
+        .filter(
+          (c) =>
+            (c.kind === 'chief_model_fallback' && c.announced === true) ||
+            c.kind === 'chief_model_restored',
+        );
+    const turn = async (failFirst: boolean) => {
+      await w.send(`turn ${w.messages().length}`);
+      const running = await w.claim();
+      if (failFirst) {
+        await w.done(running!.step.id, { status: 'failed', errorMessage: QUOTA_ERROR });
+        const retried = await w.claim();
+        await w.done(retried!.step.id, { status: 'success' });
+      } else {
+        await w.done(running!.step.id, { status: 'success' });
+      }
+    };
+    await turn(true);
+    await turn(false);
+    expect(shownSwitches()).toEqual([
+      expect.objectContaining({
+        kind: 'chief_model_fallback',
+        from: 'relay-a/model-a',
+        to: 'relay-b/model-b',
+      }),
+      expect.objectContaining({ kind: 'chief_model_restored', model: 'relay-a/model-a' }),
+    ]);
+    await turn(true);
+    await turn(false);
+    await turn(true);
+    expect(shownSwitches()).toHaveLength(2);
+    w.s.db
+      .update(chiefMessage)
+      .set({ createdAt: sql`${chiefMessage.createdAt} - ${16 * 60_000}` })
+      .where(eq(chiefMessage.threadId, w.threadId))
+      .run();
+    await turn(false);
+    await turn(true);
+    expect(shownSwitches()).toHaveLength(3);
+    expect(shownSwitches()[2]).toEqual(
+      expect.objectContaining({ kind: 'chief_model_fallback', to: 'relay-b/model-b' }),
+    );
   });
 
   test('a backup model on another runtime is skipped when no machine can run it', async () => {

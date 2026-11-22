@@ -34,6 +34,7 @@ import {
   parseChiefTrigger,
   recoverGateWake,
 } from './chief.js';
+import { announcePrimaryRestored } from './chief-model-switch.js';
 import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
@@ -467,6 +468,7 @@ export function finishCoordinatorTurn(
     outcome.status === 'success' ? 'success' : outcome.status === 'stopped' ? 'stopped' : 'failed',
     outcome.errorMessage ?? undefined,
   );
+  if (outcome.status === 'success') announcePrimaryRestored(deps, stepRow);
   if (outcome.status === 'success')
     notifyChiefTurn(
       deps,

@@ -44,6 +44,7 @@ import {
   settleParkedStep,
   toBuildRecord,
 } from './builds.js';
+import { fallbackAnnounced } from './chief-model-switch.js';
 import { releaseUnconsumedSteer } from './chief-turns.js';
 import {
   buildCiFixPrompt,
@@ -812,6 +813,7 @@ export function requeueChiefStepOnFallback(
     from: modelKey(plan.from),
     to: modelKey(plan.to),
     stepId: stepRow.id,
+    announced: fallbackAnnounced(deps.db, stepRow.buildId, modelKey(plan.to)),
   };
   requeueStep(deps, stepRow, plan.row, {
     id: `chief-fallback-${stepRow.id}-${plan.row.tried.length}`,

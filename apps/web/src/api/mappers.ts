@@ -32,6 +32,7 @@ import {
   CONFIRM_ANNOUNCEMENT,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
+  chiefModelRestoredContentSchema,
   chiefNoticeContentSchema,
   chiefReportContentSchema,
   chiefTurnErrorContentSchema,
@@ -2023,6 +2024,24 @@ function collectChiefStream(
       const switched = chiefModelFallbackContentSchema.safeParse(parsed);
       if (switched.success) {
         fallback = { model: switched.data.to, stepId: switched.data.stepId };
+        if (switched.data.announced === true) {
+          items.push({
+            kind: 'note',
+            text: '主模型 {from} 暂时不可用，这轮改用 {to}',
+            vars: { from: switched.data.from, to: switched.data.to },
+            id: m.id,
+          });
+        }
+        continue;
+      }
+      const restored = chiefModelRestoredContentSchema.safeParse(parsed);
+      if (restored.success) {
+        items.push({
+          kind: 'note',
+          text: '主模型 {model} 恢复了，这轮起改回 {model}',
+          vars: { model: restored.data.model },
+          id: m.id,
+        });
         continue;
       }
       const notice = chiefNoticeContentSchema.safeParse(parsed);

@@ -295,6 +295,56 @@ test.describe('chief unavailable (T4)', () => {
     await expect(home.getByTestId('chief-outage')).toHaveCount(0);
     await evidenceShot(page, 'fallback.png');
   });
+
+  test('the thread says in one quiet line when a turn switches to the backup and when the main model is back', async ({
+    page,
+  }) => {
+    await mockLive(page, {
+      activeRun: null,
+      pending: [],
+      fallbackModel: null,
+      outage: null,
+      messages: [
+        FIRST,
+        {
+          id: 'chief-fallback-s1-2',
+          role: 'system',
+          content: JSON.stringify({
+            kind: 'chief_model_fallback',
+            from: 'relay-a/claude-opus',
+            to: 'relay-b/glm-4.6',
+            stepId: 'm1',
+            announced: true,
+          }),
+          createdAt: 11,
+        },
+        { id: 'user-m1', role: 'user', content: FIRST.content, createdAt: 11 },
+        { id: 'm2', role: 'assistant', content: '好，我先看一下看板的计数逻辑。', createdAt: 12 },
+        { id: 'user-m3', role: 'user', content: '再看下空列提示', createdAt: 20 },
+        {
+          id: 'chief-model-restored-m3',
+          role: 'system',
+          content: JSON.stringify({
+            kind: 'chief_model_restored',
+            model: 'relay-a/claude-opus',
+            stepId: 'm3',
+          }),
+          createdAt: 21,
+        },
+        { id: 'm4', role: 'assistant', content: '空列提示也看过了。', createdAt: 22 },
+      ],
+    });
+    await page.goto('/app');
+    const notes = page.getByTestId('home-c').getByTestId('chief-note');
+    await expect(notes).toHaveCount(2);
+    await expect(notes.nth(0)).toHaveText(
+      '主模型 relay-a/claude-opus 暂时不可用，这轮改用 relay-b/glm-4.6',
+    );
+    await expect(notes.nth(1)).toHaveText(
+      '主模型 relay-a/claude-opus 恢复了，这轮起改回 relay-a/claude-opus',
+    );
+    await evidenceShot(page, 'fallback-switch-lines.png');
+  });
 });
 
 test.describe('send and stop while the Coordinator is replying (T5)', () => {

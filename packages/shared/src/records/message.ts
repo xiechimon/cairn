@@ -198,8 +198,17 @@ export const chiefModelFallbackContentSchema = z.object({
   from: z.string(),
   to: z.string(),
   stepId: z.string(),
+  announced: z.boolean().optional(),
 });
 export type ChiefModelFallbackContent = z.infer<typeof chiefModelFallbackContentSchema>;
+
+export const CHIEF_MODEL_RESTORED_KIND = 'chief_model_restored';
+export const chiefModelRestoredContentSchema = z.object({
+  kind: z.literal(CHIEF_MODEL_RESTORED_KIND),
+  model: z.string(),
+  stepId: z.string(),
+});
+export type ChiefModelRestoredContent = z.infer<typeof chiefModelRestoredContentSchema>;
 
 export const THREAD_REPORT_LINE_MAX = 200;
 

@@ -1659,6 +1659,10 @@ export const EN: Record<string, string> = {
   排队: 'Queue',
   撤回: 'Withdraw',
   '由备用模型 {model} 回答': 'Answered by backup model {model}',
+  '主模型 {from} 暂时不可用，这轮改用 {to}':
+    'Main model {from} is unavailable for now, so this turn uses {to}',
+  '主模型 {model} 恢复了，这轮起改回 {model}':
+    'Main model {model} is back, and replies use it again from this turn',
   'Coordinator 用的模型 {model} 额度已用完': "The Coordinator's model {model} is out of quota",
   'Coordinator 用的模型 {model} 暂时过载': "The Coordinator's model {model} is overloaded",
   '{time} 会自动再试': 'it retries automatically at {time}',

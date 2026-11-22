@@ -466,6 +466,7 @@ export function chiefStreamRowKey(
     case 'task-card':
     case 'runner-offline':
     case 'stopped':
+    case 'note':
     case 'thread-report':
     case 'thread-message':
     case 'channel-mirror':
@@ -691,7 +692,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
         <StatusLine testId="chief-note">
-          {t(item.text)}
+          {t(item.text, item.vars)}
           {item.machineName && (
             <>
               <span className="underline decoration-current/40 underline-offset-3">

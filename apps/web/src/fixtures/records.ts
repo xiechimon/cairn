@@ -590,7 +590,7 @@ export interface QueueWait {
 export type ChiefStreamItem =
   | (ThreadReportContent & { id: string; projectId?: string | null })
   | (ThreadMessageContent & { id: string; projectId?: string | null })
-  | { kind: 'note'; text: string; machineName?: string }
+  | { kind: 'note'; text: string; vars?: Record<string, string>; id?: string; machineName?: string }
   | {
       kind: 'error';
       text: string;
