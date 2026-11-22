@@ -62,6 +62,7 @@ describe('session step kind', () => {
     expect(steps).toHaveLength(1);
     expect(stepRow.kind).toBe('session');
     expect(stepRow.prompt).toContain(SESSION_BRIEF);
+    expect(stepRow.promptOrigin).toEqual({ kind: 'first-task' });
     expect(H.s.db.select().from(build).where(eq(build.id, buildId)).get()!.withPlan).toBe(false);
   });
 
@@ -90,9 +91,9 @@ describe('session step kind', () => {
     expect(listSteps(deps(), buildId).find((r) => r.id === next.id)?.promptOrigin).toEqual({
       kind: 'rework',
     });
-    expect(listSteps(deps(), buildId).find((r) => r.id === stepRow.id)).not.toHaveProperty(
-      'promptOrigin',
-    );
+    expect(listSteps(deps(), buildId).find((r) => r.id === stepRow.id)?.promptOrigin).toEqual({
+      kind: 'first-task',
+    });
     expect(getTodo(deps(), todoId)!.phase).toBe('queued');
   });
 });

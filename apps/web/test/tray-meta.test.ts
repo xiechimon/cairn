@@ -4,8 +4,7 @@ import { expect, test } from 'vitest';
 import { TrayHeadMeta } from '../src/tray/tray-meta.js';
 import type { TrayGroup } from '../src/tray/tray-groups.js';
 
-const TIP =
-  '可用内存 7.7 GB；5 分钟负载 45.0，8 核；剩余磁盘 178 GB';
+const TIP = '内存压力 65%；CPU 3%；剩余磁盘 178 GB';
 
 function render(meta: NonNullable<TrayGroup['meta']>): string {
   return renderToStaticMarkup(createElement(TrayHeadMeta, { meta, tip: TIP }));
@@ -16,8 +15,8 @@ const meta = (over: Partial<NonNullable<TrayGroup['meta']>> = {}) => ({
   level: 'full' as const,
   warn: true,
   tip: {
-    key: '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB',
-    vars: { free: '7.7', load: '45.0', cores: 8, disk: 178 },
+    key: '内存压力 {mem}%；CPU {cpu}%；剩余磁盘 {disk} GB',
+    vars: { mem: 65, cpu: 3, disk: 178 },
   },
   ...over,
 });

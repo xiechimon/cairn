@@ -18,17 +18,14 @@ import type { AppContext } from './context.js';
 import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
 import { HttpError, parseWith } from './lib/errors.js';
-import { loopbackOwnerOriginOf } from './lib/loopback-owner.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { isOpenRemotePath, pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import {
-  AUTH_COOKIE,
   issueBrowserSession,
   issueStreamTicket,
   requestIsSecure,
-  resolveBrowserSession,
   setAuthCookie,
 } from './services/browser-session.js';
 import { coordinatorRunsOnPi } from './services/coordinator-context.js';
@@ -72,21 +69,6 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     await next();
   });
 
-  app.post('/api/auth/bootstrap', (c) => {
-    if (ctx.loopbackOwner == null || loopbackOwnerOriginOf(c, ctx.loopbackOwner) === null) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-    const site = c.req.header('sec-fetch-site');
-    if (site !== undefined && site !== 'same-origin' && site !== 'none') {
-      return c.json({ error: 'same-origin proof required' }, 403);
-    }
-    const existing = resolveBrowserSession(ctx.db, getCookie(c, AUTH_COOKIE) ?? '');
-    if (existing?.kind === 'owner') return c.json({ ok: true });
-    const session = issueBrowserSession(ctx.db, 'owner');
-    setAuthCookie(c, session.token, requestIsSecure(c));
-    return c.json({ ok: true });
-  });
-
   app.post('/api/auth/access', async (c) => {
     if (ctx.accessVerifier == null) return c.json({ error: 'Not found' }, 404);
     const site = c.req.header('sec-fetch-site');
@@ -100,7 +82,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: refusal.error }, refusal.status);
     }
     ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'access exchange');
-    const session = issueBrowserSession(ctx.db, 'owner', null, undefined, verdict.expiresAt);
+    const session = issueBrowserSession(ctx.db, 'external', null, undefined, verdict.expiresAt);
     setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
     return c.json({ ok: true });
   });
@@ -110,7 +92,9 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const owner = c.get('ownerIdentity');
     if (owner === undefined && deviceId === null) return c.json({ error: 'Unauthorized' }, 401);
     const ticket = issueStreamTicket(
-      owner !== undefined ? { kind: 'owner', deviceId: null } : { kind: 'device', deviceId },
+      owner !== undefined
+        ? { kind: owner.via === 'access' ? 'external' : 'owner', deviceId: null }
+        : { kind: 'device', deviceId },
     );
     c.header('cache-control', 'no-store');
     return c.json(ticket);

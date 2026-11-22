@@ -1,8 +1,9 @@
 import { defineConfig } from '@playwright/test';
-import { slotPortReport, slotResources } from '../../scripts/heavy-slots.mjs';
+import { slotPortReport, slotResources, slotWorkerBudget } from '../../scripts/heavy-slots.mjs';
 import { admitTestRun } from '../../scripts/test-admission.mjs';
 
 const lease = await admitTestRun();
+const workers = slotWorkerBudget(lease) ?? undefined;
 const resources = lease === null ? null : slotResources(lease.slot, { ...process.env, E2E_PORT: process.env.E2E_PORT ?? '8399' });
 const PORT = resources?.port ?? Number(process.env.E2E_PORT ?? 8399);
 const buildFlags = resources ? `--outDir ${JSON.stringify(resources.distDir)}` : '';
@@ -20,6 +21,7 @@ export default defineConfig({
   globalSetup: './e2e/port-holder-guard.ts',
   fullyParallel: false,
   retries: 0,
+  workers,
   use: {
     baseURL: `http://127.0.0.1:${PORT}`,
     viewport: { width: 1440, height: 732 },

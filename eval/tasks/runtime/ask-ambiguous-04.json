@@ -1,0 +1,50 @@
+{
+  "kind": "runtime",
+  "id": "ask-ambiguous-04",
+  "request": "\u66f4\u65b0\u843d\u5730\u9875\u6587\u6848",
+  "world": {
+    "projects": [
+      "web",
+      "web-next"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "ask_user",
+          "args": {
+            "questions": [
+              {
+                "header": "\u54ea\u4e2a\u9879\u76ee",
+                "question": "\u66f4\u65b0\u843d\u5730\u9875\u6587\u6848\u2014\u2014\u6307\u54ea\u4e2a\u9879\u76ee\uff1f",
+                "options": [
+                  {
+                    "label": "web",
+                    "description": ""
+                  },
+                  {
+                    "label": "web-next",
+                    "description": ""
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "\u9700\u8981\u4f60\u786e\u8ba4\u3002"
+    }
+  ],
+  "expected": {
+    "decision": "ask",
+    "ask": true,
+    "askCandidates": [
+      "web",
+      "web-next"
+    ]
+  },
+  "gate": true
+}

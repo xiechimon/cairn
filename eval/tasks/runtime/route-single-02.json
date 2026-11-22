@@ -1,0 +1,43 @@
+{
+  "kind": "runtime",
+  "id": "route-single-02",
+  "request": "给 api 项目加一个 /healthz 端点返回 200",
+  "world": {
+    "projects": [
+      "api",
+      "other-a",
+      "other-b"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@api",
+            "title": "加一个 /healthz 端点"
+          }
+        }
+      ]
+    },
+    {
+      "text": "已开任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "api"
+    ],
+    "parts": 1,
+    "boundModel": "stub/m",
+    "promptContains": [
+      "api"
+    ],
+    "promptExcludes": [
+      "<script>"
+    ]
+  },
+  "gate": true
+}

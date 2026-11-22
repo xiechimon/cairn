@@ -181,7 +181,7 @@ export function ownershipOf(db: Db, row: TodoRow, now = nowMs()): Ownership | nu
 }
 
 function workOwnership(db: Db, row: TodoRow): Ownership | null {
-  if (row.archivedAt !== null || isEndedPhase(row.phase)) return null;
+  if (row.archivedAt !== null || row.supersededBy !== null || isEndedPhase(row.phase)) return null;
   const pending = row.latestBuildId === null ? [] : pendingQuestionIds(db, row.latestBuildId);
   if (pending.length > 0) {
     return {

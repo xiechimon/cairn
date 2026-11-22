@@ -10,7 +10,7 @@ import {
   type ScreenOutcome,
 } from './host-screen.js';
 import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
-import { isBrowserApp, originHosts, showsCairn } from './host-screen-self.js';
+import { originHosts, showsCairn } from './host-screen-self.js';
 import { type ComputerProvider, ComputerRefusal } from './provider.js';
 
 export const AGENT_DESKTOP_BINARY = 'agent-desktop';
@@ -186,7 +186,7 @@ export class DesktopAccessibility {
       const done: string[] = [];
       for (const [index, action] of actions.entries()) {
         try {
-          if (isBrowserApp(target.app)) await this.assertNotCairn(run, target);
+          await this.assertNotCairn(run, target);
           done.push(await this.perform(run, scopeKey, target, action, index, done.length));
         } catch (error) {
           if (error instanceof Stop && done.length > 0) {
@@ -263,8 +263,10 @@ export class DesktopAccessibility {
     const title = window.title ?? '';
     if (
       this.cairnWindows.has(window.id) ||
-      (isBrowserApp(window.app_name) && showsCairn([title], ['cairn', ...this.hosts]))
+      window.app_name.toLowerCase().includes('cairn') ||
+      showsCairn([title], ['cairn', ...this.hosts])
     ) {
+      this.cairnWindows.add(window.id);
       throw refuse(CAIRN_WINDOW_REFUSAL);
     }
     return { app: window.app_name, windowId: window.id, title, windowCount: usable.length };
@@ -388,7 +390,7 @@ export class DesktopAccessibility {
       snapshotId,
       data.complete === false || data.truncated === true,
     );
-    if (isBrowserApp(target.app) && showsCairn(rows.strings, ['cairn', ...this.hosts])) {
+    if (showsCairn(rows.strings, ['cairn', ...this.hosts])) {
       this.cairnWindows.add(target.windowId);
       throw refuse(CAIRN_WINDOW_REFUSAL);
     }

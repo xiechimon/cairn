@@ -5,10 +5,10 @@ import { acquireGithubCreateSlot } from '@cairn/shared/github-create-gate';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { setGithubCreateGate } from '../src/lib/github.js';
+import { type FetchLike, setGithubCreateGate } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, deliverCodeStep, type TestServer } from './helpers.js';
 
 const isRoot = process.getuid?.() === 0;
 
@@ -87,21 +87,30 @@ test.skipIf(isRoot)(
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const calls: string[] = [];
     try {
-      const s = bootServer({
-        githubFetch: async (input, init) => {
-          calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
-          return {
-            ok: false,
-            status: 404,
-            headers: { get: () => null },
-            json: async () => ({}),
-            text: async () => '',
-          };
-        },
-      });
+      const githubFetch: FetchLike = async (input, init) => {
+        calls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+        return {
+          ok: false,
+          status: 404,
+          headers: { get: () => null },
+          json: async () => ({}),
+          text: async () => '',
+        };
+      };
+      const s = bootServer({ githubFetch });
       seedConnection(s);
       const projectId = await postGithubProject(s.app);
       const todoId = await createTask(s.app, projectId);
+      deliverCodeStep(
+        {
+          ...s.svc,
+          box: s.secretBox,
+          reposDir: s.reposDir,
+          attachmentsDir: s.attachmentsDir,
+          githubFetch,
+        },
+        todoId,
+      );
       await flushSelfIssueWrites();
       expect((await getTodo(s.app, todoId)).sourceRef).toBeNull();
       const retry = await call(s.app, 'POST', `/api/todos/${todoId}/github-issue/retry`);
@@ -118,18 +127,27 @@ test.skipIf(isRoot)(
 );
 
 test.skipIf(isRoot)(
-  'a creation-time mirror failure on an unwritable gate directory logs the todo and the cause',
+  'a delivery-time mirror failure on an unwritable gate directory logs the todo and the cause',
   async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const s = bootServer({
-        githubFetch: async (input, init) => {
-          throw new Error(`unexpected outbound call: ${init?.method ?? 'GET'} ${String(input)}`);
-        },
-      });
+      const githubFetch: FetchLike = async (input, init) => {
+        throw new Error(`unexpected outbound call: ${init?.method ?? 'GET'} ${String(input)}`);
+      };
+      const s = bootServer({ githubFetch });
       seedConnection(s);
       const projectId = await postGithubProject(s.app);
       const todoId = await createTask(s.app, projectId);
+      deliverCodeStep(
+        {
+          ...s.svc,
+          box: s.secretBox,
+          reposDir: s.reposDir,
+          attachmentsDir: s.attachmentsDir,
+          githubFetch,
+        },
+        todoId,
+      );
       await flushSelfIssueWrites();
       const after = await getTodo(s.app, todoId);
       expect(after.sourceKind).toBe('github-issue-self');

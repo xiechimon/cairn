@@ -24,7 +24,7 @@ import type { DaemonLogger } from './log.js';
 import { type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
 import { StepAppCredential } from './step-app-credential.js';
-import { prepareStepEnv } from './step-env.js';
+import { prepareStepEnv, READONLY_GIT_ENV } from './step-env.js';
 import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
 import { runLocalMergeStep } from './step-local-merge.js';
@@ -231,7 +231,7 @@ async function runClaimedStep(
   const redactors = [credentialRedactor(...credentialValues)];
   const redact = <T>(value: T): T => redactors.reduce((result, next) => next(result), value);
   const appCredential =
-    creds.git?.kind === 'app'
+    creds.git?.kind === 'app' && !attachmentVerify
       ? new StepAppCredential(
           join(deps.paths.agentRuntimeDir, `step-${stepId}-github`),
           creds.git,
@@ -320,11 +320,13 @@ async function runClaimedStep(
     repo,
     workspacesRoot: deps.workspacesDir,
     credentials: creds.git,
+    hookCredentials: attachmentVerify ? null : creds.git,
     refresh: refreshGit,
     machineName: deps.machineName ?? hostname(),
     attachmentVerify,
     evidenceDirectory: verifyEvidenceDirectory,
     expectedHeadSha: verifyMeta?.expectedHeadSha,
+    env: attachmentVerify ? { ...opts.env, ...READONLY_GIT_ENV } : opts.env,
     cleanups: stepCleanups,
   });
   if ('error' in setup) {
@@ -400,7 +402,7 @@ async function runClaimedStep(
   const stepEnv = prepareStepEnv(
     {
       inherited: { ...opts.env, ...commitEnv(stepIdentity) },
-      git: repo?.kind === 'github' ? creds.git : null,
+      git: attachmentVerify ? null : repo?.kind === 'github' ? creds.git : null,
       appCredential,
       readonlyGit: attachmentVerify,
       runtimeId,
@@ -646,6 +648,7 @@ async function runClaimedStep(
     appIdentity,
     identity: stepIdentity,
     runGit: withStepGit,
+    env: opts.env,
     now,
   });
 }
@@ -659,7 +662,11 @@ async function failStep(
   deps.sessionHandles?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
   try {
-    await deps.client.done(stepId, { status: 'failed', errorMessage: message });
+    await deps.client.done(stepId, {
+      status: 'failed',
+      errorMessage: message,
+      generation: deps.journal.get(stepId)?.claimed?.step.generation,
+    });
     deps.journal.remove(stepId);
   } catch (err) {
     deps.logger.step(

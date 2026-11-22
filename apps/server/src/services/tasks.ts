@@ -1,7 +1,7 @@
 import type { TasksQuery } from '@cairn/shared';
 import { and, asc, eq, gte, isNull, or } from 'drizzle-orm';
 import { chiefMessage, chiefThread, todo } from '../db/schema.js';
-import { askQuestionContentOf } from './chief-questions.js';
+import { askQuestionContentOf } from './chief-question-store.js';
 import { heldByBlockers, ownershipOf, sectionOf, TASKS_RECENT_MS } from './owner.js';
 import { type TodoDeps, toTodoRecords } from './todos.js';
 

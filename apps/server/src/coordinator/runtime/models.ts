@@ -9,6 +9,7 @@ import {
   InMemoryCredentialStore,
   type Model,
   type Provider,
+  type ProviderResponse,
 } from '@earendil-works/pi-ai';
 import { createModels, type MutableModels } from '@earendil-works/pi-ai/models';
 import { resolveCacheRetentionTier } from './cold-slim.js';
@@ -118,11 +119,13 @@ export function modelResponseTiming(message: AssistantMessage): ResponseTiming {
   );
 }
 
+export type ResponseObserver = (response: ProviderResponse, model: Model<Api>) => void;
+
 export interface CoordinatorModels {
   models: MutableModels;
   setApiKey(providerId: string, key: string): Promise<void>;
   useStepProvider(config: ProviderConfig): void;
-  useProvider(config: ProviderConfig, resolveKey: KeyResolver): void;
+  useProvider(config: ProviderConfig, resolveKey: KeyResolver, observe?: ResponseObserver): void;
   markTextOnly(providerId: string, modelId: string): void;
 }
 
@@ -133,6 +136,7 @@ export function createCoordinatorModels(
   const fixed = new Set(providers.map((p) => p.id));
   const credentials = new InMemoryCredentialStore();
   const models = createModels({ credentials });
+  const observers = new Map<string, ResponseObserver>();
   const baseStream = models.streamSimple.bind(models);
   const markTextOnly = (providerId: string, modelId: string) => {
     const model = models.getModel(providerId, modelId);
@@ -209,10 +213,24 @@ export function createCoordinatorModels(
       (error) => binding.reject(key, error.errorMessage ?? ''),
     );
   };
-  models.streamSimple = (...args) => {
+  models.streamSimple = (...[model, context, options]: StreamArgs) => {
     const at = Date.now();
     const started = performance.now();
-    const stream = boundStream(...args);
+    const observe = observers.get(model.provider);
+    const incoming = options?.onResponse;
+    const stream = boundStream(
+      model,
+      context,
+      observe === undefined
+        ? options
+        : {
+            ...options,
+            onResponse: async (response, responseModel) => {
+              await incoming?.(response, responseModel);
+              observe(response, responseModel);
+            },
+          },
+    );
     const push = stream.push.bind(stream);
     const end = stream.end.bind(stream);
     let firstTokenAt: number | undefined;
@@ -258,7 +276,9 @@ export function createCoordinatorModels(
       if (provider !== null) models.setProvider(provider);
     },
     markTextOnly,
-    useProvider: (config, resolveKey) => {
+    useProvider: (config, resolveKey, observe) => {
+      if (observe === undefined) observers.delete(config.providerId);
+      else observers.set(config.providerId, observe);
       if (fixed.has(config.providerId)) return;
       const provider = stepProvider(config, resolveKey);
       if (provider !== null) models.setProvider(provider);

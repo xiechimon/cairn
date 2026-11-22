@@ -1,0 +1,49 @@
+name: eval-weekly
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: eval-weekly
+  cancel-in-progress: false
+
+jobs:
+  eval-weekly:
+    if: vars.EVAL_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    environment: eval
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install devin CLI (manifest-pinned, sha256-verified)
+        run: |
+          node eval/install-devin.mjs "$RUNNER_TEMP/devin-cli"
+          echo "$RUNNER_TEMP/devin-cli/bin" >> "$GITHUB_PATH"
+      - name: Restore Devin CLI credentials
+        env:
+          DEVIN_CREDENTIALS_TOML: ${{ secrets.DEVIN_CREDENTIALS_TOML }}
+        run: |
+          if [ -n "$DEVIN_CREDENTIALS_TOML" ]; then
+            mkdir -p ~/.local/share/devin
+            printf '%s' "$DEVIN_CREDENTIALS_TOML" > ~/.local/share/devin/credentials.toml
+            chmod 600 ~/.local/share/devin/credentials.toml
+          fi
+      - name: Weekly suite run on main (no candidate arm)
+        env:
+          EVAL_MAX_DEVIN_RUNS: ${{ vars.EVAL_MAX_DEVIN_RUNS }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+        run: node --import tsx eval/run.ts --arm "weekly-$(date -u +%Y%m%d)" --exam eval --out "$RUNNER_TEMP/weekly.json" --require-langfuse

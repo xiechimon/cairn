@@ -1,9 +1,6 @@
 import type { ClaimedStep } from '@cairn/shared';
 import {
   buildRestartPrompt,
-  buildTaskPromptText,
-  classifyUserText,
-  composeTaskPromptWithInstruction,
   fenceIssueText,
   githubIssueSourceRef,
   RETRY_LESSONS_HEAD,
@@ -508,18 +505,6 @@ describe('#1615 restarting injects the previous round lessons', () => {
       instruction: SESSION_BRIEF,
       session: 'new',
     });
-  });
-
-  test('presentation-layer misjudgment: a composed line with a lessons section (bare instruction joined with the task prefix) is not taken for a user bubble', async () => {
-    const w = makeWorld();
-    await failedBuildA(w);
-    await restart(w, '再来一轮');
-    const prompt = firstStepPrompt(w, latestBuildId(w))!;
-    const task = { title: TITLE, spec: SPEC };
-    expect(classifyUserText(prompt, task)).toBe('synthetic');
-    const delivered = composeTaskPromptWithInstruction(buildTaskPromptText(TITLE, SPEC), prompt);
-    expect(classifyUserText(delivered, task)).toBe('synthetic');
-    expect(classifyUserText(`${RETRY_LESSONS_HEAD}我自己写的话`, task)).toBe('user');
   });
 });
 

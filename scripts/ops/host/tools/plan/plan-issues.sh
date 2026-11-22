@@ -6,7 +6,7 @@ cd ~/lanes/cairn && git fetch -q origin main && { [ -d $W ] || git worktree add 
 HAS_PLAN='## Plan|## 计划|## 方案|## 实施|## 做法|## Steps|## 步骤|plan:auto'
 if [ -n "${ONLY_N:-}" ]; then list=$ONLY_N; else
   list=$(gh issue list -R $R --state open --limit 200 --json number,body,labels \
-    --jq ".[]|select([.labels[].name]|(index(\"batch:now\") or index(\"batch:next\")) and (index(\"waits-ian\")|not))|select(.body|test(\"$HAS_PLAN\";\"i\")|not)|.number")
+    --jq ".[]|select([.labels[].name]|(index(\"batch:now\") or index(\"batch:next\")))|select(.body|test(\"$HAS_PLAN\";\"i\")|not)|.number")
 fi
 count=0
 for n in $list; do

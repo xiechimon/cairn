@@ -37,7 +37,12 @@ import type {
   StepEvent,
   ToolCallRecord,
 } from '@cairn/shared';
-import { contextTokensOf, subscriptionKeyOf, todoFromTodoWrite } from '@cairn/shared';
+import {
+  contextTokensOf,
+  failureEndsStepNow,
+  subscriptionKeyOf,
+  todoFromTodoWrite,
+} from '@cairn/shared';
 import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { stepCredentialRedactor } from '../credential-output.js';
@@ -50,8 +55,8 @@ import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
-import { claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
-import { withoutPinnedEnv } from './pinned-env.js';
+import { CLAUDE_TELEMETRY_PINS, claudeCliEnv, claudeTelemetryEnv, PiStepSpanSink } from './otel.js';
+
 import {
   appendSkillsCatalog,
   collectDeniedSkillDirs,
@@ -76,7 +81,8 @@ const SDK_WRITE_TOOLS = ['Edit', 'Write'];
 const SDK_ASK_TOOL = 'AskUserQuestion';
 
 function isRetryableError(message: string): boolean {
-  return /rate.?limit|overloaded|timeout|temporarily|5\d\d/i.test(message);
+  if (failureEndsStepNow(message)) return false;
+  return /rate.?limit|overloaded|timeout|temporarily|\b5\d\d\b/i.test(message);
 }
 
 export { todoFromTodoWrite };
@@ -279,7 +285,8 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             cacheWrite: callUsage.cache_creation_input_tokens ?? 0,
           });
       }
-      if ((msg as { error?: unknown }).error === 'authentication_failed') {
+      const apiError = (msg as { error?: unknown }).error;
+      if (apiError === 'authentication_failed') {
         state.authFailed = true;
       }
       const out: StepEvent[] = [];
@@ -314,6 +321,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
         }
       }
       if (parent !== undefined) return out;
+      if (typeof apiError === 'string' && apiError !== 'max_output_tokens') return out;
       out.push({
         type: 'message_end',
         message: {
@@ -1415,7 +1423,6 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const locked = !parts.inOrb && parts.lockedDown;
   const stepToken = parts.env?.CLAUDE_CODE_OAUTH_TOKEN;
   const inheritedEnv = claudeCliEnv({
-    ...withoutPinnedEnv(process.env),
     ...parts.env,
     ...(stepToken !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
   });
@@ -1486,7 +1493,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       : {}),
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
     settings: {
-      env: claudeCliEnv({}),
+      env: { ...CLAUDE_TELEMETRY_PINS },
       ...(locked ? { disableAllHooks: true, disableSkillShellExecution: true } : {}),
       ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
         ? { permissions: { deny: [...parts.skillDenyRules] } }

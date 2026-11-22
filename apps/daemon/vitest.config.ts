@@ -1,11 +1,12 @@
 import { defineConfig } from 'vitest/config';
-import { admitTestRun } from '../../scripts/test-admission.mjs';
+import { testRunWorkers } from '../../scripts/test-admission.mjs';
 
-await admitTestRun();
+const workers = await testRunWorkers();
 
 export default defineConfig({
   test: {
     fsModuleCache: true,
+    maxWorkers: workers,
     testTimeout: 20_000,
   },
 });

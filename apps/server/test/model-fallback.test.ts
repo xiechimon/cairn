@@ -248,7 +248,7 @@ describe('model fallback chain (#1493)', () => {
   });
 
   test.each(['review', 'merge'] as const)(
-    'a %s quota report never switches models: retired reviews stop and explicit merges wait',
+    'a %s quota report follows its own chain: reviews retry on the next model, explicit merges wait',
     async (kind) => {
       const w = await setupWorld();
       await startBuild(w);
@@ -274,14 +274,18 @@ describe('model fallback chain (#1493)', () => {
       expect(c.stepId).toBe(pending.id);
       await done(w, c.stepId, quotaDone('relay-a'));
       const row = stepRow(w, c.stepId);
-      expect(row.status).toBe(kind === 'review' ? 'stopped' : 'waiting_quota');
-      expect(row.fallback).toBeNull();
+      expect(row.status).toBe(kind === 'review' ? 'pending' : 'waiting_quota');
+      if (kind === 'review') {
+        expect(row.fallback?.model).toEqual({ provider: 'relay-b', modelId: 'model-b' });
+      } else {
+        expect(row.fallback).toBeNull();
+      }
       const notif = w.s.db
         .select()
         .from(notificationTable)
         .where(eq(notificationTable.type, 'model_fallback'))
         .all();
-      expect(notif).toHaveLength(0);
+      expect(notif).toHaveLength(kind === 'review' ? 1 : 0);
     },
   );
 

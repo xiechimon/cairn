@@ -1,6 +1,6 @@
 ---
 name: verify-merge-gate
-description: TLA+ model checking (TLC, one command ~75 seconds) of cairn's merge gate and local landing. Use when changing mergeReadiness's verdict binding (headSha / patchDigest), the independent-review head rule, planGateStatusWrite, apiMergeGate / mergeThroughGithub (the REST merge and its `sha` pin), applyMergeLanding, or decideLocalMerge; judge whether a change makes "a merge landing on a patch no verdict judged", "a stale verdict satisfying the gate", or "a local landing without the re-checks" better or worse.
+description: TLA+ model checking (TLC, one command ~75 seconds) of cairn's merge gate and local landing. Use when changing mergeReadiness's verdict binding (headSha / patchDigest), the independent-review head rule, planGateStatusWrite, apiMergeGate / mergeThroughGithub (the REST merge and its `sha` pin), applyMergeLanding, decideLocalMerge, landLocalMerge, or localMergeAuthorizationRefusal / localMergeRecheckAuthorization; judge whether a change makes "a merge landing on a patch no verdict judged", "a stale verdict satisfying the gate", or "a local landing without the re-checks" better or worse.
 ---
 
 # verify-merge-gate
@@ -39,6 +39,7 @@ Local landing path, `LocalLanding.tla`:
 
 - **P3 `LocalLandingBindsJudgedPatch`**: the base ref only moves to a patch that was judged, at the base the judgement was made against. The judgement can be redone (`Rejudge`) and the commit rebuilt (`Rebuild`) after drift, and the landing still carries the latest judgement.
 - **P3E `DriftHasWayOut`**: after drift past a judgement or a built commit, a `Rejudge` or `Rebuild` is still available within the bound.
+- **P3G `LocalLandingHeldAuthorization`**: no landing without a held server authorization. Since #5210 the daemon re-asks the claim-time predicate (`localMergeAuthorizationRefusal`, shared by the claim scan, the claim transaction and `localMergeRecheckAuthorization`) after the local checks and before `landGitSquash`; `AuthorizeLanding` records the last answer in `rechecked`, `RevokeAuthorization` models a mid-check revocation, and `LandLocal` requires `rechecked` under `AuthRecheck`. A revocation between the answer and the ref write still lands — the residual race `P3R5` records (F8).
 
 Base movement on the GitHub path: `MergeGate.tla` has an `UpdateBranch` action. `requireUpToDate` was retired (#5337) — the `pr-behind-base` blocker no longer exists, so `Synced` is not a readiness requirement; `UpdateBranch` remains in the model as an external event that moves the head and clears the stored evaluation.
 
@@ -48,9 +49,9 @@ Each negative control drops exactly the guard its property names, and its counte
 
 - `P1N` / `P2N_UnboundVerdicts`: the `patchDigest` filter is dropped. `P1H_UnboundReviewHead`: only the review-head equality is dropped.
 - `P4_MergeRechecksDigest`: the digest re-check between evaluate and merge is dropped (see F1).
-- `P3A_NoLandingRecheck`, `P3B_NoFfCheck`, `P3C_NoBaseRecheck`, `P3D_RebuildReusesJudgement`: a local-landing re-check, the fast-forward check, the base re-check, or the judgement binding after `Rebuild` is dropped. `P3F_NoRejudgeNoRebuild` is the model without `Rejudge` and `Rebuild`; `DriftHasWayOut` fails on it.
+- `P3A_NoLandingRecheck`, `P3B_NoFfCheck`, `P3C_NoBaseRecheck`, `P3D_RebuildReusesJudgement`: a local-landing re-check, the fast-forward check, the base re-check, or the judgement binding after `Rebuild` is dropped. `P3F_NoRejudgeNoRebuild` is the model without `Rejudge` and `Rebuild`; `DriftHasWayOut` fails on it. `P3H_NoAuthRecheck` drops the `AuthRecheck` guard on `LandLocal`, mirroring the pre-#5210 code that landed with no authorization round-trip at all.
 - `P1U` / `P2U_UnboundAfterBaseUpdate`, `P1HU_UnboundReviewHeadAfterUpdate`: the digest binding or the review-head rule is dropped with pushes disabled, so a stale verdict can only come from a base move.
-- `R1` to `R6` and `P3R1` to `P3R3` are reachability witnesses, expected FAIL: each says a state is never reached and the counterexample proves it is. One turning PASS means the model lost a path it had.
+- `R1` to `R6` and `P3R1` to `P3R5` are reachability witnesses, expected FAIL: each says a state is never reached and the counterexample proves it is. One turning PASS means the model lost a path it had. `P3R5` is the recorded residual race, not a guard: `AuthorizeLanding, RevokeAuthorization, LandLocal` stays reachable (F8).
 
 ## Known findings
 
@@ -58,9 +59,10 @@ Checked against the code on 2026-11-16. The full write-ups, including the reason
 
 - **F1 (P4, live gap)**: `mergeThroughGithub` through `apiMergeGate` (`build-github-merge.ts`) merges with the checkpoint pin alone (`pull.headSha === checkpoint`, `sha: checkpoint`). Neither it nor `build-merge-request.ts` references `mergeReadiness` or any verdict, so the digest is not re-derived at merge time. `mergeReadiness` is called from `merge-gate-run.ts` and `merge-gate/harness-eval-judge.ts`. Whether a stored evaluation gates this path was not re-checked. The P4 counterexample is three verdicts, `Evaluate`, `BaseMoveInteracting`, merge: the head SHA is unchanged while the diff against the default branch is not.
 - **F2 (P1H, model-only)**: dropping only the review-head equality still yields a counterexample, so the head check is load-bearing on its own. In the code both conditions are one conjunction in the same filter.
-- **F4 (local path, wired)**: `enqueueLocalMerge` (`local-merge.ts`) judges through `localGateFacts`; `landLocalMerge` (`apps/daemon/src/local-merge.ts`) calls `decideLocalMerge` before building the candidate and again before landing, and lands through `landGitSquash`, which updates the ref with `git update-ref --stdin`. The earlier audit recorded that the update carries the expected old value, so the fast-forward check and the update are one step; this was not re-audited.
+- **F4 (local path, wired)**: `enqueueLocalMerge` (`local-merge.ts`) judges through `localGateFacts`; `landLocalMerge` (`apps/daemon/src/local-merge.ts`) calls `decideLocalMerge` before building the candidate and again before landing, then runs the `authorize` round-trip (`localMergeRecheck` in `step-local-merge.ts` -> `POST /api/machine/local-merge-recheck/:stepId` -> `localMergeRecheckAuthorization`) and lands through `landGitSquash`, which updates the ref with `git update-ref --stdin`. The earlier audit recorded that the update carries the expected old value, so the fast-forward check and the update are one step; this was not re-audited.
 - **F6 (hosted landing, not covered by P3)**: `applyMergeLanding` (`machine-merge-landing.ts`, hosted projects) awaits `isAncestor`, then several checks, then a separate `updateBranchRef`, so an intervening advance can be overwritten. The reproduction is `evidence/local-landing-race.json`. See F6 before using this model to accept a change to that path.
 - **F7 (model mistake, kept as evidence)**: an unrestricted review-head choice made `P1H` pass vacuously; P6 and the `carriers` set fix it. The failing log is `evidence/future-review-head-red.log`, the passing one `evidence/causal-models-green.log`, and the repeated-verdict failure `evidence/repeated-verdict-original-red.log`.
+- **F8 (local path, residual race, recorded by P3R5)**: the authorization answer can flip between `authorize` returning and `git update-ref` writing — the server cannot gate a ref write on the daemon's filesystem, so the re-check shrinks the window from the checks' minutes to one round-trip plus the ref update. Two adjacent gaps stay out of the property: an old daemon never calls the route and lands as before, and `rechecked` in the model is the last answer, not a lease.
 
 ## How to tell a real bug from a model mistake
 
@@ -90,14 +92,16 @@ The server is single-process with synchronous SQLite writes, so code between two
 - `LocalPatchChange` / `LocalBaseMove`: the patch or the default branch moves between judgement and landing.
 - `CreateCommit`: the merge commit is built on whatever the base is then (`commitBase`).
 - `DecideLocalMerge`: `decideLocalMerge` (`apps/daemon/src/merge-decision.ts`): a stale patch or a moved default head gives `recheck`; an unknown checkout or a dirty worktree gives `hold`; otherwise it returns the update-ref or fast-forward outcome. `RecheckPatch` and `RecheckBase` are the two guards.
-- `LandLocal`: `landGitSquash` (`apps/daemon/src/git.ts`). The landed fact is the commit's own base and patch, not the current ones. For hosted projects see F6.
-- `Rejudge`: a new judgement on the current patch and base after a `recheck`; the next `enqueueLocalMerge` reads fresh facts.
-- `Rebuild`: the commit is built again on the current base; `landLocalMerge` builds the candidate with `commit-tree` on the command's `judgedBase`, so a rebuilt commit comes with a new command.
+- `LandLocal`: `landGitSquash` (`apps/daemon/src/git.ts`). The landed fact is the commit's own base and patch, not the current ones. For hosted projects see F6. Under `AuthRecheck` it also requires `rechecked` — the held answer of the last `AuthorizeLanding`.
+- `AuthorizeLanding`: the `authorize` callback in `landLocalMerge`, wired to `client.localMergeRecheck` (`apps/daemon/src/machine-client.ts`) and answered by `localMergeRecheckAuthorization` (`apps/server/src/services/local-merge.ts`), which re-runs `localMergeAuthorizationRefusal` — the same predicate `tryClaim` (`apps/server/src/services/machine-claim.ts`) runs on the candidate scan and in the claim transaction. `rechecked` records the answer; a refusal or no answer returns a `recheck` report and nothing lands.
+- `RevokeAuthorization`: any single write that flips the predicate — the task leaves `done`/`review`/`failed`, is archived or superseded by a newer build, moves project, or the project's repo kind, base branch or `localChecks` change — while the merge is in flight. One revocation inside the bound.
+- `Rejudge`: a new judgement on the current patch and base after a `recheck`; the next `enqueueLocalMerge` reads fresh facts. A new attempt re-runs the authorization round-trip, so `rechecked` resets.
+- `Rebuild`: the commit is built again on the current base; `landLocalMerge` builds the candidate with `commit-tree` on the command's `judgedBase`, so a rebuilt commit comes with a new command. `rechecked` resets the same way.
 - `RebuildRefreshesChecks`: the broken variant used by `P3D`, where the re-checks compare against the rebuilt commit instead of the judgement.
 
 ## Bounds and assumptions
 
-- Three heads, two digests, two bases. GitHub path: at most one push (code or evidence), one base move, one `UpdateBranch`, `MaxVerdicts` verdict records. Local path: one patch change, one base move, `MaxRejudges` (2) `Rejudge` and `Rebuild`, one landing. Pass means all orderings within these bounds satisfy the properties, not that the whole system is correct.
+- Three heads, two digests, two bases. GitHub path: at most one push (code or evidence), one base move, one `UpdateBranch`, `MaxVerdicts` verdict records. Local path: one patch change, one base move, `MaxRejudges` (2) `Rejudge` and `Rebuild`, one authorization revocation, one landing. Pass means all orderings within these bounds satisfy the properties, not that the whole system is correct.
 - Assumed satisfied and outside the model: required checks, `pr-evidence`, mergeable state, size caps, evidence links, the recording requirement, round limits, availability. `base-not-default` is not modelled.
 - Digest assumption, not checked against the code: the model lets an interacting base move change the patch digest. The code reads `compare/${base}...${head}` (three dots, `lib/github.ts`), which diffs the head against the merge base, so a default-branch move that does not touch the PR's files leaves the digest unchanged even when it changes the merged result. If so, the only guards are the checks and verdict bindings. Left for the owner as a design question.
 - A review verdict names a head from `carriers` (heads whose patch equals the current digest). Identical verdict rows collapse in the set; a pass and a block on one kind and digest coexist, and any block keeps that kind blocked.
@@ -137,13 +141,18 @@ Not in scope: scheduler and chief wiring, the CI green-wash loop, `unstable` mer
   apps/server/src/lib/git.ts
   apps/server/src/services/machine-merge-landing.ts
   apps/server/src/services/machine-finish-step.ts
+  apps/server/src/services/machine-claim.ts
   apps/server/src/services/local-merge.ts
+  apps/server/src/routes-machine.ts
   apps/server/src/services/merge-gate-run.ts
   apps/server/src/lib/github.ts
   packages/shared/src/records/project.ts
+  packages/shared/src/protocol/machine-wire.ts
   apps/daemon/src/merge-decision.ts
   apps/daemon/src/local-merge.ts
+  apps/daemon/src/step-local-merge.ts
+  apps/daemon/src/machine-client.ts
   apps/daemon/src/git.ts
 ```
 
-sync-commit: cbfbd566acd375fd924b00ba02e8075435fbe9df
+sync-commit: 58d7451ee

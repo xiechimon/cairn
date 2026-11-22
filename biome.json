@@ -36,6 +36,8 @@
       "apps/desktop/scripts/**",
       "apps/desktop/package.json",
       "apps/desktop/tsconfig.json",
+      "eval/**/*.ts",
+      "eval/**/*.mjs",
       "integration/test/**/*.ts",
       "integration/*.ts",
       "integration/package.json",
@@ -139,7 +141,8 @@
         "apps/daemon/src/backend/**",
         "apps/server/src/coordinator/runtime/**",
         "apps/server/src/db/client.ts",
-        "apps/server/test/**"
+        "apps/server/test/**",
+        "eval/**/*.ts"
       ],
       "linter": {
         "rules": {

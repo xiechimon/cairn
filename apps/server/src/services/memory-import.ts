@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { agentMemory, project } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import type { RepoCtx } from './git.js';
+import type { RepoReadCtx } from './git.js';
 import { readFile, readFiles } from './git.js';
 import { executeMemoryDocumentTool } from './memory-documents.js';
 import { listedProjects } from './personal-space.js';
@@ -24,7 +24,7 @@ export interface RepoReader {
   read(projectId: string, path: string): Promise<{ content: string; encoding: string }>;
 }
 
-export function repoReaderOf(ctx: RepoCtx): RepoReader {
+export function repoReaderOf(ctx: RepoReadCtx): RepoReader {
   return {
     list: async (projectId) => (await readFiles(ctx, projectId, undefined, '5000')).files,
     read: async (projectId, path) => readFile(ctx, projectId, path),

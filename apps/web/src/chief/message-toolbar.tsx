@@ -188,6 +188,7 @@ export function MessageToolbar({
       <Undo width={20} height={20} />
     </IconTooltip>
   );
+  const hasMenu = onRewind !== undefined || onDismiss !== undefined;
   const pill = !armed ? (
     <div className={TOOLS_CLS} data-slot="message-toolbar-tools">
       {withdraw}
@@ -207,14 +208,26 @@ export function MessageToolbar({
         variant="ghost"
         size="icon"
         className={TOOL_BTN_CLS}
-        aria-label={t('更多')}
-        aria-haspopup="menu"
-        aria-expanded="false"
-        data-testid="chief-msg-more"
-        data-tool="more"
+        aria-label={t('复制')}
+        data-testid="chief-msg-copy"
+        data-tool="copy"
       >
-        <Ellipsis width={20} height={20} />
+        <Copy width={20} height={20} />
       </PlainButton>
+      {hasMenu && (
+        <PlainButton
+          variant="ghost"
+          size="icon"
+          className={TOOL_BTN_CLS}
+          aria-label={t('更多')}
+          aria-haspopup="menu"
+          aria-expanded="false"
+          data-testid="chief-msg-more"
+          data-tool="more"
+        >
+          <Ellipsis width={20} height={20} />
+        </PlainButton>
+      )}
     </div>
   ) : (
     <div className={TOOLS_CLS} data-slot="message-toolbar-tools">
@@ -236,59 +249,67 @@ export function MessageToolbar({
           <Reply width={20} height={20} />
         </IconTooltip>
       )}
-      <DropdownMenu>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={TOOL_BTN_CLS}
-                    aria-label={t('更多')}
-                    data-testid="chief-msg-more"
-                    data-tool="more"
-                  />
-                }
-              />
-            }
-          >
-            <Ellipsis width={20} height={20} />
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={8}>
-            {t('更多')}
-          </TooltipContent>
-        </Tooltip>
-        <KeyedMenuContent align="start" aria-label={t('更多')} className="w-auto min-w-40">
-          <KeyedMenuItem
-            shortcut="C"
-            data-action="copy"
+      <IconTooltip
+        label={t('复制')}
+        trigger={
+          <Button
+            variant="ghost"
+            size="icon"
+            className={TOOL_BTN_CLS}
             data-testid="chief-msg-copy"
+            data-tool="copy"
             onClick={onCopy}
-          >
-            <Copy width={20} height={20} />
-            {t('复制')}
-          </KeyedMenuItem>
-          {onRewind !== undefined && (
-            <KeyedMenuItem shortcut="R" data-action="rewind" onClick={onRewind}>
-              <Restore width={20} height={20} />
-              {t('恢复到此处')}
-            </KeyedMenuItem>
-          )}
-          {onDismiss !== undefined && (
-            <KeyedMenuItem
-              shortcut="D"
-              variant="destructive"
-              data-testid="chief-question-dismiss"
-              onClick={onDismiss}
+          />
+        }
+      >
+        <Copy width={20} height={20} />
+      </IconTooltip>
+      {hasMenu && (
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={TOOL_BTN_CLS}
+                      aria-label={t('更多')}
+                      data-testid="chief-msg-more"
+                      data-tool="more"
+                    />
+                  }
+                />
+              }
             >
-              <X width={20} height={20} />
-              {t('取消提问')}
-            </KeyedMenuItem>
-          )}
-        </KeyedMenuContent>
-      </DropdownMenu>
+              <Ellipsis width={20} height={20} />
+            </TooltipTrigger>
+            <TooltipContent side="top" sideOffset={8}>
+              {t('更多')}
+            </TooltipContent>
+          </Tooltip>
+          <KeyedMenuContent align="start" aria-label={t('更多')} className="w-auto min-w-40">
+            {onRewind !== undefined && (
+              <KeyedMenuItem shortcut="R" data-action="rewind" onClick={onRewind}>
+                <Restore width={20} height={20} />
+                {t('恢复到此处')}
+              </KeyedMenuItem>
+            )}
+            {onDismiss !== undefined && (
+              <KeyedMenuItem
+                shortcut="D"
+                variant="destructive"
+                data-testid="chief-question-dismiss"
+                onClick={onDismiss}
+              >
+                <X width={20} height={20} />
+                {t('取消提问')}
+              </KeyedMenuItem>
+            )}
+          </KeyedMenuContent>
+        </DropdownMenu>
+      )}
     </div>
   );
   const meta =

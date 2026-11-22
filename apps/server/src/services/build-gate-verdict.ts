@@ -90,6 +90,7 @@ export function persistGateVerdict(
       patchDigest: null,
       headSha: bound.headSha,
       expectedHeadSha: bound.expectedHeadSha,
+      ranModel: stepRow.ranModel ?? null,
       createdAt: nowMs(),
     })
     .onConflictDoNothing({ target: gateVerdict.stepId })

@@ -50,7 +50,11 @@ import {
   ensureChief,
   extractText,
 } from '../chief.js';
-import { askQuestionContentOf, proposalIdOfCard, publishQuestion } from '../chief-questions.js';
+import {
+  askQuestionContentOf,
+  proposalIdOfCard,
+  publishQuestion,
+} from '../chief-question-store.js';
 import {
   cancelPendingEffects,
   drainEffects,
@@ -745,6 +749,7 @@ export function createImService(deps: ImServiceDeps): ImService {
             decision: cardDecision(option.label),
             decidedBy: `im:${action.sender.id}`,
             viaCard: true,
+            interactive: 'im',
           },
         );
         enqueueSend(

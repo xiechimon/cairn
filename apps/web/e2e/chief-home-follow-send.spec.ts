@@ -66,9 +66,9 @@ test('a sent message scrolls into view even when the reader was scrolled up', as
   await mockSlowSend(page);
   await page.goto('/app');
   await expect(row(page, 'answer 249')).toBeInViewport();
-  await viewport(page).evaluate((node) => {
-    node.scrollTop = node.scrollHeight - node.clientHeight - 600;
-  });
+  await viewport(page).hover();
+  await page.mouse.wheel(0, -700);
+  await expect.poll(() => gapToBottom(page)).toBeGreaterThan(300);
   await expect(row(page, 'answer 249')).not.toBeInViewport();
 
   const input = home(page).getByTestId('chief-composer-input');
@@ -250,7 +250,7 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
     await expect
       .poll(async () => {
         await body.evaluate((node) => {
-          node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+          node.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, bubbles: true }));
           node.scrollTop = 0;
         });
         return row(page, 'Delivery review 0').count();
@@ -261,7 +261,7 @@ for (const activation of ['click', 'Enter', 'Space', 'reduced-motion', 'phone-li
       await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });
     }
     await body.evaluate((node) => {
-      node.dispatchEvent(new WheelEvent('wheel', { deltaY: -1, bubbles: true }));
+      node.dispatchEvent(new WheelEvent('wheel', { deltaY: -700, bubbles: true }));
       for (const item of node.querySelectorAll<HTMLElement>(
         '[data-slot="message-scroller-item"]',
       )) {

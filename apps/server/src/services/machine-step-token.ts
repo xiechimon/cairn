@@ -19,11 +19,11 @@ import {
 } from './credentials.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
-import { chiefTurnLocked, stepMcpGrant } from './machine-claim.js';
+import { stepMcpGrant } from './machine-claim.js';
 import {
   isChiefConversation,
   type MachineDeps,
-  ownedStep,
+  ownedStepRow,
   profileForStep,
 } from './machine-deps.js';
 import {
@@ -41,7 +41,7 @@ export async function stepToken(
   stepId: string,
   surface: SecretSurface = 'host',
 ): Promise<MachineTokenResponse> {
-  const owned = ownedStep(deps, machineId, stepId);
+  const owned = ownedStepRow(deps, machineId, stepId);
   if (isChiefConversation(owned.buildId))
     return chiefStepToken(deps, stepId, owned.buildId, owned.status === 'claimed');
   const bundle = resolveStepCredentials({ db: deps.db, box: deps.box }, stepId);
@@ -62,7 +62,7 @@ export async function stepToken(
       stepId,
       claimedAt: owned.claimedAt,
     });
-  } else if (projectRow?.repoKind === 'github' && todoRow) {
+  } else if (projectRow?.repoKind === 'github' && todoRow && owned.status === 'claimed') {
     const ref = githubRepoOfProject(projectRow);
     const githubToken =
       ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref, true, 50 * 60_000);
@@ -111,7 +111,7 @@ export async function stepToken(
   };
 }
 
-type ClaimedStepRow = Pick<typeof step.$inferSelect, 'id' | 'machineId' | 'claimedAt'>;
+type ClaimedStepRow = Pick<typeof step.$inferSelect, 'id' | 'machineId' | 'claimedAt' | 'mcpGrant'>;
 
 function stillClaimedBy(deps: MachineDeps, claimed: ClaimedStepRow): boolean {
   const current = deps.db
@@ -130,12 +130,12 @@ async function connectorFields(
   deps: MachineDeps,
   claimed: ClaimedStepRow,
   teamId: string,
-  locked = false,
 ): Promise<Pick<MachineTokenResponse, 'mcpConnectors' | 'withheldMcp'>> {
   if (claimed.machineId === null) return {};
   const machineRow = deps.db.select().from(machine).where(eq(machine.id, claimed.machineId)).get();
   if (machineRow?.capabilities?.mcpConnectors !== true) return {};
-  const grant = stepMcpGrant(deps.db, machineRow, locked);
+  const current = new Set(stepMcpGrant(deps.db, machineRow) ?? []);
+  const grant = (claimed.mcpGrant ?? []).filter((slug) => current.has(slug));
   const fields = await stepConnectorEndpoints(
     {
       db: deps.db,
@@ -148,7 +148,7 @@ async function connectorFields(
       oauthClient: deps.oauthClient,
     },
     teamId,
-    grant ?? [],
+    grant,
   );
   return stillClaimedBy(deps, claimed) ? fields : {};
 }
@@ -278,7 +278,7 @@ async function chiefStepToken(
       ? { antigravityToken: bundle.antigravityToken }
       : {}),
     ...(claimed && stepRow && threadRow && agentRow
-      ? await connectorFields(deps, stepRow, threadRow.teamId, chiefTurnLocked(stepRow))
+      ? await connectorFields(deps, stepRow, threadRow.teamId)
       : {}),
     git: null,
     commitIdentity: softwareCommitIdentity(deps),

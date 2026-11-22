@@ -115,4 +115,19 @@ describe('system-authored step prompts', () => {
     expect(kindsOf(items, 'step-prompt')).toEqual([]);
     expect(kindsOf(items, 'user').map((item) => item.kind === 'user' && item.text)).toEqual([typed]);
   });
+
+  test.each<[string, StepPromptOrigin, string]>([
+    ['first-task', { kind: 'first-task' }, 'You own this task end to end in one session.'],
+    ['pr-wake', { kind: 'pr-wake', reasons: ['review'] }, 'Review findings for PR #7.'],
+    ['restart', { kind: 'restart' }, '上一轮执行失败。用户反馈：「再试一次」。'],
+    ['replan', { kind: 'replan' }, '用户对方案提出驳回。驳回反馈：「重写」。'],
+    ['plan-rewrite', { kind: 'plan-rewrite' }, '规划步未产出 plan.md。'],
+    ['continue', { kind: 'continue' }, 'Your questions have been answered.'],
+  ])('a %s prompt folds into one step-prompt row', (_label, origin, raw) => {
+    const items = render([promptRow('step-new', raw, NOW)], [step('step-new', NOW - 1_000, origin)]);
+    expect(kindsOf(items, 'user')).toEqual([]);
+    expect(kindsOf(items, 'step-prompt')).toEqual([
+      { kind: 'step-prompt', id: transcriptPromptRowId('step-new'), origin, raw },
+    ]);
+  });
 });

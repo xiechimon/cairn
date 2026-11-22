@@ -12,11 +12,8 @@ import {
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
 import { CARD_ENDINGS, proposeAction } from '../src/services/action-proposals.js';
-import {
-  announceQuestion,
-  askQuestionContentOf,
-  createOrGetQuestion,
-} from '../src/services/chief-questions.js';
+import { askQuestionContentOf } from '../src/services/chief-question-store.js';
+import { announceQuestion, createOrGetQuestion } from '../src/services/chief-questions.js';
 import { createImService, type ImService } from '../src/services/im/core.js';
 import { ImSendError } from '../src/services/im/errors.js';
 import { setImRuntime } from '../src/services/im/runtime.js';

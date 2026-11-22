@@ -90,6 +90,11 @@ function withToolResultText(message: ToolResultMessage, text: string): ToolResul
   };
 }
 
+function turnStartOf(messages: readonly Message[]): number {
+  const latest = messages.findLastIndex((message) => message.role === 'user');
+  return latest < 0 ? messages.length : latest;
+}
+
 export function truncateOldToolResults(
   messages: readonly Message[],
   options?: { keepFull?: number; maxChars?: number },
@@ -101,8 +106,9 @@ export function truncateOldToolResults(
     if (messages[i]?.role === 'toolResult') toolIndexes.push(i);
   }
   const keep = new Set(toolIndexes.slice(-keepFull));
+  const turnStart = turnStartOf(messages);
   return messages.map((message, index) => {
-    if (message.role !== 'toolResult' || keep.has(index)) return message;
+    if (message.role !== 'toolResult' || keep.has(index) || index >= turnStart) return message;
     if (TOOL_RESULT_EXEMPT.has(message.toolName)) return message;
     const text = toolResultText(message);
     if (text.length <= maxChars) return message;
@@ -181,7 +187,7 @@ export function stripConsumedImages(
   options?: { keepRecentMessages?: number },
 ): Message[] {
   const keepRecent = options?.keepRecentMessages ?? 1;
-  const cutoff = Math.max(0, messages.length - keepRecent);
+  const cutoff = Math.min(turnStartOf(messages), Math.max(0, messages.length - keepRecent));
   return messages.map((message, index) => {
     if (index >= cutoff) return message;
     if (message.role === 'user' && typeof message.content !== 'string') {

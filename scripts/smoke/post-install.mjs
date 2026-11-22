@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { setTimeout as delay } from 'node:timers/promises';
 import { chromium, _electron as electron } from '@playwright/test';
+import { mainWindow } from '../../apps/desktop/scripts/main-window.mjs';
 
 const DEFAULT_BASE = 'http://127.0.0.1:54400';
 const DEFAULT_USER_DATA = join(homedir(), 'Library', 'Application Support', '@cairn', 'desktop');
@@ -53,9 +63,10 @@ const PNG_BASE64 =
 const TXT_BODY = 'post-install smoke attachment body\nsecond line of the file\n';
 
 const SMOKE_LABEL = 'post-install-smoke';
-const MESSAGE_TEXT = (pngKey, txtKey) =>
+const IMAGE_NAMES = ['smoke.png', 'second.png'];
+const MESSAGE_TEXT = (pngKeys, txtKey) =>
   'Release notes draft — see [the spec](https://example.com/release-notes) for details.\n' +
-  `![smoke.png](attachment:${pngKey})\n` +
+  pngKeys.map((key, index) => `![${IMAGE_NAMES[index]}](attachment:${key})\n`).join('') +
   `![notes.txt](attachment:${txtKey})`;
 
 export function parseArgs(argv) {
@@ -114,17 +125,36 @@ async function api(ctx, method, path, body, token = ctx.token) {
   return text === '' ? null : JSON.parse(text);
 }
 
+async function windowApi(ctx, method, path, body) {
+  await ctx.page.waitForLoadState('load');
+  const result = await ctx.page.evaluate(
+    async (request) => {
+      const res = await fetch(request.path, {
+        method: request.method,
+        headers: request.body === undefined ? {} : { 'content-type': 'application/json' },
+        body: request.body === undefined ? undefined : JSON.stringify(request.body),
+      });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    },
+    { method, path, body },
+  );
+  if (!result.ok) {
+    throw new Error(`${method} ${path} from the app window -> ${result.status}: ${result.text}`);
+  }
+  return result.text === '' ? null : JSON.parse(result.text);
+}
+
 const SEEDED_MODELS = [
   { provider: 'devin', modelId: 'swe-2-high', thinkingLevel: null },
   { provider: 'claude-code', modelId: 'claude-sonnet-5-5', thinkingLevel: null },
 ];
 
 async function seedModelSources(ctx) {
-  const created = await api(ctx, 'POST', `/api/teams/${ctx.teamId}/devin-subscriptions`, {
+  const created = await windowApi(ctx, 'POST', `/api/teams/${ctx.teamId}/devin-subscriptions`, {
     label: SMOKE_LABEL,
     token: 'post-install-smoke-devin-token',
   });
-  await api(ctx, 'PATCH', `/api/teams/${ctx.teamId}/devin-subscriptions/${created.id}`, {
+  await windowApi(ctx, 'PATCH', `/api/teams/${ctx.teamId}/devin-subscriptions/${created.id}`, {
     models: [
       {
         id: 'swe-2-high',
@@ -135,7 +165,7 @@ async function seedModelSources(ctx) {
     ],
   });
   const started = await api(ctx, 'POST', '/api/machine/enroll/start', { name: SMOKE_LABEL });
-  const confirmed = await api(ctx, 'POST', '/api/machine/enroll/confirm', {
+  const confirmed = await windowApi(ctx, 'POST', '/api/machine/enroll/confirm', {
     enrollId: started.enrollId,
   });
   const machine = confirmed.machine ?? confirmed;
@@ -161,19 +191,19 @@ async function seedModelSources(ctx) {
     },
     machine.token,
   );
-  await api(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: SEEDED_MODELS });
+  await windowApi(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: SEEDED_MODELS });
 }
 
 async function ensureProject(ctx) {
   const projects = await api(ctx, 'GET', '/api/projects');
   const live = (projects.projects ?? projects).filter((p) => p.archivedAt == null);
   if (live.length > 0) return;
-  const created = await api(ctx, 'POST', '/api/projects', {
+  const created = await windowApi(ctx, 'POST', '/api/projects', {
     name: 'post-install-smoke',
     localPath: ctx.userData,
   });
   ctx.cleanup.push(async () => {
-    await api(ctx, 'DELETE', `/api/projects/${created.id}`).catch(() => {});
+    await windowApi(ctx, 'DELETE', `/api/projects/${created.id}`).catch(() => {});
   });
 }
 
@@ -187,11 +217,11 @@ async function seedTopModels(ctx) {
     }
   }
   if (merged.length === existing.length) return;
-  await api(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: merged });
+  await windowApi(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: merged });
   ctx.cleanup.push(async () => {
-    await api(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, { models: existing }).catch(
-      () => {},
-    );
+    await windowApi(ctx, 'PUT', `/api/teams/${ctx.teamId}/top-models`, {
+      models: existing,
+    }).catch(() => {});
   });
 }
 
@@ -202,23 +232,33 @@ async function seedTsnet(userData) {
 }
 
 async function uploadAttachment(ctx, fileName, mimeType, bytes) {
-  const grant = await api(ctx, 'POST', '/api/uploads/grant', {
+  const grant = await windowApi(ctx, 'POST', '/api/uploads/grant', {
     kind: 'attachment',
     fileName,
     mimeType,
     size: bytes.byteLength,
     scope: 'message',
   });
-  const form = new FormData();
-  form.set('grant', grant.grant);
-  form.set('file', new Blob([bytes], { type: mimeType }), fileName);
-  const res = await fetch(`${ctx.base}${grant.uploadUrl}/upload`, {
-    method: 'POST',
-    signal: AbortSignal.timeout(30_000),
-    headers: { authorization: `Bearer ${ctx.token}`, 'sec-fetch-site': 'same-origin' },
-    body: form,
-  });
-  if (!res.ok) throw new Error(`attachment upload -> ${res.status}: ${await res.text()}`);
+  const uploaded = await ctx.page.evaluate(
+    async (request) => {
+      const form = new FormData();
+      form.set('grant', request.grant);
+      const bytes = Uint8Array.from(atob(request.b64), (ch) => ch.charCodeAt(0));
+      form.set('file', new Blob([bytes], { type: request.mimeType }), request.fileName);
+      const res = await fetch(request.url, { method: 'POST', body: form });
+      return { ok: res.ok, status: res.status, text: await res.text() };
+    },
+    {
+      url: `${grant.uploadUrl}/upload`,
+      grant: grant.grant,
+      fileName,
+      mimeType,
+      b64: bytes.toString('base64'),
+    },
+  );
+  if (!uploaded.ok) {
+    throw new Error(`attachment upload -> ${uploaded.status}: ${uploaded.text}`);
+  }
   return grant.key;
 }
 
@@ -429,7 +469,7 @@ function seedChiefMessage(ctx) {
     db.prepare(
       `INSERT INTO chief_message (id, threadId, role, content, projectId, delivery, createdAt)
        VALUES (?, ?, 'user', ?, NULL, NULL, ?)`,
-    ).run(messageId, threadId, JSON.stringify(MESSAGE_TEXT(ctx.pngKey, ctx.txtKey)), now);
+    ).run(messageId, threadId, JSON.stringify(MESSAGE_TEXT(ctx.pngKeys, ctx.txtKey)), now);
     ctx.cleanup.push(async () => {
       const cleanupDb = new DatabaseSync(dbPath);
       try {
@@ -677,24 +717,39 @@ async function checkAttachment(page, ctx) {
   await openCoordinator(page, ctx);
   const attachments = page.getByTestId('chief-sent-attachment');
   await attachments.first().waitFor({ timeout: UI_WAIT_MS });
-  assert.equal(await attachments.count(), 2, 'expected 2 seeded attachment tiles');
+  assert.equal(
+    await attachments.count(),
+    IMAGE_NAMES.length + 1,
+    'expected the seeded image and text tiles',
+  );
   const textTile = attachments.filter({ hasText: 'notes.txt' }).first();
   assert.ok(
     (await textTile.locator('svg, [data-file-icon]').count()) > 0,
     'text file tile does not show a type icon',
   );
-  await attachments.first().click();
+  await page.getByRole('button', { name: IMAGE_NAMES[0], exact: true }).first().click();
   const lightbox = page.getByTestId('file-lightbox');
   await lightbox.waitFor({ timeout: UI_WAIT_MS });
-  const position = await page.getByTestId('file-lightbox-position').textContent();
-  assert.ok(
-    position.includes('1') && position.includes('2'),
+  const position = await lightbox.getByTestId('file-lightbox-position').textContent();
+  assert.equal(
+    position.trim(),
+    `1 / ${IMAGE_NAMES.length}`,
     `lightbox pager position unexpected: ${position}`,
   );
-  await page.getByTestId('file-lightbox-next').waitFor({ timeout: UI_WAIT_MS });
-  await page.getByTestId('file-lightbox-prev').waitFor({ timeout: UI_WAIT_MS });
+  await lightbox.getByTestId('file-lightbox-next').click();
+  await lightbox
+    .getByTestId('file-preview-name')
+    .filter({ hasText: IMAGE_NAMES[1] })
+    .waitFor({ timeout: UI_WAIT_MS });
   await page.keyboard.press('Escape');
-  return `lightbox opened, pager at ${position.trim()}`;
+  await lightbox.waitFor({ state: 'detached', timeout: UI_WAIT_MS });
+  await page.getByRole('button', { name: 'notes.txt', exact: true }).first().click();
+  const panel = page.getByTestId('file-panel');
+  await panel
+    .getByTestId('file-preview-body')
+    .filter({ hasText: TXT_BODY.split('\n')[0] })
+    .waitFor({ timeout: UI_WAIT_MS });
+  return `lightbox paged ${position.trim()} to ${IMAGE_NAMES[1]}, notes.txt opened in the side panel`;
 }
 
 async function checkRemote(page, ctx) {
@@ -759,6 +814,39 @@ async function waitForServerUp(base, timeoutMs) {
   throw new Error(`server never came up${lastError ? `: ${lastError.message}` : ''}`);
 }
 
+const INSTALLED_APPS = /^\/applications(\/|$)/i;
+
+export function smokableBundle(appPath) {
+  const resolved = resolve(appPath);
+  if (INSTALLED_APPS.test(resolved)) {
+    throw new Error(`refusing to run against the installed app: ${resolved}`);
+  }
+  const root = realpathSync(resolved);
+  if (INSTALLED_APPS.test(root)) {
+    throw new Error(`refusing to run against the installed app: ${root}`);
+  }
+  return root;
+}
+
+function matchingPids(pattern) {
+  try {
+    return execFileSync('pgrep', ['-f', pattern], { encoding: 'utf8' })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function killTree(root) {
+  for (const pid of matchingPids(`^${root}/`)) {
+    try {
+      process.kill(Number(pid), 'SIGKILL');
+    } catch {}
+  }
+}
+
 async function launchPackagedApp(executable, userData) {
   return electron.launch({
     executablePath: executable,
@@ -767,21 +855,32 @@ async function launchPackagedApp(executable, userData) {
   });
 }
 
+function procOf(electronApp) {
+  try {
+    return electronApp.process();
+  } catch {
+    return null;
+  }
+}
+
 async function connectApp(appPath, prevAppPath) {
   const scratch = mkdtempSync(join(tmpdir(), 'cairn-smoke-'));
-  const executable = join(resolve(appPath), 'Contents', 'MacOS', 'Cairn');
+  const appRoot = smokableBundle(appPath);
+  const executable = join(appRoot, 'Contents', 'MacOS', 'Cairn');
   if (!existsSync(executable)) {
     throw new Error(`no executable at ${executable}; pass the path to Cairn.app`);
   }
   await seedTsnet(scratch);
   let seededTables;
   if (prevAppPath !== null) {
-    const prevExecutable = join(resolve(prevAppPath), 'Contents', 'MacOS', 'Cairn');
+    const prevRoot = smokableBundle(prevAppPath);
+    const prevExecutable = join(prevRoot, 'Contents', 'MacOS', 'Cairn');
     if (!existsSync(prevExecutable)) {
       throw new Error(`no executable at ${prevExecutable}; pass the previous release's Cairn.app`);
     }
     console.log('booting previous release on the scratch home');
     const prevApp = await launchPackagedApp(prevExecutable, scratch);
+    const prevProc = procOf(prevApp);
     let prevBase;
     try {
       const prevPortFile = join(scratch, 'server-port');
@@ -791,7 +890,8 @@ async function connectApp(appPath, prevAppPath) {
       console.log(`previous release server up on ${prevBase}`);
     } finally {
       await Promise.race([prevApp.close(), delay(30_000)]).catch(() => {});
-      prevApp.process()?.kill('SIGKILL');
+      prevProc?.kill('SIGKILL');
+      killTree(prevRoot);
     }
     const dbPath = join(scratch, 'home', 'server', 'server.db');
     const seeded = seedEveryTable(dbPath);
@@ -804,6 +904,7 @@ async function connectApp(appPath, prevAppPath) {
   }
   console.log('booting the packaged app over the seeded database');
   const electronApp = await launchPackagedApp(executable, scratch);
+  const appProc = procOf(electronApp);
   const launchedAt = Date.now();
   const portFile = join(scratch, 'server-port');
   await waitForFile(
@@ -815,12 +916,7 @@ async function connectApp(appPath, prevAppPath) {
   const base = `http://127.0.0.1:${readFileSync(portFile, 'utf8').trim()}`;
   let page;
   try {
-    page = await Promise.race([
-      electronApp.firstWindow(),
-      delay(SERVER_WAIT_MS).then(() => {
-        throw new Error('main window did not open');
-      }),
-    ]);
+    page = await mainWindow(electronApp, SERVER_WAIT_MS);
   } catch (error) {
     const serverLog = join(scratch, 'logs', 'server.log');
     if (existsSync(serverLog)) {
@@ -842,6 +938,8 @@ async function connectApp(appPath, prevAppPath) {
     token: readOwnerToken(scratch),
     page,
     electronApp,
+    appProc,
+    appRoot,
     launchedAt,
     scratch,
     seededTables,
@@ -905,12 +1003,12 @@ async function main() {
     } else {
       await seedTopModels(ctx);
     }
-    ctx.pngKey = await uploadAttachment(
-      ctx,
-      'smoke.png',
-      'image/png',
-      Buffer.from(PNG_BASE64, 'base64'),
-    );
+    ctx.pngKeys = [];
+    for (const name of IMAGE_NAMES) {
+      ctx.pngKeys.push(
+        await uploadAttachment(ctx, name, 'image/png', Buffer.from(PNG_BASE64, 'base64')),
+      );
+    }
     ctx.txtKey = await uploadAttachment(ctx, 'notes.txt', 'text/plain', Buffer.from(TXT_BODY));
     await api(ctx, 'GET', `/api/teams/${ctx.teamId}/chief`);
     await waitForChief(ctx);
@@ -948,7 +1046,8 @@ async function main() {
     for (const undo of ctx.cleanup.reverse()) await undo().catch(() => {});
     if (ctx.electronApp) {
       await Promise.race([ctx.electronApp.close(), delay(30_000)]).catch(() => {});
-      ctx.electronApp.process()?.kill('SIGKILL');
+      ctx.appProc?.kill('SIGKILL');
+      killTree(ctx.appRoot);
       if (ctx.scratch) rmSync(ctx.scratch, { recursive: true, force: true });
     }
     if (ctx.browser) await ctx.browser.close().catch(() => {});
@@ -958,15 +1057,15 @@ async function main() {
     console.log(
       `${results.length - failed}/${results.length} checks passed; evidence: ${evidence}`,
     );
-    process.exitCode = 1;
-  } else {
-    console.log(`${results.length} checks green`);
+    process.exit(1);
   }
+  console.log(`${results.length} checks green`);
+  process.exit(0);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   main().catch((error) => {
     console.error(`post-install smoke failed to run: ${error.stack ?? error.message}`);
-    process.exitCode = 2;
+    process.exit(2);
   });
 }

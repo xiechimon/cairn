@@ -530,6 +530,7 @@ export function createPrWakes(deps: BuildDeps) {
       if (ledger.wakes >= 10) notices.push('Total wake cap (10) reached. Auto-fix disabled.');
       if (events.length > 0 && ledger.wakes < 10) {
         const content = events.map((e) => e.prompt).join('\n\n');
+        const reasons = [...new Set(events.map((event) => event.kind))];
         insertMessageRow(deps, row.buildId, {
           id: newRecordId(),
           role: 'user',
@@ -579,7 +580,10 @@ export function createPrWakes(deps: BuildDeps) {
             current.phase === 'building' || current.phase === 'planning' ? current.phase : 'queued',
             { lastRunAt: now },
           );
-          enqueueStep(deps, row.buildId, 'session', row.teamId, content);
+          enqueueStep(deps, row.buildId, 'session', row.teamId, content, undefined, undefined, {
+            kind: 'pr-wake',
+            reasons,
+          });
         }
         ledger.wakes += 1;
         for (const event of events) {

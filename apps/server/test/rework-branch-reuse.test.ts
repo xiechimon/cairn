@@ -214,6 +214,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     const fresh = stepsOf(w, w.buildId).filter((st) => st.kind === 'plan');
     expect(fresh).toHaveLength(1);
     expect(fresh[0]!.prompt).toBe(buildRestartPrompt('我要的是svg样式的'));
+    expect(fresh[0]!.promptOrigin).toEqual({ kind: 'restart' });
     expect(fresh[0]!.freshSession).toBe(true);
   });
 
@@ -378,6 +379,7 @@ describe('#931 a failed restart reworks on the original branch: the reuse decisi
     );
     const steps = stepsOf(w, newId);
     expect(steps[0]!.prompt).toBe(`${SESSION_BRIEF}\n\n${buildRestartPrompt('普通重启')}`);
+    expect(steps[0]!.promptOrigin).toEqual({ kind: 'first-task' });
     expect(steps[0]!.freshSession).toBe(false);
   });
 

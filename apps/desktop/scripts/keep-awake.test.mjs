@@ -14,14 +14,14 @@ import {
 } from '../src/wake-ahead.ts';
 
 function fakeBlocker() {
-  const active = new Set();
+  const active = new Map();
   let next = 1;
   return {
     active,
+    types: () => [...active.values()],
     start(type) {
-      assert.equal(type, 'prevent-app-suspension');
       const id = next++;
-      active.add(id);
+      active.set(id, type);
       return id;
     },
     stop(id) {
@@ -51,6 +51,28 @@ test('turning keep awake on holds exactly one blocker until it is turned off', (
   keepAwake.set(false);
   assert.equal(keepAwake.isOn(), false);
   assert.equal(blocker.active.size, 0);
+});
+
+test('the button keeps the screen on, wake-ahead only keeps the Mac running, and the screen wins', () => {
+  const blocker = fakeBlocker();
+  const keepAwake = createKeepAwake(blocker, choicePath());
+  const steps = [
+    [true, false, ['prevent-display-sleep']],
+    [true, true, ['prevent-display-sleep']],
+    [false, true, ['prevent-app-suspension']],
+    [false, false, []],
+    [false, true, ['prevent-app-suspension']],
+    [true, true, ['prevent-display-sleep']],
+    [true, false, ['prevent-display-sleep']],
+    [false, false, []],
+  ];
+  for (const [manual, wakeAhead, expected] of steps) {
+    keepAwake.set(manual);
+    keepAwake.setWakeAhead(wakeAhead);
+    assert.deepEqual(blocker.types(), expected, `manual=${manual} wakeAhead=${wakeAhead}`);
+    assert.equal(keepAwake.isOn(), manual);
+    assert.equal(keepAwake.isHolding(), expected.length > 0);
+  }
 });
 
 test('the choice survives a restart', () => {
@@ -155,7 +177,7 @@ test('the tray item is a checkbox that shows the state and asks for the opposite
   const actions = { open() {}, quit() {}, setKeepAwake: (on) => asked.push(on) };
   for (const on of [false, true]) {
     const item = trayMenuTemplate('127.0.0.1:1', on, actions).find(
-      (entry) => entry.label === 'Keep the Mac Awake',
+      (entry) => entry.label === 'Keep the Screen On',
     );
     assert.equal(item?.type, 'checkbox');
     assert.equal(item?.checked, on);

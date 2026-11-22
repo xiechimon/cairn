@@ -4,7 +4,7 @@ import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { AccessVerifier } from './lib/cloudflare-access.js';
 import type { FetchLike } from './lib/github.js';
-import type { LoopbackOwner } from './lib/loopback-owner.js';
+import type { OwnerChannel } from './lib/owner-channel.js';
 import type { KeySecretBox } from './lib/secret-box.js';
 import type { CodexDeviceState } from './services/codex-device-login.js';
 import type { ConversationStreamHub, TeamStreamHub } from './services/events.js';
@@ -60,6 +60,8 @@ export interface AppContext {
       name?: string;
       code: string;
       createdAt: number;
+      hostKey?: string;
+      fromLocalHost?: boolean;
       machine?: { machineId: string; token: string; teamId: string; serverUrl: string };
     }
   >;
@@ -83,7 +85,7 @@ export interface AppContext {
   providerTestTimeoutMs?: number;
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
-  loopbackOwner?: LoopbackOwner | null;
+  ownerChannel?: OwnerChannel;
   accessVerifier?: AccessVerifier | null;
   mcpConfigPath: string;
   mcpFetch?: typeof fetch;

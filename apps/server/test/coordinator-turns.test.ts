@@ -2,26 +2,31 @@ import {
   ASK_USER_QUESTION_KIND,
   buildOrchestratePrompt,
   CHIEF_TURN_ERROR_KIND,
+  CHIEF_TURN_STOPPED_KIND,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
+import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   chiefMessage,
   chiefThread,
   machine as machineTable,
+  routingRule,
   step as stepTable,
   stopPending,
 } from '../src/db/schema.js';
 import { enqueueChiefStep, upsertChiefMessage } from '../src/services/chief.js';
 import {
   CHIEF_TURN_MAX_MS,
+  CHIEF_TURN_STOP_GRACE_MS,
   recordChiefStop,
   sweepOverlongChiefTurns,
 } from '../src/services/chief-turns.js';
 import { CORRECTION_PROMPT } from '../src/services/merge-gate/correction.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { H, registerChiefHarness } from './chief-harness.js';
-import { postProject, req } from './helpers.js';
+import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
+import { issueApiKey, postProject, req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -393,5 +398,125 @@ describe('rewind never cuts another project out of the shared transcript', () =>
       projectId: H.projectId,
     });
     expect((await rewind(anchor)).status).toBe(409);
+  });
+});
+
+describe('a daemon that heartbeats but ignores its stop request is force-stopped after the grace (#2556)', () => {
+  const STOP_GRACE_MS = CHIEF_TURN_STOP_GRACE_MS;
+
+  async function call(
+    app: Hono,
+    method: string,
+    path: string,
+    opts: { cred?: string; body?: unknown } = {},
+  ): Promise<Response> {
+    const headers: Record<string, string> = {};
+    if (opts.cred) headers.authorization = `Bearer ${opts.cred}`;
+    if (opts.body !== undefined) headers['content-type'] = 'application/json';
+    return Promise.resolve(
+      app.request(path, {
+        method,
+        headers,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      }),
+    );
+  }
+
+  async function send(content: string): Promise<string> {
+    const res = await req(H.s.app, 'POST', `/api/teams/${H.teamId}/chief/threads`, { content });
+    expect(res.status).toBe(201);
+    return ((await res.json()) as { message: { id: string } }).message.id;
+  }
+
+  async function enrollDaemon(): Promise<{ machineId: string; token: string }> {
+    const key = await issueApiKey(H.s);
+    const res = await call(H.s.app, 'POST', '/api/machine/enroll', {
+      cred: key,
+      body: readyMachine({ teamId: H.teamId, name: 'stubborn-mbp', cliVersion: '0.9.9' }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { machineId: string; token: string };
+    H.s.db
+      .update(machineTable)
+      .set({ online: true })
+      .where(eq(machineTable.id, body.machineId))
+      .run();
+    H.s.db
+      .update(routingRule)
+      .set({ machineId: body.machineId })
+      .where(eq(routingRule.id, AGENT_ID))
+      .run();
+    return body;
+  }
+
+  function stepRow(id: string) {
+    return H.s.db.select().from(stepTable).where(eq(stepTable.id, id)).get()!;
+  }
+
+  test('the turn ends at the bound, the stop marker shows, late writes are refused and the queued turn runs', async () => {
+    const { token, machineId } = await enrollDaemon();
+    const stepId = await send('run forever');
+
+    const claim = await call(H.s.app, 'POST', '/api/machine/tasks/claim', {
+      cred: token,
+      body: {},
+    });
+    const claimed = ((await claim.json()) as { step: { step: { id: string } } | null }).step;
+    expect(claimed?.step.id).toBe(stepId);
+
+    const nextId = await send('queued behind');
+
+    const beat = () =>
+      call(H.s.app, 'POST', `/api/machine/heartbeat/${stepId}`, { cred: token, body: {} });
+    expect((await beat()).status).toBe(200);
+
+    const t0 = Date.now();
+    setStep(stepId, { claimedAt: t0 - CHIEF_TURN_MAX_MS - 1 });
+
+    sweepOverlongChiefTurns(H.s.svc, t0);
+    const delegated = H.s.db.select().from(stopPending).all();
+    expect(delegated.map((r) => [r.conversationId, r.stepId])).toEqual([[H.threadId, stepId]]);
+    expect(stepRow(stepId).status).toBe('claimed');
+
+    await beat();
+    sweepOverlongChiefTurns(H.s.svc, t0 + STOP_GRACE_MS - 1);
+    expect(stepRow(stepId).status).toBe('claimed');
+    expect(
+      H.s.db
+        .select()
+        .from(stopPending)
+        .all()
+        .map((r) => r.createdAt),
+    ).toEqual([t0]);
+
+    await beat();
+    sweepOverlongChiefTurns(H.s.svc, t0 + STOP_GRACE_MS + 1);
+    expect(stepRow(stepId).status).toBe('stopped');
+    expect(H.s.db.select().from(stopPending).all()).toEqual([]);
+
+    const marker = H.s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, `chief-stop-${stepId}`))
+      .get();
+    expect(marker?.role).toBe('system');
+    expect((JSON.parse(marker!.content as string) as { kind: string }).kind).toBe(
+      CHIEF_TURN_STOPPED_KIND,
+    );
+    expect((await beat()).status).toBe(404);
+    const done = await call(H.s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: token,
+      body: { status: 'success' },
+    });
+    expect(done.status).toBe(200);
+    expect(stepRow(stepId).status).toBe('stopped');
+
+    const again = await call(H.s.app, 'POST', '/api/machine/tasks/claim', {
+      cred: token,
+      body: {},
+    });
+    const next = ((await again.json()) as { step: { step: { id: string } } | null }).step;
+    expect(next?.step.id).toBe(nextId);
+    expect(stepRow(nextId).machineId).toBe(machineId);
   });
 });

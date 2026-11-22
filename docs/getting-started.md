@@ -22,7 +22,7 @@ npx @xiechimon/cairn
 
 One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team. Use a different port with `PORT=9000 npx @xiechimon/cairn`.
 
-The server listens on loopback only and always requires an access token for non-browser clients. The first start generates one in `~/.cairn/token` (mode 0600). A browser on a Linux server machine exchanges a loopback bootstrap for an HttpOnly session and does not paste the token. macOS, Windows, and `CAIRN_REQUIRE_TOKEN=1` have no loopback peer proof, so the first browser session is a pairing code minted with the owner token:
+The server listens on loopback only and always requires an access token for non-browser clients. The first start generates one in `~/.cairn/token` (mode 0600). The first browser session comes from a pairing code minted with the owner token:
 
 ```sh
 curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" http://127.0.0.1:8787/api/remote/pairing
@@ -37,7 +37,7 @@ curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" -H "Content-
   -d '{"enrollId":"<enroll value>"}' http://127.0.0.1:8787/api/machine/enroll/confirm
 ```
 
-Cairn for Mac signs in as the owner and needs none of this.
+Cairn for Mac signs in as the owner and needs none of this. These token curls only work against a headless server — on the desktop app every owner write travels an in-memory channel the app injects into its own window's requests, so the same calls are refused there; use the app instead.
 
 ## Run builds on your own machines
 

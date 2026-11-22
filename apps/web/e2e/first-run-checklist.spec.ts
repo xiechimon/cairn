@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, PROJECT } from './chief-home-mock';
+import { HISTORY, mockLive, PROJECT, THREAD } from './chief-home-mock';
 
 interface World {
   providers: unknown[];
@@ -18,10 +18,12 @@ interface World {
 
 const BOUND_AGENT = { id: 'agent-1', displayName: 'scribe', modelId: 'm', tools: [] };
 
-async function open(page: Page, world: World) {
+async function open(page: Page, world: World, history = false) {
   await mockLive(
     page,
-    { threads: [], messages: [], projects: [PROJECT], todos: [] },
+    history
+      ? { threads: [THREAD], messages: HISTORY, projects: [PROJECT], todos: [] }
+      : { threads: [], messages: [], projects: [PROJECT], todos: [] },
     (path, route, json) => {
       if (path.startsWith('/api/teams/')) world.teamPaths.push(path);
       if (path === '/api/teams/t1/providers') {
@@ -60,8 +62,10 @@ async function open(page: Page, world: World) {
   await page.goto('/app');
 }
 
-const chip = (page: Page) => page.getByTestId('composer-setup-chip');
-const hint = (page: Page) => page.getByTestId('composer-setup-hint');
+const prompt = (page: Page) => page.getByTestId('setup-prompt');
+const action = (page: Page) => page.getByTestId('setup-prompt-action');
+const label = (page: Page) => page.getByTestId('setup-prompt-label');
+const hint = (page: Page) => page.getByTestId('setup-prompt-hint');
 
 const fresh = (): World => ({ providers: [], machines: [], bound: false, teamPaths: [] });
 const ONLINE = { id: 'm1', name: 'omarchy', online: true };
@@ -73,37 +77,56 @@ const SUBSCRIPTION = {
   available: true,
 };
 
-test('a fresh install shows one chip for the first missing step and no card', async ({ page }) => {
+test('a fresh install puts one centered model-source prompt on the empty home instead of the starters', async ({
+  page,
+}) => {
   await open(page, fresh());
-  await expect(chip(page)).toHaveCount(1);
-  await expect(chip(page)).toHaveAttribute('data-step', 'models');
-  await expect(chip(page)).toHaveText('接入模型来源');
-  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
-  await expect(hint(page)).toContainText('Claude 订阅');
+  await expect(prompt(page)).toHaveCount(1);
+  await expect(prompt(page)).toHaveAttribute('data-step', 'models');
+  await expect(prompt(page)).toHaveAttribute('data-variant', 'empty');
+  await expect(prompt(page)).toContainText('先接入一个模型来源，Coordinator 才能回复你');
+  await expect(prompt(page)).toContainText('Claude 订阅');
+  await expect(action(page)).toHaveText('接入模型来源');
+  await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
+  await expect(page.getByTestId('chief-composer-placeholder')).toHaveText('接入模型来源后就能发消息');
+  await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
   await expect(page.getByTestId('first-run-checklist')).toHaveCount(0);
   await expect(page.getByTestId('chief-gate')).toHaveCount(0);
+  await expect(page.getByTestId('home-spiral')).toHaveCount(0);
 });
 
-test('with models on both sides the chip asks for a machine and the hint shows the start command', async ({
+test('with a conversation already there the model-source prompt is one notice line after it', async ({
+  page,
+}) => {
+  await open(page, fresh(), true);
+  await expect(page.getByText('这条和 #9 是同一处，已经补给它了。')).toBeVisible();
+  await expect(prompt(page)).toHaveCount(1);
+  await expect(prompt(page)).toHaveAttribute('data-variant', 'line');
+  await expect(prompt(page)).toHaveText(/Coordinator 现在没有模型可用/);
+  await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
+});
+
+test('with models on both sides one notice line asks for a machine and shows the start command', async ({
   page,
 }) => {
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], bound: true });
-  await expect(chip(page)).toHaveAttribute('data-step', 'machine');
-  await expect(chip(page)).toHaveText('连接一台执行机');
-  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/machines/);
+  await expect(prompt(page)).toHaveAttribute('data-step', 'machine');
+  await expect(prompt(page)).toHaveAttribute('data-variant', 'line');
+  await expect(label(page)).toHaveText('连接一台执行机');
+  await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/machines/);
   await expect(hint(page).locator('code')).toHaveText(/ start$/);
   await expect(hint(page)).toContainText('在要干活的电脑上运行');
 });
 
 test('a model source the Coordinator cannot use still asks for a provider', async ({ page }) => {
   await open(page, { ...fresh(), providers: [{ id: 'p1', name: 'gw' }], machines: [ONLINE] });
-  await expect(chip(page)).toHaveAttribute('data-step', 'models');
-  await expect(chip(page)).toHaveText('Coordinator 还缺模型');
-  await expect(chip(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
-  await expect(hint(page)).toContainText('Coordinator 能用的服务商');
+  await expect(prompt(page)).toHaveAttribute('data-step', 'models');
+  await expect(prompt(page)).toContainText('Coordinator 还缺模型');
+  await expect(action(page)).toHaveAttribute('href', /\/app\/settings\/routing/);
+  await expect(prompt(page)).toContainText('Coordinator 能用的服务商');
 });
 
-test('a machine coming back online clears the chip', async ({ page }) => {
+test('a machine coming back online clears the notice', async ({ page }) => {
   const world: World = {
     providers: [{ id: 'p1', name: 'gw' }],
     machines: [{ ...ONLINE, online: false }],
@@ -111,14 +134,14 @@ test('a machine coming back online clears the chip', async ({ page }) => {
     teamPaths: [],
   };
   await open(page, world);
-  await expect(chip(page)).toHaveAttribute('data-step', 'machine');
-  await expect(chip(page)).toHaveText('omarchy 离线');
+  await expect(prompt(page)).toHaveAttribute('data-step', 'machine');
+  await expect(label(page)).toHaveText('omarchy 离线');
   await expect(hint(page)).toHaveText(/^在 omarchy 上运行 .+ start 让它重新上线$/);
   world.machines = [ONLINE];
   await page.evaluate(() => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
-  await expect(chip(page)).toHaveCount(0);
+  await expect(prompt(page)).toHaveCount(0);
 });
 
 async function openDesktop(page: Page, world: World) {
@@ -137,7 +160,7 @@ async function openDesktop(page: Page, world: World) {
 
 const OWN_OFFLINE = { id: 'm1', name: 'xmonsMac', online: false, kind: 'local' as const, lastSeenAt: 1 };
 
-test('a re-registering Runner counts as a Runner already, so its startup shows no chip, and one reported offline again shows at once', async ({
+test('a re-registering Runner counts as a Runner already, so its startup shows no notice, and one reported offline again shows at once', async ({
   page,
 }) => {
   const world: World = {
@@ -150,14 +173,14 @@ test('a re-registering Runner counts as a Runner already, so its startup shows n
   await open(page, world);
   await machinesRead;
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
-  await expect(chip(page)).toHaveCount(0);
+  await expect(prompt(page)).toHaveCount(0);
   await expect(hint(page)).toHaveCount(0);
   world.machines = [OWN_OFFLINE];
   await page.evaluate(() => {
     for (const es of window.__es)
       es.emit({ type: 'machine_presence', machineId: 'm1', online: false });
   });
-  await expect(chip(page)).toHaveText('xmonsMac 离线');
+  await expect(label(page)).toHaveText('xmonsMac 离线');
   await expect(hint(page)).toHaveText(/^在 xmonsMac 上运行 .+ start 让它重新上线$/);
 });
 
@@ -171,19 +194,19 @@ test('opening the desktop app shows no Runner hint while its own Runner re-regis
     machines: [{ ...OWN_OFFLINE, online: true }],
   };
   await openDesktop(page, world);
-  await expect(chip(page)).toHaveCount(0);
+  await expect(prompt(page)).toHaveCount(0);
   await expect(hint(page)).toHaveCount(0);
   world.machines = [OWN_OFFLINE];
   await page.evaluate(() => {
     for (const es of window.__es)
       es.emit({ type: 'machine_presence', machineId: 'm1', online: false });
   });
-  await expect(chip(page)).toHaveText('xmonsMac 离线');
+  await expect(label(page)).toHaveText('xmonsMac 离线');
   world.machines = [{ ...OWN_OFFLINE, online: true }];
   await page.evaluate(() => {
     for (const es of window.__es) es.emit({ type: 'machine_presence', machineId: 'm1', online: true });
   });
-  await expect(chip(page)).toHaveCount(0);
+  await expect(prompt(page)).toHaveCount(0);
 });
 
 test('in the desktop app its own offline machine reconnects instead of asking for cairn start', async ({
@@ -195,10 +218,10 @@ test('in the desktop app its own offline machine reconnects instead of asking fo
     bound: true,
     machines: [OWN_OFFLINE],
   });
-  await expect(chip(page)).toHaveText('xmonsMac 离线');
+  await expect(label(page)).toHaveText('xmonsMac 离线');
   await expect(hint(page)).toHaveText('Cairn 会在这台电脑唤醒后自动重连');
   await expect(hint(page).locator('code')).toHaveCount(0);
-  await page.getByTestId('composer-setup-reconnect').click();
+  await page.getByTestId('setup-prompt-reconnect').click();
   await expect
     .poll(() => page.evaluate(() => (window as unknown as { __reconnects: string[] }).__reconnects))
     .toEqual(['reconnect']);
@@ -214,10 +237,10 @@ test('outside the desktop app an offline local machine still shows the start com
     machines: [{ id: 'm1', name: 'xmonsMac', online: false, kind: 'local', lastSeenAt: 1 }],
   });
   await expect(hint(page)).toHaveText(/^在 xmonsMac 上运行 .+ start 让它重新上线$/);
-  await expect(page.getByTestId('composer-setup-reconnect')).toHaveCount(0);
+  await expect(page.getByTestId('setup-prompt-reconnect')).toHaveCount(0);
 });
 
-test('with several runners all offline the chip counts them instead of asking to connect one', async ({
+test('with several runners all offline the notice counts them instead of asking to connect one', async ({
   page,
 }) => {
   await open(page, {
@@ -229,11 +252,11 @@ test('with several runners all offline the chip counts them instead of asking to
       { id: 'm2', name: 'mac', online: false },
     ],
   });
-  await expect(chip(page)).toHaveText('2 台执行机都离线');
+  await expect(label(page)).toHaveText('2 台执行机都离线');
   await expect(hint(page)).toContainText('在其中一台上运行');
 });
 
-test('the chip and hint are gone once the Coordinator, a model source and a machine are ready', async ({
+test('the notice is gone once the Coordinator, a model source and a machine are ready', async ({
   page,
 }) => {
   await open(page, {
@@ -244,14 +267,14 @@ test('the chip and hint are gone once the Coordinator, a model source and a mach
   });
   await expect(page.getByTestId('home-c')).toBeVisible();
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
-  await expect(chip(page)).toHaveCount(0);
+  await expect(prompt(page)).toHaveCount(0);
   await expect(hint(page)).toHaveCount(0);
 });
 
 test('every status read is scoped to the current team', async ({ page }) => {
   const world = fresh();
   await open(page, world);
-  await expect(chip(page)).toBeVisible();
+  await expect(prompt(page)).toBeVisible();
   expect(world.teamPaths).toEqual(
     expect.arrayContaining(['/api/teams/t1/providers', '/api/teams/t1/machines', '/api/teams/t1/chief']),
   );
@@ -268,7 +291,7 @@ test('nothing shows until every status read has loaded', async ({ page }) => {
   );
   await page.goto('/app');
   await expect(page.getByTestId('chief-composer-input')).toBeVisible();
-  await expect(chip(page)).toHaveCount(0);
+  await expect(prompt(page)).toHaveCount(0);
 });
 
 test('sending before the Coordinator is ready shows an actionable translated message, not the raw error', async ({
@@ -281,7 +304,7 @@ test('sending before the Coordinator is ready shows an actionable translated mes
   await composer.press('Enter');
   const toast = page.locator('[data-sonner-toast]').first();
   await expect(toast).toContainText('Coordinator 还不能回答');
-  await expect(toast).toContainText('输入框下方的按钮');
+  await expect(toast).toContainText('先接入模型来源');
   await expect(page.locator('[data-sonner-toast]')).not.toContainText('chief agent not bound');
 });
 
@@ -289,8 +312,8 @@ test('a Claude subscription the Coordinator cannot run yet leaves it without a m
   page,
 }) => {
   await open(page, { ...fresh(), connections: [SUBSCRIPTION], machines: [ONLINE] });
-  await expect(chip(page)).toHaveAttribute('data-step', 'models');
-  await expect(chip(page)).toHaveText('Coordinator 还缺模型');
+  await expect(prompt(page)).toHaveAttribute('data-step', 'models');
+  await expect(prompt(page)).toContainText('Coordinator 还缺模型');
 });
 
 test('an expired subscription does not count as a model source', async ({ page }) => {
@@ -299,6 +322,6 @@ test('an expired subscription does not count as a model source', async ({ page }
     connections: [{ ...SUBSCRIPTION, available: false }],
     machines: [ONLINE],
   });
-  await expect(chip(page)).toHaveAttribute('data-step', 'models');
-  await expect(chip(page)).toHaveText('接入模型来源');
+  await expect(prompt(page)).toHaveAttribute('data-step', 'models');
+  await expect(action(page)).toHaveText('接入模型来源');
 });

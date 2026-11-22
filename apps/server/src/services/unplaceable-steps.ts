@@ -1,9 +1,14 @@
 import { and, eq, isNull } from 'drizzle-orm';
-import { build, machine, notification, step, todo } from '../db/schema.js';
+import { build, machine, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { BLOCKED_BY_HOLD } from './blockers.js';
 import { waitingSince } from './machine-routing.js';
-import { type NotificationDeps, notifyNoMachine } from './notifications.js';
+import {
+  type ActiveCondition,
+  type NotificationDeps,
+  notifyNoMachine,
+  raiseConditionNotices,
+} from './notifications.js';
 import { profileForStep } from './routing-rules.js';
 import { stepQueueProjector } from './step-queue.js';
 
@@ -18,7 +23,7 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     .where(and(eq(step.status, 'pending'), isNull(todo.archivedAt)))
     .all();
   const projectors = new Map<string, ReturnType<typeof stepQueueProjector>>();
-  let raised = 0;
+  const unplaceable: ActiveCondition[] = [];
   for (const { stepRow, todoRow } of rows) {
     if (stepRow.holdReason === 'quota' || stepRow.holdReason === BLOCKED_BY_HOLD) continue;
     const since = waitingSince(stepRow);
@@ -37,12 +42,6 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     });
     if (queue?.blocked === undefined) continue;
     if (queue.blocked.kind === 'machine-offline' && queue.waitingFor !== null) continue;
-    const existing = deps.db
-      .select()
-      .from(notification)
-      .where(eq(notification.id, `${deps.user.id}:${todoRow.id}`))
-      .get();
-    if (existing?.type === 'no_machine' && existing.createdAt >= since) continue;
     const minutes = Math.floor(waited / 60_000);
     const preferredName =
       homeMachineId === null
@@ -54,11 +53,16 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
         ? `没有在线执行机满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
         : queue.blocked.kind === 'sandbox-unavailable' && runnerName !== null
           ? `${runnerName} 的任务沙箱没就绪，接不了任务（原因和修法见执行机页），步骤已等 ${minutes} 分钟`
-          : preferredName !== null
-            ? `${preferredName} 不能跑这一步，不会改派到其他执行机，步骤已等 ${minutes} 分钟`
-            : `没有在线执行机能跑这一步，步骤已等 ${minutes} 分钟`;
-    notifyNoMachine(deps, todoRow, snippet);
-    raised += 1;
+          : queue.blocked.kind === 'machine-retired'
+            ? `${runnerName ?? '这一步绑定的执行机'} 已删除或注销，这一步不会改派：重新注册这台执行机，或在工作路由里改派，步骤已等 ${minutes} 分钟`
+            : preferredName !== null
+              ? `${preferredName} 不能跑这一步，不会改派到其他执行机，步骤已等 ${minutes} 分钟`
+              : `没有在线执行机能跑这一步，步骤已等 ${minutes} 分钟`;
+    unplaceable.push({
+      subjectId: stepRow.id,
+      fingerprint: String(since),
+      notify: () => notifyNoMachine(deps, todoRow, snippet),
+    });
   }
-  return raised;
+  return raiseConditionNotices(deps, 'no_machine', unplaceable, now);
 }

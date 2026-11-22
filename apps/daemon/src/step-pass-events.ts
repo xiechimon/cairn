@@ -9,6 +9,7 @@ import {
   classifyAgentFailure,
   classifySkillFact,
   classifyStepFailure,
+  failureEndsStepNow,
   noVisionSignalOf,
   parseRetryAfterMs,
   REMOTE_TOOL_RETRY_DELAYS_MS,
@@ -245,7 +246,8 @@ export async function consumeStepPassEvent(
         });
         break;
       }
-      await segments.endAssistantMessage(ev.message.content);
+      if (ev.message.stopReason === 'error') stream.discardAttempt();
+      else await segments.endAssistantMessage(ev.message.content);
       break;
     }
     case 'error':
@@ -257,11 +259,10 @@ export async function consumeStepPassEvent(
         const failureKind = s.lastErrorWasProcessCrash
           ? 'other'
           : classifyAgentFailure(ev.error.message);
-        if (
-          !s.lastErrorWasProcessCrash &&
-          classifyStepFailure(ev.error.message) === 'model_unavailable'
-        ) {
-          logger.step(`model unavailable: ${modelKey} — stopping session without retry`);
+        if (!s.lastErrorWasProcessCrash && failureEndsStepNow(ev.error.message)) {
+          logger.step(
+            `${classifyStepFailure(ev.error.message)}: ${modelKey} — stopping session without retry`,
+          );
           await handle.stop();
         } else if (failureKind === 'quota' || failureKind === 'capacity') {
           if (s.quotaTrip === null) {
@@ -308,7 +309,8 @@ export async function consumeStepPassEvent(
         void handle.stop();
       }
       logger.step(`auto_retry_start attempt=${ev.attempt}`);
-      activity.setPhase('retrying', { attempt: ev.attempt });
+      stream.discardAttempt();
+      activity.setPhase('retrying', { attempt: ev.attempt, resetLive: true });
       break;
     case 'auto_retry_end':
       activity.setPhase('awaiting_model');

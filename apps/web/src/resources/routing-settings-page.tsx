@@ -127,11 +127,16 @@ export function ModelPicker({
             ]),
         ...rows.map((o) => ({
           value: modelKey(o),
-          label: o.liveness === 'dead' ? `${o.modelName}（${t('已下架')}）` : o.modelName,
+          label:
+            o.liveness === 'dead'
+              ? `${o.modelName}（${t('已下架')}）`
+              : o.updateRequired !== undefined
+                ? `${o.modelName}（${t('需要更新 Cairn')}）`
+                : o.modelName,
           detail: modelGroupName(o),
           group: modelGroupKey(o),
           groupLabel: modelGroupName(o),
-          disabled: o.liveness === 'dead',
+          disabled: o.liveness === 'dead' || o.updateRequired !== undefined,
           keywords: `${o.modelId} ${o.runtime}`,
         })),
       ]}

@@ -1,4 +1,4 @@
-import { SECRET_NAME_PATTERN, type SetSecretBody } from '@cairn/shared';
+import { isCredentialSecretName, SECRET_NAME_PATTERN, type SetSecretBody } from '@cairn/shared';
 import { useState } from 'react';
 import { FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -46,7 +46,8 @@ export function BulkSecretDialog({
   const [secret, setSecret] = useState(false);
   const [busy, setBusy] = useState(false);
   const { entries, badLines } = parseAssignments(text);
-  const emptySecrets = secret ? entries.filter((entry) => entry.value === '') : [];
+  const storesSecret = (name: string) => secret || isCredentialSecretName(name);
+  const emptySecrets = entries.filter((entry) => storesSecret(entry.name) && entry.value === '');
   const canSubmit = entries.length > 0 && badLines.length === 0 && emptySecrets.length === 0;
 
   const close = () => {
@@ -66,7 +67,7 @@ export function BulkSecretDialog({
     let lastError: unknown = null;
     for (const entry of entries) {
       try {
-        await onCreate({ ...entry, kind: secret ? 'secret' : 'env' });
+        await onCreate({ ...entry, kind: storesSecret(entry.name) ? 'secret' : 'env' });
       } catch (error) {
         failed.push(entry.name);
         lastError = error;

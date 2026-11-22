@@ -39,6 +39,25 @@ On green the script runs `git push origin S:refs/heads/main`. The push uses the
 caller's normal `gh` login, so it also triggers the ordinary main CI run that
 any future green-checking watcher or ruleset would consume.
 
+The `green-main` ruleset's view of check state lags the check-runs API the
+script reads, so a green push is intermittently refused with `GH013 … required
+status check … is expected`. The script retries that refusal up to 8 times with
+exponential backoff (10s doubling, capped at 120s), re-verifying before each
+retry that `queue/main` still points at `S` and `main` has not moved — a `main`
+that already contains `S` counts as landed. Any other push failure, or a
+refusal that survives all attempts, exits with git's real status code.
+
+After the push lands, the same code path closes every issue named by a
+`Closes #N`, `Fixes #N` or `Resolves #N` trailer in the commits the push moved
+onto `main` (`main_before..main_after`), posting a comment that names the
+commit(s) first. This exists because GitHub's closing-keyword processing only
+runs on pushes made by a user credential — pushes made by the `cairn-release`
+GitHub App token (the `promote` workflow) create `referenced` events but never
+close. The step is idempotent (it skips issues already closed), never touches
+`Part of` trailers, and warns instead of failing when a call fails — a failed
+close never fails the landing. Both the workflow run and a local
+`promote-queue.mjs --enforce` go through it.
+
 ## Failure behavior
 
 - candidate run red: `main` untouched; output names the failing jobs; lane

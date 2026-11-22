@@ -21,7 +21,6 @@ export interface AnswerComposerProps {
   handleRef?: Ref<ComposerSurfaceHandle>;
   tab?: ReactNode;
   above: ReactNode;
-  tools: ReactNode;
   context?: ChiefContextUsage | undefined;
   running?: boolean | undefined;
   threadId?: string | null;
@@ -38,7 +37,6 @@ export function AnswerComposer({
   handleRef,
   tab,
   above,
-  tools,
   context,
   running,
   threadId = null,
@@ -95,7 +93,6 @@ export function AnswerComposer({
       composerRef={composerRef}
       tab={tab}
       above={above}
-      tools={tools}
       context={context}
       running={running}
       threadId={threadId}

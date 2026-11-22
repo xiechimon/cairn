@@ -79,7 +79,7 @@ Observed in `AGENTS.md` on this branch: path class does not keep a PR on ian's r
 | `integration/eval/review/experiment.mjs` | eval ruler (`integration/eval/**`) and `CODEOWNERS` `@xiechimon` | must not share a PR with a review-behavior change |
 | this file, `docs/design/*.md` | `autoMerge` (`docs/**/*.md`) | this PR only; it edits no gate |
 
-The ruler a review-system PR must not edit is the eval globs in `packages/shared/merge-gate-paths.json`: `integration/eval/**`, `.claude/hillclimb/**`, `apps/server/src/trajectory-export.ts`, `apps/server/src/trajectory-export-cli.ts`, `apps/server/src/trajectory-outcome.ts`, `packages/shared/src/trajectory-pack.ts`. The dataset itself lives in Langfuse, which a PR cannot commit. `pr-gate.js` runs from `origin/main`, so a PR cannot edit the gate that judges it.
+The ruler a review-system PR must not edit is the eval globs in `packages/shared/merge-gate-paths.json`: `eval/**` (`protected` and `humanQueue.evalConfig`). The dataset itself lives in Langfuse, which a PR cannot commit. `pr-gate.js` runs from `origin/main`, so a PR cannot edit the gate that judges it.
 
 ## What we copy, and what we do not
 

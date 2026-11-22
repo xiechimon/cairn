@@ -11,6 +11,8 @@ const SUBREAPER_LAUNCH = [
   '    raise SystemExit(1)',
 ].join('\n');
 
+const SYSTEM_BIN_PATH = '/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/usr/sbin:/sbin:/snap/bin';
+
 export function python3Executable(pathValue: string | undefined): string | undefined {
   return executableOnPath('python3', pathValue);
 }
@@ -42,7 +44,7 @@ export function spawnContainedCommand(
   args: readonly string[],
   options: SpawnOptions,
 ): ReturnType<typeof spawn> {
-  const launcher = process.platform === 'linux' ? python3Executable(process.env.PATH) : undefined;
+  const launcher = process.platform === 'linux' ? python3Executable(SYSTEM_BIN_PATH) : undefined;
   const argv = containedCommandArgv(command, args, launcher);
   return spawn(argv.file, argv.args, options);
 }

@@ -18,6 +18,9 @@ import { formatTokens } from '../usage/usage-model.js';
 export const TRAY_MAX_ROWS = 6;
 export const TRAY_MACHINE_MAX_ROWS = 5;
 
+export const TRAY_HIGH_PRESSURE = 0.6;
+export const TRAY_FULL_PRESSURE = 0.9;
+
 const PLUMBING_KINDS: ReadonlySet<string> = new Set([
   RESEARCH_BEFORE_PLAN_SOURCE_KIND,
   RESEARCH_STUCK_SOURCE_KIND,
@@ -129,26 +132,31 @@ function machineMeta(machine: TrayMachine): TrayGroup['meta'] {
   const hardware = machine.capabilities?.hardware;
   if (hardware == null) return undefined;
   const strain = machine.strain ?? [];
-  const load = hardware.loadAvg5 ?? hardware.loadAvg1;
   const total = hardware.memoryTotalMb;
-  const memory = total !== undefined && total > 0 ? 1 - hardware.memoryAvailableMb / total : null;
-  const loadRatio = load / hardware.cpuCores;
-  const pressure = Math.min(1, Math.max(memory ?? 0, loadRatio));
+  const memory =
+    hardware.memoryPressure ??
+    (total !== undefined && total > 0 ? 1 - hardware.memoryAvailableMb / total : null);
+  const cpu = hardware.cpuUtilization ?? null;
+  const pressure = Math.min(1, Math.max(memory ?? 0, cpu ?? 0));
   const level: TrayMetaLevel =
-    strain.length > 0 || loadRatio >= 1 ? 'full' : pressure >= 0.6 ? 'high' : 'normal';
+    strain.length > 0 || pressure >= TRAY_FULL_PRESSURE
+      ? 'full'
+      : pressure >= TRAY_HIGH_PRESSURE
+        ? 'high'
+        : 'normal';
+  const disk = Math.round(hardware.diskFreeMb / 1024);
+  const mem = Math.round((memory ?? 0) * 100);
   return {
     percent: Math.round(pressure * 100),
     level,
     warn: strain.length > 0,
-    tip: {
-      key: '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB',
-      vars: {
-        free: (hardware.memoryAvailableMb / 1024).toFixed(1),
-        load: load.toFixed(1),
-        cores: hardware.cpuCores,
-        disk: Math.round(hardware.diskFreeMb / 1024),
-      },
-    },
+    tip:
+      cpu === null
+        ? { key: '内存压力 {mem}%；剩余磁盘 {disk} GB', vars: { mem, disk } }
+        : {
+            key: '内存压力 {mem}%；CPU {cpu}%；剩余磁盘 {disk} GB',
+            vars: { mem, cpu: Math.round(cpu * 100), disk },
+          },
   };
 }
 

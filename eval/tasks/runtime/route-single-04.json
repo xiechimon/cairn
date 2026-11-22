@@ -1,0 +1,43 @@
+{
+  "kind": "runtime",
+  "id": "route-single-04",
+  "request": "修复 mobile 项目的深色模式闪退",
+  "world": {
+    "projects": [
+      "mobile",
+      "other-a",
+      "other-b"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@mobile",
+            "title": "修复深色模式闪退"
+          }
+        }
+      ]
+    },
+    {
+      "text": "已开任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "mobile"
+    ],
+    "parts": 1,
+    "boundModel": "stub/m",
+    "promptContains": [
+      "mobile"
+    ],
+    "promptExcludes": [
+      "<script>"
+    ]
+  },
+  "gate": true
+}

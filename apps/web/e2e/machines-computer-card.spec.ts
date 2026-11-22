@@ -19,6 +19,7 @@ const computer = (patch: Record<string, unknown> = {}) => ({
 interface Feed {
   computers: unknown[];
   controlCalls?: string[];
+  holdControl?: boolean;
 }
 
 const FEED_MACHINE = { id: 'm1', name: 'omarchy', online: true, kind: 'remote', runningSteps: 0 };
@@ -37,6 +38,7 @@ async function open(
       return json({ error: 'the computer is not connected' }, 409);
     }
     if (path === '/api/teams/t1/computers/comp-1/control') {
+      if (feed.holdControl === true) return new Promise<void>(() => {});
       const method = route.request().method();
       feed.controlCalls?.push(method);
       if (method === 'DELETE') return json({ released: true });
@@ -310,11 +312,14 @@ test('the pointer on the enlarged screen opens the control channel, and Shrink g
 test('keyboard focus in the enlarged view shows the bar with how to take control', async ({
   page,
 }) => {
-  const feed: Feed = { computers: [computer()], controlCalls: [] };
+  const feed: Feed = { computers: [computer()], controlCalls: [], holdControl: true };
   await open(page, feed, [SCREEN_MACHINE], '/app?pane=machines&machine=m1&screen=1');
+  const enlarged = page.getByTestId('machine-screen-enlarged');
   const bar = page.getByTestId('machine-screen-bar');
-  await expect(page.getByTestId('machine-screen-enlarged')).toBeVisible();
+  await expect(enlarged).toBeVisible();
   await expect(bar).toHaveAttribute('data-shown', 'false');
+  const center = await screenCenter(enlarged.getByTestId('machine-screen'));
+  await page.mouse.move(center.x, center.y);
   await page.keyboard.press('Tab');
   await expect(bar).toHaveAttribute('data-shown', 'true');
   await expect(bar).toContainText('鼠标移进画面就能操作');

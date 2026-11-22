@@ -18,6 +18,7 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { childEnv } from '../child-env.js';
 import type { OrbCommandRunner, OrbExecResult } from './provider.js';
 
 const ORB_DEPLOY_TIMEOUT_MS = 600_000;
@@ -133,7 +134,7 @@ export async function publishOrbDist(
             temporary,
           ],
           {
-            env: { ...process.env, PNPM_CONFIG_IGNORE_SCRIPTS: 'true' },
+            env: childEnv({ PNPM_CONFIG_IGNORE_SCRIPTS: 'true' }),
             signal: deploySignal,
           },
         );

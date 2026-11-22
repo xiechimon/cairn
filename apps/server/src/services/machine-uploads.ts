@@ -17,10 +17,12 @@ import {
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  ownedStepRow,
   publishStepStatus,
   upsertChiefRow,
   upsertMessage,
 } from './machines.js';
+import { stepScopeProjectId } from './picked-project.js';
 
 export interface PendingUpload {
   stepId: string;
@@ -43,7 +45,7 @@ export function createUploadUrls(
     }
     authorizeRepoArchiveUpload(machineId, stepId);
   } else {
-    ownedStep(deps, machineId, stepId);
+    ownedStepRow(deps, machineId, stepId);
   }
   const out = files.map((f) => {
     const uploadId = newRecordId();
@@ -59,7 +61,7 @@ export function createUploadUrls(
 }
 
 export function receivePlanUpload(deps: MachineDeps, upload: PendingUpload, content: string): void {
-  const stepRow = ownedStep(deps, upload.machineId, upload.stepId);
+  const stepRow = ownedStepRow(deps, upload.machineId, upload.stepId);
   if (stepRow.kind !== 'plan') {
     throw new HttpError(400, `step ${upload.stepId} is a ${stepRow.kind} step, not a plan step`);
   }
@@ -119,6 +121,9 @@ export function receiveUpload(
         role: m.role,
         content: m.content,
         createdAt: m.createdAt,
+        projectId: stepScopeProjectId(stepRow),
+        origin:
+          m.role === 'user' && m.id === transcriptPromptRowId(body.stepId) ? 'task-prompt' : null,
       });
       continue;
     }

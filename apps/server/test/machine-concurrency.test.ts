@@ -338,8 +338,10 @@ const CALM: MachineHardware = {
   cpuCores: 8,
   memoryTotalMb: 16_384,
   memoryAvailableMb: 8_000,
-  loadAvg1: 2,
-  loadAvg5: 2,
+  loadAvg1: 12.4,
+  loadAvg5: 12.1,
+  cpuUtilization: 0.05,
+  memoryPressure: 0.5,
   diskFreeMb: 100_000,
 };
 
@@ -374,8 +376,8 @@ async function machineListRow(w: World) {
 
 describe('machine strain never holds a task (mon X 2026-11-19)', () => {
   const strained: [string, Partial<MachineHardware>, MachineStrainReason][] = [
-    ['memory below 10% available', { memoryAvailableMb: 1_500 }, 'memory'],
-    ['5-minute load above the core count', { loadAvg5: 9.5 }, 'load'],
+    ['memory pressure above 90%', { memoryPressure: 0.93 }, 'memory'],
+    ['CPU pinned', { cpuUtilization: 0.97 }, 'cpu'],
     ['disk below 5 GB free', { diskFreeMb: 4_000 }, 'disk'],
   ];
   for (const [label, patch, reason] of strained) {
@@ -480,10 +482,10 @@ describe('strain changes reach subscribed clients', () => {
       .get()!.capabilities!;
     const report = (hardware: MachineHardware) =>
       markPresence(machineDepsOf(w), w.machineAId, { capabilities: { ...capabilities, hardware } });
-    report({ ...CALM, memoryAvailableMb: 7_000 });
+    report({ ...CALM, memoryAvailableMb: 7_000, memoryPressure: 0.7 });
     expect(events).toEqual([]);
-    report({ ...CALM, memoryAvailableMb: 900 });
-    report({ ...CALM, memoryAvailableMb: 800 });
+    report({ ...CALM, memoryAvailableMb: 900, memoryPressure: 0.95 });
+    report({ ...CALM, memoryAvailableMb: 800, memoryPressure: 0.96 });
     report(CALM);
     expect(events).toEqual([
       { type: 'machine_presence', machineId: w.machineAId, online: true },

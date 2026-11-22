@@ -2,7 +2,7 @@
 
 Whether chief's `run_builds` dispatches a task plan-first or fix-directly = **chief's per-dispatch judgment** (the judgment belongs to the chief, no team settings slot; history in ADR 0014 "old ruling reversal record").
 The server-side only mechanical guarantee = the default fail-safe: the `withPlan` parameter defaults to true plan-first (the unclear direction is "ask once more"). "Fix directly" only skips the plan-confirmation gate, the review gate is on the merge path and unrelated to this parameter (structurally unskippable). The judgment reason takes the `dispatchReason` parameter: it lands in the transcript (chief_message) with the tool call for audit, the response echoes it back verbatim; the prompt orders the chief to write "I judge fix-directly / plan-first, because X" in the receipt, the user can overturn it with one sentence in place and it only affects this once.
-The criterion = the static charter prose of the system-prompt dispatch-judgment section (the Mika judgment-discipline original sentence + three judgeable signals), not a code rule table, not synthesized from any settings. The server-side failure modes are pinned in `apps/server/test/chief.test.ts` (#903 five tests: the PATCH slot dead state / the judgment-section static four elements / default plan-first / explicit false + reason echo / explicit true + reason echo), `orchestration-source.test.ts` B1, `packages/shared/test/chief-tools.test.ts` (the run_builds definition shape); the fixture face pinned in `apps/web/e2e/chief-settings.spec.ts` (the Agent tab no `派发方式` row zombie-control negative pin).
+The criterion = the static charter prose of the system-prompt dispatch-judgment section (the Mika judgment-discipline original sentence + three judgeable signals), not a code rule table, not synthesized from any settings. The server-side failure modes are pinned in the `chief-*.test.ts` scenario files (`apps/server/test/chief.test.ts` was split into them in #1162) (#903 five tests: the PATCH slot dead state / the judgment-section static four elements / default plan-first / explicit false + reason echo / explicit true + reason echo), `orchestration-source.test.ts` B1, `packages/shared/test/chief-tools.test.ts` (the run_builds definition shape); the fixture face was `apps/web/e2e/chief-settings.spec.ts`, retired with the Coordinator settings page (the Agent tab no `派发方式` row zombie-control negative pin is therefore history).
 
 ## Sub-features
 
@@ -54,7 +54,7 @@ Preconditions: `launch.mjs` already started the isolated stack (fresh DB); proxy
   AbortSignal timeout, the symptom = DOMException TimeoutError not an assertion FAIL (hit in the
   first run).
 - The prompt-judgment-section assertion uses the **original sentence substrings** (the JUDGMENT_MUSTS array),
-  changing the prompt wording must sync the probe and chief.test.ts / orchestration-source.test.ts, the three canon sites.
+  changing the prompt wording must sync the probe and the `chief-*.test.ts` scenario files / orchestration-source.test.ts, the three canon sites.
 - The negative pin on the `withPlan:false` literal: the judgment-section prose deliberately describes the parameter
   with the "withPlan=false" equals shape - the colon shape is the fingerprint of the #892 disease instruction, the two
   canon sites (unit test + probe) both pin not-contain, do not bring the colon shape back when changing the prompt.

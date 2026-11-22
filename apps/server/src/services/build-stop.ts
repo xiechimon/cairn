@@ -15,6 +15,7 @@ import { emitRuntimeBuildSpan } from '../runtime-otel.js';
 import { settleAutonomousMerge } from './autonomous-merge.js';
 import { settleRetiredGateStep } from './build-gate-steps.js';
 import { type BuildDeps, NotFoundError, publishBuild, settleParkedStep } from './builds.js';
+import { announceMergeStepOutcome } from './merge-announcement.js';
 import { canStopTransitionPhase, stopReturnPhase } from './phase.js';
 import { publishStepRow } from './quota-wait.js';
 import { finishScheduledStep } from './schedules.js';
@@ -151,6 +152,12 @@ export function applyStoppedStep(deps: BuildDeps, stepId: string): void {
   if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
+  if (stepRow.kind === 'merge')
+    announceMergeStepOutcome(deps, {
+      stepId,
+      buildId: buildRow.id,
+      text: '合并没有完成：合并步被停止。',
+    });
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   const cancelledRow = db.select().from(build).where(eq(build.id, buildRow.id)).get();
   if (cancelledRow) publishBuild(deps, cancelledRow);
@@ -262,6 +269,12 @@ export function stopStepKeepPhase(deps: BuildDeps, stepId: string): void {
   if (stoppedRow) publishStepRow(deps, stoppedRow);
   const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
   if (!buildRow) return;
+  if (stepRow.kind === 'merge')
+    announceMergeStepOutcome(deps, {
+      stepId,
+      buildId: buildRow.id,
+      text: '合并没有完成：合并步被停止。',
+    });
   db.update(build).set({ errorMessage: STOP_MESSAGE }).where(eq(build.id, buildRow.id)).run();
   const cancelledRow = db.select().from(build).where(eq(build.id, buildRow.id)).get();
   if (cancelledRow) publishBuild(deps, cancelledRow);

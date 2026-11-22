@@ -25,6 +25,7 @@ export interface StepDoneOutcome {
   branchDrift: { expected: string; actual: string } | null;
   quotaBlock: QuotaBlock | null;
   skillInjectionFacts: SkillInjectionFacts | null;
+  generation?: number;
 }
 
 export interface StepVerdictSource {
@@ -73,6 +74,7 @@ export function composeDoneBody(
     ...(outcome.skillInjectionFacts !== null
       ? { skillInjectionFacts: outcome.skillInjectionFacts }
       : {}),
+    ...(outcome.generation !== undefined ? { generation: outcome.generation } : {}),
     ...(outcome.status === 'success' && !source.messages.some((m) => m.role === 'assistant')
       ? { noOutput: true as const }
       : {}),

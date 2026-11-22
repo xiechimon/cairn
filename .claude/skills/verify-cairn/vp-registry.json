@@ -895,6 +895,16 @@
           "status": "current",
           "purpose": "The MCP page shows the local config read-only: the API projection hides secrets, write routes return 404, rows have no new or more entry points, and there is no mcp_server table.",
           "usage": "launch with CAIRN_MCP_CONFIG=<fixture claude.json>; env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
+        },
+        "owner-chrome": {
+          "script": ".claude/skills/verify-cairn/scripts/drive-owner-chrome.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "The Browser MCP preset: catalog card, store link and two setup steps in the connect dialog, no token field, enable writes transport stdio / status local / url null (API and SQLite), manage dialog repeats the local state and install steps.",
+          "usage": "env VERIFY_REPO_ROOT, VERIFY_RUN_DIR, VERIFY_EVIDENCE_DIR"
         }
       }
     },

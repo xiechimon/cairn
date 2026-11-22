@@ -3,7 +3,7 @@ import { type AddressInfo, createConnection } from 'node:net';
 import { expect, test } from 'vitest';
 import { createHttpDrain } from '../src/shutdown-http.js';
 
-test('drains an active request before the final tracing shutdown', async () => {
+test('drains an active request before the drain resolves', async () => {
   let terminalSpan = false;
   let release: (() => void) | undefined;
   let entered: (() => void) | undefined;
@@ -27,21 +27,21 @@ test('drains an active request before the final tracing shutdown', async () => {
     }).on('error', reject);
   });
   await requestEntered;
-  let tracingClosed = false;
-  const shutdown = drain(async () => {
-    expect(terminalSpan).toBe(true);
-    tracingClosed = true;
+  let drained = false;
+  const shutdown = drain().then(() => {
+    drained = true;
   });
   const observed = shutdown.then(
     () => null,
     (error: unknown) => error,
   );
   try {
-    expect(tracingClosed).toBe(false);
+    expect(drained).toBe(false);
     release?.();
     await response;
     expect(await observed).toBeNull();
-    expect(tracingClosed).toBe(true);
+    expect(drained).toBe(true);
+    expect(terminalSpan).toBe(true);
   } finally {
     release?.();
     await response;
@@ -67,7 +67,7 @@ test('ends open event streams so they cannot hold tracing shutdown open', async 
   });
   await response;
   try {
-    const shutdown = drain(async () => {});
+    const shutdown = drain();
     expect(stream?.writableEnded).toBe(true);
     await shutdown;
   } finally {
@@ -97,22 +97,19 @@ test('bounds shutdown when a client never finishes uploading a request body', as
   client.on('error', () => {});
   client.write('POST / HTTP/1.1\r\nHost: localhost\r\nContent-Length: 100\r\n\r\nx');
   await requestEntered;
-  let tracingClosed = false;
+  let drained = false;
   let guard: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
-      drain(async () => {
-        tracingClosed = true;
+      drain().then(() => {
+        drained = true;
       }),
       new Promise<never>((_resolve, reject) => {
-        guard = setTimeout(
-          () => reject(new Error('HTTP drain did not reach tracing shutdown')),
-          2000,
-        );
+        guard = setTimeout(() => reject(new Error('HTTP drain did not finish')), 2000);
       }),
     ]);
     await closed;
-    expect(tracingClosed).toBe(true);
+    expect(drained).toBe(true);
     expect(client.destroyed).toBe(true);
   } finally {
     clearTimeout(guard);

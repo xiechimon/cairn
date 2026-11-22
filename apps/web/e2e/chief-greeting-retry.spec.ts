@@ -36,7 +36,7 @@ test('a failed initial greeting retries once without sending an owner message', 
     return undefined;
   });
   await page.goto(`/app?project=${PROJECT.id}&chat=1`);
-  await expect(page.getByTestId('chief-turn-error')).toHaveCount(2);
+  await expect(page.getByTestId('chief-turn-error')).toHaveText(['Did not finish']);
   await expect(page.getByTestId('chief-turn-retry')).toHaveCount(1);
   await expect(page.getByTestId('chief-stream')).not.toContainText('EHOSTUNREACH');
   await page.getByTestId('chief-turn-retry').click();

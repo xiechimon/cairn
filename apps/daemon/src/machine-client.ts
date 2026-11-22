@@ -16,6 +16,8 @@ import {
   type MachineEnrollResponse,
   type MachineHeartbeatBody,
   type MachineImEventBody,
+  type MachineLocalMergeRecheckBody,
+  type MachineLocalMergeRecheckResponse,
   type MachineOfflineBody,
   type MachineOfflineResponse,
   type MachinePresenceBody,
@@ -37,6 +39,7 @@ import {
   machineEnrollPollResponseSchema,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
+  machineLocalMergeRecheckResponseSchema,
   machineOfflineResponseSchema,
   machineOkResponseSchema,
   machinePresenceResponseSchema,
@@ -104,6 +107,7 @@ export interface MachineApi {
     apiKey: string;
     claudeCode?: ClaudeCodeReport;
     capabilities?: MachineCapabilities;
+    hostKey?: string;
   }): Promise<MachineEnrollResponse>;
   me(): Promise<MachineRecord>;
   presence(body: MachinePresenceBody, signal?: AbortSignal): Promise<MachinePresenceResponse>;
@@ -114,6 +118,10 @@ export interface MachineApi {
   ): Promise<string[]>;
   claim(signal?: AbortSignal, body?: MachineClaimBody): Promise<ClaimedStep | null>;
   heartbeat(stepId: string, body?: MachineHeartbeatBody): Promise<void>;
+  localMergeRecheck?(
+    stepId: string,
+    body: MachineLocalMergeRecheckBody,
+  ): Promise<MachineLocalMergeRecheckResponse>;
   tool(stepId: string, call: ToolCallRecord): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
   thinkingDelta?(stepId: string, text: string): Promise<void>;
@@ -216,6 +224,7 @@ export class MachineClient implements MachineApi {
     apiKey: string;
     claudeCode?: ClaudeCodeReport;
     capabilities?: MachineCapabilities;
+    hostKey?: string;
   }): Promise<MachineEnrollResponse> {
     const { apiKey, ...rest } = body;
     return this.request<MachineEnrollResponse>('POST', '/api/machine/enroll', {
@@ -225,7 +234,7 @@ export class MachineClient implements MachineApi {
     });
   }
 
-  async enrollStart(body: { teamId?: string; name?: string }): Promise<{
+  async enrollStart(body: { teamId?: string; name?: string; hostKey?: string }): Promise<{
     enrollId: string;
     url: string;
     code?: string;
@@ -310,6 +319,34 @@ export class MachineClient implements MachineApi {
       signal: AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
+  }
+
+  async localMergeRecheck(
+    stepId: string,
+    body: MachineLocalMergeRecheckBody,
+  ): Promise<MachineLocalMergeRecheckResponse> {
+    const delays = [...REMOTE_TOOL_RETRY_DELAYS_MS];
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= delays.length; attempt++) {
+      try {
+        return await this.request<MachineLocalMergeRecheckResponse>(
+          'POST',
+          `/api/machine/local-merge-recheck/${stepId}`,
+          {
+            body,
+            signal: AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
+            parse: (raw) => machineLocalMergeRecheckResponseSchema.parse(raw),
+          },
+        );
+      } catch (err) {
+        lastErr = err;
+        if (err instanceof MachineApiError && err.status < 500) throw err;
+      }
+      const delay = delays[attempt];
+      if (delay === undefined) break;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+    throw lastErr instanceof Error ? lastErr : new Error('local merge recheck failed');
   }
 
   async tool(stepId: string, call: ToolCallRecord): Promise<void> {

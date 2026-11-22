@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import type { LocalMergeCommand, LocalMergeResult } from '@cairn/shared';
 import { type CompareFile, PATCH_DIGEST_VERSION } from '@cairn/shared/merge-gate';
-import { withoutPinnedEnv } from './backend/pinned-env.js';
+import { childEnv } from './child-env.js';
 import { commitEnv, gitPrim, landGitSquash, runGit, runGitOk } from './git.js';
 import { decideLocalMerge } from './merge-decision.js';
 
@@ -90,6 +90,7 @@ export async function inspectLocalPatch(
 export async function landLocalMerge(
   dir: string,
   command: LocalMergeCommand,
+  authorize: () => Promise<string | null>,
   shouldStop: () => boolean = () => false,
 ): Promise<LocalMergeResult> {
   for (const sha of [command.judgedBase, command.judgedHead]) {
@@ -159,7 +160,7 @@ export async function landLocalMerge(
       try {
         await exec('/bin/sh', ['-c', check], {
           cwd: candidate,
-          env: withoutPinnedEnv(process.env),
+          env: childEnv(),
           timeout: 300_000,
           maxBuffer: 1024 * 1024,
         });
@@ -175,6 +176,14 @@ export async function landLocalMerge(
     const checkedOut = worktrees.split('\n\n').filter((entry) => entry.includes(`\nbranch ${ref}`));
     if (checkedOut.length > (decision.action === 'fast-forward' ? 1 : 0))
       return { outcome: 'held', reason: 'checkout-unknown' };
+    let refusal: string | null;
+    try {
+      refusal = await authorize();
+    } catch {
+      return { outcome: 'recheck', reason: 'authorization-unreachable' };
+    }
+    if (refusal !== null) return { outcome: 'recheck', reason: refusal };
+    if (shouldStop()) return { outcome: 'held', reason: 'stopped' };
     const landed = await landGitSquash({
       dir,
       branch: command.defaultBranch,

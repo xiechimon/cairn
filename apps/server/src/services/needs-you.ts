@@ -60,6 +60,7 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
   for (const row of rows) {
     if (
       row.latestBuildId === null ||
+      row.supersededBy !== null ||
       row.sourceKind === 'research-intake' ||
       row.sourceKind === 'research-citation-check'
     )

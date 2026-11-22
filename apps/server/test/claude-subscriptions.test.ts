@@ -919,14 +919,7 @@ describe('the subscription list wire carries quota windows and usage stats', () 
     const used = byId.get(id)!;
     expect(used.state).toBeUndefined();
     expect(used.cooldownUntil).toBeUndefined();
-    expect(used.windows).toEqual([
-      {
-        name: 'five_hour',
-        utilization: 1,
-        resetsAt: observed + 1_000,
-        observedAt: observed,
-      },
-    ]);
+    expect(used.windows).toEqual([]);
     expect(used.lastUsedAt).toBeNull();
     expect(used.stepsLast24h).toBeNull();
     const freshRow = byId.get(fresh)!;
@@ -934,6 +927,357 @@ describe('the subscription list wire carries quota windows and usage stats', () 
     expect(freshRow.windows).toEqual([]);
     expect(freshRow.lastUsedAt).toBeNull();
     expect(freshRow.stepsLast24h).toBeNull();
+    s.dispose();
+  });
+});
+
+describe('opening the tray refreshes the Claude quota from upstream', () => {
+  const quotaHeaders = (fiveHour: string, sevenDay: string) =>
+    new Response('{}', {
+      status: 200,
+      headers: {
+        'content-type': 'application/json',
+        'anthropic-ratelimit-unified-status': 'allowed',
+        'anthropic-ratelimit-unified-representative-claim': 'seven_day',
+        'anthropic-ratelimit-unified-5h-utilization': fiveHour,
+        'anthropic-ratelimit-unified-5h-reset': '1800000000',
+        'anthropic-ratelimit-unified-7d-utilization': sevenDay,
+        'anthropic-ratelimit-unified-7d-reset': '1800500000',
+      },
+    });
+
+  const staleWeek = (s: TestServer, id: string, reportedAt: number) =>
+    s.db
+      .update(claudeSubscription)
+      .set({
+        quotaWindows: [
+          {
+            subscription: 'seven_day',
+            status: 'allowed',
+            utilization: 0.31,
+            resetsAt: null,
+            reportedAt,
+          },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+
+  test('a figure used elsewhere since the last Cairn run is read back from the account, once per minute', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    const fetchStub = vi.fn<typeof globalThis.fetch>(async (url) =>
+      String(url).includes('/v1/models') ? modelsOk() : quotaHeaders('0.14', '0.33'),
+    );
+    vi.stubGlobal('fetch', fetchStub);
+    const path = `/api/teams/${s.team.id}/claude-subscriptions/quota`;
+    const refreshed = (await (await req(s.app, 'POST', path)).json()) as {
+      windows: { name: string; utilization: number; resetsAt: number | null }[];
+    }[];
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({
+        name: 'seven_day',
+        utilization: 0.33,
+        resetsAt: 1_800_500_000_000,
+      }),
+      expect.objectContaining({
+        name: 'five_hour',
+        utilization: 0.14,
+        resetsAt: 1_800_000_000_000,
+      }),
+    ]);
+    expect(fetchStub).toHaveBeenCalledTimes(3);
+    const [url, init] = fetchStub.mock.calls[2]!;
+    expect(String(url)).toBe('https://api.anthropic.com/v1/messages');
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      max_tokens: 1,
+      model: 'claude-haiku-5-5',
+    });
+    expect((await req(s.app, 'POST', path)).status).toBe(200);
+    expect(fetchStub).toHaveBeenCalledTimes(3);
+    s.dispose();
+  });
+
+  test('a fresh observation suppresses the paid probe', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 120_000);
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url) => {
+        calls.push(String(url));
+        const target = String(url);
+        if (target.includes('/v1/models')) return modelsOk();
+        if (target.includes('/v1/messages')) return quotaHeaders('0.14', '0.33');
+        return new Response('{}', { status: 403 });
+      }),
+    );
+    const refreshed = (await (
+      await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`)
+    ).json()) as {
+      windows: { name: string; utilization: number }[];
+    }[];
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.31 }),
+    ]);
+    expect(calls.filter((url) => url.includes('/v1/messages'))).toEqual([]);
+    s.dispose();
+  });
+
+  test('the paid probe opens with the cheapest model the account lists', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    s.db
+      .update(claudeSubscription)
+      .set({
+        models: [
+          { id: 'claude-opus-5-5', name: 'Opus' },
+          { id: 'claude-sonnet-5-5', name: 'Sonnet' },
+          { id: 'claude-haiku-5-5', name: 'Haiku' },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+    staleWeek(s, id, Date.now() - 10 * 60_000 - 1_000);
+    const probed: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url, init) => {
+        const target = String(url);
+        if (target.includes('/api/oauth/usage')) return new Response('{}', { status: 403 });
+        if (target.includes('/v1/models')) return modelsOk();
+        probed.push(JSON.parse(String(init?.body)).model as string);
+        return quotaHeaders('0.14', '0.33');
+      }),
+    );
+    await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`);
+    expect(probed[0]).toBe('claude-haiku-5-5');
+    s.dispose();
+  });
+
+  test('a refused first model falls through to the next model the account lists', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    const probed: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url, init) => {
+        const target = String(url);
+        if (target.includes('/api/oauth/usage')) return new Response('{}', { status: 429 });
+        if (target.includes('/v1/models')) return modelsOk();
+        probed.push(JSON.parse(String(init?.body)).model as string);
+        return probed.length === 1
+          ? new Response('{"error":{"type":"rate_limit_error"}}', { status: 429 })
+          : quotaHeaders('0.14', '0.33');
+      }),
+    );
+    const refreshed = (await (
+      await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`)
+    ).json()) as {
+      windows: { name: string; utilization: number }[];
+    }[];
+    expect(probed).toEqual(['claude-haiku-5-5', 'claude-opus-5-5']);
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.33 }),
+      expect.objectContaining({ name: 'five_hour', utilization: 0.14 }),
+    ]);
+    s.dispose();
+  });
+
+  test('an upstream that answers without quota headers keeps the stored figure and is not asked again within the minute', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    const fetchStub = vi.fn<typeof globalThis.fetch>(
+      async () => new Response('{"error":{}}', { status: 401 }),
+    );
+    vi.stubGlobal('fetch', fetchStub);
+    const path = `/api/teams/${s.team.id}/claude-subscriptions/quota`;
+    const first = (await (await req(s.app, 'POST', path)).json()) as {
+      windows: { name: string; utilization: number }[];
+    }[];
+    expect(first[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.31 }),
+    ]);
+    await req(s.app, 'POST', path);
+    expect(fetchStub).toHaveBeenCalledTimes(2);
+    s.dispose();
+  });
+
+  test('reads the windows Claude Code reads from the usage endpoint, without sending a paid message', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url) => {
+        calls.push(String(url));
+        if (String(url).includes('/api/oauth/usage')) {
+          return Response.json({
+            five_hour: { utilization: 42, resets_at: '2030-01-01T00:00:00Z' },
+            seven_day: { utilization: 7, resets_at: null },
+            extra_usage: { is_enabled: true, utilization: 5 },
+          });
+        }
+        return quotaHeaders('0.14', '0.33');
+      }),
+    );
+    const refreshed = (await (
+      await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`)
+    ).json()) as {
+      windows: { name: string; utilization: number; resetsAt: number | null }[];
+    }[];
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.07, resetsAt: null }),
+      expect.objectContaining({
+        name: 'five_hour',
+        utilization: 0.42,
+        resetsAt: Date.parse('2030-01-01T00:00:00Z'),
+      }),
+    ]);
+    expect(calls).toEqual(['https://api.anthropic.com/api/oauth/usage']);
+    s.dispose();
+  });
+
+  test('a refused probe marks the account exhausted instead of keeping a stale figure', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url) => {
+        const target = String(url);
+        if (target.includes('/api/oauth/usage')) return new Response('{}', { status: 403 });
+        if (target.includes('/v1/models')) return modelsOk();
+        return new Response('{"error":{"type":"rate_limit_error"}}', { status: 429 });
+      }),
+    );
+    const refreshed = (await (
+      await req(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`)
+    ).json()) as {
+      state?: string;
+      cooldownUntil?: number | null;
+      windows: { name: string }[];
+    }[];
+    expect(refreshed[0]?.state).toBe('exhausted');
+    expect(refreshed[0]?.cooldownUntil).toBeNull();
+    expect(refreshed[0]?.windows).toEqual([expect.objectContaining({ name: 'seven_day' })]);
+    s.dispose();
+  });
+
+  test('a token the usage endpoint refuses goes straight to the message probe next time', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url) => {
+        calls.push(String(url).split('?')[0]!);
+        const target = String(url);
+        if (target.includes('/api/oauth/usage')) return new Response('{}', { status: 403 });
+        if (target.includes('/v1/models')) return modelsOk();
+        return quotaHeaders('0.14', '0.33');
+      }),
+    );
+    const path = `/api/teams/${s.team.id}/claude-subscriptions/quota`;
+    const t0 = Date.now();
+    await req(s.app, 'POST', path);
+    vi.spyOn(Date, 'now').mockReturnValue(t0 + 601_000);
+    const refreshed = (await (await req(s.app, 'POST', path)).json()) as {
+      windows: { name: string; utilization: number }[];
+    }[];
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.33 }),
+      expect.objectContaining({ name: 'five_hour', utilization: 0.14 }),
+    ]);
+    expect(calls).toEqual([
+      'https://api.anthropic.com/api/oauth/usage',
+      'https://api.anthropic.com/v1/models',
+      'https://api.anthropic.com/v1/messages',
+      'https://api.anthropic.com/v1/models',
+      'https://api.anthropic.com/v1/messages',
+    ]);
+    s.dispose();
+  });
+
+  test('a recovered account clears the exhausted mark when real windows arrive', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    staleWeek(s, id, Date.now() - 10 * 60_000);
+    let probes = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url) => {
+        const target = String(url);
+        if (target.includes('/api/oauth/usage')) return new Response('{}', { status: 403 });
+        if (target.includes('/v1/models')) return modelsOk();
+        probes += 1;
+        return probes <= 3
+          ? new Response('{"error":{"type":"rate_limit_error"}}', { status: 429 })
+          : quotaHeaders('0.14', '0.33');
+      }),
+    );
+    const path = `/api/teams/${s.team.id}/claude-subscriptions/quota`;
+    const t0 = Date.now();
+    const first = (await (await req(s.app, 'POST', path)).json()) as { state?: string }[];
+    expect(first[0]?.state).toBe('exhausted');
+    vi.spyOn(Date, 'now').mockReturnValue(t0 + 601_000);
+    const refreshed = (await (await req(s.app, 'POST', path)).json()) as {
+      state?: string;
+      windows: { name: string; utilization: number }[];
+    }[];
+    expect(refreshed[0]?.state).toBeUndefined();
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'seven_day', utilization: 0.33 }),
+      expect.objectContaining({ name: 'five_hour', utilization: 0.14 }),
+    ]);
+    s.dispose();
+  });
+
+  test('a window whose reset already passed no longer reports its last figure', async () => {
+    const s = bootServer();
+    const id = insertClaudeSubscription(s);
+    const now = Date.now();
+    s.db
+      .update(claudeSubscription)
+      .set({
+        quotaWindows: [
+          {
+            subscription: 'five_hour',
+            status: 'allowed',
+            utilization: 0.9,
+            resetsAt: now - 1_000,
+            reportedAt: now - 3_600_000,
+          },
+          {
+            subscription: 'seven_day',
+            status: 'allowed',
+            utilization: 0.34,
+            resetsAt: now + 86_400_000,
+            reportedAt: now - 3_600_000,
+          },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+    const rows = (await (
+      await req(s.app, 'GET', `/api/teams/${s.team.id}/claude-subscriptions`)
+    ).json()) as {
+      windows: { name: string; utilization: number; resetsAt: number | null }[];
+    }[];
+    expect(rows[0]?.windows).toEqual([
+      {
+        name: 'seven_day',
+        utilization: 0.34,
+        resetsAt: now + 86_400_000,
+        observedAt: now - 3_600_000,
+      },
+    ]);
     s.dispose();
   });
 });

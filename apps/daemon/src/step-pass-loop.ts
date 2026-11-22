@@ -2,7 +2,7 @@ import {
   type AgentBackend,
   type AgentSessionHandle,
   type ClaimedStep,
-  classifyStepFailure,
+  failureEndsStepNow,
   type ProviderConfig,
   type SessionOpts,
 } from '@cairn/shared';
@@ -85,13 +85,13 @@ async function drainPass(
       watchdog.noteEvent();
       activity.noteEvent();
       await consumeStepPassEvent(ev, passEvents, passState);
-      if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable') break;
+      if (failureEndsStepNow(passState.lastModelError ?? '')) break;
     }
   } catch (err) {
     passState.lastError = err instanceof Error ? err.message : String(err);
   }
   stop.detach();
-  if (classifyStepFailure(passState.lastModelError ?? '') === 'model_unavailable')
+  if (failureEndsStepNow(passState.lastModelError ?? ''))
     passState.lastError = passState.lastModelError;
 }
 
@@ -113,7 +113,7 @@ export async function runStepPasses(input: StepPassLoopInput): Promise<StepPassL
       priorPassMadeProgress ||= passState.sawProgress;
       resetStepPassForRetry(passState);
       watchdog.clearTrip();
-      stream.discardDeltas();
+      stream.discardAttempt();
     }
     if (stop.request !== null) break;
     input.activity.setPhase('starting', pass > 0 ? { resetLive: true } : undefined);

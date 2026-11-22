@@ -1,4 +1,5 @@
 import type { TodoRecord } from '../fixtures/records.js';
+import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
 import { STATUS_WORDS } from './status-words.js';
 
 export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
@@ -28,11 +29,17 @@ export const THREAD_PARAM = 'thread';
 
 export const VIEW_PARAM = 'view';
 
-export function threadHref(id: string, homeSearch: string): string {
-  const params = new URLSearchParams(homeSearch);
+export function withThread(search: string | URLSearchParams, id: string): URLSearchParams {
+  const params = new URLSearchParams(search);
   params.set(THREAD_PARAM, id);
   params.delete(VIEW_PARAM);
-  return `/app?${params.toString()}`;
+  params.delete(FILE_PARAM);
+  params.delete(FILE_NAME_PARAM);
+  return params;
+}
+
+export function threadHref(id: string, homeSearch: string): string {
+  return `/app?${withThread(homeSearch, id).toString()}`;
 }
 
 export function threadHrefFrom(id: string, search: string): string {

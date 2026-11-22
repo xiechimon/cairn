@@ -37,4 +37,4 @@ A write always replaces the whole list. Last write wins; two tabs that reorder a
 ## Tests
 
 - Server: the PUT stores the order, the providers envelope returns it, model sources follow it, and an invalid body is refused (`apps/server/test/provider-order.test.ts`).
-- Web: dragging a row by its handle and moving it with the keyboard both reorder the list and send the new order; a failed save puts the old order back (`apps/web/e2e/providers-order.spec.ts`).
+- Web: dragging a row anywhere on it (mouse past 4px, or a 250ms touch hold) and moving it with Space and the arrow keys on its focused row button both reorder the list and send the new order; a failed save puts the old order back (`apps/web/e2e/providers-order.spec.ts`).

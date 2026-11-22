@@ -21,6 +21,7 @@ import {
   type BuildDeps,
   finishTodoDone,
   lastPushedCheckpoint,
+  type MergeRequestOutcome,
   mergingBuilds,
   NotFoundError,
   STEP_KIND_TEXT,
@@ -31,7 +32,7 @@ import { githubText } from './github-text.js';
 import { assertMergeRequiredChecks } from './merge-required-checks.js';
 import { assertPhaseTransition } from './phase.js';
 import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
-import { setTodoPhase } from './todos.js';
+import { selfIssueCreatePending, setTodoPhase } from './todos.js';
 import { insertGateAnnouncement, insertMessageRow } from './transcript.js';
 
 type BuildRow = typeof build.$inferSelect;
@@ -99,7 +100,7 @@ export async function mergeThroughGithub(
   prNumber: number,
   repoRef: GithubRepoRef,
   actor: string,
-): Promise<{ delegated: true }> {
+): Promise<MergeRequestOutcome> {
   const initial = apiMergeGate(deps, row);
   const targetProject = projectOfTodo(deps.db, initial.todoRow);
   await assertNoMergedPrElsewhere(deps, row, prNumber);
@@ -182,7 +183,7 @@ export async function mergeThroughGithub(
         content: `PR #${prNumber} 已在 GitHub 合并：cairn 对账核对后收尾（核对不上时在时间线说明）。`,
         createdAt: nowMs(),
       });
-      return { delegated: true };
+      return { state: 'merged', prNumber, commit: pull.headSha, alreadyMerged: true };
     }
     const checkpoint = lastPushedCheckpoint(deps, row.id, { mergeSteps: true });
     if (checkpoint === null || !isFullSha(checkpoint)) {
@@ -199,6 +200,7 @@ export async function mergeThroughGithub(
     }
     const titled = `${pull.title} (#${prNumber})`;
     await assertMergeRequiredChecks(fetchImpl, token, repoRef, pull.baseRef, checkpoint);
+    await selfIssueCreatePending(row.todoId);
     const closing = apiMergeGate(deps, row);
     await ensurePullClosesTaskIssue(
       fetchImpl,
@@ -270,7 +272,9 @@ export async function mergeThroughGithub(
       createdAt: nowMs(),
     });
     if (result.kind === 'merged' && atGate) finishTodoDone(deps, row.todoId, row.id);
-    return { delegated: true };
+    return result.kind === 'merged'
+      ? { state: 'merged', prNumber, commit: result.sha, alreadyMerged: false }
+      : { state: 'unconfirmed', prNumber };
   } finally {
     mergingBuilds.delete(row.id);
   }

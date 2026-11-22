@@ -147,7 +147,7 @@ test('a computer group carries the machine OS for the header icon', () => {
 });
 
 test('an idle computer shows only when strained, with a pressure percent and level in the header', () => {
-  const hardware = { cpuCores: 10, memoryTotalMb: 16_384, memoryAvailableMb: 1_024, loadAvg1: 2, loadAvg5: 7, diskFreeMb: 2_048 };
+  const hardware = { cpuCores: 10, memoryTotalMb: 16_384, memoryAvailableMb: 1_024, loadAvg1: 2, loadAvg5: 7, cpuUtilization: 0.02, memoryPressure: 0.94, diskFreeMb: 2_048 };
   const groups = trayGroups(
     { questions: [], entries: [] },
     [machine({ strain: ['memory', 'disk'], capabilities: { hardware } as TrayMachine['capabilities'] })],
@@ -160,19 +160,21 @@ test('an idle computer shows only when strained, with a pressure percent and lev
   expect(meta?.percent).toBe(94);
   expect(meta?.level).toBe('full');
   expect(meta?.tip).toEqual({
-    key: '可用内存 {free} GB；5 分钟负载 {load}，{cores} 核；剩余磁盘 {disk} GB',
-    vars: { free: '1.0', load: '7.0', cores: 10, disk: 2 },
+    key: '内存压力 {mem}%；CPU {cpu}%；剩余磁盘 {disk} GB',
+    vars: { mem: 94, cpu: 2, disk: 2 },
   });
   expect(meta && Object.keys(meta).sort()).toEqual(['level', 'percent', 'tip', 'warn']);
 });
 
-test('the header percent is the machine pressure: the worse of memory and per-core load, capped', () => {
+test('the header percent is the worse of CPU utilization and memory pressure', () => {
   const hardware = (over: Record<string, number>) => ({
     cpuCores: 8,
     memoryTotalMb: 16_384,
     memoryAvailableMb: 9_830,
-    loadAvg1: 1,
-    loadAvg5: 1,
+    loadAvg1: 12.4,
+    loadAvg5: 12.1,
+    cpuUtilization: 0.03,
+    memoryPressure: 0.4,
     diskFreeMb: 500_000,
     ...over,
   });
@@ -184,11 +186,50 @@ test('the header percent is the machine pressure: the worse of memory and per-co
         capabilities: { hardware: hardware(hw) } as TrayMachine['capabilities'],
       }),
     ])[0]?.meta;
-  expect(metaOf({ memoryAvailableMb: 9_830, loadAvg5: 1 })).toMatchObject({ percent: 40, level: 'normal' });
-  expect(metaOf({ memoryAvailableMb: 9_830, loadAvg5: 6 })).toMatchObject({ percent: 75, level: 'high' });
-  expect(metaOf({ memoryAvailableMb: 12_288, loadAvg5: 45 })).toMatchObject({ percent: 100, level: 'full' });
-  expect(metaOf({ memoryAvailableMb: 1_024 }, ['memory'])).toMatchObject({ percent: 94, level: 'full' });
-  expect(metaOf({ memoryAvailableMb: 14_746 }, ['disk'])).toMatchObject({ percent: 13, level: 'full' });
+  expect(metaOf({})).toMatchObject({ percent: 40, level: 'normal' });
+  expect(metaOf({ cpuUtilization: 0.75 })).toMatchObject({ percent: 75, level: 'high' });
+  expect(metaOf({ cpuUtilization: 0.97 })).toMatchObject({ percent: 97, level: 'full' });
+  expect(metaOf({ memoryPressure: 0.94 }, ['memory'])).toMatchObject({ percent: 94, level: 'full' });
+  expect(metaOf({ memoryPressure: 0.13 }, ['disk'])).toMatchObject({ percent: 13, level: 'full' });
+});
+
+test('a Mac with load 12 on 8 cores and idle CPU reads as its CPU and memory, not 100%', () => {
+  const hardware = {
+    cpuCores: 8,
+    memoryTotalMb: 16_384,
+    memoryAvailableMb: 6_062,
+    loadAvg1: 12.4,
+    loadAvg5: 12.1,
+    cpuUtilization: 0.03,
+    memoryPressure: 0.63,
+    diskFreeMb: 182_000,
+  };
+  const meta = trayGroups({ questions: [], entries: [] }, [
+    machine({
+      running: [thread('t', 0)],
+      capabilities: { hardware } as TrayMachine['capabilities'],
+    }),
+  ])[0]?.meta;
+  expect(meta).toMatchObject({ percent: 63, level: 'high', warn: false });
+  expect(meta?.tip.vars).toEqual({ mem: 63, cpu: 3, disk: 178 });
+});
+
+test('a Runner that reports no CPU utilization falls back to memory pressure alone', () => {
+  const hardware = {
+    cpuCores: 8,
+    memoryTotalMb: 16_384,
+    memoryAvailableMb: 9_830,
+    loadAvg1: 40,
+    loadAvg5: 30,
+    diskFreeMb: 500_000,
+  };
+  const meta = trayGroups({ questions: [], entries: [] }, [
+    machine({
+      running: [thread('t', 0)],
+      capabilities: { hardware } as TrayMachine['capabilities'],
+    }),
+  ])[0]?.meta;
+  expect(meta).toMatchObject({ percent: 40, level: 'normal' });
 });
 
 test('usage is hidden before anything ran today and reports the tightest Claude window', () => {

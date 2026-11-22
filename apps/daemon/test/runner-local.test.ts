@@ -7,6 +7,7 @@ import type {
   ClaimedStep,
   GitCredentials,
   MachineDoneBody,
+  MachineLocalMergeRecheckResponse,
   MachineStreamEvent,
   ToolCallRecord,
   TranscriptUpload,
@@ -102,6 +103,12 @@ class FakeClient implements MachineApi {
     return null;
   }
   async heartbeat() {}
+  rechecks: string[] = [];
+  recheckAnswer: MachineLocalMergeRecheckResponse = { authorized: true };
+  localMergeRecheck: MachineApi['localMergeRecheck'] = async (stepId) => {
+    this.rechecks.push(stepId);
+    return this.recheckAnswer;
+  };
   async tool(_stepId: string, _call: ToolCallRecord) {}
   async transcriptDelta() {}
   async relayTool() {
@@ -274,7 +281,12 @@ function seedUserRepo(dir: string): void {
 
 async function setup(
   claimed: ClaimedStep,
-  opts: { git?: GitCredentials | null; machineName?: string; prepareError?: Error } = {},
+  opts: {
+    git?: GitCredentials | null;
+    machineName?: string;
+    prepareError?: Error;
+    recheck?: { answer: MachineLocalMergeRecheckResponse } | 'absent';
+  } = {},
 ) {
   probeMock.mockReset();
   probeMock.mockResolvedValue(null);
@@ -283,6 +295,8 @@ async function setup(
   const { logger, lines } = captureLogger();
   const client = new FakeClient();
   client.git = opts.git ?? null;
+  if (opts.recheck === 'absent') client.localMergeRecheck = undefined;
+  else if (opts.recheck !== undefined) client.recheckAnswer = opts.recheck.answer;
   const journal = new StepJournal(paths.outboxDir);
   const { ws, calls, pushes } = fakeWorkspace(
     opts.prepareError ? { prepareError: opts.prepareError } : {},
@@ -669,38 +683,83 @@ describe('runner local shape execution surface fail-loud (#1210 C fallback)', ()
   });
 });
 
+async function localMergeClaim(dir: string): Promise<{ claimed: ClaimedStep; base: string }> {
+  seedUserRepo(dir);
+  const git = (...args: string[]) =>
+    execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
+  const base = git('rev-parse', 'HEAD');
+  git('checkout', '-b', 'work');
+  writeFileSync(join(dir, 'added.txt'), 'landed\n');
+  git('add', 'added.txt');
+  git('-c', 'user.name=test', '-c', 'user.email=test@localhost', 'commit', '-m', 'candidate');
+  const head = git('rev-parse', 'HEAD');
+  git('checkout', 'main');
+  const claimed = claimedStep('merge', { kind: 'local', cloneUrl: dir });
+  claimed.localMerge = {
+    projectId: 'p1',
+    buildId: 'conv-1',
+    defaultBranch: 'main',
+    workBranch: 'work',
+    judgedBase: base,
+    judgedHead: head,
+    judgedPatchDigest: (await inspectLocalPatch(dir, base, head)).patchDigest,
+    localChecks: ['test -f added.txt'],
+    message: 'Land candidate',
+    identity: { name: 'test', email: 'test@localhost' },
+  };
+  return { claimed, base };
+}
+
 test('a structured local merge lands without starting an agent or the branch delivery path', async () => {
   const dir = testTempDir('cairn-local-command-');
   try {
-    seedUserRepo(dir);
-    const git = (...args: string[]) =>
-      execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
-    const base = git('rev-parse', 'HEAD');
-    git('checkout', '-b', 'work');
-    writeFileSync(join(dir, 'added.txt'), 'landed\n');
-    git('add', 'added.txt');
-    git('-c', 'user.name=test', '-c', 'user.email=test@localhost', 'commit', '-m', 'candidate');
-    const head = git('rev-parse', 'HEAD');
-    git('checkout', 'main');
-    const claimed = claimedStep('merge', { kind: 'local', cloneUrl: dir });
-    claimed.localMerge = {
-      projectId: 'p1',
-      buildId: 'conv-1',
-      defaultBranch: 'main',
-      workBranch: 'work',
-      judgedBase: base,
-      judgedHead: head,
-      judgedPatchDigest: (await inspectLocalPatch(dir, base, head)).patchDigest,
-      localChecks: ['test -f added.txt'],
-      message: 'Land candidate',
-      identity: { name: 'test', email: 'test@localhost' },
-    };
+    const { claimed, base } = await localMergeClaim(dir);
     const { client, calls } = await setup(claimed);
     expect(calls).toEqual([]);
+    expect(client.rechecks).toEqual(['s1']);
     expect(client.calls).toEqual(['done:s1:success']);
     expect(client.doneBodies[0]?.body.localMerge?.result.outcome).toBe('merged');
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
     expect(git('rev-list', '--count', `${base}..main`)).toBe('1');
     expect(readFileSync(join(dir, 'added.txt'), 'utf8')).toBe('landed\n');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a refused local merge re-check leaves the default branch unmoved', async () => {
+  const dir = testTempDir('cairn-local-recheck-');
+  try {
+    const { claimed, base } = await localMergeClaim(dir);
+    const { client } = await setup(claimed, {
+      recheck: { answer: { authorized: false, reason: 'task-archived' } },
+    });
+    expect(client.rechecks).toEqual(['s1']);
+    expect(client.doneBodies[0]?.body.localMerge?.result).toEqual({
+      outcome: 'recheck',
+      reason: 'authorization-task-archived',
+    });
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
+    expect(git('rev-parse', 'main')).toBe(base);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a local merge against a server without the re-check route does not land', async () => {
+  const dir = testTempDir('cairn-local-no-route-');
+  try {
+    const { claimed, base } = await localMergeClaim(dir);
+    const { client } = await setup(claimed, { recheck: 'absent' });
+    expect(client.doneBodies[0]?.body.localMerge?.result).toEqual({
+      outcome: 'recheck',
+      reason: 'authorization-unreachable',
+    });
+    const git = (...args: string[]) =>
+      execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8' }).trim();
+    expect(git('rev-parse', 'main')).toBe(base);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -10,6 +10,10 @@ concurrency:
   group: ${{ github.event_name == 'pull_request' && format('ci-pr-{0}', github.event.pull_request.number) || github.event_name == 'push' && format('ci-push-{0}-{1}', github.ref, github.sha) || format('ci-ref-{0}', github.ref) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+env:
+  # A GitHub runner is one job's machine; the flag keeps that bypass visible in the log.
+  CAIRN_HEAVY_GATE_BYPASS: '1'
+
 jobs:
   changes:
     runs-on: ubuntu-latest
@@ -23,6 +27,7 @@ jobs:
       gates-needed: ${{ steps.classify.outputs.gates-needed }}
       ops-selftests: ${{ steps.classify.outputs.ops-selftests }}
       needs-integration: ${{ steps.classify.outputs.needs-integration }}
+      eval-needed: ${{ steps.classify.outputs.eval-needed }}
       base-sha: ${{ steps.classify.outputs.base-sha }}
       e2e-tier: ${{ (github.event_name == 'pull_request' && github.event.pull_request.draft) && 'none' || steps.classify.outputs.e2e-tier }}
     steps:
@@ -43,6 +48,7 @@ jobs:
           gates_needed=true
           ops_selftests=true
           needs_integration=true
+          eval_needed=true
           e2e_tier=full
           base_ref=""
           case "$GITHUB_REF" in
@@ -56,19 +62,22 @@ jobs:
               ;;
           esac
           if [ -n "$base_ref" ]; then
-            changed=$(git diff --name-only "$base_ref" HEAD)
+            changed=$(git diff --name-only -z "$base_ref" HEAD | tr '\0' '\n')
             if ! printf '%s\n' "$changed" | grep -qE '^(scripts/|\.github/|\.claude/skills/verify-cairn/scripts/|ops/langfuse/|packages/shared/|package\.json$|pnpm-lock\.yaml$)'; then
               ops_selftests=false
             fi
             if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/|apps/daemon/|integration/|packages/shared/|scripts/|\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'; then
               needs_integration=false
             fi
+            if ! printf '%s\n' "$changed" | grep -qE '^(apps/server/src/coordinator/|apps/server/src/services/(chief|coordinator-|project-instructions|memory|team-memory|routing-|step-route|machine-routing|model-routing|dispatch-|schedules|schedule-run|thread-schedule)|packages/shared/src/(protocol/chief-tools|skill-)|eval/|\.github/workflows/(ci|eval-weekly)\.yml$|docs/agent-dispatch-prompts\.md|docs/ops/lane-workers\.md|scripts/(dispatch-agent|lane-model-policy)\.m?js)'; then
+              eval_needed=false
+            fi
             has_code=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --has-code) || has_code=true
             has_sidecar=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --has-sidecar) || has_sidecar=true
             gates_needed=$(PREPUSH_BASE_SHA="$base_ref" node scripts/prepush.mjs --needs-gates) || gates_needed=true
             if [ "$has_code" = "false" ]; then
               e2e_tier=none
-            elif printf '%s\n' "$changed" | grep -qE '^(apps/web/(package\.json|index\.html|vite\.config|playwright\.config)|apps/web/src/(components/|styles/|main\.tsx$|App\.tsx$)|packages/shared/|package\.json$|pnpm-lock\.yaml$|\.github/actions/playwright-chromium/|\.github/workflows/ci\.yml$)'; then
+            elif printf '%s\n' "$changed" | grep -qE '^(apps/web/(package\.json|index\.html|vite\.config|playwright\.config)|apps/web/src/(components/|styles/|main\.tsx$|App\.tsx$)|packages/shared/|package\.json$|pnpm-lock\.yaml$|\.github/actions/playwright-chromium/)'; then
               e2e_tier=full
             elif printf '%s\n' "$changed" | grep -vE '\.test\.tsx?$' | grep -qE '^(apps/web/src/|apps/web/e2e/|apps/server/(src/|drizzle/|package\.json$))'; then
               e2e_tier=affected
@@ -81,18 +90,34 @@ jobs:
           echo "gates-needed=$gates_needed" >> "$GITHUB_OUTPUT"
           echo "ops-selftests=$ops_selftests" >> "$GITHUB_OUTPUT"
           echo "needs-integration=$needs_integration" >> "$GITHUB_OUTPUT"
+          echo "eval-needed=$eval_needed" >> "$GITHUB_OUTPUT"
           echo "base-sha=$base_ref" >> "$GITHUB_OUTPUT"
           echo "e2e-tier=$e2e_tier" >> "$GITHUB_OUTPUT"
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
-    needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar-test, tsnet-sidecar-build]
+    needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar-test, tsnet-sidecar-build, eval]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate check parts
         run: |
           [ "${{ needs.changes.result }}" = "success" ]
+          ev_result="${{ needs.eval.result }}"
+          if [ "$ev_result" != "success" ]; then
+            if [ "$ev_result" = "skipped" ]; then
+              case "$GITHUB_REF" in
+                refs/heads/queue/* | refs/heads/preflight/*)
+                  if [ "${{ needs.changes.outputs.eval-needed }}" = "true" ] && \
+                     [ "${{ vars.EVAL_ENABLED }}" = "true" ]; then
+                    exit 1
+                  fi
+                  ;;
+              esac
+            else
+              exit 1
+            fi
+          fi
           for result in "${{ needs.check-core.result }}" "${{ needs.vitest-light.result }}"; do
             if [ "$result" = "success" ]; then
               continue
@@ -524,7 +549,7 @@ jobs:
 
       - name: Real smoke runner and checker fixtures (#2283)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/real-smoke.test.mjs
+        run: node --test scripts/ops/real-smoke.test.mjs scripts/smoke/post-install.test.mjs
 
       - name: Orb host provisioning fixtures (#2273)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
@@ -570,3 +595,102 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Self-deploy and deploy-lag watch fixtures (#2288)
         run: node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
+
+  eval:
+    needs: changes
+    if: >-
+      needs.changes.outputs.eval-needed == 'true' &&
+      vars.EVAL_ENABLED == 'true' &&
+      (startsWith(github.ref, 'refs/heads/queue/') || startsWith(github.ref, 'refs/heads/preflight/'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    environment: eval
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: cand
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          path: base
+          ref: ${{ needs.changes.outputs.base-sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - name: Install both checkouts
+        run: |
+          (cd base && pnpm install --frozen-lockfile --ignore-scripts)
+          (cd cand && pnpm install --frozen-lockfile --ignore-scripts)
+      - name: Install devin CLI (manifest-pinned, sha256-verified)
+        working-directory: cand
+        run: |
+          node eval/install-devin.mjs "$RUNNER_TEMP/devin-cli"
+          echo "$RUNNER_TEMP/devin-cli/bin" >> "$GITHUB_PATH"
+      - name: Restore Devin CLI credentials
+        env:
+          DEVIN_CREDENTIALS_TOML: ${{ secrets.DEVIN_CREDENTIALS_TOML }}
+        run: |
+          if [ -n "$DEVIN_CREDENTIALS_TOML" ]; then
+            mkdir -p ~/.local/share/devin
+            printf '%s' "$DEVIN_CREDENTIALS_TOML" > ~/.local/share/devin/credentials.toml
+            chmod 600 ~/.local/share/devin/credentials.toml
+          fi
+      - name: Exam source selection (base checkout wins when it has eval/)
+        id: exam
+        run: |
+          if [ -d "$GITHUB_WORKSPACE/base/eval" ]; then echo "dir=$GITHUB_WORKSPACE/base/eval" >> "$GITHUB_OUTPUT"; else echo "dir=$GITHUB_WORKSPACE/cand/eval" >> "$GITHUB_OUTPUT"; fi
+      - name: Baseline arm requires the suite on the merge base
+        env:
+          BASE_SHA: ${{ needs.changes.outputs.base-sha }}
+        run: |
+          test -n "$BASE_SHA" || {
+            echo "eval: no merge base against origin/main, so there is no commit to compare against" >&2
+            exit 1
+          }
+          git -C "$GITHUB_WORKSPACE/base" merge-base --is-ancestor "$BASE_SHA" origin/main || {
+            echo "eval: base-sha $BASE_SHA is not an ancestor of origin/main" >&2
+            exit 1
+          }
+          test -f "$GITHUB_WORKSPACE/base/eval/run.ts" || {
+            echo "eval: the merge-base checkout has no eval/ suite, so there is no baseline arm to compare against; land the suite on main before setting EVAL_ENABLED" >&2
+            exit 1
+          }
+      - name: Run baseline arm
+        id: base-run
+        working-directory: base
+        env:
+          EVAL_MAX_DEVIN_RUNS: ${{ vars.EVAL_MAX_DEVIN_RUNS }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+        run: node --import tsx eval/run.ts --arm base --exam "${{ steps.exam.outputs.dir }}" --out "$RUNNER_TEMP/base.json" --require-langfuse
+      - name: Run candidate arm
+        id: cand-run
+        working-directory: cand
+        env:
+          EVAL_MAX_DEVIN_RUNS: ${{ vars.EVAL_MAX_DEVIN_RUNS }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          LANGFUSE_BASE_URL: ${{ vars.LANGFUSE_BASE_URL }}
+        run: node --import tsx eval/run.ts --arm candidate --exam "${{ steps.exam.outputs.dir }}" --out "$RUNNER_TEMP/cand.json" --require-langfuse
+      - name: Compare arms
+        id: verdict
+        working-directory: base
+        run: |
+          set +e
+          node --import tsx eval/compare.ts "$RUNNER_TEMP/base.json" "$RUNNER_TEMP/cand.json" "${{ needs.changes.outputs.base-sha }}" "${{ github.sha }}" | tee "$RUNNER_TEMP/eval-report.md"
+          echo "verdict-exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          set -e
+      - name: Comment score diff on the candidate commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments" -f body="$(cat "$RUNNER_TEMP/eval-report.md")" || true
+      - name: Gate on the verdict
+        run: test "${{ steps.verdict.outputs.verdict-exit }}" = "0"

@@ -23,6 +23,7 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites, updateAutonomousTodo } from '../src/services/todos.js';
 import {
   bootServer,
+  deliverCodeStep,
   insertMachine,
   postProject,
   req,
@@ -190,6 +191,17 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
       ghFetch,
     )) as TodoWire;
     expect(created.sourceKind).toBe('github-issue-self');
+    expect(created.sourceRef).toBeNull();
+    deliverCodeStep(
+      {
+        ...s.svc,
+        box: s.secretBox,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        githubFetch: ghFetch,
+      },
+      created.id,
+    );
     await flushSelfIssueWrites();
     const row = s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get();
     expect(row?.sourceRef).toBe(`github:${REPO}#5`);

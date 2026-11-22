@@ -1,0 +1,15 @@
+{
+  "kind": "lane",
+  "id": "write-doc",
+  "instruction": "\u5199\u4e00\u4e2a USAGE.md \u8bf4\u660e\u600e\u4e48\u8fd0\u884c ./run.sh",
+  "timeoutMs": 600000,
+  "checks": {
+    "files": [
+      {
+        "path": "USAGE.md"
+      }
+    ],
+    "commands": []
+  },
+  "gate": true
+}

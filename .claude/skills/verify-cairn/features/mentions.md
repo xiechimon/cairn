@@ -1,6 +1,6 @@
 # @mentions (composer, #311/#327)
 
-Users reference other entities (agent/todo/skill/project/machine, plus files) in a composer by typing `@` in the textarea, which opens the inline completion (`.mention-inline`) grouped by kind. The textarea shows the chosen mention as `@label`; the text that is sent keeps the wire token — agent -> `[名](agent:{id})`, task -> `#seq`. The execution surface (Segments rendering) parses tokens back into chips. The former toolbar `提及` button, the five-group picker dialog and the `/mention` slash command were removed; the new-task dialog has no mention route.
+Users reference other entities (agent/todo/skill/project/machine, plus files) in a composer by typing `@` in the textarea, which opens the inline completion (`.mention-inline`) grouped by kind. The textarea shows the chosen mention as `@label`; the text that is sent keeps the wire token — agent -> `[名](agent:{id})`, task -> `#seq`. The execution surface (Segments rendering) parses tokens back into chips. The former toolbar `提及` button, the five-group picker dialog and the slash-command menu were removed (a leading `/` is plain text); the new-task dialog has no mention route.
 
 ## Sub-features
 

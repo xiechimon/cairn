@@ -420,6 +420,7 @@ const connector = (
 ): McpConnectorRecord => ({
   id,
   teamId: TEAM_ID,
+  transport: 'http',
   account: null,
   statusReason: null,
   toolCount: null,

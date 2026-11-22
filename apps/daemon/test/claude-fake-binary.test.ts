@@ -10,7 +10,6 @@ const FAKE = resolve(__dirname, 'fixtures/fake-claude.mjs');
 
 const dirs: string[] = [];
 afterEach(() => {
-  delete process.env.FAKE_CLAUDE_LOG;
   for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
 });
 
@@ -23,14 +22,13 @@ test.each([
     const dir = makeTestTempDir('fake-claude-');
     dirs.push(dir);
     const log = join(dir, 'log');
-    process.env.FAKE_CLAUDE_LOG = log;
     const token = 'sk-ant-oat01-synthetic-token';
     const handle = await createClaudeCodeBackend({ inOrb, executablePath: FAKE }).createSession({
       provider: { kind: 'http', providerId: 'claude-code' },
       modelId: 'claude-sonnet-5-5',
       cwd: dir,
       prompt: 'do the thing',
-      env: { CLAUDE_CODE_OAUTH_TOKEN: token },
+      env: { CLAUDE_CODE_OAUTH_TOKEN: token, FAKE_CLAUDE_LOG: log },
     });
     const events: StepEvent[] = [];
     for await (const event of handle.events) {

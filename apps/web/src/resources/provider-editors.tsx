@@ -269,7 +269,7 @@ export function CheckResultPopover({
                 <div key={`${fact.label}/${fact.value}`} className="contents">
                   <dt
                     className={cn(
-                      'text-content-tertiary',
+                      'text-content-secondary',
                       fact.code === true && 'font-mono text-caption leading-5',
                     )}
                   >
@@ -444,6 +444,7 @@ export function ModelTestReport({
 export function ModelChip({
   id,
   dead,
+  needsUpdate = false,
   check,
   busy,
   meta,
@@ -453,6 +454,7 @@ export function ModelChip({
 }: {
   id: string;
   dead: boolean;
+  needsUpdate?: boolean;
   meta?: ReactNode;
   testId?: string;
   check: ModelCheck | undefined;
@@ -483,6 +485,11 @@ export function ModelChip({
       </span>
       {meta}
       {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
+      {!dead && needsUpdate && (
+        <span data-slot="needs-update" className="flex-none text-meta text-content-tertiary">
+          {t('需要更新 Cairn')}
+        </span>
+      )}
       {onTest !== undefined && (
         <IconTooltip
           label={t('测试 {name}', { name: id })}

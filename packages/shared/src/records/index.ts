@@ -68,6 +68,7 @@ export * from './system-row.js';
 export * from './task-request.js';
 export * from './tasks.js';
 export * from './team.js';
+export * from './terminal-claims.js';
 export * from './thread-pr.js';
 export * from './ticket-dedupe.js';
 export * from './todo.js';

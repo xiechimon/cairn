@@ -1,0 +1,56 @@
+{
+  "kind": "runtime",
+  "id": "ask-ambiguous-03",
+  "request": "\u4fee\u4e00\u4e0b\u90a3\u4e2a\u62a5\u9519",
+  "world": {
+    "projects": [
+      "one",
+      "two",
+      "three"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "ask_user",
+          "args": {
+            "questions": [
+              {
+                "header": "\u54ea\u4e2a\u9879\u76ee",
+                "question": "\u4fee\u4e00\u4e0b\u90a3\u4e2a\u62a5\u9519\u2014\u2014\u6307\u54ea\u4e2a\u9879\u76ee\uff1f",
+                "options": [
+                  {
+                    "label": "one",
+                    "description": ""
+                  },
+                  {
+                    "label": "two",
+                    "description": ""
+                  },
+                  {
+                    "label": "three",
+                    "description": ""
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "\u9700\u8981\u4f60\u786e\u8ba4\u3002"
+    }
+  ],
+  "expected": {
+    "decision": "ask",
+    "ask": true,
+    "askCandidates": [
+      "one",
+      "two",
+      "three"
+    ]
+  },
+  "gate": true
+}

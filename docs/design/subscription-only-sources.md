@@ -47,7 +47,7 @@ Antigravity follows the same rule: an `antigravity` step requires an enabled `an
 | web `top-models-card.tsx` `suggestedTopModels` | suggested Claude Code models a Runner reported | suggests them only with a usable subscription |
 | web `first-run-checklist-model.ts` `modelSourceCount` | counted `machine:` connections | counts subscriptions and providers (server no longer sends Runner connections) |
 | web `first-run-setup.tsx`, `routing-settings-page.tsx` copy | "this computer is signed in to Claude Code / Codex" | reasons name the Claude subscription; `codex-login` copy removed |
-| web `composer-setup-hint.tsx` | "add a provider, or sign in to Claude Code on a Runner" | "add a provider, or add a Claude subscription" |
+| web `setup-prompt.tsx` | "add a provider, or sign in to Claude Code on a Runner" | "add a provider, or add a Claude subscription" |
 | web providers page Runner scope `claudeCodeStatus` | showed signed in / signed out | shows install and model state; without a subscription says to add one |
 | web `claude-login-banner.tsx` / `claude-login-warning.ts` | warned about each Runner's login expiry | warns only about stored subscriptions |
 | web `mappers.ts` `claude-logged-out` queue label | "run claude login on the Runner, or add a subscription" | "add a Claude subscription" |

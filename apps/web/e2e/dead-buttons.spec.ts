@@ -135,7 +135,7 @@ test('mcp page: catalog cards connect, add-server opens a form, local rows stay 
 }) => {
   await page.goto('/app/resources/mcp-servers?scenario=01');
   const catalog = page.getByTestId('mcp-catalog');
-  await expect(catalog.locator('[data-connector-card]')).toHaveCount(11);
+  await expect(catalog.locator('[data-connector-card]')).toHaveCount(12);
   await expect(page.getByTestId('resource-empty')).toHaveCount(0);
   await catalog.getByRole('button', { name: '接入 Linear' }).click();
   const signIn = page.getByRole('dialog', { name: '前往 mcp.linear.app 登录' });
@@ -297,8 +297,8 @@ test('detail transcript message tools carry no restore action (#884)', async ({ 
   await block.hover();
   const tools = block.getByTestId('msg-tools');
   await expect(tools.getByRole('button')).toHaveCount(1);
-  await tools.getByTestId('chief-msg-more').click();
-  await expect(page.getByRole('menuitem')).toHaveText([/^复制/]);
+  await expect(tools.getByTestId('chief-msg-copy')).toHaveCount(1);
+  await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);
 });
 
 test('fail row `查看原始错误` opens the raw-error dialog with the full text (#1258)', async ({

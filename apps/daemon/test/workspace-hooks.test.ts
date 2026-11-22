@@ -206,7 +206,7 @@ describe('workspace hook primitive (#1149)', () => {
     expect(without!.output).toContain('cred=unset');
   });
 
-  test("failure mode 7b: parent environment carries its own GIT_CONFIG_* → credential entries appended after them, the parent's keys still apply inside the hook (#1460)", async () => {
+  test('failure mode 7b: the daemon’s own GIT_CONFIG_* does not reach hook children, only the step credential entries do', async () => {
     const root = tmpRoot();
     writeHook(
       root,
@@ -230,8 +230,9 @@ describe('workspace hook primitive (#1149)', () => {
     } finally {
       vi.unstubAllEnvs();
     }
-    expect(note!.output).toContain('cred=3');
-    expect(note!.output).toContain('probe=kept');
+    expect(note!.output).toContain('cred=2');
+    expect(note!.output).toContain('probe=\n');
+    expect(note!.output).not.toContain('probe=kept');
   });
 
   test('the resume name runs the same (the primitive is name-agnostic)', async () => {

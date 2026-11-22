@@ -47,9 +47,37 @@ Restart reconciliation: at startup (`index.ts`, beside the IM resume and compute
 | `interrupted` surfacing | read on scope display / next step prompt | none — read-only | next step on the thread sees the uncertain effect instead of resending |
 | `answer-delivery`-style replay reader | reads `delivered` rows by dedupeKey | missing row → normal first send | resubmission after delivered returns the stored receipt without a provider call |
 
+## Second slice: remaining decision-versus-effect gaps
+
+Audit of `db.transaction` and autocommit decision writes on main (2026-11-22). In-memory signals inside a transaction (`machineHub.wake`/`steerSignal`/`stopSignal`, `hub.publish*`, `convHub.publish*`) are hints: a phantom signal on rollback re-derives on the next poll, and transcript/deliverable publishes are deferred past commit by `afterCommit`/`deferSignals`. They are not listed as gaps.
+
+Already durable and consistent, kept on their own ledger (single path, no migration): `push_delivery` (`sendMustReachAlert`, SMTP fallback claim), `pushDigestItem` (delete-after-deliver, tag-deduped digest), `autonomousMergeAdmission` + `sha` pin (`githubMergePull`), `client_message`, `steerPending`/`stopPending`/`queuedMessage` (held-until-ack), `deliverMailEvent`, `coordinatorInput`, `computer_call`, the pr-wakes `capRequest` ledger (write-ahead `pending`, `CAP_MARKER` comment probe before resend), `ensurePullClosesTaskIssue` (probe-then-act on the PR body), `drainCiCorrections` (body-marker dedupe probe before create, ack row after), `fireScheduleWebhook`/`receiveGithubWebhook` (delivery dedupe in one transaction), `schedule.retryNotBefore`, `task_issue_close` tombstones *as consumed by* `task-issue-sync`.
+
+Gaps this slice closes:
+
+| Path | Decision commit | Effect | Window |
+|---|---|---|---|
+| `runSelfIssueCreate` (`github-issue-create`) | `noteTaskCodeDelivered` inside `completeStep`'s transaction | `recordEffect` ran after `await autonomousToken` — outside the decision commit | kill between commit and intent row → issue never created until a later delivery; a rolled-back settle still recorded and sent (phantom) |
+| `fireSchedule` (steer path) | `sendBuildSteer` commits step + `step.scheduleId` + wake message in one tx | `schedule.lastRun*` + `nextRunAt` written after return | kill → schedule stays due → refires into a duplicate continuation once the step ends |
+| `fireSchedule` (start path) | `startBuilds` commits build + step + phase | `step.scheduleId`, `schedule-wake` message, `lastRun*`, `nextRunAt` all post-commit | kill → refires into a duplicate build; the orphan step is never attributed (`lastRunStatus` never settles) |
+| `applyTodoPatch` project move | move + `sourceRef` clear in one tx | `queueIssueClose` tombstone written after | kill → the old GitHub issue stays open forever (nothing re-derives it) |
+| `applyCreatedIssue` repo move | `sourceRef` swap autocommit | `queueIssueClose` for the replaced issue after | kill → replaced issue stays open |
+| `writebackSelfIssueTitle` (`set_task_meta`) | `updateAutonomousTodo` commits the new title | `githubUpdateIssueTitle` fire-and-forget, errors swallowed | any kill or refusal → GitHub title stale forever |
+| `executeMailSend` (cairn-mail connector) | approval/`journalRow` ledger | `sendSmtpMail` then `journalRow('run')` | kill after SMTP accept → journal shows nothing → an identical re-call sends a second copy |
+
+Design per path:
+
+- **Schedule fire is folded into the act's transaction, not given an `external_effect` row.** The effect (build + step + phase) is itself a set of DB writes; `startBuilds`/`sendBuildSteer` already wrap them in one transaction. `BuildSteerOptions.schedule` and a new `startBuilds` `schedule` option carry `{id, createdBy, at, expected, next, triggered}`; inside that transaction the code now (a) re-checks `schedule.enabled && nextRunAt = expected` (compare-and-swap on the due claim — a concurrent `runScheduleNow` or crash-orphaned mark rolls the whole act back instead of double-firing), (b) writes `step.scheduleId` (+`scheduledBy` on the steer path, matching today's asymmetry — `workerScheduleRunHistory` counts start-path runs via `build.triggerSource`, so `step.scheduledBy` must stay unset there or runs double-count), (c) inserts the `schedule-wake` message, (d) sets `lastRunAt/lastRunStatus/lastRunStepId/nextRunAt`. For `triggered` kinds (webhook/event, which queue one run per delivery) a moved `nextRunAt` is a *newer* claim, not a stolen one: the run still commits but only `lastRun*` is re-marked and the moved `nextRunAt` stands, so each queued delivery gets its run; for once/cron a failed CAS aborts the act. Kill anywhere → all-or-nothing; a due schedule with no fired step is the only post-crash state and refires once.
+- **`github-issue-create` intent moves before the first `await`.** `runSelfIssueCreate` now does `registerSelfIssueCreateKind` + `recordEffect` before `await autonomousToken`, so `noteTaskCodeDelivered` records the intent inside `completeStep`'s transaction. A rollback removes the row and the post-commit runner's `claimEffect` misses → no send. `retrySelfIssueCreate` records standalone (no ambient transaction) — same dedupe attach semantics.
+- **`queueIssueClose` moves inside the two transactions** (`applyTodoPatch` move branch, `applyCreatedIssue` ref swap).
+- **`github-issue-title` kind (`replay-safe`)**: intent recorded inside `updateAutonomousTodo`'s transaction when the opted-in caller changes a `github-issue-self` todo's title (`opts.issueTitleWriteback`); dedupe key hashes `(teamId, todoId, owner/repo#issueNumber, title)` so a second rename is a new row while a retried one attaches. `writebackSelfIssueTitle` becomes settle + claim + PATCH + mark; `drainEffects` covers a crash before the send. PATCH is idempotent, so `replay-safe` re-sends after a stale claim.
+- **`mail-send` kind (`unsafe`)**: `executeMailSend` records the intent keyed by `(actionId, inputHash(gatedArgs))` once the outbound gate passes, then settles/claims/sends/marks; `journalRow('run')` is written on `delivered`. An identical re-call attaches to the row: `delivered` replays the receipt, stale `sending` settles to `interrupted` on reconcile (SMTP has no probe — never resent blind), and the caller sees a 409 that names the uncertainty instead of a second copy. `journalRow('error')` still accompanies thrown failures.
+
+User-visible permanent failure: `failed`/`interrupted` rows surface through `interruptedEffectsNote` on todo/step scopes; `mail-send` is scoped `chiefThread` and surfaces as the tool-call error the Coordinator reports (`previous send outcome unknown`), plus the `action_journal` error row. Per-kind consecutive-failure stderr reporting already covers all registered kinds.
+
 ## Out of scope
 
-Daemon-side effects, a UI for `interrupted` rows beyond the minimal surfacing, and any change to push/IM/GitHub provider clients beyond the receipt write-back.
+Daemon-side effects, a UI for `interrupted` rows beyond the minimal surfacing, and any change to push/IM/GitHub provider clients beyond the receipt write-back. The `dispatchSplitChildren` per-child `catch` (a failed child stays `todo`; logged, not counted) and the `pushDigestItem` deliver-delete dup window remain on their own mechanisms.
 
 ## As built (first slice)
 

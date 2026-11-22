@@ -36,17 +36,23 @@ function call(
   s: TestServer,
   method: string,
   path: string,
-  options: { headers?: Record<string, string>; body?: unknown } = {},
+  options: { headers?: Record<string, string>; body?: unknown; peer?: string } = {},
 ): Promise<Response> {
   return Promise.resolve(
-    s.app.request(path, {
-      method,
-      headers: {
-        ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
-        ...options.headers,
+    s.app.request(
+      path,
+      {
+        method,
+        headers: {
+          ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
+          ...options.headers,
+        },
+        body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
       },
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    }),
+      options.peer === undefined
+        ? undefined
+        : { incoming: { socket: { remoteAddress: options.peer } } },
+    ),
   );
 }
 
@@ -535,6 +541,7 @@ describe('paired devices can approve Runner enrollment', () => {
       seedLocalMachine(s.db, s.team.id);
       const first = await call(s, 'POST', '/api/machine/enroll/start', {
         body: { name: hostname() },
+        peer: '127.0.0.1',
       });
       const claimed = await call(s, 'POST', '/api/machine/enroll/confirm', {
         headers: ownerHeaders,
@@ -555,6 +562,7 @@ describe('paired devices can approve Runner enrollment', () => {
             };
       const started = await call(s, 'POST', '/api/machine/enroll/start', {
         body: { name: hostname() },
+        peer: '127.0.0.1',
       });
       const body = (await started.json()) as { enrollId: string };
       expect((await call(s, 'POST', '/api/machine/enroll/confirm', { headers, body })).status).toBe(

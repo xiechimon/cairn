@@ -113,7 +113,7 @@ test('explicit local merge ignores retired policy, verdicts, pause and cap; pins
   const f = fixture();
   pauseTeamForTest(f.s.db, f.s.team.id);
   f.s.db.update(team).set({ maxAutonomousMergesPerDay: 0 }).run();
-  expect(await requestMerge(f.deps, 'build')).toEqual({ delegated: true });
+  expect(await requestMerge(f.deps, 'build')).toMatchObject({ state: 'requested' });
   const command = parseLocalMergeInstruction(f.merge().prompt);
   expect(command).toMatchObject({
     projectId: 'project',

@@ -267,7 +267,7 @@ test('messages sent back to back are posted one at a time, in the order they wer
   await composer(page).fill('Second of two');
   await composer(page).press('Enter');
   await expect(sending(page)).toHaveCount(2);
-  expect(posts).toHaveLength(1);
+  await expect.poll(() => posts.length).toBe(1);
   await expect(sending(page)).toHaveCount(0);
   await expect(bubbles(page)).toHaveText(['Earlier note', 'First of two', 'Second of two']);
   expect(posts.map((post) => post.content)).toEqual(['First of two', 'Second of two']);

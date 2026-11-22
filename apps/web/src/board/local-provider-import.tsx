@@ -6,7 +6,7 @@ import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -59,13 +59,15 @@ function reasonOf(state: Row['state'], t: TFunc): string | null {
 export function LocalProviderImportCard({
   teamId,
   live,
+  onImported,
 }: {
   teamId: string | undefined;
   live: boolean;
+  onImported: (recordIds: string[]) => void;
 }) {
   const { t } = useI18n();
   const rows = useLocalProviders(teamId, live);
-  const { createProvider, deleteProvider } = useApiMutations(teamId);
+  const { createProvider } = useApiMutations(teamId);
   const [choosing, setChoosing] = useState(false);
   const [unchecked, setUnchecked] = useState<ReadonlySet<string>>(new Set());
   const [importing, setImporting] = useState(false);
@@ -99,27 +101,11 @@ export function LocalProviderImportCard({
           toastError(t('导入 {name} 失败', { name: row.label }), error);
         }
       }
-      if (added.length > 0) {
-        toastSuccess(t('已导入 {n} 个服务商', { n: added.length }), {
-          label: t('撤销'),
-          onClick: () => void undoImport(added),
-        });
-      }
+      if (added.length > 0) onImported(added);
     } catch (error) {
       toastError(t('读取本机配置失败'), error);
     } finally {
       setImporting(false);
-    }
-  };
-
-  const undoImport = async (ids: readonly string[]) => {
-    for (const id of ids) {
-      try {
-        await deleteProvider.mutateAsync(id);
-      } catch (error) {
-        toastError(t('撤销导入失败，可以在设置的服务商里删除。'), error);
-        return;
-      }
     }
   };
 

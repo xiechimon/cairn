@@ -78,7 +78,8 @@ Linear agent sessions, the Copilot coding agent and Devin all hand over the huma
    - `dependsOn?`: writes `blockedBy`;
    - `priority?`: `first` | `normal`, which sets `orderIndex`;
    - `difficulty?`;
-   - `output?`.
+   - `output?`;
+   - `start?`: `false` creates the task in phase `todo` without starting a build, so `open_thread` or the owner starts it later; omitted, the thread starts in this call (#5389). A parked call skips the machine check, because nothing dispatches.
 
    Each quote must be an exact substring of one cited segment (NFC, trimmed at the ends). It becomes a new `quote` segment that keeps that segment's `author` and `sourceRef`, so re-splitting a corrected issue child keeps the owner's correction owner-authored.
 7. `update_todo` (Coordinator surface) takes `todoId`, `tagIds`, `projectId` and `addMessageIds`. `addMessageIds` is allowed only on a task that has `request` and has not started. The cited messages and the task state are validated first, then the routing changes run, and only then the new owner segments are appended and `spec` is re-rendered, in one transaction.
@@ -171,7 +172,7 @@ Each test is written first and is red on `origin/main` (or on #3558's revision-1
 | W9 | MCP face `create_todo`, `update_todo` | caller's own text | `create_todo` unchanged (`request` null); `update_todo` with `title` or `spec` on a task with `request` returns 409 and leaves segments and `spec` untouched; tags still update |
 | W10 | research threads | server templates | unchanged; automatic citation checks and retro proposals are retired |
 | W11 | worker `set_task_meta` | title | step 1: refused for a task with `request` (`titleFinal`); step 3: sets `titleSource: 'worker'`, after which every prompt labels the title as the worker's and does not fence it as the issue author's |
-| R1 | claim payload, daemon `buildTaskPrompt` (`machine-claim.ts`, `runner.ts`) | segments | the claim carries `request` to a daemon at or above `TASK_SEGMENTS_MIN_CLI_VERSION`; the prompt fences exactly the third-party segments and a third-party title; `classifyUserText` still reads it as `task-prompt`; an older daemon receives the server-fenced title and the rendered spec, and its prompt shows no third-party text unfenced |
+| R1 | claim payload, daemon `buildTaskPrompt` (`machine-claim.ts`, `runner.ts`) | segments | the claim carries `request` to a daemon at or above `TASK_SEGMENTS_MIN_CLI_VERSION`; the prompt fences exactly the third-party segments and a third-party title; the persisted prompt row still carries `origin: 'task-prompt'`; an older daemon receives the server-fenced title and the rendered spec, and its prompt shows no third-party text unfenced |
 | R2 | verify step prompt (`builds.ts`) | segments | same rendering as R1 |
 | R3 | orchestration prompt (`orchestrate.ts`, `buildOrchestratePrompt`) | segments | `POST /api/todos/:id/orchestrate` on an issue child with an owner correction: one fence around the issue quote only, the correction unfenced (red on revision 1) |
 | R4 | wake prompts (`wakeFacts`) | title author | an issue-quoted title is fenced; an owner title is not |

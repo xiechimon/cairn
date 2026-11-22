@@ -84,6 +84,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
           content: r.content,
           createdAt: r.createdAt,
           projectId: r.projectId,
+          origin: r.origin,
         })),
         chips: [],
         historyEpoch: 0,
@@ -168,8 +169,8 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/builds/:id/merge', async (c) => {
     try {
-      const result = await requestMerge(svc, c.req.param('id'));
-      return c.json(result, 202);
+      await requestMerge(svc, c.req.param('id'));
+      return c.json({ delegated: true }, 202);
     } catch (err) {
       if (err instanceof PhaseTransitionError) throw conflict(err.message);
       throw err;

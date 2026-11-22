@@ -217,10 +217,12 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
   });
 
   const EVAL_SURFACE_PATHS = [
-    'apps/server/src/trajectory-export.ts',
-    'apps/server/src/trajectory-export-cli.ts',
-    'apps/server/src/trajectory-outcome.ts',
-    'packages/shared/src/trajectory-pack.ts',
+    'eval/suite.json',
+    'eval/tasks/runtime/route-single.json',
+    'eval/tasks/lane/fix-typo/task.json',
+    'eval/scorers/runtime-checks.ts',
+    'eval/run.ts',
+    'eval/compare.ts',
   ];
   test('⑥ eval ruler surface: every path is protected and never in gateSource', () => {
     for (const p of EVAL_SURFACE_PATHS) {
@@ -232,10 +234,7 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
   });
 
   test('⑥ is case-insensitive like the other protect globs', () => {
-    for (const p of [
-      'Apps/Server/Src/Trajectory-Export.ts',
-      'Packages/Shared/Src/Trajectory-Pack.ts',
-    ]) {
+    for (const p of ['Eval/Suite.JSON', 'EVAL/Tasks/Runtime/X.json']) {
       expect(classify([f(p)]).protected, p).toEqual([p]);
     }
   });
@@ -243,9 +242,8 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
   test('⑥ lookalikes outside the eval dirs stay in the auto-merge set', () => {
     for (const p of [
       'packages/hillclimb/src/cases.json',
-      'apps/server/src/trajectory.ts',
-      'apps/server/src/trajectory-attribution.ts',
-      'packages/shared/src/trajectory.ts',
+      'apps/server/src/eval.ts',
+      'packages/shared/src/eval-helpers.ts',
     ]) {
       const r = classify([f(p)]);
       expect(r.protected, p).toEqual([]);

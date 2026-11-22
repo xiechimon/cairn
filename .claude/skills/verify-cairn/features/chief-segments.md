@@ -33,7 +33,7 @@ env -u http_proxy -u https_proxy -u all_proxy VERIFY_REPO_ROOT=<worktree> \
 
 Seeding all goes through public REST + fake machine (provider / agent / PATCH chief / POST chief/threads / api-key / machine enroll / claim), then pushes frames per the **sealed true wire order**: `transcript_delta` (in-flight text), the fifth shape `transcript_row` (segment row), the existing shape toolCallRecord (the tool row's two halves). Zero daemon, zero LLM. 9 assertions: segment order / segment-row shape / persist-then-broadcast / late-entry invariant / idempotence / the tool-row start-half persisted / the drawer's three DOM rows. Evidence `docs/verify/955/`.
 
-The daemon-side sealing itself is pinned by `apps/daemon/test/segment.test.ts` (the segment buffer, 10 cases) and `apps/daemon/test/machine-loop.test.ts` (full-chain row order).
+The daemon-side sealing itself is pinned by `apps/daemon/test/segment.test.ts` (the segment buffer, 10 cases) and `apps/daemon/test/machine-boot.test.ts` (full-chain row order, out of `machine-loop.test.ts`, split by scenario in #1162).
 
 ## Gotchas
 

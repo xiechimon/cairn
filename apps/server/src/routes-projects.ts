@@ -10,7 +10,7 @@ import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { actionJournal, actionProposal, build, project, todo } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
-import { pairedDeviceIdOf } from './lib/token-auth.js';
+import { pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import {
   githubAppOf,
   githubIssueDepsOf,
@@ -83,7 +83,14 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/projects/:id/files', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
-    return c.json(await readFiles(ctx, row.id, c.req.query('ref'), c.req.query('limit')));
+    return c.json(
+      await readFiles(
+        { ...ctx, box: ctx.secretBox },
+        row.id,
+        c.req.query('ref'),
+        c.req.query('limit'),
+      ),
+    );
   });
 
   app.get('/api/projects/:id/branches', async (c) => {
@@ -178,6 +185,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     if (decision !== 'refuse' && decision !== 'allow-once' && decision !== 'always') {
       throw new HttpError(400, 'invalid decision');
     }
+    const deviceId = pairedDeviceIdOf(c);
     return c.json(
       answerProposal(
         { db: ctx.db, reposDir: ctx.reposDir, hub: ctx.hub, user: ctx.user },
@@ -185,7 +193,8 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
           proposalId: c.req.param('id'),
           teamId: ctx.team.id,
           decision,
-          decidedBy: ctx.user.id,
+          decidedBy: deviceId === null ? ctx.user.id : `device:${deviceId}`,
+          interactive: sameOriginPageWrite(c) ? 'page' : undefined,
         },
       ),
     );

@@ -1,36 +1,50 @@
-import type { DailyUsage, DailyUsageDay } from '@cairn/shared';
+import type { DailyUsage } from '@cairn/shared';
 import { cn } from 'cn';
 import { ChartColumn, TriangleAlert } from 'lucide-react';
-import { type KeyboardEvent, useState } from 'react';
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  type RefObject,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { useSearchParams } from 'react-router';
 import { useTeams } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useDailyUsage } from '../api/usage-daily.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { EmptyState } from '../components/empty-state.js';
-import { SegmentedTabs } from '../components/segmented.js';
+import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import {
-  axisMax,
-  formatAxis,
   formatTokens,
   localDay,
-  modelSeries,
-  OTHER_MODELS,
+  shiftDay,
   USAGE_FETCH_DAYS,
-  USAGE_RANGES,
-  type UsageRange,
+  USAGE_NARROW_WEEKS,
+  USAGE_WEEKS,
+  type UsageCell,
+  type UsageGrid,
   type UsageSummary,
+  usageGrid,
   usageSummary,
 } from '../usage/usage-model.js';
 
-const INKS = ['bg-(--heat-4)', 'bg-(--heat-2)', 'bg-(--heat-3)', 'bg-(--heat-1)'] as const;
+const LEVEL_BG = [
+  'bg-(--heat-0)',
+  'bg-(--heat-1)',
+  'bg-(--heat-2)',
+  'bg-(--heat-3)',
+  'bg-(--heat-4)',
+] as const;
 const TYPE_INKS = ['bg-(--heat-4)', 'bg-(--heat-3)', 'bg-(--heat-2)', 'bg-(--heat-1)'] as const;
+const CELL_GAP = 0.2;
 
-type Split = 'source' | 'model';
+const CARD_CLS = 'rounded-(--radius-card) bg-card shadow-(--e1)';
 
 function useDateLabels() {
   const { locale } = useI18n();
@@ -42,6 +56,8 @@ function useDateLabels() {
   return {
     day: format({ month: 'long', day: 'numeric', weekday: 'short' }),
     short: format({ month: 'numeric', day: 'numeric' }),
+    month: format({ month: 'short' }),
+    weekday: format({ weekday: 'short' }),
   };
 }
 
@@ -53,76 +69,60 @@ function Swatch({ ink }: { ink: string }) {
   return <i aria-hidden className={cn('block size-2 flex-none rounded-(--cds-radius-xs)', ink)} />;
 }
 
-function Stat({
-  label,
-  value,
-  note,
-  lead = false,
-}: {
-  label: string;
-  value: string;
-  note?: string;
-  lead?: boolean;
-}) {
+function Stat({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 sm:px-6 sm:first:pl-0">
+    <div className="flex min-w-0 flex-col items-center gap-1 bg-card px-5 py-4 text-center max-sm:px-4 max-sm:py-3">
       <span className="text-meta text-content-tertiary">{label}</span>
-      <span
-        className={cn(
-          'voice-title tabular-nums text-foreground',
-          lead ? 'text-page' : 'text-brand',
-        )}
-      >
-        {value}
+      <span className="voice-title text-brand text-foreground tabular-nums">{value}</span>
+      <span className="max-w-full truncate text-meta text-content-tertiary tabular-nums">
+        {note}
       </span>
-      {note !== undefined && (
-        <span className="text-meta text-content-tertiary tabular-nums">{note}</span>
-      )}
     </div>
   );
 }
 
-function Stats({ summary, range }: { summary: UsageSummary; range: UsageRange }) {
+function Stats({ summary, days }: { summary: UsageSummary; days: number }) {
   const { t } = useI18n();
-  const labels = useDateLabels();
-  const change =
-    summary.change === null
-      ? undefined
-      : t('比上一个 {n} 天 {change}', {
-          n: range,
-          change: `${summary.change >= 0 ? '+' : '−'}${percent(Math.abs(summary.change))}`,
-        });
   return (
     <div
       data-testid="usage-stats"
-      className="grid grid-cols-3 gap-x-6 gap-y-5 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-border"
+      className={cn(
+        'grid grid-cols-4 gap-px overflow-hidden bg-border max-sm:grid-cols-2',
+        CARD_CLS,
+      )}
     >
-      <div className="col-span-3 sm:col-span-1">
-        <Stat
-          lead
-          label={
-            summary.since === null
-              ? t('近 {n} 天', { n: range })
-              : t('自 {date}', { date: labels.short(summary.since) })
-          }
-          value={`${formatTokens(summary.total)} token`}
-          note={change}
-        />
-      </div>
       <Stat
-        label="Coordinator"
-        value={formatTokens(summary.coordinator)}
-        note={summary.total > 0 ? percent(summary.coordinator / summary.total) : undefined}
+        label={t('过去一年')}
+        value={`${formatTokens(summary.total)} token`}
+        note={
+          summary.total > 0
+            ? t('Coordinator {a} · 任务 {b}', {
+                a: percent(summary.coordinator / summary.total),
+                b: percent(summary.tasks / summary.total),
+              })
+            : t('没有用量')
+        }
       />
       <Stat
-        label={t('任务')}
-        value={formatTokens(summary.tasks)}
-        note={t('{n} 个任务', { n: summary.tasksRun })}
+        label={t('用了')}
+        value={t('{n} 天', { n: summary.usedDays })}
+        note={t('共 {n} 天', { n: days })}
+      />
+      <Stat
+        label={t('日均')}
+        value={formatTokens(
+          summary.usedDays === 0 ? 0 : Math.round(summary.total / summary.usedDays),
+        )}
+        note={t('按用了的天算')}
       />
       <Stat
         label={t('缓存命中')}
         value={summary.cacheHit === null ? '0%' : percent(summary.cacheHit)}
-        note={summary.cost === null ? undefined : t('按标价 {cost}', { cost: usd(summary.cost) })}
+        note={
+          summary.cost === null
+            ? t('缓存读取 {n}', { n: formatTokens(summary.cacheRead) })
+            : t('按标价 {cost}', { cost: usd(summary.cost) })
+        }
       />
     </div>
   );
@@ -158,180 +158,31 @@ function TokenMix({ summary }: { summary: UsageSummary }) {
   );
 }
 
-function Chart({
-  summary,
-  split,
-  modelName,
-  active,
-  onActive,
-}: {
-  summary: UsageSummary;
-  split: Split;
-  modelName: (key: string) => string;
-  active: number | null;
-  onActive: (index: number | null) => void;
-}) {
-  const { t } = useI18n();
-  const labels = useDateLabels();
-  const { slots } = summary;
-  const series = (day: DailyUsageDay) =>
-    split === 'source' ? [day.coordinator, day.tasks] : modelSeries(day, summary.chartModels);
-  const max = axisMax(
-    Math.max(0, ...slots.map(({ day }) => (day ? day.coordinator + day.tasks : 0))),
-  );
-  const tick = (date: string, i: number) => {
-    const n = slots.length;
-    if (n <= 14)
-      return i === 0 || date.endsWith('-01') ? labels.short(date) : String(Number(date.slice(8)));
-    return (n - 1 - i) % (n <= 31 ? 7 : 14) === 0 ? labels.short(date) : '';
-  };
-  const move = (event: KeyboardEvent<HTMLDivElement>) => {
-    const by = { ArrowLeft: -1, ArrowRight: 1 }[event.key];
-    if (by === undefined) return;
-    event.preventDefault();
-    onActive(Math.min(slots.length - 1, Math.max(0, (active ?? slots.length) + by)));
-  };
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="relative h-56 max-sm:h-44">
-        {[1, 0.5, 0].map((level) => (
-          <div
-            key={level}
-            aria-hidden
-            className="absolute inset-x-0 flex items-center gap-2"
-            style={{ top: `${(1 - level) * 100}%` }}
-          >
-            <span className="w-9 -translate-y-1/2 text-right font-mono text-caption text-content-tertiary">
-              {level === 0 ? '0' : formatAxis(max * level)}
-            </span>
-            <span
-              className={cn(
-                'h-px flex-1 -translate-y-1/2',
-                level === 0 ? 'bg-border' : 'border-t border-dashed border-border',
-              )}
-            />
-          </div>
-        ))}
-        <div
-          data-testid="usage-chart"
-          role="slider"
-          tabIndex={0}
-          aria-label={t('按天用量')}
-          aria-orientation="horizontal"
-          aria-valuemin={0}
-          aria-valuemax={slots.length - 1}
-          aria-valuenow={active ?? slots.length - 1}
-          aria-valuetext={labels.day(slots[active ?? slots.length - 1]?.date ?? '')}
-          className="absolute inset-y-0 right-0 left-11 flex items-stretch rounded-(--cds-radius-sm) outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onKeyDown={move}
-          onBlur={() => onActive(null)}
-          onPointerLeave={() => onActive(null)}
-        >
-          {slots.map(({ date, day }, i) => {
-            const values = day ? series(day) : [];
-            const shown = values.map((v, k) => [v, k] as const).filter(([v]) => v > 0);
-            return (
-              <div
-                key={date}
-                data-day={date}
-                data-active={active === i || undefined}
-                className="group relative flex min-w-0 flex-1 flex-col-reverse items-center"
-                onPointerEnter={() => onActive(i)}
-              >
-                <span
-                  aria-hidden
-                  className="absolute inset-y-0 left-1/2 hidden w-px bg-border group-data-active:block"
-                />
-                <div className="relative flex h-full w-7/10 max-w-7 flex-col-reverse gap-px">
-                  {shown.map(([value, k], j) => (
-                    <i
-                      key={k}
-                      className={cn(
-                        'block',
-                        INKS[k],
-                        j === shown.length - 1 && 'rounded-t-(--cds-radius-xs)',
-                      )}
-                      style={{ height: `${(value / max) * 100}%` }}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div aria-hidden className="ml-11 flex text-caption text-content-tertiary">
-        {slots.map(({ date }, i) => (
-          <span key={date} className="flex min-w-0 flex-1 justify-center overflow-visible">
-            <span className="whitespace-nowrap tabular-nums">{tick(date, i)}</span>
-          </span>
-        ))}
-      </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-meta text-content-tertiary">
-        {(split === 'source'
-          ? ['Coordinator', t('任务')]
-          : summary.chartModels.map((key) => (key === OTHER_MODELS ? t('其他') : modelName(key)))
-        ).map((label, k) => (
-          <span key={label} className="inline-flex items-center gap-1.5 whitespace-nowrap">
-            <Swatch ink={INKS[k] ?? INKS[3]} />
-            {label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
+interface MonthTotals {
+  total: number;
+  coordinator: number;
+  tasks: number;
 }
 
-function Readout({
-  summary,
-  split,
-  range,
-  modelName,
-  active,
-}: {
-  summary: UsageSummary;
-  split: Split;
-  range: UsageRange;
-  modelName: (key: string) => string;
-  active: number | null;
-}) {
+function Readout({ cell, month }: { cell: UsageCell | null; month: MonthTotals }) {
   const { t } = useI18n();
   const labels = useDateLabels();
-  const slot = active === null ? null : summary.slots[active];
-  let text: string;
-  if (!slot) {
-    text =
-      summary.since === null
-        ? t('日均 {avg} · 用了 {n} 天', {
-            avg: formatTokens(Math.round(summary.total / range)),
-            n: summary.usedDays,
-          })
-        : t('{date} 开始使用 · 用了 {n} 天', {
-            date: labels.short(summary.since),
-            n: summary.usedDays,
-          });
-  } else if (!slot.day) {
-    text = `${labels.day(slot.date)} · ${t('没有用量')}`;
-  } else {
-    const { day } = slot;
-    const parts: [string, number][] =
-      split === 'source'
-        ? [
-            ['Coordinator', day.coordinator],
-            [t('任务'), day.tasks],
-          ]
-        : summary.chartModels
-            .map((key, k): [string, number] => [
-              key === OTHER_MODELS ? t('其他') : modelName(key),
-              modelSeries(day, summary.chartModels)[k] ?? 0,
-            ])
-            .filter(([, v]) => v > 0);
-    text = [
-      labels.day(slot.date),
-      `${formatTokens(day.coordinator + day.tasks)} token`,
-      ...parts.map(([label, v]) => `${label} ${formatTokens(v)}`),
-    ].join(' · ');
-  }
+  const text =
+    cell === null
+      ? [
+          t('本月'),
+          `${formatTokens(month.total)} token`,
+          `Coordinator ${formatTokens(month.coordinator)}`,
+          `${t('任务')} ${formatTokens(month.tasks)}`,
+        ].join(' · ')
+      : cell.day === null || cell.total === 0
+        ? `${labels.day(cell.date)} · ${t('没有用量')}`
+        : [
+            labels.day(cell.date),
+            `${formatTokens(cell.total)} token`,
+            `Coordinator ${formatTokens(cell.day.coordinator)}`,
+            `${t('任务')} ${formatTokens(cell.day.tasks)}`,
+          ].join(' · ');
   return (
     <p
       data-testid="usage-readout"
@@ -340,6 +191,317 @@ function Readout({
     >
       {text}
     </p>
+  );
+}
+
+type Point = readonly [number, number];
+
+function monthLoops(grid: UsageGrid, month: string): Point[][] {
+  const inMonth = new Set(
+    grid.weeks.flatMap((week, col) =>
+      week
+        .filter((cell) => !cell.future && cell.date.startsWith(month))
+        .map((cell) => `${col},${cell.weekday}`),
+    ),
+  );
+  const has = (col: number, row: number) => inMonth.has(`${col},${row}`);
+  const edges = new Map<string, Point[]>();
+  const add = (from: Point, to: Point) => {
+    const key = `${from[0]},${from[1]}`;
+    edges.set(key, [...(edges.get(key) ?? []), to]);
+  };
+  for (const spot of inMonth) {
+    const [c = 0, r = 0] = spot.split(',').map(Number);
+    if (!has(c, r - 1)) add([c, r], [c + 1, r]);
+    if (!has(c + 1, r)) add([c + 1, r], [c + 1, r + 1]);
+    if (!has(c, r + 1)) add([c + 1, r + 1], [c, r + 1]);
+    if (!has(c - 1, r)) add([c, r + 1], [c, r]);
+  }
+  const loops: Point[][] = [];
+  for (const [key, targets] of edges) {
+    while (targets.length > 0) {
+      const [x0 = 0, y0 = 0] = key.split(',').map(Number);
+      const loop: Point[] = [[x0, y0]];
+      let at: Point = [x0, y0];
+      let heading: Point | null = null;
+      for (;;) {
+        const atKey = `${at[0]},${at[1]}`;
+        const out = edges.get(atKey) ?? [];
+        const turn = (to: Point) => {
+          if (heading === null) return 0;
+          const dx = to[0] - at[0];
+          const dy = to[1] - at[1];
+          return heading[0] * dy - heading[1] * dx;
+        };
+        const pick = out.reduce<number>(
+          (best, to, i) => (turn(to) > turn(out[best] ?? to) ? i : best),
+          0,
+        );
+        const next = out.splice(pick, 1)[0];
+        if (next === undefined) break;
+        heading = [next[0] - at[0], next[1] - at[1]];
+        at = next;
+        if (at[0] === x0 && at[1] === y0) break;
+        loop.push(at);
+      }
+      loops.push(
+        loop.filter((point, i) => {
+          const prev = loop[(i + loop.length - 1) % loop.length] ?? point;
+          const next = loop[(i + 1) % loop.length] ?? point;
+          return (
+            (point[0] - prev[0]) * (next[1] - point[1]) !==
+            (point[1] - prev[1]) * (next[0] - point[0])
+          );
+        }),
+      );
+    }
+  }
+  return loops;
+}
+
+function roundedLoop(loop: Point[], pitch: number, gap: number, radius: number): string {
+  const at = (i: number) => {
+    const [c = 0, r = 0] = loop[(i + loop.length) % loop.length] ?? [];
+    return [c * pitch - gap / 2, r * pitch - gap / 2] as const;
+  };
+  const corners = loop.map((_, i) => {
+    const [px, py] = at(i - 1);
+    const [x, y] = at(i);
+    const [nx, ny] = at(i + 1);
+    const inLen = Math.hypot(x - px, y - py);
+    const outLen = Math.hypot(nx - x, ny - y);
+    const r = Math.min(radius, inLen / 2, outLen / 2);
+    const [ix, iy] = [(x - px) / inLen, (y - py) / inLen];
+    const [ox, oy] = [(nx - x) / outLen, (ny - y) / outLen];
+    return {
+      enter: `${x - ix * r},${y - iy * r}`,
+      leave: `${x + ox * r},${y + oy * r}`,
+      arc: `A${r},${r} 0 0 ${ix * oy - iy * ox > 0 ? 1 : 0} `,
+    };
+  });
+  const start = corners.at(-1)?.leave ?? '0,0';
+  return `M${start}${corners.map((c) => `L${c.enter}${c.arc}${c.leave}`).join('')}Z`;
+}
+
+function useCellMetrics(ref: RefObject<HTMLDivElement | null>) {
+  const [metrics, setMetrics] = useState<{ pitch: number; radius: number } | null>(null);
+  useLayoutEffect(() => {
+    const grid = ref.current;
+    if (!grid) return;
+    const measure = () => {
+      const cell = grid.querySelector('[data-day]');
+      const radius = cell ? Number.parseFloat(getComputedStyle(cell).borderTopLeftRadius) : 0;
+      setMetrics({ pitch: grid.clientHeight / (7 - CELL_GAP), radius });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [ref]);
+  return metrics;
+}
+
+function Legend() {
+  const { t } = useI18n();
+  return (
+    <div
+      aria-hidden
+      data-testid="usage-legend"
+      className="flex flex-none items-center gap-1 text-caption text-content-tertiary"
+    >
+      {t('少')}
+      {LEVEL_BG.map((bg) => (
+        <i key={bg} className={cn('block size-2.5 rounded-(--cds-radius-xs)', bg)} />
+      ))}
+      {t('多')}
+    </div>
+  );
+}
+
+function Heatmap({
+  grid,
+  selected,
+  onSelect,
+  onHover,
+}: {
+  grid: UsageGrid;
+  selected: string | null;
+  onSelect: (date: string | null) => void;
+  onHover: (date: string | null) => void;
+}) {
+  const { t } = useI18n();
+  const labels = useDateLabels();
+  const narrow = useNarrow();
+  const gridRef = useRef<HTMLDivElement>(null);
+  const cols = 'auto-cols-(--cell) gap-x-(--gap)';
+  const rows = 'grid-rows-[repeat(7,var(--cell))] gap-y-(--gap)';
+  const cells = grid.weeks.flat().filter((cell) => !cell.future);
+  const focusDate = selected ?? cells.at(-1)?.date;
+
+  const move = (event: KeyboardEvent<HTMLButtonElement>, date: string) => {
+    const by = { ArrowLeft: -7, ArrowRight: 7, ArrowUp: -1, ArrowDown: 1 }[event.key];
+    if (by === undefined) return;
+    event.preventDefault();
+    const next = shiftDay(date, by);
+    const target = gridRef.current?.querySelector<HTMLButtonElement>(`[data-day="${next}"]`);
+    if (!target) return;
+    onSelect(next);
+    target.focus();
+  };
+
+  const firstWeek = grid.weeks[0] ?? [];
+  const month = cells.at(-1)?.date.slice(0, 7) ?? '';
+  const metrics = useCellMetrics(gridRef);
+  const outline =
+    metrics === null || metrics.pitch === 0
+      ? null
+      : monthLoops(grid, month)
+          .map((loop) =>
+            roundedLoop(
+              loop,
+              metrics.pitch,
+              metrics.pitch * CELL_GAP,
+              metrics.radius + (metrics.pitch * CELL_GAP) / 2,
+            ),
+          )
+          .join('');
+  const weeks = grid.weeks.length;
+  return (
+    <div
+      data-testid="usage-heatmap-frame"
+      style={{ '--weeks': weeks } as CSSProperties}
+      className={cn(
+        'grid grid-cols-[2rem_auto] gap-x-1.5 gap-y-1 [--cell:calc(var(--pitch)*0.8)] [--gap:calc(var(--pitch)*0.2)]',
+        narrow
+          ? 'w-max [--pitch:1.25rem]'
+          : 'w-full [--pitch:min(calc((100cqw-2.375rem)/var(--weeks)),1.5rem)]',
+      )}
+      onPointerLeave={() => onHover(null)}
+    >
+      <span />
+      <div
+        aria-hidden
+        className={cn('grid h-3.5 grid-flow-col text-caption text-content-tertiary', cols)}
+      >
+        {grid.weeks.map((week, w) => (
+          <span
+            key={week[0]?.date ?? w}
+            className={cn(
+              'whitespace-nowrap',
+              week.some((cell) => !cell.future && cell.date.startsWith(month)) &&
+                grid.monthStarts[w] !== null &&
+                '-ml-[calc(var(--gap)/2)] font-medium text-foreground',
+            )}
+          >
+            {grid.monthStarts[w] !== null && week[0] ? labels.month(week[0].date) : ''}
+          </span>
+        ))}
+      </div>
+      <div aria-hidden className={cn('grid text-caption leading-none text-content-tertiary', rows)}>
+        {firstWeek.map((cell) => (
+          <span key={cell.weekday} className="flex items-center">
+            {cell.weekday % 2 === 0 && cell.weekday < 6 ? labels.weekday(cell.date) : ''}
+          </span>
+        ))}
+      </div>
+      <div
+        ref={gridRef}
+        data-testid="usage-heatmap"
+        className={cn('relative grid grid-flow-col', cols, rows)}
+      >
+        {outline !== null && outline !== '' && (
+          <svg
+            aria-hidden
+            data-testid="usage-current-month"
+            className="pointer-events-none absolute top-0 left-0 size-px overflow-visible text-input"
+          >
+            <path d={outline} fill="none" stroke="currentColor" />
+          </svg>
+        )}
+        {grid.weeks
+          .flat()
+          .map((cell) =>
+            cell.future ? (
+              <span key={cell.date} />
+            ) : (
+              <Button
+                key={cell.date}
+                type="button"
+                variant="link"
+                size="icon"
+                data-day={cell.date}
+                data-level={cell.level}
+                aria-pressed={cell.date === selected}
+                aria-label={
+                  cell.total === 0
+                    ? `${labels.day(cell.date)}，${t('没有用量')}`
+                    : `${labels.day(cell.date)}，${formatTokens(cell.total)} token`
+                }
+                tabIndex={cell.date === focusDate ? 0 : -1}
+                className={cn(
+                  'size-(--cell) rounded-(--cds-radius-xs) border-0 p-0 hover:outline-solid hover:outline-2 hover:outline-offset-1 hover:outline-content-tertiary focus-visible:ring-2 focus-visible:ring-ring',
+                  LEVEL_BG[cell.level],
+                  cell.date === selected &&
+                    'outline-solid outline-2 outline-offset-1 outline-foreground hover:outline-foreground',
+                )}
+                onPointerEnter={() => onHover(cell.date)}
+                onClick={() => onSelect(cell.date === selected ? null : cell.date)}
+                onKeyDown={(event) => move(event, cell.date)}
+              />
+            ),
+          )}
+      </div>
+    </div>
+  );
+}
+
+function Year({
+  grid,
+  firstDay,
+  selected,
+  onSelect,
+}: {
+  grid: UsageGrid;
+  firstDay: string | null;
+  selected: string | null;
+  onSelect: (date: string | null) => void;
+}) {
+  const { t } = useI18n();
+  const labels = useDateLabels();
+  const [hover, setHover] = useState<string | null>(null);
+  const cells = grid.weeks.flat();
+  const shown = hover ?? selected;
+  const cell = shown === null ? null : (cells.find((c) => c.date === shown) ?? null);
+  const fresh = firstDay !== null && firstDay > shiftDay(grid.from, 28);
+  const thisMonth =
+    cells
+      .filter((c) => !c.future)
+      .at(-1)
+      ?.date.slice(0, 7) ?? '';
+  const monthCells = cells.filter((c) => !c.future && c.date.startsWith(thisMonth));
+  const month = {
+    total: monthCells.reduce((sum, c) => sum + c.total, 0),
+    coordinator: monthCells.reduce((sum, c) => sum + (c.day?.coordinator ?? 0), 0),
+    tasks: monthCells.reduce((sum, c) => sum + (c.day?.tasks ?? 0), 0),
+  };
+  return (
+    <section
+      data-testid="usage-year"
+      className={cn('flex min-w-0 flex-col gap-3 px-4 pt-3.5 pb-3', CARD_CLS)}
+    >
+      <div className="flex min-h-5 items-center justify-between gap-4">
+        <Readout cell={cell} month={month} />
+        <Legend />
+      </div>
+      <div className="@container -m-1 flex justify-end overflow-hidden p-1">
+        <Heatmap grid={grid} selected={selected} onSelect={onSelect} onHover={setHover} />
+      </div>
+      {fresh && firstDay !== null && (
+        <p data-testid="usage-since" className="m-0 text-meta text-content-tertiary tabular-nums">
+          {t('{date} 开始使用', { date: labels.short(firstDay) })}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -385,92 +547,48 @@ function Ranking({
   );
 }
 
-function RangeTabs({ range, onChange }: { range: UsageRange; onChange: (r: UsageRange) => void }) {
-  const { t } = useI18n();
-  return (
-    <SegmentedTabs
-      label={t('时间范围')}
-      value={String(range)}
-      options={USAGE_RANGES.map((n) => ({
-        value: String(n),
-        label: t('{n} 天', { n }),
-        testId: `usage-range-${n}`,
-      }))}
-      onChange={(next) => onChange(Number(next) as UsageRange)}
-    />
-  );
-}
-
-function UsageBody({
-  usage,
-  today,
-  range,
-  onRange,
-}: {
-  usage: DailyUsage;
-  today: string;
-  range: UsageRange;
-  onRange: (r: UsageRange) => void;
-}) {
+function UsageBody({ usage, today }: { usage: DailyUsage; today: string }) {
   const { t } = useI18n();
   const narrow = useNarrow();
-  const [split, setSplit] = useState<Split>('source');
-  const [active, setActive] = useState<number | null>(null);
-  const summary = usageSummary(usage.days, today, range);
+  const [selected, setSelected] = useState<string | null>(null);
+  const year = usageGrid(usage.days, today, USAGE_WEEKS);
+  const grid = narrow ? usageGrid(usage.days, today, USAGE_NARROW_WEEKS) : year;
+  const yearDays = usage.days.filter((day) => day.date >= year.from && day.date <= today);
+  const yearSummary = usageSummary(yearDays);
+  const picked = selected === null ? null : yearDays.filter((day) => day.date === selected);
+  const scoped = picked === null ? yearSummary : usageSummary(picked);
   const models = new Map(usage.models.map((model) => [model.key, model]));
   const projects = new Map(usage.projects.map((project) => [project.id, project.name]));
   const modelName = (key: string) => models.get(key)?.name ?? key;
+  const usedDates = yearDays.filter((day) => day.coordinator + day.tasks > 0);
   return (
-    <div className="flex flex-col gap-7 px-7 pt-7 pb-8 max-sm:gap-6 max-sm:px-4 max-sm:pt-5">
-      {narrow && <RangeTabs range={range} onChange={onRange} />}
-      <Stats summary={summary} range={range} />
-      <TokenMix summary={summary} />
-      <div className="flex flex-col gap-3">
-        <div className="flex min-h-7 items-center justify-between gap-3">
-          <SegmentedTabs
-            quiet
-            label={t('拆分')}
-            value={split}
-            options={[
-              { value: 'source', label: t('来源'), testId: 'usage-split-source' },
-              { value: 'model', label: t('模型'), testId: 'usage-split-model' },
-            ]}
-            onChange={(next) => setSplit(next)}
-          />
-          <Readout
-            summary={summary}
-            split={split}
-            range={range}
-            modelName={modelName}
-            active={active}
-          />
-        </div>
-        <Chart
-          summary={summary}
-          split={split}
-          modelName={modelName}
-          active={active}
-          onActive={setActive}
-        />
-      </div>
+    <div className="flex flex-col gap-6 px-7 pt-7 pb-8 max-sm:gap-5 max-sm:px-4 max-sm:pt-5">
+      <Year
+        grid={grid}
+        firstDay={usedDates[0]?.date ?? null}
+        selected={selected}
+        onSelect={setSelected}
+      />
+      <Stats summary={yearSummary} days={year.days} />
+      <TokenMix summary={scoped} />
       <div className="grid grid-cols-2 gap-8 max-sm:grid-cols-1 max-sm:gap-6">
         <Ranking
           testId="usage-models"
           title={t('模型')}
-          total={summary.total}
-          rows={summary.models.map(([key, tokens]) => ({
+          total={scoped.total}
+          rows={scoped.models.map(([key, tokens]) => ({
             id: key,
             name: modelName(key),
             note: models.get(key)?.provider,
             tokens,
           }))}
         />
-        {summary.projects.length > 0 && (
+        {scoped.projects.length > 0 && (
           <Ranking
             testId="usage-projects"
             title={t('项目')}
-            total={summary.tasks}
-            rows={summary.projects.map(([id, tokens]) => ({
+            total={scoped.tasks}
+            rows={scoped.projects.map(([id, tokens]) => ({
               id,
               name: projects.get(id) ?? t('已删除的项目'),
               tokens,
@@ -484,7 +602,6 @@ function UsageBody({
 
 export function UsagePage() {
   const { t } = useI18n();
-  const narrow = useNarrow();
   const [params] = useSearchParams();
   const { live } = useLiveData();
   const fixture = resolveScenario(params);
@@ -495,16 +612,9 @@ export function UsagePage() {
   const query = useDailyUsage(teamId, USAGE_FETCH_DAYS, tz, live);
   const usage = live ? query.data : (fixture.dailyUsage ?? { days: [], models: [], projects: [] });
   const failed = live && (teams.isError || query.isError);
-  const [range, setRange] = useState<UsageRange>(30);
-  const ready = !failed && usage !== undefined && usage.days.length > 0;
 
   return (
-    <RouteDialog
-      title={t('用量')}
-      size="page"
-      bleed
-      actions={ready && !narrow ? <RangeTabs range={range} onChange={setRange} /> : undefined}
-    >
+    <RouteDialog title={t('用量')} size="page" bleed>
       {failed ? (
         <EmptyState
           testId="usage-error"
@@ -523,8 +633,8 @@ export function UsagePage() {
           <span role="status" className="sr-only">
             {t('正在加载用量…')}
           </span>
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-56 w-full" />
+          <Skeleton className="h-40 w-full" />
+          <Skeleton className="h-24 w-full" />
         </div>
       ) : usage.days.length === 0 ? (
         <EmptyState
@@ -535,7 +645,7 @@ export function UsagePage() {
           className="h-full"
         />
       ) : (
-        <UsageBody usage={usage} today={today} range={range} onRange={setRange} />
+        <UsageBody usage={usage} today={today} />
       )}
     </RouteDialog>
   );

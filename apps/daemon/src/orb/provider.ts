@@ -5,7 +5,7 @@ import { basename, dirname, join } from 'node:path';
 import type { Duplex } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { WorkspaceHookNoteData } from '@cairn/shared';
-import { withoutPinnedEnv } from '../backend/pinned-env.js';
+import { childEnv } from '../child-env.js';
 import { ensurePrivateDir, writePrivateFile } from '../private-fs.js';
 import { defaultOrbDistSource, publishOrbDist } from './dist.js';
 import { assertOrbMachineName, orbMachineName } from './names.js';
@@ -75,7 +75,7 @@ export const runOrbCommand: OrbCommandRunner = (argv, options = {}) =>
     }
     const child = spawn(command, args, {
       cwd: options.cwd,
-      env: options.env,
+      env: childEnv(options.env),
       signal: options.signal,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -139,7 +139,7 @@ export class HostOrbProvider implements OrbProvider {
     argv: readonly string[],
     options: OrbExecOptions,
   ): Promise<OrbExecResult> {
-    const env = { ...withoutPinnedEnv(process.env), ...options.env };
+    const env = childEnv(options.env);
     delete env.CAIRN_ORB;
     return this.runner(argv, { ...options, env });
   }

@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import type {
@@ -21,6 +22,7 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
 } from '@cairn/shared';
+import { probeHostKey } from '@cairn/shared/host-identity';
 import { AgentReachProbe } from './agent-reach.js';
 import { createAcpBackend, createGeminiBackend } from './backend/acp.js';
 import {
@@ -34,6 +36,7 @@ import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
 import { createDevinManaged, type DevinManaged } from './backend/devin-managed.js';
 import { createGeminiManaged, type GeminiManaged } from './backend/gemini-managed.js';
+import { createHostShellConfinement } from './backend/host-shell-confinement.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';
@@ -50,6 +53,7 @@ import { HostComputerProvider } from './computer/host.js';
 import { HostDesktops } from './computer/host-desktop.js';
 import { createHostScreenFromEnv, type HostScreen } from './computer/host-screen.js';
 import { ComputerInputFence } from './computer/input-fence.js';
+import { closeOwnerChrome } from './computer/owner-chrome.js';
 import { createPhones } from './computer/phones.js';
 import { ComputerPresenceReporter, type ComputerPresenceSource } from './computer/presence.js';
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
@@ -191,11 +195,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.machine(`agent config import failed: ${failure.item}: ${failure.reason}`);
     }
   }
+  const extraDeniedRoots = (process.env[ENV_VARS.confineDeniedRoots] ?? '')
+    .split(delimiter)
+    .filter((path) => path !== '');
   const confine = createSessionConfiner({
     daemonHome: config.home,
-    extraDeniedRoots: (process.env[ENV_VARS.confineDeniedRoots] ?? '')
-      .split(delimiter)
-      .filter((path) => path !== ''),
+    extraDeniedRoots,
     readable: [config.skillsDir, paths.teamSkillsCacheDir, join(paths.home, 'tools')],
     handoffDirectories: [paths.plansDir],
     serverUrl: config.serverUrl,
@@ -271,15 +276,31 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
     });
+  const serverUrl = new URL(config.serverUrl);
+  const serverPort =
+    serverUrl.port === '' ? (serverUrl.protocol === 'https:' ? 443 : 80) : Number(serverUrl.port);
   const hostComputer =
     opts.hostComputer ??
-    (capEnv.CAIRN_OWN_COMPUTER === '1' ? new HostComputerProvider() : undefined);
+    (capEnv.CAIRN_OWN_COMPUTER === '1'
+      ? new HostComputerProvider({
+          confinement: createHostShellConfinement({
+            deniedRoots: [config.home, join(homedir(), '.cairn'), ...extraDeniedRoots],
+            ...(Number.isInteger(serverPort) && serverPort > 0 ? { serverPort } : {}),
+            agentDesktop: capEnv.CAIRN_AGENT_DESKTOP ?? null,
+          }),
+        })
+      : undefined);
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? createHostPermissionsProbe(capEnv);
+  const cairnOrigins = [
+    config.serverUrl,
+    ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
+  ];
   const hostScreen =
     opts.hostScreen ??
     createHostScreenFromEnv(capEnv, {
       stateDir: join(paths.home, 'agent-desktop'),
       onPermissionDenied: () => hostPermissionsProbe.refreshNow(),
+      cairnOrigins,
     });
   const enrolledIdentity = { machineId: '' };
   const computerInputLocks = join(paths.home, 'computer-input');
@@ -581,6 +602,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
 
   let machineJson = loadMachineJson(paths);
+  const hostKey = machineJson?.hostKey ?? probeHostKey(paths.home);
   if (machineJson && machineJson.serverUrl !== config.serverUrl) {
     logger.machine(
       `enrolled against ${machineJson.serverUrl} but polling ${config.serverUrl} — if auth fails, re-enroll: logout, then start --api-key <k> --team <id>`,
@@ -588,11 +610,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   if (!machineJson) {
     if (!config.apiKey || !config.teamId) {
-      const enrolled = await enrollThroughBrowser(client, paths, config.serverUrl, config.name, {
-        now: () => Date.now(),
-        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-        log: (line) => logger.raw(line),
-      });
+      const enrolled = await enrollThroughBrowser(
+        client,
+        paths,
+        config.serverUrl,
+        config.name,
+        {
+          now: () => Date.now(),
+          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+          log: (line) => logger.raw(line),
+        },
+        hostKey ?? undefined,
+      );
       machineJson = {
         machineId: enrolled.machineId,
         token: enrolled.token,
@@ -608,6 +637,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         cliVersion: DAEMON_VERSION,
         claudeCode: claudeReport(),
         capabilities: capabilitiesReport(),
+        hostKey: hostKey ?? undefined,
       });
       machineJson = {
         machineId: enrolled.machineId,
@@ -618,6 +648,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       saveMachineJson(paths, machineJson);
       logger.raw(`Enrolled in team ${machineJson.teamId} (machine ${machineJson.machineId})`);
     }
+  }
+  if (hostKey !== null && machineJson.hostKey !== hostKey) {
+    machineJson = { ...machineJson, hostKey };
+    saveMachineJson(paths, machineJson);
   }
   inMemoryToken = machineJson.token;
   const machineId = machineJson.machineId;
@@ -649,6 +683,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       cliVersion: DAEMON_VERSION,
       claudeCode: claudeReport(),
       capabilities: capabilitiesReport(),
+      hostKey: hostKey ?? undefined,
     }),
     timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
     send: async (body, signal) => {
@@ -707,6 +742,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   availability = new ConfinementAvailability({
     home: paths.home,
     platform,
+    log: (message) => logger.machine(message),
     launch: opts.confinementPreflight,
     ...(opts.seatbeltProbe !== undefined ? { seatbeltProbe: opts.seatbeltProbe } : {}),
     me: () => client.me(),
@@ -951,6 +987,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           await client.done(stepRecord.id, {
             status: 'failed',
             errorMessage: 'daemon journal lost across restart',
+            generation: stepRecord.generation,
           });
         }
       }
@@ -1076,10 +1113,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
     phones,
-    cairnOrigins: [
-      config.serverUrl,
-      ...(capEnv.CAIRN_WEB_ORIGINS ?? '').split(',').filter((origin) => origin.trim() !== ''),
-    ],
+    cairnOrigins,
   });
   const imsgBridge = createImsgBridge({ api: client, logger, home: config.home });
   void (async () => {
@@ -1357,6 +1391,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         });
     }
     await computerDispatcher.close();
+    await closeOwnerChrome();
     hostDesktops?.close();
   }
 

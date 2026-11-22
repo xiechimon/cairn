@@ -14,13 +14,17 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createConnection, createServer } from 'node:net';
-import { tmpdir } from 'node:os';
+import { availableParallelism, cpus, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { ownerChain, runOwned } from './owned-process.mjs';
 
-const DEFAULT_SLOTS = 2;
+const CORES_PER_HEAVY_SLOT = 4;
+const CPU_SAMPLE_MS = 250;
+const DEFAULT_CPU_SATURATION_PERCENT = 90;
+const DEFAULT_CPU_MAX_WAIT_MS = 10 * 60_000;
 const POLL_MS = 250;
+const QUEUE_REPRINT_MS = 30_000;
 const PARTIAL_WRITE_GRACE_MS = 2_000;
 const CLOSED_PROBE_CODES = new Set([
   'ENOENT',
@@ -51,7 +55,59 @@ export const LIVE_STACK_POOL = {
   label: 'live-stack-slots',
 };
 
-export function slotCount(env, countEnv = 'CAIRN_HEAVY_SLOTS', defaultCount = DEFAULT_SLOTS) {
+export function defaultSlotCount(cores = availableParallelism()) {
+  return Math.max(1, Math.floor(cores / CORES_PER_HEAVY_SLOT));
+}
+
+function cpuTotals(read = cpus) {
+  let busy = 0;
+  let total = 0;
+  for (const cpu of read()) {
+    const { user, nice, sys, irq, idle } = cpu.times;
+    busy += user + nice + sys + irq;
+    total += user + nice + sys + irq + idle;
+  }
+  return { busy, total };
+}
+
+export function cpuUsagePercent(before, after) {
+  const busy = after.busy - before.busy;
+  const total = after.total - before.total;
+  if (!(total > 0)) return 0;
+  return Math.round((busy / total) * 1000) / 10;
+}
+
+export async function cpuUtilizationPercent({ sampleMs = CPU_SAMPLE_MS, read = cpus } = {}) {
+  const before = cpuTotals(read);
+  await sleep(sampleMs);
+  return cpuUsagePercent(before, cpuTotals(read));
+}
+
+export function cpuSaturationPercent(env) {
+  const raw = env.CAIRN_CPU_SATURATION_PERCENT;
+  if (raw === undefined || raw === '') return { percent: DEFAULT_CPU_SATURATION_PERCENT };
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 100) return { percent: parsed };
+  return {
+    percent: DEFAULT_CPU_SATURATION_PERCENT,
+    warning: `CAIRN_CPU_SATURATION_PERCENT=${raw} is not a number from 0 to 100; treating it as ${DEFAULT_CPU_SATURATION_PERCENT}`,
+  };
+}
+
+export function cpuMaxWaitMs(env) {
+  const raw = env.CAIRN_CPU_SATURATION_MAX_WAIT_MS;
+  if (raw === undefined || raw === '') return DEFAULT_CPU_MAX_WAIT_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_CPU_MAX_WAIT_MS;
+}
+
+function bypassName(env) {
+  const raw = env.CAIRN_HEAVY_GATE_BYPASS;
+  if (raw === undefined || raw === '' || raw === '0' || raw === 'false') return null;
+  return `CAIRN_HEAVY_GATE_BYPASS=${raw}`;
+}
+
+export function slotCount(env, countEnv, defaultCount) {
   const raw = env[countEnv];
   if (raw === undefined || raw === '') return { count: defaultCount };
   if (/^[1-9]\d*$/.test(raw.trim())) return { count: Number(raw) };
@@ -61,15 +117,42 @@ export function slotCount(env, countEnv = 'CAIRN_HEAVY_SLOTS', defaultCount = DE
   };
 }
 
-export function skipsQueue(env, dir = slotLockDir(env)) {
-  if (env.CI === undefined || env.CI === '' || env.CI === 'false' || env.CI === '0') return false;
-  try {
-    statSync(dir);
-    return false;
-  } catch (error) {
-    if (error.code === 'ENOENT') return true;
-    throw error;
-  }
+export function slotWorkerBudget(lease, cores = availableParallelism()) {
+  if (lease === null) return null;
+  return Math.max(1, Math.floor(cores / Math.max(1, defaultSlotCount(cores))));
+}
+
+function processCommand(pid) {
+  const ps = spawnSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' });
+  if (ps.error) return undefined;
+  const command = (ps.stdout || '').trim();
+  return command === '' ? undefined : command;
+}
+
+export function laneOf(cwd) {
+  if (typeof cwd !== 'string' || cwd === '' || cwd === 'unknown') return 'unknown';
+  return cwd.split('/').filter(Boolean).at(-1) ?? cwd;
+}
+
+export function formatAge(ms) {
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return `${Math.max(1, Math.round(ms / 1000))}s`;
+  if (minutes < 60) return `${minutes}m`;
+  return `${Math.floor(minutes / 60)}h${String(minutes % 60).padStart(2, '0')}m`;
+}
+
+export function describeHolder(record, { commandOf = processCommand, now = Date.now() } = {}) {
+  const parts = [`lane ${laneOf(record.cwd)}`];
+  if (Number.isInteger(record.pid)) parts.push(`pid ${record.pid}`);
+  const command = Number.isInteger(record.pid) ? commandOf(record.pid) : undefined;
+  if (command !== undefined) parts.push(command);
+  const since = Number.isInteger(record.startedAt)
+    ? record.startedAt
+    : Number.isInteger(record.since)
+      ? record.since
+      : undefined;
+  if (since !== undefined) parts.push(`${formatAge(Math.max(0, now - since))} old`);
+  return parts.join(', ');
 }
 
 export function slotResources(slot, env) {
@@ -235,7 +318,13 @@ async function holderState(path, legacyPid) {
         if (error.code !== 'ENOENT' && !REACH_PROBE_CODES.has(error.code)) throw error;
       }
     }
-    return { ...record, state: alive ? 'held' : 'stale', pid, cwd };
+    return {
+      ...record,
+      state: alive ? 'held' : 'stale',
+      pid,
+      cwd,
+      since: Number.isInteger(record.startedAt) ? record.startedAt : modified,
+    };
   }
   return { state: Date.now() - modified < PARTIAL_WRITE_GRACE_MS ? 'held' : 'stale' };
 }
@@ -262,17 +351,54 @@ export async function acquireSlot({
   wait = true,
   log = console.error,
   pool = {},
+  cpuProbe = cpuUtilizationPercent,
+  light = null,
 } = {}) {
-  const {
-    countEnv = 'CAIRN_HEAVY_SLOTS',
-    defaultCount = DEFAULT_SLOTS,
-    dirName = '',
-    label = 'heavy-slots',
-  } = pool;
+  const { countEnv, defaultCount = defaultSlotCount(), dirName = '', label = 'heavy-slots' } = pool;
   const dir = join(slotLockDir(env), dirName);
-  if (skipsQueue(env, dir)) return null;
-  const { count, warning } = slotCount(env, countEnv, defaultCount);
+  const bypass = bypassName(env);
+  if (bypass) {
+    log(
+      `[${label}] BYPASS: ${bypass} skips the machine-wide slot queue and the per-run worker cap this run (pid ${process.pid}, cwd ${process.cwd()})`,
+    );
+    return null;
+  }
+  const { count, warning } =
+    countEnv === undefined ? { count: defaultCount } : slotCount(env, countEnv, defaultCount);
   if (warning) log(`[${label}] ${warning}`);
+  const saturation = cpuSaturationPercent(env);
+  if (saturation.warning) log(`[${label}] ${saturation.warning}`);
+  const cpuMaxWait = cpuMaxWaitMs(env);
+  let saturatedPercent = null;
+  let saturatedSince = null;
+  const cpuAdmits = async () => {
+    if (saturation.percent === 0) return true;
+    const percent = await cpuProbe();
+    if (percent < saturation.percent) {
+      if (saturatedPercent !== null)
+        log(
+          `[${label}] cpu back to ${percent}%, under the ${saturation.percent}% saturation limit`,
+        );
+      saturatedPercent = null;
+      saturatedSince = null;
+      return true;
+    }
+    saturatedSince ??= Date.now();
+    const waitedMs = Date.now() - saturatedSince;
+    if (cpuMaxWait > 0 && waitedMs >= cpuMaxWait) {
+      log(
+        `[${label}] cpu held at or above ${saturation.percent}% for ${Math.round(waitedMs / 1000)}s; starting anyway (CAIRN_CPU_SATURATION_MAX_WAIT_MS=${cpuMaxWait})`,
+      );
+      return true;
+    }
+    if (saturatedPercent !== percent) {
+      log(
+        `[${label}] cpu ${percent}% is at or above the ${saturation.percent}% saturation limit; not starting more heavy work until the machine drains (CAIRN_CPU_SATURATION_PERCENT, 0 disables)`,
+      );
+      saturatedPercent = percent;
+    }
+    return false;
+  };
   const slotPath = (slot) => join(dir, `slot-${slot}.lock`);
   mkdirSync(dir, { recursive: true });
   chmodSync(dir, 0o700);
@@ -288,6 +414,13 @@ export async function acquireSlot({
       (owner === process.pid || ownerChain(process.pid).some((entry) => entry.pid === owner))
     )
       return { slot: inherited, owner, release() {} };
+  }
+
+  if (light !== null) {
+    log(
+      `[${label}] ${light} is light work; taking no slot and no worker cap, so a full queue of heavy work cannot hold it up (heavy work needs one of the ${count} machine-wide slots)`,
+    );
+    return null;
   }
 
   const token = randomUUID();
@@ -319,6 +452,7 @@ export async function acquireSlot({
     probe,
     token,
     count,
+    startedAt: Date.now(),
   };
   let claimed = false;
   const claim = async () => {
@@ -369,7 +503,7 @@ export async function acquireSlot({
   };
   if (!wait) {
     try {
-      return await claim();
+      return (await cpuAdmits()) ? await claim() : null;
     } finally {
       if (!claimed) closeProbe();
     }
@@ -388,7 +522,9 @@ export async function acquireSlot({
     throw error;
   }
   process.once('exit', dropTicket);
+  const reprintMs = Number(env.CAIRN_HEAVY_QUEUE_REPRINT_MS) || QUEUE_REPRINT_MS;
   let announced = 0;
+  let announcedAt = 0;
   try {
     for (;;) {
       const waiting = [];
@@ -417,25 +553,24 @@ export async function acquireSlot({
         const reach = entry.count ?? horizon;
         for (let slot = 1; slot <= reach; slot++) if (free.delete(slot)) break;
       }
-      if ([...free].some((slot) => slot <= count)) {
+      if ([...free].some((slot) => slot <= count) && (await cpuAdmits())) {
         const lease = await claim();
         if (lease) return lease;
       }
-      if (position !== announced) {
-        const holders = (
-          await Promise.all(
-            Array.from({ length: count }, async (_, index) => {
-              const holder = await holderState(slotPath(index + 1));
-              return holder.state === 'held'
-                ? `slot ${index + 1}: pid ${holder.pid ?? 'writing'}, cwd ${holder.cwd ?? 'unknown'}`
-                : null;
-            }),
-          )
-        ).filter(Boolean);
+      if (position !== announced || Date.now() - announcedAt >= reprintMs) {
+        const holders = await Promise.all(
+          Array.from({ length: count }, async (_, index) => {
+            const holder = await holderState(slotPath(index + 1));
+            return holder.state === 'held'
+              ? `slot ${index + 1}: ${describeHolder(holder)}`
+              : `slot ${index + 1}: free`;
+          }),
+        );
         log(
-          `[${label}] queued, position ${position} (all ${count} slots are busy); ${holders.join('; ')}`,
+          `[${label}] queued, position ${position} of ${count} slot(s); ${holders.join('; ')}${announced === position ? ' — still waiting' : ''}`,
         );
         announced = position;
+        announcedAt = Date.now();
       }
       await sleep(POLL_MS);
     }

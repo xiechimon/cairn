@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import { Duplex, PassThrough } from 'node:stream';
+import { childEnv } from '../child-env.js';
 import type { ComputerScreenConnection } from './screen-channel.js';
 
 const CONTROL_PTY = [
@@ -45,6 +46,7 @@ export function openUserControlPty(
 ): UserControlPty {
   if (signal.aborted) throw new Error('computer control closed');
   const child = spawn('python3', ['-S', '-c', CONTROL_PTY, ...command], {
+    env: childEnv(),
     stdio: ['pipe', 'pipe', 'pipe'],
     detached: process.platform !== 'win32',
   });

@@ -21,6 +21,18 @@ import { proposalCardId } from './action-proposals.js';
 import { executeAction } from './action-registry.js';
 import { announceQuestion } from './chief-questions.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import {
+  claimEffect,
+  type EffectRow,
+  effectAttemptOutcome,
+  effectDedupeKey,
+  effectRegistry,
+  failEffect,
+  markEffectAttempt,
+  markEffectDelivered,
+  recordEffect,
+  settleEffectRow,
+} from './external-effects.js';
 import { type SendMail, sendSmtpMail } from './mail-smtp.js';
 import {
   callConnectorTool,
@@ -46,6 +58,7 @@ export interface ConnectorCallContext {
   threadId: string;
   scopeProjectId: string | null;
   untrustedTurn?: boolean;
+  mcpGrant: readonly string[] | null;
 }
 
 type ConnectorRow = typeof mcpConnector.$inferSelect;
@@ -57,6 +70,7 @@ function cachedTools(row: ConnectorRow): McpConnectorTool[] {
 
 export const MAIL_CONNECTOR_SLUG = 'cairn-mail';
 const MAIL_SEND_TOOL = 'send';
+const MAIL_SEND_KIND = 'mail-send';
 
 const mailSendArgsSchema = z
   .object({
@@ -291,6 +305,131 @@ async function executeMailSend(
     journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'error');
     throw new HttpError(409, 'the mailbox has no usable credentials');
   }
+  effectRegistry.set(MAIL_SEND_KIND, {
+    policy: 'unsafe',
+    scopeGone: (db, effectRow) => {
+      const p = mailSendPayloadOf(effectRow);
+      return (
+        p === null ||
+        db
+          .select({ id: mailAccount.id })
+          .from(mailAccount)
+          .where(eq(mailAccount.id, p.accountId))
+          .get() === undefined
+      );
+    },
+    send: (effectRow) => sendMailEffect(deps, effectRow),
+  });
+  const intent = recordEffect(deps.db, {
+    teamId: ctx.teamId,
+    scopeKind: 'chiefThread',
+    scopeId: ctx.threadId,
+    kind: MAIL_SEND_KIND,
+    dedupeKey: effectDedupeKey(MAIL_SEND_KIND, ctx.teamId, entry.id, inputHash(gated)),
+    payload: { accountId: account.id, threadId: ctx.threadId, actionId: entry.id, input: gated },
+  });
+  const settled = await settleEffectRow(deps.db, effectRegistry, intent.row);
+  if (settled.state === 'delivered') {
+    const receipt = settled.receipt as { to?: unknown; subject?: unknown } | null;
+    return JSON.stringify({
+      sent: true,
+      to: typeof receipt?.to === 'string' ? receipt.to : args.to,
+      subject: typeof receipt?.subject === 'string' ? receipt.subject : args.subject,
+    });
+  }
+  if (settled.state !== 'pending') {
+    journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'error');
+    throw new HttpError(
+      409,
+      settled.state === 'failed'
+        ? 'a previous identical send failed permanently and was not retried; check the mailbox before sending again'
+        : 'a previous identical send already ran to an unresolved state and was not retried; check the mailbox before sending again',
+    );
+  }
+  const claimed = claimEffect(deps.db, settled.id);
+  if (claimed === null) {
+    journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'error');
+    throw new HttpError(409, 'the identical send is already in flight');
+  }
+  try {
+    const receipt = await sendMailEffect(deps, claimed);
+    markEffectDelivered(deps.db, claimed.id, claimed.claimFence ?? nowMs(), receipt);
+    return JSON.stringify(receipt);
+  } catch (err) {
+    markEffectAttempt(
+      deps.db,
+      claimed.id,
+      claimed.claimFence ?? nowMs(),
+      effectAttemptOutcome(err, claimed.attempts, nowMs()),
+    );
+    journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'error');
+    throw new HttpError(502, 'the mail server refused or could not send this message');
+  }
+}
+
+interface MailSendPayload {
+  accountId: string;
+  threadId: string;
+  actionId: string;
+  input: {
+    to: string;
+    subject: string;
+    body: string;
+    inReplyTo?: string;
+    from: string;
+  };
+}
+
+function mailSendPayloadOf(row: EffectRow): MailSendPayload | null {
+  const p = row.payload as Record<string, unknown> | null;
+  if (p === null) return null;
+  const input = p.input as Record<string, unknown> | null;
+  if (
+    typeof p.accountId !== 'string' ||
+    typeof p.threadId !== 'string' ||
+    typeof p.actionId !== 'string' ||
+    input === null ||
+    typeof input.to !== 'string' ||
+    typeof input.subject !== 'string' ||
+    typeof input.body !== 'string' ||
+    typeof input.from !== 'string'
+  )
+    return null;
+  return {
+    accountId: p.accountId,
+    threadId: p.threadId,
+    actionId: p.actionId,
+    input: {
+      to: input.to,
+      subject: input.subject,
+      body: input.body,
+      ...(typeof input.inReplyTo === 'string' ? { inReplyTo: input.inReplyTo } : {}),
+      from: input.from,
+    },
+  };
+}
+
+async function sendMailEffect(deps: ConnectorBrokerDeps, effectRow: EffectRow): Promise<unknown> {
+  const p = mailSendPayloadOf(effectRow);
+  if (p === null) throw failEffect('mail-send payload is malformed');
+  const account = deps.db
+    .select()
+    .from(mailAccount)
+    .where(and(eq(mailAccount.id, p.accountId), eq(mailAccount.teamId, effectRow.teamId)))
+    .get();
+  if (account === undefined || !['watching', 'degraded'].includes(account.status))
+    throw failEffect('the mailbox is gone');
+  const password =
+    account.secretId === null
+      ? null
+      : openMailPassword({ db: deps.db, box: deps.mcp.box }, effectRow.teamId, account.secretId);
+  if (password === null || account.address === null || account.smtpHost === null) {
+    throw failEffect('the mailbox has no usable credentials');
+  }
+  const replied =
+    p.input.inReplyTo === undefined
+      ? undefined
+      : deps.db.select().from(mailEvent).where(eq(mailEvent.id, p.input.inReplyTo)).get();
   try {
     await (deps.sendMail ?? sendSmtpMail)(
       {
@@ -301,20 +440,31 @@ async function executeMailSend(
       },
       {
         from: account.address,
-        to: args.to,
-        subject: args.subject,
-        text: args.body,
+        to: p.input.to,
+        subject: p.input.subject,
+        text: p.input.body,
         inReplyTo: /^<[^\s<>]+>$/.test(replied?.messageId ?? '')
           ? (replied?.messageId ?? null)
           : null,
       },
     );
   } catch {
-    journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'error');
-    throw new HttpError(502, 'the mail server refused or could not send this message');
+    throw failEffect('the mail server refused or could not send this message');
   }
-  journalRow(deps, ctx, entry.id, MAIL_CONNECTOR_SLUG, args, 'run');
-  return JSON.stringify({ sent: true, to: args.to, subject: args.subject });
+  journalRow(
+    deps,
+    {
+      teamId: effectRow.teamId,
+      threadId: p.threadId,
+      scopeProjectId: null,
+      mcpGrant: [],
+    },
+    p.actionId,
+    MAIL_CONNECTOR_SLUG,
+    p.input,
+    'run',
+  );
+  return { sent: true, to: p.input.to, subject: p.input.subject };
 }
 
 export async function executeConnectorToolCall(
@@ -330,12 +480,16 @@ export async function executeConnectorToolCall(
     if (parsed.tool !== MAIL_SEND_TOOL) throw new HttpError(400, `unknown connector tool ${name}`);
     return executeMailSend(deps, ctx, params);
   }
+  const actionId = `connector.${parsed.slug}.${parsed.tool}`;
+  if (!(ctx.mcpGrant ?? []).includes(parsed.slug)) {
+    journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
+    throw new HttpError(403, `connector ${parsed.slug} is outside the step's grant`);
+  }
   const row = deps.db
     .select()
     .from(mcpConnector)
     .where(and(eq(mcpConnector.teamId, ctx.teamId), eq(mcpConnector.slug, parsed.slug)))
     .get();
-  const actionId = `connector.${parsed.slug}.${parsed.tool}`;
   if (row === undefined) {
     journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
     throw new HttpError(400, `unknown connector ${parsed.slug}`);

@@ -9,13 +9,23 @@ interface World {
   rules: { use: string; provider: string; modelId: string }[];
   patches: { use: string; body: unknown }[];
   machines?: unknown[];
-  local?: { providerId: string; state: string }[];
+  local?: { providerId: string; state: string; models?: { id: string; name: string }[] }[];
   existing?: string[];
-  created?: { providerId: string; apiKey?: string }[];
+  created?: {
+    providerId: string;
+    label?: string;
+    apiKey?: string;
+    models?: { id: string; name: string }[];
+  }[];
   deleted?: string[];
+  verdicts?: Record<string, { status: 'ok' | 'failed'; failure: string | null }>;
+  tests?: string[];
   vm?: boolean;
   installs?: string[];
 }
+
+const liveCreated = (world: World) =>
+  (world.created ?? []).filter((c) => !world.deleted?.includes(`p-${c.providerId}`));
 
 const MACHINE = { id: 'm1', name: 'mac', online: true, enabledRuntimes: ['pi', 'claude-code'] };
 
@@ -52,8 +62,22 @@ async function open(page: Page, world: World, path = '/app') {
     page,
     { threads: [], messages: [], projects: world.projects, todos: [] },
     (p, route, json) => {
+      const tested = /^\/api\/teams\/t1\/providers\/([\w-]+)\/test$/.exec(p);
+      if (tested?.[1] !== undefined && route.request().method() === 'POST') {
+        const { model } = (route.request().postDataJSON() ?? {}) as { model?: string };
+        const key = `${tested[1]}/${model}`;
+        world.tests = [...(world.tests ?? []), key];
+        const verdict = world.verdicts?.[key] ?? { status: 'ok', failure: null };
+        return json({
+          ...verdict,
+          reason: verdict.status === 'ok' ? null : 'upstream refused',
+          httpStatus: null,
+          detail: null,
+          latencyMs: null,
+        });
+      }
       if (p === '/api/teams/t1/providers' && route.request().method() === 'POST') {
-        const body = route.request().postDataJSON() as { providerId: string; apiKey?: string };
+        const body = route.request().postDataJSON() as NonNullable<World['created']>[number];
         world.created = [...(world.created ?? []), body];
         world.bound = true;
         return json({ id: `p-${body.providerId}`, ...body }, 201);
@@ -61,14 +85,29 @@ async function open(page: Page, world: World, path = '/app') {
       const removed = /^\/api\/teams\/t1\/providers\/([\w-]+)$/.exec(p);
       if (removed?.[1] !== undefined && route.request().method() === 'DELETE') {
         world.deleted = [...(world.deleted ?? []), removed[1]];
-        world.bound = (world.created ?? []).some((c) => !world.deleted?.includes(`p-${c.providerId}`));
+        world.bound = liveCreated(world).length > 0;
         return route.fulfill({ status: 204 });
       }
       if (p === '/api/teams/t1/providers') {
         return json({
           presets: [],
           providers: [
-            ...(world.bound ? [{ id: 'p1', providerId: 'p1', label: 'Claude token' }] : []),
+            ...(world.bound
+              ? [
+                  {
+                    id: 'p1',
+                    providerId: 'p1',
+                    label: 'Claude token',
+                    models: [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }],
+                  },
+                ]
+              : []),
+            ...liveCreated(world).map((c) => ({
+              id: `p-${c.providerId}`,
+              providerId: c.providerId,
+              label: c.label ?? c.providerId,
+              models: c.models ?? [],
+            })),
             ...(world.existing ?? []).map((id) => ({ id, providerId: id, label: id })),
           ],
         });
@@ -122,6 +161,12 @@ async function open(page: Page, world: World, path = '/app') {
                 { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
               ],
             },
+            ...liveCreated(world).map((c) => ({
+              runtime: 'pi',
+              provider: c.providerId,
+              providerLabel: c.label ?? c.providerId,
+              models: c.models ?? [],
+            })),
           ],
         });
       }
@@ -318,7 +363,12 @@ test('a saved subscription without Claude Code on this computer says what is mis
   await expect(page.getByTestId('first-run-setup')).toContainText('现在先添加一个服务商，Coordinator 就能开始工作');
 });
 
-test('on the Mac app, Import all adds every ready provider found in Pi and opens step 2', async ({ page }) => {
+const TWO = [
+  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+  { id: 'gone-model', name: 'Gone model' },
+];
+
+test('Import all keeps step 1 open and checks every imported provider before step 2', async ({ page }) => {
   const world: World = {
     ...fresh(),
     bound: false,
@@ -327,6 +377,7 @@ test('on the Mac app, Import all adds every ready provider found in Pi and opens
       { providerId: 'gateway', state: 'ready' },
       { providerId: 'anthropic', state: 'needs-login' },
     ],
+    verdicts: { 'p-gateway/claude-opus-5-5': { status: 'failed', failure: 'auth' } },
   };
   await open(page, world);
   const card = page.getByTestId('local-provider-import');
@@ -336,10 +387,46 @@ test('on the Mac app, Import all adds every ready provider found in Pi and opens
     ['relay', 'test-key-relay'],
     ['gateway', 'test-key-gateway'],
   ]);
+  const list = page.getByTestId('first-run-provider-check');
+  await expect(list).toContainText('导入了 2 个服务商');
+  await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
+  await expect(list.getByTestId('provider-check-relay')).toContainText('能用');
+  const gateway = list.getByTestId('provider-check-gateway');
+  await expect(gateway).toContainText('不能用');
+  await expect(gateway).toContainText('密钥被拒绝');
+  await gateway.getByRole('button', { name: '移除' }).click();
+  await expect.poll(() => world.deleted).toEqual(['p-gateway']);
+  await expect(gateway).toHaveCount(0);
+  await list.getByRole('button', { name: '下一步：确认模型' }).click();
   await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
 });
 
-test('Undo right after Import all removes what it added and goes back to step 1', async ({ page }) => {
+test('a provider with some broken models reads partly usable, and step 2 lists neither its broken model nor a rejected provider', async ({ page }) => {
+  const world: World = {
+    ...fresh(),
+    bound: false,
+    local: [
+      { providerId: 'relay', state: 'ready', models: TWO },
+      { providerId: 'gateway', state: 'ready', models: TWO },
+    ],
+    verdicts: {
+      'p-relay/gone-model': { status: 'failed', failure: 'not-found' },
+      'p-gateway/claude-opus-5-5': { status: 'failed', failure: 'auth' },
+    },
+  };
+  await open(page, world);
+  await page.getByTestId('local-provider-import').getByRole('button', { name: '全部导入' }).click();
+  const relay = page.getByTestId('provider-check-relay');
+  await expect(relay).toContainText('部分能用');
+  await expect(relay).toContainText('gone-model');
+  await expect(relay).toContainText('服务商没有这个模型');
+  await page.getByRole('button', { name: '下一步：确认模型' }).click();
+  await page.getByTestId('first-run-pick-coordinator').getByRole('combobox').click();
+  await expect(page.getByRole('option', { name: 'Claude Opus 5.5' }).first()).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Gone model' })).toHaveCount(0);
+});
+
+test('Undo this import on the check list removes what it added and shows the provider list again', async ({ page }) => {
   const world: World = {
     ...fresh(),
     bound: false,
@@ -350,12 +437,22 @@ test('Undo right after Import all removes what it added and goes back to step 1'
   };
   await open(page, world);
   await page.getByTestId('local-provider-import').getByRole('button', { name: '全部导入' }).click();
-  await expect(page.getByTestId('first-run-step-2')).toHaveAttribute('data-state', 'now');
-  const toast = page.locator('[data-sonner-toast]', { hasText: '已导入 2 个服务商' });
-  await toast.getByRole('button', { name: '撤销' }).click();
+  await page.getByTestId('first-run-provider-check').getByRole('button', { name: '撤销这次导入' }).click();
   await expect.poll(() => world.deleted).toEqual(['p-relay', 'p-gateway']);
-  await expect(page.getByTestId('first-run-step-1')).toHaveAttribute('data-state', 'now');
+  await expect(page.getByTestId('first-run-provider-check')).toHaveCount(0);
   await expect(page.getByTestId('local-provider-import')).toContainText('在这台 Mac 上找到 2 个服务商');
+});
+
+test('confirming tries the picked model first and saves nothing when it does not answer', async ({ page }) => {
+  const world: World = {
+    ...fresh(),
+    verdicts: { 'p1/claude-opus-5-5': { status: 'failed', failure: 'upstream' } },
+  };
+  await open(page, world);
+  await page.getByTestId('first-run-confirm').click();
+  await expect(page.getByTestId('first-run-pick-coordinator')).toContainText('服务商暂时没响应或额度用完');
+  await expect.poll(() => world.tests).toContain('p1/claude-opus-5-5');
+  expect(world.patches).toEqual([]);
 });
 
 test('Choose lists what was found; sign-in and already-added providers cannot be picked', async ({ page }) => {

@@ -1,15 +1,11 @@
 import { TRANSCRIPT_PROMPT_ROW_ID_PREFIX } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapChiefStream } from '../src/api/mappers.js';
+import { CHIEF_ROW_CLASS, chiefRowRenders } from '../src/chief/chief-row-kinds.js';
 
 const NOW = 1_758_000_000_000;
 
-function macCall(
-  id: string,
-  name: string,
-  args: Record<string, unknown>,
-  finished?: { isError?: boolean },
-): MessageRow {
+function macCall(id: string, name: string, args: Record<string, unknown>): MessageRow {
   return {
     id,
     role: 'assistant',
@@ -20,78 +16,59 @@ function macCall(
         name,
         arguments: args,
         startedAt: NOW,
-        ...(finished !== undefined
-          ? {
-              endedAt: NOW + 1_000,
-              result: [{ type: 'text', text: 'ok' }],
-              ...(finished.isError !== undefined ? { isError: finished.isError } : {}),
-            }
-          : {}),
+        endedAt: NOW + 1_000,
+        result: [{ type: 'text', text: 'ok' }],
       },
     },
     createdAt: NOW,
   } as MessageRow;
 }
 
-const lines = (rows: MessageRow[]) =>
-  mapChiefStream(rows).filter((entry) => entry.kind === 'mac-activity');
+const MAC_CALLS = [
+  macCall('m1', 'user_computer_shell', {
+    command: 'cd ~/Library/Application\\ Support/Cairn/4f0c2a9e && git status -sb',
+  }),
+  macCall('m2', 'user_computer_act', { app: 'Notes', actions: [{ kind: 'click' }] }),
+  macCall('m3', 'user_computer_observe', { app: 'Finder' }),
+];
 
 describe("the owner's Mac in the Coordinator conversation", () => {
-  test('each call is one line naming what ran, running until it ends', () => {
-    expect(
-      lines([
-        macCall('m1', 'user_computer_shell', { command: 'xcodebuild -scheme Cairn' }, {}),
-        macCall('m2', 'user_computer_act', { app: 'Notes', actions: [{ kind: 'click' }] }),
-        macCall('m3', 'user_computer_observe', { app: 'Finder' }, { isError: true }),
-      ]),
-    ).toEqual([
+  test('Mac calls leave no row; the reply around them still shows', () => {
+    const stream = mapChiefStream([
+      { id: 'u1', role: 'user', content: 'check the repo', createdAt: NOW } as MessageRow,
+      ...MAC_CALLS,
       {
-        kind: 'mac-activity',
-        id: 'm1',
-        tool: 'user_computer_shell',
-        summary: 'xcodebuild -scheme Cairn',
-        running: false,
-        error: false,
-      },
-      {
-        kind: 'mac-activity',
-        id: 'm2',
-        tool: 'user_computer_act',
-        summary: 'Notes: click',
-        running: true,
-        error: false,
-      },
-      {
-        kind: 'mac-activity',
-        id: 'm3',
-        tool: 'user_computer_observe',
-        summary: 'Finder',
-        running: false,
-        error: true,
-      },
+        id: 'a1',
+        role: 'assistant',
+        content: [{ type: 'text', text: 'The repo is clean.' }],
+        createdAt: NOW + 2_000,
+      } as MessageRow,
     ]);
+    expect(JSON.stringify(stream)).not.toMatch(/git status|Library|Notes|Finder|user_computer/);
+    expect(stream.map((item) => item.kind)).toEqual(['user', 'robot']);
   });
 
-  test('a multi-line or long command shows its first line, clipped', () => {
-    const heredoc = "python3 - <<'EOF'\nprint(1)\nEOF";
-    const long = `echo ${'x'.repeat(400)}`;
-    const [first, second] = lines([
-      macCall('m1', 'user_computer_shell', { command: heredoc }, {}),
-      macCall('m2', 'user_computer_shell', { command: long }, {}),
-    ]);
-    expect(first?.summary).toBe("python3 - <<'EOF' …");
-    expect(second?.summary).toBe(`${long.slice(0, 160)} …`);
-  });
-
-  test('a routine or event turn still shows its Mac calls', () => {
+  test('a routine turn adds no Mac rows either', () => {
     const wake = {
       id: `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}step-1`,
       role: 'user',
       content: '[wake:routine] check the nightly build',
       createdAt: NOW,
     } as MessageRow;
-    expect(
-      lines([wake, macCall('m1', 'user_computer_shell', { command: 'ls ~/Builds' }, {})]),
-    ).toHaveLength(1);
+    expect(JSON.stringify(mapChiefStream([wake, ...MAC_CALLS]))).not.toMatch(/user_computer|Finder/);
+  });
+});
+
+describe('Coordinator chat row allow-list', () => {
+  test('every row kind is a message, card, alert or status, or never renders', () => {
+    for (const rowClass of Object.values(CHIEF_ROW_CLASS))
+      expect(['message', 'card', 'exception-alert', 'status', 'hidden']).toContain(rowClass);
+  });
+
+  test('a kind outside the allow-list does not render', () => {
+    expect(chiefRowRenders('mac-activity')).toBe(false);
+    expect(chiefRowRenders('work')).toBe(false);
+    expect(chiefRowRenders('report-ack')).toBe(false);
+    expect(chiefRowRenders('robot')).toBe(true);
   });
 });

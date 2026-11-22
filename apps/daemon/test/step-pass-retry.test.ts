@@ -54,6 +54,15 @@ describe('planStepPassRetry', () => {
     expect(plan({ lastModelError: NETWORK, sawProgress: true }).kind).toBe('images');
   });
 
+  test('a provider asking for a newer agent CLI finishes without a compat retry', () => {
+    expect(
+      plan({
+        lastError:
+          'API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required',
+      }),
+    ).toEqual({ kind: 'finish' });
+  });
+
   test('an unavailable model finishes', () => {
     expect(plan({ lastError: MODEL_GONE })).toEqual({ kind: 'finish' });
   });

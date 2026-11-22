@@ -1,9 +1,8 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type APIRequestContext, type Page, test } from '@playwright/test';
 import { bootLiveServer, type LiveServer } from './live-server';
 
 declare global {
   interface Window {
-
     __esUrls?: string[];
   }
 }
@@ -28,6 +27,19 @@ async function streamUrls(page: Page): Promise<string[]> {
   return page.evaluate(() => window.__esUrls ?? []);
 }
 
+async function issuePairingCode(request: APIRequestContext, base: string): Promise<string> {
+  const res = await request.post(`${base}/api/remote/pairing`, {
+    headers: { authorization: `Bearer ${GATE_TOKEN}` },
+  });
+  expect(res.status()).toBe(201);
+  return ((await res.json()) as { code: string }).code;
+}
+
+async function redeemAtGate(page: Page, code: string): Promise<void> {
+  await page.locator('#cairn-pair-input').fill(code);
+  await page.locator('#cairn-pair-input').press('Enter');
+}
+
 let authed: LiveServer;
 let openServer: LiveServer;
 
@@ -40,14 +52,19 @@ test.afterAll(async () => {
   await Promise.all([authed, openServer].map((server) => server?.dispose()));
 });
 
-test('auth on, loopback: bootstrap session opens the board and SSE uses a ticket, not the owner token', async ({
+test('auth on, loopback: the gate blocks the board until a pairing code opens it as a device', async ({
   page,
+  request,
 }) => {
-  test.skip(process.platform !== 'linux', 'loopback bootstrap reads /proc/net/tcp');
   await recordEventSourceUrls(page);
   await page.goto(`${authed.base}/app`);
-  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await expect(page.locator('.token-gate')).toBeVisible();
+
+  const code = await issuePairingCode(request, authed.base);
+  await redeemAtGate(page, code);
+
   await expect(page.locator('.token-gate')).toHaveCount(0);
+  await expect(page.locator('.board-sidebar')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
   await expect
     .poll(async () =>
@@ -57,13 +74,16 @@ test('auth on, loopback: bootstrap session opens the board and SSE uses a ticket
   for (const url of await streamUrls(page)) expect(url).not.toContain('token=');
 });
 
-test('auth on: a stored owner token is cleared and is not sent', async ({ page }) => {
-  test.skip(process.platform !== 'linux', 'loopback bootstrap reads /proc/net/tcp');
+test('auth on: a stored owner token is cleared and is not sent', async ({ page, request }) => {
   await recordEventSourceUrls(page);
   await page.addInitScript(() => localStorage.setItem('cairn.token', 'stale-bad-token'));
   await page.goto(`${authed.base}/app`);
-  await expect(page.locator('.board-sidebar')).toBeVisible();
+  await expect(page.locator('.token-gate')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
+
+  const code = await issuePairingCode(request, authed.base);
+  await redeemAtGate(page, code);
+  await expect(page.locator('.board-sidebar')).toBeVisible();
   for (const url of await streamUrls(page)) expect(url).not.toContain('stale-bad-token');
 });
 
@@ -85,13 +105,8 @@ test('auth off: zero gate page, zero token attached, behavior unchanged', async 
   }
 });
 
-test('a forged Tailscale-User-Login header is not required on loopback', async ({ page }) => {
-  test.skip(process.platform !== 'linux', 'loopback bootstrap reads /proc/net/tcp');
+test('a forged Tailscale-User-Login header does not open the board', async ({ page }) => {
   await page.setExtraHTTPHeaders({ 'Tailscale-User-Login': FORGED_TAILSCALE_LOGIN });
-  const loaded = page.waitForResponse(
-    (res) => res.url().endsWith('/api/teams') && res.status() === 200,
-  );
   await page.goto(`${authed.base}/app`);
-  await loaded;
-  await expect(page.locator('.token-gate')).toHaveCount(0);
+  await expect(page.locator('.token-gate')).toBeVisible();
 });

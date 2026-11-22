@@ -223,9 +223,8 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
     /^项目设置/,
     /^移到分组/,
     /^归档/,
-    /^删除…/,
   ]);
-  await expect(menu.getByTestId('menu-key-hint')).toHaveText(['R', 'S', 'M', 'A', 'D']);
+  await expect(menu.getByTestId('menu-key-hint')).toHaveText(['R', 'S', 'M', 'A']);
   await menu.evaluate((el) =>
     Promise.all(el.getAnimations({ subtree: true }).map((animation) => animation.finished)),
   );
@@ -247,25 +246,15 @@ test('the row menu matches the reference metrics and order', async ({ page }) =>
       itemRadius: getComputedStyle(items[0]!).borderRadius,
       icon: [box(svg).width, box(svg).x - box(items[0]!).x],
       font: getComputedStyle(items[0]!).fontSize,
-      danger: getComputedStyle(items.at(-1)!).color,
-      destructive: (() => {
-        const probe = document.createElement('span');
-        probe.style.color = 'var(--destructive)';
-        document.body.append(probe);
-        const value = getComputedStyle(probe).color;
-        probe.remove();
-        return value;
-      })(),
     };
   });
   expect(m.menu.width).toBeGreaterThanOrEqual(168);
   expect(m.radius).toBe('10px');
   expect(m.padding).toBe('6px');
-  expect(m.itemHeights).toEqual([27, 27, 27, 27, 27]);
+  expect(m.itemHeights).toEqual([27, 27, 27, 27]);
   expect(m.itemRadius).toBe('6px');
   expect(m.icon).toEqual([20, 10]);
   expect(m.font).toBe('13px');
-  expect(m.danger).toBe(m.destructive);
   expect(m.triggerSize).toEqual([22, 22]);
   expect(m.triggerGlyph).toBe(16);
   expect(m.menu.top - m.trigger.bottom).toBe(5);

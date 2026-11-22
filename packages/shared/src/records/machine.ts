@@ -3,6 +3,9 @@ import { claudeLoginSchema } from './claude-login.js';
 import { epochMs, recordId } from './common.js';
 import { machineCapabilitiesSchema, machineStrainReasonSchema } from './machine-capabilities.js';
 
+export const MACHINE_HOST_KEY_PATTERN = /^[a-f0-9]{64}$/;
+export const hostKeySchema = z.string().regex(MACHINE_HOST_KEY_PATTERN);
+
 export const MACHINE_RUNTIMES = ['pi', 'claude-code', 'gemini', 'devin', 'antigravity'] as const;
 export type MachineRuntime = (typeof MACHINE_RUNTIMES)[number];
 

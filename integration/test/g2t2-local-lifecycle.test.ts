@@ -357,7 +357,10 @@ for (const checkout of ['default', 'other', 'dirty', 'configured-base'] as const
       ])
       .run();
     const deps = { db: server.db, hub: new TeamStreamHub(), user: seed(server.db).user };
-    expect(await requestMerge(deps, buildId)).toEqual({ delegated: true });
+    expect(await requestMerge(deps, buildId)).toEqual({
+      state: 'requested',
+      stepId: expect.any(String),
+    });
     await waitFor(
       () =>
         server.db

@@ -2,6 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 
 const TEST_FILE = /^(apps|packages)\/[^/]+\/test\/.+\.test\.(ts|tsx|mts|mjs)$/;
 const SOURCE_FILE = /^((apps|packages)\/[^/]+)\/src\/.+\.(ts|tsx|mts)$/;
@@ -185,7 +186,7 @@ function git(args) {
   return execFileSync('git', args, { encoding: 'utf8' }).split('\n').filter(Boolean);
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
   const commitAt = args.indexOf('--commit');
@@ -242,7 +243,11 @@ function main() {
     process.platform === 'darwin' && !process.env.CAIRN_TEST_TEMP_ROOT
       ? { ...process.env, CAIRN_TEST_TEMP_ROOT: '/tmp' }
       : process.env;
-  const child = spawn('pnpm', ['exec', 'vitest', 'run', ...selected], { stdio: 'inherit', env });
+  const lease = await acquireSlot({ label: 'test:changed' });
+  const child = spawn('pnpm', ['exec', 'vitest', 'run', ...selected], {
+    stdio: 'inherit',
+    env: leaseEnv(lease, env),
+  });
   const timer = setTimeout(() => {
     console.error(
       `test:changed: over the ${BUDGET_MS / 60_000}-minute budget; stopped. Run the slow file alone and fix it.`,
@@ -255,4 +260,4 @@ function main() {
   });
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) main();
+if (import.meta.url === pathToFileURL(process.argv[1]).href) await main();

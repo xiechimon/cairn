@@ -1,3 +1,4 @@
+import { backgroundTaskMessageId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
@@ -7,8 +8,10 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
+import { NotFoundError } from '../src/services/builds.js';
 import {
   addChiefWatch,
+  enqueueChiefStep,
   enqueueOwnershipWake,
   fireDueChiefWakes,
   setChiefWake,
@@ -16,9 +19,18 @@ import {
   upsertChiefMessage,
 } from '../src/services/chief.js';
 import { createOrGetQuestion } from '../src/services/chief-questions.js';
+import { finishCoordinatorTurn } from '../src/services/coordinator-steps.js';
+import { receiveUpload } from '../src/services/machine-uploads.js';
+import {
+  ownedStepRow,
+  reportBackgroundTask,
+  reportTool,
+  reportTranscriptRow,
+  storeTranscriptRow,
+} from '../src/services/machines.js';
 import { getTodo, setTodoPhase } from '../src/services/todos.js';
-import { H, registerChiefHarness } from './chief-harness.js';
-import { postProject, req } from './helpers.js';
+import { H, registerChiefHarness, toolDeps } from './chief-harness.js';
+import { insertMachine, postProject, req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -191,5 +203,134 @@ describe('a Coordinator turn records its project scope as data (D74 P3)', () => 
       .where(eq(chiefMessage.id, 'assistant-legacy'))
       .get();
     expect(row?.projectId).toBe(site);
+  });
+});
+
+describe('a turn force-stopped on the server keeps its scope on late writes (#2555)', () => {
+  function storedProjectId(id: string): string | null | undefined {
+    return H.s.db
+      .select({ projectId: chiefMessage.projectId })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, id))
+      .get()?.projectId;
+  }
+
+  async function forceStopThenClaimNext(projectA: string, projectB: string) {
+    const machineId = insertMachine(H.s, { name: 'late-uploader' });
+    const stepA = enqueueChiefStep(toolDeps(), H.threadId, {
+      prompt: 'turn A',
+      trigger: 'user',
+      scopeProjectId: projectA,
+      ownerMessageIds: [],
+    });
+    H.s.db
+      .update(stepTable)
+      .set({ machineId, status: 'claimed', claimedAt: nowMs() })
+      .where(eq(stepTable.id, stepA))
+      .run();
+    H.s.db
+      .update(stepTable)
+      .set({ status: 'stopped', finishedAt: nowMs() })
+      .where(eq(stepTable.id, stepA))
+      .run();
+    const stepB = enqueueChiefStep(toolDeps(), H.threadId, {
+      prompt: 'turn B',
+      trigger: 'user',
+      scopeProjectId: projectB,
+      ownerMessageIds: [],
+    });
+    H.s.db
+      .update(stepTable)
+      .set({ status: 'claimed', claimedAt: nowMs() })
+      .where(eq(stepTable.id, stepB))
+      .run();
+    return { machineId, stepA };
+  }
+
+  test('a daemon transcript upload to the stopped step is refused, not mistagged', async () => {
+    const projA = await postProject(H.s.app, 'proj-a');
+    const projB = await postProject(H.s.app, 'proj-b');
+    const { machineId, stepA } = await forceStopThenClaimNext(projA, projB);
+    expect(() =>
+      receiveUpload(
+        toolDeps(),
+        { stepId: stepA, name: 'transcript', machineId },
+        {
+          stepId: stepA,
+          messages: [
+            {
+              id: 'a-late-reply',
+              role: 'assistant',
+              content: 'reply written by turn A',
+              createdAt: nowMs(),
+            },
+          ],
+        },
+      ),
+    ).toThrow(NotFoundError);
+    expect(storedProjectId('a-late-reply')).toBeUndefined();
+  });
+
+  test('live daemon reports to the stopped step are refused, not mistagged', async () => {
+    const projA = await postProject(H.s.app, 'proj-a');
+    const projB = await postProject(H.s.app, 'proj-b');
+    const { machineId, stepA } = await forceStopThenClaimNext(projA, projB);
+    expect(() =>
+      reportTranscriptRow(toolDeps(), machineId, stepA, {
+        id: 'a-late-row',
+        role: 'assistant',
+        content: 'row from turn A',
+        createdAt: nowMs(),
+      }),
+    ).toThrow(NotFoundError);
+    expect(() =>
+      reportTool(toolDeps(), machineId, stepA, {
+        id: 'a-late-call',
+        name: 'read',
+        arguments: {},
+        endedAt: nowMs(),
+      }),
+    ).toThrow(NotFoundError);
+    expect(storedProjectId('a-late-row')).toBeUndefined();
+    expect(storedProjectId('a-late-call')).toBeUndefined();
+  });
+
+  test('a mirrored transcript row on the settled step is tagged with the producing turn', async () => {
+    const projA = await postProject(H.s.app, 'proj-a');
+    const projB = await postProject(H.s.app, 'proj-b');
+    const { machineId, stepA } = await forceStopThenClaimNext(projA, projB);
+    storeTranscriptRow(toolDeps(), ownedStepRow(toolDeps(), machineId, stepA), stepA, {
+      id: 'a-mirror-row',
+      role: 'assistant',
+      content: 'row mirrored from turn A',
+      createdAt: nowMs(),
+    });
+    expect(storedProjectId('a-mirror-row')).toBe(projA);
+  });
+
+  test('a background task row is tagged with the producing turn, not the claimed one', async () => {
+    const projA = await postProject(H.s.app, 'proj-a');
+    const projB = await postProject(H.s.app, 'proj-b');
+    const { machineId, stepA } = await forceStopThenClaimNext(projA, projB);
+    reportBackgroundTask(toolDeps(), machineId, stepA, {
+      taskId: 't1',
+      type: 'shell',
+      description: 'late shell',
+      status: 'done',
+      startedAt: nowMs(),
+    });
+    expect(storedProjectId(backgroundTaskMessageId(stepA, 't1'))).toBe(projA);
+  });
+
+  test('a late finish error note is tagged with the producing turn, not the claimed one', async () => {
+    const projA = await postProject(H.s.app, 'proj-a');
+    const projB = await postProject(H.s.app, 'proj-b');
+    const { stepA } = await forceStopThenClaimNext(projA, projB);
+    const stepRowA = H.s.db.select().from(stepTable).where(eq(stepTable.id, stepA)).get()!;
+    finishCoordinatorTurn(toolDeps(), stepRowA, {
+      status: 'failed',
+      errorMessage: 'executor lost',
+    });
+    expect(storedProjectId(`chief-err-${stepA}`)).toBe(projA);
   });
 });

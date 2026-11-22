@@ -29,7 +29,6 @@ import { useComposerWire } from '../overlay/composer-wire.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
-import { SlashHelp, SlashMenu } from '../overlay/slash-menu.js';
 import type { ComposerBinding } from './composer-binding.js';
 import { ContextMeterLine, ContextMeterRing, contextPercentOf } from './context-meter-ring.js';
 
@@ -75,7 +74,7 @@ export interface ComposerSurfaceProps {
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   mentionGroups?: MentionGroups | undefined;
   onPickProject?: ((project: { id: string }) => void) | undefined;
-  slash?: { stopAvailable: boolean; onStop: () => void } | undefined;
+  stop?: { available: boolean; onStop: () => void } | undefined;
   onAdvance?: (() => void) | undefined;
   send?: ComposerSend | undefined;
   active?: boolean;
@@ -87,7 +86,6 @@ export interface ComposerSurfaceProps {
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   tab?: ReactNode;
   above: ReactNode;
-  tools: ReactNode;
   context?: ChiefContextUsage | null | undefined;
   running?: boolean | undefined;
   threadId?: string | null;
@@ -105,7 +103,7 @@ export function ComposerSurface({
   onAttachment,
   mentionGroups,
   onPickProject,
-  slash,
+  stop,
   onAdvance,
   send,
   active = true,
@@ -117,7 +115,6 @@ export function ComposerSurface({
   composerRef,
   tab,
   above,
-  tools,
   context = null,
   running = false,
   threadId = null,
@@ -143,7 +140,7 @@ export function ComposerSurface({
     onAttachment,
     ...(mentionGroups !== undefined ? { mentionGroups } : {}),
     ...(onPickProject !== undefined ? { onPickProject } : {}),
-    ...(slash !== undefined ? { slash } : {}),
+    ...(stop !== undefined ? { stop } : {}),
     growCap: 120,
     active,
   });
@@ -166,19 +163,6 @@ export function ComposerSurface({
     inlineListboxId,
     inlineListboxRef,
     acceptInlineRow,
-    slashOpen,
-    slashQuery,
-    slashCaret,
-    slashSections,
-    slashHighlight,
-    setSlashHighlight,
-    slashListboxId,
-    slashListboxRef,
-    acceptSlashRow,
-    helpOpen,
-    closeHelp,
-    helpRows,
-    helpSkillCount,
     textareaRef,
   } = wire;
   const [seeded, setSeeded] = useState(seededFiles ?? []);
@@ -301,14 +285,6 @@ export function ComposerSurface({
           seeded={seeded}
           onDismissSeeded={(index) => setSeeded((current) => current.filter((_, i) => i !== index))}
         />
-        {narrow && (
-          <div
-            data-slot="composer-tools"
-            className="mb-1 flex flex-wrap items-center gap-1 empty:hidden"
-          >
-            {tools}
-          </div>
-        )}
         <div className={cn('flex gap-2', narrow ? 'items-center' : 'items-end')}>
           {narrow && plusMenu}
           <div className="relative min-w-0 flex-1">
@@ -372,19 +348,10 @@ export function ComposerSurface({
                     'aria-controls': inlineListboxId,
                     'aria-autocomplete': 'list' as const,
                   }
-                : slashOpen
-                  ? {
-                      role: 'combobox',
-                      'aria-expanded': true,
-                      'aria-controls': slashListboxId,
-                      'aria-autocomplete': 'list' as const,
-                    }
-                  : {})}
+                : {})}
               {...(inlineOpen && inlineHighlight != null
                 ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
-                : slashOpen && slashHighlight != null
-                  ? { 'aria-activedescendant': `${slashListboxId}-opt-${slashHighlight}` }
-                  : {})}
+                : {})}
             />
             {wire.draft === '' && (
               <span
@@ -410,20 +377,6 @@ export function ComposerSurface({
               onPick={acceptInlineRow}
               listboxRef={inlineListboxRef}
               listboxId={inlineListboxId}
-            />
-            <SlashMenu
-              open={slashOpen}
-              sections={slashSections.map((s) => ({
-                title: s.section === 'builtin' ? t('命令') : t('技能'),
-                rows: s.rows,
-              }))}
-              caret={slashCaret}
-              query={slashQuery}
-              highlight={slashHighlight}
-              onHover={setSlashHighlight}
-              onPick={(row) => acceptSlashRow(row, 'enter')}
-              listboxRef={slashListboxRef}
-              listboxId={slashListboxId}
             />
           </div>
           <Button
@@ -523,7 +476,6 @@ export function ComposerSurface({
       {!narrow && (
         <div className="mt-1.5 flex items-center gap-0 px-1.5">
           {plusMenu}
-          {tools}
           {showMeter && (
             <span className="ml-auto flex">
               <ContextMeterRing context={meterContext} running={running} loading={contextLoading} />
@@ -531,12 +483,6 @@ export function ComposerSurface({
           )}
         </div>
       )}
-      <SlashHelp
-        open={helpOpen}
-        onClose={closeHelp}
-        commands={helpRows}
-        skillCount={helpSkillCount}
-      />
     </div>
   );
 }

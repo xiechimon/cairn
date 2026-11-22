@@ -1,0 +1,23 @@
+{
+  "kind": "runtime",
+  "id": "prompt-contract-01",
+  "request": "\u968f\u4fbf\u770b\u770b\u72b6\u6001",
+  "world": {
+    "projects": [
+      "proj-alpha",
+      "other"
+    ]
+  },
+  "script": [
+    {
+      "text": "\u72b6\u6001\u6b63\u5e38\u3002"
+    }
+  ],
+  "expected": {
+    "decision": "any",
+    "promptContains": [
+      "proj-alpha"
+    ]
+  },
+  "gate": true
+}

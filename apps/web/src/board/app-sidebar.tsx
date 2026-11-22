@@ -8,7 +8,6 @@ import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
 import { toastError } from '../components/ui/toaster.js';
-import { markDeleted } from '../fixtures/deletions.js';
 import {
   fixtureProjects,
   setFixtureProjectArchived,
@@ -215,27 +214,6 @@ export function AppSidebar({
         throw error;
       }
     },
-    remove: (id) =>
-      mutations.deleteProject.mutate(id, {
-        onSuccess: () => leaveIfOpen(id),
-        onError: (error) => toastError(t('删除项目失败，请重试。'), error),
-      }),
-    removeMany: async (ids) => {
-      let refused = 0;
-      let firstError: unknown;
-      for (const id of ids) {
-        try {
-          await mutations.deleteProject.mutateAsync(id);
-          leaveIfOpen(id);
-        } catch (error) {
-          refused += 1;
-          firstError ??= error;
-        }
-      }
-      if (refused > 0) {
-        toastError(t('{n} 个项目没能删除，已留在列表里。', { n: refused }), firstError);
-      }
-    },
     renameGroup: async (from, to) => {
       try {
         await Promise.all(
@@ -266,16 +244,6 @@ export function AppSidebar({
     },
     unarchive: (id) => setFixtureProjectArchived(id, null),
     rename: async (id, name) => editFixture(id, { name }),
-    remove: (id) => {
-      markDeleted(id);
-      editFixture(id, {});
-      leaveIfOpen(id);
-    },
-    removeMany: async (ids) => {
-      for (const id of ids) markDeleted(id);
-      editFixture('', {});
-      for (const id of ids) leaveIfOpen(id);
-    },
     renameGroup: async (from, to) => {
       for (const project of inGroup(from)) editFixture(project.id, { group: to });
     },

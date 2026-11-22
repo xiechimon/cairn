@@ -59,14 +59,23 @@ const BUILD: BuildRecord = {
 };
 
 let seq = 0;
-function msg(text: string, at: number): MessageRow {
+function msg(text: string, at: number, origin?: MessageRow['origin']): MessageRow {
   seq += 1;
-  return { id: `msg-${seq}`, role: 'user', content: text, createdAt: at };
+  return {
+    id: `msg-${seq}`,
+    role: 'user',
+    content: text,
+    createdAt: at,
+    ...(origin === undefined ? {} : { origin }),
+  };
 }
 
-function render(todo: TodoRecord, texts: string[]): TranscriptItem[] {
+function render(
+  todo: TodoRecord,
+  rows: { text: string; origin?: MessageRow['origin'] }[],
+): TranscriptItem[] {
   return mapTranscript({
-    messages: texts.map((t, i) => msg(t, NOW - 50_000 + i * 1_000)),
+    messages: rows.map((row, i) => msg(row.text, NOW - 50_000 + i * 1_000, row.origin)),
     steps: [],
     build: BUILD,
     todo,
@@ -85,14 +94,17 @@ describe('F9 fence-shaped task text rows do not become user bubbles', () => {
     expect(toDisplayTodo(WIRE)).toMatchObject(SOURCE);
   });
 
-  test('fence-shaped task text rows, first-round plan-contract combo rows, and pre-change source rows all retire; the user words render as usual', () => {
+  test('fence-shaped task prompt rows, first-round plan-contract combo rows, and pre-change source rows all retire; the user words render as usual', () => {
     const fenced = taskText(TITLE, SPEC, SOURCE);
     expect(fenced.startsWith('【GitHub issue 原文 · octo/alpha#7】')).toBe(true);
     const items = render(toDisplayTodo(WIRE), [
-      fenced,
-      composeTaskPromptWithInstruction(fenced, buildPlanFirstRoundInstruction()),
-      `${TITLE}\n\n${SPEC}`,
-      '圆角改成 6px 吧',
+      { text: fenced, origin: 'task-prompt' },
+      {
+        text: composeTaskPromptWithInstruction(fenced, buildPlanFirstRoundInstruction()),
+        origin: 'synthetic',
+      },
+      { text: `${TITLE}\n\n${SPEC}`, origin: 'task-prompt' },
+      { text: '圆角改成 6px 吧' },
     ]);
     expect(userTexts(items)).toEqual(['圆角改成 6px 吧']);
   });

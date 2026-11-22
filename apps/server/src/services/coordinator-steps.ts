@@ -34,10 +34,11 @@ import {
   parseChiefTrigger,
   recoverGateWake,
 } from './chief.js';
-import { cancelPendingQuestions } from './chief-questions.js';
+import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
+import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { imTurnFinished } from './im/runtime.js';
 import {
   isChiefConversation,
@@ -72,13 +73,14 @@ export function claimPendingChiefStep(
     machineId: string | null;
     bind?: ChiefSubscriptionBind | string | null;
     model?: StepRanModel | null;
+    mcpGrant?: string[] | null;
   },
 ): StepRow | null {
   const bind =
     typeof options.bind === 'string'
       ? { runtime: 'claude-code' as const, teamId: options.bind }
       : (options.bind ?? null);
-  const claimedAt = nowMs();
+  const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
   const claimed = db.transaction(() => {
     const res = db
       .update(step)
@@ -108,6 +110,7 @@ export function claimPendingChiefStep(
         holdReason: null,
         holdUntil: null,
         ranModel: options.model ?? null,
+        mcpGrant: options.mcpGrant ?? null,
       })
       .where(
         and(
@@ -451,17 +454,13 @@ export function finishCoordinatorTurn(
     .run();
   if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
   publishStepStatus(deps, stepRow.id);
-  cancelPendingQuestions(
-    {
-      db: deps.db,
-      hub: deps.hub,
-      user: deps.user,
-      ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-    },
+  cancelPendingQuestions(deps, stepRow.buildId, CHIEF_TURN_END_REASON);
+  finishChiefTurn(
+    deps,
     stepRow.buildId,
-    '回合已结束',
+    { ...outcome, sessionId: reportedSessionId },
+    stepRuntimeFor(stepRow.ranModel?.provider ?? null),
   );
-  finishChiefTurn(deps, stepRow.buildId, { ...outcome, sessionId: reportedSessionId });
   settleMemoryEditTurn(
     db,
     stepRow,
@@ -480,6 +479,7 @@ export function finishCoordinatorTurn(
     upsertChiefRow(deps, {
       id: `chief-err-${stepRow.id}`,
       threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
       role: 'system',
       content: JSON.stringify({
         kind: CHIEF_TURN_ERROR_KIND,

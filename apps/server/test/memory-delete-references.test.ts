@@ -1,12 +1,11 @@
 import { expect, test } from 'vitest';
-import { agentMemory, memoryCandidate } from '../src/db/schema.js';
+import { agentMemory } from '../src/db/schema.js';
 import { injectMemoryDocuments } from '../src/services/memory.js';
 import {
   appendMemoryIndex,
   executeMemoryDocumentTool,
   rememberMemoryFile,
 } from '../src/services/memory-documents.js';
-import { confirmCandidate } from '../src/trajectory-curate.js';
 import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
 import { req } from './helpers.js';
 
@@ -47,26 +46,13 @@ const writers = {
     ).id,
   }),
   curation: () => {
-    H.s.db
-      .insert(memoryCandidate)
-      .values({
-        id: 'candidate',
-        agentId: AGENT_ID,
-        teamId: H.teamId,
-        projectId: H.projectId,
-        title: 'curated lesson',
-        content: 'durable curated lesson',
-        buildIds: ['one', 'two'],
-        evidence: [],
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    return {
-      projectId: H.projectId,
-      label: 'curated lesson',
-      id: confirmCandidate(H.s.db, 'candidate') as string,
-    };
+    const saved = rememberMemoryFile(
+      H.s.db,
+      { ...owner(H.projectId), sourceBuildId: 'two' },
+      'curated lesson',
+      'durable curated lesson',
+    );
+    return { projectId: H.projectId, label: 'curated lesson', id: saved.id };
   },
   'spilled flush': () => {
     appendMemoryIndex(H.s.db, owner(), 'flushed detail', 'first line\nsecond line');

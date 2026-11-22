@@ -4,6 +4,7 @@ import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
+import { mainWindow } from './main-window.mjs';
 
 const [binary, screenshot] = process.argv.slice(2);
 assert.ok(binary, 'usage: node scripts/smoke-linux.mjs <extracted cairn binary> [screenshot.png]');
@@ -27,7 +28,7 @@ let origin;
 let unit;
 try {
   desktop = await electron.launch({ executablePath: resolve(binary), env, timeout: 90_000 });
-  const page = await desktop.firstWindow({ timeout: 90_000 });
+  const page = await mainWindow(desktop, 90_000);
   await page.waitForLoadState('load');
   origin = new URL(page.url()).origin;
   assert.equal(new URL(origin).hostname, '127.0.0.1');

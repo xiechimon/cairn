@@ -54,6 +54,7 @@ function world(opts: { untrustedTurn?: boolean } = {}) {
     teamId: s.team.id,
     threadId: 'thread-a',
     scopeProjectId: null,
+    mcpGrant: ['gmail', 'dead', 'nope'],
     ...(opts.untrustedTurn === true ? { untrustedTurn: true } : {}),
   };
   return { s, mcp, deps, ctx };
@@ -166,6 +167,42 @@ describe('executeConnectorToolCall validation', () => {
       { actionId: 'connector.nope.X', targetId: 'nope', kind: 'error', actor: 'coordinator' },
     ]);
     expect(mcp.calls).toHaveLength(0);
+    s.dispose();
+  });
+
+  test('refuses a connector outside the step grant and still executes a granted one', async () => {
+    const { s, mcp, deps, ctx } = world();
+    insertConnector(s);
+    await expectHttpError(
+      () =>
+        executeConnectorToolCall(
+          deps,
+          { ...ctx, mcpGrant: ['slack'] },
+          'connector_gmail__GMAIL_FETCH',
+          {},
+        ),
+      403,
+      /grant/,
+    );
+    await expectHttpError(
+      () =>
+        executeConnectorToolCall(
+          deps,
+          { ...ctx, mcpGrant: [] },
+          'connector_gmail__GMAIL_FETCH',
+          {},
+        ),
+      403,
+      /grant/,
+    );
+    expect(mcp.calls).toHaveLength(0);
+    const out = await executeConnectorToolCall(
+      deps,
+      { ...ctx, mcpGrant: ['gmail'] },
+      'connector_gmail__GMAIL_FETCH',
+      {},
+    );
+    expect(out).toContain('inbox-ok');
     s.dispose();
   });
 
@@ -353,6 +390,7 @@ describe('executeConnectorToolCall dispatch', () => {
         decision: 'allow-once',
         decidedBy: s.user.id,
         viaCard: true,
+        interactive: 'page',
       },
     );
     expect(mcp.calls).toHaveLength(0);
@@ -381,6 +419,7 @@ describe('executeConnectorToolCall dispatch', () => {
         decision: 'allow-once',
         decidedBy: s.user.id,
         viaCard: true,
+        interactive: 'page',
       },
     );
     dispatchActionWakes(s);
@@ -412,6 +451,7 @@ describe('executeConnectorToolCall dispatch', () => {
         decision: 'allow-once',
         decidedBy: s.user.id,
         viaCard: true,
+        interactive: 'page',
       },
     );
     const again = JSON.parse(

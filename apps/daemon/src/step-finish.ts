@@ -30,6 +30,7 @@ export interface StepFinishInput
   appIdentity: CommitIdentity | null;
   identity: CommitIdentity;
   runGit: StepGitRunner;
+  env?: NodeJS.ProcessEnv;
   now: () => number;
 }
 
@@ -95,6 +96,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     lastError: outcome.lastError,
     stopped,
     closes: outcome.lastError === null && !stopped && !isReview && !attachmentVerify,
+    env: input.env,
     note: (id, content) =>
       transcript.upsert({
         id,

@@ -56,7 +56,7 @@ import type { SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
-import { withoutPinnedEnv } from './pinned-env.js';
+
 import { appendSkillsCatalog, composeSkillsSection } from './skills.js';
 
 const adapterProcessGroups = new Set<number>();
@@ -642,17 +642,17 @@ class AcpBackend implements AgentBackend {
       };
       const confined =
         this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch) ?? launch;
-      const childEnv: NodeJS.ProcessEnv = { ...withoutPinnedEnv(process.env), ...opts.env };
+      const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
       if (adapter?.harness === 'devin') {
-        for (const key of Object.keys(childEnv)) {
-          if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete childEnv[key];
+        for (const key of Object.keys(sessionEnv)) {
+          if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete sessionEnv[key];
         }
       }
       child = spawnProcess(confined.command, confined.args, {
         cwd: opts.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
-        env: runtimeChildEnv(childEnv),
+        env: runtimeChildEnv(sessionEnv),
       });
     } catch (error) {
       hostTools?.close();

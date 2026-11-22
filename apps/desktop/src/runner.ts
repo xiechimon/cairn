@@ -1,6 +1,6 @@
 import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -8,7 +8,10 @@ import {
   type MachineJson,
   machineEnrollResponseSchema,
   machineEnrollStartResponseSchema,
+  machineJsonSchema,
+  OWNER_CHANNEL_HEADER,
 } from '@cairn/shared';
+import { probeHostKey } from '@cairn/shared/host-identity';
 import { type OtelEnv, withOtelEnv } from './otel-config.js';
 import { createRestartBudget } from './restart-budget.js';
 
@@ -25,6 +28,7 @@ export interface RunnerOptions {
   serverHome: string;
   origin: string;
   ownerToken: string;
+  ownerChannelKey: string;
   otelEnv: OtelEnv;
   agentDesktop: string | null;
   isQuitting: () => boolean;
@@ -50,16 +54,47 @@ async function postJson(
   return response.json();
 }
 
-async function enrollLocalMachine(origin: string, ownerToken: string): Promise<MachineJson> {
+async function enrollLocalMachine(
+  origin: string,
+  ownerToken: string,
+  ownerChannelKey: string,
+  hostKey: string | undefined,
+): Promise<MachineJson> {
   const started = machineEnrollStartResponseSchema.parse(
-    await postJson(`${origin}/api/machine/enroll/start`, { name: hostname() }),
+    await postJson(`${origin}/api/machine/enroll/start`, {
+      name: hostname(),
+      ...(hostKey !== undefined ? { hostKey } : {}),
+    }),
   );
-  const confirmed = (await postJson(
-    `${origin}/api/machine/enroll/confirm`,
-    { enrollId: started.enrollId },
-    { Authorization: `Bearer ${ownerToken}` },
-  )) as { machine?: unknown };
-  return machineEnrollResponseSchema.parse(confirmed.machine);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const confirmed = (await postJson(
+        `${origin}/api/machine/enroll/confirm`,
+        { enrollId: started.enrollId },
+        {
+          Authorization: `Bearer ${ownerToken}`,
+          [OWNER_CHANNEL_HEADER]: ownerChannelKey,
+        },
+      )) as { machine?: unknown };
+      return machineEnrollResponseSchema.parse(confirmed.machine);
+    } catch (error) {
+      const pending =
+        error instanceof Error && error.message.endsWith('answered HTTP 503') && attempt < 9;
+      if (!pending) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+}
+
+function storedHostKey(home: string): string | undefined {
+  try {
+    const parsed = machineJsonSchema.safeParse(
+      JSON.parse(readFileSync(join(home, 'machine.json'), 'utf8')),
+    );
+    return parsed.success ? parsed.data.hostKey : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function writeMachineJson(home: string, machine: MachineJson): void {
@@ -76,6 +111,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
       [ENV_VARS.home]: options.home,
+      [ENV_VARS.parentPid]: String(process.pid),
       [ENV_VARS.confineDeniedRoots]: options.serverHome,
       [ENV_VARS.server]: options.origin,
       [ENV_VARS.skillsDir]: join(options.home, 'skills'),
@@ -88,11 +124,21 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
   );
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
+  delete env[ENV_VARS.apiKey];
   return env;
 }
 
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
-  writeMachineJson(options.home, await enrollLocalMachine(options.origin, options.ownerToken));
+  const hostKey = storedHostKey(options.home) ?? probeHostKey(options.home) ?? undefined;
+  writeMachineJson(options.home, {
+    ...(await enrollLocalMachine(
+      options.origin,
+      options.ownerToken,
+      options.ownerChannelKey,
+      hostKey,
+    )),
+    ...(hostKey !== undefined ? { hostKey } : {}),
+  });
   let child: ChildProcess | null = null;
   let unit: string | null = null;
   let pending: NodeJS.Timeout | null = null;

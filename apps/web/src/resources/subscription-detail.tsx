@@ -24,7 +24,7 @@ import {
   TONE_DOT,
 } from '../components/providers/provider-panel.js';
 import { isLowQuota } from '../components/settings/quota-row.js';
-import { SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
+import { SettingsCard, SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
@@ -33,10 +33,8 @@ import { ACCENT_INK } from '../phase.js';
 import {
   type CheckFact,
   CheckResultPopover,
-  CommitInput,
   FAILURE_SENTENCE,
   FAILURE_SHORT,
-  Field,
   ModelChip,
   ModelTestReport,
   useModelTests,
@@ -220,7 +218,11 @@ export function subscriptionRowTone(
   models: readonly ModelSourceModel[],
 ): ProviderTone {
   if (view.tone === 'fail') return 'fail';
-  if (models.length === 0 || models.some((model) => model.liveness === 'dead')) return 'warn';
+  if (
+    models.length === 0 ||
+    models.some((model) => model.liveness === 'dead' || model.updateRequired !== undefined)
+  )
+    return 'warn';
   return view.tone;
 }
 
@@ -232,11 +234,13 @@ export function subscriptionSummary(
   t: TFunc,
 ): string {
   const retired = models.filter((model) => model.liveness === 'dead').length;
+  const outdated = models.filter((model) => model.updateRequired !== undefined).length;
   return [
     t('订阅'),
     ...(account.plan === null ? [] : [account.plan]),
     t('{n} 个模型', { n: models.length }),
     ...(retired === 0 ? [] : [t('{n} 个已下架', { n: retired })]),
+    ...(outdated === 0 ? [] : [t('{n} 个需要更新 Cairn', { n: outdated })]),
     ...(view.label === null ? [] : [view.label]),
     ...(account.lastUsedAt === null || view.label !== null
       ? []
@@ -286,76 +290,95 @@ export function QuotaMarks({ windows }: { windows: readonly QuotaWindow[] }) {
   );
 }
 
-function QuotaHead({ account, now }: { account: SubscriptionAccount; now: number }) {
+const HOUR = 3_600_000;
+
+export function resetsIn(
+  ts: number,
+  now: number,
+  t: TFunc,
+  clock: (ts: number, now: number) => string,
+): string {
+  const left = ts - now;
+  if (left <= 0) return t('即将重置');
+  const minutes = Math.max(1, Math.round(left / 60_000));
+  if (minutes < 90) return t('{n} 分钟后重置', { n: minutes });
+  if (left < DAY) return t('{n} 小时后重置', { n: Math.round(left / HOUR) });
+  return t('{time} 重置', { time: clock(ts, now) });
+}
+
+const QUOTA_ROW_CLS = 'settings-row grid min-h-11 items-center gap-x-3 py-2 text-meta tabular-nums';
+
+function QuotaSection({ account, now }: { account: SubscriptionAccount; now: number }) {
   const { t } = useI18n();
   const clock = useClock();
   const ordered = quotaWindows(account.windows);
   if (ordered.length === 0) {
     return (
-      <span
-        data-testid="subscription-usage"
-        className="ml-auto flex w-60 flex-col gap-1 max-sm:ml-0 max-sm:w-full"
-      >
-        <span className="flex justify-between text-meta text-content-tertiary">
-          {t('近 24 小时')}
-          <span className="font-medium text-foreground tabular-nums">
-            {t('{n} 次运行', { n: account.stepsLast24h ?? 0 })}
-          </span>
-        </span>
-        {account.vendor !== 'claude' && (
-          <span
-            data-testid="subscription-usage-note"
-            className="text-caption text-content-tertiary"
-          >
-            {t('{vendor} 不提供剩余用量', { vendor: VENDORS[account.vendor].short })}
-          </span>
-        )}
-      </span>
+      <SettingsSection title={t('用量')} testId="subscription-usage">
+        <SettingsCard>
+          <div className={cn(QUOTA_ROW_CLS, 'grid-cols-[minmax(0,1fr)_auto]')}>
+            <span className="text-content-secondary">{t('近 24 小时')}</span>
+            <span className="text-foreground">
+              {t('{n} 次运行', { n: account.stepsLast24h ?? 0 })}
+            </span>
+            {account.vendor !== 'claude' && (
+              <span
+                data-testid="subscription-usage-note"
+                className="col-span-2 text-caption text-content-tertiary"
+              >
+                {t('{vendor} 不提供剩余用量', { vendor: VENDORS[account.vendor].short })}
+              </span>
+            )}
+          </div>
+        </SettingsCard>
+      </SettingsSection>
     );
   }
   return (
-    <span data-testid="subscription-quota" className="ml-auto flex gap-4 max-sm:ml-0 max-sm:w-full">
-      {ordered.map((window) => {
-        const left = leftPercent(window);
-        const label = t(WINDOW_LABELS[window.name] ?? window.name);
-        return (
-          <span key={window.name} className="flex w-28 flex-col gap-1 max-sm:flex-auto">
-            <span className="flex justify-between text-meta text-content-tertiary">
-              {label}
+    <SettingsSection title={t('额度')} testId="subscription-quota">
+      <SettingsCard>
+        {ordered.map((window) => {
+          const left = leftPercent(window);
+          const label = t(WINDOW_LABELS[window.name] ?? window.name);
+          return (
+            <div
+              key={window.name}
+              className={cn(
+                QUOTA_ROW_CLS,
+                'grid-cols-[4.5rem_minmax(3rem,1fr)_4rem_minmax(0,8rem)] max-sm:grid-cols-[4rem_minmax(2rem,1fr)_3.5rem_minmax(0,6.5rem)]',
+              )}
+            >
+              <span className="truncate text-content-secondary">{label}</span>
               <span
-                className={cn(
-                  'font-medium text-foreground tabular-nums',
-                  isLowQuota(left) && ACCENT_INK,
-                )}
+                role="progressbar"
+                aria-label={t('{window} 剩余', { window: label })}
+                aria-valuenow={left}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                className="block h-1 overflow-hidden rounded-full bg-secondary"
               >
+                <i
+                  className={cn(
+                    'block h-full rounded-full',
+                    isLowQuota(left) ? 'bg-(--card-button)' : 'bg-content-secondary',
+                  )}
+                  style={{ width: `${left}%` }}
+                />
+              </span>
+              <span className={cn('text-right text-foreground', isLowQuota(left) && ACCENT_INK)}>
                 {t('剩 {left}%', { left })}
               </span>
-            </span>
-            <span
-              role="progressbar"
-              aria-label={t('{window} 剩余', { window: label })}
-              aria-valuenow={left}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="block h-1 overflow-hidden rounded-full bg-secondary"
-            >
-              <i
-                className={cn(
-                  'block h-full rounded-full',
-                  isLowQuota(left) ? 'bg-(--card-button)' : 'bg-running',
-                )}
-                style={{ width: `${left}%` }}
-              />
-            </span>
-            {window.resetsAt !== null && (
-              <span className="text-caption text-content-tertiary">
-                {t('{time} 重置', { time: clock(window.resetsAt, now) })}
+              <span
+                data-testid="subscription-quota-reset"
+                className="truncate text-right text-caption text-content-tertiary"
+              >
+                {window.resetsAt === null ? null : resetsIn(window.resetsAt, now, t, clock)}
               </span>
-            )}
-          </span>
-        );
-      })}
-    </span>
+            </div>
+          );
+        })}
+      </SettingsCard>
+    </SettingsSection>
   );
 }
 
@@ -524,61 +547,38 @@ export function SubscriptionDetail({
             ? t('还没用过')
             : t('最近使用 {ago}', { ago: relativeTime(account.lastUsedAt, now, t) }),
         ].join(' · ')}
-        aside={<QuotaHead account={account} now={now} />}
+        {...(actions.onRename === undefined ? {} : { onRename: actions.onRename })}
+        aside={
+          actions.onVerify !== undefined && (
+            <Button
+              ref={verifyRef}
+              variant="outline"
+              size="sm"
+              data-testid="subscription-verify"
+              disabled={verifying}
+              onClick={actions.onVerify}
+            >
+              {t('验证')}
+            </Button>
+          )
+        }
       />
-      {actions.onRename === undefined && actions.onVerify === undefined ? (
-        view.label !== null && (
-          <span data-testid="subscription-status" className={STATUS_CLS}>
-            <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
-            {view.label}
-          </span>
-        )
-      ) : (
-        <div className="grid grid-cols-1 gap-3 @sm:grid-cols-[minmax(0,1fr)_auto]">
-          <Field label={t('名称')}>
-            {actions.onRename === undefined ? (
-              <span className="flex h-8 items-center truncate text-ui text-foreground">
-                {account.label}
-              </span>
-            ) : (
-              <CommitInput
-                key={`label:${account.label}`}
-                label={t('名称')}
-                value={account.label}
-                className="sm:w-full"
-                onCommit={actions.onRename}
-              />
-            )}
-          </Field>
-          <Field label={t('连通')}>
-            <span className="flex h-8 items-center gap-2">
-              {view.label !== null && (
-                <span data-testid="subscription-status" className={STATUS_CLS}>
-                  <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
-                  {view.label}
-                </span>
-              )}
-              {actions.onVerify !== undefined && (
-                <Button
-                  ref={verifyRef}
-                  variant="outline"
-                  size="sm"
-                  data-testid="subscription-verify"
-                  disabled={verifying}
-                  onClick={actions.onVerify}
-                >
-                  {t('验证')}
-                </Button>
-              )}
+      {(view.label !== null || view.reason !== null) && (
+        <div className="-mt-3 flex flex-col gap-1">
+          {view.label !== null && (
+            <span data-testid="subscription-status" className={STATUS_CLS}>
+              <span aria-hidden className={cn(STATUS_DOT_CLS, TONE_DOT[view.tone])} />
+              {view.label}
             </span>
-          </Field>
+          )}
+          {view.reason !== null && (
+            <p data-testid="subscription-reason" className="m-0 text-meta text-content-tertiary">
+              {withCodeSpans(view.reason)}
+            </p>
+          )}
         </div>
       )}
-      {view.reason !== null && (
-        <p data-testid="subscription-reason" className="-mt-3 m-0 text-meta text-content-tertiary">
-          {withCodeSpans(view.reason)}
-        </p>
-      )}
+      <QuotaSection account={account} now={now} />
       <VerifyResultPopover
         vendor={account.vendor}
         verification={verification}
@@ -644,6 +644,7 @@ export function SubscriptionDetail({
                 id={model.id}
                 testId="subscription-model"
                 dead={model.liveness === 'dead'}
+                needsUpdate={'updateRequired' in model && model.updateRequired !== undefined}
                 check={checks[model.id]}
                 busy={actions.modelsBusy ?? false}
                 meta={tierMeta(model, t)}

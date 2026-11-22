@@ -1,5 +1,4 @@
 const exitCodes = { unknown: 2, complete: 0, paused: 20, failed: 30, incomplete: 10 };
-const humanLabels = new Set(['waits-ian', 'ready-for-human']);
 export const shaPattern = /^[a-f0-9]{40}$/;
 export const isoPattern = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|[+-]\d\d:\d\d)$/;
 export function requireFact(condition, message) {
@@ -86,9 +85,6 @@ export function nodes(connection, context) {
   );
   return connection.nodes;
 }
-export function labels(connection) {
-  return nodes(connection, 'labels').map((label) => label.name);
-}
 export function errorMessage(error) {
   const message = error instanceof Error ? error.message : String(error);
   const stderr = error?.stderr?.toString().trim().slice(-2000);
@@ -160,12 +156,7 @@ export function decideEpic(facts) {
       if (missingPull) reasons.push(`Issue #${issue.number} has no merged closing PR.`);
       const held =
         definition.humanHeld ||
-        issue.labels.some((label) => humanLabels.has(label)) ||
-        issue.linkedPulls.some(
-          (pull) =>
-            pull.state === 'OPEN' &&
-            (pull.isDraft === true || pull.labels.some((label) => humanLabels.has(label))),
-        );
+        issue.linkedPulls.some((pull) => pull.state === 'OPEN' && pull.isDraft === true);
       const needsOwner = manifest.items && issue.state === 'CLOSED' && (blocker || missingPull);
       return {
         id: definition.id,

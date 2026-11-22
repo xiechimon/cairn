@@ -43,6 +43,7 @@ function optionOf(model: TopModel, options: readonly ModelOption[]): ModelOption
   return options.find(
     (o) =>
       o.liveness !== 'dead' &&
+      o.updateRequired === undefined &&
       (model.provider === 'pi'
         ? o.runtime === 'pi' && o.modelId === model.modelId
         : o.provider === model.provider && o.modelId === model.modelId),
@@ -124,7 +125,10 @@ export function FrequentModelsCard({
   const addable = [
     ...new Map(
       options
-        .filter((o) => o.liveness !== 'dead' && !listed.has(frequentKey(o)))
+        .filter(
+          (o) =>
+            o.liveness !== 'dead' && o.updateRequired === undefined && !listed.has(frequentKey(o)),
+        )
         .map((o) => [frequentKey(o), o]),
     ).values(),
   ];

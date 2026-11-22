@@ -36,6 +36,7 @@ import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import { ChiefReportMessage } from './chief-report-row.js';
+import { chiefRowRenders } from './chief-row-kinds.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import type { TaskRef } from './chief-task-refs.js';
 import { CloakLicenseCard } from './cloak-license-card.js';
@@ -59,7 +60,7 @@ import { TakeoverCard } from './takeover-card.js';
 import { growDelays, hoverTaskRef, markGrown, useTaskRefSignal } from './task-ref-signal.js';
 import type { ChannelMirror } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
-import { TurnFailureLine } from './turn-failure.js';
+import { CardFailureContext, TurnFailureMarker } from './turn-failure.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 
@@ -426,33 +427,6 @@ function HandoffRow({ todoId }: { todoId: string }) {
   );
 }
 
-function MacActivityRow({ item }: { item: Extract<ChiefStreamItem, { kind: 'mac-activity' }> }) {
-  const { t } = useI18n();
-  const verb =
-    item.tool === 'user_computer_shell'
-      ? item.running
-        ? t('正在你的 Mac 上运行')
-        : t('在你的 Mac 上运行了')
-      : item.tool === 'user_computer_act'
-        ? item.running
-          ? t('正在你的 Mac 上操作')
-          : t('在你的 Mac 上操作了')
-        : item.running
-          ? t('正在查看你的 Mac 上的')
-          : t('查看了你的 Mac 上的');
-  return (
-    <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-      <StatusLine testId="chief-mac-activity">
-        {verb}{' '}
-        <code className="rounded-(--cds-radius-sm) bg-(--muted) px-1 py-px font-mono text-meta">
-          {item.summary}
-        </code>
-        {item.error && <span className="text-destructive"> · {t('没有成功')}</span>}
-      </StatusLine>
-    </MessageScrollerItem>
-  );
-}
-
 const LIVE_TURN_KEY = 'live-turn';
 
 export function chiefStreamRowKeys(
@@ -486,7 +460,6 @@ export function chiefStreamRowKey(
     case 'thinking':
     case 'question':
     case 'handoff':
-    case 'mac-activity':
     case 'takeover':
     case 'cloak-license':
     case 'package-install':
@@ -685,22 +658,23 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
   const highlightedSource = useContext(ReplySourceHighlightContext);
+  const cardFailure = useContext(CardFailureContext);
   const highlight = (id: string | undefined) =>
     id !== undefined && id === highlightedSource?.sourceMessageId
       ? { [REPLY_HIGHLIGHT_ATTR]: '' }
       : {};
+  if (!chiefRowRenders(item.kind)) return null;
   if (item.kind === 'stopped') return <StoppedRow todos={item.todos} />;
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;
   if (item.kind === 'error')
-    return (
+    return item.id !== undefined && item.id === cardFailure ? null : (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
-        <TurnFailureLine error={item.error ?? { message: item.text }} />
+        <TurnFailureMarker />
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
-  if (item.kind === 'mac-activity') return <MacActivityRow item={item} />;
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'cloak-license') return <CloakLicenseCard item={item} />;
   if (item.kind === 'package-install') return <PackageInstallCard item={item} />;
@@ -900,7 +874,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   const settled = item.typing !== true;
-  const whole = robotText(item);
+  const markdown = item.plain !== undefined ? t(item.plain.key, item.plain.vars) : item.markdown;
+  const whole = markdown ?? robotText(item);
   const fallbackNote =
     item.fallbackModel != null ? (
       <span data-testid="chief-fallback-note">
@@ -919,11 +894,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         testId={testId}
         stamp={<MessageStamp createdAt={item.createdAt} />}
         note={withNote ? fallbackNote : undefined}
-        onReply={
-          onReply !== undefined && item.id != null
-            ? () => onReply({ sourceMessageId: item.id ?? '', quote })
-            : undefined
-        }
         onCopy={() => onCopy(quote)}
       />
     ) : null;
@@ -945,9 +915,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
             {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
           >
-            {item.markdown != null ? (
+            {markdown != null ? (
               <ChatMarkdown
-                text={item.markdown}
+                text={markdown}
                 bubbles
                 bubbleFooter={<BubbleReports todoIds={reports} />}
                 bubbleTools={(group, n) =>

@@ -403,7 +403,7 @@ describe('#1466 read path: legacy rows treated as "not a valid GitHub repo", zer
         b2,
         'tester',
       );
-      expect(result).toEqual({ delegated: true });
+      expect(result).toEqual({ state: 'requested', stepId: expect.any(String) });
       expect(rec.calls).toEqual([]);
     },
   );

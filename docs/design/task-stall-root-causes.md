@@ -21,7 +21,7 @@ Implementation order is the section order. Each class is one PR of under 400 lin
 
 Prior art: GitHub `needs`, Airflow trigger rules and Buildkite `depends_on` all record the dependency on the downstream unit, park it in a named waiting state, and let the scheduler start it.
 
-1. `create_todo` starts the thread. A todo the Coordinator creates goes straight to `queued` through `startBuilds`, so a Coordinator-created todo can never sit in `todo`. `reopen_todos` also starts a new build instead of landing in `todo`. `open_thread` stays only for todos the person created.
+1. `create_todo` starts the thread. A todo the Coordinator creates goes straight to `queued` through `startBuilds`, so a Coordinator-created todo can never sit in `todo`. `reopen_todos` also starts a new build instead of landing in `todo`. `open_thread` stays only for todos the person created. Since #5389 the Coordinator can pass `start: false` to park the task in `todo` instead: the owner asked for a task on the board without running it, and without the flag the workaround was to create it and `stop_thread` it, which dispatched a build against his wish (2026-11-18, task `5eRsi_-IPzR8BVtXjt3Cb`). A parked task starts with `open_thread` or from the owner's Start, and its result says it is not started.
 2. `create_todo` and `update_todo` accept `blockedBy: todoId[]`, validated as same-team todos with no cycle.
 3. A blocked task is held by one rule. While any blocker is unsatisfied, every pending `plan` or `session` step of the task carries `holdReason = 'blocked-by'`. Claim already skips held steps. A blocker is satisfied when it is `done`, or when it is an `info` task in `review` whose stored report matches `build.reportAttachmentId` (today's research rule, kept).
 4. `releaseBlockedSteps(deps)` runs on every scheduler tick and after every phase write. It is the only function that clears `blocked-by`.
@@ -30,7 +30,7 @@ Prior art: GitHub `needs`, Airflow trigger rules and Buildkite `depends_on` all 
 
 The owner decided rule 1 on 2026-11-09: Coordinator-created todos start automatically, without his confirmation.
 
-This follows Orca R1's root fix, which folds create and open into one call. It does not add R1's level-triggered `runTick` sweep over unstarted todos, for two reasons. First, the sweep cannot tell a todo the Coordinator forgot from one that was deliberately stopped back to `todo`: #139's first build was cancelled during the 11-08 freeze, and a sweep would have restarted it. Second, with create and reopen starting the build themselves, the forgotten case no longer exists, so the sweep would be a second starter for a state that cannot be reached. The level re-check Orca relies on lives in rule 4, which re-evaluates every held task on every tick.
+This follows Orca R1's root fix, which folds create and open into one call. It does not add R1's level-triggered `runTick` sweep over unstarted todos, for two reasons. First, the sweep cannot tell a todo the Coordinator forgot from one that was deliberately stopped back to `todo`: #139's first build was cancelled during the 11-08 freeze, and a sweep would have restarted it. Second, with create and reopen starting the build themselves, the forgotten case no longer exists, so the sweep would be a second starter for a state that cannot be reached. The level re-check Orca relies on lives in rule 4, which re-evaluates every held task on every tick. `start: false` makes the unstarted state reachable again, but only on purpose: nothing sweeps it, and only `open_thread` or the owner starts a parked task.
 
 ### Deletes
 
@@ -41,7 +41,7 @@ This follows Orca R1's root fix, which folds create and open into one call. It d
 
 | # | Path | Today | After |
 |---|---|---|---|
-| 1 | `create_todo` (Coordinator) | `todo`; needs `open_thread` | `queued`; held if blocked (auto-start, owner decision 2026-11-09) |
+| 1 | `create_todo` (Coordinator) | `todo`; needs `open_thread` | `queued`; held if blocked (auto-start, owner decision 2026-11-09). With `start: false`, `todo` until `open_thread` or the owner starts it (#5389) |
 | 2 | `reopen_todos` | back to `todo` | new build, `queued` |
 | 3 | `update_todo` with `blockedBy` | n/a | writes the edge; next release pass re-evaluates |
 | 4 | `startBuilds` / `enqueueStep` for a blocked task (continuation, rework, wakes) | not held | held at insert |
@@ -163,8 +163,9 @@ Migration: add a nullable `coordinatorTurn` JSON column. Existing rows read as n
 | Decision | By | Date |
 |---|---|---|
 | Coordinator-created todos start automatically, without owner confirmation (class 3 rule 1) | owner | 2026-11-09 |
+| A Coordinator-created todo may be parked with `create_todo` `start: false`, started later by `open_thread` or the owner (#5389) | owner | 2026-11-18 |
 | The design as a whole, including the departures from Orca R1 to R3 | coordinator | 2026-11-09 |
 
-- Coordinator-created todos always start. There is no draft switch, because no recorded case needed a Coordinator-created backlog item. Revert: add the switch back on `create_todo`.
+- Coordinator-created todos always start unless the Coordinator parks them. The draft switch on `create_todo` (`start: false`) was added on 2026-11-18 because the owner asked for a task on the board without starting it and the build dispatched anyway; the earlier claim that no recorded case needed a Coordinator-created backlog item no longer holds. Revert: drop `start` from the schema and the parked branch in `chief-tools.ts`.
 - A failed or closed blocker routes to the Coordinator instead of failing the dependent. Research-before-plan no longer proceeds silently when its research fails.
 - The 30-minute Coordinator turn deadline is one constant in `owner.ts`.

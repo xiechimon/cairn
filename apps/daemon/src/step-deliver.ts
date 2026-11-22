@@ -128,6 +128,7 @@ export async function deliverStepOutcome(input: StepDeliveryInput): Promise<void
       branchDrift: git.branchDrift,
       quotaBlock: input.quotaBlock,
       skillInjectionFacts: input.skillInjectionFacts,
+      generation: input.claimed.step.generation,
     },
     {
       kind: input.claimed.step.kind,

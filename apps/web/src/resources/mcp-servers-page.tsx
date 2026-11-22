@@ -1,4 +1,5 @@
 import {
+  isLocalCatalogEntry,
   MCP_CATALOG,
   type McpCatalogEntry,
   type McpConnectorRecord,
@@ -234,14 +235,16 @@ export function McpServersPage() {
         key: record.id,
         icon: <McpConnectorIcon catalogId={record.catalogId} />,
         name: record.label,
-        description: entry !== undefined ? t(entry.description) : hostOf(record.url),
+        description: entry !== undefined ? t(entry.description) : hostOf(record.url ?? ''),
         ...(record.status === 'needs_auth'
           ? { status: <RowNote>{t('需要重新授权')}</RowNote> }
           : record.status === 'error'
             ? { status: <RowNote danger>{t('连不上')}</RowNote> }
-            : record.status === 'unchecked'
-              ? { status: <RowNote>{t('还没检查')}</RowNote> }
-              : {}),
+            : record.status === 'local'
+              ? { status: <RowNote>{t('在你的 Chrome 里')}</RowNote> }
+              : record.status === 'unchecked'
+                ? { status: <RowNote>{t('还没检查')}</RowNote> }
+                : {}),
         action: manageButton(record.label, () => setDialog({ kind: 'manage', connector: record })),
       };
     }),
@@ -306,7 +309,7 @@ export function McpServersPage() {
     const entry = MCP_CATALOG.find((e) => e.id === attempt.catalogId);
     const withEntry = entry !== undefined ? { entry } : {};
     if (!live) {
-      const host = entry !== undefined ? hostOf(entry.url) : name;
+      const host = entry !== undefined && !isLocalCatalogEntry(entry) ? hostOf(entry.url) : name;
       return setSignIn({ name, host, authorizationUrl: '#', attempt, ...withEntry });
     }
     const failed = (body: string, retry: boolean) =>
@@ -355,6 +358,10 @@ export function McpServersPage() {
   };
 
   const connect = (entry: McpCatalogEntry) => {
+    if (isLocalCatalogEntry(entry)) {
+      setNotice(null);
+      return setDialog({ kind: 'catalog', entry });
+    }
     if (entry.auth.includes('github-app') && githubApp?.available === true) {
       setNotice(null);
       if (live && githubApp.connectionReady)

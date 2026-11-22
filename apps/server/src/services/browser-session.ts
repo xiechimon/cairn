@@ -13,7 +13,7 @@ const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const TICKET_TTL_MS = 60_000;
 const TOKEN_BYTES = 32;
 
-export type BrowserSessionKind = 'owner' | 'device';
+export type BrowserSessionKind = 'owner' | 'device' | 'external';
 
 export interface ResolvedBrowserSession {
   kind: BrowserSessionKind;
@@ -54,7 +54,7 @@ export function resolveBrowserSession(
     .where(eq(browserSession.tokenHash, hashCredential(token)))
     .get();
   if (row === undefined || row.expiresAt <= now) return null;
-  if (row.kind !== 'owner' && row.kind !== 'device') return null;
+  if (row.kind !== 'owner' && row.kind !== 'device' && row.kind !== 'external') return null;
   return { kind: row.kind, deviceId: row.deviceId };
 }
 

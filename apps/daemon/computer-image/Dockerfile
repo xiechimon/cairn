@@ -74,6 +74,7 @@ COPY cloak.mjs /opt/cloak/cloak.mjs
 COPY cairn-browser.desktop cairn-chromium.desktop /usr/share/applications/
 COPY --chmod=755 entry.sh /usr/local/bin/cairn-entry
 COPY --chmod=755 desktop.sh /usr/local/bin/cairn-desktop
+COPY --chmod=755 wait-display.sh /usr/local/bin/cairn-wait-display
 COPY --chmod=755 browser.sh /usr/local/bin/cairn-browser
 COPY --chmod=755 agent-browser.sh /usr/local/bin/agent-browser
 COPY --chmod=755 agent-desktop.sh /usr/local/bin/agent-desktop

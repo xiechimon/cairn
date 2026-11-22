@@ -517,6 +517,30 @@ test('the product plan retires the optional Cloudflare service without retiring 
   }
 });
 
+test('the memory feature reaches both the team dialog and the project memory tab', () => {
+  const registry = JSON.parse(readFileSync(join(SCRIPTS, '..', REGISTRY), 'utf8'));
+  const memory = registry.features.find(({ id }) => id === 'memory');
+  assert.ok(memory, 'the memory feature stays registered');
+  assert.deepEqual(
+    memory.routes.web,
+    ['/app/project/:id/settings'],
+    'memory carries the project settings route so a route search finds the project memory tab',
+  );
+  const projectTab = memory.reach.findIndex((step) =>
+    /^open \/app\/project\/<[^>]+>\/settings$/.test(step),
+  );
+  assert.notEqual(projectTab, -1, 'a reach step opens a bound project settings route');
+  assert.equal(
+    memory.reach[projectTab + 1],
+    'click label:记忆',
+    'the reach steps select the 记忆 tab on the project settings surface',
+  );
+  assert.ok(
+    memory.reach.slice(0, projectTab).includes('click label:记忆'),
+    'the team memory dialog keeps its own entry path',
+  );
+});
+
 test('the real registry passes its own check', () => {
   const result = spawnSync(
     process.execPath,

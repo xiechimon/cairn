@@ -21,7 +21,7 @@ Messages opt in with `data-reply-source="<message id>"` on the assistant `Bubble
 
 ### Bar
 
-- Surface: the measured claude.ai pill. `--selection-bar-bg` (black at 80%), `backdrop-blur-sm` (8px), 1px border `--selection-bar-ring` (white at 10%), radius 8px, `--shadow-selection-bar` (the measured two layers per theme). V3 allows blur on this surface only.
+- Surface: the app's own popover surface, not claude.ai's black pill (owner review, 2026-11-21): `bg-popover`, `text-popover-foreground`, `--shadow-popover`, radius `--radius-control`; buttons are `font-medium` foreground ink with secondary-ink icons, hover `menu-hover`, and a `border` rule between actions. The same tokens carry dark mode.
 - One button `回复` with the reply arrow after it: 32px high, padding 6px 12px, `text-ui` (14px/20px), gap 4px, white. Hover fills the whole button with white at 10%, with `transition-none` (claude.ai fades over 150ms; cairn's hover rule forbids delayed feedback).
 - Position: centred on the selection rectangle, 8px above it (measured); clamped 12px inside the conversation viewport; below the line when there is less than 12px above. Fixed, moved with `transform` only (A2).
 - Appears 250ms after the selection settles, or on mouse release after a drag. Needs at least 2 characters after trimming, and a selection that starts and ends in the same message.

@@ -65,8 +65,8 @@ import {
   taskLink,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
+import { APPROVAL_CARD_ID_PREFIX } from './chief-question-store.js';
 import {
-  APPROVAL_CARD_ID_PREFIX,
   announceQuestion,
   askUserQuestionsOfParams,
   type ChiefQuestionDeps,
@@ -112,6 +112,7 @@ import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
 import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
 import { listBuildStepRoutes } from './step-route.js';
+import { assertGroundedClaims, TerminalClaimError } from './terminal-claims.js';
 import { startThreadBuild } from './thread-message.js';
 import { getTodo, listTodos, setTodoArchived, setTodoPhase } from './todos.js';
 import { readTopModels } from './top-models.js';
@@ -558,7 +559,14 @@ export async function executeChiefTool(
             throw new HttpError(403, 'credential file access denied');
           }
           const f = await readFile(
-            { db, reposDir: deps.reposDir, workspacesDir: deps.workspacesDir },
+            {
+              db,
+              reposDir: deps.reposDir,
+              workspacesDir: deps.workspacesDir,
+              box: deps.box,
+              githubFetch: deps.githubFetch,
+              githubAppTokenSocket: deps.githubAppTokenSocket,
+            },
             projectId,
             p,
             ref,
@@ -713,8 +721,9 @@ export async function executeChiefTool(
 
     case 'create_todo': {
       const body = parseWith(coordinatorCreateTodoParamsSchema, params, 'params');
-      assertNamedMachineForNewTask(svc, ctx.teamId);
       const untrustedTurn = turnForcesOutboundApproval(db, turnPrompt);
+      const parked = untrustedTurn || body.start === false;
+      if (!parked) assertNamedMachineForNewTask(svc, ctx.teamId);
       const record = db.transaction(() => {
         const projectRow =
           body.projectId === undefined
@@ -746,13 +755,16 @@ export async function executeChiefTool(
           });
         return created;
       });
-      if (untrustedTurn)
+      if (parked)
         return json({
           ...record,
           ...getTodo(svc, record.id),
+          link: taskLink(record.id, record.title),
           sourceBuildId: ctx.chiefId,
           buildId: null,
-          note: 'Created but not started: this turn carries outside content, so only the owner starts the task. Tell the owner it is waiting for them.',
+          note: untrustedTurn
+            ? 'Created but not started: this turn carries outside content, so only the owner starts the task. Tell the owner it is waiting for them.'
+            : 'Created and parked, not started: it sits in 待开始 until open_thread or the owner starts it. Say so instead of starting it now.',
         });
       const buildId = startThreadBuild(svc, requireTeamTodo(db, record.id, ctx.teamId), {
         origin: 'coordinator',
@@ -1031,19 +1043,32 @@ export async function executeChiefTool(
       const buildIds = strArr(params, 'buildIds');
       const reason = str(params, 'reason');
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
-      for (const buildId of buildIds) {
-        cancelBuild(deps, buildId, { actor: 'coordinator', reason });
-      }
-      return json({ cancelled: buildIds });
+      const cancels: { buildId: string; state: string }[] = [];
+      for (const buildId of buildIds)
+        cancels.push({
+          buildId,
+          state: cancelBuild(deps, buildId, { actor: 'coordinator', reason }),
+        });
+      return json({
+        cancels,
+        note: '"stopped" means the step is no longer running; "delegated" means a stop signal was sent to the machine and the step keeps running until it acknowledges; "released" means there was no running step to stop.',
+      });
     }
     case 'merge_builds': {
       const buildIds = strArr(params, 'buildIds');
       if (parseChiefTrigger(ctx.turnPrompt ?? null) !== 'user')
         throw new HttpError(403, 'A user instruction is required to merge; events cannot merge');
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
+      const merges: { buildId: string }[] = [];
       for (const buildId of buildIds)
-        await requestMerge(buildDeps(deps), buildId, deps.user.displayName);
-      return json({ merged: buildIds });
+        merges.push({
+          buildId,
+          ...(await requestMerge(buildDeps(deps), buildId, deps.user.displayName)),
+        });
+      return json({
+        merges,
+        note: 'state "requested" means a machine runs the merge later: it is not merged yet, and the merge step reports the outcome. Only state "merged" confirms the change landed.',
+      });
     }
 
     case 'ask_user': {
@@ -1053,6 +1078,22 @@ export async function executeChiefTool(
         'ask_user',
       );
       const questions = askUserQuestionsOfParams(params);
+      try {
+        assertGroundedClaims(db, {
+          threadId: ctx.threadId,
+          turnPrompt,
+          text: questions
+            .flatMap((question) => [
+              question.header,
+              question.question,
+              ...question.options.flatMap((option) => [option.label, option.description ?? '']),
+            ])
+            .join('\n'),
+        });
+      } catch (error) {
+        if (error instanceof TerminalClaimError) throw new HttpError(409, error.message);
+        throw error;
+      }
       const requestId = optStr(params, 'requestId') ?? `ask-${newRecordId()}`;
       if (requestId.startsWith(APPROVAL_CARD_ID_PREFIX)) {
         throw new HttpError(
@@ -1095,6 +1136,12 @@ export async function executeChiefTool(
         report === null
           ? str(params, 'message')
           : str(params, 'message').replaceAll(report.attachmentId, '报告');
+      try {
+        assertGroundedClaims(db, { threadId: ctx.threadId, turnPrompt, text });
+      } catch (error) {
+        if (error instanceof TerminalClaimError) throw new HttpError(409, error.message);
+        throw error;
+      }
       const noticeId =
         report === null
           ? `notice-${effectDedupeKey(ctx.threadId, ctx.turnPrompt ?? '', provenance, text)}`

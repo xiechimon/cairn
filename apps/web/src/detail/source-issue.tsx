@@ -45,6 +45,7 @@ export function SourceIssueLine({
     );
   }
   if (todo.sourceRef === null) {
+    if (todo.sourceKind === 'github-issue-self' && !todo.hasChanges) return null;
     return (
       <div
         className="flex min-w-0 items-center gap-2 px-4 pt-2 text-meta text-(--text-tertiary)"

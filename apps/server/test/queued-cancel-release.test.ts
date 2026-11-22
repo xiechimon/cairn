@@ -55,9 +55,9 @@ describe('#1219 the chief cancel -> re-dispatch chain', () => {
       buildIds: [buildId],
       reason: 'test cancel',
     })) as {
-      cancelled: string[];
+      cancels: { buildId: string; state: string }[];
     };
-    expect(cancelled.cancelled).toEqual([buildId]);
+    expect(cancelled.cancels).toEqual([{ buildId, state: 'stopped' }]);
 
     const stepRow = H.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).get()!;
     expect(stepRow.status).toBe('stopped');

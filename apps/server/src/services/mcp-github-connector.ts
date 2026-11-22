@@ -2,6 +2,7 @@ import {
   type GithubConnectorAvailability,
   type GithubConnectorDevicePoll,
   type GithubConnectorDeviceStart,
+  isLocalCatalogEntry,
   mcpCatalogEntry,
 } from '@cairn/shared';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
@@ -140,6 +141,8 @@ export function bindGithubConnector(
   if (target.kind === 'new') {
     const entry = mcpCatalogEntry(GITHUB_CATALOG_ID);
     if (!entry) throw notFound(`catalog entry ${GITHUB_CATALOG_ID}`);
+    if (isLocalCatalogEntry(entry))
+      throw new HttpError(400, `${entry.name} runs on the machine and has no url`);
     try {
       assertSlugFree(deps, teamId, target.slug);
     } catch {

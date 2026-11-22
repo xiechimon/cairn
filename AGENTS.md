@@ -11,13 +11,13 @@ Before any change under `apps/web/src`, invoke the `design-cairn` skill and run 
 - Do not run postinstall scripts without explicit user authorization; install dependencies with scripts disabled unless authorized.
 - Seams: read the comments in `biome.json` before changing locked imports (`@earendil-works/*`, `@modelcontextprotocol/sdk`, `simple-git`, `isomorphic-git`, `cron-parser`) and consume them through thin bridges. Keep GitOps, MCP and LLM provider access behind `apps/daemon/src/backend/`; the exceptions are the in-server Coordinator runtime, `apps/server/src/coordinator/runtime/`, and the MCP connector client in `apps/server/src/services/mcp-servers.ts`.
 - Never kill another lane's processes; inspect the PID, command and working directory before stopping a process you started. Shared ports, heavy slots and worktree rules: `docs/ops/worktrees-and-ports.md`.
-- No change may edit what judges it: the trajectory exporter, its outcome fields and the pack schema (the eval globs in `packages/shared/merge-gate-paths.json`).
+- No change may edit what judges it: the eval suite (`eval/**` — task set, scorers and run configuration — is a `humanQueue.evalConfig` path in `packages/shared/merge-gate-paths.json`), and the gate reads the exam from the merge-base checkout at run time.
 - Before pushing a change to a security surface, run `/security-review` and fix confirmed findings; name any finding you leave unfixed, with its reason, in the commit message.
 
 Security surfaces (the `credentials`, `machineAndCommandBoundary` and `externalEntryAuth` lists in `packages/shared/merge-gate-paths.json`; `apps/server/test/merge-gate-paths-json.test.ts` fails when this list differs):
 
-- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth,github-connection,github-connection-device,github-device-core}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
-- Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/command-gate.ts`
+- Keys and encryption: `apps/server/src/lib/{secret-box,keys,token-auth,owner-channel,attachments-token}.ts`, `apps/server/src/services/{secrets,credentials,api-keys,oauth,github-connection,github-connection-device,github-device-core}.ts`, `apps/server/src/coordinator/{credentials,codex-login}.ts`
+- Machine registration and dispatch protocol: `apps/server/src/routes-machine.ts`, `apps/server/src/services/machine*.ts`, `apps/daemon/src/{credentials,secret-channel,machine-client}.ts`, `apps/daemon/src/backend/{command-gate,host-shell-confinement}.ts`
 - MCP auth and external entry points: `apps/server/src/services/{mcp-face,mcp-servers,composio,composio-connectors,github-webhook,schedule-webhook,connector-broker}.ts`, `apps/server/src/lib/webhook-token.ts`, `apps/server/src/{routes-github-webhook,routes-schedule-webhook,routes-design-share}.ts`
 
 ## Ship

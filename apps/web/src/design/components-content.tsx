@@ -299,14 +299,13 @@ export function ConversationSection() {
                 <ChatMarkdown
                   bubbles
                   text={
-                    'The last commit bumped a version in package.json without updating the lockfile.\n\n- the frozen install fails\n- I will commit the lockfile\n\n> Hover a bubble for Reply and More.'
+                    'The last commit bumped a version in package.json without updating the lockfile.\n\n- the frozen install fails\n- I will commit the lockfile\n\n> Hover a bubble to copy it.'
                   }
                   bubbleTools={() => (
                     <MessageToolbar
                       placement="right"
                       testId="turn-reply-tools"
                       stamp="10:43"
-                      onReply={() => {}}
                       onCopy={() => {}}
                     />
                   )}

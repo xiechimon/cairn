@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronUp, CircleAlert, Copy, X } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useId, useState } from 'react';
+import { createContext, type KeyboardEvent, type ReactNode, useId, useState } from 'react';
 import { Link } from 'react-router';
 import {
   type TurnErrorCopy,
@@ -7,9 +7,10 @@ import {
   type TurnFailureAction,
   turnErrorCopy,
 } from '../api/mappers.js';
+import { canUpdateDesktop, updateDesktopNow } from '../board/desktop-update.js';
 import { PANE_PARAM } from '../board/work-panel.js';
 import { Button } from '../components/ui/button.js';
-import { Marker } from '../components/ui/marker.js';
+import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import type { QueueWait } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -22,6 +23,7 @@ const FAIL_ICON_CLS = 'mt-0.5 size-5.5 flex-none text-(--destructive)';
 const WAIT_ICON_CLS = 'mt-0.5 size-5.5 flex-none text-(--card-button)';
 
 const ACTION_LABELS: Record<TurnFailureAction, string> = {
+  update: '更新 Cairn',
   retry: '重试',
   continue: '继续',
   swap: '换 Coordinator 模型',
@@ -74,44 +76,22 @@ function RawError({ id, text }: { id: string; text: string }) {
   );
 }
 
-export function TurnFailureLine({ error }: { error: TurnErrorFacts }) {
+export const CardFailureContext = createContext<string | null>(null);
+
+export function TurnFailureMarker() {
   const { t } = useI18n();
-  const copy = turnErrorCopy(error, ON_MAC);
-  const text = useCopyText()(copy);
-  const [open, setOpen] = useState(false);
-  const detailId = useId();
-  const label = copy.kind === 'unknown' ? text.title : t('没完成：{title}', { title: text.title });
   return (
-    <div role="note" className="flex flex-col gap-2">
-      <Marker variant="separator" className="gap-1.5 text-meta text-content-tertiary">
-        <Button
-          variant="ghost"
-          size="sm"
-          data-testid="chief-turn-error"
-          aria-expanded={open}
-          aria-controls={detailId}
-          onClick={() => setOpen((v) => !v)}
-          className="h-auto min-h-7 min-w-0 shrink gap-1.5 px-1 font-normal whitespace-normal text-content-tertiary hover:bg-transparent hover:text-foreground aria-expanded:bg-transparent aria-expanded:text-content-tertiary dark:hover:bg-transparent pointer-coarse:min-h-11"
-        >
-          <CircleAlert aria-hidden="true" className="size-4 flex-none" />
-          <span className="min-w-0">{label}</span>
-          {open ? (
-            <ChevronUp aria-hidden="true" className="size-4 flex-none" />
-          ) : (
-            <ChevronDown aria-hidden="true" className="size-4 flex-none" />
-          )}
-        </Button>
-      </Marker>
-      {open && (
-        <span
-          data-testid="chief-turn-error-detail"
-          className="mx-auto block w-full max-w-140 text-meta text-pretty text-content-secondary"
-        >
-          {text.why}
-          <RawError id={detailId} text={error.message} />
-        </span>
-      )}
-    </div>
+    <Marker
+      variant="separator"
+      role="note"
+      data-testid="chief-turn-error"
+      className="gap-1.5 text-meta text-content-tertiary"
+    >
+      <MarkerIcon>
+        <CircleAlert />
+      </MarkerIcon>
+      <MarkerContent>{t('没完成')}</MarkerContent>
+    </Marker>
   );
 }
 
@@ -186,8 +166,10 @@ export function TurnFailureCard({
   const text = useCopyText()(copy);
   const [open, setOpen] = useState(false);
   const detailId = useId();
-  const actions = copy.actions.filter(
-    (action) => (action !== 'retry' && action !== 'continue') || onRetry !== undefined,
+  const actions = copy.actions.filter((action) =>
+    action === 'update'
+      ? canUpdateDesktop()
+      : (action !== 'retry' && action !== 'continue') || onRetry !== undefined,
   );
   return (
     <NoticeCard
@@ -210,8 +192,8 @@ export function TurnFailureCard({
               size="sm"
               variant={variant}
               className="pointer-coarse:h-11"
-              data-testid="chief-turn-retry"
-              onClick={onRetry}
+              data-testid={action === 'update' ? 'chief-turn-update' : 'chief-turn-retry'}
+              onClick={action === 'update' ? () => void updateDesktopNow() : onRetry}
             >
               {label}
             </Button>

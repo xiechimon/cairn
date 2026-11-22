@@ -1,0 +1,43 @@
+{
+  "kind": "runtime",
+  "id": "route-single-05",
+  "request": "在 infra 项目里给 CI 加一个 lint 步骤",
+  "world": {
+    "projects": [
+      "infra",
+      "other-a",
+      "other-b"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@infra",
+            "title": "给 CI 加 lint 步骤"
+          }
+        }
+      ]
+    },
+    {
+      "text": "已开任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "infra"
+    ],
+    "parts": 1,
+    "boundModel": "stub/m",
+    "promptContains": [
+      "infra"
+    ],
+    "promptExcludes": [
+      "<script>"
+    ]
+  },
+  "gate": true
+}

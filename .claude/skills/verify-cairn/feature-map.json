@@ -12,7 +12,6 @@
     "docs/research/sidebar-coordinator-icon-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/t3code-devices-and-scope-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/thread-pr-placement-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
-    "docs/research/trajectory-self-improvement-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/ui-ux-audit-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/research/user-computer-model-2026-11-08.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
     "docs/design/pilot-coordinator-chat-2026-11-06.md": "uncommitted in worktree project-review-52869e (2026-11-08)",
@@ -150,14 +149,17 @@
     {
       "id": "selection-reply",
       "name": "Reply quote",
-      "summary": "Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.",
-      "states": "Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.",
+      "summary": "Press Reply in your own message's hover tools to quote it above the composer. Coordinator messages have no reply arrow (owner decision, 2026-11-21); instead, select text in a Coordinator message to get a pill with Ask in side chat and Quote (R); Quote opens a one-input box where Enter stages the quote above the composer and Cmd+Enter sends it at once; Ask in side chat opens the related task thread with the selection quoted in its composer. The sent message carries the quote and its source message id.",
+      "states": "Selection pill with and without a related task, quote box with its key hint, quote staged above the composer from your own message or a selection, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, side chat composer seeded with the quote, light and dark, 1440 and 390 wide.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/chief/reply-quote-block.tsx",
-          "apps/web/src/chief/reply-source-highlight.ts"
+          "apps/web/src/chief/reply-source-highlight.ts",
+          "apps/web/src/chief/selection-reply.tsx",
+          "apps/web/src/chief/selection-reply-model.ts",
+          "apps/web/src/board/side-chat-seed.ts"
         ],
         "other": [
           "packages/shared/src/reply-quote.ts"
@@ -170,8 +172,8 @@
       },
       "reach": [
         "open /app",
-        "hover testid:chief-reply-bubble",
-        "click testid:chief-msg-reply"
+        "hover testid:chief-reply",
+        "click testid:selection-quote"
       ],
       "research": [
         "docs/research/selection-reply-2026-11-08.md"
@@ -184,6 +186,7 @@
       ],
       "evidence": [
         "apps/web/e2e/chief-reply-quote.spec.ts",
+        "apps/web/e2e/chief-selection-quote.spec.ts",
         "packages/shared/test/reply-quote.test.ts"
       ]
     },
@@ -247,6 +250,9 @@
         ]
       },
       "routes": {
+        "web": [
+          "/app/project/:id/settings"
+        ],
         "server": [
           "/api/teams/:id/memories**",
           "/api/teams/:id/memory-edits**",
@@ -256,6 +262,8 @@
       },
       "reach": [
         "open /app",
+        "click label:记忆",
+        "open /app/project/<id of a project listed by the projects API>/settings",
         "click label:记忆"
       ],
       "research": [
@@ -1157,38 +1165,6 @@
       ]
     },
     {
-      "id": "trajectory-export",
-      "name": "Trajectory export",
-      "summary": "Build trajectories export as packs and traces for the self-improvement loop.",
-      "states": "No product page; results appear as command-line reports and traces.",
-      "centrality": 1,
-      "status": "partial",
-      "code": {
-        "server": [
-          "apps/server/src/trajectory-export.ts",
-          "apps/server/src/trajectory-push.ts",
-          "apps/server/src/runtime-otel.ts"
-        ]
-      },
-      "reach": [
-        "settings routing"
-      ],
-      "research": [
-        "docs/research/eval-methods.md",
-        "docs/research/trajectory-self-improvement-2026-11-08.md"
-      ],
-      "frontendDesign": {
-        "na": "runs as command-line tools and trace export with no product page"
-      },
-      "backendDesign": [
-        "docs/spec/29-evaluation-and-data-loop.md",
-        "docs/research/trajectory-self-improvement-2026-11-08.md"
-      ],
-      "evidence": [
-        "apps/server/test/trajectory-export.test.ts"
-      ]
-    },
-    {
       "id": "research-loop",
       "name": "Research before retry and plan",
       "summary": "Threads research outward when a fix keeps failing or a new mechanism is planned, and cite sources in their plan.",
@@ -1479,7 +1455,6 @@
         ],
         "server": [
           "/api/remote/**",
-          "/api/auth/bootstrap",
           "/api/auth/access",
           "/api/auth/stream-ticket"
         ]
@@ -1576,8 +1551,8 @@
     {
       "id": "first-run",
       "name": "First run",
-      "summary": "The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.",
-      "states": "A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.",
+      "summary": "The setup page before the first project, the Coordinator setup prompt and the first-PR card that take a new user to a first merged PR.",
+      "states": "A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards, while no model source is connected, an empty Coordinator home shows one centered sentence and a primary connect-a-model-source button, and a conversation with history shows one notice line after it; a missing or offline Runner shows the same notice line; then a first-PR card.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1585,13 +1560,13 @@
           "apps/web/src/board/first-run-checklist-model.ts",
           "apps/web/src/board/first-run-setup.tsx",
           "apps/web/src/board/home-banners.ts",
-          "apps/web/src/board/composer-setup-hint.tsx"
+          "apps/web/src/board/setup-prompt.tsx"
         ]
       },
       "reach": [
         "open /app",
         "click testid:first-run-confirm",
-        "click testid:composer-setup-chip"
+        "click testid:setup-prompt-action"
       ],
       "research": [
         "docs/research/ui-ux-audit-2026-11-06.md"
@@ -1648,8 +1623,8 @@
     {
       "id": "projects",
       "name": "Projects",
-      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.",
-      "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.",
+      "summary": "Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, and an archived project opened read-only; the UI offers no project deletion.",
+      "states": "A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -1860,8 +1835,8 @@
     {
       "id": "token-usage",
       "name": "Token usage",
-      "summary": "The Usage dialog from the sidebar footer: a 7, 30 or 90 day range with totals, cache hit, the token-type bar, tokens per local day as stacked bars by source or by model, and models and projects ranked.",
-      "states": "Loading, failed with retry, empty for a new team, a new user whose chart starts at the first used day, and a full range with the previous-range change and a readout for the hovered or keyboard-selected day; light and dark, desktop dialog and phone.",
+      "summary": "The Usage dialog from the sidebar footer: a past-year heatmap of tokens per local day, year totals with days used, daily average and cache hit, the token-type bar, and models and projects ranked for the year or the clicked day.",
+      "states": "Loading, failed with retry, empty for a new team, a new user with a started-on line under the heatmap, a full year with a readout for the hovered or selected day, and a selected day scoping the rankings; light and dark, desktop dialog and phone (16 weeks).",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1906,7 +1881,7 @@
     {
       "id": "sidebar",
       "name": "Sidebar",
-      "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.",
+      "summary": "The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, project settings, move to group, archive), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive) and the machine-status footer.",
       "states": "Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and collapsed with only the toggle, whose hover, edge or keyboard focus floats the whole sidebar as a peek.",
       "centrality": 3,
       "status": "shipped",
@@ -1960,14 +1935,14 @@
     {
       "id": "composer",
       "name": "Composer",
-      "summary": "The message composer: mentions, slash commands, named prompts and drafts that survive closing the app.",
-      "states": "Empty with a placeholder, a draft restored after reload, slash menu and mention suggestions open, and a send error.",
+      "summary": "The message composer: mentions, named prompts and drafts that survive closing the app. A leading / is plain text; there is no slash-command menu.",
+      "states": "Empty with a placeholder, a draft restored after reload, mention suggestions open, and a send error.",
       "centrality": 3,
       "status": "shipped",
       "code": {
         "web": [
           "apps/web/src/chief/composer-surface.tsx",
-          "apps/web/src/overlay/slash-menu.tsx",
+          "apps/web/src/overlay/mention-inline.tsx",
           "apps/web/src/overlay/draft-sync.ts"
         ],
         "server": [
@@ -1983,7 +1958,7 @@
       "reach": [
         "open /app",
         "click testid:chief-composer-block",
-        "type / to open slash commands or @ to mention"
+        "type @ to mention"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/mentions.md",
@@ -2001,7 +1976,6 @@
         "gap": "no design for server drafts  and named prompts"
       },
       "evidence": [
-        "apps/web/e2e/composer-slash.spec.ts",
         "apps/web/e2e/chief-draft-persist.spec.ts",
         "apps/server/test/composer-drafts.test.ts"
       ],
@@ -2010,8 +1984,8 @@
     {
       "id": "attachments",
       "name": "Attachments",
-      "summary": "Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens in a full-window lightbox with a pager across the message's files.",
-      "states": "Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; file lightbox for text with line numbers, an empty file, an image, a video, an office document, an unsupported type, loading, a load error and the pager; agent attachments in the thread transcript.",
+      "summary": "Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens by kind: images and video in a full-window lightbox with a zoned top bar, a filmstrip of the message's media and peeks of the adjacent files; documents (Markdown with a preview/source switch, code with muted highlighting, text, PDF, office) in a right side panel inside the Coordinator layout, one at a time.",
+      "states": "Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; lightbox for an image, a video, the filmstrip and a hovered peek; document side panel for text and code with line numbers, Markdown preview and source, PDF, an office document, an unsupported type, loading and a load error; agent attachments in the thread transcript.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2021,6 +1995,7 @@
           "apps/web/src/overlay/file-drop.ts",
           "apps/web/src/chief/sent-attachments.tsx",
           "apps/web/src/board/file-lightbox.tsx",
+          "apps/web/src/board/file-doc-panel.tsx",
           "apps/web/src/board/file-tile.tsx",
           "apps/web/src/board/file-data.ts",
           "apps/web/src/board/file-pane.ts"

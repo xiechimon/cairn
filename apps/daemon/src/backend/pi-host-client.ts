@@ -8,6 +8,8 @@ import type {
   SessionOpts,
   StepEvent,
 } from '@cairn/shared';
+import { ENV_VARS } from '@cairn/shared';
+import { childEnv } from '../child-env.js';
 import { stepCredentialRedactor } from '../credential-output.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
 import { EventQueue } from './event-queue.js';
@@ -22,7 +24,13 @@ import {
   parseFrame,
   readFrames,
 } from './pi-host-protocol.js';
-import { withoutPinnedEnv } from './pinned-env.js';
+
+export function piHostEnv(parent: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  return childEnv({
+    [ENV_VARS.piCacheRetention]: parent[ENV_VARS.piCacheRetention],
+    [ENV_VARS.customModelReasoning]: parent[ENV_VARS.customModelReasoning],
+  });
+}
 
 const START_TIMEOUT_MS = 60_000;
 const STOP_TIMEOUT_MS = 10_000;
@@ -98,7 +106,7 @@ class PiHostSession implements AgentSessionHandle {
     });
     this.child = spawn(launch.command, launch.args, {
       cwd: opts.cwd,
-      env: withoutPinnedEnv(process.env),
+      env: piHostEnv(),
       detached: true,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,

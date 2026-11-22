@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import { Link, type LinkProps, useLocation, useSearchParams } from 'react-router';
 import { prefetchThread } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { THREAD_PARAM, threadHref, threadHrefFrom, VIEW_PARAM } from './thread-copy.js';
+import { THREAD_PARAM, threadHref, threadHrefFrom, VIEW_PARAM, withThread } from './thread-copy.js';
 
 export function useThreadHref(): (todoId: string) => string {
   const location = useLocation();
@@ -49,13 +49,7 @@ export function usePrefetchThread(): (todoId: string) => void {
 export function useOpenThread(): (todoId: string) => void {
   const [, setSearchParams] = useSearchParams();
   return useCallback(
-    (todoId: string) =>
-      setSearchParams((prev) => {
-        const params = new URLSearchParams(prev);
-        params.set(THREAD_PARAM, todoId);
-        params.delete(VIEW_PARAM);
-        return params;
-      }),
+    (todoId: string) => setSearchParams((prev) => withThread(prev, todoId)),
     [setSearchParams],
   );
 }

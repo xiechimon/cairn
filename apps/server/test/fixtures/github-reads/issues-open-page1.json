@@ -72,7 +72,7 @@
       },
       {
         "id": 12449502350,
-        "name": "ready-for-human",
+        "name": "ready-for-agent",
         "color": "0E8A16",
         "default": false
       }

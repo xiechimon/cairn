@@ -56,24 +56,21 @@ function mount(page: Page, saved: string[][], failSave = false) {
 
 const DEFAULT = ['subscription:sub-d1', 'provider:p-a', 'provider:p-b'];
 
-test('dragging a provider by its handle moves it and the order survives a reload', async ({
-  page,
-}) => {
+test('dragging a provider row moves it and the order survives a reload', async ({ page }) => {
   const saved: string[][] = [];
   await mount(page, saved);
   await page.goto('/app/resources/providers');
   await expect.poll(() => names(page)).toEqual(DEFAULT);
 
-  const handle = page
-    .locator('[data-instance-id="provider:p-b"]')
-    .getByTestId('provider-drag-handle');
-  await expect(handle).toHaveAccessibleName('拖动调整顺序：anthropic-max');
   const target = await page.locator('[data-instance-id="subscription:sub-d1"]').boundingBox();
-  const from = await handle.boundingBox();
+  const from = await page.locator('[data-instance-id="provider:p-b"]').boundingBox();
   if (target === null || from === null) throw new Error('rows not laid out');
   await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
   await page.mouse.down();
-  await page.mouse.move(from.x + from.width / 2, target.y + 4, { steps: 12 });
+  await page.mouse.move(from.x + 400, target.y - 300, { steps: 12 });
+  const held = await page.locator('[data-instance-id="provider:p-b"]').boundingBox();
+  expect(held?.x ?? 0, 'the dragged row stays in its column').toBeCloseTo(from.x, 0);
+  expect(held?.y ?? 0, 'the dragged row stops at the top of the list').toBeCloseTo(target.y, 0);
   await page.mouse.up();
 
   const moved = ['provider:p-b', 'subscription:sub-d1', 'provider:p-a'];
@@ -91,7 +88,8 @@ test('the keyboard moves a provider with Space and the arrow keys', async ({ pag
 
   await page
     .locator('[data-instance-id="subscription:sub-d1"]')
-    .getByTestId('provider-drag-handle')
+    .locator('button')
+    .first()
     .focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-dragging="true"]')).toHaveCount(1);
@@ -117,7 +115,8 @@ test('a failed save puts the previous order back and says so', async ({ page }) 
 
   await page
     .locator('[data-instance-id="provider:p-a"]')
-    .getByTestId('provider-drag-handle')
+    .locator('button')
+    .first()
     .focus();
   await page.keyboard.press('Space');
   await expect(page.locator('[data-dragging="true"]')).toHaveCount(1);

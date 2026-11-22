@@ -11,24 +11,17 @@ import {
   claudeRateProbeAt,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
-import {
-  build,
-  chiefThread,
-  claudeSubscription,
-  machine,
-  type QuotaWaitRow,
-  step,
-  todo,
-} from '../db/schema.js';
+import { build, chiefThread, machine, type QuotaWaitRow, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { holdBlockedBuild } from './blockers.js';
 import { accountHeld } from './claude-account-hold.js';
-import { enabledSubscriptionId } from './claude-subscriptions.js';
+import { enabledSubscriptionId, recordClaudeQuotaNotices } from './claude-subscriptions.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { isChiefConversation, type MachineDeps, stepTeamId } from './machine-deps.js';
 import {
+  liveMachineId,
   platformFallbackMachineId,
   priorSessionOf,
   routeTargets,
@@ -87,6 +80,7 @@ function writeClaudeQuota(
       quotaBlock: next.quotaBlock,
       holdReason: null,
       holdUntil: null,
+      mcpGrant: null,
     })
     .where(
       and(
@@ -135,6 +129,7 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
         ? {
             priorSessionId: null,
             priorMachineId: null,
+            priorMachineLiveId: null,
             priorSubscriptionId: null,
             freshSession: true,
           }
@@ -150,8 +145,9 @@ export function refreshClaudeRateParks(deps: MachineDeps, teamId: string): void 
             agentRow.provider,
           );
     const sessionId =
-      !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null;
-    const namedId = routeTargets(sessionId, agentRow.machineId)[0]?.machineId ?? null;
+      !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineLiveId : null;
+    const namedId =
+      routeTargets(sessionId, liveMachineId(deps.db, agentRow.machineId))[0]?.machineId ?? null;
     const homeId =
       namedId ??
       platformFallbackMachineId(
@@ -252,7 +248,7 @@ export function recordClaudeRateLimit(
     .set({ claudeRateLimits: windows })
     .where(eq(machine.id, machineRow.id))
     .run();
-  attributeQuotaWindows(deps, machineRow, body, now);
+  attributeQuotaWindows(deps, machineRow, body);
   refreshClaudeRateParks(deps, machineRow.teamId);
 }
 
@@ -260,7 +256,6 @@ function attributeQuotaWindows(
   deps: MachineDeps,
   machineRow: { id: string; teamId: string },
   body: ClaudeRateLimitReport,
-  now: number,
 ): void {
   if (body.stepId === undefined) return;
   const stepRow = deps.db
@@ -269,30 +264,20 @@ function attributeQuotaWindows(
     .where(eq(step.id, body.stepId))
     .get();
   if (stepRow?.machineId !== machineRow.id || stepRow.claudeSubscriptionId === null) return;
-  const subscriptionId = stepRow.claudeSubscriptionId;
-  const current = deps.db
-    .select({ quotaWindows: claudeSubscription.quotaWindows })
-    .from(claudeSubscription)
-    .where(
-      and(
-        eq(claudeSubscription.id, subscriptionId),
-        eq(claudeSubscription.teamId, machineRow.teamId),
-      ),
-    )
-    .get();
-  if (current === undefined) return;
-  deps.db
-    .update(claudeSubscription)
-    .set({ quotaWindows: applyClaudeRateLimit(current.quotaWindows ?? [], body, now) })
-    .where(eq(claudeSubscription.id, subscriptionId))
-    .run();
+  recordClaudeQuotaNotices(deps, machineRow.teamId, stepRow.claudeSubscriptionId, [body]);
 }
 
 function handBackClaimed(deps: MachineDeps, stepId: string): boolean {
   return (
     deps.db
       .update(step)
-      .set({ status: 'pending', machineId: null, holdReason: null, holdUntil: null })
+      .set({
+        status: 'pending',
+        machineId: null,
+        holdReason: null,
+        holdUntil: null,
+        mcpGrant: null,
+      })
       .where(and(eq(step.id, stepId), eq(step.status, 'claimed')))
       .run().changes > 0
   );

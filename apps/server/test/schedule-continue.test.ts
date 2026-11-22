@@ -586,6 +586,58 @@ test('replayed once completion does not renotify or re-unread the thread', async
   expect(notifications.markNotificationRead(s.svc, s.team.id, s.todoId)).toEqual(readNotice);
 });
 
+test('a recurring run applies its completion once when the same completion is delivered twice', async () => {
+  const s = await world('cron');
+  const notice = vi.spyOn(notifications, 'notifyScheduleRun');
+  await s.scheduler.tick(s.due);
+  const fired = s.db.select().from(step).all().at(-1)!;
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  expect(notice).toHaveBeenCalledOnce();
+  const readNotice = notifications.markNotificationRead(s.svc, s.team.id, s.todoId);
+  finishScheduledStep(s.svc, fired);
+  expect(notice).toHaveBeenCalledOnce();
+  expect(notifications.markNotificationRead(s.svc, s.team.id, s.todoId)).toEqual(readNotice);
+  expect(s.stored()).toMatchObject({ lastRunStatus: 'completed', lastRunStepId: fired.id });
+});
+
+test('a completion replayed after a completed one-shot is retuned to cron applies no second time', async () => {
+  const s = await world('once');
+  const notice = vi.spyOn(notifications, 'notifyScheduleRun');
+  await s.scheduler.tick(s.due);
+  const fired = s.db.select().from(step).all().at(-1)!;
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, fired.id);
+  expect(notice).toHaveBeenCalledOnce();
+  const task = s.db.select().from(todo).where(eq(todo.id, s.todoId)).get()!;
+  executeThreadScheduleTool(s.svc, task, `worker:${fired.id}`, 'schedule_update', {
+    cadence: '*/20 * * * *',
+  });
+  expect(s.stored()).toMatchObject({ kind: 'cron', lastRunStatus: 'completed' });
+  const readNotice = notifications.markNotificationRead(s.svc, s.team.id, s.todoId);
+  finishScheduledStep(s.svc, fired);
+  expect(notice).toHaveBeenCalledOnce();
+  expect(notifications.markNotificationRead(s.svc, s.team.id, s.todoId)).toEqual(readNotice);
+  expect(s.stored()).toMatchObject({ lastRunStatus: 'completed', lastRunStepId: fired.id });
+});
+
+test('a late completion from a previous run leaves the current run untouched', async () => {
+  const s = await world('cron');
+  const notice = vi.spyOn(notifications, 'notifyScheduleRun');
+  await s.scheduler.tick(s.due);
+  const previous = s.db.select().from(step).all().at(-1)!;
+  setTodoPhase(s.svc, s.todoId, 'building');
+  builds.completeStep(s.svc, previous.id);
+  await s.scheduler.tick(s.due + 900_000);
+  const current = s.db.select().from(step).all().at(-1)!;
+  expect(current.id).not.toBe(previous.id);
+  expect(s.stored()).toMatchObject({ lastRunStatus: 'started', lastRunStepId: current.id });
+  const notices = notice.mock.calls.length;
+  finishScheduledStep(s.svc, previous);
+  expect(notice.mock.calls.length).toBe(notices);
+  expect(s.stored()).toMatchObject({ lastRunStatus: 'started', lastRunStepId: current.id });
+});
+
 test('once completion leaves a replacement schedule and its fresh metadata unchanged', async () => {
   const s = await world('once');
   await s.scheduler.tick(s.due);

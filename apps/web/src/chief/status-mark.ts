@@ -142,6 +142,11 @@ export function statusMarkView({
   return view('think');
 }
 
+export function chatMarkView(input: StatusMarkInput): StatusMarkView {
+  const marked = statusMarkView(input);
+  return marked.id === 'error' ? view('idle') : marked;
+}
+
 const ACTIVE: ReadonlySet<StatusMarkId> = new Set(['think', 'write', 'look', 'run', 'task']);
 
 export function isActiveMark(id: StatusMarkId): boolean {

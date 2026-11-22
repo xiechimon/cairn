@@ -9,6 +9,11 @@ concurrency:
   group: motion-reel
   cancel-in-progress: true
 
+env:
+  # Every machine this repo is built on is one lane's machine; a GitHub runner is one job's
+  # machine. The explicit flag keeps the bypass visible in the runner log instead of implicit.
+  CAIRN_HEAVY_GATE_BYPASS: '1'
+
 permissions:
   contents: read
 
