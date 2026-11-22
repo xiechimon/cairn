@@ -62,6 +62,12 @@ export function confinementCauseOf(
     : { kind: 'home-overlay-failed', mountPoint };
 }
 
+function describeProbeError(error: unknown): string {
+  if (error instanceof ConfinementExitedError && error.stderrTail.trim() !== '')
+    return error.stderrTail.trim();
+  return error instanceof Error ? error.message : String(error);
+}
+
 export class ConfinementAvailability {
   report: ConfinementReport | undefined;
   cause: ConfinementCause | undefined;
@@ -77,6 +83,7 @@ export class ConfinementAvailability {
       me(): Promise<{ capabilities?: MachineCapabilities | null }>;
       send(): Promise<void>;
       seatbeltProbe?: (directory: string) => Promise<void>;
+      log?: (message: string) => void;
       launch?: typeof launchConfined;
       reconcile?: typeof reconcileConfinement;
       mountinfo?: () => string;
@@ -156,6 +163,9 @@ export class ConfinementAvailability {
         this.cause = {
           kind: error instanceof SeatbeltProbeError ? error.kind : 'seatbelt-probe-failed',
         };
+        this.options.log?.(
+          `confinement probe failed (startup-failed): ${describeProbeError(error)}`,
+        );
       }
       await this.options.send();
       this.accepted = true;
@@ -234,6 +244,7 @@ export class ConfinementAvailability {
           mountinfo: this.options.mountinfo ?? (() => readFileSync('/proc/self/mountinfo', 'utf8')),
           home: this.options.userHome ?? (() => realpathSync(homedir())),
         });
+      this.options.log?.(`confinement probe failed (${reason}): ${describeProbeError(error)}`);
     }
     await this.options.send();
     this.accepted = true;

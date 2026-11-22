@@ -742,6 +742,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   availability = new ConfinementAvailability({
     home: paths.home,
     platform,
+    log: (message) => logger.machine(message),
     launch: opts.confinementPreflight,
     ...(opts.seatbeltProbe !== undefined ? { seatbeltProbe: opts.seatbeltProbe } : {}),
     me: () => client.me(),
