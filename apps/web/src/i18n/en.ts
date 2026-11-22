@@ -733,8 +733,16 @@ export const EN: Record<string, string> = {
   推送通知: 'Push notifications',
   '任务需要你处理时，在系统通知中心提醒':
     'Notify you in the system notification center when a task needs you',
-  '任务需要你处理时，在系统通知中心提醒；可稍后处理的邮件通知并入简报，每日设两个发送时段':
-    'Notify you in the system notification center when a task needs you. Email notifications that can wait go into a push digest with two scheduled times each day',
+  '需要你处理时提醒，不急的邮件定时汇总':
+    'Alerts you when you are needed; email that can wait arrives as a digest',
+  '正在更新推送通知…': 'Updating push notifications…',
+  '未能开启推送，请重试': 'Could not turn on push notifications. Try again',
+  '未能关闭推送，请重试': 'Could not turn off push notifications. Try again',
+  此浏览器不支持推送通知: 'This browser does not support push notifications',
+  '无法确认系统通知权限，请在系统设置中管理':
+    'Cannot verify notification permissions. Manage them in System Settings',
+  暂停应用提醒: 'Pause app alerts',
+  恢复应用提醒: 'Resume app alerts',
   '浏览器已拒绝通知权限，需到站点设置重新允许':
     'Notifications are blocked by the browser — re-allow them in site settings',
 

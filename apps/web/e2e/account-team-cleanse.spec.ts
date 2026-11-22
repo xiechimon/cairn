@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { stubNotification } from './helpers.js';
+import { stubAccountPush, stubNotification } from './helpers.js';
 
 test('account: `退出登录` / `删除` / `更换` removed (avatar stays)', async ({ page }) => {
   await page.goto('/app/account?scenario=13');
@@ -17,6 +17,7 @@ test('account switch: default permission renders off; click requests and grants'
   page,
 }) => {
   await stubNotification(page, 'default', 'granted');
+  await stubAccountPush(page);
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
   await expect(sw).toHaveAttribute('aria-checked', 'false');
@@ -27,6 +28,7 @@ test('account switch: default permission renders off; click requests and grants'
 
 test('account switch: granted permission renders checked without a click', async ({ page }) => {
   await stubNotification(page, 'granted', 'granted');
+  await stubAccountPush(page);
   await page.goto('/app/account');
   await expect(page.getByRole('switch', { name: '推送通知' })).toHaveAttribute(
     'aria-checked',
@@ -40,9 +42,7 @@ test('account switch: a denied site cannot be turned on from the account page', 
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
   await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await sw.click();
-
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(sw).toBeDisabled();
   expect(await page.evaluate(() => window.__permCalls)).toBe(0);
   await expect(page.locator('.account-notify-blocked')).toContainText('重新允许');
 });

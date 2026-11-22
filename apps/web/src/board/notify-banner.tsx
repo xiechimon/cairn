@@ -3,31 +3,37 @@ import { Bell } from 'lucide-react';
 import { useState } from 'react';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
-import { setNotifications, useNotificationsPermission } from '../pwa/push-device.js';
+import { setNotifications, useNotificationsState } from '../pwa/push-device.js';
 
 export function useNotificationBanner(
   fixtureFlag: boolean,
   live: boolean,
   teamId: string | undefined,
-): { visible: boolean; enable: () => void } {
-  const { t } = useI18n();
-  const permission = useNotificationsPermission();
+) {
+  const device = useNotificationsState();
   const [fixtureEnabled, setFixtureEnabled] = useState(false);
+  const pending = live && device.kind === 'pending';
+  const failed = live && device.kind === 'failed' && device.target && teamId !== undefined;
+  const visible = live
+    ? ((device.kind === 'off' || pending) && device.offerBanner) || failed
+    : fixtureFlag && !fixtureEnabled;
   const enable = () => {
-    if (!live) {
-      setFixtureEnabled(true);
-      return;
-    }
-    void setNotifications(teamId, true).catch((error: unknown) =>
-      toastError(t('保存失败，请重试。'), error),
-    );
+    if (live) setNotifications(teamId, true);
+    else setFixtureEnabled(true);
   };
-  return { visible: live ? permission === 'default' : fixtureFlag && !fixtureEnabled, enable };
+  return { visible, enable, pending, failed };
 }
 
-export function NotificationBanner({ onEnable }: { onEnable: () => void }) {
+export function NotificationBanner({
+  onEnable,
+  pending = false,
+  failed = false,
+}: {
+  onEnable: () => void;
+  pending?: boolean;
+  failed?: boolean;
+}) {
   const { t } = useI18n();
   return (
     <NoticeBanner
@@ -35,10 +41,16 @@ export function NotificationBanner({ onEnable }: { onEnable: () => void }) {
       tone="info"
       icon={Bell}
       title={t(NOTIFICATION_BANNER_COPY.title)}
-      body={t(NOTIFICATION_BANNER_COPY.body)}
+      body={
+        pending
+          ? t('正在更新推送通知…')
+          : failed
+            ? t('未能开启推送，请重试')
+            : t(NOTIFICATION_BANNER_COPY.body)
+      }
       actions={
-        <Button size="sm" className="px-3" onClick={onEnable}>
-          {t(NOTIFICATION_BANNER_COPY.action)}
+        <Button size="sm" className="px-3" onClick={onEnable} disabled={pending}>
+          {failed ? t('重试') : t(NOTIFICATION_BANNER_COPY.action)}
         </Button>
       }
     />

@@ -1,4 +1,5 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { stubAccountPush } from './helpers.js';
 
 const TEAM = { id: 't1', name: '团队' };
 const USER = { id: 'u1', displayName: '我', avatarUrl: null };
@@ -329,8 +330,9 @@ test.describe('push notification click loop (XMON-106)', () => {
     await hideDocument(page);
     await spySwShowNotification(page);
     await mockLiveApi(page);
-    await page.goto('/app');
-    await expect(page.locator('[data-route="board"]')).toBeVisible();
+    await stubAccountPush(page);
+    await page.goto('/app/account');
+    await expect(page.getByRole('switch', { name: '推送通知' })).toBeChecked();
 
     await fireTeamNotification(page, makeRecord({}));
     await fireTeamNotification(
@@ -370,18 +372,19 @@ test.describe('push notification click loop (XMON-106)', () => {
     expect(await page.evaluate(() => window.__pageNotifs.length)).toBe(0);
   });
 
-  test('T3a: SW registration failure → falls back to in-page Notification, onclick full-page jumps to href', async ({
-    page,
-    context,
-  }) => {
-
-    await context.route('**/sw.js', (route) => route.abort());
+  test('T3a: SW display failure falls back to an in-page Notification, whose click jumps to href', async ({ page }) => {
     await stubNotification(page);
     await stubEventSource(page);
     await hideDocument(page);
     await mockLiveApi(page);
-    await page.goto('/app');
-    await expect(page.locator('[data-route="board"]')).toBeVisible();
+    await stubAccountPush(page);
+    await page.addInitScript(() => {
+      ServiceWorkerRegistration.prototype.showNotification = async () => {
+        throw new Error('notification display unavailable');
+      };
+    });
+    await page.goto('/app/account');
+    await expect(page.getByRole('switch', { name: '推送通知' })).toBeChecked();
 
     await fireTeamNotification(page, makeRecord({ entityId: 'todo-fb', id: 'u1:todo-fb' }));
 
@@ -450,12 +453,15 @@ test.describe('push notification click loop (XMON-106)', () => {
     await hideDocument(page);
     await spySwShowNotification(page);
     await mockLiveApi(page);
-    await page.goto('/app');
-    await expect(page.locator('[data-route="board"]')).toBeVisible();
+    await stubAccountPush(page);
+    await page.goto('/app/account');
+    const sw = page.getByRole('switch', { name: '推送通知' });
+    await expect(sw).toHaveAttribute('aria-checked', 'false');
 
     await fireTeamNotification(page, makeRecord({}));
 
-    await page.evaluate(() => localStorage.setItem('cairn.notifications', '1'));
+    await sw.click();
+    await expect(sw).toBeChecked();
     await fireTeamNotification(page, makeRecord({ entityId: 'todo-y', id: 'u1:todo-y' }));
     await expect.poll(() => page.evaluate(() => window.__swNotifs.length)).toBe(1);
     expect(await page.evaluate(() => window.__swNotifs[0].options.data)).toEqual({
@@ -472,8 +478,8 @@ test.describe('push notification click loop (XMON-106)', () => {
     await spySwShowNotification(page);
     await stubDesktopNotify(page);
     await mockLiveApi(page);
-    await page.goto('/app');
-    await expect(page.locator('[data-route="board"]')).toBeVisible();
+    await page.goto('/app/account');
+    await expect(page.getByRole('button', { name: '暂停应用提醒' })).toBeVisible();
 
     await fireTeamNotification(page, makeRecord({}));
     await fireTeamNotification(
@@ -507,18 +513,20 @@ test.describe('push notification click loop (XMON-106)', () => {
     expect(await page.evaluate(() => window.__pageNotifs.length)).toBe(0);
   });
 
-  test('T6b: desktop shell honors the off switch', async ({ page }) => {
+  test('T6b: desktop shell honors the local pause action without claiming OS permission', async ({ page }) => {
     await stubNotification(page);
     await stubEventSource(page);
     await stubDesktopNotify(page);
     await mockLiveApi(page);
-    await page.goto('/app');
-    await expect(page.locator('[data-route="board"]')).toBeVisible();
+    await page.goto('/app/account');
+    const pause = page.getByRole('button', { name: '暂停应用提醒' });
+    await expect(pause).toBeVisible();
 
     await fireTeamNotification(page, makeRecord({}));
     await expect.poll(() => page.evaluate(() => window.__desktopNotifs.length)).toBe(1);
 
-    await page.evaluate(() => localStorage.setItem('cairn.notifications', '0'));
+    await pause.click();
+    await expect(page.getByRole('button', { name: '恢复应用提醒' })).toBeVisible();
     await fireTeamNotification(page, makeRecord({ entityId: 'todo-y', id: 'u1:todo-y' }));
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => window.__desktopNotifs.length)).toBe(1);

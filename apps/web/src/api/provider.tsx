@@ -77,7 +77,7 @@ export function LiveDataBridge() {
   const teamId = teams.data?.[0]?.id;
   const machines = useMachines(teamId, live);
   useTeamStream(teamId, live);
-  useNotificationsSync(teamId, live);
+  useNotificationsSync(teamId, live, teamId === undefined && teams.isFetching);
   const value = useMemo<LiveData>(
     () => ({
       live,

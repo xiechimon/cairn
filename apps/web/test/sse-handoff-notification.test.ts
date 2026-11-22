@@ -5,6 +5,8 @@ import { startTeamStream } from '../src/api/sse.js';
 import { EN } from '../src/i18n/en.js';
 import type { Locale } from '../src/i18n/locale.js';
 
+vi.mock('../src/pwa/push-device.js', () => ({ canDeliverNotifications: () => true }));
+
 const CJK = /[一-鿿]/;
 
 let receive: ((event: { data: string }) => void) | null = null;
@@ -28,8 +30,6 @@ function storedLocale(locale: Locale) {
   };
 }
 
-/** Drives the hidden-tab path end to end: an SSE notification event through
- *  startTeamStream to the Notification constructor, under `locale`. */
 async function handoffTitle(locale: Locale): Promise<string> {
   const shown = vi.fn();
   class DesktopNotification {

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   migrateLegacyNotifications,
   NOTIFICATIONS_KEY,
-  notificationsOn,
   persistNotificationsChoice,
   readNotificationsChoice,
 } from '../src/board/notify-pref.js';
@@ -34,7 +33,7 @@ describe('migrateLegacyNotifications', () => {
     });
   }
 
-  it('an untouched in-app switch keeps following the browser permission unless the device was subscribed', () => {
+  it('leaves an untouched choice unset unless the device was subscribed', () => {
     const untouched = memStorage();
     migrateLegacyNotifications(untouched, false);
     expect(untouched.dump()).toEqual({});
@@ -59,14 +58,27 @@ describe('migrateLegacyNotifications', () => {
 });
 
 describe('notifications choice', () => {
-  it('round-trips and falls back to the permission when unset', () => {
+  it('ignores malformed values in either key', () => {
+    for (const invalid of ['maybe', '', '2', 'ON', 'true']) {
+      expect(readNotificationsChoice(memStorage({ [NOTIFICATIONS_KEY]: invalid })), invalid).toBeNull();
+      expect(readNotificationsChoice(memStorage({ [LEGACY_KEY]: invalid })), invalid).toBeNull();
+    }
+  });
+
+  it('recovers a valid legacy choice when the new value is malformed', () => {
+    const storage = memStorage({ [NOTIFICATIONS_KEY]: 'true', [LEGACY_KEY]: '0' });
+    expect(readNotificationsChoice(storage)).toBe(false);
+    migrateLegacyNotifications(storage, false);
+    expect(storage.dump()).toEqual({ [NOTIFICATIONS_KEY]: '0' });
+  });
+
+  it('round-trips both choices and leaves an untouched choice unset', () => {
     const storage = memStorage();
-    expect(notificationsOn(readNotificationsChoice(storage), 'granted')).toBe(true);
-    expect(notificationsOn(readNotificationsChoice(storage), 'default')).toBe(false);
+    expect(readNotificationsChoice(storage)).toBeNull();
     persistNotificationsChoice(false, storage);
-    expect(notificationsOn(readNotificationsChoice(storage), 'granted')).toBe(false);
+    expect(readNotificationsChoice(storage)).toBe(false);
     persistNotificationsChoice(true, storage);
-    expect(notificationsOn(readNotificationsChoice(storage), 'denied')).toBe(false);
-    expect(notificationsOn(readNotificationsChoice(storage), 'granted')).toBe(true);
+    expect(readNotificationsChoice(storage)).toBe(true);
+    expect(Object.keys(storage.dump())).toEqual([NOTIFICATIONS_KEY]);
   });
 });

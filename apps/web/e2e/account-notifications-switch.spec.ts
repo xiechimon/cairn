@@ -2,10 +2,16 @@ import { expect, type Page, test } from '@playwright/test';
 import { stubNotification } from './helpers.js';
 
 const SUB_ENDPOINT = 'https://push.test/sub-1';
+const settingsStatus = (page: Page) => page.locator('.account-card').getByRole('status');
+const retrySetting = (page: Page) => page.locator('.account-card').getByRole('button', { name: '重试' });
 
 declare global {
   interface Window {
     __pushSub: unknown;
+    __pushLookup: 'reject' | 'hang' | null;
+    __lookupCalls: number;
+    __subscribeFails: boolean;
+    __unsubscribeFails: boolean;
     __shown: string[];
     __finishPermission: (() => void) | undefined;
     __teamStream: { emit: (ev: unknown) => void } | undefined;
@@ -19,17 +25,25 @@ function stubDevice(page: Page, subscribed: boolean, ready = true): Promise<void
         endpoint,
         toJSON: () => ({ endpoint, keys: { p256dh: 'BP256dhKey', auth: 'authSecret' } }),
         unsubscribe: async () => {
+          if (window.__unsubscribeFails) throw new Error('unsubscribe rejected');
           window.__pushSub = null;
           return true;
         },
       };
       window.__pushSub = subscribed ? sub : null;
+      window.__lookupCalls = 0;
       window.__shown = [];
       const registration = {
         showNotification: async (title: string) => void window.__shown.push(title),
         pushManager: {
-          getSubscription: async () => window.__pushSub ?? null,
+          getSubscription: async () => {
+            window.__lookupCalls++;
+            if (window.__pushLookup === 'reject') throw new Error('lookup rejected');
+            if (window.__pushLookup === 'hang') return new Promise(() => {});
+            return window.__pushSub ?? null;
+          },
           subscribe: async () => {
+            if (window.__subscribeFails) throw new Error('subscribe rejected');
             window.__pushSub = sub;
             return sub;
           },
@@ -140,7 +154,7 @@ test('one switch drives both the in-app notification and this device’s push su
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await expect(page.getByRole('switch')).toHaveCount(1);
   await expect(
-    page.getByText('可稍后处理的邮件通知并入简报，每日设两个发送时段', { exact: false }),
+    page.getByText('需要你处理时提醒，不急的邮件定时汇总', { exact: true }),
   ).toBeVisible();
 
   await sw.click();
@@ -181,7 +195,7 @@ test('an old in-app off with this device subscribed loads as on and keeps the su
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   await page.reload();
   await expect(sw).toHaveAttribute('aria-checked', 'true');
-  expect(calls).toEqual([]);
+  expect(calls.map(({ method }) => method)).toEqual(['POST', 'POST']);
 });
 
 test('a rejected browser permission leaves the switch off and explains why', async ({ page }) => {
@@ -196,27 +210,17 @@ test('a rejected browser permission leaves the switch off and explains why', asy
   expect(calls).toEqual([]);
 });
 
-test('legacy off still stops in-app notifications when the service worker never becomes ready', async ({ page }) => {
+test('legacy off keeps in-app notifications quiet when startup cannot confirm push is off', async ({ page }) => {
   await stubNotification(page, 'granted', 'granted');
   await stubDevice(page, false, false);
   await page.addInitScript(() => localStorage.setItem('cairn.notifyEnabled', '0'));
-  await mockApi(page);
+  const calls = await mockApi(page);
   await page.goto('/app/account');
-  await expect(page.getByRole('switch', { name: '推送通知' })).toHaveAttribute('aria-checked', 'false');
-});
-
-test('off remains off when the service worker lookup expires', async ({ page }) => {
-  await page.clock.install();
-  await stubNotification(page, 'granted', 'granted');
-  await stubDevice(page, false, false);
-  await mockApi(page);
-  await page.goto('/app/account');
-  const sw = page.getByRole('switch', { name: '推送通知' });
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
-  await sw.click();
-  await page.clock.runFor(10000);
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
-  expect(await page.evaluate(() => localStorage.getItem('cairn.notifications'))).toBe('0');
+  await expect(page.getByText('未能关闭推送，请重试')).toBeVisible();
+  await expect(page.getByRole('switch', { name: '推送通知' })).toHaveCount(0);
+  await notify(page, 'legacy-off');
+  expect(calls).toEqual([]);
+  expect(await page.evaluate(() => window.__shown)).toEqual([]);
 });
 
 test('blocked preference storage does not prevent requesting browser permission', async ({ page }) => {
@@ -259,7 +263,8 @@ test('a late permission grant cannot undo an explicit off', async ({ page }) => 
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
   await sw.click();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(sw).not.toBeChecked();
+  await expect(sw).toHaveAttribute('aria-busy', 'true');
   await expect.poll(() => page.evaluate(() => typeof window.__finishPermission)).toBe('function');
   await sw.click();
   await page.evaluate(() => window.__finishPermission?.());
@@ -270,7 +275,7 @@ test('a late permission grant cannot undo an explicit off', async ({ page }) => 
   expect(await page.evaluate(() => window.__shown)).toEqual([]);
 });
 
-test('turning off while a subscription is starting removes the resulting subscription', async ({ page }) => {
+test('turning off while a subscription is starting prevents a superseded registration', async ({ page }) => {
   await stubNotification(page, 'granted', 'granted');
   await stubDevice(page, false);
   await page.addInitScript(() => localStorage.setItem('cairn.notifications', '0'));
@@ -286,22 +291,65 @@ test('turning off while a subscription is starting removes the resulting subscri
   await keyRequested.promise;
   await sw.click();
   key.resolve();
-  await expect.poll(() => calls.map(({ method }) => method)).toEqual(['POST', 'DELETE']);
-  await expect.poll(() => page.evaluate(() => window.__pushSub)).toBeNull();
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(sw).not.toHaveAttribute('aria-busy', 'true');
+  await expect(sw).not.toBeChecked();
+  expect(calls).toEqual([]);
+  expect(await page.evaluate(() => window.__pushSub)).toBeNull();
 });
 
-test('a failed DELETE restores the on state rather than claiming push stopped', async ({ page }) => {
+test('rapid presses during a slow POST settle on the last requested position', async ({ page }) => {
   await stubNotification(page, 'granted', 'granted');
-  await stubDevice(page, true);
-  await mockApi(page, (method) => method === 'DELETE' ? 500 : 200);
+  await stubDevice(page, false);
+  await page.addInitScript(() => localStorage.setItem('cairn.notifications', '0'));
+  const posted = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  const calls = await mockApi(page, async (method) => {
+    if (method === 'POST' && calls.length === 1) {
+      posted.resolve();
+      await release.promise;
+    }
+    return 200;
+  });
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
-  await expect(page.getByText('保存失败，请重试。')).toBeVisible();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await posted.promise;
+  await expect(sw).toHaveAttribute('aria-busy', 'true');
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await sw.click({ position: { x: 16, y: 9 } });
+  await sw.click({ position: { x: 17, y: 10 }, delay: 50 });
+  release.resolve();
+  await expect(sw).toBeChecked();
+  expect(calls.every(({ method }) => method === 'POST')).toBe(true);
+  expect(await page.evaluate(() => localStorage.getItem('cairn.notifications'))).toBe('1');
+});
+
+test('an unsupported browser does not display an inert push switch', async ({ page }) => {
+  await page.addInitScript(() => Reflect.deleteProperty(window, 'PushManager'));
+  const calls = await mockApi(page);
+  await page.goto('/app/account');
+  await expect(settingsStatus(page)).toHaveText('此浏览器不支持推送通知');
+  await expect(page.getByRole('switch', { name: '推送通知' })).toHaveCount(0);
+  expect(calls).toEqual([]);
+});
+
+test('a failed DELETE hides the unverified position and retries disabling', async ({ page }) => {
+  await stubNotification(page, 'granted', 'granted');
+  await stubDevice(page, true);
+  let status = 500;
+  const calls = await mockApi(page, (method) => method === 'DELETE' ? status : 200);
+  await page.goto('/app/account');
+  const sw = page.getByRole('switch', { name: '推送通知' });
+  await expect(sw).toBeChecked();
+  await sw.click();
+  await expect(page.getByText('未能关闭推送，请重试')).toBeVisible();
+  await expect(sw).toHaveCount(0);
   expect(await page.evaluate(() => window.__pushSub)).not.toBeNull();
+  status = 200;
+  await retrySetting(page).click();
+  await expect(sw).not.toBeChecked();
+  expect(calls.map(({ method }) => method)).toEqual(['POST', 'DELETE', 'DELETE']);
 });
 
 test('revoking permission while settings are open updates the switch and drops device push', async ({ page }) => {
@@ -316,7 +364,7 @@ test('revoking permission while settings are open updates the switch and drops d
     window.dispatchEvent(new Event('focus'));
   });
   await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await expect.poll(() => calls.map(({ method }) => method)).toEqual(['DELETE']);
+  await expect.poll(() => calls.map(({ method }) => method)).toEqual(['POST', 'DELETE']);
   await expect.poll(() => page.evaluate(() => window.__pushSub)).toBeNull();
 });
 
@@ -343,8 +391,8 @@ test('a failed POST cleans up the browser subscription and restores off', async 
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
   await sw.click();
-  await expect(page.getByText('保存失败，请重试。')).toBeVisible();
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(settingsStatus(page)).toHaveText('未能开启推送，请重试');
+  await expect(sw).not.toBeChecked();
   expect(await page.evaluate(() => window.__pushSub)).toBeNull();
 });
 
@@ -355,7 +403,161 @@ test('desktop settings do not advertise a Web Push digest', async ({ page }) => 
   await mockApi(page);
   await page.goto('/app/account');
   await expect(page.getByText('任务需要你处理时，在系统通知中心提醒', { exact: true })).toBeVisible();
-  await expect(page.getByText('每日设两个发送时段', { exact: false })).toHaveCount(0);
+  await expect(page.getByText('需要你处理时提醒，不急的邮件定时汇总', { exact: true })).toHaveCount(0);
+});
+
+test('a timed-out off lookup does not claim push is off and offers to retry disabling', async ({ page }) => {
+  await page.clock.install();
+  await stubNotification(page, 'granted', 'granted');
+  await stubDevice(page, true);
+  const calls = await mockApi(page);
+  await page.goto('/app/account');
+  const sw = page.getByRole('switch', { name: '推送通知' });
+  await expect(sw).toBeChecked();
+  const lookups = await page.evaluate(() => {
+    window.__pushLookup = 'hang';
+    return window.__lookupCalls;
+  });
+  await sw.click();
+  await expect.poll(() => page.evaluate(() => window.__lookupCalls)).toBeGreaterThan(lookups);
+  await page.clock.runFor(2500);
+  await expect(page.getByText('未能关闭推送，请重试')).toBeVisible();
+  expect(calls.some(({ method }) => method === 'DELETE')).toBe(false);
+  expect(await page.evaluate(() => window.__pushSub)).not.toBeNull();
+  await page.evaluate(() => { window.__pushLookup = null; });
+  await retrySetting(page).click();
+  await expect(sw).not.toBeChecked();
+  expect(calls.at(-1)?.method).toBe('DELETE');
+});
+
+test('a rejected on lookup never checks the switch and can be retried', async ({ page }) => {
+  await stubNotification(page, 'granted', 'granted');
+  await stubDevice(page, false);
+  await page.addInitScript(() => localStorage.setItem('cairn.notifications', '0'));
+  const calls = await mockApi(page);
+  await page.goto('/app/account');
+  const sw = page.getByRole('switch', { name: '推送通知' });
+  await expect(sw).not.toBeChecked();
+  await page.evaluate(() => { window.__pushLookup = 'reject'; });
+  await sw.click();
+  await expect(settingsStatus(page)).toHaveText('未能开启推送，请重试');
+  expect(calls).toEqual([]);
+  await page.evaluate(() => { window.__pushLookup = null; });
+  await retrySetting(page).click();
+  await expect(sw).toBeChecked();
+  expect(calls.map(({ method }) => method)).toEqual(['POST']);
+});
+
+test('a subscribe rejection on startup is visible and retryable rather than on', async ({ page }) => {
+  await stubNotification(page, 'granted', 'granted');
+  await stubDevice(page, false);
+  await page.addInitScript(() => {
+    localStorage.setItem('cairn.notifications', '1');
+    window.__subscribeFails = true;
+  });
+  const calls = await mockApi(page);
+  await page.goto('/app/account');
+  await expect(settingsStatus(page)).toHaveText('未能开启推送，请重试');
+  const sw = page.getByRole('switch', { name: '推送通知' });
+  await expect(sw).not.toBeChecked();
+  expect(calls).toEqual([]);
+  await page.evaluate(() => { window.__subscribeFails = false; });
+  await retrySetting(page).click();
+  await expect(sw).toBeChecked();
+  expect(calls.map(({ method }) => method)).toEqual(['POST']);
+});
+
+test('after DELETE succeeds, a rejected unsubscribe does not restore on', async ({ page }) => {
+  await stubNotification(page, 'granted', 'granted');
+  await stubDevice(page, true);
+  await page.addInitScript(() => { window.__unsubscribeFails = true; });
+  const calls = await mockApi(page);
+  await page.goto('/app/account');
+  const sw = page.getByRole('switch', { name: '推送通知' });
+  await expect(sw).toBeChecked();
+  await sw.click();
+  await expect.poll(() => calls.at(-1)?.method).toBe('DELETE');
+  await expect(page.getByText('未能关闭推送，请重试')).toBeVisible();
+  await expect(sw).not.toBeChecked();
+  expect(await page.evaluate(() => localStorage.getItem('cairn.notifications'))).toBe('0');
+  expect(await page.evaluate(() => window.__pushSub)).not.toBeNull();
+  await sw.click();
+  await expect(sw).toBeChecked();
+  expect(calls.map(({ method }) => method)).toEqual(['POST', 'DELETE', 'POST']);
+});
+
+test('the Mac shell removes a stale Web Push subscription before using native notifications', async ({ page }) => {
+  await stubDevice(page, true);
+  await stubNotification(page, 'granted', 'granted');
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'cairnDesktop', {
+      value: { notify: { show: ({ title }: { title: string }) => window.__shown.push(title) } },
+    });
+  });
+  const calls = await mockApi(page);
+  await page.goto('/app/account');
+  await expect.poll(() => calls.map(({ method }) => method)).toEqual(['DELETE']);
+  await expect.poll(() => page.evaluate(() => window.__pushSub)).toBeNull();
+  await expect(page.getByText('无法确认系统通知权限，请在系统设置中管理')).toBeVisible();
+  await notify(page, 'native-only');
+  await expect.poll(() => page.evaluate(() => window.__shown.length)).toBe(1);
+});
+
+test('a send-only native bridge does not claim macOS permission is granted', async ({ page }) => {
+  await stubDevice(page, false);
+  await stubNotification(page, 'denied', 'denied');
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'cairnDesktop', { value: { notify: { show: () => {} } } });
+  });
+  await mockApi(page);
+  await page.goto('/app/account');
+  await expect(page.getByText('无法确认系统通知权限，请在系统设置中管理')).toBeVisible();
+  await expect(page.getByRole('switch', { name: '推送通知' })).toHaveCount(0);
+});
+
+test('the banner retries a failed POST after browser permission has been granted', async ({ page }) => {
+  await stubDevice(page, false);
+  await stubNotification(page, 'default', 'granted');
+  let status = 500;
+  const calls = await mockApi(page, () => status);
+  await page.goto('/app');
+  const banner = page.getByRole('region', { name: '浏览器通知未开启' });
+  await banner.getByRole('button', { name: '开启' }).click();
+  await expect.poll(() => calls.length).toBe(1);
+  await expect(banner.getByRole('button', { name: '重试' })).toBeVisible();
+  expect(await page.evaluate(() => Notification.permission)).toBe('granted');
+  status = 200;
+  await banner.getByRole('button', { name: '重试' }).click();
+  await expect(banner).toHaveCount(0);
+  expect(calls.map(({ method }) => method)).toEqual(['POST', 'POST']);
+});
+
+test('a waiting takeover stops offering push when the banner finishes enabling it', async ({ page }) => {
+  await stubDevice(page, false);
+  await stubNotification(page, 'default', 'granted');
+  const key = Promise.withResolvers<void>();
+  const requested = Promise.withResolvers<void>();
+  const calls = await mockApi(page, undefined, () => {
+    requested.resolve();
+    return key.promise;
+  });
+  await page.route('**/api/teams/t1/chief/threads', (route) => route.fulfill({ json: [{ id: 'chief-one', title: '登录', updatedAt: 1 }] }));
+  await page.route('**/api/conversations/chief-one/messages*', (route) => route.fulfill({ json: {
+    messages: [{ id: 'm1', role: 'assistant', content: { kind: 'toolcall', call: { id: 'c-m1', name: 'request_takeover', arguments: { reason: '请登录' }, startedAt: Date.now() } }, createdAt: Date.now() }],
+    nextCursor: null, chips: null, historyEpoch: 0, steerPending: [], activeRun: null,
+  } }));
+  await page.goto('/app');
+  const card = page.getByTestId('chief-takeover');
+  const enable = card.getByTestId('chief-takeover-push-on');
+  await expect(enable).toBeVisible();
+  const banner = page.getByRole('region', { name: '浏览器通知未开启' });
+  await banner.getByRole('button', { name: '开启' }).click();
+  await requested.promise;
+  await expect(enable).toBeVisible();
+  key.resolve();
+  await expect.poll(() => calls.map(({ method }) => method)).toEqual(['POST']);
+  await expect(enable).toHaveCount(0);
+  await expect(card).toBeVisible();
 });
 
 test('fixture mode shows the single switch without touching device push', async ({ page }) => {

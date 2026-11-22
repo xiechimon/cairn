@@ -7,13 +7,21 @@ type NotificationsStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
 let pageChoice: boolean | null = null;
 
+function parseChoice(value: string | null | undefined): boolean | null {
+  if (value === '1') return true;
+  if (value === '0') return false;
+  return null;
+}
+
 export function readNotificationsChoice(storage: Pick<Storage, 'getItem'> | null): boolean | null {
   try {
-    const value = storage?.getItem(NOTIFICATIONS_KEY) ?? storage?.getItem(LEGACY_IN_APP_KEY);
-    if (value === '1') return true;
-    if (value === '0') return false;
-  } catch {}
-  return null;
+    return (
+      parseChoice(storage?.getItem(NOTIFICATIONS_KEY)) ??
+      parseChoice(storage?.getItem(LEGACY_IN_APP_KEY))
+    );
+  } catch {
+    return null;
+  }
 }
 
 export function persistNotificationsChoice(
@@ -37,13 +45,6 @@ export function setNotificationsChoice(on: boolean): void {
   }
 }
 
-export function notificationsOn(
-  choice: boolean | null,
-  permission: NotificationPermission | 'unsupported',
-): boolean {
-  return choice !== false && permission === 'granted';
-}
-
 export function migrateLegacyNotifications(
   storage: NotificationsStorage | null,
   deviceSubscribed: boolean,
@@ -51,7 +52,7 @@ export function migrateLegacyNotifications(
   if (storage === null) return;
   try {
     const legacy = storage.getItem(LEGACY_IN_APP_KEY);
-    if (storage.getItem(NOTIFICATIONS_KEY) === null) {
+    if (parseChoice(storage.getItem(NOTIFICATIONS_KEY)) === null) {
       if (legacy === '1' || deviceSubscribed) storage.setItem(NOTIFICATIONS_KEY, '1');
       else if (legacy === '0') storage.setItem(NOTIFICATIONS_KEY, '0');
     }

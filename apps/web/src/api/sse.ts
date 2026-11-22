@@ -14,12 +14,12 @@ import {
 } from '@cairn/shared';
 import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { currentNotificationsChoice } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { desktopNotify } from '../desktop-shell.js';
 import { EN } from '../i18n/en.js';
 import { readStoredLocale } from '../i18n/locale.js';
 import { translate } from '../i18n/translate.js';
+import { canDeliverNotifications } from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
@@ -146,12 +146,7 @@ function notificationHref(record: NotificationRecord): string {
 }
 
 function webNotificationAllowed(): boolean {
-  return (
-    document.hidden &&
-    typeof Notification !== 'undefined' &&
-    Notification.permission === 'granted' &&
-    currentNotificationsChoice() !== false
-  );
+  return document.hidden && canDeliverNotifications(false);
 }
 
 async function showViaServiceWorker(
@@ -177,18 +172,17 @@ async function showViaServiceWorker(
 function fireDesktopNotification(record: NotificationRecord): void {
   if (window.location.pathname === DESKTOP_TRAY_PATH) return;
   if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
-  if (currentNotificationsChoice() === false) return;
+  const desktop = desktopNotify();
+  if (desktop === null ? !webNotificationAllowed() : !canDeliverNotifications(true)) return;
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);
   const titleSource = NOTIFICATION_TITLES[record.type];
   const title = titleSource === undefined ? record.entityRef.title : t(titleSource);
   const body = record.snippet ?? record.entityRef.title;
   const href = notificationHref(record);
-  const desktop = desktopNotify();
   if (desktop !== null) {
     desktop.show({ title, body, href, tag: record.id });
     return;
   }
-  if (!webNotificationAllowed()) return;
   void showViaServiceWorker(title, body, record.id, href).then((shown) => {
     if (shown || !webNotificationAllowed()) return;
     try {

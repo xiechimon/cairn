@@ -11,10 +11,11 @@ export function stubNotification(
   page: Page,
   initial: string,
   resolution: string,
+  persist = false,
 ): Promise<void> {
   return page.addInitScript(
-    ({ p, r }) => {
-      let perm = p;
+    ({ p, r, persist }) => {
+      let perm = (persist && sessionStorage.getItem('notification-test-permission')) || p;
       window.__permCalls = 0;
       Object.defineProperty(window, 'Notification', {
         configurable: true,
@@ -25,13 +26,40 @@ export function stubNotification(
           requestPermission() {
             window.__permCalls++;
             perm = r;
+            if (persist) sessionStorage.setItem('notification-test-permission', r);
             return Promise.resolve(r);
           },
         },
       });
     },
-    { p: initial, r: resolution },
+    { p: initial, r: resolution, persist },
   );
+}
+
+export async function stubAccountPush(page: Page, beforePost: () => void | Promise<void> = () => {}) {
+  await page.route('**/api/teams', (route) => route.fulfill({ json: [{ id: 't1', name: 'Team' }] }));
+  await page.route('**/push/key', (route) => route.fulfill({ json: { publicKey: 'BPdGVzdA' } }));
+  await page.route('**/push/subscriptions', async (route) => {
+    if (route.request().method() === 'POST') await beforePost();
+    return route.fulfill({ status: 204 });
+  });
+  await page.addInitScript(() => {
+    const endpoint = 'https://push.test/account';
+    const subscription = {
+      endpoint,
+      toJSON: () => ({ endpoint, keys: { p256dh: 'BP256dhKey', auth: 'authSecret' } }),
+      unsubscribe: async () => {
+        sessionStorage.removeItem('notification-test-subscription');
+        return true;
+      },
+    } as PushSubscription;
+    PushManager.prototype.getSubscription = async () =>
+      sessionStorage.getItem('notification-test-subscription') ? subscription : null;
+    PushManager.prototype.subscribe = async () => {
+      sessionStorage.setItem('notification-test-subscription', '1');
+      return subscription;
+    };
+  });
 }
 
 export async function settleTransitions(page: Page): Promise<void> {

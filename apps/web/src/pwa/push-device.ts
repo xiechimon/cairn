@@ -4,22 +4,46 @@ import {
   currentNotificationsChoice,
   migrateLegacyNotifications,
   NOTIFICATIONS_KEY,
-  notificationsOn,
   setNotificationsChoice,
 } from '../board/notify-pref.js';
 import { desktopNotify } from '../desktop-shell.js';
 import { safeLocalStorage } from '../safe-storage.js';
 
-type Permission = NotificationPermission | 'unsupported';
+type DeviceState =
+  | { kind: 'off'; offerBanner: boolean }
+  | {
+      kind: 'pending';
+      checked: boolean | null;
+      target: boolean;
+      offerBanner: boolean;
+      interactive: boolean;
+    }
+  | { kind: 'on' }
+  | { kind: 'failed'; checked: boolean | null; target: boolean }
+  | { kind: 'denied' }
+  | { kind: 'unsupported'; nativeEnabled: boolean | null };
 
-const NOTIFICATIONS_CHANGE = 'cairn:notifications-change';
 const DEVICE_LOOKUP_MS = 2000;
+const INITIAL_STATE: DeviceState = {
+  kind: 'pending',
+  checked: null,
+  target: false,
+  offerBanner: false,
+  interactive: false,
+};
+let state: DeviceState = INITIAL_STATE;
 let deviceQueue = Promise.resolve();
-let permissionRequest: Promise<Permission> | null = null;
+let permissionRequest: Promise<NotificationPermission> | null = null;
 let revision = 0;
+let running = false;
+const listeners = new Set<() => void>();
 
-function readPermission(): Permission {
-  if (desktopNotify() !== null) return 'granted';
+function publish(next: DeviceState): void {
+  state = next;
+  for (const listener of listeners) listener();
+}
+
+function browserPermission(): NotificationPermission | 'unsupported' {
   return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
 }
 
@@ -27,73 +51,41 @@ function browserPushAvailable(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window;
 }
 
-export function pushDeviceSupported(): boolean {
-  return browserPushAvailable() && desktopNotify() === null && typeof Notification !== 'undefined';
+function subscribeState(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
-function announceChange(): void {
-  window.dispatchEvent(new Event(NOTIFICATIONS_CHANGE));
+export function useNotificationsState(): DeviceState {
+  return useSyncExternalStore(subscribeState, () => state);
 }
 
-function watchPermission(change: () => void): () => void {
-  let status: PermissionStatus | undefined;
-  let cancelled = false;
-  window.addEventListener('focus', change);
-  document.addEventListener('visibilitychange', change);
-  void navigator.permissions
-    ?.query({ name: 'notifications' })
-    .then((result) => {
-      if (cancelled) return;
-      status = result;
-      status.addEventListener('change', change);
-    })
-    .catch(() => {});
-  return () => {
-    cancelled = true;
-    status?.removeEventListener('change', change);
-    window.removeEventListener('focus', change);
-    document.removeEventListener('visibilitychange', change);
-  };
+export function notificationsChecked(device: DeviceState): boolean | null {
+  switch (device.kind) {
+    case 'on':
+      return true;
+    case 'off':
+    case 'denied':
+      return false;
+    case 'pending':
+    case 'failed':
+      return device.checked;
+    case 'unsupported':
+      return null;
+  }
 }
 
-function subscribeNotifications(change: () => void): () => void {
-  const stop = watchPermission(change);
-  window.addEventListener(NOTIFICATIONS_CHANGE, change);
-  window.addEventListener('storage', change);
-  return () => {
-    stop();
-    window.removeEventListener(NOTIFICATIONS_CHANGE, change);
-    window.removeEventListener('storage', change);
-  };
+export function canDeliverNotifications(native: boolean): boolean {
+  if (currentNotificationsChoice() === false) return false;
+  return native
+    ? state.kind === 'unsupported' && state.nativeEnabled === true
+    : notificationsChecked(state) === true && browserPermission() === 'granted';
 }
 
-export function useNotificationsPermission(): Permission {
-  return useSyncExternalStore(subscribeNotifications, readPermission);
-}
-
-export function useNotificationsChecked(): boolean {
-  return useSyncExternalStore(subscribeNotifications, () => {
-    const choice = currentNotificationsChoice();
-    const permission = readPermission();
-    return (
-      notificationsOn(choice, permission) ||
-      (choice === true && permission === 'default' && permissionRequest !== null)
-    );
-  });
-}
-
-function requestPermission(): Promise<Permission> {
-  const permission = readPermission();
-  if (permission !== 'default') return Promise.resolve(permission);
-  permissionRequest ??= (async () => {
-    try {
-      return await Notification.requestPermission();
-    } catch {
-      return 'denied';
-    }
-  })().finally(() => {
+function requestPermission(): Promise<NotificationPermission> | undefined {
+  if (browserPermission() !== 'default') return undefined;
+  permissionRequest ??= (async () => await Notification.requestPermission())().finally(() => {
     permissionRequest = null;
-    announceChange();
   });
   return permissionRequest;
 }
@@ -104,108 +96,226 @@ export function urlBase64ToUint8Array(base64: string): Uint8Array {
   return Uint8Array.from(raw, (char) => char.charCodeAt(0));
 }
 
-async function deviceRegistration() {
-  if (!browserPushAvailable()) return null;
+async function observeDevice<T>(read: () => Promise<T>): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
-      navigator.serviceWorker.ready.then(async ({ pushManager }) => ({
-        pushManager,
-        subscription: await pushManager.getSubscription(),
-      })),
+      read(),
       new Promise<never>((_resolve, reject) => {
         timer = setTimeout(
-          () => reject(new Error('Push service worker not ready')),
+          () => reject(new Error('Push device lookup timed out')),
           DEVICE_LOOKUP_MS,
         );
       }),
     ]);
-  } catch {
-    return undefined;
   } finally {
     clearTimeout(timer);
   }
 }
 
-export async function currentDeviceSubscription(): Promise<PushSubscription | null> {
-  return (await deviceRegistration())?.subscription ?? null;
+async function removeBrowserSubscription(subscription: PushSubscription, pushManager: PushManager) {
+  if (await subscription.unsubscribe()) return;
+  const remaining = await observeDevice(() => pushManager.getSubscription());
+  if (remaining !== null) throw new Error('Browser push subscription was not removed');
 }
 
-function reconcileDevice(teamId: string, migrate: boolean): Promise<void> {
-  const sync = async () => {
-    const device = await deviceRegistration();
-    if (device === undefined) return;
+function reconcileDevice(teamId: string, request?: { on: boolean }): void {
+  const native = desktopNotify() !== null;
+  const hasPush = browserPushAvailable();
+  const permission = browserPermission();
+  if (!native && (!hasPush || permission === 'unsupported')) {
+    publish({ kind: 'unsupported', nativeEnabled: null });
+    return;
+  }
+  const attempt = ++revision;
+  const current = () => attempt === revision;
+  const target =
+    !native &&
+    (request?.on ?? (currentNotificationsChoice() !== false && permission === 'granted'));
+  const offerBanner =
+    !native && (state.kind === 'off' || state.kind === 'pending') && state.offerBanner;
+  const pending: Extract<DeviceState, { kind: 'pending' }> = {
+    kind: 'pending',
+    checked: native ? null : permission === 'denied' ? false : notificationsChecked(state),
+    target,
+    offerBanner: target && (offerBanner || (state.kind === 'failed' && state.target)),
+    interactive: request !== undefined && !native && permission !== 'denied',
+  };
+  publish(pending);
+  running = true;
+  const prompt = target && request !== undefined ? requestPermission() : undefined;
+  let checked: boolean | null = null;
+  let enabling = target;
+  const confirm = (value: boolean) => {
+    checked = value;
+    if (current() && !native && pending.checked !== value) publish({ ...pending, checked: value });
+  };
+
+  const sync = async (): Promise<DeviceState | undefined> => {
+    if (!current()) return;
+    const device = hasPush
+      ? await observeDevice(async () => {
+          const { pushManager } = await navigator.serviceWorker.ready;
+          return { pushManager, subscription: await pushManager.getSubscription() };
+        })
+      : null;
+    if (!current()) return;
     const subscription = device?.subscription ?? null;
-    if (migrate) {
-      migrateLegacyNotifications(safeLocalStorage(), subscription !== null);
-      announceChange();
+    migrateLegacyNotifications(safeLocalStorage(), !native && subscription !== null);
+    const latestPermission = browserPermission();
+    enabling = !native && currentNotificationsChoice() !== false && latestPermission === 'granted';
+    const path = `/api/teams/${teamId}/push/subscriptions`;
+    if (!enabling || device === null) {
+      if (subscription !== null && device !== null) {
+        await api.del(path, { endpoint: subscription.endpoint });
+        confirm(false);
+        await removeBrowserSubscription(subscription, device.pushManager);
+      }
+      if (native)
+        return { kind: 'unsupported', nativeEnabled: currentNotificationsChoice() !== false };
+      if (latestPermission === 'denied') return { kind: 'denied' };
+      return { kind: 'off', offerBanner: latestPermission === 'default' };
     }
-    if (device === null) return;
-    const on = notificationsOn(currentNotificationsChoice(), readPermission());
-    if (!on && subscription !== null) {
-      await api.del(`/api/teams/${teamId}/push/subscriptions`, { endpoint: subscription.endpoint });
-      await subscription.unsubscribe();
-    } else if (on && subscription === null && pushDeviceSupported()) {
+    let next = subscription;
+    if (next === null) {
+      confirm(false);
       const { publicKey } = await api.get<{ publicKey: string }>(`/api/teams/${teamId}/push/key`);
-      const created = await device.pushManager.subscribe({
+      if (!current()) return;
+      next = await device.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(publicKey) as BufferSource,
       });
-      try {
-        const json = created.toJSON();
-        await api.post(`/api/teams/${teamId}/push/subscriptions`, {
-          endpoint: created.endpoint,
-          keys: { p256dh: json.keys?.p256dh ?? '', auth: json.keys?.auth ?? '' },
-          ...(json.expirationTime != null ? { expirationTime: json.expirationTime } : {}),
-        });
-      } catch (error) {
-        await created.unsubscribe().catch(() => {});
-        throw error;
-      }
     }
-  };
-  const operation = deviceQueue.then(() =>
-    navigator.locks === undefined ? sync() : navigator.locks.request(NOTIFICATIONS_KEY, sync),
-  );
-  deviceQueue = operation.catch(() => {});
-  return operation;
-}
-
-export async function setNotifications(teamId: string | undefined, on: boolean): Promise<boolean> {
-  const requestRevision = ++revision;
-  setNotificationsChoice(on);
-  const permission = on ? requestPermission() : null;
-  announceChange();
-  if (permission !== null && (await permission) !== 'granted') return false;
-  if (requestRevision !== revision || currentNotificationsChoice() !== on) return false;
-  try {
-    if (teamId !== undefined) await reconcileDevice(teamId, false);
-    return on && currentNotificationsChoice() === true;
-  } catch (error) {
-    if (requestRevision === revision && currentNotificationsChoice() === on) {
-      setNotificationsChoice(!on);
-      announceChange();
+    if (!current()) return;
+    const json = next.toJSON();
+    checked = null;
+    try {
+      await api.post(path, {
+        endpoint: next.endpoint,
+        keys: { p256dh: json.keys?.p256dh ?? '', auth: json.keys?.auth ?? '' },
+        ...(json.expirationTime != null ? { expirationTime: json.expirationTime } : {}),
+      });
+    } catch (error) {
+      if (subscription === null) {
+        await removeBrowserSubscription(next, device.pushManager).then(
+          () => confirm(false),
+          () => {},
+        );
+      }
       throw error;
     }
-    return false;
-  }
+    return { kind: 'on' };
+  };
+  void (async () => {
+    try {
+      if (prompt !== undefined) await prompt;
+      if (!current()) return;
+      const operation = deviceQueue.then(() =>
+        navigator.locks === undefined ? sync() : navigator.locks.request(NOTIFICATIONS_KEY, sync),
+      );
+      deviceQueue = operation.then(
+        () => {},
+        () => {},
+      );
+      const result = await operation;
+      if (!current() || result === undefined) return;
+      if (
+        result.kind === 'on' &&
+        (browserPermission() !== 'granted' || currentNotificationsChoice() === false)
+      ) {
+        reconcileDevice(teamId);
+      } else {
+        publish(result);
+      }
+    } catch {
+      if (current())
+        publish({ kind: 'failed', checked: native ? null : checked, target: enabling });
+    } finally {
+      if (current()) running = false;
+    }
+  })();
 }
 
-export function useNotificationsSync(teamId: string | undefined, live: boolean): void {
+export function setNotifications(teamId: string | undefined, on: boolean): void {
+  if (teamId === undefined) return;
+  setNotificationsChoice(on);
+  reconcileDevice(teamId, { on });
+}
+
+export function retryNotifications(teamId: string | undefined): void {
+  if (state.kind !== 'failed' || teamId === undefined) return;
+  reconcileDevice(teamId, { on: state.target });
+}
+
+export function useNotificationsSync(
+  teamId: string | undefined,
+  live: boolean,
+  loadingTeams: boolean,
+): void {
   useEffect(() => {
-    if (!live || teamId === undefined) return;
-    const sync = () => void reconcileDevice(teamId, true).catch(() => {});
-    const onStorage = (event: StorageEvent) => {
+    if (!live) return;
+    if (teamId === undefined) {
+      const native = desktopNotify() !== null;
+      const permission = browserPermission();
+      if (!native && (!browserPushAvailable() || permission === 'unsupported')) {
+        publish({ kind: 'unsupported', nativeEnabled: null });
+      } else if (!native && permission === 'denied') {
+        publish({ kind: 'denied' });
+      } else if (loadingTeams) {
+        publish(INITIAL_STATE);
+      } else {
+        publish({
+          kind: 'failed',
+          checked: null,
+          target: !native && currentNotificationsChoice() !== false,
+        });
+      }
+      return;
+    }
+    let lastPermission = browserPermission();
+    let watched: PermissionStatus | undefined;
+    let disposed = false;
+    const sync = () => reconcileDevice(teamId);
+    const refresh = () => {
+      if (!running) sync();
+    };
+    const permissionChanged = () => {
+      const permission = browserPermission();
+      if (permission === lastPermission) return;
+      lastPermission = permission;
+      if (!(running && permission === 'granted' && state.kind === 'pending' && state.target))
+        sync();
+    };
+    const storageChanged = (event: StorageEvent) => {
       if (event.key === NOTIFICATIONS_KEY || event.key === null) sync();
     };
-    const stop = watchPermission(sync);
-    navigator.serviceWorker?.addEventListener('controllerchange', sync);
-    window.addEventListener('storage', onStorage);
+    if (desktopNotify() === null) {
+      void navigator.permissions
+        ?.query({ name: 'notifications' })
+        .then((result) => {
+          if (disposed) return;
+          watched = result;
+          watched.addEventListener('change', permissionChanged);
+        })
+        .catch(() => {});
+      window.addEventListener('focus', permissionChanged);
+      document.addEventListener('visibilitychange', permissionChanged);
+    }
+    navigator.serviceWorker?.addEventListener('controllerchange', refresh);
+    window.addEventListener('online', refresh);
+    window.addEventListener('storage', storageChanged);
     sync();
     return () => {
-      stop();
-      navigator.serviceWorker?.removeEventListener('controllerchange', sync);
-      window.removeEventListener('storage', onStorage);
+      disposed = true;
+      revision++;
+      running = false;
+      watched?.removeEventListener('change', permissionChanged);
+      window.removeEventListener('focus', permissionChanged);
+      document.removeEventListener('visibilitychange', permissionChanged);
+      navigator.serviceWorker?.removeEventListener('controllerchange', refresh);
+      window.removeEventListener('online', refresh);
+      window.removeEventListener('storage', storageChanged);
+      publish(INITIAL_STATE);
     };
-  }, [teamId, live]);
+  }, [teamId, live, loadingTeams]);
 }

@@ -9,16 +9,10 @@ import { ComputerScreenDialog } from '../board/computer-screen-dialog.js';
 import { useScreenHoverControl } from '../board/screen-hover-control.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { toastError } from '../components/ui/toaster.js';
 import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import {
-  currentDeviceSubscription,
-  pushDeviceSupported,
-  setNotifications,
-  useNotificationsChecked,
-} from '../pwa/push-device.js';
+import { setNotifications, useNotificationsState } from '../pwa/push-device.js';
 
 type TakeoverItem = Extract<ChiefStreamItem, { kind: 'takeover' }>;
 
@@ -38,31 +32,6 @@ function useNow(active: boolean): number {
     return () => window.clearInterval(tick);
   }, [active]);
   return now;
-}
-
-function useDevicePushOff(teamId: string | undefined, active: boolean) {
-  const { t } = useI18n();
-  const checked = useNotificationsChecked();
-  const [off, setOff] = useState(false);
-  useEffect(() => {
-    if (!active || !pushDeviceSupported()) return;
-    let cancelled = false;
-    void currentDeviceSubscription()
-      .then((subscription) => {
-        if (!cancelled) setOff(subscription === null);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [active, checked]);
-  const turnOn = () => {
-    if (teamId === undefined) return;
-    void setNotifications(teamId, true)
-      .then((enabled) => setOff(!enabled))
-      .catch((error: unknown) => toastError(t('保存失败，请重试。'), error));
-  };
-  return { off: pushDeviceSupported() && (!checked || off), turnOn };
 }
 
 function PhoneTakeoverButtons({ item, waiting }: { item: TakeoverItem; waiting: boolean }) {
@@ -106,7 +75,9 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
   const hover = useScreenHoverControl(control, computer?.handoffReason != null);
   const [open, setOpen] = useState(false);
   const now = useNow(waiting);
-  const push = useDevicePushOff(teamId, waiting);
+  const device = useNotificationsState();
+  const pushPending = device.kind === 'pending' && device.interactive && device.target;
+  const pushFailed = device.kind === 'failed' && device.target;
   const left = minutesLeft(item.startedAt, now);
   const online = computer?.machine.online === true && computer.state !== 'failed';
   const held = waiting && control.controlHeld;
@@ -161,21 +132,29 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
             {timeLeft}
           </p>
         )}
-        {waiting && push.off && (
-          <p className="m-0 text-meta text-content-tertiary">
-            {t('这台设备未开启推送，可能无法收到下次提醒。')}{' '}
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto p-0 text-meta"
-              data-testid="chief-takeover-push-on"
-              onClick={push.turnOn}
-            >
-              {t('开启推送')}
-            </Button>
-          </p>
-        )}
+        {waiting &&
+          live &&
+          teamId !== undefined &&
+          (device.kind === 'off' || pushPending || pushFailed) && (
+            <p className="m-0 text-meta text-content-tertiary">
+              {pushPending
+                ? t('正在更新推送通知…')
+                : pushFailed
+                  ? t('未能开启推送，请重试')
+                  : t('这台设备未开启推送，可能无法收到下次提醒。')}{' '}
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-meta"
+                data-testid="chief-takeover-push-on"
+                disabled={pushPending}
+                onClick={() => setNotifications(teamId, true)}
+              >
+                {pushFailed ? t('重试') : t('开启推送')}
+              </Button>
+            </p>
+          )}
         {waiting && onPhone && <PhoneTakeoverButtons item={item} waiting={waiting} />}
         {waiting && !onPhone && (
           <div className="mt-2 flex flex-wrap items-center gap-3">

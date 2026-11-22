@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { stubNotification } from './helpers.js';
+import { stubAccountPush, stubNotification } from './helpers.js';
 
 declare global {
   interface Window {
@@ -105,6 +105,7 @@ test('rename live: submit sends PATCH /api/user/me, the new name survives reload
 
 test('switch: granted state can be turned off, the off state persists across reload, and it can be turned back on (S1/S2)', async ({ page }) => {
   await stubNotification(page, 'granted', 'granted');
+  await stubAccountPush(page);
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
   await expect(sw).toHaveAttribute('aria-checked', 'true');
@@ -132,8 +133,7 @@ test('switch: browser denial is explained immediately and remains off after relo
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await expect(hint).toContainText('重新允许');
 
-  await sw.click();
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(sw).toBeDisabled();
   expect(await page.evaluate(() => window.__permCalls)).toBe(0);
 
   await page.reload();
@@ -141,17 +141,32 @@ test('switch: browser denial is explained immediately and remains off after relo
   await expect(hint).toBeVisible();
 });
 
-test('switch: default state requests browser permission and reflects the granted result (S5)', async ({
-  page,
-}) => {
-  await stubNotification(page, 'default', 'granted');
+test('switch: default permission grants, then on survives reload only after registration is confirmed (S5)', async ({ page }) => {
+  await stubNotification(page, 'default', 'granted', true);
+  const reloadPost = Promise.withResolvers<void>();
+  const release = Promise.withResolvers<void>();
+  let reloading = false;
+  await stubAccountPush(page, () => {
+    if (!reloading) return;
+    reloadPost.resolve();
+    return release.promise;
+  });
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(sw).not.toBeChecked();
   await sw.click();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(sw).toBeChecked();
   expect(await page.evaluate(() => window.__permCalls)).toBe(1);
   expect(await page.evaluate(() => localStorage.getItem('cairn.notifications'))).toBe('1');
+
+  reloading = true;
+  await page.reload();
+  await expect(page.getByText('正在更新推送通知…')).toBeVisible();
+  await reloadPost.promise;
+  await expect(sw).toHaveCount(0);
+  release.resolve();
+  await expect(sw).toBeChecked();
+  expect(await page.evaluate(() => window.__permCalls)).toBe(0);
 });
 
 test('switch fixture face: denied stays off with an explanation; 13 baselines stay on (S6)', async ({
@@ -162,8 +177,7 @@ test('switch fixture face: denied stays off with an explanation; 13 baselines st
   await page.goto('/app/account?scenario=13-notify-denied');
   const sw = page.getByRole('switch', { name: '推送通知' });
   await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await sw.click();
-  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(sw).toBeDisabled();
   await expect(page.locator('.account-notify-blocked')).toContainText('重新允许');
   expect(await page.evaluate(() => window.__permCalls)).toBe(0);
 
