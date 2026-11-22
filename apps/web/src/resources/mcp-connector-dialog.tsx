@@ -62,9 +62,9 @@ export function connectorProblem(t: Translate, record: McpConnectorRecord): stri
     case 'forbidden':
       return record.authKind === 'github-app'
         ? t('GitHub 拒绝了访问。组织可能要求先做 SSO 授权，或等管理员批准 Cairn 应用。')
-        : t('令牌有效，但权限不够。给令牌加上需要的权限后重新检查。');
+        : t('令牌有效，但权限不够。给令牌加上需要的权限后重新连接。');
     case 'timeout':
-      return t('{name} 10 秒内没有响应。稍后重新检查。', { name });
+      return t('{name} 10 秒内没有响应。稍后重新连接。', { name });
     case 'unreachable':
       return t('连不上这个地址。检查地址是否正确、服务器是否在线。');
     case 'reconnect':
@@ -73,9 +73,9 @@ export function connectorProblem(t: Translate, record: McpConnectorRecord): stri
     case 'refresh_rejected':
       return t('{name} 收回了这次授权，重新连接一次。', { name });
     case 'refresh_failed':
-      return t('刷新 {name} 的授权时出错，稍后重新检查。', { name });
+      return t('刷新 {name} 的授权时出错，稍后重新连接。', { name });
     default:
-      return t('{name} 返回了错误。稍后重新检查。', { name });
+      return t('{name} 返回了错误。稍后重新连接。', { name });
   }
 }
 
@@ -570,8 +570,8 @@ function ManageConnectorDialog({
   const entry = connector.catalogId !== null ? mcpCatalogEntry(connector.catalogId) : undefined;
   const [token, setToken] = useState('');
   const [current, setCurrent] = useState(connector);
+  const [url, setUrl] = useState(connector.url ?? '');
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [savedProblem, setSavedProblem] = useState(false);
   const [report, setReport] = useState<RecheckReport | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const primaryRef = useRef<HTMLButtonElement>(null);
@@ -579,38 +579,47 @@ function ManageConnectorDialog({
   const oauth = current.authKind === 'oauth' || github;
   const local = current.transport === 'stdio';
   const needsAuth = oauth && current.status === 'needs_auth';
+  const signInAgain = needsAuth || (oauth && SIGN_IN_REASONS.has(current.statusReason ?? ''));
+  const healthy = current.status === 'connected' && connectorProblem(t, current) === null;
+  const urlEditable = !local && !oauth && current.catalogId === null;
+  const edit = {
+    ...(token !== '' ? { token } : {}),
+    ...(urlEditable && url.trim() !== (current.url ?? '') ? { url: url.trim() } : {}),
+  };
+  const dirty = Object.keys(edit).length > 0;
   const pending =
     mutations.patchMcpConnector.isPending ||
     mutations.checkMcpConnector.isPending ||
     mutations.deleteMcpConnector.isPending;
-  const recheckOrSave = (event: MouseEvent<HTMLButtonElement>) => {
+  const settle = (anchor: Element, failure: (error: unknown) => string | null) => ({
+    onSuccess: (record: McpConnectorRecord) => {
+      setCurrent(record);
+      setToken('');
+      setUrl(record.url ?? '');
+      setReport({ phase: 'done', record, anchor, open: true });
+    },
+    onError: (error: unknown) =>
+      setReport({ phase: 'unfinished', message: failure(error), anchor, open: true }),
+  });
+  const save = (event: MouseEvent<HTMLButtonElement>) => {
     if (!live) return onClose();
-    setSaveError(null);
-    if (token !== '') {
-      setReport(null);
-      mutations.patchMcpConnector.mutate(
-        { id: current.id, body: { token } },
-        {
-          onSuccess: (record) => {
-            setCurrent(record);
-            setToken('');
-            setSavedProblem(true);
-          },
-          onError: (error) => setSaveError(submitError(t, error)),
-        },
-      );
-      return;
-    }
     const anchor = event.currentTarget;
-    setSavedProblem(false);
+    setSaveError(null);
     setReport({ phase: 'checking', anchor, open: true });
-    mutations.checkMcpConnector.mutate(current.id, {
-      onSuccess: (record) => {
-        setCurrent(record);
-        setReport({ phase: 'done', record, anchor, open: true });
-      },
-      onError: () => setReport({ phase: 'unfinished', anchor, open: true }),
-    });
+    mutations.patchMcpConnector.mutate(
+      { id: current.id, body: edit },
+      settle(anchor, (error) => submitError(t, error)),
+    );
+  };
+  const reconnectNow = (event: MouseEvent<HTMLButtonElement>) => {
+    if (!live) return onClose();
+    const anchor = event.currentTarget;
+    setSaveError(null);
+    setReport({ phase: 'checking', anchor, open: true });
+    mutations.checkMcpConnector.mutate(
+      current.id,
+      settle(anchor, () => null),
+    );
   };
   const closeReport = () => setReport((prev) => (prev === null ? null : { ...prev, open: false }));
   const showProblem = () =>
@@ -623,16 +632,22 @@ function ManageConnectorDialog({
       onError: (error) => setSaveError(submitError(t, error)),
     });
   };
-  const recheck = {
-    label: token !== '' ? t('保存并检查') : t('重新检查'),
-    onClick: recheckOrSave,
-    disabled: pending,
-  };
-  const reconnect = {
+  const signIn = {
     label: t('重新连接'),
     onClick: () => onSignIn({ kind: 'reconnect', connector: current }),
     disabled: pending,
   };
+  const done = { label: t('完成'), onClick: onClose };
+  const primary: FootAction = local
+    ? { label: t('关闭'), onClick: onClose }
+    : dirty
+      ? { label: t('保存'), onClick: save, disabled: pending }
+      : signInAgain
+        ? signIn
+        : !healthy
+          ? { label: t('重新连接'), onClick: reconnectNow, disabled: pending }
+          : done;
+  const nothingToSave = local || (!dirty && healthy);
   if (confirmDelete)
     return (
       <DeleteConfirm
@@ -676,16 +691,15 @@ function ManageConnectorDialog({
       footer={
         <DialogFoot
           primaryRef={primaryRef}
-          primary={local ? { label: t('关闭'), onClick: onClose } : needsAuth ? reconnect : recheck}
+          primary={primary}
           onCancel={onClose}
-          hideCancel={local}
+          hideCancel={nothingToSave}
           danger={{ label: t('删除'), onClick: () => setConfirmDelete(true), disabled: pending }}
-          {...(local ? {} : oauth ? { secondary: needsAuth ? recheck : reconnect } : {})}
+          {...(oauth && healthy && !dirty ? { secondary: signIn } : {})}
         />
       }
     >
       <FormStack className={DIALOG_FORM_CLS}>
-        {savedProblem && !needsAuth && <DialogError message={connectorProblem(t, current)} />}
         {local && entry !== undefined ? (
           <>
             <SetupSteps entry={entry} />
@@ -693,6 +707,15 @@ function ManageConnectorDialog({
               {t('这个连接在你的电脑上启动，不用填地址，也不用令牌。')}
             </p>
           </>
+        ) : urlEditable ? (
+          <FormField label={t('地址')} htmlFor="mcp-manage-url">
+            <Input
+              id="mcp-manage-url"
+              className={FIELD_CLS}
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+            />
+          </FormField>
         ) : (
           <Field>
             <span className="text-ui font-medium text-foreground">{t('地址')}</span>
@@ -739,10 +762,12 @@ function ManageConnectorDialog({
   );
 }
 
+const SIGN_IN_REASONS = new Set(['reconnect', 'expired', 'refresh_rejected']);
+
 type RecheckReport = { anchor: Element | null; open: boolean } & (
   | { phase: 'checking' }
   | { phase: 'done'; record: McpConnectorRecord }
-  | { phase: 'unfinished' }
+  | { phase: 'unfinished'; message: string | null }
 );
 
 function RecheckResult({
@@ -763,7 +788,9 @@ function RecheckResult({
       ? t('正在检查 {name} 能不能连上…', { name })
       : ok
         ? t('{name} 回应了，能用。', { name })
-        : (problem ?? t('没能完成检查，稍后重试。'));
+        : (problem ??
+          (report.phase === 'unfinished' ? report.message : null) ??
+          t('没能完成检查，稍后重试。'));
   const detail =
     record === null || (!ok && problem === null)
       ? null

@@ -2329,17 +2329,17 @@ export const EN: Record<string, string> = {
   '等 {n} 个任务': 'Waits for {n#1 task|# tasks}',
   '{name} 拒绝了这个令牌。检查令牌是否填对、有没有过期，然后换一个新的。':
     '{name} rejected this token. Check that it is correct and not expired, then use a new one.',
-  '令牌有效，但权限不够。给令牌加上需要的权限后重新检查。':
-    'The token works but lacks permissions. Grant the permissions it needs, then check again.',
-  '{name} 10 秒内没有响应。稍后重新检查。':
-    '{name} did not answer within 10 seconds. Check again later.',
+  '令牌有效，但权限不够。给令牌加上需要的权限后重新连接。':
+    'The token works but lacks permissions. Grant the permissions it needs, then reconnect.',
+  '{name} 10 秒内没有响应。稍后重新连接。':
+    '{name} did not answer within 10 seconds. Reconnect later.',
   '连不上这个地址。检查地址是否正确、服务器是否在线。':
     "Can't reach this address. Check the URL and that the server is online.",
   '{name} 的授权已失效，重新连接一次。': 'The sign-in for {name} is no longer valid. Reconnect it.',
   '{name} 收回了这次授权，重新连接一次。': '{name} revoked this sign-in. Reconnect it.',
-  '刷新 {name} 的授权时出错，稍后重新检查。':
-    'Refreshing the sign-in for {name} failed. Check again later.',
-  '{name} 返回了错误。稍后重新检查。': '{name} returned an error. Check again later.',
+  '刷新 {name} 的授权时出错，稍后重新连接。':
+    'Refreshing the sign-in for {name} failed. Reconnect later.',
+  '{name} 返回了错误。稍后重新连接。': '{name} returned an error. Reconnect later.',
   '这个标识已经被占用了，换一个标识再试。': 'This ID is already taken. Choose another one.',
   '没能保存，稍后重试。': "Couldn't save. Try again later.",
   '正在检查 {name} 能不能连上…': 'Checking the connection to {name}…',
@@ -2362,7 +2362,6 @@ export const EN: Record<string, string> = {
   请求头的值: 'Header value',
   删除这个请求头: 'Remove this header',
   添加请求头: 'Add header',
-  保存并检查: 'Save and check',
   重新检查: 'Check again',
   重新连接: 'Reconnect',
   '用浏览器登录连接。删除只移除本机保存的令牌，{name} 那边的授权要在它的设置里撤销。':
