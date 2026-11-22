@@ -2,13 +2,30 @@ import { hostname } from 'node:os';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { describe, expect, test } from 'vitest';
-import { machine as machineTable } from '../src/db/schema.js';
+import { machine as machineTable, pairedDevice } from '../src/db/schema.js';
 import { createApiKey } from '../src/services/api-keys.js';
+import { issueBrowserSession } from '../src/services/browser-session.js';
 import { seedLocalMachine } from '../src/services/machines.js';
 import { bootServer, issueApiKey, type TestServer } from './helpers.js';
 
 const HOST = hostname();
 const OWNER_TOKEN = 'cairn-owner-enroll-2054';
+const HOST_KEY = 'a'.repeat(64);
+
+function machineRow(s: TestServer, id: string) {
+  return s.db.select().from(machineTable).where(eq(machineTable.id, id)).get();
+}
+
+function enrollKey(s: TestServer, name: string) {
+  return createApiKey(s, {
+    teamId: s.team.id,
+    name,
+    gitAccess: false,
+    mcpAccess: false,
+    machineAccess: true,
+    toolGrants: { read: [], write: [] },
+  });
+}
 
 function call(
   app: Hono,
@@ -286,6 +303,220 @@ describe('machine enrollment authority (#2054)', () => {
           .all()
           .filter((row) => row.kind === 'local'),
       ).toHaveLength(0);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('another machineAccess key cannot adopt a remote machine by its hostKey', async () => {
+    const s = bootServer();
+    try {
+      const victimKey = enrollKey(s, 'victim-enroll');
+      const enrolled = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: victimKey.plaintext,
+        body: { teamId: s.team.id, name: 'victim-runner', hostKey: HOST_KEY },
+      });
+      expect(enrolled.status).toBe(200);
+      const victim = (await enrolled.json()) as { machineId: string; token: string };
+      const before = machineRow(s, victim.machineId);
+
+      const attackerKey = enrollKey(s, 'other-enroll');
+      const takeover = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: attackerKey.plaintext,
+        body: { teamId: s.team.id, name: 'lookalike', hostKey: HOST_KEY },
+      });
+      expect(takeover.status).toBe(403);
+      const after = machineRow(s, victim.machineId);
+      expect(after?.tokenHash).toBe(before?.tokenHash);
+      expect(after?.apiKeyId).toBe(victimKey.id);
+      expect((await call(s.app, 'GET', '/api/machine/me', { cred: victim.token })).status).toBe(
+        200,
+      );
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('an api key cannot adopt a browser-enrolled machine by its hostKey', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      const start = await call(s.app, 'POST', '/api/machine/enroll/start', {
+        body: { teamId: s.team.id, name: 'desk-box', hostKey: HOST_KEY },
+        peer: '127.0.0.1',
+      });
+      expect(start.status).toBe(200);
+      const { enrollId } = (await start.json()) as { enrollId: string };
+      const confirmed = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+        cred: OWNER_TOKEN,
+        body: { enrollId },
+      });
+      expect(confirmed.status).toBe(200);
+      const { machine: enrolled } = (await confirmed.json()) as {
+        machine: { machineId: string; token: string };
+      };
+      const before = machineRow(s, enrolled.machineId);
+      expect(before?.apiKeyId).toBeNull();
+
+      const key = enrollKey(s, 'key-claim');
+      const takeover = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'key-claim', hostKey: HOST_KEY },
+      });
+      expect(takeover.status).toBe(403);
+      expect(machineRow(s, enrolled.machineId)?.tokenHash).toBe(before?.tokenHash);
+      expect((await call(s.app, 'GET', '/api/machine/me', { cred: enrolled.token })).status).toBe(
+        200,
+      );
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('same key re-enroll keeps the machine identity through its hostKey', async () => {
+    const s = bootServer();
+    try {
+      const key = enrollKey(s, 'repeat-enroll');
+      const first = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'lan-box', hostKey: HOST_KEY },
+      });
+      expect(first.status).toBe(200);
+      const firstBody = (await first.json()) as { token: string; machineId: string };
+      const second = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'lan-box-renamed', hostKey: HOST_KEY },
+      });
+      expect(second.status).toBe(200);
+      const secondBody = (await second.json()) as { token: string; machineId: string };
+      expect(secondBody.machineId).toBe(firstBody.machineId);
+      expect(secondBody.token).not.toBe(firstBody.token);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a revoked machine cannot re-register through the api-key path', async () => {
+    const s = bootServer();
+    try {
+      const key = enrollKey(s, 'revoked-enroll');
+      const enrolled = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'victim-runner', hostKey: HOST_KEY },
+      });
+      expect(enrolled.status).toBe(200);
+      const victim = (await enrolled.json()) as { machineId: string; token: string };
+      s.db
+        .update(machineTable)
+        .set({ tokenHash: null, retiredAt: Date.now() })
+        .where(eq(machineTable.id, victim.machineId))
+        .run();
+
+      const again = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'victim-runner', hostKey: HOST_KEY },
+      });
+      expect(again.status).toBe(403);
+      const after = machineRow(s, victim.machineId);
+      expect(after?.tokenHash).toBeNull();
+      expect(after?.retiredAt).not.toBeNull();
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a revoked machine cannot re-register by api key alone', async () => {
+    const s = bootServer();
+    try {
+      const key = enrollKey(s, 'revoked-key-enroll');
+      const enrolled = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'key-runner' },
+      });
+      expect(enrolled.status).toBe(200);
+      const victim = (await enrolled.json()) as { machineId: string };
+      s.db
+        .update(machineTable)
+        .set({ tokenHash: null, retiredAt: Date.now() })
+        .where(eq(machineTable.id, victim.machineId))
+        .run();
+
+      const again = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'key-runner' },
+      });
+      expect(again.status).toBe(403);
+      const after = machineRow(s, victim.machineId);
+      expect(after?.tokenHash).toBeNull();
+      expect(after?.retiredAt).not.toBeNull();
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a paired-device confirm cannot resurrect a revoked machine, an owner confirm can', async () => {
+    const s = bootServer({ authToken: OWNER_TOKEN });
+    try {
+      s.db
+        .insert(pairedDevice)
+        .values({
+          id: 'paired-enroll',
+          teamId: s.team.id,
+          name: 'phone',
+          tokenHash: 'synthetic',
+          masked: 'test',
+          createdAt: 1,
+        })
+        .run();
+      const key = enrollKey(s, 'enroll-then-revoke');
+      const enrolled = await call(s.app, 'POST', '/api/machine/enroll', {
+        cred: key.plaintext,
+        body: { teamId: s.team.id, name: 'revoked-runner', hostKey: HOST_KEY },
+      });
+      expect(enrolled.status).toBe(200);
+      const victim = (await enrolled.json()) as { machineId: string };
+      s.db
+        .update(machineTable)
+        .set({ tokenHash: null, retiredAt: Date.now() })
+        .where(eq(machineTable.id, victim.machineId))
+        .run();
+
+      const deviceSession = issueBrowserSession(s.db, 'device', 'paired-enroll');
+      const deviceConfirm = (enrollId: string) =>
+        s.app.request('/api/machine/enroll/confirm', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie: `cairn_auth=${deviceSession.token}`,
+            'sec-fetch-site': 'same-origin',
+          },
+          body: JSON.stringify({ enrollId }),
+        });
+      const start = () =>
+        call(s.app, 'POST', '/api/machine/enroll/start', {
+          body: { teamId: s.team.id, name: 'revoked-runner', hostKey: HOST_KEY },
+          peer: '127.0.0.1',
+        });
+
+      const firstStart = await start();
+      expect(firstStart.status).toBe(200);
+      const { enrollId: deviceEnrollId } = (await firstStart.json()) as { enrollId: string };
+      const denied = await deviceConfirm(deviceEnrollId);
+      expect(denied.status).toBe(403);
+      const afterDeny = machineRow(s, victim.machineId);
+      expect(afterDeny?.tokenHash).toBeNull();
+      expect(afterDeny?.retiredAt).not.toBeNull();
+
+      const secondStart = await start();
+      expect(secondStart.status).toBe(200);
+      const { enrollId: ownerEnrollId } = (await secondStart.json()) as { enrollId: string };
+      const allowed = await call(s.app, 'POST', '/api/machine/enroll/confirm', {
+        cred: OWNER_TOKEN,
+        body: { enrollId: ownerEnrollId },
+      });
+      expect(allowed.status).toBe(200);
+      const afterOwner = machineRow(s, victim.machineId);
+      expect(afterOwner?.tokenHash).not.toBeNull();
+      expect(afterOwner?.retiredAt).toBeNull();
     } finally {
       s.dispose();
     }
