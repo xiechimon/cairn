@@ -14,7 +14,7 @@ export function injectBeforeBodyEnd(html: string, payload: string): string {
 
 export function designSrcdoc(html: string): string {
   return injectBeforeBodyEnd(
-    PREVIEW_PREFIX + (html.startsWith('\uFEFF') ? html.slice(1) : html),
+    PREVIEW_PREFIX + html,
     buildPreviewSandboxShim() + buildCommentBridgeScript() + buildSnapshotBridgeScript(),
   );
 }

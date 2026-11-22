@@ -125,6 +125,7 @@ Web, `apps/web/src/vendor-open-design/` (with `LICENSE` and `NOTICE.md` naming e
 | Comment bridge | `apps/web/src/runtime/comment-bridge.ts`, `packages/contracts/src/runtime/annotated-selector.ts` | Accept `data-od-id`, `data-screen-label` and `data-cairn-id`; unannotated elements fall back to a structural selector (upstream ignores them); posts computed style for the inspect rows; pod and stroke modes dropped |
 | Sandbox shim | `packages/contracts/src/runtime/preview-guards.ts` `buildPreviewSandboxShim` | As is: in-memory storage and history guards for the opaque-origin frame |
 | Snapshot bridge | `apps/web/src/runtime/srcdoc.ts` `injectSnapshotBridge`, `apps/web/src/runtime/exports.ts` `requestPreviewSnapshot` | As is |
+| Body-close injection | `srcdoc.ts` `injectBeforeBodyEnd` | Last real `</body>` search instead of the 890-line tokenizer |
 | Anchor resolution | `apps/web/src/comments/anchor.ts` | Team identity and pod members dropped; the four states map to `anchored`, `moved` (`reanchored`, `stale`) and `lost` |
 | Viewport presets | `apps/web/src/components/FileViewer.tsx` `PREVIEW_VIEWPORT_PRESETS` | As is |
 | Mark-up overlay | `apps/web/src/components/PreviewDrawOverlay.tsx` | Box, pen and text tools, undo, redo and the bake; its dock UI replaced with Cairn components |
@@ -236,7 +237,7 @@ Attachment garbage collection reads `design_version.attachmentId` and `design_co
 
 ### Security
 
-The page runs in an iframe with `sandbox="allow-scripts allow-forms allow-downloads"` (Open Design's `HTML_PREVIEW_SANDBOX`) and no `allow-same-origin`. Its opaque origin prevents direct access to the Cairn window, cookies and storage; the sandbox also denies top navigation and popups. The parent starts `srcdoc` with a fixed doctype and CSP meta tag, then appends the original HTML after dropping one leading BOM if present. The CSP is in place before any artifact bytes, regardless of the artifact's markup. The parent does not parse the artifact into a DOM or serialize it.
+The page runs in an iframe with `sandbox="allow-scripts allow-forms allow-downloads"` (Open Design's `HTML_PREVIEW_SANDBOX`) and no `allow-same-origin`. Its opaque origin prevents direct access to the Cairn window, cookies and storage; the sandbox also denies top navigation and popups. The parent starts `srcdoc` with a fixed doctype and CSP meta tag, then appends the original HTML as fetched: `Response.text()` already drops one leading BOM, so no further stripping happens here. The CSP is in place before any artifact bytes, regardless of the artifact's markup. The parent does not parse the artifact into a DOM or serialize it.
 
 In the initial `srcdoc` document, the CSP meta tag's `base-uri 'none'; object-src 'none'` directives deny replacement base URLs and loads via `object` or `embed` without changing the approved access to fonts, images, scripts and APIs inside the frame (owner decision 4). This meta policy covers only the initial document. Child documents and self-navigation destinations remain sandboxed, but the preview does not enforce those `base-uri` and `object-src` restrictions on them.
 
