@@ -3,7 +3,7 @@ import { readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute, join, relative, sep } from 'node:path';
 import { compareVersions } from '../antigravity-local.js';
 
-function insidePath(parent: string, child: string): boolean {
+export function insidePath(parent: string, child: string): boolean {
   const rel = relative(parent, child);
   return rel === '' || (rel !== '..' && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }

@@ -130,6 +130,50 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     await handle.done;
   });
 
+  test('an authenticated Antigravity install is re-probed so a later sign-out is seen', async () => {
+    const api = new FakeMachineApi();
+    let authenticated = true;
+    let probes = 0;
+    const { handle } = await boot({
+      api,
+      presenceIntervalMs: 20,
+      antigravityReprobeMs: 80,
+      antigravityManaged: {
+        current: () => ({
+          version: 'test',
+          binPath: '/agy',
+          args: [],
+          source: 'managed' as const,
+          authenticated,
+          models: [],
+        }),
+        ensure: async () => null,
+        probe: async () => {
+          probes += 1;
+          authenticated = false;
+          return {
+            version: 'test',
+            binPath: '/agy',
+            args: [],
+            source: 'managed' as const,
+            authenticated: false,
+            models: [],
+          };
+        },
+      },
+    });
+    await waitFor(() => probes >= 1);
+    await waitFor(() =>
+      api.presenceBodies.some(
+        (body) =>
+          (body as { capabilities?: { antigravity?: { authenticated?: boolean } } }).capabilities
+            ?.antigravity?.authenticated === false,
+      ),
+    );
+    await handle.stop();
+    await handle.done;
+  });
+
   test('a failing Antigravity ensure is not retried on every presence tick', async () => {
     const api = new FakeMachineApi();
     let attempts = 0;

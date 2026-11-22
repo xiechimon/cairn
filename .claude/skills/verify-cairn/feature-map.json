@@ -1199,7 +1199,7 @@
       "id": "providers",
       "name": "Model providers and subscriptions",
       "summary": "The user connects their own provider keys, OAuth presets and Claude or Codex subscriptions; cairn lists live models per source.",
-      "states": "An empty list, providers with their models, a subscription being verified, verified or failing with a reason.",
+      "states": "An empty list, providers with their models, a subscription being verified, verified or failing with a reason. Antigravity first-time host login: not installed (managed install runs first), installed but not logged in (login action shown), installing/authenticating progress, succeeded (verify turns green), cancelled or failed (plain reason plus retry), and a signed-out runner bringing the board banner back.",
       "centrality": 2,
       "status": "shipped",
       "code": {
@@ -1207,7 +1207,20 @@
           "apps/web/src/resources/providers-page.tsx",
           "apps/web/src/resources/claude-subscriptions.tsx",
           "apps/web/src/resources/devin-subscriptions.tsx",
-          "apps/web/src/resources/antigravity-subscriptions.tsx"
+          "apps/web/src/resources/antigravity-subscriptions.tsx",
+          "apps/web/src/board/antigravity-login-banner.tsx",
+          "apps/web/src/antigravity-login-warning.ts",
+          "apps/web/src/api/antigravity-subscriptions.ts"
+        ],
+        "daemon": [
+          "apps/daemon/src/backend/antigravity-managed.ts"
+        ],
+        "other": [
+          "apps/desktop/src/antigravity-auth.ts",
+          "apps/desktop/src/preload.ts",
+          "apps/desktop/src/main.ts",
+          "packages/shared/src/node/antigravity-install.ts",
+          "packages/shared/src/antigravity-local.ts"
         ],
         "server": [
           "apps/server/src/services/providers.ts",
@@ -1271,6 +1284,8 @@
         "apps/server/test/antigravity-subscriptions.test.ts",
         "packages/shared/test/devin-local.test.ts",
         "packages/shared/test/antigravity-local.test.ts",
+        "packages/shared/test/antigravity-install.test.ts",
+        "apps/web/test/antigravity-login-warning.test.ts",
         "apps/daemon/test/devin-acp.test.ts",
         "apps/daemon/test/devin-managed.test.ts",
         "apps/daemon/test/antigravity-acp.test.ts",

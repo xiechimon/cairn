@@ -7,7 +7,7 @@ import {
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Download, Play } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { type ReactNode, useRef, useState } from 'react';
 import type { Verification, VerifyFailure, VerifyNotRun } from '../api/account-verification.js';
 import type {
   AccountVendor,
@@ -504,6 +504,7 @@ export function SubscriptionDetail({
   view,
   verification,
   actions,
+  relogin,
 }: {
   account: SubscriptionAccount;
   models: readonly SubscriptionModel[];
@@ -511,6 +512,7 @@ export function SubscriptionDetail({
   view: SubscriptionStatusView;
   verification: Verification | undefined;
   actions: SubscriptionActions;
+  relogin?: ReactNode;
 }) {
   const { t } = useI18n();
   const test = actions.onTestModel;
@@ -578,6 +580,7 @@ export function SubscriptionDetail({
           )}
         </div>
       )}
+      {relogin}
       <QuotaSection account={account} now={now} />
       <VerifyResultPopover
         vendor={account.vendor}

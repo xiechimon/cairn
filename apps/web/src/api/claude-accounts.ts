@@ -28,6 +28,7 @@ export interface SubscriptionAccount {
   lastUsedAt: number | null;
   stepsLast24h: number | null;
   models?: SubscriptionModel[];
+  hasToken?: boolean;
 }
 
 const isAccountState = (value: unknown): value is AccountState =>

@@ -124,6 +124,7 @@ export interface MachineLoopOpts {
   presenceTimeoutMs?: number;
   devinEnsureRetryMs?: number;
   antigravityEnsureRetryMs?: number;
+  antigravityReprobeMs?: number;
   computerPresence?: ComputerPresenceSource;
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
@@ -167,6 +168,7 @@ export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): numb
 export const PRESENCE_TIMEOUT_MS = 20_000;
 export const GOODBYE_TIMEOUT_MS = 2_000;
 const MANAGED_ENSURE_RETRY_MS = 5 * 60_000;
+const ANTIGRAVITY_REPROBE_MS = 10 * 60_000;
 export const DISPATCHER_RESET_FAILURE_THRESHOLD = 3;
 
 export const PORT_BASE_ENV = 'CAIRN_PORT_BASE';
@@ -1181,6 +1183,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   })();
 
   let antigravityRetryAt = 0;
+  let antigravityReprobeAt = Date.now() + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
   const presenceTimer = setInterval(() => {
     const currentAg = antigravityManaged.current();
     if (currentAg === null) {
@@ -1200,7 +1203,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             );
           });
       }
-    } else if (!currentAg.authenticated) void antigravityManaged.probe().catch(() => {});
+    } else if (!currentAg.authenticated) {
+      void antigravityManaged.probe().catch(() => {});
+    } else if (Date.now() >= antigravityReprobeAt) {
+      antigravityReprobeAt = Date.now() + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
+      void antigravityManaged.probe().catch(() => {});
+    }
     void probeAuthAndRemember()
       .then(() => presenceReporter.send())
       .catch((err: unknown) => {

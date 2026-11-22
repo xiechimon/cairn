@@ -64,6 +64,7 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
+import { AntigravityRelogin } from './antigravity-subscriptions.js';
 import {
   type ProviderEditActions,
   providerKind,
@@ -144,6 +145,7 @@ interface SubscriptionEntryDeps {
   models: readonly ModelSourceModel[];
   verifications: Record<string, Verification>;
   actionsFor: (account: SubscriptionAccount) => SubscriptionActions;
+  reloginFor?: (account: SubscriptionAccount) => ReactNode;
   t: TFunc;
   clock: (ts: number, now: number) => string;
 }
@@ -188,6 +190,7 @@ function subscriptionEntries(
           view={view}
           verification={verification}
           actions={deps.actionsFor(account)}
+          relogin={deps.reloginFor?.(account)}
         />
       ),
     };
@@ -471,6 +474,10 @@ export function ProvidersSection() {
     ...subscriptionEntries(antigravitySubscriptions, {
       ...subscriptionDeps,
       models: subscriptionModels(sources, 'antigravity'),
+      reloginFor: (account) =>
+        live && account.hasToken === false ? (
+          <AntigravityRelogin onLoggedIn={() => startVerification(account)} />
+        ) : undefined,
     }),
     ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
   ];

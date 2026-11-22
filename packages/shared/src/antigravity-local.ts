@@ -19,6 +19,8 @@ export type AntigravityLoginFailure =
 
 export type AntigravityLoginOutcome = { ok: true } | { ok: false; reason: AntigravityLoginFailure };
 
+export type AntigravityLoginPhase = 'installing' | 'authenticating';
+
 const GEMINI_KEY_ENV_LINE =
   /^(?:export\s+)?GEMINI_API_KEY\s*=\s*(?:"([^"\r\n]+)"|'([^'\r\n]+)'|([^\s#\r\n]+))\s*$/m;
 

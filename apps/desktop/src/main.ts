@@ -813,7 +813,13 @@ function serveUpdates(origin: string, notice: UpdateNotice | null): void {
     fromOwnPage(event) ? antigravityImportKey() : { ok: false, reason: 'no-key' },
   );
   ipcMain.handle('antigravity:login', (event) =>
-    fromOwnPage(event) ? antigravityLogin() : { ok: false, reason: 'cancelled' },
+    fromOwnPage(event)
+      ? antigravityLogin((phase) => {
+          if (!event.sender.isDestroyed()) {
+            event.sender.send('antigravity:login-progress', phase);
+          }
+        })
+      : { ok: false, reason: 'cancelled' },
   );
   ipcMain.handle('antigravity:cancel-login', (event) => {
     if (fromOwnPage(event)) antigravityCancelLogin();

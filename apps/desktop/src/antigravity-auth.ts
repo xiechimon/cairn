@@ -13,12 +13,17 @@ import { basename, join } from 'node:path';
 import {
   type AntigravityLocalStatus,
   type AntigravityLoginOutcome,
+  type AntigravityLoginPhase,
   antigravityCliDir,
   antigravityKeyFromText,
 } from '@cairn/shared';
+import {
+  antigravityInstallSupported,
+  ensureAntigravityManagedInstall,
+} from '@cairn/shared/antigravity-install';
 import { verifiedManagedBins } from '@cairn/shared/managed-bin';
 
-const STATUS_TIMEOUT_MS = 4_000;
+const STATUS_TIMEOUT_MS = 20_000;
 const LOGIN_TIMEOUT_MS = 600_000;
 
 interface ResolvedBinary {
@@ -35,8 +40,12 @@ interface JsonRpcMessage {
   error?: unknown;
 }
 
+function managedToolsRoot(): string {
+  return `${homedir()}/.cairn/tools/antigravity`;
+}
+
 function managedVersionsRoot(): string {
-  return `${homedir()}/.cairn/tools/antigravity/versions`;
+  return `${managedToolsRoot()}/versions`;
 }
 
 function managedVersions(): string[] {
@@ -114,7 +123,11 @@ function pickAuthMethod(authMethods: { id?: unknown }[] | undefined): string {
 export async function antigravityLocalStatus(): Promise<AntigravityLocalStatus> {
   const resolved = resolveAntigravityBinary();
   if (resolved === null) {
-    return { installed: false, loggedIn: false, canLogin: false };
+    return {
+      installed: false,
+      loggedIn: false,
+      canLogin: antigravityInstallSupported(process.platform, process.arch),
+    };
   }
   const probeDir = mkdtempSync(join(tmpdir(), 'cairn-agy-status-'));
   let child: ChildProcess | null = null;
@@ -155,6 +168,7 @@ export async function antigravityLocalStatus(): Promise<AntigravityLocalStatus> 
 
       activeChild.on('exit', () => finish(false));
       activeChild.on('error', () => finish(false));
+      activeChild.stdin?.on('error', () => finish(false));
 
       attachNdjsonReader(activeChild, (message) => {
         if (message.id === 1) {
@@ -227,89 +241,121 @@ export function stopAntigravityLogin(): void {
   antigravityCancelLogin();
 }
 
-export function antigravityLogin(): Promise<AntigravityLoginOutcome> {
+export function antigravityLogin(
+  onPhase?: (phase: AntigravityLoginPhase) => void,
+): Promise<AntigravityLoginOutcome> {
   if (flight !== null) return Promise.resolve({ ok: false, reason: 'busy' });
-  const resolved = resolveAntigravityBinary();
-  if (resolved === null) return Promise.resolve({ ok: false, reason: 'no-binary' });
 
-  const loginDir = mkdtempSync(join(tmpdir(), 'cairn-agy-login-'));
-  let child: ChildProcess;
-  try {
-    child = spawn(resolved.binPath, acpSpawnArgs(resolved.binPath, join(loginDir, 'login.log')), {
-      cwd: loginDir,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-  } catch (error) {
-    console.error('Antigravity login failed to spawn:', error);
-    rmSync(loginDir, { recursive: true, force: true });
-    return Promise.resolve({ ok: false, reason: 'spawn' });
-  }
+  let cancelled = false;
+  let cancelChild: (() => void) | null = null;
+  const token = {
+    cancel: (): void => {
+      cancelled = true;
+      cancelChild?.();
+    },
+  };
+  flight = token;
 
-  let stderr = '';
-  child.stderr?.on('data', (chunk: Buffer) => {
-    stderr = (stderr + chunk.toString()).slice(-4000);
+  return runLogin().finally(() => {
+    if (flight === token) flight = null;
   });
 
-  return new Promise<AntigravityLoginOutcome>((resolve) => {
-    let exited = false;
-    let settled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+  async function runLogin(): Promise<AntigravityLoginOutcome> {
+    let resolved = resolveAntigravityBinary();
+    if (resolved === null) {
+      onPhase?.('installing');
+      const installed = await ensureAntigravityManagedInstall({
+        root: managedToolsRoot(),
+        log: (message) => console.error(`Antigravity install: ${message}`),
+      });
+      resolved = resolveAntigravityBinary();
+      if (installed === null || resolved === null) return { ok: false, reason: 'no-binary' };
+    }
+    if (cancelled) return { ok: false, reason: 'cancelled' };
 
-    const finish = (outcome: AntigravityLoginOutcome): void => {
-      if (settled) return;
-      settled = true;
-      if (timer !== null) clearTimeout(timer);
-      if (flight === token) flight = null;
-      if (!exited) child.kill();
+    const loginDir = mkdtempSync(join(tmpdir(), 'cairn-agy-login-'));
+    let child: ChildProcess;
+    try {
+      child = spawn(resolved.binPath, acpSpawnArgs(resolved.binPath, join(loginDir, 'login.log')), {
+        cwd: loginDir,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch (error) {
+      console.error('Antigravity login failed to spawn:', error);
       rmSync(loginDir, { recursive: true, force: true });
-      resolve(outcome);
-    };
+      return { ok: false, reason: 'spawn' };
+    }
 
-    const token = {
-      cancel: () => finish({ ok: false, reason: 'cancelled' }),
-    };
-    flight = token;
-
-    timer = setTimeout(() => finish({ ok: false, reason: 'timeout' }), LOGIN_TIMEOUT_MS);
-
-    child.on('exit', () => {
-      exited = true;
-      console.error(`Antigravity login exited unexpectedly. stderr: ${stderr}`);
-      finish({ ok: false, reason: 'exit' });
-    });
-    child.on('error', (error) => {
-      exited = true;
-      console.error('Antigravity login process error:', error);
-      finish({ ok: false, reason: 'spawn' });
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr = (stderr + chunk.toString()).slice(-4000);
     });
 
-    attachNdjsonReader(child, (message) => {
-      if (message.id === 1) {
-        if (message.error !== undefined) {
-          finish({ ok: false, reason: 'failed' });
-          return;
-        }
-        sendJsonRpc(child, {
-          jsonrpc: '2.0',
-          id: 2,
-          method: 'authenticate',
-          params: { methodId: pickAuthMethod(message.result?.authMethods) },
-        });
-      } else if (message.id === 2) {
-        if (message.error === undefined) {
-          finish({ ok: true });
-        } else {
-          console.error(`Antigravity authenticate failed. stderr: ${stderr}`);
-          finish({ ok: false, reason: 'failed' });
-        }
+    return await new Promise<AntigravityLoginOutcome>((resolve) => {
+      let exited = false;
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+
+      const finish = (outcome: AntigravityLoginOutcome): void => {
+        if (settled) return;
+        settled = true;
+        cancelChild = null;
+        if (timer !== null) clearTimeout(timer);
+        if (!exited) child.kill();
+        rmSync(loginDir, { recursive: true, force: true });
+        resolve(outcome);
+      };
+
+      cancelChild = () => finish({ ok: false, reason: 'cancelled' });
+      if (cancelled) {
+        finish({ ok: false, reason: 'cancelled' });
+        return;
       }
-    });
 
-    sendJsonRpc(child, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { protocolVersion: 1, clientCapabilities: {} },
+      timer = setTimeout(() => finish({ ok: false, reason: 'timeout' }), LOGIN_TIMEOUT_MS);
+
+      child.stdin?.on('error', () => finish({ ok: false, reason: 'exit' }));
+      child.on('exit', () => {
+        exited = true;
+        if (settled) return;
+        console.error(`Antigravity login exited unexpectedly. stderr: ${stderr}`);
+        finish({ ok: false, reason: 'exit' });
+      });
+      child.on('error', (error) => {
+        exited = true;
+        console.error('Antigravity login process error:', error);
+        finish({ ok: false, reason: 'spawn' });
+      });
+
+      attachNdjsonReader(child, (message) => {
+        if (message.id === 1) {
+          if (message.error !== undefined) {
+            finish({ ok: false, reason: 'failed' });
+            return;
+          }
+          onPhase?.('authenticating');
+          sendJsonRpc(child, {
+            jsonrpc: '2.0',
+            id: 2,
+            method: 'authenticate',
+            params: { methodId: pickAuthMethod(message.result?.authMethods) },
+          });
+        } else if (message.id === 2) {
+          if (message.error === undefined) {
+            finish({ ok: true });
+          } else {
+            console.error(`Antigravity authenticate failed. stderr: ${stderr}`);
+            finish({ ok: false, reason: 'failed' });
+          }
+        }
+      });
+
+      sendJsonRpc(child, {
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'initialize',
+        params: { protocolVersion: 1, clientCapabilities: {} },
+      });
     });
-  });
+  }
 }

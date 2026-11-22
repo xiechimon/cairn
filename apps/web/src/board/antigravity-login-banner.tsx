@@ -1,7 +1,12 @@
 import { KeyRound } from 'lucide-react';
 import { Link } from 'react-router';
-import { antigravitySubscriptionLoginWarning } from '../antigravity-login-warning.js';
+import {
+  antigravityRunnersSignedOut,
+  antigravitySubscriptionLoginWarning,
+  antigravitySubscriptionSignedOutWarning,
+} from '../antigravity-login-warning.js';
 import { useAntigravitySubscriptions } from '../api/antigravity-subscriptions.js';
+import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
@@ -10,7 +15,7 @@ import { settingsHref } from '../settings/settings-href.js';
 
 export interface AntigravityLoginWarning {
   key: string;
-  kind: 'expired' | 'expiring';
+  kind: 'expired' | 'expiring' | 'signed-out';
   text: string;
 }
 
@@ -18,20 +23,27 @@ export function useAntigravityLoginWarnings(now: number): AntigravityLoginWarnin
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const subscriptions = useAntigravitySubscriptions(teamId, live);
-  return (subscriptions.data ?? []).flatMap((subscription) => {
-    const text = antigravitySubscriptionLoginWarning(subscription, now, t);
-    return text === null
+  const machines = useMachines(teamId, live);
+  const signedOut = antigravityRunnersSignedOut(machines.data);
+  return (subscriptions.data ?? []).flatMap((subscription): AntigravityLoginWarning[] => {
+    const expiringText = antigravitySubscriptionLoginWarning(subscription, now, t);
+    if (expiringText !== null) {
+      return [
+        {
+          key: subscription.id,
+          kind:
+            subscription.expiresAt !== null && subscription.expiresAt <= now
+              ? ('expired' as const)
+              : ('expiring' as const),
+          text: expiringText,
+        },
+      ];
+    }
+    const signedOutText =
+      signedOut === true ? antigravitySubscriptionSignedOutWarning(subscription, t) : null;
+    return signedOutText === null
       ? []
-      : [
-          {
-            key: subscription.id,
-            kind:
-              subscription.expiresAt !== null && subscription.expiresAt <= now
-                ? ('expired' as const)
-                : ('expiring' as const),
-            text,
-          },
-        ];
+      : [{ key: subscription.id, kind: 'signed-out' as const, text: signedOutText }];
   });
 }
 
@@ -60,15 +72,22 @@ export function AntigravityLoginBanner({
     );
   }
   const expired = warnings.filter((warning) => warning.kind === 'expired').length;
-  const expiring = warnings.length - expired;
+  const signedOut = warnings.filter((warning) => warning.kind === 'signed-out').length;
+  const expiring = warnings.length - expired - signedOut;
   const title =
-    expiring === 0
+    expiring === 0 && signedOut === 0
       ? t('{count} 处 Antigravity 登录已过期', { count: expired })
-      : expired === 0
+      : expired === 0 && signedOut === 0
         ? t('{count} 处 Antigravity 登录即将过期', { count: expiring })
-        : t('{expired} 处已过期，{expiring} 处即将过期', { expired, expiring });
+        : [
+            expired === 0 ? null : t('{count} 处已过期', { count: expired }),
+            signedOut === 0 ? null : t('{count} 处登录失效', { count: signedOut }),
+            expiring === 0 ? null : t('{count} 处即将过期', { count: expiring }),
+          ]
+            .filter((part): part is string => part !== null)
+            .join('，');
   const body =
-    expired === 0
+    expired === 0 && signedOut === 0
       ? t('到期前更新登录或 API Key，任务才不会中断。')
       : t('更新登录或 API Key 之前，这些订阅不会接新任务。');
   return (

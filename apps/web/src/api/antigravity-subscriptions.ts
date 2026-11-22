@@ -8,7 +8,12 @@ import type {
 import { antigravityKeyFromText } from '@cairn/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { runVerification, type Verification, type VerifyOutcome } from './account-verification.js';
+import {
+  runVerification,
+  VERIFY_TIMEOUT_MS,
+  type Verification,
+  type VerifyOutcome,
+} from './account-verification.js';
 import type { SubscriptionAccount, SubscriptionModel } from './claude-accounts.js';
 import { api } from './client.js';
 
@@ -41,6 +46,7 @@ export function toAntigravityAccount(
     lastUsedAt: wire.lastUsedAt ?? null,
     stepsLast24h: typeof wire.stepsLast24h === 'number' ? wire.stepsLast24h : null,
     models: Array.isArray(wire.models) ? wire.models : [],
+    hasToken: wire.hasToken,
   };
 }
 
@@ -63,6 +69,11 @@ export function hasUsableAntigravitySubscription(
       (subscription.expiresAt === null || subscription.expiresAt > now),
   );
 }
+
+const HOST_LOGIN_RETRY_MS = 12_000;
+const HOST_LOGIN_RETRY_ATTEMPTS = 3;
+const HOST_LOGIN_VERIFY_TIMEOUT_MS =
+  VERIFY_TIMEOUT_MS + HOST_LOGIN_RETRY_ATTEMPTS * HOST_LOGIN_RETRY_MS + 15_000;
 
 export function useCreateAntigravitySubscription(teamId: string | undefined) {
   const client = useQueryClient();
@@ -103,11 +114,24 @@ export function useAntigravitySubscriptionVerification(teamId: string | undefine
     if (inFlight.current.has(id)) return null;
     inFlight.current.add(id);
     setStates((current) => ({ ...current, [id]: { phase: 'verifying' } }));
-    const outcome = await runVerification(() =>
-      api.post<AntigravitySubscriptionVerifyResult>(
-        `/api/teams/${teamId}/antigravity-subscriptions/${id}/verify`,
-      ),
-    );
+    const outcome = await runVerification(async () => {
+      const post = () =>
+        api.post<AntigravitySubscriptionVerifyResult>(
+          `/api/teams/${teamId}/antigravity-subscriptions/${id}/verify`,
+        );
+      let result = await post();
+      for (
+        let attempt = 0;
+        attempt < HOST_LOGIN_RETRY_ATTEMPTS &&
+        !result.ok &&
+        result.reason === 'missing_local_login';
+        attempt++
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, HOST_LOGIN_RETRY_MS));
+        result = await post();
+      }
+      return result;
+    }, HOST_LOGIN_VERIFY_TIMEOUT_MS);
     inFlight.current.delete(id);
     setStates((current) => {
       const { [id]: _settled, ...rest } = current;

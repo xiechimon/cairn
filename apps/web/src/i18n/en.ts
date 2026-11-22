@@ -127,7 +127,23 @@ export const EN: Record<string, string> = {
   '这台 Mac 已登录 Antigravity。': 'This Mac is signed in to Antigravity.',
   '从这台 Mac 接入': 'Connect from this Mac',
   '在这台 Mac 上登录 Antigravity': 'Sign in to Antigravity on this Mac',
+  '安装并登录 Antigravity': 'Install and sign in to Antigravity',
   '会打开浏览器完成 Google 账号登录。': 'A browser opens to sign in with your Google account.',
+  '会先下载 Antigravity，再打开浏览器完成 Google 账号登录。':
+    'Downloads Antigravity first, then opens a browser to sign in with your Google account.',
+  '正在下载安装 Antigravity，完成后会打开浏览器登录。':
+    'Downloading and installing Antigravity; a browser opens to sign in when it finishes.',
+  'Antigravity 没能装上，可以再试一次，或改用下方粘贴。':
+    'Antigravity could not be installed. Try again, or paste below instead.',
+  '还有一个 Antigravity 登录在进行，等它结束后再试。':
+    'Another Antigravity sign-in is still running; retry when it finishes.',
+  '登录完成后会重新验证；如果执行机是另一台机器，请在那台机器上登录。':
+    'Verification runs again once sign-in finishes; if your Runner is a different machine, sign in there.',
+  '{name}：执行机上没有可用的 Antigravity 登录，Coordinator 和任务都暂时用不了。在「设置 → 模型路由」重新登录。':
+    '{name}: no usable Antigravity sign-in on the Runner, so the Coordinator and tasks cannot run for now. Sign in again under Settings → Model routing.',
+  '{count} 处已过期': '{count} expired',
+  '{count} 处登录失效': '{count} signed out',
+  '{count} 处即将过期': '{count} about to expire',
   '默认使用执行机已登录的 Antigravity，也可以展开下方粘贴 `GEMINI_API_KEY`。':
     'Uses the Antigravity sign-in on your Runner by default. You can also expand below to paste a `GEMINI_API_KEY`.',
   '也可以粘贴 API Key': 'Or paste an API key',

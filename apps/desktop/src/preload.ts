@@ -1,6 +1,7 @@
 import type {
   AntigravityLocalStatus,
   AntigravityLoginOutcome,
+  AntigravityLoginPhase,
   DesktopMenuCommand,
   DesktopNotifyPayload,
   DesktopRollbackNotice,
@@ -79,6 +80,13 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
       ipcRenderer.invoke('antigravity:import-key'),
     login: (): Promise<AntigravityLoginOutcome> => ipcRenderer.invoke('antigravity:login'),
     cancelLogin: (): Promise<void> => ipcRenderer.invoke('antigravity:cancel-login'),
+    onLoginProgress: (listener: (phase: AntigravityLoginPhase) => void): (() => void) => {
+      const relay = (_event: unknown, phase: AntigravityLoginPhase) => listener(phase);
+      ipcRenderer.on('antigravity:login-progress', relay);
+      return () => {
+        ipcRenderer.removeListener('antigravity:login-progress', relay);
+      };
+    },
   },
   windowControls: {
     setVisible: (visible: boolean): void => {
