@@ -337,6 +337,7 @@ describe('gate_verdict: one row per step, attached only to real builds', () => {
         patchDigest: null,
         headSha: null,
         expectedHeadSha: H1,
+        ranModel: null,
         createdAt: 10,
       },
     ]);

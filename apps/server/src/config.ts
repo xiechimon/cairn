@@ -88,9 +88,6 @@ export const serverConfigSchema = z.object({
   tsnet: tsnetSettingsSchema,
   mcpConfigPath: z.string(),
   coordinatorInServer: z.boolean(),
-  trajectoryOutcomeBackfill: z.boolean(),
-  trajectoryReflectCurate: z.boolean(),
-  trajectoryReflectOpenGuardIssues: z.boolean(),
   pushDigestTimes: z
     .array(z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/))
     .length(2)
@@ -302,9 +299,6 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
       process.env[ENV_VARS.mcpConfig] || join(homedir(), CLAUDE_CONFIG_FILE_NAME),
     ),
     coordinatorInServer: envFlagDefaultOn(ENV_VARS.coordinatorInServer),
-    trajectoryOutcomeBackfill: envFlag(ENV_VARS.trajectoryOutcomeBackfill),
-    trajectoryReflectCurate: envFlag(ENV_VARS.trajectoryReflectCurate),
-    trajectoryReflectOpenGuardIssues: envFlag(ENV_VARS.trajectoryReflectOpenGuardIssues),
     pushDigestTimes: (() => {
       const raw = envStr('CAIRN_PUSH_DIGEST_TIMES');
       if (raw === null) return ['09:00', '18:00'];

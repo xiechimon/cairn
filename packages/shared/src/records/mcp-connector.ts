@@ -12,11 +12,16 @@ export interface McpCatalogOption {
   input: 'flag' | 'text';
 }
 
-export interface McpCatalogEntry {
+export interface McpCatalogSetup {
+  installUrl: string;
+  installLabel: string;
+  steps: readonly string[];
+}
+
+interface McpCatalogEntryBase {
   id: string;
   name: string;
   description: string;
-  url: string;
   docsUrl: string;
   auth: readonly McpConnectorAuth[];
   tokenLabel?: string;
@@ -24,7 +29,20 @@ export interface McpCatalogEntry {
   tokenHelp?: string;
   oauthScope?: string;
   oauthOptions?: Readonly<Record<string, string>>;
+  setup?: McpCatalogSetup;
   options: readonly McpCatalogOption[];
+}
+
+export type McpCatalogEntry = McpCatalogEntryBase &
+  (
+    | { transport?: 'http'; url: string }
+    | { transport: 'stdio'; command: string; args: readonly string[] }
+  );
+
+export type McpCatalogLocalEntry = Extract<McpCatalogEntry, { transport: 'stdio' }>;
+
+export function isLocalCatalogEntry(entry: McpCatalogEntry): entry is McpCatalogLocalEntry {
+  return entry.transport === 'stdio';
 }
 
 export const MCP_CATALOG: readonly McpCatalogEntry[] = [
@@ -122,6 +140,26 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
     oauthScope: 'openid profile read-mcp',
     options: [],
   },
+  {
+    id: 'browsermcp',
+    name: 'Browser MCP',
+    description:
+      '让 Agent 在你自己的 Chrome 里干活：已登录的站点直接可用，标签页在后台打开，不会把窗口弹到前面',
+    docsUrl: 'https://browsermcp.io/docs',
+    auth: ['none'],
+    transport: 'stdio',
+    command: 'npx',
+    args: ['-y', '@browsermcp/mcp@2.5.0'],
+    setup: {
+      installUrl: 'https://chromewebstore.google.com/detail/bjfgambnhccakkhmkepdoekmckoijdlc',
+      installLabel: '在 Chrome 应用商店安装扩展',
+      steps: [
+        '把 Browser MCP 扩展装进你要用的那个 Chrome，并固定到工具栏。',
+        '回到对话里让 Agent 打开一个网页。第一次它会告诉你扩展弹窗里那行六位数字，你在扩展里核对同一个数字，再点 Allow。',
+      ],
+    },
+    options: [],
+  },
 ];
 
 export function mcpCatalogEntry(id: string): McpCatalogEntry | undefined {
@@ -179,6 +217,7 @@ export const MCP_CONNECTOR_STATUSES = [
   'needs_auth',
   'error',
   'revoked',
+  'local',
 ] as const;
 export const mcpConnectorStatusSchema = z.enum(MCP_CONNECTOR_STATUSES);
 export type McpConnectorStatus = z.infer<typeof mcpConnectorStatusSchema>;
@@ -241,13 +280,17 @@ export interface McpConnectorOAuthMeta {
   scope: string | null;
 }
 
+export const MCP_CONNECTOR_TRANSPORTS = ['http', 'stdio'] as const;
+export type McpConnectorTransport = (typeof MCP_CONNECTOR_TRANSPORTS)[number];
+
 export const mcpConnectorRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
   slug: z.string(),
   label: z.string(),
   catalogId: z.string().nullable(),
-  url: z.string(),
+  transport: z.enum(MCP_CONNECTOR_TRANSPORTS),
+  url: z.string().nullable(),
   headerNames: z.array(z.string()),
   authKind: mcpConnectorAuthKindSchema,
   account: z.string().nullable(),

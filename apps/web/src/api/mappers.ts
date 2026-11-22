@@ -39,7 +39,6 @@ import {
   chiefTurnStoppedContentSchema,
   classifySkillFact,
   classifyStepFailure,
-  classifyUserText,
   conversationBranch,
   DONE_ROW,
   derivePlaceholderTitle,
@@ -51,10 +50,8 @@ import {
   isOwnComputerTool,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
-  type OwnComputerTool,
   orchestratedTodoIdOf,
   orchestratePromptHeadOf,
-  ownComputerCallSummary,
   PACKAGES_DECLINED,
   PACKAGES_INSTALLED_PREFIX,
   PACKAGES_NOT_ANSWERED,
@@ -70,6 +67,7 @@ import {
   reviewVerdictSchema,
   reworkNoteWithoutReason,
   runnerOfflineContentSchema,
+  runtimeUpdateRequired,
   SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
@@ -127,6 +125,8 @@ const RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], string>> =
   'runtime-disabled': '排队中：{machine} 上没有检测到 {runtime}，装好后重启执行机',
   'model-unavailable': '排队中：{machine} 用不了这一步的模型——在工作路由里换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上跑，{machine} 跑不了',
+  'machine-retired':
+    '排队中：{machine} 已删除或注销，这一步不会改派——重新注册这台执行机，或在工作路由里改派',
   'claude-rate-limited': '排队中：{machine} 的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
     '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
@@ -147,6 +147,8 @@ const UNNAMED_RUNNER_REFUSAL_LABELS: Partial<Record<StepQueueBlocked['kind'], st
   'runtime-disabled': '排队中：执行机上没有检测到 {runtime}，装好后重启执行机',
   'model-unavailable': '排队中：执行机用不了这一步的模型——在工作路由里换模型',
   'local-path': '排队中：本地项目只在它所在的执行机上跑，这台执行机跑不了',
+  'machine-retired':
+    '排队中：这一步绑定的执行机已删除或注销，不会改派到其他执行机——重新注册那台执行机，或在工作路由里改派',
   'claude-rate-limited': '排队中：执行机上的 Claude 被限流，恢复后自动继续',
   'claude-logged-out':
     '排队中：团队还没有可用的 Claude 订阅——在终端运行 claude setup-token，把 token 添加到模型路由',
@@ -510,27 +512,6 @@ function verifyVerdictOfContent(content: unknown): {
   };
 }
 
-const MAC_SUMMARY_MAX = 160;
-
-function macActivityItemOf(
-  call: ToolCallRecord,
-  tool: OwnComputerTool,
-  id: string,
-): Extract<ChiefStreamItem, { kind: 'mac-activity' }> {
-  const full = ownComputerCallSummary(tool, (call.arguments ?? {}) as Record<string, unknown>);
-  const line = full.split('\n')[0] ?? '';
-  const clipped = line.length > MAC_SUMMARY_MAX ? line.slice(0, MAC_SUMMARY_MAX) : line;
-  const error = call.isError === true;
-  return {
-    kind: 'mac-activity',
-    id,
-    tool,
-    summary: clipped === full ? full : `${clipped} …`,
-    running: call.result === undefined && call.endedAt === undefined && !error,
-    error,
-  };
-}
-
 export function pillOf(call: ToolCallRecord): string {
   const args = (call.arguments ?? {}) as Record<string, unknown>;
   const primary =
@@ -817,7 +798,6 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (m.origin === 'task-prompt' || m.origin === 'synthetic') continue;
-      if (m.origin !== 'user' && classifyUserText(text, todo) !== 'user') continue;
       entries.push({
         at: m.createdAt,
         item: { kind: 'user', text, markdown: text, id: m.id, createdAt: m.createdAt },
@@ -1131,11 +1111,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         failureReasonKey(item.raw) === failureReasonKey(build.errorMessage ?? ''),
     )
   ) {
+    const plain = runtimeUpdatePlain(build.errorMessage);
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
       createdAt: todo.phaseAt,
       body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
+      ...(plain !== null ? { plain } : {}),
     });
   }
   if (
@@ -1230,12 +1212,14 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
     case BUILD_FAILURE_ROW_KIND: {
       const headline =
         /^(.+?\(exit -?\d+\))/.exec(row.reason)?.[1] ?? row.reason.split('\n')[0] ?? '';
+      const plain = runtimeUpdatePlain(row.reason);
       return {
         kind: 'fail',
         id,
         createdAt,
         title: stripAnsiEscapes(headline),
         body: failGuidanceBody(classifyStepFailure(row.reason)),
+        ...(plain !== null ? { plain } : {}),
         facts: {
           files: row.fileCount,
           commits: row.commits.map((commit) => commit.slice(0, 9)),
@@ -1247,8 +1231,29 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
   }
 }
 
+export function runtimeUpdatePlain(
+  raw: string,
+): { key: string; vars: Record<string, string> } | null {
+  const update = runtimeUpdateRequired(raw);
+  if (update === null) return null;
+  const vars = {
+    runtime: update.runtime ?? 'Claude Code',
+    current: update.current ?? '',
+    required: update.required,
+  };
+  return {
+    key:
+      update.current === null
+        ? '这个模型需要 {runtime} {required} 或更新的版本'
+        : 'Cairn 自带的 {runtime} {current} 太旧，这个模型需要 {required} 或更新的版本',
+    vars,
+  };
+}
+
 function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
   switch (kind) {
+    case 'runtime_outdated':
+      return '更新 Cairn 后再重跑这个任务。';
     case 'network':
       return '连接模型服务时超时或断开，通常是暂时的，重跑即可。';
     case 'quota':
@@ -1561,6 +1566,7 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
         modelName: m.name,
         ...(source.machineId !== undefined ? { machineId: source.machineId } : {}),
         ...(lv !== undefined && lv !== 'unknown' ? { liveness: lv } : {}),
+        ...(m.updateRequired !== undefined ? { updateRequired: m.updateRequired } : {}),
         ...thinkingOf(m),
       });
     }
@@ -1571,6 +1577,7 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
 export type TurnErrorFacts = Omit<ChiefTurnErrorContent, 'kind'>;
 
 export type TurnFailureAction =
+  | 'update'
   | 'retry'
   | 'continue'
   | 'swap'
@@ -1673,6 +1680,13 @@ export function turnErrorCopy(error: TurnErrorFacts, onMac: boolean): TurnErrorC
         'Cairn 在回复途中重启或断开了，这一轮没跑完。已经做完的操作不会撤回；重试会把刚才的话再发一次。',
         ['retry'],
       );
+    case 'runtime-update': {
+      const plain = runtimeUpdatePlain(error.message);
+      Object.assign(vars, plain?.vars ?? {});
+      return copy(plain?.key ?? '这个模型需要更新的 Claude Code', '更新 Cairn 后再重试。', [
+        'update',
+      ]);
+    }
     case 'turn-limit':
       return copy(
         '这一轮的步数用完了',
@@ -1752,6 +1766,15 @@ export function askQuestionOfContent(content: unknown): {
 }
 
 const WAKE_MARKER_PREFIX_RE = /^\[wake:\w+\]\s*/;
+
+function isChiefPromptEcho(m: MessageRow): boolean {
+  if (m.origin === 'user') return false;
+  return (
+    m.origin === 'task-prompt' ||
+    m.origin === 'synthetic' ||
+    m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+  );
+}
 
 function chiefUserText(raw: string): string {
   return stripTurnContext(stripSkillRouteSection(raw.replace(WAKE_MARKER_PREFIX_RE, ''))).trim();
@@ -1853,8 +1876,29 @@ function archivedTodoIdsOf(call: ToolCallRecord): string[] {
     : [];
 }
 
+const RAW_API_ERROR_RE = /^API Error: /;
+
 export function mapChiefStream(messages: MessageRow[]): ChiefStreamItem[] {
   return collectChiefStream(messages).items;
+}
+
+function dropThinkingOfFailedTurns(items: ChiefStreamItem[], itemsAt: number[]): void {
+  const drop = new Set<number>();
+  let turn: number[] = [];
+  let answered = false;
+  items.forEach((item, index) => {
+    if (item.kind === 'user') {
+      turn = [];
+      answered = false;
+    } else if (item.kind === 'robot') answered = true;
+    else if (item.kind === 'thinking') turn.push(index);
+    else if (item.kind === 'error' && !answered) for (const at of turn) drop.add(at);
+  });
+  for (let index = items.length - 1; index >= 0; index--) {
+    if (!drop.has(index)) continue;
+    items.splice(index, 1);
+    itemsAt.splice(index, 1);
+  }
 }
 
 function collectChiefStream(
@@ -1872,11 +1916,6 @@ function collectChiefStream(
   let lastAt = 0;
   const pendingById = new Map<string, ChiefStreamItem>();
   let fallback: { model: string; stepId: string } | null = null;
-  const postedTexts = new Set(
-    messages
-      .filter((m) => m.role === 'user' && !m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX))
-      .map((m) => chiefUserText(textOfContent(m.content).trim())),
-  );
   let pendingTools: ChiefToolRow[] = [];
   let pendingCards: ChiefStreamItem[] = [];
   const flushCards = () => {
@@ -1904,12 +1943,10 @@ function collectChiefStream(
         : m.id;
       if (stepOfRow !== fallback.stepId) fallback = null;
     }
-    if (m.role === 'user' && m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+    if (m.role === 'user' && isChiefPromptEcho(m)) {
       eventTurn = WAKE_MARKER_PREFIX_RE.test(textOfContent(m.content).trim());
-      if (eventTurn) {
-        pendingTools = [];
-        continue;
-      }
+      if (eventTurn) pendingTools = [];
+      continue;
     }
     const pendingState = m.role === 'user' ? pendingIds.get(m.id) : undefined;
     if (m.role === 'user' && pendingState === undefined) eventTurn = false;
@@ -1930,6 +1967,8 @@ function collectChiefStream(
     const turnError = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (turnError !== null) {
       pendingTools = [];
+      const last = items.at(-1);
+      if (last?.kind === 'error' && last.error === undefined) items.pop();
       items.push({ kind: 'error', text: turnError.message, error: turnError, id: m.id });
       continue;
     }
@@ -1974,9 +2013,26 @@ function collectChiefStream(
       const notice = chiefNoticeContentSchema.safeParse(parsed);
       if (notice.success) {
         pendingTools = [];
+        const update = notice.data.runtimeUpdate;
         items.push({
           kind: 'robot',
           markdown: notice.data.message,
+          ...(update !== undefined
+            ? {
+                plain: {
+                  key:
+                    update.current === null
+                      ? '任务「{task}」已暂停：它的模型需要 {runtime} {required} 或更新的版本。更新 Cairn 后再重试。'
+                      : '任务「{task}」已暂停：Cairn 自带的 {runtime} {current} 太旧，它的模型需要 {required} 或更新的版本。更新 Cairn 后再重试。',
+                  vars: {
+                    task: update.task,
+                    runtime: update.runtime ?? 'Claude Code',
+                    current: update.current ?? '',
+                    required: update.required,
+                  },
+                },
+              }
+            : {}),
           seconds: '',
           id: m.id,
           ...(notice.data.report !== undefined ? { report: notice.data.report } : {}),
@@ -2021,10 +2077,7 @@ function collectChiefStream(
       items.push(packageInstallItemOf(call, m.id));
       continue;
     }
-    if (call !== null && isOwnComputerTool(call.name)) {
-      items.push(macActivityItemOf(call, call.name, m.id));
-      continue;
-    }
+    if (call !== null && isOwnComputerTool(call.name)) continue;
     if (call !== null) {
       const created = createdTodoOf(call);
       if (created !== null)
@@ -2073,7 +2126,6 @@ function collectChiefStream(
     if (m.role === 'user') {
       const text = chiefUserText(rawText);
       if (text === '') continue;
-      if (m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX) && postedTexts.has(text)) continue;
       pendingTools = [];
       flushCards();
       const head = orchestratePromptHeadOf(text);
@@ -2100,6 +2152,11 @@ function collectChiefStream(
       continue;
     }
     if (m.role === 'system') continue;
+    if (RAW_API_ERROR_RE.test(rawText)) {
+      pendingTools = [];
+      items.push({ kind: 'error', text: rawText, id: m.id });
+      continue;
+    }
     items.push({
       kind: 'robot',
       markdown: rawText,
@@ -2117,6 +2174,7 @@ function collectChiefStream(
   }
   flushCards();
   while (itemsAt.length < items.length) itemsAt.push(lastAt);
+  dropThinkingOfFailedTurns(items, itemsAt);
   items.forEach((item, index) => {
     if (
       item.kind === 'user' ||

@@ -5,6 +5,7 @@ Backend for the tray's run overview (prototype approved by mon X, 2026-11-18): p
 ## Scenarios
 
 - A Mac with 16 GB runs three tasks and memory runs out. The tray heading turns amber and names the strain. The fourth task still starts: strain never holds a task (mon X, 2026-11-19, after a high load average made every second task queue behind the first).
+- A Mac sits at load 12 on 8 cores with the fans quiet and the cpu mostly idle. The tray heading reads 3%, not 100%: the percent is CPU utilization and memory pressure, never the load average (mon X, 2026-11-21).
 - A task's agent sits in one tool call or retry loop for twenty minutes. Today nothing distinguishes it from a healthy run: the 30-second heartbeat only says the process is alive. After: the step carries the time of its last real progress, and the tray marks the task stuck after 15 minutes without progress.
 
 ## Strain
@@ -13,11 +14,13 @@ Backend for the tray's run overview (prototype approved by mon X, 2026-11-18): p
 
 | Reason | Condition |
 |---|---|
-| `memory` | available memory below 10% of total |
-| `load` | 5-minute load average above the core count |
+| `memory` | memory pressure at or above 90% (available below 10% of total) |
+| `cpu` | CPU utilization at or above 90% |
 | `disk` | free disk below 5 GB |
 
-The Runner reports `loadAvg5` beside `loadAvg1` (optional on the wire; an old Runner omits it and is never load-strained). On macOS available memory comes from `kern.memorystatus_level` (the share of memory the kernel considers available, the figure behind Activity Monitor's memory pressure); `os.freemem()` there counts only completely free pages and sits near zero on a healthy Mac. If the sysctl read fails the Runner falls back to `os.freemem()`. Linux keeps `os.freemem()`, which reads `MemAvailable`.
+The load average is reported but decides nothing: on macOS it counts threads blocked on IO, so a Mac with idle cores routinely sits above its core count, and the earlier rule marked it strained for hours after a single busy spell. `cpuUtilization` is the busy share of the `os.cpus()` tick delta between two reports, so it measures work the computer actually did in that window. `memoryPressure` on macOS comes from `kern.memorystatus_level` (the share of memory the kernel considers available, the figure behind Activity Monitor's memory pressure); on Linux it is the share `MemAvailable` does not cover, and `os.freemem()` there reads `MemAvailable`. If the sysctl read fails the Runner reports no macOS pressure and keeps `os.freemem()`, which counts only completely free pages and sits near zero on a healthy Mac.
+
+A Runner that predates these fields reports neither, and is never strained on CPU or pressure; its available-memory share still strains memory, so an old Runner is never presented as calmer than it is.
 
 ## No claim gate
 
@@ -47,4 +50,4 @@ Strain is shown, never enforced. A strained computer claims task steps like a ca
 
 ## Tests
 
-One per path: memory, load and disk strain each still let a busy computer start the next task, with the strain reported on the computer; progress reports set `lastProgressAt` and non-progress activity does not; the throttle skips a second write within 30 seconds; a strain change publishes `machine_presence` and an unchanged report does not; the macOS memory probe parses the sysctl value and falls back on failure.
+One per path: memory, CPU and disk strain each still let a busy computer start the next task, with the strain reported on the computer; progress reports set `lastProgressAt` and non-progress activity does not; the throttle skips a second write within 30 seconds; a strain change publishes `machine_presence` and an unchanged report does not; the macOS memory probe parses the sysctl value and falls back on failure; CPU utilization is the busy share of the tick delta, and a Runner reporting load 12 on idle cores with 63% memory pressure is not strained.

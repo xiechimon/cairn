@@ -76,6 +76,7 @@ import {
   disableClaudeSubscription,
   enableClaudeSubscription,
   listClaudeSubscriptions,
+  refreshClaudeQuota,
   testClaudeSubscriptionModel,
   updateClaudeSubscription,
   verifySubscriptionConnection,
@@ -503,6 +504,12 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json(listClaudeSubscriptions(keysvc, teamId));
+  });
+
+  app.post('/api/teams/:id/claude-subscriptions/quota', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    return c.json(await refreshClaudeQuota(claudeUpstreamSvc(), teamId));
   });
 
   app.post('/api/teams/:id/claude-subscriptions', async (c) => {

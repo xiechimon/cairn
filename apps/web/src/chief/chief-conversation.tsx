@@ -19,10 +19,14 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
+import { useSearchParams } from 'react-router';
 import { useConnected } from '../api/connection-state.js';
 import { useArchivedTodos, useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import type { PendingComments } from '../board/design/design-composer.js';
+import { seedSideChat } from '../board/side-chat-seed.js';
+import { THREAD_PARAM } from '../board/thread-copy.js';
+import { useOpenThread } from '../board/thread-link.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
@@ -80,9 +84,11 @@ import { QuickReplies } from './quick-replies.js';
 import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
 import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
+import { SelectionReply } from './selection-reply.js';
+import { sideChatSeed } from './selection-reply-model.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
-import { QueueWaitCard, TurnFailureCard } from './turn-failure.js';
+import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
 import { VirtualStream } from './virtual-stream.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
@@ -221,7 +227,7 @@ export interface ChiefConversationProps {
   prefill?: { text: string; key: number } | null;
   placeholder?: string;
   composerReplacement?: ReactNode;
-  composerTools?: ReactNode;
+  notice?: ReactNode;
   showBindGate?: boolean;
   pendingComments?: PendingComments | null;
 }
@@ -252,7 +258,7 @@ export function ChiefConversation({
   prefill = null,
   placeholder,
   composerReplacement,
-  composerTools,
+  notice,
   showBindGate = true,
   pendingComments,
 }: ChiefConversationProps) {
@@ -374,13 +380,12 @@ export function ChiefConversation({
         }
       : undefined,
   );
-  const sendFromComposer =
+  const sendQuoted =
     onSend == null
       ? undefined
-      : (text: string) => {
+      : (quoted: ReplyQuoteDraft | null, text: string) => {
           followSentRef.current = true;
           userKeyAtSendRef.current = latestUserKeyRef.current;
-          const quoted = replyQuote;
           const sent = onSend(quoted === null ? text : encodeReplyQuote(quoted, text));
           Promise.resolve(sent).then(
             () => setReplyQuote((current) => (current === quoted ? null : current)),
@@ -390,6 +395,8 @@ export function ChiefConversation({
           );
           return sent;
         };
+  const sendFromComposer =
+    sendQuoted === undefined ? undefined : (text: string) => sendQuoted(replyQuote, text);
   const stageReply = useCallback((draft: ReplyQuoteDraft) => {
     setReplyQuote(draft);
     setThreadOverride(true);
@@ -414,6 +421,9 @@ export function ChiefConversation({
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const [searchParams] = useSearchParams();
+  const openThreadId = searchParams.get(THREAD_PARAM);
+  const openThread = useOpenThread();
   const canStop = chief.running === true && onStop != null;
   const connected = useConnected();
   const restoreSent = (text: string) => {
@@ -607,6 +617,7 @@ export function ChiefConversation({
     if (key === dismissedFailure) return null;
     return {
       key,
+      id: latestError.item.id ?? null,
       error: latestError.item.error ?? { message: latestError.item.text },
       retry: latestUser == null ? onRetryGreeting : retryLastUser,
     };
@@ -618,6 +629,8 @@ export function ChiefConversation({
     if (waitNow === null) setDismissedWait(null);
   }, [waitNow]);
   const queueWait = waitNow !== null && waitNow.kind !== dismissedWait ? waitNow : null;
+  const cardFailure =
+    connected && chief.outage == null && queueWait === null ? (failure?.id ?? null) : null;
   const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
@@ -629,6 +642,34 @@ export function ChiefConversation({
       layoutStream(rows.slice(dayEarlier), glances, before.lastAt, seen, reportSeen),
     ] as const;
   }, [rows, glances, dayEarlier]);
+  const sideChatFor = useCallback(
+    (sourceMessageId: string) => {
+      if (openThreadId !== null) return openThreadId;
+      let nearest: string | null = null;
+      for (const layout of [earlierLayout, streamLayout]) {
+        for (const { item } of layout.grouped) {
+          const own =
+            layout.taskRefs.get(item)?.[0]?.todoId ??
+            (item.kind === 'task-card' ? item.todoId : null);
+          if ('id' in item && item.id === sourceMessageId) return own ?? nearest;
+          if (own !== null) nearest = own;
+        }
+      }
+      return null;
+    },
+    [openThreadId, earlierLayout, streamLayout],
+  );
+  const addQuote = (draft: ReplyQuoteDraft, text: string) => {
+    stageReply(draft);
+    if (text !== '')
+      restoreToThread((current) =>
+        current.trim() === '' ? text : `${current.trimEnd()}\n${text}`,
+      );
+  };
+  const askSideChat = (todoId: string, quote: string) => {
+    seedSideChat(todoId, sideChatSeed(quote));
+    if (openThreadId !== todoId) openThread(todoId);
+  };
   const row = (
     item: GroupedRow['item'],
     i: number,
@@ -743,24 +784,26 @@ export function ChiefConversation({
                   <ReplySourceHighlightContext.Provider
                     value={highlightedSource === replyQuote ? highlightedSource : null}
                   >
-                    {lead}
-                    {day == null ? (
-                      <VirtualStream
-                        cacheKey={chief.threadId ?? ''}
-                        keys={streamLayout.keys}
-                        renderRow={(n) => streamEntry(streamLayout, n)}
-                        viewportRef={viewportRef}
-                      />
-                    ) : (
-                      <>
-                        <div data-testid="chief-earlier" className="opacity-60">
-                          {renderRows(earlierLayout)}
-                        </div>
-                        {day.today}
-                        {renderRows(streamLayout)}
-                      </>
-                    )}
-                    <ChiefQuestion key={chief.threadId ?? ''} />
+                    <CardFailureContext.Provider value={cardFailure}>
+                      {lead}
+                      {day == null ? (
+                        <VirtualStream
+                          cacheKey={chief.threadId ?? ''}
+                          keys={streamLayout.keys}
+                          renderRow={(n) => streamEntry(streamLayout, n)}
+                          viewportRef={viewportRef}
+                        />
+                      ) : (
+                        <>
+                          <div data-testid="chief-earlier" className="opacity-60">
+                            {renderRows(earlierLayout)}
+                          </div>
+                          {day.today}
+                          {renderRows(streamLayout)}
+                        </>
+                      )}
+                      <ChiefQuestion key={chief.threadId ?? ''} />
+                    </CardFailureContext.Provider>
                   </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
@@ -777,6 +820,14 @@ export function ChiefConversation({
               />
             )}
           </MessageScroller>
+          <SelectionReply
+            containerRef={viewportRef}
+            enabled={sendQuoted !== undefined && composerReplacement == null}
+            sideChatFor={sideChatFor}
+            onAddQuote={addQuote}
+            onSendQuote={(draft, text) => void sendQuoted?.(draft, text)}
+            onAskSideChat={askSideChat}
+          />
         </>
       )}
 
@@ -799,10 +850,10 @@ export function ChiefConversation({
           onRetry={failure.retry}
           onDismiss={() => setDismissedFailure(failure.key)}
         />
+      ) : chief.fallbackModel != null ? (
+        <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
       ) : (
-        chief.fallbackModel != null && (
-          <ChiefFallbackBanner model={chief.fallbackModel} onSettings={onSettings} />
-        )
+        notice
       )}
       <div
         {...drop.bind}
@@ -845,8 +896,8 @@ export function ChiefConversation({
               }
               onAttachment={onAttachment}
               mentionGroups={mentionGroups}
-              slash={{
-                stopAvailable: canStop,
+              stop={{
+                available: canStop,
                 onStop: () => stopTurnRef.current?.(),
               }}
               active={!answerActive}
@@ -867,7 +918,6 @@ export function ChiefConversation({
                   </>
                 )
               }
-              tools={answerActive ? null : composerTools}
               context={chief.context}
               running={chief.running}
               threadId={chief.threadId ?? null}
@@ -888,7 +938,6 @@ export function ChiefConversation({
                 composerRef={answerActive ? composerRef : undefined}
                 tab={answerActive ? queueTab : null}
                 above={answerActive ? capsules : null}
-                tools={answerActive ? composerTools : null}
                 context={chief.context}
                 running={chief.running}
                 threadId={chief.threadId ?? null}

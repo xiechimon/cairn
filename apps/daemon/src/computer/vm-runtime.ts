@@ -15,6 +15,7 @@ import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { z } from 'zod';
 import manifestJson from '../../computer-image/image.json' with { type: 'json' };
+import { childEnv } from '../child-env.js';
 import { executableOnPath } from './contained-spawn.js';
 import { ComputerRefusal } from './provider.js';
 
@@ -50,6 +51,7 @@ export interface VmCommandResult {
 export interface VmCommandOptions {
   timeoutMs?: number;
   stdin?: string;
+  env?: NodeJS.ProcessEnv;
 }
 
 export type VmCommandRunner = (
@@ -60,6 +62,7 @@ export type VmCommandRunner = (
 export const runVmCommand: VmCommandRunner = (argv, options = {}) =>
   new Promise((resolve) => {
     const child = spawn(argv[0] as string, argv.slice(1), {
+      env: childEnv(options.env),
       stdio: [options.stdin === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
     });
     let stdout = '';

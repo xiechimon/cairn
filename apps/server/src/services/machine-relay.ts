@@ -51,7 +51,7 @@ import { projectOfTodo } from './git.js';
 import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { executeInfoCardTool } from './info-card-tools.js';
 import { forwardComputerCall } from './machine-computer.js';
-import { isChiefConversation, type MachineDeps, ownedStep } from './machines.js';
+import { isChiefConversation, type MachineDeps, ownedStepRow } from './machines.js';
 import {
   defaultMcpConfigPath,
   type McpConnectorDeps,
@@ -80,13 +80,16 @@ export async function machineAsk(
   body: MachineAskBody,
   opts: { holdMs: number; signal?: AbortSignal } = { holdMs: ASK_HOLD_MS },
 ): Promise<MachineAskResponse> {
-  const row = ownedStep(deps, machineId, stepId);
+  const row = ownedStepRow(deps, machineId, stepId);
   refuseRestrictedTurnTool(deps.db, row.prompt, 'ask_user', {}, row.ownerMessageIds ?? []);
   if (row.kind === 'session') {
     return askWorkerQuestion(deps, row, body, opts);
   }
   if (row.kind !== 'chief' || !isChiefConversation(row.buildId)) {
     throw new HttpError(400, `step ${stepId} is not a chief step`);
+  }
+  if (row.status !== 'claimed') {
+    throw new HttpError(409, 'ask_user requires a currently claimed turn');
   }
   const qDeps: ChiefQuestionDeps = {
     db: deps.db,
@@ -146,7 +149,7 @@ export async function relayComputerTool(
   toolCallId?: string,
   signal?: AbortSignal,
 ): Promise<ComputerRelayResult> {
-  const row = ownedStep(deps, machineId, stepId);
+  const row = ownedStepRow(deps, machineId, stepId);
   refuseRestrictedTurnTool(deps.db, row.prompt, name, params, row.ownerMessageIds ?? []);
   if (row.kind !== 'chief') {
     throw new HttpError(400, 'computer tools require a chief step');
@@ -180,7 +183,7 @@ export async function executeRelayToolCall(
   toolCallId?: string,
   signal?: AbortSignal,
 ): Promise<string> {
-  const row = ownedStep(deps, machineId, stepId);
+  const row = ownedStepRow(deps, machineId, stepId);
   if (infoCardTodoOf(deps.db, row) !== null) {
     return executeInfoCardTool(deps, machineId, row, name, params, toolCallId, signal);
   }
@@ -243,6 +246,7 @@ export async function executeRelayToolCall(
         teamId: threadRow.teamId,
         threadId,
         scopeProjectId: stepScopeProjectId(row),
+        mcpGrant: row.mcpGrant,
         ...(turnForcesOutboundApproval(deps.db, row.prompt) ? { untrustedTurn: true } : {}),
       },
       name,
@@ -393,9 +397,6 @@ async function executeWorkerMemoryToolCall(
   if (!buildRow) throw new NotFoundError(`build ${row.buildId}`);
   const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (!todoRow) throw new NotFoundError(`todo ${buildRow.todoId}`);
-  if (isThreadScheduleTool(name)) {
-    return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
-  }
   if (name === 'thread_report' && row.kind === 'session') {
     if (row.status !== 'claimed') {
       throw new HttpError(409, 'thread_report requires a currently claimed step');
@@ -410,6 +411,12 @@ async function executeWorkerMemoryToolCall(
       throw new HttpError(409, 'close_as_duplicate requires a currently claimed step');
     }
     return closeThreadAsDuplicate(deps, row, todoRow, params);
+  }
+  if (row.status !== 'claimed') {
+    throw new HttpError(409, 'worker tools require a currently claimed step');
+  }
+  if (isThreadScheduleTool(name)) {
+    return executeThreadScheduleTool(deps, todoRow, `worker:${row.id}`, name, params);
   }
   if (name === 'attach_file') return attachWorkerFile(deps, row, todoRow, params);
   if (name === 'set_task_meta') {
@@ -558,10 +565,15 @@ async function setTaskMetaGithubForm(
     githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
   };
-  const record = updateAutonomousTodo(todoDeps, todoRow.id, {
-    ...(title !== undefined ? { title } : {}),
-    ...(githubLabelIds !== undefined ? { githubLabelIds } : {}),
-  });
+  const record = updateAutonomousTodo(
+    todoDeps,
+    todoRow.id,
+    {
+      ...(title !== undefined ? { title } : {}),
+      ...(githubLabelIds !== undefined ? { githubLabelIds } : {}),
+    },
+    { issueTitleWriteback: true },
+  );
   if (!record) throw new NotFoundError(`todo ${todoRow.id}`);
   if (title !== undefined && record.sourceKind === 'github-issue-self') {
     await writebackSelfIssueTitle(todoDeps, todoRow.id, record.title).catch(() => undefined);

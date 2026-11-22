@@ -9,7 +9,7 @@ import {
   UnfoldVertical,
   X,
 } from 'lucide-react';
-import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { useApiMutations, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -40,6 +40,7 @@ import { EngineQuestion, EngineRawView } from './engine-run-view.js';
 import { OpenDesignPageContext } from './file-pane.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
+import { onSideChatSeed, takeSideChatSeed } from './side-chat-seed.js';
 import { STATUS_WORDS } from './status-words.js';
 import { isWaiting, SECTION_LABEL } from './tasks-sections.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
@@ -442,6 +443,21 @@ function ThreadBody({
     localKey: `cairn.draft.todo:${todo.id}`,
     enabled: live,
   });
+  const composerRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const take = () => {
+      const seed = takeSideChatSeed(todo.id);
+      if (seed === undefined) return;
+      setDraft((current) => (current.trim() === '' ? seed : `${current.trimEnd()}\n\n${seed}`));
+      window.requestAnimationFrame(() => {
+        const input = composerRef.current?.querySelector('textarea');
+        input?.focus({ preventScroll: true });
+        input?.setSelectionRange(input.value.length, input.value.length);
+      });
+    };
+    take();
+    return onSideChatSeed(take);
+  }, [todo.id, setDraft]);
   const reportThread = { title: todo.title, final: isFinalReportPhase(todo.phase) };
   return (
     <>
@@ -523,33 +539,35 @@ function ThreadBody({
         </div>
       )}
       {!archived && (
-        <Composer
-          placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
-          streaming={chat.running}
-          editable={chat.send !== undefined}
-          readOnly={chat.locked}
-          draft={draft}
-          onDraftChange={setDraft}
-          {...(chat.send !== undefined ? { onSend: chat.send } : {})}
-          {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
-          {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
-          {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
-          {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
-          mentionGroups={mentions.groups}
-          mentionFiles={mentions.files}
-          queuedMessages={chat.queuedMessages}
-          onSendQueuedNow={chat.sendQueuedNow}
-          onRemoveQueued={chat.removeQueued}
-          onEditQueued={chat.editQueued}
-          {...(usage !== null
-            ? {
-                meter: <ThreadUsageRing key={todo.id} {...usage} running={chat.running} />,
-                menuMeter: (
-                  <ThreadUsageDetails {...usage} running={chat.running} className="px-2.5 py-2" />
-                ),
-              }
-            : {})}
-        />
+        <div ref={composerRef} className="contents">
+          <Composer
+            placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
+            streaming={chat.running}
+            editable={chat.send !== undefined}
+            readOnly={chat.locked}
+            draft={draft}
+            onDraftChange={setDraft}
+            {...(chat.send !== undefined ? { onSend: chat.send } : {})}
+            {...(chat.queue !== undefined ? { onQueue: chat.queue } : {})}
+            {...(chat.stopAndSend !== undefined ? { onStopAndSend: chat.stopAndSend } : {})}
+            {...(chat.stop !== undefined ? { onStop: chat.stop } : {})}
+            {...(chat.attach !== undefined ? { onAttachment: chat.attach } : {})}
+            mentionGroups={mentions.groups}
+            mentionFiles={mentions.files}
+            queuedMessages={chat.queuedMessages}
+            onSendQueuedNow={chat.sendQueuedNow}
+            onRemoveQueued={chat.removeQueued}
+            onEditQueued={chat.editQueued}
+            {...(usage !== null
+              ? {
+                  meter: <ThreadUsageRing key={todo.id} {...usage} running={chat.running} />,
+                  menuMeter: (
+                    <ThreadUsageDetails {...usage} running={chat.running} className="px-2.5 py-2" />
+                  ),
+                }
+              : {})}
+          />
+        </div>
       )}
     </>
   );

@@ -18,6 +18,7 @@ test('replaying a mirrored Coordinator row publishes nothing, while a changed ro
     .where(and(eq(step.buildId, H.threadId), eq(step.kind, 'chief')))
     .get();
   if (turn === undefined) throw new Error('no Coordinator turn');
+  H.s.db.update(step).set({ status: 'claimed' }).where(eq(step.id, turn.id)).run();
   const api = createCoordinatorServerApi({
     ...H.s.svc,
     box: H.s.secretBox,

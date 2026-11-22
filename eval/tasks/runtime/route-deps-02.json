@@ -1,0 +1,48 @@
+{
+  "kind": "runtime",
+  "id": "route-deps-02",
+  "request": "先做 schema 迁移，然后基于它实现 API 2",
+  "world": {
+    "projects": [
+      "core"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@core",
+            "title": "schema 迁移",
+            "quotes": [
+              "先做 schema 迁移"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@core",
+            "title": "API 2",
+            "quotes": [
+              "然后基于它实现 API"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "已建好两个任务，API 依赖迁移完成。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "parts": 2
+  },
+  "gate": true
+}

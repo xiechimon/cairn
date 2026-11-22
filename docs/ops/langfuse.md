@@ -1,6 +1,6 @@
 # Self-hosted Langfuse for debugging (#1569)
 
-OTel is the outward data format. Self-hosted Langfuse is only for viewing and annotating traces; the local sqlite + trajectory packs remain the source of truth. The compose lives in `ops/langfuse/` and does not enter the product install path; Cairn behaves the same when it is not configured. The OTLP endpoint accepts any Langfuse target: this compose is the self-hosted path, Langfuse Cloud works too.
+OTel is the outward data format. Self-hosted Langfuse is only for viewing and annotating traces; the local sqlite remains the source of truth. The compose lives in `ops/langfuse/` and does not enter the product install path; Cairn behaves the same when it is not configured. The OTLP endpoint accepts any Langfuse target: this compose is the self-hosted path, Langfuse Cloud works too.
 
 ## Starting the stack
 
@@ -24,7 +24,7 @@ export CAIRN_OTEL_HEADERS="Authorization=Basic $(printf '%s' "$LANGFUSE_PUBLIC_K
 
 A `user:password@` embedded in the endpoint becomes the Basic header. `CAIRN_OTEL_ENVIRONMENT` (lowercase/digits/`_`/`-`, ≤40 chars, not starting `langfuse`) adds `langfuse.environment` to each span; export is off unless the endpoint is set and never blocks a turn.
 
-Trajectory packs: `pnpm traj:export --build <buildId> --out /tmp/pack.jsonl && pnpm traj:push /tmp/pack.jsonl` converts and pushes to `CAIRN_OTEL_ENDPOINT`; requests go through `redactSecrets` first.
+Eval results: the eval suite (`eval/`, `docs/design/eval-gate.md`) writes runs and item scores into the Langfuse project via `client.experiment.run`.
 
 ## Trace layout
 

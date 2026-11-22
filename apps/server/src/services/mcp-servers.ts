@@ -7,6 +7,7 @@ import {
   BRAND,
   CLAUDE_CONFIG_FILE_NAME,
   type CreateMcpConnectorBody,
+  isLocalCatalogEntry,
   type MachineTokenResponse,
   type McpCatalogEntry,
   type McpConnectorAuthKind,
@@ -19,6 +20,8 @@ import {
   mcpCatalogEntry,
   type PatchMcpConnectorBody,
   parseClaudeMcpEntries,
+  publicOrigin,
+  publicUrl,
   type SecretBox,
   type StartMcpConnectorOAuthBody,
 } from '@cairn/shared';
@@ -117,7 +120,7 @@ export function readClaudeMcpServers(path: string): ClaudeMcpRead {
       label: key,
       slug,
       transport: 'http',
-      url: entry.url,
+      url: publicUrl(entry.url),
       hasCredential: credentialKeys.length > 0,
       credentialKeys,
     });
@@ -141,21 +144,24 @@ export function listMcpServers(
       source: 'local' as const,
       status: null,
     })),
-    ...connectorRows(deps.db, teamId).map((c) => ({
-      teamId,
-      id: c.id,
-      label: c.label,
-      slug: c.slug,
-      transport: 'http' as const,
-      url: publicUrl(c.url),
-      hasCredential: c.authKind !== 'none',
-      credentialKeys: c.headerNames,
-      createdBy: '',
-      createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
-      source: 'connector' as const,
-      status: c.status,
-    })),
+    ...connectorRows(deps.db, teamId)
+      .filter((c) => c.transport === 'http')
+      .map((c) => ({
+        teamId,
+        id: c.id,
+        label: c.label,
+        slug: c.slug,
+        transport: 'http' as const,
+        url:
+          c.url === null ? '' : c.authKind === 'composio' ? publicOrigin(c.url) : publicUrl(c.url),
+        hasCredential: c.authKind !== 'none',
+        credentialKeys: c.headerNames,
+        createdBy: '',
+        createdAt: c.createdAt,
+        updatedAt: c.updatedAt,
+        source: 'connector' as const,
+        status: c.status,
+      })),
   ];
 }
 
@@ -196,19 +202,6 @@ export function githubAppOfDeps(deps: Pick<McpConnectorDeps, 'githubApp'>): Gith
 
 type ConnectorRow = typeof mcpConnector.$inferSelect;
 
-function publicUrl(raw: string): string {
-  const url = new URL(raw);
-  return `${url.origin}${url.pathname}`;
-}
-
-function composioPublicUrl(raw: string): string {
-  try {
-    return new URL(raw).origin;
-  } catch {
-    return '';
-  }
-}
-
 function connectorRows(db: Db, teamId: string): ConnectorRow[] {
   return db
     .select()
@@ -236,7 +229,13 @@ export function toConnectorRecord(
     slug: row.slug,
     label: row.label,
     catalogId: row.catalogId,
-    url: row.authKind === 'composio' ? composioPublicUrl(row.url) : publicUrl(row.url),
+    transport: row.transport,
+    url:
+      row.url === null
+        ? null
+        : row.authKind === 'composio'
+          ? publicOrigin(row.url)
+          : publicUrl(row.url),
     headerNames: row.headerNames,
     authKind: row.authKind,
     account: row.authKind === 'github-app' ? githubAccountOf(deps, row.teamId) : null,
@@ -284,6 +283,8 @@ function catalogTarget(
   options: Record<string, string>,
   oauth = false,
 ): ConnectorTarget {
+  if (isLocalCatalogEntry(entry))
+    throw new HttpError(400, `${entry.name} runs on the machine; enable it instead`);
   if (oauth && !entry.auth.includes('oauth'))
     throw new HttpError(400, `${entry.name} does not offer browser sign-in`);
   if (token !== undefined && !entry.auth.includes('token'))
@@ -309,6 +310,7 @@ function catalogState(
   row: ConnectorRow,
   headers: Record<string, string>,
 ): { token: string | undefined; options: Record<string, string> } {
+  if (row.url === null) return { token: undefined, options: {} };
   const url = new URL(row.url);
   const options: Record<string, string> = {};
   for (const option of entry.options) {
@@ -375,11 +377,17 @@ export function createMcpConnector(
 ): McpConnectorRecord {
   let label: string;
   let target: ConnectorTarget;
+  let local = false;
   if (body.kind === 'catalog') {
     const entry = mcpCatalogEntry(body.catalogId);
     if (!entry) throw notFound(`catalog entry ${body.catalogId}`);
     label = entry.name;
-    target = catalogTarget(entry, body.token, body.options ?? {});
+    if (isLocalCatalogEntry(entry)) {
+      if (body.token !== undefined || Object.keys(body.options ?? {}).length > 0)
+        throw new HttpError(400, `${entry.name} runs on the machine and takes no token or options`);
+      local = true;
+      target = { url: '', headers: {} };
+    } else target = catalogTarget(entry, body.token, body.options ?? {});
   } else {
     label = body.label;
     target = { url: body.url, headers: body.headers ?? {} };
@@ -395,10 +403,14 @@ export function createMcpConnector(
       slug: body.slug,
       label,
       catalogId: body.kind === 'catalog' ? body.catalogId : null,
-      url: target.url,
+      transport: local ? 'stdio' : 'http',
+      url: local ? null : target.url,
       ...sealHeaders(deps, target.headers),
       authKind: staticAuthKind(target.headers),
-      ...UNCHECKED,
+      status: local ? 'local' : UNCHECKED.status,
+      statusReason: null,
+      toolCount: null,
+      checkedAt: null,
       createdAt: now,
       updatedAt: now,
     })
@@ -414,6 +426,17 @@ export function updateMcpConnector(
 ): { record: McpConnectorRecord; targetChanged: boolean } {
   const row = connectorRow(deps, teamId, id);
   const oauth = row.authKind === 'oauth';
+  if (
+    row.transport === 'stdio' &&
+    (patch.token !== undefined ||
+      patch.headers !== undefined ||
+      patch.options !== undefined ||
+      patch.url !== undefined)
+  )
+    throw new HttpError(
+      400,
+      'this connector runs on the machine; it takes no token, url or headers',
+    );
   if (
     row.authKind === 'github-app' &&
     (patch.token !== undefined ||
@@ -456,7 +479,7 @@ export function updateMcpConnector(
       throw new HttpError(400, 'a custom connector takes a url, not options');
     if (patch.url !== undefined) {
       target = { url: patch.url, headers: {} };
-      dropTokens = new URL(patch.url).origin !== new URL(row.url).origin;
+      dropTokens = row.url === null || new URL(patch.url).origin !== new URL(row.url).origin;
     }
   } else {
     if (patch.token !== undefined || patch.options !== undefined)
@@ -466,7 +489,11 @@ export function updateMcpConnector(
       );
     if (patch.url !== undefined || patch.headers !== undefined) {
       const url = patch.url ?? row.url;
-      if (new URL(url).origin !== new URL(row.url).origin && patch.headers === undefined)
+      if (url === null) throw new HttpError(400, 'this connector has no url');
+      if (
+        new URL(url).origin !== (row.url === null ? '' : new URL(row.url).origin) &&
+        patch.headers === undefined
+      )
         throw new HttpError(400, 'a new origin needs its headers again');
       target = { url, headers: patch.headers ?? openHeaders(deps, row) };
     }
@@ -634,7 +661,8 @@ export async function checkMcpConnector(
   id: string,
 ): Promise<McpConnectorRecord> {
   let row = connectorRow(deps, teamId, id);
-  if (row.status === 'revoked') return toConnectorRecord(deps, row);
+  if (row.status === 'revoked' || row.transport === 'stdio' || row.url === null)
+    return toConnectorRecord(deps, row);
   let result: ProbeResult;
   if (signsIn(row)) {
     if (row.authKind !== 'github-app') {
@@ -642,6 +670,7 @@ export async function checkMcpConnector(
       if (before?.expiresAt != null && before.expiresAt <= nowMs()) {
         await refreshMcpConnectorToken(deps, teamId, id);
         row = connectorRow(deps, teamId, id);
+        if (row.url === null) return toConnectorRecord(deps, row);
       }
     }
     const secrets = await signInBearer(deps, row);
@@ -781,7 +810,7 @@ function oauthTarget(
 ): { target: McpOAuthTarget; url: string; custom: boolean; scope?: string } {
   if (body.kind === 'reconnect') {
     const row = connectorRow(deps, teamId, body.connectorId);
-    if (row.authKind !== 'oauth')
+    if (row.authKind !== 'oauth' || row.url === null)
       throw new HttpError(400, 'only a browser sign-in connector can reconnect');
     const entry = row.catalogId === null ? undefined : mcpCatalogEntry(row.catalogId);
     const scope = entry?.oauthScope;
@@ -1099,9 +1128,25 @@ export function connectorSlugs(db: Db, teamId: string): string[] {
   return db
     .select({ slug: mcpConnector.slug })
     .from(mcpConnector)
-    .where(eq(mcpConnector.teamId, teamId))
+    .where(and(eq(mcpConnector.teamId, teamId), eq(mcpConnector.transport, 'http')))
     .all()
     .map((row) => row.slug);
+}
+
+export function localBrowserConnector(db: Db, teamId: string): 'browsermcp' | null {
+  const row = db
+    .select({ catalogId: mcpConnector.catalogId })
+    .from(mcpConnector)
+    .where(
+      and(
+        eq(mcpConnector.teamId, teamId),
+        eq(mcpConnector.transport, 'stdio'),
+        eq(mcpConnector.status, 'local'),
+        eq(mcpConnector.catalogId, 'browsermcp'),
+      ),
+    )
+    .get();
+  return row === undefined ? null : 'browsermcp';
 }
 
 const TOKEN_PATH_REFRESH_LEAD_MS = 10 * 60_000;
@@ -1124,7 +1169,9 @@ async function deliverableConnector(
   teamId: string,
   row: ConnectorRow,
 ): Promise<McpConnectorEndpoint | null> {
-  if (row.status === 'needs_auth' || row.status === 'revoked') return null;
+  if (row.status === 'needs_auth' || row.status === 'revoked' || row.transport === 'stdio')
+    return null;
+  if (row.url === null) return null;
   const headers = openHeaders(deps, row);
   if (!signsIn(row)) return { slug: row.slug, transport: 'http', url: row.url, headers };
   if (row.authKind !== 'github-app') {
@@ -1135,7 +1182,7 @@ async function deliverableConnector(
   }
   const current = connectorRow(deps, teamId, row.id);
   const secrets = await signInBearer(deps, current);
-  if (current.status === 'needs_auth' || secrets === null) return null;
+  if (current.status === 'needs_auth' || secrets === null || current.url === null) return null;
   if (secrets.expiresAt !== null && secrets.expiresAt <= nowMs()) return null;
   return {
     slug: current.slug,
@@ -1155,7 +1202,7 @@ export async function stepConnectorEndpoints(
   const rows = deps.db
     .select()
     .from(mcpConnector)
-    .where(eq(mcpConnector.teamId, teamId))
+    .where(and(eq(mcpConnector.teamId, teamId), eq(mcpConnector.transport, 'http')))
     .all()
     .filter((row) => granted.has(row.slug));
   const mcpConnectors: McpConnectorEndpoint[] = [];

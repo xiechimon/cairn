@@ -5,7 +5,7 @@ import { backgroundTaskSchema } from '../background-task.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
-import { machineRecordSchema } from '../records/machine.js';
+import { hostKeySchema, machineRecordSchema } from '../records/machine.js';
 import { confinementIdentitySchema } from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
@@ -40,10 +40,11 @@ export const machineEnrollBodySchema = z.object({
   cliVersion: z.string().optional(),
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
+  hostKey: hostKeySchema.optional(),
 });
 export type MachineEnrollBody = z.infer<typeof machineEnrollBodySchema>;
 
-export const machineEnrollResponseSchema = machineJsonSchema;
+export const machineEnrollResponseSchema = machineJsonSchema.omit({ hostKey: true });
 export type MachineEnrollResponse = z.infer<typeof machineEnrollResponseSchema>;
 
 export const MACHINE_ENROLL_TTL_MS = 600_000;
@@ -51,6 +52,7 @@ export const MACHINE_ENROLL_TTL_MS = 600_000;
 export const machineEnrollStartBodySchema = z.object({
   teamId: recordId.optional(),
   name: z.string().optional(),
+  hostKey: hostKeySchema.optional(),
 });
 export const machineEnrollStartResponseSchema = z.object({
   enrollId: z.string(),
@@ -61,7 +63,7 @@ export const machineEnrollStartResponseSchema = z.object({
 export const machineEnrollPollBodySchema = z.object({ enrollId: z.string() });
 export const machineEnrollPollResponseSchema = z.union([
   z.object({ status: z.literal('pending'), name: z.string().optional() }),
-  z.object({ status: z.literal('authorized'), machine: machineJsonSchema }),
+  z.object({ status: z.literal('authorized'), machine: machineEnrollResponseSchema }),
   z.object({ status: z.literal('expired') }),
 ]);
 export type MachineEnrollPollResponse = z.infer<typeof machineEnrollPollResponseSchema>;
@@ -106,6 +108,7 @@ export const machinePresenceBodySchema = z.object({
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
   connectionId: z.string().min(1).max(64).nullable().optional(),
+  hostKey: hostKeySchema.optional(),
 });
 export type MachinePresenceBody = z.infer<typeof machinePresenceBodySchema>;
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });
@@ -186,6 +189,19 @@ export const localMergeReportSchema = z.object({
   result: localMergeResultSchema,
 });
 export type LocalMergeReport = z.infer<typeof localMergeReportSchema>;
+
+export const machineLocalMergeRecheckBodySchema = z.object({
+  command: localMergeCommandSchema,
+});
+export type MachineLocalMergeRecheckBody = z.infer<typeof machineLocalMergeRecheckBodySchema>;
+
+export const machineLocalMergeRecheckResponseSchema = z.object({
+  authorized: z.boolean(),
+  reason: z.string().min(1).optional(),
+});
+export type MachineLocalMergeRecheckResponse = z.infer<
+  typeof machineLocalMergeRecheckResponseSchema
+>;
 
 const MIB = 1024 * 1024;
 
@@ -648,6 +664,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'GET',
     path: '/api/machine/session/{stepId}',
     reason: '[设计] #1512 按 stepId 取回步收尾上传的原始会话 JSONL（session.jsonl）',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/local-merge-recheck/{stepId}',
+    reason:
+      '[design] #5210 landing round-trip: after the local checks and before the ref write the daemon re-asks the claim-time authorization; a refusal or no answer stops the landing (docs/design/local-merge-landing-recheck.md)',
   },
   {
     method: 'POST',

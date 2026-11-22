@@ -58,6 +58,16 @@ export {
 } from './build-stop.js';
 export { applyStoppedStep, type BuildSteerResult, sendBuildSteer, stopUnclaimedGateSteps };
 
+export type MergeRequestOutcome =
+  | {
+      state: 'merged';
+      prNumber: number | null;
+      commit: string | null;
+      alreadyMerged: boolean;
+    }
+  | { state: 'requested'; stepId: string | null }
+  | { state: 'unconfirmed'; prNumber: number };
+
 export interface BuildDeps {
   githubAppTokenSocket?: string | null | undefined;
   githubAppIdentity?: GitIdentity | null | undefined;
@@ -141,7 +151,14 @@ export interface BuildSteerOptions {
   human?: boolean;
   actor?: string;
   origin?: 'user' | 'synthetic';
-  schedule?: { id: string; createdBy: string; at: number };
+  schedule?: {
+    id: string;
+    createdBy: string;
+    at: number;
+    expected: number | null;
+    next: number | null;
+    triggered: boolean;
+  };
   answer?: QuestionAnswer;
   beforeCommit?: () => void;
 }

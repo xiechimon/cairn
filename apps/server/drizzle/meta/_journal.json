@@ -1660,6 +1660,48 @@
       "when": 1795197084788,
       "tag": "0241_drop_github_project_local_path",
       "breakpoints": true
+    },
+    {
+      "idx": 242,
+      "version": "6",
+      "when": 1795202768212,
+      "tag": "0242_public_randall",
+      "breakpoints": true
+    },
+    {
+      "idx": 243,
+      "version": "6",
+      "when": 1795215830198,
+      "tag": "0243_elite_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 244,
+      "version": "6",
+      "when": 1795238242958,
+      "tag": "0244_browsermcp_local_connector",
+      "breakpoints": true
+    },
+    {
+      "idx": 245,
+      "version": "6",
+      "when": 1795296679452,
+      "tag": "0245_oval_professor_monster",
+      "breakpoints": true
+    },
+    {
+      "idx": 246,
+      "version": "6",
+      "when": 1795302973585,
+      "tag": "0246_keen_pixie",
+      "breakpoints": true
+    },
+    {
+      "idx": 247,
+      "version": "6",
+      "when": 1795311662378,
+      "tag": "0247_giant_mimic",
+      "breakpoints": true
     }
   ]
 }

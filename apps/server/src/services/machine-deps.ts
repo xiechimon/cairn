@@ -1,6 +1,6 @@
 import type { GitIdentity, StepRecord, TranscriptUserOrigin, UserRecord } from '@cairn/shared';
 import { isChiefConversationId } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, message, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
@@ -67,10 +67,16 @@ export function profileForStep(
   return profileForStepRoute(deps.db, todoRow, kind, stepId);
 }
 
-export function ownedStep(deps: MachineDeps, machineId: string | null, stepId: string) {
+export function ownedStepRow(deps: MachineDeps, machineId: string | null, stepId: string) {
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) throw new NotFoundError(`step ${stepId}`);
   if (row.machineId !== machineId) throw new NotFoundError(`step ${stepId} (not yours)`);
+  return row;
+}
+
+export function ownedStep(deps: MachineDeps, machineId: string | null, stepId: string) {
+  const row = ownedStepRow(deps, machineId, stepId);
+  if (row.status !== 'claimed') throw new NotFoundError(`step ${stepId} (not running)`);
   return row;
 }
 
@@ -115,7 +121,7 @@ export function upsertMessage(
         content: row.content,
         createdAt: row.createdAt,
         actor: null,
-        origin: row.origin ?? null,
+        origin: sql`coalesce(excluded.origin, ${message.origin})`,
       },
     })
     .run();
@@ -124,7 +130,11 @@ export function upsertMessage(
 
 export function upsertChiefRow(
   deps: { db: Db; convHub?: ConversationStreamHub },
-  row: MessageRowInput & { threadId: string },
+  row: MessageRowInput & {
+    threadId: string;
+    projectId?: string | null;
+    origin?: TranscriptUserOrigin | null;
+  },
 ): void {
   const stored = upsertChiefMessage(deps.db, row);
   deps.convHub?.publishMessage(row.threadId, stored);

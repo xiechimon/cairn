@@ -9,6 +9,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import {
+  type BoundGitCredentials,
   BRAND,
   conversationBranch,
   ORPHAN_WORKTREE_TTL_MS,
@@ -138,12 +139,38 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     expect(logger.lines).toContain('[workspace] Repo origin re-pointed to the project clone URL');
   }, 30_000);
 
+  test('#3703: retargeting the project to a repository with another default branch refreshes it', async () => {
+    const first = await ws.prepare(prepareInput(CONV_A));
+    expect(first.defaultBranch).toBe('main');
+    const replacement = join(testTempDir('cairn-ws-replacement-'), 'repo.git');
+    const replacementWork = join(testTempDir('cairn-ws-replacement-work-'), 'repo');
+    await runGit(['init', '--bare', replacement]);
+    await runGit(['symbolic-ref', 'HEAD', 'refs/heads/trunk'], { cwd: replacement });
+    await runGit(['clone', replacement, replacementWork]);
+    await runGit(['checkout', '-B', 'trunk'], { cwd: replacementWork });
+    writeFileSync(join(replacementWork, 'README.md'), '# replacement trunk\n');
+    await runGit(['add', '-A'], { cwd: replacementWork });
+    await runGit(['commit', '-m', 'trunk seed'], {
+      cwd: replacementWork,
+      env: commitEnv(IDENTITY),
+    });
+    await runGit(['push', 'origin', 'trunk'], { cwd: replacementWork });
+    await runGit(['checkout', '-B', 'main'], { cwd: replacementWork });
+    writeFileSync(join(replacementWork, 'README.md'), '# replacement main\n');
+    await runGit(['add', '-A'], { cwd: replacementWork });
+    await runGit(['commit', '-m', 'main seed'], { cwd: replacementWork, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: replacementWork });
+    const second = await ws.prepare({ ...prepareInput(CONV_B), cloneUrl: replacement });
+    expect(second.defaultBranch).toBe('trunk');
+    expect(readFileSync(join(second.cwd, 'README.md'), 'utf8')).toBe('# replacement trunk\n');
+  }, 30_000);
+
   test("#1484: comparison uses origin's raw configured value, insteadOf rewrites do not trigger repointing", async () => {
     const alias = 'cairn-alias:repo';
     stubOutInheritedGitConfig();
-    vi.stubEnv('GIT_CONFIG_COUNT', '1');
-    vi.stubEnv('GIT_CONFIG_KEY_0', `url.${originDir}.insteadOf`);
-    vi.stubEnv('GIT_CONFIG_VALUE_0', alias);
+    const home = testTempDir('cairn-ws-home-');
+    writeFileSync(join(home, '.gitconfig'), `[url "${originDir}"]\n\tinsteadOf = ${alias}\n`);
+    vi.stubEnv('HOME', home);
     try {
       await ws.prepare({ ...prepareInput(CONV_A), cloneUrl: alias });
       logger.lines.length = 0;
@@ -406,6 +433,28 @@ describe('#1149 environment lifecycle hooks (two prepare mount points)', () => {
     });
     expect(prepared.hooks![0]!.output).toContain('setup-ran-marker');
     expect(logger.lines.some((l) => l.includes('setup hook: running'))).toBe(true);
+  }, 30_000);
+
+  test('verify shape: credentials feed clone/fetch while hookCredentials:null keeps them out of hook env', async () => {
+    const creds: BoundGitCredentials = {
+      username: 'x-access-token',
+      password: 'step-token-secret',
+      url: 'https://github.com/o/r.git',
+    };
+    seedHook(
+      'setup',
+      `#!/bin/sh\nif [ -z "$GIT_CONFIG_COUNT" ]; then echo "cred=unset"; else echo "cred=$GIT_CONFIG_COUNT"; fi\n`,
+    );
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const prepared = await ws.prepare({
+      ...prepareInput(CONV_A),
+      credentials: creds,
+      hookCredentials: null,
+    });
+    expect(prepared.hooks).toHaveLength(1);
+    expect(prepared.hooks![0]!.output).toContain('cred=unset');
   }, 30_000);
 
   test('repo without hooks: hooks default to [], zero hook log lines (behavior consistent with current)', async () => {

@@ -1,6 +1,8 @@
 import { mkdirSync } from 'node:fs';
+import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { ENV_VARS } from '@cairn/shared';
+import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
@@ -25,10 +27,10 @@ import { createAccessVerifier } from './lib/cloudflare-access.js';
 import { installEnvProxy } from './lib/env-proxy.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
-import { loopbackOwnerFor } from './lib/loopback-owner.js';
+import { listenOwnerChannel, ownerChannelFromEnv } from './lib/owner-channel.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
-import { shutdownRuntimeOtel } from './runtime-otel.js';
+import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
 import { runServerCommand } from './server-command.js';
 import { loadApnsConfig } from './services/apns.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
@@ -55,17 +57,13 @@ import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
-import {
-  createScheduler,
-  trajectoryExportRunOf,
-  trajectoryOutcomeRunOf,
-  trajectoryReflectCurateRunOf,
-} from './services/scheduler.js';
+import { createScheduler } from './services/scheduler.js';
 import { sharedAgentSkillRoots } from './services/skills.js';
 import { prepareSkillsHome } from './services/skills-home.js';
 import { fillSystemAvatar } from './services/system-avatar.js';
 import { createTailscaleServe } from './services/tailscale-serve.js';
 import { backfillTokenUsageCost } from './services/token-usage-cost.js';
+import { backfillTranscriptOrigins } from './services/transcript-origin-backfill.js';
 import { createTsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
@@ -143,10 +141,20 @@ const vapidKeys = {
 };
 const seeded = seed(db);
 await fillSystemAvatar(seeded.user);
-seedLocalMachine(db, seeded.team.id);
+if (seedLocalMachine(db, seeded.team.id) === 'blocked') {
+  logger.warn(
+    { name: hostname() },
+    'an enrolled machine holds the server hostname; the local-machine row stays unseeded until it is renamed or removed',
+  );
+}
 setCoordinatorInServer(config.coordinatorInServer);
 logger.info(seedDefaultRouting(db), 'default routing rules and policies');
 runDataMigrationOnce(db, 'token-usage-cost-backfill', () => backfillTokenUsageCost(db));
+const originsStamped = runDataMigrationOnce(db, 'transcript-origin-backfill', () =>
+  backfillTranscriptOrigins(db),
+);
+if (originsStamped !== undefined)
+  logger.info(originsStamped, 'transcript user-row provenance backfilled');
 const ownersSeeded = runDataMigrationOnce(db, 'owner-checkpoints-seed', () =>
   seedOwnerCheckpoints(db),
 );
@@ -207,6 +215,8 @@ const tailnet = createTsnetRemote({
   authToken: config.authToken,
   logger,
 });
+const ownerChannel = ownerChannelFromEnv(process.env);
+listenOwnerChannel(ownerChannel);
 const app = createApp(
   {
     remote: {
@@ -252,7 +262,7 @@ const app = createApp(
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
     webDir: config.webDir,
     authToken: config.authToken,
-    loopbackOwner: loopbackOwnerFor(config),
+    ownerChannel,
     accessVerifier:
       config.cloudflareAccess === null ? null : createAccessVerifier(config.cloudflareAccess),
     mcpConfigPath: config.mcpConfigPath,
@@ -289,17 +299,6 @@ const scheduler = createScheduler(
   },
   { attachmentsDir, logger },
   { githubFetch, logger },
-  trajectoryOutcomeRunOf(config, { logger }),
-  trajectoryExportRunOf(config, { logger }),
-  trajectoryReflectCurateRunOf(config, {
-    logger,
-    config,
-    model: process.env.CAIRN_REFLECTOR_MODEL ?? '',
-    endpoint: {
-      baseUrl: process.env.CAIRN_REFLECTOR_BASE_URL ?? '',
-      apiKey: process.env.CAIRN_REFLECTOR_API_KEY ?? '',
-    },
-  }),
 );
 if (config.coordinatorInServer) {
   warnTeamsWithoutCoordinatorRule(db, logger);
@@ -385,6 +384,8 @@ async function shutdown(): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   scheduler.stop();
+  killInFlightPick();
+  computerScreens.close();
   await Promise.race([
     tailscale.withdraw().catch(() => {}),
     new Promise((resolve) => setTimeout(resolve, TAILSCALE_WITHDRAW_MS)),
@@ -393,14 +394,17 @@ async function shutdown(): Promise<void> {
     coordinator?.close(),
     new Promise((resolve) => setTimeout(resolve, COORDINATOR_CLOSE_MS)),
   ]);
-  killInFlightPick();
-  computerScreens.close();
+  await drainHttp();
+  await tailnetReady;
+  await tailnet.stop();
   await im.shutdown().catch(() => {});
   await mail.shutdown().catch(() => {});
   setImRuntime(null);
-  await drainHttp(shutdownRuntimeOtel);
-  await tailnetReady;
-  await tailnet.stop();
+  await sealRuntimeOtel();
+  const dropped = spansDroppedBySeal();
+  if (dropped > 0) {
+    logger.warn({ spans: dropped }, 'spans dropped after the final tracing shutdown');
+  }
   close();
   process.exit(0);
 }
@@ -409,4 +413,9 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     void shutdown();
   });
+}
+
+const parentPid = parentPidFromEnv(process.env);
+if (parentPid !== null) {
+  watchParentProcess({ pid: parentPid, onDead: () => void shutdown() });
 }

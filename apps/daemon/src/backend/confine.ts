@@ -1,6 +1,13 @@
 import { type ChildProcessWithoutNullStreams, execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+} from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
@@ -21,6 +28,17 @@ export const DENIED_DIRECTORIES = [
   '.aws',
   '.config/gh',
   '.docker',
+  '.orbstack',
+  '.colima',
+  '.lima',
+  '.rd',
+  '.local/share/containers',
+  '.config/containers',
+  '.local/share/docker',
+  '.local/share/containerd',
+  '.local/share/buildkit',
+  '.tmux',
+  '.screen',
   '.kube',
   '.password-store',
   '.config/google-chrome',
@@ -31,6 +49,12 @@ export const DENIED_DIRECTORIES = [
   '.gemini',
 ];
 export const DENIED_FILES = ['.netrc', '.git-credentials', '.claude.json'];
+export const CONTAINER_SOCKETS = [
+  '/var/run/docker.sock',
+  '/private/var/run/docker.sock',
+  '/run/docker.sock',
+  '/run/podman/podman.sock',
+];
 
 export function contains(parent: string, child: string): boolean {
   const path = relative(parent, child);
@@ -122,7 +146,46 @@ export function confinementArgs(
     '--tmpfs',
     '/tmp',
   ];
-  args.push('--overlay-src', home, '--tmp-overlay', home);
+  const deniedSet = new Set(denied);
+  const rebound: string[] = [];
+  const rebindChildren = (sandboxDir: string, realDir: string): void => {
+    args.push('--tmpfs', sandboxDir);
+    rebound.push(sandboxDir);
+    for (const entry of (() => {
+      try {
+        return readdirSync(realDir, { withFileTypes: true });
+      } catch {
+        return [] as const;
+      }
+    })()) {
+      const sandboxPath = join(sandboxDir, entry.name);
+      const realPath = join(realDir, entry.name);
+      if (deniedSet.has(realPath)) continue;
+      let resolved = realPath;
+      if (entry.isSymbolicLink()) {
+        try {
+          resolved = realpathSync(realPath);
+        } catch {}
+      }
+      const ancestorOfDenied = denied.some(
+        (path) =>
+          (path !== realPath && contains(realPath, path)) ||
+          (path !== resolved && contains(resolved, path)),
+      );
+      if (ancestorOfDenied) {
+        if (lstatSync(resolved, { throwIfNoEntry: false })?.isDirectory() === true)
+          rebindChildren(sandboxPath, resolved);
+        else {
+          args.push('--tmpfs', sandboxPath);
+          rebound.push(sandboxPath);
+        }
+        continue;
+      }
+      if (entry.isSymbolicLink()) args.push('--symlink', readlinkSync(realPath), sandboxPath);
+      else if (entry.isDirectory() || entry.isFile()) args.push('--ro-bind', realPath, sandboxPath);
+    }
+  };
+  rebindChildren(home, home);
   for (const path of deniedDirectories) args.push('--tmpfs', path);
   for (const path of writable) args.push('--bind', path, path);
   for (const path of deniedDirectories) {
@@ -172,7 +235,7 @@ export function confinementArgs(
     pinContainer(join(directory, 'worktrees'));
     pinContainer(join(directory, 'modules'));
   }
-  args.push('--remount-ro', home);
+  for (const directory of rebound) args.push('--remount-ro', directory);
   args.push('--chdir', policy.workspace);
   return args;
 }
@@ -243,8 +306,9 @@ export async function launchConfined(options: {
   completed: Promise<void>;
   stop: () => Promise<void>;
 }> {
-  if (!/^[a-zA-Z0-9_-]+\.service$/.test(options.owner))
+  if (!/^[a-zA-Z0-9_-]+\.(service|scope)$/.test(options.owner))
     throw new ConfinementOwnerError('Invalid confinement owner');
+  const scope = options.owner.endsWith('.scope');
   const timeout = options.timeoutMs ?? 10000;
   const control = async (...args: string[]) =>
     (await exec('systemctl', ['--user', ...args], { timeout })).stdout;
@@ -256,17 +320,33 @@ export async function launchConfined(options: {
       .map((line) => line.split('=')),
   );
   const selfGroup = readFileSync('/proc/self/cgroup', 'utf8').trim();
-  if (
-    fields.ActiveState !== 'active' ||
-    !fields.InvocationID ||
-    fields.InvocationID !== process.env.INVOCATION_ID ||
-    !fields.ControlGroup ||
-    !selfGroup.endsWith(`:${fields.ControlGroup}`)
-  )
+  const inside =
+    fields.ControlGroup !== undefined &&
+    fields.ControlGroup !== '' &&
+    selfGroup.endsWith(`:${fields.ControlGroup}`);
+  const enrolled =
+    inside &&
+    (!scope ||
+      (() => {
+        try {
+          return readFileSync(`/sys/fs/cgroup${fields.ControlGroup}/cgroup.procs`, 'utf8')
+            .split('\n')
+            .includes(String(process.pid));
+        } catch {
+          return false;
+        }
+      })());
+  const invocation = process.env.INVOCATION_ID;
+  const invocationMatches = scope
+    ? invocation === undefined || fields.InvocationID === invocation
+    : fields.InvocationID !== undefined &&
+      fields.InvocationID !== '' &&
+      fields.InvocationID === invocation;
+  if (fields.ActiveState !== 'active' || !enrolled || !invocationMatches)
     throw new ConfinementOwnerError('Confinement owner is not this daemon invocation');
   options.signal?.throwIfAborted();
   const unit = `cairn-confine-${randomUUID()}.service`;
-  const nonce = `${fields.InvocationID}:${randomUUID()}`;
+  const nonce = `${fields.InvocationID || options.owner}:${randomUUID()}`;
   const runtimeEnvironment = process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {};
   const mounts = [
     ...confinementArgs(options.policy),
@@ -338,6 +418,7 @@ export async function launchConfined(options: {
           ]);
           if (!settled) throw error;
         }
+        await control('reset-failed', unit).catch(() => {});
       }
       assertConfinementCleanup(true, () => readFileSync(eventsPath, 'utf8'), 'path');
       options.released?.();
@@ -423,5 +504,8 @@ export async function reconcileConfinement(reservation: {
   } catch (error) {
     if (!isUnitNotLoaded(error)) throw error;
   }
+  await exec('systemctl', ['--user', 'reset-failed', reservation.unit], { timeout: 10000 }).catch(
+    () => {},
+  );
   assertConfinementCleanup(true, () => readFileSync(reservation.eventsPath, 'utf8'), 'path');
 }

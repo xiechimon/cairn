@@ -30,6 +30,10 @@ describe('turnErrorKind names the failure from the stored raw text', () => {
     ],
     ['Coordinator turn ended: model_error "529: overloaded"', 'busy'],
     ['Coordinator turn ended: model_error "502: Bad Gateway"', 'provider'],
+    [
+      'API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required',
+      'runtime-update',
+    ],
     ['Coordinator turn has no answer entry', 'unknown'],
   ])('%s', (message, kind) => {
     expect(turnErrorKind(message)).toBe(kind);

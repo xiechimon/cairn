@@ -1,3 +1,5 @@
+> Superseded by `docs/design/eval-gate.md` (existing-framework decision, 2026-11-21).
+
 # Offline Coordinator evaluation on Langfuse
 
 Status: direction accepted by the coordinator in round 2; revised details await review; stop before implementation. Scope: offline routing evaluation, not production state or the other eval families. Source: [research](../research/eval-on-langfuse-2026-11-09.md); issue #3700. Evidence terms: observed = read in this checkout; derived = proposed consequence; unverified = implementation acceptance remains open.

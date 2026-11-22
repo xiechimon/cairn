@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -110,15 +110,22 @@ beforeAll(async () => {
     })}\n`,
   );
   runLog = join(claudeConfigHome(home), 'fake-runs.log');
+  const fake = join(userHome, 'fake-claude-env.mjs');
+  writeFileSync(
+    fake,
+    '#!/usr/bin/env node\n' +
+      `process.env.FAKE_CLAUDE_HONOR_SESSION_ID = '1';\n` +
+      `process.env.FAKE_CLAUDE_TRANSCRIPT_DIR = ${JSON.stringify(transcripts)};\n` +
+      `process.env.FAKE_CLAUDE_RUN_LOG = ${JSON.stringify(runLog)};\n` +
+      `await import(${JSON.stringify(`file://${FAKE}`)});\n`,
+  );
+  chmodSync(fake, 0o755);
   for (const [key, value] of Object.entries({
     HOME: userHome,
     CLAUDE_CONFIG_DIR: configDir,
     CLAUDE_CODE_PROJECT_DIR_NAME: PROJECT_DIR_NAME,
-    CAIRN_CLAUDE_BIN: FAKE,
-    CLAUDE_BIN: FAKE,
-    FAKE_CLAUDE_HONOR_SESSION_ID: '1',
-    FAKE_CLAUDE_TRANSCRIPT_DIR: transcripts,
-    FAKE_CLAUDE_RUN_LOG: runLog,
+    CAIRN_CLAUDE_BIN: fake,
+    CLAUDE_BIN: fake,
   })) {
     saved[key] = process.env[key];
     process.env[key] = value;
@@ -218,6 +225,7 @@ describe('after the owner switches the enabled Claude account', () => {
       return th?.lastTurnAt != null && th.activeRun === null;
     }, 120_000);
     const turn = stepsOf(threadId).find((st) => st.kind === 'chief');
+
     expect(turn).toMatchObject({ status: 'done', claudeSubscriptionId: accountA });
     threadSessionOnA =
       server.db.select().from(chiefThread).where(eq(chiefThread.id, threadId)).get()?.sessionId ??

@@ -11,10 +11,10 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import { sha256Hex } from '../src/lib/crypto.js';
+import { cancelPendingQuestions } from '../src/services/chief-question-store.js';
 import {
   ASK_HOLD_MS,
   answerQuestion,
-  cancelPendingQuestions,
   createOrGetQuestion,
   holdForQuestion,
 } from '../src/services/chief-questions.js';

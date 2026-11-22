@@ -133,10 +133,21 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
     acp === 'session-error'
       ? '{"jsonrpc":"2.0","id":3,"error":{"code":-32000,"message":"session blew up"}}'
       : `{"jsonrpc":"2.0","id":3,"result":{"sessionId":"s1","configOptions":${JSON.stringify(CONFIG_OPTIONS)}}}`;
-  const updateLine =
+  const sessionUpdate =
     acp === 'ok'
-      ? `printf '%s\\n' '{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s1","update":{"sessionUpdate":"config_option_update","configOptions":${JSON.stringify(UPDATE_OPTIONS)}}}}'`
-      : ':';
+      ? JSON.stringify({
+          jsonrpc: '2.0',
+          method: 'session/update',
+          params: {
+            sessionId: 's1',
+            update: { sessionUpdate: 'config_option_update', configOptions: UPDATE_OPTIONS },
+          },
+        })
+      : null;
+  const sessionLines = sessionUpdate === null ? [sessionReply] : [sessionReply, sessionUpdate];
+  const sessionWrite = `printf '${sessionLines.map(() => '%s\\n').join('')}' ${sessionLines
+    .map((line) => `'${line}'`)
+    .join(' ')}`;
   writeFileSync(
     binary,
     [
@@ -156,9 +167,7 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
       '    *authenticate*)',
       `      printf '%s\\n' '${authReply}' ;;`,
       '    *session/new*)',
-      `      printf '%s\\n' '${sessionReply}'`,
-      '      sleep 0.1',
-      `      ${updateLine} ;;`,
+      `      ${sessionWrite} ;;`,
       '  esac',
       'done',
     ].join('\n'),

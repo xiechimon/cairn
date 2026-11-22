@@ -11,7 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useClaudeSubscriptions } from '../api/claude-subscriptions.js';
+import { useClaudeSubscriptions, useRefreshClaudeQuota } from '../api/claude-subscriptions.js';
 import { useChiefThreads, useMachines, useTasks } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useDailyUsage } from '../api/usage-daily.js';
@@ -54,6 +54,7 @@ function useTrayData(): { groups: TrayGroup[]; usage: TrayUsage | null; coordina
   const machinesQ = useMachines(teamId, live);
   const usageQ = useDailyUsage(teamId, 1, TIME_ZONE, live);
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const refreshQuota = useRefreshClaudeQuota(teamId).mutate;
   const threadsQ = useChiefThreads(teamId, live);
 
   useEffect(() => {
@@ -61,9 +62,20 @@ function useTrayData(): { groups: TrayGroup[]; usage: TrayUsage | null; coordina
       setNow(Date.now());
       void client.invalidateQueries({ queryKey: ['machines', teamId] });
       void client.invalidateQueries({ queryKey: ['usage-daily', teamId] });
+      if (live && teamId !== undefined && document.visibilityState === 'visible') refreshQuota();
     }, TRAY_REFRESH_MS);
     return () => window.clearInterval(timer);
-  }, [client, teamId]);
+  }, [client, live, teamId, refreshQuota]);
+
+  useEffect(() => {
+    if (!live || teamId === undefined) return;
+    const onShow = () => {
+      if (document.visibilityState === 'visible') refreshQuota();
+    };
+    onShow();
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, [live, teamId, refreshQuota]);
 
   const groups = useMemo(
     () => trayGroups(tasksFromQuery(tasksQ.data), machinesQ.data, now),
@@ -254,8 +266,8 @@ export function TrayPage() {
           role="switch"
           aria-checked={keepAwake}
           className="tray-disc"
-          title={t('保持 Mac 唤醒')}
-          aria-label={t('保持 Mac 唤醒')}
+          title={t('保持屏幕常亮')}
+          aria-label={t('保持屏幕常亮')}
           onClick={() => bridge?.setKeepAwake(!keepAwake)}
         >
           <Coffee className="size-5" aria-hidden="true" />

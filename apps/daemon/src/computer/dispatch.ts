@@ -32,6 +32,11 @@ import {
   protectedComputerLifecycleRefusal,
 } from './guard.js';
 import type { HostScreen, ScreenCall, ScreenOutcome } from './host-screen.js';
+import {
+  OWNER_CHROME_NO_EXTENSION,
+  OwnerChromeUnavailable,
+  runOwnerChromeTool,
+} from './owner-chrome.js';
 import type { Phones } from './phones.js';
 import {
   type ComputerFileEntry,
@@ -470,6 +475,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     const poster = posterFor(call, controller);
     let result: BrowserToolResult;
+    let ownerChromeNote: string | null = null;
     const run = (params: Record<string, unknown>) =>
       runBrowserTool(route.provider, call.tool as BrowserToolName, params, {
         deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
@@ -481,12 +487,32 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         cairnOrigins: options.cairnOrigins,
         browserSecrets: call.browserSecrets,
       });
+    const runOwnerChrome = () =>
+      runOwnerChromeTool(call.tool as BrowserToolName, call.params, {
+        deadlineAt: call.deadlineAt - FINAL_FRAME_MARGIN_MS,
+        now,
+        signal: controller.signal,
+        session: call.scopeKey ?? call.stepId,
+        cairnOrigins: options.cairnOrigins,
+      });
     try {
-      result = await run(call.params);
+      if (call.ownerChrome !== undefined) {
+        try {
+          result = await runOwnerChrome();
+        } catch (error) {
+          if (!(error instanceof OwnerChromeUnavailable)) throw error;
+          const reason =
+            error.reason === 'no-extension' ? OWNER_CHROME_NO_EXTENSION : error.message;
+          ownerChromeNote = `[Ran in Cairn's browser instead of your own Chrome. ${reason}]`;
+          result = await run(call.params);
+        }
+      } else result = await run(call.params);
       if (result.automationBlocked) {
         const stealthy = await run({ ...call.params, stealth: true });
         result = { ...stealthy, text: `${AUTO_STEALTH_NOTE}\n${stealthy.text}` };
       }
+      if (ownerChromeNote !== null)
+        result = { ...result, text: `${ownerChromeNote}\n${result.text}` };
     } catch (error) {
       await poster.finish(
         error instanceof ComputerRefusal

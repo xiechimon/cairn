@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
@@ -78,6 +79,8 @@ async function drain(events: AsyncIterable<StepEvent>): Promise<StepEvent[]> {
   for await (const event of events) out.push(event);
   return out;
 }
+
+const LEAKY_MCP = join(import.meta.dirname, 'fixtures', 'leaky-mcp-server.mjs');
 
 function sessionOpts(cwd: string, baseUrl: string, extra: Partial<SessionOpts>): SessionOpts {
   return {
@@ -172,4 +175,38 @@ test('an MCP connect failure reaches the log callback with the step redactor app
   } finally {
     await handle.stop();
   }
+});
+
+test('an MCP server log message never writes the step credential to the daemon MCP log', async () => {
+  const baseUrl = await listen(scriptedModel(['done']));
+  const directory = testTempDir('pi-cred-mcp-log-');
+  const agentDir = join(directory, 'agent');
+  const handle = await createPiBackend({
+    agentDir,
+    sessionDir: join(directory, 'sessions'),
+  }).createSession(
+    sessionOpts(directory, baseUrl, {
+      secrets: () => [STEP_SECRET],
+      mcpServers: [
+        {
+          slug: 'leaky',
+          transport: 'stdio',
+          command: process.execPath,
+          args: [LEAKY_MCP],
+          env: { MCP_FIXTURE_SECRET: STEP_SECRET },
+        },
+      ],
+    }),
+  );
+  try {
+    await drain(handle.events);
+  } finally {
+    await handle.stop();
+  }
+  const logPath = join(agentDir, 'mcp.log');
+  await vi.waitFor(() => expect(existsSync(logPath)).toBe(true), { timeout: 15_000 });
+  const written = readFileSync(logPath, 'utf8');
+  expect(written).toContain('[leaky]');
+  expect(written).not.toContain(STEP_SECRET);
+  expect(written).toContain('[REDACTED]');
 });

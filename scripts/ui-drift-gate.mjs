@@ -231,12 +231,31 @@ for (const owner of SEGMENTED_ALLOWLIST.keys()) {
     failures.push(`G7 STALE allowlist entry ${owner}: file is gone — drop or re-point it.`);
 }
 
+const STATE_SHADOW_ALLOWLIST = new Map([
+  [
+    'board/file-lightbox.tsx hover:shadow-(--e2)',
+    'V21 lightbox exception: the adjacent-file peek lifts on hover to say it pages',
+  ],
+]);
+const stateShadowAllowed = new Set();
 for (const file of [...cssFiles, ...tsxFiles, ...walk(WEB_SRC, '.ts')]) {
   for (const finding of shadowFindings(readFileSync(file, 'utf8'))) {
+    const allowKey = `${rel(file)} ${finding.text}`;
+    if (STATE_SHADOW_ALLOWLIST.has(allowKey)) {
+      stateShadowAllowed.add(allowKey);
+      continue;
+    }
     failures.push(
       `G8 ${rel(file)}:${finding.line}: state shadow or box-shadow transition (${finding.text}); remove it or add deliberate-shadow with a reason on the preceding line`,
     );
   }
+}
+
+for (const allowKey of STATE_SHADOW_ALLOWLIST.keys()) {
+  if (!stateShadowAllowed.has(allowKey))
+    failures.push(
+      `G8 STALE allowlist entry ${allowKey}: no such state shadow — drop or re-point it.`,
+    );
 }
 
 if (failures.length === 0) {

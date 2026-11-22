@@ -108,7 +108,7 @@ function releaseClaimedStep(
   } else {
     deps.db
       .update(step)
-      .set({ status: 'pending', machineId: null, claimCount: claims })
+      .set({ status: 'pending', machineId: null, claimCount: claims, mcpGrant: null })
       .where(eq(step.id, row.id))
       .run();
   }

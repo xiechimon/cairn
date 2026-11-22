@@ -258,6 +258,14 @@ export const chiefNoticeContentSchema = z.object({
   message: z.string(),
   provenance: provenanceSchema,
   report: reportRefSchema.optional(),
+  runtimeUpdate: z
+    .object({
+      task: z.string(),
+      runtime: z.string().nullable(),
+      current: z.string().nullable(),
+      required: z.string(),
+    })
+    .optional(),
 });
 export type ChiefNoticeContent = z.infer<typeof chiefNoticeContentSchema>;
 

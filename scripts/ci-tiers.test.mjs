@@ -125,10 +125,10 @@ function gatePasses(scenarios) {
   return statuses.map((status) => status === '0');
 }
 
-test('the full 4-shard e2e and 2-shard e2e-affected match classifier tiers unless draft overrides', () => {
+test('the full 5-shard e2e and 2-shard e2e-affected match classifier tiers unless draft overrides', () => {
   assert.ok(tierExpression);
-  assert.match(job('e2e'), /shard: \[1, 2, 3, 4\]/);
-  assert.match(job('e2e'), /run: pnpm prepush --e2e-shard \$\{\{ matrix.shard \}\}\/4/);
+  assert.match(job('e2e'), /shard: \[1, 2, 3, 4, 5\]/);
+  assert.match(job('e2e'), /run: pnpm prepush --e2e-shard \$\{\{ matrix.shard \}\}\/5/);
   assert.match(job('e2e-affected'), /shard: \[1, 2\]/);
   assert.match(job('e2e-affected'), /run: pnpm --filter @cairn\/web e2e:affected --shard=/);
   assert.match(job('e2e-affected'), /fetch-depth: 0/);
@@ -341,6 +341,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'ops-selftests': 'false',
       'needs-integration': 'false',
       'e2e-tier': 'none',
+      'eval-needed': 'false',
     });
     assert.equal(lastBaseSha, baseSha);
 
@@ -351,6 +352,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'ops-selftests': 'false',
       'needs-integration': 'false',
       'e2e-tier': 'none',
+      'eval-needed': 'false',
     });
 
     assert.deepEqual(runClassify({ 'apps/daemon/src/worker.ts': 'export const a = 1;\n' }), {
@@ -360,6 +362,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'ops-selftests': 'false',
       'needs-integration': 'true',
       'e2e-tier': 'none',
+      'eval-needed': 'false',
     });
 
     assert.deepEqual(runClassify({ 'apps/server/src/routes.ts': 'export const r = 1;\n' }), {
@@ -369,6 +372,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'ops-selftests': 'false',
       'needs-integration': 'true',
       'e2e-tier': 'affected',
+      'eval-needed': 'false',
     });
 
     assert.deepEqual(runClassify({ 'apps/web/src/pages/Home.tsx': 'export const h = 1;\n' }), {
@@ -378,6 +382,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'ops-selftests': 'false',
       'needs-integration': 'false',
       'e2e-tier': 'affected',
+      'eval-needed': 'false',
     });
 
     assert.deepEqual(
@@ -389,6 +394,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
         'ops-selftests': 'false',
         'needs-integration': 'false',
         'e2e-tier': 'full',
+        'eval-needed': 'false',
       },
     );
 
@@ -399,6 +405,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'ops-selftests': 'true',
       'needs-integration': 'true',
       'e2e-tier': 'full',
+      'eval-needed': 'false',
     });
 
     assert.deepEqual(runClassify({ 'apps/tsnet-sidecar/main.go': 'package main\n' }), {
@@ -408,6 +415,17 @@ test('changes classify script sets outputs across push and pull_request diffs in
       'ops-selftests': 'false',
       'needs-integration': 'false',
       'e2e-tier': 'none',
+      'eval-needed': 'false',
+    });
+
+    assert.deepEqual(runClassify({ '.github/workflows/ci.yml': 'name: ci\n' }), {
+      'has-code': 'true',
+      'has-sidecar': 'false',
+      'gates-needed': 'true',
+      'ops-selftests': 'true',
+      'needs-integration': 'true',
+      'e2e-tier': 'none',
+      'eval-needed': 'true',
     });
 
     assert.deepEqual(
@@ -422,6 +440,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
         'ops-selftests': 'true',
         'needs-integration': 'true',
         'e2e-tier': 'full',
+        'eval-needed': 'true',
       },
     );
 
@@ -461,6 +480,7 @@ test('changes classify script sets outputs across push and pull_request diffs in
         'ops-selftests': 'false',
         'needs-integration': 'true',
         'e2e-tier': 'affected',
+        'eval-needed': 'false',
       });
       git('checkout', '-q', '-B', 'case', baseSha);
       git('update-ref', '-d', 'refs/remotes/origin/main');

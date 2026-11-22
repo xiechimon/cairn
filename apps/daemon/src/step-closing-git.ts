@@ -18,6 +18,7 @@ export interface ClosingGitInput {
   headAtStart: string | null;
   stepStartMs: number;
   push: () => Promise<GitCredentialSource>;
+  env?: NodeJS.ProcessEnv;
   note: (id: string, content: string) => void;
   log: (message: string) => void;
   logRaw: (message: string) => void;
@@ -59,7 +60,12 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       );
     }
     if (claimed.step.kind === 'merge') {
-      const merged = await git.mergeDefaultBranch(ws.cwd, ws.defaultBranch, input.mergeCredential);
+      const merged = await git.mergeDefaultBranch(
+        ws.cwd,
+        ws.defaultBranch,
+        input.mergeCredential,
+        input.env,
+      );
       note(
         `merge-${stepId}`,
         `git merge origin/${ws.defaultBranch} 结果为 "${merged.output || 'OK'}"`,

@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { rmSync } from 'node:fs';
+import { realpathSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   GitCgiRequest,
@@ -18,6 +18,15 @@ export interface GitRunResult {
   stderr: string;
 }
 
+const REPO_BINDING_ENV =
+  /^GIT_(DIR|WORK_TREE|INDEX_FILE|PREFIX|COMMON_DIR|OBJECT_DIRECTORY|ALTERNATE_OBJECT_DIRECTORIES|NAMESPACE|CEILING_DIRECTORIES)$/;
+
+function inheritedGitEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) if (REPO_BINDING_ENV.test(key)) delete env[key];
+  return env;
+}
+
 export function runGit(
   args: string[],
   opts: { cwd?: string; stdin?: Uint8Array; env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
@@ -25,7 +34,8 @@ export function runGit(
   return new Promise((resolve, reject) => {
     const child = spawn('git', args, {
       cwd: opts.cwd,
-      env: { ...process.env, ...opts.env },
+      // a pushed refs/replace/* ref must never change what server-side git reads see
+      env: { ...inheritedGitEnv(), ...opts.env, GIT_NO_REPLACE_OBJECTS: '1' },
       windowsHide: true,
       ...(opts.timeoutMs !== undefined ? { timeout: opts.timeoutMs } : {}),
     });
@@ -37,7 +47,7 @@ export function runGit(
     });
     child.on('error', reject);
     child.on('close', (code) =>
-      resolve({ code: code ?? 0, stdout: Buffer.concat(stdout), stderr }),
+      resolve({ code: code ?? 1, stdout: Buffer.concat(stdout), stderr }),
     );
     // an in-flight stdin write becomes EPIPE when the child closes its read end early
     child.stdin.on('error', () => {});
@@ -55,6 +65,10 @@ export const DEFAULT_HEAD_BRANCH = 'main';
 export function isSafeRepoPath(path: string): boolean {
   if (path === '' || path.startsWith('/') || path.includes('\0')) return false;
   return !path.split('/').includes('..');
+}
+
+export function looksBinary(buf: Uint8Array): boolean {
+  return buf.subarray(0, 8000).includes(0);
 }
 
 export function decodeCgiResponse(raw: Buffer): GitCgiResponse {
@@ -95,6 +109,34 @@ export function decodeCgiResponse(raw: Buffer): GitCgiResponse {
   }
   if (chunked) body = decodeChunked(body);
   return { status, headers, body };
+}
+
+const REPLACE_REFS_PREFIX = 'refs/replace';
+
+async function transferHideRefs(dir: string): Promise<string[]> {
+  const listed = await runGit(['config', '--get-all', 'transfer.hideRefs'], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  return listed.code === 0 ? listed.stdout.toString('utf8').split('\n') : [];
+}
+
+async function denyReplaceRefs(dir: string): Promise<void> {
+  // the dir itself must be the git dir; inside an unrelated repo the config write would land there
+  const probe = await runGit(['rev-parse', '--absolute-git-dir'], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  if (probe.code !== 0 || probe.stdout.toString('utf8').trim() !== realpathSync(dir)) return;
+  if ((await transferHideRefs(dir)).includes(REPLACE_REFS_PREFIX)) return;
+  const added = await runGit(['config', '--add', 'transfer.hideRefs', REPLACE_REFS_PREFIX], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  // a racing first touch may hold the config lock; the value it wrote satisfies the guard
+  if (added.code !== 0 && !(await transferHideRefs(dir)).includes(REPLACE_REFS_PREFIX)) {
+    throw new Error(`git config transfer.hideRefs failed: ${added.stderr}`);
+  }
 }
 
 export function decodeChunked(buf: Buffer): Buffer {
@@ -344,6 +386,7 @@ export const systemGitOps: GitOps = {
       ['symbolic-ref', 'HEAD', `refs/heads/${DEFAULT_HEAD_BRANCH}`],
       ['config', 'http.receivepack', 'true'],
       ['config', 'http.uploadpack', 'true'],
+      ['config', 'transfer.hideRefs', REPLACE_REFS_PREFIX],
     ];
     for (const args of steps) {
       const r = await runGit(args, { cwd: dir, timeoutMs: META_TIMEOUT_MS });
@@ -416,11 +459,13 @@ export const systemGitOps: GitOps = {
 
   async isGitRepo(dir) {
     try {
-      const r = await runGit(['rev-parse', '--is-inside-work-tree'], {
+      const r = await runGit(['rev-parse', '--show-toplevel'], {
         cwd: dir,
         timeoutMs: META_TIMEOUT_MS,
       });
-      return r.code === 0 && r.stdout.toString('utf8').trim() === 'true';
+      if (r.code !== 0) return false;
+      const toplevel = r.stdout.toString('utf8').trim();
+      return toplevel !== '' && realpathSync(toplevel) === realpathSync(dir);
     } catch {
       return false;
     }
@@ -530,6 +575,9 @@ export const systemGitOps: GitOps = {
   },
 
   async httpBackend(req: GitCgiRequest): Promise<GitCgiResponse> {
+    // existing repositories predate initBareRepo's transfer.hideRefs; backfill on first touch
+    const repoName = req.pathInfo.slice(1).split('/')[0] ?? '';
+    if (repoName.endsWith('.git')) await denyReplaceRefs(join(req.projectRoot, repoName));
     const env: NodeJS.ProcessEnv = {
       GIT_PROJECT_ROOT: req.projectRoot,
       GIT_HTTP_EXPORT_ALL: '1',

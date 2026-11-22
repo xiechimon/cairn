@@ -406,18 +406,13 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
   });
 
-  test('Esc in the composer and `/stop` both stop the running reply', async ({ page }) => {
+  test('Esc in the composer stops the running reply', async ({ page }) => {
     const calls = await mockLive(page, busyState());
     await page.goto('/app');
     const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
     await input.focus();
     await input.press('Escape');
     await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(1);
-    await input.fill('/stop');
-    await input.press('ArrowDown');
-    await input.press('Enter');
-    await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(2);
-    await expect(input).toHaveValue('');
     expect(calls).not.toContain('send');
   });
 

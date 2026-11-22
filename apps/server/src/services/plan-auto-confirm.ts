@@ -17,7 +17,7 @@ import {
   todo,
 } from '../db/schema.js';
 import type { BuildDeps } from './builds.js';
-import { askQuestionContentOf } from './chief-questions.js';
+import { askQuestionContentOf } from './chief-question-store.js';
 import { projectOfTodo } from './git.js';
 import { planHasOpenDecisions } from './plan-decisions.js';
 import { childrenOfTodo } from './todos.js';

@@ -18,7 +18,6 @@ const PER_PAGE = 100;
 const COMPARE_PAGES = 10;
 const RUN_PAGES = 10;
 const STATUS_PAGES = 5;
-const RULE_PAGES = 5;
 const EVIDENCE_PROBES = 5;
 const DIRECTORY_CAP = 1000;
 
@@ -237,7 +236,7 @@ async function readRules(
   allowUnsupportedRulesets = false,
 ): Promise<Binding[] | null> {
   const out: Binding[] = [];
-  for (let page = 1; page <= RULE_PAGES; page += 1) {
+  for (let page = 1; ; page += 1) {
     const got = await readBody(
       r,
       page === 1 ? `rules:${req.owner}/${req.repo}:${branch}`.toLowerCase() : null,
@@ -271,7 +270,6 @@ async function readRules(
     }
     if (got.body.length < PER_PAGE) return out;
   }
-  return null;
 }
 
 function commitsOf(v: unknown): GateCompareCommit[] | null {

@@ -36,6 +36,7 @@ import type {
   McpConnectorOAuthMeta,
   McpConnectorStatus,
   McpConnectorTool,
+  McpConnectorTransport,
   MemoryCandidateStatus,
   MemoryLayer,
   ModelRef,
@@ -333,6 +334,7 @@ export const step = sqliteTable(
     holdUntil: epochMs('holdUntil'),
     holdCount: integer('holdCount').notNull().default(0),
     claimCount: integer('claimCount').notNull().default(0),
+    mcpGrant: json<string[]>('mcpGrant'),
     memoryTrace: json<ChiefMemoryTrace>('memoryTrace'),
     createdAt: epochMs('createdAt').notNull(),
   },
@@ -609,6 +611,19 @@ export const notification = sqliteTable(
     channels: json<['in_app']>('channels').notNull().default(['in_app']),
   },
   (t) => [index('notification_type_readAt_idx').on(t.type, t.readAt)],
+);
+
+export const noticeMark = sqliteTable(
+  'notice_mark',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId').notNull(),
+    condition: text('condition').$type<'no_machine' | 'watchdog_flag'>().notNull(),
+    subjectId: text('subjectId').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    notedAt: epochMs('notedAt').notNull(),
+  },
+  (t) => [index('notice_mark_userId_condition_idx').on(t.userId, t.condition)],
 );
 
 export const routingRule = sqliteTable(
@@ -976,8 +991,13 @@ export const machine = sqliteTable(
     claudeRateLimits: json<ClaudeRateLimitWindow[] | null>('claudeRateLimits'),
     lastSeenAt: epochMs('lastSeenAt'),
     capabilities: json<MachineCapabilities | null>('capabilities'),
+    hostKey: text('hostKey'),
+    retiredAt: epochMs('retiredAt'),
   },
-  (t) => [index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt)],
+  (t) => [
+    index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt),
+    index('machine_team_hostKey_idx').on(t.teamId, t.hostKey),
+  ],
 );
 
 export const threadPr = sqliteTable(
@@ -1222,6 +1242,7 @@ export const chiefMessage = sqliteTable('chief_message', {
   content: json<unknown>('content').notNull(),
   projectId: text('projectId'),
   delivery: text('delivery').$type<ChiefMessageDelivery>(),
+  origin: text('origin').$type<TranscriptUserOrigin>(),
   createdAt: epochMs('createdAt').notNull(),
 });
 
@@ -1444,6 +1465,7 @@ export const gateVerdict = sqliteTable(
     patchDigest: text('patchDigest'),
     headSha: text('headSha'),
     expectedHeadSha: text('expectedHeadSha').notNull(),
+    ranModel: json<StepRanModel>('ranModel'),
     createdAt: epochMs('createdAt').notNull(),
   },
   (t) => [index('gate_verdict_buildId_idx').on(t.buildId)],
@@ -1564,7 +1586,8 @@ export const mcpConnector = sqliteTable(
     slug: text('slug').notNull(),
     label: text('label').notNull(),
     catalogId: text('catalogId'),
-    url: text('url').notNull(),
+    transport: text('transport').$type<McpConnectorTransport>().notNull().default('http'),
+    url: text('url'),
     headerNames: json<string[]>('headerNames').notNull(),
     valuesCipher: text('valuesCipher'),
     authKind: text('authKind').$type<McpConnectorAuthKind>().notNull().default('none'),
@@ -1586,8 +1609,9 @@ export const mcpConnector = sqliteTable(
     uniqueIndex('mcp_connector_team_slug_idx').on(t.teamId, t.slug),
     check(
       'mcp_connector_status',
-      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error', 'revoked')`,
+      sql`${t.status} in ('unchecked', 'connected', 'needs_auth', 'error', 'revoked', 'local')`,
     ),
+    check('mcp_connector_transport', sql`${t.transport} in ('http', 'stdio')`),
     check(
       'mcp_connector_auth_kind',
       sql`${t.authKind} in ('none', 'static', 'oauth', 'github-app', 'composio')`,

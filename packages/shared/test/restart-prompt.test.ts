@@ -1,15 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import {
-  appendPlanLocationNote,
-  appendWorkBranchNote,
   buildRestartPrompt,
   buildTaskPromptText,
-  CONTINUE_PROMPTS,
-  classifyUserText,
   composeTaskPromptWithInstruction,
   RESTART_FEEDBACK_MAX_CHARS,
-  SESSION_BRIEF,
-  SESSION_REWORK_BRIEF,
 } from '../src/records/prompts.js';
 
 const TITLE = '重启探针';
@@ -58,107 +52,5 @@ describe('composeTaskPromptWithInstruction (failure mode 1)', () => {
     expect(composed).toBe(`${TASK_TEXT}\n\n${instruction}`);
     expect(composed.startsWith(TASK_TEXT)).toBe(true);
     expect(composed.endsWith(instruction)).toBe(true);
-  });
-});
-
-describe('classifyUserText combined-line recognition (failure modes 4/5)', () => {
-  const task = { title: TITLE, spec: SPEC };
-
-  test('bare task text -> task-prompt (existing contract regression pin)', () => {
-    expect(classifyUserText(TASK_TEXT.trim(), task)).toBe('task-prompt');
-  });
-
-  test('bare restart instruction -> synthetic (existing contract regression pin)', () => {
-    expect(classifyUserText(buildRestartPrompt('x'), task)).toBe('synthetic');
-  });
-
-  test('combined line (task prefix + restart instruction remainder) -> synthetic whole line exits', () => {
-    const composed = composeTaskPromptWithInstruction(
-      TASK_TEXT,
-      buildRestartPrompt('把测试也补上'),
-    );
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test('combined line (truncated restart instruction remainder) -> synthetic (truncation does not break recognition)', () => {
-    const instruction = buildRestartPrompt('返'.repeat(RESTART_FEEDBACK_MAX_CHARS + 100));
-    const composed = composeTaskPromptWithInstruction(TASK_TEXT, instruction);
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test('combined line (task prefix + CONTINUE instruction remainder) -> synthetic (general synthesis surface)', () => {
-    const composed = composeTaskPromptWithInstruction(TASK_TEXT, CONTINUE_PROMPTS.plan);
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test("task prefix + user's own words -> user (no false kills)", () => {
-    const text = `${TASK_TEXT}\n\n另外移动端也要看一眼`;
-    expect(classifyUserText(text.trim(), task)).toBe('user');
-  });
-
-  test('feedback text -> user (real user lines unaffected by combined-line recognition)', () => {
-    expect(classifyUserText('把测试也补上', task)).toBe('user');
-  });
-
-  test('combined line (task title drifted) -> synthetic', () => {
-    const composed = composeTaskPromptWithInstruction(
-      buildTaskPromptText('漂移前标题', SPEC),
-      buildRestartPrompt('把测试也补上'),
-    );
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test('combined line (spec drifted) -> synthetic', () => {
-    const composed = composeTaskPromptWithInstruction(
-      buildTaskPromptText(TITLE, '旧版目标，句号收尾。'),
-      buildRestartPrompt('把测试也补上'),
-    );
-    expect(classifyUserText(composed.trim(), task)).toBe('synthetic');
-  });
-
-  test('drifted combined lines with work-branch note / plan handoff note at the tail still synthetic', () => {
-    const base = composeTaskPromptWithInstruction(
-      buildTaskPromptText('漂移前标题', SPEC),
-      buildRestartPrompt('把测试也补上'),
-    );
-    expect(classifyUserText(appendWorkBranchNote(base, 'cairn/conv-1279').trim(), task)).toBe(
-      'synthetic',
-    );
-    expect(
-      classifyUserText(
-        appendPlanLocationNote(base, '/tmp/cairn/plans/conv-1279/plan.md').trim(),
-        task,
-      ),
-    ).toBe('synthetic');
-  });
-
-  test('drifted bare task text (no restart instruction) is still user', () => {
-    const stale = buildTaskPromptText('漂移前标题', SPEC).trim();
-    expect(classifyUserText(stale, task)).toBe('user');
-  });
-
-  test('user text containing a restart header but not matching the template -> user', () => {
-    const text = '看这段\n\n上一轮执行失败。用户反馈：「还没写完';
-    expect(classifyUserText(text, task)).toBe('user');
-  });
-});
-
-describe('session briefs are daemon-injected, not user bubbles', () => {
-  const task = { title: TITLE, spec: SPEC };
-  test('session brief variants classify synthetic', () => {
-    const first = [SESSION_BRIEF, TASK_TEXT].join('\n\n');
-    expect(classifyUserText(SESSION_BRIEF, task)).toBe('synthetic');
-    expect(classifyUserText(first, task)).toBe('synthetic');
-    expect(classifyUserText(composeTaskPromptWithInstruction(TASK_TEXT, first), task)).toBe(
-      'synthetic',
-    );
-    expect(classifyUserText(`${SESSION_REWORK_BRIEF}\n\n改一下`, task)).toBe('synthetic');
-    expect(
-      classifyUserText(
-        composeTaskPromptWithInstruction(TASK_TEXT, `${SESSION_REWORK_BRIEF}\n\n改一下`),
-        task,
-      ),
-    ).toBe('synthetic');
-    expect(classifyUserText('我自己写的话', task)).toBe('user');
   });
 });

@@ -1,0 +1,71 @@
+{
+  "kind": "runtime",
+  "id": "route-split-03",
+  "request": "backend 改登录接口，frontend 改登录页，e2e 补登录测试",
+  "world": {
+    "projects": [
+      "backend",
+      "frontend",
+      "e2e",
+      "unrelated"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@backend",
+            "title": "backend 部分",
+            "quotes": [
+              "backend 改登录接口"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@frontend",
+            "title": "frontend 部分",
+            "quotes": [
+              "frontend 改登录页"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@e2e",
+            "title": "e2e 部分",
+            "quotes": [
+              "e2e 补登录测试"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "已拆成多个任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "backend",
+      "frontend",
+      "e2e"
+    ],
+    "parts": 3,
+    "boundModel": "stub/m"
+  },
+  "gate": true
+}

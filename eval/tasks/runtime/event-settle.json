@@ -1,0 +1,41 @@
+{
+  "kind": "runtime",
+  "id": "event-settle",
+  "request": "todo-100",
+  "event": "settle",
+  "world": {
+    "projects": [
+      "p"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "ask_user",
+          "args": {
+            "questions": [
+              {
+                "header": "ok",
+                "question": "确认?",
+                "options": [
+                  {
+                    "label": "ok",
+                    "description": ""
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "记录完毕。"
+    }
+  ],
+  "expected": {
+    "decision": "any"
+  },
+  "gate": true
+}

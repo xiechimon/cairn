@@ -46,7 +46,7 @@ export async function applyBuildStepAction(
   if (!todoRecord) throw new NotFoundError(`todo ${row.todoId}`);
   if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
-  if (origin !== 'person') assertAutomaticRetryAllowed(deps, row.todoId);
+  if (origin === 'retry') assertAutomaticRetryAllowed(deps, row.todoId);
   else assertParkedBuildIdle(deps, row);
 
   if (body.action === 'restart') {
@@ -111,7 +111,9 @@ export async function applyBuildStepAction(
       revising.phase === 'review'
         ? buildReviewRejectPrompt(body.feedback)
         : buildReplanPrompt(body.feedback);
-    enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person');
+    enqueueStep(deps, buildId, 'plan', revising.teamId, replanPrompt, false, origin === 'person', {
+      kind: 'replan',
+    });
     holdSecondRejectionRework(deps, buildId);
   });
   for (const publish of afterCommit) publish();

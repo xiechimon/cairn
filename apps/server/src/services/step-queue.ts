@@ -31,6 +31,8 @@ import {
 import { projectOfTodo } from './git.js';
 import { infoCardPlan } from './info-card.js';
 import {
+  liveMachineId,
+  machineCanReturn,
   platformFallbackMachineId,
   priorSessionOf,
   type RouteVerdict,
@@ -205,11 +207,14 @@ export function stepQueueProjector(db: Db, teamId: string) {
     );
     const need = agentRow.requiredCapabilities?.os;
     const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);
+    const homeRetired =
+      target.homeMachineId !== null && !machineCanReturn(db, target.homeMachineId);
+    const homePin = homeRetired && !facts.localProject ? null : target.homeMachineId;
     const verdict = routeVerdict({
       machineId: null,
       targets: routeTargets(
-        !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineId : null,
-        target.homeMachineId,
+        !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineLiveId : null,
+        homePin,
         sole,
       ),
     });
@@ -221,6 +226,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
     }
     if (verdict.claim) return { verdict, blocked: undefined };
     const named = verdict.waitingFor;
+    if (homeRetired && facts.localProject && named === target.homeMachineId) {
+      return { verdict, blocked: { kind: 'machine-retired', missing: [] } };
+    }
     const platform = need === undefined ? {} : { platform: need };
     if (named === null) {
       return {
@@ -269,10 +277,11 @@ export function stepQueueProjector(db: Db, teamId: string) {
         }
       }
     }
-    if (target.homeMachineId === null) {
+    const homeMachineId = liveMachineId(db, target.homeMachineId);
+    if (homeMachineId === null) {
       return { kind: 'machine-offline', missing: [] };
     }
-    const home = teamMachines.find((m) => m.id === target.homeMachineId);
+    const home = teamMachines.find((m) => m.id === homeMachineId);
     if (home === undefined || !home.online) {
       return { kind: 'machine-offline', missing: [] };
     }

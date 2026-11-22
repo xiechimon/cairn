@@ -21,6 +21,15 @@ export function useClaudeSubscriptions(teamId: string | undefined, live: boolean
   });
 }
 
+export function useRefreshClaudeQuota(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<ClaudeSubscriptionListEntry[]>(`/api/teams/${teamId}/claude-subscriptions/quota`),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] }),
+  });
+}
+
 export function hasUsableClaudeSubscription(
   subscriptions: readonly Pick<ClaudeSubscription, 'enabled' | 'expiresAt'>[] | undefined,
   now: number,

@@ -171,6 +171,7 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
         .filter((st) => st.kind === 'plan' && st.status === 'pending');
       expect(pending).toHaveLength(1);
       expect(pending[0]!.prompt).toContain(PLAN_FILE_NAME);
+      expect(pending[0]!.promptOrigin).toEqual({ kind: 'plan-rewrite' });
       expect(w.todoRow().hasPlan).toBe(false);
     } finally {
       w.s.dispose();
@@ -191,6 +192,25 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
       expect(w.todoRow().phase).toBe('failed');
       expect(w.stepsOf(buildId).filter((st) => st.kind === 'plan')).toHaveLength(2);
       expect(w.todoRow().hasPlan).toBe(false);
+    } finally {
+      w.s.dispose();
+    }
+  });
+
+  test('a plan.md that fails the structure check -> a rewrite step queued, marked as a plan rewrite', async () => {
+    const w = await setupWorld();
+    try {
+      const buildId = w.startBuild(true);
+      const planStep = await w.claim();
+      await w.uploadPlan(planStep.step.id, '# 方案\nContext: x');
+      await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
+      const pending = w
+        .stepsOf(buildId)
+        .filter((st) => st.kind === 'plan' && st.status === 'pending');
+      expect(pending).toHaveLength(1);
+      expect(pending[0]!.prompt).toContain('结构检查');
+      expect(pending[0]!.promptOrigin).toEqual({ kind: 'plan-rewrite' });
+      expect(w.todoRow().phase).toBe('planning');
     } finally {
       w.s.dispose();
     }
@@ -231,6 +251,9 @@ describe('the plan-gate deliverable check (#113 candidate 1: the plan is the fil
       expect(w.todoRow().phase).toBe('planning');
       const replan = await w.claim();
       expect(replan.step.kind).toBe('plan');
+      expect(w.stepsOf(buildId).find((st) => st.id === replan.step.id)?.promptOrigin).toEqual({
+        kind: 'replan',
+      });
       await w.done(replan.step.id, { status: 'success', sessionId: 'pi-1' });
       expect(w.todoRow().phase).toBe('confirm');
       expect(w.stepsOf(buildId).filter((st) => st.kind === 'plan')).toHaveLength(2);

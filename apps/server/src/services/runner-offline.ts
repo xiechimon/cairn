@@ -5,7 +5,7 @@ import {
   type RunnerOfflineContent,
   runnerOfflineContentSchema,
 } from '@cairn/shared';
-import { and, desc, eq, gte, isNotNull, isNull, like } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNotNull, isNull, like } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefMessage, machine, step, todo } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
@@ -38,8 +38,24 @@ interface PendingRow {
   todoRow: typeof todo.$inferSelect;
 }
 
-function noticeId(machineId: string, lastSeenAt: number): string {
-  return `${NOTICE_PREFIX}${machineId}-${lastSeenAt}`;
+function noticeId(machineId: string): string {
+  return `${NOTICE_PREFIX}${machineId}`;
+}
+
+interface NoticeRow {
+  row: typeof chiefMessage.$inferSelect;
+  content: RunnerOfflineContent;
+}
+
+function canonicalNotice(group: NoticeRow[], machineId: string): NoticeRow {
+  const open = group.filter((entry) => entry.content.recoveredAt === null);
+  const pool = open.length > 0 ? open : group;
+  const stable = noticeId(machineId);
+  return pool.reduce((best, entry) => {
+    if (entry.row.id === stable) return entry;
+    if (best.row.id === stable) return best;
+    return entry.row.createdAt > best.row.createdAt ? entry : best;
+  });
 }
 
 function waitingByMachine(db: Db): Map<string, Map<string, PendingRow>> {
@@ -221,31 +237,75 @@ export function sweepOfflineRunners(deps: ChiefDeps, now: number = nowMs()): voi
       .all()
       .map((row) => [row.id, row]),
   );
+  const byMachine = new Map<string, NoticeRow[]>();
+  for (const row of db
+    .select()
+    .from(chiefMessage)
+    .where(like(chiefMessage.id, `${NOTICE_PREFIX}%`))
+    .all()) {
+    let stored: unknown = null;
+    try {
+      stored = JSON.parse(String(row.content));
+    } catch {}
+    const parsed = runnerOfflineContentSchema.safeParse(stored);
+    if (!parsed.success) continue;
+    const group = byMachine.get(parsed.data.machineId) ?? [];
+    group.push({ row, content: parsed.data });
+    byMachine.set(parsed.data.machineId, group);
+  }
+  const canonical = new Map<string, NoticeRow>();
+  for (const [machineId, group] of byMachine) {
+    const keep = canonicalNotice(group, machineId);
+    canonical.set(machineId, keep);
+    const extras = group.filter((entry) => entry !== keep).map((entry) => entry.row.id);
+    if (extras.length > 0) db.delete(chiefMessage).where(inArray(chiefMessage.id, extras)).run();
+  }
   const created = new Set<string>();
   for (const [machineId, rows] of waiting) {
     const runner = machines.get(machineId);
     if (runner === undefined || runner.online) continue;
     const lastSeenAt = runner.lastSeenAt ?? 0;
     if (now - lastSeenAt < RUNNER_OFFLINE_NOTICE_MS) continue;
+    const existing = canonical.get(machineId);
+    if (
+      existing !== undefined &&
+      existing.content.recoveredAt === null &&
+      existing.content.backAt === null
+    )
+      continue;
+    const content = nextContent(
+      db,
+      {
+        kind: RUNNER_OFFLINE_KIND,
+        machineId,
+        machineName: runner.name,
+        lastSeenAt,
+        todos: [],
+        alternative: null,
+        backAt: null,
+        recoveredAt: null,
+      },
+      runner,
+      rows,
+      now,
+    );
+    if (existing !== undefined) {
+      db.update(chiefMessage)
+        .set({ content: JSON.stringify(content), createdAt: now })
+        .where(eq(chiefMessage.id, existing.row.id))
+        .run();
+      publishNotice(deps, existing.row.id);
+      continue;
+    }
     const thread = coordinatorThreadRow(deps, ensureChief(deps, runner.teamId));
-    const content: RunnerOfflineContent = {
-      kind: RUNNER_OFFLINE_KIND,
-      machineId,
-      machineName: runner.name,
-      lastSeenAt,
-      todos: [],
-      alternative: null,
-      backAt: null,
-      recoveredAt: null,
-    };
-    const id = noticeId(machineId, lastSeenAt);
+    const id = noticeId(machineId);
     const inserted = db
       .insert(chiefMessage)
       .values({
         id,
         threadId: thread.id,
         role: 'system',
-        content: JSON.stringify(nextContent(db, content, runner, rows, now)),
+        content: JSON.stringify(content),
         createdAt: now,
       })
       .onConflictDoNothing()

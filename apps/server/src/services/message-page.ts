@@ -113,6 +113,7 @@ function chiefMessagesWithTurnBoundaries(
         createdAt: turn.claimedAt,
         projectId: scope,
         delivery: null,
+        origin: null,
       },
     ];
   });

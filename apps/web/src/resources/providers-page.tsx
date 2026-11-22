@@ -30,6 +30,7 @@ import {
   testClaudeSubscriptionModel,
   useClaudeSubscriptions,
   useDeleteClaudeSubscription,
+  useRefreshClaudeQuota,
   useRenameClaudeSubscription,
   useSubscriptionVerification,
   useUpdateClaudeSubscriptionModels,
@@ -155,6 +156,7 @@ function subscriptionEntries(
     const verification = deps.verifications[account.id];
     const view = subscriptionStatusView(account, deps.now, deps.t, deps.clock);
     const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
+    const runtimeUpdate = new Map(deps.models.map((model) => [model.id, model.updateRequired]));
     const picked = account.models ?? [];
     const shown: SubscriptionModel[] = (
       picked.length > 0
@@ -163,6 +165,9 @@ function subscriptionEntries(
     ).map((model) => ({
       ...model,
       liveness: runtimeLiveness.get(model.id) === 'dead' ? 'dead' : model.liveness,
+      ...(runtimeUpdate.get(model.id) !== undefined
+        ? { updateRequired: runtimeUpdate.get(model.id) }
+        : {}),
     }));
     const rowModels = shown as ModelSourceModel[];
     return {
@@ -209,6 +214,7 @@ export function ProvidersSection() {
   const client = useQueryClient();
   const clock = useClock();
   const subscriptionsQ = useClaudeSubscriptions(teamId, live);
+  const refreshQuota = useRefreshClaudeQuota(teamId).mutate;
   const devinSubscriptionsQ = useDevinSubscriptions(teamId, live);
   const antigravitySubscriptionsQ = useAntigravitySubscriptions(teamId, live);
   const deleteSubscription = useDeleteClaudeSubscription(teamId);
@@ -253,6 +259,10 @@ export function ProvidersSection() {
   const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
   const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
   const antigravityApiIds = live ? (antigravitySubscriptionsQ.data ?? []).map((s) => s.id) : [];
+
+  useEffect(() => {
+    if (live && teamId !== undefined) refreshQuota();
+  }, [live, teamId, refreshQuota]);
 
   useEffect(() => {
     const oauth = searchParams.get('oauth');

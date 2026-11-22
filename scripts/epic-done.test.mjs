@@ -25,7 +25,6 @@ const issue = (number) => ({
   number,
   state: 'CLOSED',
   stateReason: 'COMPLETED',
-  labels: connection([]),
   timelineItems: connection([
     {
       closer: {
@@ -386,13 +385,7 @@ test('failure mode 1: malformed or partial GitHub data never completes', async (
           : undefined;
     },
     (s) => {
-      s.issues[0].labels.pageInfo.hasNextPage = true;
-    },
-    (s) => {
       s.issues[0].closedByPullRequestsReferences.pageInfo.hasNextPage = true;
-    },
-    (s) => {
-      s.issues[0].labels = null;
     },
     (s) => {
       s.issues[0].timelineItems = null;
@@ -449,9 +442,7 @@ test('failure mode 3: a merged linked PR does not substitute for an open issue',
   const { state, invoke } = harness();
   state.issues[0].state = 'OPEN';
   state.issues[0].stateReason = null;
-  state.issues[0].closedByPullRequestsReferences = connection([
-    { number: 88, state: 'MERGED', labels: connection([]) },
-  ]);
+  state.issues[0].closedByPullRequestsReferences = connection([{ number: 88, state: 'MERGED' }]);
   expectState(await invoke(), 'incomplete', 10, /#1234.*open/i);
 });
 
@@ -638,31 +629,6 @@ test('missing state requires an explicit start without creating a fresh state', 
   expectState(await main(['E1.0a', '--state', path], deps), 'unknown', 2, /started-at/);
   assert.equal(existsSync(path), false);
   assert.equal(state.calls.length, 0);
-});
-
-test('paused: every human-wait label on issues or open linked PRs takes priority over failure', async () => {
-  for (const label of ['waits-ian', 'ready-for-human']) {
-    for (const onPull of [false, true]) {
-      const { state, invoke } = harness();
-      state.stdout = 'no match';
-      if (onPull)
-        state.issues[0].closedByPullRequestsReferences = connection([
-          { number: 88, state: 'OPEN', labels: connection([{ name: label }]) },
-        ]);
-      else state.issues[0].labels = connection([{ name: label }]);
-      expectState(await invoke(['--fail', 'stop']), 'failed', 30, /stop/);
-    }
-  }
-});
-
-test('closed linked PR labels do not pause, while explicit pause does', async () => {
-  const { state, invoke } = harness();
-  state.stdout = 'no match';
-  state.issues[0].closedByPullRequestsReferences = connection([
-    { number: 88, state: 'CLOSED', labels: connection([{ name: 'waits-ian' }]) },
-  ]);
-  expectState(await invoke(), 'incomplete', 10);
-  expectState(await invoke(['--pause', 'quota wait', '--fail', 'stop']), 'failed', 30, /stop/);
 });
 
 test('failed: explicit failure and elapsed maxHours apply only when not complete or paused', async () => {
@@ -1165,18 +1131,6 @@ test('invalid DAGs fail closed before running checks', async () => {
   }
 });
 
-test('owner-waiting open PR is reported and blocks dependents', async () => {
-  const { state, invoke } = batchHarness();
-  state.manifest.items[0].humanHeld = false;
-  state.issues[0].closedByPullRequestsReferences = connection([
-    { number: 88, state: 'OPEN', labels: connection([{ name: 'waits-ian' }]) },
-  ]);
-  const result = await invoke();
-  assert.deepEqual(result.humanHeld, ['owner']);
-  assert.equal(result.items[0].pr, 88);
-  assert.deepEqual(result.ready, ['independent']);
-});
-
 for (const closer of [
   { __typename: 'Commit', oid: outside },
   null,
@@ -1193,7 +1147,6 @@ for (const closer of [
         state: 'MERGED',
         merged: true,
         mergeCommit: commit(closing),
-        labels: connection([]),
       },
     ]);
     const result = await invoke();
@@ -1217,14 +1170,29 @@ for (const reason of ['NOT_PLANNED', 'COMPLETED']) {
   });
 }
 
+test('labels on issues and linked PRs no longer hold items', async () => {
+  const { invoke } = batchHarness();
+  const { facts } = await invoke();
+  facts.manifest.items[0].humanHeld = false;
+  facts.issues[0].labels = ['waits-ian', 'ready-for-human'];
+  facts.issues[0].linkedPulls = [
+    { number: 88, state: 'OPEN', isDraft: false, labels: ['waits-ian'] },
+  ];
+  const result = decideEpic(facts);
+  assert.deepEqual(result.humanHeld, []);
+  assert.deepEqual(result.ready, ['owner', 'independent']);
+  assert.deepEqual(result.blocked, ['child', 'grandchild']);
+});
+
 test('draft open PRs hold items and block dependents', async () => {
   const { state, invoke } = batchHarness();
   state.manifest.items[0].humanHeld = false;
   state.issues[0].closedByPullRequestsReferences = connection([
-    { number: 88, state: 'OPEN', isDraft: true, labels: connection([]) },
+    { number: 88, state: 'OPEN', isDraft: true },
   ]);
   const result = await invoke();
   assert.deepEqual(result.humanHeld, ['owner']);
+  assert.equal(result.items[0].pr, 88);
   assert.deepEqual(result.blocked, ['child', 'grandchild']);
   assert.match(
     JSON.parse(state.calls.find(({ args }) => args[1] === 'graphql').options.input).query,

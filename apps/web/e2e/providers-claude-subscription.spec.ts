@@ -65,7 +65,7 @@ test(`connects, verifies and deletes a subscription on the providers page (${loc
       ? '这个订阅的登录有效。'
       : 'This subscription’s sign-in is valid.',
   );
-  await expect(detail.getByLabel(locale === 'zh' ? '名称' : 'Name')).toBeVisible();
+  await expect(detail.getByTestId('provider-rename')).toBeVisible();
 
   const remove = locale === 'zh' ? '移除' : 'Remove';
   const removeButton = detail.getByRole('button', { name: remove, exact: true });

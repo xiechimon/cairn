@@ -16,7 +16,7 @@ export function trayMenuTemplate(
     { type: 'separator' },
     { label: 'Open Cairn', click: actions.open },
     {
-      label: 'Keep the Mac Awake',
+      label: 'Keep the Screen On',
       type: 'checkbox',
       checked: keepAwake,
       click: () => actions.setKeepAwake(!keepAwake),

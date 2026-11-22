@@ -1,0 +1,30 @@
+{
+  "kind": "canary",
+  "id": "canary-route",
+  "request": "\u5efa\u4e2a\u4efb\u52a1\u5230 p1",
+  "world": {
+    "projects": [
+      "p1"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "p1",
+            "title": "t"
+          }
+        }
+      ]
+    },
+    {
+      "text": "done"
+    }
+  ],
+  "expected": {
+    "decision": "route"
+  },
+  "gate": true
+}

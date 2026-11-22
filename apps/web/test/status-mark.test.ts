@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chatMarkView,
   FULL_PEN,
   finishedTurn,
   isActiveMark,
@@ -42,6 +43,14 @@ describe('statusMarkView', () => {
     );
     expect(view.id).toBe('error');
     expect(view.label).toBe('出错了');
+  });
+
+  it('the chat mark rests after a failed turn, leaving the failure to the card', () => {
+    expect(
+      chatMarkView(
+        input({ running: false, stream: [USER, { kind: 'error', text: 'model refused' }] }),
+      ).id,
+    ).toBe('idle');
   });
 
   it('a pending question is ask, even while a tool runs', () => {

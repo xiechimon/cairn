@@ -9,6 +9,7 @@ import type {
   SessionOpts,
   StepEvent,
   ToolCallRecord,
+  TranscriptRow,
   TranscriptUpload,
 } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
@@ -66,6 +67,7 @@ function claimedBuildStep(): ClaimedStep {
 class FakeClient implements MachineApi {
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   uploadNames: string[][] = [];
+  rows: TranscriptRow[] = [];
 
   constructor(private readonly providerId: string) {}
 
@@ -87,6 +89,9 @@ class FakeClient implements MachineApi {
   async heartbeat() {}
   async tool(_stepId: string, _call: ToolCallRecord) {}
   async transcriptDelta() {}
+  async transcriptRow(_stepId: string, row: TranscriptRow) {
+    this.rows.push(row);
+  }
   async relayTool() {
     return '{}';
   }
@@ -329,6 +334,72 @@ describe('runner auto_retry lifecycle (#708)', () => {
     expect(autoRetries).toBe(2);
     expect(client.doneBodies[0]?.body.status).toBe('failed');
     expect(client.doneBodies[0]?.body.errorMessage).toBe(TRANSIENT_503);
+  });
+});
+
+describe('a retried attempt replaces the failed one in the transcript', () => {
+  const thought = (text: string): StepEvent[] => [
+    { type: 'thinking_delta', text: 'Check the last step.\n' },
+    { type: 'thinking_delta', text },
+  ];
+  const answer: StepEvent[] = [
+    { type: 'text_delta', text: 'It is stuck on review.' },
+    {
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        content: [{ type: 'text', text: 'It is stuck on review.' }],
+        stopReason: 'stop',
+      },
+    },
+    { type: 'done', usage: [] },
+  ];
+  const thinkingRows = (rows: TranscriptRow[]) =>
+    rows.flatMap((row) =>
+      Array.isArray(row.content)
+        ? (row.content as { type?: string; thinking?: string }[]).flatMap((block) =>
+            block.type === 'thinking' ? [block.thinking] : [],
+          )
+        : [],
+    );
+
+  test('thinking streamed before a CLI auto-retry is not kept', async () => {
+    const { client } = await runLifecycleCase([
+      [
+        ...sessionOpenEcho(),
+        ...thought('Compare its machine and model.'),
+        { type: 'auto_retry_start', attempt: 1 },
+        ...thought('Compare its machine and model.'),
+        ...answer,
+      ],
+    ]);
+    expect(thinkingRows(client.rows)).toEqual([
+      'Check the last step.\nCompare its machine and model.',
+    ]);
+  });
+
+  test('an errored assistant message is not persisted before pi retries it', async () => {
+    const { client } = await runLifecycleCase([
+      [
+        ...sessionOpenEcho(),
+        ...thought('Compare its machine and model.'),
+        {
+          type: 'message_end',
+          message: {
+            role: 'assistant',
+            content: [{ type: 'thinking', thinking: 'Check the last step.' }],
+            stopReason: 'error',
+          },
+        },
+        { type: 'error', error: { message: TRANSIENT_503, retryable: true } },
+        { type: 'auto_retry_start', attempt: 1 },
+        ...thought('Compare its machine and model.'),
+        ...answer,
+      ],
+    ]);
+    expect(thinkingRows(client.rows)).toEqual([
+      'Check the last step.\nCompare its machine and model.',
+    ]);
   });
 });
 

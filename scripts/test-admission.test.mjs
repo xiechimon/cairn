@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { join, resolve } from 'node:path';
@@ -11,6 +19,16 @@ import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 const repo = resolve('.');
 const require = createRequire(import.meta.url);
+
+function pinSingleSlot(file) {
+  const source = readFileSync(file, 'utf8');
+  const pinned = source.replace(
+    'const CORES_PER_HEAVY_SLOT = 4;',
+    'const CORES_PER_HEAVY_SLOT = 4096;',
+  );
+  assert.notEqual(pinned, source, `${file} still states the cores per heavy slot`);
+  writeFileSync(file, pinned);
+}
 const runners = {
   vitest: join(require.resolve('vitest/package.json'), '../vitest.mjs'),
   playwright: join(require.resolve('@playwright/test/package.json'), '../cli.js'),
@@ -52,15 +70,17 @@ function fixture(t) {
     if (existsSync(join(repo, 'scripts', name)))
       cpSync(join(repo, 'scripts', name), join(root, 'scripts', name));
   }
+  pinSingleSlot(join(root, 'scripts/heavy-slots.mjs'));
   cpSync('vitest.config.ts', join(root, 'vitest.config.ts'));
   symlinkSync(join(repo, 'node_modules'), join(root, 'node_modules'));
   writeFileSync(join(root, 'package.json'), '{"type":"module"}');
   const packageDir = join(root, 'packages/shared');
   mkdirSync(join(packageDir, 'test'), { recursive: true });
   writeFileSync(join(packageDir, 'package.json'), '{"type":"module","name":"fixture"}');
-  writeFileSync(
-    join(packageDir, 'test/admission.test.ts'),
-    `
+  for (const name of ['admission', 'second', 'third', 'fourth', 'fifth'])
+    writeFileSync(
+      join(packageDir, 'test', `${name}.test.ts`),
+      `
 import { test, expect } from 'vitest';
 import { existsSync, writeFileSync, readFileSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -73,16 +93,17 @@ test('actual worker admission', async () => {
   while (!existsSync(process.env.RELEASE)) await sleep(20);
 }, 30000);
 `,
-  );
+    );
   const env = {
     ...process.env,
     CAIRN_OWNED_MODE: 'group',
     CI: '',
-    CAIRN_HEAVY_SLOTS: '1',
     CAIRN_HEAVY_SLOTS_DIR: join(root, 'locks'),
+    CAIRN_CPU_SATURATION_PERCENT: '0',
   };
   delete env.CAIRN_HEAVY_SLOT;
   delete env.CAIRN_HEAVY_SLOT_OWNER;
+  delete env.CAIRN_HEAVY_GATE_BYPASS;
   mkdirSync(env.CAIRN_HEAVY_SLOTS_DIR);
   function start(args, extra = {}, cwd = root) {
     const [, runner, ...rest] = args;
@@ -125,25 +146,33 @@ test('actual worker admission', async () => {
   return { root, env, start, writeOwner, holder };
 }
 async function until(child, check = () => /queued, position/.test(child.output)) {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 40_000;
   while (!check()) {
     assert.ok(!child.closed && Date.now() < deadline, `runner condition failed\n${child.output}`);
     await sleep(20);
   }
 }
-const vitestArgs = ['exec', 'vitest', 'run', 'admission.test.ts', '--maxWorkers=4'];
+const HEAVY_FILES = [
+  'admission.test.ts',
+  'second.test.ts',
+  'third.test.ts',
+  'fourth.test.ts',
+  'fifth.test.ts',
+];
+const vitestArgs = ['exec', 'vitest', 'run', ...HEAVY_FILES, '--maxWorkers=4'];
+const serialVitestArgs = ['exec', 'vitest', 'run', ...HEAVY_FILES, '--maxWorkers=1'];
 test('two direct Vitest runs serialize with one slot', async (t) => {
   const { root, start } = fixture(t);
   const release = join(root, 'release');
-  const first = start(vitestArgs, { MARKER: join(root, 'first'), RELEASE: release });
+  const first = start(serialVitestArgs, { MARKER: join(root, 'first'), RELEASE: release });
   await until(first, () => existsSync(join(root, 'first')));
-  const second = start(vitestArgs, { MARKER: join(root, 'second'), RELEASE: release });
+  const second = start(serialVitestArgs, { MARKER: join(root, 'second'), RELEASE: release });
   await until(
     second,
     () => /queued, position/.test(second.output) || existsSync(join(root, 'second')),
   );
   assert.equal(existsSync(join(root, 'second')), false);
-  assert.match(second.output, /pid \d+, cwd /);
+  assert.match(second.output, /lane \w[^,]*, pid \d+, /);
   writeFileSync(release, 'go');
   assert.equal(await first.done, 0, first.output);
   assert.equal(await second.done, 0, second.output);
@@ -204,14 +233,29 @@ export default { ...base, globalSetup: undefined, testDir: './e2e', webServer: {
   assert.notEqual(await run.done, 0);
   assert.equal(existsSync(join(env.CAIRN_HEAVY_SLOTS_DIR, 'slot-1.lock')), false);
 });
-test('CI skips admission only for an absent slot directory', async (t) => {
+test('CI takes a slot even when its directory does not exist yet', async (t) => {
   const { root, start } = fixture(t);
   const missing = join(root, 'absent');
   writeFileSync(join(root, 'release'), 'go');
   const run = start(vitestArgs, { CI: 'true', CAIRN_HEAVY_SLOTS_DIR: missing });
   assert.equal(await run.done, 0, run.output);
-  assert.equal(existsSync(missing), false);
+  assert.match(run.output, /acquired slot 1\/1/);
+  assert.equal(existsSync(join(missing, 'slot-1.lock')), false, 'released on exit');
   assert.equal(existsSync(join(root, 'started')), true);
+});
+
+test('a one-file run takes no slot while every slot is held', async (t) => {
+  const { root, start, holder: startHolder } = fixture(t);
+  const holder = startHolder();
+  await until(holder, () => /HOLDER/.test(holder.output));
+  writeFileSync(join(root, 'release'), 'go');
+  const run = start(['exec', 'vitest', 'run', 'admission.test.ts', '--maxWorkers=1'], {
+    MARKER: join(root, 'light'),
+  });
+  assert.equal(await run.done, 0, run.output);
+  assert.equal(existsSync(join(root, 'light')), true);
+  assert.match(run.output, /1 test file is light work; taking no slot/);
+  assert.doesNotMatch(run.output, /queued, position/);
 });
 for (const [dir, config] of [
   ['packages/shared', 'vitest.config.ts'],

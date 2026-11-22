@@ -100,7 +100,7 @@ for (const [name, paths, expected] of [
 
 for (const [name, paths, expected] of [
   ['sidecar sources', ['apps/tsnet-sidecar/main.go', 'apps/tsnet-sidecar/go.sum'], true],
-  ['the workflow that builds it', ['.github/workflows/ci.yml'], true],
+  ['the workflow that builds it', ['.github/workflows/ci.yml'], false],
   ['server code that starts it', ['apps/server/src/services/tsnet-remote.ts'], false],
   ['other workflows and documents', ['.github/workflows/site-deploy.yml', 'README.md'], false],
   ['empty changes', [], false],
@@ -313,6 +313,7 @@ test('required aggregates only accept skipped work its classification excused', 
         'vitest-integration',
         'tsnet-sidecar-test',
         'tsnet-sidecar-build',
+        'eval',
       ],
     ],
   ]) {
@@ -342,7 +343,9 @@ test('required aggregates only accept skipped work its classification excused', 
         ['true', 'false'].map((needsIntegration) => ({ hasCode, sidecar, needsIntegration })),
       ),
     );
-    const skipAllowed = (dependency, { hasCode, sidecar, needsIntegration }) => {
+    const skipAllowed = (dependency, { hasCode, sidecar, needsIntegration }, vars) => {
+      if (dependency === 'eval')
+        return !(vars.evalNeeded === 'true' && vars.evalEnabled === 'true');
       if (dependency === 'vitest-integration')
         return hasCode === 'false' || needsIntegration === 'false';
       return (sidecarJobs.includes(dependency) ? sidecar : hasCode) === 'false';
@@ -350,30 +353,44 @@ test('required aggregates only accept skipped work its classification excused', 
     for (const classification of classifications) {
       const { hasCode, sidecar, needsIntegration } = classification;
       for (const results of scenarios) {
-        const shell = command.replace(/\$\{\{ (.*?) \}\}/g, (_, expression) => {
-          if (expression === 'needs.changes.outputs.has-code') return hasCode;
-          if (expression === 'needs.changes.outputs.has-sidecar') return sidecar;
-          if (expression === 'needs.changes.outputs.needs-integration') return needsIntegration;
-          const match = /^needs\.([\w-]+)\.result$/.exec(expression);
-          assert.ok(match, expression);
-          assert.ok(dependencies.includes(match[1]), expression);
-          return results[match[1]];
-        });
-        const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', shell], {
-          encoding: 'utf8',
-        });
-        assert.equal(
-          result.status === 0,
-          results.changes === 'success' &&
-            dependencies
-              .slice(1)
-              .every(
-                (dependency) =>
-                  results[dependency] === 'success' ||
-                  (skipAllowed(dependency, classification) && results[dependency] === 'skipped'),
-              ),
-          `${name}: ${JSON.stringify(classification)} ${JSON.stringify(results)}`,
-        );
+        const varSets =
+          results.eval === 'skipped'
+            ? [
+                { evalNeeded: 'true', evalEnabled: 'true' },
+                { evalNeeded: 'true', evalEnabled: 'false' },
+                { evalNeeded: 'false', evalEnabled: 'true' },
+              ]
+            : [{ evalNeeded: 'false', evalEnabled: 'false' }];
+        for (const vars of varSets) {
+          const shell = command.replace(/\$\{\{ (.*?) \}\}/g, (_, expression) => {
+            if (expression === 'needs.changes.outputs.has-code') return hasCode;
+            if (expression === 'needs.changes.outputs.has-sidecar') return sidecar;
+            if (expression === 'needs.changes.outputs.needs-integration') return needsIntegration;
+            if (expression === 'needs.changes.outputs.eval-needed') return vars.evalNeeded;
+            if (expression === 'vars.EVAL_ENABLED') return vars.evalEnabled;
+            const match = /^needs\.([\w-]+)\.result$/.exec(expression);
+            assert.ok(match, expression);
+            assert.ok(dependencies.includes(match[1]), expression);
+            return results[match[1]];
+          });
+          const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', shell], {
+            encoding: 'utf8',
+            env: { ...process.env, GITHUB_REF: 'refs/heads/queue/main' },
+          });
+          assert.equal(
+            result.status === 0,
+            results.changes === 'success' &&
+              dependencies
+                .slice(1)
+                .every(
+                  (dependency) =>
+                    results[dependency] === 'success' ||
+                    (skipAllowed(dependency, classification, vars) &&
+                      results[dependency] === 'skipped'),
+                ),
+            `${name}: ${JSON.stringify(classification)} ${JSON.stringify(vars)} ${JSON.stringify(results)}`,
+          );
+        }
       }
     }
   }
@@ -882,7 +899,11 @@ test('the temp-dir ratchet is a required gate and CI vitest runs sit under the s
   for (const run of vitestRuns) assert.match(run, /node scripts\/test-temp-run\.mjs -- pnpm test /);
 });
 
-const prepushEnv = (overrides = {}) => ({ ...scrubGateEnv(), ...overrides });
+const prepushEnv = (overrides = {}) => ({
+  ...scrubGateEnv(),
+  CAIRN_CPU_SATURATION_PERCENT: '0',
+  ...overrides,
+});
 
 test('CLI skips real document changes and rejects a missing base', () => {
   const directory = mkdtempSync(join(tmpdir(), 'cairn-prepush-'));

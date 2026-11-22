@@ -102,7 +102,7 @@ const allowed = [
   ['gh', 'issue', 'list', '-l', 'batch:now'],
   ['gh', 'issue', 'comment', '5', '-b', 'x'],
   ['gh', 'issue', 'create', '-t', 't', '-b', 'b', '-l', 'bug'],
-  ['gh', 'issue', 'edit', '5', '--remove-label', 'waits-ian'],
+  ['gh', 'issue', 'edit', '5', '--remove-label', 'bug'],
   ['gh', 'issue', 'pin', '5'],
   ['gh', 'issue', 'close', '77', '-R', REPO, '-c', `Caught up: omarchy runs ${HEAD}.`],
   ['gh', 'issue', 'close', '77', '--repo', REPO, '--comment', `Caught up: omarchy runs ${HEAD}.`],

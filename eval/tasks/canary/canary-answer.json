@@ -1,0 +1,17 @@
+{
+  "kind": "canary",
+  "id": "canary-answer",
+  "request": "say hi",
+  "world": {
+    "projects": []
+  },
+  "script": [
+    {
+      "text": "hi"
+    }
+  ],
+  "expected": {
+    "decision": "any"
+  },
+  "gate": true
+}

@@ -57,8 +57,8 @@ Reach:
 3. `type a request and press Enter`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: `A`, `C`, `D`, `R`
-- Test ids in its code: `*`, `approval-card-context`, `approval-card-note`, `approval-card-problem`, `approval-card-quote`, `approval-card-title`, `approval-detail-label`, `approval-details`, `approval-details-toggle`, `approval-field-more`, `approval-field-value`, `approval-history-text`, `approval-history-toggle`, `chief-body`, `chief-bubble`, `chief-channel-mirror`, `chief-cloak-license`, `chief-cloak-license-get`, `chief-cloak-license-input`, `chief-cloak-license-problem`, `chief-cloak-license-save`, `chief-cloak-license-saved`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-mac-activity`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-package-install`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-queue`, `chief-queue-cancel-edit`, `chief-queue-more`, `chief-queue-wait-card`, `chief-queued-message`, `chief-queued-message-text`, `chief-queued-remove`, `chief-queued-steer`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-sentence`, `chief-runner-offline`, `chief-send-queue`, `chief-send-steer`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-steer-withdraw`, `chief-stopped`, `chief-stream`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-handback`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-task-started-said`, `chief-time-divider`, `chief-turn-error`, `chief-turn-error-card`, `chief-turn-error-detail`, `chief-turn-error-raw`, `chief-turn-retry`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `context-panel`, `context-panel-*`, `context-panel-reading`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-edit-card`, `memory-edit-composer`, `memory-edit-content`, `memory-edit-input`, `memory-edit-send`, `memory-edit-stop`, `memory-edit-title`, `memory-list`, `memory-usage`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `tasks-badge`, `tasks-toggle`
+- Keyboard shortcuts in its code: `A`, `D`, `R`
+- Test ids in its code: `*`, `approval-card-context`, `approval-card-note`, `approval-card-problem`, `approval-card-quote`, `approval-card-title`, `approval-detail-label`, `approval-details`, `approval-details-toggle`, `approval-field-more`, `approval-field-value`, `approval-history-text`, `approval-history-toggle`, `chief-body`, `chief-bubble`, `chief-channel-mirror`, `chief-cloak-license`, `chief-cloak-license-get`, `chief-cloak-license-input`, `chief-cloak-license-problem`, `chief-cloak-license-save`, `chief-cloak-license-saved`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-package-install`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-queue`, `chief-queue-cancel-edit`, `chief-queue-more`, `chief-queue-wait-card`, `chief-queued-message`, `chief-queued-message-text`, `chief-queued-remove`, `chief-queued-steer`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-sentence`, `chief-runner-offline`, `chief-send-queue`, `chief-send-steer`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-steer-withdraw`, `chief-stopped`, `chief-stream`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-handback`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-task-started-said`, `chief-time-divider`, `chief-turn-error`, `chief-turn-error-card`, `chief-turn-error-raw`, `chief-turn-retry`, `chief-turn-update`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `context-panel`, `context-panel-*`, `context-panel-reading`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-edit-card`, `memory-edit-composer`, `memory-edit-content`, `memory-edit-input`, `memory-edit-send`, `memory-edit-stop`, `memory-edit-title`, `memory-list`, `memory-usage`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `selection-ask-side-chat`, `selection-quote`, `selection-quote-box`, `selection-quote-hint`, `selection-quote-input`, `selection-quote-text`, `selection-reply-bar`, `tasks-badge`, `tasks-toggle`, `update`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -174,8 +174,10 @@ Reach:
 
 1. `open /app`
 2. `click label:记忆`
+3. `open /app/project/<id of a project listed by the projects API>/settings`
+4. `click label:记忆`
 
-- Web routes: none
+- Web routes: `/app/project/:id/settings`
 - Keyboard shortcuts in its code: none
 - Test ids in its code: `memory-edit-card`, `memory-edit-composer`, `memory-edit-content`, `memory-edit-input`, `memory-edit-send`, `memory-edit-stop`, `memory-edit-title`, `memory-list`, `memory-usage`, `project-instructions-input`
 - Research: [docs/research/personal-agent-memory-2026-11-07.md](../../../docs/research/personal-agent-memory-2026-11-07.md), [docs/research/research-loop-plan.md](../../../docs/research/research-loop-plan.md), [docs/research/memory-2026-11-08.md](../../../docs/research/memory-2026-11-08.md), [docs/research/memory-inplace-edit-2026-11-09.md](../../../docs/research/memory-inplace-edit-2026-11-09.md)
@@ -320,23 +322,23 @@ Reach:
 
 ### selection-reply
 
-**Reply quote** (shipped, centrality 1). Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.
+**Reply quote** (shipped, centrality 1). Press Reply in your own message's hover tools to quote it above the composer. Coordinator messages have no reply arrow (owner decision, 2026-11-21); instead, select text in a Coordinator message to get a pill with Ask in side chat and Quote (R); Quote opens a one-input box where Enter stages the quote above the composer and Cmd+Enter sends it at once; Ask in side chat opens the related task thread with the selection quoted in its composer. The sent message carries the quote and its source message id.
 
-States: Quote staged above the composer, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, light and dark, 1440 and 390 wide.
+States: Selection pill with and without a related task, quote box with its key hint, quote staged above the composer from your own message or a selection, source marked while the quote bar is hovered and unmarked once it is removed, sent bubble with the quote, side chat composer seeded with the quote, light and dark, 1440 and 390 wide.
 
 Reach:
 
 1. `open /app`
-2. `hover testid:chief-reply-bubble`
-3. `click testid:chief-msg-reply`
+2. `hover testid:chief-reply`
+3. `click testid:selection-quote`
 
 - Web routes: `/app`
-- Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `reply-quote`
+- Keyboard shortcuts in its code: `R`
+- Test ids in its code: `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `reply-quote`, `selection-ask-side-chat`, `selection-quote`, `selection-quote-box`, `selection-quote-hint`, `selection-quote-input`, `selection-quote-text`, `selection-reply-bar`
 - Research: [docs/research/selection-reply-2026-11-08.md](../../../docs/research/selection-reply-2026-11-08.md)
 - Frontend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
 - Backend design: [docs/design/selection-reply-2026-11-08.md](../../../docs/design/selection-reply-2026-11-08.md)
-- Evidence: `apps/web/e2e/chief-reply-quote.spec.ts`, `packages/shared/test/reply-quote.test.ts`
+- Evidence: `apps/web/e2e/chief-reply-quote.spec.ts`, `apps/web/e2e/chief-selection-quote.spec.ts`, `packages/shared/test/reply-quote.test.ts`
 
 ### steer-queue-stop
 
@@ -439,24 +441,6 @@ Reach:
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
-### trajectory-export
-
-**Trajectory export** (partial, centrality 1). Build trajectories export as packs and traces for the self-improvement loop.
-
-States: No product page; results appear as command-line reports and traces.
-
-Reach:
-
-1. `settings routing`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: [docs/research/eval-methods.md](../../../docs/research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Frontend design: n/a: runs as command-line tools and trace export with no product page
-- Backend design: [docs/spec/29-evaluation-and-data-loop.md](../../../docs/spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](../../../docs/research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Evidence: `apps/server/test/trajectory-export.test.ts`
-
 ### desktop-app
 
 **Desktop app** (planned, centrality 2). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
@@ -472,19 +456,19 @@ Reach:
 
 ### first-run
 
-**First run** (shipped, centrality 2). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped, centrality 2). The setup page before the first project, the Coordinator setup prompt and the first-PR card that take a new user to a first merged PR.
 
-States: A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards a setup hint on the composer, then a first-PR card.
+States: A team with no projects lands on a full-screen two-step setup page (connect models for the Coordinator and tasks, confirm both models) with a language switch; it can be skipped, and once both steps are done it opens the Coordinator conversation. The first project waits for both steps. Afterwards, while no model source is connected, an empty Coordinator home shows one centered sentence and a primary connect-a-model-source button, and a conversation with history shows one notice line after it; a missing or offline Runner shows the same notice line; then a first-PR card.
 
 Reach:
 
 1. `open /app`
 2. `click testid:first-run-confirm`
-3. `click testid:composer-setup-chip`
+3. `click testid:setup-prompt-action`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `composer-setup-chip`, `composer-setup-hint`, `composer-setup-reconnect`, `first-run-add-provider`, `first-run-confirm`, `first-run-frame`, `first-run-pick-coordinator`, `first-run-setup`, `first-run-step-*`, `first-run-task-model-note`, `first-run-vm`
+- Test ids in its code: `first-run-add-provider`, `first-run-confirm`, `first-run-frame`, `first-run-pick-coordinator`, `first-run-setup`, `first-run-step-*`, `first-run-task-model-note`, `first-run-vm`, `setup-prompt`, `setup-prompt-action`, `setup-prompt-hint`, `setup-prompt-label`, `setup-prompt-reconnect`
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](../../../docs/design/references/first-run)
 - Backend design: **gap**: no design for checklist state and the 10-minute path
@@ -648,9 +632,9 @@ Reach:
 
 ### token-usage
 
-**Token usage** (shipped, centrality 2). The Usage dialog from the sidebar footer: a 7, 30 or 90 day range with totals, cache hit, the token-type bar, tokens per local day as stacked bars by source or by model, and models and projects ranked.
+**Token usage** (shipped, centrality 2). The Usage dialog from the sidebar footer: a past-year heatmap of tokens per local day, year totals with days used, daily average and cache hit, the token-type bar, and models and projects ranked for the year or the clicked day.
 
-States: Loading, failed with retry, empty for a new team, a new user whose chart starts at the first used day, and a full range with the previous-range change and a readout for the hovered or keyboard-selected day; light and dark, desktop dialog and phone.
+States: Loading, failed with retry, empty for a new team, a new user with a started-on line under the heatmap, a full year with a readout for the hovered or selected day, and a selected day scoping the rankings; light and dark, desktop dialog and phone (16 weeks).
 
 Reach:
 
@@ -659,7 +643,7 @@ Reach:
 
 - Web routes: `/app/usage`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `usage-chart`, `usage-empty`, `usage-error`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-stats`
+- Test ids in its code: `usage-current-month`, `usage-empty`, `usage-error`, `usage-heatmap`, `usage-heatmap-frame`, `usage-legend`, `usage-mix`, `usage-models`, `usage-projects`, `usage-readout`, `usage-since`, `usage-stats`, `usage-year`
 - Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar)
 - Backend design: [docs/design/step-usage-daily.md](../../../docs/design/step-usage-daily.md)
@@ -748,9 +732,9 @@ Reach:
 
 ### attachments
 
-**Attachments** (shipped, centrality 3). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens in a full-window lightbox with a pager across the message's files.
+**Attachments** (shipped, centrality 3). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens by kind: images and video in a full-window lightbox with a zoned top bar, a filmstrip of the message's media and peeks of the adjacent files; documents (Markdown with a preview/source switch, code with muted highlighting, text, PDF, office) in a right side panel inside the Coordinator layout, one at a time.
 
-States: Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; file lightbox for text with line numbers, an empty file, an image, a video, an office document, an unsupported type, loading, a load error and the pager; agent attachments in the thread transcript.
+States: Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; lightbox for an image, a video, the filmstrip and a hovered peek; document side panel for text and code with line numbers, Markdown preview and source, PDF, an office document, an unsupported type, loading and a load error; agent attachments in the thread transcript.
 
 Reach:
 
@@ -759,7 +743,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `attachment-pending`, `attachment-tile-preview`, `attachment-tile-video`, `chief-sent-attachment`, `chief-sent-attachments`, `composer-attachments`, `file-lightbox`, `file-lightbox-close`, `file-lightbox-next`, `file-lightbox-position`, `file-lightbox-prev`, `file-preview-body`, `file-preview-copy`, `file-preview-download`, `file-preview-name`, `file-preview-pdf`, `file-preview-source-toggle`
+- Test ids in its code: `attachment-pending`, `attachment-tile-preview`, `attachment-tile-video`, `chief-sent-attachment`, `chief-sent-attachments`, `composer-attachments`, `file-lightbox`, `file-lightbox-close`, `file-lightbox-filmstrip`, `file-lightbox-head`, `file-lightbox-next`, `file-lightbox-peek-*`, `file-lightbox-position`, `file-lightbox-prev`, `file-lightbox-thumb`, `file-panel`, `file-preview-body`, `file-preview-copy`, `file-preview-download`, `file-preview-meta`, `file-preview-name`, `file-preview-pdf`, `file-preview-source-toggle`
 - Verify recipes: [.claude/skills/verify-cairn/features/attachments.md](features/attachments.md)
 - Research: [docs/research/file-preview-reference-2026-11-11.md](../../../docs/research/file-preview-reference-2026-11-11.md)
 - Frontend design: [docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg](../../../docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg), [docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg](../../../docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg), [docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg](../../../docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg)
@@ -768,15 +752,15 @@ Reach:
 
 ### composer
 
-**Composer** (shipped, centrality 3). The message composer: mentions, slash commands, named prompts and drafts that survive closing the app.
+**Composer** (shipped, centrality 3). The message composer: mentions, named prompts and drafts that survive closing the app. A leading / is plain text; there is no slash-command menu.
 
-States: Empty with a placeholder, a draft restored after reload, slash menu and mention suggestions open, and a send error.
+States: Empty with a placeholder, a draft restored after reload, mention suggestions open, and a send error.
 
 Reach:
 
 1. `open /app`
 2. `click testid:chief-composer-block`
-3. `type / to open slash commands or @ to mention`
+3. `type @ to mention`
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`
@@ -785,7 +769,7 @@ Reach:
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat)
 - Backend design: **gap**: no design for server drafts  and named prompts
-- Evidence: `apps/web/e2e/composer-slash.spec.ts`, `apps/web/e2e/chief-draft-persist.spec.ts`, `apps/server/test/composer-drafts.test.ts`
+- Evidence: `apps/web/e2e/chief-draft-persist.spec.ts`, `apps/server/test/composer-drafts.test.ts`
 
 ### coordinator-mcp
 
@@ -931,9 +915,9 @@ Reach:
 
 ### projects
 
-**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped, centrality 3). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, and an archived project opened read-only; the UI offers no project deletion.
 
-States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived or deleted. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.
+States: A new-project form for a local folder or a GitHub repository, a project conversation, settings for base branch, concurrency, autonomy and instructions, archived. A GitHub project has no local speed-up path: the accelerator was removed by the owner on 2026-11-20, so it always runs from its clone and a conversion from a local folder drops that folder. The autonomy card's external-actions tier follows the global setting or pins its own ask-first or full-access tier.
 
 Reach:
 
@@ -1072,7 +1056,7 @@ Reach:
 
 ### sidebar
 
-**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
+**Sidebar** (shipped, centrality 3). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, project settings, move to group, archive), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive) and the machine-status footer.
 
 States: Projects under the Coordinator with no group, ungrouped projects then groups in name order, a folded group with its count, an ochre dot on a project with a task waiting on the owner, the open row menu, loading or error rows, the filter on archived (note, archived rows with their groups, back row) or empty archived, the filter on all with archived rows marked, an archived project opened read-only with the unarchive bar, and collapsed with only the toggle, whose hover, edge or keyboard focus floats the whole sidebar as a peek.
 
@@ -1085,8 +1069,8 @@ Reach:
 5. `click testid:archived-project-bar-unarchive`
 
 - Web routes: none
-- Keyboard shortcuts in its code: `A`, `D`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-delete-all`, `sidebar-archived-empty`, `sidebar-archived-note`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
+- Keyboard shortcuts in its code: `A`, `M`, `N`, `R`, `S`, `U`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

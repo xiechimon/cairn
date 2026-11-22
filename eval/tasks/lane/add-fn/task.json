@@ -1,0 +1,18 @@
+{
+  "kind": "lane",
+  "id": "add-fn",
+  "instruction": "\u5728 main.py \u52a0\u4e00\u4e2a\u51fd\u6570 greet(name) \u8fd4\u56de \"hello \"+name",
+  "timeoutMs": 600000,
+  "checks": {
+    "files": [
+      {
+        "path": "main.py",
+        "contains": "def greet"
+      }
+    ],
+    "commands": [
+      "python3 -c \"import main; assert main.greet(\\\"x\\\")==\\\"hello x\\\"\""
+    ]
+  },
+  "gate": true
+}

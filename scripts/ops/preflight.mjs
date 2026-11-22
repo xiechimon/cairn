@@ -55,9 +55,13 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     );
     process.exit(0);
   }
-  const watched = spawnSync('gh', ['run', 'watch', String(run.id), '--exit-status'], {
-    stdio: 'inherit',
-  });
+  const watched = spawnSync(
+    'gh',
+    ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'],
+    {
+      stdio: 'inherit',
+    },
+  );
   if (watched.status === 0) {
     console.log('[preflight] green — push-queue will accept this head');
   } else {

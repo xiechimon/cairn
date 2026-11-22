@@ -6,6 +6,7 @@ import {
   contextResumeOf,
   imageOmissionNote,
   isColdResume,
+  projectWarmMessages,
   resumeExpiresAtOf,
   stripConsumedImages,
   truncateOldToolResults,
@@ -177,6 +178,72 @@ describe('stripConsumedImages', () => {
       (block) => block.type === 'text' && block.text.includes('omitted'),
     );
     expect(note?.type === 'text' ? note.text : '').toBe(imageOmissionNote('att-from-block'));
+  });
+});
+
+const screenshot = { type: 'image' as const, data: 'aaa', mimeType: 'image/png' };
+
+const imageTool = (name: string, timestamp: number): ToolResultMessage => ({
+  role: 'toolResult',
+  toolCallId: `c-${name}-${timestamp}`,
+  toolName: name,
+  content: [screenshot],
+  isError: false,
+  timestamp,
+});
+
+function imageBlocks(message: Message | undefined): number {
+  if (message === undefined || typeof message.content === 'string') return 0;
+  return message.content.filter((block) => block.type === 'image').length;
+}
+
+describe('projectWarmMessages', () => {
+  it('keeps every image the current turn carries when that turn ran parallel tool calls', () => {
+    const messages: Message[] = [
+      {
+        role: 'user',
+        content: [{ type: 'text', text: 'earlier turn' }, screenshot],
+        timestamp: 1,
+      },
+      imageTool('attachment', 1),
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'see\n\n![shot.png](attachment:team1/att-abc.png)' },
+          screenshot,
+        ],
+        timestamp: 2,
+      },
+      imageTool('attachment', 2),
+      tool('threads', 'threads answer', 2),
+      tool('machines', 'machines answer', 2),
+    ];
+    const out = projectWarmMessages(messages);
+    expect(imageBlocks(out[2])).toBe(1);
+    expect(imageBlocks(out[3])).toBe(1);
+    expect(imageBlocks(out[0])).toBe(0);
+    expect(imageBlocks(out[1])).toBe(0);
+  });
+
+  it('does not shorten a tool result the current turn produced, even four in flight', () => {
+    const long = 'x'.repeat(2_000);
+    const messages: Message[] = [
+      user('earlier turn'),
+      tool('bash', long, 1),
+      tool('bash', long, 1),
+      user('now', 2),
+      tool('bash', long, 2),
+      tool('bash', long, 2),
+      tool('bash', long, 2),
+      tool('bash', long, 2),
+    ];
+    const out = truncateOldToolResults(messages);
+    const tools = out.filter((message) => message.role === 'toolResult');
+    expect(tools).toHaveLength(6);
+    expect(toolResultChars(tools[0]!).length).toBeLessThan(1_100);
+    expect(toolResultChars(tools[1]!).length).toBeLessThan(1_100);
+    expect(toolResultChars(tools[2]!).length).toBe(2_000);
+    expect(toolResultChars(tools[3]!).length).toBe(2_000);
   });
 });
 

@@ -49,3 +49,16 @@ test('the menu bar carries the shortcuts a Mac user expects', () => {
     assert.ok(roles.has(role), `menu lacks ${role}`);
   }
 });
+
+test('a staged update offers a restart that installs it', () => {
+  let installed = 0;
+  const template = appMenuTemplate(
+    { status: 'ready', version: '0.1.536' },
+    { check: () => {}, install: () => (installed += 1) },
+    { send: () => {}, back: () => {}, forward: () => {} },
+  );
+  const item = template[0].submenu.find((entry) => entry.label?.includes('0.1.536'));
+  assert.equal(item.label, 'Restart to Update 0.1.536…');
+  item.click();
+  assert.equal(installed, 1);
+});

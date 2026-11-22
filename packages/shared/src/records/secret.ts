@@ -92,6 +92,13 @@ export function isHttpSecretValue(value: string): boolean {
   return value !== '' && !CONTROL_CHARACTER.test(value);
 }
 
+const CREDENTIAL_NAME =
+  /SECRET|TOKEN|PRIVATE|APIKEY|BEARER|MNEMONIC|TOTP|AUTHORIZATION|(^|_)(PASS|CRED|CERT|PEM|SEED|SESSION|OTP)|(^|_)(KEYS?|PATS?|AUTH|PINS?)(_|$)/;
+
+export function isCredentialSecretName(name: string): boolean {
+  return CREDENTIAL_NAME.test(name);
+}
+
 export function isDaemonReadSecretName(name: string): boolean {
   return (
     name === WEB_EXA_KEY_SECRET ||

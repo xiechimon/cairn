@@ -40,7 +40,7 @@ export function listedProjects(teamId: string) {
   return and(eq(project.teamId, teamId), isNull(project.personalOwnerId));
 }
 
-const SPACE_PUSH_DENIED_REFS = [`refs/heads/${DEFAULT_HEAD_BRANCH}`, 'refs/replace'];
+const SPACE_PUSH_DENIED_REFS = [`refs/heads/${DEFAULT_HEAD_BRANCH}`];
 
 const creating = new Map<string, Promise<ProjectRow>>();
 

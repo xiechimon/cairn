@@ -26,7 +26,7 @@ import {
   parseGithubIssueSourceRef,
   renderTaskText,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, or, sql } from 'drizzle-orm';
 import { cacheTtlMsFor, resolveCacheRetentionTier } from '../coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import type { Db } from '../db/client.js';
@@ -75,6 +75,7 @@ import {
   markEffectDelivered,
   recordEffect,
   retryEffect,
+  runEffectRow,
   settleEffectRow,
 } from './external-effects.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
@@ -86,7 +87,12 @@ import {
   todoGithubLabelIds,
 } from './github-labels.js';
 import { DELIVERABLES_MESSAGE_PREFIX, retireTodoDeliverables } from './machine-deliverables.js';
-import { priorSessionOf, soleOnlineMachineId, teamDefaultMachineId } from './machine-routing.js';
+import {
+  liveMachineId,
+  priorSessionOf,
+  soleOnlineMachineId,
+  teamDefaultMachineId,
+} from './machine-routing.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyTodo } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -442,6 +448,7 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
     .where(and(eq(machine.teamId, row.teamId), eq(machine.online, true)))
     .all();
   const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  const localProject = projectOfTodo(deps.db, row)?.repoKind === 'local';
   const sole =
     teamDefaultMachineId(deps.db, row.teamId) ?? soleOnlineMachineId(online.map((m) => m.id));
   for (const s of pendingSteps) {
@@ -452,6 +459,7 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
         ? {
             priorSessionId: null,
             priorMachineId: null,
+            priorMachineLiveId: null,
             priorSubscriptionId: null,
             freshSession: true,
           }
@@ -468,8 +476,9 @@ function waitingOnOf(deps: Pick<TodoDeps, 'db'>, row: TodoRow): TodoWaitingOn | 
           );
     const named =
       !prior.freshSession && prior.priorSessionId !== null
-        ? prior.priorMachineId
-        : (agentRow.machineId ?? sole);
+        ? prior.priorMachineLiveId
+        : ((localProject ? agentRow.machineId : liveMachineId(deps.db, agentRow.machineId)) ??
+          sole);
     const provider = s.fallback?.model?.provider ?? agentRow.provider;
     const target = online.find(
       (m) => m.id === named && runtimeGatePasses(m, provider) && capabilityGatePasses(m, agentRow),
@@ -558,6 +567,7 @@ export function createAutonomousTodo(
     ownerId: string | null;
     sourceKind?: TodoSourceKind;
     sourceRef?: string;
+    issueState?: 'open' | 'closed';
     withoutSelfIssue?: boolean;
     orchestration?: { threadId: string };
     output?: TodoOutputKind;
@@ -591,7 +601,7 @@ export function createAutonomousTodo(
     input.title.trim() || derivePlaceholderTitle(input.spec) || PLACEHOLDER_TITLE_FALLBACK;
   const selfIssue =
     input.sourceKind === undefined && input.withoutSelfIssue !== true
-      ? planSelfIssue(deps, input.teamId, input.projectId)
+      ? planSelfIssue(deps, input.teamId, input.projectId, input.output ?? 'code')
       : null;
   db.transaction((tx) => {
     tx.insert(todo)
@@ -628,6 +638,7 @@ export function createAutonomousTodo(
           (selfIssue === null && input.orchestration !== undefined
             ? orchestrationSourceRef(input.orchestration.threadId)
             : null),
+        issueState: input.issueState ?? null,
         output: input.output ?? 'code',
         ...(input.userSpecAttachmentIds !== undefined
           ? { userSpecAttachmentIds: input.userSpecAttachmentIds }
@@ -643,7 +654,6 @@ export function createAutonomousTodo(
   const record = getTodo(deps, id);
   if (!record) throw new Error('todo missing after insert');
   hub.publishTodoDoc(input.teamId, record);
-  if (selfIssue !== null) scheduleSelfIssueCreate(deps, id);
   return record;
 }
 
@@ -680,6 +690,7 @@ export function updateAutonomousTodo(
     manualPhase?: boolean;
     userSpecAttachmentIds?: string[];
     textWriter?: TodoTextWriter;
+    issueTitleWriteback?: boolean;
   } = {},
 ): TodoRecord | null {
   const { db, hub } = deps;
@@ -801,6 +812,14 @@ export function updateAutonomousTodo(
         .run();
       if (githubLabelIds === undefined)
         tx.delete(todoGithubLabel).where(eq(todoGithubLabel.todoId, id)).run();
+      if (move.closeIssueRef !== null) {
+        queueIssueClose(
+          db,
+          row.teamId,
+          move.closeIssueRef,
+          `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
+        );
+      }
     }
     if (githubLabelIds !== undefined) {
       tx.delete(todoGithubLabel).where(eq(todoGithubLabel.todoId, id)).run();
@@ -815,6 +834,15 @@ export function updateAutonomousTodo(
     ) {
       insertGateAnnouncement(deps, row.latestBuildId, DONE_ANNOUNCEMENT, deps.user.displayName);
     }
+    if (
+      opts.issueTitleWriteback === true &&
+      patch.title !== undefined &&
+      row.sourceKind === 'github-issue-self' &&
+      row.sourceRef !== null
+    ) {
+      const parsed = parseGithubIssueSourceRef(row.sourceRef);
+      if (parsed !== null) recordSelfIssueTitle(deps, row, parsed, patch.title);
+    }
   });
 
   if (sets.blockedBy !== undefined && row.latestBuildId !== null)
@@ -822,17 +850,6 @@ export function updateAutonomousTodo(
   const record = getTodo(deps, id);
   if (!record) return null;
   hub.publishTodoDoc(record.teamId, record);
-  if (move?.closeIssueRef != null) {
-    queueIssueClose(
-      deps.db,
-      row.teamId,
-      move.closeIssueRef,
-      `Cairn：这个任务挪到了项目「${move.targetName}」，这里的 issue 关闭。`,
-    );
-  }
-  if (move !== null && record.sourceKind === 'github-issue-self') {
-    scheduleSelfIssueCreate(deps, id);
-  }
   if (patch.phase !== undefined && !manualPhaseApplied) {
     notifyPhaseEntry(deps, record, row.phase, patch.phase);
   }
@@ -870,7 +887,7 @@ function planProjectMove(deps: TodoDeps, row: TodoRow, projectId: string): Proje
     .where(and(eq(todo.projectId, target.id), eq(todo.phase, 'todo')))
     .get();
   const sets: ProjectMove['sets'] = { projectId: target.id, orderIndex: (orderRow?.n ?? -1) + 1 };
-  const targetOpensIssues = planSelfIssue(deps, row.teamId, target.id) !== null;
+  const targetOpensIssues = planSelfIssue(deps, row.teamId, target.id, row.output) !== null;
   const dropsIssue = row.sourceKind === 'github-issue-self' && !targetOpensIssues;
   if (dropsIssue) {
     sets.sourceKind = null;
@@ -1034,7 +1051,13 @@ export async function flushSelfIssueWrites(): Promise<void> {
   await Promise.all([...selfIssueInFlight.values()]);
 }
 
-function planSelfIssue(deps: TodoDeps, teamId: string, projectId: string): GithubRepoRef | null {
+function planSelfIssue(
+  deps: TodoDeps,
+  teamId: string,
+  projectId: string,
+  output: TodoOutputKind,
+): GithubRepoRef | null {
+  if (output !== 'code') return null;
   if (deps.box === undefined) return null;
   const ref = githubRepoOfProject(projectOfTodo(deps.db, { projectId, teamId }));
   if (ref === null) return null;
@@ -1055,9 +1078,32 @@ function scheduleSelfIssueCreate(deps: TodoDeps, todoId: string): void {
   selfIssueInFlight.set(todoId, pending);
 }
 
-const selfIssueMarker = (todoId: string) => `<!-- cairn:todo ${todoId} -->`;
+export function selfIssueCreateInFlight(todoId: string): boolean {
+  return selfIssueInFlight.has(todoId);
+}
 
-const SELF_ISSUE_PROBE_PAGES = 3;
+export function selfIssueCreatePending(todoId: string): Promise<unknown> | undefined {
+  return selfIssueInFlight.get(todoId);
+}
+
+export function noteTaskCodeDelivered(deps: TodoDeps, todoId: string): void {
+  const row = getRow(deps, todoId);
+  if (row?.sourceKind !== 'github-issue-self') return;
+  scheduleSelfIssueCreate(deps, todoId);
+}
+
+function taskDeliveredCode(db: Db, row: TodoRow): boolean {
+  if (row.hasChanges) return true;
+  return (
+    db
+      .select({ id: build.id })
+      .from(build)
+      .where(and(eq(build.todoId, row.id), or(isNotNull(build.prNumber), isNotNull(build.prUrl))))
+      .get() !== undefined
+  );
+}
+
+const selfIssueMarker = (todoId: string) => `<!-- cairn:todo ${todoId} -->`;
 
 interface SelfIssuePayload {
   todoId: string;
@@ -1101,20 +1147,22 @@ function applyCreatedIssue(
     return null;
   }
   if (fresh.sourceRef !== row.sourceRef) return null;
-  db.update(todo)
-    .set({ sourceRef: ref, issueState: 'open', v: fresh.v + 1 })
-    .where(eq(todo.id, row.id))
-    .run();
+  db.transaction(() => {
+    db.update(todo)
+      .set({ sourceRef: ref, issueState: 'open', v: fresh.v + 1 })
+      .where(eq(todo.id, row.id))
+      .run();
+    if (row.sourceRef !== null && parseGithubIssueSourceRef(row.sourceRef) !== null) {
+      queueIssueClose(
+        db,
+        row.teamId,
+        row.sourceRef,
+        `Cairn：这个任务挪到了 ${repoRef.owner}/${repoRef.repo}#${number}，这里的 issue 关闭。`,
+      );
+    }
+  });
   const record = getTodo(deps, row.id);
   if (record) hub.publishTodoDoc(record.teamId, record);
-  if (row.sourceRef !== null && parseGithubIssueSourceRef(row.sourceRef) !== null) {
-    queueIssueClose(
-      db,
-      row.teamId,
-      row.sourceRef,
-      `Cairn：这个任务挪到了 ${repoRef.owner}/${repoRef.repo}#${number}，这里的 issue 关闭。`,
-    );
-  }
   return record;
 }
 
@@ -1146,7 +1194,7 @@ async function probeSelfIssueCreated(
   const token = await autonomousToken(deps, effectRow.teamId, { owner: p.owner, repo: p.repo });
   if (token === null) return { verdict: 'unknown' };
   const marker = selfIssueMarker(p.todoId);
-  for (let page = 1; page <= SELF_ISSUE_PROBE_PAGES; page += 1) {
+  for (let page = 1; ; page += 1) {
     const res = await githubListIssues(deps.githubFetch ?? fetch, token, p.owner, p.repo, {
       state: 'all',
       page,
@@ -1190,10 +1238,6 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
   if (row.sourceRef !== null && !replacesOtherRepo) return null;
   if (!box) throw new HttpError(502, 'github writeback unavailable (no secret box)');
   if (repoRef === null) throw new HttpError(404, 'project is not github-backed');
-  const token = await (
-    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
-  )(row.teamId, repoRef);
-  if (token === null) throw new HttpError(404, 'github connection not found');
   registerSelfIssueCreateKind(deps);
   const body = `${row.spec}\n\n${selfIssueMarker(todoId)}`;
   const intent = recordEffect(db, {
@@ -1210,6 +1254,10 @@ async function runSelfIssueCreate(deps: TodoDeps, todoId: string): Promise<TodoR
     ),
     payload: { todoId, owner: repoRef.owner, repo: repoRef.repo, title: row.title, body },
   });
+  const token = await (
+    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
+  )(row.teamId, repoRef);
+  if (token === null) throw new HttpError(404, 'github connection not found');
   const settled = await settleEffectRow(db, effectRegistry, intent.row);
   if (settled.state === 'delivered') {
     const number = issueNumberOfReceipt(settled.receipt);
@@ -1251,6 +1299,15 @@ export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Prom
   if (selfIssueInFlight.has(todoId)) {
     throw new HttpError(409, 'github issue creation already in flight');
   }
+  if (githubRepoOfProject(projectOfTodo(deps.db, row)) === null) {
+    throw new HttpError(404, 'project is not github-backed');
+  }
+  if (row.sourceRef === null && !taskDeliveredCode(deps.db, row)) {
+    throw new HttpError(
+      409,
+      'the task has not delivered any code yet; its issue opens when a leg reports commits or a PR',
+    );
+  }
   const raw = runSelfIssueCreate(
     { ...deps, githubWriteTokenForRepo: (teamId) => userTokenOrNull(deps, teamId) },
     todoId,
@@ -1266,27 +1323,105 @@ export async function retrySelfIssueCreate(deps: TodoDeps, todoId: string): Prom
   return record;
 }
 
+interface SelfIssueTitlePayload {
+  todoId: string;
+  owner: string;
+  repo: string;
+  issueNumber: number;
+  title: string;
+}
+
+function selfIssueTitlePayloadOf(row: EffectRow): SelfIssueTitlePayload | null {
+  const p = row.payload as Record<string, unknown> | null;
+  if (p === null) return null;
+  if (
+    typeof p.todoId !== 'string' ||
+    typeof p.owner !== 'string' ||
+    typeof p.repo !== 'string' ||
+    typeof p.issueNumber !== 'number' ||
+    typeof p.title !== 'string'
+  )
+    return null;
+  return {
+    todoId: p.todoId,
+    owner: p.owner,
+    repo: p.repo,
+    issueNumber: p.issueNumber,
+    title: p.title,
+  };
+}
+
+function recordSelfIssueTitle(
+  deps: TodoDeps,
+  row: TodoRow,
+  parsed: { owner: string; repo: string; issueNumber: number },
+  title: string,
+): EffectRow {
+  registerSelfIssueTitleKind(deps);
+  return recordEffect(deps.db, {
+    teamId: row.teamId,
+    scopeKind: 'todo',
+    scopeId: row.id,
+    kind: 'github-issue-title',
+    dedupeKey: effectDedupeKey('github-issue-title', row.teamId, row.id, row.sourceRef, title),
+    payload: {
+      todoId: row.id,
+      owner: parsed.owner,
+      repo: parsed.repo,
+      issueNumber: parsed.issueNumber,
+      title,
+    },
+  }).row;
+}
+
+async function sendSelfIssueTitleEffect(
+  deps: TodoDeps,
+  effectRow: EffectRow,
+): Promise<{ title: string }> {
+  const p = selfIssueTitlePayloadOf(effectRow);
+  if (p === null) throw failEffect('github-issue-title payload is malformed');
+  const row = getRow(deps, p.todoId);
+  if (row === undefined || row.teamId !== effectRow.teamId)
+    throw failEffect('github-issue-title scope is gone');
+  const token = await (
+    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
+  )(row.teamId, { owner: p.owner, repo: p.repo });
+  if (token === null) throw retryEffect('github connection not found');
+  await githubUpdateIssueTitle(
+    deps.githubFetch ?? fetch,
+    token,
+    p.owner,
+    p.repo,
+    p.issueNumber,
+    p.title,
+  );
+  return { title: p.title };
+}
+
+function registerSelfIssueTitleKind(deps: TodoDeps): void {
+  effectRegistry.set('github-issue-title', {
+    policy: 'replay-safe',
+    scopeGone: (_db, effectRow) => {
+      const p = selfIssueTitlePayloadOf(effectRow);
+      return p === null || getRow(deps, p.todoId) === undefined;
+    },
+    send: (effectRow) => sendSelfIssueTitleEffect(deps, effectRow),
+  });
+}
+
 export async function writebackSelfIssueTitle(
   deps: TodoDeps,
   todoId: string,
   title: string,
 ): Promise<void> {
-  const { box } = deps;
+  const { db, box } = deps;
   if (!box) return;
   const row = getRow(deps, todoId);
   if (row?.sourceKind !== 'github-issue-self' || row.sourceRef === null) return;
   const parsed = parseGithubIssueSourceRef(row.sourceRef);
   if (parsed === null) return;
-  const token = await (
-    deps.githubWriteTokenForRepo ?? ((teamId, repo) => autonomousToken(deps, teamId, repo))
-  )(row.teamId, parsed);
-  if (token === null) return;
-  await githubUpdateIssueTitle(
-    deps.githubFetch ?? fetch,
-    token,
-    parsed.owner,
-    parsed.repo,
-    parsed.issueNumber,
-    title,
-  );
+  const intent = recordSelfIssueTitle(deps, row, parsed, title);
+  const settled = await settleEffectRow(db, effectRegistry, intent);
+  if (settled.state !== 'pending') return;
+  await runEffectRow(db, effectRegistry, settled.id);
 }

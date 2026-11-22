@@ -41,10 +41,15 @@ import {
   deliverableManifestFailure,
   publishDeliverables,
 } from './machine-deliverables.js';
+import {
+  announceMergeStepOutcome,
+  MERGE_LANDED_TEXT,
+  MERGE_UNCONFIRMED_TEXT,
+} from './merge-announcement.js';
 import { assertPhaseTransition, canTransitionPhase } from './phase.js';
 import { planAutoConfirmation, planContractOfStep } from './plan-auto-confirm.js';
 import { finishScheduledStep } from './schedules.js';
-import { setTodoPhase } from './todos.js';
+import { noteTaskCodeDelivered, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions, pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -224,6 +229,10 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
 
   finishScheduledStep(deps, stepRow);
 
+  const deliveredCode =
+    outcome.hasChanges === true || buildRow.prNumber !== null || buildRow.prUrl !== null;
+  if (isBuildStepKind(stepRow.kind) && deliveredCode) noteTaskCodeDelivered(deps, todoRow.id);
+
   if (
     receivesAnswers(stepRow.kind) &&
     pendingWorkerQuestions(deps.db, stepRow.buildId).length === 0 &&
@@ -241,6 +250,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       ANSWERS_CONTINUE_PROMPT,
       false,
       true,
+      { kind: 'continue' },
     );
     return;
   }
@@ -251,7 +261,18 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       .where(eq(planTable.buildId, stepRow.buildId))
       .get();
     if (!planDoc) {
-      enqueueStep(deps, stepRow.buildId, 'plan', todoRow.teamId, PLAN_REWRITE_PROMPT);
+      enqueueStep(
+        deps,
+        stepRow.buildId,
+        'plan',
+        todoRow.teamId,
+        PLAN_REWRITE_PROMPT,
+        undefined,
+        undefined,
+        {
+          kind: 'plan-rewrite',
+        },
+      );
       return;
     }
     if (planContract !== null && !planContract.ok) {
@@ -261,6 +282,9 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
         'plan',
         todoRow.teamId,
         buildPlanContractRewritePrompt(planContract.problem),
+        undefined,
+        undefined,
+        { kind: 'plan-rewrite' },
       );
       return;
     }
@@ -288,12 +312,8 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     pendingWorkerQuestions(deps.db, stepRow.buildId).length > 0
   ) {
     if (isInfoOutput(todoRow.output)) keepInfoReport();
-    setTodoPhase(
-      deps,
-      todoRow.id,
-      'needs_input',
-      outcome.hasChanges !== undefined ? { hasChanges: outcome.hasChanges } : {},
-    );
+    const hasChanges = deliveredCode ? true : outcome.hasChanges;
+    setTodoPhase(deps, todoRow.id, 'needs_input', hasChanges !== undefined ? { hasChanges } : {});
     return;
   }
   if (isBuildStepKind(stepRow.kind) && isInfoOutput(todoRow.output)) {
@@ -310,7 +330,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
   }
   if (isBuildStepKind(stepRow.kind)) {
     finishTodoDone(deps, todoRow.id, buildRow.id, {
-      hasChanges: outcome.hasChanges ?? true,
+      hasChanges: outcome.hasChanges !== false || deliveredCode,
     });
     return;
   }
@@ -323,7 +343,13 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
       content: `合并步跑完了；本任务以 PR #${pr.prNumber} 在 GitHub 上的状态为准，cairn 对账读到它合并后记录结果。`,
       createdAt: nowMs(),
     });
+    announceMergeStepOutcome(deps, {
+      stepId,
+      buildId: buildRow.id,
+      text: MERGE_UNCONFIRMED_TEXT,
+    });
     return;
   }
   finishTodoDone(deps, todoRow.id, buildRow.id);
+  announceMergeStepOutcome(deps, { stepId, buildId: buildRow.id, text: MERGE_LANDED_TEXT });
 }

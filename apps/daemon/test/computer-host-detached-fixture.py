@@ -3,7 +3,8 @@ import os
 import sys
 import time
 
-mode, receipt_path, token = sys.argv[1:]
+mode, receipt_path, token = sys.argv[1:4]
+keep_marker = len(sys.argv) > 4 and sys.argv[4] == "keep-marker"
 if mode == "launch":
     child = os.fork()
     if child:
@@ -19,7 +20,8 @@ if mode == "launch":
     if null > 2:
         os.close(null)
     environment = dict(os.environ)
-    environment.pop("CAIRN_COMPUTER_CALL", None)
+    if not keep_marker:
+        environment.pop("CAIRN_COMPUTER_CALL", None)
     os.execve(
         sys.executable,
         [sys.executable, os.path.realpath(__file__), "detached", receipt_path, token],

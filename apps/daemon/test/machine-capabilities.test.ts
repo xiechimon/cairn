@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { machineHardwareSchema, osPlatformOf } from '@cairn/shared';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
+  cpuUtilizationBetween,
   createMachineCapabilitiesProbe,
   probeDeviceName,
   probeMachineCapabilities,
@@ -297,5 +298,73 @@ describe('probeDeviceName', () => {
       expect(name).not.toHaveProperty('computerName');
       expect(name.hostname).toBeTruthy();
     }
+  });
+});
+
+describe('CPU utilization and memory pressure (not load average, not raw used memory)', () => {
+  const core = (busy: number, idle: number) => ({
+    model: 'cpu',
+    speed: 0,
+    times: { user: busy, nice: 0, sys: 0, idle, irq: 0 },
+  });
+  const window = (busy: number, idle: number) => ({ total: busy + idle, idle });
+
+  test('U1 the utilization is the busy share of the tick delta: blocked threads on IO leave it near zero', () => {
+    expect(cpuUtilizationBetween(window(1_000, 9_000), window(1_006, 9_194))).toBeCloseTo(0.03, 5);
+  });
+
+  test('U2 pinned cores read as fully busy', () => {
+    expect(cpuUtilizationBetween(window(1_000, 9_000), window(1_200, 9_000))).toBeCloseTo(1, 5);
+  });
+
+  test('U3 a window with no elapsed ticks is unknown, never NaN', () => {
+    expect(cpuUtilizationBetween(window(1_000, 9_000), window(1_000, 9_000))).toBeUndefined();
+  });
+
+  test('U4 the beat probe derives utilization from os.cpus ticks between two beats', () => {
+    let ticks = Array.from({ length: 8 }, () => core(0, 1_000));
+    const probe = createMachineCapabilitiesProbe(
+      { mcpConfigPath: join(tmpRoot(), 'absent.json'), skillsDir: join(tmpRoot(), 'absent') },
+      { readCpus: () => ticks },
+    );
+    expect(probe().hardware?.cpuUtilization).toBeUndefined();
+    ticks = ticks.map((tick) => core(tick.times.user + 60, tick.times.idle + 1_940));
+    expect(probe().hardware?.cpuUtilization).toBeCloseTo(0.03, 5);
+  });
+
+  test('U4b a beat sent moments after the last one keeps the previous figure instead of a noisy sliver', () => {
+    let ticks = Array.from({ length: 8 }, () => core(0, 1_000));
+    const probe = createMachineCapabilitiesProbe(
+      { mcpConfigPath: join(tmpRoot(), 'absent.json'), skillsDir: join(tmpRoot(), 'absent') },
+      { readCpus: () => ticks },
+    );
+    ticks = ticks.map((tick) => core(tick.times.user + 60, tick.times.idle + 1_940));
+    expect(probe().hardware?.cpuUtilization).toBeCloseTo(0.03, 5);
+    ticks = ticks.map((tick) => core(tick.times.user + 10, tick.times.idle));
+    expect(probe().hardware?.cpuUtilization).toBeCloseTo(0.03, 5);
+  });
+
+  test('U5 macOS memory pressure is the kernel level read as the share it calls unavailable', () => {
+    const hw = probeMachineHardware(tmpRoot(), 'darwin', () => '35\n', undefined)!;
+    expect(hw.memoryPressure).toBeCloseTo(0.65, 5);
+    expect(machineHardwareSchema.parse(hw)).toEqual(hw);
+  });
+
+  test('U6 Linux reports memory pressure as the share MemAvailable does not cover', () => {
+    const hw = probeMachineHardware(tmpRoot(), 'linux', () => '35\n', undefined)!;
+    expect(hw.memoryPressure).toBeCloseTo(1 - hw.memoryAvailableMb / hw.memoryTotalMb!, 5);
+  });
+
+  test('U7 a failed memory level read reports no macOS pressure instead of guessing', () => {
+    const hw = probeMachineHardware(
+      tmpRoot(),
+      'darwin',
+      () => {
+        throw new Error('sysctl missing');
+      },
+      undefined,
+    )!;
+    expect(hw.memoryPressure).toBeUndefined();
+    expect(hw.memoryAvailableMb).toBeGreaterThanOrEqual(0);
   });
 });

@@ -95,6 +95,7 @@ import {
 } from './model-fallback.js';
 import { markModelDead } from './model-liveness.js';
 import { notifyModelFallback } from './notifications.js';
+import { stepScopeProjectId } from './picked-project.js';
 import { applyQuotaWaitStep } from './quota-wait.js';
 import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
@@ -109,7 +110,14 @@ function holdStepForQuota(
   const holdCount = stepRow.holdCount + 1;
   const holdUntil = nowMs() + quotaHoldBackoffMs(holdCount);
   db.update(step)
-    .set({ status: 'pending', machineId: null, holdReason: 'quota', holdUntil, holdCount })
+    .set({
+      status: 'pending',
+      machineId: null,
+      holdReason: 'quota',
+      holdUntil,
+      holdCount,
+      mcpGrant: null,
+    })
     .where(eq(step.id, stepRow.id))
     .run();
   const note = quotaHoldNote(outcome.errorMessage ?? '', holdUntil);
@@ -117,6 +125,7 @@ function holdStepForQuota(
     upsertChiefRow(deps, {
       id: `quota-hold-${stepRow.id}`,
       threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
       role: 'system',
       content: note,
       createdAt: nowMs(),
@@ -197,7 +206,12 @@ function recordSkillInjectionCheck(
     }),
     createdAt: nowMs(),
   };
-  if (chiefStep) upsertChiefRow(deps, { ...row, threadId: stepRow.buildId });
+  if (chiefStep)
+    upsertChiefRow(deps, {
+      ...row,
+      threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
+    });
   else upsertMessage(deps, { ...row, conversationId: stepRow.buildId });
 }
 
@@ -251,6 +265,41 @@ async function finishStepReport(
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
+  if (
+    (stepRow.kind === 'review' || stepRow.kind === 'verify') &&
+    stepRow.archiveStop === null &&
+    db
+      .select({ stepId: stopPending.stepId })
+      .from(stopPending)
+      .where(eq(stopPending.stepId, stepRow.id))
+      .get() === undefined
+  ) {
+    const gateWorker = workerStepContext(deps, stepRow);
+    const plan = gateWorker?.agentRow
+      ? planModelFallback(db, stepRow, gateWorker.agentRow, body)
+      : null;
+    if (plan !== null && gateWorker?.agentRow) {
+      recordStepUsage(deps, stepRow, body.usage ?? []);
+      recordProviderOutcome(
+        stepTeamId(deps, stepRow),
+        ranModel(gateWorker.agentRow, stepRow).provider,
+        body,
+        false,
+      );
+      if (plan.trigger === 'model_unavailable') {
+        const teamId = stepTeamId(deps, stepRow);
+        if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
+      }
+      requeueStep(deps, stepRow, plan.row, {
+        id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
+        content: plan.note,
+      });
+      notifyModelFallback(deps, gateWorker.todoRow, gateWorker.agentRow, plan.note);
+      revokeStepGitCredential(deps, stepId);
+      emitRuntimeStepSpan(db, stepId);
+      return;
+    }
+  }
   if (settleRetiredGateStep(deps, stepRow, body)) {
     recordStepUsage(deps, stepRow, body.usage ?? []);
     revokeStepGitCredential(deps, stepId);
@@ -723,6 +772,7 @@ function requeueStep(
       fallback,
       holdReason: null,
       holdUntil: null,
+      mcpGrant: null,
     })
     .where(eq(step.id, stepRow.id))
     .run();
@@ -733,7 +783,11 @@ function requeueStep(
     createdAt: nowMs(),
   };
   if (isChiefConversation(stepRow.buildId)) {
-    upsertChiefRow(deps, { ...noteRow, threadId: stepRow.buildId });
+    upsertChiefRow(deps, {
+      ...noteRow,
+      threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
+    });
   } else {
     upsertMessage(deps, { ...noteRow, conversationId: stepRow.buildId });
   }

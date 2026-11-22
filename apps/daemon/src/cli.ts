@@ -12,10 +12,12 @@ import { join } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { BRAND, ENV_VARS, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
+import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
 import { runPiHost } from './backend/pi-host.js';
+import { childEnv } from './child-env.js';
 import { bundledClaudeCodePath } from './claude-code-bin.js';
 import {
   type DaemonConfig,
@@ -126,9 +128,15 @@ export async function runForeground(opts: StartOptions): Promise<void> {
   };
   process.on('SIGTERM', () => onSignal('SIGTERM'));
   process.on('SIGINT', () => onSignal('SIGINT'));
+  const parentPid = parentPidFromEnv(process.env);
+  const stopParentWatch =
+    parentPid === null
+      ? () => {}
+      : watchParentProcess({ pid: parentPid, onDead: () => onSignal('parent') });
   try {
     await handle.done;
   } finally {
+    stopParentWatch();
     await shutdownDaemonOtel();
   }
 }
@@ -358,7 +366,7 @@ export function buildProgram(): Command {
       ensurePrivateDir(claudeHome);
       const result = spawnSync(command, ['auth', 'login'], {
         stdio: 'inherit',
-        env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome },
+        env: childEnv({ CLAUDE_CONFIG_DIR: claudeHome }),
       });
       if (result.error !== undefined) throw result.error;
       process.exitCode = result.status ?? 1;

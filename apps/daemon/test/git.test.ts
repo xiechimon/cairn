@@ -162,16 +162,15 @@ describe("gitCredentialEnv — appended after the parent environment's GIT_CONFI
     expect(fill.stdout).not.toContain('STALE_REVOKED');
   });
 
-  test("failure mode 5: runGit composition — default parent env = process.env, the process's own keys still apply", async () => {
+  test('failure mode 5: runGit composition — the daemon’s own GIT_CONFIG_* does not reach git children', async () => {
     stubOutInheritedGitConfig();
     vi.stubEnv('GIT_CONFIG_COUNT', '1');
     vi.stubEnv('GIT_CONFIG_KEY_0', 'cairn.probe');
     vi.stubEnv('GIT_CONFIG_VALUE_0', 'kept');
     try {
       const env = gitCredentialEnv(CRED);
-      expect(env.GIT_CONFIG_COUNT).toBe('3');
-      const out = await runGitOk(['config', '--get', 'cairn.probe'], { env });
-      expect(out).toBe('kept');
+      expect(env.GIT_CONFIG_COUNT).toBe('2');
+      await expect(runGitOk(['config', '--get', 'cairn.probe'], { env })).rejects.toThrow();
     } finally {
       vi.unstubAllEnvs();
     }

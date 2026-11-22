@@ -193,7 +193,7 @@ export class WorkspaceManager implements WorktreeOps {
           await gitPrim.clone(seed, baseRepoDir, null);
           await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
           await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
-          await gitPrim.remoteSetHeadAuto(baseRepoDir, input.credentials);
+          await runNet('set-head', (cred) => gitPrim.remoteSetHeadAuto(baseRepoDir, cred));
           this.logger.workspace('Repo source: orb seed');
           fromSeed = true;
         }
@@ -210,11 +210,15 @@ export class WorkspaceManager implements WorktreeOps {
         }
       } else {
         const origin = await gitPrim.originConfigUrl(baseRepoDir);
-        if (origin !== null && origin !== cloneUrl) {
+        const retargeted = origin !== null && origin !== cloneUrl;
+        if (retargeted) {
           await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
           this.logger.workspace('Repo origin re-pointed to the project clone URL');
         }
         await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
+        if (retargeted) {
+          await runNet('set-head', (cred) => gitPrim.remoteSetHeadAuto(baseRepoDir, cred));
+        }
       }
       const defaultBranch = input.baseBranch ?? (await gitPrim.remoteDefaultBranch(baseRepoDir));
       if (input.readonly === true) {
@@ -243,7 +247,12 @@ export class WorkspaceManager implements WorktreeOps {
           if (remoteAhead > 0 && current !== branch) throw new RemoteBranchDivergedError(branch);
         }
         this.logger.workspace('Worktree reused');
-        const hooks = await this.runHookStage(convDir, 'resume', input.credentials);
+        const hooks = await this.runHookStage(
+          convDir,
+          'resume',
+          input.hookCredentials === undefined ? input.credentials : input.hookCredentials,
+          input.env,
+        );
         return {
           cwd: convDir,
           baseRepoDir,
@@ -272,7 +281,12 @@ export class WorkspaceManager implements WorktreeOps {
       }
       await gitPrim.worktreeAdd(baseRepoDir, branch, convDir, base);
       this.logger.workspace(`Worktree added (${branch} from ${base})`);
-      const hooks = await this.runHookStage(convDir, 'setup', input.credentials);
+      const hooks = await this.runHookStage(
+        convDir,
+        'setup',
+        input.hookCredentials === undefined ? input.credentials : input.hookCredentials,
+        input.env,
+      );
       return {
         cwd: convDir,
         baseRepoDir,
@@ -318,6 +332,7 @@ export class WorkspaceManager implements WorktreeOps {
     cwd: string,
     name: 'setup' | 'resume',
     credentials: BoundGitCredentials | null,
+    env?: NodeJS.ProcessEnv,
   ): Promise<WorkspaceHookNoteData[]> {
     try {
       const note = await this.recordingSetupDrift(cwd, () =>
@@ -325,6 +340,7 @@ export class WorkspaceManager implements WorktreeOps {
           cwd,
           name,
           credentials,
+          env,
           timeoutMs: this.hookTimeoutMs,
           log: (line) => this.logger.workspace(line),
         }),
@@ -433,6 +449,7 @@ export class WorkspaceManager implements WorktreeOps {
     cwd: string,
     defaultBranch: string,
     credentials: BoundGitCredentials | null,
+    env?: NodeJS.ProcessEnv,
   ): Promise<{ output: string }> {
     const driftFile = await gitPrim.gitPath(cwd, SETUP_DRIFT_FILE);
     const drift = readSetupDrift(driftFile);
@@ -452,6 +469,7 @@ export class WorkspaceManager implements WorktreeOps {
           cwd,
           name: 'setup',
           credentials,
+          env,
           timeoutMs: this.hookTimeoutMs,
           log: (line) => this.logger.workspace(line),
         }),

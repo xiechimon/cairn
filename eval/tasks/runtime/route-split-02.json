@@ -1,0 +1,55 @@
+{
+  "kind": "runtime",
+  "id": "route-split-02",
+  "request": "ios 改启动页 logo，android 也改启动页 logo",
+  "world": {
+    "projects": [
+      "ios",
+      "android",
+      "unrelated"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@ios",
+            "title": "ios 部分",
+            "quotes": [
+              "ios 改启动页 logo"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@android",
+            "title": "android 部分",
+            "quotes": [
+              "android 也改启动页 logo"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "已拆成多个任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "ios",
+      "android"
+    ],
+    "parts": 2,
+    "boundModel": "stub/m"
+  },
+  "gate": true
+}

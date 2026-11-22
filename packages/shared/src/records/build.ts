@@ -5,7 +5,7 @@ import { routeOverrideSchema } from './routing-rule.js';
 export const triggerSourceSchema = z.enum(['user', 'chief', 'schedule', 'retry']);
 export type TriggerSource = z.infer<typeof triggerSourceSchema>;
 
-export type StepActionOrigin = 'person' | 'coordinator' | 'retry';
+export type StepActionOrigin = 'person' | 'coordinator' | 'retry' | 'runtime';
 
 export const stopActorSchema = z.enum(['person', 'coordinator', 'mcp', 'system']);
 export type StopActor = z.infer<typeof stopActorSchema>;

@@ -293,15 +293,28 @@ export async function executeMcpTool(
     case 'merge_builds': {
       const buildIds = strArrOf(args, 'buildIds');
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
-      for (const buildId of buildIds) await requestMerge(svc, buildId, ctx.user.displayName);
-      return json({ merged: buildIds });
+      const merges: { buildId: string }[] = [];
+      for (const buildId of buildIds)
+        merges.push({
+          buildId,
+          ...(await requestMerge(svc, buildId, ctx.user.displayName)),
+        });
+      return json({
+        merges,
+        note: 'state "requested" means a machine runs the merge later: it is not merged yet. Only state "merged" confirms the change landed.',
+      });
     }
     case 'cancel_builds': {
       const buildIds = strArrOf(args, 'buildIds');
       const reason = optStr(args, 'reason') ?? `cancel_builds over MCP by ${deps.user.displayName}`;
       for (const buildId of buildIds) requireTeamBuild(db, buildId, ctx.teamId);
-      for (const buildId of buildIds) cancelBuild(svc, buildId, { actor: 'mcp', reason });
-      return json({ cancelled: buildIds });
+      const cancels: { buildId: string; state: string }[] = [];
+      for (const buildId of buildIds)
+        cancels.push({ buildId, state: cancelBuild(svc, buildId, { actor: 'mcp', reason }) });
+      return json({
+        cancels,
+        note: '"stopped" means the step is no longer running; "delegated" means a stop signal was sent to the machine and the step keeps running until it acknowledges; "released" means there was no running step to stop.',
+      });
     }
     case 'complete_todos':
       return json(transitionTodos(deps, ctx.teamId, strArrOf(args, 'todoIds'), 'done', mcpActor));

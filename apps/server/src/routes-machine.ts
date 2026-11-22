@@ -20,6 +20,7 @@ import {
   machineEnrollStartBodySchema,
   machineHeartbeatBodySchema,
   machineImEventBodySchema,
+  machineLocalMergeRecheckBodySchema,
   machineOfflineBodySchema,
   machinePresenceBodySchema,
   machineSteerAckBodySchema,
@@ -51,6 +52,7 @@ import { githubAppOf, jsonBody } from './routes-helpers.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
+import { localMergeRecheckAuthorization } from './services/local-merge.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
@@ -72,6 +74,7 @@ import {
   findMachineByToken,
   finishStep,
   heartbeatStep,
+  localEnrollmentRefusal,
   machineAttachmentDownload,
   machineRunningCount,
   machineSkillFile,
@@ -91,6 +94,7 @@ import {
   toMachineRecord,
 } from './services/machines.js';
 import { phoneRowsForPresence } from './services/phone-computer.js';
+import { resumeRuntimeHeldBuilds } from './services/runtime-holds.js';
 
 function isComputerRelayBody(raw: unknown): boolean {
   return raw !== null && typeof raw === 'object' && 'computer' in raw && raw.computer === true;
@@ -272,14 +276,24 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ...(body.cliVersion !== undefined ? { cliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCode: body.claudeCode } : {}),
       ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
+      ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
       serverUrl: originOf(c),
     });
+    if (body.claudeCode !== undefined) await resumeRuntimeHeldBuilds(deps, body.teamId);
     return c.json(result);
   });
 
   const ENROLL_CAP = 100;
   app.post('/api/machine/enroll/start', async (c) => {
     const body = parseWith(machineEnrollStartBodySchema, await jsonBody(c), 'body');
+    const fromLocalHost = isLoopbackPeer(c);
+    const refusal = localEnrollmentRefusal(ctx.db, {
+      teamId: body.teamId ?? ctx.team.id,
+      name: body.name,
+      hostKey: body.hostKey,
+      fromLocalHost,
+    });
+    if (refusal !== null) throw new HttpError(409, refusal);
     const now = Date.now();
     for (const [id, e] of ctx.enrollments) {
       if (now - e.createdAt > MACHINE_ENROLL_TTL_MS) ctx.enrollments.delete(id);
@@ -296,6 +310,8 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       name: body.name,
       code,
       createdAt: now,
+      fromLocalHost,
+      ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
     });
     return c.json({
       enrollId,
@@ -333,6 +349,8 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       name: entry.name ?? 'machine',
       serverUrl: originOf(c),
       ownerApproved: pairedDeviceIdOf(c) === null,
+      fromLocalHost: entry.fromLocalHost === true,
+      ...(entry.hostKey !== undefined ? { hostKey: entry.hostKey } : {}),
     });
     entry.machine = machineJson;
     return c.json({ machine: machineJson });
@@ -383,7 +401,10 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       async (row, decoded) => {
         const body = parseWith(machinePresenceBodySchema, decoded ?? {}, 'body');
         const admission = ctx.machineHub.admitPresence(row.id, body.connectionId);
-        if (admission !== 'ignore') markPresence(deps, row.id, body, admission === 'online');
+        if (admission !== 'ignore') {
+          markPresence(deps, row.id, body, admission === 'online');
+          if (body.claudeCode !== undefined) await resumeRuntimeHeldBuilds(deps, row.teamId);
+        }
         const phones = phoneRowsForPresence(ctx.db, row.id);
         return c.json({
           ok: true as const,
@@ -730,6 +751,17 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/machine/session/:stepId', (c) => {
     const row = me(c);
     return c.json(getStepSession(deps, row.id, c.req.param('stepId')));
+  });
+
+  app.post('/api/machine/local-merge-recheck/:stepId', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineLocalMergeRecheckBodySchema, decoded, 'body');
+        return c.json(localMergeRecheckAuthorization(deps, row.id, c.req.param('stepId'), body));
+      },
+    );
   });
 
   app.post(

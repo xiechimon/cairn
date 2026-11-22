@@ -3,6 +3,7 @@ import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context, Hono } from 'hono';
 import { AUTH_COOKIE, type ResolvedBrowserSession } from '../services/browser-session.js';
 import { sha256Hex } from './crypto.js';
+import { type OwnerChannel, ownerChannelAdmits } from './owner-channel.js';
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -59,7 +60,6 @@ function isExempt(pathname: string): boolean {
   if (pathname.startsWith('/api/webhook/')) return true;
   if (pathname === '/api/mcp') return true;
   if (pathname === '/api/oauth/callback') return true;
-  if (pathname === '/api/auth/bootstrap') return true;
   if (pathname === '/api/auth/access') return true;
   if (pathname.startsWith('/api/webhook/schedule/')) return true;
   if (isOpenRemotePath(pathname)) return true;
@@ -92,9 +92,11 @@ export interface TokenAuthOptions {
   resolveDeviceId?: (provided: string) => string | null;
   resolveSession?: (cookie: string) => ResolvedBrowserSession | null;
   redeemTicket?: (ticket: string) => ResolvedBrowserSession | null;
+  ownerChannel?: OwnerChannel;
+  accessExchange?: boolean;
 }
 
-export type OwnerIdentity = { via: 'session' };
+export type OwnerIdentity = { via: 'session' | 'access' };
 
 declare module 'hono' {
   interface ContextVariableMap {
@@ -129,8 +131,8 @@ function cookieValue(c: Context, name: string): string | undefined {
 }
 
 function applySession(c: Context, session: ResolvedBrowserSession): Response | null {
-  if (session.kind === 'owner') {
-    c.set('ownerIdentity', { via: 'session' });
+  if (session.kind === 'owner' || session.kind === 'external') {
+    c.set('ownerIdentity', { via: session.kind === 'external' ? 'access' : 'session' });
     return null;
   }
   if (session.deviceId === null) return c.json({ error: 'Unauthorized' }, 401);
@@ -163,10 +165,17 @@ export function registerTokenAuth(
     const url = new URL(c.req.url);
     const pathname = url.pathname;
     if (isExempt(pathname)) return next();
-    const admit = () =>
-      pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, c.req.path)
-        ? c.json({ error: 'only the owner token can do this' }, 403)
-        : next();
+    const admit = () => {
+      if (pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, c.req.path)) {
+        return c.json({ error: 'only the owner token can do this' }, 403);
+      }
+      if (!READ_METHODS.has(c.req.method.toUpperCase())) {
+        return (
+          ownerChannelAdmits(c, options.ownerChannel, options.accessExchange === true) ?? next()
+        );
+      }
+      return next();
+    };
     const authorization = c.req.header('authorization');
     if (authorization !== undefined) {
       const match = /^Bearer\s+(.+)$/i.exec(authorization);

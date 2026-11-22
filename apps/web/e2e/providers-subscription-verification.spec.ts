@@ -136,6 +136,12 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
   await open(page, mode);
   await expect(row(page)).toContainText('订阅 · 3 个模型');
   await expect(row(page).getByTestId('subscription-quota-mini')).toHaveText('5h 62%周 88%');
+  await expect(detail(page).getByTestId('subscription-quota-reset').first()).toHaveText(
+    /^(59|60) 分钟后重置$/,
+  );
+  await expect(detail(page).getByTestId('subscription-quota-reset').nth(1)).not.toContainText(
+    '小时后',
+  );
   await expectNoCheckStatus(page);
   await expect(result(page)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

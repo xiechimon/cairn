@@ -1,0 +1,23 @@
+{
+  "kind": "runtime",
+  "id": "prompt-contract-02",
+  "request": "随便看看状态",
+  "world": {
+    "projects": [
+      "proj-beta",
+      "other"
+    ]
+  },
+  "script": [
+    {
+      "text": "状态正常。"
+    }
+  ],
+  "expected": {
+    "decision": "any",
+    "promptContains": [
+      "proj-beta"
+    ]
+  },
+  "gate": true
+}

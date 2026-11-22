@@ -330,6 +330,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         else
           await mutations.messageThread.mutateAsync({
             todoId,
+            conversationId: buildId,
             content: text,
             clientMessageId: key,
           });

@@ -28,6 +28,8 @@ export const feedbackHighWaterSchema = z.object({
   review: z.number().int().nonnegative(),
 });
 
+const FEEDBACK_PER_PAGE = 100;
+
 export function isCairnIdentity(login: string): boolean {
   return /^(?:cairn|cairnwright)(?:\[bot\])?$/i.test(login);
 }
@@ -48,9 +50,8 @@ export async function githubPrFeedback(
     ['review', `pulls/${prNumber}/reviews`],
   ] as const) {
     for (let page = 1; ; page += 1) {
-      if (page > 10) throw new HttpError(502, 'GitHub feedback pagination incomplete');
       const response = await githubTokenFetch(fetchImpl, token)(
-        `${base}/${path}?per_page=100&page=${page}`,
+        `${base}/${path}?per_page=${FEEDBACK_PER_PAGE}&page=${page}`,
         {
           headers: {
             accept: 'application/vnd.github+json',
@@ -89,7 +90,7 @@ export async function githubPrFeedback(
           body: body || 'Changes requested.',
         });
       }
-      if (rows.length < 100) break;
+      if (rows.length < FEEDBACK_PER_PAGE) break;
     }
   }
   return {

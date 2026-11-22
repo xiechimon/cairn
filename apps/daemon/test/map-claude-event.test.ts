@@ -526,6 +526,39 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
     expect(err.error.message).not.toContain('ANTHROPIC_API_KEY');
   });
 
+  test('an API error the CLI reports as an assistant message is the turn error, never a reply', () => {
+    const text =
+      'API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required';
+    const { events } = feed([
+      {
+        type: 'assistant',
+        error: 'invalid_request',
+        message: {
+          id: 'msg_api_error',
+          role: 'assistant',
+          content: [{ type: 'text', text }],
+          model: '<synthetic>',
+          stop_reason: 'stop_sequence',
+        },
+      } as unknown as SDKMessage,
+      {
+        type: 'result',
+        subtype: 'success',
+        is_error: true,
+        result: text,
+        usage: { input_tokens: 0, output_tokens: 0 },
+        num_turns: 1,
+        total_cost_usd: 0,
+        session_id: 'sdk-sess-uuid-1',
+      } as unknown as SDKMessage,
+    ]);
+    expect(events.filter((e) => e.type === 'message_end')).toEqual([]);
+    expect(events.find((e) => e.type === 'error')).toEqual({
+      type: 'error',
+      error: { message: text, retryable: false },
+    });
+  });
+
   test("failure mode 8: system init's session_id scraped into state (A7 resume channel)", () => {
     const { state } = feed([INIT]);
     expect(state.sessionId).toBe('sdk-sess-uuid-1');

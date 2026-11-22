@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { applyFlush, flushPrompt } from '../src/coordinator/memory-flush.js';
-import { agentMemory, memoryCandidate, project } from '../src/db/schema.js';
+import { agentMemory, project } from '../src/db/schema.js';
 import { executeWorkerMemoryTool } from '../src/services/chief-tools.js';
 import { injectMemoryDocuments } from '../src/services/memory.js';
 import {
@@ -9,7 +9,6 @@ import {
   executeMemoryDocumentTool,
   rememberMemoryFile,
 } from '../src/services/memory-documents.js';
-import { confirmCandidate } from '../src/trajectory-curate.js';
 import { AGENT_ID, H, registerChiefHarness, relay } from './chief-harness.js';
 
 registerChiefHarness();
@@ -224,22 +223,12 @@ test.each(['MEMORY.md', 'duplicate.md', 'bad\nname\0.md', 'x'.repeat(1200), 'cut
 );
 
 test('curation returns a file id that survives document reads and injection folds', async () => {
-  H.s.db
-    .insert(memoryCandidate)
-    .values({
-      id: 'candidate',
-      agentId: AGENT_ID,
-      teamId: H.teamId,
-      projectId: H.projectId,
-      title: 'curated'.repeat(300),
-      content: 'durable curated lesson',
-      buildIds: ['one', 'two'],
-      evidence: [],
-      createdAt: 1,
-      updatedAt: 1,
-    })
-    .run();
-  const id = confirmCandidate(H.s.db, 'candidate');
+  const { id } = rememberMemoryFile(
+    H.s.db,
+    { teamId: H.teamId, agentId: AGENT_ID, projectId: H.projectId, sourceBuildId: 'two' },
+    'curated'.repeat(300),
+    'durable curated lesson',
+  );
   await relay('memories', { scope: H.projectId });
   const rows = H.s.db.select().from(agentMemory).all();
   const row = rows.find((r) => r.id === id)!;

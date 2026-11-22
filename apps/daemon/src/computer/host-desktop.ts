@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
 import { z } from 'zod';
+import { childEnv } from '../child-env.js';
 import {
   AGENT_BROWSER_BINARY,
   browserProfileKeyOfSession,
@@ -29,6 +30,7 @@ import type { ComputerDesktops, ComputerHoldUse } from './desktops.js';
 import { HostComputerProvider } from './host.js';
 import type { ComputerInputFence, ComputerInputLease } from './input-fence.js';
 import { type ComputerProcessEvent, type ComputerProvider, ComputerRefusal } from './provider.js';
+import { x11DisplayAnswers } from './x11-display.js';
 
 export const PINNED_AGENT_BROWSER_VERSION = '0.41.2';
 
@@ -188,7 +190,7 @@ function runCommand(argv: readonly string[], env?: NodeJS.ProcessEnv): Promise<C
     execFile(
       argv[0] as string,
       argv.slice(1),
-      { timeout: 15_000, env: env ? { ...process.env, ...env } : process.env },
+      { timeout: 15_000, env: childEnv(env) },
       (error, stdout) => {
         const code = error ? (typeof error.code === 'number' ? error.code : 1) : 0;
         resolve({ code, stdout: String(stdout) });
@@ -348,16 +350,18 @@ export class HostDesktops implements ComputerDesktops {
     return join(this.directory(scopeKey), 'computer', kind === 'view' ? 'view.sock' : 'vnc.sock');
   }
 
-  private ready(directory: string): string | undefined {
+  private async ready(directory: string): Promise<string | undefined> {
+    let display: string;
     try {
-      const display = readFileSync(join(directory, 'display'), 'utf8').trim();
+      display = readFileSync(join(directory, 'display'), 'utf8').trim();
       const sockets = ['view.sock', 'vnc.sock'].every((name) =>
         lstatSync(join(directory, 'computer', name)).isSocket(),
       );
-      return display !== '' && sockets ? `:${display}` : undefined;
+      if (display === '' || !sockets) return undefined;
     } catch {
       return undefined;
     }
+    return (await x11DisplayAnswers(display)) ? `:${display}` : undefined;
   }
 
   private notify(): void {
@@ -686,7 +690,7 @@ export class HostDesktops implements ComputerDesktops {
     }
     const unit = `${UNIT_PREFIX}${this.id(scopeKey)}.service`;
     const active = (await this.run(['systemctl', '--user', 'is-active', unit])).code === 0;
-    let display = active ? this.ready(directory) : undefined;
+    let display = active ? await this.ready(directory) : undefined;
     if (display === undefined) {
       await this.run(['systemctl', '--user', 'stop', unit]);
       await this.run(['systemctl', '--user', 'reset-failed', unit]);
@@ -708,14 +712,14 @@ export class HostDesktops implements ComputerDesktops {
       ]);
       if (started.code !== 0) throw new ComputerRefusal('The host desktop could not be started');
       const deadline = Date.now() + (this.options.readyMs ?? HOST_DESKTOP_READY_MS);
-      display = this.ready(directory);
+      display = await this.ready(directory);
       while (display === undefined) {
         if (Date.now() >= deadline) {
           await this.run(['systemctl', '--user', 'stop', unit]);
           throw new ComputerRefusal('The host desktop did not become ready');
         }
         await sleep(100);
-        display = this.ready(directory);
+        display = await this.ready(directory);
       }
     }
     const current = this.desktops.get(scopeKey);
@@ -931,7 +935,7 @@ export class HostDesktops implements ComputerDesktops {
     const directory = this.directory(scopeKey);
     const provider =
       this.desktops.get(scopeKey)?.provider ??
-      this.provider(join(directory, 'home'), this.ready(directory) ?? '');
+      this.provider(join(directory, 'home'), (await this.ready(directory)) ?? '');
     const listed = await browserCommand(provider, ['--json', 'session', 'list'])
       .then(({ code, text }) =>
         code === 0 ? (sessionList.safeParse(JSON.parse(text)).data?.data.sessions ?? []) : [],

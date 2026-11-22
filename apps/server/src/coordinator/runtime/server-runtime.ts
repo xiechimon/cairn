@@ -8,7 +8,7 @@ import {
   WORKER_MEMORY_REMOTE_TOOLS,
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
-import type { Provider } from '@earendil-works/pi-ai';
+import type { Api, Model, Provider, ProviderResponse } from '@earendil-works/pi-ai';
 import type { Harness } from '@earendil-works/pi-durable';
 import {
   coordinatorCompactionExtension,
@@ -71,6 +71,7 @@ export interface ProviderBinding {
   config: ProviderConfig;
   modelId: string;
   resolveKey(): string | null | Promise<string | null>;
+  observe?(response: ProviderResponse, model: Model<Api>): void;
 }
 
 export interface ServerTurn {
@@ -116,7 +117,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       config.onImagesRejected?.(threadId, providerId, modelId);
     });
     for (const binding of config.providersFor?.(threadId) ?? []) {
-      models.useProvider(binding.config, binding.resolveKey);
+      models.useProvider(binding.config, binding.resolveKey, binding.observe);
     }
     const gate = createConversationGate();
     const inputs =
@@ -257,8 +258,12 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       });
       await settleClosing(threadId);
       const prepare = (target: ThreadState): ThreadState => {
-        target.models.useProvider(turn.router.config, turn.router.resolveKey);
-        target.models.useProvider(turn.summary.config, turn.summary.resolveKey);
+        target.models.useProvider(turn.router.config, turn.router.resolveKey, turn.router.observe);
+        target.models.useProvider(
+          turn.summary.config,
+          turn.summary.resolveKey,
+          turn.summary.observe,
+        );
         target.summary.ref = {
           provider: turn.summary.config.providerId,
           modelId: turn.summary.modelId,

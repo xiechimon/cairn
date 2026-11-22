@@ -43,6 +43,11 @@ export class SegmentBuffer {
     return seg;
   }
 
+  discard(): void {
+    this.kind = null;
+    this.text = '';
+  }
+
   current(): SealedSegment | null {
     return this.kind === null || this.text === '' ? null : { kind: this.kind, text: this.text };
   }
@@ -64,6 +69,11 @@ export class SegmentEmitter {
 
   async seal(): Promise<void> {
     await this.deliver(this.buffer.seal());
+  }
+
+  discard(): void {
+    this.buffer.discard();
+    this.emittedInMessage = false;
   }
 
   async endAssistantMessage(content: unknown): Promise<void> {

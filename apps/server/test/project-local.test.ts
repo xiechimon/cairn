@@ -2,7 +2,7 @@ import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { type LocalErrorReason, PROJECT_LOCAL_ERROR_REASONS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { project } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
@@ -207,6 +207,38 @@ describe('retained local file mentions, branches and Coordinator document reads'
     const id = await createLocalProject(repo);
     rmSync(repo, { recursive: true, force: true });
     mkdirSync(repo, { recursive: true });
+    const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
+      'not_git',
+    );
+  });
+
+  test('F3b a foreign repo bound through the environment does not change the verdict', async () => {
+    const repo = await makeLocalRepo();
+    const id = await createLocalProject(repo);
+    rmSync(repo, { recursive: true, force: true });
+    mkdirSync(repo, { recursive: true });
+    const foreign = tempDir('cairn-foreign-repo-');
+    expect((await runGit(['init', foreign], { env: READ_GIT_ENV })).code).toBe(0);
+    vi.stubEnv('GIT_DIR', join(foreign, '.git'));
+    try {
+      const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
+      expect(res.status).toBe(404);
+      expect(((await res.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(
+        'not_git',
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  test('F3c a directory that only sits inside another worktree -> 404 + reason=not_git', async () => {
+    const outer = tempDir('cairn-outer-worktree-');
+    expect((await runGit(['init', outer], { env: READ_GIT_ENV })).code).toBe(0);
+    const inner = join(outer, 'replaced');
+    mkdirSync(inner);
+    const id = await createLocalProject(inner);
     const res = await req(s.app, 'GET', `/api/projects/${id}/files`);
     expect(res.status).toBe(404);
     expect(((await res.json()) as { reason?: LocalErrorReason }).reason).toBe<LocalErrorReason>(

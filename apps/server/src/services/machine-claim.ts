@@ -77,6 +77,7 @@ import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { infoCardPlan, infoCardRemoteTools } from './info-card.js';
 import { infoRepoOffered } from './info-repo-snapshot.js';
+import { localMergeAuthorizationRefusal } from './local-merge.js';
 import { teamOffersDesktop } from './machine-computer.js';
 import { failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
@@ -87,6 +88,7 @@ import {
 } from './machine-deps.js';
 import {
   fallbackMachineId,
+  liveMachineId,
   platformFallbackMachineId,
   priorSessionOf,
   routeTargets,
@@ -95,14 +97,13 @@ import {
   type WorkerStepFacts,
   workerIneligibility,
 } from './machine-routing.js';
-import { connectorSlugs } from './mcp-servers.js';
+import { connectorSlugs, localBrowserConnector } from './mcp-servers.js';
 import { injectMemories } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
 import { mergedCatalogModels } from './model-liveness.js';
 import { ownComputerOffered } from './own-computer.js';
 import { offeredPhoneNames } from './phone-computer.js';
-import { projectMergeConfigOf } from './projects.js';
 import {
   coordinatorMemoryOwner,
   coordinatorProfile,
@@ -263,7 +264,10 @@ export function stepMcpGrant(
 }
 
 export function chiefTurnLocked(stepRow: typeof step.$inferSelect): boolean {
-  return turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
+  return (
+    turnProvenance(stepRow.prompt)?.startsWith('mail:') === true ||
+    memoryEditIdOfPrompt(stepRow.prompt) !== null
+  );
 }
 
 function claimLocalTools(agentTools: readonly string[]): string[] {
@@ -319,6 +323,7 @@ function buildChiefClaim(
             modelId: model.modelId,
             thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
           },
+    mcpGrant: stepMcpGrant(deps.db, machineRow, chiefTurnLocked(stepRow)) ?? null,
   });
   if (claimed === null) return null;
   return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
@@ -364,6 +369,7 @@ function chiefClaimPayload(
   const continuesSession =
     !stepRow.freshSession &&
     threadRow.sessionId !== '' &&
+    threadRow.sessionRuntime === runtime &&
     (runtime !== 'claude-code' && runtime !== 'devin' && runtime !== 'antigravity'
       ? true
       : !chiefLastRanOnOtherAccount(
@@ -375,7 +381,7 @@ function chiefClaimPayload(
         ));
   const mailTurn = turnProvenance(stepRow.prompt)?.startsWith('mail:') === true;
   const memoryEditTurn = memoryEditIdOfPrompt(stepRow.prompt) !== null;
-  const locked = mailTurn || memoryEditTurn;
+  const locked = chiefTurnLocked(stepRow);
   const history = locked ? null : chiefHistoryFor(deps.db, threadRow, stepRow);
   const chiefMcp = machineRow ? stepMcpGrant(deps.db, machineRow, locked) : locked ? [] : undefined;
   return {
@@ -385,6 +391,7 @@ function chiefClaimPayload(
       kind: 'chief',
       machineId,
       createdAt: stepRow.createdAt,
+      generation: stepRow.claimedAt ?? undefined,
     },
     conversationId: stepRow.buildId,
     session: {
@@ -422,6 +429,7 @@ function chiefClaimPayload(
                 vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
                 vmBrowser: teamHasVmBrowser(deps.db, threadRow.teamId),
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
+                ownerChrome: localBrowserConnector(deps.db, threadRow.teamId) !== null,
                 phoneComputer: offeredPhoneNames(deps, stepRow.buildId),
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),
@@ -487,13 +495,14 @@ function claimChiefTurn(
           online: machine.online,
           kind: machine.kind,
           lastSeenAt: machine.lastSeenAt,
+          retiredAt: machine.retiredAt,
         })
         .from(machine)
         .where(eq(machine.teamId, teamId))
         .all(),
       teamDefaultMachineId(db, teamId),
     );
-    const chiefMachine = cand.agentRow.machineId ?? sole;
+    const chiefMachine = liveMachineId(db, cand.agentRow.machineId) ?? sole;
     if (chiefMachine !== machineId) continue;
     const claimed = buildChiefClaim(
       deps,
@@ -546,25 +555,16 @@ async function tryClaim(
       continue;
     if (!stillAuthorized()) return null;
     const localMerge = parseLocalMergeInstruction(cand.stepRow.prompt);
-    if (localMerge !== null) {
-      const project = projectOfTodo(db, cand.todoRow);
-      const config = project ? projectMergeConfigOf(project) : null;
-      if (
-        project?.repoKind !== 'local' ||
-        project.id !== localMerge.projectId ||
-        config === null ||
-        JSON.stringify(config.localChecks) !== JSON.stringify(localMerge.localChecks) ||
-        (project.baseBranch !== null && project.baseBranch !== localMerge.defaultBranch) ||
-        !['done', 'review', 'failed'].includes(cand.todoRow.phase) ||
-        cand.todoRow.latestBuildId !== localMerge.buildId
-      ) {
-        failStepWithEvents(
-          deps,
-          cand.stepRow,
-          'Local merge authorization changed; request the merge again',
-        );
-        continue;
-      }
+    if (
+      localMerge !== null &&
+      localMergeAuthorizationRefusal(db, localMerge, cand.todoRow) !== null
+    ) {
+      failStepWithEvents(
+        deps,
+        cand.stepRow,
+        'Local merge authorization changed; request the merge again',
+      );
+      continue;
     }
     const infoCard = isBuildStepKind(cand.stepRow.kind) && isInfoOutput(cand.todoRow.output);
     const infoPlan = infoCard ? infoCardPlan(db, cand.todoRow, cand.stepRow) : null;
@@ -614,7 +614,7 @@ async function tryClaim(
       },
       model.provider,
     );
-    const { priorSessionId, priorMachineId, freshSession } = prior;
+    const { priorSessionId, priorMachineId, priorMachineLiveId, freshSession } = prior;
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
@@ -628,6 +628,7 @@ async function tryClaim(
           lastSeenAt: machine.lastSeenAt,
           tokenHash: machine.tokenHash,
           capabilities: machine.capabilities,
+          retiredAt: machine.retiredAt,
         })
         .from(machine)
         .where(eq(machine.teamId, teamId))
@@ -638,8 +639,8 @@ async function tryClaim(
     const allowed = routeVerdict({
       machineId,
       targets: routeTargets(
-        !freshSession && priorSessionId !== null ? priorMachineId : null,
-        agentRow.machineId,
+        !freshSession && priorSessionId !== null ? priorMachineLiveId : null,
+        facts.localProject ? agentRow.machineId : liveMachineId(db, agentRow.machineId),
         sole,
       ),
     }).claim;
@@ -653,6 +654,7 @@ async function tryClaim(
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     if (!stillAuthorized()) return null;
     const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+    const workerMcp = stepMcpGrant(db, machineRow, infoPlan !== null);
     let won = false;
     try {
       won = db.transaction((tx) => {
@@ -688,17 +690,11 @@ async function tryClaim(
             !['done', 'review', 'failed'].includes(latestTodo.phase))
         )
           return false;
-        if (localMerge !== null) {
-          const target = projectOfTodo(db, latestTodo);
-          if (
-            target?.repoKind !== 'local' ||
-            target.id !== localMerge.projectId ||
-            JSON.stringify(projectMergeConfigOf(target).localChecks) !==
-              JSON.stringify(localMerge.localChecks) ||
-            (target.baseBranch !== null && target.baseBranch !== localMerge.defaultBranch)
-          )
-            return false;
-        }
+        if (
+          localMerge !== null &&
+          localMergeAuthorizationRefusal(db, localMerge, latestTodo) !== null
+        )
+          return false;
         holdBlockedBuild(db, cand.stepRow.buildId);
         const res = tx
           .update(step)
@@ -715,6 +711,7 @@ async function tryClaim(
             holdReason: null,
             holdUntil: null,
             ranModel: pinnedModel,
+            mcpGrant: workerMcp ?? null,
           })
           .where(
             and(
@@ -780,7 +777,6 @@ async function tryClaim(
       repoRef?.kind === 'hosted' && mergeTarget !== null
         ? { ...repoRef, baseBranch: mergeTarget.baseBranch }
         : repoRef;
-    const workerMcp = stepMcpGrant(db, machineRow, infoPlan !== null);
     const segmentsDaemon = cliVersionAtLeast(
       machineRow.latestCliVersion,
       TASK_SEGMENTS_MIN_CLI_VERSION,
@@ -822,6 +818,7 @@ async function tryClaim(
         kind: cand.stepRow.kind,
         machineId,
         createdAt: cand.stepRow.createdAt,
+        generation: claimedAt,
       },
       conversationId: cand.stepRow.buildId,
       ...(localMerge !== null ? { localMerge } : {}),

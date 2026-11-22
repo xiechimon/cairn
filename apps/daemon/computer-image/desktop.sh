@@ -14,8 +14,7 @@ exec dbus-run-session -- bash -s <<'SESSION'
 set -euo pipefail
 export DISPLAY=:1 ACCESSIBILITY_ENABLED=1
 Xvfb :1 -screen 0 1600x1000x24 -nolisten tcp &
-for _ in $(seq 100); do [[ -S /tmp/.X11-unix/X1 ]] && break; sleep 0.1; done
-[[ -S /tmp/.X11-unix/X1 ]] || exit 1
+cairn-wait-display :1 || exit 1
 dbus-update-activation-environment DISPLAY ACCESSIBILITY_ENABLED
 printf 'export DISPLAY=:1 ACCESSIBILITY_ENABLED=1 GTK_A11Y=atspi QT_ACCESSIBILITY=1 DBUS_SESSION_BUS_ADDRESS=%q\n' "$DBUS_SESSION_BUS_ADDRESS" > /run/cairn/session.env
 hsetroot -solid '#1e1e2e' >/dev/null 2>&1 || true

@@ -12,6 +12,22 @@ const row = (page: Page) => page.getByTestId('resource-row').first();
 const card = (page: Page) => page.getByTestId('page-col').locator('.settings-card').first();
 const sideChat = (page: Page) => page.getByTestId('side-chat');
 const searchDialog = (page: Page) => page.getByRole('dialog', { name: '搜索' });
+const searchInput = (page: Page) => searchDialog(page).getByLabel('搜索');
+export const composerInput = (page: Page) =>
+  page.getByTestId('home-c').getByTestId('chief-composer-input');
+
+export async function expectTypedInFull(field: Locator, text: string): Promise<void> {
+  await expect(field, `the capture must show "${text}" typing complete`).toHaveValue(text);
+}
+
+export async function typeIntoField(page: Page, field: Locator, text: string): Promise<void> {
+  await expect(field).toBeVisible();
+  if (!(await field.evaluate((node) => node === document.activeElement))) await field.click();
+  await expect(field, 'typing starts in the focused field').toBeFocused();
+  await expect(field, 'typing starts from an empty field').toHaveValue('');
+  await page.keyboard.type(text);
+  await expectTypedInFull(field, text);
+}
 
 export const PAGES: AuditPage[] = [
   {
@@ -20,7 +36,7 @@ export const PAGES: AuditPage[] = [
     open: async (page) => {
       await page.waitForSelector('.board-sidebar', { state: 'attached' });
       await pressAndExpect(page, 'Meta+k', searchDialog(page));
-      await page.keyboard.type('probe');
+      await typeIntoField(page, searchInput(page), 'probe');
     },
     ready: (p) => searchDialog(p).locator('[data-row-kind="todo"]').first(),
   },
@@ -47,10 +63,7 @@ export const PAGES: AuditPage[] = [
         .getByRole('complementary')
         .locator('[data-slot="sidebar-nav-row"]', { hasText: 'Coordinator' })
         .click();
-      const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
-      await expect(input).toBeVisible();
-      await page.keyboard.type('probe');
-      await expect(input).toBeFocused();
+      await typeIntoField(page, composerInput(page), 'probe');
     },
     ready: (p) => p.getByTestId('home-c').getByTestId('chief-composer-input'),
   },

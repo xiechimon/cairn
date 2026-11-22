@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'node:child_process';
+import { lstatSync, realpathSync } from 'node:fs';
 import { readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve, sep as SEPARATOR } from 'node:path';
 import { promisify } from 'node:util';
 
 const run = promisify(execFile);
@@ -14,11 +15,47 @@ export async function removeFolder(path: string): Promise<void> {
   await run(REMOVE, ['-rf', path]);
 }
 
-export async function removeStagingFolders(folder: string): Promise<void> {
+export function canonicalPath(path: string): string {
+  const absolute = resolve(path);
+  let head = absolute;
+  const tail: string[] = [];
+  for (;;) {
+    try {
+      return join(realpathSync(head), ...tail);
+    } catch {
+      const parent = dirname(head);
+      if (parent === head) return absolute;
+      tail.unshift(basename(head));
+      head = parent;
+    }
+  }
+}
+
+export function isStagedBundleFor(bundle: string, stagedApp: string): boolean {
+  if (!isAbsolute(stagedApp)) return false;
+  if (basename(stagedApp) !== basename(bundle)) return false;
+  const folder = dirname(stagedApp);
+  if (dirname(folder) !== dirname(bundle)) return false;
+  if (!basename(folder).startsWith(STAGING_PREFIX)) return false;
+  if (canonicalPath(folder) !== folder || canonicalPath(stagedApp) !== stagedApp) return false;
+  try {
+    return lstatSync(stagedApp).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+export async function removeStagingFolders(
+  folder: string,
+  keep: readonly string[] = [],
+): Promise<void> {
+  const directory = canonicalPath(folder);
+  const kept = keep.map(canonicalPath);
   const entries = await readdir(folder).catch(() => []);
   await Promise.all(
     entries
       .filter((name) => name.startsWith(STAGING_PREFIX))
+      .filter((name) => !kept.some((path) => path.startsWith(join(directory, name, SEPARATOR))))
       .map((name) => removeFolder(join(folder, name)).catch(() => {})),
   );
 }

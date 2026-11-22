@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test';
 
 const LOCAL_TITLE = '登录偶发 500：重试风暴';
 
-function selfRecord(sourceRef: string | null) {
+function selfRecord(sourceRef: string | null, hasChanges = sourceRef !== null) {
   return {
     id: 'todo-self-1',
     teamId: 'team-1',
@@ -17,7 +17,7 @@ function selfRecord(sourceRef: string | null) {
     agent: null,
     latestBuildId: null,
     lastRunAt: null,
-    hasChanges: false,
+    hasChanges,
     hasPlan: false,
     buildHistory: [],
     sourceTodo: null,
@@ -36,10 +36,12 @@ async function stubWorld(
 
     sourceRef: string | null;
 
+    hasChanges?: boolean;
+
     echo: { mode: 'ok'; title: string; state?: 'open' | 'closed' } | { mode: 'gone' };
   },
 ) {
-  let record = selfRecord(opts.sourceRef);
+  let record = selfRecord(opts.sourceRef, opts.hasChanges);
   let retryHits = 0;
   let echoHits = 0;
   const json = (body: unknown, status = 200) => ({
@@ -144,9 +146,10 @@ test('3. unreachable (echo 404): whole row hidden, page shows no error state', a
   await expect(page.locator('[data-testid="source-issue-pending"]')).toHaveCount(0);
 });
 
-test('4. not built: status row + retry entry; successful retry upgrades the row to the echo state (AC3)', async ({ page }) => {
+test('4. not built after delivery: status row + retry entry; successful retry upgrades the row to the echo state (AC3)', async ({ page }) => {
   const world = await stubWorld(page, {
     sourceRef: null,
+    hasChanges: true,
     echo: { mode: 'ok', title: LOCAL_TITLE },
   });
   await page.goto('/app/todo/todo-self-1');
@@ -161,4 +164,16 @@ test('4. not built: status row + retry entry; successful retry upgrades the row 
   await expect(row).toContainText('#101');
   expect(world.retryHits).toBe(1);
   await expect(pending).toHaveCount(0);
+});
+
+test('5. marked but undelivered: no issue row at all — the issue opens on first delivered code', async ({ page }) => {
+  const world = await stubWorld(page, {
+    sourceRef: null,
+    hasChanges: false,
+    echo: { mode: 'ok', title: LOCAL_TITLE },
+  });
+  await page.goto('/app/todo/todo-self-1');
+  await expect(page.locator('[data-testid="source-issue-pending"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="source-issue-echo"]')).toHaveCount(0);
+  expect(world.echoHits).toBe(0);
 });

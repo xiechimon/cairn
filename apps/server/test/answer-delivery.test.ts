@@ -267,7 +267,32 @@ describe('an answer is delivered only when the daemon acks it', () => {
     expect(queued.map((row) => [row.kind, row.prompt])).toEqual([
       [world.stepRow.kind, ANSWERS_CONTINUE_PROMPT],
     ]);
+    expect(queued[0]!.promptOrigin).toEqual({ kind: 'continue' });
     expect((await claimContinuation(world)).answerIds).toEqual([REQUEST_A]);
+  });
+
+  test('a person message that answers the pending question enqueues a continue step marked as such, and keeps their own words a bubble', async () => {
+    const world = startSession();
+    await ask(world, REQUEST_A, true);
+    finish(world.stepRow.id);
+    await sendBuildSteer(deps(), world.buildId, { content: 'Use the repo rule.' }, { human: true });
+    const queued = H.s.db
+      .select()
+      .from(step)
+      .where(and(eq(step.buildId, world.buildId), eq(step.status, 'pending')))
+      .all()
+      .filter((row) => row.kind !== 'chief');
+    expect(queued.map((row) => row.prompt)).toEqual([ANSWERS_CONTINUE_PROMPT]);
+    expect(queued[0]!.promptOrigin).toEqual({ kind: 'continue' });
+    expect(
+      H.s.db
+        .select()
+        .from(message)
+        .where(eq(message.conversationId, world.buildId))
+        .all()
+        .filter((row) => row.role === 'user' && row.content === 'Use the repo rule.')
+        .map((row) => row.origin),
+    ).toEqual(['user']);
   });
 
   test('a step that ends with a pending question still goes to needs_input, with no continuation', async () => {

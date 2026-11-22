@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { mergeBase } from './diff-base.mjs';
+import { acquireSlot, leaseEnv } from './heavy-slots.mjs';
 import { OWNED_PROCESS_CLI } from './owned-process.mjs';
 import { scrubGitEnv } from './scrub-git-env.mjs';
 
@@ -80,7 +81,7 @@ export function hasCode(paths) {
   return paths.some((path) => !path.startsWith('.claude/epics/') && !isDocument(path));
 }
 
-const SIDECAR_INPUTS = ['apps/tsnet-sidecar/', '.github/workflows/ci.yml'];
+const SIDECAR_INPUTS = ['apps/tsnet-sidecar/'];
 
 export function hasSidecar(paths) {
   return paths.some((path) => SIDECAR_INPUTS.some((input) => path.startsWith(input)));
@@ -318,11 +319,11 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
     (!modes.includes(args[0]) || args.length !== (args[0] === '--e2e-shard' ? 2 : 1))
   ) {
     console.error(
-      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard N/4 | --self-test | --has-code | --has-sidecar | --needs-gates]',
+      'Usage: pnpm prepush [--ci | --advisory | --e2e-shard i/n | --self-test | --has-code | --has-sidecar | --needs-gates]',
     );
     process.exit(2);
   }
-  if (args[0] === '--e2e-shard' && !/^[1-4]\/4$/.test(args[1] ?? '')) process.exit(2);
+  if (args[0] === '--e2e-shard' && !/^([1-9]\d*)\/([1-9]\d*)$/.test(args[1] ?? '')) process.exit(2);
   if (args[0] in classifiers) {
     try {
       console.log(classifiers[args[0]](changedPaths()));
@@ -333,7 +334,7 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
   }
   const plan =
     args[0] === '--e2e-shard'
-      ? [['pnpm', '--filter', '@cairn/web', 'e2e', `--shard=${args[1]}`]]
+      ? [['node', 'scripts/e2e-full-shard.mjs', `--shard=${args[1]}`]]
       : args[0] === '--self-test'
         ? [selfTest]
         : prepushPlan(
@@ -341,6 +342,8 @@ if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
             args[0]?.slice(2) ?? 'local',
             process.env.PREPUSH_FORCE_FULL === 'true',
           );
+  const lease = await acquireSlot({ label: 'prepush' });
+  if (lease !== null) Object.assign(process.env, leaseEnv(lease));
   runPlan(plan, { cwd: root, env: process.env });
   console.log(`[prepush] PASS (${plan.length} checks)`);
 }

@@ -18,6 +18,21 @@ function desktopUpdates(): DesktopUpdateBridge | null {
   return desktop?.update ?? null;
 }
 
+export function canUpdateDesktop(): boolean {
+  return desktopUpdates() !== null;
+}
+
+function installable(state: DesktopUpdateState | null): boolean {
+  return state?.status === 'available' || state?.status === 'ready';
+}
+
+export async function updateDesktopNow(): Promise<void> {
+  const bridge = desktopUpdates();
+  if (bridge === null) return;
+  if (!installable(await bridge.state())) await bridge.check();
+  if (installable(await bridge.state())) await bridge.install();
+}
+
 const BLOCKER_HINTS: Record<DesktopUpdateBlocker, string> = {
   development: '开发版不检查更新',
   'not-in-applications': '把 Cairn 移到「应用程序」后才能自动更新',
@@ -34,7 +49,9 @@ type UpdateMark = 'waiting' | 'failed' | null;
 
 function fillLevel(state: DesktopUpdateState): number {
   if (state.status === 'downloading') return Math.min(1, Math.max(0, state.percent / 100));
-  return state.status === 'installing' || state.status === 'restarting' ? 1 : 0;
+  return state.status === 'ready' || state.status === 'installing' || state.status === 'restarting'
+    ? 1
+    : 0;
 }
 
 function UpdateGlyph({
@@ -141,21 +158,23 @@ export function DesktopUpdateButton({
   const label =
     state.status === 'available'
       ? t('更新到 {version}', { version: state.version })
-      : state.status === 'downloading'
-        ? t('正在更新 {percent}%', { percent: Math.round(state.percent) })
-        : state.status === 'installing'
-          ? t('正在安装…')
-          : state.status === 'restarting'
-            ? t('正在重启…')
-            : state.status === 'unsupported'
-              ? t(BLOCKER_HINTS[state.blocker])
-              : state.status === 'checking'
-                ? t('正在检查更新…')
-                : state.status === 'current'
-                  ? t('已是最新版本 {version}', { version: state.version })
-                  : state.status === 'error'
-                    ? t('更新失败：{message}', { message: state.message })
-                    : t('检查更新');
+      : state.status === 'ready'
+        ? t('重新启动以更新到 {version}', { version: state.version })
+        : state.status === 'downloading'
+          ? t('正在更新 {percent}%', { percent: Math.round(state.percent) })
+          : state.status === 'installing'
+            ? t('正在安装…')
+            : state.status === 'restarting'
+              ? t('正在重启…')
+              : state.status === 'unsupported'
+                ? t(BLOCKER_HINTS[state.blocker])
+                : state.status === 'checking'
+                  ? t('正在检查更新…')
+                  : state.status === 'current'
+                    ? t('已是最新版本 {version}', { version: state.version })
+                    : state.status === 'error'
+                      ? t('更新失败：{message}', { message: state.message })
+                      : t('检查更新');
   const busy =
     state.status === 'checking' ||
     state.status === 'downloading' ||
@@ -163,7 +182,11 @@ export function DesktopUpdateButton({
     state.status === 'restarting' ||
     state.status === 'unsupported';
   const mark: UpdateMark =
-    state.status === 'available' ? 'waiting' : state.status === 'error' ? 'failed' : null;
+    state.status === 'available' || state.status === 'ready'
+      ? 'waiting'
+      : state.status === 'error'
+        ? 'failed'
+        : null;
 
   return (
     <Tooltip>
@@ -179,7 +202,9 @@ export function DesktopUpdateButton({
             className={cn(idleClassName, busy && 'cursor-default')}
             onClick={() => {
               if (busy) return;
-              void (state.status === 'available' ? bridge.install() : bridge.check());
+              void (state.status === 'available' || state.status === 'ready'
+                ? bridge.install()
+                : bridge.check());
             }}
           >
             <UpdateGlyph level={fillLevel(state)} mark={mark} className={iconClassName} />

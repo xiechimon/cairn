@@ -240,7 +240,7 @@ const cursorBoxSchema = z.object({
 
 const SECRET_AUTOCOMPLETE = new Set(['current-password', 'new-password', 'one-time-code']);
 
-function secretField(type: string, autocomplete: string): boolean {
+export function secretField(type: string, autocomplete: string): boolean {
   if (type.trim().toLowerCase() === 'password') return true;
   return autocomplete
     .toLowerCase()
@@ -251,7 +251,7 @@ function secretField(type: string, autocomplete: string): boolean {
 const INPUT_VALUE_LINE =
   /^(\s*- (?:textbox|searchbox|combobox|spinbutton|slider)\b(?: "(?:[^"\\]|\\.)*")?(?: \[[^\]]*\])?(?: [a-z-]+ \[[^\]]*\])?): .*$/;
 
-function clearInputValues(snapshot: string): string {
+export function clearInputValues(snapshot: string): string {
   return snapshot
     .split('\n')
     .map((line) => line.replace(INPUT_VALUE_LINE, '$1: [value cleared]'))

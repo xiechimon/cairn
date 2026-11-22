@@ -434,6 +434,7 @@ export function coordinatorToolsExtension(
     vmComputer?: boolean;
     vmBrowser?: boolean;
     ownComputer?: boolean;
+    ownerChrome?: boolean;
     phoneComputer?: readonly string[];
     connectorTools?: RemoteToolDef[];
     remoteTools?: readonly RemoteToolDef[];

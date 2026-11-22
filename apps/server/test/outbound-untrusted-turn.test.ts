@@ -22,7 +22,7 @@ import {
   dispatchActionWakes,
   proposalCardId,
 } from '../src/services/action-proposals.js';
-import { askQuestionContentOf } from '../src/services/chief-questions.js';
+import { askQuestionContentOf } from '../src/services/chief-question-store.js';
 import { executeRelayToolCall, relayComputerTool } from '../src/services/machine-relay.js';
 import { refuseRestrictedTurnTool } from '../src/services/report-turn.js';
 import { bootServer } from './helpers.js';
@@ -152,6 +152,7 @@ function world() {
         kind: 'chief',
         prompt,
         status: 'claimed',
+        mcpGrant: ['gmail'],
         createdAt: 2,
       })
       .run();
@@ -162,7 +163,14 @@ function world() {
   const answer = (proposalId: string, decision: 'allow-once' | 'refuse') =>
     answerProposal(
       { db: s.db, reposDir: s.reposDir, hub: s.hub, user: s.user },
-      { proposalId, teamId: s.team.id, decision, decidedBy: s.user.id, viaCard: true },
+      {
+        proposalId,
+        teamId: s.team.id,
+        decision,
+        decidedBy: s.user.id,
+        viaCard: true,
+        interactive: 'page',
+      },
     );
   return { s, mcp, deps, turn, call, answer };
 }

@@ -1,5 +1,5 @@
 import { ACTIVE_STEP_STATUSES, isInfoOutput, MERGE_ANNOUNCEMENT } from '@cairn/shared';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { build, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { systemGitOps } from '../lib/git.js';
@@ -11,6 +11,7 @@ import {
   enqueueStep,
   githubPrOf,
   INFO_CARD_MERGE_REFUSAL,
+  type MergeRequestOutcome,
   NotFoundError,
   restoreFailedReview,
 } from './builds.js';
@@ -20,11 +21,22 @@ import { enqueueLocalMerge } from './local-merge.js';
 import { assertPhaseTransition } from './phase.js';
 import { insertGateAnnouncement } from './transcript.js';
 
+function newestMergeStepId(deps: BuildDeps, buildId: string): string | null {
+  return (
+    deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, buildId), eq(step.kind, 'merge')))
+      .orderBy(desc(step.createdAt), desc(sql`rowid`))
+      .get()?.id ?? null
+  );
+}
+
 export async function requestMerge(
   deps: BuildDeps,
   buildId: string,
   actor?: string,
-): Promise<{ delegated: true }> {
+): Promise<MergeRequestOutcome> {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
   if (!row) throw new NotFoundError(`build ${buildId}`);
   let todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
@@ -57,7 +69,7 @@ export async function requestMerge(
     }
     await enqueueLocalMerge(deps, buildId, projectRow.baseBranch ?? listing.defaultBranch);
     insertGateAnnouncement(deps, buildId, MERGE_ANNOUNCEMENT, actor ?? deps.user.displayName);
-    return { delegated: true };
+    return { state: 'requested', stepId: newestMergeStepId(deps, buildId) };
   }
   restoreFailedReview(deps, row);
   if (todoRow.phase === 'failed') {
@@ -89,8 +101,8 @@ export async function requestMerge(
   )
     throw new HttpError(409, 'The delivery changed while preparing the merge');
   assertNoMergeStepInFlight(deps, buildId);
-  enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt, false, true);
-  return { delegated: true };
+  const enqueued = enqueueStep(deps, buildId, 'merge', todoRow.teamId, prompt, false, true);
+  return { state: 'requested', stepId: enqueued.id };
 }
 
 function assertNoMergeStepInFlight(deps: BuildDeps, buildId: string): void {

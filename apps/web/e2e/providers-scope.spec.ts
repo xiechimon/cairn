@@ -25,7 +25,7 @@ test('provider rows open an editor; the selection lives in the URL and survives 
   await expect(rows).toHaveCount(3);
   await expect(rows.first()).toHaveAttribute('aria-current', 'true');
   await instance(page, 'provider:prov-relay')
-    .locator('button:not([data-testid="provider-drag-handle"])')
+    .locator('button')
     .first()
     .click();
   await expect(page).toHaveURL(/item=provider%3Aprov-relay/);

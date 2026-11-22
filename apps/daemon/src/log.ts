@@ -55,8 +55,16 @@ export function createDaemonLogger(opts: {
         fields = { msg: line.trimEnd() };
       }
       const text = `${redactSecrets(formatLine(fields), [process.env[ENV_VARS.token] ?? '']).value}\n`;
-      if (opts.logFile) appendFileSync(opts.logFile, `${wallClock()} ${text}`);
-      if (opts.stdout) process.stdout.write(text);
+      if (opts.logFile) {
+        try {
+          appendFileSync(opts.logFile, `${wallClock()} ${text}`);
+        } catch {}
+      }
+      if (opts.stdout) {
+        try {
+          process.stdout.write(text);
+        } catch {}
+      }
     },
   };
   const log = pino({ level: opts.level ?? 'info', base: undefined }, sink);

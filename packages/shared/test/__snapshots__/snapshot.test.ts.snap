@@ -361,6 +361,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           "minimum": -9007199254740991,
           "type": "integer",
         },
+        "generation": {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer",
+        },
         "id": {
           "type": "string",
         },
@@ -1392,6 +1397,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                   "type": "string",
                 },
                 "createdAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "generation": {
                   "maximum": 9007199254740991,
                   "minimum": -9007199254740991,
                   "type": "integer",
@@ -2678,6 +2688,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     "cliVersion": {
       "type": "string",
     },
+    "hostKey": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string",
+    },
     "name": {
       "type": "string",
     },
@@ -2955,6 +2969,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         },
       ],
     },
+    "hostKey": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string",
+    },
   },
   "type": "object",
 }
@@ -3017,6 +3035,11 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "type": "string",
           },
           "createdAt": {
+            "maximum": 9007199254740991,
+            "minimum": -9007199254740991,
+            "type": "integer",
+          },
+          "generation": {
             "maximum": 9007199254740991,
             "minimum": -9007199254740991,
             "type": "integer",
@@ -3267,6 +3290,10 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "maximum": 9007199254740991,
               "minimum": -9007199254740991,
               "type": "integer",
+            },
+            "ownerChrome": {
+              "const": "browsermcp",
+              "type": "string",
             },
             "params": {
               "additionalProperties": {},
@@ -5736,6 +5763,11 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
               "minimum": -9007199254740991,
               "type": "integer",
             },
+            "generation": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
             "id": {
               "type": "string",
             },
@@ -5821,7 +5853,99 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                   "additionalProperties": false,
                   "properties": {
                     "kind": {
+                      "const": "pr-wake",
+                      "type": "string",
+                    },
+                    "reasons": {
+                      "items": {
+                        "enum": [
+                          "ci",
+                          "conflict",
+                          "review",
+                          "queue",
+                        ],
+                        "type": "string",
+                      },
+                      "minItems": 1,
+                      "type": "array",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                    "reasons",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "first-task",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "restart",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
                       "const": "rework",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "replan",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "plan-rewrite",
+                      "type": "string",
+                    },
+                  },
+                  "required": [
+                    "kind",
+                  ],
+                  "type": "object",
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "continue",
                       "type": "string",
                     },
                   },
@@ -5841,6 +5965,7 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                     "kind": {
                       "enum": [
                         "machine-offline",
+                        "machine-retired",
                         "capability-missing",
                         "sandbox-unavailable",
                         "runtime-disabled",
@@ -6686,6 +6811,10 @@ exports[`body/envelope schema snapshots > machineJson > machineJson.json 1`] = `
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "hostKey": {
+      "pattern": "^[a-f0-9]{64}$",
+      "type": "string",
+    },
     "machineId": {
       "type": "string",
     },
@@ -7364,6 +7493,11 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
       "minimum": -9007199254740991,
       "type": "integer",
     },
+    "generation": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
     "id": {
       "type": "string",
     },
@@ -7449,7 +7583,99 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
           "additionalProperties": false,
           "properties": {
             "kind": {
+              "const": "pr-wake",
+              "type": "string",
+            },
+            "reasons": {
+              "items": {
+                "enum": [
+                  "ci",
+                  "conflict",
+                  "review",
+                  "queue",
+                ],
+                "type": "string",
+              },
+              "minItems": 1,
+              "type": "array",
+            },
+          },
+          "required": [
+            "kind",
+            "reasons",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "first-task",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "restart",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
               "const": "rework",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "replan",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "plan-rewrite",
+              "type": "string",
+            },
+          },
+          "required": [
+            "kind",
+          ],
+          "type": "object",
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "continue",
               "type": "string",
             },
           },
@@ -7469,6 +7695,7 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
             "kind": {
               "enum": [
                 "machine-offline",
+                "machine-retired",
                 "capability-missing",
                 "sandbox-unavailable",
                 "runtime-disabled",
@@ -8961,6 +9188,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 "todo_failed",
                 "schedule_run",
                 "marked_unread",
+                "watchdog_flag",
               ],
               "type": "string",
             },
@@ -9363,6 +9591,11 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                       "minimum": -9007199254740991,
                       "type": "integer",
                     },
+                    "generation": {
+                      "maximum": 9007199254740991,
+                      "minimum": -9007199254740991,
+                      "type": "integer",
+                    },
                     "id": {
                       "type": "string",
                     },
@@ -9448,7 +9681,99 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                           "additionalProperties": false,
                           "properties": {
                             "kind": {
+                              "const": "pr-wake",
+                              "type": "string",
+                            },
+                            "reasons": {
+                              "items": {
+                                "enum": [
+                                  "ci",
+                                  "conflict",
+                                  "review",
+                                  "queue",
+                                ],
+                                "type": "string",
+                              },
+                              "minItems": 1,
+                              "type": "array",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                            "reasons",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "first-task",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "restart",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
                               "const": "rework",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "replan",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "plan-rewrite",
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "kind",
+                          ],
+                          "type": "object",
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "const": "continue",
                               "type": "string",
                             },
                           },
@@ -9468,6 +9793,7 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                             "kind": {
                               "enum": [
                                 "machine-offline",
+                                "machine-retired",
                                 "capability-missing",
                                 "sandbox-unavailable",
                                 "runtime-disabled",
@@ -10109,6 +10435,8 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "home": "CAIRN_HOME",
     "hookTimeoutMs": "CAIRN_HOOK_TIMEOUT_MS",
     "mcpConfig": "CAIRN_MCP_CONFIG",
+    "ownerChannel": "CAIRN_OWNER_CHANNEL",
+    "parentPid": "CAIRN_PARENT_PID",
     "piCacheRetention": "CAIRN_PI_CACHE_RETENTION",
     "requireToken": "CAIRN_REQUIRE_TOKEN",
     "server": "CAIRN_SERVER",
@@ -10116,9 +10444,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "tailscaleUsers": "CAIRN_TAILSCALE_USERS",
     "team": "CAIRN_TEAM",
     "token": "CAIRN_TOKEN",
-    "trajectoryOutcomeBackfill": "CAIRN_TRAJ_OUTCOME_BACKFILL",
-    "trajectoryReflectCurate": "CAIRN_TRAJ_REFLECT_CURATE",
-    "trajectoryReflectOpenGuardIssues": "CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES",
     "tsnet": "CAIRN_TSNET",
     "tsnetBinary": "CAIRN_TSNET_BINARY",
     "tsnetControlUrl": "CAIRN_TSNET_CONTROL_URL",
@@ -10568,6 +10893,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > storage table lis
   "plan",
   "schedule",
   "notification",
+  "notice_mark",
   "agent_memory",
   "provider",
   "secret",
@@ -11817,6 +12143,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                 "kind": {
                   "enum": [
                     "machine-offline",
+                    "machine-retired",
                     "capability-missing",
                     "sandbox-unavailable",
                     "runtime-disabled",
@@ -12362,6 +12689,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "maximum": 9007199254740991,
                   "type": "integer",
                 },
+                "cpuUtilization": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number",
+                },
                 "diskFreeMb": {
                   "maximum": 9007199254740991,
                   "minimum": 0,
@@ -12379,6 +12711,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   "maximum": 9007199254740991,
                   "minimum": 0,
                   "type": "integer",
+                },
+                "memoryPressure": {
+                  "maximum": 1,
+                  "minimum": 0,
+                  "type": "number",
                 },
                 "memoryTotalMb": {
                   "maximum": 9007199254740991,
@@ -12747,7 +13084,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "items": {
         "enum": [
           "memory",
-          "load",
+          "cpu",
           "disk",
         ],
         "type": "string",
@@ -12904,6 +13241,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > not
         "todo_failed",
         "schedule_run",
         "marked_unread",
+        "watchdog_flag",
       ],
       "type": "string",
     },
@@ -13729,6 +14067,11 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > ste
       "type": "string",
     },
     "createdAt": {
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991,
+      "type": "integer",
+    },
+    "generation": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,
       "type": "integer",

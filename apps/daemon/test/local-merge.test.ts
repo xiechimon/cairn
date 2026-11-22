@@ -1,4 +1,4 @@
-import { readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -49,7 +49,7 @@ async function fixture() {
 
 test('clean default checkout advances by exactly one squash commit', async () => {
   const f = await fixture();
-  const result = await landLocalMerge(f.dir, f.command);
+  const result = await landLocalMerge(f.dir, f.command, async () => null);
   expect(result.outcome).toBe('merged');
   expect(await f.git(['rev-list', '--count', `${f.base}..main`])).toBe('1');
   expect(await f.git(['rev-parse', 'main^'])).toBe(f.base);
@@ -59,7 +59,7 @@ test('clean default checkout advances by exactly one squash commit', async () =>
   expect(readFileSync(join(f.dir, 'file.txt'), 'utf8')).toBe('candidate\n');
   expect(await f.git(['status', '--porcelain'])).toBe('');
   expect(await f.git(['log', '-1', '--format=%B'])).toBe(f.command.message);
-  expect(await landLocalMerge(f.dir, f.command)).toEqual(result);
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual(result);
 });
 
 test('another clean branch keeps its branch, index and files unchanged', async () => {
@@ -67,7 +67,7 @@ test('another clean branch keeps its branch, index and files unchanged', async (
   await f.git(['checkout', '-b', 'user']);
   utimesSync(join(f.dir, 'file.txt'), new Date(0), new Date(0));
   const index = readFileSync(join(f.dir, '.git', 'index'));
-  expect((await landLocalMerge(f.dir, f.command)).outcome).toBe('merged');
+  expect((await landLocalMerge(f.dir, f.command, async () => null)).outcome).toBe('merged');
   expect(await f.git(['branch', '--show-current'])).toBe('user');
   expect(await f.git(['rev-parse', 'HEAD'])).toBe(f.base);
   expect(readFileSync(join(f.dir, '.git', 'index'))).toEqual(index);
@@ -80,7 +80,7 @@ for (const branch of ['main', 'user']) {
     if (branch !== 'main') await f.git(['checkout', '-b', branch]);
     writeFileSync(join(f.dir, 'file.txt'), 'user edits\n');
     const index = readFileSync(join(f.dir, '.git', 'index'));
-    expect(await landLocalMerge(f.dir, f.command)).toEqual({
+    expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual({
       outcome: 'held',
       reason: 'worktree-dirty',
     });
@@ -93,7 +93,7 @@ for (const branch of ['main', 'user']) {
 test('detached checkout holds', async () => {
   const f = await fixture();
   await f.git(['checkout', '--detach']);
-  expect(await landLocalMerge(f.dir, f.command)).toEqual({
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual({
     outcome: 'held',
     reason: 'checkout-unknown',
   });
@@ -103,7 +103,7 @@ test('a moved default ref requires a new judgment', async () => {
   const f = await fixture();
   await f.git(['commit', '--allow-empty', '-m', 'user commit']);
   const before = await f.git(['rev-parse', 'HEAD']);
-  expect(await landLocalMerge(f.dir, f.command)).toEqual({
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual({
     outcome: 'recheck',
     reason: 'default-head-moved',
   });
@@ -112,7 +112,9 @@ test('a moved default ref requires a new judgment', async () => {
 
 test('a stale patch requires a new judgment', async () => {
   const f = await fixture();
-  expect(await landLocalMerge(f.dir, { ...f.command, judgedPatchDigest: 'pd2:stale' })).toEqual({
+  expect(
+    await landLocalMerge(f.dir, { ...f.command, judgedPatchDigest: 'pd2:stale' }, async () => null),
+  ).toEqual({
     outcome: 'recheck',
     reason: 'patch-stale',
   });
@@ -121,7 +123,9 @@ test('a stale patch requires a new judgment', async () => {
 
 test('failed checks name the command and leave the default ref unchanged', async () => {
   const f = await fixture();
-  expect(await landLocalMerge(f.dir, { ...f.command, localChecks: ['exit 7'] })).toEqual({
+  expect(
+    await landLocalMerge(f.dir, { ...f.command, localChecks: ['exit 7'] }, async () => null),
+  ).toEqual({
     outcome: 'checks-failed',
     reason: 'exit 7',
   });
@@ -132,10 +136,14 @@ test('failed checks name the command and leave the default ref unchanged', async
 test('a check moving the default ref cannot overwrite the concurrent commit', async () => {
   const f = await fixture();
   await f.git(['checkout', '-b', 'user']);
-  const result = await landLocalMerge(f.dir, {
-    ...f.command,
-    localChecks: [`git update-ref refs/heads/main ${f.head} ${f.base}`],
-  });
+  const result = await landLocalMerge(
+    f.dir,
+    {
+      ...f.command,
+      localChecks: [`git update-ref refs/heads/main ${f.head} ${f.base}`],
+    },
+    async () => null,
+  );
   expect(result).toEqual({ outcome: 'recheck', reason: 'default-head-moved' });
   expect(await f.git(['rev-parse', 'main'])).toBe(f.head);
 });
@@ -143,7 +151,7 @@ test('a check moving the default ref cannot overwrite the concurrent commit', as
 test('a changed work branch cannot land an earlier judged patch', async () => {
   const f = await fixture();
   await f.git(['update-ref', 'refs/heads/work', f.base, f.head]);
-  expect(await landLocalMerge(f.dir, f.command)).toEqual({
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual({
     outcome: 'recheck',
     reason: 'patch-stale',
   });
@@ -152,9 +160,9 @@ test('a changed work branch cannot land an earlier judged patch', async () => {
 
 test('interrupted result recording is recovered without a second squash commit', async () => {
   const f = await fixture();
-  const result = await landLocalMerge(f.dir, f.command);
+  const result = await landLocalMerge(f.dir, f.command, async () => null);
   await f.git(['update-ref', '-d', 'refs/cairn/local-merges/build']);
-  expect(await landLocalMerge(f.dir, f.command)).toEqual(result);
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual(result);
   expect(await f.git(['rev-list', '--count', `${f.base}..main`])).toBe('1');
 });
 
@@ -166,7 +174,7 @@ test('a default ref rewind between the last read and landing fails the compare-a
     await f.git(['update-ref', 'refs/heads/main', previous, f.base]);
     return original(input);
   });
-  expect(await landLocalMerge(f.dir, f.command)).toEqual({
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual({
     outcome: 'recheck',
     reason: 'default-head-moved',
   });
@@ -181,10 +189,64 @@ test('an alternate checkout dirtied while acquiring the ref transaction is held'
     writeFileSync(join(f.dir, 'file.txt'), 'concurrent user work\n');
     return original(input);
   });
-  expect(await landLocalMerge(f.dir, f.command)).toEqual({
+  expect(await landLocalMerge(f.dir, f.command, async () => null)).toEqual({
     outcome: 'held',
     reason: 'worktree-dirty',
   });
   expect(await f.git(['rev-parse', 'main'])).toBe(f.base);
   expect(readFileSync(join(f.dir, 'file.txt'), 'utf8')).toBe('concurrent user work\n');
+});
+
+test('authorization is re-asked after the local checks and before the ref write', async () => {
+  const f = await fixture();
+  const events: string[] = [];
+  const marker = join(f.dir, '.git', 'checks-ran');
+  const original = gitModule.landGitSquash;
+  vi.spyOn(gitModule, 'landGitSquash').mockImplementation(async (input) => {
+    events.push('land');
+    return original(input);
+  });
+  const result = await landLocalMerge(
+    f.dir,
+    { ...f.command, localChecks: [`touch ${marker}`] },
+    async () => {
+      events.push(existsSync(marker) ? 'checks' : 'checks-missing');
+      events.push('authorize');
+      return null;
+    },
+  );
+  expect(result.outcome).toBe('merged');
+  expect(events).toEqual(['checks', 'authorize', 'land']);
+});
+
+test('authorization revoked while the local checks run does not land', async () => {
+  const f = await fixture();
+  const landed = vi.spyOn(gitModule, 'landGitSquash');
+  const result = await landLocalMerge(f.dir, f.command, async () => {
+    rmSync(join(f.dir, 'file.txt'));
+    return 'authorization-task-archived';
+  });
+  expect(result).toEqual({ outcome: 'recheck', reason: 'authorization-task-archived' });
+  expect(landed).not.toHaveBeenCalled();
+  expect(await f.git(['rev-parse', 'main'])).toBe(f.base);
+});
+
+test('an unreachable authorization answer does not land', async () => {
+  const f = await fixture();
+  const landed = vi.spyOn(gitModule, 'landGitSquash');
+  const result = await landLocalMerge(f.dir, f.command, async () => 'authorization-unreachable');
+  expect(result).toEqual({ outcome: 'recheck', reason: 'authorization-unreachable' });
+  expect(landed).not.toHaveBeenCalled();
+  expect(await f.git(['rev-parse', 'main'])).toBe(f.base);
+});
+
+test('an authorization callback that throws does not land', async () => {
+  const f = await fixture();
+  const landed = vi.spyOn(gitModule, 'landGitSquash');
+  const result = await landLocalMerge(f.dir, f.command, async () => {
+    throw new Error('connect refused');
+  });
+  expect(result).toEqual({ outcome: 'recheck', reason: 'authorization-unreachable' });
+  expect(landed).not.toHaveBeenCalled();
+  expect(await f.git(['rev-parse', 'main'])).toBe(f.base);
 });

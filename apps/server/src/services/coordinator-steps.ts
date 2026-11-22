@@ -5,12 +5,14 @@ import {
   formatSkillRouteSection,
   stripTurnContext,
   suggestSkillsForMessage,
+  TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   TURN_STATE_OPEN,
 } from '@cairn/shared';
 import { and, asc, desc, eq, inArray, isNotNull, notInArray, notLike, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   antigravitySubscription,
+  chiefMessage,
   chiefThread,
   chiefTurnUsage,
   claudeSubscription,
@@ -32,10 +34,11 @@ import {
   parseChiefTrigger,
   recoverGateWake,
 } from './chief.js';
-import { cancelPendingQuestions } from './chief-questions.js';
+import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
+import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { imTurnFinished } from './im/runtime.js';
 import {
   isChiefConversation,
@@ -70,13 +73,14 @@ export function claimPendingChiefStep(
     machineId: string | null;
     bind?: ChiefSubscriptionBind | string | null;
     model?: StepRanModel | null;
+    mcpGrant?: string[] | null;
   },
 ): StepRow | null {
   const bind =
     typeof options.bind === 'string'
       ? { runtime: 'claude-code' as const, teamId: options.bind }
       : (options.bind ?? null);
-  const claimedAt = nowMs();
+  const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
   const claimed = db.transaction(() => {
     const res = db
       .update(step)
@@ -106,6 +110,7 @@ export function claimPendingChiefStep(
         holdReason: null,
         holdUntil: null,
         ranModel: options.model ?? null,
+        mcpGrant: options.mcpGrant ?? null,
       })
       .where(
         and(
@@ -204,6 +209,116 @@ function turnStateSection(deps: MachineDeps, threadRow: ThreadRow, at: number): 
   ].join('\n');
 }
 
+const REPLY_LANGUAGE_GENERIC = "the language of the user's message";
+const REPLY_LANGUAGE_MIN_SHARE = 0.15;
+const LETTER = /\p{L}/gu;
+const REPLY_LANGUAGE_SCRIPTS: readonly [string, RegExp][] = [
+  ['Chinese', /[㐀-䶿一-鿿豈-﫿]/g],
+  ['Japanese', /[぀-ヿㇰ-ㇿ]/g],
+  ['Korean', /[ᄀ-ᅟ㄰-㆏가-힯]/g],
+  ['Russian', /\p{Script=Cyrillic}/gu],
+  ['Arabic', /[؀-ۿݐ-ݿ]/g],
+  ['Hindi', /[ऀ-ॿ]/g],
+  ['Thai', /[฀-๿]/g],
+];
+
+const QUOTED_OR_LINKED = /「[^」]*」|『[^』]*』|“[^”]*”|"[^"\n]*"|`[^`\n]*`|https?:\/\/\S+/g;
+
+function replyLanguageOf(words: string): string | null {
+  const own = words.replace(QUOTED_OR_LINKED, ' ');
+  const letters = own.match(LETTER)?.length ?? 0;
+  if (letters === 0) return null;
+  const counts = new Map(
+    REPLY_LANGUAGE_SCRIPTS.map(([name, script]) => [name, own.match(script)?.length ?? 0] as const),
+  );
+  let best: [string, number] = ['', 0];
+  for (const [name, count] of counts) {
+    if (count > best[1]) best = [name, count];
+  }
+  const kana = counts.get('Japanese') ?? 0;
+  const han = counts.get('Chinese') ?? 0;
+  if (kana > 0 && kana * 2 > han) best = ['Japanese', kana];
+  return best[1] / letters >= REPLY_LANGUAGE_MIN_SHARE ? best[0] : REPLY_LANGUAGE_GENERIC;
+}
+
+function ownerTextOf(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .map((block) =>
+        block !== null && typeof block === 'object' && 'text' in block
+          ? String((block as { text: unknown }).text)
+          : '',
+      )
+      .join('\n');
+  }
+  return '';
+}
+
+const IM_ENVELOPE_BLANK = '\n\n';
+const IM_BOILERPLATE = ['对方发来的附件', '（另有', '（这条消息没有文字'];
+
+function senderWordsOf(prompt: string, provenance: string): string {
+  const body = prompt.slice(prompt.indexOf('\n') + 1);
+  if (provenance.startsWith('im:')) {
+    const lines = body.split(IM_ENVELOPE_BLANK).slice(1).join('\n\n').split('\n');
+    const cut = lines.findIndex((line) => IM_BOILERPLATE.some((head) => line.startsWith(head)));
+    return (cut === -1 ? lines : lines.slice(0, cut)).join('\n');
+  }
+  if (provenance.startsWith('mail:')) {
+    return body
+      .split('\n')
+      .filter((line) => line.startsWith('>'))
+      .map((line) => line.replace(/^> ?/, ''))
+      .join('\n');
+  }
+  return body;
+}
+
+function latestOwnerRow(db: Db, threadId: string) {
+  return db
+    .select({ content: chiefMessage.content })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, threadId),
+        eq(chiefMessage.role, 'user'),
+        notLike(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`),
+      ),
+    )
+    .orderBy(desc(chiefMessage.createdAt), sql`rowid desc`)
+    .limit(1)
+    .get();
+}
+
+function replyLanguageWords(db: Db, stepRow: StepRow, threadRow: ThreadRow): string {
+  const prompt = stepRow.prompt ?? '';
+  const provenance = turnProvenance(prompt);
+  if (provenance !== null && (provenance.startsWith('im:') || provenance.startsWith('mail:'))) {
+    return stripTurnContext(senderWordsOf(prompt, provenance));
+  }
+  try {
+    const ownerId = (stepRow.ownerMessageIds ?? []).at(-1);
+    const row =
+      ownerId === undefined
+        ? latestOwnerRow(db, threadRow.id)
+        : (db
+            .select({ content: chiefMessage.content })
+            .from(chiefMessage)
+            .where(
+              and(
+                eq(chiefMessage.id, ownerId),
+                eq(chiefMessage.threadId, threadRow.id),
+                eq(chiefMessage.role, 'user'),
+              ),
+            )
+            .get() ?? latestOwnerRow(db, threadRow.id));
+    const words = stripTurnContext(ownerTextOf(row?.content));
+    if (words.trim() !== '') return words;
+  } catch {}
+  return stripTurnContext(prompt);
+}
+
 export function chiefTurnContext(
   deps: MachineDeps,
   stepRow: StepRow,
@@ -258,9 +373,16 @@ export function chiefTurnContext(
         )
       : null;
   const state = ctx ? turnStateSection(deps, threadRow, nowMs()) : '';
-  const sections = [state, project?.text, routeSection, recall?.text ?? ''].filter(
-    (part): part is string => !!part,
-  );
+  const replyLanguage = ctx
+    ? replyLanguageOf(replyLanguageWords(deps.db, stepRow, threadRow))
+    : null;
+  const sections = [
+    state,
+    replyLanguage === null ? '' : `Reply language: ${replyLanguage}`,
+    project?.text,
+    routeSection,
+    recall?.text ?? '',
+  ].filter((part): part is string => !!part);
   const memoryTrace = {
     teamMemoryIds: ctx?.memoryIds ?? [],
     teamMemoriesOmitted: ctx?.memoriesOmitted ?? 0,
@@ -332,17 +454,13 @@ export function finishCoordinatorTurn(
     .run();
   if (outcome.status === 'stopped') recordChiefStop(deps, stepRow);
   publishStepStatus(deps, stepRow.id);
-  cancelPendingQuestions(
-    {
-      db: deps.db,
-      hub: deps.hub,
-      user: deps.user,
-      ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
-    },
+  cancelPendingQuestions(deps, stepRow.buildId, CHIEF_TURN_END_REASON);
+  finishChiefTurn(
+    deps,
     stepRow.buildId,
-    '回合已结束',
+    { ...outcome, sessionId: reportedSessionId },
+    stepRuntimeFor(stepRow.ranModel?.provider ?? null),
   );
-  finishChiefTurn(deps, stepRow.buildId, { ...outcome, sessionId: reportedSessionId });
   settleMemoryEditTurn(
     db,
     stepRow,
@@ -361,6 +479,7 @@ export function finishCoordinatorTurn(
     upsertChiefRow(deps, {
       id: `chief-err-${stepRow.id}`,
       threadId: stepRow.buildId,
+      projectId: stepScopeProjectId(stepRow),
       role: 'system',
       content: JSON.stringify({
         kind: CHIEF_TURN_ERROR_KIND,

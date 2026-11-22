@@ -11,7 +11,6 @@ import {
   Pencil,
   RotateCcw,
   Settings2,
-  Trash2,
 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useId, useState } from 'react';
 import {
@@ -38,7 +37,6 @@ import {
 import { Input } from '../components/ui/input.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
-import { DeleteProjectConfirm } from '../overlay/delete-project-confirm.js';
 import { isProjectFilter, PROJECT_FILTERS, type ProjectFilter } from './sidebar-projects.js';
 
 const NAME_FORM = 'sidebar-name-form';
@@ -47,8 +45,6 @@ export const SIDEBAR_MENU_CLS = 'w-auto min-w-42 rounded-(--radius-tile) p-1.5';
 
 export const SIDEBAR_MENU_ITEM_CLS =
   'h-6.75 gap-2.5 rounded-(--cds-radius-md) px-2.5 text-meta whitespace-nowrap focus:bg-(--sidebar-active) data-open:bg-(--sidebar-active) data-popup-open:bg-(--sidebar-active) [&_svg]:text-sidebar-ink [&_svg:not([class*=size-])]:size-5';
-
-const DANGER_ITEM_CLS = 'text-destructive [&_svg]:text-destructive';
 
 function NameDialog({
   open,
@@ -165,7 +161,6 @@ export interface ProjectMenuActions {
   onMove: (group: string | null) => void;
   onArchive: () => void;
   onRename: () => void;
-  onDelete: () => void;
   onSettings: () => void;
 }
 
@@ -176,7 +171,6 @@ export function SidebarProjectMenu({
   onMove,
   onArchive,
   onRename,
-  onDelete,
   onSettings,
 }: {
   name: string;
@@ -184,8 +178,8 @@ export function SidebarProjectMenu({
   groups: readonly string[];
 } & ProjectMenuActions) {
   const { t } = useI18n();
-  const [dialog, setDialog] = useState<'group' | 'delete' | null>(null);
-  const close = () => setDialog(null);
+  const [dialog, setDialog] = useState(false);
+  const close = () => setDialog(false);
   return (
     <>
       <DropdownMenu>
@@ -233,7 +227,7 @@ export function SidebarProjectMenu({
               <KeyedMenuItem
                 shortcut="N"
                 className={SIDEBAR_MENU_ITEM_CLS}
-                onClick={() => setDialog('group')}
+                onClick={() => setDialog(true)}
               >
                 <FolderPlus />
                 {t('新建分组')}
@@ -244,21 +238,10 @@ export function SidebarProjectMenu({
             <Archive />
             {t('归档')}
           </KeyedMenuItem>
-          <DropdownMenuSeparator />
-          <KeyedMenuItem
-            shortcut="D"
-            confirms
-            variant="destructive"
-            className={`${SIDEBAR_MENU_ITEM_CLS} ${DANGER_ITEM_CLS}`}
-            onClick={() => setDialog('delete')}
-          >
-            <Trash2 />
-            {t('删除')}
-          </KeyedMenuItem>
         </RowMenuContent>
       </DropdownMenu>
       <NameDialog
-        open={dialog === 'group'}
+        open={dialog}
         title={t('新建分组')}
         label={t('分组名称')}
         confirmLabel={t('移入')}
@@ -267,15 +250,6 @@ export function SidebarProjectMenu({
         onSubmit={(created) => {
           close();
           onMove(created);
-        }}
-      />
-      <DeleteProjectConfirm
-        projectName={name}
-        open={dialog === 'delete'}
-        onClose={close}
-        onConfirm={() => {
-          close();
-          onDelete();
         }}
       />
     </>
@@ -313,46 +287,21 @@ export function SidebarGroupMenu({
 export function SidebarArchivedProjectMenu({
   name,
   onUnarchive,
-  onDelete,
 }: {
   name: string;
   onUnarchive: () => void;
-  onDelete: () => void;
 }) {
   const { t } = useI18n();
-  const [deleting, setDeleting] = useState(false);
   return (
-    <>
-      <DropdownMenu>
-        <RowMenuTrigger label={t('{name} 的菜单', { name })} />
-        <RowMenuContent>
-          <KeyedMenuItem shortcut="U" className={SIDEBAR_MENU_ITEM_CLS} onClick={onUnarchive}>
-            <RotateCcw />
-            {t('取消归档')}
-          </KeyedMenuItem>
-          <DropdownMenuSeparator />
-          <KeyedMenuItem
-            shortcut="D"
-            confirms
-            variant="destructive"
-            className={`${SIDEBAR_MENU_ITEM_CLS} ${DANGER_ITEM_CLS}`}
-            onClick={() => setDeleting(true)}
-          >
-            <Trash2 />
-            {t('删除')}
-          </KeyedMenuItem>
-        </RowMenuContent>
-      </DropdownMenu>
-      <DeleteProjectConfirm
-        projectName={name}
-        open={deleting}
-        onClose={() => setDeleting(false)}
-        onConfirm={() => {
-          setDeleting(false);
-          onDelete();
-        }}
-      />
-    </>
+    <DropdownMenu>
+      <RowMenuTrigger label={t('{name} 的菜单', { name })} />
+      <RowMenuContent>
+        <KeyedMenuItem shortcut="U" className={SIDEBAR_MENU_ITEM_CLS} onClick={onUnarchive}>
+          <RotateCcw />
+          {t('取消归档')}
+        </KeyedMenuItem>
+      </RowMenuContent>
+    </DropdownMenu>
   );
 }
 

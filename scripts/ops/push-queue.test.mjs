@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { preflightRef, preflightRun } from './preflight.mjs';
 import {
+  failedGreenContexts,
   laneName,
   missingGreenContexts,
+  nextWaitAction,
   planPush,
   preflightEvidence,
   stampCommand,
@@ -72,7 +74,7 @@ test('the pre-flight gate needs the three green-main contexts on a tree-identica
     ]).length,
     0,
   );
-  const checkRunsOf = (sha) => [
+  const checkRunsOf = () => [
     run('check', 'success'),
     run('pack-smoke', 'success'),
     run('e2e-gate', 'success'),
@@ -142,4 +144,64 @@ test('the pre-flight ref and run lookup are lane-scoped', () => {
   );
   assert.equal(preflightRun([ci], 'S', 'preflight/other/wt'), null);
   assert.equal(preflightRun([], 'S', 'preflight/mac/wt'), null);
+});
+
+test('--wait rebases onto the live candidate, arms preflight once, then polls', () => {
+  const base = {
+    live: X,
+    headOnLive: false,
+    deadBase: false,
+    headTree: 'T1',
+    armedTree: null,
+    evidence: { ok: false },
+    failed: [],
+  };
+  assert.deepEqual(nextWaitAction(base), { action: 'rebase', onto: X });
+  assert.deepEqual(nextWaitAction({ ...base, headOnLive: true }), { action: 'preflight' });
+  assert.deepEqual(nextWaitAction({ ...base, headOnLive: true, armedTree: 'T1' }), {
+    action: 'poll',
+  });
+  assert.deepEqual(
+    nextWaitAction({ ...base, headOnLive: true, armedTree: 'T1', failed: ['check'] }),
+    { action: 'fail', contexts: ['check'] },
+  );
+});
+
+test('--wait on a freed queue rebases off a dropped base, waits for evidence, then pushes', () => {
+  const base = {
+    live: null,
+    headOnLive: false,
+    deadBase: true,
+    headTree: 'T1',
+    armedTree: 'T1',
+    evidence: { ok: false },
+    failed: [],
+  };
+  assert.deepEqual(nextWaitAction(base), { action: 'rebase', onto: 'origin/main' });
+  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, failed: ['e2e-gate'] }), {
+    action: 'fail',
+    contexts: ['e2e-gate'],
+  });
+  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, armedTree: 'T2' }), {
+    action: 'preflight',
+  });
+  assert.deepEqual(nextWaitAction({ ...base, deadBase: false }), { action: 'poll' });
+  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, evidence: { ok: true, sha: 's' } }), {
+    action: 'push',
+  });
+});
+
+test('failedGreenContexts flags only required contexts that went red', () => {
+  const run = (name, conclusion) => ({ name, conclusion });
+  assert.deepEqual(
+    failedGreenContexts([
+      run('check', 'failure'),
+      run('pack-smoke', 'success'),
+      run('e2e (3)', 'failure'),
+      run('e2e-gate', 'in_progress'),
+    ]),
+    ['check'],
+  );
+  assert.deepEqual(failedGreenContexts([run('check', 'cancelled')]), ['check']);
+  assert.deepEqual(failedGreenContexts([run('check', 'in_progress')]), []);
 });

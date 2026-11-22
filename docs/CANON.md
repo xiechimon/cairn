@@ -27,5 +27,5 @@ Lanes add an entry when they land or revise a ruling, keyed `area.topic`.
 - **tokens.canonical** (2026-10-08, volume) — The canonical color and geometry token table lives here; UI code consumes tokens, not literals.
 ## docs/spec/29-evaluation-and-data-loop.md
 
-- **eval.data-loop** (2026-10-08, volume) — The trajectory exporter and the trajectory-pack schema are protected paths; no change may edit what judges it.
+- **eval.data-loop** (2026-10-08, volume) — The eval suite's task set, scorers and run configuration (eval/**) are protected paths; no change may edit what judges it.
 

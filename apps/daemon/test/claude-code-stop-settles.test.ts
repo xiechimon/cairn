@@ -17,8 +17,6 @@ afterEach(() => {
     } catch {}
   }
   for (const dir of dirs.splice(0)) releaseTestTempDir(dir);
-  delete process.env.FAKE_STOP_MODE;
-  delete process.env.FAKE_STOP_PIDS;
 });
 
 function alive(pid: number): boolean {
@@ -49,13 +47,12 @@ async function startSession(
   const dir = makeTestTempDir('claude-stop-');
   dirs.push(dir);
   const pidFile = join(dir, 'pids.json');
-  process.env.FAKE_STOP_MODE = mode;
-  process.env.FAKE_STOP_PIDS = pidFile;
   const handle = await createClaudeCodeBackend({ executablePath: FAKE, ...opts }).createSession({
     provider: { kind: 'http', providerId: 'claude-code' },
     modelId: 'claude-sonnet-5-5',
     cwd: dir,
     prompt: 'start the dev server in the background',
+    env: { FAKE_STOP_MODE: mode, FAKE_STOP_PIDS: pidFile },
   });
   const events: StepEvent[] = [];
   let pids: Pids | null = null;

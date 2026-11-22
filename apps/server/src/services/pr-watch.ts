@@ -16,6 +16,7 @@ import { autonomousToken } from './github-autonomous-token.js';
 import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
+import { selfIssueCreateInFlight } from './todos.js';
 
 export const PR_WATCH_INTERVAL_MS = 60_000;
 
@@ -285,7 +286,7 @@ export function createPrWatch(
     const finished = FINISHED_PR_STATES.includes(state);
     const head = pull.headSha ?? '';
     const task = deps.db.select().from(todo).where(eq(todo.id, target.threadId)).get();
-    if (pull.state === 'open' && task !== undefined) {
+    if (pull.state === 'open' && task !== undefined && !selfIssueCreateInFlight(task.id)) {
       try {
         const body = await ensurePullClosesTaskIssue(
           fetchImpl,

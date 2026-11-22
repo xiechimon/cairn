@@ -15,15 +15,15 @@
 
 | Item | Count |
 |---|---|
-| Features | 58 |
+| Features | 57 |
 | status shipped | 45 |
-| status partial | 11 |
+| status partial | 10 |
 | status planned | 2 |
-| research, frontend design and backend design all present or not applicable | 30 |
+| research, frontend design and backend design all present or not applicable | 29 |
 | Research gaps | 13 |
 | Frontend design gaps | 15 |
 | Backend design gaps | 18 |
-| notes cited but not on main | 20 |
+| notes cited but not on main | 19 |
 
 ## Coverage
 
@@ -50,7 +50,6 @@
 | [Thread PR panel and auto-fix](#thread-pr-panel) | 1 | shipped | yes | yes | yes |  |
 | [Thread transcript and work trace](#thread-transcript) | 1 | shipped | yes | yes | yes |  |
 | [Threads](#threads) | 1 | shipped | yes | yes | yes |  |
-| [Trajectory export](#trajectory-export) | 1 | partial | yes | n/a | yes |  |
 | [Desktop app](#desktop-app) | 2 | planned | yes (not on main) | gap | gap | B6 |
 | [First run](#first-run) | 2 | shipped | yes (not on main) | yes | gap | B6 |
 | [Machine enrollment](#machine-enrollment) | 2 | shipped | yes | gap | gap | B5 |
@@ -321,7 +320,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### selection-reply
 
-**Reply quote** (shipped). Press Reply in a Coordinator message's hover tools to quote it above the composer; the sent message carries the quote and its source message id. Selecting text shows no reply bar.
+**Reply quote** (shipped). Press Reply in your own message's hover tools to quote it above the composer. Coordinator messages have no reply arrow (owner decision, 2026-11-21); instead, select text in a Coordinator message to get a pill with Ask in side chat and Quote (R); Quote opens a one-input box where Enter stages the quote above the composer and Cmd+Enter sends it at once; Ask in side chat opens the related task thread with the selection quoted in its composer. The sent message carries the quote and its source message id.
 
 - Research: [docs/research/selection-reply-2026-11-08.md](research/selection-reply-2026-11-08.md)
 - Frontend design: [docs/design/selection-reply-2026-11-08.md](design/selection-reply-2026-11-08.md)
@@ -367,14 +366,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Frontend design: [docs/design/references/thread-review](design/references/thread-review), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 
-### trajectory-export
-
-**Trajectory export** (partial). Build trajectories export as packs and traces for the self-improvement loop.
-
-- Research: [docs/research/eval-methods.md](research/eval-methods.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
-- Frontend design: n/a: runs as command-line tools and trace export with no product page
-- Backend design: [docs/spec/29-evaluation-and-data-loop.md](spec/29-evaluation-and-data-loop.md), [docs/research/trajectory-self-improvement-2026-11-08.md](research/trajectory-self-improvement-2026-11-08.md) (not on main)
-
 ### desktop-app
 
 **Desktop app** (planned). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
@@ -385,7 +376,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### first-run
 
-**First run** (shipped). The setup page before the first project, the composer setup hint and the first-PR card that take a new user to a first merged PR.
+**First run** (shipped). The setup page before the first project, the Coordinator setup prompt and the first-PR card that take a new user to a first merged PR.
 
 - Research: [docs/research/ui-ux-audit-2026-11-06.md](research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/references/first-run](design/references/first-run)
@@ -457,7 +448,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### token-usage
 
-**Token usage** (shipped). The Usage dialog from the sidebar footer: a 7, 30 or 90 day range with totals, cache hit, the token-type bar, tokens per local day as stacked bars by source or by model, and models and projects ranked.
+**Token usage** (shipped). The Usage dialog from the sidebar footer: a past-year heatmap of tokens per local day, year totals with days used, daily average and cache hit, the token-type bar, and models and projects ranked for the year or the clicked day.
 
 - Research: **gap**: no note beyond GitHub's contribution calendar, which the owner named
 - Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar)
@@ -497,7 +488,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### attachments
 
-**Attachments** (shipped). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens in a full-window lightbox with a pager across the message's files.
+**Attachments** (shipped). Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens by kind: images and video in a full-window lightbox with a zoned top bar, a filmstrip of the message's media and peeks of the adjacent files; documents (Markdown with a preview/source switch, code with muted highlighting, text, PDF, office) in a right side panel inside the Coordinator layout, one at a time.
 
 - Research: [docs/research/file-preview-reference-2026-11-11.md](research/file-preview-reference-2026-11-11.md)
 - Frontend design: [docs/design/references/coordinator-chat/claude-duet-composer-attachment.jpg](design/references/coordinator-chat/claude-duet-composer-attachment.jpg), [docs/design/references/coordinator-chat/claude-duet-file-preview-panel.jpg](design/references/coordinator-chat/claude-duet-file-preview-panel.jpg), [docs/design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg](design/references/coordinator-chat/claude-duet-sent-attachment-uploading.jpg)
@@ -505,7 +496,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### composer
 
-**Composer** (shipped). The message composer: mentions, slash commands, named prompts and drafts that survive closing the app.
+**Composer** (shipped). The message composer: mentions, named prompts and drafts that survive closing the app. A leading / is plain text; there is no slash-command menu.
 
 - Research: **gap**: no note comparing composers in claude.ai, Amp and t3code
 - Frontend design: [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/references/coordinator-chat](design/references/coordinator-chat)
@@ -569,7 +560,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### projects
 
-**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, an archived project opened read-only, and delete.
+**Projects** (shipped). Projects as filter and context: create from a local repo or GitHub, a project conversation, settings (base branch, concurrency, autonomy, instructions, local-to-GitHub conversion), archive, unarchive from the sidebar's archived filter, and an archived project opened read-only; the UI offers no project deletion.
 
 - Research: [docs/research/project-coordinators.md](research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
@@ -625,7 +616,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### sidebar
 
-**Sidebar** (shipped). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, instructions, move to group, archive, delete), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive, delete) and the machine-status footer.
+**Sidebar** (shipped). The sidebar tree: the Coordinator row with its projects hung under it on a tree guide, owner-made project groups as folder rows, a needs-you dot, the project menu (rename, project settings, move to group, archive), the group menu, the project filter (active, archived, all) with the archived row menu (unarchive) and the machine-status footer.
 
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](design/archived-projects-settings.md)
@@ -684,6 +675,5 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 | `docs/research/sidebar-coordinator-icon-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/t3code-devices-and-scope-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/thread-pr-placement-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
-| `docs/research/trajectory-self-improvement-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/ui-ux-audit-2026-11-06.md` | uncommitted in worktree project-review-52869e (2026-11-08) |
 | `docs/research/user-computer-model-2026-11-08.md` | uncommitted in worktree project-review-52869e (2026-11-08) |

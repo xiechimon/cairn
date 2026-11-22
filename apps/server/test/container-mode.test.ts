@@ -194,18 +194,8 @@ describe('#2057 safe bare-server defaults on a real process', () => {
     expect((await fetch(`${base}/api/user/me`, RELAYED)).status).toBe(401);
     expect((await fetch(`${base}/api/user/me`)).status).toBe(401);
     const bootstrapped = await fetch(`${base}/api/auth/bootstrap`, { method: 'POST' });
-    expect(bootstrapped.status).toBe(process.platform === 'linux' ? 200 : 401);
-    const authCookie = (bootstrapped.headers.getSetCookie?.() ?? [])
-      .map((value) => value.split(';')[0] ?? '')
-      .find((value) => value.startsWith('cairn_auth='));
-    expect(authCookie !== undefined).toBe(process.platform === 'linux');
-    expect(
-      (
-        await fetch(`${base}/api/user/me`, {
-          headers: authCookie === undefined ? {} : { cookie: authCookie },
-        })
-      ).status,
-    ).toBe(process.platform === 'linux' ? 200 : 401);
+    expect(bootstrapped.status).not.toBe(200);
+    expect(bootstrapped.headers.get('set-cookie') ?? '').not.toContain('cairn_auth');
     const tokenPath = join(booted.home, ACCESS_TOKEN_FILE_NAME);
     expect(statSync(tokenPath).mode & 0o777).toBe(0o600);
     const token = storedToken(booted.home);

@@ -1,0 +1,1 @@
+ALTER TABLE `gate_verdict` ADD `ranModel` text;

@@ -4,6 +4,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import {
   build as buildTable,
   chiefMessage,
+  gateVerdict,
   machine as machineTable,
   notification as notificationTable,
   project as projectTable,
@@ -14,9 +15,11 @@ import {
 import { newRecordId } from '../src/lib/ids.js';
 import { BLOCKED_BY_HOLD } from '../src/services/blockers.js';
 import { seedLocalMachine } from '../src/services/machines.js';
+import { notifyModelFallback } from '../src/services/notifications.js';
 import { RUNNER_OFFLINE_NOTICE_MS, sweepOfflineRunners } from '../src/services/runner-offline.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { NO_MACHINE_ALERT_MS, sweepUnplaceableSteps } from '../src/services/unplaceable-steps.js';
+import { sweepWorkerWatchdog, WATCHDOG_BLOCK_ROUNDS } from '../src/services/worker-watchdog.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -247,7 +250,7 @@ function claim(w: World, stepId: string, machineId: string, at: number): void {
     .run();
 }
 
-describe('an offline Runner with waiting tasks raises one Coordinator notice per offline period', () => {
+describe('an offline Runner with waiting tasks keeps one Coordinator status row per machine', () => {
   test('a Runner back within two minutes raises no notice', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
@@ -317,7 +320,7 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     expect(notices(w)[0]?.todos.filter((t) => t.state === 'waiting')).toHaveLength(1);
   });
 
-  test('a return marks waiting tasks started, and a second offline period gets a new notice', async () => {
+  test('a return marks waiting tasks started, and a second offline period rewrites the same row', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     routeOf(w, omarchy);
@@ -338,8 +341,100 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     lastSeen(w, omarchy, t0 + 20_000);
     sweepOfflineRunners(w.s.svc, t0 + 20_000 + RUNNER_OFFLINE_NOTICE_MS + 1_000);
     const all = notices(w);
-    expect(all).toHaveLength(2);
-    expect(all.find((n) => n.id !== recovered?.id)?.todos).toHaveLength(1);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.id).toBe(recovered?.id);
+    expect(all[0]?.lastSeenAt).toBe(t0 + 20_000);
+    expect(all[0]?.backAt).toBeNull();
+    expect(all[0]?.recoveredAt).toBeNull();
+    expect(all[0]?.todos.filter((t) => t.state === 'waiting')).toHaveLength(1);
+  });
+
+  test('flapping keeps one row that always shows the latest state', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    routeOf(w, omarchy);
+    pendingStep(w);
+    const t0 = Date.now();
+    for (let flap = 0; flap < 4; flap += 1) {
+      const down = t0 + flap * 300_000;
+      lastSeen(w, omarchy, down, false);
+      sweepOfflineRunners(w.s.svc, down + RUNNER_OFFLINE_NOTICE_MS + 1_000);
+      lastSeen(w, omarchy, down + RUNNER_OFFLINE_NOTICE_MS + 30_000, true);
+      sweepOfflineRunners(w.s.svc, down + RUNNER_OFFLINE_NOTICE_MS + 60_000);
+      sweepOfflineRunners(w.s.svc, down + 2 * RUNNER_OFFLINE_NOTICE_MS + 60_000);
+    }
+    const all = notices(w);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.kind).toBe('runner_offline');
+    expect(all[0]?.backAt).not.toBeNull();
+    expect(all[0]?.recoveredAt).not.toBeNull();
+  });
+
+  test('a Runner that drops again before the return settles shows offline on the same row', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    routeOf(w, omarchy);
+    pendingStep(w);
+    const t0 = Date.now();
+    lastSeen(w, omarchy, t0 - RUNNER_OFFLINE_NOTICE_MS - 1_000);
+    sweepOfflineRunners(w.s.svc, t0);
+    lastSeen(w, omarchy, t0 + 10_000, true);
+    sweepOfflineRunners(w.s.svc, t0 + 20_000);
+    expect(notices(w)[0]?.backAt).toBe(t0 + 20_000);
+    expect(notices(w)[0]?.recoveredAt).toBeNull();
+
+    lastSeen(w, omarchy, t0 + 30_000);
+    sweepOfflineRunners(w.s.svc, t0 + 30_000 + RUNNER_OFFLINE_NOTICE_MS + 1_000);
+    const all = notices(w);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.backAt).toBeNull();
+    expect(all[0]?.recoveredAt).toBeNull();
+    expect(all[0]?.lastSeenAt).toBe(t0 + 30_000);
+  });
+
+  test('duplicate rows left by per-period ids merge into one on the next sweep', async () => {
+    const w = await world();
+    const omarchy = await machineOf(w, 'omarchy', { online: false });
+    routeOf(w, omarchy);
+    pendingStep(w);
+    const t0 = Date.now();
+    lastSeen(w, omarchy, t0 - RUNNER_OFFLINE_NOTICE_MS - 1_000);
+    sweepOfflineRunners(w.s.svc, t0);
+    const [first] = notices(w);
+    expect(first).toBeDefined();
+    const legacy = (at: number): RunnerOfflineContent => ({
+      kind: 'runner_offline',
+      machineId: omarchy,
+      machineName: 'omarchy',
+      lastSeenAt: at,
+      todos: [],
+      alternative: null,
+      backAt: at + 5_000,
+      recoveredAt: at + 10_000,
+    });
+    const threadId = w.s.db
+      .select({ threadId: chiefMessage.threadId })
+      .from(chiefMessage)
+      .all()
+      .find((row) => row.threadId !== null)?.threadId;
+    expect(threadId).toBeDefined();
+    for (const at of [t0 - 500_000, t0 - 400_000]) {
+      w.s.db
+        .insert(chiefMessage)
+        .values({
+          id: `runner-offline-${omarchy}-${at}`,
+          threadId: threadId ?? '',
+          role: 'system',
+          content: JSON.stringify(legacy(at)),
+          createdAt: at,
+        })
+        .run();
+    }
+    expect(notices(w)).toHaveLength(3);
+    sweepOfflineRunners(w.s.svc, t0 + 60_000);
+    const all = notices(w);
+    expect(all).toHaveLength(1);
+    expect(all[0]?.id).toBe(first?.id);
   });
 
   test('another online Runner is offered, and the action routes the task there', async () => {
@@ -413,5 +508,48 @@ describe('an offline Runner with waiting tasks raises one Coordinator notice per
     const todoId = `todo-${stepId.slice('step-'.length)}`;
     const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/runner`, { machineId: mac });
     expect(res.status).toBe(409);
+  });
+});
+
+describe('coexisting conditions on one task each notify once', () => {
+  test('a looping task that no Runner can run notifies once per condition across ticks', async () => {
+    const w = await world();
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, mac, { mcpServers: ['figma'] });
+    const stepId = pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    const todoId = stepId.replace(/^step-/, 'todo-');
+    const buildId = stepId.replace(/^step-/, 'build-');
+    w.s.db.update(todoTable).set({ latestBuildId: buildId }).where(eq(todoTable.id, todoId)).run();
+    for (let round = 0; round < WATCHDOG_BLOCK_ROUNDS; round++) {
+      w.s.db
+        .insert(gateVerdict)
+        .values({
+          stepId: `verdict-${stepId}-${round}`,
+          buildId,
+          kind: 'review',
+          outcome: 'block',
+          expectedHeadSha: `${round}`.padStart(40, 'a'),
+          createdAt: Date.now() - round * 60_000,
+        })
+        .run();
+    }
+    const published: { type: string; snippet: string | null }[] = [];
+    const publish = w.s.svc.hub.publishNotification.bind(w.s.svc.hub);
+    w.s.svc.hub.publishNotification = (teamId, record) => {
+      published.push({ type: record.type, snippet: record.snippet });
+      publish(teamId, record);
+    };
+    const start = Date.now();
+    for (let tick = 0; tick < 8; tick++) {
+      const now = start + tick * 15_000;
+      sweepUnplaceableSteps(w.s.svc, now);
+      sweepWorkerWatchdog(w.s.svc, now);
+      if (tick === 3) {
+        const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+        if (todoRow === undefined) throw new Error('seeded todo missing');
+        notifyModelFallback(w.s.svc, todoRow, null, 'switched to the fallback model');
+      }
+    }
+    expect(published.map((p) => p.type)).toEqual(['no_machine', 'watchdog_flag', 'model_fallback']);
   });
 });

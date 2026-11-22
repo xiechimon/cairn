@@ -56,6 +56,7 @@ function commandPath(name: string): string {
 async function expectDetachedDescendantDies(input: {
   argv: string[];
   env?: Record<string, string>;
+  marker?: 'inherited' | 'scrubbed';
 }): Promise<void> {
   const allocated = makeTestTempDir('host-detached-');
   const home = realpathSync(allocated);
@@ -75,7 +76,7 @@ async function expectDetachedDescendantDies(input: {
     });
     await waitFor(() => existsSync(receiptPath));
     receipt = JSON.parse(readFileSync(receiptPath, 'utf8')) as Receipt;
-    expect(receipt.markerPresent).toBe(false);
+    expect(receipt.markerPresent).toBe(input.marker === 'inherited');
     expect(receipt.uid).toBe(process.getuid?.());
     expect(receipt.token).toBe(token);
     expect(receipt.cwd).toBe(home);
@@ -116,14 +117,32 @@ async function expectDetachedDescendantDies(input: {
   }
 }
 
-test.skipIf(!hasPython || process.platform === 'win32')(
+test.skipIf(!hasPython || process.platform !== 'linux')(
   'timeout kills a double-forked new-session descendant after it removes the marker',
   () =>
     expectDetachedDescendantDies({
+      marker: 'scrubbed',
       argv: [
         'bash',
         '-c',
         'python3 "$1" launch "$2" "$3"; sleep 30',
+        'fixture-shell',
+        fixture,
+        '$RECEIPT',
+        '$TOKEN',
+      ],
+    }),
+);
+
+test.skipIf(!hasPython || process.platform !== 'darwin')(
+  'macOS kills a double-forked new-session descendant through the marker it inherits',
+  () =>
+    expectDetachedDescendantDies({
+      marker: 'inherited',
+      argv: [
+        'bash',
+        '-c',
+        'python3 "$1" launch "$2" "$3" keep-marker; sleep 30',
         'fixture-shell',
         fixture,
         '$RECEIPT',
@@ -150,6 +169,7 @@ test.skipIf(!hasPython || process.platform !== 'linux')(
         commandPath('sleep'),
       ],
       env: { PATH: join(home, 'bin') },
+      marker: 'scrubbed',
     }).finally(() => {
       expect(releaseTestTempDir(home)).toBe(true);
     });

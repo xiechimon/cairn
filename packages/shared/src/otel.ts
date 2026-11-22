@@ -19,6 +19,7 @@ import {
   type SpanProcessor,
   TracerProvider,
 } from '@opentelemetry/sdk-trace';
+import { publicUrl } from './public-url.js';
 
 export class OtlpTargetConfigError extends Error {
   constructor(message: string) {
@@ -124,7 +125,7 @@ export function stepOtelContext(
     traceId: otlpTraceIdOfStep({ kind: options.kind ?? '', buildId, stepId }),
     stepSpanId: otlpStepSpanIdOfBuild(buildId, stepId),
     ...(options.environment != null ? { environment: options.environment } : {}),
-    tracesUrl: `${target.url.origin}${target.url.pathname}`,
+    tracesUrl: publicUrl(target.url.href),
     headers: target.headers,
   };
 }

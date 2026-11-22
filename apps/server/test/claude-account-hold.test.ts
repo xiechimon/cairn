@@ -394,6 +394,7 @@ describe('a Coordinator turn after a switch', () => {
         updatedAt: 2,
         sessionId: 'chief-session',
         sessionOpenedAt: 2,
+        sessionRuntime: 'claude-code',
       })
       .run();
     s.db

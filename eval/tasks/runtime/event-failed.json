@@ -1,0 +1,30 @@
+{
+  "kind": "runtime",
+  "id": "event-failed",
+  "request": "todo-100",
+  "event": "failed",
+  "world": {
+    "projects": [
+      "p"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "post_note",
+          "args": {
+            "text": "状态更新"
+          }
+        }
+      ]
+    },
+    {
+      "text": "记录完毕。"
+    }
+  ],
+  "expected": {
+    "decision": "any"
+  },
+  "gate": true
+}

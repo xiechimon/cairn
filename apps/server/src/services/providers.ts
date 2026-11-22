@@ -3,6 +3,7 @@ import {
   canonicalClaudeModels,
   claudeCodeThinkingDefault,
   claudeCodeThinkingLevels,
+  claudeCodeUpdateRequired,
   DEFAULT_ANTIGRAVITY_MODELS,
   DEFAULT_DEVIN_MODELS,
   type ModelSourceModel,
@@ -165,13 +166,17 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
           models: (picked === null
             ? canonicalClaudeModels(report.models)
             : picked.map((model) => ({ ...model, slot: 'builtin' }))
-          ).map((model) => ({
-            ...model,
-            ...asTask({
-              levels: claudeCodeThinkingLevels(model.id),
-              resolvesTo: claudeCodeThinkingDefault(model.id),
-            }),
-          })),
+          ).map((model) => {
+            const updateRequired = claudeCodeUpdateRequired(model.id, report.bin?.version);
+            return {
+              ...model,
+              ...asTask({
+                levels: claudeCodeThinkingLevels(model.id),
+                resolvesTo: claudeCodeThinkingDefault(model.id),
+              }),
+              ...(updateRequired !== null ? { updateRequired } : {}),
+            };
+          }),
           ...(report.bin !== undefined ? { bin: report.bin } : {}),
         },
       ];

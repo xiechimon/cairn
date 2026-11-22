@@ -19,6 +19,7 @@ import {
   stepOtelContext,
   traceparentFor,
 } from '@cairn/shared/otel';
+import { childEnv } from '../child-env.js';
 
 const SCOPE = 'cairn.daemon';
 
@@ -67,36 +68,47 @@ export function daemonOtelFromEnv(env: NodeJS.ProcessEnv): DaemonOtel | null {
   };
 }
 
+export const CLAUDE_TELEMETRY_PINS: Record<string, string> = {
+  OTEL_SDK_DISABLED: 'true',
+  CLAUDE_CODE_ENABLE_TELEMETRY: '0',
+  CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '0',
+  ENABLE_BETA_TRACING_DETAILED: '0',
+  BETA_TRACING_ENDPOINT: '',
+};
+
 export function claudeTelemetryEnv(ctx: StepOtelContext): Record<string, string> {
   return {
     TRACEPARENT: traceparentFor(ctx.traceId, ctx.stepSpanId),
-    ...claudeCliEnv({}),
+    ...CLAUDE_TELEMETRY_PINS,
   };
 }
 
 const CLI_EXPORT_KEY = /^(OTEL_|CAIRN_OTEL_|ANT_OTEL_|BETA_TRACING_|ENABLE_BETA_TRACING_)/;
 
-export function runtimeChildEnv(env: NodeJS.ProcessEnv): Record<string, string> {
-  const filtered: Record<string, string> = {};
-  for (const [key, value] of Object.entries(env)) {
-    if (value === undefined || CLI_EXPORT_KEY.test(key)) continue;
+export function runtimeChildEnv(
+  extra: NodeJS.ProcessEnv = {},
+  parent: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
+  const filtered: NodeJS.ProcessEnv = {};
+  for (const [key, value] of Object.entries(extra)) {
+    if (CLI_EXPORT_KEY.test(key)) continue;
     if (
-      env.CAIRN_GIT_CRED_FILE &&
+      extra.CAIRN_GIT_CRED_FILE &&
       ['GH_TOKEN', 'GITHUB_TOKEN', 'CAIRN_GIT_CRED_PASSWORD'].includes(key)
     )
       continue;
     filtered[key] = value;
   }
-  return { ...filtered, OTEL_SDK_DISABLED: 'true' };
+  return childEnv({ ...filtered, OTEL_SDK_DISABLED: 'true' }, parent);
 }
 
-export function claudeCliEnv(env: NodeJS.ProcessEnv): Record<string, string> {
+export function claudeCliEnv(
+  extra: NodeJS.ProcessEnv = {},
+  parent: NodeJS.ProcessEnv = process.env,
+): Record<string, string> {
   return {
-    ...runtimeChildEnv(env),
-    CLAUDE_CODE_ENABLE_TELEMETRY: '0',
-    CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: '0',
-    ENABLE_BETA_TRACING_DETAILED: '0',
-    BETA_TRACING_ENDPOINT: '',
+    ...runtimeChildEnv(extra, parent),
+    ...CLAUDE_TELEMETRY_PINS,
   };
 }
 

@@ -631,9 +631,9 @@ describe('readGateGithubFacts: base branch, compare and required checks (F6 to F
     const two = await read({ rules: (_n, o) => ok(o.page === 1 ? full : [rules[2]]) });
     expect(two.checks?.required).toEqual(['check', 'pr-evidence', 'lint']);
     expect(two.log.filter(([n]) => n === 'rules')).toHaveLength(2);
-    const capped = await read({ rules: () => ok(full) });
-    expect(capped.checks?.required).toBeNull();
-    expect(capped.log.filter(([n]) => n === 'rules')).toHaveLength(5);
+    const many = await read({ rules: (_n, o) => ok(o.page <= 6 ? full : [rules[2]]) });
+    expect(many.checks?.required).toEqual(['check', 'pr-evidence', 'lint']);
+    expect(many.log.filter(([n]) => n === 'rules')).toHaveLength(7);
   });
 });
 

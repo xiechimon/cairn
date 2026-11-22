@@ -9,6 +9,7 @@ export async function localMergeDoneBody(
   claimed: ClaimedStep,
   command: LocalMergeCommand,
   stopRequested: () => boolean,
+  authorize: () => Promise<string | null> = async () => 'authorization-unreachable',
 ): Promise<MachineDoneBody> {
   const repo = claimed.project?.repo;
   try {
@@ -26,16 +27,18 @@ export async function localMergeDoneBody(
       throw new Error('Local merge requires merge and push permission');
     const result = stopRequested()
       ? { outcome: 'held' as const, reason: 'stopped' }
-      : await landLocalMerge(repo.cloneUrl, command, stopRequested);
+      : await landLocalMerge(repo.cloneUrl, command, authorize, stopRequested);
     return {
       status: 'success',
       localMerge: { command, result },
+      generation: claimed.step.generation,
       ...(result.outcome === 'merged' ? { commit: result.commit } : {}),
     };
   } catch (err) {
     return {
       status: 'failed',
       errorMessage: err instanceof Error ? err.message : String(err),
+      generation: claimed.step.generation,
     };
   }
 }
@@ -48,7 +51,19 @@ export async function runLocalMergeStep(
   opts: { stopRequested: () => boolean; now: () => number; running: number },
 ): Promise<void> {
   const stepId = claimed.step.id;
-  const doneBody = await localMergeDoneBody(claimed, command, opts.stopRequested);
+  const authorize = async (): Promise<string | null> => {
+    if (deps.client.localMergeRecheck === undefined) return 'authorization-unreachable';
+    try {
+      const res = await deps.client.localMergeRecheck(stepId, { command });
+      return res.authorized ? null : `authorization-${res.reason ?? 'refused'}`;
+    } catch (err) {
+      deps.logger.step(
+        `local merge re-check failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return 'authorization-unreachable';
+    }
+  };
+  const doneBody = await localMergeDoneBody(claimed, command, opts.stopRequested, authorize);
   new TranscriptBuffer(deps.paths.outboxDir, stepId).upsert({
     id: `local-merge-${stepId}`,
     role: 'system',

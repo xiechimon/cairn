@@ -15,9 +15,11 @@ import {
 } from '../src/services/mcp-github-connector.js';
 import {
   checkMcpConnector,
+  connectorSlugs,
   createMcpConnector,
   createPublicOAuthFetch,
   type GithubAppRegistration,
+  localBrowserConnector,
   type McpConnectorDeps,
   refreshMcpConnectorToken,
   stepConnectorEndpoints,
@@ -698,7 +700,12 @@ describe('MCP connector OAuth', () => {
       const id = queueConnectorStep(t.s, projectId, runner.machineId);
       t.s.db
         .update(stepTable)
-        .set({ status: 'claimed', machineId: runner.machineId, claimedAt: Date.now() })
+        .set({
+          status: 'claimed',
+          machineId: runner.machineId,
+          claimedAt: Date.now(),
+          mcpGrant: ['linear'],
+        })
         .where(eq(stepTable.id, id))
         .run();
       return id;
@@ -1392,5 +1399,76 @@ describe('GitHub connector device sign-in', () => {
     expect(isOwnerOnlyRoute('POST', `${path}/github/bind`)).toBe(true);
     expect(isOwnerOnlyRoute('POST', `${path}/c1/github/installations`)).toBe(true);
     expect(isOwnerOnlyRoute('GET', `${path}/github`)).toBe(false);
+  });
+});
+
+describe('a connector that runs on the owner’s machine', () => {
+  test('the Browser MCP preset is stored as local and never probed from the server', async () => {
+    const mcp = fakeMcp();
+    const { s, base, deps } = boot(mcp.fetch);
+    const res = await req(s.app, 'POST', base, {
+      kind: 'catalog',
+      catalogId: 'browsermcp',
+      slug: 'browsermcp',
+    });
+    expect(res.status).toBe(201);
+    const record = mcpConnectorRecordSchema.parse(await res.json());
+    expect(record).toMatchObject({
+      slug: 'browsermcp',
+      catalogId: 'browsermcp',
+      transport: 'stdio',
+      url: null,
+      authKind: 'none',
+      status: 'local',
+      statusReason: null,
+      toolCount: null,
+    });
+    expect(mcp.seen).toEqual([]);
+    const row = s.db.select().from(mcpConnector).get();
+    expect(row?.valuesCipher).toBeNull();
+    expect(await stepConnectorEndpoints(deps, s.team.id, ['browsermcp'])).toEqual({});
+    expect(connectorSlugs(s.db, s.team.id)).toEqual([]);
+    expect(localBrowserConnector(s.db, s.team.id)).toBe('browsermcp');
+  });
+
+  test('rechecking a local connector keeps its state and probes nothing', async () => {
+    const mcp = fakeMcp();
+    const { s, base } = boot(mcp.fetch);
+    const created = (await (
+      await req(s.app, 'POST', base, {
+        kind: 'catalog',
+        catalogId: 'browsermcp',
+        slug: 'browsermcp',
+      })
+    ).json()) as { id: string };
+    const checked = await req(s.app, 'POST', `${base}/${created.id}/check`);
+    expect(checked.status).toBe(200);
+    expect(await checked.json()).toMatchObject({ status: 'local', url: null });
+    expect(mcp.seen).toEqual([]);
+  });
+
+  test('a local connector takes no token, url, headers or options', async () => {
+    const mcp = fakeMcp();
+    const { s, base } = boot(mcp.fetch);
+    for (const body of [
+      { kind: 'catalog', catalogId: 'browsermcp', slug: 'browsermcp', token: 'tok' },
+      { kind: 'catalog', catalogId: 'browsermcp', slug: 'browsermcp', options: { x: 'y' } },
+    ])
+      expect((await req(s.app, 'POST', base, body)).status).toBe(400);
+    const created = (await (
+      await req(s.app, 'POST', base, {
+        kind: 'catalog',
+        catalogId: 'browsermcp',
+        slug: 'browsermcp',
+      })
+    ).json()) as { id: string };
+    for (const patch of [
+      { token: 'tok-1234567890' },
+      { url: 'https://mcp.example.test/mcp' },
+      { options: { readonly: 'true' } },
+    ])
+      expect((await req(s.app, 'PATCH', `${base}/${created.id}`, patch)).status).toBe(400);
+    expect((await req(s.app, 'DELETE', `${base}/${created.id}`)).status).toBe(204);
+    expect(localBrowserConnector(s.db, s.team.id)).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import { githubTokenFetch } from './github-token.js';
 
 const repositorySchema = z.object({ default_branch: z.string().min(1).nullable() });
 const branchesSchema = z.array(z.object({ name: z.string().min(1) }));
+const BRANCHES_PER_PAGE = 100;
 
 export async function githubBranches(
   fetchImpl: FetchLike,
@@ -38,13 +39,13 @@ export async function githubBranches(
   if (!repository.success) throw new HttpError(502, 'Invalid GitHub repository response');
   const defaultBranch = repository.data.default_branch;
   const branches: ProjectBranchesResponse['branches'] = [];
-  for (let page = 1; page <= 10; page += 1) {
+  for (let page = 1; ; page += 1) {
     const result = branchesSchema.safeParse(
-      await read(`${base}/branches?per_page=100&page=${page}`),
+      await read(`${base}/branches?per_page=${BRANCHES_PER_PAGE}&page=${page}`),
     );
     if (!result.success) throw new HttpError(502, 'Invalid GitHub branches response');
     branches.push(...result.data.map(({ name }) => ({ name, isDefault: name === defaultBranch })));
-    if (result.data.length < 100) break;
+    if (result.data.length < BRANCHES_PER_PAGE) break;
   }
   return { defaultBranch, branches };
 }

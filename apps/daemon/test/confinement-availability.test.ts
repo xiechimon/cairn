@@ -288,6 +288,26 @@ test.each([
   },
 );
 
+test('a refused Linux probe names the launch failure in the daemon log', async () => {
+  const launch = vi
+    .fn<typeof launchConfined>()
+    .mockRejectedValue(new ConfinementExitedError(OVERLAY_STDERR));
+  const { api, handle, lines } = await boot({
+    confinementPlatform: 'linux',
+    confinementPreflight: launch,
+  });
+  expect(api.presenceBodies.at(-1)).toMatchObject({
+    capabilities: {
+      confinement: { state: 'unavailable', reason: 'startup-failed' },
+      confinementCause: { kind: 'home-overlay-failed' },
+    },
+  });
+  expect(
+    lines.some((line) => line.includes('confinement') && line.includes("Can't make overlay mount")),
+  ).toBe(true);
+  await handle.stop();
+});
+
 test('a ready Runner invalidated by a stale-report 409 is rechecked by the timer', async () => {
   const api = new FakeMachineApi();
   const presence = api.presence.bind(api);

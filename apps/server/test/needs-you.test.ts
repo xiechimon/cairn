@@ -195,6 +195,35 @@ describe('needs you (#1800)', () => {
     expect(buildCount(w)).toBe(1);
   });
 
+  test('an outdated bundled agent CLI parks on its first failure with a plain notice and no retry', async () => {
+    const w = openWorld();
+    const raw =
+      'API Error: 400 Claude Code 2.1.278 does not support this model; version 2.1.280 or newer is required';
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    applyStepFailure(w.deps, row, raw);
+    agePhase(w, nowMs() - AUTOMATIC_RETRY_BASE_MS - 1);
+    await sweepFailedRetries(w.deps);
+    expect(phaseOf(w)).toBe('failed');
+    expect(buildCount(w)).toBe(1);
+    expect(failureNeedsHuman(raw)).toBe(true);
+    const notices = w.s.db
+      .select()
+      .from(chiefMessage)
+      .all()
+      .map(
+        (notice) =>
+          JSON.parse(String(notice.content)) as { message: string; runtimeUpdate?: unknown },
+      );
+    const parked = notices.find((notice) => notice.runtimeUpdate !== undefined);
+    expect(parked?.runtimeUpdate).toEqual({
+      task: getTodo(w.deps, w.todoId)?.title,
+      runtime: 'Claude Code',
+      current: '2.1.278',
+      required: '2.1.280',
+    });
+    expect(parked?.message).not.toContain('API Error');
+  });
+
   test('parking a watched model rejection emits a notice and exactly one Coordinator failure wake', () => {
     const w = openWorld();
     const thread = coordinatorThreadRow(w.deps, ensureChief(w.deps, w.s.team.id));

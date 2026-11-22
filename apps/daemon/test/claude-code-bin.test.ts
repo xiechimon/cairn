@@ -1,5 +1,7 @@
-import { chmodSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { chmodSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { CLAUDE_CODE_MIN_CLI_VERSIONS, claudeCodeUpdateRequired } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { parseClaudeVersion, probeClaudeBin, resolveCommandPath } from '../src/claude-code-bin.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -202,5 +204,18 @@ describe('probeClaudeBin', () => {
       else process.env.CAIRN_CLAUDE_BIN = prev;
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe('the bundled Claude Code runs every model Cairn offers', () => {
+  test('the pinned SDK ships a CLI at or above each model minimum', () => {
+    const sdkMain = createRequire(import.meta.url).resolve('@anthropic-ai/claude-agent-sdk');
+    const manifest = JSON.parse(readFileSync(join(dirname(sdkMain), 'package.json'), 'utf8')) as {
+      claudeCodeVersion: string;
+    };
+    const outdated = Object.keys(CLAUDE_CODE_MIN_CLI_VERSIONS).filter(
+      (id) => claudeCodeUpdateRequired(id, manifest.claudeCodeVersion) !== null,
+    );
+    expect(outdated).toEqual([]);
   });
 });

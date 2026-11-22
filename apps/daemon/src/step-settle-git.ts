@@ -26,6 +26,7 @@ export interface SettleStepGitInput {
   lastError: string | null;
   stopped: boolean;
   closes: boolean;
+  env?: NodeJS.ProcessEnv;
   note: (id: string, content: string) => void;
   log: (message: string) => void;
   logRaw: (message: string) => void;
@@ -71,6 +72,7 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
       headAtStart: input.headAtStart,
       stepStartMs: input.stepStartMs,
       push: () => pushStep(git, ws),
+      env: input.env,
       note: input.note,
       log: input.log,
       logRaw: input.logRaw,

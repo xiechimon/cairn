@@ -2,7 +2,7 @@ import type { ClaimedStep } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   claudeSubscription as claudeSubscriptionTable,
@@ -19,6 +19,11 @@ import {
 } from './helpers.js';
 
 const HOUR = 60 * 60 * 1000;
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 async function call(
   app: Hono,
@@ -758,6 +763,45 @@ describe('subscription quota attribution', () => {
     expect(quotaWindows(s, subscriptionId)).toEqual([
       expect.objectContaining({ subscription: 'five_hour', status: 'allowed', utilization: 0.1 }),
     ]);
+    s.dispose();
+  });
+
+  test('a task run observation feeds the tray quota and sends no probe', async () => {
+    const s = bootServer({ claimHoldMs: 50 });
+    const subscriptionId = insertClaudeSubscription(s);
+    const machine = await enroll(s, await issueKey(s, 'omarchy-key'), 'omarchy');
+    seedStep(s, {
+      id: 'observed-step',
+      machineId: machine.machineId,
+      subscriptionId,
+    });
+    const res = await report(s, machine.token, machine.machineId, {
+      stepId: 'observed-step',
+      status: 'allowed',
+      rateLimitType: 'five_hour',
+      utilization: 0.22,
+      resetsAt: Date.now() + HOUR,
+    });
+    expect(res.status).toBe(200);
+    const calls: string[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn<typeof globalThis.fetch>(async (url) => {
+        calls.push(String(url));
+        const target = String(url);
+        if (target.includes('/v1/models'))
+          return Response.json({ data: [{ id: 'claude-haiku-5-5' }], has_more: false });
+        if (target.includes('/v1/messages')) return new Response('{}', { status: 200 });
+        return new Response('{}', { status: 403 });
+      }),
+    );
+    const refreshed = (await (
+      await call(s.app, 'POST', `/api/teams/${s.team.id}/claude-subscriptions/quota`, {})
+    ).json()) as { windows: { name: string; utilization: number }[] }[];
+    expect(refreshed[0]?.windows).toEqual([
+      expect.objectContaining({ name: 'five_hour', utilization: 0.22 }),
+    ]);
+    expect(calls.filter((url) => url.includes('/v1/messages'))).toEqual([]);
     s.dispose();
   });
 });

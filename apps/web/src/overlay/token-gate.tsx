@@ -2,7 +2,6 @@ import { cn } from 'cn';
 import { type FormEvent, type MouseEvent, useEffect, useRef, useState } from 'react';
 import {
   beginGateProbe,
-  bootstrapLoopback,
   consumePairFragment,
   passGate,
   redeemPairingCode,
@@ -13,7 +12,6 @@ import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
-import { DEMO_MODE } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 
 const PAIR_CODE_CELLS = 32;
@@ -28,10 +26,7 @@ export function TokenGate() {
   const cellsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void (async () => {
-      await consumePairFragment(() => rejectGate());
-      if (!DEMO_MODE && (await bootstrapLoopback())) passGate();
-    })();
+    void consumePairFragment(() => rejectGate());
   }, []);
 
   useEffect(() => {

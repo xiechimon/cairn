@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
-import { withoutPinnedEnv } from './backend/pinned-env.js';
+import { childEnv } from './child-env.js';
 import { loopbackNoProxy } from './proxy.js';
 
 export interface GitRunResult {
@@ -33,7 +33,7 @@ export function runGit(
   opts: { cwd?: string; env?: NodeJS.ProcessEnv; timeoutMs?: number; input?: string } = {},
 ): Promise<GitRunResult> {
   return new Promise((resolve, reject) => {
-    const env = { ...withoutPinnedEnv(process.env), ...opts.env };
+    const env = childEnv(opts.env);
     const noProxy = LOOPBACK_URL_HOSTS.reduce<string | undefined>(
       (merged, host) => loopbackNoProxy({ NO_PROXY: merged }, `http://${host}`),
       env.NO_PROXY ?? env.no_proxy,
@@ -137,7 +137,7 @@ const CREDENTIAL_HELPER =
 
 export function gitCredentialEnv(
   cred: BoundGitCredentials,
-  parent: NodeJS.ProcessEnv = process.env,
+  parent: NodeJS.ProcessEnv = {},
 ): NodeJS.ProcessEnv {
   const n = inheritedGitConfigCount(parent);
   if (/[\r\n\0]/.test(cred.username + cred.password)) {
@@ -311,7 +311,7 @@ export async function landGitSquash(input: {
   return new Promise((resolve, reject) => {
     const child = spawn('git', ['update-ref', '--no-deref', '--stdin'], {
       cwd: dir,
-      env: withoutPinnedEnv(process.env),
+      env: childEnv(),
     });
     let output = '';
     let preparing = false;
@@ -460,17 +460,36 @@ export const gitPrim = {
         timeoutMs: options.timeoutMs ?? NET_TIMEOUT_MS,
       },
     );
+    if ((await gitPrim.remoteHeadRef(repoDir)) !== null) return;
+    const fetched = await runGit(
+      ['for-each-ref', '--count=1', '--format=%(refname)', 'refs/remotes/origin/'],
+      { cwd: repoDir, timeoutMs: META_TIMEOUT_MS },
+    );
+    if (fetched.code !== 0 || fetched.stdout.trim() === '') return;
+    if ((await gitPrim.originConfigUrl(repoDir)) !== origin) return;
+    await gitPrim.remoteSetHeadAuto(repoDir, cred);
+    if ((await gitPrim.remoteHeadRef(repoDir)) === null) {
+      throw new Error(`git fetch left ${origin} without a resolvable default branch`);
+    }
   },
 
-  async remoteDefaultBranch(repoDir: string): Promise<string> {
-    const r = await runGit(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], {
+  async remoteHeadRef(repoDir: string): Promise<string | null> {
+    const r = await runGit(['symbolic-ref', '--quiet', 'refs/remotes/origin/HEAD'], {
       cwd: repoDir,
       timeoutMs: META_TIMEOUT_MS,
     });
-    if (r.code === 0) {
-      const name = r.stdout.trim().replace(/^origin\//, '');
-      if (name !== '') return name;
-    }
+    const target = r.stdout.trim();
+    if (r.code !== 0 || target === '') return null;
+    const resolved = await runGit(
+      ['rev-parse', '--verify', '--quiet', '--end-of-options', target],
+      { cwd: repoDir, timeoutMs: META_TIMEOUT_MS },
+    );
+    return resolved.code === 0 && resolved.stdout.trim() !== '' ? target : null;
+  },
+
+  async remoteDefaultBranch(repoDir: string): Promise<string> {
+    const name = (await gitPrim.remoteHeadRef(repoDir))?.replace(/^refs\/remotes\/origin\//, '');
+    if (name !== undefined && name !== '') return name;
     return 'main';
   },
 
@@ -879,7 +898,7 @@ export const gitPrim = {
       const proofId = randomUUID();
       const proofRef = `refs/cairn/push-check/${proofId}`;
       const proofRemote = `cairn-proof-${proofId}`;
-      const configIndex = inheritedGitConfigCount({ ...process.env, ...env });
+      const configIndex = inheritedGitConfigCount(env);
       let remote = '';
       try {
         const fetched = await runGit(

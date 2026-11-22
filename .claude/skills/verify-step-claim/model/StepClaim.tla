@@ -145,11 +145,20 @@ HeartbeatStep(e) ==
   LET m == ex[e].mach IN
   /\ ex[e].stage \in Working /\ connected[m]
   /\ sm = m
+  /\ st = "claimed"
   /\ ~(fresh /\ progressed /\ ex[e].beat)
   /\ fresh' = TRUE /\ progressed' = TRUE
   /\ ex' = [ex EXCEPT ![e].beat = TRUE]
   /\ UNCHANGED <<st, sm, probeDue, phase, stopPending, arch, online, presenceFresh, home,
                  daemon, ghosts, budgets>>
+
+HeartbeatRefused(e) ==
+  LET m == ex[e].mach IN
+  /\ ex[e].stage \in Working /\ connected[m]
+  /\ (sm /= m \/ st /= "claimed")
+  /\ ~ex[e].halt
+  /\ ex' = [ex EXCEPT ![e].halt = TRUE]
+  /\ UNCHANGED <<server, daemon, ghosts, budgets>>
 
 FinishOutcomes(e) ==
   IF ex[e].stage = "preparing"
@@ -239,6 +248,13 @@ SchedulerTick ==
   /\ holder' = IF release THEN None ELSE holder
   /\ UNCHANGED <<fresh, progressed, probeDue, phase, archived, presenceFresh, home,
                  daemon, ex, staleApply, stopDelivered, budgets>>
+
+ForceStopChiefTurn ==
+  /\ st = "claimed" /\ stopPending
+  /\ st' = "stopped" /\ stopPending' = FALSE /\ archiveStop' = "none"
+  /\ holder' = None
+  /\ UNCHANGED <<sm, fresh, progressed, probeDue, phase, archived, online, presenceFresh,
+                 home, daemon, ex, staleApply, stopDelivered, budgets>>
 
 ----------------------------------------------------------------------------
 
@@ -426,9 +442,9 @@ Next ==
        \/ DaemonCrash(m) \/ DaemonStartRecover(m) \/ DaemonRecoverDone(m)
        \/ RebindHomeMachine(m)
   \/ \E e \in ExecIds :
-       \/ StartSession(e) \/ HeartbeatStep(e) \/ FinishSession(e)
+       \/ StartSession(e) \/ HeartbeatStep(e) \/ HeartbeatRefused(e) \/ FinishSession(e)
        \/ FinishStepOwnedCheck(e) \/ FinishStepApply(e)
-  \/ SchedulerTick \/ CloseCard \/ ArchiveCard \/ EnqueueAfterArchive
+  \/ SchedulerTick \/ ForceStopChiefTurn \/ CloseCard \/ ArchiveCard \/ EnqueueAfterArchive
   \/ HeartbeatAges \/ QuotaProbeDue
 
 Spec == Init /\ [][Next]_vars

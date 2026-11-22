@@ -69,6 +69,32 @@ async function markerHolders(rows: readonly ProcessRow[], marker: TreeMarker): P
   return found.filter((pid): pid is number => pid !== undefined);
 }
 
+const DARWIN_PS_MAX_BYTES = 32 * 1024 * 1024;
+
+async function darwinMarkerHolders(
+  rows: readonly ProcessRow[],
+  marker: TreeMarker,
+  known: ReadonlySet<number>,
+): Promise<number[]> {
+  const needle = `${marker.env}=${marker.value}`;
+  const candidates = rows.filter((row) => row.pid > 1 && !known.has(row.pid)).map((row) => row.pid);
+  if (candidates.length === 0) return [];
+  const listing = await execFileAsync(
+    'ps',
+    ['-E', '-o', 'pid=,command=', '-p', candidates.join(',')],
+    {
+      maxBuffer: DARWIN_PS_MAX_BYTES,
+    },
+  ).catch(() => ({ stdout: '' }));
+  const holders: number[] = [];
+  for (const line of listing.stdout.split('\n')) {
+    const [pid, ...tokens] = line.trim().split(/\s+/);
+    if (pid === undefined || !/^\d+$/.test(pid) || !tokens.includes(needle)) continue;
+    holders.push(Number(pid));
+  }
+  return holders;
+}
+
 export class ProcessTree {
   private members = new Set<number>();
 
@@ -78,7 +104,7 @@ export class ProcessTree {
     private readonly graceMs: number,
   ) {}
 
-  private async collect(): Promise<ProcessRow[]> {
+  private async collect(portableMarkerScan: boolean): Promise<ProcessRow[]> {
     const linux = process.platform === 'linux';
     const rows = linux ? await readLinuxProcesses() : await readPortableProcesses();
     const children = new Map<number, number[]>();
@@ -96,7 +122,11 @@ export class ProcessTree {
       queue.push(...(children.get(pid) ?? []));
     }
     for (const row of rows) if (row.pgid === this.rootPid) found.add(row.pid);
-    if (linux) for (const pid of await markerHolders(rows, this.marker)) found.add(pid);
+    if (linux) {
+      for (const pid of await markerHolders(rows, this.marker)) found.add(pid);
+    } else if (portableMarkerScan && process.platform === 'darwin') {
+      for (const pid of await darwinMarkerHolders(rows, this.marker, found)) found.add(pid);
+    }
     found.delete(process.pid);
     found.delete(process.ppid);
     const live = rows.filter((row) => found.has(row.pid));
@@ -131,16 +161,16 @@ export class ProcessTree {
   }
 
   async snapshot(): Promise<void> {
-    await this.collect();
+    await this.collect(false);
   }
 
   async kill(): Promise<void> {
-    await this.collect();
+    await this.collect(true);
     this.signalAll('SIGTERM');
     const graceEnds = Date.now() + this.graceMs;
     while (Date.now() < graceEnds && this.anyKnownAlive()) await sleep(POLL_MS);
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const live = await this.collect();
+      const live = await this.collect(true);
       if (!live.some((row) => !row.zombie)) return;
       this.signalAll('SIGKILL');
       await sleep(POLL_MS);

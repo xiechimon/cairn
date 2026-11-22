@@ -183,7 +183,12 @@ test('a GitHub PR targeting the configured dev branch passes the base check', as
   await req(s.app, 'PATCH', '/api/projects/branch-project', { baseBranch: 'dev' });
   await expect(
     requestMerge({ ...s.svc, box: s.secretBox, githubFetch: fetch }, 'branch-build'),
-  ).resolves.toEqual({ delegated: true });
+  ).resolves.toEqual({
+    state: 'merged',
+    prNumber: 1,
+    commit: 'b'.repeat(40),
+    alreadyMerged: false,
+  });
   expect(requests.filter((r) => r.method === 'PUT')).toHaveLength(1);
   expect(requests.map((r) => r.url)).toContain(
     'https://api.github.com/repos/octo/demo/branches/dev',

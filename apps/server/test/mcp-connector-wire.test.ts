@@ -11,6 +11,7 @@ import {
 } from '../src/db/schema.js';
 import { newRecordId } from '../src/lib/ids.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
+import { executeRelayToolCall } from '../src/services/machine-relay.js';
 import { claimStep, stepToken } from '../src/services/machines.js';
 import {
   bootServer,
@@ -124,6 +125,49 @@ describe('MCP connectors on the machine wire', () => {
     ]);
     expect(token.withheldMcp).toEqual(['notion']);
   });
+
+  test('a connector added between claim and token is not delivered to the Runner', async () => {
+    const { s, projectId } = await world();
+    connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
+    const runner = await enrollConnectorRunner(s, 'new-runner', true, ['files']);
+    const stepId = queueConnectorStep(s, projectId, runner.machineId);
+    const claimed = await claim(s, runner.machineId);
+    expect(claimed?.mcpServers).toEqual(['files', 'linear']);
+    connector(s, 'notion', { headers: { Authorization: 'Bearer notion-token' } });
+    const token = await tokenOf(s, runner.token, stepId);
+    expect(token.mcpConnectors?.map((c) => c.slug)).toEqual(['linear']);
+    expect(token.withheldMcp).toBeUndefined();
+  });
+
+  test('a re-claimed step gets its new claim’s grant', async () => {
+    const { s, projectId } = await world();
+    connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
+    const runner = await enrollConnectorRunner(s, 'new-runner', true, ['files']);
+    const stepId = queueConnectorStep(s, projectId, runner.machineId);
+    await claim(s, runner.machineId);
+    s.db
+      .update(stepTable)
+      .set({ status: 'pending', machineId: null })
+      .where(eq(stepTable.id, stepId))
+      .run();
+    connector(s, 'notion', { headers: { Authorization: 'Bearer notion-token' } });
+    const reclaimed = await claim(s, runner.machineId);
+    expect(reclaimed?.step.id).toBe(stepId);
+    const token = await tokenOf(s, runner.token, stepId);
+    expect(token.mcpConnectors?.map((c) => c.slug)).toEqual(['linear', 'notion']);
+  });
+
+  test('a claimed step with no recorded grant gets no connectors', async () => {
+    const { s, projectId } = await world();
+    connector(s, 'linear', { headers: { Authorization: 'Bearer lin-static-token' } });
+    const runner = await enrollConnectorRunner(s, 'new-runner', true, ['files']);
+    const stepId = queueConnectorStep(s, projectId, runner.machineId);
+    await claim(s, runner.machineId);
+    s.db.update(stepTable).set({ mcpGrant: null }).where(eq(stepTable.id, stepId)).run();
+    const token = await tokenOf(s, runner.token, stepId);
+    expect(token.mcpConnectors).toBeUndefined();
+    expect(token.withheldMcp).toBeUndefined();
+  });
 });
 
 const THREAD = 'chief-mcp-thread';
@@ -210,5 +254,22 @@ describe('MCP connectors for the Coordinator on a Runner', () => {
     expect(
       s.db.select().from(chiefMessageTable).where(eq(chiefMessageTable.threadId, THREAD)).all(),
     ).toEqual([]);
+  });
+
+  test('a connector added between claim and token is not delivered for a Coordinator turn', async () => {
+    const { machineId, deps, s } = coordinatorWorld(true);
+    await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
+    connector(s, 'notion', { headers: { Authorization: 'Bearer notion-token' } });
+    const token = await stepToken(deps, machineId, 's1');
+    expect(token.mcpConnectors?.map((c) => c.slug)).toEqual(['linear']);
+  });
+
+  test('a claimed chief turn cannot reach a connector added after the claim through the broker', async () => {
+    const { machineId, deps, s } = coordinatorWorld(true);
+    await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
+    connector(s, 'notion', { headers: { Authorization: 'Bearer notion-token' } });
+    await expect(
+      executeRelayToolCall(deps, machineId, 's1', 'connector_notion__PING', {}),
+    ).rejects.toThrow(/grant/);
   });
 });

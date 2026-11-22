@@ -20,9 +20,9 @@ import type {
   ToolCallRecord,
 } from '@cairn/shared';
 import {
-  classifyStepFailure,
   createThinkingBindingGuard,
   ENV_VARS,
+  failureEndsStepNow,
   LANGFUSE_ATTR,
   observationAttributes,
   THINKING_LEVELS,
@@ -68,10 +68,11 @@ import { EventQueue } from './event-queue.js';
 import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { describeImageWithModels } from './image-text.js';
 import { connectFailedLine } from './mcp-config.js';
+import { redactingMcpTransports } from './mcp-log-redaction.js';
 import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
 import { openPiHostSession } from './pi-host-client.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
-import { pinProcessEnv, withoutPinnedEnv } from './pinned-env.js';
+import { pinProcessEnv } from './pinned-env.js';
 import {
   enrichProviderError,
   type ProviderResponseSink,
@@ -294,6 +295,27 @@ function inMemoryMcpCredentials(): McpCredentials {
 function shellPathFor(agentDir: string): Record<string, string> {
   const key = Object.keys(process.env).find((name) => name.toLowerCase() === 'path') ?? 'PATH';
   return { [key]: [join(agentDir, 'bin'), process.env[key]].filter(Boolean).join(delimiter) };
+}
+
+const PI_BASH_SESSION_ENV_KEYS = [
+  'PI_SESSION_ID',
+  'PI_SESSION_FILE',
+  'PI_PROVIDER',
+  'PI_MODEL',
+  'PI_REASONING_LEVEL',
+] as const;
+
+export function piBashEnv(
+  shellEnv: NodeJS.ProcessEnv,
+  sessionEnv: Record<string, string> | undefined,
+  agentDir: string,
+): Record<string, string> {
+  const sessionMeta: Record<string, string> = {};
+  for (const key of PI_BASH_SESSION_ENV_KEYS) {
+    const value = shellEnv[key];
+    if (value !== undefined) sessionMeta[key] = value;
+  }
+  return runtimeChildEnv({ ...sessionMeta, ...shellPathFor(agentDir), ...sessionEnv });
 }
 
 function mcpServerConfig(endpoint: McpEndpoint): McpServerConfig {
@@ -767,7 +789,7 @@ export class PiSessionHandle implements AgentSessionHandle {
         raw.type === 'message_end' &&
         raw.message?.role === 'assistant' &&
         raw.message.stopReason === 'error' &&
-        classifyStepFailure(raw.message.errorMessage ?? '') === 'model_unavailable'
+        failureEndsStepNow(raw.message.errorMessage ?? '')
       ) {
         session.setAutoRetryEnabled(false);
       }
@@ -1160,6 +1182,7 @@ export class PiBackend implements AgentBackend {
         createMcpExtension({
           loadConfig: () => ({ servers: [], errors: [] }),
           credentials: this.mcpCredentials,
+          createTransport: redactingMcpTransports(redact),
           logPath: join(this.opts.agentDir, 'mcp.log'),
         }),
       ],
@@ -1231,11 +1254,7 @@ export class PiBackend implements AgentBackend {
       createBashToolDefinition(opts.cwd, {
         spawnHook: (ctx) => ({
           ...ctx,
-          env: runtimeChildEnv({
-            ...withoutPinnedEnv(ctx.env),
-            ...shellPathFor(this.opts.agentDir),
-            ...opts.env,
-          }),
+          env: piBashEnv(ctx.env, opts.env, this.opts.agentDir),
         }),
       }),
     );

@@ -1,0 +1,17 @@
+{
+  "name": "@cairn/eval",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "dependencies": {
+    "@cairn/shared": "workspace:*",
+    "@earendil-works/pi-ai": "1.5.0",
+    "@langfuse/client": "6.1.1",
+    "better-sqlite3": "13.0.3",
+    "drizzle-orm": "0.45.2",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "9.6.0"
+  }
+}

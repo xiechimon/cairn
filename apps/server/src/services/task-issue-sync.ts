@@ -11,7 +11,7 @@ import {
 } from '../lib/github.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { autonomousToken } from './github-autonomous-token.js';
-import type { TodoDeps } from './todos.js';
+import { selfIssueCreateInFlight, type TodoDeps } from './todos.js';
 
 type TodoRow = typeof todo.$inferSelect;
 
@@ -51,18 +51,13 @@ export function desiredIssue(
   row: TodoRow,
 ): DesiredIssue | 'wait' | null {
   const archived = row.archivedAt !== null;
-  if (row.phase === 'done' && !archived) return null;
-  if (row.phase === 'done') {
-    return {
-      state: 'closed',
-      stateReason: 'completed',
-      comment: 'Cairn：这个任务已完成并归档，这里的 issue 关闭。',
-    };
-  }
-  if (row.phase !== 'closed' && !archived) return { state: 'open', comment: REOPENED };
   if (row.supersededBy !== null) {
     const successor = deps.db.select().from(todo).where(eq(todo.id, row.supersededBy)).get();
-    if (successor?.sourceKind === 'github-issue-self' && successor.sourceRef === null)
+    if (
+      successor?.sourceKind === 'github-issue-self' &&
+      successor.sourceRef === null &&
+      selfIssueCreateInFlight(successor.id)
+    )
       return 'wait';
     const repo = githubRepoOfProject(projectOfTodo(deps.db, row));
     const ref =
@@ -74,6 +69,15 @@ export function desiredIssue(
       comment: `Cairn：这个任务被 ${ref} 取代，这里的 issue 关闭（未计划）。`,
     };
   }
+  if (row.phase === 'done' && !archived) return null;
+  if (row.phase === 'done') {
+    return {
+      state: 'closed',
+      stateReason: 'completed',
+      comment: 'Cairn：这个任务已完成并归档，这里的 issue 关闭。',
+    };
+  }
+  if (row.phase !== 'closed' && !archived) return { state: 'open', comment: REOPENED };
   return {
     state: 'closed',
     stateReason: 'not_planned',
@@ -82,10 +86,18 @@ export function desiredIssue(
 }
 
 function divergentRows(deps: Pick<TodoDeps, 'db'>): TodoRow[] {
-  const shelved = or(eq(todo.phase, 'closed'), isNotNull(todo.archivedAt));
+  const shelved = or(
+    eq(todo.phase, 'closed'),
+    isNotNull(todo.archivedAt),
+    isNotNull(todo.supersededBy),
+  );
   const recordedOpen = or(isNull(todo.issueState), eq(todo.issueState, 'open'));
   const recordedClosed = or(isNull(todo.issueState), eq(todo.issueState, 'closed'));
-  const active = and(notInArray(todo.phase, ['closed', 'done']), isNull(todo.archivedAt));
+  const active = and(
+    notInArray(todo.phase, ['closed', 'done']),
+    isNull(todo.archivedAt),
+    isNull(todo.supersededBy),
+  );
   return deps.db
     .select()
     .from(todo)

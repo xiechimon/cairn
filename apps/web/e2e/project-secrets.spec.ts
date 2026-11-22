@@ -56,7 +56,7 @@ test('a secret added from a project defaults to that project and is listed as pr
   await dialog.getByLabel('值', { exact: true }).fill('deploy-value');
   await dialog.getByRole('button', { name: '添加', exact: true }).click();
   await expect.poll(() => posted).toEqual([
-    { name: 'DEPLOY_TOKEN', value: 'deploy-value', kind: 'env', projectId: 'proj-1' },
+    { name: 'DEPLOY_TOKEN', value: 'deploy-value', kind: 'secret', projectId: 'proj-1' },
   ]);
   await expect(
     page.getByTestId('resource-row').filter({ hasText: 'DEPLOY_TOKEN' }),

@@ -37,6 +37,7 @@ import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTurnModel } from '../services/machine-claim.js';
 import { teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
+import { connectorSlugs, localBrowserConnector } from '../services/mcp-servers.js';
 import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
@@ -395,10 +396,15 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     if (STEER_HOLDS.includes(head.holdReason ?? '')) return null;
     if (head.holdUntil !== null && head.holdUntil > nowMs()) return null;
     const teamId = threadTeam(threadId);
-    const model = teamId === null ? null : serverTurnModel(db, teamId, head);
+    if (teamId === null) return null;
+    const model = serverTurnModel(db, teamId, head);
     if (model === null) return null;
     if (hasEarlierLiveChiefStep(db, head)) return null;
-    const claimed = claimPendingChiefStep(db, head, { machineId: null, model });
+    const claimed = claimPendingChiefStep(db, head, {
+      machineId: null,
+      model,
+      mcpGrant: connectorSlugs(db, teamId),
+    });
     if (claimed === null) return null;
     freshClaims.add(head.id);
     publishStepStatus(machine, head.id);
@@ -425,6 +431,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         role: 'user',
         content: row.prompt,
         createdAt: nowMs(),
+        projectId: stepScopeProjectId(row),
+        origin: 'task-prompt',
       });
     }
     const volatileParts = context.sections;
@@ -553,6 +561,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           kind: 'chief',
           machineId: null,
           createdAt: row.createdAt,
+          generation: row.claimedAt ?? undefined,
         },
         conversationId: row.buildId,
         session: { action: 'new', sessionId: null },
@@ -581,6 +590,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
             vmComputer: teamHasVmComputer(db, threadRow.teamId),
             vmBrowser: teamHasVmBrowser(db, threadRow.teamId),
             ownComputer: ownComputerOffered(db, row.buildId),
+            ownerChrome: localBrowserConnector(db, threadRow.teamId) !== null,
             phoneComputer: offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
           }),
           ...connectorToolDefsForTeam(db, threadRow.teamId),
@@ -622,7 +632,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       logger.error({ stepId: row.id, error: scrubbed }, 'coordinator turn failed');
       const current = db.select().from(step).where(eq(step.id, row.id)).get();
       if (!closing && current?.status === 'claimed') {
-        await api.done(row.id, { status: 'failed', errorMessage: scrubbed });
+        await api.done(row.id, {
+          status: 'failed',
+          errorMessage: scrubbed,
+          generation: row.claimedAt ?? undefined,
+        });
       }
     } finally {
       clearInterval(heartbeat);
@@ -763,12 +777,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       await infoCards.idle();
     },
-    close: async () => {
+    close: async (): Promise<void> => {
       closing = true;
       clearInterval(timer);
       try {
         await infoCards.close();
         await runtime.close();
+        while (draining.size > 0) await Promise.allSettled([...draining.values()]);
       } finally {
         for (const lease of leases.values()) lease.release();
         leases.clear();

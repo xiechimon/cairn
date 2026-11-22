@@ -1,0 +1,55 @@
+{
+  "kind": "runtime",
+  "id": "route-split-04",
+  "request": "service 加 --verbose，cli 透传该 flag",
+  "world": {
+    "projects": [
+      "service",
+      "cli",
+      "unrelated"
+    ]
+  },
+  "script": [
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@service",
+            "title": "service 部分",
+            "quotes": [
+              "service 加 --verbose"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "toolCalls": [
+        {
+          "name": "create_todo",
+          "args": {
+            "projectId": "@cli",
+            "title": "cli 部分",
+            "quotes": [
+              "cli 透传该 flag"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "text": "已拆成多个任务。"
+    }
+  ],
+  "expected": {
+    "decision": "route",
+    "projects": [
+      "service",
+      "cli"
+    ],
+    "parts": 2,
+    "boundModel": "stub/m"
+  },
+  "gate": true
+}

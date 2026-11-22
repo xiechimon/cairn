@@ -1,4 +1,7 @@
 import { build } from 'esbuild';
+import { acquireSlot } from '../../scripts/heavy-slots.mjs';
+
+await acquireSlot({ label: 'desktop:build' });
 
 const shared = {
   bundle: true,

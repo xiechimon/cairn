@@ -5,7 +5,6 @@ import {
   CAIRN_REVIEW_HOLD_LABEL,
   isReviewBotAuthor,
   reviewFindingBadge,
-  stripWorkBranchNote,
 } from '@cairn/shared';
 import { eq, ne } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -256,7 +255,7 @@ function fixture() {
     now: 1000,
   });
   const reconcile = () => reconcilePrReviewFindings(deps, input());
-  const wake = () =>
+  const wake = (opts: { mergeableState?: string } = {}) =>
     createPrWakes(deps)({
       ...input(),
       pull: {
@@ -267,8 +266,10 @@ function fixture() {
         body: '',
         htmlUrl: null,
         headSha: 'abc',
+        baseSha: 'base',
+        baseRef: 'main',
         headRef: 'work',
-        mergeableState: 'clean',
+        mergeableState: opts.mergeableState ?? 'clean',
         additions: 1,
         deletions: 0,
       },
@@ -288,10 +289,22 @@ test.each(['P2', 'P3'])(
     expect(f.queries.filter((q) => q.includes('convertPullRequestToDraft'))).toHaveLength(1);
     expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toHaveLength(1);
     expect(f.s.db.select().from(step).get()?.prompt).toContain('RT_1');
+    expect(f.s.db.select().from(step).get()?.promptOrigin).toEqual({
+      kind: 'pr-wake',
+      reasons: ['review'],
+    });
     expect(f.s.db.select().from(step).get()?.prompt).toContain('a.ts:7');
     expect(f.s.db.select().from(step).get()?.prompt).toContain(f.state.body);
   },
 );
+
+test('a wake whose events are a conflict and a review marks both reasons on the enqueued step', async () => {
+  const f = fixture();
+  await f.wake({ mergeableState: 'dirty' });
+  const steps = f.s.db.select().from(step).where(ne(step.kind, 'chief')).all();
+  expect(steps).toHaveLength(1);
+  expect(steps[0]!.promptOrigin).toEqual({ kind: 'pr-wake', reasons: ['conflict', 'review'] });
+});
 
 test.each([true, false])(
   'dismissed ready PR with findings stays ready without notices or wakes (autoFix=%s)',
@@ -634,9 +647,6 @@ test('shared matcher, badges and prompts preserve the ready boundary', () => {
   const note = buildWorkBranchNote('work');
   expect(note).toContain('Codex');
   expect(note).toContain('draft');
-  expect(stripWorkBranchNote(`task\n${note}`)).toBe('task');
-  const old = note.slice(note.indexOf('工作分支注记'), note.indexOf('\n'));
-  expect(stripWorkBranchNote(`task\n${old}`)).toBe('task');
   expect(buildReviewFindingsPrompt({ prNumber: 1, round: 1, findings: [] })).toContain(
     'addPullRequestReviewThreadReply',
   );

@@ -4,10 +4,20 @@ import { createTempEnvironment } from '@cairn/shared/temp-environment';
 import { claudeConfigDir, prepareAntigravityHome, prepareGeminiHome } from './agent-config.js';
 import { gitCredentialEnv } from './git.js';
 
-const READONLY_GIT_ENV: Record<string, string> = {
+const NULL_DEVICE = process.platform === 'win32' ? 'NUL' : '/dev/null';
+
+export const READONLY_GIT_ENV: Record<string, string> = {
   GIT_CONFIG_COUNT: '1',
   GIT_CONFIG_KEY_0: 'url.cairn-readonly-workspace-denied://.pushInsteadOf',
   GIT_CONFIG_VALUE_0: '',
+  GIT_CONFIG_GLOBAL: NULL_DEVICE,
+  GIT_CONFIG_SYSTEM: NULL_DEVICE,
+  GIT_TERMINAL_PROMPT: '0',
+  GIT_ASKPASS: 'false',
+  SSH_ASKPASS: 'false',
+  GIT_SSH_COMMAND: 'false',
+  SSH_AUTH_SOCK: '',
+  SSH_AGENT_PID: '',
 };
 
 export interface StepEnvInput {
@@ -32,7 +42,7 @@ export interface StepEnv {
 
 export function assembleStepEnv(input: StepEnvInput): StepEnv {
   const gitEnv: Record<string, string> =
-    input.git === null
+    input.git === null || input.readonlyGit
       ? {}
       : (input.appCredential?.env() ?? {
           ...Object.fromEntries(

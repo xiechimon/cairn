@@ -20,7 +20,7 @@ export function createHttpDrain(server: ServerType, graceMs = 5_000) {
     response.once('close', () => responses.delete(response));
   };
   server.on('request', track);
-  return async (shutdownTracing: () => Promise<void>): Promise<void> => {
+  return async (): Promise<void> => {
     for (const response of responses) {
       if (String(response.getHeader('content-type')).startsWith('text/event-stream'))
         response.end();
@@ -31,8 +31,11 @@ export function createHttpDrain(server: ServerType, graceMs = 5_000) {
     try {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
-          if (error) reject(error);
-          else resolve();
+          if (error && (error as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING') {
+            reject(error);
+            return;
+          }
+          resolve();
         });
       });
     } finally {
@@ -40,6 +43,5 @@ export function createHttpDrain(server: ServerType, graceMs = 5_000) {
       server.off('request', track);
       server.off('connection', trackSocket);
     }
-    await shutdownTracing();
   };
 }

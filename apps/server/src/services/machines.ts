@@ -24,6 +24,7 @@ import {
   machineStrain,
   PROGRESS_ACTIVITY_PHASES,
   parseReportedCapabilities,
+  transcriptPromptRowId,
 } from '@cairn/shared';
 import { and, asc, eq, isNotNull, isNull, lt, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -53,19 +54,23 @@ import {
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  ownedStepRow,
   profileForStep,
   upsertChiefRow,
   upsertMessage,
 } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
+import { stepScopeProjectId } from './picked-project.js';
 import type { LocalSkill } from './skills.js';
 import { listSkillFiles, readSkillFileBytes, scanLocalSkills } from './skills.js';
+import { flushShield, shieldFor, stepClaimFacts } from './terminal-claims.js';
 
 export { claimStep, meetsMcpVersionGate } from './machine-claim.js';
 export {
   isChiefConversation,
   type MachineDeps,
   ownedStep,
+  ownedStepRow,
   profileForStep,
   publishStepStatus,
   upsertChiefRow,
@@ -298,17 +303,41 @@ function localMachineRow(db: Db, teamId: string, name: string) {
     .get();
 }
 
-export function seedLocalMachine(db: Db, teamId: string): void {
+function machineByHostKey(db: Db, teamId: string, hostKey: string) {
+  return db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.hostKey, hostKey)))
+    .get();
+}
+
+function hostKeyHeldByOther(db: Db, teamId: string, hostKey: string, machineId: string): boolean {
+  return (
+    db
+      .select({ id: machine.id })
+      .from(machine)
+      .where(
+        and(eq(machine.teamId, teamId), eq(machine.hostKey, hostKey), ne(machine.id, machineId)),
+      )
+      .get() !== undefined
+  );
+}
+
+export function seedLocalMachine(
+  db: Db,
+  teamId: string,
+): 'existing' | 'adopted' | 'created' | 'blocked' {
   const local = db
     .select()
     .from(machine)
     .where(and(eq(machine.teamId, teamId), eq(machine.kind, 'local')))
     .get();
-  if (local) return;
+  if (local) return 'existing';
   const byName = localMachineRow(db, teamId, hostname());
-  if (byName) {
+  if (byName !== undefined) {
+    if (byName.tokenHash !== null || byName.apiKeyId !== null) return 'blocked';
     db.update(machine).set({ kind: 'local' }).where(eq(machine.id, byName.id)).run();
-    return;
+    return 'adopted';
   }
   db.insert(machine)
     .values({
@@ -322,6 +351,7 @@ export function seedLocalMachine(db: Db, teamId: string): void {
       kind: 'local',
     })
     .run();
+  return 'created';
 }
 
 function adoptAsDefaultIfUnset(db: Db, teamId: string, machineId: string): void {
@@ -360,59 +390,62 @@ export function enrollMachine(
     serverUrl: string;
     claudeCode?: ClaudeCodeReport;
     capabilities?: unknown;
+    hostKey?: string;
   },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
+  if (input.name === hostname()) {
+    throw new HttpError(403, 'local machine requires owner approval');
+  }
   const token = newMachineToken();
-  const isLocalName = input.name === hostname();
   const capabilities = parseCapabilitiesField(input.capabilities);
-  const byKey = db
-    .select()
-    .from(machine)
-    .where(and(eq(machine.apiKeyId, input.keyId), eq(machine.teamId, input.teamId)))
-    .get();
-  if (byKey) {
+  const hostKey = input.hostKey ?? null;
+  const byHost = hostKey === null ? undefined : machineByHostKey(db, input.teamId, hostKey);
+  const byKey =
+    byHost === undefined
+      ? db
+          .select()
+          .from(machine)
+          .where(and(eq(machine.apiKeyId, input.keyId), eq(machine.teamId, input.teamId)))
+          .get()
+      : undefined;
+  const existing = byHost ?? byKey;
+  if (existing !== undefined && existing.kind === 'local') {
+    throw new HttpError(403, 'local machine requires owner approval');
+  }
+  if (existing !== undefined) {
     db.update(machine)
       .set({
         tokenHash: token.hash,
         name: input.name,
         apiKeyId: input.keyId,
+        retiredAt: null,
+        ...(existing.hostKey === null && hostKey !== null ? { hostKey } : {}),
         ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
         ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-        ...(capabilities !== undefined || byKey.capabilities?.confinement
+        ...(capabilities !== undefined || existing.capabilities?.confinement
           ? {
               capabilities: mergeReportedCapabilities(
-                byKey.capabilities,
+                existing.capabilities,
                 capabilities ?? {
-                  ...(byKey.capabilities ?? { mcpServers: [], skills: [] }),
+                  ...(existing.capabilities ?? { mcpServers: [], skills: [] }),
                   confinement: undefined,
                 },
               ),
             }
           : {}),
       })
-      .where(eq(machine.id, byKey.id))
+      .where(eq(machine.id, existing.id))
       .run();
-    if (deps.machineHub.isConnected(byKey.id)) deps.machineHub.revokeMachine(byKey.id);
-    beginMachineStarting(deps, byKey);
-    adoptAsDefaultIfUnset(db, input.teamId, byKey.id);
+    if (deps.machineHub.isConnected(existing.id)) deps.machineHub.revokeMachine(existing.id);
+    beginMachineStarting(deps, existing);
+    adoptAsDefaultIfUnset(db, input.teamId, existing.id);
     return {
-      machineId: byKey.id,
+      machineId: existing.id,
       token: token.plain,
       teamId: input.teamId,
       serverUrl: input.serverUrl,
     };
-  }
-  if (isLocalName) {
-    const seeded = localMachineRow(db, input.teamId, input.name);
-    if (seeded) {
-      throw new HttpError(
-        403,
-        seeded.apiKeyId !== null || seeded.tokenHash !== null
-          ? 'local machine already enrolled'
-          : 'local machine requires owner approval',
-      );
-    }
   }
   const machineId = newRecordId();
   db.insert(machine)
@@ -424,7 +457,8 @@ export function enrollMachine(
       tokenHash: token.hash,
       apiKeyId: input.keyId,
       latestCliVersion: input.cliVersion ?? null,
-      kind: isLocalName ? 'local' : 'remote',
+      kind: 'remote',
+      ...(hostKey !== null ? { hostKey } : {}),
       ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
       ...(capabilities !== undefined
         ? { capabilities: mergeReportedCapabilities(null, capabilities) }
@@ -436,22 +470,80 @@ export function enrollMachine(
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
 }
 
+function enrollmentExistingRow(
+  db: Db,
+  teamId: string,
+  name: string | undefined,
+  hostKey: string | null,
+) {
+  const byHost = hostKey === null ? undefined : machineByHostKey(db, teamId, hostKey);
+  if (byHost !== undefined) return byHost;
+  return name === undefined ? undefined : localMachineRow(db, teamId, name);
+}
+
+/** Whether an enrollment may claim the server host's own runner identity. A
+ * machine name is self-reported and is not a credential: claiming the local
+ * runner (by name or by hostKey) needs proof that the enrollment was started on
+ * the host itself, and once the row knows a hostKey the enrollment must present
+ * that same one. */
+export function localEnrollmentRefusal(
+  db: Db,
+  input: { teamId: string; name?: string; hostKey?: string; fromLocalHost: boolean },
+): string | null {
+  const namesThisHost = input.name === hostname();
+  const hostKey = input.hostKey ?? null;
+  const row = enrollmentExistingRow(db, input.teamId, input.name, hostKey);
+  if (row?.kind !== 'local' && !namesThisHost) return null;
+  if (row !== undefined && row.kind !== 'local') {
+    return 'another enrolled machine already holds this host name';
+  }
+  if (
+    !input.fromLocalHost ||
+    (row !== undefined && row.hostKey !== null && hostKey !== row.hostKey)
+  ) {
+    return 'this enrollment does not prove it is the local host runner';
+  }
+  return null;
+}
+
 export function authorizeEnrollmentMachine(
   deps: MachineDeps,
-  input: { teamId: string; name: string; serverUrl: string; ownerApproved: boolean },
+  input: {
+    teamId: string;
+    name: string;
+    serverUrl: string;
+    ownerApproved: boolean;
+    fromLocalHost: boolean;
+    hostKey?: string;
+  },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
   const isLocal = input.name === hostname();
-  if (isLocal && !input.ownerApproved) {
+  const hostKey = input.hostKey ?? null;
+  const existing = enrollmentExistingRow(db, input.teamId, input.name, hostKey);
+  const claimsLocal = existing?.kind === 'local' || isLocal;
+  if (claimsLocal && !input.ownerApproved) {
     throw new HttpError(403, 'local machine requires owner approval');
   }
-  const existing = isLocal ? localMachineRow(db, input.teamId, input.name) : undefined;
+  const refusal = localEnrollmentRefusal(db, {
+    teamId: input.teamId,
+    name: input.name,
+    hostKey: input.hostKey,
+    fromLocalHost: input.fromLocalHost,
+  });
+  if (refusal !== null) {
+    throw new HttpError(403, refusal);
+  }
   if (existing) {
     db.update(machine)
       .set({
         tokenHash: token.hash,
-        kind: 'local',
+        name: existing.kind === 'local' ? hostname() : input.name,
+        apiKeyId: null,
+        retiredAt: null,
+        ...(existing.kind === 'local' || isLocal ? { kind: 'local' as const } : {}),
+        ...(existing.hostKey === null && hostKey !== null ? { hostKey } : {}),
         capabilities:
           existing.capabilities === null
             ? null
@@ -483,6 +575,7 @@ export function authorizeEnrollmentMachine(
       apiKeyId: null,
       latestCliVersion: null,
       kind: isLocal ? 'local' : 'remote',
+      ...(hostKey !== null ? { hostKey } : {}),
     })
     .run();
   beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
@@ -513,9 +606,17 @@ export function markPresence(
     capabilities !== undefined
       ? mergeReportedCapabilities(row.capabilities, capabilities)
       : undefined;
+  const reportedHostKey = body.hostKey ?? null;
+  const backfilledHostKey =
+    reportedHostKey !== null &&
+    row.hostKey === null &&
+    !hostKeyHeldByOther(db, row.teamId, reportedHostKey, machineId)
+      ? reportedHostKey
+      : undefined;
   db.update(machine)
     .set({
       ...(admitOnline ? { online: true } : {}),
+      ...(backfilledHostKey !== undefined ? { hostKey: backfilledHostKey } : {}),
       lastSeenAt: nowMs(),
       ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
       ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
@@ -609,6 +710,7 @@ function toStepRecord(r: typeof step.$inferSelect): StepRecord {
     kind: r.kind,
     machineId: r.machineId,
     createdAt: r.createdAt,
+    generation: r.claimedAt ?? undefined,
   };
 }
 
@@ -647,7 +749,13 @@ export function reportTool(
     createdAt: call.endedAt ?? nowMs(),
   };
   if (isChiefConversation(row.buildId)) {
-    upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });
+    const rest = flushShield(stepId);
+    if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
+    upsertChiefRow(deps, {
+      ...messageRow,
+      threadId: row.buildId,
+      projectId: stepScopeProjectId(row),
+    });
     return;
   }
   upsertMessage(deps, { ...messageRow, conversationId: row.buildId });
@@ -659,7 +767,7 @@ export function reportBackgroundTask(
   stepId: string,
   task: BackgroundTask,
 ): void {
-  const row = ownedStep(deps, machineId, stepId);
+  const row = ownedStepRow(deps, machineId, stepId);
   markProgress(deps, row);
   const messageRow = {
     id: backgroundTaskMessageId(row.id, task.taskId),
@@ -674,7 +782,13 @@ export function reportBackgroundTask(
     createdAt: task.startedAt,
   };
   if (isChiefConversation(row.buildId)) {
-    upsertChiefRow(deps, { ...messageRow, threadId: row.buildId });
+    const rest = flushShield(stepId);
+    if (rest !== '') deps.convHub?.publishTextDelta(row.buildId, rest);
+    upsertChiefRow(deps, {
+      ...messageRow,
+      threadId: row.buildId,
+      projectId: stepScopeProjectId(row),
+    });
     return;
   }
   upsertMessage(deps, { ...messageRow, conversationId: row.buildId });
@@ -689,7 +803,12 @@ export function reportTranscriptDelta(
   const row = ownedStep(deps, machineId, stepId);
   if (text === '') return;
   markProgress(deps, row);
-  deps.convHub?.publishTextDelta(row.buildId, text);
+  if (!isChiefConversation(row.buildId)) {
+    deps.convHub?.publishTextDelta(row.buildId, text);
+    return;
+  }
+  const shielded = shieldFor(stepId, () => stepClaimFacts(deps.db, row)).push(text);
+  if (shielded !== '') deps.convHub?.publishTextDelta(row.buildId, shielded);
 }
 
 export function reportThinkingDelta(
@@ -704,21 +823,26 @@ export function reportThinkingDelta(
   deps.convHub?.publishThinkingDelta(row.buildId, text);
 }
 
-export function reportTranscriptRow(
+export function storeTranscriptRow(
   deps: MachineDeps,
-  machineId: string | null,
+  owned: ReturnType<typeof ownedStepRow>,
   stepId: string,
   row: TranscriptRow,
 ): void {
-  const owned = ownedStep(deps, machineId, stepId);
   markProgress(deps, owned);
+  const origin =
+    row.role === 'user' && row.id === transcriptPromptRowId(stepId) ? 'task-prompt' : null;
   if (isChiefConversation(owned.buildId)) {
+    const rest = flushShield(stepId);
+    if (rest !== '') deps.convHub?.publishTextDelta(owned.buildId, rest);
     upsertChiefRow(deps, {
       id: row.id,
       threadId: owned.buildId,
       role: row.role,
       content: row.content,
       createdAt: row.createdAt,
+      projectId: stepScopeProjectId(owned),
+      origin,
     });
     return;
   }
@@ -728,7 +852,17 @@ export function reportTranscriptRow(
     role: row.role,
     content: row.content,
     createdAt: row.createdAt,
+    origin,
   });
+}
+
+export function reportTranscriptRow(
+  deps: MachineDeps,
+  machineId: string | null,
+  stepId: string,
+  row: TranscriptRow,
+): void {
+  storeTranscriptRow(deps, ownedStep(deps, machineId, stepId), stepId, row);
 }
 
 export function reportActivity(

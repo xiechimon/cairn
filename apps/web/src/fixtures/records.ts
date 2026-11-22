@@ -13,7 +13,6 @@ import {
   type MachineOsPlatform,
   type MemoryRecord,
   type ModelSource,
-  type OwnComputerTool,
   type PermissionState,
   PHASE_VALUES,
   type Phase,
@@ -474,6 +473,7 @@ export type TranscriptItem =
       kind: 'fail';
       title: string;
       body: string;
+      plain?: { key: string; vars: Record<string, string> };
       raw?: string;
       facts?: FailFacts;
       id?: string;
@@ -598,14 +598,6 @@ export type ChiefStreamItem =
       createdAt?: number;
     }
   | { kind: 'handoff'; todoId: string; id?: string }
-  | {
-      kind: 'mac-activity';
-      id: string;
-      tool: OwnComputerTool;
-      summary: string;
-      running: boolean;
-      error: boolean;
-    }
   | { kind: 'report-ack'; id: string; todoId: string; buildId: string }
   | {
       kind: 'takeover';
@@ -673,6 +665,7 @@ export type ChiefStreamItem =
       paragraphs?: ChiefSegment[][];
       bullets?: ChiefSegment[][];
       markdown?: string;
+      plain?: { key: string; vars: Record<string, string> };
       typing?: boolean;
       seconds: string;
       tools?: ChiefToolRow[];
@@ -730,6 +723,7 @@ export interface ModelOption {
   modelId: string;
   modelName: string;
   liveness?: 'alive' | 'dead' | 'unknown';
+  updateRequired?: { runtime: string; current: string; required: string };
   thinkingLevels?: readonly ThinkingLevel[];
   thinkingDefault?: ThinkingLevel;
   coordinatorThinkingLevels?: readonly ThinkingLevel[];

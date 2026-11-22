@@ -33,7 +33,7 @@ import {
   APPROVAL_CARD_ID_PREFIX,
   askQuestionContentOf,
   proposalIdOfCard,
-} from './chief-questions.js';
+} from './chief-question-store.js';
 import type { TeamStreamHub } from './events.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import { isOwner } from './instance-owner.js';
@@ -69,6 +69,7 @@ export interface AnswerInput {
   decision: Decision;
   decidedBy: string;
   viaCard?: boolean;
+  interactive?: 'page' | 'im';
   now?: number;
 }
 
@@ -81,7 +82,21 @@ export interface AnswerDeps {
 }
 
 function entryOf(deps: AnswerDeps, actionId: string): ActionEntry | undefined {
-  return (deps.registry ?? SLICE1_ACTIONS).find((entry) => entry.id === actionId);
+  return (
+    (deps.registry ?? SLICE1_ACTIONS).find((entry) => entry.id === actionId) ??
+    connectorActionForId(actionId)
+  );
+}
+
+function sendsOutside(deps: AnswerDeps, actionId: string): boolean {
+  const entry = entryOf(deps, actionId);
+  return (
+    (entry !== undefined && isExternalActionClass(entry.class)) || isConnectorActionId(actionId)
+  );
+}
+
+function approvedOnlyInteractively(deps: AnswerDeps, actionId: string): boolean {
+  return sendsOutside(deps, actionId) || actionId === BROWSER_PASSWORD_ACTION;
 }
 
 export const proposalCardId = (proposalId: string) => `${APPROVAL_CARD_ID_PREFIX}${proposalId}`;
@@ -428,9 +443,7 @@ function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: numb
     journal(tx, row, 'run', now);
     return;
   }
-  const entry = entryOf(deps, row.actionId);
-  if (entry !== undefined && isExternalActionClass(entry.class)) return;
-  if (isConnectorActionId(row.actionId)) return;
+  if (sendsOutside(deps, row.actionId)) return;
   if (row.actionId === 'todo.delete') {
     runTodoDelete(deps, tx, row, now);
     return;
@@ -479,6 +492,16 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
         closeProposal(tx, row, 'expired', null, null, now);
         outcome.expired = true;
         return;
+      }
+      if (
+        input.decision !== 'refuse' &&
+        input.interactive === undefined &&
+        approvedOnlyInteractively(deps, row.actionId)
+      ) {
+        throw new HttpError(
+          403,
+          `proposal ${input.proposalId} is approved only by the owner on its card`,
+        );
       }
       const standing =
         input.decision === 'always' && entryOf(deps, row.actionId)?.standingGrant === true;

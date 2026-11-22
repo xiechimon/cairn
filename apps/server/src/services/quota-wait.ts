@@ -115,7 +115,7 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
       continue;
     deps.db
       .update(step)
-      .set({ status: 'pending', machineId: null })
+      .set({ status: 'pending', machineId: null, mcpGrant: null })
       .where(eq(step.id, row.id))
       .run();
     released += 1;

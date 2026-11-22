@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
-import { admitTestRun } from '../../scripts/test-admission.mjs';
+import { testRunWorkers } from '../../scripts/test-admission.mjs';
 
-await admitTestRun();
+const workers = await testRunWorkers();
 
 export default defineConfig({
   resolve: {
@@ -13,6 +13,7 @@ export default defineConfig({
   },
   test: {
     fsModuleCache: true,
+    maxWorkers: workers,
     include: ['test/**/*.test.ts'],
   },
 });

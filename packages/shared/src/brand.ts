@@ -72,10 +72,13 @@ export const ENV_VARS = {
   confineDeniedRoots: 'CAIRN_CONFINE_DENIED_ROOTS',
   claudeBin: 'CAIRN_CLAUDE_BIN',
   agentImportHome: 'CAIRN_AGENT_IMPORT_HOME',
-  trajectoryOutcomeBackfill: 'CAIRN_TRAJ_OUTCOME_BACKFILL',
-  trajectoryReflectCurate: 'CAIRN_TRAJ_REFLECT_CURATE',
-  trajectoryReflectOpenGuardIssues: 'CAIRN_TRAJ_REFLECT_OPEN_GUARD_ISSUES',
+  parentPid: 'CAIRN_PARENT_PID',
+  ownerChannel: 'CAIRN_OWNER_CHANNEL',
 } as const;
+
+export const OWNER_CHANNEL_HEADER = 'x-cairn-owner-channel';
+export const OWNER_CHANNEL_READY = 'cairn-owner-channel-ready';
+export const OWNER_CHANNEL_MESSAGE = 'cairn-owner-channel';
 
 export const API_KEY_PATTERN = /^cairn_[0-9a-f]{48}$/;
 

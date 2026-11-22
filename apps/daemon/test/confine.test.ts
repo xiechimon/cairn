@@ -370,3 +370,67 @@ test.runIf(linuxProbes)('real bwrap: absent credential masks create no host plac
   for (const path of ['.aws', '.git-credentials', '.config/gh', '.gemini'])
     expect(existsSync(join(policy.home, path))).toBe(false);
 });
+
+const tmpfsAt = (args: string[], path: string) =>
+  args.some((arg, index) => arg === path && args[index - 1] === '--tmpfs');
+const roBoundAt = (args: string[], path: string) =>
+  args.some(
+    (arg, index) => arg === path && args[index - 1] === '--ro-bind' && args[index + 1] === path,
+  );
+const boundAt = (args: string[], path: string) =>
+  args.some(
+    (arg, index) => arg === path && args[index - 1] === '--bind' && args[index + 1] === path,
+  );
+const remountedRo = (args: string[], path: string) =>
+  args.some((arg, index) => arg === path && args[index - 1] === '--remount-ro');
+
+test('a btrfs-style home mounts a tmpfs view entry-by-entry instead of an overlayfs', () => {
+  const policy = fixture();
+  writeFileSync(join(policy.home, 'notes.txt'), 'n');
+  mkdirSync(join(policy.home, 'plain-dir'));
+  symlinkSync('notes.txt', join(policy.home, 'notes-link'));
+  spawnSync('mkfifo', [join(policy.home, 'a-fifo')]);
+  const args = confinementArgs(policy, 'linux');
+  expect(args).not.toContain('--overlay-src');
+  expect(args).not.toContain('--tmp-overlay');
+  expect(tmpfsAt(args, policy.home)).toBe(true);
+  expect(roBoundAt(args, join(policy.home, 'notes.txt'))).toBe(true);
+  expect(roBoundAt(args, join(policy.home, 'plain-dir'))).toBe(true);
+  expect(roBoundAt(args, join(policy.home, '.cache'))).toBe(true);
+  const linkIndex = args.indexOf(join(policy.home, 'notes-link'));
+  expect(args[linkIndex - 2]).toBe('--symlink');
+  expect(args[linkIndex - 1]).toBe('notes.txt');
+  expect(args).not.toContain(join(policy.home, 'a-fifo'));
+  for (const denied of ['.ssh', '.cairn', '.pi', '.netrc'])
+    expect(roBoundAt(args, join(policy.home, denied)), denied).toBe(false);
+  expect(tmpfsAt(args, join(policy.home, '.ssh'))).toBe(true);
+  expect(boundAt(args, join(policy.home, '.pi'))).toBe(true);
+  expect(boundAt(args, join(policy.home, '.cache'))).toBe(true);
+  const nullMasked = (path: string) =>
+    args.some(
+      (arg, index) =>
+        arg === path && args[index - 2] === '--ro-bind' && args[index - 1] === '/dev/null',
+    );
+  expect(nullMasked(join(policy.home, '.netrc'))).toBe(true);
+  expect(nullMasked(join(policy.home, '.git-credentials'))).toBe(true);
+  expect(remountedRo(args, policy.home)).toBe(true);
+});
+
+test('an existing denied-path ancestor is repopulated so missing masks still land', () => {
+  const policy = fixture();
+  mkdirSync(join(policy.home, '.config', 'keep'), { recursive: true });
+  mkdirSync(join(policy.home, '.local', 'share', 'app'), { recursive: true });
+  const args = confinementArgs(policy, 'linux');
+  expect(tmpfsAt(args, join(policy.home, '.config'))).toBe(true);
+  expect(tmpfsAt(args, join(policy.home, '.config', 'gh'))).toBe(true);
+  expect(tmpfsAt(args, join(policy.home, '.local', 'share', 'containers'))).toBe(true);
+  expect(roBoundAt(args, join(policy.home, '.config', 'keep'))).toBe(true);
+  expect(roBoundAt(args, join(policy.home, '.local', 'share', 'app'))).toBe(true);
+  for (const path of [
+    policy.home,
+    join(policy.home, '.config'),
+    join(policy.home, '.local'),
+    join(policy.home, '.local', 'share'),
+  ])
+    expect(remountedRo(args, path), path).toBe(true);
+});

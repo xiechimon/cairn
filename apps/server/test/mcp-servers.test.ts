@@ -117,6 +117,24 @@ describe('readClaudeMcpServers -- config read seam (spec 13: bad = empty set, do
     expect(records.map((r) => r.hasCredential)).toEqual([false, false]);
     expect(records.map((r) => r.credentialKeys)).toEqual([[], []]);
   });
+
+  test('http entry url drops query, fragment and userinfo before it leaves the read seam (issue 5173)', () => {
+    const { records } = readClaudeMcpServers(
+      configPath({
+        mcpServers: {
+          remote: {
+            url: 'https://u5er:p4ss@example.invalid/mcp?token=url-s3cret&ok=1#frag',
+            headers: { 'x-key': 'hdr-s3cret' },
+          },
+          opaque: { url: 'not a url?token=q-s3cret' },
+        },
+      }),
+    );
+    expect(records.map((r) => r.url)).toEqual(['https://example.invalid/mcp', 'not a url']);
+    const raw = JSON.stringify(records);
+    for (const secret of ['u5er', 'p4ss', 'url-s3cret', 'q-s3cret', 'hdr-s3cret', 'frag'])
+      expect(raw).not.toContain(secret);
+  });
 });
 
 describe('listMcpServers -- wire record projection (shape-preserving = web zero learning cost)', () => {
@@ -204,6 +222,57 @@ describe('REST surface: GET re-sourced, management write surface deleted (spec 1
       credentialKeys: ['Authorization'],
     });
     expect(JSON.stringify(rows)).not.toContain('s3cret');
+    s.dispose();
+  });
+
+  test('GET trims a composio connector url to origin — the session id in the path is the credential', async () => {
+    const s = bootServer({ mcpConfigPath: configPath(MIXED) });
+    s.db
+      .insert(mcpConnector)
+      .values({
+        id: 'conn-composio',
+        teamId: s.team.id,
+        slug: 'composio-x',
+        label: 'Composio X',
+        catalogId: null,
+        url: 'https://backend.composio.dev/v3/mcp/session-s3cret-id',
+        headerNames: [],
+        valuesCipher: null,
+        authKind: 'composio',
+        oauthMeta: null,
+        oauthCipher: null,
+        status: 'connected',
+        statusReason: null,
+        toolCount: null,
+        checkedAt: null,
+        authRevision: 1,
+        tokenGeneration: 0,
+        createdAt: 5,
+        updatedAt: 6,
+      })
+      .run();
+    const res = await call(s.app, 'GET', `/api/teams/${s.team.id}/mcp-servers`);
+    const rows = mcpServerRecordSchema.array().parse(await res.json());
+    const composio = rows.find((r) => r.slug === 'composio-x');
+    expect(composio?.url).toBe('https://backend.composio.dev');
+    expect(JSON.stringify(rows)).not.toContain('session-s3cret-id');
+    s.dispose();
+  });
+
+  test('GET trims a credential-bearing local entry url to origin + pathname (issue 5173 negative control)', async () => {
+    const s = bootServer({
+      mcpConfigPath: configPath({
+        mcpServers: {
+          remote: { url: 'https://u5er:p4ss@example.invalid/mcp?token=url-s3cret#frag' },
+        },
+      }),
+    });
+    const res = await call(s.app, 'GET', `/api/teams/${s.team.id}/mcp-servers`);
+    expect(res.status).toBe(200);
+    const rows = mcpServerRecordSchema.array().parse(await res.json());
+    expect(rows.map((r) => r.url)).toEqual(['https://example.invalid/mcp']);
+    const raw = JSON.stringify(rows);
+    for (const secret of ['u5er', 'p4ss', 'url-s3cret', 'frag']) expect(raw).not.toContain(secret);
     s.dispose();
   });
 
@@ -351,6 +420,43 @@ describe('chief mcp_servers read tool: data source = local config (spec 13 re-so
     expect(rows[1]).toMatchObject({ transport: 'stdio', url: 'npx' });
     expect(text).not.toContain('s3cret');
     expect(text).not.toContain('k3y!');
+    s.dispose();
+  });
+
+  test('a credential in the local entry url stays out of the tool output (issue 5173 negative control)', async () => {
+    const p = configPath({
+      mcpServers: {
+        remote: { url: 'https://u5er:p4ss@example.invalid/mcp?token=url-s3cret#frag' },
+      },
+    });
+    const s = bootServer({ mcpConfigPath: p });
+    const ctx: ChiefToolCtx = {
+      teamId: s.team.id,
+      userId: s.user.id,
+      chiefId: 'chief-1',
+      threadId: 'thread-1',
+      chiefAgentId: null,
+      conversationId: 'chief-thread-1',
+    };
+    const text = await executeChiefTool(
+      {
+        db: s.db,
+        hub: s.hub,
+        machineHub: s.machineHub,
+        box: s.secretBox,
+        user: s.user,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        skillsDir: s.skillsDir,
+        mcpConfigPath: p,
+      },
+      ctx,
+      'mcp_servers',
+      {},
+    );
+    const rows = JSON.parse(text) as { url: string }[];
+    expect(rows.map((r) => r.url)).toEqual(['https://example.invalid/mcp']);
+    for (const secret of ['u5er', 'p4ss', 'url-s3cret', 'frag']) expect(text).not.toContain(secret);
     s.dispose();
   });
 });

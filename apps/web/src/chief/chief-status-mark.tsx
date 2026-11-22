@@ -10,6 +10,7 @@ import { useQuestionPending } from './chief-question.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import {
   ANNOUNCE_SETTLE_MS,
+  chatMarkView,
   FULL_PEN,
   finishedTurn,
   isActiveMark,
@@ -211,7 +212,7 @@ export function ChiefStatusMark({
 }) {
   const connected = useConnected();
   const questionPending = useQuestionPending();
-  const base = statusMarkView({ chief, questionPending, connected });
+  const base = chatMarkView({ chief, questionPending, connected });
   const stream = chief.stream ?? [];
   const lastTurn = lastTurnOf(stream);
   const sawActiveRef = useRef(false);

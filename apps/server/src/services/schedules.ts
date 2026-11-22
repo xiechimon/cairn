@@ -305,7 +305,7 @@ export function setScheduleClockListener(listener: (() => void) | null): void {
   scheduleClockListener = listener;
 }
 
-function notifyScheduleClock(): void {
+export function notifyScheduleClock(): void {
   scheduleClockListener?.();
 }
 
@@ -581,6 +581,13 @@ function dispatchEventScheduleClaims(deps: ScheduleDeps, stepRow: typeof step.$i
   }
 }
 
+const FINISHED_RUN_STATUSES: ReadonlySet<string> = new Set([
+  'completed',
+  'failed',
+  'skipped',
+  'stopped',
+]);
+
 export function finishScheduledStep(
   deps: ScheduleDeps & { user: UserRecord },
   stepRow: typeof step.$inferSelect,
@@ -595,7 +602,7 @@ export function finishScheduledStep(
     .from(schedule)
     .where(and(eq(schedule.id, stepRow.scheduleId), eq(schedule.lastRunStepId, stepRow.id)))
     .get();
-  if (!row || (row.kind === 'once' && row.lastRunStatus === 'completed')) return;
+  if (!row || FINISHED_RUN_STATUSES.has(row.lastRunStatus ?? '')) return;
   if (outcome.status !== 'stopped') {
     const todoRow = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
     if (todoRow) {

@@ -4,7 +4,9 @@ import {
   DndContext,
   type DragEndEvent,
   KeyboardSensor,
-  PointerSensor,
+  type Modifier,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -16,12 +18,14 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { cn } from 'cn';
-import { GripVertical } from 'lucide-react';
-import type { ComponentType, CSSProperties, ReactNode, SVGProps } from 'react';
+import { GripVertical, Pencil } from 'lucide-react';
+import type { ComponentType, CSSProperties, DOMAttributes, ReactNode, Ref, SVGProps } from 'react';
+import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { IconTooltip } from '../icon-tooltip.js';
 import { SettingsPanel, SettingsSection } from '../settings-list.js';
 import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 
 export type ProviderMark = ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -58,16 +62,22 @@ export function ProviderInstanceRow({
   item,
   selected,
   onSelect,
-  handle,
   rowRef,
+  rowListeners,
+  selectRef,
+  selectProps,
   style,
   dragging = false,
+  grip,
 }: {
   item: ProviderItem;
   selected: boolean;
   onSelect: () => void;
-  handle?: ReactNode;
+  grip?: ReactNode;
   rowRef?: (node: HTMLElement | null) => void;
+  rowListeners?: DOMAttributes<HTMLDivElement>;
+  selectRef?: Ref<HTMLButtonElement>;
+  selectProps?: Record<string, unknown>;
   style?: CSSProperties;
   dragging?: boolean;
 }) {
@@ -75,24 +85,27 @@ export function ProviderInstanceRow({
     <div
       ref={rowRef}
       style={style}
+      {...rowListeners}
       data-testid="provider-instance"
       data-instance-id={item.id}
       data-tone={item.tone}
       data-dragging={dragging ? 'true' : undefined}
       aria-current={selected ? 'true' : undefined}
       className={cn(
-        'relative flex items-start gap-3 px-3.5 py-3',
-        handle !== undefined && 'pl-1.5',
+        'group/row relative flex items-start gap-3 px-3.5 py-3',
+        grip !== undefined && 'pl-1.5',
         dragging
-          ? 'z-10 bg-popover shadow-(--shadow-popover)'
+          ? 'z-10 cursor-grabbing bg-popover shadow-(--e2)'
           : selected
             ? 'bg-(--sidebar-active)'
             : 'bg-card hover:bg-menu-hover',
       )}
     >
-      {handle}
+      {grip}
       <Button
+        ref={selectRef}
         variant="ghost"
+        {...selectProps}
         onClick={onSelect}
         className={cn(
           'h-auto min-w-0 flex-auto items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent dark:hover:bg-transparent',
@@ -124,6 +137,44 @@ export function ProviderInstanceRow({
   );
 }
 
+function RowGrip({ dragging }: { dragging: boolean }) {
+  const { t } = useI18n();
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            aria-hidden
+            data-testid="provider-drag-grip"
+            className={cn(
+              '-mr-2 flex h-5 w-4 flex-none items-center justify-center rounded-(--cds-radius-xs) text-content-dim group-hover/row:text-content-secondary',
+              dragging ? 'cursor-grabbing text-content-secondary' : 'cursor-grab',
+            )}
+          />
+        }
+      >
+        <GripVertical className="size-4" />
+      </TooltipTrigger>
+      <TooltipContent side="left" sideOffset={6}>
+        {t('拖动调整优先级')}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+const keepInList: Modifier = ({ transform, draggingNodeRect, containerNodeRect }) => {
+  if (draggingNodeRect === null || containerNodeRect === null) return { ...transform, x: 0 };
+  const top = containerNodeRect.top - draggingNodeRect.top;
+  const bottom = containerNodeRect.bottom - draggingNodeRect.bottom;
+  return { ...transform, x: 0, y: Math.min(Math.max(transform.y, top), bottom) };
+};
+
+const KEYBOARD_CODES = {
+  start: ['Space'],
+  cancel: ['Escape'],
+  end: ['Space', 'Enter'],
+};
+
 function SortableRow({
   item,
   selected,
@@ -143,38 +194,28 @@ function SortableRow({
     transition,
     isDragging,
   } = useSortable({ id: item.id });
-  const label = t('拖动调整顺序：{name}', { name: item.name });
   return (
     <ProviderInstanceRow
       item={item}
       selected={selected}
       onSelect={onSelect}
+      grip={<RowGrip dragging={isDragging} />}
       rowRef={setNodeRef}
+      rowListeners={listeners}
+      selectRef={setActivatorNodeRef}
+      selectProps={{
+        ...attributes,
+        role: undefined,
+        tabIndex: undefined,
+        'aria-pressed': undefined,
+        'aria-roledescription': t('可拖动排序'),
+      }}
       dragging={isDragging}
       style={{
         transform:
           transform === null ? undefined : `translate3d(0, ${Math.round(transform.y)}px, 0)`,
         transition,
       }}
-      handle={
-        <IconTooltip
-          label={label}
-          trigger={
-            <Button
-              ref={setActivatorNodeRef}
-              variant="ghost"
-              size="icon-xs"
-              data-testid="provider-drag-handle"
-              {...attributes}
-              {...listeners}
-              aria-roledescription={t('可拖动排序')}
-              className="-my-0.5 w-5 flex-none cursor-grab touch-none text-content-tertiary hover:text-foreground active:cursor-grabbing"
-            />
-          }
-        >
-          <GripVertical aria-hidden className="size-4" />
-        </IconTooltip>
-      }
     />
   );
 }
@@ -192,8 +233,12 @@ function SortableRows({
 }) {
   const { t } = useI18n();
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: KEYBOARD_CODES,
+    }),
   );
   const ids = items.map((item) => item.id);
   const nameOf = (id: string | number) => items.find((item) => item.id === id)?.name ?? String(id);
@@ -219,6 +264,8 @@ function SortableRows({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      modifiers={[keepInList]}
+      autoScroll={false}
       onDragEnd={onDragEnd}
       accessibility={{
         announcements,
@@ -228,14 +275,16 @@ function SortableRows({
       }}
     >
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        {items.map((item) => (
-          <SortableRow
-            key={item.id}
-            item={item}
-            selected={item.id === selectedId}
-            onSelect={() => onSelect(item.id)}
-          />
-        ))}
+        <div className="flex flex-col divide-y divide-border">
+          {items.map((item) => (
+            <SortableRow
+              key={item.id}
+              item={item}
+              selected={item.id === selectedId}
+              onSelect={() => onSelect(item.id)}
+            />
+          ))}
+        </div>
       </SortableContext>
     </DndContext>
   );
@@ -297,25 +346,87 @@ export function ProviderPanel({
   );
 }
 
+function RenameTitle({ name, onRename }: { name: string; onRename: (next: string) => void }) {
+  const { t } = useI18n();
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft !== null) {
+    const commit = () => {
+      const next = draft.trim();
+      if (next !== '' && next !== name) onRename(next);
+      setDraft(null);
+    };
+    return (
+      <Input
+        autoFocus
+        aria-label={t('名称')}
+        data-testid="provider-rename-input"
+        value={draft}
+        onFocus={(event) => event.currentTarget.select()}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') commit();
+          if (event.key === 'Escape') {
+            event.stopPropagation();
+            setDraft(null);
+          }
+        }}
+        className="-ml-1.5 h-7 rounded-(--radius-control) px-1.5 text-card-title font-medium md:text-card-title"
+      />
+    );
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            variant="ghost"
+            data-testid="provider-rename"
+            onClick={() => setDraft(name)}
+            className="group/rename -ml-1.5 h-7 max-w-full justify-start gap-1 px-1.5 text-card-title font-medium text-foreground"
+          />
+        }
+      >
+        <span className="truncate">{name}</span>
+        <Pencil
+          aria-hidden
+          className="hidden size-4 flex-none text-content-tertiary group-hover/rename:block group-focus-visible/rename:block"
+        />
+      </TooltipTrigger>
+      <TooltipContent sideOffset={6}>{t('点击改名')}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function ProviderEditorHead({
   Mark,
   name,
   kind,
   version,
   aside,
+  onRename,
 }: {
   Mark: ProviderMark;
   name: string;
   kind: string;
   version?: string | null;
   aside?: ReactNode;
+  onRename?: (next: string) => void;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <ProviderMarkTile Mark={Mark} />
-      <div className="flex min-w-0 flex-1 basis-0 flex-col">
-        <h2 className="m-0 truncate text-card-title font-medium text-foreground">{name}</h2>
-        <span className="truncate text-meta text-content-tertiary" title={kind}>
+      <div className="flex min-w-0 flex-1 basis-0 flex-col items-start">
+        {onRename === undefined ? (
+          <h2 className="m-0 max-w-full truncate text-card-title font-medium text-foreground">
+            {name}
+          </h2>
+        ) : (
+          <h2 className="m-0 flex max-w-full min-w-0 self-stretch">
+            <RenameTitle key={name} name={name} onRename={onRename} />
+          </h2>
+        )}
+        <span className="max-w-full truncate text-meta text-content-tertiary" title={kind}>
           {kind}
         </span>
       </div>

@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { mkdirSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
-import { parseArgs } from './post-install.mjs';
+import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
+import { parseArgs, smokableBundle } from './post-install.mjs';
 
 const CLI = join(import.meta.dirname, 'post-install.mjs');
 
@@ -41,6 +43,20 @@ test('parseArgs reads every flag', () => {
 test('parseArgs rejects unknown arguments', () => {
   assert.throws(() => parseArgs(['--bogus']), /unknown argument: --bogus/);
   assert.throws(() => parseArgs(['stray']), /unknown argument: stray/);
+});
+
+test('smokableBundle refuses the installed app', () => {
+  assert.throws(() => smokableBundle('/Applications/Cairn.app'), /installed app/);
+  const scratch = makeTestTempDir('post-install-smokable-');
+  try {
+    mkdirSync(join(scratch, 'Cairn.app'));
+    assert.equal(
+      smokableBundle(join(scratch, 'Cairn.app')),
+      realpathSync(join(scratch, 'Cairn.app')),
+    );
+  } finally {
+    releaseTestTempDir(scratch);
+  }
 });
 
 test('--help prints usage and exits without touching an app', () => {

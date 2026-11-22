@@ -1,13 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { claimedStepSchema } from '../src/protocol/machine-wire.js';
 import {
-  appendConfirmedPlanNote,
-  appendWorkBranchNote,
   buildOrchestratePrompt,
-  buildPlanFirstRoundInstruction,
   buildRestartPrompt,
   buildTaskPromptText,
-  classifyUserText,
   composeTaskPromptWithInstruction,
   fenceHistoryText,
   HISTORY_FENCE_OPEN,
@@ -234,45 +230,6 @@ describe('F5 sourceRef missing or malformed: still enters the fence', () => {
     expect(lines[0]?.startsWith('【GitHub issue 原文 · 出处未知】')).toBe(true);
     expect(lines[lines.length - 1]).toBe('【GitHub issue 原文结束 · 出处未知】');
     for (const line of lines.slice(1, -1)) expect(line, line).toMatch(/^>( |$)/);
-  });
-});
-
-describe('F9 presentation-layer classification: fenced task-text lines do not become user bubbles', () => {
-  const ghTask = { title: TITLE, spec: BODY, ...GH };
-
-  test('fenced task-text lines (including work-branch notes) -> task-prompt; pre-change raw lines stored in the DB judged the same', () => {
-    const fenced = taskText(TITLE, BODY, GH);
-    expect(fenced.startsWith(HEAD)).toBe(true);
-    expect(classifyUserText(fenced, ghTask)).toBe('task-prompt');
-    expect(classifyUserText(appendWorkBranchNote(fenced, 'cairn/conv-1'), ghTask)).toBe(
-      'task-prompt',
-    );
-    expect(classifyUserText(`${TITLE}\n\n${BODY}`, ghTask)).toBe('task-prompt');
-  });
-
-  test('S3 fenced task text + confirmed-plan location line (degraded build step) -> task-prompt', () => {
-    const fenced = taskText(TITLE, BODY, GH);
-    expect(fenced.startsWith(HEAD)).toBe(true);
-    const degraded = appendConfirmedPlanNote(fenced, '/home/u/.cairn/plans/conv-1/plan.md');
-    expect(degraded).not.toBe(fenced);
-    expect(classifyUserText(degraded, ghTask)).toBe('task-prompt');
-    expect(classifyUserText(appendWorkBranchNote(degraded, 'cairn/conv-1'), ghTask)).toBe(
-      'task-prompt',
-    );
-  });
-
-  test("fence + first-round plan-contract combined line -> synthetic; user's own words -> user", () => {
-    const fenced = taskText(TITLE, BODY, GH);
-    expect(fenced.startsWith(HEAD)).toBe(true);
-    const composite = composeTaskPromptWithInstruction(fenced, buildPlanFirstRoundInstruction());
-    expect(classifyUserText(composite, ghTask)).toBe('synthetic');
-    expect(classifyUserText('圆角改成 6px 吧', ghTask)).toBe('user');
-  });
-
-  test('non-GitHub tasks classification unchanged', () => {
-    const plain = { title: TITLE, spec: BODY, sourceKind: null, sourceRef: null };
-    expect(classifyUserText(`${TITLE}\n\n${BODY}`, plain)).toBe('task-prompt');
-    expect(classifyUserText('圆角改成 6px 吧', plain)).toBe('user');
   });
 });
 
