@@ -350,10 +350,7 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       script: 'push-queue.mjs',
       args: ['--wait'],
       status: 2,
-      checkRuns: [
-        [0, { check_runs: [] }],
-        [1, 'gh: HTTP 500'],
-      ],
+      checkRuns: [[1, 'gh: HTTP 500']],
       matches: [/could not read the queue state or its check runs/],
       calls: /push --force-with-lease/,
       env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
@@ -405,6 +402,29 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       matches: [new RegExp(`still waiting on ${LIVE.slice(0, 9)}`)],
       timeout: 6000,
       env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
+    {
+      name: 'push-queue reports the failed check it read even when the next check-runs read fails',
+      script: 'push-queue.mjs',
+      args: ['--wait'],
+      status: 1,
+      checkRuns: [
+        [0, { check_runs: [{ name: 'check', conclusion: 'failure' }] }],
+        [1, 'gh: HTTP 500'],
+      ],
+      matches: [/went red in check/],
+      misses: [/still waiting on/],
+      env: { PUSH_QUEUE_WAIT_MINUTES: '0', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
+    {
+      name: 'preflight re-reads the run before watching again, so a run finished during the sleep is watched once',
+      script: 'preflight.mjs',
+      args: ['--wait'],
+      status: 0,
+      search: ciRun('in_progress', null),
+      byId: [ciRun('in_progress', null), ciRun('completed', 'success')],
+      matches: [/\[preflight\] green/],
+      watchCount: 1,
     },
   ];
   for (const row of rows) {

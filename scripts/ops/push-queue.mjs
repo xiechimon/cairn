@@ -167,7 +167,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           deadBase,
           headTree,
           armedTree,
-          evidence: preflightEvidence({ shas: [head], pushedTree: headTree, treeOf, checkRunsOf }),
+          evidence: preflightEvidence({
+            shas: [head],
+            pushedTree: headTree,
+            treeOf,
+            checkRunsOf: () => runs,
+          }),
           failed: failedGreenContexts(runs ?? []),
         });
       } catch {

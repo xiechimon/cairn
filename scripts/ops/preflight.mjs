@@ -100,12 +100,13 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         : '[preflight] no verdict yet: could not read the run; retrying',
     );
     sleep(5);
+    state = currentStatus();
     if (state !== null && state.status !== 'completed') {
       spawnSync('gh', ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'], {
         stdio: 'inherit',
       });
+      state = currentStatus();
     }
-    state = currentStatus();
   }
   console.error(
     `[preflight] could not read the run at ${run.html_url}; rerun node scripts/ops/preflight.mjs --wait`,
