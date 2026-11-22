@@ -168,11 +168,14 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
             : picked.map((model) => ({ ...model, slot: 'builtin' }))
           ).map((model) => {
             const updateRequired = claudeCodeUpdateRequired(model.id, report.bin?.version);
+            const thinking = {
+              customBackend: picked === null && report.customBackend === true,
+            };
             return {
               ...model,
               ...asTask({
-                levels: claudeCodeThinkingLevels(model.id),
-                resolvesTo: claudeCodeThinkingDefault(model.id),
+                levels: claudeCodeThinkingLevels(model.id, thinking),
+                resolvesTo: claudeCodeThinkingDefault(model.id, thinking),
               }),
               ...(updateRequired !== null ? { updateRequired } : {}),
             };
@@ -338,7 +341,7 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
         models: models.map((m) => ({
           ...m,
           liveness: getModelLiveness(teamId, p.providerId, m.id),
-          ...asTask(piThinking(p.providerId, m.id)),
+          ...asTask(piThinking(p, m.id)),
           ...asInServer(inServerThinking(p, m.id)),
         })),
       },

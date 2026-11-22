@@ -203,6 +203,9 @@ describe('agent config isolation', () => {
     expect(
       JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8')),
     ).toEqual({ gcp: { project: 'p1' } });
+    expect(
+      JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-acp', 'settings.json'), 'utf8')),
+    ).toEqual({ auth: { type: 'oauth-personal' } });
 
     writeFileSync(`${tokenFile}.new`, 'token-v2');
     renameSync(`${tokenFile}.new`, tokenFile);
@@ -238,6 +241,9 @@ describe('agent config isolation', () => {
     expect(
       JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8')),
     ).toEqual({ modelProvider: 'gemini' });
+    expect(
+      JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-acp', 'settings.json'), 'utf8')),
+    ).toEqual({ auth: { type: 'gemini-api-key' } });
     expect(existsSync(join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token'))).toBe(
       false,
     );

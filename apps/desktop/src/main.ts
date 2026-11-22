@@ -27,6 +27,7 @@ import {
   OWNER_CHANNEL_HEADER,
   OWNER_CHANNEL_MESSAGE,
   OWNER_CHANNEL_READY,
+  PAGE_CAPTURE_RESULT,
   parseAccessTokenFile,
 } from '@cairn/shared';
 import {
@@ -71,8 +72,11 @@ import {
 } from './devin-auth.js';
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
+import { type DesktopLocale, desktopLocale } from './locale.js';
 import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
+import { type CapturePage, createPageCapture } from './page-capture.js';
+import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
 import { createRestartBudget } from './restart-budget.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { runnerHomeFor } from './runner-home.js';
@@ -86,6 +90,14 @@ import {
   TRAY_POPOVER_WIDTH,
   trayPopoverBounds,
 } from './tray-popover.js';
+import {
+  couldNotStartCopy,
+  installUpdateCopy,
+  serverStoppedCopy,
+  unsupportedUpdateCopy,
+  updateCheckFailedCopy,
+  upToDateCopy,
+} from './update-copy.js';
 import {
   armGuard,
   type GuardAction,
@@ -169,8 +181,11 @@ const serverExited = createServerExitHandler<RunningServer>({
     },
     restart: (dead) => void restartServer(dead),
     fatal: (code) => {
-      dialog.showErrorBox('Cairn server stopped', `The Cairn server exited with code ${code}.`);
-      app.quit();
+      void windowLocale().then((locale) => {
+        const copy = serverStoppedCopy(locale, code);
+        dialog.showErrorBox(copy.title, copy.detail);
+        app.quit();
+      });
     },
   },
 });
@@ -298,6 +313,21 @@ async function serverPort(): Promise<number> {
 
 const ownerChannelKey = randomBytes(32).toString('base64url');
 
+let pageCapture: CapturePage | null = null;
+
+async function answerPageCapture(
+  child: UtilityProcess,
+  request: { id: string; html: string },
+): Promise<void> {
+  pageCapture ??= createPageCapture(offscreenCaptureSurfaces({ BrowserWindow, session }));
+  const image = tray === null ? null : await pageCapture(request.html);
+  try {
+    child.postMessage({ type: PAGE_CAPTURE_RESULT, id: request.id, image });
+  } catch (error) {
+    console.error('the page thumbnail reply did not reach the server:', messageOf(error));
+  }
+}
+
 function startServer(
   port: number,
   otelEnv: OtelEnv,
@@ -324,6 +354,11 @@ function startServer(
     env,
   });
   child.on('message', (data: unknown) => {
+    const capture = pageCaptureRequestOf(data);
+    if (capture !== null) {
+      void answerPageCapture(child, capture);
+      return;
+    }
     if (
       data !== null &&
       typeof data === 'object' &&
@@ -440,7 +475,7 @@ function openWindow(origin: string): BrowserWindow {
   window.webContents.setUserAgent(
     `${window.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
   );
-  installContextMenu(window.webContents, { clipboard, Menu });
+  installContextMenu(window.webContents, { clipboard, Menu }, desktopLocale);
   window.once('ready-to-show', () => window.show());
   window.on('close', (event) => {
     if (quitting) return;
@@ -544,6 +579,16 @@ function createTrayPopover(origin: string): BrowserWindow {
 function systemAccent(): string | null {
   if (!IS_MAC) return null;
   return `#${systemPreferences.getAccentColor().slice(0, 6)}`;
+}
+
+async function windowLocale(): Promise<DesktopLocale> {
+  for (const window of BrowserWindow.getAllWindows()) {
+    const lang = await window.webContents
+      .executeJavaScript('document.documentElement.lang')
+      .catch(() => null);
+    if (typeof lang === 'string' && lang !== '') return desktopLocale(lang);
+  }
+  return desktopLocale(app.getLocale());
 }
 
 function showTray(origin: string, controls: TrayControls): Tray {
@@ -665,15 +710,30 @@ function showTray(origin: string, controls: TrayControls): Tray {
 function serveNotifications(origin: string): void {
   ipcMain.on('desktop-notify', (event, payload: unknown) => {
     if (event.senderFrame?.origin !== origin || !isDesktopNotifyPayload(payload)) return;
-    if (!Notification.isSupported()) return;
+    const fallback = (): void => {
+      if (payload.dialog !== undefined) {
+        void dialog.showMessageBox({
+          type: 'warning',
+          message: payload.dialog.title,
+          detail: payload.dialog.detail,
+        });
+      }
+    };
+    if (!Notification.isSupported()) {
+      fallback();
+      return;
+    }
     const notification = new Notification(desktopNotificationOptions(payload));
     notification.on('click', () => sendToWindow('desktop-navigate', payload.href));
-    notification.on('failed', (_event, error) => console.warn('notification failed:', error));
+    notification.on('failed', (_event, error) => {
+      console.warn('notification failed:', error);
+      fallback();
+    });
     notification.show();
   });
 }
 
-function serveUpdates(origin: string): void {
+function serveUpdates(origin: string, notice: UpdateNotice | null): void {
   const showMenu = (state: DesktopUpdateState): void =>
     Menu.setApplicationMenu(
       Menu.buildFromTemplate(
@@ -711,14 +771,14 @@ function serveUpdates(origin: string): void {
       return;
     }
     if (state.status !== 'available') return;
+    const blocked =
+      readUpdateState(updateStatePath(app.getPath('userData'))).blocked?.version === state.version;
+    const copy = installUpdateCopy(await windowLocale(), state.version, app.getVersion(), blocked);
     const { response } = await dialog.showMessageBox({
       type: 'question',
-      message: `Cairn ${state.version} is available`,
-      detail:
-        readUpdateState(updateStatePath(app.getPath('userData'))).blocked?.version === state.version
-          ? `${state.version} did not start here last time. Cairn will install it again because you asked.`
-          : `You have ${app.getVersion()}. Cairn downloads the update and restarts to install it.`,
-      buttons: ['Install and Restart', 'Later'],
+      message: copy.title,
+      detail: copy.detail,
+      buttons: copy.buttons ?? [],
       defaultId: 0,
       cancelId: 1,
     });
@@ -731,33 +791,33 @@ function serveUpdates(origin: string): void {
     await check();
     const state = created.state();
     if (state.status === 'available' || state.status === 'ready') await installFromMenu();
-    else if (state.status === 'current')
-      await dialog.showMessageBox({
-        type: 'info',
-        message: 'Cairn is up to date',
-        detail: `You have the latest version, ${state.version}.`,
-      });
-    else if (state.status === 'unsupported')
-      await dialog.showMessageBox({
-        type: 'info',
-        message: 'Cairn cannot update itself here',
-        detail:
-          state.blocker === 'not-in-applications'
-            ? 'Move Cairn to the Applications folder, then check again.'
-            : state.blocker === 'read-only'
-              ? 'Cairn is running from a read-only location. Copy it to the Applications folder, then check again.'
-              : 'This is a development build.',
-      });
-    else if (state.status === 'error')
-      await dialog.showMessageBox({
-        type: 'warning',
-        message: 'Cairn could not check for updates',
-        detail: state.message,
-      });
+    else if (state.status === 'current') {
+      const copy = upToDateCopy(await windowLocale(), state.version);
+      await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
+    } else if (state.status === 'unsupported') {
+      const copy = unsupportedUpdateCopy(await windowLocale(), state.blocker);
+      await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
+    } else if (state.status === 'error') {
+      const copy = updateCheckFailedCopy(await windowLocale(), state.message);
+      await dialog.showMessageBox({ type: 'warning', message: copy.title, detail: copy.detail });
+    }
   };
   showMenu(created.state());
+  let pendingNotice = notice;
   const fromOwnPage = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
     event.senderFrame?.origin === origin;
+  ipcMain.handle('desktop-update:rollback-notice', (event) => {
+    if (!fromOwnPage(event)) return null;
+    const pending = pendingNotice;
+    pendingNotice = null;
+    return pending === null
+      ? null
+      : {
+          failedVersion: pending.failedVersion,
+          restoredVersion: pending.restoredVersion,
+          logPath: pending.logPath,
+        };
+  });
   ipcMain.on('window-controls:set-visible', (event, visible: unknown) => {
     if (!fromOwnPage(event)) return;
     BrowserWindow.fromWebContents(event.sender)?.setWindowButtonVisibility(visible === true);
@@ -829,25 +889,6 @@ function takeRollbackNotice(userData: string): UpdateNotice | null {
   return notice;
 }
 
-async function tellRollback(notice: UpdateNotice): Promise<void> {
-  const line = `${notice.failedVersion} did not start, so Cairn went back to ${notice.restoredVersion}.`;
-  if (Notification.isSupported()) {
-    const delivered = await new Promise<boolean>((done) => {
-      const notification = new Notification({ title: 'Cairn rolled back an update', body: line });
-      notification.on('failed', () => done(false));
-      notification.on('show', () => done(true));
-      notification.show();
-      setTimeout(() => done(true), 3_000).unref();
-    });
-    if (delivered) return;
-  }
-  await dialog.showMessageBox({
-    type: 'warning',
-    message: 'Cairn rolled back an update',
-    detail: `${line}\n\nThe failure is logged in ${notice.logPath}.`,
-  });
-}
-
 function armVersionGuard(userData: string): VersionGuard | null {
   const statePath = updateStatePath(userData);
   const state = readUpdateState(statePath);
@@ -898,7 +939,8 @@ function armVersionGuard(userData: string): VersionGuard | null {
       app.quit();
     } catch (error) {
       appendUpdateLog(userData, `rollback of ${installed.version} failed: ${messageOf(error)}`);
-      dialog.showErrorBox('Cairn could not start', `${reason}\n\n${messageOf(error)}`);
+      const copy = couldNotStartCopy(await windowLocale(), `${reason}\n\n${messageOf(error)}`);
+      dialog.showErrorBox(copy.title, copy.detail);
       app.exit(1);
     }
     return 'rollback';
@@ -1046,12 +1088,11 @@ async function boot(): Promise<void> {
       return bringRunnerUp();
     });
     void removeLeftoverUpdates();
-    serveUpdates(server.origin);
+    serveUpdates(server.origin, notice);
     serveNotifications(server.origin);
     serveOwnComputer(server.origin, agentDesktopBinary());
     watchIdleUpdate();
     if (!BACKGROUND_LAUNCH) openWindow(server.origin);
-    if (notice !== null) void tellRollback(notice);
   } catch (error) {
     const reason = messageOf(error);
     if (guard !== null) {
@@ -1059,7 +1100,8 @@ async function boot(): Promise<void> {
       if (guard.rollingBack()) return;
     }
     quitting = true;
-    dialog.showErrorBox('Cairn could not start', reason);
+    const copy = couldNotStartCopy(await windowLocale(), reason);
+    dialog.showErrorBox(copy.title, copy.detail);
     server?.process.kill();
     app.exit(1);
   }

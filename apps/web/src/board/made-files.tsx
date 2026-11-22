@@ -1,17 +1,15 @@
 import type { TodoDeliverables } from '@cairn/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Globe, Presentation } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '../components/ui/button.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import { useI18n } from '../i18n/provider.js';
 import { Download } from '../icons/index.js';
 
 type Deliverable = TodoDeliverables['items'][number];
 
-const PAGE_CSP =
-  "default-src 'none'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data:; media-src data:; base-uri 'none'; form-action 'none'; frame-src 'none'";
-
-const THUMB_WIDTH = 800;
+const THUMB_SKELETON_DELAY_MS = 200;
 
 export const THUMB_MAX_BYTES = 256 * 1024;
 
@@ -28,6 +26,10 @@ const SKIP_REASON: Record<string, string> = {
 
 export function deliverableHref(id: string): string {
   return `/api/attachments/${encodeURIComponent(id)}?download=1`;
+}
+
+export function pageThumbnailHref(id: string): string {
+  return `/api/attachments/${encodeURIComponent(id)}/thumbnail`;
 }
 
 export function sizeLabel(bytes: number): string {
@@ -84,61 +86,28 @@ function classifyPage(html: string): { html: string; scripted: boolean } {
   return { html, scripted: activeIn(new DOMParser().parseFromString(html, 'text/html')) };
 }
 
-export function PageFrame({
-  html,
-  title,
-  className,
-  inert = false,
-}: {
-  html: string;
-  title: string;
-  className?: string;
-  inert?: boolean;
-}) {
-  return (
-    <iframe
-      data-testid="made-page-frame"
-      title={title}
-      sandbox=""
-      referrerPolicy="no-referrer"
-      allow=""
-      tabIndex={inert ? -1 : undefined}
-      srcDoc={`<meta http-equiv="Content-Security-Policy" content="${PAGE_CSP}">${html}`}
-      className={className}
-    />
-  );
-}
-
-export function PageThumb({ html, title }: { html: string; title: string }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(0);
+export function PageThumb({ src, onFail }: { src: string; onFail: () => void }) {
+  const [loaded, setLoaded] = useState(false);
+  const [waiting, setWaiting] = useState(false);
   useEffect(() => {
-    const el = ref.current;
-    if (el === null) return;
-    const measure = () => setScale(el.clientWidth / THUMB_WIDTH);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-    return () => observer.disconnect();
+    const timer = window.setTimeout(() => setWaiting(true), THUMB_SKELETON_DELAY_MS);
+    return () => window.clearTimeout(timer);
   }, []);
   return (
     <div
-      ref={ref}
       aria-hidden="true"
       data-testid="made-card-thumb"
       className="relative size-full overflow-hidden rounded-(--radius-tile) border border-border bg-(--page-preview)"
     >
-      <div
-        className="absolute top-0 left-0 origin-top-left"
-        style={{ transform: `scale(${scale})` }}
-      >
-        <PageFrame
-          inert
-          html={html}
-          title={title}
-          className="pointer-events-none h-150 w-200 border-0"
-        />
-      </div>
+      {!loaded && waiting && <Skeleton className="absolute inset-0 rounded-none" />}
+      <img
+        src={src}
+        alt=""
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={onFail}
+        className={`size-full object-cover object-top ${loaded ? '' : 'opacity-0'}`}
+      />
     </div>
   );
 }

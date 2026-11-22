@@ -39,6 +39,10 @@ function isReferenced(corpus: RefCorpus, row: { id: string; storageKey: string }
   return corpus.chunks.some((c) => c.includes(row.id));
 }
 
+export function thumbnailKeyOf(row: { id: string; teamId: string }): string {
+  return `${row.teamId}/${row.id}.thumb.jpg`;
+}
+
 export function teamAttachmentBytes(db: Db, teamId: string): number {
   let total = 0;
   for (const r of db
@@ -152,6 +156,9 @@ export function* sweepAttachmentBatches(
           continue;
         }
       }
+      try {
+        unlinkSync(join(deps.attachmentsDir, thumbnailKeyOf(v)));
+      } catch {}
       deps.db.delete(attachment).where(eq(attachment.id, v.id)).run();
       if (kind === 'pending') stats.pending += 1;
       else stats.orphan += 1;

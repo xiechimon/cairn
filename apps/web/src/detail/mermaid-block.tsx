@@ -1,0 +1,120 @@
+import type * as PeleLazy from 'pele/lazy';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useI18n } from '../i18n/provider.js';
+
+const DRAWN_TYPES = new Set(['flowchart', 'sequence', 'state']);
+
+type Pele = typeof PeleLazy;
+type Failure = 'unsupported' | 'syntax' | 'limit' | 'load';
+type Outcome = 'drawn' | Failure;
+
+let peleModule: Promise<Pele> | null = null;
+
+function loadPele(): Promise<Pele> {
+  peleModule ??= import('pele/lazy').catch((error: unknown) => {
+    peleModule = null;
+    throw error;
+  });
+  return peleModule;
+}
+
+function drawnType(pele: Pele, text: string): PeleLazy.DiagramType | null {
+  try {
+    const type = pele.detectType(text);
+    return type !== null && DRAWN_TYPES.has(type) ? type : null;
+  } catch {
+    return null;
+  }
+}
+
+function failureOf(pele: Pele | null, error: unknown): Failure {
+  if (pele === null || !(error instanceof pele.PeleError)) return 'load';
+  if (error.code === 'unsupported-diagram') return 'unsupported';
+  if (error.code === 'limit') return 'limit';
+  return 'syntax';
+}
+
+const FAILURE_NOTICE: Record<Failure, string> = {
+  unsupported: '暂不支持这种图表，显示源码',
+  syntax: '图表语法有误，显示源码',
+  limit: '图表太大，显示源码',
+  load: '图表没能加载，显示源码',
+};
+
+interface Drawing {
+  live: boolean;
+  mounted: PeleLazy.Mounted | null;
+  settle: (result: Outcome) => void;
+}
+
+async function draw(element: HTMLElement, text: string, drawing: Drawing): Promise<void> {
+  let pele: Pele | null = null;
+  try {
+    pele = await loadPele();
+    const type = drawnType(pele, text);
+    if (type === null) return drawing.settle('unsupported');
+    await pele.load(type);
+    if (!drawing.live) return;
+    const loaded = pele;
+    drawing.mounted = loaded.mount(element, text, {
+      zoom: false,
+      onRender: () => drawing.settle('drawn'),
+      onError: (error) => drawing.settle(failureOf(loaded, error)),
+    });
+  } catch (error) {
+    drawing.settle(failureOf(pele, error));
+  }
+}
+
+function useDiagram(text: string) {
+  const host = useRef<HTMLDivElement>(null);
+  const [outcome, setOutcome] = useState<{ text: string; result: Outcome } | null>(null);
+  useEffect(() => {
+    const element = host.current;
+    if (element === null) return;
+    const drawing: Drawing = {
+      live: true,
+      mounted: null,
+      settle: (result) => {
+        if (drawing.live) setOutcome({ text, result });
+      },
+    };
+    void draw(element, text, drawing);
+    return () => {
+      drawing.live = false;
+      drawing.mounted?.destroy();
+      element.replaceChildren();
+    };
+  }, [text]);
+  return { host, outcome: outcome !== null && outcome.text === text ? outcome.result : null };
+}
+
+export function MermaidBlock({ text, source }: { text: string; source: ReactNode }) {
+  const { t } = useI18n();
+  const { host, outcome } = useDiagram(text);
+  const failure: Failure | null = outcome !== null && outcome !== 'drawn' ? outcome : null;
+  const drawn = outcome === 'drawn';
+  return (
+    <div
+      className="relative flex min-w-0 flex-col gap-1.5"
+      data-testid="md-mermaid"
+      data-state={failure ?? (drawn ? 'drawn' : 'pending')}
+    >
+      <div
+        ref={host}
+        role="img"
+        aria-label={t('图表')}
+        hidden={failure !== null}
+        className="chat-md-diagram w-(--container-reply-bubble) max-w-full overflow-x-auto overscroll-x-contain rounded-(--radius-code) border border-border bg-background p-4 data-[pending]:invisible data-[pending]:absolute"
+        data-testid="md-mermaid-diagram"
+        {...(drawn ? {} : { 'data-pending': '' })}
+      />
+      {!drawn && source}
+      {failure !== null && (
+        <p className="m-0 text-meta text-(--text-tertiary)" data-testid="md-mermaid-notice">
+          {t(FAILURE_NOTICE[failure])}
+        </p>
+      )}
+    </div>
+  );
+}

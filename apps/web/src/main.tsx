@@ -4,7 +4,11 @@ import { createRoot } from 'react-dom/client';
 import { toast } from 'sonner';
 import { App, router } from './App.js';
 import { chiefOutbox } from './chief/outbox.js';
-import { followDesktopNavigation, markDesktopShell } from './desktop-shell.js';
+import {
+  followDesktopNavigation,
+  markDesktopShell,
+  showPendingRollbackNotice,
+} from './desktop-shell.js';
 import { EN } from './i18n/en.js';
 import { applyLocaleLang, readStoredLocale } from './i18n/locale.js';
 import { translate } from './i18n/translate.js';
@@ -22,6 +26,7 @@ markDesktopShell(document.documentElement, navigator.userAgent, window.location.
 followDesktopNavigation((path) => void router.navigate(path));
 followSystemTheme(bootStorage);
 applyLocaleLang(readStoredLocale(bootStorage));
+void showPendingRollbackNotice();
 trackPointerFocus();
 reloadOnStaleBuild({
   target: window,

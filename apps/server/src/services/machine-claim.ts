@@ -55,7 +55,6 @@ import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
-import { teamHasVmBrowser, teamHasVmComputer } from './cloak-license.js';
 import { connectorToolDefsForTeam } from './connector-broker.js';
 import { coordinatorInServerEnabled } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
@@ -117,6 +116,7 @@ import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
 import { turnProvenance } from './turn-provenance.js';
+import { teamHasVmComputer } from './vm-computer.js';
 
 function workerSkillInjection(
   deps: MachineDeps,
@@ -427,7 +427,6 @@ function chiefClaimPayload(
               ...coordinatorToolDefs({
                 desktopTools: teamOffersDesktop(deps.db, threadRow.teamId),
                 vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
-                vmBrowser: teamHasVmBrowser(deps.db, threadRow.teamId),
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
                 ownerChrome: localBrowserConnector(deps.db, threadRow.teamId) !== null,
                 phoneComputer: offeredPhoneNames(deps, stepRow.buildId),

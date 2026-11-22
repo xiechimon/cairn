@@ -25,6 +25,7 @@ import {
   failureEndsStepNow,
   LANGFUSE_ATTR,
   observationAttributes,
+  piCatalogProviderId,
   THINKING_LEVELS,
   contextTokensOf as usageContextTokens,
 } from '@cairn/shared';
@@ -1396,6 +1397,16 @@ function builtinModelIds(providerId: string): ReadonlySet<string> {
   return new Set(getAllBuiltinModels(providerId).map((model) => model.id));
 }
 
+function catalogEntry(provider: ProviderConfig, modelId: string): Model<Api> | undefined {
+  const catalogId = piCatalogProviderId(provider.providerId);
+  if (!isBuiltinProvider(catalogId)) return undefined;
+  const api = provider.api ?? 'openai-completions';
+  return getAllBuiltinModels(catalogId).find(
+    (model): model is Model<Api> =>
+      model.api === api && 'reasoning' in model && model.id === modelId,
+  );
+}
+
 export function materializeProvider(modelsPath: string, provider: ProviderConfig): void {
   if (!provider.baseUrl) return;
   const serverCompatKey = JSON.stringify(provider.compat ?? null);
@@ -1424,16 +1435,44 @@ export function materializeProvider(modelsPath: string, provider: ProviderConfig
     ...(builtin.size > 0 && declared.length === 0
       ? {}
       : {
-          models: declared.map((m) => ({
-            id: m.id,
-            name: m.name,
-            ...CUSTOM_MODEL_DEFAULTS,
-            ...(m.cost !== undefined ? { cost: m.cost } : {}),
-            ...(m.contextWindow !== undefined ? { contextWindow: m.contextWindow } : {}),
-            ...(m.maxTokens !== undefined ? { maxTokens: m.maxTokens } : {}),
-            ...(m.input !== undefined ? { input: m.input } : {}),
-            ...customModelReasoning(),
-          })),
+          models: declared.map((m) => {
+            const entry = catalogEntry(provider, m.id);
+            return {
+              id: m.id,
+              name: m.name,
+              ...CUSTOM_MODEL_DEFAULTS,
+              ...customModelReasoning(),
+              ...(entry === undefined
+                ? {}
+                : {
+                    reasoning: entry.reasoning,
+                    ...(entry.thinkingLevelMap !== undefined
+                      ? { thinkingLevelMap: entry.thinkingLevelMap }
+                      : {}),
+                    ...(entry.compat !== undefined ? { compat: entry.compat } : {}),
+                  }),
+              ...(m.cost !== undefined
+                ? { cost: m.cost }
+                : entry?.cost !== undefined
+                  ? { cost: entry.cost }
+                  : {}),
+              ...(m.contextWindow !== undefined
+                ? { contextWindow: m.contextWindow }
+                : entry?.contextWindow !== undefined
+                  ? { contextWindow: entry.contextWindow }
+                  : {}),
+              ...(m.maxTokens !== undefined
+                ? { maxTokens: m.maxTokens }
+                : entry?.maxTokens !== undefined
+                  ? { maxTokens: entry.maxTokens }
+                  : {}),
+              ...(m.input !== undefined
+                ? { input: m.input }
+                : entry?.input !== undefined
+                  ? { input: entry.input }
+                  : {}),
+            };
+          }),
         }),
   };
   writeFileSync(modelsPath, `${JSON.stringify({ providers }, null, 2)}\n`, 'utf8');

@@ -3,20 +3,8 @@ import { cn } from 'cn';
 import { useEffect, useId, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import { desktopUpdates } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
-
-interface DesktopUpdateBridge {
-  state: () => Promise<DesktopUpdateState | null>;
-  check: () => Promise<void>;
-  install: () => Promise<void>;
-  subscribe: (listener: (state: DesktopUpdateState) => void) => () => void;
-}
-
-function desktopUpdates(): DesktopUpdateBridge | null {
-  const desktop = (window as Window & { cairnDesktop?: { update?: DesktopUpdateBridge } })
-    .cairnDesktop;
-  return desktop?.update ?? null;
-}
 
 export function canUpdateDesktop(): boolean {
   return desktopUpdates() !== null;

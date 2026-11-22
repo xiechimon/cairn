@@ -20,16 +20,19 @@ const DISCLOSURE = '[aria-expanded]:not([aria-haspopup])';
 const SETTLED_FRAMES = 3;
 const MAX_SETTLE_FRAMES = 120;
 
-function whenHeightSettles(node: HTMLElement, then: () => void) {
+export function whenHeightSettles(node: { scrollHeight: number }, then: () => void) {
+  const from = node.scrollHeight;
   let last = -1;
   let still = 0;
+  let moved = false;
   let frames = 0;
   const tick = () => {
     const height = node.scrollHeight;
-    still = height === last ? still + 1 : 0;
+    moved ||= height !== from;
+    still = moved && height === last ? still + 1 : 0;
     last = height;
     frames += 1;
-    if (still >= SETTLED_FRAMES || frames >= MAX_SETTLE_FRAMES) then();
+    if ((moved && still >= SETTLED_FRAMES) || frames >= MAX_SETTLE_FRAMES) then();
     else requestAnimationFrame(tick);
   };
   requestAnimationFrame(tick);

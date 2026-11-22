@@ -402,6 +402,13 @@ describe('thinking levels per model', () => {
         models: [{ id: 'gpt-6-sol', name: 'Sol' }],
       },
       {
+        providerId: 'z-ai',
+        label: 'Z.AI',
+        baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+        api: 'openai-completions',
+        models: [{ id: 'glm-5.3', name: 'GLM' }],
+      },
+      {
         providerId: 'relay',
         label: 'Relay',
         baseUrl: 'https://relay.example.com/v1',
@@ -419,6 +426,8 @@ describe('thinking levels per model', () => {
         hostname: 'mac',
         models: [
           { id: 'claude-opus-5-5', name: 'claude-opus-5-5' },
+          { id: 'claude-opus-4-7', name: 'claude-opus-4-7' },
+          { id: 'claude-opus-4-6', name: 'claude-opus-4-6' },
           { id: 'claude-haiku-4-5', name: 'claude-haiku-4-5' },
           { id: 'deepseek-v4-pro', name: 'deepseek-v4-pro' },
         ],
@@ -445,14 +454,33 @@ describe('thinking levels per model', () => {
     const claude = ['low', 'medium', 'high', 'xhigh', 'max'];
     expect(levelsOf(env, 'claude-code')).toEqual({
       'claude-opus-5-5': { task: claude, taskDefault: 'medium' },
+      'claude-opus-4-7': { task: claude, taskDefault: 'xhigh' },
+      'claude-opus-4-6': { task: ['low', 'medium', 'high', 'max'], taskDefault: 'high' },
       'claude-haiku-4-5': { task: [] },
       'deepseek-v4-pro': { task: [] },
     });
     expect(levelsOf(env, 'pi', 'anthropic')).toEqual({
-      'claude-opus-5-5': { task: claude, taskDefault: 'medium', inServer: [] },
+      'claude-opus-5-5': {
+        task: claude,
+        taskDefault: 'medium',
+        inServer: claude,
+        inServerDefault: 'high',
+      },
     });
     expect(levelsOf(env, 'pi', 'deepseek')).toEqual({
-      'deepseek-v4-pro': { task: ['off', 'high', 'max'], taskDefault: 'high', inServer: [] },
+      'deepseek-v4-pro': {
+        task: ['off', 'high', 'max'],
+        taskDefault: 'high',
+        inServer: ['high', 'max'],
+        inServerDefault: 'off',
+      },
+    });
+    expect(levelsOf(env, 'pi', 'z-ai')).toEqual({
+      'glm-5.3': {
+        task: ['low', 'high', 'max'],
+        taskDefault: 'high',
+        inServer: ['low', 'high', 'max'],
+      },
     });
     expect(levelsOf(env, 'pi', 'openai-codex')).toEqual({
       'gpt-6-sol': {

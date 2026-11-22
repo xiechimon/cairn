@@ -15,5 +15,6 @@ export * from './own-computer.js';
 export * from './phone-computer.js';
 export * from './rest.js';
 export * from './search.js';
+export * from './secret-request.js';
 export * from './sse.js';
 export * from './tool-parameters.js';

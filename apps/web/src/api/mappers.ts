@@ -29,7 +29,6 @@ import {
   BUILD_FAILURE_ROW_KIND,
   backgroundTaskSchema,
   CHIEF_TURN_ERROR_KIND,
-  CLOAK_LICENSE_SAVED,
   CONFIRM_ANNOUNCEMENT,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
@@ -58,7 +57,7 @@ import {
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
   parseAgentTodoText,
-  REQUEST_CLOAK_LICENSE_TOOL,
+  REQUEST_SECRET_TOOL,
   REVIEW_VERDICT_KIND,
   RUNNER_OS_LABELS,
   replyQuoteText,
@@ -68,6 +67,8 @@ import {
   reworkNoteWithoutReason,
   runnerOfflineContentSchema,
   runtimeUpdateRequired,
+  SECRET_REQUEST_CANCELLED,
+  SECRET_REQUEST_SAVED_PREFIX,
   SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
@@ -1800,16 +1801,30 @@ function takeoverItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
   };
 }
 
-function cloakLicenseItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
-  const reason = (call.arguments as { reason?: unknown } | null)?.reason;
+function secretRequestItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
+  const args = call.arguments as {
+    name?: unknown;
+    scope?: unknown;
+    projectId?: unknown;
+    description?: unknown;
+  } | null;
   const finished = call.result !== undefined || call.endedAt !== undefined || call.isError === true;
-  const saved =
-    finished && call.isError !== true && toolResultText(call.result) === CLOAK_LICENSE_SAVED;
+  const text = call.isError === true ? '' : (toolResultText(call.result) ?? '');
+  const projectId = typeof args?.projectId === 'string' ? args.projectId : null;
   return {
-    kind: 'cloak-license',
+    kind: 'secret-request',
     id,
-    reason: typeof reason === 'string' ? reason : '',
-    outcome: !finished ? 'waiting' : saved ? 'saved' : 'not-saved',
+    name: typeof args?.name === 'string' ? args.name : '',
+    scope: args?.scope === 'project' && projectId !== null ? 'project' : 'team',
+    projectId: args?.scope === 'project' ? projectId : null,
+    description: typeof args?.description === 'string' ? args.description : '',
+    outcome: !finished
+      ? 'waiting'
+      : text.startsWith(SECRET_REQUEST_SAVED_PREFIX)
+        ? 'saved'
+        : text === SECRET_REQUEST_CANCELLED
+          ? 'cancelled'
+          : 'failed',
   };
 }
 
@@ -2069,8 +2084,8 @@ function collectChiefStream(
       items.push(takeoverItemOf(call, m.id));
       continue;
     }
-    if (call?.name === REQUEST_CLOAK_LICENSE_TOOL) {
-      items.push(cloakLicenseItemOf(call, m.id));
+    if (call?.name === REQUEST_SECRET_TOOL) {
+      items.push(secretRequestItemOf(call, m.id));
       continue;
     }
     if (call?.name === INSTALL_PACKAGES_TOOL) {

@@ -17,7 +17,13 @@ import { Skeleton } from '../components/ui/skeleton.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight } from '../icons/index.js';
-import { PageThumb, primaryPage, THUMB_MAX_BYTES, usePageHtml } from './made-files.js';
+import {
+  PageThumb,
+  pageThumbnailHref,
+  primaryPage,
+  THUMB_MAX_BYTES,
+  usePageHtml,
+} from './made-files.js';
 import { MADE_GROUP_LABEL, type MadeGroupKey } from './made-groups.js';
 
 const CARD_CLS =
@@ -76,7 +82,11 @@ export function MadeCard({
   const page =
     candidate !== undefined && candidate.sizeBytes <= THUMB_MAX_BYTES ? candidate : undefined;
   const pageHtml = usePageHtml(page, seen).data;
-  const thumbHtml = pageHtml?.scripted === false ? pageHtml.html : undefined;
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const thumbSrc =
+    page !== undefined && pageHtml?.scripted === false && !thumbFailed
+      ? pageThumbnailHref(page.attachmentId)
+      : undefined;
   const slides =
     todo.madeKind === 'slides'
       ? todo.deliverables?.items.find((item) => item.kind === 'slides')
@@ -91,7 +101,7 @@ export function MadeCard({
           className="absolute inset-0 size-full rounded-(--radius-card) p-0 hover:bg-transparent focus-visible:ring-2 focus-visible:ring-(--focus-ring) focus-visible:ring-inset dark:hover:bg-transparent"
         />
         <h4 className="pointer-events-none relative m-0 flex-none text-ui font-medium text-foreground">
-          <span className={thumbHtml !== undefined ? 'line-clamp-1' : 'line-clamp-2'}>
+          <span className={thumbSrc !== undefined ? 'line-clamp-1' : 'line-clamp-2'}>
             {todo.title}
           </span>
         </h4>
@@ -99,8 +109,8 @@ export function MadeCard({
           data-testid="made-card-preview"
           className="pointer-events-none relative mt-1.5 min-h-0 flex-1 overflow-hidden"
         >
-          {page !== undefined && thumbHtml !== undefined ? (
-            <PageThumb html={thumbHtml} title={page.name} />
+          {thumbSrc !== undefined ? (
+            <PageThumb src={thumbSrc} onFail={() => setThumbFailed(true)} />
           ) : todo.previewUrl !== undefined ? (
             <img
               src={todo.previewUrl}

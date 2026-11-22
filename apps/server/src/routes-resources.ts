@@ -2,7 +2,6 @@ import {
   bindGithubConnectorBodySchema,
   capabilitiesResponseSchema,
   claudeSubscriptionTestSchema,
-  cloakLicenseBodySchema,
   composioConnectBodySchema,
   composioKeyBodySchema,
   createAntigravitySubscriptionSchema,
@@ -27,6 +26,7 @@ import {
   renameClaudeSubscriptionSchema,
   renameDevinSubscriptionSchema,
   SKILL_ENTRY_FILE,
+  secretRequestAnswerSchema,
   setSecretBodySchema,
   skillRecordSchema,
   startGithubConnectorDeviceBodySchema,
@@ -64,7 +64,7 @@ import {
   patchAntigravitySubscription,
   verifyAntigravitySubscriptionConnection,
 } from './services/antigravity-subscriptions.js';
-import { createApiKey, listApiKeys } from './services/api-keys.js';
+import { createApiKey, deleteApiKey, listApiKeys } from './services/api-keys.js';
 import {
   listBrowserPasswordGrants,
   revokeBrowserPasswordGrant,
@@ -81,7 +81,6 @@ import {
   updateClaudeSubscription,
   verifySubscriptionConnection,
 } from './services/claude-subscriptions.js';
-import { saveCloakLicense } from './services/cloak-license.js';
 import { pollCodexDeviceLogin, startCodexDeviceLogin } from './services/codex-device-login.js';
 import { deleteComposioKey, saveComposioKey } from './services/composio.js';
 import {
@@ -180,6 +179,7 @@ import {
   setScheduleEnabled,
 } from './services/schedules.js';
 import { search } from './services/search.js';
+import { answerSecretRequest } from './services/secret-requests.js';
 import {
   createSecret,
   deleteSecret,
@@ -1344,14 +1344,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.body(null, 204);
   });
 
-  app.put('/api/teams/:id/cloak-license', async (c) => {
+  app.post('/api/teams/:id/secret-requests', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     if (!isOwnerSession(c))
-      throw new HttpError(403, 'Only the instance owner can save the CloakBrowser license');
-    const body = parseWith(cloakLicenseBodySchema, await jsonBody(c), 'body');
+      throw new HttpError(403, 'Only the instance owner can answer a secret request');
+    const body = parseWith(secretRequestAnswerSchema, await jsonBody(c), 'body');
     c.header('Cache-Control', 'no-store');
-    return c.json(saveCloakLicense(keysvc, teamId, body.value));
+    return c.json(answerSecretRequest(keysvc, teamId, body));
   });
 
   app.get('/api/teams/:id/api-keys', (c) => {
@@ -1373,6 +1373,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       toolGrants: body.toolGrants,
     });
     return c.json(created, 201);
+  });
+
+  app.delete('/api/teams/:id/api-keys/:keyId', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    const keyId = c.req.param('keyId');
+    const listed = listApiKeys(svc, teamId).find(
+      (key) => key.id === keyId && stepIdOfGitKey(key.name) === null,
+    );
+    if (listed === undefined || !deleteApiKey(svc, teamId, keyId)) {
+      throw notFound(`api key ${keyId}`);
+    }
+    return c.body(null, 204);
   });
 }
 

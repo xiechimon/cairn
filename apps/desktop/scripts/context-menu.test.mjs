@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { contextMenuLocale, contextMenuTemplate } from '../src/context-menu.ts';
+import { contextMenuTemplate } from '../src/context-menu.ts';
+import { desktopLocale } from '../src/locale.ts';
 
 const NONE = {
   x: 10,
@@ -16,7 +17,7 @@ const NONE = {
 function labelsFor(target, lang, actions = {}) {
   const template = contextMenuTemplate(
     { ...NONE, ...target },
-    contextMenuLocale(lang),
+    desktopLocale(lang),
     {
       copyImage: () => {},
       saveImage: () => {},

@@ -413,6 +413,12 @@ export function enrollMachine(
   if (existing !== undefined && existing.kind === 'local') {
     throw new HttpError(403, 'local machine requires owner approval');
   }
+  if (byHost !== undefined && byHost.apiKeyId !== input.keyId) {
+    throw new HttpError(403, 'another enrollment owns this host key');
+  }
+  if (existing !== undefined && existing.retiredAt !== null) {
+    throw new HttpError(403, 'a revoked machine re-registers through the authorize page');
+  }
   if (existing !== undefined) {
     db.update(machine)
       .set({
@@ -525,6 +531,9 @@ export function authorizeEnrollmentMachine(
   const claimsLocal = existing?.kind === 'local' || isLocal;
   if (claimsLocal && !input.ownerApproved) {
     throw new HttpError(403, 'local machine requires owner approval');
+  }
+  if (existing !== undefined && existing.retiredAt !== null && !input.ownerApproved) {
+    throw new HttpError(403, 'a revoked machine requires owner approval to re-register');
   }
   const refusal = localEnrollmentRefusal(db, {
     teamId: input.teamId,

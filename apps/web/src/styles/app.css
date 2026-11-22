@@ -1408,3 +1408,26 @@ body:has([data-testid="chief-body"]),
   pointer-events: none;
   -webkit-app-region: drag;
 }
+
+.chat-md-diagram {
+  --pele-bg: var(--background);
+  --pele-fg: var(--foreground);
+  --pele-muted: var(--text-secondary);
+  --pele-line: var(--text-tertiary);
+  --pele-surface: var(--card);
+  --pele-surface-alt: var(--secondary);
+  --pele-border: var(--text-dim);
+  --pele-accent: var(--foreground);
+  --pele-critical: var(--destructive);
+  --pele-error: var(--destructive);
+  --pele-font: var(--font-sans);
+  --pele-font-mono: var(--font-mono);
+  --pele-radius: var(--radius-control);
+}
+
+.chat-md-diagram > svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin-inline: auto;
+}

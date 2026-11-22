@@ -1,10 +1,17 @@
 import {
   distinctThinkingLevels,
   type ProviderConfig,
+  piCatalogProviderId,
   resolveModelInput,
   type ThinkingLevel,
 } from '@cairn/shared';
-import type { Api, Model, Provider, ProviderStreams } from '@earendil-works/pi-ai';
+import type {
+  AnthropicMessagesCompat,
+  Api,
+  Model,
+  Provider,
+  ProviderStreams,
+} from '@earendil-works/pi-ai';
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy';
 import { openAICodexResponsesApi } from '@earendil-works/pi-ai/api/openai-codex-responses.lazy';
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy';
@@ -38,14 +45,16 @@ export function isBuiltinProvider(providerId: string): providerId is BuiltinProv
 }
 
 export function builtinModelIds(providerId: string): ReadonlySet<string> {
-  if (!isBuiltinProvider(providerId)) return new Set();
-  return new Set(getBuiltinModels(providerId).map((model) => model.id));
+  const catalogId = piCatalogProviderId(providerId);
+  if (!isBuiltinProvider(catalogId)) return new Set();
+  return new Set(getBuiltinModels(catalogId).map((model) => model.id));
 }
 
 export function catalogContextWindow(providerId: string, modelId: string): number {
-  if (!isBuiltinProvider(providerId)) return DEFAULT_CONTEXT_WINDOW;
+  const catalogId = piCatalogProviderId(providerId);
+  if (!isBuiltinProvider(catalogId)) return DEFAULT_CONTEXT_WINDOW;
   return (
-    getBuiltinModels(providerId).find((model) => model.id === modelId)?.contextWindow ??
+    getBuiltinModels(catalogId).find((model) => model.id === modelId)?.contextWindow ??
     DEFAULT_CONTEXT_WINDOW
   );
 }
@@ -54,10 +63,13 @@ function catalogModel(
   providerId: string,
   modelId: string,
   subscription: boolean,
+  api?: string,
 ): Model<Api> | undefined {
-  const catalogId = subscription ? CODEX_PROVIDER_ID : providerId;
+  const catalogId = subscription ? CODEX_PROVIDER_ID : piCatalogProviderId(providerId);
   return isBuiltinProvider(catalogId)
-    ? getBuiltinModels(catalogId).find((model) => model.id === modelId)
+    ? getBuiltinModels(catalogId).find(
+        (model) => model.id === modelId && (api === undefined || model.api === api),
+      )
     : undefined;
 }
 
@@ -80,21 +92,46 @@ export interface ThinkingChoice {
   resolvesTo?: ThinkingLevel;
 }
 
-export function piThinking(providerId: string, modelId: string): ThinkingChoice {
-  const entry = catalogModel(providerId, modelId, false);
+export function piThinking(
+  provider: Pick<ProviderConfig, 'providerId' | 'api' | 'baseUrl'>,
+  modelId: string,
+): ThinkingChoice {
+  const subscription = isCodexSubscription(provider);
+  const entry = catalogModel(
+    provider.providerId,
+    modelId,
+    subscription,
+    subscription ? CODEX_API : (provider.api ?? 'openai-completions'),
+  );
   const levels = catalogThinkingLevels(entry);
   if (entry === undefined || levels.length === 0) return { levels };
   return { levels, resolvesTo: clampThinkingLevel(entry, RUNNER_DEFAULT_THINKING) };
 }
 
+// pi-ai never sends an explicit effort for an anthropic-messages model without
+// supportsMidConvoEffort, so the provider default is unknowable here; with the
+// flag the reply markers carry `options.effort ?? 'high'`.
+function inServerNoChoiceDefault(entry: Model<Api>): ThinkingLevel | undefined {
+  return entry.api === 'anthropic-messages' &&
+    (entry.compat as AnthropicMessagesCompat | undefined)?.supportsMidConvoEffort === true
+    ? 'high'
+    : undefined;
+}
+
 export function inServerThinking(
-  config: Pick<ProviderConfig, 'providerId' | 'baseUrl'>,
+  config: Pick<ProviderConfig, 'providerId' | 'baseUrl' | 'api'>,
   modelId: string,
 ): ThinkingChoice {
-  if (!isCodexSubscription(config)) return { levels: [] };
-  const entry = catalogModel(config.providerId, modelId, true);
+  const subscription = isCodexSubscription(config);
+  const api = subscription ? CODEX_API : config.api;
+  const entry = catalogModel(config.providerId, modelId, subscription, api);
   const levels = catalogThinkingLevels(entry).filter((level) => level !== 'off');
-  return entry?.thinkingLevelMap?.off === null ? { levels } : { levels, resolvesTo: 'off' };
+  if (entry === undefined || levels.length === 0) return { levels };
+  if (entry.thinkingLevelMap?.off === null) {
+    const resolvesTo = inServerNoChoiceDefault(entry);
+    return resolvesTo === undefined ? { levels } : { levels, resolvesTo };
+  }
+  return { levels, resolvesTo: 'off' };
 }
 
 export type KeyResolver = () => string | null | Promise<string | null>;
@@ -105,22 +142,27 @@ export function stepProvider(config: ProviderConfig, resolveKey?: KeyResolver): 
   const streams = api === undefined ? undefined : STREAMS[api];
   const baseUrl = subscription ? CODEX_BASE_URL : config.baseUrl;
   if (api === undefined || streams === undefined || baseUrl === undefined) return null;
-  const models: Model<Api>[] = (config.models ?? []).map((m) => ({
-    id: m.id,
-    name: m.name,
-    api,
-    provider: config.providerId,
-    baseUrl,
-    input: resolveModelInput(m),
-    cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    reasoning: subscription,
-    thinkingLevelMap: subscription
-      ? catalogModel(config.providerId, m.id, true)?.thinkingLevelMap
-      : undefined,
-    contextWindow: m.contextWindow ?? catalogContextWindow(config.providerId, m.id),
-    maxTokens: m.maxTokens ?? DEFAULT_MAX_TOKENS,
-    ...(config.compat === undefined ? {} : { compat: config.compat }),
-  }));
+  const models: Model<Api>[] = (config.models ?? []).map((m) => {
+    const entry = catalogModel(config.providerId, m.id, subscription, api);
+    const compat = {
+      ...(entry?.compat as Record<string, unknown> | undefined),
+      ...(config.compat ?? {}),
+    };
+    return {
+      id: m.id,
+      name: m.name,
+      api,
+      provider: config.providerId,
+      baseUrl,
+      input: resolveModelInput(m),
+      cost: m.cost ?? entry?.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      reasoning: subscription || entry?.reasoning === true,
+      thinkingLevelMap: entry?.thinkingLevelMap,
+      contextWindow: m.contextWindow ?? entry?.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
+      maxTokens: m.maxTokens ?? entry?.maxTokens ?? DEFAULT_MAX_TOKENS,
+      ...(Object.keys(compat).length === 0 ? {} : { compat: compat as Model<Api>['compat'] }),
+    };
+  });
   return createProvider({
     id: config.providerId,
     name: config.label ?? config.providerId,

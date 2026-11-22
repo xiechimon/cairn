@@ -50,17 +50,19 @@ export function SecretDialog({
     wasSecret || startSecret ? true : editing === null ? null : false,
   );
   const [scope, setScope] = useState(defaultProjectId ?? '');
+  const [valueTouched, setValueTouched] = useState(wasSecret || startSecret);
   const valueRef = useRef<HTMLTextAreaElement>(null);
   const trimmed = name.trim();
   const secret = secretChoice ?? isCredentialSecretName(trimmed);
   const nameChecked = editing === null || trimmed !== editing.name;
   const nameInvalid = nameChecked && trimmed !== '' && !SECRET_NAME_PATTERN.test(trimmed);
   const valueMissing = secret && value === '' && !wasSecret;
+  const showValueError = valueMissing && valueTouched;
   const canSave = trimmed !== '' && !nameInvalid && !valueMissing;
   const converting = editing !== null && !wasSecret && secret;
   const problem = nameInvalid
     ? t('名称要符合环境变量格式（例如 MY_VAR）')
-    : valueMissing
+    : showValueError
       ? t('机密的值不能为空')
       : null;
   const submit = () => {
@@ -159,9 +161,10 @@ export function SecretDialog({
             ref={valueRef}
             className={`${FORM_TEXTAREA_CLS} resize-none font-mono`}
             value={value}
-            aria-invalid={valueMissing}
-            aria-describedby={valueMissing ? 'dlg-secret-problem' : undefined}
+            aria-invalid={showValueError}
+            aria-describedby={showValueError ? 'dlg-secret-problem' : undefined}
             onChange={(event) => setValue(event.target.value)}
+            onBlur={() => setValueTouched(true)}
             autoComplete="off"
             spellCheck={false}
           />

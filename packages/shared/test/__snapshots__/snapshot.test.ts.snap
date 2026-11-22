@@ -2562,6 +2562,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             },
           ],
         },
+        "customBackend": {
+          "type": "boolean",
+        },
         "hostname": {
           "type": "string",
         },
@@ -2796,6 +2799,9 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
               "type": "null",
             },
           ],
+        },
+        "customBackend": {
+          "type": "boolean",
         },
         "hostname": {
           "type": "string",
@@ -11222,6 +11228,11 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "method": "GET",
     "note": "docx, pptx, xlsx text sections (borrowed from Open Design)",
     "path": "/api/attachments/{id}/document-preview",
+  },
+  {
+    "method": "GET",
+    "note": "JPEG of the first screen of a ready deliverable page, captured once by the desktop app; 404 without it",
+    "path": "/api/attachments/{id}/thumbnail",
   },
   {
     "method": "GET",

@@ -604,7 +604,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 - Research: [docs/research/1775-gateway-prior-art.md](research/1775-gateway-prior-art.md), [docs/research/browser-secret-fill-2026-11-16.md](research/browser-secret-fill-2026-11-16.md)
 - Frontend design: [docs/design/browser-secret-fill.md](design/browser-secret-fill.md)
-- Backend design: [docs/research/1775-secret-gateway-design.md](research/1775-secret-gateway-design.md), [docs/design/browser-secret-fill.md](design/browser-secret-fill.md)
+- Backend design: [docs/research/1775-secret-gateway-design.md](research/1775-secret-gateway-design.md), [docs/design/browser-secret-fill.md](design/browser-secret-fill.md), [docs/design/secret-request-card.md](design/secret-request-card.md)
 
 ### server-status
 

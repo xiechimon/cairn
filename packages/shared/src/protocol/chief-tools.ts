@@ -35,6 +35,7 @@ export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'needs_you',
   'notify_user',
   'ask_user',
+  'request_secret',
   'memories',
   'attachment',
 ]);
@@ -705,7 +706,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'set_secret',
     description:
-      'Create or overwrite a secret (value is write-only, encrypted at rest). Team-wide unless projectId is given.',
+      'Create or overwrite a secret (value is write-only, encrypted at rest). Team-wide unless projectId is given. For a value only the owner has, call request_secret instead of asking them to paste it in chat.',
     parameters: obj(
       {
         name: str('Secret name (env var name).'),

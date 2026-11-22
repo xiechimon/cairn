@@ -175,22 +175,4 @@ export const browserPasswordGrantsResponseSchema = z.object({
 export type BrowserPasswordGrantsResponse = z.infer<typeof browserPasswordGrantsResponseSchema>;
 
 export const CLOAK_LICENSE_SECRET = 'CLOAKBROWSER_LICENSE_KEY';
-export const CLOAK_LICENSE_MAX_CHARS = 512;
-
-export const cloakLicenseBodySchema = z.strictObject({
-  value: z
-    .string()
-    .trim()
-    .min(1, 'the license key is empty')
-    .max(
-      CLOAK_LICENSE_MAX_CHARS,
-      `the license key is longer than ${CLOAK_LICENSE_MAX_CHARS} characters`,
-    )
-    .refine((value) => !CONTROL_CHARACTER.test(value), 'the license key holds a control character'),
-});
-export type CloakLicenseBody = z.infer<typeof cloakLicenseBodySchema>;
-
-export const cloakLicenseSavedSchema = z.strictObject({ name: z.literal(CLOAK_LICENSE_SECRET) });
-export type CloakLicenseSaved = z.infer<typeof cloakLicenseSavedSchema>;
-
 export const SECRET_MIN_CLI_VERSION = '0.1.28';

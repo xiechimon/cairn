@@ -31,6 +31,7 @@ export {
   chiefGated,
   chiefMarkdown,
   chiefMarkdownRef,
+  chiefMermaid,
   chiefQuestion,
   chiefReady,
   chiefScrollLong,

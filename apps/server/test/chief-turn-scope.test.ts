@@ -1,4 +1,4 @@
-import { backgroundTaskMessageId } from '@cairn/shared';
+import { backgroundTaskMessageId, CHIEF_TURN_ERROR_KIND } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import {
@@ -332,5 +332,48 @@ describe('a turn force-stopped on the server keeps its scope on late writes (#25
       errorMessage: 'executor lost',
     });
     expect(storedProjectId(`chief-err-${stepA}`)).toBe(projA);
+  });
+});
+
+describe('a failed Coordinator turn always leaves an error row', () => {
+  function failStep(errorMessage?: string) {
+    const stepId = enqueueChiefStep(toolDeps(), H.threadId, {
+      prompt: 'turn without a reason',
+      trigger: 'user',
+      ownerMessageIds: [],
+    });
+    claim(stepId);
+    const stepRow = H.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
+    finishCoordinatorTurn(toolDeps(), stepRow, {
+      status: 'failed',
+      ...(errorMessage === undefined ? {} : { errorMessage }),
+    });
+    return stepId;
+  }
+
+  function storedError(stepId: string) {
+    const row = H.s.db
+      .select({ content: chiefMessage.content })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, `chief-err-${stepId}`))
+      .get();
+    return row === undefined
+      ? undefined
+      : (JSON.parse(row.content as string) as { kind: string; message: string });
+  }
+
+  test('a turn that reports failed with no errorMessage still writes a chief error row', () => {
+    const stepId = failStep();
+    const stored = storedError(stepId);
+    expect(stored?.kind).toBe(CHIEF_TURN_ERROR_KIND);
+    expect(stored?.message).not.toBe('');
+  });
+
+  test('a turn that reports a blank errorMessage stores a fallback reason', () => {
+    const stepId = failStep('   ');
+    const stored = storedError(stepId);
+    expect(stored?.kind).toBe(CHIEF_TURN_ERROR_KIND);
+    expect(stored?.message).not.toBe('   ');
+    expect(stored?.message.trim()).not.toBe('');
   });
 });

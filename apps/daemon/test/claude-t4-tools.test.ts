@@ -158,20 +158,22 @@ describe('parametersToShape (failure modes 2/3)', () => {
   });
 
   test('every shipped tool schema is inside the vocabulary the Claude Code backend accepts', () => {
-    const toolLists = Object.entries(shared).filter(
-      (entry): entry is [string, RemoteToolDef[]] =>
-        Array.isArray(entry[1]) &&
-        entry[1].length > 0 &&
-        entry[1].every(
-          (item: unknown) =>
-            typeof item === 'object' && item !== null && 'name' in item && 'parameters' in item,
-        ),
+    const isToolDef = (item: unknown): item is RemoteToolDef =>
+      typeof item === 'object' && item !== null && 'name' in item && 'parameters' in item;
+    const toolLists = Object.entries(shared).flatMap(
+      ([name, value]): [string, RemoteToolDef[]][] =>
+        isToolDef(value)
+          ? [[name, [value]]]
+          : Array.isArray(value) && value.length > 0 && value.every(isToolDef)
+            ? [[name, value]]
+            : [],
     );
     expect(toolLists.map(([name]) => name)).toEqual(
       expect.arrayContaining([
         'CHIEF_REMOTE_TOOLS',
         'COMPUTER_DESKTOP_TOOLS',
         'OWN_COMPUTER_TOOLS',
+        'REQUEST_SECRET_TOOL_DEF',
       ]),
     );
     for (const [list, tools] of toolLists) {

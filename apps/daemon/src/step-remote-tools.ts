@@ -6,7 +6,7 @@ import {
   INSTALL_PACKAGES_TOOL,
   isComputerBrowserTool,
   isInfoCardComputerTool,
-  REQUEST_CLOAK_LICENSE_TOOL,
+  REQUEST_SECRET_TOOL,
   type RemoteToolDef,
 } from '@cairn/shared';
 import { z } from 'zod';
@@ -50,7 +50,7 @@ export function stepRemoteToolExecutor(input: {
       });
     }
     const def = remoteTools.find((t) => t.name === name);
-    const ownerWait = name === 'request_takeover' || name === REQUEST_CLOAK_LICENSE_TOOL;
+    const ownerWait = name === 'request_takeover' || name === REQUEST_SECRET_TOOL;
     const install = name === INSTALL_PACKAGES_TOOL;
     const computerCall =
       isComputerBrowserTool(name) || isInfoCardComputerTool(name) || ownerWait || install;

@@ -20,7 +20,7 @@
 
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/hero-zh-dark.webp">
-    <img alt="MacBook 上装成网页 app 的 Cairn，开着一个 thread 的报告；旁边是 iPhone 上的 Cairn iOS app" src="docs/assets/readme/hero-zh-light.webp" width="100%">
+    <img alt="MacBook 上装成网页 app 的 Cairn，开着一个 thread 的报告和 Coordinator 对话" src="docs/assets/readme/hero-zh-light.webp" width="100%">
   </picture>
 </div>
 
@@ -38,8 +38,8 @@
 <table>
   <tr>
     <td width="33%"><picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/ios-home-zh-dark.webp">
-    <img alt="Cairn iOS app：两句需求、各自开出的 thread 和一个带三个选项的决定" src="docs/assets/readme/ios-home-zh-light.webp" width="100%">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/board-dark.png">
+    <img alt="Mac 上的 Cairn 工作台：任务按待开始、执行中、待处理、已完成分列" src="docs/assets/readme/board-light.png" width="100%">
   </picture></td>
     <td width="33%"><picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/work-zh-dark.webp">

@@ -74,6 +74,7 @@ function resolveAntigravityBinary(): ResolvedBinary | null {
 }
 
 function acpSpawnArgs(binPath: string, logFile: string): string[] {
+  if (basename(binPath).endsWith('.par')) return [];
   return basename(binPath).startsWith('agy') ? ['acp', '--log-file', logFile] : ['acp'];
 }
 

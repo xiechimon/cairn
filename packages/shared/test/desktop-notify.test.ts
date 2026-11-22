@@ -31,6 +31,19 @@ describe('isDesktopNotifyPayload', () => {
     expect(isDesktopNotifyPayload({ ...payload, href: '/settings' })).toBe(false);
     expect(isDesktopNotifyPayload({ ...payload, href: '/app?chief=c1' })).toBe(true);
   });
+
+  test('accepts an optional dialog fallback and rejects malformed ones', () => {
+    const dialog = { title: 'Cairn 回滚了更新', detail: '失败记录在 /tmp/log。' };
+    expect(isDesktopNotifyPayload({ ...payload, dialog })).toBe(true);
+    expect(isDesktopNotifyPayload({ ...payload, dialog: 'x' })).toBe(false);
+    expect(isDesktopNotifyPayload({ ...payload, dialog: { title: '', detail: 'd' } })).toBe(false);
+    expect(
+      isDesktopNotifyPayload({ ...payload, dialog: { title: 't', detail: 'x'.repeat(501) } }),
+    ).toBe(false);
+    expect(
+      isDesktopNotifyPayload({ ...payload, dialog: { title: 'x'.repeat(201), detail: 'd' } }),
+    ).toBe(false);
+  });
 });
 
 describe('desktopNotificationOptions', () => {

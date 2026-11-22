@@ -27,11 +27,30 @@ export function isAppPath(path: unknown): path is string {
   return typeof path === 'string' && /^\/app(?:[/?]|$)/.test(path);
 }
 
+export interface DesktopNotifyDialog {
+  title: string;
+  detail: string;
+}
+
 export interface DesktopNotifyPayload {
   title: string;
   body: string;
   href: string;
   tag: string;
+  dialog?: DesktopNotifyDialog;
+}
+
+function isDesktopNotifyDialog(value: unknown): value is DesktopNotifyDialog {
+  if (typeof value !== 'object' || value === null) return false;
+  const dialog = value as Partial<Record<keyof DesktopNotifyDialog, unknown>>;
+  return (
+    typeof dialog.title === 'string' &&
+    dialog.title !== '' &&
+    dialog.title.length <= 200 &&
+    typeof dialog.detail === 'string' &&
+    dialog.detail !== '' &&
+    dialog.detail.length <= 500
+  );
 }
 
 export function isDesktopNotifyPayload(value: unknown): value is DesktopNotifyPayload {
@@ -45,8 +64,15 @@ export function isDesktopNotifyPayload(value: unknown): value is DesktopNotifyPa
     payload.body.length <= 500 &&
     isAppPath(payload.href) &&
     typeof payload.tag === 'string' &&
-    payload.tag.length <= 100
+    payload.tag.length <= 100 &&
+    (payload.dialog === undefined || isDesktopNotifyDialog(payload.dialog))
   );
+}
+
+export interface DesktopRollbackNotice {
+  failedVersion: string;
+  restoredVersion: string;
+  logPath: string;
 }
 
 export interface DesktopNotificationOptions {

@@ -14,6 +14,8 @@ import { claudeConfigHome, runtimeHome } from './runtime-homes.js';
 
 export const ANTIGRAVITY_CREDENTIAL_FILES = [
   '.gemini/antigravity-cli/antigravity-oauth-token',
+  '.gemini/antigravity-acp/acp_token.json',
+  '.gemini/antigravity-acp/acp_business_token.json',
   '.gemini/jetski-standalone-oauth-token',
 ] as const;
 export const GEMINI_CREDENTIAL_FILES = [
@@ -110,6 +112,14 @@ export function prepareAntigravityHome(input: {
   writeJsonObject(home, settingsFile, {
     ...(input.apiKey ? { modelProvider: 'gemini' } : {}),
     ...(userGcp === undefined ? {} : { gcp: userGcp }),
+  });
+  const acpSettingsFile = '.gemini/antigravity-acp/settings.json';
+  const acpUserGcp = input.apiKey
+    ? undefined
+    : readJsonObject(join(input.realHome, acpSettingsFile)).gcp;
+  writeJsonObject(home, acpSettingsFile, {
+    auth: { type: input.apiKey ? 'gemini-api-key' : 'oauth-personal' },
+    ...(acpUserGcp === undefined ? {} : { gcp: acpUserGcp }),
   });
   return home;
 }

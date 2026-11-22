@@ -79,6 +79,11 @@ export const ENV_VARS = {
 export const OWNER_CHANNEL_HEADER = 'x-cairn-owner-channel';
 export const OWNER_CHANNEL_READY = 'cairn-owner-channel-ready';
 export const OWNER_CHANNEL_MESSAGE = 'cairn-owner-channel';
+export const PAGE_CAPTURE_REQUEST = 'cairn-page-capture';
+export const PAGE_CAPTURE_RESULT = 'cairn-page-capture-result';
+export const PAGE_CAPTURE_SIZE = { width: 800, height: 600 } as const;
+export const PAGE_PREVIEW_CSP =
+  "default-src 'none'; style-src 'unsafe-inline' data:; img-src data: blob:; font-src data:; media-src data:; base-uri 'none'; form-action 'none'; frame-src 'none'";
 
 export const API_KEY_PATTERN = /^cairn_[0-9a-f]{48}$/;
 

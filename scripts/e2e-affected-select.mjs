@@ -80,6 +80,7 @@ const DETAIL = [
   'chief-home-',
   'chief-project-pick',
   'chief-stream-markdown',
+  'mermaid-',
   'composer-wire-reject',
   'user-menu-',
   'phase-chip-words',

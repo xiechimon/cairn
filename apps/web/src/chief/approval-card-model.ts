@@ -3,7 +3,7 @@ export interface ApprovalField {
   value: string;
 }
 
-export type ApprovalKind = 'mail' | 'send' | 'install' | 'shell' | 'app' | 'other';
+export type ApprovalKind = 'mail' | 'send' | 'install' | 'shell' | 'app' | 'secret' | 'other';
 
 export interface ApprovalCardModel {
   kind: ApprovalKind;

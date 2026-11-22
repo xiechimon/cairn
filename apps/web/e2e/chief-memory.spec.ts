@@ -644,7 +644,7 @@ test('memory edit composer submits an instruction and shows the applied result',
   const input = page.getByPlaceholder('告诉 Coordinator 要记住或改什么');
   await input.fill('把验证命令改成只跑 vitest');
   await page.getByRole('button', { name: '发送' }).click();
-  expect(control.editPosts).toHaveLength(1);
+  await expect.poll(() => control.editPosts).toHaveLength(1);
   expect(control.editPosts[0].text).toBe('把验证命令改成只跑 vitest');
   await expect(page.getByText('已按你的话改了 1 处')).toBeVisible();
   await expect(page.getByText('- 推送代码前先跑受影响的测试。')).toBeVisible();
@@ -687,7 +687,9 @@ test('import card lists CLAUDE.md and AGENTS.md candidates and imports one', asy
   await expect(page.getByText('Harbor API · docs/AGENTS.md')).toBeVisible();
   const item = page.locator('li').filter({ hasText: 'Field Notes · CLAUDE.md' });
   await item.getByRole('button', { name: '导入' }).click();
-  expect(control.importPosts).toEqual([{ projectId: 'p-notes', file: 'CLAUDE.md' }]);
+  await expect
+    .poll(() => control.importPosts)
+    .toEqual([{ projectId: 'p-notes', file: 'CLAUDE.md' }]);
   await expect(page.getByText('Field Notes · CLAUDE.md')).toHaveCount(0);
   await expect(page.getByText('Harbor API · docs/AGENTS.md')).toBeVisible();
   await evidenceShot(page, 'memory-import-card.png');
@@ -736,9 +738,15 @@ for (const memories of [[], MANY]) {
     const bottomGap = ({ outer, field }: Awaited<ReturnType<typeof box>>) =>
       Math.abs(outer.y + outer.height - 16 - (field.y + field.height));
     await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
-    const top = await box();
-    expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
-    expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
+    await expect
+      .poll(async () => {
+        const top = await box();
+        return Math.max(
+          Math.abs(top.field.x - top.inner.x),
+          Math.abs(top.field.width - top.inner.width),
+        );
+      })
+      .toBeLessThan(2);
     await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
   });
@@ -764,9 +772,15 @@ for (const memories of [[], MANY_TEAM]) {
     const bottomGap = ({ outer, field }: Awaited<ReturnType<typeof box>>) =>
       Math.abs(outer.y + outer.height - 16 - (field.y + field.height));
     await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
-    const top = await box();
-    expect(Math.abs(top.field.x - top.inner.x)).toBeLessThan(2);
-    expect(Math.abs(top.field.width - top.inner.width)).toBeLessThan(2);
+    await expect
+      .poll(async () => {
+        const top = await box();
+        return Math.max(
+          Math.abs(top.field.x - top.inner.x),
+          Math.abs(top.field.width - top.inner.width),
+        );
+      })
+      .toBeLessThan(2);
     await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     await expect.poll(async () => bottomGap(await box())).toBeLessThan(2);
   });

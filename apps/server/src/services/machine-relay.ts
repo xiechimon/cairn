@@ -14,7 +14,7 @@ import {
   isPhoneTool,
   OWN_COMPUTER_TOOL_NAMES,
   parseGithubIssueSourceRef,
-  REQUEST_CLOAK_LICENSE_TOOL,
+  REQUEST_SECRET_TOOL,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
@@ -38,7 +38,6 @@ import {
   transitionTodos,
 } from './chief-tools.js';
 import { steeredMessageScopes } from './chief-turns.js';
-import { holdCloakLicense } from './cloak-license.js';
 import { infoCardTodoOf } from './computer-thread.js';
 import { executeConnectorToolCall } from './connector-broker.js';
 import {
@@ -67,6 +66,7 @@ import {
   profileForStep,
   type RouteProfile,
 } from './routing-rules.js';
+import { holdSecretRequest } from './secret-requests.js';
 import { createLocalSkill, updateLocalSkill } from './skills.js';
 import { stepNamesTask } from './task-naming.js';
 import { executeThreadScheduleTool, isThreadScheduleTool } from './thread-schedule-tools.js';
@@ -254,8 +254,12 @@ export async function executeRelayToolCall(
       signal,
     );
   }
-  if (name === REQUEST_CLOAK_LICENSE_TOOL)
-    return holdCloakLicense(deps, { stepId }, signal !== undefined ? { signal } : {});
+  if (name === REQUEST_SECRET_TOOL)
+    return holdSecretRequest(
+      deps.db,
+      { teamId: threadRow.teamId, stepId, params },
+      signal !== undefined ? { signal } : {},
+    );
   const tool = isCaptureTool(name) ? name : undefined;
   const captured = tool !== undefined ? existingTurnCapture(stepId) : undefined;
   if (captured !== undefined && tool !== undefined)

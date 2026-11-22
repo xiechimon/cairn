@@ -609,10 +609,13 @@ export type ChiefStreamItem =
       outcome: 'waiting' | 'handed-back' | 'not-done';
     }
   | {
-      kind: 'cloak-license';
+      kind: 'secret-request';
       id: string;
-      reason: string;
-      outcome: 'waiting' | 'saved' | 'not-saved';
+      name: string;
+      scope: 'team' | 'project';
+      projectId: string | null;
+      description: string;
+      outcome: 'waiting' | 'saved' | 'cancelled' | 'failed';
     }
   | {
       kind: 'package-install';

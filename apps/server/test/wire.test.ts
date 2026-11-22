@@ -115,11 +115,12 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/secrets',
   'PATCH /api/teams/{id}/secrets/{sid}',
   'DELETE /api/teams/{id}/secrets/{sid}',
-  'PUT /api/teams/{id}/cloak-license',
+  'POST /api/teams/{id}/secret-requests',
   'GET /api/teams/{id}/browser-password-grants',
   'DELETE /api/teams/{id}/browser-password-grants/{grantId}',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
+  'DELETE /api/teams/{id}/api-keys/{keyId}',
   'GET /api/remote/descriptor',
   'GET /api/remote/tailscale',
   'POST /api/remote/tailscale',
@@ -239,11 +240,12 @@ const M2C_ROUTES = [
   'POST /api/teams/{id}/secrets',
   'PATCH /api/teams/{id}/secrets/{sid}',
   'DELETE /api/teams/{id}/secrets/{sid}',
-  'PUT /api/teams/{id}/cloak-license',
+  'POST /api/teams/{id}/secret-requests',
   'GET /api/teams/{id}/browser-password-grants',
   'DELETE /api/teams/{id}/browser-password-grants/{grantId}',
   'GET /api/teams/{id}/api-keys',
   'POST /api/teams/{id}/api-keys',
+  'DELETE /api/teams/{id}/api-keys/{keyId}',
 ];
 
 const M5_ROUTES = [

@@ -3,10 +3,16 @@ import {
   DESKTOP_TRAY_PATH,
   type DesktopMenuCommand,
   type DesktopNotifyPayload,
+  type DesktopRollbackNotice,
   type DesktopTrayOpen,
   type DesktopTrayState,
+  type DesktopUpdateState,
 } from '@cairn/shared';
 import { useEffect } from 'react';
+import { EN } from './i18n/en.js';
+import { readStoredLocale } from './i18n/locale.js';
+import { type TVars, translate } from './i18n/translate.js';
+import { safeLocalStorage } from './safe-storage.js';
 
 export const MAC_DESKTOP_SHELL = 'mac-desktop';
 export const MAC_TRAY_SHELL = 'mac-tray';
@@ -86,4 +92,44 @@ export function desktopTray(): DesktopTrayBridge | null {
   return (
     (window as Window & { cairnDesktop?: { tray?: DesktopTrayBridge } }).cairnDesktop?.tray ?? null
   );
+}
+
+export interface DesktopUpdateBridge {
+  state: () => Promise<DesktopUpdateState | null>;
+  check: () => Promise<void>;
+  install: () => Promise<void>;
+  rollbackNotice: () => Promise<DesktopRollbackNotice | null>;
+  subscribe: (listener: (state: DesktopUpdateState) => void) => () => void;
+}
+
+export function desktopUpdates(): DesktopUpdateBridge | null {
+  return (
+    (window as Window & { cairnDesktop?: { update?: DesktopUpdateBridge } }).cairnDesktop?.update ??
+    null
+  );
+}
+
+export async function showPendingRollbackNotice(): Promise<void> {
+  const updates = desktopUpdates();
+  const notify = desktopNotify();
+  if (updates === null || notify === null) return;
+  const notice = await updates.rollbackNotice();
+  if (notice === null) return;
+  const t = (source: string, vars?: TVars) =>
+    translate(readStoredLocale(safeLocalStorage()), EN, source, vars);
+  const title = t('Cairn 回滚了更新');
+  const line = t('{failed} 没能启动，Cairn 装回了 {restored}。', {
+    failed: notice.failedVersion,
+    restored: notice.restoredVersion,
+  });
+  notify.show({
+    title,
+    body: line,
+    href: '/app',
+    tag: 'update-rollback',
+    dialog: {
+      title,
+      detail: `${line}\n\n${t('失败记录在 {path}。', { path: notice.logPath })}`,
+    },
+  });
 }

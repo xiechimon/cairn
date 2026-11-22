@@ -17,6 +17,7 @@ import type { MailConnector } from './services/mail-connector.js';
 import type { SendMail } from './services/mail-smtp.js';
 import type { GithubAppRegistration, McpOAuthState } from './services/mcp-servers.js';
 import type { OAuthClientConfig, OAuthStateEntry } from './services/oauth.js';
+import type { PageThumbnails } from './services/page-thumbnails.js';
 import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 import type { TailscaleServe } from './services/tailscale-serve.js';
@@ -68,6 +69,7 @@ export interface AppContext {
   reposDir: string;
   workspacesDir?: string | undefined;
   attachmentsDir: string;
+  pageThumbnails?: PageThumbnails;
   backupStatusPath?: string;
   deployRecordPath?: string;
   skillsDir: string;

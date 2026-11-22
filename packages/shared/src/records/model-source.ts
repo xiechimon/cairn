@@ -242,6 +242,7 @@ export const claudeCodeReportSchema = z.object({
   bin: claudeBinInfoSchema.nullable().optional(),
   auth: claudeAuthStateSchema.optional(),
   login: claudeLoginSchema.optional(),
+  customBackend: z.boolean().optional(),
 });
 export type ClaudeCodeReport = z.infer<typeof claudeCodeReportSchema>;
 

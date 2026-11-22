@@ -111,6 +111,18 @@ test('a new reading grows the ring arc from the old share instead of redrawing i
   await expect(meter).toHaveAttribute('data-percent', '12');
   expect(await meter.evaluate((el) => el.getAnimations({ subtree: true }).length)).toBe(0);
   await page.waitForFunction(() => window.__es.some((es) => es.url.includes('/api/teams/t1/stream')));
+  const sharesPromise = arc.evaluate(
+    (el) =>
+      new Promise<number[]>((resolve) => {
+        const seen: number[] = [];
+        const read = () => {
+          seen.push(Number.parseFloat(getComputedStyle(el).strokeDasharray));
+          if ((seen.at(-1) ?? 0) >= 70 || seen.length >= 300) resolve(seen);
+          else requestAnimationFrame(read);
+        };
+        read();
+      }),
+  );
   tokens = 140_000;
   await page.evaluate(() =>
     (
@@ -120,18 +132,7 @@ test('a new reading grows the ring arc from the old share instead of redrawing i
     ).onerror(),
   );
   await expect(meter).toHaveAttribute('data-percent', '70');
-  const shares = await arc.evaluate(
-    (el) =>
-      new Promise<number[]>((resolve) => {
-        const seen: number[] = [];
-        const read = () => {
-          seen.push(Number.parseFloat(getComputedStyle(el).strokeDasharray));
-          if (seen.length < 40) requestAnimationFrame(read);
-          else resolve(seen);
-        };
-        read();
-      }),
-  );
+  const shares = await sharesPromise;
   expect(shares.some((share) => share > 12 && share < 70)).toBe(true);
   expect(shares.at(-1)).toBe(70);
 });
