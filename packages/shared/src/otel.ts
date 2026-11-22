@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFileSync, statSync } from 'node:fs';
+import { parseEnv } from 'node:util';
 import {
   type Attributes,
   ROOT_CONTEXT,
@@ -73,6 +75,38 @@ export function traceparentFor(traceId: string, spanId: string): string {
     },
   );
   return carrier.traceparent ?? '';
+}
+
+export const OTEL_ENV_FILE = 'CAIRN_OTEL_ENV_FILE';
+
+const OTEL_ENV_KEYS = ['CAIRN_OTEL_ENDPOINT', 'CAIRN_OTEL_HEADERS', 'CAIRN_OTEL_ENVIRONMENT'];
+
+const otelFileCache = new Map<string, NodeJS.ProcessEnv>();
+
+function otelFileValues(path: string): NodeJS.ProcessEnv {
+  let values = otelFileCache.get(path);
+  if (values === undefined) {
+    values = {};
+    try {
+      if ((statSync(path).mode & 0o077) === 0) {
+        const parsed = parseEnv(readFileSync(path, 'utf8'));
+        for (const key of OTEL_ENV_KEYS) {
+          if (parsed[key] !== undefined) values[key] = parsed[key];
+        }
+      }
+    } catch {}
+    otelFileCache.set(path, values);
+  }
+  return values;
+}
+
+export function otelConfigEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const file = env[OTEL_ENV_FILE];
+  if (file === undefined) return env;
+  const stripped = Object.fromEntries(
+    Object.entries(env).filter(([key]) => !key.startsWith('CAIRN_OTEL_')),
+  );
+  return { ...stripped, ...otelFileValues(file) };
 }
 
 export function parseOtlpTarget(env: {

@@ -339,10 +339,14 @@ describe('session confiner', () => {
     mkdirSync(join(pivot, 'x'), { recursive: true });
     symlinkSync(pivot, join(agentDir, 'inner'));
     expect(() =>
-      confine({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] }, [
-        agentDir,
-        join(agentDir, 'inner', 'x'),
-      ]),
+      confine(
+        { cwd: worktree, env: {} },
+        'pi',
+        { command: '/bin/true', args: [] },
+        {
+          state: [agentDir, join(agentDir, 'inner', 'x')],
+        },
+      ),
     ).toThrow('Unsafe confinement symlink');
   });
 
@@ -357,11 +361,14 @@ describe('session confiner', () => {
     writeFileSync(join(pivot, 'session.jsonl'), 'x');
     symlinkSync(join(pivot, 'session.jsonl'), join(privateDirectory, 'session.jsonl'));
     expect(() =>
-      confine({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] }, [
-        agentDir,
-        privateDirectory,
-        join(privateDirectory, 'session.jsonl'),
-      ]),
+      confine(
+        { cwd: worktree, env: {} },
+        'pi',
+        { command: '/bin/true', args: [] },
+        {
+          state: [agentDir, privateDirectory, join(privateDirectory, 'session.jsonl')],
+        },
+      ),
     ).toThrow('Unsafe confinement symlink');
   });
 
@@ -522,16 +529,218 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     expect(() => execFileSync(launch.command, launch.args, { stdio: 'pipe' })).not.toThrow();
   });
 
+  test('denies ~/.config wholesale while ~/.config/git stays readable', () => {
+    const { confine, worktree, root } = fixture();
+    const home = join(root, 'user');
+    const config = join(home, '.config');
+    mkdirSync(join(config, 'gh'), { recursive: true });
+    mkdirSync(join(config, 'git'), { recursive: true });
+    writeFileSync(join(config, 'gh', 'hosts.yml'), 'gh-secret');
+    writeFileSync(join(config, 'git', 'config'), '[user]\n\tname = x\n');
+    writeFileSync(join(config, 'git', 'credentials'), 'https://u:token@host\n');
+    writeFileSync(join(config, 'opencode.json'), 'opencode-secret');
+    const read = (script: string) =>
+      confine({ cwd: worktree, env: {} }, 'claude-code', {
+        command: '/bin/sh',
+        args: ['-c', script],
+      });
+    const allowed = read(`cat '${join(config, 'git', 'config')}'`);
+    expect(execFileSync(allowed.command, allowed.args, { encoding: 'utf8' })).toContain('name = x');
+    for (const denied of [
+      join(config, 'gh', 'hosts.yml'),
+      join(config, 'opencode.json'),
+      join(config, 'git', 'credentials'),
+    ]) {
+      const launch = read(`cat '${denied}'`);
+      expect(() => execFileSync(launch.command, launch.args, { stdio: 'pipe' })).toThrow();
+    }
+  });
+
+  test('a symlinked .config stays denied while its real .config/git target stays readable', () => {
+    const { confine, worktree, root } = fixture();
+    const home = join(root, 'user');
+    const real = join(root, 'dotfiles', 'config');
+    mkdirSync(join(real, 'gh'), { recursive: true });
+    mkdirSync(join(real, 'git'), { recursive: true });
+    writeFileSync(join(real, 'gh', 'hosts.yml'), 'gh-secret');
+    writeFileSync(join(real, 'git', 'config'), '[user]\n\tname = link\n');
+    symlinkSync(real, join(home, '.config'));
+    const read = (script: string) =>
+      confine({ cwd: worktree, env: {} }, 'claude-code', {
+        command: '/bin/sh',
+        args: ['-c', script],
+      });
+    const allowed = read(`cat '${join(home, '.config', 'git', 'config')}'`);
+    expect(execFileSync(allowed.command, allowed.args, { encoding: 'utf8' })).toContain(
+      'name = link',
+    );
+    for (const denied of [
+      join(home, '.config', 'gh', 'hosts.yml'),
+      join(real, 'gh', 'hosts.yml'),
+    ]) {
+      const launch = read(`cat '${denied}'`);
+      expect(() => execFileSync(launch.command, launch.args, { stdio: 'pipe' })).toThrow();
+    }
+  });
+
+  test('a remote server URL denies only that host:port instead of all egress on the port', () => {
+    const { root, runnerHome, worktree } = fixture();
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'https://cairn.example.com',
+      platform: 'darwin',
+      home: join(root, 'user'),
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    const launch = confine({ cwd: worktree, env: {} }, 'claude-code', {
+      command: '/bin/true',
+      args: [],
+    });
+    const profile = launch.args[1] as string;
+    expect(profile).toContain('(deny network-outbound (remote tcp "localhost:443"))');
+    expect(profile).toContain('(deny network-outbound (remote tcp "*:443"))');
+  });
+
+  test('rejects extra state outside the daemon home', () => {
+    const { confine, worktree, root } = fixture();
+    const outside = join(root, 'elsewhere');
+    mkdirSync(outside, { recursive: true });
+    expect(() =>
+      confine(
+        { cwd: worktree, env: {} },
+        'claude-code',
+        { command: '/bin/true', args: [] },
+        {
+          state: [outside],
+        },
+      ),
+    ).toThrow('Unsafe confinement state path');
+  });
+
+  test('a readable entry equal to a denied path is refused', () => {
+    const { worktree, root, runnerHome } = fixture();
+    const home = join(root, 'user');
+    mkdirSync(join(home, '.ssh'), { recursive: true });
+    const bad = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [],
+      readable: [join(home, '.ssh')],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:8787',
+      platform: 'darwin',
+      home,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    expect(() =>
+      bad({ cwd: worktree, env: {} }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement readable overlap');
+  });
+
+  test('daemon-env credential flags do not shape the policy for a session that never sees them', () => {
+    const { worktree, root, runnerHome } = fixture();
+    const home = join(root, 'user');
+    const keychains = join(home, 'Library', 'Keychains');
+    mkdirSync(keychains, { recursive: true });
+    const confiner = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:8787',
+      platform: 'darwin',
+      home,
+      environment: {
+        GEMINI_API_KEY: 'daemon-only-key',
+        TMPDIR: join(root, 'tmp-user', 'T'),
+      },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    const readableLine = (profile: string) =>
+      profile.split('\n').find((line) => line.startsWith('(allow file-read* (')) ?? '';
+    const plain = confiner({ cwd: worktree, env: {} }, 'antigravity', {
+      command: '/bin/true',
+      args: [],
+    });
+    expect(readableLine(plain.args[1] as string)).toContain(`(subpath "${keychains}")`);
+    const keyed = confiner(
+      { cwd: worktree, env: { GEMINI_API_KEY: 'session-key' } },
+      'antigravity',
+      { command: '/bin/true', args: [] },
+    );
+    expect(readableLine(keyed.args[1] as string)).not.toContain(keychains);
+  });
+
+  test('exposes the runner web-tools directory read-only when it exists', () => {
+    const { confine, worktree, runnerHome } = fixture();
+    const webTools = `${runnerHome}-web-tools`;
+    mkdirSync(webTools, { recursive: true });
+    writeFileSync(join(webTools, 'probe.txt'), 'web-tools-body');
+    const launch = confine({ cwd: worktree, env: {} }, 'claude-code', {
+      command: '/bin/sh',
+      args: ['-c', `cat '${join(webTools, 'probe.txt')}'`],
+    });
+    expect(execFileSync(launch.command, launch.args, { encoding: 'utf8' })).toBe('web-tools-body');
+    const write = confine({ cwd: worktree, env: {} }, 'claude-code', {
+      command: '/bin/sh',
+      args: ['-c', `echo x > '${join(webTools, 'tamper')}'`],
+    });
+    expect(() => execFileSync(write.command, write.args, { stdio: 'pipe' })).toThrow();
+  });
+
+  test('a step credential dir is readable only in the session that declares it as state', () => {
+    const { confine, worktree, runnerHome } = fixture();
+    const credsDir = join(runnerHome, 'creds');
+    const stepA = join(credsDir, 'step-a-github');
+    mkdirSync(join(stepA, 'gh'), { recursive: true });
+    writeFileSync(join(stepA, 'github-token'), 'step-a-token');
+    const cat = `cat '${join(stepA, 'github-token')}'`;
+    const own = confine(
+      { cwd: worktree, env: {} },
+      'claude-code',
+      { command: '/bin/sh', args: ['-c', cat] },
+      { readable: [stepA] },
+    );
+    expect(execFileSync(own.command, own.args, { encoding: 'utf8' })).toBe('step-a-token');
+    for (const harness of ['claude-code', 'pi', 'gemini', 'devin', 'hook'] as const) {
+      const other = confine({ cwd: worktree, env: {} }, harness, {
+        command: '/bin/sh',
+        args: ['-c', cat],
+      });
+      expect(() => execFileSync(other.command, other.args, { stdio: 'pipe' }), harness).toThrow();
+    }
+  });
+
+  test('the hook harness gets no harness state but keeps workspace writes and denies', () => {
+    const { confine, worktree, runnerHome, serverHome } = fixture();
+    const launch = confine({ cwd: worktree, env: {} }, 'hook', {
+      command: '/bin/sh',
+      args: [
+        '-c',
+        `echo built > '${join(worktree, 'hook-out')}' && cat '${join(serverHome, 'token')}'`,
+      ],
+    });
+    expect(() => execFileSync(launch.command, launch.args, { stdio: 'pipe' })).toThrow();
+    const profile = launch.args[1] as string;
+    expect(profile).not.toContain(`(subpath "${join(runnerHome, 'claude')}")`);
+    expect(profile).toContain(`(subpath "${realpathSync(serverHome)}")`);
+  });
+
   test('the pi profile exposes only its own state and keeps the same denied roots', () => {
     const { confine, worktree, runnerHome, serverHome } = fixture();
     const agentDir = join(runnerHome, 'homes', 'pi');
     const privateDirectory = join(runnerHome, 'chat-sessions', 'host-x');
     mkdirSync(agentDir, { recursive: true });
     mkdirSync(privateDirectory, { recursive: true });
-    const launch = confine({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] }, [
-      agentDir,
-      privateDirectory,
-    ]);
+    const launch = confine(
+      { cwd: worktree, env: {} },
+      'pi',
+      { command: '/bin/true', args: [] },
+      {
+        state: [agentDir, privateDirectory],
+      },
+    );
     const profile = launch.args[1] as string;
     expect(profile).toContain(`(subpath "${realpathSync(agentDir)}")`);
     expect(profile).toContain(`(subpath "${realpathSync(privateDirectory)}")`);
@@ -588,6 +797,189 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
           args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
         });
         expect(() => execFileSync(denied.command, denied.args, { stdio: 'pipe' })).toThrow();
+      }
+    },
+  );
+
+  test('step credential dirs are read-only, never writable state', () => {
+    const { confine, worktree, runnerHome } = fixture();
+    const credsDir = join(runnerHome, 'creds', 'step-1-github');
+    mkdirSync(join(credsDir, 'gh'), { recursive: true });
+    const launch = confine(
+      { cwd: worktree, env: {} },
+      'claude-code',
+      { command: '/bin/true', args: [] },
+      { readable: [credsDir] },
+    );
+    const profile = launch.args[1] as string;
+    const readOnly = profile
+      .split('\n')
+      .find((line) => line.startsWith('(allow file-read* (subpath'));
+    const writable = profile
+      .split('\n')
+      .find((line) => line.startsWith('(allow file-read* file-write*'));
+    expect(readOnly).toContain(`(subpath "${realpathSync(credsDir)}")`);
+    expect(writable).not.toContain(realpathSync(credsDir));
+    expect(() =>
+      confine(
+        { cwd: worktree, env: {} },
+        'claude-code',
+        { command: '/bin/true', args: [] },
+        { readable: [join('/tmp', 'outside')] },
+      ),
+    ).toThrow('Unsafe confinement state path');
+  });
+
+  test.runIf(process.platform === 'darwin')(
+    'a session can read its step credentials but cannot write or swap the credential dir',
+    () => {
+      const { confine, worktree, runnerHome } = fixture();
+      const credsDir = join(runnerHome, 'creds', 'step-9-github');
+      mkdirSync(join(credsDir, 'gh'), { recursive: true });
+      writeFileSync(join(credsDir, 'github-token'), 'step-token');
+      const read = confine(
+        { cwd: worktree, env: {} },
+        'claude-code',
+        { command: '/bin/sh', args: ['-c', `cat '${join(credsDir, 'github-token')}'`] },
+        { readable: [credsDir] },
+      );
+      expect(execFileSync(read.command, read.args, { encoding: 'utf8' })).toBe('step-token');
+      for (const attempt of [
+        `echo x > '${join(credsDir, 'github-token')}'`,
+        `mv '${join(credsDir, 'gh')}' '${join(credsDir, 'gh.real')}'`,
+        `ln -s /tmp '${join(credsDir, 'swap')}'`,
+      ]) {
+        const write = confine(
+          { cwd: worktree, env: {} },
+          'claude-code',
+          { command: '/bin/sh', args: ['-c', attempt] },
+          { readable: [credsDir] },
+        );
+        expect(() => execFileSync(write.command, write.args, { stdio: 'pipe' })).toThrow();
+      }
+    },
+  );
+
+  test('denied roots are emitted even when they do not exist yet', () => {
+    const { confine, worktree, root } = fixture();
+    const profile = confine({ cwd: worktree, env: {} }, 'claude-code', {
+      command: '/bin/true',
+      args: [],
+    }).args[1] as string;
+    expect(profile).toContain(`(subpath "${join(root, 'user', '.config')}")`);
+    expect(profile).toContain(`(subpath "${join(root, 'user', '.cairn')}")`);
+  });
+
+  test('harness state outside home and the daemon home is refused', () => {
+    const { confine, worktree, root } = fixture();
+    const outside = join(root, 'elsewhere', 'claude');
+    expect(() =>
+      confine({ cwd: worktree, env: { CLAUDE_CONFIG_DIR: outside } }, 'claude-code', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement state path');
+    expect(existsSync(outside)).toBe(false);
+  });
+
+  test('harness state behind a symlinked ancestor inside the daemon home is refused before mkdir', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const outside = join(root, 'outside-target');
+    mkdirSync(outside, { recursive: true });
+    symlinkSync(outside, join(runnerHome, 'linked-homes'));
+    expect(() =>
+      confine(
+        { cwd: worktree, env: { CLAUDE_CONFIG_DIR: join(runnerHome, 'linked-homes', 'claude') } },
+        'claude-code',
+        { command: '/bin/true', args: [] },
+      ),
+    ).toThrow(/Unsafe confinement/);
+    expect(existsSync(join(outside, 'claude'))).toBe(false);
+  });
+
+  test('harness state tolerates non-normalized env paths but refuses leaf symlinks', () => {
+    const { confine, worktree, runnerHome } = fixture();
+    const direct = confine(
+      { cwd: worktree, env: { CLAUDE_CONFIG_DIR: `${join(runnerHome, 'claude')}/` } },
+      'claude-code',
+      { command: '/bin/true', args: [] },
+    );
+    expect(direct.command).toBe('/usr/bin/sandbox-exec');
+    const target = join(runnerHome, 'claude-real');
+    mkdirSync(target, { recursive: true });
+    const linked = join(runnerHome, 'claude-link');
+    symlinkSync(target, linked);
+    expect(() =>
+      confine({ cwd: worktree, env: { CLAUDE_CONFIG_DIR: linked } }, 'claude-code', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('extra readable behind a symlinked ancestor inside the daemon home is refused', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const outside = join(root, 'outside-target');
+    mkdirSync(join(outside, 'gh'), { recursive: true });
+    symlinkSync(outside, join(runnerHome, 'linked-creds'));
+    expect(() =>
+      confine(
+        { cwd: worktree, env: {} },
+        'claude-code',
+        { command: '/bin/true', args: [] },
+        { readable: [join(runnerHome, 'linked-creds', 'gh')] },
+      ),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('bootstrap and keychain service lookups are denied except api-key-less antigravity', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const home = join(root, 'user');
+    mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
+    mkdirSync(join(runnerHome, 'homes', 'antigravity'), { recursive: true });
+    const profileFor = (harness: 'claude-code' | 'antigravity', env: Record<string, string>) =>
+      confine({ cwd: worktree, env }, harness, { command: '/bin/true', args: [] })
+        .args[1] as string;
+    const locked = profileFor('claude-code', {});
+    expect(locked).toContain('(deny mach-bootstrap)');
+    expect(locked).toContain('(deny process-exec (literal "/bin/launchctl")');
+    expect(locked).toContain('global-name-prefix "com.apple.secd"');
+    expect(locked).toContain('global-name-prefix "com.apple.trustd"');
+    const oauth = profileFor('antigravity', { HOME: join(runnerHome, 'homes', 'antigravity') });
+    expect(oauth).not.toContain('com.apple.secd');
+    const keyed = profileFor('antigravity', { GEMINI_API_KEY: 'AIza-step' });
+    expect(keyed).toContain('global-name-prefix "com.apple.secd"');
+  });
+
+  test.runIf(process.platform === 'darwin')(
+    'a confined session cannot submit launchd jobs or exec escape binaries',
+    () => {
+      const { confine, worktree, root } = fixture();
+      const plist = join(worktree, 'agent.plist');
+      writeFileSync(
+        plist,
+        '<?xml version="1.0"?><plist version="1.0"><dict><key>Label</key><string>test.cairn.escape</string><key>ProgramArguments</key><array><string>/bin/true</string></array></dict></plist>',
+      );
+      const bootstrap = confine({ cwd: worktree, env: {} }, 'claude-code', {
+        command: '/bin/launchctl',
+        args: ['bootstrap', `gui/${userInfo().uid}`, plist],
+      });
+      expect(() => execFileSync(bootstrap.command, bootstrap.args, { stdio: 'pipe' })).toThrow();
+      const copied = join(root, 'launchctl-copy');
+      execFileSync('/bin/cp', ['/bin/launchctl', copied]);
+      const copiedLaunch = confine({ cwd: worktree, env: {} }, 'claude-code', {
+        command: copied,
+        args: ['bootstrap', `gui/${userInfo().uid}`, plist],
+      });
+      expect(() =>
+        execFileSync(copiedLaunch.command, copiedLaunch.args, { stdio: 'pipe' }),
+      ).toThrow();
+      for (const binary of ['/usr/bin/security', '/usr/bin/osascript', '/usr/bin/open']) {
+        const launch = confine({ cwd: worktree, env: {} }, 'claude-code', {
+          command: binary,
+          args: [],
+        });
+        expect(() => execFileSync(launch.command, launch.args, { stdio: 'pipe' })).toThrow();
       }
     },
   );

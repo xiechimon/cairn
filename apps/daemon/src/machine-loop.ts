@@ -31,6 +31,7 @@ import {
 } from './backend/antigravity-managed.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
+import { serverPortOf } from './backend/confine.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
 import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
@@ -276,16 +277,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
     });
-  const serverUrl = new URL(config.serverUrl);
-  const serverPort =
-    serverUrl.port === '' ? (serverUrl.protocol === 'https:' ? 443 : 80) : Number(serverUrl.port);
+  const serverPort = serverPortOf(new URL(config.serverUrl));
   const hostComputer =
     opts.hostComputer ??
     (capEnv.CAIRN_OWN_COMPUTER === '1'
       ? new HostComputerProvider({
           confinement: createHostShellConfinement({
             deniedRoots: [config.home, join(homedir(), '.cairn'), ...extraDeniedRoots],
-            ...(Number.isInteger(serverPort) && serverPort > 0 ? { serverPort } : {}),
+            ...(serverPort !== null ? { serverPort } : {}),
             agentDesktop: capEnv.CAIRN_AGENT_DESKTOP ?? null,
           }),
         })
@@ -803,6 +802,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     logger,
     ...(opts.orphanTtlMs !== undefined ? { orphanTtlMs: opts.orphanTtlMs } : {}),
     ...(opts.hookTimeoutMs !== undefined ? { hookTimeoutMs: opts.hookTimeoutMs } : {}),
+    ...(confine !== null ? { confine } : {}),
   });
   await backfillRepositoryCaches(config.workspacesDir, (message) => logger.workspace(message));
   const sessionHandles = new Map<string, AgentSessionHandle>();

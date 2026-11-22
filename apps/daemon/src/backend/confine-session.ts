@@ -4,10 +4,10 @@ import { homedir, tmpdir, userInfo } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
 import { ANTIGRAVITY_CREDENTIAL_FILES, GEMINI_CREDENTIAL_FILES } from '../agent-config.js';
-import { contains } from './confine.js';
+import { canonical, contains, deniedVariants, serverPortOf } from './confine.js';
 import { type SeatbeltPolicy, seatbeltCommand } from './confine-seatbelt.js';
 
-export type SessionHarness = 'claude-code' | 'gemini' | 'pi' | 'devin' | 'antigravity';
+export type SessionHarness = 'claude-code' | 'gemini' | 'pi' | 'devin' | 'antigravity' | 'hook';
 
 export interface Launch {
   command: string;
@@ -18,7 +18,7 @@ export type SessionConfiner = (
   opts: Pick<SessionOpts, 'cwd' | 'env'>,
   harness: SessionHarness,
   launch: Launch,
-  state?: readonly string[],
+  extra?: { state?: readonly string[]; readable?: readonly string[] },
 ) => Launch;
 
 export interface SessionConfinerOptions {
@@ -170,6 +170,8 @@ function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv)
         { path: join(base, '.config', 'devin'), root: base },
       ];
     }
+    case 'hook':
+      return [];
   }
 }
 
@@ -188,10 +190,21 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
   const environment = options.environment ?? process.env;
   const home = realpathSync(options.home ?? homedir());
   const serverUrl = new URL(options.serverUrl);
-  const port =
-    serverUrl.port === '' ? (serverUrl.protocol === 'https:' ? 443 : 80) : Number(serverUrl.port);
-  return (opts, harness, launch, extraState = []) => {
-    const env = { ...environment, ...opts.env };
+  const port = serverPortOf(serverUrl);
+  const extraDeniedRoots = options.extraDeniedRoots.map((path) => {
+    if (!isAbsolute(path) || resolve(path) !== path)
+      throw new Error(`Unsafe confinement denied root: ${path}`);
+    return path;
+  });
+  const daemonHomeLexical = existsSync(options.daemonHome)
+    ? realpathSync(options.daemonHome)
+    : canonical(options.daemonHome);
+  return (opts, harness, launch, extra = {}) => {
+    const env: NodeJS.ProcessEnv = {
+      ...opts.env,
+      HOME: opts.env?.HOME ?? environment.HOME,
+      TMPDIR: opts.env?.TMPDIR ?? environment.TMPDIR,
+    };
     const workspace = realpathSync(opts.cwd);
     const tempInput = resolve(env.TMPDIR ?? tmpdir());
     const systemTempInput =
@@ -213,7 +226,8 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         .filter((entry) => !isStateFile(home, entry.path))
         .map((entry) => resolve(entry.path)),
       ...options.handoffDirectories.map((path) => resolve(path)),
-      ...extraState.map((path) => resolve(path)),
+      ...(extra.state ?? []).map((path) => resolve(path)),
+      ...(extra.readable ?? []).map((path) => resolve(path)),
       ...SHARED_CACHES.map((path) => join(home, path)).filter((path) => existsSync(path)),
     ]);
     const grantPath = (path: string, root?: string): string => {
@@ -231,12 +245,27 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const temp = grantPath(tempInput);
     writableRoots.add(temp);
     writableRoots.add(dirname(temp));
-    const daemonHome = existsSync(options.daemonHome)
-      ? realpathSync(options.daemonHome)
-      : options.daemonHome;
-    const deniedRoots = [daemonHome, ...options.extraDeniedRoots]
-      .filter((path) => existsSync(path))
-      .map((path) => realpathSync(path));
+    const daemonHome = daemonHomeLexical;
+    const daemonChild = (path: string): string => {
+      if (!contains(daemonHome, path) || path === daemonHome)
+        throw new Error(`Unsafe confinement state path: ${path}`);
+      const resolved = grantPath(path);
+      if (!contains(daemonHome, resolved) || resolved === daemonHome)
+        throw new Error(`Unsafe confinement state path: ${path}`);
+      return resolved;
+    };
+    const insideAllowedRoots = (path: string): boolean =>
+      (contains(home, path) && path !== home) ||
+      (contains(daemonHome, path) && path !== daemonHome);
+    const deniedRoots = [
+      ...new Set([daemonHome, join(home, '.config'), join(home, '.cairn'), ...extraDeniedRoots]),
+    ].map((path) => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return canonical(path);
+      }
+    });
     const systemTemp =
       options.systemTempDirectory === undefined
         ? systemTempDirectory()
@@ -254,12 +283,15 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const userDirectories = [...new Set([dirname(temp), systemUserDirectory])].filter(
       (path): path is string => path !== null,
     );
-    const state = stateEntries.map((entry) => ({
-      lexical: grantPath(entry.path, entry.root),
-      dir: !isStateFile(home, entry.path),
-    }));
+    const state = stateEntries.map((entry) => {
+      const lexical = grantPath(entry.path, entry.root);
+      if (!insideAllowedRoots(lexical))
+        throw new Error(`Unsafe confinement state path: ${entry.path}`);
+      return { lexical, dir: !isStateFile(home, entry.path) };
+    });
     const handoff = options.handoffDirectories.map((path) => grantPath(path));
-    const explicitState = [...handoff, ...extraState.map((path) => grantPath(path))];
+    const explicitState = [...handoff, ...(extra.state ?? []).map(daemonChild)];
+    const extraReadable = (extra.readable ?? []).map(daemonChild);
     const policy: SeatbeltPolicy = {
       home,
       daemonHome,
@@ -275,13 +307,20 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       ],
       readable: [
         ...options.readable,
-        ...(harness === 'antigravity' && opts.env?.GEMINI_API_KEY === undefined
+        join(home, '.config', 'git'),
+        `${daemonHome}-web-tools`,
+        ...extraReadable,
+        ...(harness === 'antigravity' && env.GEMINI_API_KEY === undefined
           ? [join(home, 'Library', 'Keychains')]
           : []),
-      ]
-        .filter((path) => existsSync(path))
-        .map((path) => realpathSync(path)),
-      ...(Number.isInteger(port) && port > 0 ? { serverPort: port } : {}),
+      ].filter((path) => existsSync(path)),
+      readableDeniedAllowed:
+        harness === 'antigravity' && env.GEMINI_API_KEY === undefined
+          ? deniedVariants(join(home, 'Library', 'Keychains'))
+          : [],
+      allowKeychainServices: harness === 'antigravity' && env.GEMINI_API_KEY === undefined,
+      postReadableDenies: [join(home, '.config', 'git', 'credentials')],
+      ...(port !== null ? { serverPort: port } : {}),
     };
     const confined = seatbeltCommand(policy, launch.command, launch.args);
     for (const entry of state) {

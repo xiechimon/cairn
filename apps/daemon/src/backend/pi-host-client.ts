@@ -11,6 +11,7 @@ import type {
 import { ENV_VARS } from '@cairn/shared';
 import { childEnv } from '../child-env.js';
 import { stepCredentialRedactor } from '../credential-output.js';
+import { stepCredentialStateDirs } from '../step-app-credential.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
 import { EventQueue } from './event-queue.js';
 import type { PiBackendOpts } from './pi.js';
@@ -29,6 +30,8 @@ export function piHostEnv(parent: NodeJS.ProcessEnv = process.env): Record<strin
   return childEnv({
     [ENV_VARS.piCacheRetention]: parent[ENV_VARS.piCacheRetention],
     [ENV_VARS.customModelReasoning]: parent[ENV_VARS.customModelReasoning],
+    SSH_AUTH_SOCK: '',
+    SSH_AGENT_PID: '',
   });
 }
 
@@ -111,18 +114,6 @@ class PiHostSession implements AgentSessionHandle {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
-    const { stdin, stdout, stderr } = this.child;
-    if (stdin === null || stdout === null || stderr === null)
-      throw new Error('Pi host has no stdio pipes');
-    this.writer = new FrameWriter(
-      stdin,
-      (chunk) => stdin.write(chunk),
-      (error) => this.fail(error.message),
-    );
-    stderr.on('data', (data: Buffer) => {
-      this.stderrTail = `${this.stderrTail}${data.toString('utf8')}`.slice(-STDERR_TAIL_BYTES);
-    });
-    stdin.on('error', () => {});
     this.child.on('error', (error) => this.fail(`Pi host failed to start: ${error.message}`));
     this.child.on('exit', (code, signal) => {
       this.exited = true;
@@ -134,6 +125,21 @@ class PiHostSession implements AgentSessionHandle {
       }
       this.closedResolve();
     });
+    const { stdin, stdout, stderr } = this.child;
+    if (stdin === null || stdout === null || stderr === null) {
+      void this.ready.catch(() => {});
+      killGroup(this.child.pid);
+      throw new Error('Pi host has no stdio pipes');
+    }
+    this.writer = new FrameWriter(
+      stdin,
+      (chunk) => stdin.write(chunk),
+      (error) => this.fail(error.message),
+    );
+    stderr.on('data', (data: Buffer) => {
+      this.stderrTail = `${this.stderrTail}${data.toString('utf8')}`.slice(-STDERR_TAIL_BYTES);
+    });
+    stdin.on('error', () => {});
     readFrames(
       stdout,
       (line) => this.receive(line),
@@ -366,24 +372,30 @@ function serializableSession(opts: SessionOpts) {
 
 export async function openPiHostSession(args: PiHostOpen): Promise<AgentSessionHandle> {
   const privateDirectory = realpathSync(mkdtempSync(join(args.backend.sessionDir, 'host-')));
-  const allowedFiles =
-    args.resumeFile !== null
-      ? [join(realpathSync(dirname(args.resumeFile)), basename(args.resumeFile))]
-      : [];
   let confined: Launch;
+  let allowedFiles: string[] = [];
   try {
-    confined = args.confine({ cwd: args.opts.cwd, env: args.opts.env ?? {} }, 'pi', args.launch, [
-      args.backend.agentDir,
-      privateDirectory,
-      ...allowedFiles,
-    ]);
+    allowedFiles =
+      args.resumeFile !== null
+        ? [join(realpathSync(dirname(args.resumeFile)), basename(args.resumeFile))]
+        : [];
+    confined = args.confine({ cwd: args.opts.cwd, env: args.opts.env ?? {} }, 'pi', args.launch, {
+      state: [args.backend.agentDir, privateDirectory, ...allowedFiles],
+      readable: stepCredentialStateDirs(args.opts.env),
+    });
   } catch (error) {
     removeIfEmpty(privateDirectory);
     throw new Error(
       `Pi session confinement failed: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
-  const session = new PiHostSession(args, confined, privateDirectory, allowedFiles);
-  await session.ready;
+  let session: PiHostSession;
+  try {
+    session = new PiHostSession(args, confined, privateDirectory, allowedFiles);
+    await session.ready;
+  } catch (error) {
+    removeIfEmpty(privateDirectory);
+    throw error;
+  }
   return session;
 }

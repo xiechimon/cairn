@@ -233,7 +233,7 @@ async function runClaimedStep(
   const appCredential =
     creds.git?.kind === 'app' && !attachmentVerify
       ? new StepAppCredential(
-          join(deps.paths.agentRuntimeDir, `step-${stepId}-github`),
+          join(deps.paths.credsDir, `step-${stepId}-github`),
           creds.git,
           async () => {
             const fresh = (await client.token(stepId)).git;

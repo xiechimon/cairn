@@ -26,7 +26,10 @@ export const DENIED_DIRECTORIES = [
   '.ssh',
   '.gnupg',
   '.aws',
+  '.azure',
   '.config/gh',
+  '.config/devin',
+  '.config/opencode',
   '.docker',
   '.orbstack',
   '.colima',
@@ -47,8 +50,44 @@ export const DENIED_DIRECTORIES = [
   '.codex',
   '.pi',
   '.gemini',
+  '.local/share/cairn',
+  '.local/share/devin',
+  '.local/share/opencode',
+  '.local/share/fish',
+  '.m2',
+  '.gradle',
+  '.gem',
+  '.terraform.d',
+  '.deno',
+  '.composer',
+  '.vercel',
+  '.netlify',
+  '.cache/huggingface',
 ];
-export const DENIED_FILES = ['.netrc', '.git-credentials', '.claude.json'];
+export const DENIED_FILES = [
+  '.netrc',
+  '.git-credentials',
+  '.claude.json',
+  '.claude.json.backup',
+  '.npmrc',
+  '.cargo/credentials.toml',
+  '.pypirc',
+  '.zshrc',
+  '.zshenv',
+  '.zprofile',
+  '.bashrc',
+  '.bash_profile',
+  '.profile',
+  '.zsh_history',
+  '.bash_history',
+  '.python_history',
+  '.node_repl_history',
+  '.aider.conf.yml',
+  '.aider.model.settings.yml',
+  '.aider.input.history',
+  '.aider.chat.history.md',
+  '.aider.llm.history',
+];
 export const CONTAINER_SOCKETS = [
   '/var/run/docker.sock',
   '/private/var/run/docker.sock',
@@ -59,6 +98,28 @@ export const CONTAINER_SOCKETS = [
 export function contains(parent: string, child: string): boolean {
   const path = relative(parent, child);
   return path === '' || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
+}
+
+export function deniedVariants(path: string): string[] {
+  if (!isAbsolute(path) || resolve(path) !== path) throw new Error('Unsafe confinement path');
+  let resolved = path;
+  try {
+    resolved = realpathSync(path);
+  } catch {}
+  return resolved === path ? [path] : [path, resolved];
+}
+
+const SERVER_PROTOCOL_PORTS: Record<string, number> = {
+  'http:': 80,
+  'https:': 443,
+  'ws:': 80,
+  'wss:': 443,
+};
+
+export function serverPortOf(url: URL): number | null {
+  if (url.hostname === '') return null;
+  const port = url.port === '' ? SERVER_PROTOCOL_PORTS[url.protocol] : Number(url.port);
+  return port !== undefined && Number.isInteger(port) && port >= 1 && port <= 65535 ? port : null;
 }
 
 export function canonical(path: string, required = false): string {
@@ -88,12 +149,12 @@ export function confinementArgs(
   const home = canonical(policy.home, true);
   const daemonHome = canonical(policy.daemonHome, true);
   const deniedDirectories = [
-    '/run',
-    ...DENIED_DIRECTORIES.map((path) => join(home, path)),
-    daemonHome,
+    ...deniedVariants('/run'),
+    ...DENIED_DIRECTORIES.flatMap((path) => deniedVariants(join(home, path))),
+    ...deniedVariants(daemonHome),
   ];
-  const deniedFiles = DENIED_FILES.map((path) => join(home, path));
-  const denied = [...deniedDirectories, ...deniedFiles].map((path) => canonical(path));
+  const deniedFiles = DENIED_FILES.flatMap((path) => deniedVariants(join(home, path)));
+  const denied = [...deniedDirectories, ...deniedFiles];
   const writable = [
     policy.workspace,
     ...policy.gitDirectories,
@@ -101,8 +162,18 @@ export function confinementArgs(
     ...policy.state,
     ...policy.caches,
   ].map((path) => canonical(path, true));
-  for (const path of policy.caches) {
-    if (denied.some((secret) => contains(secret, path) || contains(path, secret)))
+  const statePaths = new Set(policy.state.map((path) => canonical(path, true)));
+  const isState = (path: string): boolean => {
+    if (statePaths.has(path)) return true;
+    try {
+      return statePaths.has(realpathSync(path));
+    } catch {
+      return false;
+    }
+  };
+  const cachePaths = new Set(policy.caches.map((path) => canonical(path, true)));
+  for (const path of cachePaths) {
+    if (denied.some((secret) => contains(secret, path)))
       throw new Error('Unsafe confinement cache overlap');
   }
   for (const path of writable) {
@@ -110,18 +181,19 @@ export function confinementArgs(
       denied.some(
         (secret) =>
           contains(path, secret) &&
-          !(path === secret && secret !== daemonHome && policy.state.includes(path)),
+          !(cachePaths.has(path) && path !== home && contains(home, path)) &&
+          !(path === secret && secret !== daemonHome && isState(path)),
       )
     )
       throw new Error('Unsafe confinement overlap');
     if (
       denied.some((secret) => contains(secret, path)) &&
       !contains(daemonHome, path) &&
-      !policy.state.includes(path)
+      !isState(path)
     )
       throw new Error('Unsafe confinement overlap');
   }
-  for (const path of policy.state) {
+  for (const path of statePaths) {
     if (
       denied.some((secret) => contains(secret, path)) &&
       !contains(daemonHome, path) &&
@@ -186,12 +258,18 @@ export function confinementArgs(
     }
   };
   rebindChildren(home, home);
-  for (const path of deniedDirectories) args.push('--tmpfs', path);
-  for (const path of writable) args.push('--bind', path, path);
-  for (const path of deniedDirectories) {
-    if (!policy.state.includes(path)) args.push('--remount-ro', path);
+  const mounts = [
+    ...deniedDirectories.map((path) => ({ path, bind: false })),
+    ...writable.map((path) => ({ path, bind: true })),
+  ].sort((a, b) => a.path.split(sep).length - b.path.split(sep).length);
+  for (const mount of mounts) {
+    if (mount.bind) args.push('--bind', mount.path, mount.path);
+    else args.push('--tmpfs', mount.path);
   }
-  for (const path of deniedFiles.filter((path) => !policy.state.includes(path))) {
+  for (const path of deniedDirectories) {
+    if (!isState(path)) args.push('--remount-ro', path);
+  }
+  for (const path of deniedFiles.filter((path) => !isState(path))) {
     args.push('--ro-bind', '/dev/null', path);
   }
   const maskGitDirectory = (directory: string) => {
@@ -219,7 +297,11 @@ export function confinementArgs(
         args.push('--tmpfs', parent, '--remount-ro', parent);
         return;
       }
-      if (!stat.isDirectory() || stat.isSymbolicLink()) {
+      if (stat.isSymbolicLink()) {
+        args.push('--tmpfs', parent, '--remount-ro', parent);
+        return;
+      }
+      if (!stat.isDirectory()) {
         args.push('--ro-bind', parent, parent);
         return;
       }

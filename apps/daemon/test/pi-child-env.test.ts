@@ -108,12 +108,15 @@ test('the pi host child keeps operator pins but no daemon credentials', () => {
   vi.stubEnv('CAIRN_CUSTOM_MODEL_REASONING', '1');
   vi.stubEnv('GH_TOKEN', 'daemon-gh-token');
   vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-anthropic-key');
+  vi.stubEnv('SSH_AUTH_SOCK', '/tmp/owner-agent.sock');
   const env = piHostEnv();
   expect(env.CAIRN_PI_CACHE_RETENTION).toBe('long');
   expect(env.CAIRN_CUSTOM_MODEL_REASONING).toBe('1');
   expect(resolvePiCacheRetention(env)).toBe('long');
   expect(env).not.toHaveProperty('GH_TOKEN');
   expect(env).not.toHaveProperty('ANTHROPIC_API_KEY');
+  expect(env.SSH_AUTH_SOCK).toBe('');
+  expect(env.SSH_AGENT_PID).toBe('');
 });
 
 test('the embedded pi keeps its agent dir and pins out of task commands', async () => {

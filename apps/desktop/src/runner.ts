@@ -12,7 +12,7 @@ import {
   OWNER_CHANNEL_HEADER,
 } from '@cairn/shared';
 import { probeHostKey } from '@cairn/shared/host-identity';
-import { type OtelEnv, withOtelEnv } from './otel-config.js';
+import { withOtelFileEnv } from './otel-config.js';
 import { createRestartBudget } from './restart-budget.js';
 
 const PRIVATE_DIR_MODE = 0o700;
@@ -29,7 +29,7 @@ export interface RunnerOptions {
   origin: string;
   ownerToken: string;
   ownerChannelKey: string;
-  otelEnv: OtelEnv;
+  otelFile: string | null;
   agentDesktop: string | null;
   isQuitting: () => boolean;
 }
@@ -106,7 +106,7 @@ function writeMachineJson(home: string, machine: MachineJson): void {
 }
 
 function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
-  const env = withOtelEnv(
+  const env = withOtelFileEnv(
     {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
@@ -120,7 +120,7 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
         ? {}
         : { CAIRN_AGENT_DESKTOP: options.agentDesktop, CAIRN_OWN_COMPUTER: '1' }),
     },
-    options.otelEnv,
+    options.otelFile,
   );
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];

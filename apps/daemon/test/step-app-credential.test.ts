@@ -3,10 +3,31 @@ import { join } from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { runtimeChildEnv } from '../src/backend/otel.js';
 import { gitCredentialEnv, runGitOk } from '../src/git.js';
-import { StepAppCredential } from '../src/step-app-credential.js';
+import { StepAppCredential, stepCredentialStateDirs } from '../src/step-app-credential.js';
 import { testTempDir } from './test-temp-dir.js';
 
 afterEach(() => vi.useRealTimers());
+
+test('step credential state dirs only follow absolute env values', () => {
+  const base = testTempDir('step-dirs-');
+  expect(
+    stepCredentialStateDirs({
+      CAIRN_GIT_CRED_FILE: join(base, 'step-github', 'github-token'),
+      GH_CONFIG_DIR: join(base, 'step-github', 'gh'),
+    }),
+  ).toEqual([join(base, 'step-github'), join(base, 'step-github', 'gh')]);
+  expect(
+    stepCredentialStateDirs({
+      CAIRN_GIT_CRED_FILE: 'github-token',
+      GH_CONFIG_DIR: 'gh',
+    }),
+  ).toEqual([]);
+});
+
+test('a top-level GH_CONFIG_DIR grants itself, never the shared creds root', () => {
+  const base = testTempDir('step-dirs-');
+  expect(stepCredentialStateDirs({ GH_CONFIG_DIR: join(base, 'gh') })).toEqual([join(base, 'gh')]);
+});
 
 test('App shell credentials use private files read afresh by git and gh', async () => {
   const dir = join(testTempDir('step-app-'), 'private');

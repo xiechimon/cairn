@@ -14,6 +14,7 @@ import {
   parseAccessTokenFile,
   TEAM_STREAM_PING_INTERVAL_MS,
 } from '@cairn/shared';
+import { isLoopbackHost } from '@cairn/shared/loopback';
 import { z } from 'zod';
 
 const TSNET_HOSTNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
@@ -169,12 +170,8 @@ function defaultTsnetBinaryPath(home: string): string {
     [...bundledTsnetBinaries(), fallback].find((candidate) => existsSync(candidate)) ?? fallback
   );
 }
-const LOOPBACK_BIND_HOSTS = new Set(['::1', '::ffff:127.0.0.1', 'localhost']);
-const LOOPBACK_IPV4 = /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 
-export function isLoopbackHost(host: string): boolean {
-  return LOOPBACK_BIND_HOSTS.has(host) || LOOPBACK_IPV4.test(host);
-}
+export { isLoopbackHost };
 
 function envAuthOff(): boolean {
   const raw = envStr(ENV_VARS.auth);

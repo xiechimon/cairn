@@ -1,5 +1,13 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { createServer as createUnixServer } from 'node:net';
 import { join } from 'node:path';
@@ -208,11 +216,88 @@ describe('createHostShellConfinement', () => {
       '(deny network-outbound (remote unix-socket (literal "/var/run/docker.sock")))',
     );
     expect(profile).toContain(
+      `(remote unix-socket (literal "${join(home, 'Library', 'Group Containers', '2BUA8C4S2C.com.1password', 't', 'agent.sock')}"))`,
+    );
+    expect(profile).toContain(
       '(deny network-bind (local unix-socket (literal "/var/run/docker.sock")))',
     );
     expect(profile).toContain(
       '(deny mach-lookup (global-name-prefix "com.apple.windowserver") (global-name-prefix "com.apple.hiservices") (global-name-prefix "com.apple.pasteboard"))',
     );
+    expect(profile).toContain('(deny mach-bootstrap)');
+    expect(profile).toContain('(deny process-exec (literal "/bin/launchctl")');
+    expect(profile).toContain('global-name-prefix "com.apple.secd"');
+    const writeDeny = profile
+      .split('\n')
+      .filter((line) => line.startsWith('(deny file-write*'))
+      .join('\n');
+    expect(writeDeny).toContain(`(subpath "${join(home, 'Library', 'LaunchAgents')}")`);
+    expect(writeDeny).toContain('(subpath "/Library/LaunchAgents")');
+    expect(writeDeny).toContain('(subpath "/Library/LaunchDaemons")');
+    expect(writeDeny).toContain(`(subpath "${join(home, '.config', 'git')}")`);
+    expect(writeDeny).toContain(`(literal "${join(home, '.gitconfig')}")`);
+    expect(writeDeny).toContain(`(literal "${join(home, '.zlogin')}")`);
+    const hookDeny = profile
+      .split('\n')
+      .filter(
+        (line) =>
+          line.startsWith('(deny file-write* (regex') && line.includes('[hH][oO][oO][kK][sS]'),
+      )
+      .join('\n');
+    expect(hookDeny).toContain('[pP][rR][eE]-[cC][oO][mM][mM][iI][tT]');
+    expect(hookDeny).toContain('[uU][pP][dD][aA][tT][eE]');
+    expect(hookDeny).toContain('[cC][oO][nN][fF][iI][gG]');
+  });
+
+  test('writeDenied() covers deferred-persistence paths while denied() leaves them readable', () => {
+    const { home, serverHome } = layout();
+    const conf = createHostShellConfinement({
+      home,
+      deniedRoots: [serverHome],
+      platform: 'darwin',
+    });
+    expect(conf.writeDenied(join(home, 'Library', 'LaunchAgents', 'com.evil.plist'))).toBe(true);
+    expect(conf.writeDenied('/Library/LaunchDaemons/com.evil.plist')).toBe(true);
+    expect(conf.writeDenied(join(home, '.gitconfig'))).toBe(true);
+    expect(conf.writeDenied(join(home, '.config', 'git', 'config'))).toBe(true);
+    expect(conf.writeDenied(join(home, 'repo', '.git', 'hooks', 'pre-commit'))).toBe(true);
+    expect(conf.writeDenied(join(home, 'repo', '.git', 'config'))).toBe(true);
+    expect(conf.writeDenied(join(home, 'repo.git', 'objects', 'x'))).toBe(true);
+    expect(conf.writeDenied(join(home, 'repo', '.github', 'workflows', 'x'))).toBe(false);
+    expect(conf.writeDenied(join(home, 'work', 'out.txt'))).toBe(false);
+    expect(conf.writeDenied(join(home, 'repo', '.gitignore'))).toBe(false);
+    expect(conf.writeDenied(join(home, 'repo', '.gitkeep'))).toBe(false);
+    expect(conf.writeDenied(join(home, 'repo', 'x.git2', 'hooks', 'x'))).toBe(false);
+    expect(conf.writeDenied(join(home, 'notes.git'))).toBe(true);
+    expect(conf.denied(join(home, 'Library', 'LaunchAgents', 'com.evil.plist'))).toBe(false);
+    expect(conf.denied(join(home, '.gitconfig'))).toBe(false);
+  });
+
+  test('the write_file host verb refuses write-protected targets', async () => {
+    const { home, serverHome } = layout();
+    const host = provider(home, [serverHome]);
+    await expect(
+      host.writeFile(join(home, 'Library', 'LaunchAgents', 'com.evil.plist'), 'x'),
+    ).rejects.toBeInstanceOf(ComputerRefusal);
+    await expect(host.writeFile(join(home, '.gitconfig'), 'x')).rejects.toBeInstanceOf(
+      ComputerRefusal,
+    );
+    await expect(
+      host.writeFile(join(home, 'repo', '.git', 'hooks', 'pre-commit'), 'x'),
+    ).rejects.toBeInstanceOf(ComputerRefusal);
+    await expect(host.writeFile(join(home, 'repo', '.git', 'config'), 'x')).rejects.toBeInstanceOf(
+      ComputerRefusal,
+    );
+    const linkedRepo = join(home, 'linked');
+    const elsewhere = join(home, 'elsewhere');
+    mkdirSync(linkedRepo, { recursive: true });
+    mkdirSync(join(elsewhere, 'hooks'), { recursive: true });
+    symlinkSync(elsewhere, join(linkedRepo, '.git'));
+    await expect(
+      host.writeFile(join(linkedRepo, '.git', 'hooks', 'pre-commit'), 'x'),
+    ).rejects.toBeInstanceOf(ComputerRefusal);
+    await host.writeFile(join(home, 'work', 'ok.txt'), 'x');
+    await host.writeFile(join(home, 'work', '.gitkeep'), 'x');
   });
 
   test('on linux the wrapped command is bubblewrap over the host tree', () => {
@@ -227,6 +312,15 @@ describe('createHostShellConfinement', () => {
       expect(() => conf.wrap('true', [])).toThrow(ComputerRefusal);
       return;
     }
+    const gitconfig = join(home, '.gitconfig');
+    writeFileSync(gitconfig, '[user]\n');
+    mkdirSync(join(home, '.config', 'git'), { recursive: true });
+    const sockets = [
+      '/private/var/run/docker.sock',
+      '/var/run/docker.sock',
+      '/run/podman/podman.sock',
+    ];
+    const socketsExistedBefore = sockets.map((sock) => existsSync(sock));
     const launch = conf.wrap('bash', ['-c', 'echo hi']);
     expect(launch.command.endsWith('/bwrap') || launch.command === 'bwrap').toBe(true);
     for (const [flag, mount] of [
@@ -239,7 +333,84 @@ describe('createHostShellConfinement', () => {
       );
       expect(at, `${flag} ${mount}`).toBeGreaterThan(-1);
     }
+    const pairAt = (source: string, target: string) =>
+      launch.args.findIndex(
+        (arg, index) =>
+          arg === '--ro-bind' &&
+          launch.args[index + 1] === source &&
+          launch.args[index + 2] === target,
+      );
+    expect(pairAt(gitconfig, gitconfig)).toBeGreaterThan(-1);
+    expect(pairAt(join(home, '.config', 'git'), join(home, '.config', 'git'))).toBeGreaterThan(-1);
+    const missingFile = join(home, '.yarnrc');
+    expect(pairAt('/dev/null', missingFile)).toBeGreaterThan(-1);
+    const bashLogin = join(home, '.bash_login');
+    expect(pairAt(bashLogin, bashLogin)).toBeGreaterThan(-1);
+    expect(readFileSync(bashLogin, 'utf8')).toContain('.profile');
+    const gnupg = join(home, '.gnupg');
+    expect(
+      launch.args.findIndex((arg, index) => arg === '--tmpfs' && launch.args[index + 1] === gnupg),
+    ).toBeGreaterThan(-1);
+    expect(lstatSync(gnupg).mode & 0o777).toBe(0o700);
+    const missingDir = join(home, '.config', 'autostart');
+    const tmpfsAt = launch.args.findIndex(
+      (arg, index) => arg === '--tmpfs' && launch.args[index + 1] === missingDir,
+    );
+    expect(tmpfsAt).toBeGreaterThan(-1);
+    expect(launch.args.slice(tmpfsAt + 2, tmpfsAt + 4)).toEqual(['--remount-ro', missingDir]);
+    const missingDeniedDir = join(home, '.aws');
+    expect(
+      launch.args.findIndex(
+        (arg, index) => arg === '--tmpfs' && launch.args[index + 1] === missingDeniedDir,
+      ),
+    ).toBeGreaterThan(-1);
+    for (const [index, sock] of sockets.entries()) {
+      if (socketsExistedBefore[index] === true) {
+        expect(pairAt('/dev/null', realpathSync(sock)), sock).toBeGreaterThan(-1);
+      } else {
+        expect(pairAt('/dev/null', sock), sock).toBe(-1);
+        expect(existsSync(sock), sock).toBe(false);
+      }
+    }
+    const netrc = join(home, '.netrc');
+    mkdirSync(netrc, { recursive: true });
+    const dirWrap = conf.wrap('true', []);
+    expect(
+      dirWrap.args.findIndex(
+        (arg, index) => arg === '--tmpfs' && dirWrap.args[index + 1] === netrc,
+      ),
+    ).toBeGreaterThan(-1);
     expect(launch.args.slice(-3)).toEqual(['bash', '-c', 'echo hi']);
+    const probe = spawnSync(dirWrap.command, dirWrap.args, { encoding: 'utf8' });
+    const diag = spawnSync('ls', ['-la', '/var', '/var/run', '/run'], {
+      encoding: 'utf8',
+    });
+    const mounts = dirWrap.args.join(' ');
+    expect(
+      probe.status,
+      `${probe.stderr}\n--- mounts ---\n${mounts}\n--- fs ---\n${diag.stdout}${diag.stderr}`,
+    ).toBe(0);
+  });
+
+  test('on linux a dangling symlink at a denied path is unlinked then masked', () => {
+    const { home, serverHome } = layout();
+    const conf = createHostShellConfinement({
+      home,
+      deniedRoots: [serverHome],
+      platform: 'linux',
+      path: process.env.PATH,
+    });
+    if (executableOnPath('bwrap', process.env.PATH) === undefined) {
+      expect(() => conf.wrap('true', [])).toThrow(ComputerRefusal);
+      return;
+    }
+    const kube = join(home, '.kube');
+    symlinkSync(join(home, 'no-such-target'), kube);
+    const launch = conf.wrap('true', []);
+    expect(
+      launch.args.findIndex((arg, index) => arg === '--tmpfs' && launch.args[index + 1] === kube),
+    ).toBeGreaterThan(-1);
+    expect(() => lstatSync(kube)).toThrow();
   });
 
   test('on linux without bwrap every command is refused', () => {
@@ -331,4 +502,47 @@ describe.runIf(process.platform === 'darwin')('host shell seatbelt probe', () =>
       server.close();
     }
   }, 30000);
+
+  test('write-denied paths refuse writes but keep reads, and git hooks are protected', () => {
+    const { home, serverHome } = layout();
+    mkdirSync(join(home, 'Library', 'LaunchAgents'), { recursive: true });
+    writeFileSync(join(home, 'Library', 'LaunchAgents', 'existing.plist'), 'plist');
+    writeFileSync(join(home, '.gitconfig'), '[user]\n');
+    mkdirSync(join(home, 'repo', '.git', 'hooks', 'pre-commit.d'), { recursive: true });
+    const conf = createHostShellConfinement({ home, deniedRoots: [serverHome] });
+    if (!existsSync('/usr/bin/sandbox-exec')) return;
+    const run = (script: string) => {
+      const launch = conf.wrap('/bin/sh', ['-c', script]);
+      return spawnSync(launch.command, launch.args, { cwd: home, encoding: 'utf8', timeout: 8000 });
+    };
+    expect(run(`echo x > '${join(home, 'Library', 'LaunchAgents', 'new.plist')}'`).status).not.toBe(
+      0,
+    );
+    expect(run(`echo x >> '${join(home, '.gitconfig')}'`).status).not.toBe(0);
+    expect(run(`echo x > '${join(home, 'repo', '.git', 'hooks', 'pre-commit')}'`).status).not.toBe(
+      0,
+    );
+    expect(run(`echo x >> '${join(home, 'repo', '.git', 'config')}'`).status).not.toBe(0);
+    expect(run(`echo x > '${join(home, 'repo', '.git', 'commondir')}'`).status).not.toBe(0);
+    expect(run(`echo x > '${join(home, 'repo', '.GIT', 'hooks', 'Pre-Commit')}'`).status).not.toBe(
+      0,
+    );
+    expect(run(`echo x > '${join(home, 'repo', '.git')}/./hooks/update'`).status).not.toBe(0);
+    expect(
+      run(`echo x > '${join(home, 'repo', '.git', 'hooks', 'pre-commit.d', 'x')}'`).status,
+    ).not.toBe(0);
+    expect(run(`echo x > '${join(home, 'repo', '.git')}//hooks//pre-commit'`).status).not.toBe(0);
+    expect(
+      run(`mv '${join(home, 'repo', '.git', 'hooks')}' '${join(home, 'repo', '.git', 'h')}'`)
+        .status,
+    ).not.toBe(0);
+    expect(run(`mv '${join(home, 'repo', '.git')}' '${join(home, 'repo', 'g')}'`).status).not.toBe(
+      0,
+    );
+    expect(run(`rmdir '${join(home, 'repo', '.git', 'hooks')}'`).status).not.toBe(0);
+    expect(run(`mkdir -p '${join(home, 'fresh', '.git', 'hooks')}'`).status).toBe(0);
+    expect(run(`cat '${join(home, 'Library', 'LaunchAgents', 'existing.plist')}'`).status).toBe(0);
+    expect(run(`cat '${join(home, '.gitconfig')}'`).status).toBe(0);
+    expect(run(`echo x > '${join(home, 'work', 'ok')}'`).status).toBe(0);
+  });
 });

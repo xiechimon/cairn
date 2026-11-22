@@ -1,8 +1,18 @@
 import { rmSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, isAbsolute, join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { gitCredentialEnv } from './git.js';
 import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
+
+export function stepCredentialStateDirs(env: NodeJS.ProcessEnv | undefined): string[] {
+  const dirs = [
+    env?.CAIRN_GIT_CRED_FILE !== undefined && isAbsolute(env.CAIRN_GIT_CRED_FILE)
+      ? dirname(env.CAIRN_GIT_CRED_FILE)
+      : [],
+    env?.GH_CONFIG_DIR !== undefined && isAbsolute(env.GH_CONFIG_DIR) ? [env.GH_CONFIG_DIR] : [],
+  ].flat();
+  return [...new Set(dirs)];
+}
 
 export class StepAppCredential {
   private credential: BoundGitCredentials;

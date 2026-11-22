@@ -112,6 +112,12 @@ describe('runtimeChildEnv', () => {
     expect(env.OTEL_SDK_DISABLED).toBe('true');
   });
 
+  test('session children never inherit the owner SSH agent pointer', () => {
+    const env = runtimeChildEnv({ TMPDIR: '/step/tmp' }, PARENT);
+    expect(env.SSH_AUTH_SOCK).toBe('');
+    expect(env.SSH_AGENT_PID).toBe('');
+  });
+
   test('an App credential file still hides token variables inside the session env', () => {
     const env = runtimeChildEnv(
       { CAIRN_GIT_CRED_FILE: '/private/token', GH_TOKEN: 'inherited', GITHUB_TOKEN: 'x' },

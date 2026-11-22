@@ -26,6 +26,7 @@ import {
   type CairnTracing,
   createCairnTracing,
   type OtlpTarget,
+  otelConfigEnv,
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
@@ -48,7 +49,7 @@ let droppedAfterSeal = 0;
 
 function runtimeTarget(env: NodeJS.ProcessEnv): OtlpTarget | null {
   try {
-    return parseOtlpTarget(env);
+    return parseOtlpTarget(otelConfigEnv(env));
   } catch {
     return null;
   }
@@ -60,7 +61,7 @@ function push(target: OtlpTarget, env: NodeJS.ProcessEnv, spans: CairnSpan[]): v
     droppedAfterSeal += spans.length;
     return;
   }
-  const environment = otelEnvironment(env);
+  const environment = otelEnvironment(otelConfigEnv(env));
   const key = JSON.stringify([target.url.href, target.headers, environment]);
   let tracing = tracings.get(key);
   if (tracing === undefined) {
@@ -198,7 +199,7 @@ export function emitRuntimeStepSpan(
   if (target === null) return;
   const row = db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row || row.claimedAt == null) return;
-  const environment = otelEnvironment(env);
+  const environment = otelEnvironment(otelConfigEnv(env));
   const attribution = Object.fromEntries(
     [...githubUnattributedCounts()].map(([reason, count]) => [
       `cairn.github.write_unattributed.${reason}`,
@@ -351,7 +352,7 @@ export function emitRuntimeBuildSpan(
           name: 'build',
           sessionId: row.todoId,
           tags: ['cairn', 'build'],
-          environment: otelEnvironment(env),
+          environment: otelEnvironment(otelConfigEnv(env)),
         }),
       },
       ...(outcome === 'done' ? {} : { error: errorMessage ?? outcome }),
@@ -411,7 +412,7 @@ export function emitCoordinatorTurnSpans(
 ): void {
   const target = runtimeTarget(env);
   if (target === null || records.length === 0) return;
-  const environment = otelEnvironment(env);
+  const environment = otelEnvironment(otelConfigEnv(env));
   const mail =
     turn.redactText === true ||
     records.some(
@@ -551,7 +552,7 @@ export function emitSummaryCallSpan(
           ? {}
           : { 'cairn.provider.diagnostics': call.diagnostics }),
         ...(call.httpStatus === undefined ? {} : { 'http.response.status_code': call.httpStatus }),
-        ...langfuseEnvironmentAttributes(otelEnvironment(env)),
+        ...langfuseEnvironmentAttributes(otelEnvironment(otelConfigEnv(env))),
       },
       ...(call.errorMessage === undefined ? {} : { error: call.errorMessage }),
     },
@@ -572,7 +573,7 @@ export function emitCompactionSpan(
 ): void {
   const target = runtimeTarget(env);
   if (target === null) return;
-  const environment = otelEnvironment(env);
+  const environment = otelEnvironment(otelConfigEnv(env));
   const now = Date.now();
   const inTurn = failure.threadId !== undefined && failure.stepId !== undefined;
   const traceId = inTurn

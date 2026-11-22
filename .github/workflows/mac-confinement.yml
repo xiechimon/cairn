@@ -5,7 +5,9 @@ on:
     paths:
       - apps/daemon/src/backend/**
       - apps/daemon/src/process-tree.ts
+      - apps/daemon/src/computer/host.ts
       - apps/daemon/test/confine-*.test.ts
+      - apps/daemon/test/host-shell-confinement.test.ts
       - apps/daemon/test/confinement-availability.test.ts
       - apps/daemon/test/computer-host-detached.test.ts
       - .github/workflows/mac-confinement.yml
@@ -14,7 +16,9 @@ on:
     paths:
       - apps/daemon/src/backend/**
       - apps/daemon/src/process-tree.ts
+      - apps/daemon/src/computer/host.ts
       - apps/daemon/test/confine-*.test.ts
+      - apps/daemon/test/host-shell-confinement.test.ts
       - apps/daemon/test/confinement-availability.test.ts
       - apps/daemon/test/computer-host-detached.test.ts
       - .github/workflows/mac-confinement.yml
@@ -50,7 +54,7 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Run the Seatbelt session probes
-        run: pnpm exec vitest run apps/daemon/test/confine-seatbelt.test.ts apps/daemon/test/confine-session.test.ts apps/daemon/test/acp-spike.test.ts
+        run: pnpm exec vitest run apps/daemon/test/confine-seatbelt.test.ts apps/daemon/test/confine-session.test.ts apps/daemon/test/host-shell-confinement.test.ts apps/daemon/test/acp-spike.test.ts
 
       - name: Run the macOS process-cleanup probes
         run: pnpm exec vitest run apps/daemon/test/computer-host-detached.test.ts

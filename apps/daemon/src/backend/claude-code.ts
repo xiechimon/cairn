@@ -47,6 +47,7 @@ import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { stepCredentialRedactor } from '../credential-output.js';
 import { ProcessTree, SESSION_TREE_ENV } from '../process-tree.js';
+import { stepCredentialStateDirs } from '../step-app-credential.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { BackgroundTaskRows } from './claude-background-tasks.js';
@@ -1633,7 +1634,9 @@ export class ClaudeCodeBackend implements AgentBackend {
       ...(this.opts.confine !== undefined
         ? {
             confine: (launch: Launch) =>
-              (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch),
+              (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch, {
+                readable: stepCredentialStateDirs(opts.env),
+              }),
           }
         : {}),
       abortController: abort,

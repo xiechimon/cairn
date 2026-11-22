@@ -30,7 +30,7 @@ Eval results: the eval suite (`eval/`, `docs/design/eval-gate.md`) writes runs a
 
 One build is one trace, root span `invoke_agent`, each step a child, model turns `chat`, tool calls `execute_tool`; ids are hashes of build/step ids so re-pushing is idempotent. Each Coordinator turn is its own trace, root `coordinator turn`, session = Coordinator thread id; build traces use the todo id as session. Tags: `cairn`, `coordinator` / `build`. Field names live in `packages/shared/src/genai-conventions.ts`.
 
-The packaged Mac app reads the same three `CAIRN_OTEL_*` keys from `~/Library/Application Support/@cairn/desktop/otel.env` (mode `0600`); see `apps/desktop/README.md`.
+The packaged Mac app reads the same three `CAIRN_OTEL_*` keys from `~/Library/Application Support/@cairn/desktop/otel.env` (mode `0600`); see `apps/desktop/README.md`. That file path is handed to the server and Runner as `CAIRN_OTEL_ENV_FILE` instead of exporting the values — a same-UID process can read another process's environment (`KERN_PROCARGS2`), so the header secret lives only in the denied file, not in the env of a process a session can inspect. A bare `CAIRN_OTEL_*` export still works for a self-hosted daemon/server that is not spawned by the desktop.
 
 ## Debugging a turn or task
 

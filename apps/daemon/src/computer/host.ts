@@ -388,16 +388,39 @@ export class HostComputerProvider implements ComputerProvider {
     if (bytes.byteLength > this.maxFileBytes) {
       throw new ComputerRefusal(`content exceeds ${this.maxFileBytes} bytes`);
     }
+    const text = (requested ?? '').trim();
+    const expanded = path.resolve(
+      this.home,
+      text === '' || text === '~'
+        ? this.home
+        : text.startsWith('~/')
+          ? path.join(this.home, text.slice(2))
+          : text,
+    );
+    if (this.options.confinement?.writeDenied(expanded) === true) {
+      throw new ComputerRefusal('path is write-protected');
+    }
     const target = await this.resolveInHome(requested, 'path');
     if (target === (await this.realHome())) throw new ComputerRefusal('path is the home folder');
-    const existing = await lstat(target).catch(() => undefined);
-    if (existing && !existing.isFile()) throw new ComputerRefusal('path is not a regular file');
+    if (this.options.confinement?.writeDenied(target) === true) {
+      throw new ComputerRefusal('path is write-protected');
+    }
     const directory = path.dirname(target);
     await mkdir(directory, { recursive: true });
-    if (!isInside(await this.realHome(), await realpath(directory))) {
+    const realDirectory = await realpath(directory);
+    if (!isInside(await this.realHome(), realDirectory)) {
       throw new ComputerRefusal('path resolves outside the home folder');
     }
-    const temporary = path.join(directory, `.cairn-write-${randomBytes(8).toString('hex')}`);
+    const realTarget = path.join(realDirectory, path.basename(target));
+    if (
+      this.options.confinement?.denied(realTarget) === true ||
+      this.options.confinement?.writeDenied(realTarget) === true
+    ) {
+      throw new ComputerRefusal('path is write-protected');
+    }
+    const existing = await lstat(realTarget).catch(() => undefined);
+    if (existing && !existing.isFile()) throw new ComputerRefusal('path is not a regular file');
+    const temporary = path.join(realDirectory, `.cairn-write-${randomBytes(8).toString('hex')}`);
     const handle = await open(
       temporary,
       constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0),
@@ -411,7 +434,7 @@ export class HostComputerProvider implements ComputerProvider {
     }
     try {
       if (existing) await chmod(temporary, existing.mode & 0o777);
-      await rename(temporary, target);
+      await rename(temporary, realTarget);
     } catch (error) {
       await rm(temporary, { force: true });
       throw error;

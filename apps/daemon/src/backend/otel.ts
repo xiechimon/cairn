@@ -14,6 +14,7 @@ import {
   type CairnSpan,
   type CairnTracing,
   createCairnTracing,
+  otelConfigEnv,
   parseOtlpTarget,
   type StepOtelContext,
   stepOtelContext,
@@ -56,9 +57,10 @@ export interface DaemonOtel {
 }
 
 export function daemonOtelFromEnv(env: NodeJS.ProcessEnv): DaemonOtel | null {
-  const target = parseOtlpTarget(env);
+  const resolved = otelConfigEnv(env);
+  const target = parseOtlpTarget(resolved);
   if (target === null) return null;
-  const environment = otelEnvironment(env);
+  const environment = otelEnvironment(resolved);
   return {
     contextFor: (buildId, stepId, kind) =>
       stepOtelContext(buildId, stepId, target, {
@@ -99,7 +101,15 @@ export function runtimeChildEnv(
       continue;
     filtered[key] = value;
   }
-  return childEnv({ ...filtered, OTEL_SDK_DISABLED: 'true' }, parent);
+  return childEnv(
+    {
+      ...filtered,
+      SSH_AUTH_SOCK: '',
+      SSH_AGENT_PID: '',
+      OTEL_SDK_DISABLED: 'true',
+    },
+    parent,
+  );
 }
 
 export function claudeCliEnv(

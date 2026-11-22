@@ -28,6 +28,7 @@ export interface StatePaths {
   teamSkillsCacheDir: string;
   stepAttachmentsDir: string;
   plansDir: string;
+  credsDir: string;
 }
 
 export function statePaths(home: string, workspacesDir?: string): StatePaths {
@@ -45,6 +46,7 @@ export function statePaths(home: string, workspacesDir?: string): StatePaths {
     teamSkillsCacheDir: join(home, 'team-skills'),
     stepAttachmentsDir: join(home, 'step-attachments'),
     plansDir: join(home, 'plans'),
+    credsDir: join(home, 'creds'),
   };
 }
 
@@ -55,6 +57,7 @@ export function ensureStateDirs(paths: StatePaths): void {
     paths.chatSessionsDir,
     paths.agentRuntimeDir,
     paths.workspacesDir,
+    paths.credsDir,
   ]) {
     ensurePrivateDir(dir);
   }

@@ -35,8 +35,28 @@ export function desktopOtelEnv(path: string, log: (line: string) => void): OtelE
   };
 }
 
-export function withOtelEnv(env: NodeJS.ProcessEnv, otel: OtelEnv): NodeJS.ProcessEnv {
+const OTEL_ENV_FILE = 'CAIRN_OTEL_ENV_FILE';
+const SECRET_SHAPED_ENV = /(?:_TOKEN|_SECRET|_PASSWORD|_KEY|_CREDENTIALS?)$/;
+const SCRUB_EXEMPT = new Set(['CAIRN_REQUIRE_TOKEN']);
+
+export function scrubSpawnEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next: NodeJS.ProcessEnv = { ...env };
-  for (const key of OTEL_KEYS) delete next[key];
-  return { ...next, ...otel };
+  for (const key of Object.keys(next)) {
+    if (SCRUB_EXEMPT.has(key)) continue;
+    if (
+      SECRET_SHAPED_ENV.test(key) ||
+      key.startsWith('CAIRN_OTEL_') ||
+      key.startsWith('OTEL_') ||
+      key === 'CAIRN_GITHUB_OAUTH_CLIENT_ID' ||
+      key === 'CAIRN_ALERT_SMTP_URL'
+    )
+      delete next[key];
+  }
+  return next;
+}
+
+export function withOtelFileEnv(env: NodeJS.ProcessEnv, file: string | null): NodeJS.ProcessEnv {
+  const next = scrubSpawnEnv(env);
+  if (file !== null) next[OTEL_ENV_FILE] = file;
+  return next;
 }

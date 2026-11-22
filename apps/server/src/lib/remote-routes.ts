@@ -2,7 +2,7 @@ import type { NetworkInterfaceInfo } from 'node:os';
 import type { RemoteRoute, RemoteRoutesResponse, TailnetAccess } from '@cairn/shared';
 import { isLoopbackHost } from '../config.js';
 
-const WILDCARD_HOSTS = new Set(['0.0.0.0', '::', '']);
+const WILDCARD_HOSTS = new Set(['0.0.0.0', '::', '[::]', '*', '']);
 const IPV4_PATTERN = /^\d{1,3}(\.\d{1,3}){3}$/;
 const LINK_LOCAL_PREFIX = '169.254.';
 const DOCKER_DEFAULT_BRIDGE_PREFIX = '172.17.';

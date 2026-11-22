@@ -73,7 +73,7 @@ import {
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { type DesktopLocale, desktopLocale } from './locale.js';
-import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
+import { desktopOtelEnv, withOtelFileEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type CapturePage, createPageCapture } from './page-capture.js';
 import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
@@ -166,7 +166,7 @@ interface RunningServer {
 }
 
 let server: RunningServer | null = null;
-let serverOtelEnv: OtelEnv | null = null;
+let serverOtelFile: string | null = null;
 const serverRestartBudget = createRestartBudget(SERVER_RESTART_MAX, SERVER_RESTART_STABLE_MS);
 const serverExited = createServerExitHandler<RunningServer>({
   budget: serverRestartBudget,
@@ -330,11 +330,11 @@ async function answerPageCapture(
 
 function startServer(
   port: number,
-  otelEnv: OtelEnv,
+  otelFile: string | null,
   onExit: (dead: RunningServer, code: number | null) => void,
 ): RunningServer {
   serverRestartBudget.started();
-  const env = withOtelEnv(
+  const env = withOtelFileEnv(
     {
       ...process.env,
       HOST: LOOPBACK,
@@ -343,7 +343,7 @@ function startServer(
       [ENV_VARS.parentPid]: String(process.pid),
       [ENV_VARS.ownerChannel]: 'ipc',
     },
-    otelEnv,
+    otelFile,
   );
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
@@ -390,7 +390,7 @@ function serverPortOf(running: RunningServer): number {
 async function restartServer(dead: RunningServer): Promise<void> {
   if (quitting) return;
   console.error(`Cairn server exited (code ${dead.exitCode}); restarting`);
-  const next = startServer(serverPortOf(dead), serverOtelEnv as OtelEnv, serverExited);
+  const next = startServer(serverPortOf(dead), serverOtelFile, serverExited);
   server = next;
   try {
     await waitUntilServing(next);
@@ -1027,10 +1027,12 @@ async function boot(): Promise<void> {
     const notice = takeRollbackNotice(userData);
     guard = armVersionGuard(userData);
     activeGuard = guard;
-    const otelEnv = desktopOtelEnv(join(userData, 'otel.env'), console.error);
-    serverOtelEnv = otelEnv;
+    const otelEnvPath = join(userData, 'otel.env');
+    const otelEnv = desktopOtelEnv(otelEnvPath, console.error);
+    const otelFile = otelEnv.CAIRN_OTEL_ENDPOINT === undefined ? null : otelEnvPath;
+    serverOtelFile = otelFile;
     otelHeaderLogSecrets.push(...otelHeaderSecrets(otelEnv.CAIRN_OTEL_HEADERS));
-    server = startServer(await serverPort(), otelEnv, serverExited);
+    server = startServer(await serverPort(), otelFile, serverExited);
     await waitUntilServing(server);
     startHealthWatch(server, guard);
     const ownerToken = readOwnerToken();
@@ -1050,7 +1052,7 @@ async function boot(): Promise<void> {
         origin,
         ownerToken,
         ownerChannelKey,
-        otelEnv,
+        otelFile,
         agentDesktop: agentDesktopBinary(),
         isQuitting: () => quitting,
       })

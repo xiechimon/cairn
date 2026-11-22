@@ -1,7 +1,8 @@
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
+import { createSessionConfiner } from '../src/backend/confine-session.js';
 import {
   HOOK_OUTPUT_CHAR_LIMIT,
   runWorkspaceHook,
@@ -234,6 +235,62 @@ describe('workspace hook primitive (#1149)', () => {
     expect(note!.output).toContain('probe=\n');
     expect(note!.output).not.toContain('probe=kept');
   });
+
+  test.runIf(process.platform === 'darwin')(
+    'a confined setup hook cannot read a denied path but keeps its workspace and step credential',
+    async () => {
+      const root = realpathSync(tmpRoot());
+      const home = join(root, 'user');
+      const runnerHome = join(root, 'runner');
+      const serverHome = join(root, 'server');
+      const worktree = join(runnerHome, 'workspaces', 'a');
+      const creds = join(runnerHome, 'creds', 'step-1-github');
+      for (const path of [home, serverHome, worktree, join(creds, 'gh'), join(root, 'tmp', 'T')])
+        mkdirSync(path, { recursive: true });
+      writeFileSync(join(serverHome, 'token'), 'owner-secret');
+      writeFileSync(join(creds, 'github-token'), 'step-secret');
+      writeHook(
+        worktree,
+        'setup',
+        '#!/bin/sh\n' +
+          `echo "cred=$(cat '${join(creds, 'github-token')}')"\n` +
+          `cat '${join(serverHome, 'token')}' || echo "denied=$?"\n` +
+          'echo "agent=[$SSH_AUTH_SOCK][$SSH_AGENT_PID]"\n' +
+          'echo built > "$PWD/hook-built"\n',
+      );
+      const confine = createSessionConfiner({
+        daemonHome: runnerHome,
+        extraDeniedRoots: [serverHome],
+        readable: [],
+        handoffDirectories: [],
+        serverUrl: 'http://127.0.0.1:1',
+        platform: 'darwin',
+        home,
+        environment: {
+          TMPDIR: join(root, 'tmp', 'T'),
+          CAIRN_GIT_CRED_FILE: join(creds, 'github-token'),
+        },
+      });
+      const note = await runWorkspaceHook({
+        cwd: worktree,
+        name: 'setup',
+        credentials: null,
+        env: {
+          CAIRN_GIT_CRED_FILE: join(creds, 'github-token'),
+          TMPDIR: join(root, 'tmp', 'T'),
+        },
+        confine: confine ?? undefined,
+        timeoutMs: 30_000,
+        log: () => {},
+      });
+      expect(note!.output).toContain('cred=step-secret');
+      expect(note!.output).toContain('denied=1');
+      expect(note!.output).toContain('agent=[][]');
+      expect(note!.output).not.toContain('owner-secret');
+      expect(readFileSync(join(worktree, 'hook-built'), 'utf8')).toBe('built\n');
+    },
+    40_000,
+  );
 
   test('the resume name runs the same (the primitive is name-agnostic)', async () => {
     const root = tmpRoot();

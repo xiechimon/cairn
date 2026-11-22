@@ -10,7 +10,7 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import { type ConfinementPolicy, confinementArgs } from '../src/backend/confine.js';
+import { type ConfinementPolicy, confinementArgs, serverPortOf } from '../src/backend/confine.js';
 import { testTempDir } from './test-temp-dir.js';
 
 const linuxProbes = process.platform === 'linux' && process.env.CAIRN_CONFINE_LINUX_PROBES === '1';
@@ -146,6 +146,56 @@ test('pins git metadata container names and the workspace .git node against rena
   ]) {
     expect(bound(path), path).toBe(true);
   }
+});
+
+test('masks a symlinked git metadata container instead of binding its target', () => {
+  const policy = fixture();
+  const git = policy.gitDirectories[0] as string;
+  const worktrees = join(git, 'worktrees');
+  mkdirSync(join(git, 'modules', 'sub'), { recursive: true });
+  symlinkSync('/', worktrees);
+  const args = confinementArgs(policy, 'linux');
+  const masked = args.some((arg, index) => arg === worktrees && args[index - 1] === '--tmpfs');
+  const bound = args.some(
+    (arg, index) =>
+      arg === worktrees && (args[index - 1] === '--bind' || args[index - 1] === '--ro-bind'),
+  );
+  expect(masked).toBe(true);
+  expect(bound).toBe(false);
+});
+
+test('denied variants resolving to state are not remounted read-only or dev-nulled', () => {
+  const policy = fixture();
+  const home = policy.home;
+  const sshState = join(policy.daemonHome, 'ssh');
+  const jsonState = join(policy.daemonHome, 'claude.json');
+  rmSync(join(home, '.ssh'), { recursive: true, force: true });
+  rmSync(join(home, '.claude.json'), { force: true });
+  mkdirSync(sshState, { recursive: true });
+  writeFileSync(jsonState, '{}');
+  symlinkSync(sshState, join(home, '.ssh'));
+  symlinkSync(jsonState, join(home, '.claude.json'));
+  policy.state = [...policy.state, sshState, jsonState];
+  const args = confinementArgs(policy, 'linux');
+  for (const [index, arg] of args.entries()) {
+    if (args[index - 1] === '--remount-ro') {
+      expect(arg).not.toBe(join(home, '.ssh'));
+      expect(arg).not.toBe(sshState);
+    }
+    if (args[index - 1] === '/dev/null' && args[index - 2] === '--ro-bind') {
+      expect(arg).not.toBe(join(home, '.claude.json'));
+      expect(arg).not.toBe(jsonState);
+    }
+  }
+});
+
+test('serverPortOf resolves protocol defaults and rejects unusable urls', () => {
+  expect(serverPortOf(new URL('http://cairn.example'))).toBe(80);
+  expect(serverPortOf(new URL('https://cairn.example'))).toBe(443);
+  expect(serverPortOf(new URL('ws://cairn.example'))).toBe(80);
+  expect(serverPortOf(new URL('wss://cairn.example'))).toBe(443);
+  expect(serverPortOf(new URL('http://cairn.example:8787'))).toBe(8787);
+  expect(serverPortOf(new URL('file:///tmp/x'))).toBeNull();
 });
 
 test('masks absent git metadata containers so they cannot be planted', () => {
@@ -396,7 +446,8 @@ test('a btrfs-style home mounts a tmpfs view entry-by-entry instead of an overla
   expect(tmpfsAt(args, policy.home)).toBe(true);
   expect(roBoundAt(args, join(policy.home, 'notes.txt'))).toBe(true);
   expect(roBoundAt(args, join(policy.home, 'plain-dir'))).toBe(true);
-  expect(roBoundAt(args, join(policy.home, '.cache'))).toBe(true);
+  expect(tmpfsAt(args, join(policy.home, '.cache'))).toBe(true);
+  expect(roBoundAt(args, join(policy.home, '.cache'))).toBe(false);
   const linkIndex = args.indexOf(join(policy.home, 'notes-link'));
   expect(args[linkIndex - 2]).toBe('--symlink');
   expect(args[linkIndex - 1]).toBe('notes.txt');
@@ -414,6 +465,47 @@ test('a btrfs-style home mounts a tmpfs view entry-by-entry instead of an overla
   expect(nullMasked(join(policy.home, '.netrc'))).toBe(true);
   expect(nullMasked(join(policy.home, '.git-credentials'))).toBe(true);
   expect(remountedRo(args, policy.home)).toBe(true);
+});
+
+test('a denied leaf inside a writable cache is masked after the cache bind', () => {
+  const policy = fixture();
+  const cache = join(policy.home, '.cache');
+  const huggingface = join(cache, 'huggingface');
+  mkdirSync(huggingface, { recursive: true });
+  const args = confinementArgs(policy, 'linux');
+  const bindIndex = args.findIndex((arg, index) => arg === cache && args[index - 1] === '--bind');
+  const maskIndex = args.findIndex(
+    (arg, index) => arg === huggingface && args[index - 1] === '--tmpfs',
+  );
+  expect(bindIndex).toBeGreaterThan(-1);
+  expect(maskIndex).toBeGreaterThan(bindIndex);
+});
+
+test('a state dir equal to a denied leaf mounts the bind over the mask', () => {
+  const policy = fixture();
+  const pi = join(policy.home, '.pi');
+  mkdirSync(pi, { recursive: true });
+  const args = confinementArgs(policy, 'linux');
+  const bindIndex = args.findIndex((arg, index) => arg === pi && args[index - 1] === '--bind');
+  const tmpfsIndex = args.findIndex((arg, index) => arg === pi && args[index - 1] === '--tmpfs');
+  expect(tmpfsIndex).toBeGreaterThan(-1);
+  expect(bindIndex).toBeGreaterThan(tmpfsIndex);
+});
+
+test('a symlinked denied file is masked under both its name and its resolved target', () => {
+  const policy = fixture();
+  const target = join(policy.home, 'dotfiles', 'zshrc');
+  mkdirSync(join(policy.home, 'dotfiles'));
+  writeFileSync(target, 'export SECRET=1\n');
+  symlinkSync(target, join(policy.home, '.zshrc'));
+  const args = confinementArgs(policy, 'linux');
+  const nullMasked = (path: string) =>
+    args.some(
+      (arg, index) =>
+        arg === path && args[index - 2] === '--ro-bind' && args[index - 1] === '/dev/null',
+    );
+  expect(nullMasked(join(policy.home, '.zshrc'))).toBe(true);
+  expect(nullMasked(target)).toBe(true);
 });
 
 test('an existing denied-path ancestor is repopulated so missing masks still land', () => {

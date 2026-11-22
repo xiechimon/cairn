@@ -79,9 +79,9 @@ function fixture() {
       resolveSessionFile: () => null,
       confine:
         confine ??
-        ((_opts, harness, launch, state) => {
+        ((_opts, harness, launch, extra) => {
           expect(harness).toBe('pi');
-          expect(state?.[0]).toBe(agentDir);
+          expect(extra?.state?.[0]).toBe(agentDir);
           writeFileSync(spawned, 'yes');
           return launch;
         }),

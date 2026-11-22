@@ -42,6 +42,7 @@ import {
   acpThoughtValue,
   CLAUDE_TODO_STATUS_STATES,
 } from '@cairn/shared';
+import { stepCredentialStateDirs } from '../step-app-credential.js';
 import { DAEMON_VERSION } from '../version.js';
 import {
   type AcpToolCall,
@@ -53,6 +54,7 @@ import {
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
 import type { PermissionRule } from './command-gate.js';
 import type { SessionConfiner } from './confine-session.js';
+
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
 import { runtimeChildEnv } from './otel.js';
@@ -641,7 +643,9 @@ class AcpBackend implements AgentBackend {
         args: adapter ? (adapter.args ?? []) : [...(this.options.executableArgs ?? ['--acp'])],
       };
       const confined =
-        this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch) ?? launch;
+        this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch, {
+          readable: stepCredentialStateDirs(opts.env),
+        }) ?? launch;
       const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
       if (adapter?.harness === 'devin') {
         for (const key of Object.keys(sessionEnv)) {

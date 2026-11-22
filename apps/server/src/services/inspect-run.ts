@@ -1,5 +1,10 @@
 import { chiefTurnErrorContentSchema, redactSecrets } from '@cairn/shared';
-import { otlpTraceIdOfBuild, otlpTraceIdOfTurn, parseOtlpTarget } from '@cairn/shared/otel';
+import {
+  otelConfigEnv,
+  otlpTraceIdOfBuild,
+  otlpTraceIdOfTurn,
+  parseOtlpTarget,
+} from '@cairn/shared/otel';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
@@ -51,7 +56,7 @@ const clip = (text: string, max = LINE_MAX_CHARS): string => {
 
 function traceExportConfigured(env: NodeJS.ProcessEnv): boolean {
   try {
-    return parseOtlpTarget(env) !== null;
+    return parseOtlpTarget(otelConfigEnv(env)) !== null;
   } catch {
     return false;
   }

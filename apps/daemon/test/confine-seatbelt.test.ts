@@ -1,9 +1,18 @@
-import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import {
+  ESCAPE_BINARIES,
   runSeatbeltProbe,
   type SeatbeltPolicy,
   seatbeltCommand,
@@ -104,6 +113,134 @@ describe('seatbelt profile', () => {
     expect(lines).toContain(
       '(deny mach-lookup (global-name-prefix "com.apple.windowserver") (global-name-prefix "com.apple.hiservices") (global-name-prefix "com.apple.pasteboard"))',
     );
+    expect(lines).toContain('(deny mach-bootstrap)');
+    expect(
+      lines.some((line) => line.includes('(deny process-exec (literal "/bin/launchctl")')),
+    ).toBe(true);
+    expect(lines).toContain(
+      '(deny mach-lookup (global-name-prefix "com.apple.securityd") (global-name-prefix "com.apple.SecurityServer") (global-name-prefix "com.apple.secd") (global-name-prefix "com.apple.trustd"))',
+    );
+    const keyed = seatbeltProfile({ ...policy, allowKeychainServices: true });
+    expect(keyed).not.toContain('com.apple.secd');
+  });
+
+  test.runIf(process.platform === 'darwin')(
+    'every denied escape binary exists on this platform',
+    () => {
+      for (const binary of ESCAPE_BINARIES) {
+        expect(existsSync(binary), binary).toBe(true);
+      }
+    },
+  );
+
+  test('denies the server port for every host and re-denies credentials under a readable carve-out', () => {
+    const { policy } = layout();
+    const remote = seatbeltProfile({
+      ...policy,
+      serverPort: 443,
+    });
+    expect(remote).toContain('(deny network-outbound (remote tcp "localhost:443"))');
+    expect(remote).toContain('(deny network-outbound (remote tcp "*:443"))');
+    const home = policy.home;
+    const readableDir = join(home, '.config', 'git');
+    const credentials = join(readableDir, 'credentials');
+    mkdirSync(readableDir, { recursive: true });
+    const carved = seatbeltProfile({
+      ...policy,
+      readable: [readableDir],
+      postReadableDenies: [credentials],
+    });
+    const lines = carved.split('\n');
+    const allowIndex = lines.findIndex((line) => line.includes(`(subpath "${readableDir}")`));
+    const denyIndex = lines.findIndex((line) => line.includes(`(subpath "${credentials}")`));
+    expect(allowIndex).toBeGreaterThanOrEqual(0);
+    expect(denyIndex).toBeGreaterThan(allowIndex);
+    expect(carved).toContain(`(deny file-read* file-write* (subpath "${credentials}")`);
+    expect(carved).toContain(
+      `(remote unix-socket (literal "${join(home, 'Library', 'Group Containers', '2BUA8C4S2C.com.1password', 't', 'agent.sock')}"))`,
+    );
+  });
+
+  test('denied paths resolve symlinks instead of failing the whole profile', () => {
+    const { policy, root } = layout();
+    const home = policy.home;
+    const target = join(root, 'dotfiles', 'zshrc');
+    mkdirSync(join(root, 'dotfiles'), { recursive: true });
+    writeFileSync(target, 'export SECRET=1\n');
+    symlinkSync(target, join(home, '.zshrc'));
+    const profile = seatbeltProfile(policy);
+    expect(profile).toContain(`(literal "${join(home, '.zshrc')}")`);
+    expect(profile).toContain(`(literal "${target}")`);
+  });
+
+  test('a denied path resolving inside a readable dir is re-denied after the allow', () => {
+    const { policy, root } = layout();
+    const home = policy.home;
+    const sshTarget = join(home, '.config', 'git', 'ssh');
+    mkdirSync(sshTarget, { recursive: true });
+    rmSync(join(home, '.ssh'), { force: true, recursive: true });
+    symlinkSync(join('.config', 'git', 'ssh'), join(home, '.ssh'));
+    const readableDir = join(home, '.config', 'git');
+    const profile = seatbeltProfile({ ...policy, readable: [readableDir] });
+    const lines = profile.split('\n');
+    const allowIndex = lines.findIndex((line) => line.includes(`(subpath "${readableDir}")`));
+    const postDenyIndex = lines.indexOf(`(deny file-read* file-write* (subpath "${sshTarget}"))`);
+    expect(allowIndex).toBeGreaterThanOrEqual(0);
+    expect(postDenyIndex, profile).toBeGreaterThan(allowIndex);
+    expect(root).toBeTruthy();
+  });
+
+  test('a readable dir equal to a denied path is refused unless explicitly allowed', () => {
+    const { policy, root } = layout();
+    const home = policy.home;
+    const sshDir = join(home, '.ssh');
+    mkdirSync(sshDir, { recursive: true });
+    expect(() => seatbeltProfile({ ...policy, readable: [sshDir] })).toThrow(
+      'Unsafe confinement readable overlap',
+    );
+    const elsewhere = join(root, 'dotfiles');
+    mkdirSync(elsewhere, { recursive: true });
+    rmSync(sshDir, { recursive: true, force: true });
+    symlinkSync(elsewhere, sshDir);
+    expect(() => seatbeltProfile({ ...policy, readable: [sshDir] })).toThrow(
+      'Unsafe confinement readable overlap',
+    );
+    const carved = seatbeltProfile({
+      ...policy,
+      readable: [sshDir],
+      readableDeniedAllowed: [sshDir, elsewhere],
+    });
+    expect(carved).toContain(`(subpath "${elsewhere}")`);
+  });
+
+  test('a readable symlink to a safe target emits the resolved variant too', () => {
+    const { policy, root } = layout();
+    const home = policy.home;
+    const target = join(root, 'dotfiles', 'git');
+    mkdirSync(target, { recursive: true });
+    mkdirSync(join(home, '.config'), { recursive: true });
+    const link = join(home, '.config', 'git');
+    rmSync(link, { recursive: true, force: true });
+    symlinkSync(target, link);
+    const profile = seatbeltProfile({ ...policy, readable: [link] });
+    expect(profile).toContain(`(subpath "${link}")`);
+    expect(profile).toContain(`(subpath "${target}")`);
+  });
+
+  test('post-readable denies reach the resolved parent under a symlinked root', () => {
+    const { policy, root } = layout();
+    const home = policy.home;
+    const configTarget = join(root, 'cfgdir');
+    mkdirSync(join(configTarget, 'git'), { recursive: true });
+    symlinkSync(configTarget, join(home, '.config'));
+    const credentials = join(home, '.config', 'git', 'credentials');
+    const profile = seatbeltProfile({
+      ...policy,
+      readable: [join(home, '.config', 'git')],
+      postReadableDenies: [credentials],
+    });
+    expect(profile).toContain(`(subpath "${join(configTarget, 'git')}")`);
+    expect(profile).toContain(`(subpath "${join(configTarget, 'git', 'credentials')}")`);
   });
 
   test('rejects a cache that overlaps a denied root and unsafe paths', () => {
@@ -195,6 +332,28 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
     expect(open.status).toBe(0);
   }, 20000);
 
+  test('a denied path resolved into a readable dir stays unreadable inside the profile', () => {
+    const fixture = layout();
+    const home = fixture.policy.home;
+    const sshTarget = join(home, '.config', 'git', 'ssh');
+    mkdirSync(sshTarget, { recursive: true });
+    writeFileSync(join(sshTarget, 'id_rsa'), 'secret');
+    rmSync(join(home, '.ssh'), { force: true, recursive: true });
+    symlinkSync(join('.config', 'git', 'ssh'), join(home, '.ssh'));
+    const policy = { ...fixture.policy, readable: [join(home, '.config', 'git')] };
+    for (const command of [
+      `cat '${join(home, '.ssh', 'id_rsa')}'`,
+      `cat '${join(sshTarget, 'id_rsa')}'`,
+      `ls '${join(sshTarget)}'`,
+    ]) {
+      const outcome = runConfined(policy, command, fixture.worktree);
+      expect(outcome.status, command).not.toBe(0);
+      expect(outcome.stdout, command).not.toContain('secret');
+    }
+    const listing = runConfined(policy, `ls '${join(home, '.config', 'git')}'`, fixture.worktree);
+    expect(listing.status).toBe(0);
+  });
+
   test('without confinement a session reads the owner token and edits the database', () => {
     const fixture = layout();
     const result = runConfined(
@@ -254,6 +413,155 @@ describe.runIf(process.platform === 'darwin')('seatbelt session probe', () => {
   });
 });
 
+describe.runIf(process.platform === 'darwin')('seatbelt hardening probes', () => {
+  test('a confined session cannot read any entry in the expanded deny inventory', () => {
+    const fixture = layout();
+    const home = fixture.policy.home;
+    const entries = [
+      join(home, '.config', 'gh', 'hosts.yml'),
+      join(home, '.config', 'opencode', 'config.json'),
+      join(home, '.npmrc'),
+      join(home, '.zshrc'),
+      join(home, '.zsh_history'),
+      join(home, '.cargo', 'credentials.toml'),
+      join(home, '.pypirc'),
+      join(home, '.local', 'share', 'devin', 'sessions', 'token'),
+      join(home, '.local', 'share', 'fish', 'fish_history'),
+      join(home, '.cache', 'huggingface', 'token'),
+      join(home, '.m2', 'settings.xml'),
+      join(home, 'Library', 'pnpm', 'rc', '.npmrc'),
+      join(home, 'Library', 'Keychains', 'login.keychain-db'),
+      join(home, 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Cookies'),
+      join(home, 'Library', 'Application Support', 'Chromium', 'Default', 'Login Data'),
+      join(home, 'Library', 'Application Support', 'Firefox', 'profiles.ini'),
+      join(home, 'Library', 'Application Support', 'Claude', 'session.json'),
+      join(home, 'Library', 'Application Support', 'Code', 'User', 'settings.json'),
+      join(home, 'Library', 'Application Support', '@cairn', 'desktop', 'Cache', 'data'),
+      join(home, 'Library', 'Safari', 'History.db'),
+      join(home, 'Library', 'Cookies', 'Cookies.binarycookies'),
+      join(home, 'Library', 'Mail', 'envelope'),
+      join(home, 'Library', 'Messages', 'chat.db'),
+    ];
+    for (const path of entries) {
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(path, 'secret');
+    }
+    const policy = {
+      ...fixture.policy,
+      deniedRoots: [...fixture.policy.deniedRoots, join(home, '.config')],
+    };
+    for (const path of entries) {
+      const outcome = runConfined(policy, `cat '${path}'`, fixture.worktree);
+      expect(outcome.status, path).not.toBe(0);
+      expect(outcome.stdout, path).not.toContain('secret');
+      const write = runConfined(policy, `echo x >> '${path}'`, fixture.worktree);
+      expect(write.status, `write ${path}`).not.toBe(0);
+    }
+    const work = runConfined(
+      policy,
+      `echo ok > '${join(fixture.worktree, 'ok')}'`,
+      fixture.worktree,
+    );
+    expect(work.status).toBe(0);
+  });
+
+  test('a confined session cannot signal or inspect outside processes, and its own children still work', () => {
+    const fixture = layout();
+    const outside = spawn('/bin/sleep', ['30']);
+    try {
+      const probe = runConfined(
+        fixture.policy,
+        [
+          `kill -0 ${outside.pid} 2>/dev/null && exit 9`,
+          'sleep 0.2 & child=$!; wait $child || exit 8',
+          'kill -0 $$ || exit 7',
+          'echo probe-done',
+        ].join('; '),
+        fixture.worktree,
+      );
+      expect(probe.status).toBe(0);
+      expect(probe.stdout).toBe('probe-done\n');
+      const signal = runConfined(
+        fixture.policy,
+        `kill -9 ${outside.pid} 2>/dev/null; echo kill-rc=$?`,
+        fixture.worktree,
+      );
+      expect(signal.stdout).toContain('kill-rc=1');
+      const info = runConfined(
+        fixture.policy,
+        `ps -p ${outside.pid} -o pid= 2>/dev/null; echo ps-rc=$?`,
+        fixture.worktree,
+      );
+      expect(info.stdout).toContain('ps-rc=1');
+    } finally {
+      outside.kill('SIGKILL');
+    }
+  });
+
+  test('the kern.procargs2 env channel stays open as the documented residual', () => {
+    const fixture = layout();
+    const python = ['/usr/bin/python3', '/opt/homebrew/bin/python3'].find(
+      (path) => spawnSync(path, ['-c', 'pass']).status === 0,
+    );
+    if (python === undefined) return;
+    const outside = spawn('/bin/sleep', ['30']);
+    try {
+      const script = join(fixture.worktree, 'procargs2.py');
+      writeFileSync(
+        script,
+        [
+          'import ctypes, sys',
+          "libc = ctypes.CDLL('libSystem.B.dylib')",
+          `name = (ctypes.c_int * 3)(1, 49, ${outside.pid})`,
+          'size = ctypes.c_size_t(0)',
+          'rc = libc.sysctl(name, 3, None, ctypes.byref(size), None, 0)',
+          'sys.exit(0 if rc == 0 and size.value > 0 else 1)',
+        ].join('\n'),
+      );
+      const confined = runConfined(fixture.policy, `${python} '${script}'`, fixture.worktree);
+      expect(confined.status, confined.stderr).toBe(0);
+    } finally {
+      outside.kill('SIGKILL');
+    }
+  });
+
+  test('a symlinked denied dotfile stays denied through both names', () => {
+    const fixture = layout();
+    const home = fixture.policy.home;
+    const target = join(fixture.root, 'dotfiles', 'zshrc');
+    mkdirSync(join(fixture.root, 'dotfiles'), { recursive: true });
+    writeFileSync(target, 'export SECRET=1\n');
+    symlinkSync(target, join(home, '.zshrc'));
+    for (const path of [join(home, '.zshrc'), target]) {
+      const outcome = runConfined(fixture.policy, `cat '${path}'`, fixture.worktree);
+      expect(outcome.status, path).not.toBe(0);
+      expect(outcome.stdout, path).not.toContain('SECRET');
+    }
+  });
+
+  test('keychain reads fail closed while TLS validation still works', () => {
+    const fixture = layout();
+    const generic = runConfined(
+      fixture.policy,
+      `security find-generic-password -s cairn-probe-does-not-exist 2>&1 | head -3`,
+      fixture.worktree,
+    );
+    expect(generic.stdout).toMatch(/Operation not permitted|could not be found|not found/i);
+    const system = runConfined(
+      fixture.policy,
+      `security find-generic-password -s probe /Library/Keychains/System.keychain 2>&1 | head -3`,
+      fixture.worktree,
+    );
+    expect(system.stdout).not.toContain('password:');
+    const tls = runConfined(
+      fixture.policy,
+      `curl -sS -o /dev/null -m 8 -w '%{http_code}' https://github.com`,
+      fixture.worktree,
+    );
+    expect(tls.stdout.trim(), tls.stderr).toMatch(/^(2|3|4)\d\d$/);
+  }, 20000);
+});
+
 describe.runIf(process.platform === 'darwin')('seatbelt startup probe', () => {
   test('the real probe passes on this Mac', async () => {
     await expect(runSeatbeltProbe(testTempDir('seatbelt-probe-'))).resolves.toBeUndefined();
@@ -263,6 +571,5 @@ describe.runIf(process.platform === 'darwin')('seatbelt startup probe', () => {
     const directory = join(testTempDir('seatbelt-probe-'), "it's-here");
     mkdirSync(directory, { recursive: true });
     await expect(runSeatbeltProbe(directory)).resolves.toBeUndefined();
-    expect(readFileSync(join(directory, 'probe-scratch', 'written'), 'utf8')).toBe('ok\n');
   });
 });

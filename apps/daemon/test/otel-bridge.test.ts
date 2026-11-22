@@ -1,5 +1,7 @@
+import { writeFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { join } from 'node:path';
 import { LANGFUSE_ATTR } from '@cairn/shared';
 import {
   OtlpTargetConfigError,
@@ -19,6 +21,7 @@ import {
   PiStepSpanSink,
   shutdownDaemonOtel,
 } from '../src/backend/otel.js';
+import { testTempDir } from './test-temp-dir.js';
 
 const env = {
   CAIRN_OTEL_ENDPOINT: 'http://pk:sk@127.0.0.1:3000/api/public/otel',
@@ -87,6 +90,40 @@ describe('daemonOtelFromEnv', () => {
     expect(() => daemonOtelFromEnv({ CAIRN_OTEL_ENDPOINT: '::bad' })).toThrowError(
       OtlpTargetConfigError,
     );
+  });
+});
+
+describe('otel env-file resolution', () => {
+  test('a CAIRN_OTEL_ENV_FILE flag resolves config from the file and strips inherited otel keys', () => {
+    const dir = testTempDir('otel-env-');
+    const file = join(dir, 'otel.env');
+    writeFileSync(
+      file,
+      `CAIRN_OTEL_ENDPOINT=${env.CAIRN_OTEL_ENDPOINT}\nCAIRN_OTEL_HEADERS=${env.CAIRN_OTEL_HEADERS}\nCAIRN_OTEL_ENVIRONMENT=file-env\nCAIRN_TOKEN=not-exported\n`,
+      { mode: 0o600 },
+    );
+    const otel = daemonOtelFromEnv({
+      CAIRN_OTEL_ENV_FILE: file,
+      CAIRN_OTEL_ENDPOINT: '::inherited',
+    });
+    expect(otel).not.toBeNull();
+    const ctx = otel!.contextFor('build-abc', 'step-xyz');
+    expect(ctx.tracesUrl).toBe('http://127.0.0.1:3000/api/public/otel/v1/traces');
+  });
+
+  test('without the flag, inherited CAIRN_OTEL_* values keep working', () => {
+    expect(daemonOtelFromEnv(env)).not.toBeNull();
+    expect(daemonOtelFromEnv({ PATH: '/usr/bin' })).toBeNull();
+  });
+
+  test('a flag pointing at a missing or group-readable file leaves telemetry off', () => {
+    expect(
+      daemonOtelFromEnv({ CAIRN_OTEL_ENV_FILE: join(testTempDir('otel-miss-'), 'none.env') }),
+    ).toBeNull();
+    const dir = testTempDir('otel-mode-');
+    const file = join(dir, 'otel.env');
+    writeFileSync(file, `CAIRN_OTEL_ENDPOINT=${env.CAIRN_OTEL_ENDPOINT}\n`, { mode: 0o644 });
+    expect(daemonOtelFromEnv({ CAIRN_OTEL_ENV_FILE: file })).toBeNull();
   });
 });
 
