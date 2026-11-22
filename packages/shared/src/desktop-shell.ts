@@ -9,20 +9,6 @@ export const DESKTOP_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${
 
 export type DesktopMenuCommand = 'settings' | 'new-task' | 'search';
 
-export const DESKTOP_TRAY_PATH = '/tray';
-
-export type DesktopRunnerState = 'starting' | 'on' | 'off' | 'failed';
-
-export interface DesktopTrayState {
-  runner: DesktopRunnerState;
-  keepAwake: boolean;
-  accent: string | null;
-}
-
-export type DesktopTrayOpen =
-  | { kind: 'path'; path: string }
-  | { kind: 'command'; command: DesktopMenuCommand };
-
 export function isAppPath(path: unknown): path is string {
   return typeof path === 'string' && /^\/app(?:[/?]|$)/.test(path);
 }

@@ -43,8 +43,8 @@ export function createKeepAwake(blocker: SleepBlocker, path: string): KeepAwake 
     isOn: () => manual,
     isHolding: () => held !== null,
     set(on) {
-      manual = on;
       writeFileSync(path, on ? 'on\n' : 'off\n');
+      manual = on;
       apply();
     },
     setWakeAhead(on) {

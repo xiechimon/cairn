@@ -1,6 +1,8 @@
-import { DESKTOP_SHELL_USER_AGENT, DESKTOP_TRAY_PATH } from '@cairn/shared';
+import { DESKTOP_SHELL_USER_AGENT } from '@cairn/shared';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { MAC_DESKTOP_SHELL, MAC_TRAY_SHELL, markDesktopShell } from '../src/desktop-shell.js';
+import { MAC_DESKTOP_SHELL, markDesktopShell } from '../src/desktop-shell.js';
 
 interface FakeElement {
   className: string;
@@ -34,11 +36,8 @@ const BROWSER_UA = 'Mozilla/5.0 (Macintosh) AppleWebKit/537.36 Chrome/156.0 Safa
 describe('markDesktopShell', () => {
   test('the desktop app user agent marks the root and adds one hidden drag strip', () => {
     const { root, appended, element } = fakeRoot();
-    expect(markDesktopShell(
-        element,
-        `${BROWSER_UA} Electron/45.2.1 ${DESKTOP_SHELL_USER_AGENT}`,
-        '/app',
-      ),
+    expect(
+      markDesktopShell(element, `${BROWSER_UA} Electron/45.2.1 ${DESKTOP_SHELL_USER_AGENT}`),
     ).toBe(true);
     expect(root.dataset.shell).toBe(MAC_DESKTOP_SHELL);
     expect(appended).toHaveLength(1);
@@ -46,19 +45,24 @@ describe('markDesktopShell', () => {
     expect(appended[0]?.attributes['aria-hidden']).toBe('true');
   });
 
-  test('the menu bar popover gets its own shell and no drag strip over its buttons', () => {
-    const { root, appended, element } = fakeRoot();
-    expect(
-      markDesktopShell(element, `${BROWSER_UA} ${DESKTOP_SHELL_USER_AGENT}`, DESKTOP_TRAY_PATH),
-    ).toBe(true);
-    expect(root.dataset.shell).toBe(MAC_TRAY_SHELL);
-    expect(appended).toHaveLength(0);
-  });
-
   test('a browser user agent leaves the page untouched', () => {
     const { root, appended, element } = fakeRoot();
-    expect(markDesktopShell(element, BROWSER_UA, '/app')).toBe(false);
+    expect(markDesktopShell(element, BROWSER_UA)).toBe(false);
     expect(root.dataset.shell).toBeUndefined();
     expect(appended).toHaveLength(0);
+  });
+});
+
+describe('the web app no longer ships a tray popover', () => {
+  const web = join(import.meta.dirname, '..');
+  const read = (path: string) => readFileSync(join(web, path), 'utf8');
+
+  test('no tray page, route, shell mark, boot branch or tray CSS remains', () => {
+    expect(existsSync(join(web, 'src/tray'))).toBe(false);
+    expect(read('src/App.tsx')).not.toContain('/tray');
+    expect(read('src/desktop-shell.ts')).not.toMatch(/tray/i);
+    expect(read('src/api/sse.ts')).not.toMatch(/tray/i);
+    expect(read('public/boot-skeleton.js')).not.toContain('/tray');
+    expect(read('src/styles/app.css')).not.toMatch(/tray-|mac-tray/);
   });
 });

@@ -99,7 +99,7 @@ describe('pick 3: labelled Button press dips to 0.97', () => {
     expect(pressBlock).toContain('[data-size^="icon"]');
     expect(pressBlock).toContain('[data-row-kind]');
     expect(pressBlock).toContain('[aria-disabled="true"]');
-    expect(pressBlock).toContain(':where(.tray-pop *)');
+    expect(pressBlock).not.toContain('tray');
   });
 
   test('scale runs on the strong ease-out over --dur-fast, gated on fine pointers and full motion', () => {

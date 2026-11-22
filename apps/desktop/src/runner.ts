@@ -32,6 +32,7 @@ export interface RunnerOptions {
   otelFile: string | null;
   agentDesktop: string | null;
   isQuitting: () => boolean;
+  onStateChanged: () => void;
 }
 
 export interface LocalRunner {
@@ -197,11 +198,13 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
       if (options.isQuitting() || halted) return;
       if (!budget.exited()) {
         console.error(`Cairn Runner exited (code ${code}, signal ${signal}); not restarting`);
+        options.onStateChanged();
         return;
       }
       console.error(`Cairn Runner exited (code ${code}, signal ${signal}); restarting`);
       pending = setTimeout(launch, RESTART_DELAY_MS);
     });
+    options.onStateChanged();
   };
   launch();
   return {

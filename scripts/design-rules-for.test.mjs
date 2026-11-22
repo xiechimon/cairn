@@ -29,13 +29,14 @@ test('a settings file gets the settings rows and not the conversation ones', () 
   for (const id of ['C8', 'C14', 'C16', 'L1', 'C9']) assert.ok(!got.includes(id), `${id} leaked`);
 });
 
-test('a sidebar file gets the L rows; a tray file gets V26', () => {
+test('a sidebar file gets the L rows; the native tray menu file gets V26', () => {
   const sidebar = ids(selectBlocks(['apps/web/src/board/sidebar.tsx']));
   assert.ok(sidebar.includes('L1') && sidebar.includes('L9'));
   assert.ok(!sidebar.includes('C14'));
-  const tray = ids(selectBlocks(['apps/web/src/tray/tray-page.tsx']));
+  const tray = ids(selectBlocks(['apps/desktop/src/tray-menu.ts']));
   assert.ok(tray.includes('V26'));
   assert.ok(!tray.includes('L1') && !tray.includes('C14'));
+  assert.ok(!tray.includes('P1'));
 });
 
 test('a file outside apps/web selects nothing', () => {

@@ -1538,13 +1538,10 @@
       "centrality": 2,
       "status": "planned",
       "code": {
-        "web": [
-          "apps/web/src/tray"
-        ]
-      },
-      "routes": {
-        "web": [
-          "/tray"
+        "other": [
+          "apps/desktop/src/main.ts",
+          "apps/desktop/src/tray-menu.ts",
+          "apps/desktop/src/tray-data.ts"
         ]
       },
       "research": [

@@ -537,18 +537,5 @@ test.describe('push notification click loop (XMON-106)', () => {
     await page.waitForTimeout(500);
     expect(await page.evaluate(() => window.__desktopNotifs.length)).toBe(0);
   });
-
-  test('T6d: the menu bar popover stays quiet so one notification shows one banner', async ({
-    page,
-  }) => {
-    await stubNotification(page);
-    await stubEventSource(page);
-    await stubDesktopNotify(page);
-    await mockLiveApi(page);
-    await page.goto('/tray');
-    await fireTeamNotification(page, makeRecord({}));
-    await page.waitForTimeout(500);
-    expect(await page.evaluate(() => window.__desktopNotifs.length)).toBe(0);
-  });
 });
 

@@ -36,7 +36,7 @@ The single entry for UI work. The gallery (`pnpm --filter @cairn/web dev`, `/des
 - `docs/design/surfaces/tasks.md` — the Tasks panel, task thread panel, task detail page, engine run.
 - `docs/design/surfaces/sidebar.md` — the sidebar tree, rows, menus, archived page, collapsed and peek, the shell.
 - `docs/design/surfaces/settings.md` — the settings list, forms, segmented controls, model routing, pickers, diagnostics.
-- `docs/design/surfaces/computers.md` — the computers panel, fleet badge, tray page.
+- `docs/design/surfaces/computers.md` — the computers panel, fleet badge, native tray menu.
 - `docs/design/surfaces/first-run.md` — the first-run setup page (C9).
 - `docs/design/surfaces/chrome.md` — buttons, SidePanel, empty state, dialogs, menus, ⌘K, slash and @ lists.
 - `docs/design/surfaces/motion.md` — the motion table, reduced motion, texture.

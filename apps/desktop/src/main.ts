@@ -1,20 +1,15 @@
 import { randomBytes } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
-import { homedir, release } from 'node:os';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
   DESKTOP_SHELL_USER_AGENT,
-  DESKTOP_TRAY_PATH,
-  type DesktopMenuCommand,
-  type DesktopRunnerState,
-  type DesktopTrayState,
   type DesktopUpdateState,
   desktopNotificationOptions,
   ENV_VARS,
-  isAppPath,
   isDesktopNotifyPayload,
   OWNER_CHANNEL_HEADER,
   OWNER_CHANNEL_MESSAGE,
@@ -35,13 +30,10 @@ import {
   type NativeImage,
   Notification,
   nativeImage,
-  nativeTheme,
   powerMonitor,
   powerSaveBlocker,
-  screen,
   session,
   shell,
-  systemPreferences,
   Tray,
   type UtilityProcess,
   utilityProcess,
@@ -64,7 +56,7 @@ import {
 } from './devin-auth.js';
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
-import { type DesktopLocale, desktopLocale } from './locale.js';
+import { type DesktopLocale, desktopLocale, openDesktopLocalePreference } from './locale.js';
 import { desktopOtelEnv, withOtelFileEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type CapturePage, createPageCapture } from './page-capture.js';
@@ -74,14 +66,14 @@ import { type LocalRunner, startLocalRunner } from './runner.js';
 import { migrateRunnerHome, runnerHomeFor } from './runner-home.js';
 import { createServerExitHandler } from './server-exit.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
-import { addLiquidGlass } from './tray-glass.js';
-import { trayMenuTemplate } from './tray-menu.js';
+import { createTrayDataLoader, type TrayData } from './tray-data.js';
 import {
-  hasLiquidGlass,
-  TRAY_POPOVER_RADIUS,
-  TRAY_POPOVER_WIDTH,
-  trayPopoverBounds,
-} from './tray-popover.js';
+  type TrayMenuActions,
+  type TrayRunnerState,
+  trayMenuTemplate,
+  traySettingsPath,
+} from './tray-menu.js';
+import { createTrayRefresh } from './tray-refresh.js';
 import {
   couldNotStartCopy,
   installUpdateCopy,
@@ -137,19 +129,8 @@ const HEALTH_PROBE_TIMEOUT_MS = 5_000;
 const IDLE_APPLY_MS = 10 * 60_000;
 const IDLE_TICK_MS = 60_000;
 const NEW_TASK_SHORTCUT = 'Control+Alt+N';
-const TRAY_FIRST_HEIGHT = 440;
-const TRAY_MAX_HEIGHT = 900;
-const TRAY_REFRESH_MS = 2_000;
-const TRAY_REOPEN_GUARD_MS = 250;
-const TRAY_LIGHT_FILL = '#f6f6f6';
-const TRAY_DARK_FILL = '#2b2b2b';
-const IS_MAC = process.platform === 'darwin';
+const TRAY_DATA_REFRESH_MS = 30_000;
 const BACKGROUND_LAUNCH = process.argv.includes(BACKGROUND_LAUNCH_FLAG);
-const MENU_COMMANDS: ReadonlySet<string> = new Set<DesktopMenuCommand>([
-  'settings',
-  'new-task',
-  'search',
-]);
 
 interface RunningServer {
   process: UtilityProcess;
@@ -413,7 +394,7 @@ function isWebUrl(url: string): boolean {
   return url.startsWith('https://') || url.startsWith('http://');
 }
 
-function openWindow(origin: string): BrowserWindow {
+function openWindow(origin: string, path = '/'): BrowserWindow {
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -449,7 +430,7 @@ function openWindow(origin: string): BrowserWindow {
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
   });
-  void window.loadURL(origin);
+  void window.loadURL(new URL(path, origin).href);
   mainWindow = window;
   window.on('closed', () => {
     if (mainWindow === window) mainWindow = null;
@@ -473,70 +454,24 @@ function sendToWindow(channel: string, payload: unknown): void {
   mainWindow?.webContents.send(channel, payload);
 }
 
-function openFromTray(target: unknown): void {
-  if (typeof target !== 'object' || target === null) return;
-  const { kind, path, command } = target as Partial<Record<string, unknown>>;
-  if (kind === 'path' && isAppPath(path)) sendToWindow('desktop-navigate', path);
-  else if (kind === 'command' && typeof command === 'string' && MENU_COMMANDS.has(command))
-    sendToWindow('desktop-menu', command);
+function openTrayPath(origin: string, path: string): void {
+  const window = mainWindow;
+  if (window === null) {
+    openWindow(origin, path);
+    return;
+  }
+  focusWindow();
+  if (window.webContents.isLoadingMainFrame()) {
+    void window.loadURL(new URL(path, origin).href);
+  } else {
+    window.webContents.send('desktop-navigate', path);
+  }
 }
 
 interface TrayControls {
-  runner: () => DesktopRunnerState;
+  runner: () => TrayRunnerState;
   setRunner: (on: boolean) => Promise<void>;
-  nextRunAt?: () => Promise<number | null>;
-}
-
-function createTrayPopover(origin: string): BrowserWindow {
-  const popover = new BrowserWindow({
-    width: TRAY_POPOVER_WIDTH,
-    height: TRAY_FIRST_HEIGHT,
-    show: false,
-    frame: false,
-    resizable: false,
-    movable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    alwaysOnTop: true,
-    hasShadow: true,
-    ...(IS_MAC
-      ? { type: 'panel', transparent: true, roundedCorners: true }
-      : { backgroundColor: nativeTheme.shouldUseDarkColors ? TRAY_DARK_FILL : TRAY_LIGHT_FILL }),
-    webPreferences: {
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-      preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
-    },
-  });
-  if (IS_MAC) {
-    const glass =
-      hasLiquidGlass(process.platform, release()) && addLiquidGlass(popover, TRAY_POPOVER_RADIUS);
-    if (!glass) popover.setVibrancy('menu');
-  }
-  popover.setVisibleOnAllWorkspaces(true, {
-    visibleOnFullScreen: true,
-    skipTransformProcessType: true,
-  });
-  popover.webContents.setUserAgent(
-    `${popover.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
-  );
-  popover.on('close', (event) => {
-    if (quitting) return;
-    event.preventDefault();
-    popover.hide();
-  });
-  popover.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  popover.webContents.on('will-navigate', (event) => event.preventDefault());
-  void popover.loadURL(`${origin}${DESKTOP_TRAY_PATH}`);
-  return popover;
-}
-
-function systemAccent(): string | null {
-  if (!IS_MAC) return null;
-  return `#${systemPreferences.getAccentColor().slice(0, 6)}`;
+  nextRunAt: () => Promise<number | null>;
 }
 
 async function windowLocale(): Promise<DesktopLocale> {
@@ -549,7 +484,11 @@ async function windowLocale(): Promise<DesktopLocale> {
   return desktopLocale(app.getLocale());
 }
 
-function showTray(origin: string, controls: TrayControls): Tray {
+function showTray(
+  origin: string,
+  ownerToken: string,
+  controls: TrayControls,
+): { tray: Tray; refresh: () => void } {
   const trayIcon = (name: string): NativeImage => {
     const image = nativeImage.createFromPath(join(app.getAppPath(), 'assets', name));
     image.setTemplateImage(true);
@@ -559,110 +498,118 @@ function showTray(origin: string, controls: TrayControls): Tray {
   const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
   const created = new Tray(keepAwake.isHolding() ? awakeIcon : idleIcon);
-  const refreshIcon = (): void => {
-    created.setImage(keepAwake.isHolding() ? awakeIcon : idleIcon);
-  };
-  const fallbackMenu = (): Menu =>
-    Menu.buildFromTemplate(
-      trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
-        open: focusWindow,
-        setKeepAwake,
-        quit: () => app.quit(),
-      }),
-    );
-  created.setToolTip(`Cairn · ${new URL(origin).host}`);
-  const setKeepAwake = (on: boolean): void => {
-    keepAwake.set(on);
-    refreshIcon();
-    if (!IS_MAC) created.setContextMenu(fallbackMenu());
-  };
-  if (controls.nextRunAt !== undefined) {
-    const nextRunAt = controls.nextRunAt;
-    const wakeAhead = createWakeAhead({
-      nextRunAt,
-      onWindow: (active) => {
-        keepAwake.setWakeAhead(active);
-        refreshIcon();
-      },
-    });
-    wakeAhead.start();
-    powerMonitor.on('resume', () => void wakeAhead.pollNow());
-  }
-  globalShortcut.register(NEW_TASK_SHORTCUT, () => sendToWindow('desktop-menu', 'new-task'));
-  const popover = createTrayPopover(origin);
-  let height = TRAY_FIRST_HEIGHT;
-  let hiddenAt = 0;
-  const state = (): DesktopTrayState => ({
-    runner: controls.runner(),
-    keepAwake: keepAwake.isOn(),
-    accent: systemAccent(),
+  created.setToolTip('Cairn');
+
+  const locale = openDesktopLocalePreference(app.getPath('userData'), app.getLocale(), (error) => {
+    console.error('Cairn could not save the desktop language:', messageOf(error));
   });
-  const publish = (): void => {
-    if (popover.isVisible()) popover.webContents.send('desktop-tray:state', state());
-  };
-  const place = (): void => {
-    const iconBounds = created.getBounds();
-    popover.setBounds(
-      trayPopoverBounds(iconBounds, screen.getDisplayMatching(iconBounds).workArea, height),
-    );
-  };
-  const hide = (): void => {
-    if (popover.isVisible()) popover.hide();
-  };
-  popover.on('blur', () => {
-    hiddenAt = Date.now();
-    popover.hide();
-  });
-  const toggle = (): void => {
-    if (popover.isVisible() || Date.now() - hiddenAt < TRAY_REOPEN_GUARD_MS) {
-      hide();
-      return;
+  const onLocale = (event: IpcMainEvent, value: unknown): void => {
+    const frame = event.senderFrame;
+    if (
+      event.sender === mainWindow?.webContents &&
+      frame?.origin === origin &&
+      frame.parent === null &&
+      locale.set(value)
+    ) {
+      refresh();
     }
-    const show = (): void => {
-      place();
-      popover.show();
-      if (!IS_MAC) popover.focus();
-      publish();
-    };
-    if (popover.webContents.isLoading()) popover.once('ready-to-show', show);
-    else show();
   };
-  created.on('click', toggle);
-  (app as NodeJS.EventEmitter).on('cairn-tray-toggle', toggle);
-  if (IS_MAC) created.on('right-click', toggle);
-  else created.setContextMenu(fallbackMenu());
-  setInterval(publish, TRAY_REFRESH_MS);
-  const fromPopover = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
-    event.sender === popover.webContents && event.senderFrame?.origin === origin;
-  ipcMain.handle('desktop-tray:state', (event) => (fromPopover(event) ? state() : null));
-  ipcMain.on('desktop-tray:open', (event, target: unknown) => {
-    if (!fromPopover(event)) return;
-    hide();
-    openFromTray(target);
+  ipcMain.on('desktop-locale:report', onLocale);
+  let data: TrayData = { status: 'loading' };
+  let tracking = false;
+  let rendered = '';
+  const refreshWorkspace = createTrayRefresh(createTrayDataLoader(origin, ownerToken), (next) => {
+    data = next;
+    refresh();
   });
-  ipcMain.handle('desktop-tray:runner', async (event, on: unknown) => {
-    if (!fromPopover(event)) return;
-    await controls.setRunner(on === true);
-    publish();
+  const actions: TrayMenuActions = {
+    open: (path) => openTrayPath(origin, path),
+    settings: () => {
+      const path = traySettingsPath(mainWindow?.webContents.getURL() ?? '', origin);
+      if (path === null) focusWindow();
+      else openTrayPath(origin, path);
+    },
+    setRunner: (on) => {
+      void controls
+        .setRunner(on)
+        .catch((error: unknown) => {
+          console.error('Cairn Runner could not change state:', messageOf(error));
+        })
+        .finally(reconcile);
+    },
+    setKeepAwake: (on) => {
+      try {
+        keepAwake.set(on);
+        refreshIcon();
+      } catch (error) {
+        console.error('Cairn could not save the screen-awake setting:', messageOf(error));
+      }
+      reconcile();
+    },
+    quit: () => app.quit(),
+  };
+
+  function refreshIcon(): void {
+    if (!quitting) created.setImage(keepAwake.isHolding() ? awakeIcon : idleIcon);
+  }
+
+  function refreshData(opened = false): void {
+    if (!quitting) void refreshWorkspace(opened);
+  }
+
+  function refresh(): void {
+    if (quitting || tracking) return;
+    const state = {
+      locale: locale.locale(),
+      runner: controls.runner(),
+      keepAwake: keepAwake.isOn(),
+      data,
+    };
+    const key = JSON.stringify(state);
+    if (rendered === key) return;
+    const menu = Menu.buildFromTemplate(trayMenuTemplate(state, actions));
+    menu.on('menu-will-show', () => {
+      tracking = true;
+      refreshData(true);
+    });
+    menu.on('menu-will-close', () => {
+      tracking = false;
+      setImmediate(refresh);
+    });
+    created.setContextMenu(menu);
+    rendered = key;
+  }
+
+  function reconcile(): void {
+    rendered = '';
+    setImmediate(refresh);
+  }
+
+  const wakeAhead = createWakeAhead({
+    nextRunAt: controls.nextRunAt,
+    onWindow: (active) => {
+      keepAwake.setWakeAhead(active);
+      refreshIcon();
+    },
   });
-  ipcMain.on('desktop-tray:keep-awake', (event, on: unknown) => {
-    if (!fromPopover(event)) return;
-    setKeepAwake(on === true);
-    publish();
+  wakeAhead.start();
+  const onResume = () => {
+    void wakeAhead.pollNow();
+    refreshData();
+  };
+  powerMonitor.on('resume', onResume);
+  globalShortcut.register(NEW_TASK_SHORTCUT, () => sendToWindow('desktop-menu', 'new-task'));
+  refresh();
+  refreshData();
+  const timer = setInterval(refreshData, TRAY_DATA_REFRESH_MS);
+  timer.unref();
+  app.once('will-quit', () => {
+    clearInterval(timer);
+    wakeAhead.stop();
+    ipcMain.removeListener('desktop-locale:report', onLocale);
+    powerMonitor.removeListener('resume', onResume);
   });
-  ipcMain.on('desktop-tray:resize', (event, next: unknown) => {
-    if (!fromPopover(event) || typeof next !== 'number' || !Number.isFinite(next) || next <= 0)
-      return;
-    height = Math.min(next, TRAY_MAX_HEIGHT);
-    if (popover.isVisible()) place();
-  });
-  ipcMain.on('desktop-tray:hide', (event) => {
-    if (fromPopover(event)) hide();
-  });
-  ipcMain.on('desktop-tray:quit', (event) => {
-    if (fromPopover(event)) app.quit();
-  });
-  return created;
+  return { tray: created, refresh };
 }
 
 function serveNotifications(origin: string): void {
@@ -1003,7 +950,10 @@ async function boot(): Promise<void> {
     signOwnPagesIn(server.origin, ownerToken);
     const origin = server.origin;
     let runnerWanted = true;
+    let stoppingRunner: Promise<void> | null = null;
+    let refreshTray = (): void => {};
     const bringRunnerUp = (): Promise<void> => {
+      if (stoppingRunner !== null) return stoppingRunner.then(bringRunnerUp);
       if (runner !== null) {
         runner.ensureRunning();
         return Promise.resolve();
@@ -1019,6 +969,7 @@ async function boot(): Promise<void> {
         otelFile,
         agentDesktop: agentDesktopBinary(),
         isQuitting: () => quitting,
+        onStateChanged: () => refreshTray(),
       })
         .then(
           (started) => {
@@ -1028,23 +979,36 @@ async function boot(): Promise<void> {
         )
         .finally(() => {
           runnerStarting = null;
+          refreshTray();
         });
+      refreshTray();
       return runnerStarting;
     };
     void bringRunnerUp();
-    tray = showTray(origin, {
+    const nativeTray = showTray(origin, ownerToken, {
       runner: () => {
-        if (runner === null) return runnerStarting !== null ? 'starting' : 'failed';
-        if (runner.isRunning()) return 'on';
-        return runnerWanted ? 'failed' : 'off';
+        if (stoppingRunner !== null) return 'stopping';
+        if (!runnerWanted) return 'off';
+        if (runnerStarting !== null) return 'starting';
+        return runner?.isRunning() === true ? 'on' : 'failed';
       },
       setRunner: async (on) => {
         runnerWanted = on;
-        if (on) await bringRunnerUp();
-        else await runner?.stop();
+        if (on) {
+          await bringRunnerUp();
+          return;
+        }
+        stoppingRunner ??= (runner?.stop() ?? Promise.resolve()).finally(() => {
+          stoppingRunner = null;
+          refreshTray();
+        });
+        refreshTray();
+        await stoppingRunner;
       },
       nextRunAt: () => earliestScheduleNextRunAt(origin, ownerToken),
     });
+    tray = nativeTray.tray;
+    refreshTray = nativeTray.refresh;
     powerMonitor.on('resume', () => {
       if (runnerWanted) void bringRunnerUp();
     });

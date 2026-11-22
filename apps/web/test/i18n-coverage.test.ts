@@ -76,7 +76,6 @@ const LATIN_ALLOWLIST: Record<string, string> = {
   'routes/im-page.tsx::123456:ABC…': 'bot token shape',
   'routes/im-page.tsx::xapp-…': 'token shape',
   'routes/im-page.tsx::xoxb-…': 'token shape',
-  'tray/tray-page.tsx::Cairn': 'product name',
 };
 
 /** t() keys with no CJK that still render correctly in zh: product names and

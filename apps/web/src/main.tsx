@@ -7,6 +7,7 @@ import { chiefOutbox } from './chief/outbox.js';
 import {
   followDesktopNavigation,
   markDesktopShell,
+  reportDesktopLocale,
   showPendingRollbackNotice,
 } from './desktop-shell.js';
 import { EN } from './i18n/en.js';
@@ -22,10 +23,12 @@ import './styles/app.css';
 
 const bootStorage = safeLocalStorage();
 paintTheme(readStoredTheme(bootStorage));
-markDesktopShell(document.documentElement, navigator.userAgent, window.location.pathname);
+markDesktopShell(document.documentElement, navigator.userAgent);
 followDesktopNavigation((path) => void router.navigate(path));
 followSystemTheme(bootStorage);
-applyLocaleLang(readStoredLocale(bootStorage));
+const bootLocale = readStoredLocale(bootStorage);
+applyLocaleLang(bootLocale);
+reportDesktopLocale(bootLocale);
 void showPendingRollbackNotice();
 trackPointerFocus();
 reloadOnStaleBuild({

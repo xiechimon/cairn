@@ -445,9 +445,9 @@ Reach:
 **Desktop app** (planned, centrality 2). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.
 
 
-- Web routes: `/tray`
+- Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `tray-machine-meta`, `tray-popover`, `tray-quit`, `tray-rows`, `tray-runner`, `tray-usage`
+- Test ids in its code: none
 - Research: [docs/research/desktop-app-stack-2026-11-08.md](../../../docs/research/desktop-app-stack-2026-11-08.md) (not on main)
 - Frontend design: **gap**: no design for the window and install flow
 - Backend design: **gap**: no design for packaging, process supervision, updates and data location

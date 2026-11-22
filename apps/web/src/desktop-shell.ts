@@ -1,28 +1,20 @@
 import {
   DESKTOP_SHELL_USER_AGENT,
-  DESKTOP_TRAY_PATH,
   type DesktopMenuCommand,
   type DesktopNotifyPayload,
   type DesktopRollbackNotice,
-  type DesktopTrayOpen,
-  type DesktopTrayState,
   type DesktopUpdateState,
 } from '@cairn/shared';
 import { useEffect } from 'react';
 import { EN } from './i18n/en.js';
-import { readStoredLocale } from './i18n/locale.js';
+import { type Locale, readStoredLocale } from './i18n/locale.js';
 import { type TVars, translate } from './i18n/translate.js';
 import { safeLocalStorage } from './safe-storage.js';
 
 export const MAC_DESKTOP_SHELL = 'mac-desktop';
-export const MAC_TRAY_SHELL = 'mac-tray';
 
-export function markDesktopShell(root: HTMLElement, userAgent: string, pathname: string): boolean {
+export function markDesktopShell(root: HTMLElement, userAgent: string): boolean {
   if (!userAgent.includes(DESKTOP_SHELL_USER_AGENT)) return false;
-  if (pathname === DESKTOP_TRAY_PATH) {
-    root.dataset.shell = MAC_TRAY_SHELL;
-    return true;
-  }
   root.dataset.shell = MAC_DESKTOP_SHELL;
   const strip = root.ownerDocument.createElement('div');
   strip.className = 'desktop-drag-strip';
@@ -43,6 +35,13 @@ export function useDesktopMenu(command: DesktopMenuCommand, run: () => void): vo
       if (sent === command) run();
     });
   }, [command, run]);
+}
+
+export function reportDesktopLocale(locale: Locale): void {
+  if (typeof window === 'undefined') return;
+  (
+    window as Window & { cairnDesktop?: { locale?: { report: (value: Locale) => void } } }
+  ).cairnDesktop?.locale?.report(locale);
 }
 
 interface DesktopWindowControlsBridge {
@@ -75,23 +74,6 @@ export function followDesktopNavigation(navigate: (path: string) => void): void 
   (
     window as Window & { cairnDesktop?: { navigate?: DesktopNavigateBridge } }
   ).cairnDesktop?.navigate?.subscribe(navigate);
-}
-
-export interface DesktopTrayBridge {
-  state: () => Promise<DesktopTrayState | null>;
-  subscribe: (listener: (state: DesktopTrayState) => void) => () => void;
-  open: (target: DesktopTrayOpen) => void;
-  setRunner: (on: boolean) => Promise<void>;
-  setKeepAwake: (on: boolean) => void;
-  resize: (height: number) => void;
-  hide: () => void;
-  quit: () => void;
-}
-
-export function desktopTray(): DesktopTrayBridge | null {
-  return (
-    (window as Window & { cairnDesktop?: { tray?: DesktopTrayBridge } }).cairnDesktop?.tray ?? null
-  );
 }
 
 export interface DesktopUpdateBridge {

@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { createKeepAwake } from '../src/keep-awake.ts';
-import { trayMenuTemplate } from '../src/tray-menu.ts';
 import {
   createWakeAhead,
   earliestNextRunAt,
@@ -172,16 +171,11 @@ test('earliestNextRunAt picks the soonest enabled run and skips disabled or unsc
   assert.equal(wakeAheadActive(1000, 1000 - WAKE_AHEAD_LEAD_MS - 1), false);
 });
 
-test('the tray item is a checkbox that shows the state and asks for the opposite', () => {
-  const asked = [];
-  const actions = { open() {}, quit() {}, setKeepAwake: (on) => asked.push(on) };
-  for (const on of [false, true]) {
-    const item = trayMenuTemplate('127.0.0.1:1', on, actions).find(
-      (entry) => entry.label === 'Keep the Screen On',
-    );
-    assert.equal(item?.type, 'checkbox');
-    assert.equal(item?.checked, on);
-    item.click();
-  }
-  assert.deepEqual(asked, [true, false]);
+test('a failed write preserves the previous awake choice and blocker', () => {
+  const blocker = fakeBlocker();
+  const directory = mkdtempSync(join(tmpdir(), 'cairn-keep-awake-'));
+  const keepAwake = createKeepAwake(blocker, directory);
+  assert.throws(() => keepAwake.set(true));
+  assert.equal(keepAwake.isOn(), false);
+  assert.equal(blocker.active.size, 0);
 });

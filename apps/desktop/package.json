@@ -23,7 +23,7 @@
     "dist:mac": "node scripts/pack.mjs --mac",
     "dist:linux": "node scripts/pack.mjs --linux --publish never",
     "typecheck": "tsc --noEmit",
-    "smoke": "node scripts/smoke-mac.mjs release/mac-arm64/Cairn.app release/smoke.png release/tray.png",
+    "smoke": "node scripts/smoke-mac.mjs release/mac-arm64/Cairn.app release/smoke.png",
     "smoke:linux": "node scripts/smoke-linux.mjs"
   },
   "devDependencies": {

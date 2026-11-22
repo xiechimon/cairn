@@ -5,8 +5,6 @@ import type {
   DesktopMenuCommand,
   DesktopNotifyPayload,
   DesktopRollbackNotice,
-  DesktopTrayOpen,
-  DesktopTrayState,
   DesktopUpdateState,
   DevinLocalStatus,
   DevinLoginOutcome,
@@ -15,6 +13,7 @@ import type {
   LocalProviderImport,
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
+import type { DesktopLocale } from './locale.js';
 
 contextBridge.exposeInMainWorld('cairnDesktop', {
   menu: {
@@ -25,6 +24,9 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
         ipcRenderer.removeListener('desktop-menu', relay);
       };
     },
+  },
+  locale: {
+    report: (locale: DesktopLocale): void => ipcRenderer.send('desktop-locale:report', locale),
   },
   navigate: {
     subscribe: (listener: (path: string) => void): (() => void) => {
@@ -37,22 +39,6 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   },
   notify: {
     show: (payload: DesktopNotifyPayload): void => ipcRenderer.send('desktop-notify', payload),
-  },
-  tray: {
-    state: (): Promise<DesktopTrayState | null> => ipcRenderer.invoke('desktop-tray:state'),
-    subscribe: (listener: (state: DesktopTrayState) => void): (() => void) => {
-      const relay = (_event: unknown, state: DesktopTrayState) => listener(state);
-      ipcRenderer.on('desktop-tray:state', relay);
-      return () => {
-        ipcRenderer.removeListener('desktop-tray:state', relay);
-      };
-    },
-    open: (target: DesktopTrayOpen): void => ipcRenderer.send('desktop-tray:open', target),
-    setRunner: (on: boolean): Promise<void> => ipcRenderer.invoke('desktop-tray:runner', on),
-    setKeepAwake: (on: boolean): void => ipcRenderer.send('desktop-tray:keep-awake', on),
-    resize: (height: number): void => ipcRenderer.send('desktop-tray:resize', height),
-    hide: (): void => ipcRenderer.send('desktop-tray:hide'),
-    quit: (): void => ipcRenderer.send('desktop-tray:quit'),
   },
   localProviders: {
     scan: (): Promise<LocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),

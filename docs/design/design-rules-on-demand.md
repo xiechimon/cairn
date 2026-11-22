@@ -32,10 +32,10 @@ Each rule row lives once, in the `## Rules` section of the surface file that own
 | `surfaces/sidebar.md` | L1–L9 | `src/board/sidebar*`/`project-*`/`archive*`, `src/components/shell/`, `e2e sidebar*`/`paper-sidebar`/`board-shell`, `test sidebar*`/`tasks-sections` |
 | `surfaces/settings.md` | C20, C22 | `src/settings/`, `src/components/settings/`/`providers/`/`model-select-core`, `src/routes/agent-model-select`, `src/usage/`, `src/resources/`, related e2e/test prefixes |
 | `surfaces/first-run.md` | C9 | `src/board/first-run-*`, `e2e first-run-*` |
-| `surfaces/computers.md` | V26 | `src/tray/`, `src/board/machines-*`/`computer-*`/`fleet-*`/`desktop-update`, `e2e machines-*`/`tray` |
+| `surfaces/computers.md` | V26 | `apps/desktop/src/tray-menu.ts`, `src/board/machines-*`/`computer-*`/`fleet-*`/`desktop-update`, `e2e machines-*` |
 | `surfaces/motion.md` | V24 | `apps/web/` |
 
-A path can match several files' scopes — the union of rows is the answer (`src/detail/` is both conversation and tasks). A path under `apps/web/` matching nothing surface-specific still gets the P + foundation rows; a path outside `apps/web/` gets nothing.
+A path can match several files' scopes — the union of rows is the answer (`src/detail/` is both conversation and tasks). A path under `apps/web/` matching nothing surface-specific still gets the P + foundation rows; a path outside `apps/web/` gets nothing, except `apps/desktop/src/tray-menu.ts`, which gets only the computers rows (V26).
 
 ## Row ↔ gate link
 

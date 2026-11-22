@@ -9,6 +9,7 @@
 
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { reportDesktopLocale } from '../desktop-shell.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { EN } from './en.js';
 import { applyLocaleLang, type Locale, persistLocale, readStoredLocale } from './locale.js';
@@ -35,6 +36,7 @@ export function I18nProvider({
   const setLocale = useCallback((next: Locale) => {
     persistLocale(next, safeLocalStorage());
     applyLocaleLang(next);
+    reportDesktopLocale(next);
     setLocaleState(next);
   }, []);
   const t = useMemo<TFunc>(

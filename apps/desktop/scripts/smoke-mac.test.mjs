@@ -28,13 +28,13 @@ test('the smoke refuses to signal the installed app', () => {
   assert.match(result.stderr, /installed app/);
 });
 
-test('the smokes drive the main window, not the hidden tray popover created before it', async () => {
-  const page = (url) => ({ url: () => url });
-  const tray = page('http://127.0.0.1:4100/tray');
-  const main = page('http://127.0.0.1:4100/app');
-  const windows = [tray, page('about:blank')];
-  const app = { firstWindow: async () => tray, windows: () => windows };
-  setTimeout(() => windows.push(main), 50);
+test('the smokes wait for the main window to load the local server', async () => {
+  let url = 'about:blank';
+  const main = { url: () => url };
+  const app = { windows: () => [main] };
+  setTimeout(() => {
+    url = 'http://127.0.0.1:4100/app';
+  }, 50);
   assert.equal(await mainWindow(app, 5_000), main);
 });
 

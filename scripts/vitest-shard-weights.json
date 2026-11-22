@@ -308,7 +308,6 @@
   "@cairn/web:test/transcript-step-prompt.test.ts": 13,
   "@cairn/web:test/transcript-tool-echo.test.ts": 11,
   "@cairn/web:test/transcript-user-words.test.ts": 17,
-  "@cairn/web:test/tray-groups.test.ts": 9,
   "@cairn/web:test/turn-timestamps.test.ts": 23,
   "@cairn/web:test/ui-reuse-inventory.test.ts": 5,
   "@cairn/web:test/unslop-signs.test.ts": 533,
