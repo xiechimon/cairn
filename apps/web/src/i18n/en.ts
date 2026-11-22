@@ -731,8 +731,8 @@ export const EN: Record<string, string> = {
   名称: 'Name',
   语言: 'Language',
   推送通知: 'Push notifications',
-  '任务需要你处理时提醒你，应用关着或锁屏时也能收到':
-    'Alerts you when a task needs you, even when the app is closed or the screen is locked',
+  '任务需要你处理时，在系统通知中心提醒':
+    'Notify you in the system notification center when a task needs you',
   '浏览器已拒绝通知权限，需到站点设置重新允许':
     'Notifications are blocked by the browser — re-allow them in site settings',
 

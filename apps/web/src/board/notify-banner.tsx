@@ -1,54 +1,30 @@
 import { NOTIFICATION_BANNER_COPY } from '@cairn/shared';
 import { Bell } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
-import { syncDevicePush } from '../pwa/push-device.js';
-import { safeLocalStorage } from '../safe-storage.js';
-import { notificationsOn, readNotificationsChoice } from './notify-pref.js';
-
-export type NotificationPermissionState = NotificationPermission | 'unsupported';
-
-function readPermission(): NotificationPermissionState {
-  return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;
-}
-
-export function useNotificationPermission(fixtureState: NotificationPermissionState | null): {
-  permission: NotificationPermissionState;
-  request: () => Promise<NotificationPermissionState>;
-} {
-  const [permission, setPermission] = useState<NotificationPermissionState>(
-    () => fixtureState ?? readPermission(),
-  );
-  const request = useCallback(async (): Promise<NotificationPermissionState> => {
-    if (typeof Notification === 'undefined') return 'unsupported';
-    let next: NotificationPermissionState = 'denied';
-    try {
-      next = await Promise.resolve(Notification.requestPermission());
-    } catch {}
-    setPermission(next);
-    return next;
-  }, []);
-  return { permission, request };
-}
+import { setNotifications, useNotificationsPermission } from '../pwa/push-device.js';
 
 export function useNotificationBanner(
   fixtureFlag: boolean,
   live: boolean,
   teamId: string | undefined,
 ): { visible: boolean; enable: () => void } {
-  const { permission, request } = useNotificationPermission(
-    live ? null : fixtureFlag ? 'default' : 'granted',
-  );
+  const { t } = useI18n();
+  const permission = useNotificationsPermission();
+  const [fixtureEnabled, setFixtureEnabled] = useState(false);
   const enable = () => {
-    void request().then((next) => {
-      if (next !== 'granted' || !live || teamId === undefined) return;
-      const on = notificationsOn(readNotificationsChoice(safeLocalStorage()), next);
-      return syncDevicePush(teamId, on);
-    });
+    if (!live) {
+      setFixtureEnabled(true);
+      return;
+    }
+    void setNotifications(teamId, true).catch((error: unknown) =>
+      toastError(t('保存失败，请重试。'), error),
+    );
   };
-  return { visible: permission === 'default', enable };
+  return { visible: live ? permission === 'default' : fixtureFlag && !fixtureEnabled, enable };
 }
 
 export function NotificationBanner({ onEnable }: { onEnable: () => void }) {

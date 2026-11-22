@@ -15,7 +15,7 @@ test('permission=default → banner renders the canon copy', async ({ page }) =>
   await expect(banner(page).getByRole('button', { name: '开启' })).toHaveText('开启');
 });
 
-test('enable → requestPermission() fires; granted hides the bar', async ({ page }) => {
+test('fixture enable dismisses the banner without requesting real browser permission', async ({ page }) => {
   await stubNotification(page, 'default', 'granted');
   await page.goto('/app?scenario=notify-banner');
 
@@ -23,20 +23,8 @@ test('enable → requestPermission() fires; granted hides the bar', async ({ pag
   await banner(page).getByRole('button', { name: '开启' }).click();
 
   await expect(banner(page)).toHaveCount(0);
-  expect(await page.evaluate(() => window.__permCalls)).toBe(1);
-
-  expect(await page.evaluate(() => Notification.permission)).toBe('granted');
-});
-
-test('enable → denied resolution also hides the bar', async ({ page }) => {
-  await stubNotification(page, 'default', 'denied');
-  await page.goto('/app?scenario=notify-banner');
-
-  await expect(banner(page)).toBeVisible();
-  await banner(page).getByRole('button', { name: '开启' }).click();
-
-  await expect(banner(page)).toHaveCount(0);
-  expect(await page.evaluate(() => window.__permCalls)).toBe(1);
+  expect(await page.evaluate(() => window.__permCalls)).toBe(0);
+  expect(await page.evaluate(() => Notification.permission)).toBe('default');
 });
 
 test('scenarios without the flag never render the strip', async ({ page }) => {

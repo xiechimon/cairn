@@ -9,13 +9,15 @@ import { ComputerScreenDialog } from '../board/computer-screen-dialog.js';
 import { useScreenHoverControl } from '../board/screen-hover-control.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { toastError } from '../components/ui/toaster.js';
 import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   currentDeviceSubscription,
   pushDeviceSupported,
-  turnOnNotifications,
+  setNotifications,
+  useNotificationsChecked,
 } from '../pwa/push-device.js';
 
 type TakeoverItem = Extract<ChiefStreamItem, { kind: 'takeover' }>;
@@ -39,6 +41,8 @@ function useNow(active: boolean): number {
 }
 
 function useDevicePushOff(teamId: string | undefined, active: boolean) {
+  const { t } = useI18n();
+  const checked = useNotificationsChecked();
   const [off, setOff] = useState(false);
   useEffect(() => {
     if (!active || !pushDeviceSupported()) return;
@@ -51,14 +55,14 @@ function useDevicePushOff(teamId: string | undefined, active: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [active]);
+  }, [active, checked]);
   const turnOn = () => {
     if (teamId === undefined) return;
-    void turnOnNotifications(teamId)
-      .then((permission) => setOff(permission !== 'granted'))
-      .catch(() => {});
+    void setNotifications(teamId, true)
+      .then((enabled) => setOff(!enabled))
+      .catch((error: unknown) => toastError(t('保存失败，请重试。'), error));
   };
-  return { off, turnOn };
+  return { off: pushDeviceSupported() && (!checked || off), turnOn };
 }
 
 function PhoneTakeoverButtons({ item, waiting }: { item: TakeoverItem; waiting: boolean }) {

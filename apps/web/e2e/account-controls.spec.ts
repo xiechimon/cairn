@@ -122,7 +122,7 @@ test('switch: granted state can be turned off, the off state persists across rel
   await expect(sw).toHaveAttribute('aria-checked', 'true');
 });
 
-test('switch: denied state opens the preference panel + interception explainer, can be turned off, both states persist across reload (S3/S4)', async ({
+test('switch: browser denial is explained immediately and remains off after reload (S3/S4)', async ({
   page,
 }) => {
   await stubNotification(page, 'denied', 'denied');
@@ -130,26 +130,18 @@ test('switch: denied state opens the preference panel + interception explainer, 
   const sw = page.getByRole('switch', { name: '推送通知' });
   const hint = page.locator('.account-notify-blocked');
   await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await expect(hint).toHaveCount(0);
-
-  await sw.click();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
-  expect(await page.evaluate(() => window.__permCalls)).toBe(1);
-
-  await expect(hint).toBeVisible();
   await expect(hint).toContainText('重新允许');
-  await page.reload();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
-  await expect(hint).toBeVisible();
 
   await sw.click();
   await expect(sw).toHaveAttribute('aria-checked', 'false');
-  await expect(hint).toHaveCount(0);
+  expect(await page.evaluate(() => window.__permCalls)).toBe(0);
+
   await page.reload();
   await expect(sw).toHaveAttribute('aria-checked', 'false');
+  await expect(hint).toBeVisible();
 });
 
-test('switch: default state fires the driver requestPermission, granted resolution lands and the on state persists (S5)', async ({
+test('switch: default state requests browser permission and reflects the granted result (S5)', async ({
   page,
 }) => {
   await stubNotification(page, 'default', 'granted');
@@ -159,12 +151,10 @@ test('switch: default state fires the driver requestPermission, granted resoluti
   await sw.click();
   await expect(sw).toHaveAttribute('aria-checked', 'true');
   expect(await page.evaluate(() => window.__permCalls)).toBe(1);
-
-  await page.reload();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('cairn.notifications'))).toBe('1');
 });
 
-test('switch fixture face: scenario can freeze denied — starts off, clicking opens the interception explainer; 13 baselines stay on (S6)', async ({
+test('switch fixture face: denied stays off with an explanation; 13 baselines stay on (S6)', async ({
   page,
 }) => {
 
@@ -173,8 +163,9 @@ test('switch fixture face: scenario can freeze denied — starts off, clicking o
   const sw = page.getByRole('switch', { name: '推送通知' });
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.account-notify-blocked')).toContainText('重新允许');
+  expect(await page.evaluate(() => window.__permCalls)).toBe(0);
 
   await page.evaluate(() => localStorage.clear());
   await page.goto('/app/account?scenario=13');

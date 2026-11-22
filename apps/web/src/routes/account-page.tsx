@@ -3,12 +3,6 @@ import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { useNotificationPermission } from '../board/notify-banner.js';
-import {
-  notificationsOn,
-  persistNotificationsChoice,
-  readNotificationsChoice,
-} from '../board/notify-pref.js';
 import { ProfileHeader } from '../components/profile-card.js';
 import {
   SETTINGS_SELECT_TRIGGER_CLS,
@@ -32,7 +26,11 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
-import { syncDevicePush } from '../pwa/push-device.js';
+import {
+  setNotifications,
+  useNotificationsChecked,
+  useNotificationsPermission,
+} from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
 
@@ -55,23 +53,20 @@ export function AccountPage() {
       { onError: (error) => toastError(t('保存失败，请重试。'), error) },
     );
   };
-  const [notifyChoice, setNotifyChoice] = useState<boolean | null>(() =>
-    readNotificationsChoice(safeLocalStorage()),
-  );
-  const { permission, request } = useNotificationPermission(
-    live ? null : (fixture.ui?.notificationPermission ?? 'granted'),
-  );
-  const notifyOn = notificationsOn(notifyChoice, permission);
-  const notifyBlocked = notifyOn && permission === 'denied';
+  const liveNotificationsOn = useNotificationsChecked();
+  const livePermission = useNotificationsPermission();
+  const fixturePermission = fixture.ui?.notificationPermission ?? 'granted';
+  const [fixtureNotificationsOn, setFixtureNotificationsOn] = useState<boolean | null>(null);
+  const notifyBlocked = (live ? livePermission : fixturePermission) === 'denied';
   const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
-  const setNotifications = (checked: boolean) => {
-    setNotifyChoice(checked);
-    persistNotificationsChoice(checked, safeLocalStorage());
-    void (async () => {
-      const granted = checked && (permission === 'granted' || (await request()) === 'granted');
-      if (!live || teamId === undefined || (checked && !granted)) return;
-      await syncDevicePush(teamId, checked);
-    })().catch((error: unknown) => toastError(t('保存失败，请重试。'), error));
+  const changeNotifications = (checked: boolean) => {
+    if (!live) {
+      if (!blockDemoWrite()) setFixtureNotificationsOn(checked);
+      return;
+    }
+    void setNotifications(teamId, checked).catch((error: unknown) =>
+      toastError(t('保存失败，请重试。'), error),
+    );
   };
   return (
     <PageShell route="account" fixture={fixture} selected="none" title={t('账号')}>
@@ -116,14 +111,19 @@ export function AccountPage() {
             hint={
               notifyBlocked
                 ? t('浏览器已拒绝通知权限，需到站点设置重新允许')
-                : t('任务需要你处理时提醒你，应用关着或锁屏时也能收到')
+                : t('任务需要你处理时，在系统通知中心提醒')
             }
             hintClassName={notifyBlocked ? 'account-notify-blocked' : undefined}
           >
             <ToggleSwitch
               aria-label={t('推送通知')}
-              checked={notifyOn}
-              onCheckedChange={setNotifications}
+              checked={
+                !notifyBlocked &&
+                (live
+                  ? liveNotificationsOn
+                  : (fixtureNotificationsOn ?? fixturePermission === 'granted'))
+              }
+              onCheckedChange={changeNotifications}
             />
           </SettingsRow>
         </SettingsCard>

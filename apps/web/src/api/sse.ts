@@ -14,7 +14,7 @@ import {
 } from '@cairn/shared';
 import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { readNotificationsChoice } from '../board/notify-pref.js';
+import { currentNotificationsChoice } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { desktopNotify } from '../desktop-shell.js';
 import { EN } from '../i18n/en.js';
@@ -145,6 +145,15 @@ function notificationHref(record: NotificationRecord): string {
     : `/app?thread=${encodeURIComponent(record.entityId)}`;
 }
 
+function webNotificationAllowed(): boolean {
+  return (
+    document.hidden &&
+    typeof Notification !== 'undefined' &&
+    Notification.permission === 'granted' &&
+    currentNotificationsChoice() !== false
+  );
+}
+
 async function showViaServiceWorker(
   title: string,
   body: string,
@@ -157,7 +166,7 @@ async function showViaServiceWorker(
       navigator.serviceWorker.ready,
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
     ]);
-    if (registration === null) return false;
+    if (registration === null || !webNotificationAllowed()) return false;
     await registration.showNotification(title, { body, tag, data: { href } });
     return true;
   } catch {
@@ -168,7 +177,7 @@ async function showViaServiceWorker(
 function fireDesktopNotification(record: NotificationRecord): void {
   if (window.location.pathname === DESKTOP_TRAY_PATH) return;
   if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
-  if (readNotificationsChoice(safeLocalStorage()) === false) return;
+  if (currentNotificationsChoice() === false) return;
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);
   const titleSource = NOTIFICATION_TITLES[record.type];
   const title = titleSource === undefined ? record.entityRef.title : t(titleSource);
@@ -179,10 +188,9 @@ function fireDesktopNotification(record: NotificationRecord): void {
     desktop.show({ title, body, href, tag: record.id });
     return;
   }
-  if (!document.hidden) return;
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  if (!webNotificationAllowed()) return;
   void showViaServiceWorker(title, body, record.id, href).then((shown) => {
-    if (shown) return;
+    if (shown || !webNotificationAllowed()) return;
     try {
       const fallback = new Notification(title, { body, tag: record.id });
       fallback.onclick = () => {

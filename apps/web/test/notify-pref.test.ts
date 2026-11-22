@@ -43,6 +43,14 @@ describe('migrateLegacyNotifications', () => {
     expect(subscribed.dump()).toEqual({ [NOTIFICATIONS_KEY]: '1' });
   });
 
+  it('leaves the legacy choice readable when migration cannot save it', () => {
+    const storage = memStorage({ [LEGACY_KEY]: '0' });
+    const unwritable = { ...storage, setItem: () => { throw new Error('storage full'); } };
+    migrateLegacyNotifications(unwritable, false);
+    expect(storage.dump()).toEqual({ [LEGACY_KEY]: '0' });
+    expect(readNotificationsChoice(storage)).toBe(false);
+  });
+
   it('never overrides a choice made on the new switch', () => {
     const storage = memStorage({ [NOTIFICATIONS_KEY]: '0', [LEGACY_KEY]: '1' });
     migrateLegacyNotifications(storage, true);
@@ -58,6 +66,7 @@ describe('notifications choice', () => {
     persistNotificationsChoice(false, storage);
     expect(notificationsOn(readNotificationsChoice(storage), 'granted')).toBe(false);
     persistNotificationsChoice(true, storage);
-    expect(notificationsOn(readNotificationsChoice(storage), 'denied')).toBe(true);
+    expect(notificationsOn(readNotificationsChoice(storage), 'denied')).toBe(false);
+    expect(notificationsOn(readNotificationsChoice(storage), 'granted')).toBe(true);
   });
 });

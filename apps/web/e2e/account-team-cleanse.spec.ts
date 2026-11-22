@@ -35,15 +35,15 @@ test('account switch: granted permission renders checked without a click', async
   expect(await page.evaluate(() => window.__permCalls)).toBe(0);
 });
 
-test('account switch: denied-state click lands the preference on-panel + interception explainer (#1031 semantic rewrite)', async ({ page }) => {
+test('account switch: a denied site cannot be turned on from the account page', async ({ page }) => {
   await stubNotification(page, 'denied', 'denied');
   await page.goto('/app/account');
   const sw = page.getByRole('switch', { name: '推送通知' });
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await sw.click();
 
-  await expect(sw).toHaveAttribute('aria-checked', 'true');
-  expect(await page.evaluate(() => window.__permCalls)).toBe(1);
+  await expect(sw).toHaveAttribute('aria-checked', 'false');
+  expect(await page.evaluate(() => window.__permCalls)).toBe(0);
   await expect(page.locator('.account-notify-blocked')).toContainText('重新允许');
 });
 
