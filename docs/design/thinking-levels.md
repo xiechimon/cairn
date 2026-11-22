@@ -20,11 +20,17 @@ Prior art: Claude Code's `/effort` offers `auto` plus the levels the current mod
 
 Source: `@anthropic-ai/claude-agent-sdk` 0.3.278 `EffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max'`; Claude Code 2.1.329 model table, where `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5` and `claude-fable-5-2` carry `effort`, `xhigh_effort`, `max_effort` and `rejects_disabled_thinking`.
 
+The levels come from a per-model table in `claudeCodeThinkingLevels` (shared), built from the CLI's own capability gates — the `effort`, `xhigh_effort` and `max_effort` deny lists — instead of a version-number rule:
+
 | Model | Supported | Default (no `--effort`) | Old mapping of Off / Minimal | Now offered |
 |---|---|---|---|---|
 | claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5 | low, medium, high, xhigh, max; thinking cannot be disabled | medium: measured with `claude -p --model <id>` and a Stop hook, whose `effort.level` was `medium` for all three, with and without the user's settings; matches `default_effort: "medium"` in the CLI model table | Off and Minimal both sent no `--effort`, the model default: **same** as each other and as Default | Default (Medium), Low, Medium, High, Xhigh, Max |
-| Other Claude 5.x ids (claude-sonnet-5, claude-opus-5, fable) | low, medium, high, xhigh, max | not measured: plain "Default" | as above | Default, Low, Medium, High, Xhigh, Max |
-| Other model ids behind Claude Code (custom `ANTHROPIC_*_MODEL` slots, Claude 4.x and older) | Not reliably: the CLI drops effort for models without the capability | n/a | Every level sent `--effort`, ignored | Nothing |
+| claude-opus-4-7, claude-opus-4-8 | low, medium, high, xhigh, max | xhigh / high respectively, from the CLI's `default_effort` | as above | Default (Xhigh), Low, Medium, High, Xhigh, Max |
+| claude-opus-4-6, claude-sonnet-4-6 | low, medium, high, max (no xhigh) | high | as above | Default (High), Low, Medium, High, Max |
+| claude-opus-4-5 | low, medium, high (no xhigh, no max) | high | as above | Default (High), Low, Medium, High |
+| Other Claude 5.x ids (claude-sonnet-5, claude-opus-5, fable) | low, medium, high, xhigh, max | high in the CLI table | as above | Default (High), Low, Medium, High, Xhigh, Max |
+| Model ids the CLI table denies effort for (claude-opus-4-0/4-1, claude-sonnet-4-0/4-5, claude-haiku-4-5, Claude 3.x) | none | n/a | Every level sent `--effort`, ignored | Nothing |
+| Any model behind a custom backend (`ANTHROPIC_BASE_URL` or a custom auth token in settings.json — reported as `customBackend` in the machine's Claude Code report) | unknowable: the table describes the stock binary against Anthropic | n/a | Same CLI flags applied | Nothing |
 
 ### pi runtime on a Runner (`apps/daemon/src/backend/pi.ts`)
 
@@ -45,15 +51,19 @@ Source: `@earendil-works/pi-ai` 1.5.0 `getSupportedThinkingLevels` and each cata
 
 ### pi runtime in the server (Coordinator and compaction, `apps/server/src/coordinator/runtime/provider.ts`)
 
-Only the Codex subscription registers models with `reasoning: true` (and the catalog `thinkingLevelMap`); every other provider, including the Anthropic and OpenAI catalog providers, is registered with `reasoning: false` and without the catalog `compat`, so pi-ai sends no reasoning parameter and every level was ignored. Default (no level) is Off in this runtime.
+Every materialized model now borrows `reasoning`, `thinkingLevelMap` and `compat` from the pi-ai catalog entry whose provider and api match the configured row — alias ids resolve first (`z-ai` → `zai`, `z-ai-coding-cn` → `zai-coding-cn`), the Codex subscription resolves to its own catalog, and a row whose `api` differs from the catalog entry's `api` borrows nothing. Explicit `compat` on the provider row wins over catalog keys. Levels are offered only when the catalog entry marks the model reasoning-capable; "off" is offered only when the model's map sends a real off value, otherwise it collapses into Default.
 
 | Provider / model | Default (no level) | Old | Now offered on the Coordinator row |
 |---|---|---|---|
 | openai-codex subscription gpt-6-sol, gpt-6.1-terra | off: pi-ai sends `reasoning.effort: none` | Seven levels; Minimal sent `low` (**same** as Low), Off **same** as Default | Default (Off), Low, Medium, High, Xhigh, Max |
 | openai-codex subscription gpt-6.1-sol | no reasoning field is sent; the Codex service picks (not knowable here) | as above | Default, Low, Medium, High, Xhigh, Max |
-| Any other pi provider (Anthropic or OpenAI key, DeepSeek, custom endpoints) | n/a | Seven levels, all ignored: **same** | Nothing |
+| anthropic claude-opus-5-5 (and other `supportsMidConvoEffort` models) | high: pi-ai sends `output_config.effort` markers and defaults a missing level to `high` | Seven levels, all ignored: **same** | Default (High), Low, Medium, High, Xhigh, Max |
+| anthropic reasoning models without an `off` map entry (claude-haiku-4-5, claude-fable-5) | off for haiku-4-5; not knowable for models that keep their effort on replies | as above | Minimal, Low, Medium, High (+ Xhigh, Max where the catalog supports them) |
+| z-ai / z-ai-coding-cn glm-5.3 (aliased to the `zai`/`zai-coding-cn` catalog) | not knowable: `thinking.type` stays enabled, no effort sent | as above | Low, High, Max |
+| deepseek deepseek-v4-pro | off | as above | Default (Off), High, Max |
+| Reasoning models whose api differs from the catalog entry, non-reasoning models, unknown models, custom endpoints | n/a | Seven levels, all ignored: **same** | Nothing |
 
-Turning reasoning on for catalog providers in the server is left out on purpose: without the catalog `compat` (`forceAdaptiveThinking`, `supportsMidConvoEffort`), pi-ai would send budget-based or `disabled` thinking to Claude 5.5 models, which reject disabled thinking. That change needs its own live run with an Anthropic key.
+Measured live: `stepProvider` on `anthropic`/`claude-opus-5-5` with reasoning `high` sends `thinking: {type: "adaptive"}` plus an `output_config.effort: "high"` marker message to `api.anthropic.com`; the same request on a model registered the old way (`reasoning: false`, no compat) sends neither field, so the choice was silently dropped. The old shape is also why simply flipping `reasoning: true` was never enough — without the catalog `compat` (`forceAdaptiveThinking`, `supportsMidConvoEffort`), pi-ai would send budget-based or `disabled` thinking to Claude 5.5 models, which reject disabled thinking.
 
 ### Devin ACP (`apps/daemon/src/backend/acp.ts`, Devin CLI 3000.14.30821)
 

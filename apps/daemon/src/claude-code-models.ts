@@ -52,8 +52,9 @@ export function readClaudeCodeReport(
   const source = parseClaudeCodeModelSource(raw ?? null, hostname());
   const binaryFound = extra.bin != null;
   const settingsIds = new Set(source.models.map((model) => model.id));
+  const customBackend = usesCustomBackend(raw);
   const builtins =
-    binaryFound && !usesCustomBackend(raw)
+    binaryFound && !customBackend
       ? DEFAULT_CLAUDE_CODE_MODELS.filter((model) => !settingsIds.has(model.id))
       : [];
   return {
@@ -66,5 +67,6 @@ export function readClaudeCodeReport(
     ...(extra.bin !== undefined ? { bin: extra.bin } : {}),
     ...(extra.auth ? { auth: toWireAuth(extra.auth) } : {}),
     ...(extra.login !== undefined ? { login: extra.login } : {}),
+    ...(customBackend ? { customBackend: true } : {}),
   };
 }

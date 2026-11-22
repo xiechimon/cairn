@@ -31,10 +31,14 @@ export interface PresetCatalog {
   models: PresetCatalogModel[];
 }
 
-const PI_PROVIDER_ID: Partial<Record<string, string>> = {
+export const PI_PROVIDER_ID: Partial<Record<string, string>> = {
   'z-ai': 'zai',
   'z-ai-coding-cn': 'zai-coding-cn',
 };
+
+export function piCatalogProviderId(providerId: string): string {
+  return PI_PROVIDER_ID[providerId] ?? providerId;
+}
 
 export const AGGREGATOR_PRESET_IDS: readonly string[] = [
   'cloudflare-ai-gateway',

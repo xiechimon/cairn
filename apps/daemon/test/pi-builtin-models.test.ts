@@ -53,4 +53,38 @@ describe('models pi already ships stay pi built-ins', () => {
       'claude-sonnet-5-5',
     ]);
   });
+
+  test('a preset id aliased to a pi catalog provider declares models with the catalog reasoning flags', () => {
+    const entry = materialized({
+      kind: 'http',
+      providerId: 'z-ai',
+      baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+      api: 'openai-completions',
+      models: [{ id: 'glm-5.3', name: 'GLM 5.3' }],
+    });
+    expect(entry.models).toEqual([
+      expect.objectContaining({
+        id: 'glm-5.3',
+        reasoning: true,
+        thinkingLevelMap: expect.objectContaining({ low: 'low', high: 'high', max: 'max' }),
+        compat: expect.objectContaining({
+          thinkingFormat: 'zai',
+          supportsReasoningEffort: true,
+        }),
+      }),
+    ]);
+  });
+
+  test('an aliased preset model the catalog lacks keeps custom defaults', () => {
+    const entry = materialized({
+      kind: 'http',
+      providerId: 'z-ai',
+      baseUrl: 'https://api.z.ai/api/coding/paas/v4',
+      api: 'openai-completions',
+      models: [{ id: 'glm-next-preview', name: 'Preview' }],
+    });
+    expect(entry.models).toEqual([
+      expect.objectContaining({ id: 'glm-next-preview', reasoning: false }),
+    ]);
+  });
 });

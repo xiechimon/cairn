@@ -107,6 +107,21 @@ describe('readClaudeCodeReport', () => {
     ).toEqual(['deepseek-v4.1-flash']);
   });
 
+  test('a custom backend is marked so the server offers no effort on its models', () => {
+    const relay = JSON.stringify({
+      model: 'claude-opus-4-8',
+      env: { ANTHROPIC_BASE_URL: 'https://relay.example' },
+    });
+    expect(
+      readClaudeCodeReport(tmpHome(relay), {
+        bin: { path: '/usr/bin/claude', version: null, source: 'bundled' },
+      }).customBackend,
+    ).toBe(true);
+    expect(
+      readClaudeCodeReport(tmpHome(JSON.stringify({ model: 'claude-opus-4-8' }))).customBackend,
+    ).toBeUndefined();
+  });
+
   test('no binary and no settings.json stays not installed, and a missing bin probe is not a found binary', () => {
     expect(readClaudeCodeReport(tmpHome(), { bin: null }).installed).toBe(false);
     expect(readClaudeCodeReport(tmpHome(), { bin: null }).models).toEqual([]);

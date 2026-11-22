@@ -114,7 +114,7 @@ export async function requestSuggestedReplies(
     model,
     { messages: requestMessages },
     {
-      ...(model.api === 'openai-codex-responses' ? { reasoning: 'low' as const } : {}),
+      ...(model.reasoning === true ? { reasoning: 'low' as const } : {}),
       toolChoice: 'none',
       maxTokens: SUGGEST_MAX_OUTPUT_TOKENS,
       maxRetries: 0,
