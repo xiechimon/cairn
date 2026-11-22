@@ -1,6 +1,5 @@
 import { computerControlLeaseSchema, openComputerScreenSchema } from '@cairn/shared';
 import type { Context, Hono } from 'hono';
-import { bodyLimit } from 'hono/body-limit';
 import type { AppContext } from './context.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -8,16 +7,12 @@ import { jsonBody } from './routes-helpers.js';
 import { computerScreensOf } from './services/computer-screen.js';
 
 export function registerComputerScreenRoutes(app: Hono, ctx: AppContext): void {
-  const boundedBody = bodyLimit({
-    maxSize: 4096,
-    onError: (c) => c.json({ error: 'computer control body too large' }, 413),
-  });
   app.use('/api/teams/:teamId/computers/:computerId/*', async (c, next) => {
     if (!['POST', 'PATCH', 'DELETE'].includes(c.req.method)) return next();
     if (!/^application\/json(?:\s*;|$)/i.test(c.req.header('content-type') ?? '')) {
       throw new HttpError(415, 'computer control requires an application/json request');
     }
-    return boundedBody(c, next);
+    return next();
   });
   const checkedTeam = (c: Context): string => {
     if (c.req.param('teamId') !== ctx.team.id) throw new HttpError(404, 'team not found');

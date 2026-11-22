@@ -39,7 +39,6 @@ import {
 } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
-import { bodyLimit } from 'hono/body-limit';
 import type { AppContext } from './context.js';
 import { build, type machine as machineTable, step, todo } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
@@ -59,6 +58,7 @@ import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machin
 import {
   createUploadUrls,
   getStepSession,
+  type PendingUpload,
   receivePlanUpload,
   receiveSessionUpload,
   receiveUpload,
@@ -160,6 +160,15 @@ function isAgentTodoBody(raw: unknown): boolean {
 
 type MachineRow = typeof machineTable.$inferSelect;
 
+const MACHINE_UPLOAD_PATH = '/api/machine/upload/:uploadId';
+
+declare module 'hono' {
+  interface ContextVariableMap {
+    authenticatedMachineId: string;
+    machineUpload: PendingUpload;
+  }
+}
+
 function bearer(c: Context): string | null {
   const header = c.req.header('authorization');
   if (!header) return null;
@@ -171,12 +180,6 @@ function bearer(c: Context): string | null {
 function unauthorized(): HttpError {
   return new HttpError(401, 'unauthorized');
 }
-
-const CLOSED_ORBS_MAX_BODY_BYTES = 64 * 1024;
-const UPLOAD_URLS_MAX_BODY_BYTES = 64 * 1024;
-const COMPUTER_FRAMES_MAX_BODY_BYTES = 24 * 1024 * 1024;
-const DONE_MAX_BODY_BYTES = 16 * 1024 * 1024;
-const IM_EVENT_MAX_BODY_BYTES = 24 * 1024 * 1024;
 
 const ENROLL_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -210,6 +213,30 @@ function originOf(c: Context): string {
   );
 }
 
+export function registerMachineAuth(app: Hono, ctx: Pick<AppContext, 'db' | 'uploads'>): void {
+  app.use('/api/machine/*', async (c, next) => {
+    const path = new URL(c.req.url).pathname;
+    if (path.startsWith('/api/machine/enroll')) return next();
+    const token = bearer(c);
+    if (!token) throw unauthorized();
+    const row = findMachineByToken(ctx.db, token);
+    if (!row) throw unauthorized();
+    c.set('authenticatedMachineId', row.id);
+    await next();
+    if (findMachineByToken(ctx.db, token)?.id !== row.id) throw unauthorized();
+  });
+
+  app.use(MACHINE_UPLOAD_PATH, async (c, next) => {
+    if (c.req.method !== 'PUT') return next();
+    const upload = ctx.uploads.get(c.req.param('uploadId'));
+    if (upload === undefined || upload.machineId !== c.get('authenticatedMachineId')) {
+      throw new HttpError(404, 'upload not found');
+    }
+    c.set('machineUpload', upload);
+    await next();
+  });
+}
+
 export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   const deps = {
     ...githubAppOf(ctx),
@@ -231,17 +258,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     ...(ctx.mailSend !== undefined ? { mailSend: ctx.mailSend } : {}),
     mcpOAuthState: ctx.mcpOAuthState,
   };
-
-  app.use('/api/machine/*', async (c, next) => {
-    const path = new URL(c.req.url).pathname;
-    if (path.startsWith('/api/machine/enroll')) return next();
-    const token = bearer(c);
-    if (!token) throw unauthorized();
-    const row = findMachineByToken(ctx.db, token);
-    if (!row) throw unauthorized();
-    await next();
-    if (findMachineByToken(ctx.db, token)?.id !== row.id) throw unauthorized();
-  });
 
   const me = (c: Context): MachineRow => {
     const token = bearer(c);
@@ -361,38 +377,31 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     return c.json(toMachineRecord(row, machineRunningCount(deps.db, row.id)));
   });
 
-  app.post(
-    '/api/machine/orbs/closed',
-    bodyLimit({
-      maxSize: CLOSED_ORBS_MAX_BODY_BYTES,
-      onError: (c) => c.json({ error: 'orb cleanup body too large' }, 413),
-    }),
-    async (c) => {
-      return executeMachineCommand(
-        c,
-        () => jsonBody(c),
-        async (row, decoded) => {
-          const body = parseWith(machineClosedOrbsBodySchema, decoded, 'body');
-          if (body.conversationIds.length === 0) return c.json([]);
-          const closed = ctx.db
-            .selectDistinct({ id: build.id })
-            .from(build)
-            .innerJoin(todo, eq(todo.id, build.todoId))
-            .innerJoin(step, eq(step.buildId, build.id))
-            .where(
-              and(
-                inArray(build.id, body.conversationIds),
-                eq(step.machineId, row.id),
-                eq(todo.teamId, row.teamId),
-                or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),
-              ),
-            )
-            .all();
-          return c.json(closed.map((conversation) => conversation.id));
-        },
-      );
-    },
-  );
+  app.post('/api/machine/orbs/closed', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineClosedOrbsBodySchema, decoded, 'body');
+        if (body.conversationIds.length === 0) return c.json([]);
+        const closed = ctx.db
+          .selectDistinct({ id: build.id })
+          .from(build)
+          .innerJoin(todo, eq(todo.id, build.todoId))
+          .innerJoin(step, eq(step.buildId, build.id))
+          .where(
+            and(
+              inArray(build.id, body.conversationIds),
+              eq(step.machineId, row.id),
+              eq(todo.teamId, row.teamId),
+              or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),
+            ),
+          )
+          .all();
+        return c.json(closed.map((conversation) => conversation.id));
+      },
+    );
+  });
 
   app.post('/api/machine/presence', async (c) => {
     return executeMachineCommand(
@@ -673,32 +682,21 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
-  app.post(
-    '/api/machine/upload-urls/:stepId',
-    bodyLimit({
-      maxSize: UPLOAD_URLS_MAX_BODY_BYTES,
-      onError: (c) => c.json({ error: 'upload-urls body too large' }, 413),
-    }),
-    async (c) => {
-      return executeMachineCommand(
-        c,
-        () => jsonBody(c),
-        async (row, decoded) => {
-          const body = parseWith(machineUploadUrlsBodySchema, decoded, 'body');
-          const stepId = c.req.param('stepId');
-          return c.json(
-            createUploadUrls(deps, row.id, stepId, body.files, originOf(c), ctx.uploads),
-          );
-        },
-      );
-    },
-  );
+  app.post('/api/machine/upload-urls/:stepId', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineUploadUrlsBodySchema, decoded, 'body');
+        const stepId = c.req.param('stepId');
+        return c.json(createUploadUrls(deps, row.id, stepId, body.files, originOf(c), ctx.uploads));
+      },
+    );
+  });
 
-  app.put('/api/machine/upload/:uploadId', async (c) => {
-    const row = me(c);
+  app.put(MACHINE_UPLOAD_PATH, async (c) => {
     const uploadId = c.req.param('uploadId');
-    const upload = ctx.uploads.get(uploadId);
-    if (!upload || upload.machineId !== row.id) throw new HttpError(404, 'upload not found');
+    const upload = c.get('machineUpload');
     const completeUpload = () => {
       ctx.uploads.delete(uploadId);
       return c.json({ ok: true as const });
@@ -764,68 +762,47 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
-  app.post(
-    '/api/machine/done/:stepId',
-    bodyLimit({
-      maxSize: DONE_MAX_BODY_BYTES,
-      onError: (c) => c.json({ error: 'done body too large' }, 413),
-    }),
-    async (c) => {
-      return executeMachineCommand(
-        c,
-        () => jsonBody(c),
-        async (row, decoded) => {
-          const body = parseWith(machineDoneBodySchema, decoded, 'body');
-          await finishStep(deps, row.id, c.req.param('stepId'), body);
-          return c.json({ ok: true as const });
-        },
-      );
-    },
-  );
+  app.post('/api/machine/done/:stepId', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineDoneBodySchema, decoded, 'body');
+        await finishStep(deps, row.id, c.req.param('stepId'), body);
+        return c.json({ ok: true as const });
+      },
+    );
+  });
 
-  app.post(
-    '/api/machine/computer/:callId',
-    bodyLimit({
-      maxSize: COMPUTER_FRAMES_MAX_BODY_BYTES,
-      onError: (c) => c.json({ error: 'computer frames body too large' }, 413),
-    }),
-    async (c) => {
-      const callId = parseWith(computerCallIdSchema, c.req.param('callId'), 'callId');
-      return executeMachineCommand(
-        c,
-        () => jsonBody(c),
-        async (row, decoded) => {
-          const body = parseWith(machineComputerFramesBodySchema, decoded, 'body');
-          return c.json(
-            receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames, ctx.secretBox),
-          );
-        },
-      );
-    },
-  );
+  app.post('/api/machine/computer/:callId', async (c) => {
+    const callId = parseWith(computerCallIdSchema, c.req.param('callId'), 'callId');
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineComputerFramesBodySchema, decoded, 'body');
+        return c.json(
+          receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames, ctx.secretBox),
+        );
+      },
+    );
+  });
 
-  app.post(
-    '/api/machine/im/:connId/event',
-    bodyLimit({
-      maxSize: IM_EVENT_MAX_BODY_BYTES,
-      onError: (c) => c.json({ error: 'im event body too large' }, 413),
-    }),
-    async (c) => {
-      const connId = c.req.param('connId');
-      return executeMachineCommand(
-        c,
-        () => jsonBody(c),
-        async (row, decoded) => {
-          const bridge = ctx.imBridge;
-          if (bridge === undefined) throw new HttpError(404, 'im bridge unavailable');
-          const bound = bridge.connMachine(connId);
-          if (bound === undefined) throw new HttpError(404, 'im connection not attached');
-          if (bound !== row.id) throw new HttpError(403, 'im connection bound to another machine');
-          const body = parseWith(machineImEventBodySchema, decoded, 'body');
-          bridge.handleEvent(connId, body);
-          return c.json({ ok: true as const });
-        },
-      );
-    },
-  );
+  app.post('/api/machine/im/:connId/event', async (c) => {
+    const connId = c.req.param('connId');
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const bridge = ctx.imBridge;
+        if (bridge === undefined) throw new HttpError(404, 'im bridge unavailable');
+        const bound = bridge.connMachine(connId);
+        if (bound === undefined) throw new HttpError(404, 'im connection not attached');
+        if (bound !== row.id) throw new HttpError(403, 'im connection bound to another machine');
+        const body = parseWith(machineImEventBodySchema, decoded, 'body');
+        bridge.handleEvent(connId, body);
+        return c.json({ ok: true as const });
+      },
+    );
+  });
 }

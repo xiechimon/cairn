@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { WORKER_REMOTE_TOOLS, WORKER_REMOTE_TOOLS_GITHUB } from '@cairn/shared';
+import {
+  ATTACHMENT_MAX_BYTES,
+  WORKER_REMOTE_TOOLS,
+  WORKER_REMOTE_TOOLS_GITHUB,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { expect, test, vi } from 'vitest';
 import { prepareFileAttachment } from '../../daemon/src/attach-file.js';
@@ -103,6 +107,20 @@ test('attach_file stores computed bytes/hash and binds output to the step team a
     expect(download.status).toBe(200);
     expect(Buffer.from(await download.arrayBuffer())).toEqual(bytes);
     expect(s.db.select().from(todo).where(eq(todo.id, task.id)).get()?.teamId).toBe(s.team.id);
+  } finally {
+    s.dispose();
+  }
+});
+
+test('attach_file accepts a maximum-size agent attachment in its JSON envelope', async () => {
+  const { s, cwd, call } = await world();
+  try {
+    writeFileSync(join(cwd, 'maximum.txt'), Buffer.alloc(ATTACHMENT_MAX_BYTES, 'x'));
+    const response = await call(prepareFileAttachment(cwd, { path: 'maximum.txt' }));
+    expect(response.status).toBe(200);
+    expect(s.db.select({ size: attachment.sizeBytes }).from(attachment).all()).toEqual([
+      { size: ATTACHMENT_MAX_BYTES },
+    ]);
   } finally {
     s.dispose();
   }

@@ -104,6 +104,16 @@ describe('session JSONL upload and per-step retrieval (#1512)', () => {
     expect(parsed.content).toBe(body);
   });
 
+  test('accepts a granted session at the existing 10 MiB file cap', async () => {
+    const w = await setupWorld();
+    const prefix = '{"text":"';
+    const suffix = '"}\n';
+    const body =
+      prefix + 'x'.repeat(SESSION_JSONL_MAX_BYTES - prefix.length - suffix.length) + suffix;
+    expect((await putSession(w, body)).status).toBe(200);
+    expect(readStepSession(w.s.attachmentsDir, w.stepId)?.length).toBe(SESSION_JSONL_MAX_BYTES);
+  });
+
   test('failure mode 2: over the cap -> nothing written, retrieval 404', async () => {
     const w = await setupWorld();
     const put = await putSession(w, 'x'.repeat(SESSION_JSONL_MAX_BYTES + 1));
