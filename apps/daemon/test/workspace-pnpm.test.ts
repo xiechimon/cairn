@@ -11,6 +11,10 @@ test('workspace installation never bootstraps package managers into the tracked 
   const env: NodeJS.ProcessEnv = { ...process.env, CI: 'true', npm_config_ignore_scripts: 'true' };
   delete env.npm_config_pm_on_fail;
   writeFileSync(join(cwd, 'package.json'), '{"private":true}');
+  writeFileSync(
+    join(cwd, 'pnpm-workspace.yaml'),
+    readFileSync(new URL('pnpm-workspace.yaml', repo)),
+  );
   execFileSync('pnpm', ['--pm-on-fail=ignore', 'install', '--offline', '--ignore-scripts'], {
     cwd,
     env,
@@ -21,10 +25,6 @@ test('workspace installation never bootstraps package managers into the tracked 
   writeFileSync(
     join(cwd, 'package.json'),
     JSON.stringify({ private: true, packageManager: manifest.packageManager }),
-  );
-  writeFileSync(
-    join(cwd, 'pnpm-workspace.yaml'),
-    readFileSync(new URL('pnpm-workspace.yaml', repo)),
   );
   const result = spawnSync(
     'pnpm',

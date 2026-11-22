@@ -42,14 +42,14 @@
     "@earendil-works/pi-schema": "1.5.0",
     "@earendil-works/pi-telemetry": "1.5.0",
     "@earendil-works/pi-tui": "1.5.0",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "cloakbrowser": "0.7.2",
     "commander": "15.0.0",
     "e2b": "2.63.0",
     "pino": "10.3.1",
     "smol-toml": "1.9.1",
-    "undici": "8.10.2",
-    "zod": "4.6.5"
+    "undici": "8.12.4",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@cairn/shared": "workspace:*",

@@ -27,7 +27,7 @@
     "@biomejs/biome": "catalog:",
     "@changesets/cli": "3.0.3",
     "@playwright/test": "catalog:",
-    "concurrently": "^10.0.5",
+    "concurrently": "^10.0.7",
     "dependency-cruiser": "18.7.2",
     "lucide-static": "^1.48.0",
     "typescript": "catalog:",

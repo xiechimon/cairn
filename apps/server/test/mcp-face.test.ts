@@ -1,10 +1,15 @@
 import { MCP_TOOL_REGISTRY } from '@cairn/shared';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { describe, expect, test } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { build as buildTable, step, todo as todoTable } from '../src/db/schema.js';
 import { PLATFORM_LOCKED_MESSAGE } from '../src/services/routing-rules.js';
 import { bootServer, postProject, startLegacyBuild, type TestServer } from './helpers.js';
+
+vi.mock('@modelcontextprotocol/sdk/server/mcp.js', { spy: true });
+vi.mock('@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js', { spy: true });
 
 interface JsonRpcResponse {
   jsonrpc: '2.0';
@@ -86,6 +91,25 @@ describe('/api/mcp auth surface (02 section 7.2: Bearer <apiKey>; mcpAccess gate
     });
     expect(res.status).toBe(403);
     s.dispose();
+  });
+});
+
+describe('/api/mcp request limits', () => {
+  test('sets both SDK limits on the path that serves authorized tools', async () => {
+    const s = bootServer();
+    onTestFinished(() => s.dispose());
+    const key = await issueMcpKey(s, { read: ['Projects'], write: [] });
+    const res = await rpc(s.app, key, 'tools/call', { name: 'projects', arguments: {} });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ result: { content: [{ type: 'text', text: '[]' }] } });
+    expect
+      .soft(vi.mocked(McpServer).mock.lastCall?.[1])
+      .toMatchObject({ maxToolInputElements: 1024 });
+    expect
+      .soft(vi.mocked(WebStandardStreamableHTTPServerTransport).mock.lastCall?.[0])
+      .toMatchObject({
+        maxRequestBodySize: 1024 * 1024,
+      });
   });
 });
 

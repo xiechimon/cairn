@@ -359,7 +359,7 @@ export async function executeMcpTool(
 export function buildMcpFaceServer(deps: ChiefToolDeps, ctx: McpCallerCtx): McpServer {
   const server = new McpServer(
     { name: BRAND.cliCommandName, version: '0.1.0' },
-    { capabilities: { tools: {} } },
+    { capabilities: { tools: {} }, maxToolInputElements: 1024 },
   );
   for (const entry of MCP_TOOL_REGISTRY) {
     if (!ctx.grants.has(entry.grant)) continue;
@@ -415,6 +415,7 @@ export async function handleMcpRequest(
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,
+    maxRequestBodySize: 1024 * 1024,
   });
   await server.connect(transport);
   try {

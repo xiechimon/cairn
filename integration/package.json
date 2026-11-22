@@ -11,14 +11,14 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@hono/node-server": "2.1.1",
-    "@modelcontextprotocol/sdk": "1.30.0",
+    "@hono/node-server": "2.1.11",
+    "@modelcontextprotocol/sdk": "1.32.2",
     "@playwright/test": "catalog:",
     "@cairn/shared": "workspace:*",
     "@xiechimon/cairn": "workspace:*",
     "@xiechimon/cairn-cli": "workspace:*",
     "drizzle-orm": "0.45.2",
-    "hono": "4.13.8",
+    "hono": "4.13.19",
     "tsx": "4.23.15",
     "typescript": "catalog:",
     "vitest": "catalog:",

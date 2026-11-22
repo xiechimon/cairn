@@ -35,9 +35,14 @@ catalog:
   react-router: 8.4.0
   tailwindcss: 4.3.3
   typescript: 7.0.2
-  vite: 8.3.0
-  vitest: 5.0.1
-  zod: 4.6.5
+  vite: 8.3.8
+  vitest: 5.0.5
+  zod: 4.6.7
+
+overrides:
+  '@google/genai>@modelcontextprotocol/sdk': 1.32.2
+  '@modelcontextprotocol/sdk>@hono/node-server': 2.1.11
+  '@modelcontextprotocol/sdk>hono': 4.13.19
 
 minimumReleaseAgeExclude:
   - '@anthropic-ai/claude-agent-sdk-darwin-arm64@0.3.330'
