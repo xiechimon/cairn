@@ -42,6 +42,7 @@ import {
   acpThoughtValue,
   CLAUDE_TODO_STATUS_STATES,
 } from '@cairn/shared';
+import { writeJsonObject } from '../agent-config.js';
 import { stepCredentialStateDirs } from '../step-app-credential.js';
 import { DAEMON_VERSION } from '../version.js';
 import {
@@ -203,6 +204,17 @@ export function mapAcpUpdate(update: SessionUpdate | { kind: 'cancelled' }): Ste
   return null;
 }
 
+const GEMINI_TOKEN_LIMIT = 1_048_576;
+const GEMMA_4_TOKEN_LIMIT = 256_000;
+const GEMMA_4_MODELS = new Set(['gemma-4-31b-it', 'gemma-4-26b-a4b-it']);
+
+function geminiCompressionSettingsPath(home: string, modelId: string, compactAt: number): string {
+  const limit = GEMMA_4_MODELS.has(modelId) ? GEMMA_4_TOKEN_LIMIT : GEMINI_TOKEN_LIMIT;
+  return writeJsonObject(home, `.gemini/cairn-system/compress-${compactAt}-of-${limit}.json`, {
+    model: { compressionThreshold: compactAt / limit },
+  });
+}
+
 class AcpSession implements AgentSessionHandle {
   readonly sessionId: string;
   readonly events: AsyncIterable<StepEvent>;
@@ -229,6 +241,7 @@ class AcpSession implements AgentSessionHandle {
     private readonly cleanup: () => void,
     private readonly adapter?: AcpBackendOptions,
     private readonly modelId = 'unknown',
+    private readonly compactAt?: number,
   ) {
     this.sessionId = sessionId;
     this.normalizer = adapter?.createUpdateNormalizer?.();
@@ -381,7 +394,9 @@ class AcpSession implements AgentSessionHandle {
         output: num('outputTokens'),
         cacheRead: num('cachedReadTokens'),
         cacheWrite: num('cachedWriteTokens'),
+        contextTokens: update.used,
         contextWindow: update.size,
+        ...(this.compactAt !== undefined ? { compactAt: this.compactAt } : {}),
       });
       this.push({ type: 'usage', usage: [...this.usageRows] });
       return;
@@ -647,6 +662,14 @@ class AcpBackend implements AgentBackend {
           readable: stepCredentialStateDirs(opts.env),
         }) ?? launch;
       const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
+      const geminiHome = sessionEnv.GEMINI_CLI_HOME;
+      if (!adapter && opts.compactAt !== undefined && geminiHome !== undefined) {
+        sessionEnv.GEMINI_CLI_SYSTEM_SETTINGS_PATH = geminiCompressionSettingsPath(
+          geminiHome,
+          opts.modelId,
+          opts.compactAt,
+        );
+      }
       if (adapter?.harness === 'devin') {
         for (const key of Object.keys(sessionEnv)) {
           if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete sessionEnv[key];
@@ -934,6 +957,7 @@ class AcpBackend implements AgentBackend {
         cleanup,
         adapter,
         opts.modelId,
+        opts.compactAt,
       );
       return session;
     } catch (error) {

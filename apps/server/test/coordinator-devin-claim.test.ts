@@ -1,8 +1,11 @@
+import { COORDINATOR_COMPACT_AT } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import {
+  chiefMessage as chiefMessageTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
+  chiefTurnUsage as chiefTurnUsageTable,
   devinSubscription as devinSubscriptionTable,
   step as stepTable,
 } from '../src/db/schema.js';
@@ -144,5 +147,65 @@ describe('Coordinator rule that selects Devin', () => {
       's2',
     );
     expect(nextToken.devinToken).toBe(secondToken);
+  });
+
+  test.each([
+    [COORDINATOR_COMPACT_AT - 1, { action: 'continue', sessionId: 'devin-sess-1' }],
+    [COORDINATOR_COMPACT_AT, { action: 'new', sessionId: null }],
+  ])('a thread whose last turn held %i tokens claims %o', async (contextTokens, session) => {
+    const { s, machineId, subscriptionId } = setupWorld({ subscription: true });
+    s.db
+      .update(chiefThreadTable)
+      .set({ sessionId: 'devin-sess-1', sessionRuntime: 'devin' })
+      .where(eq(chiefThreadTable.id, 'chief-t1'))
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({
+        id: 's1',
+        buildId: 'chief-t1',
+        kind: 'chief',
+        status: 'done',
+        machineId,
+        claimedAt: 3,
+        sessionId: 'devin-sess-1',
+        devinSubscriptionId: subscriptionId,
+        createdAt: 3,
+      })
+      .run();
+    s.db
+      .insert(chiefTurnUsageTable)
+      .values({
+        stepId: 's1',
+        threadId: 'chief-t1',
+        model: 'devin/swe-2-high',
+        input: contextTokens,
+        output: 10,
+        cacheRead: 0,
+        cacheWrite: 0,
+        contextTokens,
+        contextWindow: 1_000_000,
+        compactAt: COORDINATOR_COMPACT_AT,
+        createdAt: 4,
+        firstReportAt: 4,
+      })
+      .run();
+    s.db
+      .insert(chiefMessageTable)
+      .values({
+        id: 'm-earlier',
+        threadId: 'chief-t1',
+        role: 'assistant',
+        content: 'The release notes are drafted',
+        createdAt: 5,
+      })
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({ id: 's2', buildId: 'chief-t1', kind: 'chief', status: 'pending', createdAt: 10 })
+      .run();
+    const claimed = await claim(s, machineId);
+    expect(claimed?.session).toEqual(session);
+    expect(claimed?.chief?.history).toContain('The release notes are drafted');
   });
 });

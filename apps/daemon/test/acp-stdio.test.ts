@@ -1,7 +1,15 @@
 import { ChildProcess } from 'node:child_process';
+import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
-import { type SessionOpts, type StepEvent, stepEventSchema } from '@cairn/shared';
+import {
+  COORDINATOR_COMPACT_AT,
+  type SessionOpts,
+  type StepEvent,
+  stepEventSchema,
+} from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createGeminiBackend } from '../src/backend/acp.js';
 
 const opts: SessionOpts = {
@@ -332,3 +340,59 @@ test.each(['load', 'resume'])(
     expect(await collect(session.events)).toEqual([]);
   },
 );
+
+test.each([
+  ['gemini-3-pro-preview', 150_000 / 1_048_576],
+  ['gemma-4-31b-it', 150_000 / 256_000],
+])(
+  'a Coordinator session on Gemini %s compresses at the product threshold',
+  async (modelId, fraction) => {
+    const home = makeTestTempDir('cairn-gemini-compact-');
+    let inherited: NodeJS.ProcessEnv | undefined;
+    const agent = createGeminiBackend({
+      executablePath: 'gemini',
+      spawnProcess: (_command, _args, options) => {
+        inherited = options.env;
+        throw new Error('captured environment');
+      },
+    });
+    await expect(
+      agent.createSession({
+        ...opts,
+        modelId,
+        compactAt: COORDINATOR_COMPACT_AT,
+        env: { GEMINI_CLI_HOME: home },
+      }),
+    ).rejects.toThrow('captured environment');
+    const settingsPath = inherited?.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
+    expect(settingsPath?.startsWith(home)).toBe(true);
+    const settings = JSON.parse(readFileSync(settingsPath as string, 'utf8'));
+    expect(settings).toEqual({ model: { compressionThreshold: fraction } });
+    releaseTestTempDir(home);
+  },
+);
+
+test('a Coordinator Gemini session replaces a planted link instead of writing through it', async () => {
+  const home = makeTestTempDir('cairn-gemini-link-');
+  const outside = join(home, 'outside.txt');
+  writeFileSync(outside, 'keep me');
+  const dir = join(home, '.gemini', 'cairn-system');
+  mkdirSync(dir, { recursive: true });
+  symlinkSync(outside, join(dir, `compress-${COORDINATOR_COMPACT_AT}-of-1048576.json`));
+  const agent = createGeminiBackend({
+    executablePath: 'gemini',
+    spawnProcess: () => {
+      throw new Error('captured environment');
+    },
+  });
+  await expect(
+    agent.createSession({
+      ...opts,
+      modelId: 'gemini-3-pro-preview',
+      compactAt: COORDINATOR_COMPACT_AT,
+      env: { GEMINI_CLI_HOME: home },
+    }),
+  ).rejects.toThrow('captured environment');
+  expect(readFileSync(outside, 'utf8')).toBe('keep me');
+  releaseTestTempDir(home);
+});

@@ -1,4 +1,5 @@
 import {
+  COORDINATOR_COMPACT_AT,
   COORDINATOR_MEMORY_FLUSH_TRANSCRIPT_MAX_CHARS,
   COORDINATOR_SUMMARY_MAX_CHARS,
   COORDINATOR_SUMMARY_PROMPT_HEAD,
@@ -20,7 +21,6 @@ import {
   startSummaryCall,
 } from './failure-report.js';
 
-export const BACKGROUND_COMPACTION_AT = 150_000;
 export const COMPACTION_RESERVE_TOKENS = 16_384;
 export const KEEP_RECENT_TOKENS = 8_000;
 const TOOL_ARGS_CHARS = 200;
@@ -48,7 +48,7 @@ export function compactionWindow(contextWindow: number): CompactionWindow {
   const blockingAt = contextWindow - COMPACTION_RESERVE_TOKENS;
   return {
     blockingAt,
-    backgroundAt: Math.min(BACKGROUND_COMPACTION_AT, Math.floor(blockingAt / 2)),
+    backgroundAt: Math.min(COORDINATOR_COMPACT_AT, Math.floor(blockingAt / 2)),
   };
 }
 

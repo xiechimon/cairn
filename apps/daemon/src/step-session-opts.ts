@@ -1,5 +1,5 @@
 import type { RemoteToolDef, SessionOpts, SkillInjectionFacts } from '@cairn/shared';
-import { WEB_RESEARCH_GUIDANCE } from '@cairn/shared';
+import { COORDINATOR_COMPACT_AT, WEB_RESEARCH_GUIDANCE } from '@cairn/shared';
 import { stepRemoteToolExecutor } from './step-remote-tools.js';
 
 type RemoteExecutorInput = Parameters<typeof stepRemoteToolExecutor>[0];
@@ -32,6 +32,7 @@ export function composeStepSessionOpts(input: StepSessionOptsInput): SessionOpts
   const { isChief, isReview, remoteTools, cwd } = input;
   return {
     provider: input.provider,
+    ...(isChief ? { compactAt: COORDINATOR_COMPACT_AT } : {}),
     modelId: input.modelId,
     ...(input.thinkingLevel ? { thinkingLevel: input.thinkingLevel } : {}),
     systemPrompt: [input.systemPrompt, WEB_RESEARCH_GUIDANCE].filter(Boolean).join('\n\n'),

@@ -144,8 +144,12 @@ export interface AgentBackendCapabilities {
   readonly steering?: boolean;
 }
 
+/** Context size, in tokens, at which every Coordinator runtime compacts its conversation. */
+export const COORDINATOR_COMPACT_AT = 150_000;
+
 export interface SessionOpts {
   provider: ProviderConfig;
+  compactAt?: number;
   lockedDown?: boolean;
   modelId: string;
   thinkingLevel?: string;

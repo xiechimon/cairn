@@ -83,12 +83,17 @@ function readJsonObject(path: string): Record<string, unknown> {
   }
 }
 
-function writeJsonObject(home: string, file: string, value: Record<string, unknown>): void {
+export function writeJsonObject(
+  home: string,
+  file: string,
+  value: Record<string, unknown>,
+): string {
   const path = join(realDirectory(home, dirname(file)), file.split('/').at(-1) as string);
   clearNonLink(path);
   const staging = `${path}.${randomUUID()}`;
   writeFileSync(staging, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   renameSync(staging, path);
+  return path;
 }
 
 function keychainFiles(platform: NodeJS.Platform): string[] {

@@ -56,7 +56,7 @@ import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.j
 import { refreshClaudeRateParks } from './claude-rate-limit.js';
 import { enabledSubscriptionId, hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { connectorToolDefsForTeam } from './connector-broker.js';
-import { coordinatorInServerEnabled } from './coordinator-context.js';
+import { coordinatorInServerEnabled, rotatesPastCompaction } from './coordinator-context.js';
 import { coordinatorRoute } from './coordinator-route.js';
 import { chiefTurnContext, claimPendingChiefStep } from './coordinator-steps.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
@@ -370,6 +370,7 @@ function chiefClaimPayload(
     !stepRow.freshSession &&
     threadRow.sessionId !== '' &&
     threadRow.sessionRuntime === runtime &&
+    !rotatesPastCompaction(deps.db, threadRow.id, runtime) &&
     (runtime !== 'claude-code' && runtime !== 'devin' && runtime !== 'antigravity'
       ? true
       : !chiefLastRanOnOtherAccount(

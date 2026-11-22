@@ -472,6 +472,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         permissions: 'allow-once',
         sessionResume: true,
         allowHostMcp: true,
+        usageEvents: true,
         skills: { skillsDir: config.skillsDir, cwd: config.home },
         onSkillsLog: (msg) => logger.skills(msg),
         ...(confine !== null && confine !== undefined ? { confine } : {}),

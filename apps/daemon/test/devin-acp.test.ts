@@ -2,7 +2,12 @@ import { mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SessionUpdate } from '@agentclientprotocol/sdk';
-import type { MachineCapabilities, SessionOpts, StepEvent } from '@cairn/shared';
+import {
+  COORDINATOR_COMPACT_AT,
+  type MachineCapabilities,
+  type SessionOpts,
+  type StepEvent,
+} from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createAcpBackend } from '../src/backend/acp.js';
@@ -135,6 +140,7 @@ describe('devin ACP adapter over scripted stdio', () => {
           output: 10,
           cacheRead: 3,
           cacheWrite: 2,
+          contextTokens: 50,
           contextWindow: 1000,
         },
       ],
@@ -151,7 +157,31 @@ describe('devin ACP adapter over scripted stdio', () => {
           output: 10,
           cacheRead: 3,
           cacheWrite: 2,
+          contextTokens: 50,
           contextWindow: 1000,
+        },
+      ],
+    });
+  });
+
+  test('a Coordinator turn reports how full its context is and where Cairn starts afresh', async () => {
+    const session = await devinBackend('devin').createSession({
+      ...opts,
+      compactAt: COORDINATOR_COMPACT_AT,
+    });
+    const events = await collect(session.events);
+    expect(events).toContainEqual({
+      type: 'done',
+      usage: [
+        {
+          model: 'stub-model',
+          input: 40,
+          output: 10,
+          cacheRead: 3,
+          cacheWrite: 2,
+          contextTokens: 50,
+          contextWindow: 1000,
+          compactAt: COORDINATOR_COMPACT_AT,
         },
       ],
     });

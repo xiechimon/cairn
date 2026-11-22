@@ -1370,10 +1370,13 @@ export interface ClaudeSdkOptionParts {
   skillDenyRules?: string[];
   executablePath?: string;
   env?: Record<string, string>;
+  compactAt?: number;
   plugins?: SdkPluginConfig[];
   abortController: AbortController;
   process?: SessionProcess;
 }
+
+const CLAUDE_AUTO_COMPACT_HEADROOM = 33_000;
 
 const METERED_CLAUDE_AUTH_BLANK = {
   ANTHROPIC_API_KEY: '',
@@ -1494,7 +1497,16 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       : {}),
     ...(parts.resumeId !== null ? { resume: parts.resumeId } : { sessionId: parts.sessionId }),
     settings: {
-      env: { ...CLAUDE_TELEMETRY_PINS },
+      env: {
+        ...CLAUDE_TELEMETRY_PINS,
+        ...(parts.compactAt !== undefined
+          ? {
+              CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(
+                parts.compactAt + CLAUDE_AUTO_COMPACT_HEADROOM,
+              ),
+            }
+          : {}),
+      },
       ...(locked ? { disableAllHooks: true, disableSkillShellExecution: true } : {}),
       ...(parts.skillDenyRules !== undefined && parts.skillDenyRules.length > 0
         ? { permissions: { deny: [...parts.skillDenyRules] } }
@@ -1628,6 +1640,7 @@ export class ClaudeCodeBackend implements AgentBackend {
         ? { executablePath: this.opts.executablePath }
         : {}),
       ...(mergedEnv !== undefined ? { env: mergedEnv } : {}),
+      ...(opts.compactAt !== undefined ? { compactAt: opts.compactAt } : {}),
       ...(nativePluginDir !== null && opts.remoteToolsOnly !== true
         ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
         : {}),

@@ -1,5 +1,5 @@
 import type { ContextCache } from '@cairn/shared';
-import { isBackendRuntimeId } from '@cairn/shared';
+import { COORDINATOR_COMPACT_AT, isBackendRuntimeId } from '@cairn/shared';
 import { and, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
 import {
   type ContextResume,
@@ -141,6 +141,14 @@ export function lastContextBearingTurnUsage(
   threadId: string,
 ): ContextBearingTurnUsage | null {
   return lastContextBearingTurnUsageWhere(db, eq(chiefTurnUsage.threadId, threadId));
+}
+
+const SESSION_ROTATING_RUNTIMES: ReadonlySet<string> = new Set(['devin', 'antigravity']);
+
+export function rotatesPastCompaction(db: Db, threadId: string, runtime: string): boolean {
+  if (!SESSION_ROTATING_RUNTIMES.has(runtime)) return false;
+  const last = lastContextBearingTurnUsage(db, threadId);
+  return last !== null && last.contextTokens >= COORDINATOR_COMPACT_AT;
 }
 
 export function lastTurnUsageForColdResume(

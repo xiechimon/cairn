@@ -1,5 +1,5 @@
 import type { ProviderConfig, RemoteToolDef } from '@cairn/shared';
-import { WEB_RESEARCH_GUIDANCE } from '@cairn/shared';
+import { COORDINATOR_COMPACT_AT, WEB_RESEARCH_GUIDANCE } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import type { MachineApi } from '../src/machine-client.js';
 import { composeStepSessionOpts, type StepSessionOptsInput } from '../src/step-session-opts.js';
@@ -73,6 +73,8 @@ describe('composeStepSessionOpts', () => {
     expect(result.lockedDown).toBe(true);
     expect(result.skillsAllowlist).toBeUndefined();
     expect(result.injectedSkills).toBeUndefined();
+    expect(result.compactAt).toBe(COORDINATOR_COMPACT_AT);
+    expect(opts({}).compactAt).toBeUndefined();
   });
 
   test('a worker step keeps its skill lists, prompt and environment', () => {
