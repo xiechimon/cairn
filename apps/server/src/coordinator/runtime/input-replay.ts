@@ -38,17 +38,32 @@ export async function replayCoordinatorInputs(
   const inputs = (await channel.list(threadId)).filter(
     (input) =>
       input.conversationId === conversationKey &&
-      input.state === 'consumed' &&
-      input.entryId !== null,
+      ((input.state === 'consumed' && input.entryId !== null) || input.requestIds.length > 1),
   );
   if (inputs.length === 0) return;
-  const start = Math.min(...inputs.map((input) => Number(input.entryId)));
   const conversation = await harness.conversation(
     Number(position.conversationId) as ConversationId,
     context,
   );
   if (conversation === undefined)
     throw new InputAuthorityError('Coordinator replay conversation is missing');
+  const owners = new Map<string, Set<string>>();
+  const own = (entryId: string, stepId: string) =>
+    owners.set(entryId, (owners.get(entryId) ?? new Set()).add(stepId));
+  for (const input of inputs) {
+    if (input.state === 'consumed' && input.entryId !== null) own(input.entryId, input.stepId);
+    for (const requestId of input.requestIds) {
+      if (requestId === input.id) continue;
+      const record = await harness.commit(
+        (tx) => tx.submissionByRequest(conversation.id, requestId),
+        context,
+      );
+      if (record?.type === 'input' && record.entry !== undefined)
+        own(String(record.entry), input.stepId);
+    }
+  }
+  if (owners.size === 0) return;
+  const start = Math.min(...[...owners.keys()].map(Number));
   const entries: EntryRecord[] = [];
   let cursor: Cursor | undefined;
   do {
@@ -77,10 +92,8 @@ export async function replayCoordinatorInputs(
     if (entry.conversationId !== conversation.id || Number(entry.id) < start) continue;
     let producer: string | undefined;
     if (UserEntry.is(entry)) {
-      const owners = new Set(
-        inputs.filter((input) => input.entryId === String(entry.id)).map((input) => input.stepId),
-      );
-      if (owners.size === 1) producer = [...owners][0];
+      const stepIds = owners.get(String(entry.id));
+      if (stepIds?.size === 1) producer = [...stepIds][0];
     } else if (AssistantEntry.is(entry)) {
       if (entry.byTaskId !== undefined) {
         const task = await taskFor(entry.byTaskId);

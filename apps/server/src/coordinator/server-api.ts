@@ -22,6 +22,7 @@ import {
   coordinatorInputIsLive,
   coordinatorInputs,
   inputRequestId,
+  inputRequestIds,
   prepareCoordinatorInput,
   pullCoordinatorInput,
   releaseCoordinatorInput,
@@ -172,13 +173,18 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
         coordinatorInputs(deps.db, threadId).map((input) => ({
           ...input,
           id: inputRequestId(input),
+          requestIds: inputRequestIds(inputRequestId(input)),
           live: coordinatorInputIsLive(deps.db, inputRequestId(input)) === true,
         })),
       prepare: async (stepId, conversationId, content, existingEntryId, renew) => {
         const input = inputTransition(() =>
           prepareCoordinatorInput(deps.db, stepId, conversationId, content, existingEntryId, renew),
         );
-        return { ...input, live: coordinatorInputIsLive(deps.db, input.id) === true };
+        return {
+          ...input,
+          requestIds: inputRequestIds(input.id),
+          live: coordinatorInputIsLive(deps.db, input.id) === true,
+        };
       },
       consume: async (requestId, conversationId, entryId, placedAt) => {
         const { placed, retired } = inputTransition(() =>

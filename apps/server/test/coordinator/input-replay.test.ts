@@ -34,6 +34,8 @@ import {
   consumeCoordinatorInput,
   coordinatorInputIsLive,
   coordinatorInputs,
+  inputRequestId,
+  inputRequestIds,
   prepareCoordinatorInput,
   releaseCoordinatorInput,
   requireCoordinatorConversation,
@@ -141,6 +143,7 @@ async function fixture(reversePublications = false) {
     list: async () =>
       coordinatorInputs(H.s.db, H.threadId).map((input) => ({
         ...input,
+        requestIds: inputRequestIds(inputRequestId(input)),
         live: coordinatorInputIsLive(H.s.db, input.id) === true,
       })),
     position: async () => H.s.db.select().from(coordinatorConversation).get() ?? null,
@@ -149,6 +152,7 @@ async function fixture(reversePublications = false) {
       requireCoordinatorConversation(H.s.db, threadId, conversationId),
     prepare: async (stepId, conversationId, content, existingEntryId) => ({
       ...prepareCoordinatorInput(H.s.db, stepId, conversationId, content, existingEntryId),
+      requestIds: [],
       live: true,
     }),
     consume: async (...args) => {

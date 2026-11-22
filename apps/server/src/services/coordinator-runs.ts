@@ -19,16 +19,14 @@ export function bindCoordinatorRun(
   const producers = new Set<string>();
   for (const id of requestIds) {
     const { batch: input, stale } = inputForRequestId(db, id);
-    if (stale) continue;
     if (
       input?.threadId !== threadId ||
       input.conversationId !== conversationId ||
-      input.state !== 'consumed'
+      (!stale && input.state !== 'consumed')
     )
       throw new HttpError(409, 'Coordinator run input authority is incomplete');
     producers.add(input.stepId);
   }
-  if (producers.size === 0) return;
   const stepId = [...producers][0];
   if (producers.size !== 1 || stepId === undefined)
     throw new HttpError(409, 'Coordinator run crosses producer boundaries');

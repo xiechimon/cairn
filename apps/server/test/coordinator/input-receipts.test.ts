@@ -116,6 +116,7 @@ test('recovery reads a stored placement even when the producer is retired', asyn
       conversationId: w.receipts.key(String(w.root.id)),
       state: 'pending',
       entryId: null,
+      requestIds: ['image'],
       live: false,
     } satisfies NativeInput,
   ]);
@@ -140,6 +141,7 @@ test('recovery releases missing admission only for a retired target in an intact
     conversationId: w.receipts.key(String(w.root.id)),
     state: 'pending',
     entryId: null,
+    requestIds: ['missing'],
     live: true,
   };
   w.channel.list.mockResolvedValue([batch]);
@@ -173,6 +175,7 @@ test('a failed shutdown receipt remains recoverable by a fresh observer', async 
       conversationId: w.receipts.key(String(w.root.id)),
       state: 'pending',
       entryId: null,
+      requestIds: ['retained'],
       live: false,
     },
   ]);

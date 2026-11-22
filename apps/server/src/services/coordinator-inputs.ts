@@ -30,6 +30,11 @@ export function inputRequestId(input: Pick<CoordinatorInput, 'id' | 'attempt'>):
   return input.attempt <= 1 ? input.id : `${input.id}#${input.attempt}`;
 }
 
+export function inputRequestIds(requestId: string): string[] {
+  const { id, attempt } = parseInputRequestId(requestId);
+  return Array.from({ length: attempt }, (_, index) => inputRequestId({ id, attempt: index + 1 }));
+}
+
 function parseInputRequestId(requestId: string): { id: string; attempt: number } {
   const hash = requestId.lastIndexOf('#');
   if (hash === -1) return { id: requestId, attempt: 1 };

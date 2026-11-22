@@ -7,6 +7,7 @@ export interface NativeInput {
   conversationId: string | null;
   state: 'pending' | 'consumed' | 'released';
   entryId: string | null;
+  requestIds: string[];
   live: boolean;
 }
 

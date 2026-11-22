@@ -19,6 +19,7 @@ import {
   queueCoordinatorInput,
   releaseCoordinatorInput,
 } from '../src/services/coordinator-inputs.js';
+import { bindCoordinatorRun, coordinatorRuns } from '../src/services/coordinator-runs.js';
 import { H, registerChiefHarness } from './chief-harness.js';
 
 registerChiefHarness();
@@ -87,6 +88,16 @@ test('a consumed input does not replay: a re-claimed step prepares a new request
   expect(batch(first.id)?.state).toBe('pending');
   consumeCoordinatorInput(H.s.db, retried.id, 'conversation-1', '7');
   expect(batch(first.id)).toMatchObject({ state: 'consumed', entryId: '7' });
+});
+
+test('a run bound after its input was retried still belongs to the retried step', () => {
+  const first = prepareCoordinatorInput(H.s.db, parentId, 'conversation-1', 'Start.');
+  consumeCoordinatorInput(H.s.db, first.id, 'conversation-1', '5');
+  prepareCoordinatorInput(H.s.db, parentId, 'conversation-1', 'Start.', '5', true);
+  bindCoordinatorRun(H.s.db, H.threadId, 'conversation-1', 'task-first', [first.id]);
+  expect(coordinatorRuns(H.s.db, H.threadId)).toEqual([
+    expect.objectContaining({ taskId: 'task-first', stepId: parentId }),
+  ]);
 });
 
 test('queue and repeated pull retain the same frozen batch without early attribution', () => {
