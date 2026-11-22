@@ -1,13 +1,14 @@
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream } from 'node:fs';
+import { createWriteStream, existsSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { DesktopUpdate } from '@cairn/shared';
+import type { DesktopUpdate, DesktopUpdateState } from '@cairn/shared';
+import { appendUpdateLog } from './update-log.ts';
 import { removeFolder, removeStagingFolders, STAGING_PREFIX } from './update-staging.ts';
-import { readUpdateState, type StagedUpdate, writeUpdateState } from './update-state.ts';
-import { APP_BUNDLE_NAME, readBundleVersion } from './update-swap.ts';
+import { readUpdateState, type StagedUpdate, stagedFor, writeUpdateState } from './update-state.ts';
+import { APP_BUNDLE_NAME, APP_EXECUTABLE, readBundleVersion } from './update-swap.ts';
 
 const run = promisify(execFile);
 
@@ -19,6 +20,26 @@ export interface StageRequest {
   runningVersion: string;
   update: DesktopUpdate;
   onProgress: (phase: 'downloading' | 'installing', percent: number) => void;
+}
+
+export interface StagingFailure {
+  userData: string;
+  statePath: string;
+  runningVersion: string;
+  update: DesktopUpdate;
+  message: string;
+}
+
+export function recordStagingFailure(failure: StagingFailure): DesktopUpdateState {
+  const kept = stagedFor(readUpdateState(failure.statePath), failure.runningVersion);
+  const usable = kept !== null && existsSync(join(kept.app, APP_EXECUTABLE)) ? kept : null;
+  appendUpdateLog(
+    failure.userData,
+    `staging ${failure.update.version} failed${usable === null ? '' : `, kept ${usable.version}`}: ${failure.message}`,
+  );
+  return usable === null
+    ? { status: 'error', message: failure.message }
+    : { status: 'ready', version: usable.version };
 }
 
 async function downloadUpdate(

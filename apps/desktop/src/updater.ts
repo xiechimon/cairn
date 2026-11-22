@@ -13,7 +13,7 @@ import {
 } from '@cairn/shared';
 import { app } from 'electron';
 import { parseSigningIdentity, signatureMatches } from './signature.js';
-import { stageUpdate, UPDATE_REQUEST_HEADERS } from './update-stage.js';
+import { recordStagingFailure, stageUpdate, UPDATE_REQUEST_HEADERS } from './update-stage.js';
 import {
   canonicalPath,
   isStagedBundleFor,
@@ -146,12 +146,15 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
       });
       set({ status: 'ready', version: staged.version });
     } catch (error) {
-      const kept = stagedFor(readUpdateState(statePath()), app.getVersion());
-      if (kept !== null && existsSync(join(kept.app, APP_EXECUTABLE))) {
-        set({ status: 'ready', version: kept.version });
-        return;
-      }
-      set({ status: 'error', message: messageOf(error) });
+      set(
+        recordStagingFailure({
+          userData: app.getPath('userData'),
+          statePath: statePath(),
+          runningVersion: app.getVersion(),
+          update,
+          message: messageOf(error),
+        }),
+      );
     }
   }
 

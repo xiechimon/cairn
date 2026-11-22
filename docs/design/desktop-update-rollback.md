@@ -100,8 +100,8 @@ Paths: `<bundle dir>` is the folder holding `Cairn.app` (normally `/Applications
 | Failure | Behaviour |
 |---|---|
 | Manifest fetch fails / no network | `error`; retried on the next hourly check; nothing staged |
-| Download truncated or wrong hash | the new staging folder is removed and the previously staged record and folder are left as they were; `error` when nothing was staged before, `ready` on the older staged version when there was |
-| Extracted bundle missing or wrong version | the new staging folder is removed and the previously staged record and folder are left as they were |
+| Download truncated or wrong hash | the new staging folder is removed and the previously staged record and folder are left as they were; `error` when nothing was staged before, `ready` on the older staged version when there was; one line in `update.log` names the offered version, the kept version and the reason |
+| Extracted bundle missing or wrong version | the new staging folder is removed and the previously staged record and folder are left as they were; one line in `update.log` names the offered version, the kept version and the reason |
 | Rename across filesystems | cannot happen by construction (staging is beside the bundle) |
 | `staged.app` points anywhere but a staging folder beside the bundle | refused, record and folder discarded, `error` published |
 | The staged bundle is not signed like the running app | refused, `error` published, previous bundle untouched |

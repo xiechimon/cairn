@@ -16,7 +16,8 @@ import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { test } from 'node:test';
-import { stageUpdate } from '../src/update-stage.ts';
+import { updateLogPath } from '../src/update-log.ts';
+import { recordStagingFailure, stageUpdate } from '../src/update-stage.ts';
 import { isStagedBundleFor } from '../src/update-staging.ts';
 import {
   emptyUpdateState,
@@ -99,7 +100,16 @@ function checkout() {
     blocked: { version: '0.1.670', at: 1, reason: 'the server exited with code 1', attempts: 1 },
   };
   writeUpdateState(statePath, state);
-  return { root, applications, bundle: running, statePath, stagedApp, stagedFolder, state };
+  return {
+    root,
+    applications,
+    bundle: running,
+    userData: dirname(statePath),
+    statePath,
+    stagedApp,
+    stagedFolder,
+    state,
+  };
 }
 
 function stagingFolders(applications) {
@@ -233,6 +243,70 @@ test('a quit during staging applies the complete staged bundle, not the half-wri
     assert.equal(await readBundleVersion(staged.app), STAGED_VERSION);
     assert.notEqual(staged.app, join(interrupted, 'Cairn.app'));
   } finally {
+    rmSync(ctx.root, { recursive: true, force: true });
+  }
+});
+
+function logLines(userData) {
+  return readFileSync(updateLogPath(userData), 'utf8')
+    .trimEnd()
+    .split('\n')
+    .map((line) => line.replace(/^\S+ /, ''));
+}
+
+test('a failed replacement records the offer, the kept version and the reason', async () => {
+  const ctx = checkout();
+  const bytes = readFileSync(zipOf(ctx.root, OFFERED_VERSION));
+  const server = await serve(() => ({ status: 200, body: bytes }));
+  try {
+    const staging = request(ctx, server, bytes, 'a'.repeat(64));
+    const error = await stageUpdate(staging).then(
+      () => null,
+      (thrown) => thrown,
+    );
+    assert.ok(error instanceof Error, 'the staging failed');
+    const published = recordStagingFailure({
+      userData: ctx.userData,
+      statePath: ctx.statePath,
+      runningVersion: RUNNING_VERSION,
+      update: staging.update,
+      message: error.message,
+    });
+    assert.deepEqual(published, { status: 'ready', version: STAGED_VERSION });
+    assert.deepEqual(logLines(ctx.userData), [
+      'staging 0.1.688 failed, kept 0.1.674: the download does not match its SHA-256 digest',
+    ]);
+  } finally {
+    await server.close();
+    rmSync(ctx.root, { recursive: true, force: true });
+  }
+});
+
+test('a first staging failure records the offer and the reason with nothing kept', async () => {
+  const ctx = checkout();
+  writeUpdateState(ctx.statePath, emptyUpdateState());
+  const body = Buffer.from('no');
+  const server = await serve(() => ({ status: 500, body }));
+  try {
+    const staging = request(ctx, server, body);
+    const error = await stageUpdate(staging).then(
+      () => null,
+      (thrown) => thrown,
+    );
+    assert.ok(error instanceof Error, 'the staging failed');
+    const published = recordStagingFailure({
+      userData: ctx.userData,
+      statePath: ctx.statePath,
+      runningVersion: RUNNING_VERSION,
+      update: staging.update,
+      message: error.message,
+    });
+    assert.deepEqual(published, { status: 'error', message: 'download failed with HTTP 500' });
+    assert.deepEqual(logLines(ctx.userData), [
+      'staging 0.1.688 failed: download failed with HTTP 500',
+    ]);
+  } finally {
+    await server.close();
     rmSync(ctx.root, { recursive: true, force: true });
   }
 });
