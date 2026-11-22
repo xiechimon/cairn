@@ -116,16 +116,20 @@ test('the empty page offers one add action, in the empty state', async ({ page }
   await expect(page.getByTestId('secret-bulk')).toBeVisible();
 });
 
-test('converting an empty env var opens its edit dialog with `机密` ticked and the empty-value error', async ({
+test('converting an empty env var opens with its name prefilled and `机密` ticked, and waits for the value field before the empty-value error', async ({
   page,
 }) => {
   await page.goto(SECRETS);
   await page.getByTestId('resource-row').filter({ hasText: 'DEBUG' }).getByTestId('secret-menu').click();
   await page.getByTestId('secret-menu-convert').click();
   const dialog = page.getByRole('dialog', { name: '编辑 DEBUG' });
+  await expect(dialog.getByLabel('名称', { exact: true })).toHaveValue('DEBUG');
   await expect(dialog.getByRole('checkbox', { name: /机密/ })).toBeChecked();
-  await expect(dialog.getByRole('alert')).toHaveText('机密的值不能为空');
+  await expect(dialog.getByLabel('值', { exact: true })).toBeFocused();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: '保存并转为机密', exact: true })).toBeDisabled();
+  await dialog.getByLabel('名称', { exact: true }).focus();
+  await expect(dialog.getByRole('alert')).toHaveText('机密的值不能为空');
   await dialog.getByLabel('值', { exact: true }).fill('1');
   await expect(dialog.getByRole('button', { name: '保存并转为机密', exact: true })).toBeEnabled();
 });

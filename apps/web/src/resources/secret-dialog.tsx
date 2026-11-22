@@ -50,7 +50,7 @@ export function SecretDialog({
     wasSecret || startSecret ? true : editing === null ? null : false,
   );
   const [scope, setScope] = useState(defaultProjectId ?? '');
-  const [valueTouched, setValueTouched] = useState(wasSecret || startSecret);
+  const [valueTouched, setValueTouched] = useState(false);
   const valueRef = useRef<HTMLTextAreaElement>(null);
   const trimmed = name.trim();
   const secret = secretChoice ?? isCredentialSecretName(trimmed);
