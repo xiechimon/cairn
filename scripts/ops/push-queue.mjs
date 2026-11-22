@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename, join } from 'node:path';
 import { busyMessage, RELEASE_MARKER } from './guard-queue.mjs';
-import { commandReader, readable, sleep } from './poll-read.mjs';
+import { commandReader, readable, runCommand, sleep } from './poll-read.mjs';
 import { laneName, pushPreflight } from './preflight.mjs';
 import { ownerOf } from './promote-queue.mjs';
 
@@ -32,48 +31,26 @@ export function failedGreenContexts(checkRuns) {
 }
 
 export function preflightEvidence({ shas, pushedTree, treeOf, checkRunsOf }) {
-  let failure;
-  let failed = [];
   for (const sha of shas) {
     const tree = treeOf(sha);
-    if (tree.kind === 'unreadable') {
-      failure ??= tree;
-      continue;
-    }
+    if (tree.kind === 'unreadable') return tree;
     if (tree.value !== pushedTree) continue;
     const runs = checkRunsOf(sha);
-    if (runs.kind === 'unreadable') {
-      failure ??= runs;
-      continue;
-    }
-    if (sha === shas[0]) failed = failedGreenContexts(runs.value);
+    if (runs.kind === 'unreadable') return runs;
+    const failed = sha === shas[0] ? failedGreenContexts(runs.value) : [];
+    if (failed.length > 0) return readable({ ok: false, failed });
     if (missingGreenContexts(runs.value).length === 0) return readable({ ok: true, sha, failed });
   }
-  return failure ?? readable({ ok: false, failed });
+  return readable({ ok: false, failed: [] });
 }
 
-export function nextWaitAction({
-  live,
-  headOnLive,
-  deadBase,
-  headTree,
-  armedTree,
-  evidence,
-  failed,
-}) {
-  if (live) {
-    if (!headOnLive) return { action: 'rebase', onto: live };
-    if (headTree !== armedTree) return { action: 'preflight' };
-    if (failed.length > 0) return { action: 'fail', contexts: failed };
-    return { action: 'poll' };
-  }
+export function nextWaitAction({ live, headOnLive, deadBase, head, armedSha, evidence, failed }) {
+  if (live && !headOnLive) return { action: 'rebase', onto: live };
   if (deadBase) return { action: 'rebase', onto: 'origin/main' };
   if (failed.length > 0) return { action: 'fail', contexts: failed };
-  if (!evidence.ok) {
-    if (headTree !== armedTree) return { action: 'preflight' };
-    return { action: 'poll' };
-  }
-  return { action: 'push' };
+  if (evidence.ok && !live) return { action: 'push' };
+  if (!evidence.ok && head !== armedSha) return { action: 'preflight' };
+  return { action: 'poll' };
 }
 
 export function unownedCommits(commits) {
@@ -162,41 +139,49 @@ function checkRunsFor(read, repo, sha) {
   );
 }
 
-function assess(read, repo, { live, wait, armedTree, lastBase, preStampSha }) {
+function assess(read, repo, { live, wait, lane }) {
   const head = read('git', ['rev-parse', 'HEAD'], 'HEAD');
   if (head.kind === 'unreadable') return head;
-  if (!wait && preStampSha === null) return readable({ action: 'prepare', head: head.value });
+  const prepared = lane.prepared?.head === head.value ? lane.prepared : null;
+  if (!wait && !prepared) return readable({ action: 'prepare', head: head.value });
 
+  const candidate = live ?? (lane.observed !== lane.lastBase ? lane.observed : null);
+  const headOnCandidate = candidate ? ancestorOf(read, candidate, head.value) : readable(false);
+  if (headOnCandidate.kind === 'unreadable') return headOnCandidate;
+  if (headOnCandidate.value) lane.lastBase = candidate;
+  if (!live) lane.observed = null;
+  const baseLanded =
+    !live && lane.lastBase ? ancestorOf(read, lane.lastBase, 'origin/main') : readable(true);
+  if (baseLanded.kind === 'unreadable') return baseLanded;
   const treeOf = (sha) => read('git', ['rev-parse', `${sha}^{tree}`], `the tree of ${sha}`);
   const headTree = treeOf(head.value);
   if (headTree.kind === 'unreadable') return headTree;
-  const headOnLive = live ? ancestorOf(read, live, 'HEAD') : readable(false);
-  if (headOnLive.kind === 'unreadable') return headOnLive;
-  const baseLanded = !live && lastBase ? ancestorOf(read, lastBase, 'origin/main') : readable(true);
-  if (baseLanded.kind === 'unreadable') return baseLanded;
   const evidence = preflightEvidence({
-    shas: [...new Set([head.value, preStampSha].filter(Boolean))],
+    shas: [...new Set([head.value, prepared?.before].filter(Boolean))],
     pushedTree: headTree.value,
     treeOf: (sha) => (sha === head.value ? headTree : treeOf(sha)),
     checkRunsOf: (sha) => checkRunsFor(read, repo, sha),
   });
   if (evidence.kind === 'unreadable') return evidence;
+  const { failed, ok } = evidence.value;
   const step = wait
     ? nextWaitAction({
         live,
-        headOnLive: headOnLive.value,
+        headOnLive: live !== null && headOnCandidate.value,
         deadBase: !baseLanded.value,
-        headTree: headTree.value,
-        armedTree,
+        head: head.value,
+        armedSha: lane.armedSha,
         evidence: evidence.value,
-        failed: evidence.value.failed,
+        failed,
       })
-    : { action: evidence.value.ok ? 'push' : 'missing' };
+    : failed.length > 0
+      ? { action: 'fail', contexts: failed }
+      : { action: ok ? 'push' : 'missing' };
   return readable({
     ...step,
-    action: step.action === 'push' && preStampSha === null ? 'prepare' : step.action,
+    action: step.action === 'push' && !prepared ? 'prepare' : step.action,
     head: head.value,
-    headTree: headTree.value,
+    waitingOnEvidence: !ok,
   });
 }
 
@@ -231,7 +216,15 @@ function reportBusy(read, repo, plan) {
   );
 }
 
-function preparePush(read, remaining) {
+function runRebase(run, args) {
+  const result = run('git', ['rebase', ...args]);
+  if (result.error?.code === 'ETIMEDOUT') return 'timeout';
+  if (result.status === 0) return 'ok';
+  const abort = run('git', ['rebase', '--abort']);
+  return abort.error?.code === 'ETIMEDOUT' ? 'timeout' : 'failed';
+}
+
+function preparePush(read, run) {
   const commits = read(
     'git',
     ['log', '--reverse', '--format=%H%x1f%B%x1e', 'origin/main..HEAD'],
@@ -250,60 +243,65 @@ function preparePush(read, remaining) {
   if (unownedCommits(commits.value).length > 0) {
     const worktree = read('git', ['rev-parse', '--show-toplevel'], 'worktree path');
     if (worktree.kind === 'unreadable') return worktree;
-    if (remaining() <= 0) return readable(null);
     const lane = laneName(hostname(), basename(worktree.value));
     console.log(`[push-queue] stamping the commits that have no owner trailer with Lane: ${lane}`);
-    const stamp = spawnSync('git', ['rebase', '--exec', stampCommand(lane), 'origin/main'], {
-      stdio: 'inherit',
-    });
-    if (stamp.status !== 0) {
-      spawnSync('git', ['rebase', '--abort'], { stdio: 'inherit' });
-      return readable('could not stamp the owner trailers');
-    }
+    const stamp = runRebase(run, ['--exec', stampCommand(lane), 'origin/main']);
+    if (stamp !== 'ok') return readable({ action: stamp, operation: 'owner-trailer rebase' });
   }
-  if (remaining() <= 0) return readable(null);
-  const english = spawnSync(
-    process.execPath,
-    [join(import.meta.dirname, '..', 'english-only-gate.mjs')],
-    {
-      stdio: 'inherit',
-    },
-  );
-  return readable(english.status === 0 ? null : 'the English-only gate did not pass');
+  const head = read('git', ['rev-parse', 'HEAD'], 'the prepared HEAD');
+  if (head.kind === 'unreadable') return head;
+  const english = run(process.execPath, [join(import.meta.dirname, '..', 'english-only-gate.mjs')]);
+  if (english.status === 0) return readable({ action: 'ok', head: head.value });
+  return readable({
+    action: english.error?.code === 'ETIMEDOUT' ? 'timeout' : 'failed',
+    operation: 'English-only gate',
+  });
 }
 
 function main({ repo, wait, waitMinutes, pollMs }) {
+  for (const [name, value] of [
+    ['PUSH_QUEUE_WAIT_MINUTES', waitMinutes * 60_000],
+    ['PUSH_QUEUE_POLL_SECONDS', pollMs],
+  ]) {
+    if (!Number.isFinite(value) || value <= 0) {
+      console.error(`[push-queue] ${name} must be a positive finite number`);
+      return 1;
+    }
+  }
   const deadline = wait ? performance.now() + waitMinutes * 60_000 : Infinity;
   const remaining = () => deadline - performance.now();
   const read = commandReader(remaining);
-  let armedTree = null;
-  let lastBase = null;
-  let preStampSha = null;
+  const run = (file, args) => runCommand(remaining, file, args);
+  const lane = { armedSha: null, lastBase: null, observed: null, prepared: null };
   let lastLive;
-  let lastAction;
+  let lastStep;
+  let timedOutOperation;
   let unreadableSource;
   while (remaining() > 0) {
     const queue = findLive(read, repo);
     let decision = queue;
     if (queue.kind === 'value') {
       lastLive = queue.value.live;
+      if (lastLive) lane.observed = lastLive;
       const plan = planPush(queue.value);
       if (!wait && plan.action === 'wait') {
         reportBusy(read, repo, plan);
         return 1;
       }
-      decision = assess(read, repo, { live: lastLive, wait, armedTree, lastBase, preStampSha });
+      decision = assess(read, repo, { live: lastLive, wait, lane });
     }
     unreadableSource = decision.kind === 'unreadable' ? decision.source : null;
-    lastAction = decision.kind === 'value' ? decision.value.action : null;
+    if (decision.kind === 'value') lastStep = decision.value;
     if (remaining() <= 0) break;
     if (decision.kind === 'value') {
       const step = decision.value;
       switch (step.action) {
         case 'push': {
-          const push = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/queue/main'], {
-            stdio: 'inherit',
-          });
+          const push = run('git', ['push', 'origin', `${step.head}:refs/heads/queue/main`]);
+          if (push.error?.code === 'ETIMEDOUT') {
+            timedOutOperation = 'queue push';
+            break;
+          }
           return push.status ?? 1;
         }
         case 'missing':
@@ -319,20 +317,21 @@ function main({ repo, wait, waitMinutes, pollMs }) {
           );
           return 1;
         case 'rebase': {
-          const upstream = lastBase ?? 'origin/main';
+          const upstream = lane.lastBase ?? 'origin/main';
           console.log(`[push-queue] rebasing ${upstream}..HEAD onto ${step.onto}`);
-          const rebase = spawnSync('git', ['rebase', '--onto', step.onto, upstream], {
-            stdio: 'inherit',
-          });
-          if (rebase.status !== 0) {
-            spawnSync('git', ['rebase', '--abort'], { stdio: 'inherit' });
+          const rebase = runRebase(run, ['--onto', step.onto, upstream]);
+          if (rebase === 'timeout') {
+            timedOutOperation = 'git rebase';
+            break;
+          }
+          if (rebase === 'failed') {
             console.error(
               `[push-queue] not pushed: git could not rebase onto ${step.onto}; see git output above.`,
             );
             return 1;
           }
-          lastBase = step.onto === 'origin/main' ? null : step.onto;
-          preStampSha = null;
+          lane.lastBase = step.onto === 'origin/main' ? null : step.onto;
+          lane.prepared = null;
           continue;
         }
         case 'preflight': {
@@ -341,28 +340,44 @@ function main({ repo, wait, waitMinutes, pollMs }) {
             unreadableSource = worktree.source;
             break;
           }
-          if (remaining() <= 0) break;
-          const status = pushPreflight(step.head, laneName(hostname(), basename(worktree.value)));
-          if (status !== 0) return status;
-          armedTree = step.headTree;
+          const pushed = pushPreflight(
+            read,
+            remaining,
+            step.head,
+            laneName(hostname(), basename(worktree.value)),
+          );
+          if (pushed.kind === 'unreadable') {
+            unreadableSource = pushed.source;
+            break;
+          }
+          if (pushed.value.action === 'timeout') {
+            timedOutOperation = 'preflight push';
+            break;
+          }
+          if (pushed.value.action === 'failed') return pushed.value.status;
+          lane.armedSha = step.head;
           continue;
         }
         case 'prepare': {
-          const prepared = preparePush(read, remaining);
+          const prepared = preparePush(read, run);
           if (prepared.kind === 'unreadable') {
             unreadableSource = prepared.source;
             break;
           }
-          if (prepared.value !== null) {
-            console.error(`[push-queue] not pushed: ${prepared.value}.`);
+          if (prepared.value.action === 'timeout') {
+            timedOutOperation = prepared.value.operation;
+            break;
+          }
+          if (prepared.value.action === 'failed') {
+            console.error(`[push-queue] not pushed: ${prepared.value.operation} did not pass.`);
             return 1;
           }
-          preStampSha = step.head;
+          lane.prepared = { head: prepared.value.head, before: step.head };
           continue;
         }
       }
     }
-    if (remaining() <= 0) break;
+    if (timedOutOperation || remaining() <= 0) break;
     if (unreadableSource) {
       console.error(
         `[push-queue] could not read ${unreadableSource}${wait ? '; retrying' : '; not pushed'}`,
@@ -371,14 +386,24 @@ function main({ repo, wait, waitMinutes, pollMs }) {
     }
     sleep(Math.min(pollMs, remaining()));
   }
-  const blocker = lastLive
-    ? ` Last known live candidate: ${lastLive.slice(0, 9)}.`
-    : lastAction === 'poll'
-      ? ' Still waiting on green evidence.'
-      : '';
+  const candidate = lastLive ? ` Last known live candidate: ${lastLive.slice(0, 9)}.` : '';
+  const reason =
+    lastStep?.action === 'fail'
+      ? ` Preflight checks for ${lastStep.head.slice(0, 9)} failed: ${lastStep.contexts.join(', ')}.`
+      : lastStep?.action === 'rebase'
+        ? ` Last planned rebase: onto ${lastStep.onto}.`
+        : lastStep?.action === 'preflight' ||
+            (lastStep?.action === 'poll' && lastStep.waitingOnEvidence)
+          ? ' Still waiting on green evidence.'
+          : '';
   const failedRead = unreadableSource ? ` The last poll could not read ${unreadableSource}.` : '';
+  const outcome =
+    timedOutOperation === 'queue push' ? 'queue push outcome unconfirmed' : 'not pushed to queue';
+  const command = timedOutOperation
+    ? ` Timed out during ${timedOutOperation}; check its state before retrying.`
+    : '';
   console.error(
-    `[push-queue] wait deadline reached after ${waitMinutes} minute(s); not pushed.${blocker}${failedRead} Rerun to keep waiting.`,
+    `[push-queue] wait deadline reached after ${waitMinutes} minute(s); ${outcome}.${candidate}${reason}${failedRead}${command}`,
   );
   return 2;
 }

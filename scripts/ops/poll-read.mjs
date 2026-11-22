@@ -19,11 +19,17 @@ export function unreadable(source) {
   return { kind: 'unreadable', source };
 }
 
+export function runCommand(remaining, file, args, options = { stdio: 'inherit' }) {
+  const timeout = Math.min(2_147_483_647, Math.floor(remaining()));
+  if (timeout <= 0) return { status: null, error: { code: 'ETIMEDOUT' } };
+  return spawnSync(file, args, { ...options, timeout, killSignal: 'SIGKILL' });
+}
+
 export function commandReader(remaining = () => Infinity) {
   return (file, args, source, decode = (text) => text.trim(), statuses = [0]) => {
-    const timeout = Math.min(30_000, Math.floor(remaining()));
-    if (timeout <= 0) return unreadable(source);
-    const result = spawnSync(file, args, { encoding: 'utf8', timeout, killSignal: 'SIGKILL' });
+    const result = runCommand(() => Math.min(30_000, remaining()), file, args, {
+      encoding: 'utf8',
+    });
     if (result.error || !statuses.includes(result.status)) return unreadable(source);
     try {
       const value = decode(result.stdout, result.status);

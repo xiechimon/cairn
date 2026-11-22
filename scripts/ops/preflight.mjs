@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename } from 'node:path';
-import { commandReader, sleep } from './poll-read.mjs';
+import { commandReader, readable, runCommand, sleep, unreadable } from './poll-read.mjs';
+
+const CI_WORKFLOW = '.github/workflows/ci.yml';
+const WAIT_MS = 120 * 60_000;
 
 export function laneName(host, worktree) {
   return `${host}/${worktree}`.replace(/[^A-Za-z0-9._/-]/g, '-');
@@ -13,9 +15,14 @@ export function preflightRef(lane) {
   return `refs/heads/preflight/${lane}`;
 }
 
-export function preflightRun(runs, sha, ref) {
-  return (
-    runs.find((run) => run.name === 'ci' && run.head_sha === sha && run.head_branch === ref) ?? null
+export function preflightRuns(runs, sha, branch, startedAt) {
+  return runs.filter(
+    (run) =>
+      run.path === CI_WORKFLOW &&
+      run.event === 'push' &&
+      run.head_sha === sha &&
+      run.head_branch === branch &&
+      Date.parse(run.created_at) > startedAt,
   );
 }
 
@@ -27,54 +34,135 @@ export function watchVerdict(state) {
   return { verdict: conclusion === 'success' ? 'green' : 'red', conclusion };
 }
 
-export function pushPreflight(head, lane) {
+export function pushPreflight(read, remaining, head, lane) {
   const ref = preflightRef(lane);
-  const push = spawnSync('git', ['push', `--force-with-lease=${ref}`, 'origin', `HEAD:${ref}`], {
-    stdio: 'inherit',
+  const previous = read(
+    'git',
+    ['ls-remote', '--refs', 'origin', ref],
+    `the preflight ref ${ref}`,
+    (text) => {
+      if (!text.trim()) return null;
+      const [sha, remoteRef] = text.trim().split('\t');
+      return remoteRef === ref && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sha) ? sha : undefined;
+    },
+  );
+  if (previous.kind === 'unreadable') return previous;
+  const startedAt = Date.now();
+  const pushed = runCommand(
+    remaining,
+    'git',
+    [
+      'push',
+      '--porcelain',
+      `--force-with-lease=${ref}:${previous.value ?? ''}`,
+      'origin',
+      `${head}:${ref}`,
+    ],
+    {
+      encoding: 'utf8',
+      stdio: ['inherit', 'pipe', 'inherit'],
+    },
+  );
+  if (pushed.error?.code === 'ETIMEDOUT') {
+    console.error(`[preflight] git push to ${ref} timed out; the ref update was not confirmed`);
+    return readable({ action: 'timeout' });
+  }
+  const status = pushed.stdout
+    ?.split('\n')
+    .map((line) => line.split('\t'))
+    .find(([, refspec]) => refspec?.endsWith(`:${ref}`))?.[0];
+  if (pushed.status === 0 && status === '=') {
+    console.log(
+      `[preflight] ${ref} is already at ${head.slice(0, 9)}; no new ci run was triggered`,
+    );
+    return readable({ action: 'unchanged' });
+  }
+  if (pushed.status !== 0 || ![' ', '+', '*'].includes(status)) {
+    console.error(`[preflight] git push to ${ref} did not confirm a ref update`);
+    return readable({ action: 'failed', status: pushed.status || 1 });
+  }
+  console.log(`[preflight] pushed ${head.slice(0, 9)} to ${ref}`);
+  return readable({
+    action: 'updated',
+    before: previous.value ?? '0'.repeat(head.length),
+    startedAt,
   });
-  if (push.status === 0) console.log(`[preflight] pushed ${head.slice(0, 9)} to ${ref}`);
-  else console.error(`[preflight] git push to ${ref} did not succeed`);
-  return push.status ?? 1;
+}
+
+function discoverRun(read, repo, head, branch, { startedAt, before }) {
+  const runs = read(
+    'gh',
+    [
+      'api',
+      `repos/${repo}/actions/workflows/ci.yml/runs?head_sha=${head}&event=push&branch=${encodeURIComponent(branch)}&per_page=20`,
+    ],
+    'the ci run list',
+    (text) => {
+      const { workflow_runs } = JSON.parse(text);
+      return Array.isArray(workflow_runs)
+        ? preflightRuns(workflow_runs, head, branch, startedAt)
+        : undefined;
+    },
+  );
+  if (runs.kind === 'unreadable') return runs;
+  const matches = [];
+  for (const run of runs.value) {
+    if (!Number.isSafeInteger(run.id) || !Number.isSafeInteger(run.check_suite_id) || !run.html_url)
+      continue;
+    const suite = read(
+      'gh',
+      ['api', `repos/${repo}/check-suites/${run.check_suite_id}`],
+      'the ci run push range',
+      (text) => {
+        const record = JSON.parse(text);
+        if (
+          record.id !== run.check_suite_id ||
+          typeof record.before !== 'string' ||
+          typeof record.after !== 'string'
+        )
+          return undefined;
+        return record.before === before && record.after === head && record.head_branch === branch;
+      },
+    );
+    if (suite.kind === 'unreadable') return suite;
+    if (suite.value) matches.push(run);
+  }
+  if (matches.length > 1) return unreadable('an unambiguous ci run for this push');
+  return readable(matches[0] ?? null);
 }
 
 function main({ wait, repo }) {
-  const read = commandReader();
+  const deadline = performance.now() + WAIT_MS;
+  const remaining = () => deadline - performance.now();
+  const read = commandReader(remaining);
   const worktree = read('git', ['rev-parse', '--show-toplevel'], 'worktree path');
   const head = read('git', ['rev-parse', 'HEAD'], 'HEAD');
   for (const result of [worktree, head]) {
     if (result.kind === 'unreadable') {
-      console.error(`[preflight] could not read ${result.source}; not pushed`);
-      return 1;
+      console.error(`[preflight] could not read ${result.source}; no verdict available`);
+      return 2;
     }
   }
   const lane = laneName(hostname(), basename(worktree.value));
-  const pushed = pushPreflight(head.value, lane);
-  if (pushed !== 0) return pushed;
+  const pushed = pushPreflight(read, remaining, head.value, lane);
+  if (pushed.kind === 'unreadable') {
+    console.error(`[preflight] could not read ${pushed.source}; no verdict available`);
+    return 2;
+  }
+  if (pushed.value.action !== 'updated') return 2;
 
   let run = null;
   let attempts = 12;
   let watch = true;
-  for (;;) {
-    let detail;
+  let detail = 'the ci run has not appeared';
+  while (attempts > 0 && remaining() > 0) {
     if (run === null) {
-      const discovery = read(
-        'gh',
-        ['api', `repos/${repo}/actions/runs?head_sha=${head.value}&per_page=20`],
-        'the ci run list',
-        (text) => {
-          const { workflow_runs: runs } = JSON.parse(text);
-          if (!Array.isArray(runs)) return undefined;
-          const found = preflightRun(runs, head.value, `preflight/${lane}`);
-          return found === null || (Number.isSafeInteger(found.id) && found.html_url)
-            ? found
-            : undefined;
-        },
-      );
+      const discovery = discoverRun(read, repo, head.value, `preflight/${lane}`, pushed.value);
       if (discovery.kind === 'value' && discovery.value !== null) {
         run = discovery.value;
         console.log(`[preflight] ci run: ${run.html_url}`);
         if (!wait) {
-          console.log('[preflight] use --wait to wait for the conclusion');
+          console.log('[preflight] use --wait when pushing a new SHA to wait for its conclusion');
           return 0;
         }
         attempts = 6;
@@ -83,16 +171,23 @@ function main({ wait, repo }) {
       detail =
         discovery.kind === 'unreadable'
           ? `could not read ${discovery.source}`
-          : 'the ci run has not appeared';
+          : 'the ci run for this push has not appeared';
     } else {
       if (watch) {
-        spawnSync(
-          'gh',
-          ['run', 'watch', String(run.id), '--repo', repo, '--exit-status', '--interval', '30'],
-          {
-            stdio: 'inherit',
-          },
-        );
+        const watched = runCommand(remaining, 'gh', [
+          'run',
+          'watch',
+          String(run.id),
+          '--repo',
+          repo,
+          '--exit-status',
+          '--interval',
+          '30',
+        ]);
+        if (watched.error?.code === 'ETIMEDOUT') {
+          detail = 'the watch reached its deadline';
+          break;
+        }
       }
       const state = read(
         'gh',
@@ -108,6 +203,10 @@ function main({ wait, repo }) {
         },
       );
       const outcome = watchVerdict(state);
+      if (remaining() <= 0) {
+        detail = 'the run state read reached the wait deadline';
+        break;
+      }
       if (outcome.verdict === 'green') {
         console.log('[preflight] green — the ci run concluded success');
         return 0;
@@ -123,14 +222,13 @@ function main({ wait, repo }) {
         outcome.verdict === 'unreadable' ? `could not read ${outcome.detail}` : outcome.detail;
     }
     attempts--;
-    if (attempts === 0) {
-      const location = run ? ` at ${run.html_url}` : ' after pushing the preflight ref';
-      console.error(`[preflight] ${detail}${location}; no verdict available`);
-      return 1;
-    }
+    if (attempts === 0 || remaining() <= 0) break;
     console.error(`[preflight] ${detail}; retrying (${attempts} remaining)`);
-    sleep(5000);
+    sleep(Math.min(5000, remaining()));
   }
+  const location = run ? ` at ${run.html_url}` : ' after pushing the preflight ref';
+  console.error(`[preflight] ${detail}${location}; no verdict available`);
+  return 2;
 }
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {

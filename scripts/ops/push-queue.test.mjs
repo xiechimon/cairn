@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import { readable, unreadable } from './poll-read.mjs';
-import { laneName, preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
+import { laneName, preflightRef, preflightRuns, watchVerdict } from './preflight.mjs';
 import {
   failedGreenContexts,
   missingGreenContexts,
@@ -104,14 +104,12 @@ test('the pre-flight gate needs the three green-main contexts on a tree-identica
   );
   const evidence = (shas, checkRunsOf) =>
     preflightEvidence({ shas, pushedTree: 'T', treeOf: () => readable('T'), checkRunsOf });
-  for (const unavailable of [readable([]), unreadable('check runs')]) {
-    assert.deepEqual(
-      evidence(['local-stamp', 'preflighted'], (sha) =>
-        sha === 'local-stamp' ? unavailable : green,
-      ),
-      readable({ ok: true, sha: 'preflighted', failed: [] }),
-    );
-  }
+  assert.deepEqual(
+    evidence(['local-stamp', 'preflighted'], (sha) =>
+      sha === 'local-stamp' ? readable([]) : green,
+    ),
+    readable({ ok: true, sha: 'preflighted', failed: [] }),
+  );
   assert.deepEqual(
     evidence(['local-stamp'], () => readable([])),
     missing,
@@ -153,17 +151,17 @@ test('the pre-flight ref and run lookup are lane-scoped', () => {
     head_sha: 'S',
     head_branch: 'preflight/mac/wt',
     html_url: 'https://example/run/1',
+    path: '.github/workflows/ci.yml',
+    event: 'push',
+    created_at: '2026-11-22T12:00:01Z',
   };
-  assert.equal(
-    preflightRun(
-      [{ name: 'ci', head_sha: 'S', head_branch: 'queue/main' }, ci],
-      'S',
-      'preflight/mac/wt',
-    ),
-    ci,
+  const startedAt = Date.parse('2026-11-22T12:00:00Z');
+  assert.deepEqual(
+    preflightRuns([{ ...ci, head_branch: 'queue/main' }, ci], 'S', 'preflight/mac/wt', startedAt),
+    [ci],
   );
-  assert.equal(preflightRun([ci], 'S', 'preflight/other/wt'), null);
-  assert.equal(preflightRun([], 'S', 'preflight/mac/wt'), null);
+  assert.deepEqual(preflightRuns([ci], 'S', 'preflight/other/wt', startedAt), []);
+  assert.deepEqual(preflightRuns([ci], 'S', 'preflight/mac/wt', Date.parse(ci.created_at)), []);
 });
 
 test('--wait rebases onto the live candidate, arms preflight once, then polls', () => {
@@ -171,18 +169,18 @@ test('--wait rebases onto the live candidate, arms preflight once, then polls', 
     live: X,
     headOnLive: false,
     deadBase: false,
-    headTree: 'T1',
-    armedTree: null,
+    head: 'sha1',
+    armedSha: null,
     evidence: { ok: false },
     failed: [],
   };
   assert.deepEqual(nextWaitAction(base), { action: 'rebase', onto: X });
   assert.deepEqual(nextWaitAction({ ...base, headOnLive: true }), { action: 'preflight' });
-  assert.deepEqual(nextWaitAction({ ...base, headOnLive: true, armedTree: 'T1' }), {
+  assert.deepEqual(nextWaitAction({ ...base, headOnLive: true, armedSha: 'sha1' }), {
     action: 'poll',
   });
   assert.deepEqual(
-    nextWaitAction({ ...base, headOnLive: true, armedTree: 'T1', failed: ['check'] }),
+    nextWaitAction({ ...base, headOnLive: true, armedSha: 'sha1', failed: ['check'] }),
     { action: 'fail', contexts: ['check'] },
   );
 });
@@ -192,8 +190,8 @@ test('--wait on a freed queue rebases off a dropped base, waits for evidence, th
     live: null,
     headOnLive: false,
     deadBase: true,
-    headTree: 'T1',
-    armedTree: 'T1',
+    head: 'sha1',
+    armedSha: 'sha1',
     evidence: { ok: false },
     failed: [],
   };
@@ -202,7 +200,7 @@ test('--wait on a freed queue rebases off a dropped base, waits for evidence, th
     action: 'fail',
     contexts: ['e2e-gate'],
   });
-  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, armedTree: 'T2' }), {
+  assert.deepEqual(nextWaitAction({ ...base, deadBase: false, armedSha: 'sha2' }), {
     action: 'preflight',
   });
   assert.deepEqual(nextWaitAction({ ...base, deadBase: false }), { action: 'poll' });
@@ -226,7 +224,7 @@ test('failedGreenContexts flags only required contexts that went red', () => {
   assert.deepEqual(failedGreenContexts([run('check', 'in_progress')]), []);
 });
 
-function runWithFakes(script, scenario) {
+function runWithFakes(script, scenario, settings = {}) {
   const cwd = makeTestTempDir('cairn-queue-');
   const statePath = join(cwd, 'state.json');
   try {
@@ -259,6 +257,7 @@ function runWithFakes(script, scenario) {
           PUSH_QUEUE_WAIT_MINUTES: '1',
           PUSH_QUEUE_POLL_SECONDS: '15',
           QUEUE_TEST_SCENARIO: scenario,
+          ...settings,
         },
       },
     );
@@ -344,7 +343,7 @@ for (const [item, scenario] of [
     const result = runWithFakes('push-queue', scenario);
     assert.equal(result.status, 0, result.output);
     assert.equal(
-      result.calls.filter((call) => call.includes('HEAD:refs/heads/queue/main')).length,
+      result.calls.filter((call) => call.includes(`${X}:refs/heads/queue/main`)).length,
       1,
     );
     assert.equal(result.calls.filter((call) => call[1] === 'rebase').length, 0);
@@ -365,3 +364,121 @@ for (const scenario of ['slow', 'slow-error', 'slow-green', 'sleep-limit']) {
     assert.equal(result.calls.filter((call) => ['push', 'rebase'].includes(call[1])).length, 0);
   });
 }
+
+test('review 2: same-tree fallback cannot bypass an unreadable or failed HEAD', () => {
+  const failure = unreadable('HEAD check runs');
+  const green = readable(
+    ['check', 'pack-smoke', 'e2e-gate'].map((name) => ({ name, conclusion: 'success' })),
+  );
+  for (const [primary, expected] of [
+    [failure, failure],
+    [
+      readable([{ name: 'check', conclusion: 'failure' }]),
+      readable({ ok: false, failed: ['check'] }),
+    ],
+  ]) {
+    const read = [];
+    assert.deepEqual(
+      preflightEvidence({
+        shas: ['HEAD-sha', 'previous-sha'],
+        pushedTree: 'T',
+        treeOf: () => readable('T'),
+        checkRunsOf: (sha) => {
+          read.push(sha);
+          return sha === 'HEAD-sha' ? primary : green;
+        },
+      }),
+      expected,
+    );
+    assert.deepEqual(read, ['HEAD-sha']);
+  }
+});
+
+test('review 3: preflight waits for a new ci push run; a no-op has no new verdict', () => {
+  const fresh = runWithFakes('preflight', 'stale-run');
+  assert.equal(fresh.status, 1, fresh.output);
+  assert.match(fresh.output, /went failure: https:\/\/example\.test\/runs\/100/);
+  assert.deepEqual(
+    fresh.calls.filter((call) => call[2] === 'watch').map((call) => call[3]),
+    ['100'],
+  );
+  const noop = runWithFakes('preflight', 'noop');
+  assert.equal(noop.status, 2, noop.output);
+  assert.match(noop.output, /already.*no new ci run/i);
+  assert.equal(noop.watches, 0);
+});
+
+test('review 4: both pushes use the captured SHA instead of the symbolic HEAD', () => {
+  const preflight = runWithFakes('preflight', 'normal');
+  const queue = runWithFakes('push-queue', 'normal');
+  assert.equal(preflight.status, 0, preflight.output);
+  assert.equal(queue.status, 0, queue.output);
+  assert.ok(
+    preflight.calls.some(
+      (call) => call.at(-1) === `${X}:refs/heads/preflight/test-host/test-worktree`,
+    ),
+  );
+  assert.ok(queue.calls.some((call) => call.at(-1) === `${X}:refs/heads/queue/main`));
+});
+
+test('review 6: watch is deadline-bound and invalid queue settings are refused before any commands', () => {
+  const stuck = runWithFakes('preflight', 'watch-timeout');
+  assert.equal(stuck.watches, 1, stuck.output);
+  assert.ok(stuck.now <= 100_000 + 120 * 60_000, stuck.output);
+  assert.equal(stuck.status, 2, stuck.output);
+  const gate = runWithFakes('push-queue', 'gate-timeout');
+  assert.equal(gate.status, 2, gate.output);
+  assert.equal(gate.now, 160_000);
+  assert.match(gate.output, /Timed out during English-only gate/);
+  for (const [name, value] of [
+    ['PUSH_QUEUE_WAIT_MINUTES', 'oops'],
+    ['PUSH_QUEUE_WAIT_MINUTES', '0'],
+    ['PUSH_QUEUE_POLL_SECONDS', 'oops'],
+    ['PUSH_QUEUE_POLL_SECONDS', '-2'],
+  ]) {
+    const invalid = runWithFakes('push-queue', 'normal', { [name]: value });
+    assert.equal(invalid.status, 1, invalid.output);
+    assert.match(invalid.output, new RegExp(name));
+    assert.deepEqual(invalid.calls, []);
+  }
+});
+
+test('review 8: a live base already in HEAD is removed if it drops', () => {
+  for (const scenario of ['startup-base', 'startup-base-unreadable']) {
+    const result = runWithFakes('push-queue', scenario);
+    assert.equal(result.status, 0, result.output);
+    const rebase = result.calls.find((call) => call[1] === 'rebase');
+    assert.deepEqual(rebase, ['git', 'rebase', '--onto', 'origin/main', 'b'.repeat(40)]);
+  }
+});
+
+test('review 9: a rebased SHA with the armed tree but no usable evidence starts CI', () => {
+  const result = runWithFakes('push-queue', 'rebase-same-tree');
+  assert.equal(result.status, 0, result.output);
+  const refspecs = result.calls.filter((call) => call[1] === 'push').map((call) => call.at(-1));
+  const preflight = ':refs/heads/preflight/test-host/test-worktree';
+  assert.deepEqual(refspecs, [
+    `${'c'.repeat(40)}${preflight}`,
+    `${'d'.repeat(40)}${preflight}`,
+    `${'d'.repeat(40)}:refs/heads/queue/main`,
+  ]);
+});
+
+test('review 11: preflight exit 2 means no verdict, while exit 1 means red', () => {
+  const pending = runWithFakes('preflight', 'no-verdict');
+  assert.equal(pending.status, 2, pending.output);
+  assert.match(pending.output, /no verdict/i);
+  const red = runWithFakes('preflight', 'retry-exit');
+  assert.equal(red.status, 1, red.output);
+  assert.match(red.output, /went failure/);
+});
+
+test('review 12: a check failure observed at the deadline remains in the timeout reason', () => {
+  const result = runWithFakes('push-queue', 'slow-red');
+  assert.equal(result.status, 2, result.output);
+  assert.match(result.output, /deadline.*(?:fail|without success).*pack-smoke/i);
+  assert.equal(
+    result.calls.some((call) => call[1] === 'push'),
+    false,
+  );
+});
