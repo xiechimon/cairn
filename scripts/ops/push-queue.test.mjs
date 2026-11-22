@@ -242,6 +242,8 @@ case "$1" in
     esac ;;
   ls-remote)
     if [ -n "$FAKE_LIVE" ]; then printf '%s\t%s\n' "$FAKE_LIVE" "$last"; fi ;;
+  log)
+    if [ "$FAKE_LOG_UNOWNED" = 1 ]; then printf '%s\037no trailer here\036' "$FAKE_HEAD"; fi ;;
   merge-base)
     if [ "$last" = origin/main ]; then exit 1; fi
     exit "$FAKE_ANCESTOR" ;;
@@ -278,6 +280,15 @@ case "$2" in
   *) exit 1 ;;
 esac
 exit 0
+`;
+
+const CLOCK = `let index = 0;
+const sequence = JSON.parse(process.env.FAKE_NOW_SEQUENCE);
+Date.now = () => {
+  const value = sequence[Math.min(index, sequence.length - 1)];
+  index += 1;
+  return value;
+};
 `;
 
 const LIVE = 'b'.repeat(40);
@@ -378,15 +389,17 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       status: 0,
       search: ciRun('in_progress', null),
       byId: [
-        ciRun('in_progress', null),
-        ciRun('in_progress', null),
-        ciRun('in_progress', null),
-        ciRun('in_progress', null),
-        ciRun('in_progress', null),
+        [1, 'gh: HTTP 500'],
+        [1, 'gh: HTTP 500'],
+        [1, 'gh: HTTP 500'],
+        [1, 'gh: HTTP 500'],
+        [1, 'gh: HTTP 500'],
         ciRun('completed', 'success'),
       ],
       matches: [/\[preflight\] green/],
       misses: [/could not read the run at/],
+      watchCount: 1,
+      byIdReads: 6,
     },
     {
       name: 'preflight starts no further watch after a read that failed',
@@ -450,6 +463,17 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       misses: [/still waiting on/],
       env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
     },
+    {
+      name: 'push-queue stops at the deadline before stamping and before the queue push',
+      script: 'push-queue.mjs',
+      args: ['--wait'],
+      status: 2,
+      clock: [1_000_000, 1_001_000, 9_000_000],
+      logUnowned: true,
+      matches: [/still waiting on green evidence after 0.03 minutes/],
+      calls: /rebase --exec|HEAD:refs\/heads\/queue\/main/,
+      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
   ];
   for (const row of rows) {
     const dir = sandbox({
@@ -467,6 +491,7 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
         ]),
       ),
     });
+    if (row.clock) writeFileSync(join(dir, 'clock.cjs'), CLOCK);
     try {
       const result = spawnSync(
         process.execPath,
@@ -485,6 +510,13 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
             FAKE_LIVE: row.live ?? '',
             FAKE_ANCESTOR: String(row.ancestor ?? 0),
             FAKE_WATCH_EXIT: String(row.watchExit ?? 1),
+            FAKE_LOG_UNOWNED: row.logUnowned ? '1' : '0',
+            ...(row.clock
+              ? {
+                  NODE_OPTIONS: `--require ${join(dir, 'clock.cjs')}`,
+                  FAKE_NOW_SEQUENCE: JSON.stringify(row.clock),
+                }
+              : {}),
             ...row.env,
           },
         },
@@ -501,6 +533,13 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
         assert.equal(
           (calls.match(/^gh run watch /gm) ?? []).length,
           row.watchCount,
+          `${row.name}\n${calls}`,
+        );
+      }
+      if (row.byIdReads !== undefined) {
+        assert.equal(
+          (calls.match(/\/actions\/runs\/4242/g) ?? []).length,
+          row.byIdReads,
           `${row.name}\n${calls}`,
         );
       }

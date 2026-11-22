@@ -82,6 +82,13 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? 60);
   const waitMinutes = Number(process.env.PUSH_QUEUE_WAIT_MINUTES ?? 120);
   const deadline = Date.now() + waitMinutes * 60_000;
+  const stopAtDeadline = (waitingOn) => {
+    if (!wait || Date.now() <= deadline) return;
+    console.error(
+      `[push-queue] still waiting on ${waitingOn?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
+    );
+    process.exit(2);
+  };
 
   const released = (sha) => {
     try {
@@ -182,12 +189,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         );
         process.exit(1);
       }
-      if (Date.now() > deadline) {
-        console.error(
-          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
-        );
-        process.exit(2);
-      }
+      stopAtDeadline(current);
       if (step.action === 'push') break;
       if (step.action === 'rebase') {
         const upstream = lastBase ?? 'origin/main';
@@ -229,6 +231,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       const [sha, body] = entry.split('\x1f');
       return { sha, body };
     });
+  stopAtDeadline(null);
   if (unownedCommits(commits).length > 0) {
     const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
     console.log(`[push-queue] stamping the commits that have no owner trailer with Lane: ${lane}`);
@@ -277,6 +280,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     );
     process.exit(1);
   }
+  stopAtDeadline(null);
   const push = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/queue/main'], {
     stdio: 'inherit',
   });
