@@ -103,7 +103,7 @@ function ResizeHandle({ width }: { width: number }) {
         render={
           <span
             data-slot="side-panel-resize-zone"
-            className="absolute inset-y-0 -left-1 z-1 w-2 max-[1100px]:hidden"
+            className="absolute inset-y-0 -left-5 z-1 w-6 max-[1100px]:hidden"
           />
         }
       >
@@ -121,7 +121,7 @@ function ResizeHandle({ width }: { width: number }) {
           onPointerCancel={onPointerUp}
           onDoubleClick={() => setWidth(PANEL_WIDTH_DEFAULT, true)}
           onKeyDown={onKeyDown}
-          className="absolute inset-0 m-0 h-auto w-2 border-0 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-[3px] after:w-0.5 after:bg-transparent after:transition-colors hover:after:bg-(--border) focus-visible:after:bg-(--focus-ring) active:after:bg-(--focus-ring)"
+          className="absolute inset-0 m-0 h-auto w-full border-0 cursor-col-resize touch-none outline-none after:absolute after:inset-y-0 after:left-[19px] after:w-0.5 after:bg-transparent after:transition-colors hover:after:bg-(--border) focus-visible:after:bg-(--focus-ring) active:after:bg-(--focus-ring)"
         />
       </TooltipTrigger>
       <TooltipContent

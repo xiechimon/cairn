@@ -244,6 +244,52 @@ test('the panel width is resizable and remembered', async ({ page }) => {
   await expect(page.getByTestId('side-panel-resize')).not.toHaveAttribute('aria-valuenow', '420');
 });
 
+test('C29: the panel edge keeps a hairline but grabs the pointer across a 24px zone that leaves panel controls alone', async ({
+  page,
+}) => {
+  await page.goto(`${HOME}&thread=home-c-review`);
+  const handle = page.getByTestId('side-panel-resize');
+  await expect(handle).toBeAttached();
+  const geometry = await page.evaluate(() => {
+    const zone = document.querySelector('[data-slot="side-panel-resize-zone"]');
+    const panel = zone?.closest('aside');
+    const hr = document.querySelector('[data-testid="side-panel-resize"]');
+    if (!zone || !panel || !hr) return null;
+    const edge = panel.getBoundingClientRect().left;
+    const box = zone.getBoundingClientRect();
+    const y = box.top + box.height / 2;
+    const hits = [-18, -11, -6, 0, 4, 7].map((dx) => document.elementFromPoint(edge + dx, y) === hr);
+    return {
+      width: box.width,
+      inside: box.right - edge,
+      hits,
+      border: getComputedStyle(panel).borderLeftWidth,
+      line: getComputedStyle(hr, '::after').width,
+    };
+  });
+  expect(geometry, 'C29: the resize zone exists').not.toBeNull();
+  expect(geometry?.width, 'C29: the hit zone is 24px wide').toBe(24);
+  expect(geometry?.inside, 'C29: the hit zone covers at most the border and 4px padding').toBeLessThanOrEqual(5);
+  expect(geometry?.hits, 'C29: 18px outside to 4px inside grabs the handle; 7px inside is panel content').toEqual([
+    true,
+    true,
+    true,
+    true,
+    true,
+    false,
+  ]);
+  expect(geometry?.border, 'C29: the visible edge stays a 1px hairline').toBe('1px');
+  expect(Number.parseFloat(geometry?.line ?? '99'), 'C29: the hover line stays at most 2px').toBeLessThanOrEqual(2);
+  const before = Number(await handle.getAttribute('aria-valuenow'));
+  const box = await page.locator('[data-slot="side-panel-resize-zone"]').boundingBox();
+  if (box === null) throw new Error('no zone');
+  await page.mouse.move(box.x + 4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x - 60, box.y + box.height / 2, { steps: 5 });
+  await page.mouse.up();
+  await expect(handle).toHaveAttribute('aria-valuenow', String(before + 64));
+});
+
 test('the head is one calm row: a one-line title, the status in the task tone, controls centred on it', async ({
   page,
 }) => {
