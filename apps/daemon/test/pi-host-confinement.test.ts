@@ -12,6 +12,7 @@ import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { StepEvent } from '@cairn/shared';
+import { COORDINATOR_COMPACT_AT } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
 import { createSessionConfiner } from '../src/backend/confine-session.js';
 import { createPiBackend } from '../src/backend/pi.js';
@@ -202,9 +203,10 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
       environment: { TMPDIR: temp },
     });
     const files = new Map<string, string>();
+    const sessionDir = join(runnerHome, 'chat-sessions');
     const backend = createPiBackend({
       agentDir: join(runnerHome, 'homes', 'pi'),
-      sessionDir: join(runnerHome, 'chat-sessions'),
+      sessionDir,
       skills: { skillsDir: join(runnerHome, 'skills'), cwd: runnerHome },
       onSession: (id, file) => {
         if (file !== undefined) files.set(id, file);
@@ -221,7 +223,7 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
         baseUrl: `http://127.0.0.1:${port}/v1`,
         api: 'openai-completions' as const,
         apiKey: 'scripted-key',
-        models: [{ id: 'scripted', name: 'Scripted' }],
+        models: [{ id: 'scripted', name: 'Scripted', contextWindow: 1_000_000 }],
       },
       modelId: 'scripted',
     };
@@ -234,7 +236,82 @@ describe.runIf(process.platform === 'darwin')('pi session confinement on macOS',
     expect(events.filter((event) => event.type === 'error')).toEqual([]);
     expect(events.at(-1)?.type).toBe('done');
     expect(readFileSync(file, 'utf8').length).toBeGreaterThan(before);
-  }, 120_000);
+
+    const templates = readFileSync(file, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    const header = templates.find((entry) => entry.type === 'session') as Record<string, unknown>;
+    const templateFor = (role: string): Record<string, unknown> => {
+      const entry = templates.find(
+        (candidate) =>
+          candidate.type === 'message' &&
+          (candidate.message as { role?: string } | undefined)?.role === role,
+      );
+      if (entry === undefined) throw new Error(`no ${role} message in the transcript`);
+      return entry.message as Record<string, unknown>;
+    };
+    const userTemplate = templateFor('user');
+    const assistantTemplate = templateFor('assistant');
+    const filler = 'x'.repeat(5_000);
+    const cappedTranscript = (totalTokens: number): string => {
+      const id = `capped-${totalTokens}`;
+      const path = join(sessionDir, `${id}.jsonl`);
+      const lines = [JSON.stringify(header)];
+      let parentId: string | null = null;
+      for (let turn = 0; turn < 30; turn++) {
+        const userId = `cap-user-${turn}`;
+        lines.push(
+          JSON.stringify({
+            type: 'message',
+            id: userId,
+            parentId,
+            timestamp: new Date(turn * 2).toISOString(),
+            message: {
+              ...userTemplate,
+              content: [{ type: 'text', text: `${filler} turn ${turn}` }],
+              timestamp: turn * 2,
+            },
+          }),
+        );
+        const assistantId = `cap-assistant-${turn}`;
+        const usage = assistantTemplate.usage as Record<string, number>;
+        lines.push(
+          JSON.stringify({
+            type: 'message',
+            id: assistantId,
+            parentId: userId,
+            timestamp: new Date(turn * 2 + 1).toISOString(),
+            message: {
+              ...assistantTemplate,
+              content: [{ type: 'text', text: `${filler} reply ${turn}` }],
+              usage: { ...usage, totalTokens: turn === 29 ? totalTokens : usage.totalTokens },
+              timestamp: turn * 2 + 1,
+            },
+          }),
+        );
+        parentId = assistantId;
+      }
+      writeFileSync(path, `${lines.join('\n')}\n`);
+      files.set(id, path);
+      return id;
+    };
+    const resumeCapped = async (totalTokens: number): Promise<StepEvent[]> => {
+      const capped = await backend.continueSession(cappedTranscript(totalTokens), {
+        ...options,
+        compactAt: COORDINATOR_COMPACT_AT,
+        prompt: 'capped',
+      });
+      return drainEvents(capped.events);
+    };
+
+    const atPoint = await resumeCapped(COORDINATOR_COMPACT_AT);
+    expect(atPoint.some((event) => event.type === 'compaction_start')).toBe(true);
+    expect(atPoint.at(-1)?.type).toBe('done');
+    const beforePoint = await resumeCapped(COORDINATOR_COMPACT_AT - 1);
+    expect(beforePoint.some((event) => event.type === 'compaction_start')).toBe(false);
+    expect(beforePoint.at(-1)?.type).toBe('done');
+  }, 300_000);
 
   test('a resume file replaced by a symlink is refused instead of exposing its target', async () => {
     const root = realpathSync(testTempDir('pi-host-resume-link-'));
