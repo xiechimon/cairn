@@ -13,17 +13,21 @@ function firstFamily(family: string | undefined): string | undefined {
   return family?.split(',')[0]?.replace(/["']/g, '').trim() || undefined;
 }
 
-function visibleColor(value: string | undefined): string | undefined {
-  if (value === undefined || value === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(value))
+const INVISIBLE_COLOR = /^(?:transparent|rgba\([^)]*,\s*0\))$/;
+const CSS_VALUE_FUNCTION = /var\(|url\(|attr\(|env\(/i;
+
+function colorValue(value: string | undefined): string | undefined {
+  if (value === undefined || INVISIBLE_COLOR.test(value) || CSS_VALUE_FUNCTION.test(value))
     return undefined;
+  if (typeof CSS === 'undefined' || !CSS.supports('color', value)) return undefined;
   return value;
 }
 
 export function InspectRows({ target }: { target: ElementTarget }) {
   const { t } = useI18n();
   const style = target.style ?? {};
-  const color = visibleColor(style.color);
-  const background = visibleColor(style.backgroundColor);
+  const color = colorValue(style.color);
+  const background = colorValue(style.backgroundColor);
   const font = [style.fontSize, style.fontWeight, firstFamily(style.fontFamily)]
     .filter((part) => part !== undefined && part !== '')
     .join(' · ');
@@ -54,7 +58,7 @@ export function InspectRows({ target }: { target: ElementTarget }) {
               <span
                 aria-hidden
                 className="size-3 flex-none rounded-full border border-border"
-                style={{ background: row.swatch }}
+                style={{ backgroundColor: row.swatch }}
               />
             )}
             <span className="truncate">{row.value}</span>

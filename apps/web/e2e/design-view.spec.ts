@@ -343,6 +343,60 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await expect(pane.getByTestId('design-comment-mode')).toHaveAttribute('aria-pressed', 'false');
 });
 
+test('comments: a forged style from the frame cannot make the board fetch a url', async ({
+  page,
+}) => {
+  await openDesign(page);
+  const pane = page.getByTestId('design-pane');
+  const frame = pane.getByTestId('design-frame').contentFrame();
+  await expect(frame.getByRole('heading')).toBeVisible();
+  await pane.getByTestId('design-comment-mode').click();
+
+  const fetched: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('swatch-probe')) fetched.push(request.url());
+  });
+  const forge = (style: Record<string, string>) =>
+    frame.locator('body').evaluate((_, forged) => {
+      window.parent.postMessage(
+        {
+          type: 'od:comment-target',
+          target: {
+            elementId: '',
+            selector: 'body',
+            label: 'body',
+            text: '',
+            htmlHint: '<body>',
+            position: { x: 20, y: 20, width: 120, height: 40 },
+            style: forged,
+          },
+        },
+        '*',
+      );
+    }, style);
+
+  await forge({
+    color: 'url("/swatch-probe-text.png")',
+    backgroundColor: 'url("/swatch-probe-background.png")',
+  });
+  const popover = pane.getByTestId('design-comment-popover');
+  await expect(popover).toBeVisible();
+  await page.waitForTimeout(800);
+  expect(fetched).toEqual([]);
+
+  await forge({ color: 'rgb(12, 34, 56)', backgroundColor: 'rgb(200, 210, 220)' });
+  await expect(popover.locator('[data-inspect="color"] span[aria-hidden]')).toHaveCSS(
+    'background-color',
+    'rgb(12, 34, 56)',
+  );
+  await expect(popover.locator('[data-inspect="background"] span[aria-hidden]')).toHaveCSS(
+    'background-color',
+    'rgb(200, 210, 220)',
+  );
+  await page.waitForTimeout(800);
+  expect(fetched).toEqual([]);
+});
+
 test('mark-up: draw a box, a stroke and text, undo and redo, then save a PNG mark as a comment', async ({
   page,
 }) => {
