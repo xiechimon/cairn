@@ -51,7 +51,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
 
       - name: Test the updater with real macOS signatures
-        run: node --test apps/desktop/scripts/signature-mac.test.mjs
+        run: node --test --test-reporter=spec apps/desktop/scripts/signature-mac.test.mjs
 
   package:
     runs-on: macos-latest
