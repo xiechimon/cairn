@@ -548,3 +548,52 @@ test('a task archived in the same turn leaves no card and the next task folds in
   const bubble = await stream.getByTestId('chief-reply-bubble').first().boundingBox();
   expect((ref?.y ?? 0) + (ref?.height ?? 0)).toBeLessThanOrEqual(bubble?.y ?? 0);
 });
+
+test('a research report copies as its Markdown source and says so', async ({ page }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  const research = {
+    ...TASK,
+    id: 'todo-research',
+    seqNum: 10,
+    title: 'Research export formats',
+    phase: 'done',
+    output: 'info',
+    latestBuildId: 'build-research',
+  };
+  const source = [
+    '## Export formats',
+    '',
+    'Parquet halves the file size of [CSV](https://example.com/csv).',
+    '',
+    '| Format | Size |',
+    '| --- | --- |',
+    '| Parquet | 1x |',
+    '| CSV | 2x |',
+    '',
+    '```sql',
+    "COPY t TO 'out.parquet';",
+    '```',
+  ].join('\n');
+  const report = {
+    id: 'info-report-build-research',
+    role: 'system',
+    createdAt: 30,
+    content: JSON.stringify({
+      kind: 'info-report',
+      attachmentId: 'att-r',
+      attachmentToken: '![report.md](attachment:t1/att-r.md)',
+      content: source,
+    }),
+  };
+  await mockLive(page, { threads: [THREAD], messages: [], todos: [research] }, (path, _route, json) =>
+    path === '/api/conversations/build-research/messages'
+      ? json({ messages: [report], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null })
+      : undefined,
+  );
+  await page.goto('/app?pane=made');
+  await page.getByRole('complementary', { name: '成果' }).getByRole('button', { name: 'Research export formats' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Research export formats' });
+  await dialog.getByRole('button', { name: '复制为 Markdown' }).click();
+  await expect(page.getByText('已复制为 Markdown')).toBeVisible();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(source);
+});
