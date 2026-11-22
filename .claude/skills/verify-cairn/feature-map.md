@@ -11,7 +11,6 @@ Routes, settings paths, keyboard shortcuts and test ids below are extracted from
 | Section | Path in the settings window | Feature |
 |---|---|---|
 | `account` | `设置` (Settings) › `账号` (Account) | [Account and team](#account-and-team) |
-| `appearance` | `设置` (Settings) › `外观` (Appearance) | [Appearance and visual system](#appearance) |
 | `routing` | `设置` (Settings) › `模型` (Model) › `模型` (Model) | [Model and work routing](#routing) |
 | `machines` | `设置` (Settings) › `执行环境` (Execution) › `执行机` (Runners) | [Machines](#machines) |
 | `skills` | `设置` (Settings) › `执行环境` (Execution) › `技能` (Skills) | [Skills](#skills) |
@@ -58,7 +57,7 @@ Reach:
 
 - Web routes: `/app`
 - Keyboard shortcuts in its code: `A`, `D`, `R`
-- Test ids in its code: `*`, `approval-card-context`, `approval-card-note`, `approval-card-problem`, `approval-card-quote`, `approval-card-title`, `approval-detail-label`, `approval-details`, `approval-details-toggle`, `approval-field-more`, `approval-field-value`, `approval-history-text`, `approval-history-toggle`, `chief-body`, `chief-bubble`, `chief-channel-mirror`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-package-install`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-queue`, `chief-queue-cancel-edit`, `chief-queue-more`, `chief-queue-wait-card`, `chief-queued-message`, `chief-queued-message-text`, `chief-queued-remove`, `chief-queued-steer`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-sentence`, `chief-runner-offline`, `chief-secret-request`, `chief-secret-request-input`, `chief-send-queue`, `chief-send-steer`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-steer-withdraw`, `chief-stopped`, `chief-stream`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-handback`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-task-started-said`, `chief-time-divider`, `chief-turn-error`, `chief-turn-error-card`, `chief-turn-error-raw`, `chief-turn-retry`, `chief-turn-update`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `context-panel`, `context-panel-*`, `context-panel-reading`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-edit-card`, `memory-edit-composer`, `memory-edit-content`, `memory-edit-input`, `memory-edit-send`, `memory-edit-stop`, `memory-edit-title`, `memory-list`, `memory-usage`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `selection-ask-side-chat`, `selection-quote`, `selection-quote-box`, `selection-quote-hint`, `selection-quote-input`, `selection-quote-text`, `selection-reply-bar`, `tasks-badge`, `tasks-toggle`, `update`
+- Test ids in its code: `*`, `approval-card-context`, `approval-card-note`, `approval-card-problem`, `approval-card-quote`, `approval-card-title`, `approval-detail-label`, `approval-details`, `approval-details-toggle`, `approval-field-more`, `approval-field-value`, `approval-history-text`, `approval-history-toggle`, `chief-body`, `chief-bubble`, `chief-channel-mirror`, `chief-composer-block`, `chief-composer-input`, `chief-composer-placeholder`, `chief-earlier`, `chief-fallback-banner`, `chief-fallback-note`, `chief-gate`, `chief-handoff`, `chief-home-scroll`, `chief-msg`, `chief-msg-block-tools`, `chief-msg-col`, `chief-msg-copy`, `chief-msg-foot`, `chief-msg-more`, `chief-msg-reply`, `chief-msg-sending`, `chief-msg-stamp`, `chief-msg-tools-touch`, `chief-note`, `chief-outage`, `chief-package-install`, `chief-question`, `chief-question-asked`, `chief-question-chips`, `chief-question-dismiss`, `chief-question-error`, `chief-question-input-*`, `chief-question-line`, `chief-question-option-*`, `chief-question-submit`, `chief-question-text`, `chief-question-tools`, `chief-question-tools-touch`, `chief-queue`, `chief-queue-cancel-edit`, `chief-queue-more`, `chief-queue-wait-card`, `chief-queued-message`, `chief-queued-message-text`, `chief-queued-remove`, `chief-queued-steer`, `chief-quick-replies`, `chief-quick-reply`, `chief-reply`, `chief-reply-bubble`, `chief-report`, `chief-report-sentence`, `chief-runner-offline`, `chief-secret-request`, `chief-secret-request-input`, `chief-send-queue`, `chief-send-steer`, `chief-sent-attachment`, `chief-sent-attachments`, `chief-status-live`, `chief-status-mark`, `chief-status-pill`, `chief-steer-withdraw`, `chief-stopped`, `chief-stream`, `chief-takeover`, `chief-takeover-failed`, `chief-takeover-handback`, `chief-takeover-open`, `chief-takeover-push-on`, `chief-takeover-time-left`, `chief-task-created`, `chief-task-ref`, `chief-task-ref-hover`, `chief-task-refs`, `chief-task-started`, `chief-task-started-said`, `chief-time-divider`, `chief-turn-error`, `chief-turn-error-card`, `chief-turn-error-raw`, `chief-turn-retry`, `chief-turn-update`, `chief-virtual-rows`, `composer-context-meter`, `composer-plus`, `composer-reply-bar`, `composer-reply-quote`, `composer-reply-quote-remove`, `connection-lost`, `context-panel`, `context-panel-*`, `context-panel-reading`, `copy-markdown`, `home-c`, `home-c-error`, `home-c-pane-buttons`, `memory-edit-card`, `memory-edit-composer`, `memory-edit-content`, `memory-edit-input`, `memory-edit-send`, `memory-edit-stop`, `memory-edit-title`, `memory-list`, `memory-usage`, `panel-error`, `project-instructions-input`, `queue-blocked-fix`, `reply-quote`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`, `selection-ask-side-chat`, `selection-quote`, `selection-quote-box`, `selection-quote-hint`, `selection-quote-input`, `selection-quote-text`, `selection-reply-bar`, `tasks-badge`, `tasks-toggle`, `update`
 - Verify recipes: [.claude/skills/verify-cairn/features/chief-segments.md](features/chief-segments.md), [.claude/skills/verify-cairn/features/failed-send.md](features/failed-send.md)
 - Research: [docs/research/coordinator-in-server.md](../../../docs/research/coordinator-in-server.md), [docs/research/dsh-sig-walk-2026-11.md](../../../docs/research/dsh-sig-walk-2026-11.md), [docs/research/pi-durable-spike.md](../../../docs/research/pi-durable-spike.md) (not on main), [docs/research/chat-markdown-polish-2026-11-08.md](../../../docs/research/chat-markdown-polish-2026-11-08.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/pilot-coordinator-chat-2026-11-06.md](../../../docs/design/pilot-coordinator-chat-2026-11-06.md) (not on main)
@@ -118,7 +117,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `chief-report-sentence`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`
+- Test ids in its code: `chief-report-sentence`, `copy-markdown`, `research-report-card`, `research-report-doc`, `research-report-hover`, `research-report-meta`
 - Research: [docs/research/duet-proactive-coordinator.md](../../../docs/research/duet-proactive-coordinator.md)
 - Frontend design: [apps/web/DESIGN.md](../../../apps/web/DESIGN.md)
 - Backend design: **gap**: Retired: only chief_message report rows remain for read-only rendering; report-linked steps are stopped and the bookkeeping tables are dropped.
@@ -662,7 +661,7 @@ Reach:
 - Web routes: `/app/account`
 - Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `account-appearance`
 - Verify recipes: [.claude/skills/verify-cairn/features/avatars.md](features/avatars.md)
 - Research: [docs/research/bot-identity-and-coauthorship-2026-11-07.md](../../../docs/research/bot-identity-and-coauthorship-2026-11-07.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings)
@@ -683,7 +682,7 @@ Reach:
 - Web routes: `/app/api-keys`
 - Settings: `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `api-key-delete`, `keys-empty`
+- Test ids in its code: `api-key-delete`, `api-key-row`, `keys-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/api-keys.md](features/api-keys.md)
 - Research: **gap**: no note on API key and grant models in reference products
 - Frontend design: **gap**: the API keys page and grant picker have no design
@@ -718,10 +717,10 @@ States: Light, dark or system theme, applied immediately.
 
 Reach:
 
-1. `settings appearance`
+1. `settings account`
 
 - Web routes: none
-- Settings: `设置` (Settings) › `外观` (Appearance)
+- Settings: `设置` (Settings) › `账号` (Account)
 - Keyboard shortcuts in its code: none
 - Test ids in its code: none
 - Verify recipes: [.claude/skills/verify-cairn/features/theme.md](features/theme.md)

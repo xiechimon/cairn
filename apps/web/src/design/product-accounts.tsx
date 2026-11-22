@@ -1,5 +1,5 @@
 import type { ModelSourceModel, ProviderRecord } from '@cairn/shared';
-import { Layers, Monitor, Palette, Server, User } from 'lucide-react';
+import { KeyRound, Layers, Monitor, Server, User } from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import type { Verification } from '../api/account-verification.js';
@@ -234,7 +234,7 @@ function SettingsNavSpecimen() {
               heading: null,
               items: [
                 { id: 'account', label: 'Account', Icon: User },
-                { id: 'appearance', label: 'Appearance', Icon: Palette },
+                { id: 'secrets', label: 'Secrets', Icon: KeyRound },
               ],
             },
             {
@@ -258,7 +258,7 @@ function SettingsNavSpecimen() {
             <SettingsSearch
               sections={[
                 { id: 'account', label: 'Account', Icon: User },
-                { id: 'appearance', label: 'Appearance', Icon: Palette },
+                { id: 'secrets', label: 'Secrets', Icon: KeyRound },
               ]}
               onPick={(pick) => setCurrent(pick.section)}
             />

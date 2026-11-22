@@ -109,6 +109,7 @@ test('groups follow the design: models, execution, security', async ({ page }) =
   expect(order).toContain('remote');
   expect(order).toContain('routing');
   expect(order).not.toContain('work-routing');
+  expect(order).not.toContain('appearance');
 });
 
 test('phone: full screen with the title row and a section tab strip', async ({ page }) => {

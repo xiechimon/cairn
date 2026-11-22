@@ -4,12 +4,13 @@ The settings surface and the page patterns every settings-like page (resources, 
 
 ## Rules
 
-Scope: `apps/web/src/settings/` `apps/web/src/components/settings/` `apps/web/src/components/providers/` `apps/web/src/components/model-select-core` `apps/web/src/resources/` `apps/web/src/usage/` `apps/web/src/pages/` `apps/web/src/routes/account-page` `apps/web/src/routes/api-key` `apps/web/src/routes/im-page` `apps/web/src/routes/machine-authorize-page` `apps/web/src/routes/remote-access-page` `apps/web/src/routes/todo-redirect` `apps/web/src/routes/usage-page` `apps/web/e2e/settings-` `apps/web/e2e/provider` `apps/web/e2e/picker-filter` `apps/web/e2e/usage-` `apps/web/e2e/api-key` `apps/web/e2e/account-` `apps/web/e2e/skills-` `apps/web/e2e/skill-` `apps/web/e2e/secret-` `apps/web/e2e/vault` `apps/web/e2e/machine-authorize` `apps/web/e2e/storage-unavailable` `apps/web/e2e/theme-toggle` `apps/web/test/usage-` `apps/web/test/upstream-model-groups` `apps/web/test/computer-auth-scope` `apps/web/test/api-key` `apps/web/test/account-` `apps/web/test/antigravity-subscriptions` `apps/web/test/bulk-secret-parse` `apps/web/test/access-identity`
+Scope: `apps/web/src/settings/` `apps/web/src/components/settings/` `apps/web/src/components/providers/` `apps/web/src/components/model-select-core` `apps/web/src/resources/` `apps/web/src/usage/` `apps/web/src/pages/` `apps/web/src/routes/account-page` `apps/web/src/routes/api-key` `apps/web/src/routes/im-page` `apps/web/src/routes/machine-authorize-page` `apps/web/src/routes/remote-access-page` `apps/web/src/routes/todo-redirect` `apps/web/src/routes/usage-page` `apps/web/e2e/settings-` `apps/web/e2e/provider` `apps/web/e2e/picker-filter` `apps/web/e2e/usage-` `apps/web/e2e/api-key` `apps/web/e2e/account-` `apps/web/e2e/skills-` `apps/web/e2e/skill-` `apps/web/e2e/secret-` `apps/web/e2e/vault` `apps/web/e2e/machine-authorize` `apps/web/e2e/storage-unavailable` `apps/web/e2e/theme-toggle` `apps/web/test/usage-` `apps/web/test/upstream-model-groups` `apps/web/test/computer-auth-scope` `apps/web/test/api-key` `apps/web/test/account-` `apps/web/test/settings-density` `apps/web/test/antigravity-subscriptions` `apps/web/test/bulk-secret-parse` `apps/web/test/access-identity`
 
 | Id | Rule | Check |
 |---|---|---|
 | C20 | A model is named with its provider wherever it is picked or shown as the pick. | G `e2e/picker-filter.spec.ts` |
 | C22 | A diagnostic action opens a small popover on click (spinner, what is checked) that switches in place to the result; no persistent check status, no reflow, no toast. | G `e2e/providers-subscription-verification.spec.ts`, `e2e/provider-test-connection.spec.ts`, `e2e/settings-mcp-recheck.spec.ts` |
+| C30 | A settings nav entry earns its place with at least three rows of its own; a section with one or two controls joins the section they belong with as a titled group, and its old link redirects there. | M `test/settings-density.test.ts` |
 
 ## Settings list
 

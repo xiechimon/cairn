@@ -43,7 +43,7 @@ test('search is quiet, shows no key hint, and typing with nothing focused goes i
   await expect(search).toBeFocused();
   await expect(search).toHaveValue('color');
   await expect(settings(page).getByTestId('settings-search-results')).toBeVisible();
-  await expect(settings(page).locator('[data-settings-result="appearance"]').first()).toBeVisible();
+  await expect(settings(page).locator('[data-settings-result="account"]').first()).toBeVisible();
 });
 
 test('the slash key is no longer a shortcut: it types a slash into the search like any character', async ({

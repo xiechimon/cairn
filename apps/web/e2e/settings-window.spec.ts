@@ -129,10 +129,10 @@ test('search lists matching sections and rows, jumps to the pick and highlights 
   await search.fill('color');
   const option = settings(page).getByRole('option');
   await expect(option).toHaveCount(1);
-  await expect(option).toContainText('外观');
+  await expect(option).toContainText('账号');
   await expect(option).toContainText('颜色主题');
   await search.press('Enter');
-  await expect(page).toHaveURL(/\/app\/settings\/appearance\?/);
+  await expect(page).toHaveURL(/\/app\/settings\/account\?/);
   await expect(search).toHaveValue('');
   const row = settings(page).locator('[data-settings-label="颜色主题"]');
   await expect(row).toHaveAttribute('data-match', '');
@@ -158,8 +158,16 @@ test('typing opens the search, Escape clears it first and a second Escape closes
   await expect(settings(page)).toHaveCount(0);
 });
 
-test('appearance section switches the theme between system, light and dark', async ({ page }) => {
+test('the old appearance link lands on the account page, whose 外观 section switches the theme', async ({
+  page,
+}) => {
   await page.goto(`/app/settings/appearance?${FLEET}`);
+  await expect(page).toHaveURL(/\/app\/settings\/account\?/);
+  await expect(navItem(page, 'account')).toHaveAttribute('aria-current', 'page');
+  await expect(navItem(page, 'appearance')).toHaveCount(0);
+  const section = settings(page).getByTestId('account-appearance');
+  await expect(section.getByRole('heading', { name: '外观' })).toBeVisible();
+  await expect(section.locator('[data-settings-label="颜色主题"]')).toBeVisible();
   await expect(settings(page).getByRole('radio', { name: '跟随系统' })).toHaveAttribute(
     'aria-checked',
     'true',

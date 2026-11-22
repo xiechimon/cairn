@@ -15,7 +15,7 @@ export const SETTINGS_ROW_INDEX: SettingsRowEntry[] = [
     keywords: ['notification', 'push', 'device'],
   },
   {
-    section: 'appearance',
+    section: 'account',
     label: '颜色主题',
     keywords: ['theme', 'color', 'colour', 'dark', 'light', 'system', '深色', '浅色', '跟随系统'],
   },

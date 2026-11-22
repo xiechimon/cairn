@@ -2448,11 +2448,11 @@
       },
       "routes": {
         "web": [
-          "settings:appearance"
+          "settings:account"
         ]
       },
       "reach": [
-        "settings appearance"
+        "settings account"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/theme.md"

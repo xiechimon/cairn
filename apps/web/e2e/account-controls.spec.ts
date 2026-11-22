@@ -208,6 +208,8 @@ test('probe: every control on the account page has an observable effect on click
     '编辑名称',
     '语言',
     '推送通知',
+    '浅色',
+    '深色',
   ]);
 
   for (const d of descriptors) {

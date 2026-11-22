@@ -2,16 +2,12 @@ import {
   KeyRound,
   type LucideIcon,
   MessageCircle,
-  Monitor,
-  Moon,
-  Palette,
   Plug,
   Puzzle,
   Server,
   ShieldEllipsis,
   SlidersHorizontal,
   Smartphone,
-  Sun,
   User,
   Vault,
   X,
@@ -37,18 +33,12 @@ import {
   SettingsTabStrip,
 } from '../components/settings/settings-nav.js';
 import { SettingsSearch } from '../components/settings/settings-search.js';
-import {
-  SettingsCard,
-  SettingsMatchProvider,
-  SettingsRow,
-  SettingsRows,
-  SettingsSegmented,
-} from '../components/settings-list.js';
+import { SettingsMatchProvider, SettingsRows } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { useTypeToFocus } from '../overlay/hotkeys.js';
-import { EmbeddedShell, PageShell } from '../pages/shell.js';
+import { EmbeddedShell } from '../pages/shell.js';
 import { MachinesPage } from '../resources/machines-page.js';
 import { McpServersPage } from '../resources/mcp-servers-page.js';
 import { ModelRoutingPage } from '../resources/model-routing-page.js';
@@ -59,8 +49,6 @@ import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { ImConnectionsPage } from '../routes/im-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
-import { safeLocalStorage } from '../safe-storage.js';
-import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
 import { SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
 
 interface Section {
@@ -77,50 +65,11 @@ interface Group {
   sections: Section[];
 }
 
-function AppearanceSection() {
-  const { t } = useI18n();
-  const [searchParams] = useSearchParams();
-  const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
-  return (
-    <PageShell
-      route={`${SETTINGS_HREF}/appearance`}
-      title={t('外观')}
-      fixture={resolveScenario(searchParams)}
-    >
-      <SettingsCard>
-        <SettingsRow label={t('颜色主题')}>
-          <SettingsSegmented
-            label={t('外观')}
-            value={theme}
-            className="h-7 pointer-coarse:h-12 [&_[data-segmented=option]]:size-6 [&_[data-segmented=option]]:px-0 pointer-coarse:[&_[data-segmented=option]]:size-11"
-            onChange={(next) => {
-              applyTheme(next);
-              setTheme(next);
-            }}
-            options={[
-              { value: 'system', icon: <Monitor />, ariaLabel: t('跟随系统') },
-              { value: 'light', icon: <Sun />, ariaLabel: t('浅色') },
-              { value: 'dark', icon: <Moon />, ariaLabel: t('深色') },
-            ]}
-          />
-        </SettingsRow>
-      </SettingsCard>
-    </PageShell>
-  );
-}
-
 const GROUPS: Group[] = [
   {
     heading: null,
     sections: [
       { id: 'account', label: '账号', Icon: User, rows: true, element: () => <AccountPage /> },
-      {
-        id: 'appearance',
-        label: '外观',
-        Icon: Palette,
-        rows: true,
-        element: () => <AppearanceSection />,
-      },
     ],
   },
   {
@@ -293,7 +242,11 @@ export function SettingsDialog({
   const machineNote = useMachineNote();
   const titleId = useId();
   const movedTo =
-    sectionParam === 'providers' || sectionParam === 'work-routing' ? 'routing' : null;
+    sectionParam === 'providers' || sectionParam === 'work-routing'
+      ? 'routing'
+      : sectionParam === 'appearance'
+        ? 'account'
+        : null;
   const section = SECTIONS.find((s) => s.id === (movedTo ?? sectionParam)) ?? null;
   const shown = section ?? SECTIONS[0];
   const opener = useRef<HTMLElement | null>(

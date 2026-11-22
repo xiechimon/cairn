@@ -1,3 +1,4 @@
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
@@ -9,6 +10,8 @@ import {
   SETTINGS_SELECT_TRIGGER_CLS,
   SettingsCard,
   SettingsRow,
+  SettingsSection,
+  SettingsSegmented,
 } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
@@ -33,6 +36,7 @@ import {
   unsubscribeDevicePush,
 } from '../pwa/push-device.js';
 import { safeLocalStorage } from '../safe-storage.js';
+import { applyTheme, readStoredTheme, type ThemePreference } from '../theme.js';
 
 export function AccountPage() {
   const { locale, setLocale, t } = useI18n();
@@ -62,6 +66,7 @@ export function AccountPage() {
   const notifyOn = notifyPref === null ? permission === 'granted' : notifyPref === 'on';
   const notifyBlocked = notifyOn && permission === 'denied';
   const devicePushLive = live && teamId !== undefined && pushDeviceSupported();
+  const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
   const [deviceSubscribed, setDeviceSubscribed] = useState<boolean | null>(null);
   const [devicePushFailed, setDevicePushFailed] = useState(false);
   useEffect(() => {
@@ -173,6 +178,26 @@ export function AccountPage() {
             </SettingsRow>
           )}
         </SettingsCard>
+        <SettingsSection title={t('外观')} testId="account-appearance">
+          <SettingsCard>
+            <SettingsRow label={t('颜色主题')}>
+              <SettingsSegmented
+                label={t('颜色主题')}
+                value={theme}
+                className="h-7 pointer-coarse:h-12 [&_[data-segmented=option]]:size-6 [&_[data-segmented=option]]:px-0 pointer-coarse:[&_[data-segmented=option]]:size-11"
+                onChange={(next) => {
+                  applyTheme(next);
+                  setTheme(next);
+                }}
+                options={[
+                  { value: 'system', icon: <Monitor />, ariaLabel: t('跟随系统') },
+                  { value: 'light', icon: <Sun />, ariaLabel: t('浅色') },
+                  { value: 'dark', icon: <Moon />, ariaLabel: t('深色') },
+                ]}
+              />
+            </SettingsRow>
+          </SettingsCard>
+        </SettingsSection>
       </div>
     </PageShell>
   );
