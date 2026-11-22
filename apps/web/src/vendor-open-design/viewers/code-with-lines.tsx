@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx
 import { cn } from 'cn';
-import { useEffect, useMemo, useState } from 'react';
-import { type CodeToken, highlightCode } from '../../detail/code-highlight.js';
+import { useMemo } from 'react';
+import { type CodeToken, useCodeTokens } from '../../detail/code-highlight.js';
 import { useI18n } from '../../i18n/provider.js';
 
 export const CODE_VIEWER_MAX_LINES = 5000;
@@ -26,22 +26,6 @@ function diffLineOf(line: string): DiffLine {
   if (line.startsWith('+') && !line.startsWith('+++')) return 'add';
   if (line.startsWith('-') && !line.startsWith('---')) return 'del';
   return null;
-}
-
-function useLineTokens(text: string, lang: string | undefined, lineCount: number) {
-  const [result, setResult] = useState<{ text: string; lines: CodeToken[][] } | null>(null);
-  const highlightable = lang !== undefined && lineCount <= HIGHLIGHT_MAX_LINES;
-  useEffect(() => {
-    if (!highlightable || lang === undefined) return;
-    let live = true;
-    void highlightCode(text, lang).then((lines) => {
-      if (live && lines !== null) setResult({ text, lines });
-    });
-    return () => {
-      live = false;
-    };
-  }, [text, lang, highlightable]);
-  return highlightable && result?.text === text ? result.lines : null;
 }
 
 function LineContent({ line, tokens }: { line: string; tokens: CodeToken[] | undefined }) {
@@ -70,7 +54,10 @@ export function CodeWithLines({
   const lines = useMemo(() => codeLines(text), [text]);
   const shown = useMemo(() => lines.slice(0, CODE_VIEWER_MAX_LINES), [lines]);
   const shownText = useMemo(() => shown.join('\n'), [shown]);
-  const tokens = useLineTokens(shownText, diff ? undefined : lang, shown.length);
+  const tokens = useCodeTokens(
+    shownText,
+    diff || shown.length > HIGHLIGHT_MAX_LINES ? undefined : lang,
+  );
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
       <div

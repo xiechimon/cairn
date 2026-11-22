@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { HighlighterCore, ThemeRegistrationRaw } from 'shiki/core';
 
 export interface CodeToken {
@@ -62,4 +63,40 @@ export async function highlightCode(text: string, lang: string): Promise<CodeTok
           : { content: token.content, color: token.color },
       ),
     );
+}
+
+interface Highlighted {
+  text: string;
+  lang: string;
+  lines: CodeToken[][];
+}
+
+function carryOver(previous: Highlighted, text: string): CodeToken[][] {
+  const before = previous.text.split('\n');
+  let unchanged = true;
+  return text.split('\n').map((line, row) => {
+    const old = before[row];
+    const tokens = previous.lines[row];
+    if (!unchanged || old === undefined || tokens === undefined || !line.startsWith(old))
+      return line === '' ? [] : [{ content: line }];
+    if (line === old) return tokens;
+    unchanged = false;
+    return [...tokens, { content: line.slice(old.length) }];
+  });
+}
+
+export function useCodeTokens(text: string, lang: string | undefined): CodeToken[][] | null {
+  const [highlighted, setHighlighted] = useState<Highlighted | null>(null);
+  useEffect(() => {
+    if (lang === undefined) return;
+    let live = true;
+    void highlightCode(text, lang).then((lines) => {
+      if (live && lines !== null) setHighlighted({ text, lang, lines });
+    });
+    return () => {
+      live = false;
+    };
+  }, [text, lang]);
+  if (highlighted === null || highlighted.lang !== lang) return null;
+  return highlighted.text === text ? highlighted.lines : carryOver(highlighted, text);
 }

@@ -35,7 +35,7 @@ import {
   type TaskState,
 } from '../lib/markdown.js';
 import { AttachmentChip, attachmentIdFromKey, COMPOSER_CHIP_LABEL } from './attachment-chip.js';
-import { type CodeToken, highlightCode } from './code-highlight.js';
+import { type CodeToken, useCodeTokens } from './code-highlight.js';
 import { MermaidBlock } from './mermaid-block.js';
 import { Segments } from './segments.js';
 
@@ -392,27 +392,6 @@ const COPIED_MS = 1500;
 
 function capitalize(lang: string): string {
   return lang.charAt(0).toUpperCase() + lang.slice(1);
-}
-
-function useCodeTokens(text: string, lang: string | undefined): CodeToken[][] | null {
-  const [highlighted, setHighlighted] = useState<{
-    text: string;
-    lang: string;
-    lines: CodeToken[][];
-  } | null>(null);
-  useEffect(() => {
-    if (lang === undefined) return;
-    let live = true;
-    void highlightCode(text, lang).then((lines) => {
-      if (live && lines !== null) setHighlighted({ text, lang, lines });
-    });
-    return () => {
-      live = false;
-    };
-  }, [text, lang]);
-  return highlighted !== null && highlighted.text === text && highlighted.lang === lang
-    ? highlighted.lines
-    : null;
 }
 
 function CodeLines({ lines, text }: { lines: CodeToken[][] | null; text: string }) {
