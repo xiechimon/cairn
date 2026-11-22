@@ -110,12 +110,7 @@ for (const i of issues) {
   if (!batchOf(i)) {
     unscheduled.push(i.number);
     relabel(i, i.openDeps.length ? 'batch:later' : 'batch:next');
-  } else if (
-    batchOf(i) === 'later' &&
-    i.deps.length &&
-    i.openDeps.length === 0 &&
-    !labelsOf(i).includes('waits-ian')
-  ) {
+  } else if (batchOf(i) === 'later' && i.deps.length && i.openDeps.length === 0) {
     unblocked.push(i.number);
     relabel(i, 'batch:next', ['batch:later']);
   }
@@ -134,23 +129,21 @@ const section = (title, list) =>
   `## ${title}（${list.length}）\n\n${list.length ? list.map(line).join('\n') : '- 无'}\n`;
 const sorted = (f) => issues.filter(f).sort((a, b) => a.number - b.number);
 
-const waitsIan = sorted((i) => labelsOf(i).includes('waits-ian'));
 const body = [
-  '> 这张票由 omarchy 上的定时任务每天更新（`cairn-issue-schedule.timer`），别手改，改票上的标签就行：`batch:now` / `batch:next` / `batch:later`、`by:cairn|codex|pi|grok`、`waits-ian`。',
+  '> 这张票由 omarchy 上的定时任务每天更新（`cairn-issue-schedule.timer`），别手改，改票上的标签就行：`batch:now` / `batch:next` / `batch:later`、`by:cairn|codex|pi|grok`。',
   `> 更新于 ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC，开放 ${issues.length} 张。`,
   '',
-  section('等 ian', waitsIan),
   section(
     '现在',
-    sorted((i) => batchOf(i) === 'now' && !labelsOf(i).includes('waits-ian')),
+    sorted((i) => batchOf(i) === 'now'),
   ),
   section(
     '下一批',
-    sorted((i) => batchOf(i) === 'next' && !labelsOf(i).includes('waits-ian')),
+    sorted((i) => batchOf(i) === 'next'),
   ),
   section(
     '以后',
-    sorted((i) => batchOf(i) === 'later' && !labelsOf(i).includes('waits-ian')),
+    sorted((i) => batchOf(i) === 'later'),
   ),
 ].join('\n');
 
@@ -158,7 +151,6 @@ const summary = [
   unscheduled.length && `新票没排期，已自动放进批次：${unscheduled.map((n) => `#${n}`).join(' ')}`,
   unblocked.length &&
     `依赖已解开，从「以后」挪到「下一批」：${unblocked.map((n) => `#${n}`).join(' ')}`,
-  `等你的票 ${waitsIan.length} 张：${waitsIan.map((i) => `#${i.number}`).join(' ') || '无'}`,
 ].filter(Boolean);
 
 if (!apply) {

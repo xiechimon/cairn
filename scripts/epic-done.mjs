@@ -8,7 +8,6 @@ import {
   decideEpic,
   errorMessage,
   isoPattern,
-  labels,
   nodes,
   nonempty,
   parseShas,
@@ -22,11 +21,11 @@ import {
 export { decideEpic, validateManifest } from '../.claude/epics/checker-policy.mjs';
 
 const query = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) {
-  number state stateReason labels(first: 100) { nodes { name } pageInfo { hasNextPage } }
+  number state stateReason
   timelineItems(last: 1, itemTypes: [CLOSED_EVENT]) { nodes { ... on ClosedEvent { createdAt closer {
     __typename ... on PullRequest { number merged mergedAt mergeCommit { oid } } ... on Commit { oid associatedPullRequests(first: 5) { nodes { number merged mergedAt mergeCommit { oid } } } }
   } } } }
-  closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state isDraft merged mergeCommit { oid } labels(first: 100) { nodes { name } pageInfo { hasNextPage } } } pageInfo { hasNextPage } }
+  closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { nodes { number state isDraft merged mergeCommit { oid } } pageInfo { hasNextPage } }
 } } }`;
 export async function main(argv, deps = {}) {
   const run = deps.run ?? execFileSync;
@@ -241,7 +240,6 @@ export async function main(argv, deps = {}) {
         number,
         state: issue.state,
         stateReason: issue.stateReason,
-        labels: labels(issue.labels),
         closingSha,
         closingAt: mergedPull ? mergedPull.mergedAt : events[0]?.createdAt,
         linkedPulls: linkedPulls.map((pull) => {
@@ -250,7 +248,6 @@ export async function main(argv, deps = {}) {
             number: pull.number,
             state: pull.state,
             isDraft: pull.isDraft,
-            labels: labels(pull.labels),
           };
         }),
       };
