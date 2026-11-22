@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { preflightRef, preflightRun } from './preflight.mjs';
+import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
 import {
   failedGreenContexts,
   laneName,
@@ -124,6 +124,20 @@ test('the pre-flight gate needs the three green-main contexts on a tree-identica
     }),
     { ok: false },
   );
+});
+
+test('the verdict comes from the run conclusion, never from a failed watch', () => {
+  assert.deepEqual(watchVerdict('completed', 'success', 1), {
+    verdict: 'green',
+    conclusion: 'success',
+  });
+  assert.deepEqual(watchVerdict('completed', 'failure', 1), {
+    verdict: 'red',
+    conclusion: 'failure',
+  });
+  assert.equal(watchVerdict('in_progress', null, 1).verdict, 'unreadable');
+  assert.equal(watchVerdict(null, null, 1).verdict, 'unreadable');
+  assert.equal(watchVerdict(null, null, 0).verdict, 'unreadable');
 });
 
 test('the pre-flight ref and run lookup are lane-scoped', () => {

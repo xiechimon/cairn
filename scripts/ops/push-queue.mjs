@@ -149,12 +149,40 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     let armedTree = null;
     let lastBase = null;
     for (;;) {
-      const { live: current } = findLive();
+      let current;
+      if (Date.now() > deadline) {
+        console.error(
+          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
+        );
+        process.exit(2);
+      }
+      try {
+        ({ live: current } = findLive());
+      } catch {
+        console.error('[push-queue] could not read the queue state; retrying');
+        sleep(POLL_SECONDS);
+        continue;
+      }
       const head = git(['rev-parse', 'HEAD']);
       const headTree = treeOf(head);
       const headOnLive = current !== null && ancestor(current, 'HEAD');
       const deadBase = current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
-      const runs = checkRunsOf(head) ?? [];
+      let runs;
+      try {
+        runs = checkRunsOf(head);
+      } catch {
+        console.error('[push-queue] could not read the check runs; retrying');
+        sleep(POLL_SECONDS);
+        continue;
+      }
+      const runsOrEmpty = runs ?? [];
+      const quietCheckRunsOf = (sha) => {
+        try {
+          return checkRunsOf(sha);
+        } catch {
+          return null;
+        }
+      };
       const step = nextWaitAction({
         live: current,
         headOnLive,
@@ -165,9 +193,9 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
           shas: [head],
           pushedTree: headTree,
           treeOf,
-          checkRunsOf,
+          checkRunsOf: quietCheckRunsOf,
         }),
-        failed: failedGreenContexts(runs),
+        failed: failedGreenContexts(runsOrEmpty),
       });
       if (step.action === 'push') break;
       if (step.action === 'fail') {
@@ -202,12 +230,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         }
         armedTree = headTree;
         continue;
-      }
-      if (Date.now() > deadline) {
-        console.error(
-          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
-        );
-        process.exit(2);
       }
       sleep(POLL_SECONDS);
     }
