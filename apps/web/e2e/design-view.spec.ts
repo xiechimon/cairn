@@ -408,82 +408,94 @@ test.describe('artifact parser', () => {
     );
   });
 
-  for (const registration of ['inline', 'deferred', 'module', 'late'] as const) {
-    test(`artifact activation fallbacks yield to ${registration} handlers`, async ({ page }) => {
-      const handlers = `
-        const view = document.getElementById('view');
-        const submissions = [];
-        function routeLink(event, linkId, title) {
-          if (event.defaultPrevented || event.target.id !== linkId) return;
-          event.preventDefault();
-          view.textContent = title;
-        }
-        document.addEventListener('click', (event) => routeLink(event, 'details', 'details'));
-        window.addEventListener('click', (event) => routeLink(event, 'billing', 'billing'));
-        document.addEventListener('click', (event) => {
-          if (event.target.id === 'send') event.target.setAttribute('form', 'details-form');
-        }, true);
-        document.addEventListener('submit', (event) => {
-          event.preventDefault();
-          submissions.push(event.target.id + ':' + event.submitter.id);
-          document.getElementById('last-submitter').textContent = event.submitter.id;
-        });
-        window.addEventListener('click', (event) => {
-          if (event.target.id === 'send') setTimeout(() => setTimeout(() => {
-            document.getElementById('submissions').textContent = submissions.join(', ');
-          }, 0), 0);
-        });
-        document.documentElement.dataset.handlers = 'ready';`;
-      const pending = Promise.withResolvers<void>();
-      await page.route('**/preview-activation.js', async (route) => {
-        if (registration === 'inline') await pending.promise;
-        await route.fulfill({
-          contentType: 'application/javascript',
-          body: registration === 'deferred' ? handlers : '',
-        });
-      });
-      const script = {
-        inline: `<script>${handlers}</script><script defer src="/preview-activation.js"></script>`,
-        deferred: '<script defer src="/preview-activation.js"></script>',
-        module: `<script type="module">${handlers}</script>`,
-        late: `<script>window.addEventListener('load', () => setTimeout(() => {${handlers}}, 0))</script>`,
-      }[registration];
+  const routeClick = (target: 'document' | 'window') => `
+    ${target}.addEventListener('click', (event) => {
+      if (event.defaultPrevented || event.target.id !== 'details-link') return;
+      event.preventDefault();
+      document.getElementById('view').textContent = 'details';
+    });`;
+  const clickParity = [
+    ['an inline document router', routeClick('document'), 'details', 'about:srcdoc'],
+    [
+      'stopPropagation on click',
+      "document.addEventListener('click', (event) => event.stopPropagation())",
+      'home',
+      'about:srcdoc#details',
+    ],
+    ['a module router', routeClick('document'), 'home', 'about:srcdoc#details', 'module'],
+    [
+      'a router registered after load',
+      `window.addEventListener('load', () => { ${routeClick('document')} });`,
+      'home',
+      'about:srcdoc#details',
+    ],
+    ['a Window router', routeClick('window'), 'home', 'about:srcdoc#details'],
+    [
+      'a Window router added during the click',
+      `document.getElementById('details-link').addEventListener('click', () => {
+        ${routeClick('window')}
+      }, { once: true });`,
+      'home',
+      'about:srcdoc#details',
+    ],
+  ] as const;
+
+  for (const [label, handlers, view, url, type] of clickParity) {
+    test(`link fallback matches main for ${label}`, async ({ page }) => {
       const html = `<!doctype html><body>
-        <a id="details" href="#details">Plan details</a>
-        <a id="billing" href="#billing">Billing details</a>
-        <a href="#terms">Terms</a><p id="terms">Monthly renewal</p>
-        <h1 id="view">home</h1>
-        <form id="account-form"></form><form id="details-form"></form>
-        <button id="send" type="submit" form="account-form">Confirm plan</button>
-        <form><input aria-label="Billing email" type="email"><button id="save-email" type="submit">Save email</button></form>
-        <output id="submissions"></output><output id="last-submitter"></output>${script}`;
-      try {
-        await openDesign(page, [], null, { 'ver-2': html });
-        const frame = page.getByTestId('design-frame').contentFrame();
-        await expect(frame.locator('html')).toHaveAttribute('data-handlers', 'ready');
-        const view = frame.getByRole('heading');
-        await frame.getByRole('link', { name: 'Plan details' }).click();
-        expect.soft(await view.textContent(), 'document router').toBe('details');
-        await frame.getByRole('link', { name: 'Billing details' }).click();
-        expect.soft(await view.textContent(), 'window router').toBe('billing');
+        <a id="details-link" href="#details">Plan details</a>
+        <h1 id="view">home</h1><p id="details">Monthly renewal</p>
+        <script type="${type ?? 'text/javascript'}">${handlers}</script>`;
+      await openDesign(page, [], null, { 'ver-2': html });
+      const frame = page.getByTestId('design-frame').contentFrame();
+      await expect.poll(() => frame.locator('body').evaluate(() => document.readyState)).toBe('complete');
+      await frame.getByRole('link', { name: 'Plan details' }).click();
+      await expect.poll(() => frame.locator('body').evaluate(() => ({
+        view: document.getElementById('view')?.textContent ?? null,
+        url: location.href,
+      }))).toEqual({ view, url });
+    });
+  }
+
+  const submitParity = [
+    ['stopPropagation on Enter', true, ['fallback:confirm']],
+    ['one native submit per confirmation', false, ['native:confirm', 'native:confirm']],
+  ] as const;
+
+  for (const [label, stopPropagation, expected] of submitParity) {
+    test(`submit fallback matches main for ${label}`, async ({ page }) => {
+      const html = `<!doctype html><body>
+        <form>
+          <input type="email" value="billing@example.test" aria-label="Billing email" required>
+          <button id="confirm" type="submit">Confirm plan</button>
+        </form>
+        <output id="submissions"></output>
+        <script>
+          const output = document.getElementById('submissions');
+          document.querySelector('form').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const result = document.createElement('span');
+            result.textContent = (event.isTrusted ? 'native:' : 'fallback:') + event.submitter.id;
+            output.append(result);
+          });
+          ${stopPropagation ? "document.addEventListener('keydown', (event) => event.stopPropagation());" : ''}
+        </script>`;
+      await openDesign(page, [], null, { 'ver-2': html });
+      const frame = page.getByTestId('design-frame').contentFrame();
+      await expect.poll(() => frame.locator('body').evaluate(() => document.readyState)).toBe('complete');
+      const field = frame.getByRole('textbox', { name: 'Billing email' });
+      const submissions = () => frame.locator('#submissions').evaluate(async (output) => {
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+        return [...output.children].map((row) => row.textContent);
+      });
+      if (stopPropagation) {
+        await field.dispatchEvent('keydown', { key: 'Enter' });
+      } else {
         await frame.getByRole('button', { name: 'Confirm plan' }).click();
-        const submissions = frame.locator('#submissions');
-        await expect(submissions).not.toBeEmpty();
-        expect.soft(await submissions.textContent(), 'form selected by the artifact').toBe(
-          'details-form:send',
-        );
-        await frame.getByRole('textbox', { name: 'Billing email' }).dispatchEvent('keydown', {
-          key: 'Enter',
-        });
-        await expect(frame.locator('#last-submitter')).toHaveText('save-email');
-        await frame.getByRole('link', { name: 'Terms' }).click();
-        await expect.poll(() => view.evaluate(() => location.hash)).toBe('#terms');
-        if (registration === 'inline') {
-          expect(await view.evaluate(() => document.readyState)).toBe('interactive');
-        }
-      } finally {
-        pending.resolve();
+        expect(await submissions()).toEqual(['native:confirm']);
+        await field.press('Enter');
       }
+      expect(await submissions()).toEqual(expected);
     });
   }
 
