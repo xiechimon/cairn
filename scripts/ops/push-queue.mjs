@@ -82,13 +82,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? 60);
   const waitMinutes = Number(process.env.PUSH_QUEUE_WAIT_MINUTES ?? 120);
   const deadline = Date.now() + waitMinutes * 60_000;
-  const stopAtDeadline = (waitingOn) => {
-    if (!wait || Date.now() <= deadline) return;
-    console.error(
-      `[push-queue] still waiting on ${waitingOn?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
-    );
-    process.exit(2);
-  };
 
   const released = (sha) => {
     try {
@@ -156,41 +149,54 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     let armedTree = null;
     let lastBase = null;
     for (;;) {
-      const head = git(['rev-parse', 'HEAD']);
-      const headTree = treeOf(head);
-      let current = null;
-      let step = { action: 'poll' };
+      let current;
+      if (Date.now() > deadline) {
+        console.error(
+          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
+        );
+        process.exit(2);
+      }
       try {
         ({ live: current } = findLive());
-        const headOnLive = current !== null && ancestor(current, 'HEAD');
-        const deadBase =
-          current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
-        const runs = checkRunsOf(head);
-        step = nextWaitAction({
-          live: current,
-          headOnLive,
-          deadBase,
-          headTree,
-          armedTree,
-          evidence: preflightEvidence({
-            shas: [head],
-            pushedTree: headTree,
-            treeOf,
-            checkRunsOf: () => runs,
-          }),
-          failed: failedGreenContexts(runs ?? []),
-        });
       } catch {
-        console.error('[push-queue] could not read the queue state or its check runs; retrying');
+        console.error('[push-queue] could not read the queue state; retrying');
+        sleep(POLL_SECONDS);
+        continue;
       }
+      const head = git(['rev-parse', 'HEAD']);
+      const headTree = treeOf(head);
+      const headOnLive = current !== null && ancestor(current, 'HEAD');
+      const deadBase = current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
+      let runs;
+      try {
+        runs = checkRunsOf(head);
+      } catch {
+        console.error('[push-queue] could not read the check runs; retrying');
+        sleep(POLL_SECONDS);
+        continue;
+      }
+      const runsOrEmpty = runs ?? [];
+      const step = nextWaitAction({
+        live: current,
+        headOnLive,
+        deadBase,
+        headTree,
+        armedTree,
+        evidence: preflightEvidence({
+          shas: [head],
+          pushedTree: headTree,
+          treeOf,
+          checkRunsOf: () => runs,
+        }),
+        failed: failedGreenContexts(runsOrEmpty),
+      });
+      if (step.action === 'push') break;
       if (step.action === 'fail') {
         console.error(
           `[push-queue] not pushed: the preflight run for ${head.slice(0, 9)} went red in ${step.contexts.join(', ')}. Rerun its failed jobs or fix and push again.`,
         );
         process.exit(1);
       }
-      stopAtDeadline(current);
-      if (step.action === 'push') break;
       if (step.action === 'rebase') {
         const upstream = lastBase ?? 'origin/main';
         console.log(`[push-queue] rebasing ${upstream}..HEAD onto ${step.onto.slice(0, 9)}`);
@@ -231,7 +237,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       const [sha, body] = entry.split('\x1f');
       return { sha, body };
     });
-  stopAtDeadline(null);
   if (unownedCommits(commits).length > 0) {
     const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
     console.log(`[push-queue] stamping the commits that have no owner trailer with Lane: ${lane}`);
@@ -280,7 +285,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     );
     process.exit(1);
   }
-  stopAtDeadline(null);
   const push = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/queue/main'], {
     stdio: 'inherit',
   });

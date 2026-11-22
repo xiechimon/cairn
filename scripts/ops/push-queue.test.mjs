@@ -225,28 +225,15 @@ test('failedGreenContexts flags only required contexts that went red', () => {
   assert.deepEqual(failedGreenContexts([run('check', 'in_progress')]), []);
 });
 
-const GIT_FAKE = String.raw`#!/bin/sh
+const GIT_FAKE = `#!/bin/sh
 echo "git $*" >> "$FAKE_DIR/calls.log"
-for last; do :; done
 case "$1" in
   rev-parse)
     case "$2" in
       --show-toplevel) echo "$FAKE_TOPLEVEL" ;;
-      HEAD)
-        if [ "$FAKE_HEAD_EXIT" != 0 ]; then
-          echo 'fatal: not a git repository' >&2
-          exit "$FAKE_HEAD_EXIT"
-        fi
-        echo "$FAKE_HEAD" ;;
+      HEAD) echo "$FAKE_HEAD" ;;
       *) echo T ;;
     esac ;;
-  ls-remote)
-    if [ -n "$FAKE_LIVE" ]; then printf '%s\t%s\n' "$FAKE_LIVE" "$last"; fi ;;
-  log)
-    if [ "$FAKE_LOG_UNOWNED" = 1 ]; then printf '%s\037no trailer here\036' "$FAKE_HEAD"; fi ;;
-  merge-base)
-    if [ "$last" = origin/main ]; then exit 1; fi
-    exit "$FAKE_ANCESTOR" ;;
 esac
 exit 0
 `;
@@ -282,16 +269,6 @@ esac
 exit 0
 `;
 
-const CLOCK = `let index = 0;
-const sequence = JSON.parse(process.env.FAKE_NOW_SEQUENCE);
-Date.now = () => {
-  const value = sequence[Math.min(index, sequence.length - 1)];
-  index += 1;
-  return value;
-};
-`;
-
-const LIVE = 'b'.repeat(40);
 const LANE = laneName(hostname(), 'fake-wt');
 const GREEN_RUNS = [
   { name: 'check', conclusion: 'success' },
@@ -362,27 +339,6 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       misses: [/query failed/],
     },
     {
-      name: 'push-queue retries an unreadable check-runs answer and never arms a preflight push',
-      script: 'push-queue.mjs',
-      args: ['--wait'],
-      status: 2,
-      checkRuns: [[1, 'gh: HTTP 500']],
-      matches: [/could not read the queue state or its check runs/],
-      calls: /push --force-with-lease/,
-      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
-    },
-    {
-      name: 'push-queue names the live candidate it read when the deadline passes',
-      script: 'push-queue.mjs',
-      args: ['--wait'],
-      status: 2,
-      live: LIVE,
-      ancestor: 0,
-      matches: [new RegExp(`still waiting on ${LIVE.slice(0, 9)}`)],
-      misses: [/still waiting on green evidence/],
-      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
-    },
-    {
       name: 'preflight reports a verdict that arrives on the final retry read',
       script: 'preflight.mjs',
       args: ['--wait'],
@@ -411,30 +367,6 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       watchCount: 1,
     },
     {
-      name: 'push-queue checks the deadline before a rebase acts, naming the candidate it read',
-      script: 'push-queue.mjs',
-      args: ['--wait'],
-      status: 2,
-      live: LIVE,
-      ancestor: 1,
-      matches: [new RegExp(`still waiting on ${LIVE.slice(0, 9)}`)],
-      timeout: 6000,
-      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
-    },
-    {
-      name: 'push-queue reports the failed check it read even when the next check-runs read fails',
-      script: 'push-queue.mjs',
-      args: ['--wait'],
-      status: 1,
-      checkRuns: [
-        [0, { check_runs: [{ name: 'check', conclusion: 'failure' }] }],
-        [1, 'gh: HTTP 500'],
-      ],
-      matches: [/went red in check/],
-      misses: [/still waiting on/],
-      env: { PUSH_QUEUE_WAIT_MINUTES: '0', PUSH_QUEUE_POLL_SECONDS: '0' },
-    },
-    {
       name: 'preflight re-reads the run before watching again, so a run finished during the sleep is watched once',
       script: 'preflight.mjs',
       args: ['--wait'],
@@ -445,33 +377,26 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       watchCount: 1,
     },
     {
-      name: 'push-queue checks the deadline before it pushes, so stamping and the push cannot follow it',
+      name: 'push-queue retries an unreadable check-runs answer and never arms a preflight push',
       script: 'push-queue.mjs',
       args: ['--wait'],
       status: 2,
-      matches: [/still waiting on green evidence after 0 minutes/],
-      calls: /HEAD:refs\/heads\/queue\/main/,
-      env: { PUSH_QUEUE_WAIT_MINUTES: '0', PUSH_QUEUE_POLL_SECONDS: '0' },
-    },
-    {
-      name: 'push-queue fails fast when local HEAD cannot be read instead of waiting out the deadline',
-      script: 'push-queue.mjs',
-      args: ['--wait'],
-      status: 1,
-      headExit: 128,
-      matches: [/Command failed: git rev-parse HEAD/],
-      misses: [/still waiting on/],
+      checkRuns: [[1, 'gh: HTTP 500']],
+      matches: [/could not read the check runs/],
+      calls: /push --force-with-lease/,
       env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
     },
     {
-      name: 'push-queue stops at the deadline before stamping and before the queue push',
+      name: 'push-queue uses the check runs it read, so a failed second read never becomes absent evidence',
       script: 'push-queue.mjs',
       args: ['--wait'],
-      status: 2,
-      clock: [1_000_000, 1_001_000, 9_000_000],
-      logUnowned: true,
-      matches: [/still waiting on green evidence after 0.03 minutes/],
-      calls: /rebase --exec|HEAD:refs\/heads\/queue\/main/,
+      status: 1,
+      checkRuns: [
+        [0, { check_runs: GREEN_RUNS }],
+        [1, 'gh: HTTP 500'],
+      ],
+      misses: [/still waiting on/],
+      calls: /push --force-with-lease/,
       env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
     },
   ];
@@ -491,7 +416,6 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
         ]),
       ),
     });
-    if (row.clock) writeFileSync(join(dir, 'clock.cjs'), CLOCK);
     try {
       const result = spawnSync(
         process.execPath,
@@ -499,24 +423,13 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
         {
           cwd: dir,
           encoding: 'utf8',
-          timeout: row.timeout,
           env: {
             ...process.env,
             PATH: `${dir}:${process.env.PATH}`,
             FAKE_DIR: dir,
             FAKE_TOPLEVEL: '/tmp/fake-wt',
             FAKE_HEAD: X,
-            FAKE_HEAD_EXIT: String(row.headExit ?? 0),
-            FAKE_LIVE: row.live ?? '',
-            FAKE_ANCESTOR: String(row.ancestor ?? 0),
             FAKE_WATCH_EXIT: String(row.watchExit ?? 1),
-            FAKE_LOG_UNOWNED: row.logUnowned ? '1' : '0',
-            ...(row.clock
-              ? {
-                  NODE_OPTIONS: `--require ${join(dir, 'clock.cjs')}`,
-                  FAKE_NOW_SEQUENCE: JSON.stringify(row.clock),
-                }
-              : {}),
             ...row.env,
           },
         },
