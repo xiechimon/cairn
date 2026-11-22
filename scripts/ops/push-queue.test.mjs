@@ -369,14 +369,51 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       misses: [/still waiting on green evidence/],
       env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
     },
+    {
+      name: 'preflight reports a verdict that arrives on the final retry read',
+      script: 'preflight.mjs',
+      args: ['--wait'],
+      status: 0,
+      search: ciRun('in_progress', null),
+      byId: [
+        ciRun('in_progress', null),
+        ciRun('in_progress', null),
+        ciRun('in_progress', null),
+        ciRun('in_progress', null),
+        ciRun('in_progress', null),
+        ciRun('completed', 'success'),
+      ],
+      matches: [/\[preflight\] green/],
+      misses: [/could not read the run at/],
+    },
+    {
+      name: 'preflight starts no further watch after a read that failed',
+      script: 'preflight.mjs',
+      args: ['--wait'],
+      status: 1,
+      byId: [[1, 'gh: HTTP 500']],
+      matches: [/could not read the run at/],
+      watchCount: 1,
+    },
+    {
+      name: 'push-queue checks the deadline before a rebase acts, naming the candidate it read',
+      script: 'push-queue.mjs',
+      args: ['--wait'],
+      status: 2,
+      live: LIVE,
+      ancestor: 1,
+      matches: [new RegExp(`still waiting on ${LIVE.slice(0, 9)}`)],
+      timeout: 6000,
+      env: { PUSH_QUEUE_WAIT_MINUTES: '0.03', PUSH_QUEUE_POLL_SECONDS: '0' },
+    },
   ];
   for (const row of rows) {
     const dir = sandbox({
       'search.0': answer(0, { workflow_runs: [row.search ?? ciRun('completed', 'success')] }),
       ...Object.fromEntries(
-        (row.byId ?? [ciRun('completed', 'success')]).map((run, index) => [
+        (row.byId ?? [ciRun('completed', 'success')]).map((entry, index) => [
           `byId.${index}`,
-          answer(0, run),
+          Array.isArray(entry) ? answer(entry[0], entry[1]) : answer(0, entry),
         ]),
       ),
       ...Object.fromEntries(
@@ -393,6 +430,7 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
         {
           cwd: dir,
           encoding: 'utf8',
+          timeout: row.timeout,
           env: {
             ...process.env,
             PATH: `${dir}:${process.env.PATH}`,
@@ -410,11 +448,16 @@ test('the scripts read the run by id, never judge by a watch, and retry an unrea
       assert.equal(result.status, row.status, `${row.name}\n${output}`);
       for (const pattern of row.matches ?? []) assert.match(output, pattern, row.name);
       for (const pattern of row.misses ?? []) assert.doesNotMatch(output, pattern, row.name);
-      if (row.calls) {
-        const calls = existsSync(join(dir, 'calls.log'))
-          ? readFileSync(join(dir, 'calls.log'), 'utf8')
-          : '';
-        assert.doesNotMatch(calls, row.calls, row.name);
+      const calls = existsSync(join(dir, 'calls.log'))
+        ? readFileSync(join(dir, 'calls.log'), 'utf8')
+        : '';
+      if (row.calls) assert.doesNotMatch(calls, row.calls, row.name);
+      if (row.watchCount !== undefined) {
+        assert.equal(
+          (calls.match(/^gh run watch /gm) ?? []).length,
+          row.watchCount,
+          `${row.name}\n${calls}`,
+        );
       }
     } finally {
       releaseTestTempDir(dir);

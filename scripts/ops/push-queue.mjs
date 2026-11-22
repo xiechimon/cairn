@@ -180,6 +180,12 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         );
         process.exit(1);
       }
+      if (Date.now() > deadline) {
+        console.error(
+          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
+        );
+        process.exit(2);
+      }
       if (step.action === 'rebase') {
         const upstream = lastBase ?? 'origin/main';
         console.log(`[push-queue] rebasing ${upstream}..HEAD onto ${step.onto.slice(0, 9)}`);
@@ -206,12 +212,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         }
         armedTree = headTree;
         continue;
-      }
-      if (Date.now() > deadline) {
-        console.error(
-          `[push-queue] still waiting on ${current?.slice(0, 9) ?? 'green evidence'} after ${waitMinutes} minutes; rerun to keep waiting.`,
-        );
-        process.exit(2);
       }
       sleep(POLL_SECONDS);
     }

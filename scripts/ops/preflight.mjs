@@ -81,7 +81,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   });
   let state = currentStatus();
   const WATCH_RETRIES = 5;
-  for (let attempt = 0; attempt < WATCH_RETRIES; attempt++) {
+  for (let attempt = 0; attempt <= WATCH_RETRIES; attempt++) {
     const outcome = watchVerdict(state?.status ?? null, state?.conclusion ?? null);
     if (outcome.verdict === 'green') {
       console.log('[preflight] green — push-queue will accept this head');
@@ -93,13 +93,14 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       );
       process.exit(1);
     }
+    if (attempt === WATCH_RETRIES) break;
     console.error(
       state
         ? `[preflight] no verdict yet: the run is ${state.status}; waiting for it to finish`
         : '[preflight] no verdict yet: could not read the run; retrying',
     );
     sleep(5);
-    if (state?.status !== 'completed') {
+    if (state !== null && state.status !== 'completed') {
       spawnSync('gh', ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'], {
         stdio: 'inherit',
       });
