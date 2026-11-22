@@ -8,6 +8,7 @@ import type {
 } from '@cairn/shared';
 import {
   conversationMessageEventSchema,
+  DESKTOP_TRAY_PATH,
   isChiefConversationId,
   SILENT_NOTIFICATION_TYPES,
 } from '@cairn/shared';
@@ -165,6 +166,7 @@ async function showViaServiceWorker(
 }
 
 function fireDesktopNotification(record: NotificationRecord): void {
+  if (window.location.pathname === DESKTOP_TRAY_PATH) return;
   if (record.readAt !== null || SILENT_NOTIFICATION_TYPES.includes(record.type)) return;
   if (readNotifyPref(safeLocalStorage()) === 'off') return;
   const t = (source: string) => translate(readStoredLocale(safeLocalStorage()), EN, source);

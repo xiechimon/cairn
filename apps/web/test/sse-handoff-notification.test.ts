@@ -48,7 +48,7 @@ async function handoffTitle(locale: Locale): Promise<string> {
   }
   vi.stubGlobal('EventSource', Source);
   vi.stubGlobal('document', { hidden: true });
-  vi.stubGlobal('window', { localStorage: storedLocale(locale) });
+  vi.stubGlobal('window', { localStorage: storedLocale(locale), location: { pathname: '/app' } });
   vi.stubGlobal('navigator', { language: locale === 'zh' ? 'zh-CN' : 'en-US' });
   vi.stubGlobal('Notification', DesktopNotification);
   const record = {
