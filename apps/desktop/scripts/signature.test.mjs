@@ -1,51 +1,34 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseSigningIdentity, signatureMatches } from '../src/signature.ts';
+import { parseRunningSignature } from '../src/signature.ts';
 
-const RELEASE = `Executable=/Applications/Cairn.app/Contents/MacOS/Cairn
-Identifier=io.github.xiechimon.cairn
-Format=app bundle with Mach-O thin (arm64)
-CDHash=5f73f6d85a183b8cb154255bbf7a377ca9016717
+const REQUIREMENT =
+  'identifier "io.github.xiechimon.cairn" and certificate root = H"0123456789012345678901234567890123456789"';
+const CERTIFICATE = `Identifier=io.github.xiechimon.cairn
 Signature size=2146
 Authority=Cairn Mac Self-Signed
 `;
 
-const ADHOC = `Executable=/tmp/Cairn.app/Contents/MacOS/Cairn
-Identifier=io.github.xiechimon.cairn
-Signature=adhoc
-`;
+const DESIGNATED = `designated => ${REQUIREMENT}\n`;
 
-test('the identity comes from the codesign lines that name it', () => {
-  assert.deepEqual(parseSigningIdentity(RELEASE), {
-    identifier: 'io.github.xiechimon.cairn',
-    authority: 'Cairn Mac Self-Signed',
+test('a certificate signature preserves the full designated requirement, not the authority name', () => {
+  const expected = { kind: 'certificate', requirement: REQUIREMENT };
+  assert.deepEqual(parseRunningSignature(DESIGNATED, CERTIFICATE), expected);
+  assert.deepEqual(parseRunningSignature('', `${CERTIFICATE}${DESIGNATED}`), expected);
+});
+
+test('a certificate signature without a readable designated requirement fails closed', () => {
+  for (const stdout of ['', 'designated =>   \n', 'internal => identifier "other"\n']) {
+    assert.deepEqual(parseRunningSignature(stdout, CERTIFICATE), { kind: 'unreadable' });
+  }
+  assert.deepEqual(parseRunningSignature(DESIGNATED, ''), { kind: 'unreadable' });
+});
+
+test('only explicit ad-hoc details allow an update without a designated requirement', () => {
+  assert.deepEqual(parseRunningSignature('', 'Signature=adhoc\n'), { kind: 'adhoc' });
+  assert.deepEqual(parseRunningSignature('', ''), { kind: 'unreadable' });
+  assert.deepEqual(parseRunningSignature('Signature=adhoc\n', ''), { kind: 'unreadable' });
+  assert.deepEqual(parseRunningSignature('', `${CERTIFICATE}Signature=adhoc\n`), {
+    kind: 'unreadable',
   });
-  assert.deepEqual(parseSigningIdentity(ADHOC), {
-    identifier: 'io.github.xiechimon.cairn',
-    authority: null,
-  });
-  assert.deepEqual(parseSigningIdentity(''), { identifier: null, authority: null });
-});
-
-test('a copy signed by the identity that signed the running app is accepted', () => {
-  const running = parseSigningIdentity(RELEASE);
-  assert.equal(signatureMatches(running, parseSigningIdentity(RELEASE)), true);
-});
-
-test('a copy signed by anyone else, or by nobody, is refused', () => {
-  const running = parseSigningIdentity(RELEASE);
-  const other = parseSigningIdentity(RELEASE.replace('Cairn Mac Self-Signed', 'Someone Else'));
-  assert.equal(signatureMatches(running, other), false);
-  assert.equal(signatureMatches(running, parseSigningIdentity(ADHOC)), false);
-  assert.equal(
-    signatureMatches(running, {
-      identifier: 'com.example.other',
-      authority: 'Cairn Mac Self-Signed',
-    }),
-    false,
-  );
-});
-
-test('a running app with no signing identity has nothing to compare against', () => {
-  assert.equal(signatureMatches(parseSigningIdentity(ADHOC), parseSigningIdentity(RELEASE)), true);
 });
