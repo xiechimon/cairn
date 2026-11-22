@@ -228,6 +228,24 @@ async function streamTicket(s: TestServer): Promise<string> {
 }
 
 describe('token auth: SSE uses a short ticket, not the owner token', () => {
+  test('off + POST /api/auth/stream-ticket mints a ticket and the stream opens', async () => {
+    const s = bootServer({ authToken: null, pingIntervalMs: 50 });
+    const issued = await req(s.app, 'POST', '/api/auth/stream-ticket');
+    expect(issued.status).toBe(200);
+    const { ticket } = (await issued.json()) as { ticket: string };
+    const res = await Promise.resolve(
+      s.app.request(`/api/teams/${s.team.id}/stream?ticket=${ticket}`),
+    );
+    expect(res.status).toBe(200);
+    void res.body?.cancel().catch(() => {});
+  });
+
+  test('on + POST /api/auth/stream-ticket without a credential -> 401', async () => {
+    const s = bootServer({ authToken: TOKEN });
+    const res = await req(s.app, 'POST', '/api/auth/stream-ticket');
+    expect(res.status).toBe(401);
+  });
+
   test('on + the team stream refuses ?token= and opens with a ticket', async () => {
     const s = bootServer({ authToken: TOKEN, pingIntervalMs: 50 });
     const refused = await req(s.app, 'GET', `/api/teams/${s.team.id}/stream?token=${TOKEN}`);

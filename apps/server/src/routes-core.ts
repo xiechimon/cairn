@@ -90,11 +90,15 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/auth/stream-ticket', (c) => {
     const deviceId = pairedDeviceIdOf(c);
     const owner = c.get('ownerIdentity');
-    if (owner === undefined && deviceId === null) return c.json({ error: 'Unauthorized' }, 401);
+    if (ctx.authToken !== null && owner === undefined && deviceId === null) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
     const ticket = issueStreamTicket(
       owner !== undefined
         ? { kind: owner.via === 'access' ? 'external' : 'owner', deviceId: null }
-        : { kind: 'device', deviceId },
+        : deviceId !== null
+          ? { kind: 'device', deviceId }
+          : { kind: 'owner', deviceId: null },
     );
     c.header('cache-control', 'no-store');
     return c.json(ticket);

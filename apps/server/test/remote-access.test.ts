@@ -340,6 +340,26 @@ describe('F-R1 routes: listeners, interfaces and tailnet', () => {
     expect(ownerBody.tailnet.authUrl).toBe('https://login.tailscale.com/a/abc');
   });
 
+  test('the login URL is not hidden when token auth is off (every caller is the owner)', async () => {
+    const s = bootServer({
+      authToken: null,
+      remote: {
+        tailnetStatus: () =>
+          readyStatus({
+            state: 'needs-login',
+            authUrl: 'https://login.tailscale.com/a/abc',
+            dnsName: null,
+            ips: [],
+          }),
+      },
+    });
+    const res = await call(s, 'GET', '/api/remote/routes');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as RemoteRoutesResponse;
+    expect(body.tailnet.state).toBe('needs-login');
+    expect(body.tailnet.authUrl).toBe('https://login.tailscale.com/a/abc');
+  });
+
   test('an unsafe DNS name from the sidecar is dropped, not echoed', async () => {
     const body = await routesOf({
       tailnetStatus: () => readyStatus({ dnsName: 'evil.example/path@attacker.test' }),

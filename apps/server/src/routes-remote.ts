@@ -58,7 +58,9 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       interfaces: (remote.networkInterfaces ?? networkInterfaces)(),
       tailnet: remote.tailnetStatus(),
     });
-    if (c.get('ownerIdentity') === undefined) routes.tailnet.authUrl = null;
+    if (ctx.authToken !== null && c.get('ownerIdentity') === undefined) {
+      routes.tailnet.authUrl = null;
+    }
     return c.json(routes);
   });
 
