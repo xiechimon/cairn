@@ -1,7 +1,7 @@
 import { cn } from 'cn';
 import { Ban, CircleCheck } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalHistoryLine } from './approval-card.js';
 import { approvalCardOf } from './approval-card-model.js';
@@ -47,7 +47,7 @@ export function QuestionAsked({
             data-testid="chief-reply-bubble"
             className={cn(REPLY_BUBBLE_CLS, 'text-ui leading-5 break-words')}
           >
-            {question.question}
+            <ChatMarkdown text={question.question} />
           </div>
         );
         return (

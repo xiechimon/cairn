@@ -172,7 +172,9 @@ function Row({
           {item.questions.map((q) => (
             <div key={q.header} className="flex flex-col gap-1">
               <div className="text-meta text-(--text-tertiary)">{q.header}</div>
-              <div className="text-foreground">{q.question}</div>
+              <div className="text-foreground">
+                <ChatMarkdown text={q.question} />
+              </div>
               {q.options.length > 0 && (
                 <ul
                   className="m-0 flex list-none flex-wrap gap-1.5 p-0"

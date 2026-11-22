@@ -291,18 +291,31 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               {...attachmentOpener(openers, fileSet, seg.text, seg.attachmentKey)}
             />
           ) : seg.style === 'anchor' ? (
-            <a
-              key={j}
-              href={seg.href}
-              target="_blank"
-              rel="noreferrer"
-              className={cn(
-                codeClassName === 'chat-code' ? CHAT_ANCHOR_SKIN : ANCHOR_SKIN,
-                seg.strong === true && 'font-semibold',
-              )}
-            >
-              {seg.text}
-            </a>
+            seg.internal === true ? (
+              <Link
+                key={j}
+                to={seg.href ?? ''}
+                className={cn(
+                  codeClassName === 'chat-code' ? CHAT_ANCHOR_SKIN : ANCHOR_SKIN,
+                  seg.strong === true && 'font-semibold',
+                )}
+              >
+                {seg.text}
+              </Link>
+            ) : (
+              <a
+                key={j}
+                href={seg.href}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(
+                  codeClassName === 'chat-code' ? CHAT_ANCHOR_SKIN : ANCHOR_SKIN,
+                  seg.strong === true && 'font-semibold',
+                )}
+              >
+                {seg.text}
+              </a>
+            )
           ) : seg.style === 'strong' ? (
             <strong key={j}>{seg.text}</strong>
           ) : seg.style != null ? (

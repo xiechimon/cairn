@@ -155,6 +155,11 @@ function linkSegment(target: string, label: string, raw: string, flags: Flags): 
   }
   if (WEB_TARGET.test(target))
     return withFlags({ text: label !== '' ? label : target, style: 'anchor', href: target }, flags);
+  if (target.startsWith('/'))
+    return withFlags(
+      { text: label !== '' ? label : target, style: 'anchor', href: target, internal: true },
+      flags,
+    );
   return textSegment(raw, flags);
 }
 
