@@ -3,6 +3,7 @@ import { existsSync, readdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveRunnerClaude } from './check-runner-claude.mjs';
+import { checkVirtualStore } from './check-virtual-store.mjs';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const daemonDir = resolve(desktopDir, '..', 'daemon');
@@ -27,6 +28,7 @@ execFileSync(
     '--prod',
     '--ignore-scripts',
     '--config.node-linker=hoisted',
+    '--config.package-import-method=copy',
     `--os=${platform}`,
     `--cpu=${arch}`,
     target,
@@ -41,6 +43,7 @@ for (const name of readdirSync(join(target, 'dist'))) {
   if (name.endsWith('.map')) rmSync(join(target, 'dist', name));
 }
 
+checkVirtualStore(target);
 console.log(
   `Claude Code binary for ${platform}-${arch}: ${resolveRunnerClaude(target, platform, arch)}`,
 );

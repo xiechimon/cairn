@@ -2,6 +2,7 @@ import { cpSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { checkVirtualStore } from './check-virtual-store.mjs';
 
 const desktopDir = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const serverDir = resolve(desktopDir, '..', 'server');
@@ -53,4 +54,5 @@ for (const entry of ['package.json', 'LICENSE', 'lib', 'prebuilds']) {
   });
 }
 
+checkVirtualStore(target);
 console.log(`staged the Cairn server into ${target}`);

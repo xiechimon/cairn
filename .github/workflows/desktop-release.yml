@@ -135,6 +135,9 @@ jobs:
         run: |
           node scripts/check-runner-claude.mjs \
             "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" darwin "$ARCH"
+          node scripts/check-virtual-store.mjs \
+            "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/runner" \
+            "$RUNNER_TEMP/unzipped/Cairn.app/Contents/Resources/server"
 
       - name: Launch the arm64 app before publishing it
         if: matrix.arch == 'arm64'
