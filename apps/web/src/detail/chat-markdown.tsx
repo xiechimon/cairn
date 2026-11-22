@@ -16,6 +16,7 @@ import {
   OpenDesignPageContext,
   OpenFileContext,
 } from '../board/file-pane.js';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
@@ -23,7 +24,7 @@ import { Checkbox } from '../components/ui/checkbox.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import type { DocSegment } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChiefExpand, Copy } from '../icons/index.js';
+import { Check, ChiefExpand } from '../icons/index.js';
 import {
   type ChatBlock,
   type ChatBubbleGroup,
@@ -388,8 +389,6 @@ function MarkdownBlocks({
   ));
 }
 
-const COPIED_MS = 1500;
-
 function capitalize(lang: string): string {
   return lang.charAt(0).toUpperCase() + lang.slice(1);
 }
@@ -414,48 +413,6 @@ function CodeLines({ lines, text }: { lines: CodeToken[][] | null; text: string 
 
 const CODE_BTN_CLS =
   'size-8 flex-none cursor-pointer rounded-(--radius-control) text-foreground transition-none hover:bg-(--menu-hover) dark:hover:bg-(--menu-hover)';
-
-function useCopied(text: string) {
-  const [copied, setCopied] = useState(false);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-  const copy = () => {
-    void navigator.clipboard.writeText(text).then(() => setCopied(true));
-  };
-  return { copied, copy };
-}
-
-export function CopyCodeButton({
-  text,
-  className,
-  testId,
-}: {
-  text: string;
-  className?: string;
-  testId: string;
-}) {
-  const { t } = useI18n();
-  const { copied, copy } = useCopied(text);
-  return (
-    <IconTooltip
-      label={t('复制')}
-      trigger={
-        <Button
-          variant="ghost"
-          size="icon"
-          className={cn(CODE_BTN_CLS, className)}
-          data-testid={testId}
-          onClick={copy}
-        />
-      }
-    >
-      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-    </IconTooltip>
-  );
-}
 
 function CodeBlock({ lang, text }: { lang?: string; text: string }) {
   const { t } = useI18n();
@@ -488,7 +445,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
         >
           <ChiefExpand className="size-4" />
         </IconTooltip>
-        <CopyCodeButton text={text} testId="md-code-copy" />
+        <CopyIconButton text={text} testId="md-code-copy" />
       </div>
       <div className="overflow-x-auto overscroll-x-contain">
         <pre
@@ -519,7 +476,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
           className="relative rounded-(--cds-radius-xl) border border-border bg-secondary"
           data-testid="md-code-dialog-body"
         >
-          <CopyCodeButton
+          <CopyIconButton
             text={text}
             testId="md-code-dialog-copy"
             className="absolute top-2 right-2 z-10"

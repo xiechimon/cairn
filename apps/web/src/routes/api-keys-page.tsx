@@ -6,14 +6,14 @@ import { useApiKeys, useApiMutations, useTodos } from '../api/hooks.js';
 import { mapApiKeys, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QueryBoundary } from '../components/query-state.js';
-import { CARD_RADIUS_CLS, SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
+import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
-import { Card } from '../components/ui/card.js';
-import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
-import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
+import type { ApiKeyRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
@@ -28,33 +28,14 @@ export function ApiKeysPage() {
   const keysQ = useApiKeys(teamId, live);
   const todosQ = useTodos(teamId, live);
   const mutations = useApiMutations(teamId);
-  const [created, setCreated] = useState<{ id: string; name: string; plaintext: string } | null>(
-    null,
-  );
+  const [created, setCreated] = useState<ApiKeyRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(new Set());
   const keys = live
-    ? [
-        ...mapApiKeys(keysQ.data ?? []),
-        ...(created !== null
-          ? [
-              {
-                id: 'once',
-                name: null,
-                masked: '',
-                gitAccess: false,
-                mcpAccess: false,
-                machineAccess: true,
-                plaintext: created.plaintext,
-              },
-            ]
-          : []),
-      ]
+    ? withCreated(mapApiKeys(keysQ.data ?? []), created)
     : (fixture.apiKeys?.keys ?? []);
-  const listed = keys.filter(
-    (key) => (key.name != null || key.masked !== '') && !removedIds.has(key.id),
-  );
+  const listed = keys.filter((key) => !removedIds.has(key.id));
   const remove = () => {
     if (deleting === null) return;
     const { id } = deleting;
@@ -75,15 +56,6 @@ export function ApiKeysPage() {
         toastError(t('没能删除，请重试。'), error);
       },
     });
-  };
-  const copyKey = (text: string) => {
-    const failed = (error: unknown) => toastError(t('没能复制，请手动选中 API 密钥复制。'), error);
-    const clip = navigator.clipboard;
-    if (!clip) {
-      failed(null);
-      return;
-    }
-    void clip.writeText(text).then(() => toastSuccess(t('已复制')), failed);
   };
   return (
     <PageShell
@@ -117,58 +89,14 @@ export function ApiKeysPage() {
           />
         }
       >
-        {keys
-          .filter((key) => key.plaintext != null)
-          .map((key) => (
-            <Card
-              key={`once-${key.id}`}
-              className={cn('mt-6 gap-2 px-4 py-3 shadow-none ring-border', CARD_RADIUS_CLS)}
-            >
-              {key.id === 'once' && created !== null && (
-                <span className="font-mono text-ui text-foreground">{created.name}</span>
-              )}
-              <div className="flex items-center gap-3">
-                <code className="min-w-0 flex-1 font-mono text-ui break-all text-foreground">
-                  {key.plaintext}
-                </code>
-                <Button
-                  variant="outline"
-                  className={cn(DIALOG_PRIMARY_BUTTON, 'pointer-coarse:h-11')}
-                  onClick={live ? () => copyKey(key.plaintext ?? '') : undefined}
-                >
-                  {t('复制')}
-                </Button>
-              </div>
-              <p className="m-0 text-meta text-content-tertiary">
-                {t('请立即复制 API 密钥，它仅显示一次。')}
-              </p>
-            </Card>
-          ))}
         {listed.length > 0 && (
-          <SettingsCard className="mt-4">
+          <SettingsCard className="mt-6">
             {listed.map((key) => (
-              <div key={key.id} className={SETTINGS_ROW_CLS}>
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate font-mono text-ui text-foreground">
-                    {key.name ?? key.masked}
-                  </span>
-                  {key.name != null && (
-                    <span className="truncate font-mono text-meta text-content-tertiary">
-                      {key.masked}
-                    </span>
-                  )}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(TOPBAR_TEXT_BUTTON, 'pointer-coarse:h-11')}
-                  data-testid="api-key-delete"
-                  aria-label={t('删除 {name}', { name: key.name ?? key.masked })}
-                  onClick={() => setDeleting({ id: key.id, name: key.name ?? key.masked })}
-                >
-                  {t('删除')}
-                </Button>
-              </div>
+              <ApiKeyRow
+                key={key.id}
+                apiKey={key}
+                onDelete={() => setDeleting({ id: key.id, name: key.name ?? key.masked })}
+              />
             ))}
           </SettingsCard>
         )}
@@ -183,8 +111,9 @@ export function ApiKeysPage() {
           }
           mutations.createApiKey.mutate(body, {
             onSuccess: (res) => {
-              if (typeof res.plaintext === 'string')
-                setCreated({ id: res.id, name: body.name, plaintext: res.plaintext });
+              const [row] = mapApiKeys([res]);
+              if (row?.id !== undefined && typeof res.plaintext === 'string')
+                setCreated({ ...row, plaintext: res.plaintext });
             },
             onError: (error) => toastError(t('新建 API 密钥失败，请重试。'), error),
           });
@@ -199,5 +128,65 @@ export function ApiKeysPage() {
         onConfirm={remove}
       />
     </PageShell>
+  );
+}
+
+function withCreated(keys: ApiKeyRecord[], created: ApiKeyRecord | null): ApiKeyRecord[] {
+  if (created === null) return keys;
+  if (!keys.some((key) => key.id === created.id)) return [...keys, created];
+  return keys.map((key) =>
+    key.id === created.id ? { ...key, plaintext: created.plaintext } : key,
+  );
+}
+
+function ApiKeyRow({ apiKey, onDelete }: { apiKey: ApiKeyRecord; onDelete: () => void }) {
+  const { t } = useI18n();
+  const label = apiKey.name ?? apiKey.masked;
+  return (
+    <div data-testid="api-key-row" className={SETTINGS_ROW_CLS}>
+      <span className="flex min-w-0 flex-1 flex-col">
+        {apiKey.name !== null && (
+          <span className="truncate font-mono text-ui text-foreground">{apiKey.name}</span>
+        )}
+        {apiKey.plaintext !== undefined ? (
+          <>
+            <code className="font-mono text-meta break-all text-foreground">
+              {apiKey.plaintext}
+            </code>
+            <span className="text-meta text-content-tertiary">
+              {t('请立即复制 API 密钥，它仅显示一次。')}
+            </span>
+          </>
+        ) : (
+          <span
+            className={cn(
+              'truncate font-mono',
+              apiKey.name === null ? 'text-ui text-foreground' : 'text-meta text-content-tertiary',
+            )}
+          >
+            {apiKey.masked}
+          </span>
+        )}
+      </span>
+      <span className="flex flex-none items-center gap-1">
+        {apiKey.plaintext !== undefined && (
+          <CopyIconButton
+            text={apiKey.plaintext}
+            testId="api-key-copy"
+            className="pointer-coarse:size-11"
+          />
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn(TOPBAR_TEXT_BUTTON, 'pointer-coarse:h-11')}
+          data-testid="api-key-delete"
+          aria-label={t('删除 {name}', { name: label })}
+          onClick={onDelete}
+        >
+          {t('删除')}
+        </Button>
+      </span>
+    </div>
   );
 }

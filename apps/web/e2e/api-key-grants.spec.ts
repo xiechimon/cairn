@@ -2,21 +2,34 @@ import { MCP_TOOL_REGISTRY } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
 import { stubLiveApiKeys } from './helpers.js';
 
-test('a new key needs a MY_KEY name, gets every permission, and shows its plaintext once', async ({
+const CREATED_ROW = {
+  id: 'key-new',
+  name: 'CI_RUNNER_2',
+  masked: 'cairn_exam…',
+  gitAccess: true,
+  mcpAccess: true,
+  machineAccess: true,
+};
+
+test('a new key needs a MY_KEY name, gets every permission, and shows its plaintext once in its own row', async ({
   page,
 }) => {
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  let keys: (typeof CREATED_ROW)[] = [];
   await page.route('**/api/**', (route, request) => {
     const path = new URL(request.url()).pathname;
     if (path.endsWith('/stream')) return route.abort();
-    if (path === '/api/teams/team-1/api-keys' && request.method() === 'POST')
-      return route.fulfill({ status: 201, json: { plaintext: 'cairn_example' } });
+    if (path === '/api/teams/team-1/api-keys' && request.method() === 'POST') {
+      keys = [CREATED_ROW];
+      return route.fulfill({ status: 201, json: { ...CREATED_ROW, plaintext: 'cairn_example' } });
+    }
     if (path === '/api/teams')
       return route.fulfill({
         json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
       });
     if (path === '/api/user/me')
       return route.fulfill({ json: { id: 'user-1', displayName: 'Owner', avatarUrl: null } });
-    if (path === '/api/teams/team-1/api-keys') return route.fulfill({ json: [] });
+    if (path === '/api/teams/team-1/api-keys') return route.fulfill({ json: keys });
     return route.fulfill({ status: 500, json: { error: 'Unrelated API surface' } });
   });
   await page.goto('/app/api-keys');
@@ -51,7 +64,22 @@ test('a new key needs a MY_KEY name, gets every permission, and shows its plaint
     },
   });
   await expect(dialog).not.toBeVisible();
-  await expect(page.getByText('cairn_example', { exact: true })).toBeVisible();
+  const rows = page.getByTestId('api-key-row');
+  await expect(page.getByText('CI_RUNNER_2', { exact: true })).toHaveCount(1);
+  await expect(rows).toHaveCount(1);
+  const row = rows.first();
+  await expect(row.getByText('cairn_example', { exact: true })).toBeVisible();
+  await expect(row.getByText('cairn_exam…', { exact: true })).toHaveCount(0);
+  await expect(row).toContainText('请立即复制 API 密钥，它仅显示一次。');
+  await row.getByRole('button', { name: '复制', exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('cairn_example');
+  await expect(row.getByRole('button', { name: '删除 CI_RUNNER_2', exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(rows).toHaveCount(1);
+  await expect(page.getByText('cairn_example', { exact: true })).toHaveCount(0);
+  await expect(rows.first().getByText('cairn_exam…', { exact: true })).toBeVisible();
+  await expect(rows.first().getByRole('button', { name: '复制', exact: true })).toHaveCount(0);
 });
 
 test('Enter in the name field creates the key once the name is valid', async ({ page }) => {

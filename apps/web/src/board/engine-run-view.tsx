@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef } from 'react';
 import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { Button } from '../components/ui/button.js';
-import { CopyCodeButton } from '../detail/chat-markdown.js';
 import { useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { type EngineRun, type EngineRunActions, enginePendingQuestion } from './engine-run.js';
@@ -43,7 +43,7 @@ export function EngineRawView({ run }: { run: EngineRun }) {
           <span className="min-w-0 flex-1 truncate font-sans text-code-lang text-content-secondary">
             {t('原始输出')}
           </span>
-          <CopyCodeButton text={text} testId="engine-raw-copy" />
+          <CopyIconButton text={text} testId="engine-raw-copy" />
         </div>
         <pre
           {...scroller}
