@@ -140,8 +140,8 @@ export function daemonSettingsManager(options?: CompactAt): SettingsManager {
     const resolved = base(model);
     const window = runningWindow(model);
     if (window === undefined) return resolved;
-    const raised = Math.ceil(window - compactAt);
-    if (!Number.isSafeInteger(raised) || raised <= resolved.reserveTokens) return resolved;
+    const raised = Math.floor(window - compactAt) + 1;
+    if (raised <= resolved.reserveTokens) return resolved;
     return { ...resolved, reserveTokens: raised };
   };
   return settings;

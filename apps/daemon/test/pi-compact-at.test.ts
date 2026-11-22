@@ -2,11 +2,19 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProviderConfig, SessionOpts } from '@cairn/shared';
 import { COORDINATOR_COMPACT_AT } from '@cairn/shared';
-import { createAgentSession, type SettingsManager } from '@earendil-works/pi-coding-agent';
+import {
+  createAgentSession,
+  type SettingsManager,
+  shouldCompact,
+} from '@earendil-works/pi-coding-agent';
 import { expect, test, vi } from 'vitest';
 import { createPiBackend, daemonSettingsManager, piHostLaunch } from '../src/backend/pi.js';
 import { openPiHostSession } from '../src/backend/pi-host-client.js';
-import { PI_HOST_PROTOCOL_VERSION } from '../src/backend/pi-host-protocol.js';
+import {
+  PI_HOST_PROTOCOL_VERSION,
+  parentFrameSchema,
+  parseFrame,
+} from '../src/backend/pi-host-protocol.js';
 import { testTempDir } from './test-temp-dir.js';
 
 vi.mock('@earendil-works/pi-coding-agent', async (importOriginal) => {
@@ -35,6 +43,14 @@ function runtimeModel(
 
 function coordinatorSettings(): SettingsManager {
   return daemonSettingsManager({ compactAt: COORDINATOR_COMPACT_AT });
+}
+
+function compacts(
+  settings: SettingsManager,
+  model: { provider: string; id: string; contextWindow: number },
+  tokens: number,
+): boolean {
+  return shouldCompact(tokens, model.contextWindow, settings.getCompactionSettings(model));
 }
 
 function sessionOpts(
@@ -80,7 +96,7 @@ function sessionSettings(): {
   return { settings: options.settingsManager, model: options.model };
 }
 
-test('a listed model with no declared window compacts at the coordinator point', async () => {
+test('a listed model with no declared window compacts exactly at the coordinator point', async () => {
   const directory = testTempDir('pi-compact-at-listed-');
   const handle = await openSession(
     directory,
@@ -94,8 +110,9 @@ test('a listed model with no declared window compacts at the coordinator point',
   try {
     const { settings, model } = sessionSettings();
     expect(model.contextWindow).toBe(1_000_000);
-    const resolved = settings.getCompactionSettings(model);
-    expect(1_000_000 - resolved.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
+    expect(compacts(settings, model, COORDINATOR_COMPACT_AT - 1)).toBe(false);
+    expect(compacts(settings, model, COORDINATOR_COMPACT_AT)).toBe(true);
+    expect(settings.getCompactionSettings(model).keepRecentTokens).toBe(MAIN_KEEP_RECENT_TOKENS);
   } finally {
     await handle.stop();
   }
@@ -117,54 +134,72 @@ test('a built-in model declared wider than it resolves keeps a positive threshol
   try {
     const { settings, model } = sessionSettings();
     expect(model.contextWindow).toBe(200_000);
-    const resolved = settings.getCompactionSettings(model);
-    expect(200_000 - resolved.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
-    expect(resolved.reserveTokens).toBeGreaterThan(0);
+    expect(settings.getCompactionSettings(model).reserveTokens).toBeGreaterThan(0);
+    expect(compacts(settings, model, COORDINATOR_COMPACT_AT - 1)).toBe(false);
+    expect(compacts(settings, model, COORDINATOR_COMPACT_AT)).toBe(true);
   } finally {
     await handle.stop();
   }
 });
 
-test('a switch to a model outside the provider list compacts at the coordinator point', () => {
-  const switched = coordinatorSettings().getCompactionSettings(
-    runtimeModel('deepseek', 'deepseek-flash', 1_000_000),
-  );
-  expect(1_000_000 - switched.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
-});
-
-test('a model re-registered narrower under the same provider and id reserves for the new window', () => {
+test('a switch to a model outside the provider list compacts exactly at the coordinator point', () => {
   const settings = coordinatorSettings();
-  const wide = settings.getCompactionSettings(
-    runtimeModel('deepseek', 'deepseek-v4-pro', 1_000_000),
-  );
-  const narrow = settings.getCompactionSettings(
-    runtimeModel('deepseek', 'deepseek-v4-pro', 200_000),
-  );
-  expect(1_000_000 - wide.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
-  expect(200_000 - narrow.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
+  const switched = runtimeModel('deepseek', 'deepseek-flash', 1_000_000);
+  expect(compacts(settings, switched, COORDINATOR_COMPACT_AT - 1)).toBe(false);
+  expect(compacts(settings, switched, COORDINATOR_COMPACT_AT)).toBe(true);
+  expect(settings.getCompactionSettings(switched).keepRecentTokens).toBe(MAIN_KEEP_RECENT_TOKENS);
 });
 
-test('two models whose flattened keys collide each reserve for their own window', () => {
+test('a model re-registered narrower under the same provider and id compacts for the new window', () => {
   const settings = coordinatorSettings();
-  const small = settings.getCompactionSettings(runtimeModel('a', 'b/c', 32_000));
-  const large = settings.getCompactionSettings(runtimeModel('a/b', 'c', 1_000_000));
-  expect(small.reserveTokens).toBe(MAIN_RESERVE_TOKENS);
-  expect(1_000_000 - large.reserveTokens).toBe(COORDINATOR_COMPACT_AT);
+  const wide = runtimeModel('deepseek', 'deepseek-v4-pro', 1_000_000);
+  const narrow = runtimeModel('deepseek', 'deepseek-v4-pro', 200_000);
+  expect(compacts(settings, wide, COORDINATOR_COMPACT_AT)).toBe(true);
+  expect(compacts(settings, narrow, COORDINATOR_COMPACT_AT - 1)).toBe(false);
+  expect(compacts(settings, narrow, COORDINATOR_COMPACT_AT)).toBe(true);
 });
 
-test('a fractional window raises the reserve to a whole token instead of throwing', () => {
-  const resolved = coordinatorSettings().getCompactionSettings(
-    runtimeModel('synthetic', 'fractional', 200_000.5),
-  );
-  expect(resolved.reserveTokens).toBe(50_001);
-  expect(200_000.5 - resolved.reserveTokens).toBeLessThanOrEqual(COORDINATOR_COMPACT_AT);
+test('two models whose flattened keys collide each compact for their own window', () => {
+  const settings = coordinatorSettings();
+  const large = runtimeModel('a/b', 'c', 1_000_000);
+  const small = runtimeModel('a', 'b/c', 32_000);
+  expect(compacts(settings, large, COORDINATOR_COMPACT_AT)).toBe(true);
+  expect(settings.getCompactionSettings(small).reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+  expect(compacts(settings, small, 15_616)).toBe(false);
+  expect(compacts(settings, small, 15_617)).toBe(true);
+});
+
+test('a fractional window compacts exactly at the coordinator point', () => {
+  const settings = coordinatorSettings();
+  const fractional = runtimeModel('synthetic', 'fractional', 200_000.5);
+  expect(compacts(settings, fractional, COORDINATOR_COMPACT_AT - 1)).toBe(false);
+  expect(compacts(settings, fractional, COORDINATOR_COMPACT_AT)).toBe(true);
+});
+
+test('an oversized finite window keeps the cap instead of the base reserve', () => {
+  const settings = coordinatorSettings();
+  const oversized = runtimeModel('synthetic', 'oversized', 1e16);
+  const resolved = settings.getCompactionSettings(oversized);
+  expect(resolved.reserveTokens).toBeGreaterThan(MAIN_RESERVE_TOKENS);
+  expect(1e16 - resolved.reserveTokens).toBeLessThanOrEqual(COORDINATOR_COMPACT_AT + 1);
+  expect(compacts(settings, oversized, COORDINATOR_COMPACT_AT + 1)).toBe(true);
+});
+
+test('a 160K window keeps the earlier base trigger', () => {
+  const settings = coordinatorSettings();
+  const model = runtimeModel('synthetic', 'narrow', 160_000);
+  const baseTrigger = 160_000 - MAIN_RESERVE_TOKENS;
+  expect(settings.getCompactionSettings(model).reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+  expect(compacts(settings, model, baseTrigger)).toBe(false);
+  expect(compacts(settings, model, baseTrigger + 1)).toBe(true);
+  expect(baseTrigger + 1).toBeLessThan(COORDINATOR_COMPACT_AT);
 });
 
 test('a virtual model keeps the base reserve', () => {
-  const resolved = coordinatorSettings().getCompactionSettings(
-    runtimeModel('radius', 'balanced', 1_048_576, 'pi-virtual'),
-  );
-  expect(resolved.reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+  const settings = coordinatorSettings();
+  const virtual = runtimeModel('radius', 'balanced', 1_048_576, 'pi-virtual');
+  expect(settings.getCompactionSettings(virtual).reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+  expect(compacts(settings, virtual, COORDINATOR_COMPACT_AT)).toBe(false);
 });
 
 test('no model or no finite window keeps the base reserve', () => {
@@ -191,9 +226,9 @@ test('a window at or below compactAt never reserves below what that model gets o
   );
   try {
     const { settings, model } = sessionSettings();
-    const resolved = settings.getCompactionSettings(model);
-    expect(resolved.reserveTokens).toBe(MAIN_RESERVE_TOKENS);
-    expect(32_000 - resolved.reserveTokens).toBe(15_616);
+    expect(settings.getCompactionSettings(model).reserveTokens).toBe(MAIN_RESERVE_TOKENS);
+    expect(compacts(settings, model, 15_616)).toBe(false);
+    expect(compacts(settings, model, 15_617)).toBe(true);
   } finally {
     await handle.stop();
   }
@@ -222,9 +257,9 @@ test('a worker session without compactAt keeps origin/main compaction settings',
   }
 });
 
-test('the pi host wire carries compactAt to the confined child session', async () => {
+test('compactAt survives the real host frame parsing into the session options', async () => {
   const directory = testTempDir('pi-compact-at-host-');
-  const probe = join(directory, 'probe', 'session.json');
+  const probe = join(directory, 'probe', 'frame.json');
   const hostScript = join(directory, 'host.mjs');
   mkdirSync(join(directory, 'agent'), { recursive: true });
   mkdirSync(join(directory, 'sessions'), { recursive: true });
@@ -240,12 +275,13 @@ test('the pi host wire carries compactAt to the confined child session', async (
       `  buffer += data;`,
       `  let index;`,
       `  while ((index = buffer.indexOf('\\n')) !== -1) {`,
-      `    const frame = JSON.parse(buffer.slice(0, index));`,
+      `    const line = buffer.slice(0, index);`,
+      `    const frame = JSON.parse(line);`,
       `    buffer = buffer.slice(index + 1);`,
       `    if (frame.t === 'initialize') {`,
       `      const file = join(frame.sessionDir, 'session.jsonl');`,
       `      writeFileSync(file, '');`,
-      `      writeFileSync(${JSON.stringify(probe)}, JSON.stringify(frame.session));`,
+      `      writeFileSync(${JSON.stringify(probe)}, line);`,
       `      send({ t: 'ready', v: ${PI_HOST_PROTOCOL_VERSION}, sessionId: 'sid', sessionFile: file });`,
       `      send({ t: 'ended' });`,
       `    }`,
@@ -272,6 +308,8 @@ test('the pi host wire carries compactAt to the confined child session', async (
     resumeFile: null,
   });
   await handle.stop();
-  const sent = JSON.parse(readFileSync(probe, 'utf8')) as { compactAt?: number };
-  expect(sent.compactAt).toBe(COORDINATOR_COMPACT_AT);
+  const frame = parseFrame(readFileSync(probe, 'utf8'), parentFrameSchema);
+  if (frame.t !== 'initialize') throw new Error('expected an initialize frame');
+  const childOptions = { ...frame.session };
+  expect(childOptions.compactAt).toBe(COORDINATOR_COMPACT_AT);
 });
