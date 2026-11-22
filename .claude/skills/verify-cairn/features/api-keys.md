@@ -9,6 +9,7 @@ Users generate access credentials at `/app/api-keys`: clicking `新建 API 密�
 - `keys-once` the one-time plaintext block `.keys-once-value` + `请立即复制 API 密钥,它仅显示一次。`; gone on refresh.
 - `keys-masked` list row `.keys-row` shows the mask (shape `cairn_afe07565…`).
 - `keys-hash` the SQLite `api_key` table stores `keyHash`, the plaintext never enters the DB.
+- `keys-delete` each row's `删除` button (`api-key-delete`) opens a confirm; confirming sends `DELETE /api/teams/{id}/api-keys/{keyId}`, the row disappears, and the key stops opening `/api/mcp`, `/git/*` and `/api/machine/enroll` at once (401). Runners already enrolled with the key keep their own machine token.
 
 ## How to get to it (user POV)
 

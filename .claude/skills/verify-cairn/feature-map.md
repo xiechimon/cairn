@@ -673,7 +673,7 @@ Reach:
 
 **API keys** (shipped, centrality 3). API keys with grants for scripts and external harnesses.
 
-States: An empty state, a list of keys, and a create dialog with grants; the key is shown once.
+States: An empty state, a list of keys, and a create dialog with grants; the key is shown once; each row deletes its key after a confirmation.
 
 Reach:
 
@@ -683,7 +683,7 @@ Reach:
 - Web routes: `/app/api-keys`
 - Settings: `设置` (Settings) › `安全` (Security) › `API 密钥` (API keys)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `keys-empty`
+- Test ids in its code: `api-key-delete`, `keys-empty`
 - Verify recipes: [.claude/skills/verify-cairn/features/api-keys.md](features/api-keys.md)
 - Research: **gap**: no note on API key and grant models in reference products
 - Frontend design: **gap**: the API keys page and grant picker have no design

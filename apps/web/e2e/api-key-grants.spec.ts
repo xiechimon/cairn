@@ -70,3 +70,60 @@ test('Enter in the name field creates the key once the name is valid', async ({ 
   await name.press('Enter');
   await expect(dialog).not.toBeVisible();
 });
+
+test('deleting a key asks first, sends DELETE for that key, and drops its row; a failed delete puts it back', async ({
+  page,
+}) => {
+  let keys = [
+    { id: 'key-1', name: 'SCRIPT_KEY', masked: 'cairn_afe07565…', gitAccess: true, mcpAccess: true, machineAccess: true },
+    { id: 'key-2', name: 'MCP_CLIENT', masked: 'cairn_0b1c2d3e…', gitAccess: true, mcpAccess: true, machineAccess: true },
+  ];
+  let failNextDelete = false;
+  const deleted: string[] = [];
+  await page.route('**/api/**', (route, request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.endsWith('/stream')) return route.abort();
+    if (path === '/api/teams')
+      return route.fulfill({
+        json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+      });
+    if (path === '/api/user/me')
+      return route.fulfill({ json: { id: 'user-1', displayName: 'Owner', avatarUrl: null } });
+    const keyMatch = /^\/api\/teams\/team-1\/api-keys\/([^/]+)$/.exec(path);
+    if (keyMatch !== null && request.method() === 'DELETE') {
+      if (failNextDelete) {
+        failNextDelete = false;
+        return route.fulfill({ status: 500, json: { error: 'disk full' } });
+      }
+      deleted.push(keyMatch[1] ?? '');
+      keys = keys.filter((key) => key.id !== keyMatch[1]);
+      return route.fulfill({ status: 204, body: '' });
+    }
+    if (path === '/api/teams/team-1/api-keys') return route.fulfill({ json: keys });
+    return route.fulfill({ status: 500, json: { error: 'Unrelated API surface' } });
+  });
+  await page.goto('/app/api-keys');
+  await expect(page.getByText('SCRIPT_KEY', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: '删除 SCRIPT_KEY', exact: true }).click();
+  const confirm = page.getByRole('alertdialog', { name: '删除 SCRIPT_KEY' });
+  await expect(confirm).toBeVisible();
+  await confirm.getByRole('button', { name: '取消', exact: true }).click();
+  await expect(confirm).not.toBeVisible();
+  expect(deleted).toEqual([]);
+
+  await page.getByRole('button', { name: '删除 SCRIPT_KEY', exact: true }).click();
+  await confirm.getByRole('button', { name: '删除', exact: true }).click();
+  await expect(page.getByText('SCRIPT_KEY', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('MCP_CLIENT', { exact: true })).toBeVisible();
+  expect(deleted).toEqual(['key-1']);
+
+  failNextDelete = true;
+  await page.getByRole('button', { name: '删除 MCP_CLIENT', exact: true }).click();
+  await page
+    .getByRole('alertdialog', { name: '删除 MCP_CLIENT' })
+    .getByRole('button', { name: '删除', exact: true })
+    .click();
+  await expect(page.getByText('没能删除，请重试。')).toBeVisible();
+  await expect(page.getByText('MCP_CLIENT', { exact: true })).toBeVisible();
+});

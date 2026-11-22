@@ -1713,6 +1713,11 @@ export function useApiMutations(teamId: string | undefined) {
       }) => api.post<ApiKeyRow & { plaintext?: string }>(`/api/teams/${teamId}/api-keys`, body),
       onSuccess: invalidateAll,
     }),
+    deleteApiKey: useMutation({
+      mutationFn: (id: string) =>
+        api.del<void>(`/api/teams/${teamId}/api-keys/${encodeURIComponent(id)}`),
+      onSettled: invalidateAll,
+    }),
     createSkill: useMutation({
       mutationFn: (body: CreateSkillBody) =>
         api.post<SkillRecord>(`/api/skills?teamId=${teamId}`, body),

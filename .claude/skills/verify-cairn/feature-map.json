@@ -2334,7 +2334,7 @@
       "id": "api-keys",
       "name": "API keys",
       "summary": "API keys with grants for scripts and external harnesses.",
-      "states": "An empty state, a list of keys, and a create dialog with grants; the key is shown once.",
+      "states": "An empty state, a list of keys, and a create dialog with grants; the key is shown once; each row deletes its key after a confirmation.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2352,7 +2352,8 @@
           "settings:api-keys"
         ],
         "server": [
-          "/api/teams/:id/api-keys"
+          "/api/teams/:id/api-keys",
+          "/api/teams/:id/api-keys/:keyId"
         ]
       },
       "reach": [

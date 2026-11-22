@@ -765,6 +765,8 @@ export const EN: Record<string, string> = {
   收起思考: 'Collapse thinking',
   '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
   '没能复制，请手动选中 API 密钥复制。': 'Could not copy; select the API key and copy it by hand.',
+  '删除后，用这个 API 密钥的 MCP 客户端、脚本和 Git 访问会立即失效，无法恢复':
+    'Deleting this API key cuts off every MCP client, script and Git remote using it at once, and cannot be undone',
 
   // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
