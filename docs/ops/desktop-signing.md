@@ -40,7 +40,7 @@ gpg -d desktop-signing-<date>.tar.gpg | tar -C ~/.config/cairn -x
 
 ## Losing it or leaking it
 
-- **Lost key, no backup:** make a new certificate and rotate (below). Installed apps keep updating, because the updater checks only the zip's SHA-256. After that update, each user grants Accessibility and Screen Recording again, once.
+- **Lost key, no backup:** make a new certificate and rotate (below). The updater checks the zip's SHA-256 and verifies the staged app against the installed app's designated requirement. A new certificate changes that requirement even if its name stays the same. Users with the old certificate must install the new build from the official GitHub release page and grant Accessibility and Screen Recording again.
 - **Leaked key:** anyone holding it can sign a binary that macOS treats as Cairn for those grants. The key alone cannot push an update: the updater installs only a zip whose SHA-256 matches the manifest in this repository's latest GitHub release. An attacker still has to get the binary onto the Mac and run it. Rotating does **not** revoke the old identity: there is no revocation for a self-signed certificate, and a Mac keeps its old grants until they are removed on that Mac. Follow the compromise steps below.
 
 ## Compromise

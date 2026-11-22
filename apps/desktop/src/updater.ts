@@ -13,7 +13,7 @@ import {
   desktopUpdateFrom,
 } from '@cairn/shared';
 import { app } from 'electron';
-import { parseSigningIdentity, signatureMatches } from './signature.js';
+import { signedLikeRunningApp } from './signature.js';
 import {
   canonicalPath,
   isStagedBundleFor,
@@ -111,32 +111,6 @@ async function download(
 export function relaunchArgs(background: boolean): string[] {
   const args = process.argv.slice(1).filter((arg) => arg !== BACKGROUND_LAUNCH_FLAG);
   return background ? [...args, BACKGROUND_LAUNCH_FLAG] : args;
-}
-
-async function codesignIdentity(appPath: string): Promise<{ verified: boolean; identity: string }> {
-  const [details, verified] = await Promise.all([
-    run('/usr/bin/codesign', ['-d', '--verbose=4', appPath]).then(
-      (result) => result.stdout,
-      () => '',
-    ),
-    run('/usr/bin/codesign', ['--verify', '--strict', appPath]).then(
-      () => true,
-      () => false,
-    ),
-  ]);
-  return { verified, identity: details };
-}
-
-async function signedLikeRunningApp(bundle: string, stagedApp: string): Promise<boolean> {
-  const [running, staged] = await Promise.all([
-    codesignIdentity(bundle),
-    codesignIdentity(stagedApp),
-  ]);
-  if (!running.verified) return true;
-  return (
-    staged.verified &&
-    signatureMatches(parseSigningIdentity(running.identity), parseSigningIdentity(staged.identity))
-  );
 }
 
 function relaunch(when: Exclude<ApplyWhen, 'none'>): void {
