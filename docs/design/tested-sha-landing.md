@@ -39,6 +39,14 @@ On green the script runs `git push origin S:refs/heads/main`. The push uses the
 caller's normal `gh` login, so it also triggers the ordinary main CI run that
 any future green-checking watcher or ruleset would consume.
 
+The `green-main` ruleset's view of check state lags the check-runs API the
+script reads, so a green push is intermittently refused with `GH013 … required
+status check … is expected`. The script retries that refusal up to 8 times with
+exponential backoff (10s doubling, capped at 120s), re-verifying before each
+retry that `queue/main` still points at `S` and `main` has not moved — a `main`
+that already contains `S` counts as landed. Any other push failure, or a
+refusal that survives all attempts, exits with git's real status code.
+
 After the push lands, the same code path closes every issue named by a
 `Closes #N`, `Fixes #N` or `Resolves #N` trailer in the commits the push moved
 onto `main` (`main_before..main_after`), posting a comment that names the

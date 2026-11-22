@@ -5,8 +5,10 @@ import {
   closingTargets,
   dropNotice,
   evaluate,
+  isCheckLagRefusal,
   ownerOf,
   planDrop,
+  pushToMain,
   REQUIRED_CHECKS,
 } from './promote-queue.mjs';
 
@@ -366,4 +368,163 @@ test('a failure to close is logged and never aborts the other issues', () => {
   assert.equal(states.get('5374'), 'closed');
   assert.equal(states.get('5399'), 'open');
   assert.ok(calls.some(([k, m]) => k === 'warn' && /5399/.test(m)));
+});
+
+const MAIN_TIP = 'b'.repeat(40);
+
+const rulesetRefusal = (detail) =>
+  `remote: error: GH013: Repository rule violations found for refs/heads/main.
+remote: Review all repository rules at https://github.com/xiechimon/cairn/rules?ref=refs%2Fheads%2Fmain
+remote:
+remote: - ${detail}
+remote:
+ ! [remote rejected]     ${SHA} -> main (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/xiechimon/cairn'
+`;
+
+const REAL_REFUSAL_DETAILS = [
+  'Required status check "check" is expected.',
+  'Required status check "e2e-gate" is expected.',
+  '2 of 3 required status checks are expected.',
+  '3 of 3 required status checks have not succeeded: 2 expected.',
+];
+
+test('the GH013 ruleset check-lag refusal is the only retryable push failure', () => {
+  for (const detail of REAL_REFUSAL_DETAILS) {
+    assert.ok(isCheckLagRefusal(rulesetRefusal(detail)), detail);
+  }
+  assert.equal(
+    isCheckLagRefusal(
+      ` ! [rejected]        HEAD -> main (non-fast-forward)\nerror: failed to push some refs to 'https://github.com/xiechimon/cairn'\n`,
+    ),
+    false,
+  );
+  assert.equal(
+    isCheckLagRefusal(
+      `remote: error: GH013: Repository rule violations found for refs/heads/main.\nremote: - Commits must have verified signatures.\n`,
+    ),
+    false,
+  );
+  assert.equal(isCheckLagRefusal(''), false);
+});
+
+const noop = () => {};
+const stillHead = () => ({ queueHead: SHA, mainTip: MAIN_TIP, landed: false });
+
+const landing = ({ push, recheck = stillHead, sleep = noop, log = noop, ...options }) =>
+  pushToMain({
+    sha: SHA,
+    mainTip: MAIN_TIP,
+    push,
+    recheck,
+    sleep,
+    log,
+    baseSeconds: 0,
+    ...options,
+  });
+
+const thrown = (fn) => {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  assert.fail('expected the push helper to throw');
+};
+
+test('a GH013 refusal followed by success lands the push', () => {
+  let pushes = 0;
+  const sleeps = [];
+  let rechecks = 0;
+  landing({
+    push: () => {
+      pushes += 1;
+      return pushes === 1
+        ? { status: 1, stderr: rulesetRefusal('Required status check "check" is expected.') }
+        : { status: 0, stdout: '', stderr: '' };
+    },
+    recheck: () => {
+      rechecks += 1;
+      return stillHead();
+    },
+    sleep: (seconds) => sleeps.push(seconds),
+  });
+  assert.equal(pushes, 2);
+  assert.equal(rechecks, 1);
+  assert.equal(sleeps.length, 1);
+});
+
+test('a push failure that is not the ruleset check lag fails once, with its real exit code', () => {
+  let pushes = 0;
+  let rechecks = 0;
+  const error = thrown(() =>
+    landing({
+      push: () => {
+        pushes += 1;
+        return {
+          status: 1,
+          stderr: ` ! [rejected]        HEAD -> main (non-fast-forward)\nerror: failed to push some refs to 'https://github.com/xiechimon/cairn'\n`,
+        };
+      },
+      recheck: () => {
+        rechecks += 1;
+        return stillHead();
+      },
+    }),
+  );
+  assert.equal(error.status, 1);
+  assert.equal(pushes, 1);
+  assert.equal(rechecks, 0);
+});
+
+test('a ruleset refusal that never clears gives up after the bounded attempts', () => {
+  let pushes = 0;
+  const error = thrown(() =>
+    landing({
+      attempts: 3,
+      push: () => {
+        pushes += 1;
+        return { status: 1, stderr: rulesetRefusal('2 of 3 required status checks are expected.') };
+      },
+    }),
+  );
+  assert.equal(error.status, 1);
+  assert.equal(pushes, 3);
+  assert.match(error.message, /GH013/);
+});
+
+test('before each retry the candidate must still be the queue head and main must not have moved', () => {
+  for (const recheck of [
+    () => ({ queueHead: 'c'.repeat(40), mainTip: MAIN_TIP, landed: false }),
+    () => ({ queueHead: SHA, mainTip: 'd'.repeat(40), landed: false }),
+  ]) {
+    let pushes = 0;
+    const error = thrown(() =>
+      landing({
+        push: () => {
+          pushes += 1;
+          return {
+            status: 1,
+            stderr: rulesetRefusal('Required status check "e2e-gate" is expected.'),
+          };
+        },
+        recheck,
+      }),
+    );
+    assert.match(error.message, /moved/);
+    assert.equal(error.status, 1);
+    assert.equal(pushes, 1);
+  }
+});
+
+test('main already containing the candidate during the backoff counts as landed', () => {
+  let pushes = 0;
+  landing({
+    push: () => {
+      pushes += 1;
+      return { status: 1, stderr: rulesetRefusal('2 of 3 required status checks are expected.') };
+    },
+    recheck: () => ({ queueHead: SHA, mainTip: 'd'.repeat(40), landed: true }),
+  });
+  assert.equal(pushes, 1);
 });
