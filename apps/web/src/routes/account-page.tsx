@@ -27,6 +27,7 @@ import { LOCALE_NAMES, LOCALES } from '../i18n/locale.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import {
+  pushDeviceSupported,
   setNotifications,
   useNotificationsChecked,
   useNotificationsPermission,
@@ -111,7 +112,11 @@ export function AccountPage() {
             hint={
               notifyBlocked
                 ? t('浏览器已拒绝通知权限，需到站点设置重新允许')
-                : t('任务需要你处理时，在系统通知中心提醒')
+                : pushDeviceSupported()
+                  ? t(
+                      '任务需要你处理时，在系统通知中心提醒；可稍后处理的邮件通知并入简报，每日设两个发送时段',
+                    )
+                  : t('任务需要你处理时，在系统通知中心提醒')
             }
             hintClassName={notifyBlocked ? 'account-notify-blocked' : undefined}
           >

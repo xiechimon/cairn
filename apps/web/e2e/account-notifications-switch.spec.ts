@@ -139,6 +139,9 @@ test('one switch drives both the in-app notification and this device’s push su
   const sw = page.getByRole('switch', { name: '推送通知' });
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   await expect(page.getByRole('switch')).toHaveCount(1);
+  await expect(
+    page.getByText('可稍后处理的邮件通知并入简报，每日设两个发送时段', { exact: false }),
+  ).toBeVisible();
 
   await sw.click();
   await expect(sw).toHaveAttribute('aria-checked', 'true');
@@ -343,6 +346,16 @@ test('a failed POST cleans up the browser subscription and restores off', async 
   await expect(page.getByText('保存失败，请重试。')).toBeVisible();
   await expect(sw).toHaveAttribute('aria-checked', 'false');
   expect(await page.evaluate(() => window.__pushSub)).toBeNull();
+});
+
+test('desktop settings do not advertise a Web Push digest', async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'cairnDesktop', { value: { notify: { show: () => {} } } });
+  });
+  await mockApi(page);
+  await page.goto('/app/account');
+  await expect(page.getByText('任务需要你处理时，在系统通知中心提醒', { exact: true })).toBeVisible();
+  await expect(page.getByText('每日设两个发送时段', { exact: false })).toHaveCount(0);
 });
 
 test('fixture mode shows the single switch without touching device push', async ({ page }) => {

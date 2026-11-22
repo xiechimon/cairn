@@ -733,6 +733,8 @@ export const EN: Record<string, string> = {
   推送通知: 'Push notifications',
   '任务需要你处理时，在系统通知中心提醒':
     'Notify you in the system notification center when a task needs you',
+  '任务需要你处理时，在系统通知中心提醒；可稍后处理的邮件通知并入简报，每日设两个发送时段':
+    'Notify you in the system notification center when a task needs you. Email notifications that can wait go into a push digest with two scheduled times each day',
   '浏览器已拒绝通知权限，需到站点设置重新允许':
     'Notifications are blocked by the browser — re-allow them in site settings',
 
