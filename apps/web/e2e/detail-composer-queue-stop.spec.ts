@@ -262,13 +262,14 @@ for (const targetRead of ['reject', 'hold'] as const) {
     const task = await runningTask(page, 0, targetRead);
     await task.input.fill('Deliver A on the replacement build');
     await task.input.press('Control+Enter');
+    const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
+    await expect(capsule).toHaveCount(1);
     await task.input.fill('B waits behind A');
     await task.input.press('Control+Enter');
-    await expect(page.getByTestId('composer-card').getByTestId('queued-message')).toHaveCount(2);
+    await expect(capsule).toHaveCount(2);
     await task.rollover();
     await expect.poll(() => page.evaluate(() => (window as unknown as { __streams: { url: string; readyState: number }[] }).__streams.some((stream) => stream.url.includes('/conversations/replacement-build/stream') && stream.readyState === 1))).toBe(true);
     await expect(page.getByTestId('user-bubble').filter({ hasText: 'Deliver A on the replacement build' })).toHaveCount(1);
-    const capsule = page.getByTestId('composer-card').getByTestId('queued-message');
     await expect(capsule).toHaveCount(1);
     await expect(capsule).toContainText('B waits behind A');
     expect(task.queuedMessages.map((row) => row.content)).toEqual(['B waits behind A']);
