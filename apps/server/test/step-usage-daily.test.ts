@@ -229,7 +229,7 @@ describe('thread context on the todo payload', () => {
     expect(await contextOf('todo-build-1')).toEqual({
       tokens: 62_000,
       contextWindow: 128_000,
-      compactAt: 78_848,
+      compactAt: 111_616,
       cache: { read: 0, write: 0, input: 10 },
     });
   });

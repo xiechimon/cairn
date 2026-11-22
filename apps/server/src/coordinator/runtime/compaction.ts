@@ -50,9 +50,9 @@ export function compactionWindow(contextWindow: number): CompactionWindow {
   const blockingAt = contextWindow - COMPACTION_RESERVE_TOKENS;
   return {
     blockingAt,
-    backgroundAt: Math.max(
-      0,
-      Math.min(COORDINATOR_COMPACT_AT, blockingAt - MIN_COMPACTION_MARGIN_TOKENS),
+    backgroundAt: Math.min(
+      COORDINATOR_COMPACT_AT,
+      Math.max(blockingAt - MIN_COMPACTION_MARGIN_TOKENS, Math.floor(blockingAt / 2)),
     ),
   };
 }

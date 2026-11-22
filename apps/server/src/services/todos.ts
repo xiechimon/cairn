@@ -288,7 +288,7 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
       row.compactAt ??
       (isBackendRuntimeId(row.model.slice(0, row.model.indexOf('/')))
         ? undefined
-        : compactionWindow(contextWindow).backgroundAt);
+        : compactionWindow(contextWindow).blockingAt);
     const ttl = cacheTtlMsFor(resolveCacheRetentionTier(), row.model, {
       total: row.cacheWrite,
       oneHour: row.cacheWrite1h,
