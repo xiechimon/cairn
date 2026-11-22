@@ -475,7 +475,7 @@ export function finishCoordinatorTurn(
       steeredMessageScopes(deps.db, stepRow).length > 0,
     );
   if (outcome.status === 'failed') recoverGateWake(deps, stepRow);
-  if (outcome.status === 'failed' && outcome.errorMessage) {
+  if (outcome.status === 'failed') {
     upsertChiefRow(deps, {
       id: `chief-err-${stepRow.id}`,
       threadId: stepRow.buildId,
@@ -483,7 +483,9 @@ export function finishCoordinatorTurn(
       role: 'system',
       content: JSON.stringify({
         kind: CHIEF_TURN_ERROR_KIND,
-        message: outcome.errorMessage,
+        message: outcome.errorMessage?.trim()
+          ? outcome.errorMessage
+          : 'Coordinator turn failed without a reported reason',
         ...turnErrorFacts(deps, stepRow),
       }),
       createdAt: nowMs(),
