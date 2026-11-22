@@ -36,6 +36,7 @@ import {
 } from '../lib/markdown.js';
 import { AttachmentChip, attachmentIdFromKey, COMPOSER_CHIP_LABEL } from './attachment-chip.js';
 import { type CodeToken, highlightCode } from './code-highlight.js';
+import { MermaidBlock } from './mermaid-block.js';
 import { Segments } from './segments.js';
 
 export { attachmentIdFromKey, COMPOSER_CHIP_LABEL };
@@ -323,10 +324,12 @@ function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
       return <HeadingTag level={block.level} segments={block.segments} />;
     case 'tasks':
       return <TaskCard items={block.items} />;
-    case 'code':
-      return (
+    case 'code': {
+      const code = (
         <CodeBlock {...(block.lang !== undefined ? { lang: block.lang } : {})} text={block.text} />
       );
+      return block.lang === 'mermaid' ? <MermaidBlock text={block.text} source={code} /> : code;
+    }
     case 'attachment':
       return <AttachmentBlock name={block.name} attachmentKey={block.key} />;
     case 'table':

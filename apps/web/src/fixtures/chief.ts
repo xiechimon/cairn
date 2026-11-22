@@ -417,6 +417,104 @@ export const chiefCode: FixtureSet = {
   },
 };
 
+const CHIEF_MERMAID_FLOW = [
+  '登录流程如下：',
+  '',
+  '```mermaid',
+  'flowchart LR',
+  '  open[打开 Cairn] --> signed{已登录？}',
+  '  signed -- 是 --> home[进入首页]',
+  '  signed -- 否 --> login[用 GitHub 登录]',
+  '  login --> home',
+  '```',
+].join('\n');
+
+const CHIEF_MERMAID_SEQUENCE = [
+  '派任务时各方的交互：',
+  '',
+  '```mermaid',
+  'sequenceDiagram',
+  '  participant 你',
+  '  participant Coordinator',
+  '  participant 电脑',
+  '  你->>Coordinator: 修好登录页的报错',
+  '  Coordinator->>电脑: 派出任务',
+  '  电脑-->>Coordinator: 提交 PR',
+  '  Coordinator-->>你: 请你验收',
+  '```',
+].join('\n');
+
+const CHIEF_MERMAID_STATE = [
+  '任务的状态：',
+  '',
+  '```mermaid',
+  'stateDiagram-v2',
+  '  [*] --> 排队',
+  '  排队 --> 进行中',
+  '  进行中 --> 待验收',
+  '  待验收 --> 完成',
+  '  待验收 --> 进行中: 退回修改',
+  '  完成 --> [*]',
+  '```',
+].join('\n');
+
+const CHIEF_MERMAID_LONG = [
+  '标签很长时：',
+  '',
+  '```mermaid',
+  'flowchart TD',
+  '  a[从仓库根目录读取配置文件并校验每一个字段的取值范围] --> b[把校验通过的配置写入本地缓存，供下一次启动直接使用]',
+  '  b --> c[启动后台同步，定期把远端的最新改动合并到本地工作区]',
+  '```',
+].join('\n');
+
+const CHIEF_MERMAID_BROKEN = [
+  '这张图写错了：',
+  '',
+  '```mermaid',
+  'flowchart LR',
+  '  a[开始 --> b',
+  '```',
+].join('\n');
+
+const CHIEF_MERMAID_GANTT = [
+  '排期：',
+  '',
+  '```mermaid',
+  'gantt',
+  '  title 发布排期',
+  '  section 开发',
+  '  写代码 :a1, 2026-11-01, 5d',
+  '```',
+].join('\n');
+
+const mermaidReply = (id: string, markdown: string, minute: number) => ({
+  kind: 'robot' as const,
+  id,
+  markdown,
+  seconds: '6s',
+  createdAt: r7(13, minute) + 6_000,
+});
+
+export const chiefMermaid: FixtureSet = {
+  todos: [legacyReview, legacyDone],
+  now: r7(13, 14),
+  chief: {
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '画几张流程图…',
+    stream: [
+      { kind: 'user', id: 'mermaid-ask', text: '画几张图给我看看', createdAt: r7(13, 1) },
+      mermaidReply('mermaid-flow', CHIEF_MERMAID_FLOW, 1),
+      mermaidReply('mermaid-sequence', CHIEF_MERMAID_SEQUENCE, 2),
+      mermaidReply('mermaid-state', CHIEF_MERMAID_STATE, 3),
+      mermaidReply('mermaid-long', CHIEF_MERMAID_LONG, 4),
+      mermaidReply('mermaid-broken', CHIEF_MERMAID_BROKEN, 5),
+      mermaidReply('mermaid-gantt', CHIEF_MERMAID_GANTT, 6),
+    ],
+  },
+};
+
 export const chiefQuestion: FixtureSet = {
   todos: [legacyReview, legacyDone],
   now: r7(13, 14),

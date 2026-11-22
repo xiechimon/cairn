@@ -31,6 +31,7 @@
     "lucide-react": "^1.52.0",
     "marked": "18.0.11",
     "marked-cjk-friendly": "0.1.2",
+    "pele": "1.13.0",
     "react": "catalog:",
     "react-dom": "catalog:",
     "react-router": "catalog:",
