@@ -2004,6 +2004,7 @@
           "apps/server/src/routes-uploads.ts",
           "apps/server/src/services/attachments.ts",
           "apps/server/src/services/attachment-gc.ts",
+          "apps/server/src/services/page-thumbnails.ts",
           "apps/server/src/vendor-open-design/document-preview.ts"
         ]
       },
@@ -2012,7 +2013,8 @@
           "/api/uploads/grant",
           "/api/uploads/upload",
           "/api/attachments/:id",
-          "/api/attachments/:id/document-preview"
+          "/api/attachments/:id/document-preview",
+          "/api/attachments/:id/thumbnail"
         ]
       },
       "reach": [

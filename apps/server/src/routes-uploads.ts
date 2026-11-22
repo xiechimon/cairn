@@ -11,6 +11,7 @@ import { jsonBody } from './routes-helpers.js';
 import {
   grantUpload as grantAttachmentUpload,
   readAttachment,
+  requireAttachmentRow,
   uploadFile as uploadAttachmentFile,
 } from './services/attachments.js';
 import { assertDeviceActive } from './services/paired-devices.js';
@@ -110,6 +111,22 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
         'content-disposition': download
           ? attachmentDownloadDisposition(row.fileName)
           : inlineDisposition,
+      },
+    });
+  });
+
+  app.get('/api/attachments/:id/thumbnail', async (c) => {
+    const row = requireAttachmentRow(ctx.db, ctx.team.id, c.req.param('id'));
+    const image = (await ctx.pageThumbnails?.thumbnail(row)) ?? null;
+    if (image === null) throw new HttpError(404, 'no thumbnail for this attachment');
+    return new Response(image, {
+      status: 200,
+      headers: {
+        'content-type': 'image/jpeg',
+        'content-length': String(image.length),
+        'cache-control': 'private, max-age=86400',
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': "sandbox; default-src 'none'",
       },
     });
   });

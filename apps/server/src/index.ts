@@ -55,6 +55,7 @@ import { createMailConnector } from './services/mail-connector.js';
 import { adoptGithubConnectorGrants } from './services/mcp-github-connector.js';
 import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
+import { capturePageOver, createPageThumbnails, parentPortOf } from './services/page-thumbnails.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
 import { createScheduler } from './services/scheduler.js';
@@ -217,6 +218,11 @@ const tailnet = createTsnetRemote({
 });
 const ownerChannel = ownerChannelFromEnv(process.env);
 listenOwnerChannel(ownerChannel);
+const desktopPort = parentPortOf(process);
+const pageThumbnails = createPageThumbnails({
+  attachmentsDir,
+  capture: desktopPort === undefined ? undefined : capturePageOver(desktopPort),
+});
 const app = createApp(
   {
     remote: {
@@ -256,6 +262,7 @@ const app = createApp(
       return workspacesDirOf();
     },
     attachmentsDir,
+    pageThumbnails,
     backupStatusPath: backupStatusPathOf(config),
     deployRecordPath: deployRecordPathOf(config),
     skillsDir: config.skillsDir,

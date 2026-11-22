@@ -44,6 +44,7 @@ import { createMailConnector } from '../src/services/mail-connector.js';
 import type { OpenMailbox } from '../src/services/mail-imap.js';
 import type { SendMail } from '../src/services/mail-smtp.js';
 import { newMcpOAuthState } from '../src/services/mcp-servers.js';
+import { type CapturePage, createPageThumbnails } from '../src/services/page-thumbnails.js';
 import type { VapidKeys } from '../src/services/push.js';
 import { setTodoPhase } from '../src/services/todos.js';
 import { rejectingGithubFetch } from './network-guard.js';
@@ -97,6 +98,7 @@ export function bootServer(
     mcpGithubApp?: AppContext['mcpGithubApp'];
     backupStatusPath?: string;
     deployRecordPath?: string;
+    capturePage?: CapturePage;
     remote?: Partial<NonNullable<AppContext['remote']>>;
     im?: AppContext['im'];
     imBridge?: AppContext['imBridge'];
@@ -201,6 +203,7 @@ export function bootServer(
         : {}),
       reposDir,
       attachmentsDir,
+      pageThumbnails: createPageThumbnails({ attachmentsDir, capture: opts.capturePage }),
       ...(opts.backupStatusPath !== undefined ? { backupStatusPath: opts.backupStatusPath } : {}),
       ...(opts.deployRecordPath !== undefined ? { deployRecordPath: opts.deployRecordPath } : {}),
       skillsDir,

@@ -27,6 +27,7 @@ import {
   OWNER_CHANNEL_HEADER,
   OWNER_CHANNEL_MESSAGE,
   OWNER_CHANNEL_READY,
+  PAGE_CAPTURE_RESULT,
   parseAccessTokenFile,
 } from '@cairn/shared';
 import {
@@ -74,6 +75,8 @@ import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { type DesktopLocale, desktopLocale } from './locale.js';
 import { desktopOtelEnv, type OtelEnv, withOtelEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
+import { type CapturePage, createPageCapture } from './page-capture.js';
+import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
 import { createRestartBudget } from './restart-budget.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
 import { runnerHomeFor } from './runner-home.js';
@@ -310,6 +313,21 @@ async function serverPort(): Promise<number> {
 
 const ownerChannelKey = randomBytes(32).toString('base64url');
 
+let pageCapture: CapturePage | null = null;
+
+async function answerPageCapture(
+  child: UtilityProcess,
+  request: { id: string; html: string },
+): Promise<void> {
+  pageCapture ??= createPageCapture(offscreenCaptureSurfaces({ BrowserWindow, session }));
+  const image = tray === null ? null : await pageCapture(request.html);
+  try {
+    child.postMessage({ type: PAGE_CAPTURE_RESULT, id: request.id, image });
+  } catch (error) {
+    console.error('the page thumbnail reply did not reach the server:', messageOf(error));
+  }
+}
+
 function startServer(
   port: number,
   otelEnv: OtelEnv,
@@ -336,6 +354,11 @@ function startServer(
     env,
   });
   child.on('message', (data: unknown) => {
+    const capture = pageCaptureRequestOf(data);
+    if (capture !== null) {
+      void answerPageCapture(child, capture);
+      return;
+    }
     if (
       data !== null &&
       typeof data === 'object' &&

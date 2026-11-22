@@ -169,6 +169,11 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
   {
     method: 'GET',
+    path: '/api/attachments/{id}/thumbnail',
+    note: 'JPEG of the first screen of a ready deliverable page, captured once by the desktop app; 404 without it',
+  },
+  {
+    method: 'GET',
     path: '/api/todos/{id}/design/{fileName}/comments',
     note: 'all statuses, by pin',
   },
