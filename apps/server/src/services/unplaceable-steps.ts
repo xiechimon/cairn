@@ -14,6 +14,13 @@ import { stepQueueProjector } from './step-queue.js';
 
 export const NO_MACHINE_ALERT_MS = 10 * 60_000;
 
+type NoMachineReason =
+  | 'capability-missing'
+  | 'sandbox-unavailable'
+  | 'machine-retired'
+  | 'runner-cannot-run'
+  | 'no-runner';
+
 export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowMs()): number {
   const rows = deps.db
     .select({ stepRow: step, todoRow: todo })
@@ -48,19 +55,27 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
         ? null
         : (deps.db.select().from(machine).where(eq(machine.id, homeMachineId)).get()?.name ?? null);
     const runnerName = queue.waitingFor?.name ?? preferredName;
-    const snippet =
+    const reason: NoMachineReason =
       queue.blocked.kind === 'capability-missing'
-        ? `没有在线执行机满足要求（缺 ${queue.blocked.missing.join('、')}），步骤已等 ${minutes} 分钟`
+        ? 'capability-missing'
         : queue.blocked.kind === 'sandbox-unavailable' && runnerName !== null
-          ? `${runnerName} 的任务沙箱没就绪，接不了任务（原因和修法见执行机页），步骤已等 ${minutes} 分钟`
+          ? 'sandbox-unavailable'
           : queue.blocked.kind === 'machine-retired'
-            ? `${runnerName ?? '这一步绑定的执行机'} 已删除或注销，这一步不会改派：重新注册这台执行机，或在工作路由里改派，步骤已等 ${minutes} 分钟`
+            ? 'machine-retired'
             : preferredName !== null
-              ? `${preferredName} 不能跑这一步，不会改派到其他执行机，步骤已等 ${minutes} 分钟`
-              : `没有在线执行机能跑这一步，步骤已等 ${minutes} 分钟`;
+              ? 'runner-cannot-run'
+              : 'no-runner';
+    const waitedFor = `步骤已等 ${minutes} 分钟`;
+    const snippet = {
+      'capability-missing': `没有在线执行机满足要求（缺 ${queue.blocked.missing.join('、')}），${waitedFor}`,
+      'sandbox-unavailable': `${runnerName} 的任务沙箱没就绪，接不了任务（原因和修法见执行机页），${waitedFor}`,
+      'machine-retired': `${runnerName ?? '这一步绑定的执行机'} 已删除或注销，这一步不会改派：重新注册这台执行机，或在工作路由里改派，${waitedFor}`,
+      'runner-cannot-run': `${preferredName} 不能跑这一步，不会改派到其他执行机，${waitedFor}`,
+      'no-runner': `没有在线执行机能跑这一步，${waitedFor}`,
+    }[reason];
     unplaceable.push({
       subjectId: stepRow.id,
-      fingerprint: String(since),
+      fingerprint: `${reason}:${since}`,
       notify: () => notifyNoMachine(deps, todoRow, snippet),
     });
   }

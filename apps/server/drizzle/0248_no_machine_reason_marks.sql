@@ -1,0 +1,9 @@
+CREATE TEMP TABLE `no_machine_told` AS SELECT `notification`.`userId` AS `userId`, `step`.`id` AS `stepId`, max(`step`.`createdAt`, coalesce(`step`.`holdUntil`, 0)) AS `since`, `notification`.`createdAt` AS `notedAt`, CASE WHEN `notification`.`snippet` LIKE '没有在线执行机满足要求（缺 %' THEN 'capability-missing' WHEN `notification`.`snippet` LIKE '%的任务沙箱没就绪%' THEN 'sandbox-unavailable' WHEN `notification`.`snippet` LIKE '%已删除或注销，这一步不会改派%' THEN 'machine-retired' WHEN `notification`.`snippet` LIKE '%不能跑这一步，不会改派到其他执行机%' THEN 'runner-cannot-run' WHEN `notification`.`snippet` LIKE '没有在线执行机能跑这一步%' THEN 'no-runner' END AS `reason` FROM `step` INNER JOIN `build` ON `build`.`id` = `step`.`buildId` INNER JOIN `notification` ON `notification`.`entityId` = `build`.`todoId` AND `notification`.`type` = 'no_machine' WHERE `step`.`status` = 'pending' AND `notification`.`createdAt` >= max(`step`.`createdAt`, coalesce(`step`.`holdUntil`, 0));
+--> statement-breakpoint
+DELETE FROM `no_machine_told` WHERE `reason` IS NULL;
+--> statement-breakpoint
+UPDATE `notice_mark` SET `fingerprint` = (SELECT `reason` || ':' || `since` FROM `no_machine_told` WHERE `no_machine_told`.`userId` = `notice_mark`.`userId` AND `no_machine_told`.`stepId` = `notice_mark`.`subjectId`) WHERE `condition` = 'no_machine' AND `fingerprint` NOT LIKE '%:%' AND EXISTS (SELECT 1 FROM `no_machine_told` WHERE `no_machine_told`.`userId` = `notice_mark`.`userId` AND `no_machine_told`.`stepId` = `notice_mark`.`subjectId` AND CAST(`no_machine_told`.`since` AS TEXT) = `notice_mark`.`fingerprint`);
+--> statement-breakpoint
+INSERT OR IGNORE INTO `notice_mark` (`id`, `userId`, `condition`, `subjectId`, `fingerprint`, `notedAt`) SELECT `userId` || ':no_machine:' || `stepId`, `userId`, 'no_machine', `stepId`, `reason` || ':' || `since`, `notedAt` FROM `no_machine_told`;
+--> statement-breakpoint
+DROP TABLE `no_machine_told`;

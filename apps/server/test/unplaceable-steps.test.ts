@@ -1,11 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { RunnerOfflineContent } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
+import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import {
   build as buildTable,
   chiefMessage,
   gateVerdict,
   machine as machineTable,
+  noticeMark as noticeMarkTable,
   notification as notificationTable,
   project as projectTable,
   routingRule,
@@ -221,6 +225,79 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     sweepUnplaceableSteps(w.s.svc, Date.now() + 60_000);
     expect(alerts(w)).toHaveLength(1);
     expect(alerts(w)[0]?.readAt).not.toBeNull();
+  });
+
+  test('the upgrade marks waits users were already told about, so none notifies again', async () => {
+    const w = await world();
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, mac, { mcpServers: ['figma'] });
+    const beforeMarks = pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    const sinceOnlyMark = pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 2_000 });
+    const start = Date.now();
+    sweepUnplaceableSteps(w.s.svc, start);
+    w.s.db.delete(noticeMarkTable).where(eq(noticeMarkTable.subjectId, beforeMarks)).run();
+    const sinceOnly = w.s.db.select().from(stepTable).where(eq(stepTable.id, sinceOnlyMark)).get();
+    w.s.db
+      .update(noticeMarkTable)
+      .set({ fingerprint: String(sinceOnly?.createdAt) })
+      .where(eq(noticeMarkTable.subjectId, sinceOnlyMark))
+      .run();
+    for (const statement of readFileSync(
+      join(MIGRATIONS_FOLDER, '0248_no_machine_reason_marks.sql'),
+      'utf8',
+    ).split('--> statement-breakpoint')) {
+      w.s.db.run(sql.raw(statement));
+    }
+    const published: string[] = [];
+    const publish = w.s.svc.hub.publishNotification.bind(w.s.svc.hub);
+    w.s.svc.hub.publishNotification = (teamId, record) => {
+      published.push(record.type);
+      publish(teamId, record);
+    };
+    sweepUnplaceableSteps(w.s.svc, start + 15_000);
+    expect(published).toEqual([]);
+  });
+
+  test('a wait whose reason changes notifies again, and the same reason stays quiet', async () => {
+    const w = await world();
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, mac, { mcpServers: ['figma'] });
+    pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    const published: string[] = [];
+    const publish = w.s.svc.hub.publishNotification.bind(w.s.svc.hub);
+    w.s.svc.hub.publishNotification = (teamId, record) => {
+      if (record.type === 'no_machine') published.push(record.snippet ?? '');
+      publish(teamId, record);
+    };
+    const start = Date.now();
+    sweepUnplaceableSteps(w.s.svc, start);
+    sweepUnplaceableSteps(w.s.svc, start + 15_000);
+    const macRow = w.s.db.select().from(machineTable).where(eq(machineTable.id, mac)).get();
+    w.s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          ...macRow?.capabilities,
+          mcpServers: ['figma'],
+          skills: [],
+          executor: 'host',
+          osPlatform: 'darwin',
+          confinement: {
+            state: 'unavailable',
+            revision: 1,
+            reason: 'startup-failed',
+            generation: 1,
+            invocation: '00000000-0000-4000-8000-000000000001',
+          },
+        },
+      })
+      .where(eq(machineTable.id, mac))
+      .run();
+    sweepUnplaceableSteps(w.s.svc, start + 30_000);
+    sweepUnplaceableSteps(w.s.svc, start + 45_000);
+    expect(published).toHaveLength(2);
+    expect(published[0]).toContain('MCP server "figma"');
+    expect(published[1]).toContain('任务沙箱没就绪');
   });
 });
 

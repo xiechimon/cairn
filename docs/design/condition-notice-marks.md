@@ -31,8 +31,13 @@ Table `notice_mark`:
 | `fingerprint` | the content that counts as a material change                 |
 | `notedAt`     | when the notice was raised                                   |
 
-Fingerprints: `no_machine` uses the step's wait start (`waitingSince`), so the
-growing minute count in the snippet is not a change and a new wait is.
+Fingerprints: `no_machine` uses the reason type and the step's wait start
+(`<reason>:<waitingSince>`). The reason type is the kind of wait the notice
+names, because each asks the user for a different action:
+`capability-missing`, `sandbox-unavailable`, `machine-retired`,
+`runner-cannot-run` (the pinned Runner cannot take the step) and `no-runner`.
+A change of reason type notifies again; the growing minute count and a change
+inside one reason (another missing capability) do not. A new wait does.
 `watchdog_flag` uses the snippet, which changes only when a reason starts,
 ends or its count moves (a new BLOCK round, a new repeated failure).
 
@@ -54,10 +59,22 @@ not come back while its condition is unchanged.
 ## Failure behavior
 
 The notice and the mark commit together; a throw while writing the notice
-leaves no mark, and the next tick retries. On upgrade the migration seeds
-`watchdog_flag` marks from existing `watchdog_flag` inbox rows; open
-`no_machine` waits have no step id on their inbox row and notify once more
-after the upgrade.
+leaves no mark, and the next tick retries.
+
+Upgrade seeds marks so a condition the user was already told about does not
+notify again:
+
+- `0247` seeds `watchdog_flag` marks from existing `watchdog_flag` inbox rows.
+- `0248` seeds `no_machine` marks for every pending step whose task's inbox
+  row is a `no_machine` notice raised during the current wait, reading the
+  reason type back from the notice text. It also rewrites marks `0247`-era
+  sweeps wrote with the wait start alone into the `<reason>:<waitingSince>`
+  form. A wait whose inbox row another notice has since overwritten carries
+  no reason to read back and notifies once after the upgrade; under the code
+  before `0247` it re-notified on every tick, so this is no regression.
+  Desktop builds that already ran `0247` before `0248` shipped got their one
+  extra `no_machine` reminder then; `0248` stops the second one that the
+  reason-type fingerprint would otherwise cause.
 
 ## Tests
 
@@ -66,3 +83,9 @@ task each notify once": both sweeps across eight ticks plus a model-fallback
 notice in between publish exactly one notice per condition. Existing tests in
 that file and `worker-watchdog.test.ts` cover a read notice staying quiet,
 a changed reason notifying again and a cleared condition staying silent.
+
+"the upgrade marks waits users were already told about" runs `0248` over a
+database with no mark and one with a `0247`-format mark, then sweeps: nothing
+is published. "a wait whose reason changes notifies again" moves one wait
+from a missing capability to an unready sandbox and sweeps twice per reason:
+two notices.
