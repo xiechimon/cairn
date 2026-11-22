@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import {
   CONTAINER_SOCKETS,
   canonical,
+  canonicalDeny,
   contains,
   DENIED_DIRECTORIES,
   DENIED_FILES,
@@ -264,6 +265,8 @@ export interface SeatbeltPolicy {
   readable?: string[];
   readableDeniedAllowed?: string[];
   postReadableDenies?: string[];
+  traversalLinks?: string[];
+  pinnedInodes?: string[];
   allowKeychainServices?: boolean;
   serverPort?: number;
 }
@@ -385,8 +388,13 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
         `Unsafe confinement overlap: ${path} inside ${everythingDenied.find((secret) => contains(secret, path))}`,
       );
   }
+  const ownTargets = OWN_STATE_NAMES.map((name) => canonicalDeny(join(home, name)));
   for (const path of state) {
-    const own = OWN_STATE_NAMES.some((name) => contains(join(home, name), path));
+    const own = ownTargets.some(
+      (target) =>
+        contains(target, path) &&
+        !everythingDenied.some((secret) => secret !== target && contains(secret, target)),
+    );
     const insideRoot = deniedRoots.some((root) => root !== path && contains(root, path));
     if (everythingDenied.some((secret) => contains(secret, path)) && !own && !insideRoot)
       throw new Error('Unsafe confinement state overlap');
@@ -444,12 +452,20 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
       reexposed.map((path) => `(subpath ${quoted(path)})`),
     ),
     ...ruleLines(
+      'deny file-write-unlink',
+      (policy.pinnedInodes ?? []).map((path) => `(literal ${quoted(path)})`),
+    ),
+    ...ruleLines(
       'allow file-read-metadata',
       traversable.map((path) => `(literal ${quoted(path)})`),
     ),
     ...ruleLines(
       'allow file-read*',
       readable.map((path) => `(subpath ${quoted(path)})`),
+    ),
+    ...ruleLines(
+      'allow file-read*',
+      (policy.traversalLinks ?? []).map((path) => `(literal ${quoted(path)})`),
     ),
     ...ruleLines(
       'deny file-read* file-write*',

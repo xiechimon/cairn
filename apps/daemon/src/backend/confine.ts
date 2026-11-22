@@ -8,7 +8,7 @@ import {
   readlinkSync,
   realpathSync,
 } from 'node:fs';
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
 
@@ -139,6 +139,28 @@ export function canonical(path: string, required = false): string {
   }
   if (realpathSync(cursor) !== cursor) throw new Error('Unsafe confinement symlink');
   return join(cursor, ...missing);
+}
+
+export function canonicalDeny(path: string): string {
+  if (!isAbsolute(path) || resolve(path) !== path) throw new Error('Unsafe confinement path');
+  let cursor = path;
+  const missing: string[] = [];
+  let hops = 0;
+  while (true) {
+    try {
+      return join(realpathSync(cursor), ...missing);
+    } catch {
+      const stat = lstatSync(cursor, { throwIfNoEntry: false });
+      if (stat?.isSymbolicLink() === true && ++hops <= 40) {
+        cursor = resolve(dirname(cursor), readlinkSync(cursor));
+        continue;
+      }
+      const parent = dirname(cursor);
+      if (parent === cursor) return path;
+      missing.unshift(basename(cursor));
+      cursor = parent;
+    }
+  }
 }
 
 export function confinementArgs(

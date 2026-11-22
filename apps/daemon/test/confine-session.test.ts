@@ -109,6 +109,8 @@ describe('session confiner', () => {
     mkdirSync(join(tools, 'antigravity'), { recursive: true });
     const linkedRunner = join(root, 'runner-link');
     symlinkSync(runnerHome, linkedRunner);
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
     const linkedConfine = createSessionConfiner({
       daemonHome: join(linkedRunner),
       extraDeniedRoots: [],
@@ -117,6 +119,7 @@ describe('session confiner', () => {
       serverUrl: 'http://127.0.0.1:1',
       platform: 'darwin',
       home: join(root, 'user'),
+      systemTempDirectory: systemTemp,
       environment: { TMPDIR: join(root, 'tmp-user', 'T') },
     }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
     const launch = linkedConfine({ cwd: worktree }, 'antigravity', {
@@ -284,6 +287,262 @@ describe('session confiner', () => {
       }),
     ).toThrow('Unsafe confinement symlink');
   });
+
+  test('a user-managed symlinked state ancestor grants the resolved target', () => {
+    const { worktree, runnerHome, serverHome, root } = fixture();
+    const home = join(root, 'user');
+    const dotfiles = join(home, 'dotfiles');
+    mkdirSync(join(dotfiles, '.config', 'devin'), { recursive: true });
+    mkdirSync(join(dotfiles, '.claude'), { recursive: true });
+    symlinkSync(join(dotfiles, '.config'), join(home, '.config'));
+    symlinkSync(join(dotfiles, '.claude'), join(home, '.claude'));
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [serverHome],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home,
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+
+    const claude = confine({ cwd: worktree }, 'claude-code', {
+      command: '/bin/true',
+      args: [],
+    });
+    expect(claude.args[1]).toContain(`(subpath "${join(dotfiles, '.claude')}")`);
+
+    const devin = confine({ cwd: worktree }, 'devin', { command: '/bin/true', args: [] });
+    expect(devin.args[1]).toContain(`(subpath "${join(dotfiles, '.config', 'devin')}")`);
+
+    const pi = confine({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] });
+    const deny = ((pi.args[1] as string).split('\n') ?? []).find((line) =>
+      line.startsWith('(deny file-read*'),
+    );
+    expect(deny).toContain(`(subpath "${join(dotfiles, '.claude')}")`);
+  });
+
+  test('a symlinked shared cache grants the resolved target', () => {
+    const { worktree, runnerHome, serverHome, root } = fixture();
+    const home = join(root, 'user');
+    const cache = join(root, 'big-cache');
+    mkdirSync(cache, { recursive: true });
+    symlinkSync(cache, join(home, '.cache'));
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [serverHome],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home,
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    const launch = confine({ cwd: worktree, env: {} }, 'pi', {
+      command: '/bin/true',
+      args: [],
+    });
+    expect(launch.args[1]).toContain(`(subpath "${realpathSync(cache)}")`);
+  });
+
+  test('a symlink planted inside a grant that resolves through a user symlink fails closed', () => {
+    const { worktree, runnerHome, serverHome, root } = fixture();
+    const home = join(root, 'user');
+    const dotfiles = join(home, 'dotfiles');
+    const pivot = join(root, 'inner-pivot');
+    mkdirSync(join(dotfiles, '.claude', 'ok'), { recursive: true });
+    mkdirSync(join(pivot, 'x'), { recursive: true });
+    symlinkSync(join(dotfiles, '.claude'), join(home, '.claude'));
+    symlinkSync(pivot, join(dotfiles, '.claude', 'inner'));
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = (leaf: string) =>
+      (
+        createSessionConfiner({
+          daemonHome: runnerHome,
+          extraDeniedRoots: [serverHome],
+          readable: [],
+          handoffDirectories: [join(home, '.claude'), leaf],
+          serverUrl: 'http://127.0.0.1:1',
+          platform: 'darwin',
+          home,
+          systemTempDirectory: systemTemp,
+          environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+        }) as NonNullable<ReturnType<typeof createSessionConfiner>>
+      )({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] });
+    confine(join(home, '.claude', 'ok', 'x'));
+    expect(() => confine(join(home, '.claude', 'inner', 'x'))).toThrow(
+      'Unsafe confinement symlink',
+    );
+  });
+
+  test('a symlinked own-state file is refused because file grants cannot be inode-pinned', () => {
+    const { worktree, runnerHome, serverHome, root } = fixture();
+    const home = join(root, 'user');
+    const dotfiles = join(home, 'dotfiles');
+    mkdirSync(dotfiles, { recursive: true });
+    writeFileSync(join(dotfiles, '.claude.json'), '{}');
+    symlinkSync(join(dotfiles, '.claude.json'), join(home, '.claude.json'));
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [serverHome],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home,
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    expect(() =>
+      confine({ cwd: worktree }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a user symlink that redirects own state into a denied directory fails closed', () => {
+    const { worktree, runnerHome, serverHome, root } = fixture();
+    const home = join(root, 'user');
+    mkdirSync(join(home, '.ssh', 'x'), { recursive: true });
+    symlinkSync(join(home, '.ssh', 'x'), join(home, '.claude'));
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [serverHome],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home,
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    expect(() =>
+      confine({ cwd: worktree }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a state file whose parent sits inside the denied daemon home fails closed', () => {
+    const { worktree, runnerHome, serverHome, root } = fixture();
+    const home = join(root, 'user');
+    const sessionDir = join(runnerHome, 'chat-sessions');
+    const pivot = join(root, 'pivot');
+    for (const path of [sessionDir, pivot, join(runnerHome, 'homes', 'pi')])
+      mkdirSync(path, { recursive: true });
+    writeFileSync(join(pivot, 'session.jsonl'), 'x');
+    const resumeFile = join(sessionDir, 'session.jsonl');
+    symlinkSync(join(pivot, 'session.jsonl'), resumeFile);
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [serverHome],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home,
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    expect(() =>
+      confine(
+        { cwd: worktree, env: {} },
+        'pi',
+        { command: '/bin/true', args: [] },
+        {
+          state: [join(runnerHome, 'homes', 'pi'), resumeFile],
+        },
+      ),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a user symlink whose target crosses a task-planted link inside a grant fails closed', () => {
+    const { worktree, runnerHome, serverHome, root } = fixture();
+    const home = join(root, 'user');
+    const pivot = join(worktree, 'pivot');
+    mkdirSync(pivot, { recursive: true });
+    mkdirSync(join(home, 'victim'), { recursive: true });
+    symlinkSync(join(home, 'victim'), join(pivot, 'store'));
+    symlinkSync(join(pivot, 'store'), join(home, '.claude'));
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const confine = createSessionConfiner({
+      daemonHome: runnerHome,
+      extraDeniedRoots: [serverHome],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home,
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    expect(() =>
+      confine({ cwd: worktree }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test.runIf(process.platform === 'darwin')(
+    'a session under a symlinked dotfiles home writes the resolved target and stays denied',
+    () => {
+      const { worktree, runnerHome, serverHome, root } = fixture();
+      const home = join(root, 'user');
+      const dotfiles = join(home, 'dotfiles');
+      mkdirSync(join(dotfiles, '.config', 'devin'), { recursive: true });
+      mkdirSync(join(dotfiles, '.claude'), { recursive: true });
+      symlinkSync(join(dotfiles, '.config'), join(home, '.config'));
+      symlinkSync(join(dotfiles, '.claude'), join(home, '.claude'));
+      const systemTemp = join(root, 'sys-temp', 'T');
+      mkdirSync(systemTemp, { recursive: true });
+      const confine = createSessionConfiner({
+        daemonHome: runnerHome,
+        extraDeniedRoots: [serverHome],
+        readable: [],
+        handoffDirectories: [],
+        serverUrl: 'http://127.0.0.1:1',
+        platform: 'darwin',
+        home,
+        systemTempDirectory: systemTemp,
+        environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+      }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+
+      const write = confine({ cwd: worktree }, 'claude-code', {
+        command: '/bin/sh',
+        args: ['-c', `echo ok > '${join(home, '.claude', 'state')}'`],
+      });
+      expect(() => execFileSync(write.command, write.args, { stdio: 'pipe' })).not.toThrow();
+      expect(existsSync(join(dotfiles, '.claude', 'state'))).toBe(true);
+
+      const profile = write.args[1] as string;
+      const pinLines = profile
+        .split('\n')
+        .filter((line) => line.startsWith('(deny file-write-unlink'));
+      expect(pinLines.join('\n')).toContain(`(literal "${join(dotfiles, '.claude')}")`);
+
+      const swap = confine({ cwd: worktree }, 'claude-code', {
+        command: '/bin/sh',
+        args: ['-c', `mv '${join(dotfiles, '.claude')}' '${join(worktree, 'moved')}'`],
+      });
+      expect(() => execFileSync(swap.command, swap.args, { stdio: 'pipe' })).toThrow();
+      expect(existsSync(join(dotfiles, '.claude', 'state'))).toBe(true);
+
+      const denied = confine({ cwd: worktree, env: {} }, 'pi', {
+        command: '/bin/sh',
+        args: ['-c', `cat '${join(home, '.claude', 'state')}'`],
+      });
+      expect(() => execFileSync(denied.command, denied.args, { stdio: 'pipe' })).toThrow();
+    },
+  );
 
   test('a refused state ancestor does not materialise the leaf inside the pivot', () => {
     const { confine, worktree, runnerHome, root } = fixture();

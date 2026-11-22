@@ -1,11 +1,29 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  realpathSync,
+} from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
 import { ANTIGRAVITY_CREDENTIAL_FILES, GEMINI_CREDENTIAL_FILES } from '../agent-config.js';
-import { canonical, contains, deniedVariants, serverPortOf } from './confine.js';
-import { type SeatbeltPolicy, seatbeltCommand } from './confine-seatbelt.js';
+import {
+  canonicalDeny,
+  contains,
+  DENIED_DIRECTORIES,
+  DENIED_FILES,
+  deniedVariants,
+  serverPortOf,
+} from './confine.js';
+import {
+  MAC_DENIED_DIRECTORIES,
+  type SeatbeltPolicy,
+  seatbeltCommand,
+} from './confine-seatbelt.js';
 
 export type SessionHarness = 'claude-code' | 'gemini' | 'pi' | 'devin' | 'antigravity' | 'hook';
 
@@ -62,19 +80,40 @@ function resolvedTail(path: string): string {
   return join(realpathSync(cursor), ...missing);
 }
 
-function resolvedUnder(root: string, path: string): string {
+function resolvedUnder(
+  root: string,
+  path: string,
+  unsafeParent: (directory: string) => boolean,
+  links: Set<string>,
+  hops = 0,
+): string {
+  if (hops > 40) throw new Error(`Unsafe confinement symlink: ${path}`);
   const rel = relative(root, path);
   if (rel === '' || isAbsolute(rel) || rel.split(sep).includes('..'))
     throw new Error('Unsafe confinement path');
-  const anchor = resolvedTail(root);
-  const tail: string[] = [];
-  for (const part of rel.split(sep)) {
-    tail.push(part);
-    const stat = lstatSync(join(anchor, ...tail), { throwIfNoEntry: false });
+  const parts = rel.split(sep);
+  let base = root === '/' ? '/' : resolvedUnder('/', root, unsafeParent, links, hops);
+  let depth = 0;
+  while (depth < parts.length) {
+    const part = parts[depth];
+    if (part === undefined) break;
+    const next = join(base, part);
+    const stat = lstatSync(next, { throwIfNoEntry: false });
     if (stat === undefined) break;
-    if (stat.isSymbolicLink()) throw new Error('Unsafe confinement symlink');
+    if (stat.isSymbolicLink()) {
+      if (unsafeParent(base)) throw new Error(`Unsafe confinement symlink: ${next}`);
+      try {
+        base = resolvedUnder('/', resolve(base, readlinkSync(next)), unsafeParent, links, hops + 1);
+      } catch {
+        throw new Error(`Unsafe confinement symlink: ${next}`);
+      }
+      links.add(next);
+    } else {
+      base = next;
+    }
+    depth++;
   }
-  return join(anchor, ...rel.split(sep));
+  return join(base, ...parts.slice(depth));
 }
 
 function gitDirectoriesOf(workspace: string): string[] {
@@ -198,7 +237,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
   });
   const daemonHomeLexical = existsSync(options.daemonHome)
     ? realpathSync(options.daemonHome)
-    : canonical(options.daemonHome);
+    : canonicalDeny(options.daemonHome);
   return (opts, harness, launch, extra = {}) => {
     const env: NodeJS.ProcessEnv = {
       ...opts.env,
@@ -206,7 +245,10 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       TMPDIR: opts.env?.TMPDIR ?? environment.TMPDIR,
     };
     const workspace = realpathSync(opts.cwd);
-    const tempInput = resolve(env.TMPDIR ?? tmpdir());
+    const tempEnv = env.TMPDIR;
+    const tempInput = resolve(
+      tempEnv !== undefined && isAbsolute(tempEnv) && existsSync(tempEnv) ? tempEnv : tmpdir(),
+    );
     const systemTempInput =
       options.systemTempDirectory === undefined || options.systemTempDirectory === null
         ? null
@@ -216,6 +258,9 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     );
     const harnessTemp =
       harness === 'claude-code' ? join(realpathSync('/tmp'), `claude-${userInfo().uid}`) : null;
+    const sharedCaches = SHARED_CACHES.map((path) => join(home, path)).filter((path) =>
+      existsSync(path),
+    );
     const writableRoots = new Set([
       workspace,
       tempInput,
@@ -228,8 +273,70 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       ...options.handoffDirectories.map((path) => resolve(path)),
       ...(extra.state ?? []).map((path) => resolve(path)),
       ...(extra.readable ?? []).map((path) => resolve(path)),
-      ...SHARED_CACHES.map((path) => join(home, path)).filter((path) => existsSync(path)),
+      ...sharedCaches,
     ]);
+    const realRoots = new Map<string, string>();
+    const realGrantRoot = (root: string): string => {
+      const cached = realRoots.get(root);
+      if (cached !== undefined) return cached;
+      let real: string;
+      try {
+        real = resolvedTail(root);
+      } catch {
+        try {
+          real = realpathSync(root);
+        } catch {
+          real = root;
+        }
+      }
+      realRoots.set(root, real);
+      return real;
+    };
+    const taskWritable = (directory: string): boolean => {
+      for (const root of writableRoots) {
+        if (contains(realGrantRoot(root), directory)) return true;
+      }
+      return false;
+    };
+    const daemonHome = daemonHomeLexical;
+    const realOrFallback = (path: string): string => {
+      try {
+        return realpathSync(path);
+      } catch {
+        return canonicalDeny(path);
+      }
+    };
+    const deniedPairs = [
+      { lexical: resolve(options.daemonHome), real: daemonHome },
+      ...[join(home, '.config'), join(home, '.cairn'), ...extraDeniedRoots].map((path) => ({
+        lexical: resolve(path),
+        real: realOrFallback(path),
+      })),
+    ];
+    const deniedRoots = deniedPairs.map((pair) => pair.real);
+    const unsafeDeniedRoots = new Set(
+      deniedPairs.filter((pair) => pair.lexical !== join(home, '.config')).map((pair) => pair.real),
+    );
+    const unsafeParent = (directory: string): boolean =>
+      taskWritable(directory) || [...unsafeDeniedRoots].some((root) => contains(root, directory));
+    const deniedGuards = [
+      ...[...DENIED_DIRECTORIES, ...MAC_DENIED_DIRECTORIES, ...DENIED_FILES].map((name) => {
+        const lexical = join(home, name);
+        return { lexical, real: canonicalDeny(lexical) };
+      }),
+      ...deniedPairs,
+    ];
+    const links = new Set<string>();
+    const escapeGuard = (lexical: string, granted: string): void => {
+      for (const denied of deniedGuards) {
+        if (
+          contains(denied.real, granted) &&
+          !contains(denied.lexical, lexical) &&
+          !contains(denied.real, lexical)
+        )
+          throw new Error(`Unsafe confinement symlink: ${lexical}`);
+      }
+    };
     const grantPath = (path: string, root?: string): string => {
       const lexical = resolve(path);
       let anchor = root === undefined ? undefined : resolve(root);
@@ -240,12 +347,13 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
           if (anchor === undefined || candidate.length > anchor.length) anchor = candidate;
         }
       }
-      return anchor === undefined ? resolvedTail(lexical) : resolvedUnder(anchor, lexical);
+      const granted = resolvedUnder(anchor ?? '/', lexical, unsafeParent, links);
+      escapeGuard(lexical, granted);
+      return granted;
     };
     const temp = grantPath(tempInput);
     writableRoots.add(temp);
     writableRoots.add(dirname(temp));
-    const daemonHome = daemonHomeLexical;
     const daemonChild = (path: string): string => {
       if (!contains(daemonHome, path) || path === daemonHome)
         throw new Error(`Unsafe confinement state path: ${path}`);
@@ -257,15 +365,6 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const insideAllowedRoots = (path: string): boolean =>
       (contains(home, path) && path !== home) ||
       (contains(daemonHome, path) && path !== daemonHome);
-    const deniedRoots = [
-      ...new Set([daemonHome, join(home, '.config'), join(home, '.cairn'), ...extraDeniedRoots]),
-    ].map((path) => {
-      try {
-        return realpathSync(path);
-      } catch {
-        return canonical(path);
-      }
-    });
     const systemTemp =
       options.systemTempDirectory === undefined
         ? systemTempDirectory()
@@ -285,26 +384,53 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     );
     const state = stateEntries.map((entry) => {
       const lexical = grantPath(entry.path, entry.root);
+      const dir = !isStateFile(home, entry.path);
+      if (!dir) {
+        if (lstatSync(resolve(entry.path), { throwIfNoEntry: false })?.isSymbolicLink() === true)
+          throw new Error(`Unsafe confinement symlink: ${entry.path}`);
+        const stat = lstatSync(lexical, { throwIfNoEntry: false });
+        if (stat !== undefined && !stat.isFile())
+          throw new Error(`Unsafe confinement symlink: ${entry.path}`);
+      }
       if (!insideAllowedRoots(lexical))
         throw new Error(`Unsafe confinement state path: ${entry.path}`);
-      return { lexical, dir: !isStateFile(home, entry.path) };
+      return { lexical, dir };
     });
     const handoff = options.handoffDirectories.map((path) => grantPath(path));
-    const explicitState = [...handoff, ...(extra.state ?? []).map(daemonChild)];
+    const extraState = (extra.state ?? []).map(daemonChild);
+    const explicitState = [...handoff, ...extraState];
     const extraReadable = (extra.readable ?? []).map(daemonChild);
+    const gitDirectories = gitDirectoriesOf(workspace);
+    const resolvedCaches = sharedCaches.map((path) => grantPath(path));
+    const pinnedInodes = [
+      ...new Set([
+        workspace,
+        ...gitDirectories,
+        temp,
+        ...userDirectories,
+        ...(harnessTemp === null ? [] : [harnessTemp]),
+        ...resolvedCaches,
+        ...state.filter((entry) => entry.dir).map((entry) => entry.lexical),
+        ...handoff,
+        ...extraState.filter(
+          (path) => lstatSync(path, { throwIfNoEntry: false })?.isDirectory() === true,
+        ),
+      ]),
+    ];
     const policy: SeatbeltPolicy = {
       home,
       daemonHome,
       deniedRoots,
       workspace,
-      gitDirectories: gitDirectoriesOf(workspace),
+      gitDirectories,
       taskTemp: temp,
       state: [...state.map((entry) => entry.lexical), ...explicitState],
       caches: [
         ...userDirectories,
         ...(harnessTemp === null ? [] : [harnessTemp]),
-        ...SHARED_CACHES.map((path) => join(home, path)).filter((path) => existsSync(path)),
+        ...resolvedCaches,
       ],
+      pinnedInodes,
       readable: [
         ...options.readable,
         join(home, '.config', 'git'),
@@ -313,13 +439,21 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         ...(harness === 'antigravity' && env.GEMINI_API_KEY === undefined
           ? [join(home, 'Library', 'Keychains')]
           : []),
-      ].filter((path) => existsSync(path)),
+      ]
+        .filter((path) => existsSync(path))
+        .map((path) => {
+          const lexical = resolve(path);
+          const real = canonicalDeny(lexical);
+          escapeGuard(lexical, real);
+          return real;
+        }),
       readableDeniedAllowed:
         harness === 'antigravity' && env.GEMINI_API_KEY === undefined
           ? deniedVariants(join(home, 'Library', 'Keychains'))
           : [],
       allowKeychainServices: harness === 'antigravity' && env.GEMINI_API_KEY === undefined,
       postReadableDenies: [join(home, '.config', 'git', 'credentials')],
+      traversalLinks: [...links],
       ...(port !== null ? { serverPort: port } : {}),
     };
     const confined = seatbeltCommand(policy, launch.command, launch.args);
