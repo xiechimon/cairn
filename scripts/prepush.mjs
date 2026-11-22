@@ -21,6 +21,7 @@ export const prepushModules = [
   'scripts/import-cycle-gate.mjs',
   'scripts/conflict-marker-gate.mjs',
   'scripts/drizzle-drift-gate.mjs',
+  'scripts/doc-refs-gate.mjs',
 ];
 
 export const ciOnlyScripts = {
@@ -46,6 +47,7 @@ export const selfTests = [
   'scripts/public-content-gate.test.mjs',
   'scripts/journal-newline-gate.test.mjs',
   'scripts/doc-reader-tests.test.mjs',
+  'scripts/doc-refs-gate.test.mjs',
   'scripts/import-cycle-gate.test.mjs',
   'scripts/epic-done.test.mjs',
   'scripts/agent-rules.test.mjs',
@@ -145,7 +147,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
   const codePaths = paths.filter((path) => hasCode([path]));
   const docPaths = paths.filter(isDocument);
   if (codePaths.length === 0 && !forceFull) {
-    const checks = [language, publicContent, conflictMarker];
+    const checks = [language, publicContent, conflictMarker, ['node', 'scripts/doc-refs-gate.mjs']];
     checks.push(['node', 'scripts/doc-reader-tests.mjs', ...docPaths]);
     return checks;
   }
@@ -153,6 +155,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     language,
     publicContent,
     conflictMarker,
+    ['node', 'scripts/doc-refs-gate.mjs'],
     ['node', 'scripts/journal-newline-gate.mjs'],
     ['node', 'scripts/ui-debt-gate.mjs'],
     ['node', 'scripts/ui-drift-gate.mjs'],

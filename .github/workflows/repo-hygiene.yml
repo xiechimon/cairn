@@ -1,0 +1,51 @@
+name: repo-hygiene
+
+# Daily deterministic maintenance over every repository surface: landed PRs,
+# closed-by-commit issues, dead branches, the roadmap board, GHCR versions,
+# draft releases, actions caches and settings drift. The schedule runs for
+# real; workflow_dispatch defaults to dry so it can be rehearsed on any ref.
+# Judgement items are written to the one pinned "Repo hygiene report" issue.
+
+on:
+  schedule:
+    - cron: '30 4 * * *'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry reports only; apply performs the mutations'
+        required: true
+        default: 'dry'
+        type: choice
+        options: [dry, apply]
+
+concurrency:
+  group: repo-hygiene
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  packages: write
+  actions: write
+  security-events: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+
+      - name: Repo hygiene sweep
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HYGIENE_PROJECT_TOKEN: ${{ secrets.HYGIENE_PROJECT_TOKEN }}
+          HYGIENE_MODE: ${{ github.event_name == 'schedule' && 'apply' || inputs.mode }}
+        run: node scripts/ops/repo-hygiene.mjs --mode "$HYGIENE_MODE" --summary "$GITHUB_STEP_SUMMARY"
