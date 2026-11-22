@@ -75,6 +75,11 @@
     display: block;
   }
 
+  a,
+  :is(a, button, [role="tab"], [role="option"], [role="menuitem"]) img {
+    -webkit-user-drag: none;
+  }
+
   :where(
     button,
     a,

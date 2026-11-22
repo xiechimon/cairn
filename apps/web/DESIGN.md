@@ -53,7 +53,7 @@ The rows below are the process rules; the rows for a surface live in the `## Rul
 |---|---|---|
 | P1 | Start from a reference: name the surface, open its shots in `docs/design/references/<surface>/` before code; the wrap-up shows a reference-versus-ours row per state. | H |
 | P2 | A feature touching a main surface (first run, Coordinator chat, thread list and sidebar, thread and review, settings) needs a page draft before code; backend-only and single-setting changes exempt. | H |
-| P3 | List component x state before coding: empty, loading, error, offline, long content, pending question, 390px, dark, transition; seed what the stack cannot produce. | H |
+| P3 | List component x state before coding: empty, loading, error, offline, slow network, rapid repeated input, long content, pending question, 390px, dark, transition; seed what the stack cannot produce. | H |
 | P4 | Drafts and fixtures use real copy and real-looking data, never lorem ipsum or `Item 1`. | H |
 | P5 | Fixture screenshots (`?scenario=`) are labelled as fixture evidence and never stand in for the live stack. | H |
 | P6 | Before code, the brief answers the design-cairn craft questions: what grows, which states, which finishing rules, which spec measures each answer. | H |

@@ -66,10 +66,10 @@ References (open before coding; paths in the repo):
 Draft: <link to the sketch or mock the owner picked, or "exempt: backend-only / single setting">
 
 Component x state list (every cell is produced and screenshotted; the transition cell is recorded, rule P3):
-| Component | empty | loading | error | offline | long content | pending question | 390px | dark | transition |
-|---|---|---|---|---|---|---|---|---|---|
-| <component> | <how produced: live / seeded / fixture> | ... | | | | | | | <recording: appear, update, settle, reopened> |
-Seed any state the stack cannot reach on its own (verify-cairn seeds or fixtures). Mark fixture cells as fixture. Do not mark a cell "n/a" without a reason.
+| Component | empty | loading | error | offline | slow network | rapid repeated input | long content | pending question | 390px | dark | transition |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| <component> | <how produced: live / seeded / fixture> | ... | | | | | | | | | <recording: appear, update, settle, reopened> |
+Slow network: every API reply delayed about 400ms. Rapid repeated input: press the controls 50ms apart while the pointer still moves a few pixels; the last press must win, nothing may reorder, and no press may be dropped while a request is pending (`e2e/rapid-input-sweep.spec.ts` shows the pattern). Seed any state the stack cannot reach on its own (verify-cairn seeds or fixtures). Mark fixture cells as fixture. Do not mark a cell "n/a" without a reason.
 
 Craft (answer before code, one line each; rule P6):
 - Arrival: what appears or changes while the user watches, and how it grows (docs/design/surfaces/motion.md, Growth)? History, reloads and the user's own actions show the result at once; reduced motion turns it off. Rules C23, A2, V24.

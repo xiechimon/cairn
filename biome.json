@@ -108,6 +108,10 @@
               {
                 "group": ["@opentelemetry/*", "@opentelemetry/*/*", "@langfuse/*"],
                 "message": "Seam discipline (observability-4): the OpenTelemetry SDK is consumed only through the bridge packages/shared/src/otel.ts, and convention keys (@opentelemetry/semantic-conventions, @langfuse/core) only through packages/shared/src/genai-conventions.ts."
+              },
+              {
+                "group": ["@dnd-kit/*", "@dnd-kit/*/*"],
+                "message": "Rapid input: a drag sensor on a selectable row swallows any press that drifts past its activation distance, so the click never selects. dnd-kit is consumed only in apps/web/src/components/providers/provider-panel.tsx, whose sortable list selects the row on drag start; reuse it for any new sortable list."
               }
             ],
             "paths": {
@@ -122,6 +126,16 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["apps/web/src/components/providers/provider-panel.tsx"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
     {
       "includes": [
         "packages/shared/src/otel.ts",

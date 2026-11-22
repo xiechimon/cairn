@@ -3,6 +3,7 @@ import {
   closestCenter,
   DndContext,
   type DragEndEvent,
+  type DragStartEvent,
   KeyboardSensor,
   type Modifier,
   MouseSensor,
@@ -268,6 +269,7 @@ function SortableRows({
         : t('{name} 放在第 {n} 位', { name: nameOf(active.id), n: positionOf(over.id) }),
     onDragCancel: ({ active }) => t('{name} 放回原位', { name: nameOf(active.id) }),
   };
+  const onDragStart = ({ active }: DragStartEvent) => onSelect(String(active.id));
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (over === null || active.id === over.id) return;
     onReorder(arrayMove(ids, ids.indexOf(String(active.id)), ids.indexOf(String(over.id))));
@@ -278,6 +280,7 @@ function SortableRows({
       collisionDetection={closestCenter}
       modifiers={[keepInList]}
       autoScroll={false}
+      onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       accessibility={{
         announcements,
