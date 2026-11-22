@@ -213,6 +213,7 @@ const RESOURCES = [
   'registry-focus-ring',
   'skill-import',
   'task-panel',
+  'rapid-input-',
 ];
 export const SHARED_SURFACE_ONLY = [
   'cds-motion',
