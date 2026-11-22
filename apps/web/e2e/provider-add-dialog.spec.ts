@@ -33,7 +33,7 @@ test('topbar `新建` opens the picker: 38 preset rows, search, `自定义端点
   await expect(dialog.locator('[data-preset-id]')).toHaveCount(38);
   await expect(dialog.getByRole('button', { name: '自定义端点' })).toHaveText('自定义端点');
 
-  await expect(dialog.locator('[data-preset-id]').first()).toContainText('GitHub Copilot');
+  await expect(dialog.locator('[data-preset-id]').first()).toContainText('ChatGPT 订阅');
 
   await expect(dialog.getByRole('button', { name: '添加模型服务' })).toHaveCount(0);
 });
@@ -63,7 +63,7 @@ test('rows carry no badge; the wired sign-ins (GitHub Copilot, Codex device logi
   await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(0);
   await expect(dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' })).toHaveCount(1);
 
-  const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
+  const codex = dialog.locator('[data-preset-id]', { hasText: 'ChatGPT 订阅' });
   await expect(codex).toBeEnabled();
   await expect(dialog.getByText('暂未开通')).toHaveCount(0);
   const xai = dialog.locator('[data-preset-id="xai"]');

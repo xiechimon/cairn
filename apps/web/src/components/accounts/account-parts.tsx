@@ -26,7 +26,7 @@ type Mark = ComponentType<SVGProps<SVGSVGElement>>;
 
 export const VENDORS: Record<AccountVendor, { label: string; short: string; Mark: Mark }> = {
   claude: { label: 'Claude', short: 'Claude', Mark: ClaudeMark },
-  codex: { label: 'ChatGPT · Codex', short: 'Codex', Mark: OpenAIMark },
+  codex: { label: 'ChatGPT', short: 'ChatGPT', Mark: OpenAIMark },
   grok: { label: 'Grok', short: 'Grok', Mark: GrokMark },
   devin: { label: 'Devin', short: 'Devin', Mark: DevinMark },
   antigravity: { label: 'Antigravity', short: 'Antigravity', Mark: AntigravityMark },

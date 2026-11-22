@@ -10,14 +10,14 @@ async function openDialog(page: Page) {
   return dialog;
 }
 
-test('the wired sign-ins (GitHub Copilot, OpenAI Codex device login) are offered without a badge', async ({
+test('the wired sign-ins (GitHub Copilot, ChatGPT device login) are offered without a badge', async ({
   page,
 }) => {
   const dialog = await openDialog(page);
   await expect(dialog.locator('[data-preset-id]', { hasText: 'GitHub Copilot' })).toHaveCount(1);
   await expect(dialog.getByText('OAuth', { exact: true })).toHaveCount(0);
 
-  const codex = dialog.locator('[data-preset-id]', { hasText: 'OpenAI Codex' });
+  const codex = dialog.locator('[data-preset-id]', { hasText: 'ChatGPT 订阅' });
   await expect(codex).toBeEnabled();
   await expect(dialog.getByText('暂未开通')).toHaveCount(0);
 

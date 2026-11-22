@@ -76,7 +76,7 @@ function seedCodex(s: TestServer, apiKey: string) {
       createdBy: s.user.id,
       body: {
         providerId: 'openai-codex',
-        label: 'OpenAI Codex',
+        label: 'ChatGPT',
         baseUrl: 'https://chatgpt.com/backend-api',
         api: 'openai-responses',
         authHeader: false,

@@ -92,8 +92,8 @@ const API_OPTIONS: readonly { value: ProviderApi; label: string }[] = [
 ];
 
 const PRESET_LABELS: Record<(typeof PROVIDER_PRESET_IDS)[number], string> = {
-  'github-copilot': 'GitHub Copilot',
-  'openai-codex': 'OpenAI Codex',
+  'github-copilot': 'GitHub Copilot 订阅',
+  'openai-codex': 'ChatGPT 订阅',
   xai: 'xAI',
   'amazon-bedrock': 'Amazon Bedrock',
   'ant-ling': 'Ant Ling',
@@ -278,10 +278,15 @@ export function CreateProviderDialog({
   }, [open]);
 
   const q = query.trim().toLowerCase();
+  const shownLabel = (row: (typeof PRESET_ROWS)[number]) =>
+    row.group === '订阅登录' ? t(row.label) : row.label;
   const rows = PRESET_ROWS.filter(
     (row) =>
       (oauthSignIn || row.id === PROVIDER_CODEX_PRESET.id || !row.oauth) &&
-      (q === '' || row.label.toLowerCase().includes(q) || row.id.includes(q)),
+      (q === '' ||
+        shownLabel(row).toLowerCase().includes(q) ||
+        row.label.toLowerCase().includes(q) ||
+        row.id.includes(q)),
   );
 
   const enterForm = (entry: { id: string; label: string } | null) => {
@@ -433,7 +438,7 @@ export function CreateProviderDialog({
                     <span aria-hidden className={PICKER_TILE_CLS}>
                       <ProviderPresetIcon id={row.id} />
                     </span>
-                    <span className="min-w-0 truncate">{row.label}</span>
+                    <span className="min-w-0 truncate">{shownLabel(row)}</span>
                   </Button>
                 ))}
               </fieldset>

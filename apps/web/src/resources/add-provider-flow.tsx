@@ -149,10 +149,10 @@ export function AddProviderFlow({
     poll: mutations.pollCodexDevice,
     onComplete: () => onViewChange('closed'),
     messages: {
-      denied: t('OpenAI Codex 登录被拒绝。'),
-      superseded: t('已有更新的 OpenAI Codex 凭证，这次登录没有覆盖它。'),
+      denied: t('ChatGPT 订阅登录被拒绝。'),
+      superseded: t('已有更新的 ChatGPT 订阅凭证，这次登录没有覆盖它。'),
       expired: t('验证码已过期，请重试。'),
-      failed: t('OpenAI Codex 登录失败，请重试。'),
+      failed: t('ChatGPT 订阅登录失败，请重试。'),
     },
   });
 

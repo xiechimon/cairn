@@ -44,7 +44,25 @@ test.describe('a server with a GitHub OAuth client', () => {
 
   test('the picker offers GitHub Copilot alongside the Codex device sign-in', async ({ page }) => {
     const picker = await openPicker(page, server);
-    await expect(picker.locator('[data-preset-id="github-copilot"]')).toHaveText('GitHub Copilot');
+    await expect(picker.locator('[data-preset-id="github-copilot"]')).toHaveText(
+      'GitHub Copilot 订阅',
+    );
     await expect(picker.locator('[data-preset-id="openai-codex"]')).toBeVisible();
+  });
+
+  test('every subscription sign-in is named "<plan> 订阅"', async ({ page }) => {
+    const picker = await openPicker(page, server);
+    const group = picker.getByRole('group', { name: '订阅登录' });
+    const labels = await group.locator('[data-preset-id]').allInnerTexts();
+    expect(labels.map((label) => label.trim()).sort()).toEqual(
+      [
+        'Antigravity 订阅',
+        'ChatGPT 订阅',
+        'Claude 订阅',
+        'Devin 订阅',
+        'GitHub Copilot 订阅',
+      ].sort(),
+    );
+    for (const label of labels) expect(label.trim()).toMatch(/^\S(.*\S)? 订阅$/);
   });
 });

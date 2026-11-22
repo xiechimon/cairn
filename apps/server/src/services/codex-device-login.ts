@@ -254,7 +254,7 @@ function saveSubscription(
         createdBy: input.createdBy,
         body: {
           providerId: CODEX_PROVIDER_ID,
-          label: 'OpenAI Codex',
+          label: 'ChatGPT',
           baseUrl: CODEX_BASE_URL,
           api: 'openai-responses',
           authHeader: false,
@@ -269,7 +269,7 @@ function saveSubscription(
   const written = deps.db
     .update(provider)
     .set({
-      label: 'OpenAI Codex',
+      label: 'ChatGPT',
       baseUrl: CODEX_BASE_URL,
       api: 'openai-responses',
       authHeader: false,

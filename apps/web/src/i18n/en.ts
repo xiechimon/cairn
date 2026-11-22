@@ -115,6 +115,8 @@ export const EN: Record<string, string> = {
   '{name}：将在 {days} 天后过期。到期前在登录过 Devin 的电脑上运行 `cat ~/.local/share/devin/credentials.toml`，把输出整个添加到「设置 → 模型路由」。':
     '{name}: expires in {days## day|# days}. Before then, run `cat ~/.local/share/devin/credentials.toml` on a machine signed in to Devin and add the whole output under Settings → Model routing.',
   'Antigravity 订阅': 'Antigravity subscription',
+  'ChatGPT 订阅': 'ChatGPT subscription',
+  'GitHub Copilot 订阅': 'GitHub Copilot subscription',
   '添加 Antigravity 订阅': 'Add Antigravity subscription',
   '等待 Antigravity 登录超时，可以再试一次，或改用下方粘贴。':
     'Signing in to Antigravity timed out. Try again, or paste below instead.',
@@ -2010,10 +2012,10 @@ export const EN: Record<string, string> = {
     'A newer xAI credential is already stored. This sign-in did not replace it.',
   '验证码已过期，请重试。': 'The code expired. Try again.',
   'xAI 登录失败，请重试。': 'xAI sign-in failed. Try again.',
-  'OpenAI Codex 登录被拒绝。': 'OpenAI Codex sign-in was denied.',
-  '已有更新的 OpenAI Codex 凭证，这次登录没有覆盖它。':
-    'A newer OpenAI Codex credential is already stored. This sign-in did not replace it.',
-  'OpenAI Codex 登录失败，请重试。': 'OpenAI Codex sign-in failed. Try again.',
+  'ChatGPT 订阅登录被拒绝。': 'ChatGPT subscription sign-in was denied.',
+  '已有更新的 ChatGPT 订阅凭证，这次登录没有覆盖它。':
+    'A newer ChatGPT subscription credential is already stored. This sign-in did not replace it.',
+  'ChatGPT 订阅登录失败，请重试。': 'ChatGPT subscription sign-in failed. Try again.',
   找不到这个项目: 'That project is not here',
   '它可能已被删除、改名，或你不在它所属的团队。':
     'It may have been deleted, renamed, or you may not be on its team.',
