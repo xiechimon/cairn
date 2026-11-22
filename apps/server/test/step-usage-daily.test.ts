@@ -258,6 +258,30 @@ describe('thread context on the todo payload', () => {
     });
   });
 
+  test('a Pi-reported window reaches the stored row and the todo payload derives the worker compact point', async () => {
+    addBuild('build-1', NOW);
+    vi.setSystemTime(NOW);
+    report(
+      's1',
+      'build-1',
+      [{ ...u('pi/custom', 10), contextTokens: 105_000, contextWindow: 128_000 }],
+      'build',
+    );
+    expect(
+      H.s.db
+        .select({ contextWindow: stepUsage.contextWindow })
+        .from(stepUsage)
+        .where(eq(stepUsage.stepId, 's1'))
+        .get(),
+    ).toEqual({ contextWindow: 128_000 });
+    expect(await contextOf('todo-build-1')).toEqual({
+      tokens: 105_000,
+      contextWindow: 128_000,
+      compactAt: 111_616,
+      cache: { read: 0, write: 0, input: 10 },
+    });
+  });
+
   test('a thread with no context reading carries no field, and a zero reading is ignored', async () => {
     addBuild('build-1', NOW);
     expect(await contextOf('todo-build-1')).toBeUndefined();

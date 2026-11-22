@@ -7,7 +7,7 @@ Status: reviewed (gpt-6.1-sol, read-only, two rounds: go after changes; all five
 The composer context ring reads `context` from `GET /api/teams/:id/chief` (`lastTurnContext` in `apps/server/src/services/coordinator-context.ts`). For a turn run on the Claude Code route (usage model `claude-code/<model>`) the server derives both limits from Cairn's own tables:
 
 - `contextWindow`: `contextWindowOf` looks up provider `claude-code` in the team's `provider` rows and the pi catalog. Neither knows `claude-code`, so it falls back to `DEFAULT_CONTEXT_WINDOW` (200K).
-- `compactAt`: `compactionWindow(contextWindow).backgroundAt`, the in-server pi runtime's background compaction point (150K on a 200K window; a smaller window keeps the old half-of-blocking start, `min(150K, max(blocking − 32768, blocking/2))`).
+- `compactAt`: `compactionWindow(contextWindow).backgroundAt`, the in-server pi runtime's background compaction point (150K on a 200K window; on smaller windows the half value applies only when it wins the max, `min(150K, max(blocking − 32768, blocking/2))`).
 
 Worker Pi threads (the context ring on a todo) do not follow the Coordinator's policy: a worker session compacts when usage crosses `contextWindow - reserveTokens` (`shouldCompact` in pi-coding-agent 1.5.0 `dist/core/compaction/compaction.js`; reserveTokens 16384 by default), so the todo payload's fallback `compactAt` is `compactionWindow(contextWindow).blockingAt`.
 

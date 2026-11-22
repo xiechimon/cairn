@@ -4,6 +4,7 @@ import {
   type AgentSessionEventLike,
   mapPiSessionEvent,
   newMapState,
+  noteSessionModelWindow,
   PI_CAPABILITIES,
 } from '../src/backend/pi.js';
 
@@ -414,6 +415,70 @@ describe('mapPiSessionEvent (AgentSessionEvent → StepEvent projection)', () =>
   test('toolResult role projected to the message vocabulary (system/user/assistant, r5 §3.6)', () => {
     const out = map({ type: 'message_end', message: { role: 'toolResult', content: 'r' } });
     expect((out[0] as { message: { role: string } }).message.role).toBe('system');
+  });
+});
+
+describe('session model window on the usage rows', () => {
+  test('the running session model window rides the matching usage row through settledUsage', () => {
+    const state = newMapState();
+    noteSessionModelWindow(state, {
+      provider: 'gw',
+      id: 'stub-model',
+      contextWindow: 128_000,
+    } as never);
+    map(
+      {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          provider: 'gw',
+          model: 'stub-model',
+          stopReason: 'stop',
+          usage: { input: 12, output: 980, cacheRead: 100, cacheWrite: 50 },
+        },
+      },
+      state,
+    );
+    const done = map({ type: 'agent_settled' }, state);
+    expect(done).toEqual([
+      {
+        type: 'done',
+        usage: [
+          {
+            model: 'gw/stub-model',
+            input: 12,
+            output: 980,
+            cacheRead: 100,
+            cacheWrite: 50,
+            contextTokens: 1_142,
+            contextWindow: 128_000,
+          },
+        ],
+      },
+    ]);
+  });
+
+  test('a window for another model or an unregistered one stays off the row', () => {
+    const state = newMapState();
+    noteSessionModelWindow(state, { provider: 'gw', id: 'm1', contextWindow: 200_000 } as never);
+    map(
+      {
+        type: 'message_end',
+        message: {
+          role: 'assistant',
+          provider: 'gw',
+          model: 'other',
+          stopReason: 'stop',
+          usage: { input: 5, output: 1, cacheRead: 0, cacheWrite: 0 },
+        },
+      },
+      state,
+    );
+    const done = map({ type: 'agent_settled' }, state);
+    expect(done[0]).toMatchObject({ type: 'done' });
+    expect((done[0] as { usage: { contextWindow?: number }[] }).usage[0]).not.toHaveProperty(
+      'contextWindow',
+    );
   });
 });
 

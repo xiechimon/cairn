@@ -34,7 +34,7 @@ afterEach(() => {
 const user = (text: string): Message => ({ role: 'user', content: text, timestamp: 1 });
 
 describe('compaction policy', () => {
-  it('starts background folds at 150k whenever it fits below blocking, and keeps the old half value otherwise', () => {
+  it('starts background folds at 150k whenever it fits below blocking, the half value only when it wins the max', () => {
     expect(compactionWindow(1_000_000)).toEqual({ blockingAt: 983_616, backgroundAt: 150_000 });
     expect(compactionWindow(200_000)).toEqual({ blockingAt: 183_616, backgroundAt: 150_000 });
     expect(compactionWindow(199_152)).toEqual({ blockingAt: 182_768, backgroundAt: 150_000 });

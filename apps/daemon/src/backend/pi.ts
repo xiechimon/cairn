@@ -534,6 +534,7 @@ export interface MapState {
   promptSentAt?: number;
   firstToken?: { model: string; ms: number };
   lastContext?: { model: string; tokens: number };
+  modelWindows: Map<string, number>;
 }
 
 export const FIRST_TOKEN_EVENTS: ReadonlySet<string> = new Set([
@@ -581,8 +582,17 @@ export function newMapState(opts?: {
     usage: new Map(),
     calls: new Map(),
     now: opts?.now ?? (() => performance.now()),
+    modelWindows: new Map(),
     ...(opts?.diagnose !== undefined ? { diagnose: opts.diagnose } : {}),
   };
+}
+
+export function noteSessionModelWindow(
+  state: MapState,
+  model: { provider: string; id: string; contextWindow: number },
+): void {
+  if (model.contextWindow > 0)
+    state.modelWindows.set(`${model.provider}/${model.id}`, model.contextWindow);
 }
 
 function toMessageRecord(msg: PiMessageLike): {
@@ -752,6 +762,9 @@ function settledUsage(state: MapState): ModelUsage[] {
     ...(context !== undefined && u.model === context.model
       ? { contextTokens: context.tokens }
       : {}),
+    ...(state.modelWindows.get(u.model) !== undefined
+      ? { contextWindow: state.modelWindows.get(u.model) }
+      : {}),
   }));
 }
 
@@ -778,10 +791,12 @@ export class PiSessionHandle implements AgentSessionHandle {
     diagnose?: (message: string) => string,
     private readonly spans?: PiStepSpanSink,
     private readonly onCompactionLog?: (line: string) => void,
+    sessionModel?: { provider: string; id: string; contextWindow: number },
   ) {
     this.sessionId = session.sessionId;
     this.sessionFile = session.sessionFile;
     this.state = newMapState(diagnose !== undefined ? { diagnose } : undefined);
+    if (sessionModel !== undefined) noteSessionModelWindow(this.state, sessionModel);
     this.events = this.queue.iterable();
     session.subscribe((event) => {
       const raw = event as unknown as AgentSessionEventLike;
@@ -1297,7 +1312,7 @@ export class PiBackend implements AgentBackend {
       mcpEndpoints.length > 0 || askRelay !== undefined ? { uiContext: mcpCaptureUi } : {},
     );
     this.opts.onSession?.(session.sessionId, session.sessionFile);
-    const handle = new PiSessionHandle(session, model, diagnose, spans, log.compaction);
+    const handle = new PiSessionHandle(session, model, diagnose, spans, log.compaction, model);
     if (opts.prompt !== undefined) {
       const promptImages =
         opts.promptImages !== undefined && opts.promptImages.length > 0
