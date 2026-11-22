@@ -28,6 +28,14 @@ describe('pickHomeBanners', () => {
   });
 });
 
+it('keeps the autonomy resume action reachable when backup and login both need attention', () => {
+  expect(kinds(pickHomeBanners([
+    { kind: 'backup' as const },
+    { kind: 'login' as const },
+    { kind: 'autonomy' as const, blocking: true },
+  ]))).toContain('autonomy');
+});
+
 describe('pickHomeBanners with the Claude login warning', () => {
   it('counts the login warning against the limit and ranks it as blocking', () => {
     expect(

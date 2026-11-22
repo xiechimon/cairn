@@ -14125,6 +14125,39 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "autonomyAutoResume": {
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string",
+            },
+            "repo": {
+              "type": "string",
+            },
+            "resolvedAt": {
+              "maximum": 9007199254740991,
+              "minimum": -9007199254740991,
+              "type": "integer",
+            },
+            "resolvedReason": {
+              "type": "string",
+            },
+          },
+          "required": [
+            "id",
+            "repo",
+            "resolvedReason",
+            "resolvedAt",
+          ],
+          "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
     "autonomyPaused": {
       "type": "boolean",
     },
@@ -14158,6 +14191,34 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
             ],
             "type": "string",
           },
+          "waitsFor": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "failedSha": {
+                    "type": "string",
+                  },
+                  "kind": {
+                    "const": "main-green",
+                    "type": "string",
+                  },
+                  "repo": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "kind",
+                  "repo",
+                  "failedSha",
+                ],
+                "type": "object",
+              },
+              {
+                "type": "null",
+              },
+            ],
+          },
         },
         "required": [
           "id",
@@ -14165,6 +14226,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tea
           "reason",
           "publishError",
           "openedAt",
+          "waitsFor",
         ],
         "type": "object",
       },

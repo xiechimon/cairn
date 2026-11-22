@@ -105,7 +105,9 @@ test('human pause click keeps the user token while App is available', async () =
   const fetch: typeof globalThis.fetch = async (_input, init) => {
     if (init?.method === 'POST')
       writes.push(new Headers(init.headers).get('authorization') === 'Bearer identity-test-user');
-    return Response.json(String(_input).includes('/issues?') ? [] : { number: 1 });
+    return Response.json(
+      String(_input).includes('/issues?') ? [] : { number: 1, node_id: 'issue-1' },
+    );
   };
   const s = bootServer({ githubFetch: fetch });
   try {
@@ -161,7 +163,9 @@ test('human service entry points resolve UserToken internally with App available
         self: String(init.body ?? '').includes('cairn:todo'),
         user: new Headers(init.headers).get('authorization') === 'Bearer service-human-fixture',
       });
-    return Response.json(String(input).includes('/issues?') ? [] : { number: 1 });
+    return Response.json(
+      String(input).includes('/issues?') ? [] : { number: 1, node_id: 'issue-1' },
+    );
   };
   const home = makeTestTempDir('human-identity-');
   vi.stubEnv('CAIRN_HOME', home);

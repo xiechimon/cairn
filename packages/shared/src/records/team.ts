@@ -19,14 +19,33 @@ export const AUTONOMY_PAUSE_SOURCES = [
 ] as const;
 export type AutonomyPauseSource = (typeof AUTONOMY_PAUSE_SOURCES)[number];
 
+export const autonomyPauseWaitsForSchema = z.object({
+  kind: z.literal('main-green'),
+  repo: z.string(),
+  failedSha: z.string(),
+});
+export type AutonomyPauseWaitsFor = z.infer<typeof autonomyPauseWaitsForSchema>;
+
 export const autonomyPauseEntrySchema = z.object({
   id: z.string(),
   source: z.enum(AUTONOMY_PAUSE_SOURCES),
   reason: z.string(),
   publishError: z.string().nullable(),
   openedAt: epochMs,
+  waitsFor: autonomyPauseWaitsForSchema.nullable(),
 });
 export type AutonomyPauseEntry = z.infer<typeof autonomyPauseEntrySchema>;
+
+export const AUTONOMY_PAUSE_RESOLVERS = ['markers', 'owner', 'condition'] as const;
+export type AutonomyPauseResolver = (typeof AUTONOMY_PAUSE_RESOLVERS)[number];
+
+export const autonomyAutoResumeSchema = z.object({
+  id: z.string(),
+  repo: z.string(),
+  resolvedReason: z.string(),
+  resolvedAt: epochMs,
+});
+export type AutonomyAutoResume = z.infer<typeof autonomyAutoResumeSchema>;
 
 export const teamRecordSchema = z.object({
   id: recordId,
@@ -36,6 +55,7 @@ export const teamRecordSchema = z.object({
   avatarStyle: z.string().nullable(),
   autonomyPaused: z.boolean().optional(),
   autonomyPauses: z.array(autonomyPauseEntrySchema).optional(),
+  autonomyAutoResume: autonomyAutoResumeSchema.nullable().optional(),
   maxAutonomousMergesPerDay: z.number().int().nonnegative().optional(),
   defaultMachineId: recordId.nullable().optional(),
 });

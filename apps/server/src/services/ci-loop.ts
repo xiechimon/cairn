@@ -36,7 +36,7 @@ import {
   CI_FOREIGN_RELIST_MS,
   createReviewReconciler,
 } from './ci-review-reconcile.js';
-import { syncAutonomyPauses } from './github-autonomy-brake.js';
+import { resumeClearedAutonomyPauses, syncAutonomyPauses } from './github-autonomy-brake.js';
 import { recoverRedAutonomousMain } from './github-recovery.js';
 import { CI_FIX_PROMPT_HEAD } from './retry-lessons.js';
 
@@ -117,6 +117,14 @@ export function createCiPoller(
       run.logger?.info(
         { error: error instanceof Error ? error.message : String(error) },
         'autonomous main recovery deferred',
+      );
+    }
+    try {
+      await resumeClearedAutonomyPauses({ ...deps, githubFetch: run.githubFetch });
+    } catch (error) {
+      run.logger?.info(
+        { error: error instanceof Error ? error.message : String(error) },
+        'autonomous main resume deferred',
       );
     }
     const candidates = deps.db

@@ -2960,4 +2960,22 @@ export const EN: Record<string, string> = {
   该服务商: 'the provider',
   '排队中：信息卡要在 Coordinator 的电脑里运行，团队暂无可用的电脑（需要 macOS 26 以上的 Apple 芯片 Mac，并开启 Linux 虚拟机）':
     'Queued: info cards run on the Coordinator computer, and the team has no usable computer (it needs an Apple silicon Mac on macOS 26 or later with the Linux VM turned on)',
+  自治合并: 'Autonomous merging',
+  自治合并已暂停: 'Autonomous merging is paused',
+  '{repo} 的主分支检查在 `{sha}` 失败。检查重新通过后自动恢复。':
+    'The main branch check in {repo} failed at `{sha}`. Autonomous merging resumes when the check passes again.',
+  '多个仓库的主分支检查未通过。所有相关检查均通过后自动恢复。':
+    'Main branch checks failed in multiple repositories. Autonomous merging resumes when all of those checks pass.',
+  '自治合并已手动暂停，须手动恢复。':
+    'Autonomous merging was paused manually. Resume it to continue.',
+  '合并前未完成审核，须手动恢复自治合并。':
+    'Review was not completed before the merge. Resume autonomous merging manually.',
+  '主分支检查未通过，须手动恢复自治合并。':
+    'The main branch check failed. Resume autonomous merging manually.',
+  '升级前的暂停仍然有效，须手动恢复自治合并。':
+    'A pause from before the upgrade is still active. Resume autonomous merging manually.',
+  现在恢复: 'Resume now',
+  '未能恢复自治合并，请重试。': 'Could not resume autonomous merging. Try again.',
+  '自治合并已恢复：{repo} 的主分支检查已通过':
+    'Autonomous merging resumed: the main branch check in {repo} passed',
 };

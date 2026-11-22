@@ -10,7 +10,12 @@ import type { AutonomousToken } from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { githubRepoOfProject } from './git.js';
 import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
-import { brakeRequest, pauseTeamAutonomy } from './github-autonomy-brake.js';
+import {
+  brakeRequest,
+  pauseTeamAutonomy,
+  readDefaultBranchCheck,
+  readTeamMainCheck,
+} from './github-autonomy-brake.js';
 
 export async function prepareRecoveryBranch(input: {
   url: string;
@@ -65,32 +70,17 @@ export async function recentRecoveryTarget(
   fetchImpl: FetchLike,
   token: string,
   repo: string,
+  branch: string,
   main: string,
   target: string,
+  workflowId: number,
 ): Promise<boolean> {
   let sha = main;
   let found = false;
   for (let i = 0; i < 1000; i++) {
-    const response = await brakeRequest(
-      fetchImpl,
-      token,
-      repo,
-      `commits/${sha}/check-runs?filter=latest&per_page=100`,
-    );
-    if (!response.ok) return false;
-    const body = (await response.json()) as {
-      check_runs: {
-        id: number;
-        name: string;
-        status: string;
-        conclusion: string;
-        app?: { slug: string };
-      }[];
-    };
-    const latest = body.check_runs
-      .filter((run) => run.name === 'check' && run.app?.slug === 'github-actions')
-      .sort((a, b) => b.id - a.id)[0];
-    if (latest?.status === 'completed' && latest.conclusion === 'success') return found;
+    const check = await readDefaultBranchCheck(fetchImpl, token, repo, { branch, sha, workflowId });
+    if (check === null) return false;
+    if (check.conclusion === 'success') return found;
     if (sha === target) found = true;
     const commit = await brakeRequest(fetchImpl, token, repo, `git/commits/${sha}`);
     if (!commit.ok) return false;
@@ -116,113 +106,111 @@ export async function recoverRedAutonomousMain(
     .orderBy(desc(autonomousMergeAdmission.landedAt))
     .all();
   const seen = new Set<string>();
+  const githubDeps = { ...deps, githubFetch: fetchImpl };
+  const publications: Promise<void>[] = [];
+  const recoveries: (() => Promise<void>)[] = [];
   for (const row of rows) {
     const target = githubRepoOfProject(row.project);
-    if (!target || row.build.prNumber === null) continue;
+    const prNumber = row.build.prNumber;
+    if (!target || prNumber === null) continue;
     const repo = `${target.owner}/${target.repo}`;
-    if (seen.has(repo)) continue;
-    seen.add(repo);
-    const token = await autonomousToken(
-      { ...deps, githubFetch: fetchImpl },
-      row.admission.teamId,
-      target,
-    );
+    const key = `${row.admission.teamId}:${repo.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const token = await autonomousToken(githubDeps, row.admission.teamId, target);
     if (token === null) continue;
-    const mainResponse = await brakeRequest(fetchImpl, token, repo, 'branches/main');
-    if (!mainResponse.ok) continue;
-    const mainBody = (await mainResponse.json()) as { commit: { sha: string } };
-    const main = mainBody.commit.sha;
-    if (!isFullSha(main)) continue;
-    const checksResponse = await brakeRequest(
-      fetchImpl,
-      token,
-      repo,
-      `commits/${main}/check-runs?filter=latest&per_page=100`,
+    const check = await readTeamMainCheck(githubDeps, row.admission.teamId, repo, token);
+    if (check?.conclusion !== 'failure') continue;
+    const { sha: main, branch: baseBranch, readToken } = check;
+    publications.push(
+      pauseTeamAutonomy(githubDeps, row.admission.teamId, {
+        source: 'main-red',
+        reason: `Main check failed at ${main} in ${repo}.`,
+        requestKey: `main-red:${repo.toLowerCase()}:${baseBranch}:${main}:${check.id}:${check.attempt}`,
+        waitsFor: { kind: 'main-green', repo, failedSha: main, workflowId: check.workflowId },
+      }).catch(() => undefined),
     );
-    if (!checksResponse.ok) continue;
-    const checks = (await checksResponse.json()) as {
-      check_runs: {
-        id: number;
-        name: string;
-        status: string;
-        conclusion: string;
-        app?: { slug: string };
-      }[];
-    };
-    const latest = checks.check_runs
-      .filter((check) => check.name === 'check' && check.app?.slug === 'github-actions')
-      .sort((a, b) => b.id - a.id)[0];
-    if (latest?.status !== 'completed' || latest.conclusion !== 'failure') continue;
-    await pauseTeamAutonomy({ ...deps, githubFetch: fetchImpl }, row.admission.teamId, {
-      source: 'main-red',
-      reason: `Main check failed at ${main} in ${repo}.`,
-      requestKey: `main-red:${repo}:${main}`,
-    }).catch(() => undefined);
-    const pull = await githubPull(fetchImpl, token, target.owner, target.repo, row.build.prNumber);
-    const reverted = pull?.pull?.mergeCommitSha;
-    if (!reverted || !isFullSha(reverted)) continue;
-    const compare = await brakeRequest(fetchImpl, token, repo, `compare/${reverted}...${main}`);
-    if (!compare.ok) continue;
-    const comparison = (await compare.json()) as { status: string };
-    if (comparison.status !== 'ahead' && comparison.status !== 'identical') continue;
-    if (!(await recentRecoveryTarget(fetchImpl, token, repo, main, reverted))) continue;
-    const branch = `cairn-recovery/${reverted.slice(0, 8)}`;
-    const existing = await brakeRequest(
-      fetchImpl,
-      token,
-      repo,
-      `pulls?state=all&head=${encodeURIComponent(`${target.owner}:${branch}`)}&base=main`,
-    );
-    if (!existing.ok) continue;
-    const pulls: unknown = await existing.json();
-    if (!Array.isArray(pulls)) continue;
-    if (pulls.length > 0) {
-      for (const pull of pulls as { number: number; state: string }[]) {
-        if (pull.state !== 'open') continue;
-        const labelled = await brakeRequest(
+    recoveries.push(async () => {
+      const pull = await githubPull(fetchImpl, token, target.owner, target.repo, prNumber);
+      const reverted = pull?.pull?.mergeCommitSha;
+      if (!reverted || !isFullSha(reverted)) return;
+      const compare = await brakeRequest(fetchImpl, token, repo, `compare/${reverted}...${main}`);
+      if (!compare.ok) return;
+      const comparison = (await compare.json()) as { status: string };
+      if (comparison.status !== 'ahead' && comparison.status !== 'identical') return;
+      if (
+        !(await recentRecoveryTarget(
           fetchImpl,
-          token,
+          readToken,
           repo,
-          `issues/${pull.number}/labels`,
-          { labels: ['cairn-recovery'] },
-        );
-        if (!labelled.ok) throw new Error('Recovery PR labelling failed');
-      }
-      continue;
-    }
-    const label = await brakeRequest(fetchImpl, token, repo, 'labels/cairn-recovery');
-    if (label.status === 404) {
-      const created = await brakeRequest(fetchImpl, token, repo, 'labels', {
-        name: 'cairn-recovery',
-        color: 'b60205',
-      });
-      if (!created.ok && created.status !== 422) throw new Error('Recovery label creation failed');
-    } else if (!label.ok) continue;
-    const ref = await brakeRequest(fetchImpl, token, repo, `git/ref/heads/${branch}`);
-    if (ref.status === 404)
-      await prepareRecoveryBranch({
-        url: `https://github.com/${repo}.git`,
-        base: main,
-        reverted,
+          baseBranch,
+          main,
+          reverted,
+          check.workflowId,
+        ))
+      )
+        return;
+      const branch = `cairn-recovery/${reverted.slice(0, 8)}`;
+      const existing = await brakeRequest(
+        fetchImpl,
         token,
-        identity: softwareCommitIdentity(deps) ?? localCommitIdentity('Cairn'),
+        repo,
+        `pulls?state=all&head=${encodeURIComponent(`${target.owner}:${branch}`)}&base=${encodeURIComponent(baseBranch)}`,
+      );
+      if (!existing.ok) return;
+      const pulls: unknown = await existing.json();
+      if (!Array.isArray(pulls)) return;
+      if (pulls.length > 0) {
+        for (const pull of pulls as { number: number; state: string }[]) {
+          if (pull.state !== 'open') continue;
+          const labelled = await brakeRequest(
+            fetchImpl,
+            token,
+            repo,
+            `issues/${pull.number}/labels`,
+            { labels: ['cairn-recovery'] },
+          );
+          if (!labelled.ok) throw new Error('Recovery PR labelling failed');
+        }
+        return;
+      }
+      const label = await brakeRequest(fetchImpl, token, repo, 'labels/cairn-recovery');
+      if (label.status === 404) {
+        const created = await brakeRequest(fetchImpl, token, repo, 'labels', {
+          name: 'cairn-recovery',
+          color: 'b60205',
+        });
+        if (!created.ok && created.status !== 422)
+          throw new Error('Recovery label creation failed');
+      } else if (!label.ok) return;
+      const ref = await brakeRequest(fetchImpl, token, repo, `git/ref/heads/${branch}`);
+      if (ref.status === 404)
+        await prepareRecoveryBranch({
+          url: `https://github.com/${repo}.git`,
+          base: main,
+          reverted,
+          token,
+          identity: softwareCommitIdentity(deps) ?? localCommitIdentity('Cairn'),
+        });
+      else if (!ref.ok) return;
+      const opened = await brakeRequest(fetchImpl, token, repo, 'pulls', {
+        title: `Revert autonomous merge ${reverted.slice(0, 8)}`,
+        head: branch,
+        base: baseBranch,
+        body: `## What\n\nThis reverts commit ${reverted} after main check failed at ${main}.\n\n## Verified\n\nThe recovery exception recomputes the exact revert tree before allowing this PR through the brake.\n\n## Upstream\n\nRecovery of the repository's autonomous merge.\n\n## Risk\n\nRequires review; Cairn does not merge this PR.\n\n## Acceptance\n\n- [x] Recovery branch contains the revert.\n\n## Issues\n\nAutonomy resumes once the main check passes again, or when the marker issue is closed.`,
       });
-    else if (!ref.ok) continue;
-    const opened = await brakeRequest(fetchImpl, token, repo, 'pulls', {
-      title: `Revert autonomous merge ${reverted.slice(0, 8)}`,
-      head: branch,
-      base: 'main',
-      body: `## What\n\nThis reverts commit ${reverted} after main check failed at ${main}.\n\n## Verified\n\nThe recovery exception recomputes the exact revert tree before allowing this PR through the brake.\n\n## Upstream\n\nRecovery of the repository's autonomous merge.\n\n## Risk\n\nRequires review; Cairn does not merge this PR.\n\n## Acceptance\n\n- [x] Recovery branch contains the revert.\n\n## Issues\n\nAutonomy remains paused until the marker issue is closed.`,
+      if (!opened.ok) throw new Error('Recovery PR creation failed');
+      const recovery = (await opened.json()) as { number: number };
+      const labelled = await brakeRequest(
+        fetchImpl,
+        token,
+        repo,
+        `issues/${recovery.number}/labels`,
+        { labels: ['cairn-recovery'] },
+      );
+      if (!labelled.ok) throw new Error('Recovery PR labelling failed');
     });
-    if (!opened.ok) throw new Error('Recovery PR creation failed');
-    const recovery = (await opened.json()) as { number: number };
-    const labelled = await brakeRequest(
-      fetchImpl,
-      token,
-      repo,
-      `issues/${recovery.number}/labels`,
-      { labels: ['cairn-recovery'] },
-    );
-    if (!labelled.ok) throw new Error('Recovery PR labelling failed');
   }
+  await Promise.all(publications);
+  for (const recover of recoveries) await recover();
 }

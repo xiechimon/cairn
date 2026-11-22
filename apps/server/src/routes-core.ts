@@ -27,9 +27,9 @@ import { coordinatorRunsOnPi } from './services/coordinator-context.js';
 import { readDeployStatus } from './services/deploy-status.js';
 import { createSerialConnection, StreamSessionRegistry } from './services/events.js';
 import {
-  openAutonomyPauses,
   pauseTeamGithubRepos,
   resumeAutonomyPauses,
+  teamAutonomy,
 } from './services/github-autonomy-brake.js';
 import { isOwner } from './services/instance-owner.js';
 import { getModelRouting } from './services/model-routing.js';
@@ -119,7 +119,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/teams', (c) => {
     const row = ctx.db.select().from(team).where(eq(team.id, ctx.team.id)).get();
-    return c.json(row === undefined ? [] : [toTeamRecord(row, openAutonomyPauses(ctx.db, row.id))]);
+    return c.json(row === undefined ? [] : [toTeamRecord(row, teamAutonomy(ctx.db, row.id))]);
   });
 
   app.get('/api/teams/:id/model-routing', (c) => {
@@ -195,19 +195,22 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const body = parseWith(patchTeamBodySchema, await jsonBody(c), 'body');
-    if (body.autonomyPaused === false) resumeAutonomyPauses(ctx.db, id);
-    if (body.autonomyPaused === true) {
-      await pauseTeamGithubRepos(
-        {
-          ...githubAppOf(ctx),
-          db: ctx.db,
-          box: ctx.secretBox,
-          githubFetch: ctx.githubFetch,
-          oauthClient: ctx.oauthClient,
-        },
-        id,
-      );
-    }
+    if (
+      body.autonomyPaused !== undefined &&
+      (pairedDeviceIdOf(c) !== null ||
+        (ctx.authToken !== null && c.get('ownerIdentity') === undefined) ||
+        !isOwner(ctx.db, ctx.user.id))
+    )
+      throw new HttpError(403, 'owner session required');
+    const githubDeps = {
+      ...githubAppOf(ctx),
+      db: ctx.db,
+      box: ctx.secretBox,
+      githubFetch: ctx.githubFetch,
+      oauthClient: ctx.oauthClient,
+    };
+    if (body.autonomyPaused === false) await resumeAutonomyPauses(githubDeps, id);
+    if (body.autonomyPaused === true) await pauseTeamGithubRepos(githubDeps, id);
     if (body.maxAutonomousMergesPerDay !== undefined) {
       ctx.db
         .update(team)
@@ -218,7 +221,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const row = ctx.db.select().from(team).where(eq(team.id, id)).get();
     return c.json({
       ...ctx.team,
-      ...(row === undefined ? {} : toTeamRecord(row, openAutonomyPauses(ctx.db, id))),
+      ...(row === undefined ? {} : toTeamRecord(row, teamAutonomy(ctx.db, id))),
     });
   });
 

@@ -6,7 +6,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { afterEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
-import { project } from '../src/db/schema.js';
+import { autonomyPause, project } from '../src/db/schema.js';
 import type { AutonomousToken } from '../src/lib/github-token.js';
 import { autonomousMergePolicy } from '../src/services/autonomous-merge.js';
 import {
@@ -27,6 +27,7 @@ function teamMarkersWorld() {
   const issues = new Map<string, { repo: string; number: number; open: boolean }>();
   let next = 7;
   let postsFail = false;
+  let nextPostFails = false;
   const gates: (() => Promise<void>)[] = [];
   const fetchImpl: typeof fetch = async (input, init) => {
     const url = new URL(String(input));
@@ -35,22 +36,28 @@ function teamMarkersWorld() {
     if (url.pathname.endsWith('/issues') && init?.method === 'POST') {
       const gate = gates.shift();
       if (gate !== undefined) await gate();
-      if (postsFail) return new Response('', { status: 403 });
+      if (postsFail || nextPostFails) {
+        nextPostFails = false;
+        return new Response('', { status: 403 });
+      }
       const marker = { repo, number: next++, open: true };
       issues.set(`${repo}#${marker.number}`, marker);
-      return Response.json({ number: marker.number });
+      return Response.json({ number: marker.number, node_id: `issue-${marker.number}` });
     }
     if (url.pathname.endsWith('/issues'))
       return Response.json(
         [...issues.values()]
           .filter((issue) => issue.repo === repo && issue.open)
-          .map((issue) => ({ number: issue.number })),
+          .map((issue) => ({ number: issue.number, node_id: `issue-${issue.number}` })),
       );
     if (parts[4] === 'issues' && parts[5] !== undefined) {
       const issue = issues.get(`${repo}#${parts[5]}`);
       return issue === undefined
         ? new Response('', { status: 404 })
-        : Response.json({ state: issue.open ? 'open' : 'closed' });
+        : Response.json({
+            state: issue.open ? 'open' : 'closed',
+            node_id: `issue-${issue.number}`,
+          });
     }
     return Response.json({ name: 'autonomy-paused' });
   };
@@ -86,6 +93,9 @@ function teamMarkersWorld() {
     },
     failPosts: (fail: boolean) => {
       postsFail = fail;
+    },
+    failNextPost: () => {
+      nextPostFails = true;
     },
     holdNextPost: () => {
       let release: () => void = () => {};
@@ -151,7 +161,7 @@ test('a rejected publication stays paused through empty reads until the owner re
   }
 });
 
-test('a successful pause finishing after a failed concurrent pause cannot resume the failed one', async () => {
+test('a queued pause publishing successfully cannot resume a partially published pause', async () => {
   const w = teamMarkersWorld();
   try {
     const release = w.holdNextPost();
@@ -160,13 +170,14 @@ test('a successful pause finishing after a failed concurrent pause cannot resume
       reason: 'Main check failed in octo/alpha.',
     });
     await vi.waitFor(() => expect(w.issues.size).toBe(1));
-    w.failPosts(true);
-    await expect(
-      pauseTeamAutonomy(w.deps, w.s.team.id, { source: 'unjudged-landing', reason: 'Unjudged.' }),
-    ).rejects.toThrow();
-    w.failPosts(false);
+    const queued = pauseTeamAutonomy(w.deps, w.s.team.id, {
+      source: 'unjudged-landing',
+      reason: 'Unjudged.',
+    });
+    w.failNextPost();
     release();
-    await slow;
+    await expect(slow).rejects.toThrow();
+    await queued;
     w.closeAll();
     await syncAutonomyPauses(w.deps);
     expect(w.paused()).toBe(true);
@@ -242,6 +253,32 @@ test('an unreadable published marker keeps the pause', async () => {
   }
 });
 
+test('an old marker without an issue identity requires explicit owner resume', async () => {
+  const w = teamMarkersWorld();
+  try {
+    const { db, team, app } = w.s;
+    db.insert(autonomyPause)
+      .values({
+        id: 'historical',
+        teamId: team.id,
+        source: 'settings',
+        reason: 'Paused by the team owner.',
+        markers: [{ repo: 'octo/alpha', number: 7 }],
+        openedAt: 1,
+      })
+      .run();
+    w.issues.set('octo/alpha#7', { repo: 'octo/alpha', number: 7, open: false });
+    await syncAutonomyPauses(w.deps);
+    expect(w.paused()).toBe(true);
+    expect(
+      (await req(app, 'PATCH', `/api/teams/${team.id}`, { autonomyPaused: false })).status,
+    ).toBe(200);
+    expect(w.paused()).toBe(false);
+  } finally {
+    w.s.dispose();
+  }
+});
+
 test('the migration turns a legacy team pause into an open entry the owner resume clears', () => {
   const journal = JSON.parse(
     readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8'),
@@ -291,18 +328,26 @@ test('marker pause creates the label and issue once, and never closes a marker',
       method: init?.method ?? 'GET',
       body: init?.body ? JSON.parse(String(init.body)) : null,
     });
-    if (url.includes('/issues?')) return Response.json(created ? [{ number: 7 }] : []);
+    if (url.includes('/issues?'))
+      return Response.json(created ? [{ number: 7, node_id: 'issue-7' }] : []);
     if (url.endsWith('/labels/autonomy-paused')) return new Response('', { status: 404 });
     if (url.endsWith('/issues')) created = true;
-    return Response.json({ number: 7 });
+    return Response.json({ number: 7, node_id: 'issue-7' });
   };
   await pauseGithubRepo(
     fetchImpl,
     'token' as AutonomousToken,
     'owner/repo',
     'Paused in the product',
+    new Map(),
   );
-  await pauseGithubRepo(fetchImpl, 'token' as AutonomousToken, 'owner/repo', 'Paused again');
+  await pauseGithubRepo(
+    fetchImpl,
+    'token' as AutonomousToken,
+    'owner/repo',
+    'Paused again',
+    new Map([[7, 'issue-7']]),
+  );
   expect(calls.filter((call) => call.method === 'POST')).toEqual([
     expect.objectContaining({
       url: 'https://api.github.com/repos/owner/repo/labels',
@@ -346,17 +391,33 @@ test.each(['after-green', 'before-green', 'no-green'] as const)(
     expect(
       await recentRecoveryTarget(
         (async (input) => {
-          const url = String(input);
-          const sha = url.match(/(?:commits\/)([a-f0-9]{40})/)?.[1];
-          if (url.includes('/check-runs'))
+          const url = new URL(String(input));
+          const sha = url.pathname.split('/').at(-1);
+          if (url.pathname.endsWith('/workflows/10/runs')) {
+            const head = url.searchParams.get('head_sha') ?? '';
             return Response.json({
-              check_runs: [
+              workflow_runs: [
                 {
-                  id: 1,
+                  id: head.charCodeAt(0),
+                  workflow_id: 10,
+                  run_attempt: 1,
+                  head_sha: head,
+                  head_branch: 'main',
+                  event: 'push',
+                },
+              ],
+            });
+          }
+          if (sha === 'jobs')
+            return Response.json({
+              jobs: [
+                {
                   name: 'check',
                   status: 'completed',
-                  conclusion: sha === green && mode !== 'no-green' ? 'success' : 'failure',
-                  app: { slug: 'github-actions' },
+                  conclusion:
+                    url.pathname.includes('/runs/99/') && mode !== 'no-green'
+                      ? 'success'
+                      : 'failure',
                 },
               ],
             });
@@ -368,8 +429,10 @@ test.each(['after-green', 'before-green', 'no-green'] as const)(
         }) as typeof fetch,
         'token',
         'owner/repo',
+        'main',
         main,
         target,
+        10,
       ),
     ).toBe(mode === 'after-green');
   },

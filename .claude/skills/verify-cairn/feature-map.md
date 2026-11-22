@@ -440,6 +440,25 @@ Reach:
 - Backend design: [docs/spec/23-rework-to-original-branch-and-pr-convergence.md](../../../docs/spec/23-rework-to-original-branch-and-pr-convergence.md), [docs/design/runtime-memory-out-of-tree.md](../../../docs/design/runtime-memory-out-of-tree.md), [docs/research/branch-model-2026-11-08.md](../../../docs/research/branch-model-2026-11-08.md) (not on main), [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md)
 - Evidence: `apps/web/e2e/detail-continue-thread.spec.ts`, `apps/web/e2e/detail-archive.spec.ts`, `apps/server/test/archive.test.ts`, `apps/server/test/tasks.test.ts`
 
+### autonomy-pause
+
+**Autonomous merging pause and auto-resume** (shipped, centrality 2). When an autonomous merge turns the main check red, autonomous merging pauses; a home banner says why and what it waits for, with Resume now, and the pause ends on its own once the main check passes again.
+
+States: Hidden while not paused; a paused banner waiting for the main check, or waiting for you after a manual pause; a one-line resumed notice after an automatic resume, until dismissed.
+
+Reach:
+
+1. `open /app`
+2. `click testid:autonomy-banner`
+
+- Web routes: none
+- Keyboard shortcuts in its code: none
+- Test ids in its code: `autonomy-banner`
+- Research: n/a: single-path fix of an existing pause: it now ends on the signal it was keyed on
+- Frontend design: [docs/design/autonomy-auto-resume.md](../../../docs/design/autonomy-auto-resume.md)
+- Backend design: [docs/design/autonomy-auto-resume.md](../../../docs/design/autonomy-auto-resume.md)
+- Evidence: `apps/server/test/autonomy-auto-resume.test.ts`, `apps/server/test/github-autonomy-brake.test.ts`, `apps/web/test/autonomy-banner.test.ts`
+
 ### desktop-app
 
 **Desktop app** (planned, centrality 2). A web shell that bundles the server, daemon, Coordinator and tsnet, so installing it makes the machine an executor.

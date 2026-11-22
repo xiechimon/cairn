@@ -1,5 +1,5 @@
 import { userInfo } from 'node:os';
-import type { AutonomyPauseEntry, TeamRecord, UserRecord } from '@cairn/shared';
+import type { AutonomyAutoResume, AutonomyPauseEntry, TeamRecord, UserRecord } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { Db } from './client.js';
@@ -76,7 +76,7 @@ export function toUserRecord(row: {
 
 export function toTeamRecord(
   row: Pick<typeof team.$inferSelect, keyof typeof teamRecordColumns>,
-  pauses?: AutonomyPauseEntry[],
+  autonomy?: { pauses: AutonomyPauseEntry[]; autoResume: AutonomyAutoResume | null },
 ): TeamRecord {
   return {
     id: row.id,
@@ -84,7 +84,13 @@ export function toTeamRecord(
     createdAt: row.createdAt,
     plan: row.plan,
     avatarStyle: row.avatarStyle,
-    ...(pauses === undefined ? {} : { autonomyPaused: pauses.length > 0, autonomyPauses: pauses }),
+    ...(autonomy === undefined
+      ? {}
+      : {
+          autonomyPaused: autonomy.pauses.length > 0,
+          autonomyPauses: autonomy.pauses,
+          autonomyAutoResume: autonomy.autoResume,
+        }),
     maxAutonomousMergesPerDay: row.maxAutonomousMergesPerDay,
     defaultMachineId: row.defaultMachineId,
   };

@@ -170,6 +170,18 @@ export const useTeams = (enabled: boolean) =>
     staleTime: Number.POSITIVE_INFINITY,
   });
 
+const AUTONOMY_POLL_MS = 60_000;
+
+export const useTeamAutonomy = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['teams'],
+    queryFn: () => api.get<TeamRecord[]>('/api/teams'),
+    enabled,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchInterval: AUTONOMY_POLL_MS,
+    select: (teams: TeamRecord[]) => teams[0] ?? null,
+  });
+
 export const useProjects = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['projects', teamId],

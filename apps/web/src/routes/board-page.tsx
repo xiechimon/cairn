@@ -19,6 +19,7 @@ import {
 } from '../board/antigravity-login-banner.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { ArchivedProjectState } from '../board/archived-project-bar.js';
+import { AutonomyBanner, useAutonomyNotice } from '../board/autonomy-banner.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
 import { designTargetOf } from '../board/design/design-route.js';
@@ -167,7 +168,8 @@ export function BoardPage() {
   const devinLoginWarnings = useDevinLoginWarnings(now);
   const antigravityLoginWarnings = useAntigravityLoginWarnings(now);
   const setup = useFirstRunSetup();
-  const bannerCandidates: { kind: HomeBannerKind; node: ReactNode }[] = [
+  const autonomy = useAutonomyNotice(live);
+  const bannerCandidates: { kind: HomeBannerKind; node: ReactNode; blocking?: boolean }[] = [
     ...(backupWarning != null
       ? [{ kind: 'backup' as const, node: <BackupBanner key="backup" notice={backupWarning} /> }]
       : []),
@@ -183,6 +185,22 @@ export function BoardPage() {
                 <DevinLoginBanner warnings={devinLoginWarnings} />
                 <AntigravityLoginBanner warnings={antigravityLoginWarnings} />
               </div>
+            ),
+          },
+        ]
+      : []),
+    ...(autonomy.notice != null
+      ? [
+          {
+            kind: 'autonomy' as const,
+            blocking: autonomy.notice.kind === 'paused',
+            node: (
+              <AutonomyBanner
+                key="autonomy"
+                notice={autonomy.notice}
+                teamId={teamId}
+                onDismiss={autonomy.dismiss}
+              />
             ),
           },
         ]

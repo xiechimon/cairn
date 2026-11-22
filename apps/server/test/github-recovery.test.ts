@@ -76,29 +76,32 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
         );
         writes.push({ path, body: JSON.parse(String(init.body)) });
       }
+      if (path === '/repos/owner/repo') return Response.json({ default_branch: 'main' });
       if (path.endsWith('/branches/main')) return Response.json({ commit: { sha } });
       if (path.includes('/git/commits/'))
         return Response.json({ parents: [{ sha: 'b'.repeat(40) }] });
-      if (path.includes('b'.repeat(40)) && path.endsWith('/check-runs'))
+      if (path.endsWith('/runs')) {
+        const head = new URL(String(input)).searchParams.get('head_sha') ?? '';
         return Response.json({
-          check_runs: [
+          workflow_runs: [
             {
-              id: 1,
-              name: 'check',
-              status: 'completed',
-              conclusion: 'success',
-              app: { slug: 'github-actions' },
+              id: head === sha ? 1 : 2,
+              workflow_id: 10,
+              run_attempt: 1,
+              head_sha: head,
+              head_branch: 'main',
+              event: 'push',
             },
           ],
         });
-      if (path.endsWith('/check-runs'))
+      }
+      if (path.endsWith('/jobs'))
         return Response.json({
-          check_runs: [
+          jobs: [
             {
               name: 'check',
               status: 'completed',
-              conclusion: 'failure',
-              app: { slug: 'github-actions' },
+              conclusion: path.includes('/runs/1/') ? 'failure' : 'success',
             },
           ],
         });
@@ -111,7 +114,7 @@ test.each([null, 'app-token-unavailable', 'repo-not-installed'] as const)(
       if (path.endsWith('/pulls') && init?.method === 'POST') opened = true;
       if (path.endsWith('/issues/8/labels') && ++labelAttempts === 1)
         return new Response('', { status: 500 });
-      return Response.json({ number: 8 });
+      return Response.json({ number: 8, node_id: 'issue-8' });
     };
     const s = bootServer({ githubFetch: fetchImpl });
     try {

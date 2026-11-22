@@ -2,7 +2,9 @@ import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { project } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
+import { issueBrowserSession } from '../src/services/browser-session.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
+import { createPairedDevice } from '../src/services/paired-devices.js';
 import { bootServer, postProject, req, teamPausedForTest } from './helpers.js';
 
 test('team autonomy pause persists, is readable after reseeding, and unpauses without changing other settings', async () => {
@@ -54,12 +56,37 @@ test('team autonomy pause rejects non-booleans and other teams without writing',
   }
 });
 
+test('autonomy pause and explicit resume require an owner, not a paired device', async () => {
+  const s = bootServer({ authToken: 'owner-fixture' });
+  try {
+    const { device: phone } = createPairedDevice(s.db, { teamId: s.team.id, name: 'Phone' });
+    const device = issueBrowserSession(s.db, 'device', phone.id);
+    const patch = (paused: boolean, auth: Record<string, string>) =>
+      s.app.request(`/api/teams/${s.team.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', ...auth },
+        body: JSON.stringify({ autonomyPaused: paused }),
+      });
+    const owner = { authorization: 'Bearer owner-fixture' };
+    const paired = { cookie: `cairn_auth=${device.token}` };
+    expect((await patch(true, paired)).status).toBe(403);
+    expect((await patch(true, owner)).status).toBe(200);
+    expect((await patch(false, paired)).status).toBe(403);
+    expect(teamPausedForTest(s.db, s.team.id)).toBe(true);
+    expect((await patch(false, owner)).status).toBe(200);
+  } finally {
+    s.dispose();
+  }
+});
+
 test('pausing through the product opens the GitHub marker for each GitHub project', async () => {
   const writes: string[] = [];
   const s = bootServer({
     githubFetch: async (url, init) => {
       if (init?.method === 'POST') writes.push(String(url));
-      return Response.json(String(url).includes('/issues?') ? [] : { number: 7 });
+      return Response.json(
+        String(url).includes('/issues?') ? [] : { number: 7, node_id: 'issue-7' },
+      );
     },
   });
   try {

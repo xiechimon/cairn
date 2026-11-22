@@ -2661,6 +2661,47 @@
       "batch": "B11"
     },
     {
+      "id": "autonomy-pause",
+      "name": "Autonomous merging pause and auto-resume",
+      "summary": "When an autonomous merge turns the main check red, autonomous merging pauses; a home banner says why and what it waits for, with Resume now, and the pause ends on its own once the main check passes again.",
+      "states": "Hidden while not paused; a paused banner waiting for the main check, or waiting for you after a manual pause; a one-line resumed notice after an automatic resume, until dismissed.",
+      "centrality": 2,
+      "status": "shipped",
+      "code": {
+        "web": [
+          "apps/web/src/board/autonomy-banner.tsx"
+        ],
+        "server": [
+          "apps/server/src/services/github-autonomy-brake.ts",
+          "apps/server/src/services/github-recovery.ts"
+        ]
+      },
+      "routes": {
+        "server": [
+          "/api/teams",
+          "/api/teams/:id"
+        ]
+      },
+      "reach": [
+        "open /app",
+        "click testid:autonomy-banner"
+      ],
+      "research": {
+        "na": "single-path fix of an existing pause: it now ends on the signal it was keyed on"
+      },
+      "frontendDesign": [
+        "docs/design/autonomy-auto-resume.md"
+      ],
+      "backendDesign": [
+        "docs/design/autonomy-auto-resume.md"
+      ],
+      "evidence": [
+        "apps/server/test/autonomy-auto-resume.test.ts",
+        "apps/server/test/github-autonomy-brake.test.ts",
+        "apps/web/test/autonomy-banner.test.ts"
+      ]
+    },
+    {
       "id": "thread-tags",
       "name": "Thread tags",
       "summary": "Category UI, vocabulary, seeding, assignment writers and legacy storage are fully removed; the tag/todo_tag tables and tagIds wire fields are gone.",
