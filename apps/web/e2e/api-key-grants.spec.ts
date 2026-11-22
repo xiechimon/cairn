@@ -11,7 +11,9 @@ const CREATED_ROW = {
   machineAccess: true,
 };
 
-test('a new key needs a MY_KEY name, gets every permission, and shows its plaintext once in its own row', async ({
+const KEY = `cairn_${'6a85c15de8ad7575'.repeat(4)}`;
+
+test('a new key needs a MY_KEY name, gets every permission, and shows its plaintext once in a modal while its row stays masked', async ({
   page,
 }) => {
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -21,7 +23,7 @@ test('a new key needs a MY_KEY name, gets every permission, and shows its plaint
     if (path.endsWith('/stream')) return route.abort();
     if (path === '/api/teams/team-1/api-keys' && request.method() === 'POST') {
       keys = [CREATED_ROW];
-      return route.fulfill({ status: 201, json: { ...CREATED_ROW, plaintext: 'cairn_example' } });
+      return route.fulfill({ status: 201, json: { ...CREATED_ROW, plaintext: KEY } });
     }
     if (path === '/api/teams')
       return route.fulfill({
@@ -64,22 +66,37 @@ test('a new key needs a MY_KEY name, gets every permission, and shows its plaint
     },
   });
   await expect(dialog).not.toBeVisible();
-  const rows = page.getByTestId('api-key-row');
-  await expect(page.getByText('CI_RUNNER_2', { exact: true })).toHaveCount(1);
-  await expect(rows).toHaveCount(1);
-  const row = rows.first();
-  await expect(row.getByText('cairn_example', { exact: true })).toBeVisible();
-  await expect(row.getByText('cairn_exam…', { exact: true })).toHaveCount(0);
-  await expect(row).toContainText('请立即复制 API 密钥，它仅显示一次。');
-  await row.getByRole('button', { name: '复制', exact: true }).click();
-  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('cairn_example');
-  await expect(row.getByRole('button', { name: '删除 CI_RUNNER_2', exact: true })).toBeVisible();
+  const reveal = page.getByRole('dialog', { name: '保存你的 API 密钥' });
+  await expect(reveal).toBeVisible();
+  const field = reveal.getByRole('textbox', { name: '新的 API 密钥', exact: true });
+  await expect(field).toHaveValue(KEY);
+  expect(
+    await field.evaluate((el) => ({
+      clippedX: el.scrollWidth > el.clientWidth,
+      clippedY: el.scrollHeight > el.clientHeight,
+      scrolled: el.scrollLeft + el.scrollTop,
+    })),
+    'the whole key, cairn_ prefix included, is visible without scrolling',
+  ).toEqual({ clippedX: false, clippedY: false, scrolled: 0 });
+  await expect(reveal).toContainText('关闭后无法再次查看');
+  await expect(reveal).toContainText('cairn_');
+  await expect(reveal.getByRole('button', { name: '关闭', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(reveal).toBeVisible();
+  await reveal.getByRole('button', { name: '复制', exact: true }).click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(KEY);
 
-  await page.reload();
+  const rows = page.getByTestId('api-key-row');
   await expect(rows).toHaveCount(1);
-  await expect(page.getByText('cairn_example', { exact: true })).toHaveCount(0);
   await expect(rows.first().getByText('cairn_exam…', { exact: true })).toBeVisible();
+  await expect(rows.first().getByText(KEY, { exact: true })).toHaveCount(0);
   await expect(rows.first().getByRole('button', { name: '复制', exact: true })).toHaveCount(0);
+
+  await reveal.getByRole('button', { name: '我已保存', exact: true }).click();
+  await expect(reveal).toBeHidden();
+  await expect(page.getByText(KEY, { exact: true })).toHaveCount(0);
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first().getByRole('button', { name: '删除 CI_RUNNER_2', exact: true })).toBeVisible();
 });
 
 test('Enter in the name field creates the key once the name is valid', async ({ page }) => {
@@ -92,7 +109,7 @@ test('Enter in the name field creates the key once the name is valid', async ({ 
   await name.press('Enter');
   await expect(dialog).toBeVisible();
   await page.route('**/api/teams/*/api-keys', (route) =>
-    route.fulfill({ status: 201, json: { plaintext: 'cairn_example' } }),
+    route.fulfill({ status: 201, json: { plaintext: KEY } }),
   );
   await name.fill('LAPTOP');
   await name.press('Enter');

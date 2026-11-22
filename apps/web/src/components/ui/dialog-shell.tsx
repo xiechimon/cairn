@@ -92,6 +92,7 @@ interface DialogShellProps {
   viewportRoot?: boolean;
   backdropClassName?: string;
   stacked?: boolean;
+  dismissible?: boolean;
   initialFocus?: DialogPrimitive.Popup.Props['initialFocus'];
 }
 
@@ -143,12 +144,13 @@ export function DialogShell({
   initialFocus,
   backdropClassName,
   stacked = false,
+  dismissible = true,
 }: DialogShellProps) {
   const { t } = useI18n();
   const { shellId, restore } = useReturnFocus(open);
 
   const handleOpenChange = (next: boolean, details?: { reason?: string; event?: Event }) => {
-    if (next) return;
+    if (next || !dismissible) return;
     if (details?.reason === 'escape-key' && onEscapeWhileNested != null) {
       onEscapeWhileNested();
       return;
@@ -260,17 +262,19 @@ export function DialogShell({
           {children}
         </div>
         {(footer != null || hint != null) && <DialogFootRow hint={hint}>{footer}</DialogFootRow>}
-        <IconTooltip
-          label={t('关闭')}
-          side="bottom"
-          trigger={
-            <DialogClose
-              render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
-            />
-          }
-        >
-          <X width={20} height={20} />
-        </IconTooltip>
+        {dismissible && (
+          <IconTooltip
+            label={t('关闭')}
+            side="bottom"
+            trigger={
+              <DialogClose
+                render={<Button variant="ghost" size="icon-sm" className={DIALOG_CLOSE_CLS} />}
+              />
+            }
+          >
+            <X width={20} height={20} />
+          </IconTooltip>
+        )}
       </DialogContent>
     </Dialog>
   );

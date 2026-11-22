@@ -10,7 +10,6 @@ const API_KEY_CREATED: ApiKeyRecord = {
   gitAccess: true,
   mcpAccess: true,
   machineAccess: true,
-  plaintext: API_KEY_PLAINTEXT,
 };
 
 export const apiKeysCreated: FixtureSet = {

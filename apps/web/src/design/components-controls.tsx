@@ -124,7 +124,7 @@ export function ButtonSection() {
         id="copy-icon"
         title="Copy icon button"
         note="Copies text and shows a check; a document's copy sits in the dialog head beside close (C27)"
-        code={`<CopyIconButton text={report.content} label={t('复制为 Markdown')} testId="copy-markdown" />`}
+        code={`<CopyIconButton text={report.content} label={label} testId="copy-markdown" />`}
       >
         <Cell label="dialog head">
           <CopyIconButton

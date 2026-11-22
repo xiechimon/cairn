@@ -6,7 +6,6 @@ import { useApiKeys, useApiMutations, useTodos } from '../api/hooks.js';
 import { mapApiKeys, toDisplayTodo } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { TOPBAR_PRIMARY_BUTTON, TOPBAR_TEXT_BUTTON } from '../board/filter-panel.js';
-import { CopyIconButton } from '../components/copy-icon-button.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SETTINGS_ROW_CLS, SettingsCard } from '../components/settings-list.js';
@@ -19,6 +18,7 @@ import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { ApiKeyCreateDialog } from './api-key-create-dialog.js';
+import { ApiKeyRevealDialog } from './api-key-reveal-dialog.js';
 
 export function ApiKeysPage() {
   const { t } = useI18n();
@@ -29,6 +29,7 @@ export function ApiKeysPage() {
   const todosQ = useTodos(teamId, live);
   const mutations = useApiMutations(teamId);
   const [created, setCreated] = useState<ApiKeyRecord | null>(null);
+  const [revealed, setRevealed] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const [removedIds, setRemovedIds] = useState<ReadonlySet<string>>(new Set());
@@ -112,13 +113,14 @@ export function ApiKeysPage() {
           mutations.createApiKey.mutate(body, {
             onSuccess: (res) => {
               const [row] = mapApiKeys([res]);
-              if (row?.id !== undefined && typeof res.plaintext === 'string')
-                setCreated({ ...row, plaintext: res.plaintext });
+              if (row !== undefined) setCreated(row);
+              if (typeof res.plaintext === 'string') setRevealed(res.plaintext);
             },
             onError: (error) => toastError(t('新建 API 密钥失败，请重试。'), error),
           });
         }}
       />
+      <ApiKeyRevealDialog plaintext={revealed} onDone={() => setRevealed(null)} />
       <DeleteConfirm
         open={deleting !== null}
         title={t('删除后，用这个 API 密钥的 MCP 客户端、脚本和 Git 访问会立即失效，无法恢复')}
@@ -132,11 +134,8 @@ export function ApiKeysPage() {
 }
 
 function withCreated(keys: ApiKeyRecord[], created: ApiKeyRecord | null): ApiKeyRecord[] {
-  if (created === null) return keys;
-  if (!keys.some((key) => key.id === created.id)) return [...keys, created];
-  return keys.map((key) =>
-    key.id === created.id ? { ...key, plaintext: created.plaintext } : key,
-  );
+  if (created === null || keys.some((key) => key.id === created.id)) return keys;
+  return [...keys, created];
 }
 
 function ApiKeyRow({ apiKey, onDelete }: { apiKey: ApiKeyRecord; onDelete: () => void }) {
@@ -148,45 +147,25 @@ function ApiKeyRow({ apiKey, onDelete }: { apiKey: ApiKeyRecord; onDelete: () =>
         {apiKey.name !== null && (
           <span className="truncate font-mono text-ui text-foreground">{apiKey.name}</span>
         )}
-        {apiKey.plaintext !== undefined ? (
-          <>
-            <code className="font-mono text-meta break-all text-foreground">
-              {apiKey.plaintext}
-            </code>
-            <span className="text-meta text-content-tertiary">
-              {t('请立即复制 API 密钥，它仅显示一次。')}
-            </span>
-          </>
-        ) : (
-          <span
-            className={cn(
-              'truncate font-mono',
-              apiKey.name === null ? 'text-ui text-foreground' : 'text-meta text-content-tertiary',
-            )}
-          >
-            {apiKey.masked}
-          </span>
-        )}
-      </span>
-      <span className="flex flex-none items-center gap-1">
-        {apiKey.plaintext !== undefined && (
-          <CopyIconButton
-            text={apiKey.plaintext}
-            testId="api-key-copy"
-            className="pointer-coarse:size-11"
-          />
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(TOPBAR_TEXT_BUTTON, 'pointer-coarse:h-11')}
-          data-testid="api-key-delete"
-          aria-label={t('删除 {name}', { name: label })}
-          onClick={onDelete}
+        <span
+          className={cn(
+            'truncate font-mono',
+            apiKey.name === null ? 'text-ui text-foreground' : 'text-meta text-content-tertiary',
+          )}
         >
-          {t('删除')}
-        </Button>
+          {apiKey.masked}
+        </span>
       </span>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn(TOPBAR_TEXT_BUTTON, 'pointer-coarse:h-11')}
+        data-testid="api-key-delete"
+        aria-label={t('删除 {name}', { name: label })}
+        onClick={onDelete}
+      >
+        {t('删除')}
+      </Button>
     </div>
   );
 }

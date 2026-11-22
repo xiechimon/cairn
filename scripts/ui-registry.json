@@ -1,6 +1,6 @@
 {
   "frozenFrom": {
-    "sha": "58f85bd8c732a2f014023e17e950cc83ebbeb37a",
+    "sha": "8380b3a47ea829a1f1da7f009ec266451986116a",
     "date": "2026-11-22"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
@@ -76,7 +76,7 @@
     "dialog-shell.tsx": {
       "kind": "adapter",
       "reason": "Paper dialog adapter (docs/design/surfaces/chrome.md dialogs) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces. info puts an InfoTip beside the title for a background sentence that is not visible copy. stacked forces the registry overlay for a regular face opened over another dialog, as AlertDialogShell does, so the dialog underneath is dimmed.",
-      "hash": "2013fae16b0b1307d6e1d83e7919b2899c4b811a522ba0724d91f6d1a26e1c4d"
+      "hash": "d93a9363413dd40d6005e64e7cffc6a1ee692dec351ce65d54b6bb6ad12e75fa"
     },
     "dialog.tsx": {
       "kind": "registry",

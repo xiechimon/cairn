@@ -239,7 +239,6 @@ export interface ApiKeyRecord {
   gitAccess: boolean;
   mcpAccess: boolean;
   machineAccess: boolean;
-  plaintext?: string;
 }
 
 export interface ApiKeysContent {

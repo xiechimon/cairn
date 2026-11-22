@@ -776,8 +776,13 @@ export const EN: Record<string, string> = {
   思考: 'Thinking',
   展开思考: 'Expand thinking',
   收起思考: 'Collapse thinking',
-  '请立即复制 API 密钥，它仅显示一次。': 'Copy the API key now — it is shown only once.',
-  '没能复制，请手动选中 API 密钥复制。': 'Could not copy; select the API key and copy it by hand.',
+  '保存你的 API 密钥': 'Save your API key',
+  '关闭后无法再次查看，请现在复制并妥善保存。':
+    'You cannot view it again after closing. Copy it now and keep it somewhere safe.',
+  我已保存: 'I have saved it',
+  '新的 API 密钥': 'New API key',
+  '以 cairn_ 开头，万一泄露，密钥扫描工具和你都能认出它。':
+    'It starts with cairn_, so secret scanners and you can recognize it if it leaks.',
   '删除后，用这个 API 密钥的 MCP 客户端、脚本和 Git 访问会立即失效，无法恢复':
     'Deleting this API key cuts off every MCP client, script and Git remote using it at once, and cannot be undone',
 
