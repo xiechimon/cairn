@@ -109,7 +109,7 @@ Each phase lands on `main` on its own and ends in a check run on a `verify-cairn
 | Share, relay configured | A relay link and `复制`; later `停止分享` | W7 creates or revokes a share row; the relay forwards `/s/:token` to R6 | None |
 | Share, no relay | The HTML file downloads; the popover says a link needs a relay | Nothing stored | None |
 | Someone opens a revoked or unknown link | `链接已失效` page | R6 answers 404 | None |
-| The page loads a CDN font or script | It renders with it | No CSP network limit on the frame (Security) | Network fetches by the page |
+| The page loads a CDN font or script | It renders with it | The artifact CSP does not restrict fonts, scripts, images or API calls | Network fetches by the page |
 | Server unreachable | Last loaded version stays; save or send says it did not go through and keeps the text | Writes fail | None |
 | Task archived | Design view opens read-only; comment, mark-up, restore hidden | Writes refused with 409 | None |
 | Old task from before this ships | Its page cards open with one version | W8 migration inserts versions from existing deliverables and html attachments | One-time migration |
@@ -218,7 +218,7 @@ Anchor state (`anchored`, `moved`, `lost`) is computed on each render, never sto
 | W8 migration | versions | one Drizzle migration | For every deliverables message and `.html` message attachment, oldest first, insert versions with the W1 rule |
 | R1 pages | read | `GET /api/todos/:id/design` | Pages with current version, version count, open comment count, live share token, and `shareOrigin`: the configured relay's public origin or `null` |
 | R2 versions | read | `GET /api/todos/:id/design/:fileName/versions` | By `seq` descending |
-| R3 page content | read | `GET /api/design/versions/:versionId/page` | The version's HTML with `content-security-policy: sandbox allow-scripts allow-forms allow-downloads`; `?print=1` adds `allow-modals` and a `print()` call; same auth as attachments |
+| R3 page content | read | `GET /api/design/versions/:versionId/page` | The version's HTML with the sandbox, artifact policy and `frame-ancestors 'none'` in the CSP response header; `?print=1` adds `allow-modals` and a `print()` call; same auth as attachments |
 | R4 comments | read | `GET /api/todos/:id/design/:fileName/comments` | All statuses |
 | R5 document text | read | `GET /api/attachments/:id/document-preview` | Borrowed docx, pptx, xlsx extraction |
 | R6 shared page | read, public | `GET /s/:token` (`apps/server/src/routes-design-share.ts`, a listed security surface) | Live token: current version's HTML under the R3 CSP; else 404 page |
@@ -237,7 +237,11 @@ Attachment garbage collection reads `design_version.attachmentId` and `design_co
 
 ### Security
 
-As Open Design does it: the page runs in an iframe with `sandbox="allow-scripts allow-forms allow-downloads"` (upstream's `HTML_PREVIEW_SANDBOX`) and no `allow-same-origin`, so it has an opaque origin: no Cairn cookies, storage or API access, no access to the Cairn window, no top navigation and no popups. Network is allowed (owner decision 4): there is no network CSP, so the page loads fonts, images, scripts and calls APIs on the internet as it would in any browser, but never with Cairn's cookies. Served URLs (R3, R6) carry the same sandbox as a `content-security-policy` header, so opening one directly in a tab is equally isolated (upstream does this for its raw routes); only the `?print=1` variant adds `allow-modals` so the page can open the print dialog. The parent accepts bridge messages only from the frame's own window and validates every field. R6 is a new unauthenticated route, reached from outside only through the user's relay: it reads only a live token's current page, takes a constant-time lookup by unique token, and lists in the `externalEntryAuth` security surfaces; the change runs `/security-review`.
+The page runs in an iframe with `sandbox="allow-scripts allow-forms allow-downloads"` (Open Design's `HTML_PREVIEW_SANDBOX`) and no `allow-same-origin`. Its opaque origin prevents direct access to the Cairn window, cookies and storage; the sandbox also denies top navigation and popups. The preview inserts a CSP meta tag before artifact content with `base-uri 'none'; object-src 'none'`. These directives deny replacement base URLs and loads via `object` or `embed` without changing the approved access to fonts, images, scripts and APIs (owner decision 4).
+
+Served URLs (R3, R6) send the same artifact policy, the sandbox and `frame-ancestors 'none'` as a `Content-Security-Policy` response header. They can open directly but cannot be framed; the board still fetches the source and builds its own sandboxed `srcdoc`. Only the `?print=1` variant adds `allow-modals` so the page can open the print dialog. HTML and ZIP downloads keep the original artifact source.
+
+The parent accepts bridge messages only from the frame's own window and validates every field. R6 is unauthenticated, serves only a live token's current page, and is listed in the `externalEntryAuth` security surfaces.
 
 ## Tests
 

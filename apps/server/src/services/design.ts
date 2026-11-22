@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  DESIGN_ARTIFACT_CSP,
   type DesignPageRecord,
   type DesignShareRecord,
   type DesignVersionRecord,
@@ -239,6 +240,7 @@ const PRINT_SCRIPT =
 
 export function designPageResponse(html: Buffer, opts: { print: boolean }): Response {
   const body = opts.print ? Buffer.concat([html, Buffer.from(PRINT_SCRIPT)]) : html;
+  const sandbox = opts.print ? `${DESIGN_PAGE_SANDBOX} allow-modals` : DESIGN_PAGE_SANDBOX;
   return new Response(body, {
     status: 200,
     headers: {
@@ -247,9 +249,7 @@ export function designPageResponse(html: Buffer, opts: { print: boolean }): Resp
       'cache-control': 'private, max-age=60',
       'x-content-type-options': 'nosniff',
       'referrer-policy': 'no-referrer',
-      'content-security-policy': opts.print
-        ? `${DESIGN_PAGE_SANDBOX} allow-modals`
-        : DESIGN_PAGE_SANDBOX,
+      'content-security-policy': `${sandbox}; ${DESIGN_ARTIFACT_CSP}; frame-ancestors 'none'`,
     },
   });
 }

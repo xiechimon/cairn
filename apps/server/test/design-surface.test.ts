@@ -95,9 +95,12 @@ test('an attached page becomes a Cairn-served version; new content adds one, the
   );
   expect(served.status).toBe(200);
   expect(served.headers.get('content-type')).toContain('text/html');
-  expect(served.headers.get('content-security-policy')).toBe(
+  expect(served.headers.get('content-security-policy')?.split('; ')).toEqual([
     'sandbox allow-scripts allow-forms allow-downloads',
-  );
+    "base-uri 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+  ]);
   expect(await served.text()).toContain('Two');
 
   const versions = (await (
@@ -112,7 +115,12 @@ test('an attached page becomes a Cairn-served version; new content adds one, the
   expect(restored.status).toBe(201);
   expect(await restored.json()).toMatchObject({ seq: 3, source: 'restore', restoredFromSeq: 1 });
   const printed = await req(s.app, 'GET', `/api/design/versions/${first?.id}/page?print=1`);
-  expect(printed.headers.get('content-security-policy')).toContain('allow-modals');
+  expect(printed.headers.get('content-security-policy')?.split('; ')).toEqual([
+    'sandbox allow-scripts allow-forms allow-downloads allow-modals',
+    "base-uri 'none'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+  ]);
   expect(await printed.text()).toContain('One');
 });
 
@@ -358,9 +366,12 @@ test('share needs a relay; with one the link serves the current version until it
     await attachHtml('<h1>Shared v2</h1>');
     const page = await s.app.request(`/s/${created.token}`);
     expect(page.status).toBe(200);
-    expect(page.headers.get('content-security-policy')).toBe(
+    expect(page.headers.get('content-security-policy')?.split('; ')).toEqual([
       'sandbox allow-scripts allow-forms allow-downloads',
-    );
+      "base-uri 'none'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+    ]);
     expect(await page.text()).toContain('Shared v2');
     await req(s.app, 'DELETE', `/api/todos/${task.id}/design/index.html/share`);
     expect((await s.app.request(`/s/${created.token}`)).status).toBe(404);

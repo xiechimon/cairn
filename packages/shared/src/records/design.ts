@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export const DESIGN_ARTIFACT_CSP = "base-uri 'none'; object-src 'none'";
+
 export const DESIGN_LIMITS = {
   noteChars: 2000,
   textChars: 160,
