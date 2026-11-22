@@ -103,6 +103,32 @@ describe('session confiner', () => {
     }
   });
 
+  test('a readable path that passes through a symlink is canonicalized, not refused', () => {
+    const { worktree, runnerHome, root } = fixture();
+    const tools = join(runnerHome, 'tools');
+    mkdirSync(join(tools, 'antigravity'), { recursive: true });
+    const linkedRunner = join(root, 'runner-link');
+    symlinkSync(runnerHome, linkedRunner);
+    const linkedConfine = createSessionConfiner({
+      daemonHome: join(linkedRunner),
+      extraDeniedRoots: [],
+      readable: [join(linkedRunner, 'tools')],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home: join(root, 'user'),
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    const launch = linkedConfine({ cwd: worktree }, 'antigravity', {
+      command: '/bin/true',
+      args: [],
+    });
+    const readAllow = (launch.args[1] as string)
+      .split('\n')
+      .find((line) => line.startsWith('(allow file-read*') && !line.includes('file-write*'));
+    expect(readAllow).toContain(`(subpath "${realpathSync(tools)}")`);
+  });
+
   test('a linked worktree re-exposes only a real worktree git dir that points back', () => {
     const { confine, worktree, root } = fixture();
     const repo = join(root, 'repo');

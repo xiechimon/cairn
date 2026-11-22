@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  createWriteStream,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -14,7 +15,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { promisify } from 'node:util';
 import {
@@ -67,7 +68,7 @@ const registryAgentSchema = z.object({
     .optional(),
 });
 
-const registrySchema = z.object({ agents: z.array(registryAgentSchema) });
+const registrySchema = z.object({ agents: z.array(z.unknown()) });
 
 const installMarkerSchema = z.object({
   version: z.string(),
@@ -75,9 +76,15 @@ const installMarkerSchema = z.object({
   archiveSha256: z.string(),
   binRelPath: z.string(),
   binSha256: z.string(),
-  args: z.array(z.string()).default(['acp']),
+  args: z.array(z.string()).default([]),
   installedAt: z.number(),
 });
+
+const LEGACY_SPAWN_ARGS = ['acp'];
+
+function markerArgs(args: string[]): string[] {
+  return args.length === 1 && args[0] === LEGACY_SPAWN_ARGS[0] ? [] : args;
+}
 type InstallMarker = z.infer<typeof installMarkerSchema>;
 
 export interface AntigravityModel {
@@ -263,14 +270,14 @@ async function probeAntigravityBinary(
 ): Promise<AntigravityInstall | null> {
   const probeDir = mkdtempSync(join(tmpdir(), 'cairn-agy-probe-'));
   const logFile = join(probeDir, 'probe.log');
-  const spawnArgs = basename(binPath).startsWith('agy')
-    ? [...args, '--log-file', logFile]
-    : [...args];
-  const child = spawn(binPath, spawnArgs, {
+  const child = spawn(binPath, args, {
     cwd: probeDir,
     stdio: ['pipe', 'pipe', 'pipe'],
     env,
   });
+  const logStream = createWriteStream(logFile);
+  child.stderr.on('data', (chunk: Buffer) => logStream.write(chunk));
+  child.stderr.resume();
   const app = client({ name: 'cairn' });
   const stream = ndJsonStream(
     Writable.toWeb(child.stdin),
@@ -332,6 +339,7 @@ async function probeAntigravityBinary(
     child.kill('SIGTERM');
     const killTimer = setTimeout(() => child.kill('SIGKILL'), 500);
     killTimer.unref();
+    logStream.end();
     rmSync(probeDir, { recursive: true, force: true });
   }
 }
@@ -369,7 +377,7 @@ export function createAntigravityManaged(
     } catch {
       return null;
     }
-    return { version: marker.version, binPath, args: marker.args };
+    return { version: marker.version, binPath, args: markerArgs(marker.args) };
   }
 
   function currentManaged(): { version: string; binPath: string; args: string[] } | null {
@@ -452,11 +460,21 @@ export function createAntigravityManaged(
       log('antigravity registry did not match the expected shape');
       return null;
     }
-    const agent = parsed.data.agents.find(
-      (entry) => entry.id === 'antigravity-acp' || entry.id === 'antigravity',
+    const rawAgent = parsed.data.agents.find(
+      (entry) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        ((entry as Record<string, unknown>).id === 'antigravity-acp' ||
+          (entry as Record<string, unknown>).id === 'antigravity'),
     );
-    const binary = agent?.distribution?.binary?.[key];
-    if (agent === undefined || binary === undefined) {
+    const parsedAgent = registryAgentSchema.safeParse(rawAgent);
+    if (!parsedAgent.success) {
+      log('antigravity registry entry is missing or malformed');
+      return null;
+    }
+    const agent = parsedAgent.data;
+    const binary = agent.distribution?.binary?.[key];
+    if (binary === undefined) {
       log(`antigravity registry has no binary entry for ${key}`);
       return null;
     }
@@ -534,7 +552,7 @@ export function createAntigravityManaged(
         archiveSha256,
         binRelPath: binPath.slice(staging.length + 1),
         binSha256: sha256File(binPath),
-        args: binary.args ?? ['acp'],
+        args: binary.args ?? [],
         installedAt: Date.now(),
       };
       const markerPath = join(staging, '.install-complete');

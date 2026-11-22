@@ -99,7 +99,6 @@ describe('antigravity managed binary resolution', () => {
                       'darwin-aarch64': {
                         archive: 'https://example.invalid/ag.tar.gz',
                         cmd: './bin/antigravity-acp',
-                        args: ['acp'],
                         sha256: archiveSha256,
                       },
                     },
@@ -125,7 +124,7 @@ describe('antigravity managed binary resolution', () => {
     const install = await managed.ensure();
     expect(install).toMatchObject({
       version: '1.5.10',
-      args: ['acp'],
+      args: [],
       source: 'managed',
       authenticated: false,
     });
@@ -356,6 +355,117 @@ describe('antigravity managed binary resolution', () => {
     }
   });
 
+  test('installs even when an unrelated registry entry lacks sha256', async () => {
+    const dir = tempDir('ag-mixed-');
+    const src = join(dir, 'src');
+    mkdirSync(join(src, 'bin'), { recursive: true });
+    writeFileSync(join(src, 'bin', 'antigravity-acp'), '#!/bin/sh\nexit 0\n');
+    chmodSync(join(src, 'bin', 'antigravity-acp'), 0o755);
+    const zipPath = join(dir, 'ag.zip');
+    execFileSync('zip', ['-q', '-r', zipPath, 'bin'], { cwd: src });
+    const zipBytes = readFileSync(zipPath);
+    const validSha = createHash('sha256').update(zipBytes).digest('hex');
+
+    const managed = createAntigravityManaged({
+      root: join(dir, 'managed'),
+      platform: 'darwin',
+      arch: 'arm64',
+      registryUrl: 'https://example.invalid/registry.json',
+      archiveHost: 'example.invalid',
+      fetchImpl: async (url) =>
+        String(url).endsWith('registry.json')
+          ? new Response(
+              JSON.stringify({
+                agents: [
+                  {
+                    id: 'cursor',
+                    version: '1.0.0',
+                    distribution: {
+                      binary: {
+                        'darwin-aarch64': {
+                          archive: 'https://example.invalid/cursor.zip',
+                          cmd: './cursor',
+                        },
+                      },
+                    },
+                  },
+                  {
+                    id: 'antigravity-acp',
+                    version: '1.5.10',
+                    distribution: {
+                      binary: {
+                        'darwin-aarch64': {
+                          archive: 'https://example.invalid/ag.zip',
+                          cmd: './bin/antigravity-acp',
+                          sha256: validSha,
+                        },
+                      },
+                    },
+                  },
+                ],
+              }),
+              { status: 200 },
+            )
+          : new Response(zipBytes, { status: 200 }),
+      probeBinary: async (binPath, args, source, knownVersion) => ({
+        version: knownVersion ?? '1.5.10',
+        binPath,
+        args,
+        source,
+        authenticated: true,
+        models: [],
+      }),
+    });
+    const install = await managed.ensure();
+    expect(install).toMatchObject({ version: '1.5.10', source: 'managed', authenticated: true });
+  });
+
+  test('probe does not pass flags the real agy binary rejects', async () => {
+    const dir = tempDir('ag-flags-');
+    const root = join(dir, 'managed');
+    const versionDir = join(root, 'versions', '1.5.10');
+    mkdirSync(versionDir, { recursive: true });
+    const fakeAgy = join(versionDir, 'agy_acp_server.mjs');
+    writeFileSync(
+      fakeAgy,
+      [
+        `#!${process.execPath}`,
+        "import { createInterface } from 'node:readline';",
+        'const unknown = process.argv.slice(2);',
+        'if (unknown.length > 0) {',
+        '  process.stderr.write(`FATAL Flags parsing error: Unknown command line argument ${unknown[0]}\\n`);',
+        '  process.exit(2);',
+        '}',
+        'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+        'for await (const line of createInterface({ input: process.stdin })) {',
+        '  const msg = JSON.parse(line);',
+        '  if (msg.method === "initialize") {',
+        '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentInfo: { name: "agy", version: "1.5.10" }, agentCapabilities: {} } });',
+        '  } else if (msg.method === "session/new") {',
+        '    send({ id: msg.id, result: { sessionId: "probe-1", configOptions: [] } });',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+    chmodSync(fakeAgy, 0o755);
+    writeFileSync(
+      join(versionDir, '.install-complete'),
+      JSON.stringify({
+        version: '1.5.10',
+        url: 'https://example.invalid/ag.zip',
+        archiveSha256: '0'.repeat(64),
+        binRelPath: 'agy_acp_server.mjs',
+        binSha256: createHash('sha256').update(readFileSync(fakeAgy)).digest('hex'),
+        args: ['acp'],
+        installedAt: Date.now(),
+      }),
+    );
+    writeFileSync(join(root, 'current.json'), JSON.stringify({ version: '1.5.10' }));
+    const managed = createAntigravityManaged({ root, platform: 'darwin', arch: 'arm64' });
+    const probed = await managed.probe();
+    expect(probed).toMatchObject({ source: 'managed', args: [], authenticated: true });
+  });
+
   test('rejects an archive whose binary escapes through a symlinked directory', async () => {
     const dir = tempDir('ag-escape-');
     const outside = join(dir, 'outside');
@@ -387,7 +497,6 @@ describe('antigravity managed binary resolution', () => {
                       'darwin-aarch64': {
                         archive: 'https://example.invalid/ag.tar.gz',
                         cmd: './bin/antigravity-acp',
-                        args: ['acp'],
                         sha256: archiveSha256,
                       },
                     },

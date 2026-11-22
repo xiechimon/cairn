@@ -201,7 +201,9 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         ...(harness === 'antigravity' && opts.env?.GEMINI_API_KEY === undefined
           ? [join(home, 'Library', 'Keychains')]
           : []),
-      ].filter((path) => existsSync(path)),
+      ]
+        .filter((path) => existsSync(path))
+        .map((path) => realpathSync(path)),
       ...(Number.isInteger(port) && port > 0 ? { serverPort: port } : {}),
     };
     return seatbeltCommand(policy, launch.command, launch.args);
