@@ -1695,6 +1695,13 @@
       "when": 1795302973585,
       "tag": "0246_keen_pixie",
       "breakpoints": true
+    },
+    {
+      "idx": 247,
+      "version": "6",
+      "when": 1795311662378,
+      "tag": "0247_giant_mimic",
+      "breakpoints": true
     }
   ]
 }

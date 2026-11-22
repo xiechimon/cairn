@@ -1,7 +1,7 @@
 import type { NeedsYouReason, NotificationRecord, UserRecord } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { chiefThread, notification, todo as todoTable } from '../db/schema.js';
+import { chiefThread, noticeMark, notification, todo as todoTable } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
@@ -319,4 +319,59 @@ export function notifyModelFallback(
       : { name: deps.user.displayName, avatarUrl: deps.user.avatarUrl },
     snippet,
   });
+}
+
+export type NoticeCondition = (typeof noticeMark.$inferSelect)['condition'];
+
+export interface ActiveCondition {
+  subjectId: string;
+  fingerprint: string;
+  notify: () => void;
+}
+
+export function raiseConditionNotices(
+  deps: NotificationDeps,
+  condition: NoticeCondition,
+  active: readonly ActiveCondition[],
+  now: number,
+): number {
+  const marks = new Map(
+    deps.db
+      .select()
+      .from(noticeMark)
+      .where(and(eq(noticeMark.userId, deps.user.id), eq(noticeMark.condition, condition)))
+      .all()
+      .map((mark) => [mark.subjectId, mark]),
+  );
+  const activeSubjects = new Set<string>();
+  let raised = 0;
+  for (const entry of active) {
+    if (activeSubjects.has(entry.subjectId)) continue;
+    activeSubjects.add(entry.subjectId);
+    if (marks.get(entry.subjectId)?.fingerprint === entry.fingerprint) continue;
+    deps.db.transaction((tx) => {
+      entry.notify();
+      tx.insert(noticeMark)
+        .values({
+          id: `${deps.user.id}:${condition}:${entry.subjectId}`,
+          userId: deps.user.id,
+          condition,
+          subjectId: entry.subjectId,
+          fingerprint: entry.fingerprint,
+          notedAt: now,
+        })
+        .onConflictDoUpdate({
+          target: noticeMark.id,
+          set: { fingerprint: entry.fingerprint, notedAt: now },
+        })
+        .run();
+    });
+    raised += 1;
+  }
+  for (const mark of marks.values()) {
+    if (!activeSubjects.has(mark.subjectId)) {
+      deps.db.delete(noticeMark).where(eq(noticeMark.id, mark.id)).run();
+    }
+  }
+  return raised;
 }

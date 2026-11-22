@@ -613,6 +613,19 @@ export const notification = sqliteTable(
   (t) => [index('notification_type_readAt_idx').on(t.type, t.readAt)],
 );
 
+export const noticeMark = sqliteTable(
+  'notice_mark',
+  {
+    id: text('id').primaryKey(),
+    userId: text('userId').notNull(),
+    condition: text('condition').$type<'no_machine' | 'watchdog_flag'>().notNull(),
+    subjectId: text('subjectId').notNull(),
+    fingerprint: text('fingerprint').notNull(),
+    notedAt: epochMs('notedAt').notNull(),
+  },
+  (t) => [index('notice_mark_userId_condition_idx').on(t.userId, t.condition)],
+);
+
 export const routingRule = sqliteTable(
   'routing_rule',
   {

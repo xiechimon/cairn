@@ -4,6 +4,7 @@ import { afterAll, describe, expect, test } from 'vitest';
 import {
   build as buildTable,
   chiefMessage,
+  gateVerdict,
   machine as machineTable,
   notification as notificationTable,
   project as projectTable,
@@ -14,9 +15,11 @@ import {
 import { newRecordId } from '../src/lib/ids.js';
 import { BLOCKED_BY_HOLD } from '../src/services/blockers.js';
 import { seedLocalMachine } from '../src/services/machines.js';
+import { notifyModelFallback } from '../src/services/notifications.js';
 import { RUNNER_OFFLINE_NOTICE_MS, sweepOfflineRunners } from '../src/services/runner-offline.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { NO_MACHINE_ALERT_MS, sweepUnplaceableSteps } from '../src/services/unplaceable-steps.js';
+import { sweepWorkerWatchdog, WATCHDOG_BLOCK_ROUNDS } from '../src/services/worker-watchdog.js';
 import { bootServer, issueApiKey, postProject, req, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
@@ -505,5 +508,48 @@ describe('an offline Runner with waiting tasks keeps one Coordinator status row 
     const todoId = `todo-${stepId.slice('step-'.length)}`;
     const res = await req(w.s.app, 'POST', `/api/todos/${todoId}/runner`, { machineId: mac });
     expect(res.status).toBe(409);
+  });
+});
+
+describe('coexisting conditions on one task each notify once', () => {
+  test('a looping task that no Runner can run notifies once per condition across ticks', async () => {
+    const w = await world();
+    const mac = await machineOf(w, 'mac');
+    routeOf(w, mac, { mcpServers: ['figma'] });
+    const stepId = pendingStep(w, { ageMs: NO_MACHINE_ALERT_MS + 1_000 });
+    const todoId = stepId.replace(/^step-/, 'todo-');
+    const buildId = stepId.replace(/^step-/, 'build-');
+    w.s.db.update(todoTable).set({ latestBuildId: buildId }).where(eq(todoTable.id, todoId)).run();
+    for (let round = 0; round < WATCHDOG_BLOCK_ROUNDS; round++) {
+      w.s.db
+        .insert(gateVerdict)
+        .values({
+          stepId: `verdict-${stepId}-${round}`,
+          buildId,
+          kind: 'review',
+          outcome: 'block',
+          expectedHeadSha: `${round}`.padStart(40, 'a'),
+          createdAt: Date.now() - round * 60_000,
+        })
+        .run();
+    }
+    const published: { type: string; snippet: string | null }[] = [];
+    const publish = w.s.svc.hub.publishNotification.bind(w.s.svc.hub);
+    w.s.svc.hub.publishNotification = (teamId, record) => {
+      published.push({ type: record.type, snippet: record.snippet });
+      publish(teamId, record);
+    };
+    const start = Date.now();
+    for (let tick = 0; tick < 8; tick++) {
+      const now = start + tick * 15_000;
+      sweepUnplaceableSteps(w.s.svc, now);
+      sweepWorkerWatchdog(w.s.svc, now);
+      if (tick === 3) {
+        const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get();
+        if (todoRow === undefined) throw new Error('seeded todo missing');
+        notifyModelFallback(w.s.svc, todoRow, null, 'switched to the fallback model');
+      }
+    }
+    expect(published.map((p) => p.type)).toEqual(['no_machine', 'watchdog_flag', 'model_fallback']);
   });
 });

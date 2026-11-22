@@ -1,8 +1,13 @@
 import type { Phase } from '@cairn/shared';
 import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
-import { build, gateVerdict, notification, step, todo } from '../db/schema.js';
+import { build, gateVerdict, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
-import { type NotificationDeps, notifyWatchdogFlag } from './notifications.js';
+import {
+  type ActiveCondition,
+  type NotificationDeps,
+  notifyWatchdogFlag,
+  raiseConditionNotices,
+} from './notifications.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 export const WATCHDOG_STUCK_MS = 30 * 60_000;
@@ -96,7 +101,7 @@ export function sweepWorkerWatchdog(deps: NotificationDeps, now: number = nowMs(
       ),
     )
     .all();
-  let raised = 0;
+  const flagged: ActiveCondition[] = [];
   for (const row of rows) {
     const buildId = row.latestBuildId;
     if (buildId === null) continue;
@@ -104,14 +109,11 @@ export function sweepWorkerWatchdog(deps: NotificationDeps, now: number = nowMs(
       .filter((reason): reason is string => reason !== null)
       .join('\n');
     if (snippet === '') continue;
-    const existing = deps.db
-      .select()
-      .from(notification)
-      .where(eq(notification.id, `${deps.user.id}:${row.id}`))
-      .get();
-    if (existing?.type === 'watchdog_flag' && existing.snippet === snippet) continue;
-    notifyWatchdogFlag(deps, row, snippet);
-    raised += 1;
+    flagged.push({
+      subjectId: row.id,
+      fingerprint: snippet,
+      notify: () => notifyWatchdogFlag(deps, row, snippet),
+    });
   }
-  return raised;
+  return raiseConditionNotices(deps, 'watchdog_flag', flagged, now);
 }
