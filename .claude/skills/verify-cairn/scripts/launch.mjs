@@ -85,6 +85,7 @@ async function main() {
       CAIRN_HOME: HOME_DIR,
       CAIRN_SKILLS_DIR: SKILLS_DIR,
       CAIRN_AUTH: 'off',
+      CAIRN_WEB_ORIGIN: `http://127.0.0.1:${WEB_PORT}`,
     },
     stdio: ['ignore', serverLog, serverLog],
   });

@@ -867,6 +867,16 @@
           ],
           "status": "current",
           "purpose": "Machines page pins the local row with runtime brand marks and a shell toggle that persists across reload"
+        },
+        "enroll-origin": {
+          "script": ".claude/skills/verify-cairn/scripts/probe-enroll-origin.mjs",
+          "args": [],
+          "needs": [
+            "stack"
+          ],
+          "status": "current",
+          "purpose": "The authorize URL minted by /api/machine/enroll/start serves the web app — on a split-origin stack it must point at the web origin (CAIRN_WEB_ORIGIN), not the API origin which 404s.",
+          "usage": "env VERIFY_RUN_DIR or VERIFY_REPO_ROOT (reads ports.json); writes enroll-origin.json into VERIFY_EVIDENCE_DIR"
         }
       }
     },

@@ -51,8 +51,10 @@ export const serverConfigSchema = z.object({
     .url()
     .refine((value) => {
       const url = new URL(value);
+      const loopbackHttp =
+        url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
       return (
-        url.protocol === 'https:' &&
+        (url.protocol === 'https:' || loopbackHttp) &&
         url.username === '' &&
         url.password === '' &&
         url.pathname === '/' &&

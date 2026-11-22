@@ -608,6 +608,19 @@ describe('VAPID configuration', () => {
     }
   });
 
+  test('accepts loopback HTTP origins so split-origin dev stacks mint usable links', () => {
+    for (const webOrigin of [
+      'http://127.0.0.1:5275',
+      'http://localhost:5275',
+      'http://[::1]:5275',
+    ]) {
+      expect(loadConfig({ webOrigin }).webOrigin).toBe(webOrigin);
+    }
+    for (const webOrigin of ['http://cairn.example', 'http://192.168.1.5:5275']) {
+      expect(() => loadConfig({ webOrigin })).toThrow();
+    }
+  });
+
   test('reads the branded subject env and rejects an insecure subject URL', () => {
     const name = 'CAIRN_VAPID_SUBJECT';
     const previous = process.env[name];
