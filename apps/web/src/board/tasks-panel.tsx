@@ -19,7 +19,6 @@ import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
-import { ACCENT_INK } from '../phase.js';
 import { newTaskRequest } from './open-composer.js';
 import { compactAge, relativeTime, shortDate } from './rel-time.js';
 import { StopAndDoneConfirm } from './stop-and-done-confirm.js';
@@ -119,7 +118,7 @@ function SectionHeader({
         data-flash={flash ? '' : undefined}
         className={cn(
           'tabular-nums',
-          accent ? ACCENT_INK : 'text-content-tertiary',
+          accent ? 'text-(--waiting-ink)' : 'text-content-tertiary',
           flash && 'grow-flash',
         )}
       >
@@ -311,6 +310,12 @@ export function TasksPanel({
   const linkedToScheduled = searchParams.get(TASKS_TAB_PARAM) === 'scheduled';
   const [chosenTab, setTab] = useState<TasksTab | null>(null);
   const [adding, setAdding] = useState(false);
+  const newTaskRef = useRef<HTMLButtonElement | null>(null);
+  const wasAdding = useRef(false);
+  useEffect(() => {
+    if (wasAdding.current && !adding) newTaskRef.current?.focus();
+    wasAdding.current = adding;
+  }, [adding]);
   const newTaskAt = newTaskRequest(useLocation().state);
   useEffect(() => {
     if (newTaskAt !== null) setAdding(true);
@@ -512,6 +517,7 @@ export function TasksPanel({
           side="bottom"
           trigger={
             <Button
+              ref={newTaskRef}
               variant="ghost"
               size="icon"
               data-testid="tasks-new"

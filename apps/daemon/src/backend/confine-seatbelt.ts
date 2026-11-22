@@ -111,7 +111,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     ),
   ];
   const deniedFiles = DENIED_FILES.map((path) => canonical(join(home, path)));
-  const state = policy.state.map((path) => canonical(path, true));
+  const state = policy.state.map((path) => canonical(path));
   const readable = (policy.readable ?? []).map((path) => canonical(path, true));
   const reexposed = [
     canonical(policy.workspace, true),
@@ -121,7 +121,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
   const writable = [
     ...reexposed,
     canonical(policy.taskTemp, true),
-    ...policy.caches.map((path) => canonical(path, true)),
+    ...policy.caches.map((path) => canonical(path)),
   ];
   const everythingDenied = [...deniedDirectories, ...deniedFiles];
   for (const path of policy.caches.map((value) => canonical(value))) {

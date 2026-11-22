@@ -1106,6 +1106,12 @@ function markStoreRewind(db: Db, threadId: string, anchorId: string, doomedIds: 
     .run();
 }
 
+const STEP_OUTCOME_ROW_PREFIXES = ['chief-err-', 'chief-fallback-'] as const;
+
+function isStepOutcomeRow(messageId: string): boolean {
+  return STEP_OUTCOME_ROW_PREFIXES.some((prefix) => messageId.startsWith(prefix));
+}
+
 export function rewindChiefThread(
   deps: ChiefDeps,
   teamId: string,
@@ -1152,8 +1158,11 @@ export function rewindChiefThread(
     anchor.id,
     doomed.map((row) => row.id),
   );
+  let deletedCount = 0;
   for (const row of doomed) {
+    if (isStepOutcomeRow(row.id)) continue;
     deps.db.delete(chiefMessage).where(eq(chiefMessage.id, row.id)).run();
+    deletedCount += 1;
   }
   const now = nowMs();
   deps.db
@@ -1173,7 +1182,7 @@ export function rewindChiefThread(
   const fresh = getChiefThread(deps, threadId);
   if (!fresh) throw new Error('chief thread missing after rewind');
   return {
-    deletedCount: doomed.length,
+    deletedCount,
     thread: toChiefThreadRecord(
       fresh,
       stepQueueProjector(deps.db, teamId).chiefTurnQueueOf(threadId),

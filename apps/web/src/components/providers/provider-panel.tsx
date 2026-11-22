@@ -120,10 +120,22 @@ export function ProviderInstanceRow({
           <span className="flex min-w-0 items-center gap-2">
             <span className="truncate text-ui font-medium text-foreground">{item.name}</span>
             {item.version != null && (
-              <code className="flex-none text-meta text-content-tertiary">v{item.version}</code>
+              <code
+                className={cn(
+                  'flex-none text-meta',
+                  selected ? 'text-content-secondary' : 'text-content-tertiary',
+                )}
+              >
+                v{item.version}
+              </code>
             )}
           </span>
-          <span className="flex items-start gap-1.5 text-meta text-content-tertiary">
+          <span
+            className={cn(
+              'flex items-start gap-1.5 text-meta',
+              selected ? 'text-content-secondary' : 'text-content-tertiary',
+            )}
+          >
             <span
               aria-hidden
               className={cn('mt-1.5 size-1.5 flex-none rounded-full', TONE_DOT[item.tone])}

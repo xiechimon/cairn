@@ -1,5 +1,13 @@
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { createServer } from 'node:http';
 import { userInfo } from 'node:os';
 import { basename, join } from 'node:path';
@@ -343,6 +351,97 @@ describe('session confiner', () => {
     }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
     expect(() =>
       confine({ cwd: worktree, env: {} }, 'claude-code', { command: '/bin/true', args: [] }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a symlinked state ancestor under a writable root fails closed instead of pivoting the grant', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const agentHome = join(runnerHome, 'homes', 'devin');
+    const pivot = join(root, 'config-pivot');
+    mkdirSync(agentHome, { recursive: true });
+    mkdirSync(join(pivot, 'devin'), { recursive: true });
+    symlinkSync(pivot, join(agentHome, '.config'));
+    expect(() =>
+      confine({ cwd: worktree, env: { HOME: agentHome } }, 'devin', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a symlinked deep state ancestor fails closed instead of pivoting the grant', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const agentHome = join(runnerHome, 'homes', 'devin');
+    const pivot = join(root, 'local-pivot');
+    mkdirSync(agentHome, { recursive: true });
+    mkdirSync(join(pivot, 'share', 'devin'), { recursive: true });
+    symlinkSync(pivot, join(agentHome, '.local'));
+    expect(() =>
+      confine({ cwd: worktree, env: { HOME: agentHome } }, 'devin', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement symlink');
+  });
+
+  test('a refused state ancestor does not materialise the leaf inside the pivot', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const agentHome = join(runnerHome, 'homes', 'devin');
+    const pivot = join(root, 'mkdir-pivot');
+    mkdirSync(agentHome, { recursive: true });
+    mkdirSync(join(pivot, 'share'), { recursive: true });
+    symlinkSync(pivot, join(agentHome, '.local'));
+    expect(() =>
+      confine({ cwd: worktree, env: { HOME: agentHome } }, 'devin', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement symlink');
+    expect(existsSync(join(pivot, 'share', 'devin'))).toBe(false);
+  });
+
+  test('a CLAUDE_CONFIG_DIR inside a writable tree fails closed behind a symlinked ancestor before mkdir', () => {
+    const { confine, worktree, root } = fixture();
+    const pivot = join(root, 'env-pivot');
+    mkdirSync(join(pivot, 'inner'), { recursive: true });
+    symlinkSync(pivot, join(worktree, 'linked'));
+    expect(() =>
+      confine(
+        {
+          cwd: worktree,
+          env: { CLAUDE_CONFIG_DIR: join(worktree, 'linked', 'inner', 'claude') },
+        },
+        'claude-code',
+        { command: '/bin/true', args: [] },
+      ),
+    ).toThrow('Unsafe confinement symlink');
+    expect(existsSync(join(pivot, 'inner', 'claude'))).toBe(false);
+  });
+
+  test('a refused state dir is not created before the overlap check', () => {
+    const { confine, worktree, root } = fixture();
+    const refused = join(root, 'user', '.ssh', 'cfg');
+    expect(() =>
+      confine({ cwd: worktree, env: { CLAUDE_CONFIG_DIR: refused } }, 'claude-code', {
+        command: '/bin/true',
+        args: [],
+      }),
+    ).toThrow('Unsafe confinement');
+    expect(existsSync(refused)).toBe(false);
+  });
+
+  test('a symlinked ancestor inside a granted state dir fails closed for extra state', () => {
+    const { confine, worktree, runnerHome, root } = fixture();
+    const agentDir = join(runnerHome, 'homes', 'pi');
+    const pivot = join(root, 'extra-pivot');
+    mkdirSync(agentDir, { recursive: true });
+    mkdirSync(join(pivot, 'x'), { recursive: true });
+    symlinkSync(pivot, join(agentDir, 'inner'));
+    expect(() =>
+      confine({ cwd: worktree, env: {} }, 'pi', { command: '/bin/true', args: [] }, [
+        agentDir,
+        join(agentDir, 'inner', 'x'),
+      ]),
     ).toThrow('Unsafe confinement symlink');
   });
 
