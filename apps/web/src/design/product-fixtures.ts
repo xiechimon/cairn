@@ -339,8 +339,8 @@ export const CHANGES: ChangesContent = {
 
 export const MENTION_GROUPS: MentionGroups = {
   todo: [
-    { id: 'gallery-44', label: 'Fix the stale branch badge on cards', seq: 44 },
-    { id: 'gallery-48', label: 'Migrate the schedules table', seq: 48 },
+    { id: 'gallery-44', label: 'Fix the stale branch badge on cards' },
+    { id: 'gallery-48', label: 'Migrate the schedules table' },
   ],
   skill: [
     { id: 'frontend-design', label: 'frontend-design', subtitle: 'Distinctive UI direction' },

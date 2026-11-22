@@ -1,13 +1,13 @@
 import type { MachineCapabilities } from '@cairn/shared';
 import { fuzzyFilter } from './completion.js';
 
+/** Mention kinds the composer can insert; `todo` survives only as the stored legacy wire form (`[#n](todo:<id>)`), never a new insert. */
 export type MentionKind = 'todo' | 'skill' | 'agent' | 'project' | 'machine';
 
 export interface MentionGroupEntry {
   id: string;
   label: string;
   subtitle?: string;
-  seq?: number;
   capabilities?: MachineCapabilities;
 }
 
@@ -24,7 +24,6 @@ export interface InlineCompletionRow {
   label: string;
   subtitle?: string;
   fileType?: 'blob' | 'tree';
-  seq?: number;
   capabilities?: MachineCapabilities;
 }
 
@@ -42,15 +41,6 @@ export function buildInlineRows(
         id: a.id,
         label: a.label,
         ...(a.subtitle !== undefined ? { subtitle: a.subtitle } : {}),
-      }),
-    ),
-    ...groups.todo.map(
-      (t): InlineCompletionRow => ({
-        kind: 'todo',
-        id: t.id,
-        label: t.label,
-        ...(t.subtitle !== undefined ? { subtitle: t.subtitle } : {}),
-        ...(t.seq !== undefined ? { seq: t.seq } : {}),
       }),
     ),
     ...groups.skill.map(

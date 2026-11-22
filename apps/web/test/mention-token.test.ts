@@ -93,7 +93,7 @@ describe('serializeMention (existing wire shape unregressed, I3)', () => {
     expect(SERIALIZED).toBe('[builder](agent:a1)');
   });
 
-  test('todo → plain-text #seq', () => {
+  test('legacy todo token still serializes as the stored bare #seq (old messages keep their wire form)', () => {
     expect(serializeMention({ kind: 'todo', label: '#3', id: 't1', seq: 3 })).toBe('#3');
   });
 
@@ -222,18 +222,25 @@ describe('parseDraftChips (#812, C1–C5)', () => {
 
 const ROSTER: InlineRosterGroups = {
   agent: [{ id: 'a1', label: 'builder' }],
-  todo: [{ id: 't1', label: '#3 fix login', seq: 3 }],
+  todo: [{ id: 't1', label: '#3 fix login' }],
   skill: [{ id: 's1', label: 'review' }],
   project: [{ id: 'p1', label: 'cairn' }],
   machine: [{ id: 'm1', label: 'mea' }],
 };
 
-describe('buildInlineRows (#848, R1–R5)', () => {
-  test('empty query: five classes + files in assembly order (R1)', () => {
+describe('buildInlineRows (#848, R1–R5; tasks left the picker, owner decision 2026-11-22)', () => {
+  test('a task never appears in the picker rows, with or without a query (C15: no # picker)', () => {
     const rows = buildInlineRows('', ROSTER, [{ path: 'a.ts', type: 'blob' }]);
-    expect(rows.map((r) => r.kind)).toEqual(['agent', 'todo', 'skill', 'project', 'machine', 'file']);
+    expect(rows.some((r) => r.kind === 'todo')).toBe(false);
+    expect(rows.some((r) => r.label.includes('fix login'))).toBe(false);
+    expect(buildInlineRows('fix', ROSTER)).toHaveLength(0);
+  });
+
+  test('the other four classes and files keep their roster order (R1 minus todo)', () => {
+    const rows = buildInlineRows('', ROSTER, [{ path: 'a.ts', type: 'blob' }]);
+    expect(rows.map((r) => r.kind)).toEqual(['agent', 'skill', 'project', 'machine', 'file']);
     expect(rows[0]).toMatchObject({ kind: 'agent', id: 'a1', label: 'builder' });
-    expect(rows[5]).toMatchObject({ kind: 'file', id: 'a.ts', label: 'a.ts' });
+    expect(rows[4]).toMatchObject({ kind: 'file', id: 'a.ts', label: 'a.ts' });
   });
 
   test('query filters across classes: only hit classes remain (R2)', () => {
@@ -247,14 +254,9 @@ describe('buildInlineRows (#848, R1–R5)', () => {
     expect(buildInlineRows('review', ROSTER)).toHaveLength(1);
   });
 
-  test('todo rows carry seq (R4)', () => {
+  test('files default = pure four-class face (R5)', () => {
     const rows = buildInlineRows('', ROSTER);
-    expect(rows[1]).toMatchObject({ kind: 'todo', id: 't1', seq: 3 });
-  });
-
-  test('files default = pure five-class face (R5)', () => {
-    const rows = buildInlineRows('', ROSTER);
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(4);
     expect(rows.some((r) => r.kind === 'file')).toBe(false);
   });
 
