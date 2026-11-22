@@ -1,4 +1,9 @@
-import type { ComputerManageAction, ComputerManageOutcome, ComputerRecord } from '@cairn/shared';
+import {
+  COMPUTER_FILE_MISSING,
+  type ComputerManageAction,
+  type ComputerManageOutcome,
+  type ComputerRecord,
+} from '@cairn/shared';
 import { Ellipsis } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -29,6 +34,8 @@ export function computerActionNoteText(note: ComputerActionNote, t: TFunc): stri
       reset: t('正在重置虚拟机…'),
       install: t('正在下载 Linux 虚拟机…'),
     }[note.action];
+  if (note.kind === 'failed' && note.detail.includes(COMPUTER_FILE_MISSING))
+    return t('找不到虚拟机磁盘，请重启 Cairn 再试。');
   if (note.kind === 'failed')
     return {
       stop: t('没能停止虚拟机，请稍后重试。'),
@@ -51,6 +58,12 @@ export function computerActionNoteText(note: ComputerActionNote, t: TFunc): stri
 export function useComputerActions(teamId: string | undefined, computer: ComputerRecord | null) {
   const { manageComputer } = useApiMutations(teamId);
   const [note, setNote] = useState<ComputerActionNote | null>(null);
+  const state = computer?.state;
+  const [lastState, setLastState] = useState(state);
+  if (state !== lastState) {
+    setLastState(state);
+    if (state === 'running' && note?.kind === 'failed') setNote(null);
+  }
   const run = (action: ComputerManageAction) => {
     if (computer === null) return;
     setNote({ kind: 'running', action });

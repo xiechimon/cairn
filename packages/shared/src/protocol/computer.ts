@@ -81,6 +81,7 @@ export const COMPUTER_MANAGE_OUTCOMES = [
 ] as const;
 export type ComputerManageOutcome = (typeof COMPUTER_MANAGE_OUTCOMES)[number];
 export const COMPUTER_MANAGE_TIMEOUT_MS = 20 * 60_000;
+export const COMPUTER_FILE_MISSING = 'the container system cannot find';
 
 export const computerManageParamsSchema = z.strictObject({
   action: z.enum(COMPUTER_MANAGE_ACTIONS),

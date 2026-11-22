@@ -13,6 +13,7 @@ import { release } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { COMPUTER_FILE_MISSING } from '@cairn/shared';
 import { z } from 'zod';
 import manifestJson from '../../computer-image/image.json' with { type: 'json' };
 import { childEnv } from '../child-env.js';
@@ -85,6 +86,25 @@ export const runVmCommand: VmCommandRunner = (argv, options = {}) =>
       resolve({ code: code ?? 1, stdout, stderr });
     });
   });
+
+const CONTAINER_REASON_MAX_CHARS = 300;
+
+export function containerRefusal(summary: string, stderr: string): ComputerRefusal {
+  const missing = /no such file[\s\S]*?NSFilePath=([^,}]+)/i
+    .exec(stderr)?.[1]
+    ?.trim()
+    .slice(0, CONTAINER_REASON_MAX_CHARS);
+  if (missing !== undefined)
+    return new ComputerRefusal(`${summary}: ${COMPUTER_FILE_MISSING} ${missing}`);
+  const reason = stderr
+    .trim()
+    .split('\n')
+    .at(-1)
+    ?.replace(/^Error:\s*/, '')
+    .trim()
+    .slice(0, CONTAINER_REASON_MAX_CHARS);
+  return new ComputerRefusal(reason ? `${summary}: ${reason}` : summary);
+}
 
 export function versionAtLeast(version: string, minimum: string): boolean {
   const parts = (text: string) => text.split('.').map((part) => Number(part));
@@ -270,7 +290,9 @@ export class VmRuntime {
     const started = await this.run([binary, 'system', 'start', ...args], {
       timeoutMs: VM_RUNTIME_START_MS,
     });
-    if (started.code !== 0 || (await this.runningVersion(binary)) === undefined)
+    if (started.code !== 0)
+      throw containerRefusal('The container system could not be started', started.stderr);
+    if ((await this.runningVersion(binary)) === undefined)
       throw new ComputerRefusal('The container system could not be started');
   }
 

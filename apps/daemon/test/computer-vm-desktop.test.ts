@@ -84,7 +84,7 @@ if (command === 'volume') {
   process.exit(0);
 }
 if (command === 'run') {
-  if (flag('run-fails')) process.exit(1);
+  if (flag('run-fails')) { process.stderr.write(fs.readFileSync(path.join(dir, 'run-fails'), 'utf8')); process.exit(1); }
   const name = rest[rest.indexOf('--name') + 1];
   const label = rest[rest.indexOf('--label') + 1].split('=');
   state.vms[name] = { state: flag('guard-fails') ? 'stopped' : 'running', address: '127.0.0.1', ready: !flag('never-ready'), display: !flag('never-displayed'), labels: { [label[0]]: label[1] }, image: rest.at(-1), installed: [] };
@@ -421,6 +421,17 @@ describe('VmDesktops', () => {
     const env = setup();
     env.flag('run-fails');
     await expect(env.make().ensure('chief:a')).rejects.toThrow('image could not be started');
+  });
+
+  test('an image whose disk file is missing is refused with the missing path, not only a generic line', async () => {
+    const env = setup();
+    env.flag(
+      'run-fails',
+      'Error: internalError: "failed to bootstrap container cairn-computer-x" (cause: "unknown: "Error Domain=NSCocoaErrorDomain Code=260 "The file \u201csnapshot\u201d couldn\u2019t be opened because there is no such file." UserInfo={NSFilePath=/old/runner/vm/app/snapshots/abc/snapshot, NSURL=file:///old/runner/vm/app/snapshots/abc/snapshot}"")\n',
+    );
+    await expect(env.make().ensure('chief:a')).rejects.toThrow(
+      'The computer image could not be started: the container system cannot find /old/runner/vm/app/snapshots/abc/snapshot',
+    );
   });
 
   test('a command runs as the agent user in its home and names environment values only', async () => {

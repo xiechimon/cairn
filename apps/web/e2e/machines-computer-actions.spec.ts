@@ -7,10 +7,10 @@ const MACHINE = { id: 'm1', name: 'Mac', online: true, kind: 'local', runningSte
 type Download = { state: string; doneBytes: number; totalBytes: number } | null;
 const TOTAL = 1_481_435_942;
 
-const computer = (kind: 'host' | 'vm', download: Download = null) => ({
+const computer = (kind: 'host' | 'vm', download: Download = null, state = 'running') => ({
   id: 'comp-1',
   scopeKey: 'chief:u1',
-  state: 'running',
+  state,
   controlHolder: 'none',
   handoffReason: null,
   kind,
@@ -23,6 +23,7 @@ async function open(
   kind: 'host' | 'vm',
   answer: (action: string) => unknown,
   download: () => Download = () => null,
+  state: () => string = () => 'running',
 ) {
   const actions: string[] = [];
   await mockLive(
@@ -30,7 +31,7 @@ async function open(
     { threads: [], messages: HISTORY, machines: [MACHINE] },
     (path, route, json) => {
       if (path === '/api/computers' && route.request().method() === 'GET')
-        return json({ computers: [computer(kind, download())] });
+        return json({ computers: [computer(kind, download(), state())] });
       if (path === '/api/computers/comp-1/commands') return json({ commands: [] });
       if (path === '/api/teams/t1/computers/comp-1/screen')
         return json({ error: 'the computer is not connected' }, 409);
@@ -38,6 +39,7 @@ async function open(
         const { action } = route.request().postDataJSON() as { action: string };
         actions.push(action);
         const result = answer(action);
+        if (typeof result === 'string') return json({ error: result }, 409);
         return typeof result === 'number'
           ? json({ error: 'The computer home could not be deleted' }, result)
           : json(result);
@@ -159,5 +161,30 @@ test.describe('Coordinator computer actions menu', () => {
     const note = panel.getByTestId('computer-action-note');
     await expect(note).toHaveText('没能恢复虚拟机，请稍后重试。');
     await expect(note).toHaveAttribute('data-note', 'failed');
+  });
+
+  test('a recover that cannot find the VM disk says so plainly and clears once the VM runs', async ({
+    page,
+  }) => {
+    let state = 'failed';
+    const { panel } = await open(
+      page,
+      'vm',
+      () =>
+        'The computer image could not be started: the container system cannot find /old/runner/vm/app/snapshots/abc/snapshot',
+      () => null,
+      () => state,
+    );
+    await panel.getByTestId('computer-recover').click();
+    const note = panel.getByTestId('computer-action-note');
+    await expect(note).toHaveText(
+      '找不到虚拟机磁盘，请重启 Cairn 再试。',
+    );
+    await expect(panel.getByTestId('machine-line')).toHaveAttribute(
+      'title',
+      /cannot find \/old\/runner/,
+    );
+    state = 'running';
+    await expect(note).toHaveCount(0, { timeout: 15_000 });
   });
 });

@@ -318,6 +318,7 @@ export const EN: Record<string, string> = {
   '没能停止虚拟机，请稍后重试。': 'Could not stop the VM. Try again later.',
   '没能更新虚拟机，请稍后重试。': 'Could not update the VM. Try again later.',
   '没能恢复虚拟机，请稍后重试。': 'Could not recover the VM. Try again later.',
+  '找不到虚拟机磁盘，请重启 Cairn 再试。': 'VM disk not found. Restart Cairn and try again.',
   '没能重置虚拟机，请稍后重试。': 'Could not reset the VM. Try again later.',
   '虚拟机已停止，文件都还在，下次使用时会自动启动。':
     'The VM stopped. Its files are kept and it starts again on next use.',

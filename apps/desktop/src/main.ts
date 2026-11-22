@@ -1,16 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import {
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir, release } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -79,7 +71,7 @@ import { type CapturePage, createPageCapture } from './page-capture.js';
 import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
 import { createRestartBudget } from './restart-budget.js';
 import { type LocalRunner, startLocalRunner } from './runner.js';
-import { runnerHomeFor } from './runner-home.js';
+import { migrateRunnerHome, runnerHomeFor } from './runner-home.js';
 import { createServerExitHandler } from './server-exit.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
 import { addLiquidGlass } from './tray-glass.js';
@@ -226,40 +218,6 @@ function runnerHome(): string {
     installedBundle: '/Applications/Cairn.app',
     home: homedir(),
   });
-}
-
-function migrateRunnerHome(): void {
-  const legacy = join(app.getPath('userData'), 'runner');
-  const target = runnerHome();
-  let entries: string[];
-  try {
-    entries = readdirSync(legacy);
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    const to = join(target, entry);
-    try {
-      if (existsSync(to) || lstatSync(join(legacy, entry)).isSymbolicLink()) continue;
-      mkdirSync(target, { recursive: true, mode: 0o700 });
-      renameSync(join(legacy, entry), to);
-    } catch (error) {
-      console.warn(`runner-home migration skipped ${entry}:`, error);
-    }
-  }
-  try {
-    const claudeTarget = join(target, 'homes', 'claude');
-    if (
-      existsSync(join(target, 'claude')) &&
-      !existsSync(claudeTarget) &&
-      !lstatSync(join(target, 'claude')).isSymbolicLink()
-    ) {
-      mkdirSync(dirname(claudeTarget), { recursive: true });
-      renameSync(join(target, 'claude'), claudeTarget);
-    }
-  } catch (error) {
-    console.warn('runner-home claude home migration failed:', error);
-  }
 }
 
 function bundledRoot(name: string): string {
@@ -1044,7 +1002,7 @@ async function boot(): Promise<void> {
         runner.ensureRunning();
         return Promise.resolve();
       }
-      migrateRunnerHome();
+      migrateRunnerHome(join(app.getPath('userData'), 'runner'), runnerHome());
       runnerStarting ??= startLocalRunner({
         root: bundledRoot('runner'),
         home: runnerHome(),

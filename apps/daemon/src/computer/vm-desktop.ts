@@ -38,7 +38,12 @@ import {
   ComputerRefusal,
   type ComputerScopeGrant,
 } from './provider.js';
-import { COMPUTER_IMAGE_MANIFEST, runVmCommand, type VmCommandRunner } from './vm-runtime.js';
+import {
+  COMPUTER_IMAGE_MANIFEST,
+  containerRefusal,
+  runVmCommand,
+  type VmCommandRunner,
+} from './vm-runtime.js';
 
 export const COMPUTER_IMAGE_ENV = 'CAIRN_COMPUTER_IMAGE';
 export const NO_CLOAK_LICENSE =
@@ -617,7 +622,7 @@ export class VmDesktops implements ComputerDesktops {
       );
       if (created.code !== 0) {
         await this.run([binary, 'delete', '--force', name]);
-        throw new ComputerRefusal('The computer image could not be started');
+        throw containerRefusal('The computer image could not be started', created.stderr);
       }
     }
     this.started.add(name);
@@ -785,12 +790,13 @@ export class VmDesktops implements ComputerDesktops {
       const binary = await this.options.runtime.install((bytes) => this.progress(bytes));
       this.progress(VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel);
       const pull = (image: string) => this.pull(binary, image);
-      if ((await pull(VM_INIT_IMAGE)).code !== 0)
-        throw new ComputerRefusal('The computer image could not be downloaded');
+      const init = await pull(VM_INIT_IMAGE);
+      if (init.code !== 0)
+        throw containerRefusal('The computer image could not be downloaded', init.stderr);
       this.progress(VM_DOWNLOAD_PARTS.runtime + VM_DOWNLOAD_PARTS.kernel + VM_DOWNLOAD_PARTS.init);
       const pulled = await pull(this.image);
       if (pulled.code !== 0)
-        throw new ComputerRefusal('The computer image could not be downloaded');
+        throw containerRefusal('The computer image could not be downloaded', pulled.stderr);
       this.options.runtime.markDownloaded();
       this.installedBytes = VM_DOWNLOAD_BYTES;
     } catch (error) {
@@ -804,7 +810,7 @@ export class VmDesktops implements ComputerDesktops {
     }
   }
 
-  private pull(binary: string, image: string): Promise<{ code: number }> {
+  private pull(binary: string, image: string): Promise<{ code: number; stderr: string }> {
     return this.run(
       [binary, 'image', 'pull', '--progress', 'none', '--platform', 'linux/arm64', image],
       { timeoutMs: 30 * 60_000 },
@@ -870,7 +876,7 @@ export class VmDesktops implements ComputerDesktops {
         });
         const kept = await this.run([binary, 'volume', 'inspect', name]);
         if (volume.code !== 0 && kept.code === 0)
-          throw new ComputerRefusal('The computer home could not be deleted');
+          throw containerRefusal('The computer home could not be deleted', volume.stderr);
         rmSync(this.packagesFile(name), { force: true });
         return 'reset';
       }
@@ -912,7 +918,7 @@ export class VmDesktops implements ComputerDesktops {
       timeoutMs: VM_DELETE_MS,
     });
     if (deleted.code !== 0 && (await this.list(binary)).some((vm) => vm.name === name))
-      throw new ComputerRefusal('The computer could not be removed');
+      throw containerRefusal('The computer could not be removed', deleted.stderr);
   }
 
   private remember(scopeKey: string, desktop: Desktop): Desktop {
