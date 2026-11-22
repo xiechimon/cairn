@@ -98,6 +98,9 @@ test('a run bound after its input was retried still belongs to the retried step'
   expect(coordinatorRuns(H.s.db, H.threadId)).toEqual([
     expect.objectContaining({ taskId: 'task-first', stepId: parentId }),
   ]);
+  expect(() =>
+    bindCoordinatorRun(H.s.db, H.threadId, 'conversation-1', 'task-ahead', [`${first.id}#9`]),
+  ).toThrow('input authority is incomplete');
 });
 
 test('queue and repeated pull retain the same frozen batch without early attribution', () => {

@@ -35,7 +35,7 @@ export function inputRequestIds(requestId: string): string[] {
   return Array.from({ length: attempt }, (_, index) => inputRequestId({ id, attempt: index + 1 }));
 }
 
-function parseInputRequestId(requestId: string): { id: string; attempt: number } {
+export function parseInputRequestId(requestId: string): { id: string; attempt: number } {
   const hash = requestId.lastIndexOf('#');
   if (hash === -1) return { id: requestId, attempt: 1 };
   const attempt = Number(requestId.slice(hash + 1));

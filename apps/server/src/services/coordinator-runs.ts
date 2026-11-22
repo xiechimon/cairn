@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { coordinatorRun } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { inputForRequestId } from './coordinator-inputs.js';
+import { inputForRequestId, parseInputRequestId } from './coordinator-inputs.js';
 
 export function coordinatorRuns(db: Db, threadId: string) {
   return db.select().from(coordinatorRun).where(eq(coordinatorRun.threadId, threadId)).all();
@@ -22,6 +22,7 @@ export function bindCoordinatorRun(
     if (
       input?.threadId !== threadId ||
       input.conversationId !== conversationId ||
+      parseInputRequestId(id).attempt > input.attempt ||
       (!stale && input.state !== 'consumed')
     )
       throw new HttpError(409, 'Coordinator run input authority is incomplete');
