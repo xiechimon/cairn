@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 
-import { execFileSync, spawnSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename } from 'node:path';
-import { laneName } from './push-queue.mjs';
+import { commandReader, sleep } from './poll-read.mjs';
+
+export function laneName(host, worktree) {
+  return `${host}/${worktree}`.replace(/[^A-Za-z0-9._/-]/g, '-');
+}
 
 export function preflightRef(lane) {
   return `refs/heads/preflight/${lane}`;
@@ -15,110 +19,123 @@ export function preflightRun(runs, sha, ref) {
   );
 }
 
-export function watchVerdict(status, conclusion, watchStatus) {
-  if (status === 'completed')
-    return { verdict: conclusion === 'success' ? 'green' : 'red', conclusion };
-  return watchStatus === 0 ? { verdict: 'unreadable' } : { verdict: 'unreadable', watchStatus };
+export function watchVerdict(state) {
+  if (state.kind === 'unreadable') return { verdict: 'unreadable', detail: state.source };
+  const { status, conclusion } = state.value;
+  if (status !== 'completed') return { verdict: 'pending', detail: `run status is ${status}` };
+  if (!conclusion) return { verdict: 'pending', detail: 'run is completed without a conclusion' };
+  return { verdict: conclusion === 'success' ? 'green' : 'red', conclusion };
+}
+
+export function pushPreflight(head, lane) {
+  const ref = preflightRef(lane);
+  const push = spawnSync('git', ['push', `--force-with-lease=${ref}`, 'origin', `HEAD:${ref}`], {
+    stdio: 'inherit',
+  });
+  if (push.status === 0) console.log(`[preflight] pushed ${head.slice(0, 9)} to ${ref}`);
+  else console.error(`[preflight] git push to ${ref} did not succeed`);
+  return push.status ?? 1;
+}
+
+function main({ wait, repo }) {
+  const read = commandReader();
+  const worktree = read('git', ['rev-parse', '--show-toplevel'], 'worktree path');
+  const head = read('git', ['rev-parse', 'HEAD'], 'HEAD');
+  for (const result of [worktree, head]) {
+    if (result.kind === 'unreadable') {
+      console.error(`[preflight] could not read ${result.source}; not pushed`);
+      return 1;
+    }
+  }
+  const lane = laneName(hostname(), basename(worktree.value));
+  const pushed = pushPreflight(head.value, lane);
+  if (pushed !== 0) return pushed;
+
+  let run = null;
+  let attempts = 12;
+  let watch = true;
+  for (;;) {
+    let detail;
+    if (run === null) {
+      const discovery = read(
+        'gh',
+        ['api', `repos/${repo}/actions/runs?head_sha=${head.value}&per_page=20`],
+        'the ci run list',
+        (text) => {
+          const { workflow_runs: runs } = JSON.parse(text);
+          if (!Array.isArray(runs)) return undefined;
+          const found = preflightRun(runs, head.value, `preflight/${lane}`);
+          return found === null || (Number.isSafeInteger(found.id) && found.html_url)
+            ? found
+            : undefined;
+        },
+      );
+      if (discovery.kind === 'value' && discovery.value !== null) {
+        run = discovery.value;
+        console.log(`[preflight] ci run: ${run.html_url}`);
+        if (!wait) {
+          console.log('[preflight] use --wait to wait for the conclusion');
+          return 0;
+        }
+        attempts = 6;
+        continue;
+      }
+      detail =
+        discovery.kind === 'unreadable'
+          ? `could not read ${discovery.source}`
+          : 'the ci run has not appeared';
+    } else {
+      if (watch) {
+        spawnSync(
+          'gh',
+          ['run', 'watch', String(run.id), '--repo', repo, '--exit-status', '--interval', '30'],
+          {
+            stdio: 'inherit',
+          },
+        );
+      }
+      const state = read(
+        'gh',
+        ['api', `repos/${repo}/actions/runs/${run.id}`],
+        'the run state',
+        (text) => {
+          const current = JSON.parse(text);
+          return current?.id === run.id &&
+            typeof current.status === 'string' &&
+            (current.conclusion == null || typeof current.conclusion === 'string')
+            ? current
+            : undefined;
+        },
+      );
+      const outcome = watchVerdict(state);
+      if (outcome.verdict === 'green') {
+        console.log('[preflight] green — the ci run concluded success');
+        return 0;
+      }
+      if (outcome.verdict === 'red') {
+        console.error(
+          `[preflight] the run went ${outcome.conclusion}: ${run.html_url}; inspect the run before retrying`,
+        );
+        return 1;
+      }
+      watch = state.kind === 'value' && state.value.status !== 'completed';
+      detail =
+        outcome.verdict === 'unreadable' ? `could not read ${outcome.detail}` : outcome.detail;
+    }
+    attempts--;
+    if (attempts === 0) {
+      const location = run ? ` at ${run.html_url}` : ' after pushing the preflight ref';
+      console.error(`[preflight] ${detail}${location}; no verdict available`);
+      return 1;
+    }
+    console.error(`[preflight] ${detail}; retrying (${attempts} remaining)`);
+    sleep(5000);
+  }
 }
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
-  const wait = process.argv.includes('--wait');
-  const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
-  const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
-  const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
-  const ref = `preflight/${lane}`;
-  const sha = git(['rev-parse', 'HEAD']);
-  const push = spawnSync(
-    'git',
-    ['push', `--force-with-lease=${preflightRef(lane)}`, 'origin', `HEAD:${preflightRef(lane)}`],
-    { stdio: 'inherit' },
-  );
-  if (push.status !== 0) process.exit(push.status ?? 1);
-  console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
-  const sleep = (seconds) => spawnSync('sleep', [String(seconds)]);
-  const readRun = () => {
-    const { workflow_runs: runs } = JSON.parse(
-      execFileSync('gh', ['api', `repos/${repo}/actions/runs?head_sha=${sha}&per_page=20`], {
-        encoding: 'utf8',
-      }),
-    );
-    return preflightRun(runs, sha, ref);
-  };
-  let run = null;
-  for (let attempt = 0; attempt < 12; attempt++) {
-    try {
-      run = readRun();
-    } catch {
-      run = null;
-    }
-    if (run) break;
-    sleep(5);
-  }
-  if (!run) {
-    console.error(
-      '[preflight] could not read the run: the ci run did not appear; check that the ci workflow is enabled',
-    );
-    process.exit(1);
-  }
-  console.log(`[preflight] ci run: ${run.html_url}`);
-  if (!wait) {
-    console.log(
-      '[preflight] rerun with --wait to block until it finishes, then node scripts/ops/push-queue.mjs',
-    );
-    process.exit(0);
-  }
-  const currentStatus = () => {
-    try {
-      const latest = readRun();
-      return { status: latest?.status ?? null, conclusion: latest?.conclusion ?? null };
-    } catch {
-      return null;
-    }
-  };
-  const watched = spawnSync(
-    'gh',
-    ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'],
-    {
-      stdio: 'inherit',
-    },
-  );
-  let state = currentStatus();
-  const WATCH_RETRIES = 5;
-  for (let attempt = 0; attempt < WATCH_RETRIES; attempt++) {
-    const outcome = watchVerdict(state?.status ?? null, state?.conclusion ?? null, watched.status);
-    if (outcome.verdict !== 'unreadable') {
-      if (outcome.verdict === 'green') {
-        console.log('[preflight] green — push-queue will accept this head');
-        process.exit(0);
-      }
-      console.error(
-        `[preflight] the run went ${outcome.conclusion}: ${run.html_url}; fix the failing jobs and push again`,
-      );
-      process.exit(1);
-    }
-    console.error(
-      `[preflight] could not read the run (watch exited ${watched.status ?? 'signal'}, state query failed); retrying ${WATCH_RETRIES - attempt} more time(s)`,
-    );
-    sleep(5);
-    state = currentStatus();
-    if (state && state.status !== 'completed') {
-      const again = spawnSync(
-        'gh',
-        ['run', 'watch', String(run.id), '--exit-status', '--interval', '30'],
-        {
-          stdio: 'inherit',
-        },
-      );
-      if (again.status === 0) {
-        console.log('[preflight] green — push-queue will accept this head');
-        process.exit(0);
-      }
-      state = currentStatus();
-      if (state && state.status === 'completed') continue;
-    }
-  }
-  console.error(
-    `[preflight] could not read the run at ${run.html_url}; rerun node scripts/ops/preflight.mjs --wait`,
-  );
-  process.exit(1);
+  process.exitCode = main({
+    wait: process.argv.includes('--wait'),
+    repo: process.env.CAIRN_REPO ?? 'xiechimon/cairn',
+  });
 }
