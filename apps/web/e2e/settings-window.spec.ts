@@ -27,7 +27,7 @@ test('the settings icon opens the window on Account; Escape returns to the page 
   await page.getByTestId('sidebar-reopen').click();
   await page.mouse.move(700, 400);
   await page.getByTestId('sidebar-settings').click();
-  await expect(page).toHaveURL(/\/app\/settings\?/);
+  await expect(page).toHaveURL(/\/app\/settings\/account\?/);
   await expect(settings(page)).toBeVisible();
   await expect(navItem(page, 'account')).toHaveAttribute('aria-current', 'page');
   await page.keyboard.press('Escape');

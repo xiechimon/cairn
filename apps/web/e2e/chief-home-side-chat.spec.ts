@@ -168,6 +168,59 @@ test('a wide panel re-clamps when the window narrows', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 900 });
   await expect.poll(() => panelWidth(page)).toBe(720);
   await expect(handle(page)).toHaveAttribute('aria-valuenow', '720');
+  await page.reload();
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '720');
+  await page.setViewportSize({ width: 2000, height: 900 });
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '1200');
+  expect(await page.evaluate(() => localStorage.getItem('cairn.side-panel-width'))).toBe('1200');
+});
+
+test('narrowing the window during a held drag clamps only the display and saves the dragged width', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 2000, height: 900 });
+  await page.goto(`${HOME}&thread=home-c-review`);
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '420');
+  await slideInDone(page);
+  const box = await handle(page).boundingBox();
+  if (box == null) throw new Error('resize handle has no box');
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 580, y, { steps: 5 });
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '1000');
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '720');
+  await page.mouse.up();
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '720');
+  expect(await page.evaluate(() => localStorage.getItem('cairn.side-panel-width'))).toBe('1000');
+  await page.setViewportSize({ width: 2000, height: 900 });
+  await expect(handle(page)).toHaveAttribute('aria-valuenow', '1000');
+});
+
+test('an expanded thread follows the Tasks panel while it is being dragged', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await page.goto(`${HOME}&pane=tasks&thread=home-c-working-a`);
+  const transcript = page.getByTestId('side-chat-panel');
+  const tasksHandle = tasksPanel(page).getByTestId('side-panel-resize');
+  await expect(transcript).toHaveAttribute('data-docked', '');
+  await expect(tasksHandle).toHaveAttribute('aria-valuenow', '420');
+  const box = await tasksHandle.boundingBox();
+  if (box == null) throw new Error('resize handle has no box');
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x - 200, y, { steps: 5 });
+  await expect(tasksHandle).toHaveAttribute('aria-valuenow', '620');
+  await expect(transcript).toHaveAttribute('data-docked', 'floating');
+  const conversation = await page
+    .getByTestId('home-c')
+    .evaluate((node) => Math.round(node.getBoundingClientRect().width));
+  expect(conversation).toBe(820);
+  await page.mouse.up();
+  await expect(transcript).toHaveAttribute('data-docked', 'floating');
 });
 
 test.describe('phone width', () => {

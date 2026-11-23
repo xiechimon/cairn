@@ -208,7 +208,7 @@ test('the Mac app menu opens search, settings and a new task in the Tasks panel'
 
   await send('settings');
   await expect(settings).toBeVisible();
-  await expect(page).toHaveURL(/\/app\/settings\?scenario=01$/);
+  await expect(page).toHaveURL(/\/app\/settings\/account\?scenario=01$/);
 
   await send('new-task');
   await expect(settings).toBeHidden();

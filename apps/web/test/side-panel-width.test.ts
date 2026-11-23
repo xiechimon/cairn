@@ -10,20 +10,22 @@ import {
 
 describe('side panel width', () => {
   it('starts at the Tasks panel width when nothing is stored', () => {
-    expect(readPanelWidth(null, 1440)).toBe(PANEL_WIDTH_DEFAULT);
+    expect(readPanelWidth(null)).toBe(PANEL_WIDTH_DEFAULT);
     expect(PANEL_WIDTH_DEFAULT).toBe(420);
   });
 
   it('ignores stored values that are not numbers', () => {
-    expect(readPanelWidth('wide', 1440)).toBe(PANEL_WIDTH_DEFAULT);
-    expect(readPanelWidth('', 1440)).toBe(PANEL_WIDTH_DEFAULT);
-    expect(readPanelWidth('NaN', 1440)).toBe(PANEL_WIDTH_DEFAULT);
+    expect(readPanelWidth('wide')).toBe(PANEL_WIDTH_DEFAULT);
+    expect(readPanelWidth('')).toBe(PANEL_WIDTH_DEFAULT);
+    expect(readPanelWidth('NaN')).toBe(PANEL_WIDTH_DEFAULT);
   });
 
-  it('keeps a stored width inside the bounds of the current window', () => {
-    expect(readPanelWidth('560', 1440)).toBe(560);
-    expect(readPanelWidth('100', 1440)).toBe(PANEL_WIDTH_MIN);
-    expect(readPanelWidth('5000', 1440)).toBe(panelWidthMax(1440));
+  it('keeps the stored width as saved, to be clamped only for display', () => {
+    expect(readPanelWidth('560')).toBe(560);
+    expect(readPanelWidth('800')).toBe(800);
+    expect(clampPanelWidth(readPanelWidth('800'), 1200)).toBe(720);
+    expect(clampPanelWidth(readPanelWidth('100'), 1440)).toBe(PANEL_WIDTH_MIN);
+    expect(clampPanelWidth(readPanelWidth('5000'), 1440)).toBe(panelWidthMax(1440));
   });
 
   it('never lets the panel take more than 60% of the window', () => {
