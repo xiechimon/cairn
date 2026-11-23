@@ -58,6 +58,11 @@ jobs:
             npm.cmd install --prefix $destination.FullName --ignore-scripts --no-audit --no-fund $tarballs[0].FullName
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: windows-test-tarballs-${{ github.run_attempt }}
+          path: ${{ env.WINDOWS_ACCEPT_ROOT }}/packs/*.tgz
+          if-no-files-found: error
       - name: Exercise owner, Runner, and the paired browser
         run: |
           node scripts/smoke/windows-accept.mjs 2>&1 | Tee-Object -FilePath "$env:WINDOWS_ACCEPT_ROOT/evidence/journey.log"

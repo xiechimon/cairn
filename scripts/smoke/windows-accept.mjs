@@ -146,6 +146,7 @@ try {
   await owner.goto(`${localOrigin}/app`, { waitUntil: 'domcontentloaded' });
   await expect(owner.getByTestId('home-c')).toBeVisible({ timeout: 15_000 });
   await browserRequest(owner, '/api/remote/pairing');
+  await expect(owner.locator('.token-gate')).toHaveCount(0);
   await owner.screenshot({ path: join(evidence, 'local-owner.png') });
   console.log('Local browser acquired owner access without a bearer token');
 
@@ -173,10 +174,12 @@ try {
   await office.goto(`${officeOrigin}/app`, { waitUntil: 'domcontentloaded' });
   const pairingInput = office.locator('#cairn-pair-input');
   await expect(pairingInput).toBeVisible({ timeout });
+  await browserRequest(office, '/api/user/me', { status: 401 });
   await office.screenshot({ path: join(evidence, 'office-pairing-gate.png') });
   const { code } = await browserRequest(owner, '/api/remote/pairing', { method: 'POST', status: 201 });
   await pairingInput.fill(code);
   await pairingInput.press('Enter');
+  await expect(office.locator('.token-gate')).toHaveCount(0, { timeout });
   await expect(office.getByTestId('home-c')).toBeVisible({ timeout });
   await browserRequest(office, '/api/remote/pairing', { method: 'POST', status: 403 });
   const remoteTodoId = await runTask(office, project.id, machine.id, 'office');
