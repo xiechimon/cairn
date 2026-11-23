@@ -4,6 +4,10 @@ import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-ho
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { BatchSpanProcessor, TracerProvider } from '@opentelemetry/sdk-trace';
 
+const EXPORT_TIMEOUT_SECONDS = 30;
+const OTLP_EXPORT_TIMEOUT_MS = EXPORT_TIMEOUT_SECONDS * 1_000;
+const OTLP_BATCH_TIMEOUT_MS = OTLP_EXPORT_TIMEOUT_MS + 5_000;
+
 export type ExperimentClient = Pick<LangfuseClient, 'dataset' | 'experiment'>;
 
 export function openExperimentClient(config: {
@@ -16,7 +20,7 @@ export function openExperimentClient(config: {
     headers: {
       Authorization: `Basic ${Buffer.from(`${config.publicKey}:${config.secretKey}`).toString('base64')}`,
     },
-    timeoutMillis: 5_000,
+    timeoutMillis: OTLP_EXPORT_TIMEOUT_MS,
   });
   let failed = false;
   const send = exporter.export.bind(exporter);
@@ -27,11 +31,13 @@ export function openExperimentClient(config: {
     });
   const manager = new AsyncLocalStorageContextManager().enable();
   const provider = new TracerProvider({
-    spanProcessors: [new BatchSpanProcessor({ exporter, exportTimeoutMillis: 5_000 })],
+    spanProcessors: [
+      new BatchSpanProcessor({ exporter, exportTimeoutMillis: OTLP_BATCH_TIMEOUT_MS }),
+    ],
   });
   if (!trace.setGlobalTracerProvider(provider) || !context.setGlobalContextManager(manager))
     throw new Error('Experiment tracing requires an unused global provider and context manager');
-  const client = new LangfuseClient({ ...config, timeout: 5 });
+  const client = new LangfuseClient({ ...config, timeout: EXPORT_TIMEOUT_SECONDS });
   let closed = false;
   return {
     client,
@@ -40,7 +46,6 @@ export function openExperimentClient(config: {
       closed = true;
       try {
         await client.shutdown();
-        await provider.forceFlush({ timeoutMillis: 5_000 });
         await provider.shutdown();
       } finally {
         trace.disable();
