@@ -6,7 +6,7 @@ import type {
   MachineRecord,
 } from '@cairn/shared';
 import { Ellipsis, Hash, MessageCircle, MessageSquare, Send } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   registeredMachines,
@@ -40,6 +40,7 @@ import {
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { SLACK_APP_CREATE_URL } from '../lib/slack-app-manifest.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { IntegrationRow, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
@@ -145,12 +146,26 @@ function SlackConnectDialog({
   const { t } = useI18n();
   const [appToken, setAppToken] = useState('');
   const [botToken, setBotToken] = useState('');
+  const appTokenRef = useRef<HTMLInputElement>(null);
   const ready = appToken.trim() !== '' && botToken.trim() !== '';
   return (
     <DialogShell
       title={t('连接 Slack')}
-      subtitle={t('新建一个 Slack App 并打开 Socket Mode，把两个 token 粘贴到这里。')}
+      subtitle={
+        <>
+          <span className="block">{t('新建一个 Slack App，把两个 token 粘贴到这里。')}</span>
+          <a
+            className="flex min-h-6 w-fit items-center text-foreground pointer-coarse:min-h-11"
+            href={SLACK_APP_CREATE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t('用 Cairn 的设置创建 Slack App')}
+          </a>
+        </>
+      }
       onClose={onClose}
+      initialFocus={appTokenRef}
       footer={
         <Button
           className={DIALOG_PRIMARY_BUTTON}
@@ -169,6 +184,7 @@ function SlackConnectDialog({
           help={t('Basic Information → App-Level Tokens 里生成，scope 选 connections:write。')}
         >
           <Input
+            ref={appTokenRef}
             id="im-app-token"
             value={appToken}
             onChange={(event) => setAppToken(event.target.value)}
@@ -180,7 +196,9 @@ function SlackConnectDialog({
         <FormField
           label="Bot Token"
           htmlFor="im-bot-token"
-          help={t('OAuth & Permissions 里的 Bot User OAuth Token。')}
+          help={t(
+            '先把 Slack App 安装到工作区，再复制 OAuth & Permissions 里的 Bot User OAuth Token。',
+          )}
         >
           <Input
             id="im-bot-token"

@@ -2565,12 +2565,13 @@ export const EN: Record<string, string> = {
     'No Runners registered. Start a Runner on a Mac first.',
   '在 @BotFather 里创建机器人，把 bot token 粘贴到这里。':
     'Create a bot in @BotFather and paste the bot token here.',
-  '新建一个 Slack App 并打开 Socket Mode，把两个 token 粘贴到这里。':
-    'Create a Slack app, turn on Socket Mode and paste the two tokens here.',
+  '新建一个 Slack App，把两个 token 粘贴到这里。':
+    'Create a Slack app, then paste its two tokens here.',
+  '用 Cairn 的设置创建 Slack App': "Create a Slack app with Cairn's settings",
   'Basic Information → App-Level Tokens 里生成，scope 选 connections:write。':
     'Create one under Basic Information → App-Level Tokens with the connections:write scope.',
-  'OAuth & Permissions 里的 Bot User OAuth Token。':
-    'The Bot User OAuth Token under OAuth & Permissions.',
+  '先把 Slack App 安装到工作区，再复制 OAuth & Permissions 里的 Bot User OAuth Token。':
+    'Click Install to Workspace to install the Slack app first, then copy the Bot User OAuth Token under OAuth & Permissions.',
   'Socket Mode 直连': 'Direct Socket Mode connection',
   待处理: 'Needs attention',
   '官方 Bot API': 'Official Bot API',
