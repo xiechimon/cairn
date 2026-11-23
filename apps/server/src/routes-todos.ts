@@ -12,12 +12,14 @@ import {
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import {
   githubIssueDepsOf,
   jsonBody,
   patchTodoBodySchema,
   requireProject,
+  requireTeam,
   svcOf,
 } from './routes-helpers.js';
 import { attachmentIdsInUserText } from './services/attachment-authorization.js';
@@ -58,19 +60,22 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
     return c.json(record);
   });
 
-  app.get('/api/todos', (c) => {
+  app.get('/api/todos', conditionalGet(), (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
+    requireTeam(ctx, teamId);
     return c.json(listTodos(svc, { teamId, archived: c.req.query('archived') === '1' }));
   });
 
-  app.get('/api/tasks', (c) => {
+  app.get('/api/tasks', conditionalGet(), (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
+    requireTeam(ctx, teamId);
     const sectionedOnly = c.req.query('sectioned') === '1';
     return c.json(tasksQuerySchema.parse(listTasks(svc, teamId, { sectionedOnly })));
   });
 
   app.get('/api/needs-you', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
+    requireTeam(ctx, teamId);
     return c.json(needsYouQuerySchema.parse(listNeedsYou(svc, teamId)));
   });
 

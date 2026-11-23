@@ -4,6 +4,7 @@ import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { machine, phone } from './db/schema.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { newRecordId, nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -64,12 +65,12 @@ export function registerPhoneRoutes(app: Hono, ctx: AppContext): void {
     return row;
   };
 
-  app.get('/api/machines/:id/phones', (c) => {
+  app.get('/api/machines/:id/phones', conditionalGet(), (c) => {
     const row = ownedMachine(c);
     return c.json({ phones: listPhones(ctx.db, row.id) });
   });
 
-  app.get('/api/machines/:id/phones/activity', (c) => {
+  app.get('/api/machines/:id/phones/activity', conditionalGet(), (c) => {
     const row = ownedMachine(c);
     return c.json({ activity: listPhoneActivity(ctx.db, row) });
   });
@@ -186,7 +187,7 @@ export function registerPhoneRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ ok: handbackPhone(ctx.db, row.id) });
   });
 
-  app.get('/api/phones/handoffs', (c) => {
+  app.get('/api/phones/handoffs', conditionalGet(), (c) => {
     if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
     const rows = ctx.db
       .select()

@@ -9,6 +9,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { chiefMessage } from './db/schema.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { notFound, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
@@ -110,7 +111,7 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     return c.json(getChiefEnvelope(svc, teamId, threadId));
   });
 
-  app.get('/api/teams/:id/chief/threads', (c) => {
+  app.get('/api/teams/:id/chief/threads', conditionalGet(), (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json(listChiefThreads(svc, teamId));

@@ -1,6 +1,7 @@
 import { computerManageParamsSchema, packageInstallDecisionBodySchema } from '@cairn/shared';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { ensureCoordinatorComputer, listComputers } from './services/computer-feed.js';
@@ -34,7 +35,7 @@ export function registerComputerRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ outcome });
   });
 
-  app.get('/api/computers', (c) => {
+  app.get('/api/computers', conditionalGet(), (c) => {
     ensureCoordinatorComputer(ctx.db, ctx.team.id, ctx.user.id);
     return c.json({ computers: listComputers(ctx.db, ctx.team.id, ctx.user.id) });
   });

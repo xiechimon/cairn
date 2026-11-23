@@ -17,6 +17,7 @@ import { getCookie, setCookie } from 'hono/cookie';
 import type { AppContext } from './context.js';
 import { team, user } from './db/schema.js';
 import { toTeamRecord } from './db/seed.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { isOpenRemotePath, pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
@@ -122,7 +123,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     return c.json(row === undefined ? [] : [toTeamRecord(row, openAutonomyPauses(ctx.db, row.id))]);
   });
 
-  app.get('/api/teams/:id/model-routing', (c) => {
+  app.get('/api/teams/:id/model-routing', conditionalGet(), (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     return c.json(getModelRouting(ctx.db, id));
@@ -239,7 +240,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
 
   const notificationDeps = { db: ctx.db, hub: ctx.hub, user: ctx.user };
 
-  app.get('/api/teams/:id/notifications', (c) => {
+  app.get('/api/teams/:id/notifications', conditionalGet(), (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     return c.json({ unreadThreadIds: listUnreadEntityIds(notificationDeps, id) });

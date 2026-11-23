@@ -5,6 +5,7 @@ import {
 } from '@cairn/shared';
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { jsonBody, requireTeam } from './routes-helpers.js';
 import type { ImService } from './services/im/core.js';
@@ -15,7 +16,7 @@ function requireIm(ctx: AppContext): ImService {
 }
 
 export function registerImRoutes(app: Hono, ctx: AppContext): void {
-  app.get('/api/teams/:id/im/connections', (c) => {
+  app.get('/api/teams/:id/im/connections', conditionalGet(), (c) => {
     requireTeam(ctx, c.req.param('id'));
     return c.json({ connections: requireIm(ctx).listConnections(ctx.team.id) });
   });
@@ -71,7 +72,7 @@ export function registerImRoutes(app: Hono, ctx: AppContext): void {
     return c.json({ connection: record });
   });
 
-  app.get('/api/teams/:id/im/pairing-requests', (c) => {
+  app.get('/api/teams/:id/im/pairing-requests', conditionalGet(), (c) => {
     requireTeam(ctx, c.req.param('id'));
     return c.json({ requests: requireIm(ctx).listPairingRequests(ctx.team.id) });
   });

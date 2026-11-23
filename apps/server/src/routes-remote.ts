@@ -7,6 +7,7 @@ import {
 } from '@cairn/shared';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { buildRemoteRoutes } from './lib/remote-routes.js';
 import { matchesAuthToken } from './lib/token-auth.js';
@@ -127,7 +128,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     );
   });
 
-  app.get('/api/remote/devices', (c) => {
+  app.get('/api/remote/devices', conditionalGet(), (c) => {
     if (ctx.authToken === null) {
       throw new HttpError(409, 'pairing needs token auth, which is turned off');
     }

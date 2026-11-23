@@ -39,6 +39,7 @@ import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import type { Db } from './db/client.js';
 import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
 import { githubAppUserRepos, githubUserRepos, isGithubAppUserToken } from './lib/github.js';
 import { nowMs } from './lib/ids.js';
@@ -295,7 +296,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     c.json(search(svc, { teamId: ctx.team.id, q: c.req.query('q') ?? null })),
   );
 
-  app.get('/api/teams/:id/machines', (c) => {
+  app.get('/api/teams/:id/machines', conditionalGet(), (c) => {
     const id = c.req.param('id');
     requireTeam(ctx, id);
     const rows = ctx.db.select().from(machine).where(eq(machine.teamId, id)).all();

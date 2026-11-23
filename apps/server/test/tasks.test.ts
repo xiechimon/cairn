@@ -243,7 +243,7 @@ test('Tasks scopes both sources to the team and lists parked pending standalone 
     })
     .run();
   expect(await read(s.team.id)).toMatchObject({ todos: [] });
-  expect(await read('other-team')).toMatchObject({ questions: [] });
+  expect((await req(s.app, 'GET', '/api/tasks?teamId=other-team')).status).toBe(404);
   answerQuestion(
     { db: s.db },
     { threadId: thread.id, requestId: 'pending', answers: [{ header: 'Scope', text: 'small' }] },

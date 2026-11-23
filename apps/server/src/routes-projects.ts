@@ -51,6 +51,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/projects', (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
+    requireTeam(ctx, teamId);
     const origin = requestOrigin(c);
     const rows = ctx.db.select().from(project).where(listedProjects(teamId)).all();
     return c.json(rows.map((r) => toProjectRecord(r, origin)));

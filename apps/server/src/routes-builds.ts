@@ -15,6 +15,7 @@ import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { chiefMessage, message, plan as planTable, todo, tokenUsage } from './db/schema.js';
 import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
+import { conditionalGet } from './lib/conditional-get.js';
 import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -52,7 +53,7 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
     return c.json(record);
   });
 
-  app.get('/api/prs', (c) => {
+  app.get('/api/prs', conditionalGet(), (c) => {
     const { threadId } = parseWith(prPanelQuerySchema, c.req.query(), 'query');
     return c.json(
       prPanelListSchema.parse(
