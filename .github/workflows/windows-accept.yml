@@ -1,0 +1,81 @@
+name: Windows packaged acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['preflight/**']
+
+permissions:
+  contents: read
+
+jobs:
+  packaged-journey:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          clean: false
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - name: Prepare evidence directory
+        run: |
+          $root = "$env:RUNNER_TEMP/cairn-windows-$env:GITHUB_RUN_ATTEMPT"
+          "WINDOWS_ACCEPT_ROOT=$root" | Add-Content $env:GITHUB_ENV
+          New-Item -ItemType Directory "$root/evidence"
+          $env:GITHUB_SHA | Set-Content "$root/evidence/sha.txt"
+      - name: Install workspace dependencies without lifecycle scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Pack server and Runner
+        run: |
+          $packs = New-Item -ItemType Directory "$env:WINDOWS_ACCEPT_ROOT/packs"
+          pnpm --filter @cairn/web build --emptyOutDir false
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Copy-Item -Recurse apps/web/dist apps/server/web
+          foreach ($package in @('apps/server', 'apps/daemon')) {
+            Push-Location $package
+            try {
+              node build.mjs
+              if ($LASTEXITCODE) { exit $LASTEXITCODE }
+              npm.cmd pack --ignore-scripts --pack-destination $packs.FullName
+              if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            } finally { Pop-Location }
+          }
+      - name: Install packages in clean directories
+        run: |
+          foreach ($package in @('cairn', 'cairn-cli')) {
+            $tarballs = @(Get-ChildItem "$env:WINDOWS_ACCEPT_ROOT/packs" -Filter "xiechimon-$package-*.tgz" |
+              Where-Object { $_.Name -match "^xiechimon-$package-\d" })
+            if ($tarballs.Count -ne 1) { throw "Expected one $package tarball" }
+            $destination = New-Item -ItemType Directory "$env:WINDOWS_ACCEPT_ROOT/$package"
+            npm.cmd install --prefix $destination.FullName --ignore-scripts --no-audit --no-fund $tarballs[0].FullName
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
+      - name: Stage the SQLite prebuilt without running install scripts
+        run: |
+          $sqlite = "$env:WINDOWS_ACCEPT_ROOT/cairn/node_modules/better-sqlite3"
+          $version = (Get-Content "$sqlite/package.json" -Raw | ConvertFrom-Json).version
+          $abi = node -p 'process.versions.modules'
+          $arch = node -p 'process.arch'
+          $asset = "better-sqlite3-v$version-node-v$abi-win32-$arch.tar.gz"
+          $download = "$env:WINDOWS_ACCEPT_ROOT/$asset"
+          Invoke-WebRequest "https://github.com/WiseLibs/better-sqlite3/releases/download/v$version/$asset" -OutFile $download
+          tar.exe -xzf $download -C $sqlite
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Exercise owner, Runner, and the paired browser
+        run: |
+          node scripts/smoke/windows-accept.mjs 2>&1 | Tee-Object -FilePath "$env:WINDOWS_ACCEPT_ROOT/evidence/journey.log"
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with:
+          name: windows-packaged-acceptance-${{ github.run_attempt }}
+          path: ${{ env.WINDOWS_ACCEPT_ROOT }}/evidence
+          if-no-files-found: error
