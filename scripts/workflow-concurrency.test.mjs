@@ -23,7 +23,13 @@ function evaluate(text, context) {
     );
   const whole = /^\$\{\{\s*([\s\S]*?)\s*\}\}$/.exec(text);
   if (whole) return run(whole[1]);
-  if (!text.includes('${{')) return run(text);
+  if (!text.includes('${{')) {
+    try {
+      return run(text);
+    } catch {
+      return text;
+    }
+  }
   return text.replace(/\$\{\{\s*([\s\S]*?)\s*\}\}/g, (_, expression) => run(expression));
 }
 
@@ -97,6 +103,21 @@ test('promote listens for completed ci runs on queue refs and serializes promoti
   const { group, cancel } = concurrencyOf('promote');
   assert.equal(group, 'promote-main');
   assert.equal(cancel, 'false');
+});
+
+test('desktop-release serializes every tick on one group and never cancels the running release, whatever the trigger', () => {
+  const { group, cancel } = concurrencyOf('desktop-release');
+  assert.equal(group, 'desktop-release');
+  assert.equal(cancel, 'false');
+  for (const event_name of ['schedule', 'workflow_dispatch']) {
+    const run = decision('desktop-release', {
+      event_name,
+      ref: 'refs/heads/main',
+      event: {},
+    });
+    assert.equal(run.group, 'desktop-release');
+    assert.equal(run.cancel, false);
+  }
 });
 
 test('queue-guard runs on queue/main pushes and on deletions, without a concurrency group that could drop a pending event', () => {

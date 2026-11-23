@@ -13,10 +13,7 @@ test('AGENTS.md lands work through queue/main without force and keeps the deploy
   assert.ok(agents.includes('`node scripts/ops/push-queue.mjs`'));
   assert.match(agents, /green-main` ruleset/);
   assert.match(agents, /Push without force/);
-  assert.match(
-    agents,
-    /published by the `desktop-release` workflow on every push whose app sources moved/,
-  );
+  assert.match(agents, /published by the `desktop-release` workflow, a level-triggered poller/);
   assert.match(
     agents,
     /resolve it so both sides. intent survives, rerun step 4, and push without asking/,

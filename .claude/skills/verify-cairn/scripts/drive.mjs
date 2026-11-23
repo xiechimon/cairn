@@ -43,8 +43,8 @@ const checks = [];
 const artifacts = [];
 const extra = {};
 let failures = 0;
-const check = (ok, label) => {
-  checks.push({ ok, label });
+const check = (ok, label, id) => {
+  checks.push({ ok, label, id });
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}`);
   if (!ok) failures += 1;
 };
@@ -90,6 +90,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage({
   viewport: { width: 1440, height: 732 },
   colorScheme: 'dark',
+  locale: 'zh-CN',
 });
 
 const gotoBoard = async () => {
@@ -160,30 +161,41 @@ try {
   if (probe === 'new-task') {
 
     const title = `验证任务 ${Date.now() % 100000}`;
+    await postJson(`${API}/api/projects`, { name: '验证项目', repoKind: 'hosted' });
+    const projectsLoaded = page.waitForResponse(
+      (res) =>
+        res.url().includes('/api/projects') && res.request().method() === 'GET' && res.ok(),
+    );
     await gotoBoard();
+    await projectsLoaded;
+    await page.getByTestId('home-c').waitFor({ state: 'visible', timeout: 15_000 });
+    check(true, '首页工作台渲染(任务面板入口在顶栏)', 'home');
     await shot(page, '01-board-before.png');
 
-    await page.click('.sidebar-new-task');
-    await page.waitForSelector('.new-task-dialog', { timeout: 5000 });
-    check(true, '新建任务 dialog 打开');
+    await page.getByTestId('tasks-toggle').click();
+    const panel = page
+      .getByRole('complementary')
+      .filter({ has: page.getByTestId('tasks-new') });
+    await panel.waitFor({ state: 'visible', timeout: 15_000 });
+    await panel.getByTestId('tasks-new').click();
+    const input = panel.getByTestId('tasks-add-input');
+    await input.waitFor({ state: 'visible', timeout: 5000 });
+    await input.fill(title);
+    await panel.getByTestId('tasks-add-submit').click();
 
-    await page.fill('.new-task-spec', title);
-    await page.click('.new-task-save');
-    await page.waitForSelector('.new-task-dialog', { state: 'hidden', timeout: 5000 });
-
-    const card = page.locator('[data-column-list="todo"] .todo-card', { hasText: title });
-    await card.waitFor({ state: 'visible', timeout: 15_000 });
-    const seq = (
-      await card.locator('.todo-card-meta').getByText(/^#\d+$/).first().textContent()
-    )?.trim();
-    check(seq?.startsWith('#') === true, `卡片落「待开始」列,序号 ${seq}`);
-    await shot(page, '02-new-task-card.png');
+    const row = panel.locator('[data-section="up_next"] [data-slot="task-row-title"]', {
+      hasText: title,
+    });
+    await row.waitFor({ state: 'visible', timeout: 15_000 });
+    check(true, `任务落「接下来」区(${title})`, 'row');
+    await shot(page, '02-new-task-row.png');
 
     const todos = await getJson(`${API}/api/todos`);
     const apiTodo = Array.isArray(todos) ? todos.find((t) => t.title === title) : undefined;
     check(
       apiTodo != null && apiTodo.phase === 'todo',
       `GET /api/todos 含新任务(phase=${apiTodo?.phase ?? '缺失'})`,
+      'api',
     );
     extra.apiTodo = apiTodo ?? null;
 
@@ -195,6 +207,7 @@ try {
     check(
       dbTruth.ok && dbTruth.row != null,
       `SQLite todo 表有行(seqNum=${dbTruth.row?.seqNum ?? '缺失'}${dbTruth.skipped ? `,跳过:${dbTruth.reason}` : ''})`,
+      'db',
     );
     extra.dbTodo = dbTruth.row ?? dbTruth.reason ?? null;
   }

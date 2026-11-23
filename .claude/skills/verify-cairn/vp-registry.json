@@ -224,7 +224,7 @@
             "stack"
           ],
           "status": "current",
-          "purpose": "New-task dialog end to end: card on the board, GET /api/todos row and SQLite row; creates the default project when none exists."
+          "purpose": "New-task add field end to end: row in the up_next section of the tasks panel, GET /api/todos row and SQLite row; seeds one hosted project so the direct save path resolves."
         },
         "overlay-css-migration": {
           "script": ".claude/skills/verify-cairn/archive/948/drive-948-overlay.mjs",

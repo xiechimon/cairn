@@ -26,6 +26,20 @@ export function missingGreenContexts(checkRuns) {
   return GREEN_CONTEXTS.filter((name) => !green.has(name));
 }
 
+export function fetchCheckRuns({ repo, sha, gh }) {
+  try {
+    return gh([
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/${repo}/commits/${sha}/check-runs?per_page=100`,
+    ]).flatMap((page) => page?.check_runs ?? []);
+  } catch (error) {
+    if (/No commit found|HTTP (404|422)/.test(error.message)) return null;
+    throw error;
+  }
+}
+
 export function preflightEvidence({ shas, pushedTree, treeOf, checkRunsOf }) {
   for (const sha of shas) {
     if (treeOf(sha) !== pushedTree) continue;
@@ -104,18 +118,8 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     return { queueHead, live };
   };
   const treeOf = (sha) => git(['rev-parse', `${sha}^{tree}`]);
-  const checkRunsOf = (sha) => {
-    try {
-      return JSON.parse(
-        execFileSync('gh', ['api', `repos/${repo}/commits/${sha}/check-runs?per_page=100`], {
-          encoding: 'utf8',
-        }),
-      ).check_runs;
-    } catch (error) {
-      if (/No commit found|HTTP (404|422)/.test(error.message)) return null;
-      throw error;
-    }
-  };
+  const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
+  const checkRunsOf = (sha) => fetchCheckRuns({ repo, sha, gh: ghJson });
   const sleep = (seconds) =>
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, seconds * 1000);
 

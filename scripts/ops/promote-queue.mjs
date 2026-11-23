@@ -101,6 +101,10 @@ const gh = (args, options = {}) =>
     }),
   );
 
+export function ghPages(gh, path, key) {
+  return gh(['--paginate', '--slurp', path]).flatMap((page) => page?.[key] ?? []);
+}
+
 const CLOSING_KEYWORD = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?\s+#(\d+)\b/gi;
 
 export function closingTargets(commits) {
@@ -166,9 +170,11 @@ export function evaluateHead(repo) {
   const { workflow_runs: ciRuns } = gh([
     `repos/${repo}/actions/runs?head_sha=${queueHead}&event=push&per_page=30`,
   ]);
-  const { check_runs: checkRuns } = gh([
+  const checkRuns = ghPages(
+    gh,
     `repos/${repo}/commits/${queueHead}/check-runs?per_page=100`,
-  ]);
+    'check_runs',
+  );
   const mainTip = gh([`repos/${repo}/git/ref/heads/main`]).object.sha;
   spawnSync('git', ['fetch', '--quiet', 'origin', 'main', 'queue/main'], { stdio: 'inherit' });
   const contains =
@@ -181,7 +187,7 @@ export function evaluateHead(repo) {
       r.conclusion === 'failure',
   );
   const jobs = failed
-    ? gh([`repos/${repo}/actions/runs/${failed.id}/jobs?filter=latest&per_page=100`]).jobs
+    ? ghPages(gh, `repos/${repo}/actions/runs/${failed.id}/jobs?filter=latest&per_page=100`, 'jobs')
     : [];
   return evaluate({
     queueHead,

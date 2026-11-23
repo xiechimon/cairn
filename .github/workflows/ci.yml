@@ -501,7 +501,7 @@ jobs:
 
       - name: Workflow concurrency, scalars and queue promotion
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs
+        run: node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
 
       - name: Commit identity allowlist and hooks (#2289)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
@@ -556,7 +556,7 @@ jobs:
         run: node --test scripts/ops/orb/egress-relay.test.mjs scripts/ops/orb/orb-host-check.test.mjs scripts/ops/orb/provision.test.mjs scripts/ops/orb/shell.test.mjs scripts/ops/orb/canary.test.mjs scripts/ops/orb/canary-review.test.mjs scripts/ops/orb/canary-container.test.mjs scripts/ops/orb/container-host-check.test.mjs scripts/ops/orb/egress-unit.test.mjs scripts/ops/orb/trial-evidence-check.test.mjs scripts/ops/orb/trial-report.test.mjs
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/identity-compat.test.mjs
+        run: node --test scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/main-watch.test.mjs scripts/ops/host/identity-compat.test.mjs
 
       - name: Test temp guard fixtures (#1954)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

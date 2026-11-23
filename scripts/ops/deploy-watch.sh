@@ -40,7 +40,7 @@ green() {
   ci="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?branch=main&event=push&head_sha=$1&per_page=1" \
     --jq '.workflow_runs[0] | [.head_sha, .head_branch, .event, .status, .conclusion] | @tsv')" || return 1
   [ "$ci" = "$1"$'\tmain\tpush\tcompleted\tsuccess' ] || return 1
-  checks="$(gh api "repos/$REPO/commits/$1/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')" || return 1
+  checks="$(gh api --paginate "repos/$REPO/commits/$1/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')" || return 1
   for name in $REQUIRED_CHECKS; do
     grep -qxF "$name"$'\t'success <<<"$checks" || return 1
   done

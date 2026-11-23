@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { parseWeights } from './vitest-shard-weights.mjs';
+import { parseWeights, successfulVitestJobs } from './vitest-shard-weights.mjs';
 import { partitionByWeight, shardKey } from './vitest-timed-shard.mjs';
 
 const keys = Array.from({ length: 23 }, (_, i) => `@cairn/integration:test/f${i}.test.ts`);
@@ -108,4 +108,23 @@ test('ci shards both vitest suites by the matrix size', () => {
     );
   }
   assert.match(readFileSync('vitest.config.ts', 'utf8'), /sequencer: TimedShardSequencer/);
+});
+
+test('successfulVitestJobs reads every jobs page', () => {
+  const gh = (args) => {
+    assert.ok(args.includes('--paginate') && args.includes('--slurp'));
+    return JSON.stringify([
+      { jobs: [{ name: 'vitest-web', conclusion: 'success' }] },
+      {
+        jobs: [
+          { name: 'vitest-server', conclusion: 'success' },
+          { name: 'vitest-skip', conclusion: 'failure' },
+        ],
+      },
+    ]);
+  };
+  assert.deepEqual(
+    successfulVitestJobs(gh, '123').map((job) => job.name),
+    ['vitest-web', 'vitest-server'],
+  );
 });

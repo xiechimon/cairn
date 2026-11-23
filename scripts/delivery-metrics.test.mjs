@@ -506,6 +506,149 @@ test('fetchMainRuns keeps earlier runs and reports a rate limit while reading jo
   assert.match(reasons[0], /main runs: .*rate limit/i);
 });
 
+const fillerJobs = (count, prefix = 'job') =>
+  Array.from({ length: count }, (_, i) => ({
+    name: `${prefix}-${i}`,
+    conclusion: 'success',
+    started_at: '2026-10-20T00:00:00Z',
+    completed_at: '2026-10-20T00:01:00Z',
+  }));
+
+test('fetchMainRuns counts a required failure that only appears on a later jobs page', () => {
+  const calls = [];
+  const { runs, reasons } = fetchMainRuns({
+    repo: 'o/r',
+    now: NOW,
+    gh(args) {
+      const url = args[1];
+      calls.push(url);
+      if (url.includes('/jobs')) {
+        const page = Number(/[?&]page=(\d+)/.exec(url)[1]);
+        if (page === 1) return JSON.stringify({ total_count: 103, jobs: fillerJobs(100) });
+        return JSON.stringify({
+          total_count: 103,
+          jobs: [
+            {
+              name: 'check',
+              conclusion: 'success',
+              started_at: '2026-10-20T00:00:00Z',
+              completed_at: '2026-10-20T00:10:00Z',
+            },
+            {
+              name: 'pack-smoke',
+              conclusion: 'success',
+              started_at: '2026-10-20T00:00:00Z',
+              completed_at: '2026-10-20T00:05:00Z',
+            },
+            {
+              name: 'e2e-gate',
+              conclusion: 'failure',
+              started_at: '2026-10-20T00:00:00Z',
+              completed_at: '2026-10-20T00:20:00Z',
+            },
+          ],
+        });
+      }
+      return JSON.stringify({
+        workflow_runs: [
+          {
+            id: 1,
+            conclusion: 'failure',
+            run_started_at: '2026-10-20T00:00:00Z',
+            updated_at: '2026-10-20T00:20:00Z',
+          },
+        ],
+      });
+    },
+  });
+  assert.deepEqual(reasons, []);
+  assert.equal(runs.length, 1);
+  assert.equal(runs[0].conclusion, 'failure');
+  assert.ok(calls.some((url) => url.includes('jobs?per_page=100&page=2')));
+});
+
+test('fetchMainRuns marks the report incomplete when a jobs page cannot be read', () => {
+  let pages = 0;
+  const { runs, reasons } = fetchMainRuns({
+    repo: 'o/r',
+    now: NOW,
+    gh(args) {
+      const url = args[1];
+      if (url.includes('/jobs')) {
+        pages += 1;
+        if (pages === 2) throw new Error('gh: secondary rate limit hit (HTTP 403)');
+        return JSON.stringify({ jobs: fillerJobs(100) });
+      }
+      return JSON.stringify({
+        workflow_runs: [
+          {
+            id: 1,
+            conclusion: 'failure',
+            run_started_at: '2026-10-20T00:00:00Z',
+            updated_at: '2026-10-20T00:10:00Z',
+          },
+        ],
+      });
+    },
+  });
+  assert.equal(runs.length, 0, 'the run whose jobs could not all be read is dropped');
+  assert.equal(reasons.length, 1);
+  assert.match(reasons[0], /main runs: .*rate limit/i);
+});
+
+test('fetchMainRuns rethrows a non-rate-limit error from a later jobs page', () => {
+  let pages = 0;
+  assert.throws(
+    () =>
+      fetchMainRuns({
+        repo: 'o/r',
+        now: NOW,
+        gh(args) {
+          const url = args[1];
+          if (url.includes('/jobs')) {
+            pages += 1;
+            if (pages === 2) throw new Error('gh: HTTP 500');
+            return JSON.stringify({ jobs: fillerJobs(100) });
+          }
+          return JSON.stringify({
+            workflow_runs: [
+              {
+                id: 1,
+                conclusion: 'success',
+                run_started_at: '2026-10-20T00:00:00Z',
+                updated_at: '2026-10-20T00:10:00Z',
+              },
+            ],
+          });
+        },
+      }),
+    /HTTP 500/,
+  );
+});
+
+test('fetchMainRuns marks the report incomplete when jobs exceed the page cap', () => {
+  const { runs, reasons } = fetchMainRuns({
+    repo: 'o/r',
+    now: NOW,
+    gh(args) {
+      const url = args[1];
+      if (url.includes('/jobs')) return JSON.stringify({ jobs: fillerJobs(100) });
+      return JSON.stringify({
+        workflow_runs: [
+          {
+            id: 1,
+            conclusion: 'success',
+            run_started_at: '2026-10-20T00:00:00Z',
+            updated_at: '2026-10-20T00:10:00Z',
+          },
+        ],
+      });
+    },
+  });
+  assert.equal(runs.length, 0);
+  assert.match(reasons[0], /main runs: jobs for run 1 stopped after 20 pages/);
+});
+
 const cli = (...args) =>
   spawnSync(process.execPath, [script, '--now', NOW.toISOString(), ...args], {
     encoding: 'utf8',

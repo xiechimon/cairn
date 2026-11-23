@@ -1,10 +1,8 @@
 name: desktop-release
 
 on:
-  push:
-    branches: [main]
   schedule:
-    - cron: '17 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -15,43 +13,104 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  VERSION: 0.1.${{ github.run_number }}
   CAIRN_HEAVY_GATE_BYPASS: '1'
 
 jobs:
   decide:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
     outputs:
-      release: ${{ steps.changed.outputs.release }}
+      release: ${{ steps.decision.outputs.release }}
+      sha: ${{ steps.sha.outputs.sha }}
+      version: ${{ steps.decision.outputs.version }}
     steps:
+      - name: Resolve the main tip this run releases
+        id: sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GATE_REPO: ${{ github.repository }}
+        run: |
+          tip=$(gh api "repos/$GATE_REPO/branches/main" --jq .commit.sha)
+          echo "this run releases the current main tip: $tip"
+          echo "sha=$tip" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ steps.sha.outputs.sha }}
 
-      - name: Release only when the app's sources moved since the last release
-        id: changed
+      - name: Release the tip only when it is green, changed and untagged
+        id: decision
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ steps.sha.outputs.sha }}
+          GATE_REPO: ${{ github.repository }}
+        run: node scripts/ops/release-decide.mjs "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
+  live-verify:
+    needs: decide
+    if: needs.decide.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+          ref: ${{ needs.decide.outputs.sha }}
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright chromium
+        uses: ./.github/actions/playwright-chromium
+
+      - name: Drive the new-task journey on an isolated stack
+        env:
+          VERIFY_EVIDENCE_DIR: ${{ runner.temp }}/verify-evidence
         run: |
-          last=$(git tag --list 'desktop-v*' --sort=-v:refname | head -n 1)
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] || [ -z "$last" ]; then
-            echo "release=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          changed=$(git diff --name-only "$last" "$GITHUB_SHA" -- \
-            apps/web apps/server apps/daemon apps/desktop packages/shared \
-            package.json pnpm-lock.yaml pnpm-workspace.yaml \
-            ':(exclude)apps/*/test/*' ':(exclude)packages/*/test/*' ':(exclude)apps/web/e2e/*' \
-            ':(exclude)*.md')
-          if [ -z "$changed" ]; then
-            echo "nothing the app ships changed since $last"
-            echo "release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "$changed" | head -n 20
-            echo "release=true" >> "$GITHUB_OUTPUT"
-          fi
+          mkdir -p "$VERIFY_EVIDENCE_DIR"
+          node .claude/skills/verify-cairn/scripts/launch.mjs > "$RUNNER_TEMP/launch.log" 2>&1 &
+          launcher=$!
+          finish() {
+            node .claude/skills/verify-cairn/scripts/cleanup.mjs || kill "$launcher" 2>/dev/null || true
+          }
+          trap finish EXIT
+          for _ in $(seq 1 360); do
+            if grep -q 'verify stack ready' "$RUNNER_TEMP/launch.log"; then break; fi
+            if ! kill -0 "$launcher" 2>/dev/null; then cat "$RUNNER_TEMP/launch.log"; exit 1; fi
+            sleep 1
+          done
+          grep -q 'verify stack ready' "$RUNNER_TEMP/launch.log" || { cat "$RUNNER_TEMP/launch.log"; exit 1; }
+          node .claude/skills/verify-cairn/scripts/vp.mjs drive board-new-task new-task
+
+      - name: Require a passing new-task result
+        env:
+          VERIFY_EVIDENCE_DIR: ${{ runner.temp }}/verify-evidence
+        run: node scripts/ops/require-verify-evidence.mjs "$VERIFY_EVIDENCE_DIR/result.json" new-task
+
+      - name: Upload the live-verify evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: live-verify-evidence-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/verify-evidence
+          if-no-files-found: warn
+          retention-days: 14
 
   package:
-    needs: decide
+    needs: [decide, live-verify]
     if: needs.decide.outputs.release == 'true'
     runs-on: macos-latest
     environment: desktop-release
@@ -61,8 +120,11 @@ jobs:
         arch: [arm64, x64]
     env:
       ARCH: ${{ matrix.arch }}
+      VERSION: ${{ needs.decide.outputs.version }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ needs.decide.outputs.sha }}
 
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
 
@@ -151,8 +213,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          prev_tag=$(gh release list --limit 30 --json tagName,isDraft \
-            -q '[.[] | select(.tagName | startswith("desktop-v")) | select(.isDraft | not)][0].tagName')
+          prev_tag=$(node scripts/ops/last-desktop-release.mjs "$GITHUB_REPOSITORY")
+          test -n "$prev_tag" || { echo "no published desktop release to compare against"; exit 1; }
           echo "previous release: $prev_tag"
           gh release download "$prev_tag" -p 'Cairn-*-arm64.zip' --dir "$RUNNER_TEMP/prev" --clobber
           mkdir -p "$RUNNER_TEMP/prev-app"
@@ -185,6 +247,7 @@ jobs:
             apps/desktop/release/Cairn-${{ env.VERSION }}-${{ matrix.arch }}.zip
           if-no-files-found: error
           retention-days: 1
+          overwrite: true
 
       - name: Remove the signing keychain
         if: always()
@@ -195,12 +258,15 @@ jobs:
           fi
 
   publish:
-    needs: package
+    needs: [decide, package, live-verify]
     runs-on: ubuntu-latest
     environment: desktop-release
     permissions:
       contents: write
+      actions: read
     timeout-minutes: 15
+    env:
+      VERSION: ${{ needs.decide.outputs.version }}
     steps:
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app-token
@@ -209,6 +275,8 @@ jobs:
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ needs.decide.outputs.sha }}
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -221,22 +289,97 @@ jobs:
           merge-multiple: true
           path: apps/desktop/release
 
+      - name: Check the packaged builds carry the decided version
+        working-directory: apps/desktop/release
+        run: |
+          arm64=$(ls Cairn-*-arm64.zip | sed -n 's/^Cairn-\(.*\)-arm64\.zip$/\1/p')
+          x64=$(ls Cairn-*-x64.zip | sed -n 's/^Cairn-\(.*\)-x64\.zip$/\1/p')
+          if [ "$arm64" != "$VERSION" ] || [ "$x64" != "$VERSION" ]; then
+            echo "the packaged archives carry arm64=${arm64:-none} x64=${x64:-none}, not the decided $VERSION" >&2
+            exit 1
+          fi
+
       - name: Write the update manifest
         working-directory: apps/desktop
         run: node scripts/release-manifest.mjs "$VERSION" release
 
+      - name: Refuse to publish when the SHA's green evidence moved
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ needs.decide.outputs.sha }}
+          GATE_REPO: ${{ github.repository }}
+        run: node scripts/ops/release-gate.mjs "$RELEASE_SHA"
+
+      - name: Publish only while the candidate is still the main tip
+        id: tip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_SHA: ${{ needs.decide.outputs.sha }}
+          GATE_REPO: ${{ github.repository }}
+        run: node scripts/ops/release-tip.mjs "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
+
       - name: Publish the release
+        if: steps.tip.outputs.tip == 'true'
         working-directory: apps/desktop/release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_SHA: ${{ needs.decide.outputs.sha }}
         run: |
-          git push "https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git" \
-            "$GITHUB_SHA:refs/tags/desktop-v$VERSION"
-          gh release create "desktop-v$VERSION" \
-            --verify-tag \
-            --latest \
-            --title "Cairn for Mac $VERSION" \
-            --notes "Built from $GITHUB_SHA. Signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open." \
+          tag="desktop-v$VERSION"
+          bail() {
+            echo "publish aborted: $1" >&2
+            exit 1
+          }
+          require_free_tag() {
+            local probe
+            if probe=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" 2>&1); then
+              bail "$tag already exists; an occupied tag is never adopted, the next poll allocates a fresh version"
+            fi
+            printf '%s' "$probe" | grep -qi 'not found' || \
+              bail "the tag $tag could not be read: $probe"
+          }
+          require_free_tag
+          body="Built from $RELEASE_SHA. Signed with Cairn's own certificate, not an Apple one: the first launch needs right-click, Open."
+          release_id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+            -F draft=true \
+            -f tag_name="$tag" \
+            -f target_commitish="$RELEASE_SHA" \
+            -f name="Cairn for Mac $VERSION" \
+            -f body="$body" \
+            --jq .id) || bail "the draft release $tag could not be created"
+          case "$release_id" in
+            ''|*[!0-9]*) bail "the draft $tag returned '$release_id', not a numeric release id" ;;
+          esac
+          for asset in \
             Cairn-"$VERSION"-arm64.dmg Cairn-"$VERSION"-x64.dmg \
             Cairn-"$VERSION"-arm64.zip Cairn-"$VERSION"-x64.zip \
             desktop-latest.json
+          do
+            gh api -X POST \
+              "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$asset" \
+              -H "Content-Type: application/octet-stream" \
+              --input "$asset" --silent || bail "the asset $asset could not be uploaded"
+          done
+          tip=$(node "$GITHUB_WORKSPACE/scripts/ops/release-tip.mjs" "$RELEASE_SHA") || \
+            bail "the main tip could not be re-read"
+          [ "$tip" = "tip=true" ] || bail "main moved past $RELEASE_SHA"
+          plan=$(node "$GITHUB_WORKSPACE/scripts/ops/release-plan.mjs" "$RELEASE_SHA") || \
+            bail "the desktop-v* releases and tags could not be re-read"
+          if [ "$(printf '%s\n' "$plan" | sed -n 's/^released=//p')" = "true" ]; then
+            bail "a published desktop-v* release already covers $RELEASE_SHA"
+          fi
+          latest=$(node "$GITHUB_WORKSPACE/scripts/ops/release-version.mjs" "$VERSION") || \
+            bail "the latest decision for $tag could not be read"
+          [ "$latest" = "latest=true" ] || \
+            bail "$tag is no longer above the highest published desktop-v* release"
+          require_free_tag
+          draft=$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            --jq '[.draft, .tag_name, .target_commitish] | map(tostring) | join(" ")') || \
+            bail "the draft $tag could not be re-read"
+          [ "$draft" = "true $tag $RELEASE_SHA" ] || \
+            bail "the draft no longer holds tag $tag at $RELEASE_SHA; it now reads '$draft'"
+          node "$GITHUB_WORKSPACE/scripts/ops/release-gate.mjs" "$RELEASE_SHA" || \
+            bail "the ci evidence for $RELEASE_SHA moved"
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            -F draft=false -f make_latest=true || \
+            bail "the draft $tag could not be published"

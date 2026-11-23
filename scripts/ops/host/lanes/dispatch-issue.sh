@@ -14,8 +14,11 @@ if [ $fixing = 0 ] && [ -z "${DISPATCH_FORCE:-}" ]; then
     gh issue view $n -R xiechimon/cairn --json comments --jq '.comments[].body' 2>/dev/null | grep -q '<!-- acceptance-checklist v1' || { echo "#$n ($tier) has no acceptance checklist yet; not dispatching"; exit 3; }
   fi
   dep=$(node ~/.cairn/tools/deps-open.mjs $n 2>/dev/null) || { echo "#$n waits for open $dep"; exit 3; }
-  red=$(gh api repos/xiechimon/cairn/commits/main/check-runs --jq '[.check_runs[]|select(.conclusion=="failure")]|length' 2>/dev/null)
-  [ "${red:-0}" -gt 0 ] && { echo "#$n not dispatched: main is red"; exit 3; }
+  main_sha=$(gh api repos/xiechimon/cairn/commits/main --jq .sha 2>/dev/null) && [ -n "$main_sha" ] || { echo "#$n not dispatched: main tip unreadable"; exit 3; }
+  checks=$(gh api --paginate "repos/xiechimon/cairn/commits/$main_sha/check-runs?per_page=100" --jq '.check_runs[]' 2>/dev/null) || { echo "#$n not dispatched: main check-runs unreadable"; exit 3; }
+  [ -n "$checks" ] || { echo "#$n not dispatched: main check-runs read empty"; exit 3; }
+  red=$(jq -s '[.[]|select(.conclusion=="failure")]|length' <<<"$checks") || { echo "#$n not dispatched: main check-runs unreadable"; exit 3; }
+  [ "$red" -gt 0 ] && { echo "#$n not dispatched: main is red"; exit 3; }
 fi
 busy=$( { for f in ~/.local/state/lane-*.lock; do fuser "$f" >/dev/null 2>&1 && basename "$f" .lock | sed 's/^lane-//'; done
           ps -eo args= | grep -oE '^python3 [^ ]*ai-route run implement .*-C [^ ]*/cairn-[^ ]+' | sed -E 's/.*cairn-//'; } | sort -u | wc -l)

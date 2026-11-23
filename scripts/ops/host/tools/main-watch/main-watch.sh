@@ -11,10 +11,13 @@ set -uo pipefail
 R=xiechimon/cairn ST=~/.local/state/main-watch; mkdir -p $ST
 log(){ echo "$(date -u +%FT%H:%MZ) $*"; }
 found=
-for sha in $(gh api "repos/$R/commits?sha=main&per_page=6" --jq '.[].sha'); do
-  runs=$(gh api "repos/$R/commits/$sha/check-runs?per_page=100" --jq '[.check_runs[]|{n:.name,c:(.conclusion // "pending"),u:.details_url,app:.app.slug}]')
-  stat=$(gh api "repos/$R/commits/$sha/status" --jq '[.statuses[]|{n:.context,c:.state,u:.target_url,app:"status"}]')
-  all=$(jq -n --argjson a "$runs" --argjson b "$stat" '$a+$b')
+shas=$(gh api "repos/$R/commits?sha=main&per_page=6" --jq '.[].sha') || { log "main commit list read failed; evidence unknown, not green"; exit 1; }
+[ -n "$shas" ] || { log "main commit list is empty; evidence unknown, not green"; exit 1; }
+for sha in $shas; do
+  runs=$(gh api --paginate "repos/$R/commits/$sha/check-runs?per_page=100" --jq '.check_runs[]|{n:.name,c:(.conclusion // "pending"),u:.details_url,app:.app.slug}' | jq -s '.') || { log "check-runs read failed for ${sha:0:8}; evidence unknown, not green"; exit 1; }
+  stat=$(gh api --paginate "repos/$R/commits/$sha/status?per_page=100" --jq '.statuses[]|{n:.context,c:.state,u:.target_url,app:"status"}' | jq -s '.') || { log "status read failed for ${sha:0:8}; evidence unknown, not green"; exit 1; }
+  all=$(jq -s 'add' <(printf '%s' "$runs") <(printf '%s' "$stat")) || { log "evidence merge failed for ${sha:0:8}; evidence unknown, not green"; exit 1; }
+  [ "$all" != "[]" ] || { log "no check or status evidence for ${sha:0:8}; evidence unknown, not green"; exit 1; }
   jq -e 'any(.[]; .c=="pending" or .c=="in_progress" or .c=="queued")' <<<"$all" >/dev/null && continue
   found=1; break
 done
@@ -26,6 +29,7 @@ while IFS=$'\t' read -r num title; do
   [ -n "$num" ] || continue
   chk=${title#main red: }; chk=${chk% on *}
   grep -qF "$chk"$'\t' <<<"$red" && continue
+  jq -e --arg n "$chk" 'any(.[]; .n==$n and (.c=="success" or .c=="neutral" or .c=="skipped"))' <<<"$all" >/dev/null || continue
   gh issue close $num -R $R -c "Green again on main at $short." >/dev/null && log "closed #$num ($chk green at $short)"
 done <<<"$open"
 while IFS=$'\t' read -r chk url app; do

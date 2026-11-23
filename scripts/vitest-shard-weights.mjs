@@ -18,15 +18,26 @@ function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 }
 
+export function successfulVitestJobs(gh, runId) {
+  return JSON.parse(
+    gh([
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100`,
+    ]),
+  )
+    .flatMap((page) => page?.jobs ?? [])
+    .filter((job) => job.name.startsWith('vitest-') && job.conclusion === 'success');
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const runId = process.argv[2];
   if (!/^\d+$/.test(runId ?? '')) {
     console.error('usage: node scripts/vitest-shard-weights.mjs <ci run id on main>');
     process.exit(2);
   }
-  const jobs = JSON.parse(
-    gh(['api', `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100`]),
-  ).jobs.filter((job) => job.name.startsWith('vitest-') && job.conclusion === 'success');
+  const jobs = successfulVitestJobs(gh, runId);
   if (jobs.length === 0) {
     console.error(`run ${runId} has no successful vitest jobs`);
     process.exit(1);

@@ -506,7 +506,7 @@ assert_deployable() {
     --jq '.workflow_runs[0] | [.head_sha, .head_branch, .event, .status, .conclusion] | @tsv')" ||
     refuse "cannot read main push CI for $TARGET"
   [ "$ci" = "$TARGET"$'\tmain\tpush\tcompleted\tsuccess' ] || refuse "main push CI is not successful on $TARGET"
-  checks="$(gh api "repos/$REPO/commits/$TARGET/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')"
+  checks="$(gh api --paginate "repos/$REPO/commits/$TARGET/check-runs?per_page=100" --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')"
   for name in $REQUIRED_CHECKS; do
     grep -qxF "$name"$'\t'success <<<"$checks" || refuse "required check $name is not green on $TARGET"
   done

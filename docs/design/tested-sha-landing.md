@@ -25,10 +25,105 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
 
 - a `ci` workflow run for `S` exists with conclusion `success` (in-progress,
   queued and cancelled runs are not evidence);
-- inside that run, jobs `check`, `pack-smoke` and `e2e-gate` all succeeded.
-  `desktop-release` publishes on app-source pushes without gating, so these
-  three jobs are enforced nowhere else — the queue gate is the first place
-  they must be green;
+- inside that run, jobs `check`, `pack-smoke` and `e2e-gate` all succeeded —
+  the same three names the `green-main` ruleset requires on the pushed commit
+  and `desktop-release` re-verifies before publishing. `desktop-release` is
+  a level-triggered poller, not a push reaction: it runs on a 15-minute
+  `schedule` and on `workflow_dispatch` to `main` only, so trusted `main`
+  code still runs it. Runs serialize on one workflow-level concurrency
+  group that never cancels the running release (`desktop-release`,
+  `cancel-in-progress: false`); GitHub keeps only the newest pending run,
+  so a later tick or dispatch replaces an earlier pending one and a run
+  that finds the slot busy waits. Nothing retries a failed or replaced run
+  as such: a later tick evaluates the `main` tip current at that time,
+  and no re-dispatch job exists. Each run resolves the current
+  `main` tip through the branches API and checks it out, then
+  `scripts/ops/release-decide.mjs` judges it once: it plans the release
+  from the `desktop-v*` tags and releases
+  (`scripts/ops/release-plan.mjs`), reads the tip's push-to-`main` `ci`
+  run (`scripts/ops/release-gate.mjs`) and diffs the shipped app sources
+  against the highest-version published stable `desktop-v*` release.
+  The run releases only when all three hold — the ci run's latest attempt
+  ended `success` with green `check`/`pack-smoke`/`e2e-gate` jobs, shipped
+  sources moved, and no published stable `desktop-v*` release's tag
+  points at the tip — and exits successfully doing nothing otherwise:
+  pending ci, red ci, unchanged sources and an already released tip are
+  all skips, and a manual dispatch runs the identical check with no
+  source-diff bypass. Nothing is staged or resumed: a releasing run
+  always allocates a fresh version once, at decide time — the first
+  `desktop-v*` name held by no tag and no release, published,
+  prerelease or draft. Drafts reach the deciding token because the
+  job's `contents` scope is `write`, the only scope GitHub answers
+  with drafts; the checkout drops it (`persist-credentials: false`).
+  A draft only ever occupies its own name — it never raises the base
+  version, counts as a release, a baseline or the bar for `latest`. A
+  prerelease still counts for the allocation base but for nothing
+  else, and releases created by hand are outside the workflow
+  entirely. `publish` runs with the release-app credential, which sees
+  drafts too — and the workflow never deletes a release or a tag, so a
+  leftover draft just occupies its version, which `decide` already
+  skipped; an abandoned draft can never block a later poll, and an
+  operator who wants the number back deletes the stale draft by hand.
+  The source-diff
+  and migration baselines are the highest-version published stable
+  release, chosen by semver and never by list order, so a backfilled
+  older release cannot lower them. `decide` picks the version once
+  and passes it to both architectures and to `publish`; nothing renames
+  or bumps it afterwards — the packaged app, the assets, the manifest
+  and the tag all carry the decided version. Fifteen minutes is the polling cadence, not
+  a bound on release latency — the price of removing the edge-triggered
+  races: a tick that finds the slot busy queues behind the active build,
+  and the tip can be superseded while it packages. `publish`
+  re-reads the evidence: the run's latest attempt must have ended
+  `success` with green jobs inside `runs/{id}/attempts/{attempt}/jobs`,
+  and an attempt that started or moved between the jobs read and the run
+  re-read blocks it, as does a newer still-running, failed or cancelled
+  attempt. The publish step never creates or pushes a tag itself: it
+  first refuses when `refs/tags/desktop-v$VERSION` already exists
+  (`GET .../git/ref/tags/`), whatever it points at — an occupied tag is
+  never adopted and the next poll allocates a fresh version above it.
+  `POST /repos/{o}/{r}/releases` then stages a fresh draft owned by
+  this run, never resumed from an existing one: `draft: true`,
+  `tag_name` set to the decided tag and `target_commitish` pinned to
+  the release SHA — a draft creates no tag, so nothing on the remote
+  carries the version yet — and the response's numeric `id` is the
+  only handle used from there on. Every asset is uploaded to
+  `releases/{id}/assets`. With the upload done the evidence is re-read
+  one last time — the `main` tip (`scripts/ops/release-tip.mjs`),
+  stopping when `main` moved past the resolved tip so an out-of-order
+  `ci` completion can never ship older code as the latest update,
+  whether a published stable `desktop-v*` release's tag
+  already covers the SHA (`scripts/ops/release-plan.mjs`), and the
+  version still above the highest published stable release
+  (`scripts/ops/release-version.mjs`) — the tag is probed once more and
+  the ci attempt's green evidence is re-read last
+  (`scripts/ops/release-gate.mjs`), so a rerun that started during the
+  scans still blocks it; the draft itself is re-read by numeric id and the
+  publish refuses unless it still is a draft holding the decided tag and
+  the checked SHA, and only then does a single `PATCH /releases/{id}`
+  send `draft: false` and `make_latest: true` and nothing else — a draft
+  retargeted during the upload is abandoned, never renamed back, and
+  GitHub creates the tag at the `target_commitish` the draft still holds. Any of those re-checks
+  failing aborts the step and leaves the staged draft — no tag exists
+  to clean: a `main` that moved, ci that turned, a stable release that
+  appeared over the same commit, a higher version that landed during
+  the upload or a tag that appeared in it each refuse the publish. A
+  publish-only rerun of an old run can therefore never release the same
+  SHA twice — the coverage read catches the stable release a later run
+  already published. A failed or killed publish can leave its draft
+  behind: the workflow deletes nothing, the draft only occupies its
+  name — `decide` steps past it on the next poll — and an operator
+  deletes it by hand if they want the number back. The window that remains is accepted, not
+  defended by another read: between the final tag probe and the
+  flip — seconds — a tag created in it is adopted by the publish, and
+  a `main` push or a ci rerun that lands can still
+  publish the checked state, and the next release then publishes the
+  newer tip and moves `latest` to it. Closing the window entirely would
+  need the release write coordinated with main promotion and ci reruns
+  rather than separate API reads. A red tip therefore delays releases until
+  `main` is green again; that stall is intended, not a bug. `publish`
+  also waits on the `live-verify` job, which drives the new-task journey
+  on an isolated stack and archives the evidence as an artifact.
 - `S` still equals `queue/main` head (a lane may have stacked a newer candidate;
   promoting `S` then is still correct — `main` fast-forwards to `S` and the
   newer candidate waits for its own green run);
@@ -178,6 +273,12 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
    the `cairn-release` app token — GITHUB_TOKEN pushes cannot carry commits
    that touch `.github/workflows` and would not re-trigger `desktop-release`.
    Remaining optional work: batching policy and prepush slimming.
+4. Rollout day for the poller: cancel every `desktop-release` run started
+   on the pre-poller workflow and never rerun one — GitHub reruns a
+   workflow at its original revision, so a rerun of a pre-change run
+   publishes without the gate. The schedule retries an eligible tip on
+   its own; a tag or release left behind by a failed publish is skipped
+   past by version — the next run allocates above it.
 
 ## Tests
 
@@ -195,5 +296,32 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
 - `rebuild-queue.test.mjs`: mid-chain drop replays successors in order,
   head drop lands on the commit below, single-candidate drop deletes the
   ref, unknown sha refuses.
+- `release-gate.test.mjs`: the release gate waits on a missing or running
+  `ci` run, re-reads the run around the pinned jobs so a superseded attempt
+  cannot publish, blocks a red or cancelled latest attempt, and releases
+  only while the candidate is still the `main` tip (`release-tip.mjs`);
+  `decideRelease` releases a green, changed, unreleased tip and skips a
+  pending, red, unchanged or already released one, holding a manual
+  dispatch to the same rule; `planRelease` picks the first `desktop-v*`
+  version held by no tag and no release — a published stable release on
+  the tip ends the run, drafts and prereleases each occupy their
+  version, and a run of occupied names is skipped without a cap;
+  `publish` refuses any existing
+  `desktop-v*` tag, stages the release as a draft through the REST
+  `POST` and keeps its numeric id, uploads the assets to that id,
+  re-reads the tip, the stable-release coverage of the
+  SHA and the `latest` decision (`release-version.mjs`), probes the tag
+  once more, re-reads the draft by numeric id and refuses unless it still
+  is a draft at the decided tag and SHA, re-reads the ci attempt as the
+  last check, then flips the draft published sending only `draft: false`
+  and `make_latest: true`, so a draft retargeted during the upload is
+  abandoned rather than renamed back — a failed re-check aborts the step and leaves
+  the draft for an operator to delete by hand, the step never deleting
+  a release or a tag, and a
+  rerun that finds the SHA
+  already covered or the version occupied refuses; the workflow
+  shape is `schedule` plus
+  `main`-only dispatch on one concurrency group that never cancels the running release, with
+  no re-dispatch path.
 - Self-test: push the change itself as `queue/main`, watch its run, promote it
   with the script — the mechanism lands itself.

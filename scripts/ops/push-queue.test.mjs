@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
 import {
   failedGreenContexts,
+  fetchCheckRuns,
   laneName,
   missingGreenContexts,
   nextWaitAction,
@@ -218,4 +219,39 @@ test('failedGreenContexts flags only required contexts that went red', () => {
   );
   assert.deepEqual(failedGreenContexts([run('check', 'cancelled')]), ['check']);
   assert.deepEqual(failedGreenContexts([run('check', 'in_progress')]), []);
+});
+
+test('fetchCheckRuns paginates so a green check on a later page still counts', () => {
+  const seen = [];
+  const runs = fetchCheckRuns({
+    repo: 'o/r',
+    sha: X,
+    gh: (args) => {
+      seen.push(args);
+      return [
+        {
+          check_runs: [
+            { name: 'check', conclusion: 'success' },
+            { name: 'pack-smoke', conclusion: 'success' },
+          ],
+        },
+        { check_runs: [{ name: 'e2e-gate', conclusion: 'success' }] },
+      ];
+    },
+  });
+  assert.deepEqual(missingGreenContexts(runs), []);
+  assert.ok(seen[0].includes('--paginate') && seen[0].includes('--slurp'));
+});
+
+test('fetchCheckRuns returns null when the commit is unknown to GitHub', () => {
+  assert.equal(
+    fetchCheckRuns({
+      repo: 'o/r',
+      sha: X,
+      gh: () => {
+        throw new Error('gh: No commit found for the ref (HTTP 404)');
+      },
+    }),
+    null,
+  );
 });

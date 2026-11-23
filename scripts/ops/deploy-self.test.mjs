@@ -147,19 +147,26 @@ exec env GH_TOKEN=fixture-scoped-app-token "$@"`,
     'gh',
     `echo "gh $*" >> "${fake}/gh.log"
 [ "\${GH_TOKEN-}" != fixture-scoped-app-token ] || echo authenticated >> "${fake}/gh-auth.log"
-case "$1 $2" in
-  "api repos/"*"/actions/workflows/ci.yml/runs?"*)
-    sha=$(echo "$2" | sed -E 's/.*head_sha=([0-9a-f]+).*/\\1/')
-    [[ "$2" == *'branch=main&event=push&'* ]] || exit 1
+path=
+for arg in "$@"; do case "$arg" in repos/*) path="$arg" ;; esac; done
+paged=no
+for arg in "$@"; do [ "$arg" = --paginate ] && paged=yes; done
+case "$path" in
+  *"/actions/workflows/ci.yml/runs?"*)
+    sha=$(echo "$path" | sed -E 's/.*head_sha=([0-9a-f]+).*/\\1/')
+    [[ "$path" == *'branch=main&event=push&'* ]] || exit 1
     [ ! -f "${fake}/ci-api-fail" ] || exit 1
     if [ -f "${fake}/ci-$sha" ]; then
       cat "${fake}/ci-$sha"
     else
       printf '{"workflow_runs":[{"head_sha":"%s","head_branch":"main","event":"push","status":"completed","conclusion":"success"}]}' "$sha"
     fi | jq -r "\${@: -1}" ;;
-  "api repos/"*)
-    sha=$(echo "$2" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\\1#')
-    if [ -f "${fake}/checks-$sha" ]; then cat "${fake}/checks-$sha"; else printf 'check\\tsuccess\\npack-smoke\\tsuccess\\ne2e-gate\\tsuccess\\n'; fi ;;
+  *"/commits/"*"/check-runs"*)
+    sha=$(echo "$path" | sed -E 's#.*/commits/([0-9a-f]+)/check-runs.*#\\1#')
+    if [ -f "${fake}/checks-$sha" ]; then cat "${fake}/checks-$sha"; else printf 'check\\tsuccess\\npack-smoke\\tsuccess\\ne2e-gate\\tsuccess\\n'; fi
+    if [ "$paged" = yes ] && [ -f "${fake}/checks-$sha-2" ]; then cat "${fake}/checks-$sha-2"; fi ;;
+esac
+case "$1 $2" in
   "issue list") cat "${fake}/lag-issue" 2>/dev/null || true ;;
   "issue create") echo "https://github.com/x/y/issues/77" ;;
   "issue close") [ ! -f "${fake}/lag-close-fail" ] || exit 1 ;;
@@ -373,6 +380,26 @@ test('refuses a SHA whose required checks are not all green', () => {
     assert.equal(f.log('systemctl.log'), '');
   }
 });
+
+for (const script of [DEPLOY, WATCH]) {
+  test(`${script.endsWith('deploy-self.sh') ? 'deployment' : 'watch'} reads check-run evidence past the first page`, () => {
+    const f = fixture();
+    const target = pushTarget(f);
+    writeFileSync(join(f.fake, `checks-${target}`), 'check\tsuccess\npack-smoke\tsuccess\n');
+    writeFileSync(join(f.fake, `checks-${target}-2`), 'e2e-gate\tsuccess\n');
+    if (script === DEPLOY) {
+      const result = f.run(script, [target]);
+      assert.doesNotMatch(result.stderr, /e2e-gate is not green/);
+    } else {
+      const deployStub = join(f.bin, 'deploy-stub');
+      writeFileSync(deployStub, `#!/bin/bash\necho "$1" >> "${f.state}/deployed"\n`);
+      const result = f.run(script, [], { CAIRN_DEPLOY_SCRIPT: deployStub });
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(readFileSync(join(f.state, 'deployed'), 'utf8').trim(), target);
+    }
+    assert.match(f.log('gh.log'), /api --paginate repos\/\S*check-runs/);
+  });
+}
 
 for (const script of [DEPLOY, WATCH]) {
   test(`${script.endsWith('deploy-self.sh') ? 'deployment' : 'watch'} requires the exact SHA main push CI run to succeed`, () => {

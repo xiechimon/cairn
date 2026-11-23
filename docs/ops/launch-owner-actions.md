@@ -21,7 +21,7 @@ What launch needs, split by who can do it. The left column a lane can ship; the 
 ## Lanes can ship (no owner needed)
 
 - The W0–W3 board items: specs, registries, adapters, gates, UI work behind review.
-- `desktop-release.yml` gating on the commit's green CI (already decided: direct publish stays, but release waits for `check`/`pack-smoke`/`e2e-gate` green).
+- ~~`desktop-release.yml` gating on the commit's green CI~~ DONE: `decide` refuses a SHA without green `check`/`pack-smoke`/`e2e-gate` (`scripts/ops/release-gate.mjs`), and `publish` waits on the `live-verify` new-task journey pass with evidence archived as an artifact.
 - Adapter code for Telegram and WeChat iLink behind feature wiring, testable with recorded fixtures — credentials slot in when the owner does rows 5–6.
 - Windows/Linux packaging and the daemon win32/Linux support work.
 - Per-site egress env wiring, per-thread browser profiles, action-registry send/submit classes.

@@ -1,22 +1,21 @@
 # New task (board)
 
-Users turn a thing on the board into a persisted task: click `新建任务` to open the dialog, **write only the body** (single field, no title input — spec 15 #394), save, and the card lands in the `待开始` column; the title = the first non-empty line of the body, truncated (a placeholder title, backfilled with the official title by the executing agent via `set_task_meta` after taking the task, ADR 0002); on a fresh DB with no project the system auto-creates the `默认项目` and lands the task under it (todo -> project, two hops, imperceptible to the user).
+Users turn a thing into a persisted task from the home surface: open the `任务` panel (the `tasks-toggle` button in the home header, or the desktop menu's new-task item which lands on `/app?pane=tasks` with the field already open), press the `+` (`tasks-new`), write only the spec into the add field (`tasks-add-input`, single field — spec 15 #394), submit (`tasks-add-submit` or Enter), and the row lands in the `接下来` (`up_next`) section; the title = the first non-empty line of the body, truncated (a placeholder title, backfilled with the official title by the executing agent via `set_task_meta` after taking the task, ADR 0002). The panel save posts `POST /api/projects/:id/todos` directly when exactly one active project exists; with zero or several projects the same text goes to the Coordinator as a message instead (no `todo` row from that path — it needs an agent turn).
 
 ## Sub-features
 
-- `board-render` the workbench shell (renamed at #351 + converged to 4 columns) renders exactly 4 columns (`待开始`/`执行中`/`待处理`/`已完成`), column-head id <-> name pairs match, retired column names (`规划中`/`待确认`/`待验收`) occupy no column, the collapsed family (button / slim bar / folded state) has no render slot, the 4 columns are equal-width with no horizontal scrolling on desktop.
-- `newtask-open` the sidebar `新任务` row (`.sidebar-new-task`, the topbar `+ 任务` button removed since #445) opens the dialog (`.new-task-dialog`, **single-field body textarea `.new-task-spec`**, placeholder = the five-line template family; no title input / no tag row).
-- `newtask-gate` the gates of `保存` (`.new-task-save`) and `保存并开始` (`.new-task-start`) = non-empty body (both buttons disabled on an empty body).
-- `newtask-save` `保存` lands the card; `保存并开始` also starts a build after creating the card (dispatches to an Agent, behavior with no Agent not covered, do not verify by default).
+- `board-render` the workbench shell renders the home surface (`data-testid="home-c"`) with the pane buttons in the header (`tasks-toggle`, `成果`, machines).
+- `newtask-open` the `任务` panel header `+` (`data-testid="tasks-new"`) opens the add field (`data-testid="tasks-add-field"` wrapping `tasks-add-input` + `tasks-add-submit`); the desktop menu's new-task item navigates to `/app?pane=tasks` with `{ newTask }` state and the panel opens with the field already open.
+- `newtask-gate` the submit button is disabled while the trimmed input is empty (blank and spaces-only do not post).
+- `newtask-save` a submit saves the task and switches the panel to the `接下来` tab (`data-section="up_next"` rows); the add field stays open for the next entry. Saving goes through `POST /api/projects/:id/todos` when `saveProjectId` resolves (exactly one active project on the Coordinator home); otherwise the text is sent to the Coordinator.
 - `newtask-placeholder-title` the placeholder title = the first non-empty line of the body, <= 50 characters + ellipsis on overflow (server-derived, shared `derivePlaceholderTitle` single source; the fixture surface follows the same rule).
-- `newtask-autoproject` with no project, the `默认项目` is auto-created (hosted) and the task hangs under it.
-- `newtask-persist` the card's triple truth: visible on the board + a `GET /api/todos` row + a SQLite `todo` table row.
+- `newtask-persist` the row's triple truth: visible in `up_next` + a `GET /api/todos` row + a SQLite `todo` table row.
 
 ## How to get to it (user POV)
 
-- The sidebar `新任务` row or the C hotkey (the key changed from N to C at XMON-41; the topbar `+ 任务` button removed since #445, the row click and the hotkey are the same opener; the detail page / chief get separate tickets).
+- The `任务` pane button in the home header (`tasks-toggle`), then `+`; or the desktop menu's new-task item (`useDesktopMenu('new-task')` -> `/app?pane=tasks` with the field open). The Coordinator composer (`chief-composer-input` inside `home-c`) is the other text entry, but it delegates task creation to a Coordinator turn and needs an agent.
 - Driving (`vp.mjs list board-new-task` lists all cases and usage):
-  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive board-new-task new-task`: the sidebar `新任务` row opens the dialog, save: card on the board + API + SQLite.
+  - `node .claude/skills/verify-cairn/scripts/vp.mjs drive board-new-task new-task`: seeds one project, opens the `任务` panel, saves through the add field: row in `up_next` + API + SQLite.
   - Cases judged stale and refusing to run without `--force` (the refusal prints the reason): `vp.mjs drive board-new-task board` (the board-title element it waits for was deleted with #1375); `vp.mjs drive board-new-task overlay-css-migration` (the selectors it reads are no longer in apps/web/src).
 
 ## Driving it with verify-cairn
@@ -25,16 +24,14 @@ Preconditions:
 
 - `launch.mjs` stack up (fresh DB), `doctor.mjs` fully PASS.
 
-- **Rendering.** Open `/app`, the workbench appears. Run `node <skill>/scripts/drive.mjs board`. 4 `.board-column` columns (`待开始`/`执行中`/`待处理`/`已完成`) + `.sidebar-new-task` visible, evidence `01-board.png`.
-- **New task.** Click `新建任务` -> fill the body (the first line is the task's one-liner) -> click `保存`. Run `node <skill>/scripts/drive.mjs new-task`. It walks the full chain: dialog opens -> body on screen -> the card lands in `[data-column-list="todo"]` with `#seqNum` and title = first line -> `GET /api/todos` finds that title with `phase=todo` -> SQLite `SELECT id,title,phase,seqNum FROM todo WHERE title=?` hits. Evidence `01-board-before.png` / `02-new-task-card.png` + `result.json` (including the apiTodo/dbTodo fields).
-- **Persistence (reload).** Manually after the new-task probe: reload `/app`, the same `.todo-card[data-todo-id]` is still in the `待开始` column (the card renders from query truth, the reload is a second confirmation).
-- **Project chip.** The dialog's `.new-task-project` shows the current project (after the first creation on a fresh DB = `默认项目`); with multiple projects, open `.new-task-project-menu` and pick a row (`aria-selected`) — the selection is pure form state, submitted with the form (the fixture-surface e2e newtask-project-select.spec.ts already pins this behavior, a live re-check is not mandatory).
-- **Single-field shape + placeholder title (fixture surface).** `apps/web/e2e/home-composer-new-task.spec.ts` pins the current new-task entry: the home composer is one text box, no project chip, no save-as-draft button; the dialog-era spec (`newtask-single-field.spec.ts`: no title input / no tag UI, first line lands on the card, > 50 characters truncated with ellipsis, autofocus on the body) went with the new-task dialog in #2565.
+- **Home surface.** Seed one project (`POST /api/projects` with a `hosted` repoKind so the direct save path has a `saveProjectId`), open `/app`, `home-c` renders with the `tasks-toggle` in the header. Evidence `01-board-before.png`.
+- **New task.** `tasks-toggle` -> the `任务` panel (`aside[aria-label="任务"]`) -> `tasks-new` -> fill `tasks-add-input` -> `tasks-add-submit`. Run `node <skill>/scripts/drive.mjs new-task`. It walks the full chain: panel opens -> add field opens -> the row lands in `[data-section="up_next"]` with title = first line -> `GET /api/todos` finds that title with `phase=todo` -> SQLite `SELECT id,title,phase,seqNum FROM todo WHERE title=?` hits. Evidence `01-board-before.png` / `02-new-task-row.png` + `result.json` (including the apiTodo/dbTodo fields).
+- **Persistence (reload).** Manually after the new-task probe: reload `/app`, the same row title is still in the `接下来` tab (the panel renders from query truth, the reload is a second confirmation).
+- **Single-field shape (fixture surface).** `apps/web/e2e/chief-home-add-task.spec.ts` pins the panel add field (opens focused, rejects blank submits, saves into `up_next`, keeps the field on failure); `apps/web/e2e/home-composer-new-task.spec.ts` pins the current new-task entry shape: the home composer is one text box, no project chip, no save-as-draft button. The dialog-era spec (`newtask-single-field.spec.ts`: no title input / no tag UI, first line lands on the card, > 50 characters truncated with ellipsis, autofocus on the body) went with the new-task dialog in #2565.
 
 ## Gotchas
 
-- `保存并开始` POSTs builds (starts a run) — not part of this feature's minimal proof, do not click it casually.
-- On a fresh DB the first card triggers the auto project creation first (a two-hop mutation), the card appears one beat slower than a single hop; the probe's 15s wait covers it, do not assert too early in a manual run.
-- Assert with `[data-column-list="todo"]` to pin the column + the card's `data-todo-id`, do not guess by column order / coordinates.
-- The API/DB assertions must align with the same title on the board — **the title is derived from the body's first line** (placeholder title), the probe's body first line carries a timestamp to avoid colliding with leftover data (a fresh DB theoretically has no leftovers, what it guards against is a reused old stack).
+- The direct save only exists when exactly one active project is in scope (`saveProjectId`); seed a single hosted project before driving, and wait for the `GET /api/projects` response before clicking so `projectsQuery` has resolved.
+- Assert with `[data-section="up_next"] [data-slot="task-row-title"]` inside the `任务` panel, do not guess by tab order / coordinates.
+- The API/DB assertions must align with the same title on the panel — **the title is derived from the body's first line** (placeholder title), the probe's body first line carries a timestamp to avoid colliding with leftover data (a fresh DB theoretically has no leftovers, what it guards against is a reused old stack).
 - An agent backfill (`set_task_meta`) changes the title to the LLM's summary once the task starts — verifying "the title changes after start" belongs to the live chain with a daemon; this feature only pins the placeholder state.

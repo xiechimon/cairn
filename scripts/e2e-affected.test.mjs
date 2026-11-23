@@ -10,7 +10,7 @@ import {
   workspacePackages,
 } from './e2e-affected-select.mjs';
 import { shardOf } from './e2e-shard-run.mjs';
-import { mergeWeights, parseWeights } from './e2e-shard-weights.mjs';
+import { mergeWeights, parseWeights, successfulE2eJobs } from './e2e-shard-weights.mjs';
 import { partitionByWeight } from './timed-partition.mjs';
 
 const LOCKFILE = `---
@@ -549,4 +549,23 @@ test('shardOf spreads the full spec list across bins by recorded weight', () => 
     const spread = (Math.max(...totals) - Math.min(...totals)) / Math.min(...totals);
     assert.ok(spread < 0.05, `${count} bins spread ${(spread * 100).toFixed(1)}%`);
   }
+});
+
+test('successfulE2eJobs reads every jobs page', () => {
+  const gh = (args) => {
+    assert.ok(args.includes('--paginate') && args.includes('--slurp'));
+    return JSON.stringify([
+      { jobs: [{ name: 'e2e (1)', conclusion: 'success' }] },
+      {
+        jobs: [
+          { name: 'e2e-affected (2)', conclusion: 'success' },
+          { name: 'e2e (3)', conclusion: 'failure' },
+        ],
+      },
+    ]);
+  };
+  assert.deepEqual(
+    successfulE2eJobs(gh, '123').map((job) => job.name),
+    ['e2e (1)', 'e2e-affected (2)'],
+  );
 });

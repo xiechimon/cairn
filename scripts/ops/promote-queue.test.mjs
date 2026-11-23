@@ -5,6 +5,7 @@ import {
   closingTargets,
   dropNotice,
   evaluate,
+  ghPages,
   isCheckLagRefusal,
   ownerOf,
   planDrop,
@@ -527,4 +528,23 @@ test('main already containing the candidate during the backoff counts as landed'
     recheck: () => ({ queueHead: SHA, mainTip: 'd'.repeat(40), landed: true }),
   });
   assert.equal(pushes, 1);
+});
+
+test('ghPages asks gh to paginate and flattens every page', () => {
+  const calls = [];
+  const gh = (args) => {
+    calls.push(args);
+    return [
+      { check_runs: [{ name: 'check' }] },
+      { check_runs: [{ name: 'e2e-gate' }] },
+      { check_runs: [] },
+    ];
+  };
+  assert.deepEqual(ghPages(gh, 'repos/o/r/commits/x/check-runs?per_page=100', 'check_runs'), [
+    { name: 'check' },
+    { name: 'e2e-gate' },
+  ]);
+  assert.deepEqual(calls, [
+    ['--paginate', '--slurp', 'repos/o/r/commits/x/check-runs?per_page=100'],
+  ]);
 });

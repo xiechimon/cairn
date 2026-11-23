@@ -33,6 +33,19 @@ function gh(args) {
   return execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 }
 
+export function successfulE2eJobs(gh, runId) {
+  return JSON.parse(
+    gh([
+      'api',
+      '--paginate',
+      '--slurp',
+      `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100`,
+    ]),
+  )
+    .flatMap((page) => page?.jobs ?? [])
+    .filter((job) => /^e2e(-affected)? \(\d+\)$/.test(job.name) && job.conclusion === 'success');
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const runId = process.argv[2];
   if (!/^\d+$/.test(runId ?? '')) {
@@ -41,11 +54,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     );
     process.exit(2);
   }
-  const jobs = JSON.parse(
-    gh(['api', `repos/{owner}/{repo}/actions/runs/${runId}/jobs?per_page=100`]),
-  ).jobs.filter(
-    (job) => /^e2e(-affected)? \(\d+\)$/.test(job.name) && job.conclusion === 'success',
-  );
+  const jobs = successfulE2eJobs(gh, runId);
   const recorded = {};
   for (const job of jobs)
     Object.assign(

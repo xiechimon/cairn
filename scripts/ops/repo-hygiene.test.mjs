@@ -15,6 +15,7 @@ import {
   classifyRelease,
   classifyScheduledRun,
   closesCommitsFor,
+  liveChecks,
   newestPackageVersion,
   planBoard,
   renderReport,
@@ -618,4 +619,25 @@ test('report renders judgment items only when asked for the pinned issue body', 
   assert.match(report, /draft “d”/);
   assert.match(report, /desktop-release run 42 failed/);
   assert.doesNotMatch(report, /#5395/);
+});
+
+test('liveChecks reads later pages so a still-running check keeps a branch alive', () => {
+  const seen = [];
+  const live = liveChecks('a'.repeat(40), (args) => {
+    seen.push(args.join(' '));
+    return [{ check_runs: [{ status: 'completed' }] }, { check_runs: [{ status: 'in_progress' }] }];
+  });
+  assert.equal(live, true);
+  assert.match(seen[0], /--paginate --slurp/);
+});
+
+test('liveChecks stays false when every check is done and null when the api fails', () => {
+  assert.equal(
+    liveChecks('x', () => [{ check_runs: [{ status: 'completed' }] }]),
+    false,
+  );
+  assert.equal(
+    liveChecks('x', () => null),
+    null,
+  );
 });

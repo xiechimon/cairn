@@ -492,11 +492,21 @@ export function fetchMainRuns({ repo, now, gh }) {
     lastPageFull = batch.length >= RUN_PAGE_SIZE;
     for (const run of batch) {
       if (run.id == null) continue;
-      let jobsJson;
+      const jobs = [];
+      let jobsTruncated = false;
       try {
-        jobsJson = JSON.parse(
-          gh(['api', `repos/${repo}/actions/runs/${run.id}/jobs?per_page=100`]),
-        );
+        for (let jobsPage = 1; jobsPage <= MAX_PAGES; jobsPage += 1) {
+          const page = JSON.parse(
+            gh([
+              'api',
+              `repos/${repo}/actions/runs/${run.id}/jobs?per_page=${RUN_PAGE_SIZE}&page=${jobsPage}`,
+            ]),
+          );
+          const jobsBatch = page.jobs ?? [];
+          jobs.push(...jobsBatch);
+          if (jobsBatch.length < RUN_PAGE_SIZE) break;
+          if (jobsPage === MAX_PAGES) jobsTruncated = true;
+        }
       } catch (error) {
         if (isRateLimit(error)) {
           reasons.push(`main runs: ${String(error.message).slice(0, 200)}`);
@@ -504,7 +514,13 @@ export function fetchMainRuns({ repo, now, gh }) {
         }
         throw error;
       }
-      const reduced = requiredCheckRun(jobsJson.jobs ?? []);
+      if (jobsTruncated) {
+        reasons.push(
+          `main runs: jobs for run ${run.id} stopped after ${MAX_PAGES} pages; results are incomplete`,
+        );
+        return { runs, reasons };
+      }
+      const reduced = requiredCheckRun(jobs);
       if (run.updated_at < since && reduced?.conclusion === 'success') seenOldGreen = true;
       if (!reduced?.startedAt) continue;
       runs.push({

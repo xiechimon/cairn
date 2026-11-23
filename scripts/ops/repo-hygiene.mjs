@@ -400,10 +400,18 @@ function tipAgeDays(sha) {
   return epoch === null ? null : (Date.now() / 1000 - Number(epoch)) / 86400;
 }
 
-function liveChecks(sha) {
-  const runs = ghJson(['api', `repos/xiechimon/cairn/commits/${sha}/check-runs?per_page=100`]);
-  if (runs === null) return null;
-  return (runs.check_runs ?? []).some((r) => r.status !== 'completed');
+export function liveChecks(sha, read = ghJson) {
+  const pages = read([
+    'api',
+    '--paginate',
+    '--slurp',
+    `repos/xiechimon/cairn/commits/${sha}/check-runs?per_page=100`,
+  ]);
+  if (pages === null) return null;
+  return [pages]
+    .flat()
+    .flatMap((page) => page?.check_runs ?? [])
+    .some((r) => r.status !== 'completed');
 }
 
 function landedCommitForIssue(number, mainRef) {
