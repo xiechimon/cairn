@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
 import { type LocalErrorReason, PROJECT_LOCAL_ERROR_REASONS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -7,9 +7,21 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { project } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { expandHomePath, readFile } from '../src/services/git.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, req } from './helpers.js';
 
-const s = bootServer();
+const s = bootServer({
+  githubFetch: async (input) => {
+    const probe = /^\/repos\/[^/]+\/[^/]+$/.test(new URL(String(input)).pathname);
+    return new Response(probe ? JSON.stringify({ full_name: 'octo/demo' }) : '{}', {
+      status: probe ? 200 : 404,
+    });
+  },
+});
+upsertGithubConnection(
+  { db: s.db, box: s.secretBox },
+  { teamId: s.team.id, login: 'octo', accessToken: 'ghp_project_local', scope: 'repo' },
+);
 const tempRoots: string[] = [];
 
 function tempDir(prefix: string): string {
@@ -61,12 +73,16 @@ describe('POST /api/projects kind=local -- the localPath three-state validation 
     expect(r.body.reason).toBeUndefined();
   });
 
-  test('loosened gate one: a nonexistent path -> 201 (reachability belongs to the daemon-side precheck)', async () => {
+  test('a nonexistent path -> 400 + reason=not_found (no ancestor reconstruction binds a missing path)', async () => {
     const missing = join(tempDir('cairn-local-base-'), 'no-such-dir');
     const r = await postCreate({ name: 'p-gone', kind: 'local', localPath: missing });
-    expect(r.status).toBe(201);
-    expect(r.body.repoKind).toBe('local');
-    expect(r.body.localPath).toBe(missing);
+    expect(r.status).toBe(400);
+    expect(String(r.body.error)).toContain('localPath');
+    expect(r.body.reason).toBe<LocalErrorReason>('not_found');
+    const deep = join(tempDir('cairn-local-deep-'), 'a', 'b', 'c');
+    const r2 = await postCreate({ name: 'p-gone-deep', kind: 'local', localPath: deep });
+    expect(r2.status).toBe(400);
+    expect(r2.body.reason).toBe<LocalErrorReason>('not_found');
   });
 
   test('loosened gate two: exists but not a git repo -> 201 (reachability belongs to the daemon-side precheck)', async () => {
@@ -74,7 +90,7 @@ describe('POST /api/projects kind=local -- the localPath three-state validation 
     const r = await postCreate({ name: 'p-plain', kind: 'local', localPath: plain });
     expect(r.status).toBe(201);
     expect(r.body.repoKind).toBe('local');
-    expect(r.body.localPath).toBe(plain);
+    expect(r.body.localPath).toBe(realpathSync(plain));
   });
 
   test('loosened gate three: pointing at a plain file -> 201 (a non-directory shape still passes, reachability belongs to the daemon)', async () => {
@@ -83,7 +99,7 @@ describe('POST /api/projects kind=local -- the localPath three-state validation 
     writeFileSync(file, 'x');
     const r = await postCreate({ name: 'p-file', kind: 'local', localPath: file });
     expect(r.status).toBe(201);
-    expect(r.body.localPath).toBe(file);
+    expect(r.body.localPath).toBe(realpathSync(file));
   });
 
   test('a relative path -> 400 + reason=not_absolute (judged after `~` expansion)', async () => {
@@ -98,14 +114,14 @@ describe('POST /api/projects kind=local -- the localPath three-state validation 
     const r = await postCreate({ name: 'p-ok', kind: 'local', localPath: repo });
     expect(r.status).toBe(201);
     expect(r.body.repoKind).toBe('local');
-    expect(r.body.localPath).toBe(repo);
+    expect(r.body.localPath).toBe(realpathSync(repo));
     const row = s.db
       .select()
       .from(project)
       .where(eq(project.id, String(r.body.id)))
       .get();
     expect(row?.repoKind).toBe('local');
-    expect(row?.localPath).toBe(repo);
+    expect(row?.localPath).toBe(realpathSync(repo));
   });
 
   test('`~` expansion: localPath `~/<name>` expands by the server HOME into an absolute path', async () => {
@@ -120,7 +136,25 @@ describe('POST /api/projects kind=local -- the localPath three-state validation 
         localPath: `~/${basename(repo)}`,
       });
       expect(r.status).toBe(201);
-      expect(r.body.localPath).toBe(join(parent, basename(repo)));
+      expect(r.body.localPath).toBe(realpathSync(join(parent, basename(repo))));
+    } finally {
+      if (prevHome === undefined) delete process.env.HOME;
+      else process.env.HOME = prevHome;
+    }
+  });
+
+  test('`~` expansion keeps a missing component visible to realpath -> 400, not laundered away', async () => {
+    const repo = await makeGitRepo();
+    const parent = dirname(repo);
+    const prevHome = process.env.HOME;
+    process.env.HOME = parent;
+    try {
+      const r = await postCreate({
+        name: 'p-tilde-dotdot',
+        kind: 'local',
+        localPath: `~/missing-component/../${basename(repo)}`,
+      });
+      expect(r.status).toBe(400);
     } finally {
       if (prevHome === undefined) delete process.env.HOME;
       else process.env.HOME = prevHome;
@@ -138,6 +172,11 @@ describe('expandHomePath (the single source of `~` expansion; homeDir injected f
     expect(expandHomePath('/abs/x', '/home/u')).toBe('/abs/x');
     expect(expandHomePath('rel/x', '/home/u')).toBe('rel/x');
     expect(expandHomePath('~other/x', '/home/u')).toBe('~other/x');
+  });
+
+  test('supplied components survive verbatim; realpath, not the expander, resolves them', () => {
+    expect(expandHomePath('~/missing/../x', '/home/u')).toBe('/home/u/missing/../x');
+    expect(expandHomePath('~/../x', '/home/u')).toBe('/home/u/../x');
   });
 });
 
@@ -344,7 +383,7 @@ describe('body dual-name compatibility: kind (the spec 12 contract) and repoKind
     expect(res.status).toBe(200);
     const rows = (await res.json()) as CreateReply[];
     const hit = rows.find((r) => r.id === created.body.id);
-    expect(hit?.localPath).toBe(repo);
+    expect(hit?.localPath).toBe(realpathSync(repo));
     expect(hit?.repoKind).toBe('local');
   });
 });

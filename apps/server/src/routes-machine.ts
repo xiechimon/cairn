@@ -254,6 +254,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     convHub: ctx.convHub,
     oauthClient: ctx.oauthClient,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
+    ...(ctx.githubBaseFetch !== undefined ? { githubBaseFetch: ctx.githubBaseFetch } : {}),
     ...(ctx.oauthFetch !== undefined ? { oauthFetch: ctx.oauthFetch } : {}),
     ...(ctx.mcpFetch !== undefined ? { mcpFetch: ctx.mcpFetch } : {}),
     ...(ctx.mailSend !== undefined ? { mailSend: ctx.mailSend } : {}),
@@ -616,6 +617,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
             relay.params,
             relay.toolCallId,
             relay.toolCallId === undefined ? undefined : c.req.raw.signal,
+            row.tokenHash,
           );
           return c.json({ text });
         }

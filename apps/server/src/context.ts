@@ -76,10 +76,13 @@ export interface AppContext {
   deployRecordPath?: string;
   skillsDir: string;
   skillSourcesPath: string;
+  homeDir: string;
+  dataDir?: string | undefined;
   skillImportFetch?: SkillImportFetch;
   skillImportTimeoutMs?: number;
   webDir?: string | null;
   githubFetch?: FetchLike;
+  githubBaseFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;
   xaiDeviceStates: Map<string, XaiDeviceState>;
   codexDeviceStates: Map<string, CodexDeviceState>;

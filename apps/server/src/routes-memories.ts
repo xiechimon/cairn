@@ -5,11 +5,13 @@ import {
   patchMemoryBodySchema,
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
-import type { Hono } from 'hono';
+import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { agentMemory } from './db/schema.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireTeam, svcOf, toMemoryRecord } from './routes-helpers.js';
+import { isOwner } from './services/instance-owner.js';
 import {
   deleteMemoryEntry,
   isMemoryIndex,
@@ -31,6 +33,10 @@ import {
 } from './services/memory-import.js';
 
 export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
+  const isOwnerSession = (c: Context): boolean =>
+    pairedDeviceIdOf(c) === null &&
+    (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
+    isOwner(ctx.db, ctx.user.id);
   app.get('/api/teams/:id/memories', (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
@@ -70,7 +76,7 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
       candidates: await listMemoryImportCandidates(
         ctx.db,
         teamId,
-        repoReaderOf({ ...ctx, box: ctx.secretBox }),
+        repoReaderOf({ ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) }),
       ),
     });
   });
@@ -85,7 +91,7 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
           ctx.db,
           teamId,
           body,
-          repoReaderOf({ ...ctx, box: ctx.secretBox }),
+          repoReaderOf({ ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) }),
         ),
       },
       201,

@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join } from 'node:path';
+import { isAbsolute, join, sep } from 'node:path';
 import {
   conversationBranch,
   type DiffFileContent,
@@ -35,6 +35,11 @@ import {
   listGithubProjectFiles,
   readGithubProjectFile,
 } from '../lib/github-repo-files.js';
+import {
+  assertSourceOutsideCairnDirs,
+  type CairnSourceRoots,
+  requireRealpath,
+} from '../lib/local-source.js';
 import { githubReadToken } from './github-autonomous-token.js';
 
 export type ProjectRow = typeof project.$inferSelect;
@@ -49,6 +54,7 @@ export interface RepoReadCtx extends RepoCtx {
   box?: SecretBox | undefined;
   githubFetch?: FetchLike | undefined;
   githubAppTokenSocket?: string | null | undefined;
+  discloseLocalPath: boolean;
 }
 
 export function slugifyRepoName(name: string): string {
@@ -177,11 +183,17 @@ export function githubCloneUrl(ref: GithubRepoRef): string {
 
 export function expandHomePath(rawPath: string, homeDir: string = homedir()): string {
   if (rawPath === '~') return homeDir;
-  if (rawPath.startsWith('~/')) return join(homeDir, rawPath.slice(2));
+  if (rawPath.startsWith('~/')) {
+    const rest = rawPath.slice(2);
+    return homeDir.endsWith(sep) ? `${homeDir}${rest}` : `${homeDir}${sep}${rest}`;
+  }
   return rawPath;
 }
 
-export async function validateLocalRepoPath(rawPath: string | null | undefined): Promise<string> {
+export async function validateLocalRepoPath(
+  rawPath: string | null | undefined,
+  roots: CairnSourceRoots = {},
+): Promise<string> {
   const raw = rawPath?.trim() ?? '';
   if (raw === '') {
     throw new HttpError(400, 'invalid body at localPath: required for kind "local"');
@@ -194,10 +206,24 @@ export async function validateLocalRepoPath(rawPath: string | null | undefined):
       'not_absolute',
     );
   }
-  return expanded;
+  let real: string;
+  try {
+    real = requireRealpath(expanded);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw new HttpError(400, `invalid body at localPath: ${error.message}`, error.reason);
+    }
+    throw error;
+  }
+  assertSourceOutsideCairnDirs(real, `invalid body at localPath: ${raw}`, roots);
+  return real;
 }
 
-export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord {
+export function toProjectRecord(
+  row: ProjectRow,
+  origin: string | undefined,
+  opts: { includeLocalPath: boolean },
+): ProjectRecord {
   const githubRef = githubRepoOfProject(row);
   return {
     id: row.id,
@@ -217,7 +243,7 @@ export function toProjectRecord(row: ProjectRow, origin?: string): ProjectRecord
     ...(row.repoKind !== null ? { repoKind: row.repoKind } : {}),
     ...(row.repoName !== null ? { repoName: row.repoName } : {}),
     ...(row.githubRepo !== null ? { githubRepo: row.githubRepo } : {}),
-    ...(row.localPath !== null ? { localPath: row.localPath } : {}),
+    ...(row.localPath !== null && opts.includeLocalPath ? { localPath: row.localPath } : {}),
     ...projectMergeConfigSchema.parse({
       planAutoApproveEnabled: (row.autonomy as { planAutoApproveEnabled?: unknown } | null)
         ?.planAutoApproveEnabled,
@@ -349,7 +375,7 @@ async function githubRepoReader(ctx: RepoReadCtx, row: ProjectRow): Promise<Gith
   return { fetchImpl: ctx.githubFetch ?? fetch, token, repository };
 }
 
-export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promise<string> {
+export async function requireRepoReadDir(ctx: RepoReadCtx, projectId: string): Promise<string> {
   const row = projectRowOf(ctx, projectId);
   if (row.repoKind === 'hosted' && row.repoName !== null) {
     return repoDirFor(ctx.reposDir, row.teamId, row.repoName);
@@ -363,13 +389,20 @@ export async function requireRepoReadDir(ctx: RepoCtx, projectId: string): Promi
     if (row.localPath === null) {
       throw notFound(`local repo for project ${projectId}`);
     }
+    const disclose = ctx.discloseLocalPath !== false;
     if (!existsSync(row.localPath)) {
-      throw new HttpError(404, `local repo path not found: ${row.localPath}`, 'not_found');
+      throw new HttpError(
+        404,
+        disclose ? `local repo path not found: ${row.localPath}` : 'local repo path not found',
+        'not_found',
+      );
     }
     if (!(await systemGitOps.isGitRepo(row.localPath))) {
       throw new HttpError(
         404,
-        `local repo path is not a git repository: ${row.localPath}`,
+        disclose
+          ? `local repo path is not a git repository: ${row.localPath}`
+          : 'local repo path is not a git repository',
         'not_git',
       );
     }

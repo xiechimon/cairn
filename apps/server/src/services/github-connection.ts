@@ -29,6 +29,7 @@ export interface GithubTokenDeps {
   githubAppIdentity?: GitIdentity | null | undefined;
   box?: SecretBox | undefined;
   githubFetch?: FetchLike | undefined;
+  githubBaseFetch?: FetchLike | undefined;
   oauthClient?: OAuthClientConfig | null | undefined;
 }
 
@@ -38,7 +39,27 @@ export type GithubTokenReason =
   | 'token-unreadable'
   | 'github-disconnected';
 
-export type GithubTokenAccess = { token: string; box: SecretBox } | { reason: GithubTokenReason };
+type GithubConnectionRow = typeof githubConnection.$inferSelect;
+export type GithubConnectionPin = Pick<
+  GithubConnectionRow,
+  'teamId' | 'createdAt' | 'connectionGeneration'
+>;
+export type GithubTokenAccess =
+  | { token: string; box: SecretBox; pin: GithubConnectionPin }
+  | { reason: GithubTokenReason };
+
+function connectionPin(row: GithubConnectionPin): GithubConnectionPin {
+  const { teamId, createdAt, connectionGeneration } = row;
+  return { teamId, createdAt, connectionGeneration };
+}
+
+function matchesConnection(left: GithubConnectionPin, right: GithubConnectionPin): boolean {
+  return (
+    left.teamId === right.teamId &&
+    left.createdAt === right.createdAt &&
+    left.connectionGeneration === right.connectionGeneration
+  );
+}
 
 function getRow(deps: GithubConnectionDeps, teamId: string) {
   return deps.db.select().from(githubConnection).where(eq(githubConnection.teamId, teamId)).get();
@@ -63,6 +84,11 @@ export function upsertGithubConnection(
     input.refreshToken === undefined || input.refreshToken === null
       ? null
       : deps.box.seal(input.refreshToken);
+  const prior = deps.db
+    .select({ createdAt: githubConnection.createdAt })
+    .from(githubConnection)
+    .where(eq(githubConnection.teamId, input.teamId))
+    .get();
   const fields = {
     login: input.login,
     githubUserId: input.githubUserId ?? null,
@@ -76,7 +102,7 @@ export function upsertGithubConnection(
     refreshLeaseUntil: null,
     disconnectedReason: null,
     scope: input.scope,
-    createdAt: nowMs(),
+    createdAt: prior === undefined ? nowMs() : Math.max(nowMs(), prior.createdAt + 1),
   };
   deps.db
     .insert(githubConnection)
@@ -97,12 +123,22 @@ export function markGithubConnectionDisconnected(
     .run();
 }
 
+function sameConnectionRow(row: typeof githubConnection.$inferSelect) {
+  return and(
+    eq(githubConnection.teamId, row.teamId),
+    eq(githubConnection.createdAt, row.createdAt),
+    row.connectionGeneration === null
+      ? isNull(githubConnection.connectionGeneration)
+      : eq(githubConnection.connectionGeneration, row.connectionGeneration),
+  );
+}
+
 export function saveRefreshedTokens(
   deps: GithubConnectionDeps,
   row: typeof githubConnection.$inferSelect,
   tokens: { accessToken: string; refreshToken: string | null; expiresInSeconds: number | null },
-): void {
-  deps.db
+): number {
+  return deps.db
     .update(githubConnection)
     .set({
       accessTokenCipher: deps.box.seal(tokens.accessToken),
@@ -112,8 +148,8 @@ export function saveRefreshedTokens(
         tokens.expiresInSeconds === null ? null : nowMs() + tokens.expiresInSeconds * 1000,
       disconnectedReason: null,
     })
-    .where(and(eq(githubConnection.teamId, row.teamId), isNull(githubConnection.appClientId)))
-    .run();
+    .where(and(sameConnectionRow(row), isNull(githubConnection.appClientId)))
+    .run().changes;
 }
 
 export function deleteGithubConnection(deps: GithubConnectionDeps, teamId: string): boolean {
@@ -142,12 +178,15 @@ function refreshChainsOf(db: Db): Map<string, Promise<GithubTokenAccess>> {
 export async function connectionToken(
   deps: GithubTokenDeps,
   teamId: string,
+  pin?: GithubConnectionPin,
 ): Promise<GithubTokenAccess> {
   const box = deps.box;
   if (box === undefined) return { reason: 'no-secret-box' };
   const connectionDeps = { db: deps.db, box };
   const row = getRow(connectionDeps, teamId);
-  if (!row) return { reason: 'no-github-connection' };
+  if (!row || (pin !== undefined && !matchesConnection(row, pin))) {
+    return { reason: 'no-github-connection' };
+  }
   let token: string;
   try {
     token = box.open(row.accessTokenCipher);
@@ -160,31 +199,40 @@ export async function connectionToken(
     row.refreshTokenCipher !== null &&
     row.accessTokenExpiresAt !== null &&
     Date.now() >= row.accessTokenExpiresAt - REFRESH_SKEW_MS;
-  if (!expired) return { token, box };
-  return refreshConnectionToken(deps, connectionDeps, row, token);
+  if (!expired) return { token, box, pin: connectionPin(row) };
+  const access = await refreshConnectionToken(deps, connectionDeps, row, token);
+  if (pin !== undefined && 'token' in access && !matchesConnection(access.pin, pin)) {
+    return { reason: 'no-github-connection' };
+  }
+  return access;
 }
 
 function refreshConnectionToken(
   deps: GithubTokenDeps,
   connectionDeps: GithubConnectionDeps,
-  row: typeof githubConnection.$inferSelect,
+  row: GithubConnectionRow,
   staleToken: string,
 ): Promise<GithubTokenAccess> {
   const { box } = connectionDeps;
-  const teamId = row.teamId;
+  const pin = connectionPin(row);
+  const key = JSON.stringify([pin.teamId, pin.createdAt, pin.connectionGeneration]);
   const refreshChains = refreshChainsOf(connectionDeps.db);
-  const chained = refreshChains.get(teamId);
+  const chained = refreshChains.get(key);
   if (chained !== undefined) return chained;
   const refresh = (async (): Promise<GithubTokenAccess> => {
     const client = deps.oauthClient ?? null;
     if (row.refreshTokenCipher === null || (client === null && row.appClientId === null))
-      return { token: staleToken, box };
+      return { token: staleToken, box, pin };
     const fetchImpl = deps.githubFetch ?? globalThis.fetch;
     let refreshToken: string;
     try {
       refreshToken = box.open(row.refreshTokenCipher);
     } catch {
-      markGithubConnectionDisconnected(connectionDeps, teamId, 'stored refresh token unreadable');
+      markGithubConnectionDisconnected(
+        connectionDeps,
+        row.teamId,
+        'stored refresh token unreadable',
+      );
       return { reason: 'github-disconnected' };
     }
     if (row.appClientId !== null)
@@ -196,7 +244,7 @@ function refreshConnectionToken(
         refreshToken,
         staleToken,
       );
-    if (client === null) return { token: staleToken, box };
+    if (client === null) return { token: staleToken, box, pin };
     try {
       const tokens = await refreshOAuthAccessToken(fetchImpl, {
         tokenUrl: onGithubOauthBase(GITHUB_CONNECTION_OAUTH.tokenUrl),
@@ -204,24 +252,23 @@ function refreshConnectionToken(
         clientSecret: client.clientSecret,
         refreshToken,
       });
-      saveRefreshedTokens(connectionDeps, row, tokens);
-      if (getRow(connectionDeps, teamId)?.appClientId != null)
-        return currentConnectionToken(connectionDeps, teamId);
-      return { token: tokens.accessToken, box };
+      if (saveRefreshedTokens(connectionDeps, row, tokens) === 0)
+        return currentConnectionToken(connectionDeps, row.teamId);
+      return { token: tokens.accessToken, box, pin };
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
       connectionDeps.db
         .update(githubConnection)
         .set({ disconnectedReason: `oauth refresh failed: ${why}` })
-        .where(and(eq(githubConnection.teamId, teamId), isNull(githubConnection.appClientId)))
+        .where(and(sameConnectionRow(row), isNull(githubConnection.appClientId)))
         .run();
-      return currentConnectionToken(connectionDeps, teamId);
+      return currentConnectionToken(connectionDeps, row.teamId);
     }
   })();
-  refreshChains.set(teamId, refresh);
+  refreshChains.set(key, refresh);
   refresh
     .finally(() => {
-      if (refreshChains.get(teamId) === refresh) refreshChains.delete(teamId);
+      if (refreshChains.get(key) === refresh) refreshChains.delete(key);
     })
     .catch(() => undefined);
   return refresh;
@@ -230,25 +277,21 @@ function refreshConnectionToken(
 async function refreshDeviceGrant(
   deps: GithubConnectionDeps,
   fetchImpl: FetchLike,
-  row: typeof githubConnection.$inferSelect,
+  row: GithubConnectionRow,
   clientId: string,
   refreshToken: string,
   staleToken: string,
 ): Promise<GithubTokenAccess> {
-  const sameGeneration = and(
-    eq(githubConnection.teamId, row.teamId),
-    eq(githubConnection.connectionGeneration, row.connectionGeneration ?? ''),
-  );
   let grant: Awaited<ReturnType<typeof refreshGithubDeviceToken>>;
   try {
     grant = await refreshGithubDeviceToken({ fetch: fetchImpl }, clientId, refreshToken);
   } catch (err) {
     if (!(err instanceof HttpError && err.status === 401))
-      return { token: staleToken, box: deps.box };
+      return { token: staleToken, box: deps.box, pin: connectionPin(row) };
     deps.db
       .update(githubConnection)
       .set({ disconnectedReason: 'GitHub authorization expired' })
-      .where(sameGeneration)
+      .where(sameConnectionRow(row))
       .run();
     return currentConnectionToken(deps, row.teamId);
   }
@@ -262,10 +305,10 @@ async function refreshDeviceGrant(
       refreshTokenExpiresAt: now + grant.refreshTokenExpiresInSeconds * 1000,
       disconnectedReason: null,
     })
-    .where(sameGeneration)
+    .where(sameConnectionRow(row))
     .run().changes;
   if (saved === 0) return currentConnectionToken(deps, row.teamId);
-  return { token: grant.accessToken, box: deps.box };
+  return { token: grant.accessToken, box: deps.box, pin: connectionPin(row) };
 }
 
 function currentConnectionToken(deps: GithubConnectionDeps, teamId: string): GithubTokenAccess {
@@ -273,14 +316,24 @@ function currentConnectionToken(deps: GithubConnectionDeps, teamId: string): Git
   if (!current) return { reason: 'no-github-connection' };
   if (current.disconnectedReason !== null) return { reason: 'github-disconnected' };
   try {
-    return { token: deps.box.open(current.accessTokenCipher), box: deps.box };
+    return {
+      token: deps.box.open(current.accessTokenCipher),
+      box: deps.box,
+      pin: connectionPin(current),
+    };
   } catch (err) {
     if (!(err instanceof SecretBoxError)) throw err;
     return { reason: 'token-unreadable' };
   }
 }
 
-export function refreshingGithubFetch(deps: GithubTokenDeps, inner: FetchLike): FetchLike {
+export function refreshingGithubFetch(
+  deps: GithubTokenDeps,
+  inner: FetchLike,
+  scope?: string | GithubConnectionPin,
+): FetchLike {
+  const pin = typeof scope === 'string' ? undefined : scope;
+  const teamId = typeof scope === 'string' ? scope : scope?.teamId;
   return async (input, init) => {
     const header = init?.headers?.authorization;
     if (header?.startsWith('Bearer ') && isAppToken(header.slice(7))) return inner(input, init);
@@ -292,29 +345,44 @@ export function refreshingGithubFetch(deps: GithubTokenDeps, inner: FetchLike): 
     const rows = deps.db
       .select()
       .from(githubConnection)
-      .where(isNull(githubConnection.disconnectedReason))
+      .where(
+        teamId === undefined
+          ? isNull(githubConnection.disconnectedReason)
+          : and(eq(githubConnection.teamId, teamId), isNull(githubConnection.disconnectedReason)),
+      )
       .all();
+    const candidates: (typeof githubConnection.$inferSelect)[] = [];
     for (const row of rows) {
-      let stored: string;
-      try {
-        stored = box.open(row.accessTokenCipher);
-      } catch {
+      if (row.refreshTokenCipher === null || (pin !== undefined && !matchesConnection(row, pin))) {
         continue;
       }
-      if (stored !== rejected || row.refreshTokenCipher === null) continue;
-      const access = await refreshConnectionToken(
-        { ...deps, githubFetch: inner },
-        connectionDeps,
-        row,
-        stored,
-      );
-      if (!('token' in access) || access.token === rejected) return res;
-      return inner(input, {
-        ...init,
-        headers: { ...init?.headers, authorization: `Bearer ${access.token}` },
-      });
+      let accessToken: string | null;
+      try {
+        accessToken = box.open(row.accessTokenCipher);
+      } catch {
+        accessToken = null;
+      }
+      if (accessToken === rejected) candidates.push(row);
     }
-    return res;
+    const candidate = candidates.length === 1 ? candidates[0] : undefined;
+    if (candidate === undefined) return res;
+    const access = await refreshConnectionToken(
+      { ...deps, githubFetch: inner },
+      connectionDeps,
+      candidate,
+      rejected,
+    );
+    if (
+      !('token' in access) ||
+      access.token === rejected ||
+      (pin !== undefined && !matchesConnection(access.pin, pin))
+    ) {
+      return res;
+    }
+    return inner(input, {
+      ...init,
+      headers: { ...init?.headers, authorization: `Bearer ${access.token}` },
+    });
   };
 }
 
@@ -324,6 +392,32 @@ export async function githubTokenOrNull(
 ): Promise<string | null> {
   const access = await connectionToken(deps, teamId);
   return 'token' in access ? access.token : null;
+}
+
+export function githubConnectionPin(db: Db, teamId: string): GithubConnectionPin | null {
+  const row = db
+    .select({
+      teamId: githubConnection.teamId,
+      createdAt: githubConnection.createdAt,
+      connectionGeneration: githubConnection.connectionGeneration,
+      disconnectedReason: githubConnection.disconnectedReason,
+    })
+    .from(githubConnection)
+    .where(eq(githubConnection.teamId, teamId))
+    .get();
+  if (row === undefined || row.disconnectedReason !== null) return null;
+  return connectionPin(row);
+}
+
+export function assertGithubConnectionCurrent(
+  db: Db,
+  teamId: string,
+  pin: GithubConnectionPin,
+): void {
+  const current = githubConnectionPin(db, teamId);
+  if (current === null || !matchesConnection(current, pin)) {
+    throw new HttpError(409, 'github connection changed while binding; retry');
+  }
 }
 
 export function hasGithubConnection(db: Db, teamId: string): boolean {
@@ -356,7 +450,7 @@ export async function teamUserToken(
   teamId: string,
 ): Promise<{ token: UserToken; box: SecretBox } | { reason: GithubTokenReason }> {
   const access = await connectionToken(deps, teamId);
-  return 'token' in access ? { ...access, token: access.token as UserToken } : access;
+  return 'token' in access ? { token: access.token as UserToken, box: access.box } : access;
 }
 
 export async function userTokenOrNull(

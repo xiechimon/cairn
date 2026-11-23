@@ -12,7 +12,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
   type ClaimedStep,
   MAX_SKILL_FILE_BYTES,
@@ -24,9 +24,18 @@ import type { Hono } from 'hono';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { skillAudit } from '../src/db/schema.js';
+import { pairedDevice, skillAudit } from '../src/db/schema.js';
+import { issueBrowserSession } from '../src/services/browser-session.js';
 import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
-import { bootServer, issueApiKey, postProject, req, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  issueApiKey,
+  postProject,
+  redeemTestPairing,
+  req,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const roots: string[] = [];
 function makeRoot(): string {
@@ -50,11 +59,12 @@ async function call(
   app: Hono,
   method: string,
   path: string,
-  opts: { cred?: string; body?: unknown } = {},
+  opts: { cred?: string; body?: unknown; headers?: Record<string, string> } = {},
 ): Promise<Response> {
   const headers: Record<string, string> = {};
   if (opts.cred) headers.authorization = `Bearer ${opts.cred}`;
   if (opts.body !== undefined) headers['content-type'] = 'application/json';
+  Object.assign(headers, opts.headers);
   return Promise.resolve(
     app.request(path, {
       method,
@@ -264,6 +274,40 @@ describe('POST /api/teams/{id}/skills/import (localPath)', () => {
       expect(res.status).toBe(400);
       expect(await errorText(res)).toContain('contains the cairn skills directory');
       expect(readdirSync(skillsDir)).toEqual([]);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('LP4c: a localPath whose missing component is laundered by .. is refused — realpath runs before lexical normalization', async () => {
+    const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
+    try {
+      const source = makeSourceDir({ 'SKILL.md': skillMd('via-dotdot', 'd') });
+      const sneaky = `${dirname(source)}/missing-component/../${basename(source)}`;
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        localPath: sneaky,
+      });
+      expect(res.status).toBe(400);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('LP4d: `~` expansion keeps a missing component visible to realpath -> 400, not laundered away', async () => {
+    const s = bootServer({ skillsDir: makeRoot(), skillSourcesPath: join(makeRoot(), 's.json') });
+    try {
+      const source = makeSourceDir({ 'SKILL.md': skillMd('via-tilde-dotdot', 'd') });
+      const prevHome = process.env.HOME;
+      process.env.HOME = dirname(source);
+      try {
+        const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+          localPath: `~/missing-component/../${basename(source)}`,
+        });
+        expect(res.status).toBe(400);
+      } finally {
+        if (prevHome === undefined) delete process.env.HOME;
+        else process.env.HOME = prevHome;
+      }
     } finally {
       s.dispose();
     }
@@ -783,17 +827,15 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
     }
   });
 
-  test('R2: no source record (a hand-created skill) -> 409 with an explanation', async () => {
+  test('R2: no source record (a hand-created skill) answers the same 404 as a missing skill', async () => {
     const skillsDir = makeRoot();
     mkdirSync(join(skillsDir, 'hand-made'));
     writeFileSync(join(skillsDir, 'hand-made', 'SKILL.md'), skillMd('hand-made', '手建'));
     const s = bootServer({ skillsDir, skillSourcesPath: join(makeRoot(), 's.json') });
     try {
       const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/hand-made/refresh`, {});
-      expect(res.status).toBe(409);
-      const text = await errorText(res);
-      expect(text).toContain('hand-made');
-      expect(text).toContain('source');
+      expect(res.status).toBe(404);
+      expect(await errorText(res)).toBe('skill hand-made not found');
     } finally {
       s.dispose();
     }
@@ -868,7 +910,7 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
       localPath: source,
     });
     first.dispose();
-    const second = bootServer({ skillsDir, skillSourcesPath });
+    const second = bootServer({ db: first.db, skillsDir, skillSourcesPath });
     try {
       writeFileSync(join(source, 'SKILL.md'), skillMd('persist-src', 'v2'));
       const res = await req(
@@ -881,6 +923,100 @@ describe('POST /api/teams/{id}/skills/{sid}/refresh', () => {
       expect(skillRecordSchema.parse(await res.json())).toMatchObject({ description: 'v2' });
     } finally {
       second.dispose();
+    }
+  });
+
+  test('R9: a source record without a team tag answers the same 404 as a missing skill — the record is not claimed and the copy is untouched', async () => {
+    const skillsDir = makeRoot();
+    const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
+    mkdirSync(join(skillsDir, 'leg-skill'));
+    writeFileSync(join(skillsDir, 'leg-skill', 'SKILL.md'), skillMd('leg-skill', '旧'));
+    const source = makeSourceDir({ 'SKILL.md': skillMd('leg-skill', '新') });
+    await writeSkillSource(skillSourcesPath, {
+      skillId: 'leg-skill',
+      kind: 'localPath',
+      ref: source,
+      importedAt: 1,
+      refreshedAt: null,
+    });
+    const s = bootServer({ skillsDir, skillSourcesPath });
+    try {
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/leg-skill/refresh`, {});
+      expect(res.status).toBe(404);
+      expect(await errorText(res)).toBe('skill leg-skill not found');
+      expect(readFileSync(join(skillsDir, 'leg-skill', 'SKILL.md'), 'utf8')).toContain('旧');
+      expect(readSkillSource(skillSourcesPath, 'leg-skill')?.teamId).toBeUndefined();
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('R10: a source record owned by another team answers the same 404 as an unknown skill', async () => {
+    const skillsDir = makeRoot();
+    const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
+    mkdirSync(join(skillsDir, 'foreign-skill'));
+    writeFileSync(join(skillsDir, 'foreign-skill', 'SKILL.md'), skillMd('foreign-skill', 'd'));
+    const source = makeSourceDir({ 'SKILL.md': skillMd('foreign-skill', 'd') });
+    await writeSkillSource(skillSourcesPath, {
+      skillId: 'foreign-skill',
+      kind: 'localPath',
+      ref: source,
+      importedAt: 1,
+      refreshedAt: null,
+      teamId: 'team-elsewhere',
+    });
+    const s = bootServer({ skillsDir, skillSourcesPath });
+    try {
+      const foreign = await req(
+        s.app,
+        'POST',
+        `/api/teams/${s.team.id}/skills/foreign-skill/refresh`,
+        {},
+      );
+      const missing = await req(
+        s.app,
+        'POST',
+        `/api/teams/${s.team.id}/skills/never-seen/refresh`,
+        {},
+      );
+      expect(foreign.status).toBe(404);
+      expect(missing.status).toBe(404);
+      const foreignBody = (await foreign.json()) as { error?: string };
+      const missingBody = (await missing.json()) as { error?: string };
+      expect(foreignBody.error).toBe('skill foreign-skill not found');
+      expect(missingBody.error).toBe('skill never-seen not found');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test("R11: a skill whose directory resolves outside this team's skills root answers the same 404 even when the source record matches the caller", async () => {
+    const skillsDir = makeRoot();
+    const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
+    const outside = makeSourceDir({ 'SKILL.md': skillMd('linked-away', 'v1') });
+    symlinkSync(outside, join(skillsDir, 'linked-away'));
+    const source = makeSourceDir({ 'SKILL.md': skillMd('linked-away', 'v2') });
+    const s = bootServer({ skillsDir, skillSourcesPath });
+    await writeSkillSource(skillSourcesPath, {
+      skillId: 'linked-away',
+      kind: 'localPath',
+      ref: source,
+      importedAt: 1,
+      refreshedAt: null,
+      teamId: s.team.id,
+    });
+    try {
+      const res = await req(
+        s.app,
+        'POST',
+        `/api/teams/${s.team.id}/skills/linked-away/refresh`,
+        {},
+      );
+      expect(res.status).toBe(404);
+      expect(await errorText(res)).toBe('skill linked-away not found');
+      expect(readFileSync(join(outside, 'SKILL.md'), 'utf8')).toContain('v1');
+    } finally {
+      s.dispose();
     }
   });
 
@@ -983,7 +1119,7 @@ describe('wire: the import/refresh endpoints are registered', () => {
 });
 
 describe('source registration failure (#1185)', () => {
-  test('LP11: registration fails -> 500, the directory and the create audit row rolled back, a hand-created same-named skill still 409 on refresh', async () => {
+  test('LP11: registration fails -> 500, the directory and the create audit row rolled back, a hand-created same-named skill still 404 on refresh', async () => {
     const skillsDir = makeRoot();
     const blocker = join(makeRoot(), 'not-a-directory');
     writeFileSync(blocker, 'x');
@@ -1015,8 +1151,8 @@ describe('source registration failure (#1185)', () => {
         `/api/teams/${s.team.id}/skills/orphan-skill/refresh`,
         {},
       );
-      expect(refresh.status).toBe(409);
-      expect(await errorText(refresh)).toContain('no recorded import source');
+      expect(refresh.status).toBe(404);
+      expect(await errorText(refresh)).toBe('skill orphan-skill not found');
     } finally {
       s.dispose();
     }
@@ -1126,6 +1262,22 @@ describe('GET /api/teams/{id}/skills/import-candidates', () => {
     }
   });
 
+  test('C2b: a candidate whose SKILL.md symlinks out of the shared root is skipped', async () => {
+    const agents = agentsRoot();
+    const outside = join(home, 'outside-root');
+    mkdirSync(join(agents, 'linked'), { recursive: true });
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, 'secret.md'), skillMd('leaked', 'outside the root'));
+    symlinkSync(join(outside, 'secret.md'), join(agents, 'linked', 'SKILL.md'));
+    const s = bootServer({ skillsDir: cairnRoot(), skillSourcesPath: join(home, 's.json') });
+    try {
+      const body = await candidates(s);
+      expect(body.candidates.map((c) => c.id)).not.toContain('leaked');
+    } finally {
+      s.dispose();
+    }
+  });
+
   test('C3: importing a candidate copies it into the Cairn directory; refresh after the source changed updates the copy and leaves the source alone', async () => {
     const agents = agentsRoot();
     put(agents, 'deploy', skillMd('deploy', '部署'));
@@ -1153,6 +1305,263 @@ describe('GET /api/teams/{id}/skills/import-candidates', () => {
         skillMd('deploy', '部署（改过）'),
       );
       expect(tree(agents)).toEqual(changed);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('C4: a paired device gets 403 — listing the machine skill sources is owner-only', async () => {
+    put(agentsRoot(), 'deploy', skillMd('deploy', '部署'));
+    const authed = bootServer({
+      authToken: 'owner-secret-0123456789abcdef',
+      skillsDir: cairnRoot(),
+      skillSourcesPath: join(home, 's.json'),
+    });
+    try {
+      authed.db
+        .insert(pairedDevice)
+        .values({
+          id: 'phone',
+          teamId: authed.team.id,
+          name: 'phone',
+          tokenHash: 'synthetic',
+          masked: 'phone',
+          createdAt: 1,
+        })
+        .run();
+      const device = `cairn_auth=${issueBrowserSession(authed.db, 'device', 'phone').token}`;
+      const refused = await authed.app.request(
+        `/api/teams/${authed.team.id}/skills/import-candidates`,
+        { headers: { cookie: device } },
+      );
+      expect(refused.status).toBe(403);
+      const owner = `cairn_auth=${issueBrowserSession(authed.db, 'owner').token}`;
+      const allowed = await authed.app.request(
+        `/api/teams/${authed.team.id}/skills/import-candidates`,
+        { headers: { cookie: owner } },
+      );
+      expect(allowed.status).toBe(200);
+    } finally {
+      authed.dispose();
+    }
+  });
+});
+
+describe('local-directory import authorization (the source is owner data)', () => {
+  const OWNER = 'skill-import-owner-token-0123456789abcdef';
+
+  async function pairDevice(s: TestServer): Promise<{ token: string; cookie: string | null }> {
+    const issued = await call(s.app, 'POST', '/api/remote/pairing', { cred: OWNER });
+    expect(issued.status).toBe(201);
+    const { code } = (await issued.json()) as { code: string };
+    const paired = await redeemTestPairing(s.app, code, 'phone');
+    expect(paired.status).toBe(201);
+    const { token } = (await paired.json()) as { token: string };
+    return { token, cookie: paired.headers.get('set-cookie') };
+  }
+
+  test('SEC1: a paired device credential gets 403 on the import and refresh routes; the owner token still works', async () => {
+    const s = bootServer({
+      authToken: OWNER,
+      skillsDir: makeRoot(),
+      skillSourcesPath: join(makeRoot(), 's.json'),
+    });
+    try {
+      const { token: deviceToken, cookie } = await pairDevice(s);
+      const source = makeSourceDir({ 'SKILL.md': skillMd('device-import', 'd') });
+      const deviceImport = await call(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        cred: deviceToken,
+        body: { localPath: source },
+      });
+      expect(deviceImport.status).toBe(403);
+
+      const imported = await call(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        cred: OWNER,
+        body: { localPath: source },
+      });
+      expect(imported.status).toBe(201);
+      const deviceRefresh = await call(
+        s.app,
+        'POST',
+        `/api/teams/${s.team.id}/skills/device-import/refresh`,
+        { cred: deviceToken, body: {} },
+      );
+      expect(deviceRefresh.status).toBe(403);
+
+      if (cookie !== null) {
+        const sessionImport = await call(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+          body: { localPath: source },
+          headers: { cookie, 'sec-fetch-site': 'same-origin' },
+        });
+        expect(sessionImport.status).toBe(403);
+      }
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('SEC2: a localPath resolving inside the Cairn home directory — directly or through a symlink — gets 400 and nothing is written', async () => {
+    const home = makeRoot();
+    const skillsDir = join(home, 'skills');
+    const inside = join(home, 'homes', 'claude', 'skills', 'home-skill');
+    mkdirSync(inside, { recursive: true });
+    writeFileSync(join(inside, 'SKILL.md'), skillMd('home-skill', 'd'));
+    const linkParent = makeRoot();
+    symlinkSync(inside, join(linkParent, 'alias'));
+    const s = bootServer({
+      skillsDir,
+      skillSourcesPath: join(home, 'server', 'skill-sources.json'),
+      homeDir: home,
+    });
+    try {
+      for (const localPath of [inside, join(linkParent, 'alias')]) {
+        const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+          localPath,
+        });
+        expect(res.status, localPath).toBe(400);
+      }
+      expect(existsSync(join(skillsDir, 'home-skill'))).toBe(false);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('SEC3: refresh of a skill imported under another team gets 404 — the source record is bound to its team', async () => {
+    const skillsDir = makeRoot();
+    const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
+    const source = makeSourceDir({ 'SKILL.md': skillMd('foreign-skill', 'v1') });
+    const a = bootServer({ skillsDir, skillSourcesPath });
+    const b = bootServer({ skillsDir, skillSourcesPath });
+    try {
+      expect(a.team.id).not.toBe(b.team.id);
+      const imported = await req(a.app, 'POST', `/api/teams/${a.team.id}/skills/import`, {
+        localPath: source,
+      });
+      expect(imported.status).toBe(201);
+      writeFileSync(join(source, 'SKILL.md'), skillMd('foreign-skill', 'v2'));
+      const foreign = await req(
+        b.app,
+        'POST',
+        `/api/teams/${b.team.id}/skills/foreign-skill/refresh`,
+        {},
+      );
+      expect(foreign.status).toBe(404);
+      const own = await req(
+        a.app,
+        'POST',
+        `/api/teams/${a.team.id}/skills/foreign-skill/refresh`,
+        {},
+      );
+      expect(own.status).toBe(200);
+      expect(readFileSync(join(skillsDir, 'foreign-skill', 'SKILL.md'), 'utf8')).toContain('v2');
+    } finally {
+      a.dispose();
+      b.dispose();
+    }
+  });
+
+  test('SEC5: an untagged source record answers 404 to every team — no team can claim it; the owning team re-imports instead', async () => {
+    const skillsDir = makeRoot();
+    const skillSourcesPath = join(makeRoot(), 'skill-sources.json');
+    const source = makeSourceDir({ 'SKILL.md': skillMd('legacy-skill', 'v1') });
+    const a = bootServer({ skillsDir, skillSourcesPath });
+    const b = bootServer({ skillsDir, skillSourcesPath });
+    try {
+      const created = await req(b.app, 'POST', '/api/skills', {
+        name: 'legacy-skill',
+        description: 'v1',
+        files: [{ path: 'SKILL.md', content: skillMd('legacy-skill', 'v1') }],
+      });
+      expect(created.status).toBe(201);
+      await writeSkillSource(skillSourcesPath, {
+        skillId: 'legacy-skill',
+        kind: 'localPath',
+        ref: source,
+        importedAt: 1,
+        refreshedAt: null,
+      });
+      writeFileSync(join(source, 'SKILL.md'), skillMd('legacy-skill', 'v2'));
+      for (const s of [a, b]) {
+        const res = await req(
+          s.app,
+          'POST',
+          `/api/teams/${s.team.id}/skills/legacy-skill/refresh`,
+          {},
+        );
+        expect(res.status).toBe(404);
+        expect(await errorText(res)).toBe('skill legacy-skill not found');
+      }
+      expect(readFileSync(join(skillsDir, 'legacy-skill', 'SKILL.md'), 'utf8')).toContain('v1');
+    } finally {
+      a.dispose();
+      b.dispose();
+    }
+  });
+
+  test('SEC6: a source inside the repository or attachments directory is refused like the other cairn storage — directly or through a symlink', async () => {
+    const s = bootServer({
+      skillsDir: makeRoot(),
+      skillSourcesPath: join(makeRoot(), 's.json'),
+    });
+    try {
+      const inside = join(s.reposDir, 'src-skill');
+      mkdirSync(inside, { recursive: true });
+      writeFileSync(join(inside, 'SKILL.md'), skillMd('src-skill', 'd'));
+      const insideAtt = join(s.attachmentsDir, 'att-skill');
+      mkdirSync(insideAtt, { recursive: true });
+      writeFileSync(join(insideAtt, 'SKILL.md'), skillMd('att-skill', 'd'));
+      const linkParent = makeRoot();
+      symlinkSync(insideAtt, join(linkParent, 'att-alias'));
+      for (const localPath of [inside, insideAtt, join(linkParent, 'att-alias')]) {
+        const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+          localPath,
+        });
+        expect(res.status, localPath).toBe(400);
+      }
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('SEC7: a dangling symlink inside the source path fails closed — nothing is written and no reconstructed path is trusted', async () => {
+    const skillsDir = makeRoot();
+    const parent = makeRoot();
+    symlinkSync(join(parent, 'gone', 'target'), join(parent, 'link'));
+    const s = bootServer({ skillsDir, skillSourcesPath: join(makeRoot(), 's.json') });
+    try {
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        localPath: join(parent, 'link', 'sub'),
+      });
+      expect(res.status).toBe(400);
+      expect(readdirSync(skillsDir)).toEqual([]);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('SEC4: refresh re-checks the recorded source — a stored localPath inside the Cairn home gets 400 and the copy is untouched', async () => {
+    const home = makeRoot();
+    const skillsDir = join(home, 'skills');
+    const skillSourcesPath = join(home, 'server', 'skill-sources.json');
+    mkdirSync(join(skillsDir, 'inside-src'), { recursive: true });
+    writeFileSync(join(skillsDir, 'inside-src', 'SKILL.md'), skillMd('inside-src', 'v1'));
+    const inside = join(home, 'workspaces', 'inside-src');
+    mkdirSync(inside, { recursive: true });
+    writeFileSync(join(inside, 'SKILL.md'), skillMd('inside-src', 'v2'));
+    const s = bootServer({ skillsDir, skillSourcesPath, homeDir: home });
+    await writeSkillSource(skillSourcesPath, {
+      skillId: 'inside-src',
+      kind: 'localPath',
+      ref: inside,
+      importedAt: 1,
+      refreshedAt: null,
+      teamId: s.team.id,
+    });
+    try {
+      const res = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/inside-src/refresh`, {});
+      expect(res.status).toBe(400);
+      expect(await errorText(res)).toContain('cannot refresh');
+      expect(readFileSync(join(skillsDir, 'inside-src', 'SKILL.md'), 'utf8')).toContain('v1');
     } finally {
       s.dispose();
     }

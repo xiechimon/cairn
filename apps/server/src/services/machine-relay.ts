@@ -19,7 +19,7 @@ import {
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { build, chief, chiefThread, type step, todo } from '../db/schema.js';
+import { build, chief, chiefThread, machine, type step, todo } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { attachWorkerFile } from './agent-attachments.js';
 import { NotFoundError } from './builds.js';
@@ -182,6 +182,7 @@ export async function executeRelayToolCall(
   params: Record<string, unknown>,
   toolCallId?: string,
   signal?: AbortSignal,
+  runnerTokenHash?: string | null,
 ): Promise<string> {
   const row = ownedStepRow(deps, machineId, stepId);
   if (infoCardTodoOf(deps.db, row) !== null) {
@@ -283,6 +284,8 @@ export async function executeRelayToolCall(
         ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}),
         ...(deps.mcpConfigPath !== undefined ? { mcpConfigPath: deps.mcpConfigPath } : {}),
         ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+        ...(deps.githubBaseFetch !== undefined ? { githubBaseFetch: deps.githubBaseFetch } : {}),
+        ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
       },
       {
         teamId: threadRow.teamId,
@@ -296,6 +299,26 @@ export async function executeRelayToolCall(
         turnMessageIds: row.ownerMessageIds ?? [],
         turnScopeProjectId: stepScopeProjectId(row),
         turnScopeMixed: steeredFromAnotherScope(deps, row),
+        assertTurnClaim: () => {
+          if (machineId !== null) {
+            const runner = deps.db
+              .select({ tokenHash: machine.tokenHash, retiredAt: machine.retiredAt })
+              .from(machine)
+              .where(eq(machine.id, machineId))
+              .get();
+            if (
+              runnerTokenHash == null ||
+              runner?.tokenHash !== runnerTokenHash ||
+              runner.retiredAt !== null
+            ) {
+              throw new HttpError(401, 'unauthorized');
+            }
+          }
+          const current = ownedStepRow(deps, machineId, stepId);
+          if (current.status !== 'claimed' || current.claimedAt !== row.claimedAt) {
+            throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
+          }
+        },
       },
       name,
       params,

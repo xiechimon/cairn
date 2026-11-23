@@ -70,6 +70,7 @@ const trial = bootServer({
   attachmentsDir: join(runDir, 'attachments'),
   skillsDir: join(runDir, 'skills'),
   skillSourcesPath: join(runDir, 'skill-sources.json'),
+  homeDir: join(runDir, 'home'),
   mcpConfigPath: join(runDir, 'empty-mcp.json'),
   claimHoldMs: 1_000,
   githubFetch: async () => new Response('[]'),

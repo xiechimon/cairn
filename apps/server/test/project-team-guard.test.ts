@@ -9,6 +9,7 @@ import {
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
 import { nowMs } from '../src/lib/ids.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { executeMcpTool } from '../src/services/mcp-face.js';
 import { H, ownerTodo, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
 
@@ -176,6 +177,10 @@ describe('#1466 the chief tool surface: a cross-team project id = 404 (same shap
   });
 
   test('T8 same-team paths unchanged: docs / create_todo / update_project / connect_repo / todos / watch_todos', async () => {
+    upsertGithubConnection(
+      { db: H.s.db, box: H.s.secretBox },
+      { teamId: H.s.team.id, login: 'octo', accessToken: 'ghp_team_guard', scope: 'repo' },
+    );
     const docs = (await relay('docs', { projectId: H.projectId, paths: [] })) as { name: string };
     expect(docs.name).toBe('demo');
     const created = (await relay('create_todo', ownerTodo('本队任务'))) as {

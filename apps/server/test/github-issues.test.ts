@@ -71,9 +71,12 @@ function ghMock(initial: Record<string, GhRoute>) {
     calls.push({ url, headers: { ...(init?.headers ?? {}) } });
     const parsed = new URL(url);
     const route = routes.get(parsed.pathname);
+    const repoProbe = /^\/repos\/([^/]+\/[^/]+)$/.exec(parsed.pathname);
     const res =
       route === undefined
-        ? { status: 404, body: { message: `no mock for ${parsed.pathname}` } }
+        ? repoProbe !== null
+          ? { body: { full_name: repoProbe[1] } }
+          : { status: 404, body: { message: `no mock for ${parsed.pathname}` } }
         : typeof route === 'function'
           ? route(parsed)
           : route;
@@ -152,6 +155,15 @@ async function postGithubProject(app: Hono, name = 'alpha'): Promise<string> {
   return body.id;
 }
 
+function insertGithubProject(s: TestServer, name = 'alpha'): string {
+  const id = `gh-${name}-${Math.random().toString(36).slice(2, 10)}`;
+  s.db
+    .insert(projectTable)
+    .values({ id, name, teamId: s.team.id, repoKind: 'github', githubRepo: REPO })
+    .run();
+  return id;
+}
+
 function defaultRoutes(overrides: Record<string, GhResponse | ((url: URL) => GhResponse)> = {}) {
   return {
     [ISSUES_PATH]: { body: ISSUES_LIST } as GhResponse,
@@ -169,7 +181,7 @@ function projectLabels(s: TestServer, projectId: string) {
 describe('github project label vocabulary = repo label mirror (C12-C16)', () => {
   test('GitHub and ordinary project creation do not seed label vocabulary', async () => {
     const s = bootServer();
-    const ghId = await postGithubProject(s.app);
+    const ghId = insertGithubProject(s);
     expect(projectLabels(s, ghId)).toHaveLength(0);
     const plainId = await postProject(s.app);
     expect(projectLabels(s, plainId)).toHaveLength(0);
@@ -402,7 +414,7 @@ describe('POST /api/projects/{id}/github/issues/import (D17-D22)', () => {
 
   test('label-sync failure rolls back prior vocabulary color changes', async () => {
     const s = bootServer();
-    const projectId = await postGithubProject(s.app);
+    const projectId = insertGithubProject(s);
     syncGithubLabels(s.db, projectId, [{ name: 'bug', color: '112233' }]);
     const before = projectLabels(s, projectId);
     s.db.run(sql`CREATE TRIGGER reject_vocabulary BEFORE INSERT ON github_label
@@ -444,7 +456,7 @@ describe('POST /api/projects/{id}/github/issues/import (D17-D22)', () => {
         })
       ).status,
     ).toBe(404);
-    const ghId = await postGithubProject(s.app);
+    const ghId = insertGithubProject(s);
     expect(
       (
         await call(s.app, 'POST', `/api/projects/${ghId}/github/issues/import`, {
@@ -660,7 +672,17 @@ describe('outbound discipline', () => {
     const mock = ghMock({});
     const s = bootServer({ githubFetch: mock.impl });
     seedConnection(s);
-    const projectId = await postGithubProject(s.app);
+    const projectId = 'project-outbound';
+    s.db
+      .insert(projectTable)
+      .values({
+        id: projectId,
+        name: 'alpha',
+        teamId: s.team.id,
+        repoKind: 'github',
+        githubRepo: REPO,
+      })
+      .run();
     const res = await req(s.app, 'POST', `/api/projects/${projectId}/github/issues/import`, {
       number: 7,
     });

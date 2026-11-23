@@ -4,18 +4,25 @@ import Database from 'better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
-import { afterAll, expect, test } from 'vitest';
+import { afterAll, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { MIGRATIONS_FOLDER } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { projectRepoRef } from '../src/services/git.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, req } from './helpers.js';
 
 const journal = JSON.parse(readFileSync(join(MIGRATIONS_FOLDER, 'meta/_journal.json'), 'utf8')) as {
   entries: { idx: number; tag: string; when: number }[];
 };
 
-const s = bootServer();
+const s = bootServer({
+  githubFetch: async () => new Response(JSON.stringify({ full_name: 'octo/app' }), { status: 200 }),
+});
+upsertGithubConnection(
+  { db: s.db, box: s.secretBox },
+  { teamId: s.team.id, login: 'octo', accessToken: 'ghp_no_local', scope: 'repo' },
+);
 afterAll(() => s.dispose());
 
 test('a github project that had a local folder set runs from its GitHub clone after the upgrade', () => {
@@ -52,6 +59,30 @@ test('a github project that had a local folder set runs from its GitHub clone af
   } finally {
     sqlite.close();
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('creating a GitHub project with a local folder rejects localPath before probing GitHub', async () => {
+  const githubFetch = vi.fn(async () => new Response(null, { status: 404 }));
+  const server = bootServer({ githubFetch });
+  try {
+    upsertGithubConnection(
+      { db: server.db, box: server.secretBox },
+      { teamId: server.team.id, login: 'octo', accessToken: 'test-access', scope: 'repo' },
+    );
+    const response = await req(server.app, 'POST', '/api/projects', {
+      name: 'gh-invalid-folder',
+      kind: 'github',
+      githubRepo: 'octo/app',
+      localPath: '/Users/who/code/app',
+    });
+    expect.soft(response.status).toBe(400);
+    expect.soft(await response.json()).toMatchObject({
+      error: 'invalid body at localPath: not allowed for kind "github"',
+    });
+    expect(githubFetch).not.toHaveBeenCalled();
+  } finally {
+    server.dispose();
   }
 });
 

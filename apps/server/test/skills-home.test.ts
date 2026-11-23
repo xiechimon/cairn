@@ -264,6 +264,7 @@ describe('Cairn never writes into a skills directory other agent tools share', (
         ref: join(outside, 'deploy'),
         importedAt: 1,
         refreshedAt: null,
+        teamId: s.team.id,
       });
       const created = await req(s.app, 'POST', '/api/skills', body('made', '新建'));
       expect(created.status).toBe(409);
@@ -333,7 +334,7 @@ describe('Cairn never writes into a skills directory other agent tools share', (
     }
   });
 
-  test('a linked skill in the Cairn directory is refused even when the link chain leaves the shared roots', async () => {
+  test('a linked skill in the Cairn directory is not served when the link chain leaves the managed root', async () => {
     const elsewhere = join(home, 'dotfiles');
     writeSkill(elsewhere, 'deploy', skillMd('deploy', '原处'));
     const shared = join(home, '.agents', 'skills');
@@ -351,8 +352,7 @@ describe('Cairn never writes into a skills directory other agent tools share', (
         `/api/teams/${s.team.id}/skills/deploy`,
         body('deploy', '改了'),
       );
-      expect(res.status).toBe(409);
-      expect(((await res.json()) as { error: string }).error).toContain('edit it at its source');
+      expect(res.status).toBe(404);
       expect(snapshot(elsewhere)).toEqual(before);
     } finally {
       s.dispose();

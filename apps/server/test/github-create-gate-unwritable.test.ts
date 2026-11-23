@@ -5,6 +5,7 @@ import { acquireGithubCreateSlot } from '@cairn/shared/github-create-gate';
 import type { Hono } from 'hono';
 import { afterAll, beforeAll, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { project as projectTable } from '../src/db/schema.js';
 import { type FetchLike, setGithubCreateGate } from '../src/lib/github.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { flushSelfIssueWrites } from '../src/services/todos.js';
@@ -60,12 +61,19 @@ function seedConnection(s: TestServer): void {
   );
 }
 
-async function postGithubProject(app: Hono): Promise<string> {
-  const res = await call(app, 'POST', '/api/projects', {
-    body: { name: 'readonly', kind: 'github', githubRepo: REPO },
-  });
-  if (res.status !== 201) throw new Error(`postGithubProject: ${res.status}`);
-  return ((await res.json()) as { id: string }).id;
+function insertGithubProject(s: TestServer): string {
+  const projectId = 'project-gate-unwritable';
+  s.db
+    .insert(projectTable)
+    .values({
+      id: projectId,
+      name: 'readonly',
+      teamId: s.team.id,
+      repoKind: 'github',
+      githubRepo: REPO,
+    })
+    .run();
+  return projectId;
 }
 
 async function createTask(app: Hono, projectId: string): Promise<string> {
@@ -99,7 +107,7 @@ test.skipIf(isRoot)(
       };
       const s = bootServer({ githubFetch });
       seedConnection(s);
-      const projectId = await postGithubProject(s.app);
+      const projectId = insertGithubProject(s);
       const todoId = await createTask(s.app, projectId);
       deliverCodeStep(
         {
@@ -136,7 +144,7 @@ test.skipIf(isRoot)(
       };
       const s = bootServer({ githubFetch });
       seedConnection(s);
-      const projectId = await postGithubProject(s.app);
+      const projectId = insertGithubProject(s);
       const todoId = await createTask(s.app, projectId);
       deliverCodeStep(
         {

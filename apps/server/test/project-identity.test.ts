@@ -45,10 +45,18 @@ function ghMock(initial: Record<string, GhRoute>) {
   return { impl, calls, set: (path: string, res: GhRoute) => routes.set(path, res) };
 }
 
-const REACHABLE: Record<string, GhRoute> = { '/repos/octo/conv': { body: { id: 1 } } };
+const REACHABLE: Record<string, GhRoute> = {
+  '/repos/octo/conv': { body: { id: 1 } },
+  '/repos/octo/multi': { body: { id: 1 } },
+  '/repos/octo/keep': { body: { id: 1 } },
+};
 
 const s = bootServer({ claimHoldMs: 200, githubFetch: ghMock(REACHABLE).impl });
 insertMachine(s);
+upsertGithubConnection(
+  { db: s.db, box: s.secretBox },
+  { teamId: s.team.id, login: 'octo', accessToken: 'ghp_ident', scope: 'repo' },
+);
 afterAll(() => s.dispose());
 
 interface ProjectReply {
@@ -279,7 +287,7 @@ describe('PATCH /api/projects/{id} -- local->github conversion (#1242)', () => {
     expect(projectRow(id)?.repoKind).toBe('local');
   });
 
-  test('K6 githubRepo unreachable (mock 404) -> 400; a no-token connection = the anonymous ladder (no auth header)', async () => {
+  test('K6 no team github connection -> conversion refused with connect GitHub + zero outbound calls', async () => {
     const mock = ghMock({});
     const s404 = bootServer({ githubFetch: mock.impl });
     try {
@@ -298,10 +306,9 @@ describe('PATCH /api/projects/{id} -- local->github conversion (#1242)', () => {
         })
         .run();
       const r = await patchProject(s404.app, id, { repoKind: 'github', githubRepo: 'octo/conv' });
-      expect(r.status).toBe(400);
-      expect(String(r.body.error)).toContain('octo/conv');
-      expect(mock.calls).toHaveLength(1);
-      expect(mock.calls[0]?.headers.authorization).toBeUndefined();
+      expect(r.status).toBe(409);
+      expect(String(r.body.error)).toContain('connect GitHub');
+      expect(mock.calls).toHaveLength(0);
       expect(
         s404.db.select().from(projectTable).where(eq(projectTable.id, id)).get()?.repoKind,
       ).toBe('local');
@@ -417,9 +424,13 @@ describe('PATCH /api/projects/{id} -- githubRepo retarget on a github project (#
     routes: Record<string, GhRoute>,
     logger?: AppContext['logger'],
   ): { srv: ReturnType<typeof bootServer>; mock: ReturnType<typeof ghMock> } {
-    const mock = ghMock(routes);
+    const mock = ghMock({ '/repos/octo/keep': { body: { id: 3 } }, ...routes });
     const srv = bootServer({ githubFetch: mock.impl, ...(logger !== undefined ? { logger } : {}) });
     insertMachine(srv);
+    upsertGithubConnection(
+      { db: srv.db, box: srv.secretBox },
+      { teamId: srv.team.id, login: 'octo', accessToken: 'ghp_ident_probe', scope: 'repo' },
+    );
     retargetDisposables.push(() => srv.dispose());
     return { srv, mock };
   }
@@ -473,6 +484,7 @@ describe('PATCH /api/projects/{id} -- githubRepo retarget on a github project (#
     const { srv, mock } = bootRetargetServer({});
     const id = await createGithubProjectOn(srv, 'octo/keep');
     const t = await createTodoWithBuild(srv, id, '同值探针');
+    mock.calls.length = 0;
     const r = await patchProject(srv.app, id, { githubRepo: 'octo/keep' });
     expect(r.status).toBe(200);
     expect(r.body.githubRepo).toBe('octo/keep');
@@ -483,6 +495,7 @@ describe('PATCH /api/projects/{id} -- githubRepo retarget on a github project (#
   test('G4 a malformed ref -> 400 + no probe call + the row unchanged', async () => {
     const { srv, mock } = bootRetargetServer({});
     const id = await createGithubProjectOn(srv, 'octo/keep');
+    mock.calls.length = 0;
     const r = await patchProject(srv.app, id, { githubRepo: 'no-slash' });
     expect(r.status).toBe(400);
     expect(String(r.body.error)).toContain('githubRepo');
@@ -521,6 +534,7 @@ describe('PATCH /api/projects/{id} -- githubRepo retarget on a github project (#
   test('G6 GitHub connected -> the retarget probe carries an Authorization header (the team connection token)', async () => {
     const { srv, mock } = bootRetargetServer({
       '/repos/octo/conv': { body: { id: 1, full_name: 'octo/conv' } },
+      '/repos/octo/keep': { body: { id: 3, full_name: 'octo/keep' } },
     });
     upsertGithubConnection(
       { db: srv.db, box: srv.secretBox },
@@ -529,8 +543,9 @@ describe('PATCH /api/projects/{id} -- githubRepo retarget on a github project (#
     const id = await createGithubProjectOn(srv, 'octo/keep');
     const r = await patchProject(srv.app, id, { githubRepo: 'octo/conv' });
     expect(r.status).toBe(200);
-    expect(mock.calls[0]?.url).toBe('https://api.github.com/repos/octo/conv');
-    expect(mock.calls[0]?.headers.authorization).toBe('Bearer ghp_ident_probe');
+    const probe = mock.calls.at(-1);
+    expect(probe?.url).toBe('https://api.github.com/repos/octo/conv');
+    expect(probe?.headers.authorization).toBe('Bearer ghp_ident_probe');
   });
 
   test('G7 a renamed upstream (probe body full_name differs, the followed 301 case) -> 200 + the server logs the new name once', async () => {
@@ -579,6 +594,10 @@ describe('the claim payload repo shape after conversion (#1242)', () => {
     const mock = ghMock(REACHABLE);
     const s2 = bootServer({ claimHoldMs: 200, githubFetch: mock.impl });
     claimDisposables.push(() => s2.dispose());
+    upsertGithubConnection(
+      { db: s2.db, box: s2.secretBox },
+      { teamId: s2.team.id, login: 'octo', accessToken: 'ghp_ident_c1', scope: 'repo' },
+    );
     const key = await issueApiKey(s2);
     const enrollRes = await call(s2.app, 'POST', '/api/machine/enroll', {
       cred: key,

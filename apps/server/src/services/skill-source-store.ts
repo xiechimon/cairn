@@ -9,6 +9,7 @@ export interface SkillSourceRecord {
   ref: string;
   importedAt: number;
   refreshedAt: number | null;
+  teamId?: string;
 }
 
 interface SkillSourcesFile {

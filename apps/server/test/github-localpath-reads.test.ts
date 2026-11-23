@@ -159,7 +159,12 @@ describe('verified GitHub localPath reads', () => {
     const tip = await shaOf(checkout, 'HEAD');
     bind(checkout);
     const api = apiStub(API_COMMIT, { [DOC]: 'api-must-not-serve\n' });
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     expect(await readFile(repo, H.projectId, DOC)).toMatchObject({
       path: DOC,
       content: B_SOURCE,
@@ -183,7 +188,12 @@ describe('verified GitHub localPath reads', () => {
     await repointOrigin(checkout, BOUND_URL, b);
     bind(checkout);
     const api = apiStub(API_COMMIT, { [DOC]: B_SOURCE }, ['main']);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     for (const ref of [undefined, 'HEAD', 'main']) {
       expect(await readFile(repo, H.projectId, DOC, ref)).toMatchObject({
         content: B_SOURCE,
@@ -222,7 +232,12 @@ describe('verified GitHub localPath reads', () => {
     expect(await shaOf(checkout, 'refs/remotes/origin/main')).toBe(shaB);
     bind(checkout);
     const api = apiStub(API_COMMIT, { [DOC]: B_SOURCE }, ['main']);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     for (const ref of [undefined, 'HEAD', 'main', 'refs/remotes/origin/main', shaB]) {
       expect(await readFile(repo, H.projectId, DOC, ref)).toMatchObject({
         content: B_SOURCE,
@@ -255,7 +270,12 @@ describe('verified GitHub localPath reads', () => {
     await repointOrigin(neverFetched, BOUND_URL, b);
     bind(neverFetched);
     const api = apiStub(API_COMMIT, { [DOC]: B_SOURCE }, ['main']);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     expect(await readFile(repo, H.projectId, DOC)).toMatchObject({ commit: API_COMMIT });
     const staleAfterFailure = await cloneSource(b, 'stale-after-failure');
     await repointOrigin(staleAfterFailure, BOUND_URL, b);
@@ -276,7 +296,12 @@ describe('verified GitHub localPath reads', () => {
     await fetchOrigin(checkout);
     bind(checkout);
     const api = apiStub(API_COMMIT, { [DOC]: B_SOURCE }, ['main']);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     bind(checkout, { githubRepo: 'fixture/other' });
     await expect(readFile(repo, H.projectId, DOC, 'main')).rejects.toMatchObject({ status: 404 });
     expect(api.calls.length).toBeGreaterThan(0);
@@ -289,7 +314,12 @@ describe('verified GitHub localPath reads', () => {
     await fetchOrigin(checkout);
     bind(checkout);
     const api = apiStub(API_COMMIT, { [DOC]: B_SOURCE }, ['main']);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     expect(await readFile(repo, H.projectId, DOC)).toMatchObject({ commit: API_COMMIT });
     expect(api.calls.length).toBeGreaterThan(0);
   });
@@ -313,7 +343,13 @@ describe('verified GitHub localPath reads', () => {
     await gitPrim.fetch(cache, null);
     bind(checkout);
     const api = apiStub(API_COMMIT, { [DOC]: 'api-must-not-serve\n' }, ['main']);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      workspacesDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     expect(await readFile(repo, H.projectId, DOC)).toMatchObject({
       content: B_SOURCE,
       commit: shaB,
@@ -352,7 +388,13 @@ describe('verified GitHub localPath reads', () => {
     expect(tip).not.toBe(oldTip);
     bind(checkout);
     const api = apiStub(API_COMMIT, { [DOC]: 'api-must-not-serve\n' }, ['main']);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      workspacesDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     expect(await readFile(repo, H.projectId, DOC)).toMatchObject({
       content: B_SOURCE,
       commit: tip,

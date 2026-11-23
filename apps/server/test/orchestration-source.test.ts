@@ -174,6 +174,10 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
   });
 
   test('A2 GitHub-connected project -> the mirror slot wins (github-issue-self), zero outbound regression', async () => {
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId, login: 'octo', accessToken: 'ghp_orch_token', scope: 'repo' },
+    );
     const res = await req(s.app, 'POST', '/api/projects', {
       name: 'gh-demo',
       kind: 'github',
@@ -181,10 +185,6 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
     });
     expect(res.status).toBe(201);
     const ghProject = ((await res.json()) as { id: string }).id;
-    upsertGithubConnection(
-      { db: s.db, box: s.secretBox },
-      { teamId, login: 'octo', accessToken: 'ghp_orch_token', scope: 'repo' },
-    );
     const created = (await relay(
       'create_todo',
       ownerTodo('写贡献指南', ghProject),
@@ -208,16 +208,16 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
   });
 
   test('A2b a mail turn on a GitHub-connected project creates no GitHub issue', async () => {
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId, login: 'octo', accessToken: 'ghp_orch_token', scope: 'repo' },
+    );
     const res = await req(s.app, 'POST', '/api/projects', {
       name: 'gh-mail',
       kind: 'github',
       githubRepo: REPO,
     });
     const ghProject = ((await res.json()) as { id: string }).id;
-    upsertGithubConnection(
-      { db: s.db, box: s.secretBox },
-      { teamId, login: 'octo', accessToken: 'ghp_orch_token', scope: 'repo' },
-    );
     const posts: string[] = [];
     const watching: FetchLike = async (input, init) => {
       if ((init?.method ?? 'GET') === 'POST') posts.push(String(input));

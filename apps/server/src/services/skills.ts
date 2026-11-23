@@ -28,6 +28,7 @@ import type { Db } from '../db/client.js';
 import { skillAudit } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { samePathOrInside } from '../lib/local-source.js';
 import { NotFoundError } from './builds.js';
 
 export interface LocalSkill {
@@ -39,13 +40,19 @@ export interface LocalSkill {
 }
 
 export function scanLocalSkills(skillsDir: string): LocalSkill[] {
-  return scanSkillsRoot(skillsDir).sort((a, b) => a.id.localeCompare(b.id));
+  return scanSkillsRoot(skillsDir, { within: skillsDir }).sort((a, b) => a.id.localeCompare(b.id));
 }
 
-export function scanSkillsRoot(skillsDir: string): LocalSkill[] {
+export function scanSkillsRoot(skillsDir: string, opts: { within?: string } = {}): LocalSkill[] {
   let entryNames: string[];
   try {
     entryNames = readdirSync(skillsDir, { withFileTypes: true }).map((e) => e.name);
+  } catch {
+    return [];
+  }
+  let boundReal: string;
+  try {
+    boundReal = realpathSync(opts.within ?? skillsDir);
   } catch {
     return [];
   }
@@ -67,11 +74,14 @@ export function scanSkillsRoot(skillsDir: string): LocalSkill[] {
     } catch {
       continue;
     }
+    if (opts.within !== undefined && !samePathOrInside(real, boundReal)) continue;
     if (seenReal.has(real)) continue;
     let content: string;
     try {
       if (!readdirSync(dir).includes(SKILL_ENTRY_FILE)) continue;
-      content = readFileSync(join(dir, SKILL_ENTRY_FILE), 'utf8');
+      const entryReal = realpathSync(join(dir, SKILL_ENTRY_FILE));
+      if (opts.within !== undefined && !samePathOrInside(entryReal, boundReal)) continue;
+      content = readFileSync(entryReal, 'utf8');
     } catch {
       continue;
     }
@@ -428,10 +438,7 @@ export function updateLocalSkill(
   const resolved = resolveLocalSkill(opts.skillsDir, skillId);
   if (!resolved) throw new NotFoundError(`skill ${skillId}`);
   if (lstatSync(resolved.dir).isSymbolicLink()) {
-    throw new HttpError(
-      409,
-      `skill ${skillId} is a link to ${realpathSync(resolved.dir)}; edit it at its source`,
-    );
+    throw new HttpError(409, `skill ${skillId} is a symlink; edit it at its source`);
   }
   assertCairnWritable(resolved.dir);
   const bytes = assertWriteFiles(body.files);

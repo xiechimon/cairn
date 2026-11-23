@@ -11,6 +11,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, issueApiKey, seedSessionRoute, type TestServer } from './helpers.js';
 
 async function call(
@@ -61,6 +62,10 @@ async function setupWorld(): Promise<World> {
     machineId: s.db.select().from(machineTable).get()!.id,
   });
 
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, login: 'octo', accessToken: 'ghp_delivery_surface', scope: 'repo' },
+  );
   const ghRes = await call(s.app, 'POST', '/api/projects', {
     body: { name: 'probe-704', kind: 'github', githubRepo: 'octocat/Hello-World' },
   });

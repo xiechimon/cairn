@@ -1,3 +1,4 @@
+import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
 import {
@@ -10,7 +11,11 @@ import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { apiKey as apiKeyTable, githubConnection } from '../src/db/schema.js';
+import {
+  apiKey as apiKeyTable,
+  githubConnection,
+  project as projectTable,
+} from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, issueApiKey, seedSessionRoute, type TestServer } from './helpers.js';
@@ -63,9 +68,24 @@ async function setupWorld(
   const machineToken = ((await enrollRes.json()) as { token: string }).token;
   seedSessionRoute(s, { provider: 'p', modelId: 'm' });
 
-  const projRes = await call(s.app, 'POST', '/api/projects', { body: projectBody });
-  expect(projRes.status).toBe(201);
-  const project = (await projRes.json()) as { id: string };
+  let project: { id: string };
+  if (projectBody.kind === 'github') {
+    project = { id: `proj-${String(projectBody.name)}` };
+    s.db
+      .insert(projectTable)
+      .values({
+        id: project.id,
+        name: String(projectBody.name),
+        teamId: s.team.id,
+        repoKind: 'github',
+        githubRepo: String(projectBody.githubRepo),
+      })
+      .run();
+  } else {
+    const projRes = await call(s.app, 'POST', '/api/projects', { body: projectBody });
+    expect(projRes.status).toBe(201);
+    project = (await projRes.json()) as { id: string };
+  }
   const todoRes = await call(s.app, 'POST', `/api/projects/${project.id}/todos`, {
     body: { title: 'G2-T2 探针', spec: '写一行探针' },
   });
@@ -107,7 +127,10 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
     const userRepo = await seedUserRepo();
     const w = await setupWorld({ name: 'g2t2-local', kind: 'local', localPath: userRepo });
     const claimed = await w.claim();
-    expect(claimed.project?.repo).toEqual({ kind: 'local', cloneUrl: userRepo });
+    expect(claimed.project?.repo).toEqual({
+      kind: 'local',
+      cloneUrl: realpathSync(userRepo),
+    });
     const { git } = await w.tokenOf(claimed.step.id);
     expect(git).toBeNull();
   });

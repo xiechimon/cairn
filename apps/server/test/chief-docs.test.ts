@@ -368,7 +368,7 @@ describe('Coordinator repository reads', () => {
         .set({ githubRepo: 'fixture/replacement', localPath: null })
         .where(eq(project.id, H.projectId))
         .run();
-      const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+      const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir, discloseLocalPath: true };
       expect(
         (await readFile(repo, H.projectId, 'scripts/owned-process.mjs', 'refs/remotes/origin/main'))
           .content,
@@ -423,7 +423,7 @@ describe('Coordinator repository reads', () => {
       .set({ baseBranch: null, localPath: '/Users/fixture/obsolete/project' })
       .where(eq(project.id, H.projectId))
       .run();
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir, discloseLocalPath: true };
     const read = async () =>
       JSON.parse(
         await executeChiefTool({ ...toolDeps(), workspacesDir }, ctx(), 'docs', {
@@ -461,7 +461,7 @@ describe('Coordinator repository reads', () => {
     const cache = join(workspacesDir, H.projectId, 'repo');
     mkdirSync(join(workspacesDir, H.projectId), { recursive: true });
     expect((await runGit(['clone', source, cache])).code).toBe(0);
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir, discloseLocalPath: true };
     await fetchFixture(
       cache,
       join(H.s.reposDir, 'absent-remote'),
@@ -486,7 +486,7 @@ describe('Coordinator repository reads', () => {
     expect((await runGit(['clone', dir, cache])).code).toBe(0);
     await gitPrim.setRemoteUrl(cache, 'https://github.com/fixture/repository.git');
     H.s.db.update(project).set({ localPath: null }).where(eq(project.id, H.projectId)).run();
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir, discloseLocalPath: true };
     await expect(readFile(repo, H.projectId, 'scripts/owned-process.mjs')).rejects.toMatchObject({
       status: 403,
     });
@@ -560,7 +560,7 @@ describe('Coordinator repository reads', () => {
     expect((await runGit(['branch', '-D', 'tag-only'], { cwd: dir })).code).toBe(0);
     await fetchFixture(cache, dir);
     H.s.db.update(project).set({ localPath: null }).where(eq(project.id, H.projectId)).run();
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir };
+    const repo = { db: H.s.db, reposDir: H.s.reposDir, workspacesDir, discloseLocalPath: true };
     for (const ref of ['release', 'refs/tags/release', commit]) {
       expect(await readFile(repo, H.projectId, 'scripts/owned-process.mjs', ref)).toMatchObject({
         commit,
@@ -611,6 +611,7 @@ describe('Coordinator repository reads', () => {
           db: H.s.db,
           reposDir: H.s.reposDir,
           githubFetch: api.impl,
+          discloseLocalPath: true,
           ...workspaces,
         };
         for (const ref of ['HEAD', 'retained', 'refs/heads/main', oldCommit]) {
@@ -828,7 +829,11 @@ describe('Coordinator repository reads', () => {
 
   test('credential restrictions apply to Coordinator reads, not lower-level Git reads', async () => {
     await bindRepo('local');
-    const file = await readFile({ db: H.s.db, reposDir: H.s.reposDir }, H.projectId, '.env');
+    const file = await readFile(
+      { db: H.s.db, reposDir: H.s.reposDir, discloseLocalPath: true },
+      H.projectId,
+      '.env',
+    );
     expect(file.content).toBe('PRIVATE_FIXTURE=not-a-real-secret\n');
     expect((await docs(['.env'])).files[0]?.error).toBe('credential file access denied');
   });
@@ -990,7 +995,7 @@ describe('Coordinator reads of a GitHub project without a local cache', () => {
         contentsRoute('release content\n'),
     });
     const result = await readFile(
-      { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl },
+      { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl, discloseLocalPath: true },
       H.projectId,
       path,
       'refs/tags/release',
@@ -1016,7 +1021,7 @@ describe('Coordinator reads of a GitHub project without a local cache', () => {
     });
     expect(
       await readFile(
-        { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl },
+        { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl, discloseLocalPath: true },
         H.projectId,
         path,
       ),
@@ -1059,7 +1064,11 @@ describe('Coordinator reads of a GitHub project without a local cache', () => {
       /GitHub refused to read ref main of fixture\/repository/,
     );
     await expect(
-      readFile({ db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl }, H.projectId, path),
+      readFile(
+        { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl, discloseLocalPath: true },
+        H.projectId,
+        path,
+      ),
     ).rejects.toMatchObject({ status: 401 });
   });
 
@@ -1080,7 +1089,12 @@ describe('Coordinator reads of a GitHub project without a local cache', () => {
         body: tree,
       }),
     });
-    const repo = { db: H.s.db, reposDir: H.s.reposDir, githubFetch: api.impl };
+    const repo = {
+      db: H.s.db,
+      reposDir: H.s.reposDir,
+      githubFetch: api.impl,
+      discloseLocalPath: true,
+    };
     expect(await readFiles(repo, H.projectId)).toEqual({
       ref: 'HEAD',
       commit: GITHUB_COMMIT,

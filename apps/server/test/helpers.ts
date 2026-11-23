@@ -79,10 +79,16 @@ export function bootServer(
     attachmentsDir?: string;
     skillsDir?: string;
     skillSourcesPath?: string;
+    homeDir?: string;
+    dataDir?: string;
+    workspacesDir?: string;
+    resolveWorkspacesDir?: () => string;
     skillImportFetch?: AppContext['skillImportFetch'];
     skillImportTimeoutMs?: number;
     webDir?: string | null;
     githubFetch?: AppContext['githubFetch'];
+    githubBaseFetch?: AppContext['githubBaseFetch'];
+    githubAppTokenSocket?: AppContext['githubAppTokenSocket'];
     githubAppIdentity?: AppContext['githubAppIdentity'];
     logger?: AppContext['logger'];
     oauthClient?: AppContext['oauthClient'];
@@ -135,6 +141,9 @@ export function bootServer(
   const skillsDir = opts.skillsDir ?? takeDir('server-skills-');
   const skillSourcesPath =
     opts.skillSourcesPath ?? join(takeDir('skill-sources-'), 'skill-sources.json');
+  const homeDir = opts.homeDir ?? takeDir('server-home-');
+  const dataDir = opts.dataDir ?? takeDir('server-data-');
+  const workspacesDir = opts.workspacesDir ?? takeDir('server-workspaces-');
   let disposed = false;
   const dispose = (): void => {
     if (disposed) return;
@@ -196,6 +205,10 @@ export function bootServer(
         ? {}
         : { providerTestTimeoutMs: opts.providerTestTimeoutMs }),
       githubFetch: opts.githubFetch ?? rejectingGithubFetch,
+      ...(opts.githubBaseFetch !== undefined ? { githubBaseFetch: opts.githubBaseFetch } : {}),
+      ...(opts.githubAppTokenSocket !== undefined
+        ? { githubAppTokenSocket: opts.githubAppTokenSocket }
+        : {}),
       ...(opts.githubAppIdentity !== undefined
         ? { githubAppIdentity: opts.githubAppIdentity }
         : {}),
@@ -211,6 +224,11 @@ export function bootServer(
       ...(opts.deployRecordPath !== undefined ? { deployRecordPath: opts.deployRecordPath } : {}),
       skillsDir,
       skillSourcesPath,
+      homeDir,
+      dataDir,
+      get workspacesDir() {
+        return opts.resolveWorkspacesDir?.() ?? workspacesDir;
+      },
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
       authToken: opts.authToken ?? null,
       ownerChannel: opts.ownerChannel,
@@ -262,11 +280,15 @@ export function bootServer(
       attachmentsDir,
       skillsDir,
       skillSourcesPath,
+      homeDir,
+      dataDir,
+      workspacesDir,
       oauthStates,
       xaiDeviceStates,
       codexDeviceStates,
       githubConnectionDeviceStates,
       mcpOAuthState,
+      discloseLocalPath: true,
       svc: {
         db,
         hub,
@@ -274,7 +296,11 @@ export function bootServer(
         convHub,
         user,
         skillsDir,
+        homeDir,
+        dataDir,
+        workspacesDir,
         vapidKeys,
+        githubFetch: opts.githubFetch ?? rejectingGithubFetch,
       },
       dispose,
     };

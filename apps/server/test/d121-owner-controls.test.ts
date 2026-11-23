@@ -65,6 +65,7 @@ function world() {
     attachmentsDir: dir,
     skillsDir: dir,
     skillSourcesPath: join(dir, 'sources.json'),
+    homeDir: dir,
     mcpConfigPath: join(dir, 'mcp.json'),
   });
   let ctx = makeContext();

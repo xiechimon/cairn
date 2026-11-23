@@ -64,6 +64,7 @@ export function registerRoutes(app: Hono, ctx: AppContext): void {
         oauthClient: ctx.oauthClient,
         ...(ctx.convHub !== undefined ? { convHub: ctx.convHub } : {}),
         ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
+        ...(ctx.githubBaseFetch !== undefined ? { githubBaseFetch: ctx.githubBaseFetch } : {}),
       },
       c.req.raw,
     ),

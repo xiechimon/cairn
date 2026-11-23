@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { FS_LIST_MAX_ENTRIES } from '@cairn/shared';
 import { afterAll, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
+import { pairedDevice } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
+import { issueBrowserSession } from '../src/services/browser-session.js';
 import { listDir } from '../src/services/fs-list.js';
 import { bootServer, req } from './helpers.js';
 
@@ -205,5 +207,35 @@ describe('GET /api/fs/list -- route wire surface (R family)', () => {
     const empty = await req(s.app, 'GET', '/api/fs/list?dir=');
     expect(empty.status).toBe(200);
     expect(((await empty.json()) as { path: string }).path).toBe(home);
+  });
+
+  test('R4 a paired device gets 403 — browsing the machine filesystem is owner-only', async () => {
+    const authed = bootServer({ authToken: 'owner-secret-0123456789abcdef' });
+    try {
+      authed.db
+        .insert(pairedDevice)
+        .values({
+          id: 'phone',
+          teamId: authed.team.id,
+          name: 'phone',
+          tokenHash: 'synthetic',
+          masked: 'phone',
+          createdAt: 1,
+        })
+        .run();
+      const device = `cairn_auth=${issueBrowserSession(authed.db, 'device', 'phone').token}`;
+      const dir = encodeURIComponent(makeRoot());
+      const refused = await authed.app.request(`/api/fs/list?dir=${dir}`, {
+        headers: { cookie: device },
+      });
+      expect(refused.status).toBe(403);
+      const owner = `cairn_auth=${issueBrowserSession(authed.db, 'owner').token}`;
+      const allowed = await authed.app.request(`/api/fs/list?dir=${dir}`, {
+        headers: { cookie: owner },
+      });
+      expect(allowed.status).toBe(200);
+    } finally {
+      authed.dispose();
+    }
   });
 });

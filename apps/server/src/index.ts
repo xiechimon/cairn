@@ -259,6 +259,7 @@ const app = createApp(
     githubAppTokenSocket: config.githubAppTokenSocket,
     githubAppIdentity: config.githubAppIdentity,
     githubFetch,
+    githubBaseFetch: globalThis.fetch,
     reposDir,
     get workspacesDir() {
       return workspacesDirOf();
@@ -269,6 +270,8 @@ const app = createApp(
     deployRecordPath: deployRecordPathOf(config),
     skillsDir: config.skillsDir,
     skillSourcesPath: join(config.dataDir, 'skill-sources.json'),
+    homeDir: config.homeDir,
+    dataDir: config.dataDir,
     webDir: config.webDir,
     authToken: config.authToken,
     ownerChannel,
@@ -330,6 +333,7 @@ const coordinator = config.coordinatorInServer
         mcpConfigPath: config.mcpConfigPath,
         convHub,
         githubFetch,
+        githubBaseFetch: globalThis.fetch,
         oauthClient: config.githubOauth,
         githubAppTokenSocket: config.githubAppTokenSocket,
         githubAppIdentity: config.githubAppIdentity,

@@ -116,7 +116,7 @@ describe('the scanLocalSkills directory scan', () => {
     expect(scanned[0]).toMatchObject({ id: 'dup', dirName: 'aaa' });
   });
 
-  test('S11: symlinked directories are listed; realpath dedupe counts one', () => {
+  test('S11: symlinked directories are listed only while their realpath stays inside the root; realpath dedupe counts one', () => {
     const root = makeRoot();
     const real = addSkill(root, 'real', { name: 'linked-skill' });
     symlinkSync(real, join(root, 'alias'));
@@ -126,11 +126,7 @@ describe('the scanLocalSkills directory scan', () => {
     const outside = makeRoot();
     const outsideDir = addSkill(outside, 'outside-skill', { name: 'outside' });
     symlinkSync(outsideDir, join(root, 'external'));
-    expect(
-      scanLocalSkills(root)
-        .map((s) => s.id)
-        .sort(),
-    ).toEqual(['linked-skill', 'outside']);
+    expect(scanLocalSkills(root).map((s) => s.id)).toEqual(['linked-skill']);
   });
 
   test('S12: an unreadable SKILL.md (a directory / vanishing midway) = skipped, no crash', () => {
@@ -138,6 +134,31 @@ describe('the scanLocalSkills directory scan', () => {
     mkdirSync(join(root, 'weird', 'SKILL.md'), { recursive: true });
     addSkill(root, 'ok', { name: 'ok' });
     expect(scanLocalSkills(root).map((s) => s.id)).toEqual(['ok']);
+  });
+
+  test('S13: a SKILL.md that resolves out of the skills root is skipped — listing and detail expose nothing', async () => {
+    const root = makeRoot();
+    const outside = makeRoot();
+    writeFileSync(
+      join(outside, 'secret.md'),
+      '---\nname: leaked\ndescription: outside the root\n---\n# leaked\n',
+    );
+    const dir = join(root, 'linked');
+    mkdirSync(dir);
+    symlinkSync(join(outside, 'secret.md'), join(dir, 'SKILL.md'));
+    expect(scanLocalSkills(root).map((s) => s.id)).toEqual([]);
+
+    const s = bootServer({ skillsDir: root });
+    try {
+      const list = await req(s.app, 'GET', `/api/skills?teamId=${s.team.id}`);
+      expect(await list.json()).toEqual([]);
+      const detail = await req(s.app, 'GET', `/api/teams/${s.team.id}/skills/leaked`);
+      expect(detail.status).toBe(404);
+      const file = await req(s.app, 'GET', `/api/teams/${s.team.id}/skills/leaked/file`);
+      expect(file.status).toBe(404);
+    } finally {
+      s.dispose();
+    }
   });
 });
 
@@ -268,6 +289,27 @@ describe('the skills REST surface (rescanned source)', () => {
       );
       expect(res.status).toBe(400);
       expect(((await res.json()) as { error: string }).error).toContain('512000');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('R14: a skill directory symlinked outside the skills root = absent from listing, 404 on detail and file routes', async () => {
+    const { s, skillsDir } = setup();
+    const outside = makeRoot();
+    try {
+      const outsideDir = addSkill(outside, 'host-skill', { name: 'ghost' });
+      writeFileSync(join(outsideDir, 'notes.md'), 'outside notes\n');
+      symlinkSync(outsideDir, join(skillsDir, 'escape'));
+      const base = `/api/teams/${s.team.id}/skills`;
+
+      const list = (await (await req(s.app, 'GET', `/api/skills?teamId=${s.team.id}`)).json()) as {
+        id: string;
+      }[];
+      expect(list.map((r) => r.id)).not.toContain('ghost');
+      expect((await req(s.app, 'GET', `${base}/ghost`)).status).toBe(404);
+      expect((await req(s.app, 'GET', `${base}/ghost/file?fileName=notes.md`)).status).toBe(404);
+      expect((await req(s.app, 'GET', `${base}/ghost/file?fileName=SKILL.md`)).status).toBe(404);
     } finally {
       s.dispose();
     }

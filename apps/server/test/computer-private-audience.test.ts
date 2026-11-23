@@ -46,6 +46,7 @@ function principalApp(s: TestServer, principal: UserRecord) {
     attachmentsDir: s.attachmentsDir,
     skillsDir: s.skillsDir,
     skillSourcesPath: s.skillSourcesPath,
+    homeDir: s.homeDir,
     pingIntervalMs: 3_600_000,
     claimHoldMs: 250,
     uploads: new Map(),

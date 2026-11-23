@@ -38,6 +38,7 @@ const app = createApp({
   attachmentsDir: join(dataDir, 'attachments'),
   skillsDir: join(home, 'skills'),
   skillSourcesPath: join(home, 'skill-sources.json'),
+  homeDir: home,
   mcpConfigPath: join(home, 'mcp.json'),
 });
 

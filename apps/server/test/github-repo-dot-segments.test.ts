@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   build as buildTable,
   project as projectTable,
@@ -32,6 +33,17 @@ function recorder(): Recorder {
   const calls: { method: string; url: string }[] = [];
   const impl: FetchLike = async (input, init) => {
     calls.push({ method: init?.method ?? 'GET', url: String(input) });
+    const probe = /^\/repos\/([^/]+)\/([^/]+)$/.exec(new URL(String(input)).pathname);
+    if (probe !== null) {
+      const fullName = `${probe[1]}/${probe[2]}`;
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => null },
+        json: async () => ({ full_name: fullName }),
+        text: async () => JSON.stringify({ full_name: fullName }),
+      };
+    }
     return {
       ok: false,
       status: 404,
@@ -158,6 +170,7 @@ function chiefDeps(s: TestServer) {
     reposDir: s.reposDir,
     attachmentsDir: s.attachmentsDir,
     skillsDir: s.skillsDir,
+    githubFetch: s.svc.githubFetch,
   };
 }
 
@@ -196,7 +209,7 @@ describe('#1466 write surface: . / .. segment refusal (W1-W4)', () => {
     const created = await req(s.app, 'POST', '/api/projects', {
       name: 'loc',
       kind: 'local',
-      localPath: '/tmp/cairn-1466-local',
+      localPath: makeTestTempDir('cairn-1466-local-'),
     });
     expect(created.status).toBe(201);
     const { id } = (await created.json()) as { id: string };
@@ -250,7 +263,11 @@ describe('#1466 write surface: . / .. segment refusal (W1-W4)', () => {
       }),
     ) as { githubRepo: string };
     expect(out.githubRepo).toBe('my.org/repo.js');
-    expect(rec.calls).toHaveLength(0);
+    expect(rec.calls).toHaveLength(6);
+    for (const c of rec.calls) {
+      expect(c.method).toBe('GET');
+      expect(new URL(c.url).pathname).toMatch(/^\/repos\/[^/]+\/[^/]+$/);
+    }
   });
 });
 

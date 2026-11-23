@@ -110,6 +110,7 @@ import {
   deleteGithubConnection,
   hasGithubConnection,
   readGithubConnectionStatus,
+  refreshingGithubFetch,
   teamGithubToken,
 } from './services/github-connection.js';
 import {
@@ -213,9 +214,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
     isOwner(ctx.db, ctx.user.id);
 
-  const requireOwnerSession = (c: Context): void => {
+  const requireOwnerSession = (c: Context, what = 'manage Claude subscription tokens'): void => {
     if (!isOwnerSession(c)) {
-      throw new HttpError(403, 'Only the instance owner can manage Claude subscription tokens');
+      throw new HttpError(403, `Only the instance owner can ${what}`);
     }
   };
 
@@ -223,6 +224,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     db: ctx.db,
     skillsDir: ctx.skillsDir,
     skillSourcesPath: ctx.skillSourcesPath,
+    homeDir: ctx.homeDir,
+    dataDir: ctx.dataDir,
+    get workspacesDir() {
+      return ctx.workspacesDir;
+    },
+    reposDir: ctx.reposDir,
+    attachmentsDir: ctx.attachmentsDir,
+    logger: ctx.logger,
     teamId,
     actor: { type: 'member', id: ctx.user.id },
     fetch: ctx.skillImportFetch ?? globalThis.fetch,
@@ -421,6 +430,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/teams/:id/skills/import-candidates', (c) => {
     requireTeam(ctx, c.req.param('id'));
+    requireOwnerSession(c, 'list skill import candidates on this machine');
     return c.json(listImportCandidates(ctx.skillsDir));
   });
 
@@ -482,6 +492,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/skills/import', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'import skills into this machine');
     const body = parseWith(importSkillBodySchema, await jsonBody(c), 'body');
     const record = await importSkill(importOpts(teamId), body);
     return c.json(record, 201);
@@ -490,6 +501,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/skills/:sid/refresh', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'refresh skills on this machine');
     const record = await refreshSkill(importOpts(teamId), c.req.param('sid'));
     return c.json(record);
   });
@@ -1063,7 +1075,17 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       teamId,
     );
     if (!('token' in access)) throw notFound('github connection');
-    const fetchImpl = ctx.githubFetch ?? fetch;
+    const fetchImpl = refreshingGithubFetch(
+      {
+        ...githubAppOf(ctx),
+        db: ctx.db,
+        box: ctx.secretBox,
+        githubFetch: ctx.githubFetch,
+        oauthClient: ctx.oauthClient,
+      },
+      ctx.githubBaseFetch ?? ctx.githubFetch ?? fetch,
+      teamId,
+    );
     const repos = isGithubAppUserToken(access.token)
       ? await githubAppUserRepos(fetchImpl, access.token)
       : await githubUserRepos(fetchImpl, access.token);

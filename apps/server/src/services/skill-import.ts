@@ -7,7 +7,7 @@ import {
   statSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, relative, resolve, sep } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import {
   type CreateSkillBody,
   type ImportSkillBody,
@@ -25,6 +25,12 @@ import type { Db } from '../db/client.js';
 import { HttpError } from '../lib/errors.js';
 import { githubApiBaseUrl } from '../lib/github-api-base.js';
 import { nowMs } from '../lib/ids.js';
+import {
+  assertSourceOutsideCairnDirs,
+  realpathOrResolve,
+  requireRealpath,
+  samePathOrInside,
+} from '../lib/local-source.js';
 import { NotFoundError } from './builds.js';
 import { readSkillSource, writeSkillSource } from './skill-source-store.js';
 import {
@@ -70,6 +76,12 @@ export interface SkillImportOpts {
   db: Db;
   skillsDir: string;
   skillSourcesPath: string;
+  homeDir: string;
+  dataDir?: string;
+  workspacesDir?: string;
+  reposDir?: string;
+  attachmentsDir?: string;
+  logger?: { warn(fields: object, message: string): void };
   teamId: string;
   actor: SkillAuditActor;
   fetch: SkillImportFetch;
@@ -128,24 +140,32 @@ function assembleCreateBody(files: SkillFileBody[], sourceLabel: string): Create
 
 function expandHome(path: string): string {
   if (path === '~') return homedir();
-  if (path.startsWith('~/')) return join(homedir(), path.slice(2));
+  if (path.startsWith('~/')) {
+    const home = homedir();
+    const rest = path.slice(2);
+    return home.endsWith(sep) ? `${home}${rest}` : `${home}${sep}${rest}`;
+  }
   return path;
 }
 
-function skillsRootReal(skillsDir: string): string {
-  try {
-    return realpathSync(resolve(skillsDir));
-  } catch {
-    return resolve(skillsDir);
-  }
-}
-
-function collectFromLocalPath(rawPath: string, skillsDir: string): Collected {
-  const resolved = resolve(expandHome(rawPath));
+function collectFromLocalPath(
+  rawPath: string,
+  opts: Pick<
+    SkillImportOpts,
+    'skillsDir' | 'homeDir' | 'dataDir' | 'workspacesDir' | 'reposDir' | 'attachmentsDir' | 'logger'
+  >,
+): Collected {
   let real: string;
+  try {
+    real = requireRealpath(expandHome(rawPath));
+  } catch (error) {
+    if (error instanceof HttpError) {
+      throw new HttpError(400, `localPath ${rawPath}: ${error.message}`);
+    }
+    throw error;
+  }
   let st: Stats;
   try {
-    real = realpathSync(resolved);
     st = statSync(real);
   } catch {
     throw new HttpError(400, `localPath not found: ${rawPath}`);
@@ -153,19 +173,15 @@ function collectFromLocalPath(rawPath: string, skillsDir: string): Collected {
   if (!st.isDirectory()) {
     throw new HttpError(400, `localPath is not a directory: ${rawPath}`);
   }
-  const rootReal = skillsRootReal(skillsDir);
-  if (real === rootReal || real.startsWith(rootReal + sep)) {
-    throw new HttpError(
-      400,
-      `localPath ${rawPath} resolves inside the cairn skills directory (${skillsDir}) — it is already visible to cairn; import from a directory outside it`,
-    );
-  }
-  if (rootReal.startsWith(real + sep)) {
-    throw new HttpError(
-      400,
-      `localPath ${rawPath} contains the cairn skills directory (${skillsDir}); import a single skill directory instead`,
-    );
-  }
+  assertSourceOutsideCairnDirs(real, `localPath ${rawPath}`, {
+    skillsDir: opts.skillsDir,
+    homeDir: opts.homeDir,
+    dataDir: opts.dataDir,
+    workspacesDir: opts.workspacesDir,
+    reposDir: opts.reposDir,
+    attachmentsDir: opts.attachmentsDir,
+    logger: opts.logger,
+  });
   const files: SkillFileBody[] = [];
   let total = 0;
   const walk = (dir: string): void => {
@@ -500,7 +516,7 @@ export async function importSkill(
   let kind: 'localPath' | 'github';
   if (body.localPath !== undefined && body.url === undefined) {
     kind = 'localPath';
-    collected = collectFromLocalPath(body.localPath, opts.skillsDir);
+    collected = collectFromLocalPath(body.localPath, opts);
   } else if (body.url !== undefined && body.localPath === undefined) {
     kind = 'github';
     collected = await collectFromGithubUrl(body.url, opts);
@@ -523,6 +539,7 @@ export async function importSkill(
       ref: collected.sourceRef,
       importedAt: nowMs(),
       refreshedAt: null,
+      teamId: opts.teamId,
     });
   } catch (err) {
     try {
@@ -544,17 +561,21 @@ export async function importSkill(
 export async function refreshSkill(opts: SkillImportOpts, sid: string): Promise<SkillRecord> {
   const resolved = resolveLocalSkill(opts.skillsDir, sid);
   if (!resolved) throw new NotFoundError(`skill ${sid}`);
+  let insideRoot = false;
+  try {
+    insideRoot = samePathOrInside(requireRealpath(resolved.dir), realpathOrResolve(opts.skillsDir));
+  } catch (error) {
+    if (!(error instanceof HttpError)) throw error;
+  }
+  if (!insideRoot) throw new NotFoundError(`skill ${sid}`);
   const source = readSkillSource(opts.skillSourcesPath, sid);
-  if (!source) {
-    throw new HttpError(
-      409,
-      `skill ${JSON.stringify(sid)} has no recorded import source — only imported skills can be refreshed; import it again as a new skill instead`,
-    );
+  if (source === null || source.teamId !== opts.teamId) {
+    throw new NotFoundError(`skill ${sid}`);
   }
   let collected: Collected;
   try {
     if (source.kind === 'localPath') {
-      collected = collectFromLocalPath(source.ref, opts.skillsDir);
+      collected = collectFromLocalPath(source.ref, opts);
     } else {
       collected = await collectFromGithubUrl(source.ref, opts);
     }
@@ -576,14 +597,20 @@ export async function refreshSkill(opts: SkillImportOpts, sid: string): Promise<
     sid,
     update,
   );
-  await writeSkillSource(opts.skillSourcesPath, { ...source, refreshedAt: nowMs() });
+  await writeSkillSource(opts.skillSourcesPath, {
+    ...source,
+    teamId: opts.teamId,
+    refreshedAt: nowMs(),
+  });
   return record;
 }
 
-function candidateProblem(dir: string): SkillImportCandidate['problem'] {
+function candidateProblem(dir: string, bound: string): SkillImportCandidate['problem'] {
   let fm: { name?: string; description?: string };
   try {
-    fm = parseSkillFrontmatter(readFileSync(join(dir, SKILL_ENTRY_FILE), 'utf8'));
+    const entryReal = realpathSync(join(dir, SKILL_ENTRY_FILE));
+    if (!samePathOrInside(entryReal, bound)) return 'missing-name';
+    fm = parseSkillFrontmatter(readFileSync(entryReal, 'utf8'));
   } catch {
     return 'missing-name';
   }
@@ -595,32 +622,35 @@ function candidateProblem(dir: string): SkillImportCandidate['problem'] {
 
 export function listImportCandidates(skillsDir: string): SkillImportCandidatesResponse {
   const taken = new Set(scanLocalSkills(skillsDir).map((s) => s.id));
-  const rootReal = skillsRootReal(skillsDir);
+  const rootReal = realpathOrResolve(skillsDir);
   const seenReal = new Set<string>();
   const out: SkillImportCandidatesResponse = { candidates: [], skippedSources: [] };
   for (const root of sharedAgentSkillRoots()) {
+    let rootBound: string;
     try {
       readdirSync(root);
+      rootBound = realpathSync(root);
     } catch (err) {
       const missing = (err as NodeJS.ErrnoException).code === 'ENOENT';
       out.skippedSources.push({ root, reason: missing ? 'missing' : 'unreadable' });
       continue;
     }
-    for (const skill of scanSkillsRoot(root)) {
+    for (const skill of scanSkillsRoot(root, { within: root })) {
       let real: string;
       try {
-        real = realpathSync(skill.dir);
-      } catch {
-        continue;
+        real = realpathOrResolve(skill.dir);
+      } catch (error) {
+        if (error instanceof HttpError) continue;
+        throw error;
       }
-      if (seenReal.has(real) || real === rootReal || real.startsWith(rootReal + sep)) continue;
+      if (seenReal.has(real) || samePathOrInside(real, rootReal)) continue;
       seenReal.add(real);
       out.candidates.push({
         id: skill.id,
         description: skill.description,
         sourcePath: skill.dir,
         alreadyImported: taken.has(skill.id),
-        problem: candidateProblem(skill.dir),
+        problem: candidateProblem(skill.dir, rootBound),
       });
     }
   }

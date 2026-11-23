@@ -8,6 +8,7 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { runGit, systemGitOps } from '../src/lib/git.js';
 import { newUuidv7 } from '../src/lib/ids.js';
 import { readFile } from '../src/services/git.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
 const GIT_ENV = {
@@ -38,14 +39,21 @@ const API_KEY = 'cairn_e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0e2e0';
 
 beforeAll(async () => {
   s = bootServer({
-    githubFetch: async () => ({
-      ok: false,
-      status: 404,
-      headers: { get: () => null },
-      json: async () => ({ message: 'Not Found' }),
-      text: async () => 'Not Found',
-    }),
+    githubFetch: async (input) => {
+      const probe = /^\/repos\/[^/]+\/[^/]+$/.test(new URL(String(input)).pathname);
+      return {
+        ok: probe,
+        status: probe ? 200 : 404,
+        headers: { get: () => null },
+        json: async () => (probe ? { full_name: 'octocat/hello' } : { message: 'Not Found' }),
+        text: async () => 'Not Found',
+      };
+    },
   });
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, login: 'octo', accessToken: 'ghp_git_hosting', scope: 'repo' },
+  );
   insertGitApiKey(s, API_KEY);
   const server = serve({ fetch: s.app.fetch, port: 0 });
   await new Promise<void>((resolve) => server.once('listening', resolve));

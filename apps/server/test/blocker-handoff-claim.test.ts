@@ -16,6 +16,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { updateAutonomousTodo } from '../src/services/todos.js';
 import {
   bootServer,
@@ -49,6 +50,15 @@ function githubMock(pulls: Record<number, PullFixture | 'missing'>): {
     fetch: (input) => {
       const url = String(input);
       requests.push(url);
+      if (/^\/repos\/[^/]+\/[^/]+$/.test(new URL(url).pathname)) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: () => Promise.resolve({ full_name: 'octo/alpha' }),
+          text: () => Promise.resolve(''),
+        });
+      }
       const number = Number(/\/pulls\/(\d+)$/.exec(url)?.[1]);
       const pull = pulls[number];
       const found = pull !== undefined && pull !== 'missing';
@@ -88,6 +98,12 @@ async function setupWorld(
     modelId: 'stub-model',
     machineId: s.db.select().from(machineTable).get()!.id,
   });
+  if (opts.github) {
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, login: 'octo', accessToken: 'ghp_blocker', scope: 'repo' },
+    );
+  }
   const project = await req(
     s.app,
     'POST',
@@ -96,6 +112,7 @@ async function setupWorld(
   );
   expect(project.status).toBe(201);
   const projectId = ((await project.json()) as { id: string }).id;
+  mock.requests.length = 0;
   return { s, token, projectId, mock };
 }
 

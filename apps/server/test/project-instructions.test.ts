@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { chief as chiefTable, coordinatorInput, project, step } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { saveMemoryEntry } from '../src/services/memory.js';
 import {
   bootServer,
@@ -54,7 +55,10 @@ async function claim(token: string) {
 }
 
 beforeEach(() => {
-  s = bootServer();
+  s = bootServer({
+    githubFetch: async () =>
+      new Response(JSON.stringify({ full_name: 'octo/demo' }), { status: 200 }),
+  });
 });
 
 describe('project instructions are stored on the project (D74 P1)', () => {
@@ -101,6 +105,10 @@ describe('threads in the project receive the instructions (D74 P1)', () => {
   test('a claimed build carries its project instructions through the wire schema', async () => {
     const token = await enroll('rules-builder');
     seedSessionRoute(s, { provider: 'pi', modelId: 'stub-model' });
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId: s.team.id, login: 'octo', accessToken: 'ghp_instructions', scope: 'repo' },
+    );
     const id = await createProject('rules', { kind: 'github', githubRepo: 'octo/demo' });
     await req(s.app, 'PATCH', `/api/projects/${id}`, { instructions: RULES });
     const task = (await (

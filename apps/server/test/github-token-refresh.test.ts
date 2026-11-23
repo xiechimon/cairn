@@ -1,13 +1,15 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
-import { githubConnection } from '../src/db/schema.js';
-import { githubUserRepos } from '../src/lib/github.js';
+import { githubConnection, team } from '../src/db/schema.js';
+import { type FetchLike, githubUserRepos } from '../src/lib/github.js';
 import {
   hasGithubConnection,
   openGithubToken,
   readGithubConnectionStatus,
   refreshingGithubFetch,
+  saveRefreshedTokens,
   teamGithubToken,
+  upsertGithubConnection,
 } from '../src/services/github-connection.js';
 import { type GithubAuthFake, githubAuthFake } from './fakes/github-auth.js';
 import { bootServer, req, type TestServer } from './helpers.js';
@@ -250,6 +252,230 @@ describe('github connection token refresh (#1731)', () => {
       const status = readGithubConnectionStatus({ db: s.db, box: s.secretBox }, s.team.id);
       expect(status.connected).toBe(false);
       expect(status.disconnectReason).toContain('refresh');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a team-scoped 401 refresh rotates only that team even when another team holds the same token', async () => {
+    const { s, gh } = boot();
+    try {
+      const other = 'team-collide';
+      s.db.insert(team).values({ id: other, name: 'other', createdAt: Date.now() }).run();
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: other,
+          login: 'octo',
+          accessToken: 'gho_shared',
+          refreshToken: 'ghr_scoped_b',
+          scope: 'repo',
+        },
+      );
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          login: 'octo',
+          accessToken: 'gho_shared',
+          refreshToken: 'ghr_scoped_a',
+          scope: 'repo',
+        },
+      );
+      gh.knowGrant('gho_shared', 'ghr_scoped_a');
+      gh.knowGrant('gho_b_key', 'ghr_scoped_b');
+      gh.revokeAccess('gho_shared');
+      const otherBefore = s.db
+        .select()
+        .from(githubConnection)
+        .where(eq(githubConnection.teamId, other))
+        .get();
+      const wrapped = refreshingGithubFetch(
+        { db: s.db, box: s.secretBox, oauthClient: CLIENT },
+        gh.fetch,
+        s.team.id,
+      );
+      const res = await wrapped(`https://api.github.com${REPOS_PATH}`, {
+        headers: { authorization: 'Bearer gho_shared' },
+      });
+      expect(res.status).toBe(200);
+      const refreshCalls = refreshCallsOf(gh);
+      expect(refreshCalls).toHaveLength(1);
+      expect(refreshCalls[0]?.form.get('refresh_token')).toBe('ghr_scoped_a');
+      const otherAfter = s.db
+        .select()
+        .from(githubConnection)
+        .where(eq(githubConnection.teamId, other))
+        .get();
+      expect(otherAfter).toEqual(otherBefore);
+      expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).not.toBe('gho_shared');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('an unscoped 401 refresh passes through when two teams hold the same token', async () => {
+    const { s, gh } = boot();
+    try {
+      const other = 'team-collide';
+      s.db.insert(team).values({ id: other, name: 'other', createdAt: Date.now() }).run();
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: other,
+          login: 'octo',
+          accessToken: 'gho_shared',
+          refreshToken: 'ghr_scoped_b',
+          scope: 'repo',
+        },
+      );
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          login: 'octo',
+          accessToken: 'gho_shared',
+          refreshToken: 'ghr_scoped_a',
+          scope: 'repo',
+        },
+      );
+      gh.knowGrant('gho_shared', 'ghr_scoped_a');
+      gh.knowGrant('gho_b_key', 'ghr_scoped_b');
+      gh.revokeAccess('gho_shared');
+      const wrapped = refreshingGithubFetch(
+        { db: s.db, box: s.secretBox, oauthClient: CLIENT },
+        gh.fetch,
+      );
+      const res = await wrapped(`https://api.github.com${REPOS_PATH}`, {
+        headers: { authorization: 'Bearer gho_shared' },
+      });
+      expect(res.status).toBe(401);
+      expect(refreshCallsOf(gh)).toHaveLength(0);
+      expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).toBe('gho_shared');
+      expect(openGithubToken({ db: s.db, box: s.secretBox }, other)).toBe('gho_shared');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a stale refresh cannot overwrite a replacement connection row', async () => {
+    const { s } = boot();
+    try {
+      const deps = { db: s.db, box: s.secretBox };
+      upsertGithubConnection(deps, {
+        teamId: s.team.id,
+        login: 'octo',
+        accessToken: 'gho_old',
+        refreshToken: 'ghr_old',
+        scope: 'repo',
+      });
+      const stale = s.db
+        .select()
+        .from(githubConnection)
+        .where(eq(githubConnection.teamId, s.team.id))
+        .get();
+      expect(stale).toBeDefined();
+      upsertGithubConnection(deps, {
+        teamId: s.team.id,
+        login: 'octo',
+        accessToken: 'gho_new',
+        refreshToken: 'ghr_new',
+        scope: 'repo',
+      });
+      s.db
+        .update(githubConnection)
+        .set({ createdAt: stale!.createdAt + 1 })
+        .where(eq(githubConnection.teamId, s.team.id))
+        .run();
+      saveRefreshedTokens(deps, stale!, {
+        accessToken: 'gho_stale_rotated',
+        refreshToken: 'ghr_stale',
+        expiresInSeconds: 3600,
+      });
+      expect(openGithubToken(deps, s.team.id)).toBe('gho_new');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('binding a github project survives a probe-triggered rotation on the same connection', async () => {
+    const gh = githubAuthFake({
+      user: OCTO,
+      repos: [
+        { id: 1, name: 'alpha', full_name: 'octo/alpha', private: false, owner: { login: 'octo' } },
+      ],
+    });
+    let staleAccess = '';
+    let probeCalls = 0;
+    const probeFetch: FetchLike = async (input, init) => {
+      if (String(input).includes('/repos/')) {
+        probeCalls += 1;
+        if (staleAccess !== '' && init?.headers?.authorization === `Bearer ${staleAccess}`) {
+          return new Response(JSON.stringify({ message: 'Bad credentials' }), { status: 401 });
+        }
+        return new Response(JSON.stringify({ full_name: 'octo/alpha' }), { status: 200 });
+      }
+      return gh.fetch(input, init);
+    };
+    const s = bootServer({ oauthClient: CLIENT, oauthFetch: gh.fetch, githubFetch: probeFetch });
+    try {
+      const { access } = await connect(s, gh);
+      staleAccess = access;
+      gh.revokeAccess(access);
+      const res = await req(s.app, 'POST', '/api/projects', {
+        name: 'bound-repo',
+        kind: 'github',
+        githubRepo: 'octo/alpha',
+      });
+      expect(res.status).toBe(201);
+      expect(probeCalls).toBe(2);
+      expect(refreshCallsOf(gh)).toHaveLength(1);
+      const row = connectionRow(s);
+      expect(row?.connectionGeneration).toBeNull();
+      expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).not.toBe(access);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('GET /api/github/repos retries on 401 through the requesting team connection only', async () => {
+    const gh = githubAuthFake({
+      user: OCTO,
+      repos: [
+        { id: 1, name: 'alpha', full_name: 'octo/alpha', private: false, owner: { login: 'octo' } },
+      ],
+    });
+    let inner: FetchLike = gh.fetch;
+    const s = bootServer({
+      oauthClient: CLIENT,
+      oauthFetch: gh.fetch,
+      githubBaseFetch: gh.fetch,
+      githubFetch: (input, init) => inner(input, init),
+    });
+    try {
+      inner = refreshingGithubFetch({ db: s.db, box: s.secretBox, oauthClient: CLIENT }, gh.fetch);
+      const other = 'team-collide';
+      s.db.insert(team).values({ id: other, name: 'other', createdAt: Date.now() }).run();
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: other,
+          login: 'octo',
+          accessToken: 'gho_shared',
+          refreshToken: 'ghr_scoped_b',
+          scope: 'repo',
+        },
+      );
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        { teamId: s.team.id, login: 'octo', accessToken: 'gho_shared', scope: 'repo' },
+      );
+      gh.knowGrant('gho_shared', 'ghr_scoped_b');
+      gh.revokeAccess('gho_shared');
+      const res = await reposRequest(s);
+      expect(res.status).toBe(502);
+      expect(refreshCallsOf(gh)).toHaveLength(0);
+      expect(openGithubToken({ db: s.db, box: s.secretBox }, other)).toBe('gho_shared');
     } finally {
       s.dispose();
     }

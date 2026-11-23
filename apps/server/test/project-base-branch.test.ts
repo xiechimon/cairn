@@ -31,7 +31,14 @@ test('base branch survives PATCH, GET, unrelated edits and reset to the repo def
 });
 
 test('the next claimed build carries the configured base branch through the wire schema', async () => {
-  const s = bootServer();
+  const s = bootServer({
+    githubFetch: async () =>
+      new Response(JSON.stringify({ full_name: 'octo/demo' }), { status: 200 }),
+  });
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, login: 'octo', accessToken: 'ghp_base_branch', scope: 'repo' },
+  );
   const key = await issueApiKey(s);
   const enrolled = await s.app.request('/api/machine/enroll', {
     method: 'POST',

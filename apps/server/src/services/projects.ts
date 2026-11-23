@@ -26,9 +26,10 @@ import {
   todo,
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import type { FetchLike } from '../lib/github.js';
+import type { FetchLike, GithubRepoProbe } from '../lib/github.js';
 import { githubRepoReachable } from '../lib/github.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import type { CairnSourceRoots } from '../lib/local-source.js';
 import type { ConversationStreamHub } from './events.js';
 import {
   isGithubRepoRef,
@@ -38,11 +39,19 @@ import {
   uniqueRepoName,
   validateLocalRepoPath,
 } from './git.js';
-import { githubReadToken } from './github-autonomous-token.js';
+import {
+  assertGithubConnectionCurrent,
+  connectionToken,
+  type GithubConnectionPin,
+  type GithubTokenDeps,
+  githubConnectionPin,
+  refreshingGithubFetch,
+} from './github-connection.js';
 import { dispatchHostedCleanup, enqueueHostedCleanup } from './hosted-cleanup.js';
 import { retireTodoDeliverables } from './machine-deliverables.js';
 import { moveProjectMemoriesToTeam } from './memory.js';
 import type { OAuthClientConfig } from './oauth.js';
+import { pairedDeviceExists } from './paired-devices.js';
 import { insertMessageRow } from './transcript.js';
 
 type ProjectRow = typeof project.$inferSelect;
@@ -65,6 +74,7 @@ export interface ProjectPatchDeps {
   db: Db;
   box: SecretBox;
   githubFetch?: FetchLike;
+  githubBaseFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
   convHub?: ConversationStreamHub;
   logger?: { info(obj: object, msg: string): void };
@@ -133,12 +143,78 @@ function projectRunningWork(db: ProjectReader, projectId: string): string[] {
   return rows.map((row) => row.line);
 }
 
+function splitRepoRef(ref: string): { owner: string; repo: string } {
+  const slash = ref.indexOf('/');
+  return { owner: ref.slice(0, slash), repo: ref.slice(slash + 1) };
+}
+
+async function requireGithubRepoReachable(
+  deps: GithubTokenDeps,
+  token: string | null,
+  owner: string,
+  repo: string,
+): Promise<GithubRepoProbe> {
+  const probe = await githubRepoReachable(deps.githubFetch ?? fetch, token, owner, repo);
+  if (!probe.reachable) {
+    throw new HttpError(
+      400,
+      `invalid body at githubRepo: repository not reachable: ${owner}/${repo}`,
+    );
+  }
+  return probe;
+}
+
+export interface GithubBindingCheck {
+  probe: GithubRepoProbe;
+  pin: GithubConnectionPin;
+}
+
+export async function assertGithubRepoReachable(
+  deps: GithubTokenDeps,
+  teamId: string,
+  ref: string,
+): Promise<GithubBindingCheck> {
+  const { owner, repo } = splitRepoRef(ref);
+  const pin = githubConnectionPin(deps.db, teamId);
+  const access = await connectionToken(deps, teamId, pin ?? undefined);
+  if (pin === null || !('token' in access)) {
+    throw new HttpError(409, 'connect GitHub first to bind a GitHub repository');
+  }
+  const scopedFetch = refreshingGithubFetch(
+    deps,
+    deps.githubBaseFetch ?? deps.githubFetch ?? fetch,
+    pin,
+  );
+  const probe = await requireGithubRepoReachable(
+    { ...deps, githubFetch: scopedFetch },
+    access.token,
+    owner,
+    repo,
+  );
+  return { probe, pin };
+}
+
+function assertProjectGithubBindingCurrent(
+  tx: ProjectTx,
+  teamId: string,
+  pin: GithubConnectionPin | null,
+  pairedDeviceId: string | null,
+): void {
+  if (pin === null) return;
+  if (pairedDeviceId !== null && !pairedDeviceExists(tx, pairedDeviceId)) {
+    throw new HttpError(401, 'this device was revoked');
+  }
+  assertGithubConnectionCurrent(tx, teamId, pin);
+}
+
 export async function createProject(
-  ctx: RepoCtx,
+  ctx: RepoCtx & GithubTokenDeps & CairnSourceRoots,
   input: CreateProjectBody & { teamId: string },
+  pairedDeviceId: string | null = null,
 ): Promise<ProjectRow> {
   const kind = input.kind ?? input.repoKind;
   let githubRepo: string | null = null;
+  let bindingPin: GithubConnectionPin | null = null;
   if (kind === 'github') {
     const ref =
       typeof input.githubRepo === 'string'
@@ -149,35 +225,54 @@ export async function createProject(
     if (ref === undefined || !isGithubRepoRef(ref)) {
       throw new HttpError(400, 'invalid body at githubRepo: expected "owner/repo"');
     }
+    if (input.localPath != null && input.localPath.trim() !== '') {
+      throw new HttpError(400, 'invalid body at localPath: not allowed for kind "github"');
+    }
+    const binding = await assertGithubRepoReachable(ctx, input.teamId, ref);
+    bindingPin = binding.pin;
     githubRepo = ref;
   } else if (kind === 'local' && input.githubRepo !== undefined) {
     throw new HttpError(400, 'invalid body at githubRepo: not allowed for kind "local"');
   }
-  if (kind === 'github' && input.localPath != null && input.localPath.trim() !== '') {
-    throw new HttpError(400, 'invalid body at localPath: not allowed for kind "github"');
-  }
-  const localPath = kind === 'local' ? await validateLocalRepoPath(input.localPath) : null;
+  const localPath =
+    kind === 'local'
+      ? await validateLocalRepoPath(input.localPath, {
+          skillsDir: ctx.skillsDir,
+          homeDir: ctx.homeDir,
+          dataDir: ctx.dataDir,
+          workspacesDir: ctx.workspacesDir,
+          reposDir: ctx.reposDir,
+          attachmentsDir: ctx.attachmentsDir,
+          logger: ctx.logger,
+        })
+      : null;
   let repoName: string | null = null;
   if (kind === 'hosted') {
     repoName = await uniqueRepoName(ctx, input.teamId, slugifyRepoName(input.name));
     await provisionHostedRepo(ctx, input.teamId, repoName);
   }
   const id = newRecordId();
-  ctx.db
-    .insert(project)
-    .values({
-      id,
-      name: input.name,
-      teamId: input.teamId,
-      repoKind: kind ?? null,
-      repoName,
-      githubRepo,
-      localPath,
-    })
-    .run();
-  const row = ctx.db.select().from(project).where(eq(project.id, id)).get();
-  if (row === undefined) throw new HttpError(500, `project ${id} was not saved`);
-  return row;
+  return ctx.db.transaction(
+    (tx) => {
+      assertProjectGithubBindingCurrent(tx, input.teamId, bindingPin, pairedDeviceId);
+      const row = tx
+        .insert(project)
+        .values({
+          id,
+          name: input.name,
+          teamId: input.teamId,
+          repoKind: kind ?? null,
+          repoName,
+          githubRepo,
+          localPath,
+        })
+        .returning()
+        .get();
+      if (row === undefined) throw new HttpError(500, `project ${id} was not saved`);
+      return row;
+    },
+    { behavior: 'immediate' },
+  );
 }
 
 export const RESEARCH_PROJECT_NAME = '调研';
@@ -289,6 +384,7 @@ export async function updateProject(
   deps: ProjectPatchDeps,
   id: string,
   body: PatchProjectBody,
+  pairedDeviceId: string | null = null,
 ): Promise<ProjectRow | null> {
   const { db } = deps;
   const row = db.select().from(project).where(eq(project.id, id)).get();
@@ -363,17 +459,12 @@ export async function updateProject(
   if (conversion !== undefined) {
     await assertNoInFlightBuilds(db, id);
   }
+  let bindingPin: GithubConnectionPin | null = null;
   if (conversion !== undefined || retarget !== undefined) {
     const ref = conversion?.githubRepo ?? retarget?.githubRepo ?? '';
-    const slash = ref.indexOf('/');
-    const owner = ref.slice(0, slash);
-    const repo = ref.slice(slash + 1);
-    const token = await githubReadToken(deps, row.teamId, { owner, repo });
-    const fetchImpl = deps.githubFetch ?? fetch;
-    const probe = await githubRepoReachable(fetchImpl, token, owner, repo);
-    if (!probe.reachable) {
-      throw new HttpError(400, `invalid body at githubRepo: repository not reachable: ${ref}`);
-    }
+    const binding = await assertGithubRepoReachable(deps, row.teamId, ref);
+    bindingPin = binding.pin;
+    const probe = binding.probe;
     if (
       retarget !== undefined &&
       probe.fullName !== null &&
@@ -399,33 +490,37 @@ export async function updateProject(
   const nextGithubRepo = conversion?.githubRepo ?? retarget?.githubRepo ?? row.githubRepo;
   const nextLocalPath = conversion !== undefined ? null : row.localPath;
   const nextDescription = description !== undefined ? description : row.description;
-  db.update(project)
-    .set({
-      name: nextName,
-      group: body.group !== undefined ? body.group : row.group,
-      splitPolicy: nextSplitPolicy,
-      evidenceStore: body.evidenceStore ?? row.evidenceStore,
-      repoKind: nextRepoKind,
-      githubRepo: nextGithubRepo,
-      localPath: nextLocalPath,
-      description: nextDescription,
-      instructions:
-        body.instructions === undefined
-          ? row.instructions
-          : body.instructions === null || body.instructions.trim() === ''
-            ? null
-            : body.instructions,
-      maxConcurrent: body.maxConcurrent !== undefined ? body.maxConcurrent : row.maxConcurrent,
-      baseBranch: body.baseBranch !== undefined ? body.baseBranch : row.baseBranch,
-      icon: body.icon !== undefined ? body.icon : row.icon,
-      color: body.color !== undefined ? body.color : row.color,
-      modelOverrides:
-        body.modelOverrides === undefined
-          ? row.modelOverrides
-          : mergedModelOverrides(row.modelOverrides, body.modelOverrides),
-    })
-    .where(eq(project.id, id))
-    .run();
+  const values = {
+    name: nextName,
+    group: body.group !== undefined ? body.group : row.group,
+    splitPolicy: nextSplitPolicy,
+    evidenceStore: body.evidenceStore ?? row.evidenceStore,
+    repoKind: nextRepoKind,
+    githubRepo: nextGithubRepo,
+    localPath: nextLocalPath,
+    description: nextDescription,
+    instructions:
+      body.instructions === undefined
+        ? row.instructions
+        : body.instructions === null || body.instructions.trim() === ''
+          ? null
+          : body.instructions,
+    maxConcurrent: body.maxConcurrent !== undefined ? body.maxConcurrent : row.maxConcurrent,
+    baseBranch: body.baseBranch !== undefined ? body.baseBranch : row.baseBranch,
+    icon: body.icon !== undefined ? body.icon : row.icon,
+    color: body.color !== undefined ? body.color : row.color,
+    modelOverrides:
+      body.modelOverrides === undefined
+        ? row.modelOverrides
+        : mergedModelOverrides(row.modelOverrides, body.modelOverrides),
+  };
+  db.transaction(
+    (tx) => {
+      assertProjectGithubBindingCurrent(tx, row.teamId, bindingPin, pairedDeviceId);
+      tx.update(project).set(values).where(eq(project.id, id)).run();
+    },
+    { behavior: 'immediate' },
+  );
 
   const renamed = name !== undefined && name !== row.name;
   if (conversion !== undefined) {

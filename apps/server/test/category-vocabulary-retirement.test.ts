@@ -4,15 +4,25 @@ import { expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { todo } from '../src/db/schema.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, postProject, req } from './helpers.js';
 
 test.each(['plain', 'local', 'hosted', 'github'] as const)(
   '%s project creation has no category seeds or vocabulary routes',
   async (kind) => {
-    const s = bootServer();
+    const s = bootServer({
+      githubFetch: async () =>
+        new Response(JSON.stringify({ full_name: 'octo/demo' }), { status: 200 }),
+    });
     const localPath = kind === 'local' ? makeTestTempDir('category-local-') : undefined;
     try {
       if (localPath) execFileSync('git', ['init', '-q', localPath]);
+      if (kind === 'github') {
+        upsertGithubConnection(
+          { db: s.db, box: s.secretBox },
+          { teamId: s.team.id, login: 'octo', accessToken: 'ghp_category', scope: 'repo' },
+        );
+      }
       const response = await req(s.app, 'POST', '/api/projects', {
         name: 'Vocabulary retirement',
         ...(kind === 'plain' ? {} : { kind }),

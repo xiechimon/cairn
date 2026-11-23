@@ -42,7 +42,12 @@ function ghMock(routes: Record<string, GhResponse>) {
     const url = typeof input === 'string' ? input : String(input);
     const method = init?.method ?? 'GET';
     calls.push({ method, url, ...(init?.body !== undefined ? { body: init.body } : {}) });
-    const res = routes[`${method} ${new URL(url).pathname}`];
+    const repoProbe = /^\/repos\/([^/]+\/[^/]+)$/.exec(new URL(url).pathname);
+    const res =
+      routes[`${method} ${new URL(url).pathname}`] ??
+      (method === 'GET' && repoProbe !== null
+        ? { status: 200, body: { full_name: repoProbe[1] } }
+        : undefined);
     const status = res?.status ?? 404;
     return {
       ok: status >= 200 && status < 300,

@@ -14,6 +14,7 @@ import {
   seedSessionRoute,
   type TestServer,
 } from './helpers.js';
+import { rejectingGithubFetch } from './network-guard.js';
 import { ownerTodoParams } from './owner-message.js';
 
 export const AGENT_ID = 'agent-chief-1';
@@ -39,6 +40,7 @@ export function toolDeps() {
     reposDir: H.s.reposDir,
     attachmentsDir: H.s.attachmentsDir,
     skillsDir: H.s.skillsDir,
+    githubFetch: H.s.svc.githubFetch,
   };
 }
 export function ctx(over: Partial<ChiefToolCtx> = {}): ChiefToolCtx {
@@ -125,7 +127,19 @@ export function seedChiefThread(): void {
 
 export function registerChiefHarness(): void {
   beforeEach(async () => {
-    H.s = bootServer();
+    H.s = bootServer({
+      githubFetch: async (input, init) => {
+        const probe = /^\/repos\/([^/]+\/[^/]+)$/.exec(new URL(String(input)).pathname);
+        if (probe === null) return rejectingGithubFetch(input, init);
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => ({ full_name: probe[1] }),
+          text: async () => JSON.stringify({ full_name: probe[1] }),
+        };
+      },
+    });
     H.teamId = H.s.team.id;
     H.userId = H.s.user.id;
     H.chiefId = `chief-${H.userId}-${H.teamId}`;

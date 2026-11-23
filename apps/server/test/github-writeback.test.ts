@@ -7,6 +7,7 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   externalEffect as externalEffectTable,
+  project as projectTable,
   taskIssueClose as taskIssueCloseTable,
   team as teamTable,
   todo as todoTable,
@@ -80,6 +81,18 @@ interface GhResponse {
   body: unknown;
 }
 
+function repoProbeResponse(input: unknown) {
+  const probe = /^\/repos\/([^/]+\/[^/]+)$/.exec(new URL(String(input)).pathname);
+  if (probe === null) return undefined;
+  return {
+    ok: true,
+    status: 200,
+    headers: { get: () => null },
+    json: async () => ({ full_name: probe[1] }),
+    text: async () => JSON.stringify({ full_name: probe[1] }),
+  };
+}
+
 function ghMock(initial: Record<string, GhResponse> = {}) {
   const routes = new Map<string, GhResponse>(Object.entries(initial));
   const calls: GhCall[] = [];
@@ -88,7 +101,12 @@ function ghMock(initial: Record<string, GhResponse> = {}) {
     const method = init?.method ?? 'GET';
     calls.push({ method, url, headers: { ...(init?.headers ?? {}) }, body: init?.body });
     const route = routes.get(`${method} ${new URL(url).pathname}`);
-    const res = route ?? { status: 404, body: { message: `no mock for ${method} ${url}` } };
+    const repoProbe = /^\/repos\/([^/]+\/[^/]+)$/.exec(new URL(url).pathname);
+    const res =
+      route ??
+      (method === 'GET' && repoProbe !== null
+        ? { body: { full_name: repoProbe[1] } }
+        : { status: 404, body: { message: `no mock for ${method} ${url}` } });
     const status = res.status ?? 200;
     const headers = res.headers ?? {};
     return {
@@ -128,6 +146,15 @@ async function postGithubProject(app: Hono, name = 'alpha'): Promise<string> {
   });
   if (res.status !== 201) throw new Error(`postGithubProject: ${res.status}`);
   return ((await res.json()) as { id: string }).id;
+}
+
+function insertGithubProject(s: TestServer, name = 'alpha'): string {
+  const id = `gh-${name}-${Math.random().toString(36).slice(2, 10)}`;
+  s.db
+    .insert(projectTable)
+    .values({ id, name, teamId: s.team.id, repoKind: 'github', githubRepo: REPO })
+    .run();
+  return id;
 }
 
 async function createTask(
@@ -233,10 +260,11 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
           text(): Promise<string>;
         }) => void)
       | undefined;
-    const hanging: FetchLike = () =>
-      new Promise((resolve) => {
+    const hanging: FetchLike = async (input) =>
+      repoProbeResponse(input) ??
+      (await new Promise((resolve) => {
         release = resolve;
-      });
+      }));
     const s = bootServer({ githubFetch: hanging });
     seedConnection(s);
     const projectId = await postGithubProject(s.app);
@@ -270,7 +298,9 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
       const mock =
         f.res === 'throw'
           ? {
-              impl: (async () => {
+              impl: (async (input: unknown) => {
+                const probe = repoProbeResponse(input);
+                if (probe !== undefined) return probe;
                 throw new TypeError('fetch failed', { cause: { code: 'ECONNREFUSED' } });
               }) as unknown as FetchLike,
               calls: [] as GhCall[],
@@ -326,7 +356,7 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
   test('W4/A1 project without a github connection: no creation, zero outbound, both columns null (no failure state shown)', async () => {
     const mock = ghMock({});
     const s = bootServer({ githubFetch: mock.impl });
-    const projectId = await postGithubProject(s.app);
+    const projectId = insertGithubProject(s);
     const created = await createTask(s.app, projectId);
     expect(created.status).toBe(201);
     expect(created.record?.sourceKind).toBeNull();
@@ -377,10 +407,11 @@ describe('self-created issues: stored as not-yet-created, source backfilled afte
 
   test('W7/A10 retry race: retry while the fire-and-forget is in flight -> 409, no double creation; source settles after it completes', async () => {
     let release: ((v: unknown) => void) | undefined;
-    const hanging: FetchLike = () =>
-      new Promise((resolve) => {
+    const hanging: FetchLike = async (input) =>
+      repoProbeResponse(input) ??
+      (await (new Promise((resolve) => {
         release = resolve;
-      }) as never;
+      }) as never));
     const s = bootServer({ githubFetch: hanging });
     seedConnection(s);
     const projectId = await postGithubProject(s.app);

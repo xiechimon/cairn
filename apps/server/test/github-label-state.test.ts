@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { isCorrectionTask } from '../src/services/correction.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { deleteProject } from '../src/services/projects.js';
 import {
   createAutonomousTodo,
@@ -11,7 +12,14 @@ import {
 import { bootServer, postProject, req } from './helpers.js';
 
 async function labelWorld() {
-  const s = bootServer();
+  const s = bootServer({
+    githubFetch: async () =>
+      new Response(JSON.stringify({ full_name: 'octo/demo' }), { status: 200 }),
+  });
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    { teamId: s.team.id, login: 'octo', accessToken: 'ghp_label_state', scope: 'repo' },
+  );
   const created = await req(s.app, 'POST', '/api/projects', {
     name: 'Labels',
     kind: 'github',

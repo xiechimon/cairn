@@ -35,12 +35,13 @@ import { listTodos } from './services/todos.js';
 export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
 
+  const isOwnerSession = (c: Context): boolean =>
+    pairedDeviceIdOf(c) === null &&
+    (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
+    isOwner(ctx.db, ctx.user.id);
+
   const requireOwnerSession = (c: Context): void => {
-    const owner =
-      pairedDeviceIdOf(c) === null &&
-      (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
-      isOwner(ctx.db, ctx.user.id);
-    if (!owner) throw new HttpError(403, 'owner session required');
+    if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
   };
 
   const journalListLimit = (raw: string | undefined): number => {
@@ -53,8 +54,9 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     requireTeam(ctx, teamId);
     const origin = requestOrigin(c);
+    const includeLocalPath = isOwnerSession(c);
     const rows = ctx.db.select().from(project).where(listedProjects(teamId)).all();
-    return c.json(rows.map((r) => toProjectRecord(r, origin)));
+    return c.json(rows.map((r) => toProjectRecord(r, origin, { includeLocalPath })));
   });
 
   app.get('/api/projects/:id/todos', (c) => {
@@ -86,7 +88,7 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const row = requireProject(ctx, c.req.param('id'));
     return c.json(
       await readFiles(
-        { ...ctx, box: ctx.secretBox },
+        { ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) },
         row.id,
         c.req.query('ref'),
         c.req.query('limit'),
@@ -96,15 +98,37 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/projects/:id/branches', async (c) => {
     const row = requireProject(ctx, c.req.param('id'));
-    return c.json(await readBranches({ ...ctx, box: ctx.secretBox }, row.id));
+    return c.json(
+      await readBranches(
+        { ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) },
+        row.id,
+      ),
+    );
   });
 
   app.post('/api/projects', async (c) => {
     const body = parseWith(createProjectBodySchema, await jsonBody(c), 'body');
     const teamId = body.teamId ?? ctx.team.id;
     requireTeam(ctx, teamId);
-    const row = await createProject(ctx, { ...body, teamId });
-    return c.json(toProjectRecord(row, requestOrigin(c)), 201);
+    const local = (body.kind ?? body.repoKind) === 'local';
+    if (local) requireOwnerSession(c);
+    const row = await createProject(
+      {
+        ...svc,
+        githubBaseFetch: ctx.githubBaseFetch,
+        skillsDir: ctx.skillsDir,
+        homeDir: ctx.homeDir,
+        dataDir: ctx.dataDir,
+        ...(local ? { workspacesDir: ctx.workspacesDir } : {}),
+        logger: ctx.logger,
+      },
+      { ...body, teamId },
+      pairedDeviceIdOf(c),
+    );
+    return c.json(
+      toProjectRecord(row, requestOrigin(c), { includeLocalPath: isOwnerSession(c) }),
+      201,
+    );
   });
 
   app.patch('/api/projects/:id', async (c) => {
@@ -117,22 +141,30 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
         box: ctx.secretBox,
         oauthClient: ctx.oauthClient,
         ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
+        ...(ctx.githubBaseFetch !== undefined ? { githubBaseFetch: ctx.githubBaseFetch } : {}),
         ...(ctx.convHub !== undefined ? { convHub: ctx.convHub } : {}),
         ...(ctx.logger !== undefined ? { logger: ctx.logger } : {}),
       },
       row.id,
       body,
+      pairedDeviceIdOf(c),
     );
     if (updated === null) throw notFound(`project ${row.id}`);
-    return c.json(toProjectRecord(updated, requestOrigin(c)));
+    return c.json(
+      toProjectRecord(updated, requestOrigin(c), {
+        includeLocalPath: isOwnerSession(c),
+      }),
+    );
   });
 
   app.post('/api/fs/pick', async (c) => {
+    requireOwnerSession(c);
     const path = await pickFolder();
     return c.json({ path } satisfies FsPickResult);
   });
 
   app.get('/api/fs/list', (c) => {
+    requireOwnerSession(c);
     const result = listDir(c.req.query('dir'));
     return c.json(result satisfies FsListResult);
   });
@@ -156,7 +188,11 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
       );
       const updated = ctx.db.select().from(project).where(eq(project.id, row.id)).get();
       if (updated === undefined) throw notFound(`project ${row.id}`);
-      return c.json(toProjectRecord(updated, requestOrigin(c)));
+      return c.json(
+        toProjectRecord(updated, requestOrigin(c), {
+          includeLocalPath: isOwnerSession(c),
+        }),
+      );
     });
   }
 

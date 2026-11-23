@@ -76,6 +76,8 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/lib/github-token.ts:appFetches':
     'fetcher registry keyed on the app-token socket token; the token identifies the app',
   'apps/server/src/lib/github-token.ts:fallbackCounts': 'process metrics counters',
+  'apps/server/src/lib/local-source.ts:caseFoldingCache':
+    'whether a volume folds case is a filesystem fact shared by every instance',
   'apps/server/src/lib/remote-routes.ts:WILDCARD_HOSTS': 'constant lookup table',
   'apps/server/src/lib/request-origin.ts:LOOPBACK_PEER_ADDRESSES': 'constant lookup table',
   'apps/server/src/lib/token-auth.ts:READ_METHODS': 'constant lookup table',

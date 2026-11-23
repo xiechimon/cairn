@@ -76,7 +76,8 @@ export async function prepareSkillsHome(opts: SkillsHomeOpts): Promise<SkillsHom
       .values({ id: SKILLS_HOME_MIGRATION_ID, doneAt: nowMs(), detail: JSON.stringify(detail) })
       .onConflictDoNothing()
       .run();
-  if (opts.db.select({ id: team.id }).from(team).limit(1).get() === undefined) {
+  const teamRow = opts.db.select({ id: team.id }).from(team).limit(1).get();
+  if (teamRow === undefined) {
     recordMarker({ kind: 'fresh' });
     return { kind: 'fresh' };
   }
@@ -122,6 +123,7 @@ export async function prepareSkillsHome(opts: SkillsHomeOpts): Promise<SkillsHom
           ref: source,
           importedAt: nowMs(),
           refreshedAt: null,
+          teamId: teamRow.id,
         });
       }
       copied.push(skill.id);

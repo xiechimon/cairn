@@ -19,6 +19,7 @@ const PAIRED_DIAGNOSTIC_PATTERNS = [
   /^\/api\/teams\/[^/]+\/devin-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
   /^\/api\/teams\/[^/]+\/antigravity-subscriptions\/[^/]+\/(?:upstream-models|verify)$/,
 ];
+const OWNER_ONLY_SKILL_POST_PATTERN = /^\/api\/teams\/[^/]+\/skills\/(?:import|[^/]+\/refresh)$/;
 const OWNER_ONLY_PATTERNS = [
   /^\/api\/computers(?:\/[^/]+)?$/,
   /^\/api\/teams\/[^/]+\/(?:api-keys|secrets|providers|claude-subscriptions|devin-subscriptions|antigravity-subscriptions|mcp-connectors)(?:\/|$)/,
@@ -27,20 +28,21 @@ const OWNER_ONLY_PATTERNS = [
 ];
 
 export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
+  const verb = method.toUpperCase();
+  const read = READ_METHODS.has(verb);
   if (
     pathname === '/api/remote/pairing' ||
     pathname.startsWith('/api/remote/pairing/') ||
     pathname === '/api/remote/tailnet' ||
-    (pathname === '/api/remote/tailscale' && !READ_METHODS.has(method.toUpperCase())) ||
-    (pathname.startsWith('/api/remote/devices') && !READ_METHODS.has(method.toUpperCase()))
+    (pathname === '/api/remote/tailscale' && !read) ||
+    (pathname.startsWith('/api/remote/devices') && !read)
   )
     return true;
-  if (READ_METHODS.has(method.toUpperCase())) return false;
-  if (
-    method.toUpperCase() === 'POST' &&
-    PAIRED_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(pathname))
-  )
-    return false;
+  if (read) return false;
+  if (verb === 'POST') {
+    if (OWNER_ONLY_SKILL_POST_PATTERN.test(pathname)) return true;
+    if (PAIRED_DIAGNOSTIC_PATTERNS.some((pattern) => pattern.test(pathname))) return false;
+  }
   return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
 }
 

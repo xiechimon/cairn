@@ -2,9 +2,19 @@ import { projectRecordSchema } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import { afterAll, expect, test } from 'vitest';
 import { project } from '../src/db/schema.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { bootServer, req } from './helpers.js';
 
-const s = bootServer();
+const s = bootServer({
+  githubFetch: async (input) =>
+    new Response(JSON.stringify({ full_name: 'example/app' }), {
+      status: /^\/repos\/[^/]+\/[^/]+$/.test(new URL(String(input)).pathname) ? 200 : 404,
+    }),
+});
+upsertGithubConnection(
+  { db: s.db, box: s.secretBox },
+  { teamId: s.team.id, login: 'octo', accessToken: 'ghp_evidence', scope: 'repo' },
+);
 afterAll(() => s.dispose());
 
 test.each(['example/app', 'xiechimon/cairn', 'fork/cairn'])(

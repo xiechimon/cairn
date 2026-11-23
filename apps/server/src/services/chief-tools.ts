@@ -83,6 +83,7 @@ import {
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { effectDedupeKey } from './external-effects.js';
 import { isGithubRepoRef, readFile } from './git.js';
+import { assertGithubConnectionCurrent } from './github-connection.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { inspectRun } from './inspect-run.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -94,7 +95,7 @@ import { notifyChiefMessage } from './notifications.js';
 import type { OAuthClientConfig } from './oauth.js';
 import { coordinatorAcceptsReview, ownershipOf } from './owner.js';
 import { listedProjects } from './personal-space.js';
-import { createProject, ensureResearchProject } from './projects.js';
+import { assertGithubRepoReachable, createProject, ensureResearchProject } from './projects.js';
 import { getModelSources } from './providers.js';
 import type { VapidKeys } from './push.js';
 import {
@@ -134,6 +135,7 @@ export interface ChiefToolDeps {
   skillsDir: string;
   mcpConfigPath?: string;
   githubFetch?: FetchLike;
+  githubBaseFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
 }
 
@@ -152,6 +154,7 @@ export interface ChiefToolCtx {
   turnMessageIds?: readonly string[];
   turnScopeProjectId?: string | null;
   turnScopeMixed?: boolean;
+  assertTurnClaim?: () => void;
 }
 
 function skillAuditActor(ctx: ChiefToolCtx): { type: 'member' | 'agent'; id: string } {
@@ -339,6 +342,7 @@ export async function executeChiefTool(
     githubAppTokenSocket: deps.githubAppTokenSocket,
     githubAppIdentity: deps.githubAppIdentity,
     ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+    ...(deps.githubBaseFetch !== undefined ? { githubBaseFetch: deps.githubBaseFetch } : {}),
   };
   const chiefActor: TransitionActor = {
     kind: 'agent',
@@ -566,6 +570,7 @@ export async function executeChiefTool(
               box: deps.box,
               githubFetch: deps.githubFetch,
               githubAppTokenSocket: deps.githubAppTokenSocket,
+              discloseLocalPath: false,
             },
             projectId,
             p,
@@ -907,10 +912,21 @@ export async function executeChiefTool(
       const githubRepo = str(params, 'githubRepo');
       if (!isGithubRepoRef(githubRepo))
         throw new HttpError(400, 'invalid params.githubRepo: expected "owner/repo"');
-      db.update(project)
-        .set({ repoKind: 'github', githubRepo })
-        .where(eq(project.id, projectId))
-        .run();
+      const { pin } = await assertGithubRepoReachable(deps, ctx.teamId, githubRepo);
+      db.transaction(
+        (tx) => {
+          ctx.assertTurnClaim?.();
+          requireUnarchivedTargets(db, ctx.teamId, name, params);
+          assertGithubConnectionCurrent(db, ctx.teamId, pin);
+          const { changes } = tx
+            .update(project)
+            .set({ repoKind: 'github', githubRepo })
+            .where(and(eq(project.id, projectId), listedProjects(ctx.teamId)))
+            .run();
+          if (changes === 0) throw new HttpError(404, `project ${projectId}`);
+        },
+        { behavior: 'immediate' },
+      );
       return json({ id: projectId, repoKind: 'github', githubRepo });
     }
     case 'create_skill': {
@@ -1372,6 +1388,7 @@ function buildDeps(deps: ChiefToolDeps) {
     githubAppTokenSocket: deps.githubAppTokenSocket,
     githubAppIdentity: deps.githubAppIdentity,
     githubFetch: deps.githubFetch,
+    githubBaseFetch: deps.githubBaseFetch,
     oauthClient: deps.oauthClient,
   };
 }

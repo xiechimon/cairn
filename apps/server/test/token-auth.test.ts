@@ -20,7 +20,7 @@ import { HttpError } from '../src/lib/errors.js';
 import { registerTokenAuth } from '../src/lib/token-auth.js';
 import { AUTH_COOKIE } from '../src/services/browser-session.js';
 import { assertDeviceActive } from '../src/services/paired-devices.js';
-import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
+import { bootServer, insertGitApiKey, redeemTestPairing, req, type TestServer } from './helpers.js';
 
 const TOKEN = 'cairn-test-token-0123456789abcdef';
 const authHeaders = { authorization: `Bearer ${TOKEN}` };
@@ -79,6 +79,40 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
     const s = bootServer({ authToken: TOKEN });
     const res = await reqWith(s, 'GET', '/api/teams', authHeaders);
     expect(res.status).toBe(200);
+  });
+
+  test('a paired device can edit a skill named import without access to import or refresh', async () => {
+    const s = bootServer({ authToken: TOKEN });
+    const issued = await reqWith(s, 'POST', '/api/remote/pairing', authHeaders);
+    expect(issued.status).toBe(201);
+    const { code } = (await issued.json()) as { code: string };
+    const paired = await redeemTestPairing(s.app, code, 'phone');
+    expect(paired.status).toBe(201);
+    const { token } = (await paired.json()) as { token: string };
+    const deviceHeaders = { authorization: `Bearer ${token}` };
+    const created = await reqWith(s, 'POST', '/api/skills', authHeaders, {
+      name: 'import',
+      description: 'Original description',
+      files: [
+        {
+          path: 'SKILL.md',
+          content: '---\nname: import\ndescription: Original description\n---\n',
+        },
+      ],
+    });
+    expect(created.status).toBe(201);
+    const path = `/api/teams/${s.team.id}/skills/import`;
+    const edited = await reqWith(s, 'PUT', path, deviceHeaders, {
+      name: 'import',
+      description: 'Updated description',
+      files: [
+        { path: 'SKILL.md', content: '---\nname: import\ndescription: Updated description\n---\n' },
+      ],
+    });
+    expect(edited.status).toBe(200);
+    expect(await edited.json()).toMatchObject({ id: 'import', description: 'Updated description' });
+    expect((await reqWith(s, 'POST', path, deviceHeaders)).status).toBe(403);
+    expect((await reqWith(s, 'POST', `${path}/refresh`, deviceHeaders)).status).toBe(403);
   });
 
   test('on + a non-stream endpoint with ?token= (correct value) -> 401 -- the query surface is only for the two streams', async () => {

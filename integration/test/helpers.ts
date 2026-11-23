@@ -87,6 +87,7 @@ export interface RealServer {
   db: ReturnType<typeof openMemoryDb>;
   svc: BuildDeps;
   reposDir: string;
+  discloseLocalPath: boolean;
   attachmentsDir: string;
   skillsDir: string;
   skillSourcesPath: string;
@@ -150,6 +151,7 @@ export async function bootRealServer(opts: {
   const attachmentsDir = takeDir('it-att-');
   const skillsDir = takeDir('it-skills-');
   const skillSourcesPath = join(takeDir('it-skill-sources-'), 'skill-sources.json');
+  const homeDir = takeDir('it-home-');
   const ownMcpConfig = opts.mcpConfigPath === undefined;
   const mcpConfigPath = opts.mcpConfigPath ?? join(takeDir('it-mcp-'), 'mcp.json');
   if (ownMcpConfig) writeFileSync(mcpConfigPath, '{}\n');
@@ -183,6 +185,7 @@ export async function bootRealServer(opts: {
       attachmentsDir,
       skillsDir,
       skillSourcesPath,
+      homeDir,
       webDir: opts.webDir ?? null,
       authToken: null,
       mcpConfigPath,
@@ -326,6 +329,7 @@ export async function bootRealServer(opts: {
       db,
       svc: { db, hub, machineHub, convHub, user },
       reposDir,
+      discloseLocalPath: true,
       attachmentsDir,
       skillsDir,
       skillSourcesPath,
