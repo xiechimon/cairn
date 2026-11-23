@@ -17,6 +17,7 @@ export function TasksAddInput({
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const ref = useRef<HTMLInputElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   useEffect(() => {
     ref.current?.focus();
   }, []);
@@ -32,7 +33,9 @@ export function TasksAddInput({
       )
       .finally(() => {
         setSending(false);
-        ref.current?.focus();
+        const focused = document.activeElement;
+        if (focused === null || focused === document.body || formRef.current?.contains(focused))
+          ref.current?.focus();
       });
   };
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
@@ -42,7 +45,7 @@ export function TasksAddInput({
     onClose();
   };
   return (
-    <form onSubmit={submit} className="flex flex-none px-2">
+    <form ref={formRef} onSubmit={submit} className="flex flex-none px-2">
       <div
         data-testid="tasks-add-field"
         className="flex h-10.5 min-w-0 flex-1 items-center gap-4 rounded-(--radius-tile) border border-transparent bg-(--hover-1) pr-1.5 pl-2.5 focus-within:[outline:var(--focus-width)_solid_var(--focus-ring)]"

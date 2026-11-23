@@ -74,10 +74,12 @@ export function SegmentedTabs<T extends string>({
   optionHandle,
   slide = false,
   quiet = false,
+  onPick,
 }: SegmentedProps<T> & {
   label?: string;
   slide?: boolean;
   quiet?: boolean;
+  onPick?: (picked: T) => void;
 }) {
   return (
     <Tabs className="contents" value={value} onValueChange={(next: unknown) => onChange(next as T)}>
@@ -95,6 +97,7 @@ export function SegmentedTabs<T extends string>({
             aria-label={option.ariaLabel}
             data-testid={option.testId}
             data-segmented="option"
+            onClick={onPick === undefined ? undefined : () => onPick(option.value)}
             {...option.data}
             className={cn(
               optionClass(option),

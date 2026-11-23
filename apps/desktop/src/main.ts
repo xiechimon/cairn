@@ -122,6 +122,14 @@ import {
   type Updater,
 } from './updater.js';
 import { createWakeAhead, earliestScheduleNextRunAt } from './wake-ahead.js';
+import {
+  clampBounds,
+  createWindowStateStore,
+  DEFAULT_WINDOW_SIZE,
+  MIN_WINDOW_SIZE,
+  WINDOW_STATE_FILE_NAME,
+  type WindowStateStore,
+} from './window-state.js';
 
 const LOOPBACK = '127.0.0.1';
 const READY_TIMEOUT_MS = 60_000;
@@ -184,6 +192,7 @@ const serverExited = createServerExitHandler<RunningServer>({
   },
 });
 let mainWindow: BrowserWindow | null = null;
+let windowState: WindowStateStore | null = null;
 let tray: Tray | null = null;
 let trayOpenUntil = 0;
 let runner: LocalRunner | null = null;
@@ -416,12 +425,47 @@ function isWebUrl(url: string): boolean {
   return url.startsWith('https://') || url.startsWith('http://');
 }
 
+function windowStateStore(): WindowStateStore {
+  if (windowState !== null) return windowState;
+  const path = join(app.getPath('userData'), WINDOW_STATE_FILE_NAME);
+  windowState = createWindowStateStore({
+    read: () => {
+      try {
+        return readFileSync(path, 'utf8');
+      } catch {
+        return null;
+      }
+    },
+    write: (contents) => writeFileSync(path, contents),
+  });
+  return windowState;
+}
+
+function restoredBounds(store: WindowStateStore) {
+  const saved = store.current().bounds;
+  if (saved === null) return DEFAULT_WINDOW_SIZE;
+  return clampBounds(
+    saved,
+    screen.getAllDisplays().map((display) => display.workArea),
+    screen.getPrimaryDisplay().workArea,
+  );
+}
+
+function rememberWindow(window: BrowserWindow, store: WindowStateStore): void {
+  const saveBounds = () => {
+    if (!window.isFullScreen()) store.update({ bounds: window.getNormalBounds() });
+  };
+  window.on('resize', saveBounds);
+  window.on('move', saveBounds);
+  window.on('hide', () => store.flush());
+}
+
 function openWindow(origin: string): BrowserWindow {
+  const store = windowStateStore();
   const window = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 760,
-    minHeight: 520,
+    ...restoredBounds(store),
+    minWidth: MIN_WINDOW_SIZE.width,
+    minHeight: MIN_WINDOW_SIZE.height,
     show: false,
     title: 'Cairn',
     titleBarStyle: 'hiddenInset',
@@ -464,6 +508,7 @@ function openWindow(origin: string): BrowserWindow {
     event.preventDefault();
     if (isWebUrl(url)) void shell.openExternal(url);
   });
+  rememberWindow(window, store);
   void window.loadURL(origin);
   mainWindow = window;
   window.on('closed', () => {
@@ -1187,6 +1232,7 @@ if (!app.requestSingleInstanceLock()) {
     }
     focusWindow();
   });
+  app.on('will-quit', () => windowState?.flush());
   app.on('before-quit', (event) => {
     if (quitting || server === null) return;
     quitting = true;

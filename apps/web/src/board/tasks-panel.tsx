@@ -19,6 +19,7 @@ import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { newTaskRequest } from './open-composer.js';
 import { compactAge, relativeTime, shortDate } from './rel-time.js';
 import { StopAndDoneConfirm } from './stop-and-done-confirm.js';
@@ -79,6 +80,18 @@ function TasksSkeleton() {
 }
 
 const MOVE_FRESH_MS = 1500;
+
+const TASKS_TABS: readonly TasksTab[] = ['active', 'next', 'scheduled', 'resolved'];
+
+const TASKS_TAB_STORAGE_KEY = 'cairn.tasks-tab';
+
+function storedTasksTab(): TasksTab | null {
+  let stored: string | null = null;
+  try {
+    stored = safeLocalStorage()?.getItem(TASKS_TAB_STORAGE_KEY) ?? null;
+  } catch {}
+  return TASKS_TABS.find((tab) => tab === stored) ?? null;
+}
 
 function useMoved(entries: readonly TaskEntry[], ready: boolean): ReadonlySet<string> {
   const placed = useRef<Map<string, TaskSection> | null>(null);
@@ -308,7 +321,13 @@ export function TasksPanel({
   const { t } = useI18n();
   const [searchParams, setSearchParams] = useSearchParams();
   const linkedToScheduled = searchParams.get(TASKS_TAB_PARAM) === 'scheduled';
-  const [chosenTab, setTab] = useState<TasksTab | null>(null);
+  const [chosenTab, setChosenTab] = useState<TasksTab | null>(storedTasksTab);
+  const tabChoices = useRef(0);
+  const chooseTab = (next: TasksTab) => {
+    tabChoices.current += 1;
+    setChosenTab(next);
+    safeSetItem(TASKS_TAB_STORAGE_KEY, next);
+  };
   const [adding, setAdding] = useState(false);
   const newTaskRef = useRef<HTMLButtonElement | null>(null);
   const wasAdding = useRef(false);
@@ -428,7 +447,7 @@ export function TasksPanel({
   const loaded = query === undefined || !query.isPending;
   const openingTab: TasksTab = activeCount === 0 && groups.up_next.length > 0 ? 'next' : 'active';
   useEffect(() => {
-    if (chosenTab === null && loaded) setTab(openingTab);
+    if (chosenTab === null && loaded) setChosenTab(openingTab);
   }, [chosenTab, loaded, openingTab]);
   const tab = linkedToScheduled ? 'scheduled' : (chosenTab ?? openingTab);
   const addAction = adding ? null : (
@@ -443,7 +462,7 @@ export function TasksPanel({
         title={t('现在没有进行中的任务')}
         hint={t('接下来有 {n} 个任务在排队。', { n: groups.up_next.length })}
         action={
-          <Button variant="secondary" size="sm" onClick={() => setTab('next')}>
+          <Button variant="secondary" size="sm" onClick={() => chooseTab('next')}>
             {t('查看接下来')}
           </Button>
         }
@@ -539,8 +558,9 @@ export function TasksPanel({
           className={PANEL_TABS}
           optionHandle={PANEL_TAB}
           value={tab}
+          onPick={chooseTab}
           onChange={(next) => {
-            setTab(next);
+            chooseTab(next);
             clearPicked();
             if (linkedToScheduled)
               setSearchParams(
@@ -563,8 +583,9 @@ export function TasksPanel({
         <TasksAddInput
           onClose={() => setAdding(false)}
           onSubmit={async (text) => {
-            if ((await onAddTask(text)) === 'saved') setTab('next');
-            else setAdding(false);
+            const choicesAtSubmit = tabChoices.current;
+            if ((await onAddTask(text)) !== 'saved') setAdding(false);
+            else if (tabChoices.current === choicesAtSubmit) setChosenTab('next');
           }}
         />
       )}

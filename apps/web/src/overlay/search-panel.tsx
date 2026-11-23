@@ -30,7 +30,11 @@ import {
   removeChipAt,
   splitQuery,
 } from '../search/search-query.js';
-import { SETTINGS_HREF } from '../settings/settings-href.js';
+import {
+  isSettingsSectionId,
+  SETTINGS_HREF,
+  settingsSectionOf,
+} from '../settings/settings-href.js';
 
 const NAV_ROWS = [
   { label: 'Coordinator', Icon: Kanban, href: '/app' },
@@ -239,7 +243,11 @@ export function SearchPanel({
   const hitCount = commands.length + todos.length + projects.length;
 
   const go = (pathname: string) => {
-    navigate({ pathname, search });
+    if (
+      pathname !== SETTINGS_HREF ||
+      !isSettingsSectionId(settingsSectionOf(window.location.pathname))
+    )
+      navigate({ pathname, search });
     onClose();
   };
   const [helpOpen, setHelpOpen] = useState(false);

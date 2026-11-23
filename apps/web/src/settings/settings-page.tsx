@@ -49,7 +49,20 @@ import { AccountPage } from '../routes/account-page.js';
 import { ApiKeysPage } from '../routes/api-keys-page.js';
 import { ImConnectionsPage } from '../routes/im-page.js';
 import { RemoteAccessPage } from '../routes/remote-access-page.js';
-import { SETTINGS_HREF, type SettingsSectionId } from './settings-href.js';
+import { safeSetItem } from '../safe-storage.js';
+import {
+  isSettingsSectionId,
+  SETTINGS_HREF,
+  SETTINGS_SECTION_STORAGE_KEY,
+  type SettingsSectionId,
+  storedSettingsSection,
+} from './settings-href.js';
+
+function storePickedSection(target: EventTarget): void {
+  if (!(target instanceof Element)) return;
+  const picked = target.closest('[data-settings-section]')?.getAttribute('data-settings-section');
+  if (isSettingsSectionId(picked)) safeSetItem(SETTINGS_SECTION_STORAGE_KEY, picked);
+}
 
 interface Section {
   id: SettingsSectionId;
@@ -241,14 +254,21 @@ export function SettingsDialog({
   const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
   const machineNote = useMachineNote();
   const titleId = useId();
+  const [restoredSection] = useState(() => (sectionParam === '' ? storedSettingsSection() : null));
+  const lastShown = useRef<SettingsSectionId | null>(null);
   const movedTo =
-    sectionParam === 'providers' || sectionParam === 'work-routing'
-      ? 'routing'
-      : sectionParam === 'appearance'
-        ? 'account'
-        : null;
+    sectionParam === ''
+      ? (lastShown.current ?? restoredSection)
+      : sectionParam === 'providers' || sectionParam === 'work-routing'
+        ? 'routing'
+        : sectionParam === 'appearance'
+          ? 'account'
+          : null;
   const section = SECTIONS.find((s) => s.id === (movedTo ?? sectionParam)) ?? null;
   const shown = section ?? SECTIONS[0];
+  useEffect(() => {
+    lastShown.current = shown?.id ?? null;
+  }, [shown]);
   const opener = useRef<HTMLElement | null>(
     document.activeElement instanceof HTMLElement ? document.activeElement : null,
   );
@@ -309,6 +329,7 @@ export function SettingsDialog({
         keywords: s.keywords ?? [],
       }))}
       onPick={(pick) => {
+        safeSetItem(SETTINGS_SECTION_STORAGE_KEY, pick.section);
         navigate(hrefFor(pick.section), { replace: true });
         setMatchLabel(pick.row);
       }}
@@ -362,7 +383,10 @@ export function SettingsDialog({
         <div className="flex min-h-0 flex-auto">
           {!tabs && (
             <div
-              onClickCapture={() => setMatchLabel(null)}
+              onClickCapture={(event) => {
+                setMatchLabel(null);
+                storePickedSection(event.target);
+              }}
               className="w-(--settings-nav-w) flex-none border-r border-border"
             >
               <SettingsNav
@@ -380,7 +404,10 @@ export function SettingsDialog({
           >
             {tabs && (
               <div
-                onClickCapture={() => setMatchLabel(null)}
+                onClickCapture={(event) => {
+                  setMatchLabel(null);
+                  storePickedSection(event.target);
+                }}
                 className="flex flex-none flex-col gap-2 pt-3"
               >
                 <div className="px-4">{searchField}</div>

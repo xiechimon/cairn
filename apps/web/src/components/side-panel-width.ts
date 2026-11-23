@@ -13,9 +13,9 @@ export function clampPanelWidth(width: number, viewport: number): number {
   return Math.min(panelWidthMax(viewport), Math.max(PANEL_WIDTH_MIN, Math.round(width)));
 }
 
-export function readPanelWidth(stored: string | null, viewport: number): number {
+export function readPanelWidth(stored: string | null): number {
   const parsed = stored === null || stored === '' ? Number.NaN : Number(stored);
-  return Number.isFinite(parsed) ? clampPanelWidth(parsed, viewport) : PANEL_WIDTH_DEFAULT;
+  return Number.isFinite(parsed) ? parsed : PANEL_WIDTH_DEFAULT;
 }
 
 export const DOCKED_THREAD_MIN = 440;
