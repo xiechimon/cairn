@@ -1,3 +1,6 @@
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import { gfmFromMarkdown } from 'mdast-util-gfm';
+import { gfm } from 'micromark-extension-gfm';
 import { liveImEnv } from './env.js';
 import { asSendError, classifyHttpSendError, ImSendError, scrubSecrets } from './errors.js';
 import { chunkText } from './telegram.js';
@@ -10,7 +13,6 @@ import type {
 } from './types.js';
 
 const SLACK_API = 'https://slack.com/api';
-const MESSAGE_MAX_CHARS = 3000;
 const SECTION_TEXT_MAX_CHARS = 3000;
 const MESSAGE_MAX_BLOCKS = 50;
 const MESSAGE_MAX_BLOCK_CHARS = 12000;
@@ -228,31 +230,81 @@ function escapeText(part: string): string {
   return part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function sectionBlocks(part: string): Record<string, unknown>[] {
-  const sections: Record<string, unknown>[] = [];
-  let text = '';
-  const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(part);
-  for (const { segment } of graphemes) {
-    for (const piece of segment.length > SECTION_TEXT_MAX_CHARS ? [...segment] : [segment]) {
-      if (text.length + piece.length > SECTION_TEXT_MAX_CHARS) {
-        sections.push({ type: 'section', text: { type: 'plain_text', text } });
-        text = '';
+const GRAPHEMES = new Intl.Segmenter('en', { granularity: 'grapheme' });
+const FALLBACK_TEXT_MAX_CHARS = 4_000;
+
+function* plainPieces(text: string, limit: number): Generator<string> {
+  let piece = '';
+  for (const { segment } of GRAPHEMES.segment(text)) {
+    const units = segment.length <= limit ? [segment] : [...segment];
+    for (const unit of units) {
+      if (piece !== '' && piece.length + unit.length > limit) {
+        yield piece;
+        piece = '';
       }
-      text += piece;
+      piece += unit;
     }
   }
-  sections.push({ type: 'section', text: { type: 'plain_text', text } });
-  return sections;
+  if (piece !== '') yield piece;
+}
+
+function plainSection(text: string): Record<string, unknown> {
+  return { type: 'section', text: { type: 'plain_text', text } };
+}
+
+function fallbackText(text: string): string {
+  let out = '';
+  for (const { segment } of GRAPHEMES.segment(text)) {
+    const escaped = escapeText(segment);
+    if (out.length + escaped.length > FALLBACK_TEXT_MAX_CHARS) break;
+    out += escaped;
+  }
+  return out;
+}
+
+const HTTP_DESTINATION = /^https?:\/\//i;
+const LINK_NODE_TYPES = new Set(['link', 'image', 'definition']);
+
+interface MarkdownNode {
+  type: string;
+  url?: unknown;
+  children?: MarkdownNode[];
+}
+
+function markdownSafe(text: string): boolean {
+  let root: MarkdownNode;
+  try {
+    root = fromMarkdown(text, {
+      extensions: [gfm()],
+      mdastExtensions: [gfmFromMarkdown()],
+    }) as unknown as MarkdownNode;
+  } catch {
+    return false;
+  }
+  const stack: MarkdownNode[] = [...(root.children ?? [])];
+  while (stack.length > 0) {
+    const node = stack.pop() as MarkdownNode;
+    if (
+      LINK_NODE_TYPES.has(node.type) &&
+      (typeof node.url !== 'string' || !HTTP_DESTINATION.test(node.url))
+    ) {
+      return false;
+    }
+    if (node.children !== undefined) stack.push(...node.children);
+  }
+  return true;
 }
 
 export function slackCardBlocks({ text, buttons }: Pick<ImOutboundMessage, 'text' | 'buttons'>) {
-  if (text.length > MESSAGE_MAX_BLOCK_CHARS || text.trim() === '') return null;
+  if (text.length > MESSAGE_MAX_FALLBACK_CHARS) return null;
+  if (text.trim() === '') return null;
   if (escapeText(text).length > MESSAGE_MAX_FALLBACK_CHARS) return null;
-  const blocks = [...sectionBlocks(text), ...actionBlocks(buttons)];
-  return blocks.length <= MESSAGE_MAX_BLOCKS &&
-    JSON.stringify(blocks).length <= MESSAGE_MAX_BLOCK_CHARS
-    ? blocks
-    : null;
+  const actions = actionBlocks(buttons);
+  const maxSections = MESSAGE_MAX_BLOCKS - actions.length;
+  if (maxSections <= 0 || text.length > SECTION_TEXT_MAX_CHARS * maxSections) return null;
+  const pieces = Array.from(plainPieces(text, SECTION_TEXT_MAX_CHARS));
+  if (pieces.length > maxSections) return null;
+  return [...pieces.map(plainSection), ...actions];
 }
 
 export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
@@ -535,8 +587,38 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
             );
             return;
           }
-          for (const chunk of chunkText(msg.text, MESSAGE_MAX_CHARS)) {
-            await post({ channel: msg.chatKey, text: chunk });
+          if (msg.text.trim() === '') return;
+          const escaped = escapeText(msg.text);
+          if (
+            escaped.length <= MESSAGE_MAX_BLOCK_CHARS &&
+            markdownSafe(msg.text) &&
+            markdownSafe(escaped)
+          ) {
+            await post({
+              channel: msg.chatKey,
+              text: fallbackText(msg.text),
+              parse: 'none',
+              link_names: false,
+              mrkdwn: false,
+              unfurl_links: false,
+              unfurl_media: false,
+              blocks: [{ type: 'markdown', text: escaped }],
+            });
+            return;
+          }
+          const pieces = Array.from(plainPieces(msg.text, SECTION_TEXT_MAX_CHARS));
+          for (let at = 0; at < pieces.length; at += MESSAGE_MAX_BLOCKS) {
+            const group = pieces.slice(at, at + MESSAGE_MAX_BLOCKS);
+            await post({
+              channel: msg.chatKey,
+              text: fallbackText(group.join('')),
+              parse: 'none',
+              link_names: false,
+              mrkdwn: false,
+              unfurl_links: false,
+              unfurl_media: false,
+              blocks: group.map(plainSection),
+            });
           }
         },
         stop: async (): Promise<void> => {

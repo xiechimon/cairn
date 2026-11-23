@@ -640,6 +640,39 @@ describe('cards, actions and attachments', () => {
     ]);
   });
 
+  test('a pending question card lists each option description after its label', async () => {
+    await connectAndPair('55');
+    const stepRow = await claimImStep('pick something');
+    createOrGetQuestion(
+      { db: s.db, hub: s.hub, convHub: s.convHub, user: s.user },
+      {
+        threadId: stepRow.buildId,
+        requestId: 'q-desc',
+        questions: [
+          {
+            header: '选择',
+            question: 'Pick one?',
+            options: [
+              { label: 'A', description: 'the safe choice' },
+              { label: 'B' },
+              { label: 'C', description: '   ' },
+            ],
+          },
+        ],
+        askedFor: [],
+      },
+    );
+    await vi.waitFor(() => expect(sessions[0]?.sent).toHaveLength(1));
+    expect(sessions[0]?.sent[0]?.text).toBe('Pick one?\n\n1. A — the safe choice\n2. B\n3. C');
+    expect(sessions[0]?.sent[0]?.buttons).toEqual([
+      [
+        { label: 'A', value: 'imcb:q-desc:0' },
+        { label: 'B', value: 'imcb:q-desc:1' },
+        { label: 'C', value: 'imcb:q-desc:2' },
+      ],
+    ]);
+  });
+
   test('tapping a button answers a parked question and the resumed turn replies in chat', async () => {
     seedRoute(s, 'coordinator');
     await connectAndPair('55');

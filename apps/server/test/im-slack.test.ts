@@ -8,6 +8,7 @@ import {
   fauxToolCall,
 } from '@earendil-works/pi-ai';
 import { eq } from 'drizzle-orm';
+import { fromMarkdown } from 'mdast-util-from-markdown';
 import { beforeEach, describe, expect, onTestFinished, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { AskChannel } from '../../daemon/src/ask-channel.js';
@@ -50,6 +51,11 @@ import { machineAsk } from '../src/services/machine-relay.js';
 import { turnProvenance } from '../src/services/turn-provenance.js';
 import { chiefStep, fakeMachineApi } from './coordinator/fake-machine-api.js';
 import { bootServer, insertMachine, req, seedRoute } from './helpers.js';
+
+vi.mock('mdast-util-from-markdown', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('mdast-util-from-markdown')>();
+  return { ...actual, fromMarkdown: vi.fn(actual.fromMarkdown) };
+});
 
 const APP_TOKEN = 'xapp-1-A0123BCDE-456789-abcdef';
 const BOT_TOKEN = 'xoxb-123456789012-abcdefghijkl';
@@ -218,7 +224,7 @@ function messageEvent(overrides: Record<string, unknown> = {}): Record<string, u
 }
 
 const SHORT_QUESTION = { header: 'Pick', question: 'Which option?', options: [{ label: 'A' }] };
-const LONG_QUESTION = { ...SHORT_QUESTION, question: `Which option? ${'\u0001'.repeat(2000)}` };
+const LONG_QUESTION = { ...SHORT_QUESTION, question: `Which option? ${'x'.repeat(45_000)}` };
 const SHORTEN_ERROR = /too long for the Slack card.*ask a shorter question.*ordinary message/i;
 const ANSWERS = [{ header: 'Pick', choices: ['A'] }];
 
@@ -286,7 +292,10 @@ async function slackQuestionWorld() {
       ).toBe('delivered');
     });
     const blocks = posts()[0]?.body.blocks as { type: string; elements?: unknown[] }[];
-    expect(blocks[0]).toMatchObject({ type: 'section', text: { text: 'Which option?\n\n1. A' } });
+    expect(blocks[0]).toMatchObject({
+      type: 'section',
+      text: { type: 'plain_text', text: 'Which option?\n\n1. A' },
+    });
     const actions = blocks[1]?.elements;
     expect(actions).toEqual([
       expect.objectContaining({ value: expect.stringMatching(/^imcb:ask-.*:0$/) }),
@@ -310,7 +319,7 @@ describe('Slack question size guard', () => {
     [39_999, ' Proceed'],
     [40_000, ' Proceed?'],
     [40_001, ' Proceed?!'],
-  ])(
+  ] as const)(
     'a fresh Slack question with a %i-character escaped fallback respects the limit',
     async (length, suffix) => {
       const { s, deps, origin, provenance, posts, state } = await slackQuestionWorld();
@@ -457,7 +466,7 @@ describe('Slack question size guard', () => {
       channel: origin.chatKey,
       text: 'Which option?\n\n1. A',
       blocks: [
-        { type: 'section', text: { text: 'Which option?\n\n1. A' } },
+        { type: 'section', text: { type: 'plain_text', text: 'Which option?\n\n1. A' } },
         { type: 'actions', elements: [{ text: { text: 'A' }, value: `imcb:${requestId}:0` }] },
       ],
     });
@@ -467,7 +476,7 @@ describe('Slack question size guard', () => {
     ['blank', '   '],
     ['multi-megabyte', 'x'.repeat(3 * 1024 * 1024)],
   ])(
-    'the card check refuses %s text without entering the block builder',
+    'the card check refuses %s text without scanning it',
     (_label, text) => {
       const segment = Intl.Segmenter.prototype.segment;
       const buildSections = vi
@@ -475,13 +484,21 @@ describe('Slack question size guard', () => {
         .mockImplementation(function (this: Intl.Segmenter) {
           return segment.call(this, 'fixture');
         });
-      onTestFinished(() => buildSections.mockRestore());
+      const scan = vi.spyOn(String.prototype, 'replace');
+      const parse = vi.mocked(fromMarkdown);
+      parse.mockClear();
+      onTestFinished(() => {
+        buildSections.mockRestore();
+        scan.mockRestore();
+      });
       const blocks = slackCardBlocks({
         text,
         buttons: [[{ label: 'A', value: 'imcb:ask-fixture:0' }]],
       });
-      expect(buildSections).not.toHaveBeenCalled();
       expect(blocks).toBeNull();
+      expect(scan.mock.contexts).not.toContain(text);
+      expect(parse).not.toHaveBeenCalled();
+      expect(buildSections).not.toHaveBeenCalled();
     },
     3_000,
   );
@@ -732,6 +749,10 @@ describe('slack adapter', () => {
     blocksOf(post)
       .filter((block) => block.type === 'section')
       .map((block) => block.text?.text ?? '');
+  const markdownOf = (post: RecordedCall) =>
+    blocksOf(post)
+      .filter((block) => block.type === 'markdown')
+      .map((block) => block.text as unknown as string);
   const actionBlocksOf = (post: RecordedCall) =>
     blocksOf(post).filter((block) => block.type === 'actions');
   const escaped = (text: string) =>
@@ -933,16 +954,27 @@ describe('slack adapter', () => {
     await session.stop();
   });
 
-  test('send leaves a message without buttons unescaped and unfurled', async () => {
+  test('send cuts the reply fallback before a prepend grapheme that ends in an ampersand', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const head = 'a'.repeat(3_996);
+    await session.send({ chatKey: 'D0DM', text: `${head}\u0600&tail` });
+    const post = slack.calls.find((call) => call.method === 'chat.postMessage');
+    expect(post?.body.text).toBe(head);
+    await session.stop();
+  });
+
+  test('send escapes angle brackets in a message without buttons so they stay literal', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
     await session.send({ chatKey: 'D0DM', text: 'a & <b> c' });
     const post = slack.calls.find((call) => call.method === 'chat.postMessage');
-    expect(post?.body).toEqual({ channel: 'D0DM', text: 'a & <b> c' });
+    expect(post?.body.text).toBe('a &amp; &lt;b&gt; c');
+    expect(markdownOf(post!)).toEqual(['a &amp; &lt;b&gt; c']);
     await session.stop();
   });
 
-  test('send keeps the question above its buttons as plain text so a labeled link stays inert', async () => {
+  test('send keeps a labeled link in the question inert inside the card it answers', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
     const question =
@@ -961,7 +993,10 @@ describe('slack adapter', () => {
     expect(post?.body.mrkdwn).toBe(false);
     expect(post?.body.parse).toBe('none');
     expect(post?.body.blocks).toEqual([
-      { type: 'section', text: { type: 'plain_text', text: question } },
+      {
+        type: 'section',
+        text: { type: 'plain_text', text: question },
+      },
       {
         type: 'actions',
         elements: [
@@ -997,7 +1032,7 @@ describe('slack adapter', () => {
     await session.stop();
   });
 
-  test('send keeps the section inside the length Slack counts and the whole text in the fallback', async () => {
+  test('send keeps a wide-grapheme question whole across card sections', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
     const text = '\u{1f600}'.repeat(1600);
@@ -1006,16 +1041,10 @@ describe('slack adapter', () => {
       text,
       buttons: [[{ label: 'Approve', value: 'approve-1' }]],
     });
-    const post = slack.calls.find((call) => call.method === 'chat.postMessage');
-    expect(post?.body.text).toBe(text);
-    const blocks = post?.body.blocks as { type: string; text?: { text: string } }[];
-    const sections = blocks.filter((block) => block.type === 'section');
-    expect(sections.length).toBeGreaterThan(1);
-    for (const section of sections) {
-      expect(section.text?.text.length).toBeLessThanOrEqual(3000);
-    }
-    expect(sections.map((section) => section.text?.text ?? '').join('')).toBe(text);
-    expect(blocks.at(-1)?.type).toBe('actions');
+    const post = slack.calls.find((call) => call.method === 'chat.postMessage') as RecordedCall;
+    expect(post.body.text).toBe(text);
+    expect(sectionsOf(post)).toEqual(['\u{1f600}'.repeat(1500), '\u{1f600}'.repeat(100)]);
+    expect(blocksOf(post).at(-1)?.type).toBe('actions');
     await session.stop();
   });
 
@@ -1038,8 +1067,11 @@ describe('slack adapter', () => {
     expect(post.body.unfurl_media).toBe(false);
     expect(post.body.mrkdwn).toBe(false);
     expect(post.body.parse).toBe('none');
-    expect(sectionsOf(post).join('')).toBe(text);
-    expect(sectionsOf(post)[0]).toContain(recipient);
+    expect(markdownOf(post)).toEqual([]);
+    const sections = sectionsOf(post);
+    expect(sections).toHaveLength(3);
+    expect(sections.join('')).toBe(text);
+    expect(sections[0]).toContain(recipient);
     expect(blocksOf(post).at(-1)?.type).toBe('actions');
     expect(actionBlocksOf(post)).toHaveLength(1);
     await session.stop();
@@ -1048,7 +1080,23 @@ describe('slack adapter', () => {
   test('send keeps leading spaces inside the card', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
-    const text = `${' '.repeat(3200)}ship it?`;
+    const text = `${' '.repeat(2900)}ship it?${'y'.repeat(500)}`;
+    await session.send({
+      chatKey: 'D0DM',
+      text,
+      buttons: [[{ label: 'Approve', value: 'approve-1' }]],
+    });
+    const posts = chatPosts();
+    expect(posts).toHaveLength(1);
+    expect(sectionsOf(posts[0] as RecordedCall).join('')).toBe(text);
+    expect(blocksOf(posts[0] as RecordedCall).at(-1)?.type).toBe('actions');
+    await session.stop();
+  });
+
+  test('send keeps a run of 4500 spaces between words inside the card', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const text = `a${' '.repeat(4500)}b`;
     await session.send({
       chatKey: 'D0DM',
       text,
@@ -1091,11 +1139,9 @@ describe('slack adapter', () => {
     await session.stop();
   });
 
-  test('send answers an over-budget card with the notice alone', async () => {
+  test('send answers an over-limit card with plain text sections', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
-    for (let index = 0; index < 6; index += 1) {
-      slack.queue('chat.postMessage', { ok: true, ts: String(index) });
-    }
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
     const text = `${'x'.repeat(3000)}${' '.repeat(3000)}${'y'.repeat(6500)}`;
     await session.send({
       chatKey: 'D0DM',
@@ -1104,16 +1150,24 @@ describe('slack adapter', () => {
     });
     const posts = chatPosts();
     expect(posts).toHaveLength(1);
-    expect(posts[0]?.body).toEqual({ channel: 'D0DM', text: cardNotice });
+    const post = posts[0] as RecordedCall;
+    expect(markdownOf(post)).toEqual([]);
+    expect(sectionsOf(post)).toEqual([
+      'x'.repeat(3000),
+      ' '.repeat(3000),
+      'y'.repeat(3000),
+      'y'.repeat(3000),
+      'y'.repeat(500),
+    ]);
+    expect(sectionsOf(post).join('')).toBe(text);
+    expect(blocksOf(post).at(-1)?.type).toBe('actions');
     await session.stop();
   });
 
   test('send drops the buttons when the card would exceed the character budget', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
-    for (let index = 0; index < 6; index += 1) {
-      slack.queue('chat.postMessage', { ok: true, ts: String(index) });
-    }
-    const text = 'x'.repeat(13000);
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const text = 'x'.repeat(45_000);
     await session.send({
       chatKey: 'D0DM',
       text,
@@ -1137,12 +1191,17 @@ describe('slack adapter', () => {
     const posts = chatPosts();
     expect(posts).toHaveLength(1);
     const post = posts[0] as RecordedCall;
-    expect(sectionsOf(post).join('')).toBe(text);
+    expect(sectionsOf(post)).toEqual([
+      'x'.repeat(3000),
+      'x'.repeat(3000),
+      'x'.repeat(3000),
+      'x'.repeat(2000),
+    ]);
     expect(blocksOf(post).at(-1)?.type).toBe('actions');
     await session.stop();
   });
 
-  test('send keeps the section when 49 rows fit the block limit', async () => {
+  test('send keeps the card when 49 rows fit the block limit', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
     const rows = Array.from({ length: 49 }, (_, index) => [
@@ -1152,16 +1211,19 @@ describe('slack adapter', () => {
     const post = slack.calls.find((call) => call.method === 'chat.postMessage');
     const blocks = post?.body.blocks as { type: string }[];
     expect(blocks).toHaveLength(50);
-    expect(blocks[0]).toEqual({ type: 'section', text: { type: 'plain_text', text: 'ship it?' } });
+    expect(blocks[0]).toEqual({
+      type: 'section',
+      text: { type: 'plain_text', text: 'ship it?' },
+    });
     expect(blocks.filter((block) => block.type === 'actions')).toHaveLength(49);
     await session.stop();
   });
 
-  test('send keeps a flag whole when the section boundary falls inside it', async () => {
+  test('send keeps a flag whole when a plain section boundary falls inside it', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
     const flag = '\u{1f1e8}\u{1f1f3}';
-    const text = `${'x'.repeat(2998)}${flag}${'y'.repeat(10)}`;
+    const text = `${'x'.repeat(2998)}${flag}${'y'.repeat(9500)}`;
     await session.send({
       chatKey: 'D0DM',
       text,
@@ -1169,18 +1231,18 @@ describe('slack adapter', () => {
     });
     const posts = chatPosts();
     expect(posts).toHaveLength(1);
-    expect(sectionsOf(posts[0] as RecordedCall)).toEqual([
-      'x'.repeat(2998),
-      `${flag}${'y'.repeat(10)}`,
-    ]);
+    const sections = sectionsOf(posts[0] as RecordedCall);
+    expect(sections[0]).toBe('x'.repeat(2998));
+    expect(sections[1]?.startsWith(flag)).toBe(true);
+    for (const section of sections) expect(section.length).toBeLessThanOrEqual(3000);
+    expect(sections.join('')).toBe(text);
     await session.stop();
   });
 
-  test('send keeps a combining mark whole when the section boundary falls inside it', async () => {
+  test('send keeps a combining mark whole when a plain section boundary falls inside it', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
-    const prefix = `${'\u{1f600}'.repeat(60)}${'x'.repeat(2879)}`;
-    const text = `${prefix}e\u0301${'y'.repeat(50)}`;
+    const text = `${'x'.repeat(2999)}e\u0301${'y'.repeat(9500)}`;
     await session.send({
       chatKey: 'D0DM',
       text,
@@ -1188,15 +1250,11 @@ describe('slack adapter', () => {
     });
     const posts = slack.calls.filter((call) => call.method === 'chat.postMessage');
     expect(posts).toHaveLength(1);
-    const sections = (posts[0] as RecordedCall).body.blocks as {
-      type: string;
-      text?: { text: string };
-    }[];
-    const texts = sections
-      .filter((block) => block.type === 'section')
-      .map((block) => block.text?.text ?? '');
-    expect(texts).toEqual([prefix, `e\u0301${'y'.repeat(50)}`]);
-    for (const text of texts) expect(text.length).toBeLessThanOrEqual(3000);
+    const sections = sectionsOf(posts[0] as RecordedCall);
+    expect(sections[0]).toBe('x'.repeat(2999));
+    expect(sections[1]?.startsWith('e\u0301')).toBe(true);
+    for (const section of sections) expect(section.length).toBeLessThanOrEqual(3000);
+    expect(sections.join('')).toBe(text);
     await session.stop();
   });
 
@@ -1240,6 +1298,118 @@ describe('slack adapter', () => {
     await session.stop();
   });
 
+  test('send delivers markdown source to Slack verbatim in the card', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const text =
+      'pick **one** or _two_, the ~~old~~ way:\n## Lane\n- first\n  - second\n`code` and [doc](https://docs.example/p)';
+    await session.send({
+      chatKey: 'D0DM',
+      text,
+      buttons: [[{ label: 'Approve', value: 'approve-1' }]],
+    });
+    const post = chatPosts()[0] as RecordedCall;
+    expect(sectionsOf(post)).toEqual([text]);
+    await session.stop();
+  });
+
+  test('send keeps inline and fenced code literal in the card', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const text = 'a < b and `x < y & z` then\n```ts\nif (a && b) { <x> }\n```\ndone';
+    await session.send({
+      chatKey: 'D0DM',
+      text,
+      buttons: [[{ label: 'Approve', value: 'approve-1' }]],
+    });
+    const post = chatPosts()[0] as RecordedCall;
+    expect(sectionsOf(post)).toEqual([text]);
+    await session.stop();
+  });
+
+  test('send keeps a non-http link literal inside the plain-text card', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const text =
+      'read [the doc](https://docs.example/p?q=1&r=2) but not [local](file:///etc/hosts) nor [fn](javascript:alert(1))';
+    await session.send({
+      chatKey: 'D0DM',
+      text,
+      buttons: [[{ label: 'Approve', value: 'approve-1' }]],
+    });
+    const post = chatPosts()[0] as RecordedCall;
+    const blocks = blocksOf(post);
+    expect(markdownOf(post)).toEqual([]);
+    expect(blocks.slice(0, -1).every((block) => block.type === 'section')).toBe(true);
+    expect(sectionsOf(post).join('')).toBe(text);
+    expect(blocks.at(-1)?.type).toBe('actions');
+    await session.stop();
+  });
+
+  test('send keeps slack control syntax from the text inert in cards and replies', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    slack.queue('chat.postMessage', { ok: true, ts: '2' });
+    const text =
+      'heads up <!channel> and <!here> and <@U42> or @channel, <https://approve.example/now|Approve in Cairn>';
+    const inert =
+      'heads up &lt;!channel&gt; and &lt;!here&gt; and &lt;@U42&gt; or @channel, &lt;https://approve.example/now|Approve in Cairn&gt;';
+    await session.send({
+      chatKey: 'D0DM',
+      text,
+      buttons: [[{ label: 'Approve', value: 'approve-1' }]],
+    });
+    await session.send({ chatKey: 'D0DM', text });
+    const posts = chatPosts();
+    expect(posts).toHaveLength(2);
+    expect(sectionsOf(posts[0] as RecordedCall)).toEqual([text]);
+    expect(markdownOf(posts[1] as RecordedCall)).toEqual([inert]);
+    expect(posts[0]?.body.text).toBe(inert);
+    expect(posts[1]?.body.text).toBe(inert);
+    await session.stop();
+  });
+
+  test('send keeps the card fallback text escaped while the section carries the source', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const text = '**本次变化** <https://approve.example/now|ok> & co';
+    await session.send({
+      chatKey: 'D0DM',
+      text,
+      buttons: [[{ label: 'Approve', value: 'approve-1' }]],
+    });
+    const post = chatPosts()[0] as RecordedCall;
+    expect(post.body.text).toBe('**本次变化** &lt;https://approve.example/now|ok&gt; &amp; co');
+    expect(post.body.mrkdwn).toBe(false);
+    expect(post.body.parse).toBe('none');
+    expect(sectionsOf(post)).toEqual([text]);
+    const blocks = post.body.blocks as {
+      type: string;
+      elements?: { text?: { type?: string } }[];
+    }[];
+    const buttons = blocks.find((block) => block.type === 'actions')?.elements ?? [];
+    expect(buttons[0]?.text?.type).toBe('plain_text');
+    await session.stop();
+  });
+
+  test('send renders a reply without buttons as a markdown block', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    await session.send({ chatKey: 'D0DM', text: 'reply with **bold** and _soft_' });
+    const post = chatPosts()[0] as RecordedCall;
+    expect(post.body).toMatchObject({
+      channel: 'D0DM',
+      text: 'reply with **bold** and _soft_',
+      parse: 'none',
+      link_names: false,
+      mrkdwn: false,
+      unfurl_links: false,
+      unfurl_media: false,
+    });
+    expect(markdownOf(post)).toEqual(['reply with **bold** and _soft_']);
+    await session.stop();
+  });
+
   test('send posts once when Slack rejects the message', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: false, error: 'invalid_blocks' });
@@ -1265,24 +1435,32 @@ describe('slack adapter', () => {
     await session.stop();
   });
 
-  test('send chunks long messages into the main DM without threading', async () => {
+  test('send posts a long reply as one markdown message without threading', async () => {
     const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
     slack.queue('chat.postMessage', { ok: true, ts: '1' });
-    slack.queue('chat.postMessage', { ok: true, ts: '2' });
-    slack.queue('chat.postMessage', { ok: true, ts: '3' });
     await session.send({
       chatKey: 'D0DM',
       text: 'x'.repeat(6500),
       replyToMessageId: '1700000000.000000',
     });
     const posts = slack.calls.filter((call) => call.method === 'chat.postMessage');
-    expect(posts).toHaveLength(3);
-    expect(posts.map((post) => post.body.thread_ts)).toEqual([undefined, undefined, undefined]);
-    expect(posts.map((post) => post.body.text)).toEqual([
-      'x'.repeat(3000),
-      'x'.repeat(3000),
-      'x'.repeat(500),
-    ]);
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.body.thread_ts).toBeUndefined();
+    expect(markdownOf(posts[0] as RecordedCall)).toEqual(['x'.repeat(6500)]);
+    await session.stop();
+  });
+
+  test('send keeps a whitespace run inside one reply message', async () => {
+    const session = await readySession({ onMessage: () => {}, onStatus: () => {} });
+    slack.queue('chat.postMessage', { ok: true, ts: '1' });
+    const text = `${'a'.repeat(3000)}${'\n'.repeat(3000)}tail`;
+    await session.send({
+      chatKey: 'D0DM',
+      text,
+    });
+    const posts = chatPosts();
+    expect(posts).toHaveLength(1);
+    expect(markdownOf(posts[0] as RecordedCall)).toEqual([text]);
     await session.stop();
   });
 

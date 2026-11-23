@@ -138,7 +138,7 @@ function questionCard(requestId: string, questions: readonly AskUserQuestion[]) 
   }
   return {
     requestId,
-    text: `${question.question}\n\n${question.options.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}`.trim(),
+    text: `${question.question}\n\n${question.options.map((o, i) => `${i + 1}. ${o.label}${o.description?.trim() ? ` — ${o.description.trim()}` : ''}`).join('\n')}`.trim(),
     buttons: [
       question.options.map((o, i) => ({ label: o.label, value: `imcb:${requestId}:${i}` })),
     ],
