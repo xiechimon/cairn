@@ -141,6 +141,8 @@ const TRAY_FIRST_HEIGHT = 440;
 const TRAY_MAX_HEIGHT = 900;
 const TRAY_REFRESH_MS = 2_000;
 const TRAY_REOPEN_GUARD_MS = 250;
+const TRAY_QUEUED_OPEN_MS = 2_000;
+const ERR_ABORTED = -3;
 const TRAY_LIGHT_FILL = '#f6f6f6';
 const TRAY_DARK_FILL = '#2b2b2b';
 const IS_MAC = process.platform === 'darwin';
@@ -183,6 +185,7 @@ const serverExited = createServerExitHandler<RunningServer>({
 });
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
+let trayOpenUntil = 0;
 let runner: LocalRunner | null = null;
 let runnerStarting: Promise<void> | null = null;
 let quitting = false;
@@ -434,6 +437,18 @@ function openWindow(origin: string): BrowserWindow {
     `${window.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
   );
   installContextMenu(window.webContents, { clipboard, Menu }, desktopLocale);
+  const clearQueuedTrayOpen = (): void => {
+    trayOpenUntil = 0;
+  };
+  window.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'Escape') clearQueuedTrayOpen();
+  });
+  window.webContents.on('before-mouse-event', (_event, input) => {
+    if (input.type === 'mouseDown') clearQueuedTrayOpen();
+  });
+  window.on('close', clearQueuedTrayOpen);
+  window.on('minimize', clearQueuedTrayOpen);
+  window.on('hide', clearQueuedTrayOpen);
   window.once('ready-to-show', () => window.show());
   window.on('close', (event) => {
     if (quitting) return;
@@ -487,7 +502,7 @@ interface TrayControls {
   nextRunAt?: () => Promise<number | null>;
 }
 
-function createTrayPopover(origin: string): BrowserWindow {
+function createTrayPopover(): BrowserWindow {
   const popover = new BrowserWindow({
     width: TRAY_POPOVER_WIDTH,
     height: TRAY_FIRST_HEIGHT,
@@ -523,14 +538,8 @@ function createTrayPopover(origin: string): BrowserWindow {
   popover.webContents.setUserAgent(
     `${popover.webContents.getUserAgent()} ${DESKTOP_SHELL_USER_AGENT}`,
   );
-  popover.on('close', (event) => {
-    if (quitting) return;
-    event.preventDefault();
-    popover.hide();
-  });
   popover.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   popover.webContents.on('will-navigate', (event) => event.preventDefault());
-  void popover.loadURL(`${origin}${DESKTOP_TRAY_PATH}`);
   return popover;
 }
 
@@ -559,6 +568,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
   const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
   const created = new Tray(keepAwake.isHolding() ? awakeIcon : idleIcon);
+  if (IS_MAC) created.setIgnoreDoubleClickEvents(true);
   const refreshIcon = (): void => {
     created.setImage(keepAwake.isHolding() ? awakeIcon : idleIcon);
   };
@@ -589,9 +599,14 @@ function showTray(origin: string, controls: TrayControls): Tray {
     powerMonitor.on('resume', () => void wakeAhead.pollNow());
   }
   globalShortcut.register(NEW_TASK_SHORTCUT, () => sendToWindow('desktop-menu', 'new-task'));
-  const popover = createTrayPopover(origin);
+  const popover = createTrayPopover();
+  const contents = popover.webContents;
+  const trayUrl = `${origin}${DESKTOP_TRAY_PATH}`;
   let height = TRAY_FIRST_HEIGHT;
   let hiddenAt = 0;
+  let documentState: 'loading' | 'usable' | 'failed' = 'failed';
+  let navigation = 0;
+  let waitingForCommit = false;
   const state = (): DesktopTrayState => ({
     runner: controls.runner(),
     keepAwake: keepAwake.isOn(),
@@ -607,28 +622,103 @@ function showTray(origin: string, controls: TrayControls): Tray {
     );
   };
   const hide = (): void => {
+    trayOpenUntil = 0;
     if (popover.isVisible()) popover.hide();
   };
+  contents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'Escape') return;
+    if (popover.isVisible()) event.preventDefault();
+    hide();
+  });
+  popover.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    hide();
+  });
   popover.on('blur', () => {
     hiddenAt = Date.now();
-    popover.hide();
+    hide();
   });
+  if (IS_MAC) {
+    app.on('did-resign-active', () => {
+      trayOpenUntil = 0;
+    });
+  }
+  const show = (): void => {
+    if (quitting) return;
+    place();
+    popover.show();
+    if (!IS_MAC) popover.focus();
+    publish();
+  };
+  const failDocument = (): void => {
+    documentState = 'failed';
+    hide();
+  };
+  const reconcileStoppedLoad = (attempt = navigation): void => {
+    setImmediate(() => {
+      if (
+        attempt === navigation &&
+        documentState === 'loading' &&
+        !contents.isDestroyed() &&
+        !contents.isLoading()
+      ) {
+        failDocument();
+      }
+    });
+  };
+  const loadTray = (): void => {
+    navigation++;
+    waitingForCommit = true;
+    documentState = 'loading';
+    const load = popover.loadURL(trayUrl);
+    const attempt = navigation;
+    void load.catch(() => reconcileStoppedLoad(attempt));
+  };
   const toggle = (): void => {
     if (popover.isVisible() || Date.now() - hiddenAt < TRAY_REOPEN_GUARD_MS) {
       hide();
       return;
     }
-    const show = (): void => {
-      place();
-      popover.show();
-      if (!IS_MAC) popover.focus();
-      publish();
-    };
-    if (popover.webContents.isLoading()) popover.once('ready-to-show', show);
-    else show();
+    if (documentState === 'usable') {
+      show();
+      return;
+    }
+    const now = performance.now();
+    trayOpenUntil = now < trayOpenUntil ? 0 : now + TRAY_QUEUED_OPEN_MS;
+    if (documentState === 'failed') loadTray();
   };
+  contents.on('did-start-navigation', ({ isMainFrame, isSameDocument }) => {
+    if (!isMainFrame || isSameDocument) return;
+    navigation++;
+    if (documentState === 'failed') {
+      waitingForCommit = true;
+      documentState = 'loading';
+    }
+  });
+  contents.on('did-navigate', () => {
+    waitingForCommit = false;
+    documentState = 'loading';
+    if (popover.isVisible()) hide();
+  });
+  contents.on('did-finish-load', () => {
+    if (documentState !== 'loading' || waitingForCommit) return;
+    documentState = 'usable';
+    const shouldOpen = performance.now() < trayOpenUntil;
+    trayOpenUntil = 0;
+    if (shouldOpen) show();
+  });
+  contents.on('did-fail-provisional-load', (_event, _code, _description, _url, isMainFrame) => {
+    if (isMainFrame) reconcileStoppedLoad();
+  });
+  contents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
+    if (!isMainFrame) return;
+    if (code === ERR_ABORTED) reconcileStoppedLoad();
+    else failDocument();
+  });
+  contents.on('did-stop-loading', () => reconcileStoppedLoad());
+  contents.on('render-process-gone', failDocument);
   created.on('click', toggle);
-  (app as NodeJS.EventEmitter).on('cairn-tray-toggle', toggle);
   if (IS_MAC) created.on('right-click', toggle);
   else created.setContextMenu(fallbackMenu());
   setInterval(publish, TRAY_REFRESH_MS);
@@ -662,6 +752,7 @@ function showTray(origin: string, controls: TrayControls): Tray {
   ipcMain.on('desktop-tray:quit', (event) => {
     if (fromPopover(event)) app.quit();
   });
+  loadTray();
   return created;
 }
 
