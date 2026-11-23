@@ -953,6 +953,7 @@ export const pairingGrant = sqliteTable(
   {
     id: text('id').primaryKey(),
     codeHash: text('codeHash').notNull(),
+    kind: text('kind', { enum: ['device', 'owner'] }).notNull().default('device'),
     expiresAt: epochMs('expiresAt').notNull(),
     createdAt: epochMs('createdAt').notNull(),
     revokedAt: epochMs('revokedAt'),

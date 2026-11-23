@@ -20,24 +20,21 @@ Requirements: Node.js 22.19+ on the 22 or 24 LTS line and Git (these LTS lines s
 npx @xiechimon/cairn
 ```
 
-One command: download, start, and serve on **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team. Use a different port with `PORT=9000 npx @xiechimon/cairn`.
+By default, the server listens at **http://127.0.0.1:8787/app**. The first boot creates the database under `~/.cairn`, runs migrations, and seeds a default team. Use a different port with `PORT=9000 npx @xiechimon/cairn`.
 
-The server listens on loopback only and always requires an access token for non-browser clients. The first start generates one in `~/.cairn/token` (mode 0600). The first browser session comes from a pairing code minted with the owner token:
+Open the **Open Cairn** link printed in the server terminal to sign in as the owner. This browser can add providers, secrets and API keys, manage pairing, and approve the server's own machine as a Runner. The link works once within ten minutes. Keep it private; anyone who uses it before you can sign in as the owner.
 
-```sh
-curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" http://127.0.0.1:8787/api/remote/pairing
-```
-
-Open the returned code in the browser pairing page. Another device uses the same one-time code from Remote access. `cairn token` prints the owner token for this machine only. To reach the server from another machine, put Tailscale Serve or another route in front of loopback; the route does not sign the browser in. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
-
-A browser signed in with a pairing code is a paired device, not the owner, so on macOS and Windows, and in any browser on another machine, it cannot yet add providers, secrets or API keys, manage pairing, or approve the server's own machine as a Runner ([#5201](https://github.com/xiechimon/cairn/issues/5201)). Do those with the owner token for now. For example, to approve the Runner that `cairn start --server` printed a link for, take the `enroll=` value from that link:
+If the link expires, is already used, or the server was started without a terminal, run this on the server machine while Cairn is running. Use the same `CAIRN_HOME` and `PORT` if you set them for the server.
 
 ```sh
-curl -s -X POST -H "Authorization: Bearer $(cairn token | head -1)" -H "Content-Type: application/json" \
-  -d '{"enrollId":"<enroll value>"}' http://127.0.0.1:8787/api/machine/enroll/confirm
+npx @xiechimon/cairn token --link
 ```
 
-Cairn for Mac signs in as the owner and needs none of this. These token curls only work against a headless server — on the desktop app every owner write travels an in-memory channel the app injects into its own window's requests, so the same calls are refused there; use the app instead.
+The owner browser session lasts 30 days. If a file token or owner sign-in may have been shared, stop the server, run `npx @xiechimon/cairn token --rotate`, then restart and use a fresh link. Rotation invalidates every owner browser session and unused owner link, but keeps paired devices signed in. `npx @xiechimon/cairn token` prints the server's long-lived token for non-browser clients; do not paste it into the browser. `CAIRN_AUTH=off` disables auth and works only on a loopback bind.
+
+For another browser you own, use the same sign-in path and fragment on an HTTPS address already advertised in **Settings → Remote access**. A plain HTTP LAN address is not an owner sign-in address. For phones or other people's devices, give them a pairing link from **Remote access** instead. A paired browser can run and follow tasks, but cannot manage pairing, providers, secrets or API keys, or approve the server's own machine. A network route alone does not sign a browser in.
+
+Cairn for Mac still signs its own browser in automatically.
 
 ## Run builds on your own machines
 
@@ -48,7 +45,7 @@ npm i -g @xiechimon/cairn-cli
 cairn start --server http://127.0.0.1:8787
 ```
 
-The first start prints a link. Open it in the browser where you use Cairn and approve the machine; the daemon then connects by itself and keeps its credentials in `~/.cairn/machine.json`. When the Runner is on another machine, use the address that reaches your server instead. Later, `cairn start` alone is enough; there are also `cairn stop`, `restart`, `logs -f` and `status`.
+The first start prints a link. Open it in the browser where you already signed in as owner and approve the machine; the daemon then connects by itself and keeps its credentials in `~/.cairn/machine.json`. When the Runner is on another machine, use the address that reaches your server instead. Later, `cairn start` alone is enough; there are also `cairn stop`, `restart`, `logs -f` and `status`.
 
 On a machine without a browser, create an API key in the web UI (API keys in Settings; the key is shown once) and enroll with `cairn start --api-key <cairn_...> --team <teamId>` instead.
 

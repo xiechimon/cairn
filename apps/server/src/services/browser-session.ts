@@ -43,6 +43,10 @@ export function issueBrowserSession(
   return { token, expiresAt };
 }
 
+export function revokeOwnerBrowserSessions(db: Db): void {
+  db.update(browserSession).set({ expiresAt: 0 }).where(eq(browserSession.kind, 'owner')).run();
+}
+
 export function resolveBrowserSession(
   db: Db,
   token: string,

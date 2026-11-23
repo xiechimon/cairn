@@ -1,4 +1,3 @@
-import { networkInterfaces } from 'node:os';
 import {
   pairBodySchema,
   REMOTE_DESCRIPTOR_VERSION,
@@ -9,8 +8,8 @@ import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
-import { buildRemoteRoutes } from './lib/remote-routes.js';
-import { matchesAuthToken } from './lib/token-auth.js';
+import { remoteRoutesOf } from './lib/remote-routes.js';
+import { hasOwnerBearer } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
 import {
@@ -22,11 +21,6 @@ import {
   revokePairingGrant,
 } from './services/paired-devices.js';
 
-function bearerToken(c: Context): string | null {
-  const match = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
-  return match?.[1] ?? null;
-}
-
 export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
   const remote = ctx.remote;
   if (remote === undefined) return;
@@ -36,8 +30,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       throw new HttpError(409, 'pairing needs token auth, which is turned off');
     }
     if (c.get('ownerIdentity') !== undefined) return;
-    const provided = bearerToken(c);
-    if (provided === null || !matchesAuthToken(ctx.authToken, provided)) {
+    if (!hasOwnerBearer(c, ctx.authToken)) {
       throw new HttpError(403, 'only the owner token can manage pairing');
     }
   };
@@ -53,12 +46,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/remote/routes', (c) => {
     c.header('cache-control', 'no-store');
-    const routes = buildRemoteRoutes(remote.environmentId, {
-      listenHost: remote.listenHost,
-      listenPort: remote.listenPort,
-      interfaces: (remote.networkInterfaces ?? networkInterfaces)(),
-      tailnet: remote.tailnetStatus(),
-    });
+    const routes = remoteRoutesOf(remote);
     if (ctx.authToken !== null && c.get('ownerIdentity') === undefined) {
       routes.tailnet.authUrl = null;
     }

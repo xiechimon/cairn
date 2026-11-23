@@ -28,6 +28,7 @@ import { installEnvProxy } from './lib/env-proxy.js';
 import { environmentIdPathOf, loadOrCreateEnvironmentId } from './lib/environment-id.js';
 import { createServerLogger } from './lib/logger.js';
 import { listenOwnerChannel, ownerChannelFromEnv } from './lib/owner-channel.js';
+import { ownerLinkLoopbackOrigin, ownerLinkMessage } from './lib/owner-link-url.js';
 import { createKeyfileSecretBox } from './lib/secret-box.js';
 import { localWorkspaceRoot } from './lib/workspace-root.js';
 import { sealRuntimeOtel, spansDroppedBySeal } from './runtime-otel.js';
@@ -56,6 +57,7 @@ import { createMailConnector } from './services/mail-connector.js';
 import { adoptGithubConnectorGrants } from './services/mcp-github-connector.js';
 import { newMcpOAuthState } from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
+import { issueOwnerLink } from './services/paired-devices.js';
 import { capturePageOver, createPageThumbnails, parentPortOf } from './services/page-thumbnails.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
 import { seedDefaultRouting } from './services/routing-migration.js';
@@ -70,7 +72,7 @@ import { createTsnetRemote } from './services/tsnet-remote.js';
 import { createHttpDrain } from './shutdown-http.js';
 import { startupMessage } from './startup-log.js';
 
-const commandExit = runServerCommand(process.argv.slice(2), {
+const commandExit = await runServerCommand(process.argv.slice(2), {
   env: process.env,
   writeOut: (text) => process.stdout.write(text),
   writeErr: (text) => process.stderr.write(text),
@@ -362,6 +364,10 @@ const server = serve(
       { host: info.address, port: info.port, dataDir: config.dataDir, teamId: seeded.team.id },
       startupMessage(),
     );
+    if (process.stdout.isTTY && config.authToken !== null) {
+      const origin = ownerLinkLoopbackOrigin(config.host, info.port) ?? `http://127.0.0.1:${info.port}`;
+      process.stdout.write(ownerLinkMessage(origin, issueOwnerLink(db).code));
+    }
   },
 );
 

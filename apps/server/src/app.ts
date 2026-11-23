@@ -10,6 +10,7 @@ import { limitApiRequestBody } from './lib/request-body-limit.js';
 import { registerTokenAuth } from './lib/token-auth.js';
 import { registerRoutes } from './routes.js';
 import { registerMachineAuth, registerMachineRoutes } from './routes-machine.js';
+import { registerOwnerLinkRoutes } from './routes-owner-link.js';
 import { registerRemoteRoutes } from './routes-remote.js';
 import { resolveBrowserSession } from './services/browser-session.js';
 import { NotFoundError } from './services/builds.js';
@@ -116,6 +117,7 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
   app.use('/api/*', compress());
   registerMachineAuth(app, ctx);
   app.use('/api/*', limitApiRequestBody);
+  registerOwnerLinkRoutes(app, ctx);
   registerRoutes(app, ctx);
   registerMachineRoutes(app, ctx);
   registerRemoteRoutes(app, ctx);

@@ -11,6 +11,8 @@ export const PAIR_FRAGMENT_ENVIRONMENT_KEY = 'env';
 export const DEVICE_TOKEN_PREFIX = 'cairn_dev_';
 export const BROWSER_AUTH_HEADER = 'x-cairn-browser-auth';
 export const BROWSER_SESSION_PATH = '/api/auth/session';
+export const OWNER_LINK_MINT_PATH = '/api/auth/owner-link';
+export const OWNER_LINK_REDEEM_PATH = '/api/auth/owner-link/redeem';
 
 export function isOpenRemotePath(pathname: string): boolean {
   return pathname === '/api/remote/descriptor' || pathname === '/api/remote/pair';
@@ -26,6 +28,7 @@ export function isBrowserAuthExempt(pathname: string): boolean {
     pathname === '/api/mcp' ||
     pathname === '/api/oauth/callback' ||
     pathname === '/api/auth/access' ||
+    pathname === OWNER_LINK_REDEEM_PATH ||
     isOpenRemotePath(pathname)
   );
 }

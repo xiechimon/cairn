@@ -6,11 +6,14 @@ import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { networkInterfaces } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stripVTControlCharacters } from 'node:util';
 import { chromium, expect } from '@playwright/test';
 
 assert.equal(process.platform, 'win32', 'This probe must run on Windows');
 const root = process.env.WINDOWS_ACCEPT_ROOT;
 assert(root, 'WINDOWS_ACCEPT_ROOT is required');
+const winpty = process.env.WINDOWS_ACCEPT_WINPTY;
+assert(winpty, 'WINDOWS_ACCEPT_WINPTY is required for an interactive server terminal');
 const evidence = join(root, 'evidence');
 const home = join(root, 'state');
 const port = '8787';
@@ -25,15 +28,20 @@ const env = { ...process.env, CAIRN_HOME: home };
 const children = [];
 const timeout = 45_000;
 
-function start(packageName, entry, args, extraEnv, name) {
+function start(packageName, entry, args, extraEnv, name, terminal = false) {
   const cwd = join(root, packageName);
-  const child = spawn(
+  const command = [
     process.execPath,
-    [join(cwd, 'node_modules', '@xiechimon', packageName, 'dist', entry), ...args],
+    join(cwd, 'node_modules', '@xiechimon', packageName, 'dist', entry),
+    ...args,
+  ];
+  const child = spawn(
+    terminal ? winpty : command[0],
+    terminal ? ['-Xallow-non-tty', '-Xplain', ...command] : command.slice(1),
     { cwd, env: { ...env, ...extraEnv }, windowsHide: true },
   );
   const log = createWriteStream(join(evidence, `${name}.log`));
-  const proc = { child, enrollmentUrl: undefined, exited: false };
+  const proc = { child, enrollmentUrl: undefined, ownerUrl: undefined, exited: false };
   children.push(proc);
   child.once('error', (error) => log.write(`Process error: ${error.message}\n`));
   child.once('close', (code, signal) => {
@@ -42,11 +50,32 @@ function start(packageName, entry, args, extraEnv, name) {
   });
   for (const stream of [child.stdout, child.stderr]) {
     let pending = '';
+    let ownerPrefix = '';
+    let ownerCode = '';
     stream.setEncoding('utf8');
-    const writeLine = (line) => {
+    const writeLine = (raw) => {
+      const line = stripVTControlCharacters(raw);
+      const ownerLink = line.match(/^Open Cairn: (http:\/\/127\.0\.0\.1:\d+\/app\/sign-in#code=)([\w-]*)/u);
+      if (ownerLink) {
+        [, ownerPrefix, ownerCode] = ownerLink;
+        log.write('Open Cairn: [redacted]\n');
+      } else if (ownerPrefix) {
+        ownerCode += line.trim().match(/^[\w-]*/u)[0];
+      }
+      if (ownerPrefix) {
+        if (ownerCode.length >= 43) {
+          proc.ownerUrl = `${ownerPrefix}${ownerCode.slice(0, 43)}`;
+          ownerPrefix = '';
+          ownerCode = '';
+        }
+        return;
+      }
       const enrollment = line.match(/https?:\/\/\S+\/app\/machines\/authorize\?enroll=[\w-]+/u);
       if (enrollment) proc.enrollmentUrl = enrollment[0];
-      log.write(`${line.replace(/([?#](?:enroll|owner|pair)=)[^\s"&]+/gu, '$1[redacted]').replace(/approval code \S+/gi, 'approval code [redacted]')}\n`);
+      const redacted = line
+        .replace(/([?#](?:enroll|owner|pair|code)=)[^\s"&]+/gu, '$1[redacted]')
+        .replace(/approval code \S+/giu, 'approval code [redacted]');
+      log.write(`${redacted}\n`);
     };
     stream.on('data', (chunk) => {
       const lines = (pending + chunk).split(/\r?\n/u);
@@ -127,7 +156,7 @@ try {
   await seedAcpFixture();
   const server = start('cairn', 'index.mjs', [], {
     HOST: '0.0.0.0', PORT: port, CAIRN_TOKEN: randomBytes(32).toString('hex'),
-  }, 'server');
+  }, 'server', true);
   await expect.poll(async () => {
     assert(!server.exited, 'Packaged server exited; see server.log');
     try {
@@ -136,6 +165,9 @@ try {
       return 0;
     }
   }, { timeout, message: 'Packaged server must serve the web app' }).toBe(200);
+  await expect.poll(() => server.ownerUrl !== undefined, {
+    timeout, message: 'Packaged server must print a sign-in link in its terminal; see server.log',
+  }).toBe(true);
   const runner = start('cairn-cli', 'cli.mjs', ['start', '--foreground', '--server', localOrigin], {}, 'runner');
   await expect.poll(() => runner.enrollmentUrl ?? (runner.exited ? 'Runner exited' : ''), {
     timeout, message: 'Packaged Runner must print its enrollment URL; see runner.log',
@@ -144,7 +176,19 @@ try {
   browser = await chromium.launch({ channel: 'msedge', headless: true });
   owner = await (await browser.newContext({ locale: 'en-US' })).newPage();
   await owner.goto(`${localOrigin}/app`, { waitUntil: 'domcontentloaded' });
-  await expect(owner.getByTestId('home-c')).toBeVisible({ timeout: 15_000 });
+  await expect(owner.locator('#cairn-pair-input')).toBeVisible({ timeout });
+  await browserRequest(owner, '/api/remote/pairing', { status: 401 });
+  await owner.screenshot({ path: join(evidence, 'local-owner-signed-out.png') });
+
+  const redeemed = owner.waitForResponse((response) => response.url().endsWith('/api/auth/owner-link/redeem'));
+  try {
+    await owner.goto(server.ownerUrl, { waitUntil: 'domcontentloaded' });
+  } catch (error) {
+    if (!String(error).includes('ERR_ABORTED')) throw new Error('Could not navigate to the owner sign-in page');
+  }
+  assert.equal((await redeemed).status(), 200, 'Printed link must create an owner session');
+  await owner.waitForURL(`${localOrigin}/app`, { timeout });
+  await expect(owner.getByTestId('home-c')).toBeVisible({ timeout });
   await browserRequest(owner, '/api/remote/pairing');
   await expect(owner.locator('.token-gate')).toHaveCount(0);
   await owner.screenshot({ path: join(evidence, 'local-owner.png') });
@@ -153,22 +197,29 @@ try {
   await owner.goto(runner.enrollmentUrl, { waitUntil: 'domcontentloaded' });
   const approved = owner.waitForResponse((response) => response.url().endsWith('/api/machine/enroll/confirm'));
   await owner.getByRole('button', { name: /confirm authorization|^authorize$|确认授权/i }).click({ timeout });
-  assert.equal((await approved).status(), 200, 'Local owner must confirm Runner enrollment');
-  const [team] = await browserRequest(owner, '/api/teams');
-  let machine;
-  await expect.poll(async () => {
-    [machine] = await browserRequest(owner, `/api/teams/${team.id}/machines`);
-    return machine?.online;
-  }, { timeout, message: 'Approved Runner must send a heartbeat' }).toBe(true);
+  const approval = await approved;
+  assert.equal(approval.status(), 200, 'Local owner must confirm Runner enrollment');
+  const { machine: { machineId } } = await approval.json();
+  await expect(owner.getByText(/^(Authorized —|授权完成)/).first()).toBeVisible({ timeout });
   await owner.screenshot({ path: join(evidence, 'runner-approved.png') });
+  const [team] = await browserRequest(owner, '/api/teams');
+  await expect.poll(async () => {
+    const machines = await browserRequest(owner, `/api/teams/${team.id}/machines`);
+    return machines.find((machine) => machine.id === machineId);
+  }, { timeout, message: 'Approved local Runner must send a heartbeat' }).toMatchObject({ kind: 'local', online: true });
+  await owner.goto(`${localOrigin}/app/resources/machines`, { waitUntil: 'domcontentloaded' });
+  await expect(owner.locator(`[data-machine-id="${machineId}"]`).getByTestId('machine-item-status'))
+    .toHaveText(/^(Online|在线)$/i, { timeout });
+  await owner.screenshot({ path: join(evidence, 'runner-online.png') });
+  console.log('Local Runner was approved and is online');
 
   await browserRequest(owner, `/api/teams/${team.id}/routing-rules/session`, {
-    method: 'PATCH', body: { provider: 'gemini', modelId: 'stub-model', machineId: machine.id },
+    method: 'PATCH', body: { provider: 'gemini', modelId: 'stub-model', machineId },
   });
   const project = await browserRequest(owner, '/api/projects', {
     method: 'POST', status: 201, body: { name: 'Windows acceptance' },
   });
-  await runTask(owner, project.id, machine.id, 'local');
+  await runTask(owner, project.id, machineId, 'local');
 
   office = await (await browser.newContext({ locale: 'en-US' })).newPage();
   await office.goto(`${officeOrigin}/app`, { waitUntil: 'domcontentloaded' });
@@ -181,8 +232,10 @@ try {
   await pairingInput.press('Enter');
   await expect(office.locator('.token-gate')).toHaveCount(0, { timeout });
   await expect(office.getByTestId('home-c')).toBeVisible({ timeout });
+  await browserRequest(office, '/api/remote/pairing', { status: 403 });
   await browserRequest(office, '/api/remote/pairing', { method: 'POST', status: 403 });
-  const remoteTodoId = await runTask(office, project.id, machine.id, 'office');
+  console.log('Paired office browser cannot manage pairing');
+  const remoteTodoId = await runTask(office, project.id, machineId, 'office');
   await owner.goto(`${localOrigin}/app/todo/${remoteTodoId}`, { waitUntil: 'domcontentloaded' });
   await expect(owner.getByText('Hello Thread', { exact: true }).first()).toBeVisible({ timeout });
   await owner.screenshot({ path: join(evidence, 'office-task-seen-locally.png') });

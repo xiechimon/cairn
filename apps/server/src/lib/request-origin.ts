@@ -3,11 +3,43 @@ import type { Http2Bindings, HttpBindings } from '@hono/node-server';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context } from 'hono';
 import { forwardedOrigin } from './forwarded-origin.js';
+import { OWNER_LINK_LOOPBACK_HOSTS } from './owner-link-url.js';
 import { tailnetOriginOf } from './tailnet-listener.js';
 
 type NodeBindings = HttpBindings | Http2Bindings;
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+const RELAY_HEADERS = new Set([
+  'forwarded',
+  'via',
+  'x-real-ip',
+  'x-client-ip',
+  'x-original-host',
+  'cf-connecting-ip',
+  'true-client-ip',
+]);
+
+function requestSocket(c: Context) {
+  const env = c.env as (Partial<NodeBindings> & { server?: NodeBindings }) | undefined;
+  return (env?.server ?? env)?.incoming?.socket;
+}
+
+export function isDirectLoopbackOrigin(c: Context): boolean {
+  const port = requestSocket(c)?.localPort;
+  const host = c.req.header('host')?.toLowerCase();
+  if (port === undefined || host === undefined || !isLoopbackPeer(c)) return false;
+  if (
+    !OWNER_LINK_LOOPBACK_HOSTS.some(
+      (name) => host === `${name}:${port}` || (port === 80 && host === name),
+    )
+  ) {
+    return false;
+  }
+  return !Object.keys(c.req.header()).some(
+    (name) =>
+      RELAY_HEADERS.has(name) || name.startsWith('x-forwarded-') || name.startsWith('tailscale-'),
+  );
+}
 
 export function isLoopbackPeer(c: Context): boolean {
   let peerAddress: string | undefined;
@@ -24,8 +56,7 @@ export function requestOrigin(c: Context): string {
   if (tailnet !== null) return new URL(tailnet).origin;
 
   const requestUrl = new URL(c.req.url);
-  const env = c.env as (Partial<NodeBindings> & { server?: NodeBindings }) | undefined;
-  const socket = (env?.server ?? env)?.incoming?.socket;
+  const socket = requestSocket(c);
   const protocol =
     socket === undefined
       ? requestUrl.protocol

@@ -127,6 +127,8 @@ const INFERRED_ROUTES = [
   'POST /api/remote/tailnet',
   'GET /api/remote/routes',
   'GET /api/auth/session',
+  'POST /api/auth/owner-link',
+  'POST /api/auth/owner-link/redeem',
   'POST /api/auth/access',
   'POST /api/auth/stream-ticket',
   'GET /api/remote/pairing',

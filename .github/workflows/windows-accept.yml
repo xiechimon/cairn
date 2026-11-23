@@ -65,6 +65,9 @@ jobs:
           if-no-files-found: error
       - name: Exercise owner, Runner, and the paired browser
         run: |
+          $gitRoot = Split-Path -Parent (Split-Path -Parent (Get-Command git.exe -ErrorAction Stop).Source)
+          $env:WINDOWS_ACCEPT_WINPTY = Join-Path $gitRoot 'usr/bin/winpty.exe'
+          if (!(Test-Path -LiteralPath $env:WINDOWS_ACCEPT_WINPTY -PathType Leaf)) { throw 'Git for Windows did not provide winpty.exe' }
           node scripts/smoke/windows-accept.mjs 2>&1 | Tee-Object -FilePath "$env:WINDOWS_ACCEPT_ROOT/evidence/journey.log"
           exit $LASTEXITCODE
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a

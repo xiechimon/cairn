@@ -1,6 +1,7 @@
-import type { NetworkInterfaceInfo } from 'node:os';
+import { networkInterfaces, type NetworkInterfaceInfo } from 'node:os';
 import type { RemoteRoute, RemoteRoutesResponse, TailnetAccess } from '@cairn/shared';
 import { isLoopbackHost } from '../config.js';
+import type { RemoteAccessContext } from '../context.js';
 
 const WILDCARD_HOSTS = new Set(['0.0.0.0', '::', '[::]', '*', '']);
 const IPV4_PATTERN = /^\d{1,3}(\.\d{1,3}){3}$/;
@@ -37,6 +38,15 @@ function tailnetUrl(status: TailnetAccess | null): string | null {
   const name = status.dnsName;
   if (name === null || !DNS_NAME_PATTERN.test(name)) return null;
   return `https://${name}`;
+}
+
+export function remoteRoutesOf(remote: RemoteAccessContext): RemoteRoutesResponse {
+  return buildRemoteRoutes(remote.environmentId, {
+    listenHost: remote.listenHost,
+    listenPort: remote.listenPort,
+    interfaces: (remote.networkInterfaces ?? networkInterfaces)(),
+    tailnet: remote.tailnetStatus(),
+  });
 }
 
 export function buildRemoteRoutes(

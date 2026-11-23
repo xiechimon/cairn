@@ -440,7 +440,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 ### tailnet-login
 
-**Login and tailnet device auth** (partial). The token gate today; next, the owner's own tailnet devices are signed in without a token.
+**Login and tailnet device auth** (partial). A terminal sign-in link signs in the npm server owner; device pairing remains a separate authority.
 
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design

@@ -87,14 +87,14 @@ The bundled Runner includes **pi**, which can run tasks with your Codex subscrip
 npx @xiechimon/cairn
 ```
 
-This serves Cairn at **<http://127.0.0.1:8787/app>** and creates the database under `~/.cairn`. Then, on each machine where agents should work:
+Open the **Open Cairn** link printed in that terminal to sign in as the owner. The server creates the database under `~/.cairn`. If the link expires or was already used, run `npx @xiechimon/cairn token --link` for a fresh one. Then, on each machine where agents should work:
 
 ```sh
 npm i -g @xiechimon/cairn-cli
 cairn start --server http://127.0.0.1:8787
 ```
 
-It prints a link; open it in the browser where Cairn is open and approve the machine. Use your server's address instead when the Runner is on another machine. A Linux Runner also needs bubblewrap for its task sandbox; see [getting started](./docs/getting-started.md#keep-the-daemon-running-on-linux). On macOS and Windows, the npm server's browser cannot yet approve that machine or add providers; those need the owner token, as [getting started](./docs/getting-started.md#run-the-server) shows.
+Open the Runner's authorization link in the owner browser and approve the machine. Use your server's address instead when the Runner is on another machine. A Linux Runner also needs bubblewrap for its task sandbox; see [getting started](./docs/getting-started.md#keep-the-daemon-running-on-linux). Use pairing codes for other devices, not for the owner browser.
 
 ### Connect a model and get your first result
 

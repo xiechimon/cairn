@@ -1495,8 +1495,8 @@
     {
       "id": "tailnet-login",
       "name": "Login and tailnet device auth",
-      "summary": "The token gate today; next, the owner's own tailnet devices are signed in without a token.",
-      "states": "Signed out shows the token gate; signed in opens the app; a tailnet device is meant to skip the gate.",
+      "summary": "A terminal sign-in link signs in the npm server owner; device pairing remains a separate authority.",
+      "states": "Signed out shows the pairing gate; a fresh owner link opens the app; an unusable link asks for a new one; a paired device cannot manage the instance.",
       "centrality": 2,
       "status": "partial",
       "code": {
@@ -1506,13 +1506,18 @@
         ],
         "server": [
           "apps/server/src/lib/token-auth.ts",
-          "apps/server/src/routes-core.ts"
+          "apps/server/src/routes-core.ts",
+          "apps/server/src/routes-owner-link.ts",
+          "apps/server/src/server-command.ts"
         ]
       },
       "routes": {
         "server": [
           "/api/auth/session",
-          "/api/user/me"
+          "/api/auth/owner-link",
+          "/api/auth/owner-link/redeem",
+          "/api/user/me",
+          "/app/sign-in"
         ]
       },
       "reach": [
@@ -1532,8 +1537,10 @@
         "apps/web/e2e/token-gate.spec.ts",
         "apps/web/test/auth-gate-close.test.ts",
         "apps/server/test/browser-session-status.test.ts",
+        "apps/server/test/owner-link.test.ts",
         "apps/server/test/token-auth.test.ts",
-        "apps/server/test/tailnet-listener.test.ts"
+        "apps/server/test/tailnet-listener.test.ts",
+        "scripts/smoke/windows-accept.mjs"
       ],
       "batch": "B5"
     },

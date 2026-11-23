@@ -1,5 +1,10 @@
 import { timingSafeEqual } from 'node:crypto';
-import { BROWSER_AUTH_HEADER, BROWSER_SESSION_PATH, isBrowserAuthExempt } from '@cairn/shared';
+import {
+  BROWSER_AUTH_HEADER,
+  BROWSER_SESSION_PATH,
+  isBrowserAuthExempt,
+  OWNER_LINK_MINT_PATH,
+} from '@cairn/shared';
 import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { AUTH_COOKIE, type ResolvedBrowserSession } from '../services/browser-session.js';
 import { sha256Hex } from './crypto.js';
@@ -28,6 +33,7 @@ const OWNER_ONLY_PATTERNS = [
 
 export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   if (
+    pathname === OWNER_LINK_MINT_PATH ||
     pathname === '/api/remote/pairing' ||
     pathname.startsWith('/api/remote/pairing/') ||
     pathname === '/api/remote/tailnet' ||
@@ -52,8 +58,13 @@ function makeVerifier(token: string): (provided: string) => boolean {
   };
 }
 
-export function matchesAuthToken(expected: string, provided: string): boolean {
-  return makeVerifier(expected)(provided);
+function bearerToken(c: Context): string | undefined {
+  return /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '')?.[1];
+}
+
+export function hasOwnerBearer(c: Context, expected: string): boolean {
+  const provided = bearerToken(c);
+  return provided !== undefined && makeVerifier(expected)(provided);
 }
 
 export interface TokenAuthOptions {
@@ -162,11 +173,8 @@ export function registerTokenAuth(
       }
       return next();
     };
-    const authorization = c.req.header('authorization');
-    if (authorization !== undefined) {
-      const match = /^Bearer\s+(.+)$/i.exec(authorization);
-      if (match !== null && verify(match[1] ?? '')) return admit();
-    }
+    const provided = bearerToken(c);
+    if (provided !== undefined && verify(provided)) return admit();
     if (STREAM_PATH_PATTERNS.some((pattern) => pattern.test(pathname))) {
       const ticket = url.searchParams.get('ticket');
       const session = ticket === null ? null : (options.redeemTicket?.(ticket) ?? null);

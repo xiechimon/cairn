@@ -94,7 +94,7 @@ npm i -g @xiechimon/cairn-cli
 cairn start --server http://127.0.0.1:8787
 ```
 
-它会打印一个链接；在打开着 Cairn 的浏览器里打开它，批准这台机器。执行机在别的机器上时，换成你 server 的地址。Linux 执行机的任务沙箱还需要 bubblewrap，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。在 macOS 和 Windows 上用 npm 跑 server 时，浏览器暂时不能批准这台机器、也不能添加服务商，这些要用 owner token 来做，见[上手指南](./docs/getting-started.md#run-the-server)。
+用服务端终端里打印的 **Open Cairn** 链接登录为所有者。链接十分钟内只能用一次，失效后运行 `npx @xiechimon/cairn token --link` 获取新链接。再在同一个浏览器打开执行机的授权链接，批准这台机器。执行机在别的机器上时，换成你的服务器地址。Linux 执行机的任务沙箱还需要 bubblewrap，见[上手指南](./docs/getting-started.md#keep-the-daemon-running-on-linux)。其他设备请用配对码。
 
 ### 接上模型，拿到第一个结果
 
