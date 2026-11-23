@@ -58,17 +58,6 @@ jobs:
             npm.cmd install --prefix $destination.FullName --ignore-scripts --no-audit --no-fund $tarballs[0].FullName
             if ($LASTEXITCODE) { exit $LASTEXITCODE }
           }
-      - name: Stage the SQLite prebuilt without running install scripts
-        run: |
-          $sqlite = "$env:WINDOWS_ACCEPT_ROOT/cairn/node_modules/better-sqlite3"
-          $version = (Get-Content "$sqlite/package.json" -Raw | ConvertFrom-Json).version
-          $abi = node -p 'process.versions.modules'
-          $arch = node -p 'process.arch'
-          $asset = "better-sqlite3-v$version-node-v$abi-win32-$arch.tar.gz"
-          $download = "$env:WINDOWS_ACCEPT_ROOT/$asset"
-          Invoke-WebRequest "https://github.com/WiseLibs/better-sqlite3/releases/download/v$version/$asset" -OutFile $download
-          tar.exe -xzf $download -C $sqlite
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Exercise owner, Runner, and the paired browser
         run: |
           node scripts/smoke/windows-accept.mjs 2>&1 | Tee-Object -FilePath "$env:WINDOWS_ACCEPT_ROOT/evidence/journey.log"
