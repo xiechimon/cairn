@@ -44,9 +44,10 @@ import { build, type machine as machineTable, step, todo } from './db/schema.js'
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
+import { isLoopbackPeer } from './lib/request-origin.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
-import { isLoopbackPeer, pairedDeviceIdOf } from './lib/token-auth.js';
+import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody } from './routes-helpers.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';

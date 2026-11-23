@@ -1,3 +1,5 @@
+import { fetchWithSession } from './auth.js';
+
 export interface ConversationSink {
   onEvent(ev: Record<string, unknown>): void;
   onResync(): void;
@@ -14,7 +16,7 @@ let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 async function putSet(id: string, ids: string[]): Promise<boolean> {
   try {
-    const res = await fetch(`/api/streams/${encodeURIComponent(id)}/conversations`, {
+    const res = await fetchWithSession(`/api/streams/${encodeURIComponent(id)}/conversations`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ conversationIds: ids }),

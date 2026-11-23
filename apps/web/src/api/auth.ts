@@ -1,5 +1,12 @@
-import { type PairResponse, parsePairFragment, type RemoteDescriptor } from '@cairn/shared';
+import {
+  BROWSER_AUTH_HEADER,
+  BROWSER_SESSION_PATH,
+  isBrowserAuthExempt,
+  parsePairFragment,
+  type RemoteDescriptor,
+} from '@cairn/shared';
 import { useSyncExternalStore } from 'react';
+import { DEMO_MODE } from '../demo/demo-gate.js';
 
 export const TOKEN_STORAGE_KEY = 'cairn.token';
 
@@ -26,10 +33,6 @@ export function syncPushAuthToken(token: string | null): Promise<void> {
 }
 
 export function clearLegacyBrowserToken(): void {
-  clearStoredToken();
-}
-
-function clearStoredToken(): void {
   void syncPushAuthToken(null);
   try {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -39,23 +42,51 @@ function clearStoredToken(): void {
 export interface AuthSnapshot {
   gateOpen: boolean;
   rejected: boolean;
+  pairing: boolean;
+  retrying: boolean;
   generation: number;
 }
 
-let snapshot: AuthSnapshot = { gateOpen: false, rejected: false, generation: 0 };
-const listeners = new Set<() => void>();
-let gateWaiters: Array<() => void> = [];
+type Gate = 'hidden' | 'waiting' | 'rejected';
+type Verdict = 'authenticated' | 'signed-out';
+type SessionRecovery = {
+  phase: 'background' | 'looking-up' | 'redeeming' | 'confirming';
+  controller: AbortController;
+  result: Promise<boolean>;
+  successor?: Promise<boolean>;
+};
 
-function publish(gateOpen: boolean, rejected: boolean, acceptedToken = false): void {
-  snapshot = {
-    gateOpen,
-    rejected,
-    generation: snapshot.generation + Number(acceptedToken || gateOpen !== snapshot.gateOpen),
-  };
+let gate: Gate = 'hidden';
+let recovery: SessionRecovery | null = null;
+let retrying = false;
+let snapshot: AuthSnapshot = {
+  gateOpen: false,
+  rejected: false,
+  pairing: false,
+  retrying: false,
+  generation: 0,
+};
+const listeners = new Set<() => void>();
+
+function publish(confirmedReplacement = false): void {
+  const gateOpen = retrying || gate !== 'hidden';
+  const rejected = !retrying && gate === 'rejected';
+  const busy = recovery?.phase === 'redeeming';
+  const generation =
+    snapshot.generation + Number(confirmedReplacement || gateOpen !== snapshot.gateOpen);
+  if (
+    generation === snapshot.generation &&
+    rejected === snapshot.rejected &&
+    busy === snapshot.pairing &&
+    retrying === snapshot.retrying
+  ) {
+    return;
+  }
+  snapshot = { gateOpen, rejected, pairing: busy, retrying, generation };
   for (const listener of listeners) listener();
 }
 
-function subscribe(listener: () => void): () => void {
+export function subscribeAuth(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -67,112 +98,211 @@ export function authSnapshot(): AuthSnapshot {
 }
 
 export function useAuth(): AuthSnapshot {
-  return useSyncExternalStore(subscribe, () => snapshot);
-}
-
-const PROBE_PATH = '/api/teams';
-
-export async function probeToken(token: string): Promise<boolean> {
-  try {
-    const res = await fetch(PROBE_PATH, { headers: { authorization: `Bearer ${token}` } });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-export function demandGate(): void {
-  clearStoredToken();
-  if (snapshot.gateOpen) return;
-  publish(true, false);
-}
-
-export function passGate(): void {
-  clearStoredToken();
-  const waiters = gateWaiters;
-  gateWaiters = [];
-  publish(false, false, true);
-  for (const wake of waiters) wake();
-}
-
-export function beginGateProbe(): void {
-  if (!snapshot.rejected) return;
-  publish(snapshot.gateOpen, false);
-}
-
-export function rejectGate(): void {
-  clearStoredToken();
-  publish(true, true);
+  return useSyncExternalStore(subscribeAuth, authSnapshot);
 }
 
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
-
-export function isLoopbackPage(): boolean {
-  return LOOPBACK_HOSTS.has(window.location.hostname);
-}
-
-export async function exchangeAccessIdentity(): Promise<boolean> {
-  if (isLoopbackPage()) return false;
-  try {
-    const res = await fetch('/api/auth/access', { method: 'POST', credentials: 'same-origin' });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 const DESCRIPTOR_PATH = '/api/remote/descriptor';
 const PAIR_PATH = '/api/remote/pair';
-const FALLBACK_DEVICE_NAME = 'Browser';
+const SESSION_REQUEST_TIMEOUT_MS = 5_000;
+const PROBE_RETRY_INITIAL_MS = 250;
+const PROBE_RETRY_MAX_MS = 4_000;
 
-function pairedDeviceName(): string {
-  const platform = (navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform;
-  return platform !== undefined && platform !== '' ? platform : FALLBACK_DEVICE_NAME;
-}
+async function withSessionRequestDeadline<T>(
+  signal: AbortSignal,
+  run: (requestSignal: AbortSignal) => Promise<T>,
+): Promise<T | null> {
+  if (signal.aborted) return null;
 
-export async function consumePairFragment(
-  onFailure: (error: unknown) => void = () => {},
-): Promise<void> {
-  const pair = parsePairFragment(window.location.hash);
-  if (pair === null) return;
-  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  let onAbort!: () => void;
+  const cancelled = new Promise<null>((resolve) => {
+    onAbort = () => resolve(null);
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+  });
+  const timer = setTimeout(abort, SESSION_REQUEST_TIMEOUT_MS);
+  signal.addEventListener('abort', abort, { once: true });
   try {
-    const descriptor = await fetch(DESCRIPTOR_PATH);
-    if (!descriptor.ok) throw new Error(`descriptor ${descriptor.status}`);
-    const { environmentId } = (await descriptor.json()) as RemoteDescriptor;
-    if (environmentId !== pair.environmentId) throw new Error('environment mismatch');
-    const res = await fetch(PAIR_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code: pair.code, name: pairedDeviceName() }),
-    });
-    if (!res.ok) throw new Error(`pair ${res.status}`);
-    const paired = (await res.json()) as PairResponse;
-    if (paired.environmentId !== pair.environmentId) throw new Error('environment mismatch');
-    passGate();
-  } catch (error) {
-    onFailure(error);
+    return await Promise.race([run(controller.signal), cancelled]);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', abort);
+    controller.signal.removeEventListener('abort', onAbort);
   }
 }
 
-export async function redeemPairingCode(code: string): Promise<boolean> {
-  try {
-    const descriptor = await fetch(DESCRIPTOR_PATH);
-    if (!descriptor.ok) return false;
-    const res = await fetch(PAIR_PATH, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code, name: pairedDeviceName() }),
+async function probeSession(signal: AbortSignal): Promise<Verdict | null> {
+  let delay = PROBE_RETRY_INITIAL_MS;
+  while (!signal.aborted) {
+    const response = await withSessionRequestDeadline(signal, (requestSignal) =>
+      fetch(BROWSER_SESSION_PATH, {
+        cache: 'no-store',
+        credentials: 'same-origin',
+        mode: 'same-origin',
+        redirect: 'error',
+        headers: { [BROWSER_AUTH_HEADER]: '1' },
+        signal: requestSignal,
+      }),
+    );
+    if (signal.aborted) return null;
+    if (response !== null && !response.redirected) {
+      if (response.status === 204) return 'authenticated';
+      if (response.status === 401) return 'signed-out';
+    }
+    retrying = true;
+    publish();
+    if (signal.aborted) return null;
+    await new Promise<void>((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', finish);
+        resolve();
+      };
+      const timer = setTimeout(finish, delay);
+      signal.addEventListener('abort', finish, { once: true });
     });
-    return res.ok;
-  } catch {
+    delay = Math.min(delay * 2, PROBE_RETRY_MAX_MS);
+  }
+  return null;
+}
+
+function applyVerdict(
+  verdict: Verdict,
+  signedOutGate: Exclude<Gate, 'hidden'>,
+  replacement = false,
+): boolean {
+  retrying = false;
+  const authenticated = verdict === 'authenticated';
+  if (authenticated) {
+    if (gate !== 'hidden' || replacement) clearLegacyBrowserToken();
+    gate = 'hidden';
+  } else if (verdict === 'signed-out' && (gate === 'hidden' || signedOutGate === 'rejected')) {
+    gate = signedOutGate;
+    clearLegacyBrowserToken();
+  }
+  publish(authenticated && replacement);
+  return authenticated;
+}
+
+async function exchangeAccessIdentity(signal: AbortSignal): Promise<boolean> {
+  if (DEMO_MODE || typeof window === 'undefined' || LOOPBACK_HOSTS.has(window.location.hostname)) {
     return false;
   }
+  const response = await withSessionRequestDeadline(signal, (requestSignal) =>
+    fetch('/api/auth/access', {
+      method: 'POST',
+      credentials: 'same-origin',
+      redirect: 'error',
+      signal: requestSignal,
+    }),
+  );
+  return response?.ok === true && !response.redirected;
 }
 
-export function awaitGate(): Promise<void> {
-  if (!snapshot.gateOpen) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    gateWaiters.push(resolve);
+async function checkSession(signal: AbortSignal): Promise<boolean> {
+  let verdict = await probeSession(signal);
+  if (signal.aborted) return false;
+  const replaced = verdict === 'signed-out' && (await exchangeAccessIdentity(signal));
+  if (signal.aborted) return false;
+  if (replaced) verdict = await probeSession(signal);
+  return verdict !== null && !signal.aborted && applyVerdict(verdict, 'waiting', replaced);
+}
+
+function startRecovery(
+  phase: SessionRecovery['phase'],
+  run: (operation: SessionRecovery) => Promise<boolean>,
+): Promise<boolean> {
+  const previous = recovery;
+  const operation: SessionRecovery = {
+    phase,
+    controller: new AbortController(),
+    result: Promise.resolve()
+      .then(() => run(operation))
+      .finally(() => {
+        if (recovery === operation) recovery = null;
+      })
+      .then((authenticated) => operation.successor ?? authenticated),
+  };
+  recovery = operation;
+  if (previous !== null) {
+    previous.successor = operation.result;
+    previous.controller.abort();
+  }
+  return operation.result;
+}
+
+function recoverSession(): Promise<boolean> {
+  if (recovery !== null) return recovery.result;
+  const link = DEMO_MODE ? null : consumePairFragment();
+  return link ?? startRecovery('background', ({ controller }) => checkSession(controller.signal));
+}
+
+export async function fetchWithSession(path: string, init?: RequestInit): Promise<Response> {
+  const page = new URL(globalThis.window?.location.href ?? 'http://localhost');
+  const target = new URL(path, page);
+  const protectedRequest = target.origin === page.origin && !isBrowserAuthExempt(target.pathname);
+  const options: RequestInit = {
+    ...init,
+    credentials: 'same-origin',
+    ...(protectedRequest ? { cache: init?.cache === 'no-store' ? 'no-store' : 'no-cache' } : {}),
+  };
+  const needsProbe = (response: Response) =>
+    protectedRequest && !response.redirected && response.status === 401;
+  const first = await fetch(path, options);
+  if (!needsProbe(first) || !(await recoverSession())) return first;
+  const retry = await fetch(path, options);
+  if (needsProbe(retry)) await recoverSession();
+  return retry;
+}
+
+export function consumePairFragment(): Promise<boolean> | null {
+  if (typeof window === 'undefined') return null;
+  const pair = parsePairFragment(window.location.hash);
+  if (pair === null) return null;
+  window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  return redeemPairingCode(pair.code, pair.environmentId);
+}
+
+export function redeemPairingCode(code: string, environmentId?: string): Promise<boolean> {
+  if (recovery?.phase === 'redeeming') return recovery.result;
+  const phase = environmentId === undefined ? 'redeeming' : 'looking-up';
+  const result = startRecovery(phase, async (operation) => {
+    const { signal } = operation.controller;
+    const matchesEnvironment =
+      environmentId === undefined ||
+      (await withSessionRequestDeadline(signal, async (requestSignal) => {
+        const response = await fetch(DESCRIPTOR_PATH, { redirect: 'error', signal: requestSignal });
+        if (requestSignal.aborted || !response.ok || response.redirected) return false;
+        return ((await response.json()) as RemoteDescriptor).environmentId === environmentId;
+      })) === true;
+    if (signal.aborted) return false;
+    if (matchesEnvironment) {
+      operation.phase = 'redeeming';
+      retrying = false;
+      publish();
+      try {
+        const platform = (navigator as { userAgentData?: { platform?: string } }).userAgentData
+          ?.platform;
+        await fetch(PAIR_PATH, {
+          method: 'POST',
+          redirect: 'error',
+          headers: { 'content-type': 'application/json', [BROWSER_AUTH_HEADER]: '1' },
+          body: JSON.stringify({ code, name: platform || 'Browser', environmentId }),
+        });
+      } catch {}
+    }
+    operation.phase = 'confirming';
+    retrying = true;
+    publish();
+    const verdict = await probeSession(signal);
+    return verdict !== null && !signal.aborted && applyVerdict(verdict, 'rejected');
   });
+  clearLegacyBrowserToken();
+  gate = 'waiting';
+  retrying = phase === 'looking-up';
+  publish();
+  return result;
 }

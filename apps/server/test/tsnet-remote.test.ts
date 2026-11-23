@@ -22,7 +22,7 @@ import {
   startTsnetRemote,
   tsnetPathsOf,
 } from '../src/services/tsnet-remote.js';
-import { bootServer } from './helpers.js';
+import { bootServer, redeemTestPairing } from './helpers.js';
 
 const TOKEN = 'tsnet-remote-token-0123456789abcdef';
 const tmpDirs: string[] = [];
@@ -905,11 +905,7 @@ describe('POST /api/remote/tailnet', () => {
       headers: { authorization: `Bearer ${TOKEN}` },
     });
     const { code } = (await grant.json()) as { code: string };
-    const pair = await s.app.request('/api/remote/pair', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code, name: 'phone' }),
-    });
+    const pair = await redeemTestPairing(s.app, code, 'phone');
     const { token } = (await pair.json()) as { token: string };
     const deviceHeaders = { authorization: `Bearer ${token}` };
     expect((await callTailnet(s, { enabled: true }, deviceHeaders)).status).toBe(403);

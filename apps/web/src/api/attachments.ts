@@ -1,4 +1,5 @@
 import { ATTACHMENT_MAX_BYTES, resolveAttachmentMime } from '@cairn/shared';
+import { fetchWithSession } from './auth.js';
 
 const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
@@ -56,7 +57,7 @@ export async function attachFile(input: AttachFileInput): Promise<AttachResult> 
   if (resolveAttachmentMime(file.name, file.type) === null) {
     throw new AttachmentError('mime', `file type not allowed: ${file.name}`);
   }
-  const grantRes = await fetch('/api/uploads/grant', {
+  const grantRes = await fetchWithSession('/api/uploads/grant', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -74,7 +75,10 @@ export async function attachFile(input: AttachFileInput): Promise<AttachResult> 
   const form = new FormData();
   form.set('grant', grantBody.grant);
   form.set('file', file, file.name);
-  const upRes = await fetch(`${grantBody.uploadUrl}/upload`, { method: 'POST', body: form });
+  const upRes = await fetchWithSession(`${grantBody.uploadUrl}/upload`, {
+    method: 'POST',
+    body: form,
+  });
   if (!upRes.ok) {
     throw new AttachmentError('upload', `upload failed: ${upRes.status} ${await upRes.text()}`);
   }

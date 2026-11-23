@@ -108,11 +108,18 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
   });
 
   app.post('/api/remote/pair', async (c) => {
-    c.header('cache-control', 'no-store');
+    if (
+      c.req.header('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json'
+    ) {
+      return c.json({ error: 'application/json required' }, 415);
+    }
     if (ctx.authToken === null) {
       throw new HttpError(409, 'pairing needs token auth, which is turned off');
     }
     const body = parseWith(pairBodySchema, await jsonBody(c), 'body');
+    if (body.environmentId !== undefined && body.environmentId !== remote.environmentId) {
+      throw new HttpError(409, 'pairing environment mismatch');
+    }
     const paired = pairFromGrant(ctx.db, {
       code: body.code,
       teamId: ctx.team.id,

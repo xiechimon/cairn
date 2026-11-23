@@ -1,8 +1,10 @@
 import { createECDH, randomBytes } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
-import { hostname } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
+  BROWSER_AUTH_HEADER,
   DEVICE_TOKEN_PREFIX,
   PAIRED_DEVICE_CAP,
   PAIRING_CODE_CAP,
@@ -45,6 +47,9 @@ function call(
         method,
         headers: {
           ...(options.body !== undefined ? { 'content-type': 'application/json' } : {}),
+          ...(method === 'POST' && path === '/api/remote/pair'
+            ? { [BROWSER_AUTH_HEADER]: '1' }
+            : {}),
           ...options.headers,
         },
         body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
@@ -67,6 +72,30 @@ function readyStatus(overrides: Partial<TailnetAccess> = {}): TailnetAccess {
     ...overrides,
   };
 }
+
+test('a mismatched pairing environment does not consume the grant or set a cookie', async () => {
+  const directory = tmpdir();
+  const s = bootServer({
+    authToken: OWNER,
+    reposDir: directory,
+    attachmentsDir: directory,
+    skillsDir: directory,
+    skillSourcesPath: join(directory, 'unused-pairing-test-skill-sources.json'),
+  });
+  const body = { code: await issueCode(s), name: 'phone' };
+  const rejected = await call(s, 'POST', '/api/remote/pair', {
+    body: { ...body, environmentId: 'different-environment' },
+  });
+  expect(rejected.status).toBe(409);
+  expect(rejected.headers.get('set-cookie')).toBeNull();
+  expect(s.db.select().from(pairedDevice).all()).toHaveLength(0);
+
+  const accepted = await call(s, 'POST', '/api/remote/pair', {
+    body: { ...body, environmentId: ENVIRONMENT_ID },
+  });
+  expect(accepted.status).toBe(201);
+  expect(accepted.headers.get('set-cookie')).not.toBeNull();
+});
 
 test('a failed device insert does not consume the pairing code', async () => {
   const s = bootServer({ authToken: OWNER });

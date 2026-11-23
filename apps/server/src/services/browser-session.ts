@@ -6,7 +6,7 @@ import type { Db } from '../db/client.js';
 import { browserSession } from '../db/schema.js';
 import { hashCredential } from '../lib/hash.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { tailnetListenerOf } from '../lib/tailnet-listener.js';
+import { requestOrigin } from '../lib/request-origin.js';
 
 export const AUTH_COOKIE = 'cairn_auth';
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -74,9 +74,7 @@ export function setAuthCookie(
 }
 
 export function requestIsSecure(c: Context): boolean {
-  if (tailnetListenerOf(c) !== null) return true;
-  if (c.req.header('x-forwarded-proto') === 'https') return true;
-  return new URL(c.req.url).protocol === 'https:';
+  return new URL(requestOrigin(c)).protocol === 'https:';
 }
 
 interface Ticket {

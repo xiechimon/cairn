@@ -59,7 +59,7 @@
 | [Phone computers](#phones) | 2 | partial | yes | yes | yes |  |
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
 | [Remote access over the tailnet](#remote-access) | 2 | partial | yes | gap | yes | B5 |
-| [Login and tailnet device auth](#tailnet-login) | 2 | partial | yes (not on main) | gap | yes (not on main) | B5 |
+| [Login and tailnet device auth](#tailnet-login) | 2 | partial | yes (not on main) | gap | yes | B5 |
 | [Token usage](#token-usage) | 2 | shipped | gap | yes | yes | B7 |
 | [Account and team](#account-and-team) | 3 | shipped | yes | yes | gap | B10 |
 | [API keys](#api-keys) | 3 | shipped | gap | gap | gap | B10 |
@@ -444,7 +444,7 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design
-- Backend design: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main)
+- Backend design: [docs/research/seamless-device-auth-2026-11-08.md](research/seamless-device-auth-2026-11-08.md) (not on main), [docs/design/pairing-gate-close.md](design/pairing-gate-close.md)
 
 ### token-usage
 

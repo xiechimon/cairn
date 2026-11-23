@@ -12,7 +12,9 @@ import {
   SCENARIOS_ENABLED,
 } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { ApiError } from './client.js';
 import { useMachines, useSession, useTeams } from './hooks.js';
+import { refreshQueriesOnGateClose } from './invalidate.js';
 import { isFixtureMode } from './mode.js';
 import { useTeamStream } from './sse.js';
 
@@ -47,13 +49,15 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: (failureCount, error) =>
+        failureCount < 1 && !(error instanceof ApiError && error.status === 401),
       staleTime: 2_000,
     },
   },
 });
 
 export function ApiProvider({ children }: { children: ReactNode }) {
+  useEffect(() => refreshQueriesOnGateClose(queryClient), []);
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 

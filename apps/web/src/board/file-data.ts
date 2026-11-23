@@ -1,5 +1,6 @@
 import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 import { useLocation } from 'react-router';
+import { fetchWithSession } from '../api/auth.js';
 import { useLiveData } from '../api/provider.js';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -40,13 +41,13 @@ export function fileMetaLabel(key: string, size: number | undefined): string {
 }
 
 async function fetchAttachmentText(url: string): Promise<string> {
-  const res = await fetch(url, { credentials: 'same-origin' });
+  const res = await fetchWithSession(url);
   if (!res.ok) throw new Error(`attachment read failed: ${res.status}`);
   return res.text();
 }
 
 async function fetchDocumentPreview(url: string): Promise<DocumentPreview> {
-  const res = await fetch(`${url}/document-preview`, { credentials: 'same-origin' });
+  const res = await fetchWithSession(`${url}/document-preview`);
   if (DOCUMENT_UNAVAILABLE_STATUSES.has(res.status))
     throw new DocumentPreviewUnavailable(`document preview unavailable: ${res.status}`);
   if (!res.ok) throw new Error(`document preview failed: ${res.status}`);
@@ -54,7 +55,7 @@ async function fetchDocumentPreview(url: string): Promise<DocumentPreview> {
 }
 
 async function fetchAttachmentSize(url: string): Promise<number | null> {
-  const res = await fetch(url, { method: 'HEAD', credentials: 'same-origin' });
+  const res = await fetchWithSession(url, { method: 'HEAD' });
   const length = res.ok ? Number(res.headers.get('content-length')) : Number.NaN;
   return Number.isFinite(length) && length > 0 ? length : null;
 }

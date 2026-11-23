@@ -77,9 +77,8 @@ const ALLOWED: Record<string, string> = {
     'fetcher registry keyed on the app-token socket token; the token identifies the app',
   'apps/server/src/lib/github-token.ts:fallbackCounts': 'process metrics counters',
   'apps/server/src/lib/remote-routes.ts:WILDCARD_HOSTS': 'constant lookup table',
-  'apps/server/src/lib/token-auth.ts:LOOPBACK_PEER_ADDRESSES': 'constant lookup table',
+  'apps/server/src/lib/request-origin.ts:LOOPBACK_PEER_ADDRESSES': 'constant lookup table',
   'apps/server/src/lib/token-auth.ts:READ_METHODS': 'constant lookup table',
-  'apps/server/src/lib/token-auth.ts:OPEN_REMOTE_PATHS': 'constant lookup table',
   'apps/server/src/lib/tsnet-sidecar.ts:INHERITED_ENV_NAMES': 'constant lookup table',
   'apps/server/src/runtime-otel.ts:tracings':
     'process-wide tracing registry; one OTel pipeline per server process',

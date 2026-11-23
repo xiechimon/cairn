@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from 'vitest';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, redeemTestPairing, type TestServer } from './helpers.js';
 
 const OWNER = 'paired-diagnostics-owner-token-0123456789abcdef';
 const ownerHeaders = { authorization: `Bearer ${OWNER}` };
@@ -26,7 +26,7 @@ async function pairDevice(s: TestServer): Promise<{ token: string }> {
   const issued = await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders });
   expect(issued.status).toBe(201);
   const { code } = (await issued.json()) as { code: string };
-  const paired = await call(s, 'POST', '/api/remote/pair', { body: { code, name: 'tablet' } });
+  const paired = await redeemTestPairing(s.app, code, 'tablet');
   expect(paired.status).toBe(201);
   return (await paired.json()) as { token: string };
 }

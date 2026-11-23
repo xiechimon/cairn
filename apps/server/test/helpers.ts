@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type {
-  ModelRef,
-  PolicyUse,
-  ProjectRepoKind,
-  RequiredCapabilities,
-  RouteUse,
+import {
+  BROWSER_AUTH_HEADER,
+  type ModelRef,
+  type PolicyUse,
+  type ProjectRepoKind,
+  type RequiredCapabilities,
+  type RouteUse,
 } from '@cairn/shared';
 import type BetterSqlite from 'better-sqlite3';
 import { and, eq } from 'drizzle-orm';
@@ -324,6 +325,16 @@ export function req(app: Hono, method: string, path: string, body?: unknown): Pr
       method,
       headers: body !== undefined ? jsonHeaders : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+    }),
+  );
+}
+
+export function redeemTestPairing(app: Hono, code: string, name: string): Promise<Response> {
+  return Promise.resolve(
+    app.request('/api/remote/pair', {
+      method: 'POST',
+      headers: { ...jsonHeaders, [BROWSER_AUTH_HEADER]: '1' },
+      body: JSON.stringify({ code, name }),
     }),
   );
 }

@@ -91,6 +91,68 @@ describe('attachFile network failure classification (FM12)', () => {
   });
 });
 
+describe('attachFile session recovery', () => {
+  const grantPath = '/api/uploads/grant';
+  const uploadPath = '/api/uploads/upload';
+  const probePath = '/api/auth/session';
+
+  it.each([
+    { outcome: 'the session is confirmed', verdict: 204, retryStatus: 201, error: null },
+    { outcome: 'the session is signed out', verdict: 401, retryStatus: null, error: 'session expired' },
+    { outcome: 'the retry is unauthorized', verdict: 204, retryStatus: 401, error: 'grant rejected' },
+  ])('recovers a multipart upload 401 when $outcome', async ({ verdict, retryStatus, error }) => {
+    vi.stubGlobal('window', { location: new URL('http://localhost/app') });
+    const file = pngFile(64);
+    let uploads = 0;
+    let probes = 0;
+    const fetchMock = vi.fn(async (path: string, _init?: RequestInit) => {
+      if (path === grantPath) {
+        return Response.json({
+          uploadUrl: '/api/uploads',
+          grant: 'fixture-grant',
+          key: 'team-1/att-9.png',
+          attachmentId: 'att-9',
+        });
+      }
+      if (path === probePath) return new Response(null, { status: ++probes === 1 ? verdict : 401 });
+      if (path === uploadPath) {
+        if (++uploads === 1) return new Response('session expired', { status: 401 });
+        return new Response('grant rejected', { status: retryStatus ?? 500 });
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const result = attachFile({ file, scope: 'message' });
+    if (error === null) await expect(result).resolves.toMatchObject({ attachmentId: 'att-9' });
+    else {
+      await expect(result).rejects.toMatchObject({
+        reason: 'upload',
+        message: `upload failed: 401 ${error}`,
+      });
+    }
+    expect(fetchMock.mock.calls.map(([path]) => path)).toEqual([
+      grantPath,
+      uploadPath,
+      probePath,
+      ...(retryStatus === null ? [] : [uploadPath]),
+      ...(retryStatus === 401 ? [probePath] : []),
+    ]);
+    for (const [, init] of fetchMock.mock.calls.filter(([path]) => path === uploadPath)) {
+      expect(init).toMatchObject({ method: 'POST', credentials: 'same-origin' });
+      expect(new Headers(init?.headers).has('content-type')).toBe(false);
+      const form = init?.body;
+      expect(form).toBeInstanceOf(FormData);
+      if (!(form instanceof FormData)) throw new Error('Expected a multipart upload');
+      expect(form.get('grant')).toBe('fixture-grant');
+      const sentFile = form.get('file');
+      expect(sentFile).toMatchObject({ name: file.name, type: file.type });
+      expect(sentFile).toBeInstanceOf(File);
+      if (!(sentFile instanceof File)) throw new Error('Expected a multipart file');
+      expect(await sentFile.arrayBuffer()).toEqual(await file.arrayBuffer());
+    }
+  });
+});
+
 describe('attachmentFailureTitle — toast copy mapping (zh keys = en dictionary keys)', () => {
   it('size → size-limit copy', () => {
     expect(attachmentFailureTitle(new AttachmentError('size', 'x'))).toBe('附件超过 10MB 上限');

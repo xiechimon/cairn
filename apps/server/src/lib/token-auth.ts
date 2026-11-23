@@ -1,11 +1,12 @@
 import { timingSafeEqual } from 'node:crypto';
-import { getConnInfo } from '@hono/node-server/conninfo';
-import type { Context, Hono } from 'hono';
+import { BROWSER_AUTH_HEADER, BROWSER_SESSION_PATH, isBrowserAuthExempt } from '@cairn/shared';
+import type { Context, Hono, MiddlewareHandler } from 'hono';
 import { AUTH_COOKIE, type ResolvedBrowserSession } from '../services/browser-session.js';
 import { sha256Hex } from './crypto.js';
 import { type OwnerChannel, ownerChannelAdmits } from './owner-channel.js';
+import { requestOrigin } from './request-origin.js';
 
-const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+export { isOpenRemotePath } from '@cairn/shared';
 
 const STREAM_PATH_PATTERNS = [
   /^\/api\/teams\/[^/]+\/stream$/,
@@ -43,29 +44,6 @@ export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   return OWNER_ONLY_PATTERNS.some((pattern) => pattern.test(pathname));
 }
 
-const OPEN_REMOTE_PATHS = new Set(['/api/remote/descriptor', '/api/remote/pair']);
-
-export function isOpenRemotePath(pathname: string): boolean {
-  return OPEN_REMOTE_PATHS.has(pathname);
-}
-
-function isExempt(pathname: string): boolean {
-  if (pathname.includes('%')) return false;
-  if (!pathname.startsWith('/api/')) return true;
-  if (
-    pathname !== '/api/machine/enroll/confirm' &&
-    (pathname === '/api/machine' || pathname.startsWith('/api/machine/'))
-  )
-    return true;
-  if (pathname.startsWith('/api/webhook/')) return true;
-  if (pathname === '/api/mcp') return true;
-  if (pathname === '/api/oauth/callback') return true;
-  if (pathname === '/api/auth/access') return true;
-  if (pathname.startsWith('/api/webhook/schedule/')) return true;
-  if (isOpenRemotePath(pathname)) return true;
-  return false;
-}
-
 function makeVerifier(token: string): (provided: string) => boolean {
   const expected = Buffer.from(sha256Hex(token));
   return (provided) => {
@@ -76,16 +54,6 @@ function makeVerifier(token: string): (provided: string) => boolean {
 
 export function matchesAuthToken(expected: string, provided: string): boolean {
   return makeVerifier(expected)(provided);
-}
-
-export function isLoopbackPeer(c: Context): boolean {
-  let peerAddress: string | undefined;
-  try {
-    peerAddress = getConnInfo(c).remote.address;
-  } catch (error) {
-    if (!(error instanceof TypeError)) throw error;
-  }
-  return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
 }
 
 export interface TokenAuthOptions {
@@ -104,6 +72,17 @@ declare module 'hono' {
     ownerIdentity: OwnerIdentity;
   }
 }
+
+const requireBrowserOriginProof: MiddlewareHandler = async (c, next) => {
+  c.header('cache-control', 'no-store');
+  const site = c.req.header('sec-fetch-site');
+  if (c.req.header(BROWSER_AUTH_HEADER) !== '1' || (site !== undefined && site !== 'same-origin')) {
+    return c.body(null, 403);
+  }
+  const origin = c.req.header('origin');
+  if (origin !== undefined && origin !== requestOrigin(c)) return c.body(null, 403);
+  return next();
+};
 
 export function sameOriginPageWrite(c: Context): boolean {
   const site = c.req.header('sec-fetch-site');
@@ -125,7 +104,12 @@ function cookieValue(c: Context, name: string): string | undefined {
   if (header === undefined) return undefined;
   for (const part of header.split(';')) {
     const [rawName, ...rest] = part.trim().split('=');
-    if (rawName === name) return decodeURIComponent(rest.join('='));
+    if (rawName !== name) continue;
+    try {
+      return decodeURIComponent(rest.join('='));
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }
@@ -149,6 +133,8 @@ export function registerTokenAuth(
   token: string | null,
   options: TokenAuthOptions = {},
 ): void {
+  app.use(BROWSER_SESSION_PATH, requireBrowserOriginProof);
+  app.on('POST', '/api/remote/pair', requireBrowserOriginProof);
   if (token === null) return;
   const verifyOwner = makeVerifier(token);
   app.use('*', async (c, next) => {
@@ -164,7 +150,7 @@ export function registerTokenAuth(
     };
     const url = new URL(c.req.url);
     const pathname = url.pathname;
-    if (isExempt(pathname)) return next();
+    if (isBrowserAuthExempt(pathname)) return next();
     const admit = () => {
       if (pairedDeviceIdOf(c) !== null && isOwnerOnlyRoute(c.req.method, c.req.path)) {
         return c.json({ error: 'only the owner token can do this' }, 403);
@@ -202,6 +188,7 @@ export function registerTokenAuth(
         return admit();
       }
     }
+    if (c.req.path === '/api/auth/session') return c.body(null, 401);
     return c.json({ error: 'Unauthorized' }, 401);
   });
 }

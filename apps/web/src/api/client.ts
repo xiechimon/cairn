@@ -1,14 +1,5 @@
-import { parsePairFragment } from '@cairn/shared';
-import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
-import {
-  authSnapshot,
-  awaitGate,
-  clearLegacyBrowserToken,
-  consumePairFragment,
-  demandGate,
-  exchangeAccessIdentity,
-  passGate,
-} from './auth.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
+import { clearLegacyBrowserToken, fetchWithSession } from './auth.js';
 
 export class ApiError extends Error {
   constructor(
@@ -22,44 +13,17 @@ export class ApiError extends Error {
   }
 }
 
-function send(path: string, init?: { method?: string; body?: unknown }): Promise<Response> {
+function send(path: string, init?: { method?: string; body?: unknown }) {
   const headers: Record<string, string> = {};
   if (init?.body !== undefined) headers['content-type'] = 'application/json';
-  return fetch(path, {
+  return fetchWithSession(path, {
     method: init?.method ?? 'GET',
     headers,
-    credentials: 'same-origin',
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
   });
 }
 
 if (typeof window !== 'undefined') clearLegacyBrowserToken();
-
-let establishing: Promise<boolean> | null = null;
-
-function establishSession(): Promise<boolean> {
-  if (establishing !== null) return establishing;
-  establishing = (async () => {
-    if (DEMO_MODE) return false;
-    if (parsePairFragment(window.location.hash) !== null) {
-      let failed = false;
-      await consumePairFragment(() => {
-        failed = true;
-      });
-      if (failed) return false;
-    }
-    if ((await fetch('/api/teams')).ok) return true;
-    return (await exchangeAccessIdentity()) && (await fetch('/api/teams')).ok;
-  })().finally(() => {
-    establishing = null;
-  });
-  return establishing;
-}
-
-function signedIn(res: Response): Response {
-  if (authSnapshot().gateOpen) passGate();
-  return res;
-}
 
 async function settle<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -77,17 +41,7 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
   if (init?.method != null && init.method !== 'GET' && blockDemoWrite()) {
     return new Promise<T>(() => {});
   }
-  const first = await send(path, init);
-  if (first.status !== 401) return settle<T>(signedIn(first));
-  if (await establishSession()) {
-    const retried = await send(path, init);
-    if (retried.status !== 401) return settle<T>(signedIn(retried));
-  }
-  demandGate();
-  await awaitGate();
-  const second = await send(path, init);
-  if (second.status === 401) demandGate();
-  return settle<T>(second);
+  return settle<T>(await send(path, init));
 }
 
 export const api = {

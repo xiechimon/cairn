@@ -6,7 +6,7 @@ import { chief, chiefThread, project as projectTable } from '../src/db/schema.js
 import { proposalById } from '../src/services/action-proposals.js';
 import { executeAction } from '../src/services/action-registry.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
-import { bootServer } from './helpers.js';
+import { bootServer, redeemTestPairing } from './helpers.js';
 
 const TOKEN = 'owner-channel-test-token';
 const KEY = 'owner-channel-test-key';
@@ -228,7 +228,7 @@ describe('owner channel gate', () => {
     const issued = await post(s, '/api/remote/pairing', {}, channelHeaders());
     expect(issued.status).toBe(201);
     const { code } = (await issued.json()) as { code: string };
-    const paired = await post(s, '/api/remote/pair', { code, name: 'Test phone' });
+    const paired = await redeemTestPairing(s.app, code, 'Test phone');
     expect(paired.status).toBe(201);
     const { token: deviceToken, deviceId } = (await paired.json()) as {
       token: string;
@@ -356,7 +356,7 @@ describe('owner channel gate', () => {
     expect(topModels.status).toBe(200);
     const issued = await post(s, '/api/remote/pairing', {}, channelHeaders());
     const { code } = (await issued.json()) as { code: string };
-    const paired = await post(s, '/api/remote/pair', { code, name: 'Test phone' });
+    const paired = await redeemTestPairing(s.app, code, 'Test phone');
     const { token: deviceToken } = (await paired.json()) as { token: string };
     const deviceTicket = await post(s, '/api/auth/stream-ticket', undefined, {
       authorization: `Bearer ${deviceToken}`,

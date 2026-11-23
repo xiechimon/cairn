@@ -9,7 +9,7 @@ import {
   type RunTailscale,
   tailscaleCliCandidates,
 } from '../src/services/tailscale-serve.js';
-import { bootServer, type TestServer } from './helpers.js';
+import { bootServer, redeemTestPairing, type TestServer } from './helpers.js';
 
 const OWNER = 'tailscale-serve-owner-token-0123456789abcdef';
 const ENVIRONMENT_ID = '0f9d3a52-6c1e-4b7a-9d3e-5a1c2b4d6e80';
@@ -294,11 +294,7 @@ describe('who may turn Tailscale access on', () => {
   async function pairDevice(s: TestServer): Promise<PairResponse> {
     const issued = await call(s, 'POST', '/api/remote/pairing', ownerHeaders);
     const { code } = (await issued.json()) as { code: string };
-    const res = await s.app.request('/api/remote/pair', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ code, name: 'phone' }),
-    });
+    const res = await redeemTestPairing(s.app, code, 'phone');
     return (await res.json()) as PairResponse;
   }
 

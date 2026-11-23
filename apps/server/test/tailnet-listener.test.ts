@@ -3,6 +3,7 @@ import { chmodSync, readdirSync, readFileSync, statSync, writeFileSync } from 'n
 import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
+import { BROWSER_AUTH_HEADER } from '@cairn/shared';
 import { getRequestListener } from '@hono/node-server';
 import { afterAll, afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -336,7 +337,11 @@ test('a session cookie set through the tailnet socket is Secure', async () => {
       socketPath,
       path: '/api/remote/pair',
       method: 'POST',
-      headers: { host: 'cairn.tail.ts.net', 'content-type': 'application/json' },
+      headers: {
+        host: 'cairn.tail.ts.net',
+        'content-type': 'application/json',
+        [BROWSER_AUTH_HEADER]: '1',
+      },
     });
     req.on('response', (res) => {
       res.resume();

@@ -58,6 +58,8 @@ const ACCESS_REFUSALS = {
 
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   const streamSessions = new StreamSessionRegistry();
+  app.get('/api/auth/session', (c) => c.body(null, 204));
+
   app.use('/api/*', async (c, next) => {
     if (!getCookie(c, SESSION_COOKIE) && !isOpenRemotePath(c.req.path)) {
       setCookie(c, SESSION_COOKIE, ctx.user.id, { httpOnly: true, path: '/' });

@@ -1,7 +1,7 @@
 import { DB_TABLES, INTERNAL_ONLY_TABLES, WEB_REST_ENDPOINTS } from '@cairn/shared';
 import { afterEach, expect, test } from 'vitest';
 import { createSecret, openSecretValues } from '../src/services/secrets.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, redeemTestPairing, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 afterEach(() => {
@@ -24,7 +24,7 @@ test('paired devices also see the retired endpoint as absent', async () => {
     headers: { authorization: 'Bearer test-owner' },
   });
   const { code } = (await codeResponse.json()) as { code: string };
-  const paired = await req(server.app, 'POST', '/api/remote/pair', { code, name: 'Test device' });
+  const paired = await redeemTestPairing(server.app, code, 'Test device');
   const { token } = (await paired.json()) as { token: string };
   for (const method of ['GET', 'PUT', 'DELETE']) {
     const response = await server.app.request(`/api/teams/${server.team.id}/feishu`, {

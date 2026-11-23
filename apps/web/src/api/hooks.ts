@@ -132,7 +132,7 @@ import {
 } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
-import { useAuth } from './auth.js';
+import { fetchWithSession, useAuth } from './auth.js';
 import { ApiError, api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { cacheUserMessage, moveQueueToReplacement } from './message-cache.js';
@@ -1885,9 +1885,9 @@ export const useDesignPageHtml = (versionId: string | null) =>
     staleTime: Number.POSITIVE_INFINITY,
     retry: false,
     queryFn: async () => {
-      const res = await fetch(`/api/design/versions/${encodeURIComponent(versionId ?? '')}/page`, {
-        credentials: 'same-origin',
-      });
+      const res = await fetchWithSession(
+        `/api/design/versions/${encodeURIComponent(versionId ?? '')}/page`,
+      );
       if (!res.ok) throw new ApiError(res.status, res.statusText);
       return res.text();
     },

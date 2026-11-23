@@ -4,7 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { openMemoryDb } from '../src/db/client.js';
 import { team } from '../src/db/schema.js';
 import { readTopModels, writeTopModels } from '../src/services/top-models.js';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, redeemTestPairing, req, type TestServer } from './helpers.js';
 
 const OPUS: TopModel = {
   provider: 'claude-code',
@@ -234,7 +234,7 @@ describe('only the owner page changes the list', () => {
     const pairing = await call(s, 'POST', '/api/remote/pairing', { headers: ownerHeaders });
     expect(pairing.status).toBe(201);
     const { code } = (await pairing.json()) as { code: string };
-    const paired = await call(s, 'POST', '/api/remote/pair', { body: { code, name: 'phone' } });
+    const paired = await redeemTestPairing(s.app, code, 'phone');
     expect(paired.status).toBe(201);
     const { token } = (await paired.json()) as PairResponse;
     const res = await call(s, 'PUT', path(s.team.id), {

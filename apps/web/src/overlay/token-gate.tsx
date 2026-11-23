@@ -1,13 +1,6 @@
 import { cn } from 'cn';
 import { type FormEvent, type MouseEvent, useEffect, useRef, useState } from 'react';
-import {
-  beginGateProbe,
-  consumePairFragment,
-  passGate,
-  redeemPairingCode,
-  rejectGate,
-  useAuth,
-} from '../api/auth.js';
+import { consumePairFragment, redeemPairingCode, useAuth } from '../api/auth.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Input } from '../components/ui/input.js';
@@ -21,12 +14,11 @@ export function TokenGate() {
   const auth = useAuth();
   const [value, setValue] = useState('');
   const [caret, setCaret] = useState<number | null>(null);
-  const [probing, setProbing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const cellsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void consumePairFragment(() => rejectGate());
+    void consumePairFragment();
   }, []);
 
   useEffect(() => {
@@ -40,14 +32,8 @@ export function TokenGate() {
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     const candidate = value.trim();
-    if (candidate === '' || probing) return;
-    setProbing(true);
-    beginGateProbe();
-    void redeemPairingCode(candidate).then((accepted) => {
-      if (accepted) passGate();
-      else rejectGate();
-      setProbing(false);
-    });
+    if (candidate === '' || auth.pairing) return;
+    void redeemPairingCode(candidate);
   };
 
   const cellCount = Math.max(PAIR_CODE_CELLS, value.length);
@@ -143,9 +129,9 @@ export function TokenGate() {
             <Button
               type="submit"
               className="border-0 rounded-md px-3 text-[13px] font-normal"
-              disabled={probing || value.trim() === ''}
+              disabled={auth.pairing || value.trim() === ''}
             >
-              {probing ? (
+              {auth.pairing ? (
                 <>
                   <RingSpinner data-icon="inline-start" />
                   {t('正在配对…')}
@@ -157,6 +143,9 @@ export function TokenGate() {
           </form>
         </Card>
         <p className="m-0 text-center text-caption leading-normal text-content-tertiary">
+          <span className="block" role="status">
+            {auth.retrying ? t('正在连接…') : null}
+          </span>
           {t('服务器地址 {host} · 令牌只发一次，存在这台设备的浏览器里', {
             host: window.location.host,
           })}

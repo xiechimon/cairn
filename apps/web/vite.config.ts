@@ -58,7 +58,7 @@ export default defineConfig(({ mode }) => ({
       },
       '/api': {
         target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,
-        changeOrigin: true,
+        changeOrigin: false,
       },
       '/git': {
         target: `http://127.0.0.1:${process.env.CAIRN_DEV_SERVER_PORT ?? 8787}`,

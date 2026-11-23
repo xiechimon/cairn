@@ -17,6 +17,8 @@ import {
   warnInsecureBind,
 } from '../src/config.js';
 import { HttpError } from '../src/lib/errors.js';
+import { registerTokenAuth } from '../src/lib/token-auth.js';
+import { AUTH_COOKIE } from '../src/services/browser-session.js';
 import { assertDeviceActive } from '../src/services/paired-devices.js';
 import { bootServer, insertGitApiKey, req, type TestServer } from './helpers.js';
 
@@ -51,6 +53,20 @@ describe('token auth: the protected surface (failure modes 1/2/6)', () => {
     expect(res.status).toBe(401);
     const body = (await res.json()) as { error?: unknown };
     expect(typeof body.error).toBe('string');
+  });
+
+  test('malformed authentication cookies are rejected as 401 without resolving a session', async () => {
+    const app = new Hono();
+    const resolveSession = vi.fn(() => null);
+    registerTokenAuth(app, TOKEN, { resolveSession });
+    app.get('/api/teams', (c) => c.json([]));
+
+    const response = await app.request('/api/teams', {
+      headers: { cookie: `${AUTH_COOKIE}=%` },
+    });
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(resolveSession).not.toHaveBeenCalled();
   });
 
   test('on + a wrong Bearer token -> 401', async () => {

@@ -23,7 +23,7 @@ import { translate } from '../i18n/translate.js';
 import { safeLocalStorage } from '../safe-storage.js';
 import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
-import { useAuth } from './auth.js';
+import { fetchWithSession, useAuth } from './auth.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import {
   attachConnection,
@@ -46,7 +46,7 @@ import { applyTeamStreamEvent, notePatchedEvent } from './team-stream-cache.js';
 
 async function streamUrl(path: string): Promise<string> {
   if (DEMO_MODE) return path;
-  const res = await fetch('/api/auth/stream-ticket', { method: 'POST' });
+  const res = await fetchWithSession('/api/auth/stream-ticket', { method: 'POST' });
   if (!res.ok) return path;
   const body = (await res.json()) as { ticket?: string };
   if (body.ticket === undefined || body.ticket === '') return path;

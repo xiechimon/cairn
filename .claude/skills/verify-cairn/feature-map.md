@@ -626,8 +626,8 @@ Reach:
 - Test ids in its code: none
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design
-- Backend design: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
-- Evidence: `apps/web/e2e/token-gate.spec.ts`, `apps/server/test/token-auth.test.ts`, `apps/server/test/tailnet-listener.test.ts`
+- Backend design: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main), [docs/design/pairing-gate-close.md](../../../docs/design/pairing-gate-close.md)
+- Evidence: `apps/web/e2e/token-gate.spec.ts`, `apps/web/test/auth-gate-close.test.ts`, `apps/server/test/browser-session-status.test.ts`, `apps/server/test/token-auth.test.ts`, `apps/server/test/tailnet-listener.test.ts`
 
 ### token-usage
 

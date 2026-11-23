@@ -1,3 +1,4 @@
+import { fetchWithSession } from './auth.js';
 import { api } from './client.js';
 
 export interface DraftSnapshot {
@@ -31,10 +32,9 @@ export function createDraftTransport(teamId: string, scope: string): DraftTransp
     load: async () => checked(await api.get<unknown>(path)),
     async save(content, options) {
       if (options?.keepalive !== true) return checked(await api.put<unknown>(path, { content }));
-      const res = await fetch(path, {
+      const res = await fetchWithSession(path, {
         method: 'PUT',
         keepalive: true,
-        credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ content }),
       });

@@ -1,27 +1,48 @@
-import { expect, test, vi } from 'vitest';
-import { beginGateProbe, demandGate, passGate, rejectGate, useAuth } from '../src/api/auth.js';
+import { afterEach, expect, test, vi } from 'vitest';
+import { redeemPairingCode, useAuth } from '../src/api/auth.js';
+import { api } from '../src/api/client.js';
 
 vi.mock('react', () => ({
   useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
 }));
 
-test('accepted tokens and gate boundaries advance a private cache generation without including the token', () => {
+afterEach(() => vi.unstubAllGlobals());
+
+test('the private computer cache changes scope only at gate boundaries and confirmed Access replacement', async () => {
+  vi.stubGlobal('window', { location: new URL('https://cairn.test/app') });
+  vi.stubGlobal('navigator', {});
+  let hasCookie = false;
+  let allowAccess = true;
+  const unauthorized = () => Response.json({}, { status: 401 });
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+    if (path === '/api/auth/session') {
+      return hasCookie ? new Response(null, { status: 204 }) : unauthorized();
+    }
+    if (path === '/api/auth/access') {
+      if (!allowAccess) return unauthorized();
+      hasCookie = true;
+      return Response.json({ ok: true });
+    }
+    if (path === '/api/remote/pair') hasCookie = true;
+    if (path === '/api/teams' && !hasCookie) return unauthorized();
+    return Response.json([]);
+  }));
+
   const initial = useAuth();
-  passGate();
-  const first = useAuth();
-  expect(first.generation).toBe(initial.generation + 1);
-  expect(first.gateOpen).toBe(false);
-  passGate();
+  await expect(api.get('/api/teams')).resolves.toEqual([]);
   const replacement = useAuth();
-  expect(replacement.generation).toBe(first.generation + 1);
-  demandGate();
+  expect(replacement).toEqual({ ...initial, generation: initial.generation + 1 });
+  await expect(api.get('/api/teams')).resolves.toEqual([]);
+  expect(useAuth()).toBe(replacement);
+
+  hasCookie = false;
+  allowAccess = false;
+  await expect(api.get('/api/teams')).rejects.toMatchObject({ status: 401 });
   const gated = useAuth();
-  expect(gated.generation).toBe(replacement.generation + 1);
-  expect(gated.gateOpen).toBe(true);
-  rejectGate();
-  beginGateProbe();
-  expect(useAuth().generation).toBe(gated.generation);
-  passGate();
-  expect(useAuth().generation).toBe(gated.generation + 1);
-  expect(JSON.stringify(useAuth())).not.toContain('synthetic');
+  expect(gated).toEqual({ ...replacement, gateOpen: true, generation: replacement.generation + 1 });
+
+  const pairing = redeemPairingCode('test-code');
+  expect(useAuth()).toEqual({ ...gated, pairing: true });
+  await expect(pairing).resolves.toBe(true);
+  expect(useAuth()).toEqual({ ...initial, generation: gated.generation + 1 });
 });

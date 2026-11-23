@@ -9,6 +9,26 @@ export const DEVICE_NAME_MAX_CHARS = 80;
 export const PAIR_FRAGMENT_KEY = 'pair';
 export const PAIR_FRAGMENT_ENVIRONMENT_KEY = 'env';
 export const DEVICE_TOKEN_PREFIX = 'cairn_dev_';
+export const BROWSER_AUTH_HEADER = 'x-cairn-browser-auth';
+export const BROWSER_SESSION_PATH = '/api/auth/session';
+
+export function isOpenRemotePath(pathname: string): boolean {
+  return pathname === '/api/remote/descriptor' || pathname === '/api/remote/pair';
+}
+
+export function isBrowserAuthExempt(pathname: string): boolean {
+  if (pathname.includes('%')) return false;
+  return (
+    !pathname.startsWith('/api/') ||
+    (pathname !== '/api/machine/enroll/confirm' && pathname.startsWith('/api/machine/')) ||
+    pathname === '/api/machine' ||
+    pathname.startsWith('/api/webhook/') ||
+    pathname === '/api/mcp' ||
+    pathname === '/api/oauth/callback' ||
+    pathname === '/api/auth/access' ||
+    isOpenRemotePath(pathname)
+  );
+}
 
 export const remoteDescriptorSchema = z
   .object({
@@ -92,6 +112,7 @@ export const pairBodySchema = z
   .object({
     code: z.string().min(1).max(256),
     name: deviceNameSchema,
+    environmentId: z.string().min(1).optional(),
   })
   .strict();
 export type PairBody = z.infer<typeof pairBodySchema>;

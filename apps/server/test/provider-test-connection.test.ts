@@ -1,6 +1,6 @@
 import { sql } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
-import { bootServer, req, type TestServer } from './helpers.js';
+import { bootServer, redeemTestPairing, req, type TestServer } from './helpers.js';
 
 const KEY = 'connection-fixture-secret';
 const OTHER_KEY = `sk-ant-api03-${'Z'.repeat(32)}`;
@@ -364,7 +364,7 @@ describe('provider connection check', () => {
     });
     expect(issued.status).toBe(201);
     const { code } = (await issued.json()) as { code: string };
-    const paired = await req(s.app, 'POST', '/api/remote/pair', { code, name: 'Fixture phone' });
+    const paired = await redeemTestPairing(s.app, code, 'Fixture phone');
     expect(paired.status).toBe(201);
     const { token } = (await paired.json()) as { token: string };
     const path = `/api/teams/${s.team.id}/providers`;
