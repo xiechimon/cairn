@@ -63,3 +63,44 @@ test('IM: a connected Telegram bot is one row, and deleting it asks first', asyn
   await confirm.getByRole('button', { name: 'Delete' }).click();
   await expect.poll(() => deletes.length).toBe(1);
 });
+
+test('IM: the Slack connect dialog opens with the App-Level Token field focused', async ({
+  page,
+}) => {
+  await page.addInitScript(() => localStorage.setItem('cairn.locale', 'en'));
+  await page.route('**/api/**', (route, request) =>
+    request.method() === 'GET'
+      ? route.fulfill({ status: 500, json: { error: 'e2e stub: not the surface under test' } })
+      : route.fallback(),
+  );
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: 'Me', avatarUrl: null } }),
+  );
+  await page.route('**/api/teams/team-1/im/connections', (route) =>
+    route.fulfill({ json: { connections: [] } }),
+  );
+  await page.route('**/api/teams/team-1/im/pairing-requests', (route) =>
+    route.fulfill({ json: { requests: [] } }),
+  );
+
+  await page.goto('/app/settings/im');
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await settings.getByTestId('im-connect-slack').click();
+  const dialog = page.getByRole('dialog', { name: 'Connect Slack' });
+  await expect(dialog.getByTestId('im-app-token-input')).toBeFocused();
+
+  const link = dialog.getByRole('link', { name: "Create a Slack app with Cairn's settings" });
+  await expect(link).toBeVisible();
+  const instruction = dialog.getByText('Create a Slack app, then paste its two tokens here.');
+  const linkBox = await link.boundingBox();
+  const instructionBox = await instruction.boundingBox();
+  if (linkBox === null || instructionBox === null) {
+    throw new Error('expected both the manifest link and the instruction line to have boxes');
+  }
+  expect(linkBox.y).toBeGreaterThanOrEqual(instructionBox.y + instructionBox.height);
+});
