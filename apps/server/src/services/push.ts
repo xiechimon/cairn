@@ -55,6 +55,7 @@ export function loadOrCreateVapidKeys(
   subject = DEFAULT_VAPID_SUBJECT,
   webOrigin = 'https://cairn.local',
 ): VapidKeys {
+  const windows = process.platform === 'win32';
   const directory = dirname(resolve(keysPath));
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   const directoryStat = lstatSync(directory);
@@ -66,7 +67,7 @@ export function loadOrCreateVapidKeys(
   try {
     const openedDirectoryStat = fstatSync(directoryDescriptor);
     if (!openedDirectoryStat.isDirectory()) throw new Error('vapid keys parent is not a directory');
-    fchmodSync(directoryDescriptor, 0o700);
+    if (!windows) fchmodSync(directoryDescriptor, 0o700);
     let fileDescriptor: number;
     try {
       fileDescriptor = openSync(
@@ -86,7 +87,14 @@ export function loadOrCreateVapidKeys(
       if (!fileStat.isFile() || fileStat.nlink !== 1) {
         throw new Error('vapid keys file is not a safe regular file');
       }
-      fchmodSync(fileDescriptor, 0o600);
+      if (windows) {
+        const pathStat = lstatSync(keysPath);
+        if (!pathStat.isFile() || pathStat.dev !== fileStat.dev || pathStat.ino !== fileStat.ino) {
+          throw new Error('vapid keys file is not a safe regular file');
+        }
+      } else {
+        fchmodSync(fileDescriptor, 0o600);
+      }
       let parsed: unknown;
       try {
         parsed = JSON.parse(readFileSync(fileDescriptor, 'utf8'));
