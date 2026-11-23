@@ -23,6 +23,7 @@ import {
   writeQuestion,
 } from './chief-question-store.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
+import { assertImQuestionFits } from './im/runtime.js';
 import { notifyChiefMessage } from './notifications.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { coordinatorProfile } from './routing-rules.js';
@@ -56,6 +57,9 @@ export function createOrGetQuestion(
   }
   const existing = readQuestion(deps.db, input.threadId, input.requestId);
   if (existing !== null) return { content: existing, created: false };
+  if (deps.hub !== undefined && deps.user !== undefined) {
+    assertImQuestionFits(input.threadId, input.requestId, input.questions);
+  }
   const content: AskUserQuestionContent = {
     kind: ASK_USER_QUESTION_KIND,
     requestId: input.requestId,

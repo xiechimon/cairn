@@ -15,6 +15,7 @@ import {
   type ToolRegistration,
 } from '@earendil-works/pi-durable';
 import { createToolSearchTool } from '@earendil-works/pi-durable/tool-search';
+import { HttpError } from '../../lib/errors.js';
 import { coordinatorToolDefs } from '../../services/coordinator-tool-defs.js';
 import { createCutOffRecovery } from './cut-off-recovery.js';
 import {
@@ -92,6 +93,7 @@ async function askThroughChannel(
     return JSON.stringify(settled);
   } catch (error) {
     if (shuttingDown()) throw new ShutdownInterrupt();
+    if (error instanceof HttpError && error.status === 422) throw error;
     const message = error instanceof Error ? error.message : String(error);
     return JSON.stringify({
       status: 'cancelled',
@@ -187,18 +189,18 @@ export function coordinatorTool(
               ? undefined
               : api.models.getModel(agent.model.provider, agent.model.modelId),
           ));
-      if (def.name === 'ask_user') {
-        const text = await askThroughChannel(
-          channel,
-          stepId,
-          callId,
-          params,
-          context.abortSignal,
-          shuttingDown,
-        );
-        return { output: [{ type: 'text', text }] };
-      }
       try {
+        if (def.name === 'ask_user') {
+          const text = await askThroughChannel(
+            channel,
+            stepId,
+            callId,
+            params,
+            context.abortSignal,
+            shuttingDown,
+          );
+          return { output: [{ type: 'text', text }] };
+        }
         if (RELAY_COMPUTER_TOOL_NAMES.has(def.name)) {
           const seesImages = (await drivingModel())?.input.includes('image') === true;
           if (!seesImages && (def.name === 'computer_observe' || def.name === 'computer_act')) {

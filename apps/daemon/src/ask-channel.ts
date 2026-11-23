@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AnswerDeliveryVia, MachineAskBody } from '@cairn/shared';
-import type { MachineApi } from './machine-client.js';
+import { type MachineApi, MachineApiError } from './machine-client.js';
 
 export const ASK_KEEP_ALIVE_INTERVAL_MS = 30_000;
 
@@ -46,6 +46,7 @@ export class AskChannel {
       }
       return JSON.stringify(response);
     } catch (err) {
+      if (err instanceof MachineApiError && err.status === 422) throw err;
       const msg = err instanceof Error ? err.message : String(err);
       return JSON.stringify({
         status: 'cancelled',

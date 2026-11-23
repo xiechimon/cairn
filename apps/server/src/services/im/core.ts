@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
+  AskUserQuestion,
   ImConnectionRecord,
   ImConnectionStatus,
   ImPairedSender,
@@ -54,6 +55,7 @@ import {
   askQuestionContentOf,
   proposalIdOfCard,
   publishQuestion,
+  readQuestion,
 } from '../chief-question-store.js';
 import {
   cancelPendingEffects,
@@ -68,6 +70,7 @@ import {
 } from '../external-effects.js';
 import { asSendError } from './errors.js';
 import type { ImRuntimeHooks, ImStepRow } from './runtime.js';
+import { slackCardBlocks } from './slack.js';
 import type {
   ImAdapter,
   ImEnv,
@@ -126,6 +129,20 @@ interface Origin {
   chatKey: string;
   senderId: string;
   threadId: string;
+}
+
+function questionCard(requestId: string, questions: readonly AskUserQuestion[]) {
+  const [question] = questions;
+  if (questions.length !== 1 || question === undefined || question.options.length === 0) {
+    return undefined;
+  }
+  return {
+    requestId,
+    text: `${question.question}\n\n${question.options.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}`.trim(),
+    buttons: [
+      question.options.map((o, i) => ({ label: o.label, value: `imcb:${requestId}:${i}` })),
+    ],
+  };
 }
 
 function sessionOffset(session: LiveSession): number | null {
@@ -877,54 +894,47 @@ export function createImService(deps: ImServiceDeps): ImService {
     void drainEffects(deps.db, effectRegistry).catch(() => {});
   };
 
+  const noticeOrigins = (threadId: string) =>
+    deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')))
+      .all()
+      .flatMap((row) => {
+        const origin = originOf(row.id);
+        return origin !== undefined && turnIsImOnly(row.id) ? [{ row, origin }] : [];
+      });
+
   const service: ImService = {
     runtime: {
-      notice(threadId: string, text: string, card?: { requestId: string }): void {
-        const claimed = deps.db
-          .select({ id: step.id })
-          .from(step)
-          .where(
-            and(eq(step.buildId, threadId), eq(step.kind, 'chief'), eq(step.status, 'claimed')),
-          )
-          .all();
-        let cardSend:
-          | {
-              requestId: string;
-              text: string;
-              buttons: { label: string; value: string }[][];
-              owned: string[];
-            }
-          | undefined;
-        if (card !== undefined) {
-          const row = deps.db
-            .select({ content: chiefMessage.content })
-            .from(chiefMessage)
-            .where(and(eq(chiefMessage.id, card.requestId), eq(chiefMessage.threadId, threadId)))
-            .get();
-          const content = row === undefined ? null : askQuestionContentOf(row.content);
-          const question =
-            content !== null && content.status === 'pending' && content.questions.length === 1
-              ? content.questions[0]
-              : undefined;
-          if (question !== undefined && question.options.length > 0) {
-            cardSend = {
-              requestId: card.requestId,
-              text: `${question.question}\n\n${question.options.map((o, i) => `${i + 1}. ${o.label}`).join('\n')}`,
-              buttons: [
-                question.options.map((o, i) => ({
-                  label: o.label,
-                  value: `imcb:${card.requestId}:${i}`,
-                })),
-              ],
-              owned: [card.requestId, ...(content?.askedFor ?? [])],
-            };
-          }
+      assertQuestionFits(threadId, requestId, questions): void {
+        const card = questionCard(requestId, questions);
+        if (
+          card !== undefined &&
+          noticeOrigins(threadId).some(
+            ({ origin }) => connRow(origin.connId)?.platform === 'slack',
+          ) &&
+          slackCardBlocks(card) === null
+        ) {
+          throw new HttpError(
+            422,
+            'The question is too long for the Slack card. Ask a shorter question; send the details in an ordinary message first if needed.',
+          );
         }
-        for (const row of claimed) {
-          const origin = originOf(row.id);
-          if (origin !== undefined && turnIsImOnly(row.id)) {
-            sendToOrigin(origin, cardSend?.text ?? text, row, cardSend);
-          }
+      },
+
+      notice(threadId: string, text: string, card?: { requestId: string }): void {
+        const content = card === undefined ? null : readQuestion(deps.db, threadId, card.requestId);
+        const outbound =
+          card !== undefined && content?.status === 'pending'
+            ? questionCard(card.requestId, content.questions)
+            : undefined;
+        const cardSend =
+          outbound === undefined || content === null
+            ? undefined
+            : { ...outbound, owned: [outbound.requestId, ...(content.askedFor ?? [])] };
+        for (const { row, origin } of noticeOrigins(threadId)) {
+          sendToOrigin(origin, cardSend?.text ?? text, row, cardSend);
         }
       },
 

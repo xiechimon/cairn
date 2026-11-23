@@ -11,6 +11,12 @@ import type {
 
 const SLACK_API = 'https://slack.com/api';
 const MESSAGE_MAX_CHARS = 3000;
+const SECTION_TEXT_MAX_CHARS = 3000;
+const MESSAGE_MAX_BLOCKS = 50;
+const MESSAGE_MAX_BLOCK_CHARS = 12000;
+const MESSAGE_MAX_FALLBACK_CHARS = 40_000;
+export const CARD_TOO_LONG_NOTICE =
+  '内容太长或无法完整显示，这里不提供按钮：请在 Cairn 里查看全文后作答。';
 const FILE_MAX_BYTES = 10 * 1024 * 1024;
 const APP_TOKEN_PREFIX = 'xapp-';
 const BOT_TOKEN_PREFIX = 'xoxb-';
@@ -105,14 +111,19 @@ async function slackApi<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   let res: Response;
+  const query = method === 'users.info';
+  const params = new URLSearchParams(
+    Object.entries(body).map(([key, value]) => [key, String(value)]),
+  );
+  const url = query ? `${SLACK_API}/${method}?${params.toString()}` : `${SLACK_API}/${method}`;
   try {
-    res = await env.fetch(`${SLACK_API}/${method}`, {
-      method: 'POST',
+    res = await env.fetch(url, {
+      method: query ? 'GET' : 'POST',
       headers: {
-        'content-type': 'application/json',
+        ...(query ? {} : { 'content-type': 'application/json' }),
         authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify(body),
+      body: query ? undefined : JSON.stringify(body),
       signal: signal ?? null,
     });
   } catch (err) {
@@ -200,6 +211,63 @@ function displayName(info: SlackUserInfo): string | null {
   const name = profile?.display_name ?? info.user?.real_name ?? profile?.real_name;
   if (typeof name === 'string' && name !== '') return name;
   return typeof info.user?.name === 'string' && info.user.name !== '' ? info.user.name : null;
+}
+
+function buttonText(label: string): string {
+  let text = '';
+  let count = 0;
+  for (const point of label) {
+    text += point;
+    if (++count === BUTTON_TEXT_MAX_CHARS) break;
+  }
+  return text;
+}
+
+function actionBlocks(buttons: ImOutboundMessage['buttons']): Record<string, unknown>[] {
+  if (buttons === undefined || buttons.length === 0) return [];
+  return buttons.map((row, rowIndex) => ({
+    type: 'actions',
+    elements: row.map((button, colIndex) => ({
+      type: 'button',
+      text: {
+        type: 'plain_text',
+        text: buttonText(button.label),
+      },
+      value: button.value,
+      action_id: `cairn-${rowIndex}-${colIndex}`,
+    })),
+  }));
+}
+
+function escapeText(part: string): string {
+  return part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function sectionBlocks(part: string): Record<string, unknown>[] {
+  const sections: Record<string, unknown>[] = [];
+  let text = '';
+  const graphemes = new Intl.Segmenter('en', { granularity: 'grapheme' }).segment(part);
+  for (const { segment } of graphemes) {
+    for (const piece of segment.length > SECTION_TEXT_MAX_CHARS ? [...segment] : [segment]) {
+      if (text.length + piece.length > SECTION_TEXT_MAX_CHARS) {
+        sections.push({ type: 'section', text: { type: 'plain_text', text } });
+        text = '';
+      }
+      text += piece;
+    }
+  }
+  sections.push({ type: 'section', text: { type: 'plain_text', text } });
+  return sections;
+}
+
+export function slackCardBlocks({ text, buttons }: Pick<ImOutboundMessage, 'text' | 'buttons'>) {
+  if (text.length > MESSAGE_MAX_BLOCK_CHARS || text.trim() === '') return null;
+  if (escapeText(text).length > MESSAGE_MAX_FALLBACK_CHARS) return null;
+  const blocks = [...sectionBlocks(text), ...actionBlocks(buttons)];
+  return blocks.length <= MESSAGE_MAX_BLOCKS &&
+    JSON.stringify(blocks).length <= MESSAGE_MAX_BLOCK_CHARS
+    ? blocks
+    : null;
 }
 
 export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
@@ -449,35 +517,33 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
       return {
         send: async (msg: ImOutboundMessage): Promise<void> => {
           if (stopped) throw new ImSendError('permanent', 'slack connection is stopped');
-          const chunks = chunkText(msg.text, MESSAGE_MAX_CHARS);
-          for (const [index, chunk] of chunks.entries()) {
-            const body: Record<string, unknown> = { channel: msg.chatKey, text: chunk };
-            if (index === 0 && msg.replyToMessageId !== undefined) {
-              body.thread_ts = msg.replyToMessageId;
-            }
-            if (
-              index === chunks.length - 1 &&
-              msg.buttons !== undefined &&
-              msg.buttons.length > 0
-            ) {
-              body.blocks = msg.buttons.map((row, rowIndex) => ({
-                type: 'actions',
-                elements: row.map((button, colIndex) => ({
-                  type: 'button',
-                  text: {
-                    type: 'plain_text',
-                    text: [...button.label].slice(0, BUTTON_TEXT_MAX_CHARS).join(''),
-                  },
-                  value: button.value,
-                  action_id: `cairn-${rowIndex}-${colIndex}`,
-                })),
-              }));
-            }
+          const post = async (body: Record<string, unknown>): Promise<void> => {
             try {
               await slackApi(env, botToken, 'chat.postMessage', body, stopping.signal);
             } catch (err) {
               throw toSendError(err, appToken, botToken);
             }
+          };
+          const carded = msg.buttons !== undefined && msg.buttons.length > 0;
+          if (carded) {
+            const blocks = slackCardBlocks(msg);
+            await post(
+              blocks !== null
+                ? {
+                    channel: msg.chatKey,
+                    text: escapeText(msg.text),
+                    unfurl_links: false,
+                    unfurl_media: false,
+                    mrkdwn: false,
+                    parse: 'none',
+                    blocks,
+                  }
+                : { channel: msg.chatKey, text: CARD_TOO_LONG_NOTICE },
+            );
+            return;
+          }
+          for (const chunk of chunkText(msg.text, MESSAGE_MAX_CHARS)) {
+            await post({ channel: msg.chatKey, text: chunk });
           }
         },
         stop: async (): Promise<void> => {
