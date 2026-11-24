@@ -1,11 +1,11 @@
 import { cn } from 'cn';
+import { X } from 'lucide-react';
 import { createContext, type ReactNode, type RefObject, useContext, useRef } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { DialogClose, DialogTitle } from '../components/ui/dialog.js';
 import { DialogShell, dialogWidth } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
-import { X } from '../icons/index.js';
 import { isEditableTarget } from './hotkeys.js';
 
 const RouteDialogClose = createContext<() => void>(() => undefined);
@@ -79,7 +79,7 @@ export function RouteDialog({
           />
         }
       >
-        <X width={20} height={20} />
+        <X className="size-5" />
       </IconTooltip>
     </DialogShell>
   );

@@ -1,4 +1,5 @@
 import type { ComposioAppEntry, ComposioApps, McpConnectorRecord } from '@cairn/shared';
+import { Grid2x2 } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
@@ -12,7 +13,6 @@ import {
 import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
-import { Grid2x2 } from '../icons/index.js';
 import { McpConnectorIcon } from './mcp-connector-icon.js';
 import { type IntegrationItem, RowNote } from './parts.js';
 
@@ -44,7 +44,7 @@ export function ComposioMark() {
       aria-hidden
       className="flex size-5 flex-none items-center justify-center text-content-secondary"
     >
-      <Grid2x2 width={18} height={18} />
+      <Grid2x2 size={18} />
     </span>
   );
 }

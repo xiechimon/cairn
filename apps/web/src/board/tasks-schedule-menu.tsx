@@ -1,4 +1,4 @@
-import { Ellipsis, Pause, Pencil, Play, RotateCw } from 'lucide-react';
+import { Ellipsis, Pause, Pencil, Play, RotateCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -14,7 +14,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { scheduleViewState, toWireSchedule } from '../schedules/schedule-model.js';
 

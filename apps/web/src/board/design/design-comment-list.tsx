@@ -1,10 +1,10 @@
 import { DESIGN_LIMITS, type DesignCommentRecord, type DesignCommentStatus } from '@cairn/shared';
+import { X } from 'lucide-react';
 import { useState } from 'react';
 import { IconTooltip } from '../../components/icon-tooltip.js';
 import { Button } from '../../components/ui/button.js';
 import { Textarea } from '../../components/ui/textarea.js';
 import { useI18n } from '../../i18n/provider.js';
-import { X } from '../../icons/index.js';
 import type { Located } from './design-bridge.js';
 
 const STATUS_LABEL: Record<DesignCommentStatus, string> = {

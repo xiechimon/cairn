@@ -1,4 +1,16 @@
 import { cn } from 'cn';
+import {
+  ArrowUpDown,
+  ChevronDown,
+  Grid2x2,
+  Kanban,
+  Plus,
+  Search,
+  Settings,
+  SquarePen,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useId, useState } from 'react';
 import { CopyIconButton } from '../components/copy-icon-button.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
@@ -28,19 +40,7 @@ import {
 import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import {
-  ArrowUpDown,
-  ChevronDown,
-  Grid2x2,
-  Kanban,
-  ListLines,
-  Plus,
-  Search,
-  Settings,
-  SquarePen,
-  Trash2,
-  X,
-} from '../icons/index.js';
+import { ListLines } from '../icons/index.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
 const VARIANTS = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const;

@@ -1,4 +1,5 @@
 import type { DesignCommentRecord } from '@cairn/shared';
+import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useDesignComments, useDesignMutations, useDesignPages } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
@@ -6,7 +7,6 @@ import { IconTooltip } from '../../components/icon-tooltip.js';
 import { Button } from '../../components/ui/button.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
-import { X } from '../../icons/index.js';
 import { type DesignTarget, pickPage } from './design-route.js';
 
 export interface PendingComments {
@@ -70,7 +70,7 @@ export function useDesignComposer(
                 />
               }
             >
-              <X aria-hidden className="size-3.5" />
+              <X aria-hidden />
             </IconTooltip>
           </span>
         ))}

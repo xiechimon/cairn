@@ -1,4 +1,5 @@
 import { cn } from 'cn';
+import { Eye } from 'lucide-react';
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
 import {
@@ -13,7 +14,6 @@ import { MachineName } from '../components/machine-label.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Eye } from '../icons/index.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
 import { PHASE_UI } from '../phase.js';
 import { AttachmentChip } from './attachment-chip.js';

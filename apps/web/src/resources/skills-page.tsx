@@ -1,5 +1,5 @@
 import { SKILL_PAGE_COPY } from '@cairn/shared';
-import { Puzzle } from 'lucide-react';
+import { ChevronDown, Download, Puzzle, Search } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useSkills } from '../api/hooks.js';
@@ -18,7 +18,6 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown, Download, Search } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
 import { SKILLS_HREF } from './hrefs.js';
 import {

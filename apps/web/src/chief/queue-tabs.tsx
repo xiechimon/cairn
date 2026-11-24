@@ -1,10 +1,9 @@
-import { ChevronUp } from 'lucide-react';
+import { ChevronUp, Clock, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNarrow } from '../board/use-narrow.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
-import { Clock, X } from '../icons/index.js';
 
 export interface QueuedMessage {
   id: string;
@@ -43,7 +42,7 @@ export function QueueTabs({
       <ul className="m-0 flex max-h-44 list-none flex-col overflow-y-auto p-0">
         {shown.map((message) => (
           <li key={message.id} data-testid="chief-queued-message" className={ROW_CLS}>
-            <Clock width={16} height={16} className="flex-none text-(--text-tertiary)" />
+            <Clock className="size-4 flex-none text-(--text-tertiary)" />
             <span
               data-testid="chief-queued-message-text"
               className="min-w-0 flex-1 truncate text-foreground"
@@ -63,7 +62,7 @@ export function QueueTabs({
                   />
                 }
               >
-                <X width={20} height={20} />
+                <X className="size-5" />
               </IconTooltip>
             )}
           </li>
@@ -78,7 +77,7 @@ export function QueueTabs({
           onClick={() => setExpanded(true)}
         >
           {t('还有 {n} 条', { n: rest })}
-          <ChevronUp width={16} height={16} />
+          <ChevronUp className="size-4" />
         </Button>
       )}
     </section>

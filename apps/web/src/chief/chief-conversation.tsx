@@ -6,6 +6,7 @@ import {
   parseReplyQuote,
   replyQuoteText,
 } from '@cairn/shared';
+import { ArrowDown } from 'lucide-react';
 import {
   type CSSProperties,
   Fragment,
@@ -45,7 +46,6 @@ import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowDown } from '../icons/index.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useFileDrop } from '../overlay/file-drop.js';
@@ -699,7 +699,7 @@ export function ChiefConversation({
               </MessageScrollerContent>
             </FadeScrollerViewport>
             <JumpToLatestButton label={t('滚动到最新')} onClick={reader.follow}>
-              <ArrowDown width={20} height={20} />
+              <ArrowDown className="size-5" />
             </JumpToLatestButton>
             {earlier != null && (
               <EarlierLoader

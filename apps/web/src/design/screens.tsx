@@ -1,5 +1,5 @@
+import { ExternalLink } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { ExternalLink } from '../icons/index.js';
 import type { GalleryTheme } from './design-doc.js';
 import { Section, useOnlySpecimen } from './specimen.js';
 

@@ -4,7 +4,17 @@ import {
   type DesignViewport,
   designPagePath,
 } from '@cairn/shared';
-import { Code, Ellipsis, FileWarning, Globe, MessagesSquare, RotateCw } from 'lucide-react';
+import {
+  ChevronDown,
+  Code,
+  Download,
+  Ellipsis,
+  FileWarning,
+  Globe,
+  MessagesSquare,
+  RotateCw,
+  X,
+} from 'lucide-react';
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../../api/client.js';
@@ -30,7 +40,6 @@ import {
 import { Skeleton } from '../../components/ui/skeleton.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
-import { ChevronDown, Download, X } from '../../icons/index.js';
 import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
 import { deliverableHref } from '../made-files.js';
 import {

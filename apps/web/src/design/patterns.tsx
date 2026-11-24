@@ -1,4 +1,5 @@
 import { cn } from 'cn';
+import { Check, Plus, Search, Server } from 'lucide-react';
 import { useId, useState } from 'react';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
@@ -13,7 +14,6 @@ import {
 import { Input } from '../components/ui/input.js';
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/input-group.js';
 import { toastSuccess } from '../components/ui/toaster.js';
-import { Check, Plus, Search, Server } from '../icons/index.js';
 import { Section, Specimen } from './specimen.js';
 
 const PROVIDER_GROUPS = [

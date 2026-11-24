@@ -1,12 +1,12 @@
 import type { HostPermissions } from '@cairn/shared';
 import { cn } from 'cn';
+import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { ChevronDown } from '../icons/index.js';
 
 interface OwnComputerBridge {
   guide: () => Promise<boolean | null>;
@@ -133,7 +133,7 @@ export function useOwnComputerRow(machine: MachineRow): {
         <ChevronDown
           aria-hidden
           className={cn(
-            'size-3 flex-none transition-transform duration-(--dur-fast)',
+            'size-4 flex-none transition-transform duration-(--dur-fast)',
             expanded && 'rotate-180',
           )}
         />

@@ -1,4 +1,14 @@
-import { GitBranch, Terminal } from 'lucide-react';
+import {
+  FileText,
+  GitBranch,
+  Key,
+  Lock,
+  Paperclip,
+  Server,
+  SquarePen,
+  Terminal,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
@@ -44,7 +54,6 @@ import {
   TraceTitle,
 } from '../components/ui/trace.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
-import { FileText, Key, Lock, Paperclip, Server, SquarePen, X } from '../icons/index.js';
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
 import { splitQuery } from '../search/search-query.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';

@@ -1,3 +1,4 @@
+import { ArrowDown } from 'lucide-react';
 import {
   forwardRef,
   type ReactNode,
@@ -20,7 +21,6 @@ import {
 } from '../components/ui/message-scroller.js';
 import type { TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowDown } from '../icons/index.js';
 import { openingAnchor } from './scroll-anchor.js';
 import { Transcript } from './transcript.js';
 
@@ -138,7 +138,7 @@ function TranscriptColumnInner({
         </MessageScrollerContent>
       </FadeScrollerViewport>
       <JumpToLatestButton label={t('滚动到最新')}>
-        <ArrowDown width={20} height={20} />
+        <ArrowDown className="size-5" />
       </JumpToLatestButton>
       {earlier !== undefined && settled && (openedKey === threadKey || transcript.length === 0) && (
         <EarlierLoader

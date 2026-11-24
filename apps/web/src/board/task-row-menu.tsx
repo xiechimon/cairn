@@ -1,4 +1,4 @@
-import { Archive, ArrowUpRight, Check, Ellipsis, Pencil, RotateCw } from 'lucide-react';
+import { Archive, ArrowUpRight, Check, Ellipsis, Pencil, RotateCw, Trash2 } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -20,7 +20,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { toastArchived } from './archive-toast.js';
 import { canRetryNow } from './retry-copy.js';

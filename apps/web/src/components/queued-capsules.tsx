@@ -1,7 +1,7 @@
+import { ArrowUp, Check, Clock, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowUp, Check, Clock, X } from '../icons/index.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';
 import { Input } from './ui/input.js';
@@ -103,7 +103,7 @@ export function QueuedCapsules({
               className="flex w-full flex-col gap-1"
             >
               <div className={`${CAPSULE_CLS} w-full bg-card inset-ring-(--focus-ring)`}>
-                <Clock width={16} height={16} className="flex-none text-content-tertiary" />
+                <Clock className="size-4 flex-none text-content-tertiary" />
                 <Input
                   ref={(node) => node?.focus({ preventScroll: true })}
                   aria-label={t('编辑排队消息')}
@@ -168,9 +168,7 @@ export function QueuedCapsules({
             className={`${CAPSULE_CLS} ${failed ? CAPSULE_FAILED_CLS : CAPSULE_QUEUED_CLS}`}
           >
             <Clock
-              width={16}
-              height={16}
-              className={`flex-none ${failed ? 'text-destructive' : 'text-content-tertiary'}`}
+              className={`size-4 flex-none ${failed ? 'text-destructive' : 'text-content-tertiary'}`}
             />
             {onEdit && !failed ? (
               <Button

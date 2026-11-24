@@ -8,6 +8,7 @@ import {
   type ProviderApi,
   type ProviderModel,
 } from '@cairn/shared';
+import { ChevronLeft, Search } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
@@ -24,7 +25,7 @@ import {
   SelectValue,
 } from '../components/ui/select.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft, PlusSmall, Search } from '../icons/index.js';
+import { PlusSmall } from '../icons/index.js';
 import { LOBEHUB_MONO } from '../icons/lobehub-mono.js';
 import { ProviderConnectionDisclosure } from './provider-connection-disclosure.js';
 import { ProviderModelChips, pickedModels } from './provider-model-list.js';

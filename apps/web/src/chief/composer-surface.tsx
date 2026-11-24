@@ -1,6 +1,6 @@
 import { ATTACHMENT_ACCEPT } from '@cairn/shared';
 import { cn } from 'cn';
-import { ArrowUp, CornerDownLeft } from 'lucide-react';
+import { ArrowUp, CornerDownLeft, Paperclip, Plus } from 'lucide-react';
 import {
   type ReactNode,
   type Ref,
@@ -24,7 +24,6 @@ import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { ChiefContextUsage, ComposerFileSeed } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Paperclip, Plus } from '../icons/index.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { MENTION_TEXTAREA_CLS, MentionHighlight } from '../overlay/mention-highlight.js';
@@ -208,10 +207,10 @@ export function ComposerSurface({
             <span
               className={`${ROUND_FACE_CLS} group-hover/round:bg-(--menu-hover) group-aria-expanded/round:bg-(--menu-hover)`}
             >
-              <Plus width={20} height={20} />
+              <Plus className="size-5" />
             </span>
           ) : (
-            <Plus width={20} height={20} />
+            <Plus className="size-5" />
           )}
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8}>
@@ -230,7 +229,7 @@ export function ComposerSurface({
           disabled={attaching || onAttachment == null}
           onClick={openFilePicker}
         >
-          <Paperclip width={20} height={20} />
+          <Paperclip className="size-5" />
           {t('添加附件')}
         </KeyedMenuItem>
         {narrow && showMeter && (

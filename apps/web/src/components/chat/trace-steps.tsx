@@ -1,7 +1,7 @@
 import { cn } from 'cn';
+import { Check, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { Check, X } from '../../icons/index.js';
 import {
   EMPTY_TRACE_COUNTS,
   TraceCard,
@@ -281,7 +281,7 @@ function CheckChip({ label, ok }: { label: string; ok: boolean }) {
           ok ? 'bg-running-bar' : 'bg-destructive',
         )}
       >
-        {ok ? <Check className="size-3" /> : <X className="size-3" />}
+        {ok ? <Check width={12} height={12} /> : <X width={12} height={12} />}
       </span>
       {label}
     </div>

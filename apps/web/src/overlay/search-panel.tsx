@@ -1,5 +1,5 @@
 import { parseSearchQuery, type SearchResponse } from '@cairn/shared';
-import { CircleHelp, TriangleAlert } from 'lucide-react';
+import { CircleHelp, Clock, Kanban, Search, Settings, TriangleAlert, X } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
@@ -18,7 +18,6 @@ import { useDesktopMenu } from '../desktop-shell.js';
 import { PROJECT_ID, PROJECT_NAME } from '../fixtures/core.js';
 import type { FixtureSet, TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Clock, Kanban, Search, Settings, X } from '../icons/index.js';
 import { PHASE_STATUS, PHASE_UI } from '../phase.js';
 import { searchTodosLocally } from '../search/local-search.js';
 import { ChipProblems, QueryChip, SyntaxHelp } from '../search/query-chip.js';
@@ -328,7 +327,7 @@ export function SearchPanel({
           </div>
         )}
         <div className="flex min-h-12 flex-none flex-wrap items-center gap-1.5 border-b border-border px-4 py-2 text-content-tertiary">
-          <Search width={20} height={20} className="flex-none" />
+          <Search className="size-5 flex-none" />
           {chips.map((chip, index) => (
             <QueryChip
               key={`${chip.raw}-${index}`}
@@ -466,7 +465,7 @@ export function SearchPanel({
                     className={`${ROW_BASE} ${rowLitClasses(cursor === base + index, kbd)}`}
                     onClick={() => go(href)}
                   >
-                    <Icon width={15} height={15} />
+                    <Icon className="size-4" />
                     {t(label)}
                   </Button>
                 ))}

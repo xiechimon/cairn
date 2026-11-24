@@ -1,6 +1,6 @@
 import { ATTACHMENT_ACCEPT } from '@cairn/shared';
 import { cn } from 'cn';
-import { ArrowUp, CornerDownLeft } from 'lucide-react';
+import { ArrowUp, CornerDownLeft, Lock, Paperclip, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useNarrow } from '../board/use-narrow.js';
 import {
@@ -27,7 +27,6 @@ import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
-import { Lock, Paperclip, Plus } from '../icons/index.js';
 import { ComposerAttachments } from '../overlay/composer-attachments.js';
 import { useComposerWire } from '../overlay/composer-wire.js';
 import { useFileDrop } from '../overlay/file-drop.js';
@@ -162,10 +161,10 @@ export function Composer({
             <span
               className={`${ROUND_FACE_CLS} group-hover/round:bg-(--menu-hover) group-aria-expanded/round:bg-(--menu-hover)`}
             >
-              <Plus width={20} height={20} />
+              <Plus className="size-5" />
             </span>
           ) : (
-            <Plus width={20} height={20} />
+            <Plus className="size-5" />
           )}
         </TooltipTrigger>
         <TooltipContent side="top" sideOffset={8}>
@@ -180,7 +179,7 @@ export function Composer({
         className={MENU_CONTENT_CLS}
       >
         <KeyedMenuItem shortcut="A" disabled={attaching || !onAttachment} onClick={openFilePicker}>
-          <Paperclip width={20} height={20} />
+          <Paperclip className="size-5" />
           {t('添加附件')}
         </KeyedMenuItem>
         {narrow && menuMeter != null && (
@@ -276,7 +275,7 @@ export function Composer({
               className="flex min-h-7 min-w-0 flex-1 items-center gap-2 px-0.5 text-ui leading-5 text-(--text-secondary)"
               data-testid="composer-placeholder"
             >
-              {readOnly && <Lock width={20} height={20} className="flex-none" />}
+              {readOnly && <Lock className="size-5 flex-none" />}
               {t(placeholder)}
             </div>
           )}

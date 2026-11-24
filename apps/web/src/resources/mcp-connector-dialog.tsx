@@ -6,6 +6,7 @@ import {
   mcpCatalogEntry,
 } from '@cairn/shared';
 import { cn } from 'cn';
+import { Plus, X } from 'lucide-react';
 import { type MouseEvent, type Ref, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useApiMutations } from '../api/hooks.js';
@@ -20,7 +21,6 @@ import {
 import { Field } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { useI18n } from '../i18n/provider.js';
-import { Plus, X } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { CheckResultPopover } from './provider-editors.js';
 
