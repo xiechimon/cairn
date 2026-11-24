@@ -33,7 +33,7 @@ A failed step exits non-zero and prints `[<timestamp>] FAIL <step>` to stderr, f
 
 Requirements on the host: `sqlite3`, `gzip`, and rsync 3.x when `--attachments` or `--remote` is used.
 
-The self-test runs the script against a real rrsync receiver started through a fake ssh, and checks the copies byte for byte. It needs GNU rsync 3.x first on `PATH` and an rrsync that supports `-no-overwrite` (rsync 3.4 or later). CI runs it in the `ops-backup-test` job. On macOS, install Homebrew's rsync and run:
+The self-test runs the script against a real rrsync receiver started through a fake ssh, and checks the copies byte for byte. It needs GNU rsync 3.x first on `PATH` and an rrsync that supports `-no-overwrite` (rsync 3.4 or later). CI runs it in the `gates` job. On macOS, install Homebrew's rsync and run:
 
 ```sh
 PATH=/opt/homebrew/opt/rsync/bin:$PATH node --test scripts/ops/backup-server-db.test.mjs

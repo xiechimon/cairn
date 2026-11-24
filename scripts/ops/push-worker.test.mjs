@@ -88,6 +88,6 @@ test('ops tests run in prepush and the backup CI job', async () => {
   const ci = readFileSync(new URL('../../.github/workflows/ci.yml', import.meta.url), 'utf8');
   for (const path of ['scripts/ops/push-test.test.mjs', 'scripts/ops/push-worker.test.mjs']) {
     assert.ok(selfTests.includes(path));
-    assert.ok(ci.slice(ci.indexOf('  ops-backup-test:')).includes(path));
+    assert.ok(ci.slice(ci.indexOf('  gates:'), ci.indexOf('\n  eval:')).includes(path));
   }
 });

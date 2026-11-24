@@ -32,7 +32,7 @@ export const ciOnlyScripts = {
 
 export const ciOnlyTestSteps = {
   'scripts/ops/backup-server-db.test.mjs':
-    'needs GNU rsync 3.x and the rrsync script the ops-backup-test job downloads',
+    'needs GNU rsync 3.x and the rrsync script the gates job downloads',
 };
 
 export const selfTests = [

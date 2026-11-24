@@ -96,7 +96,7 @@ jobs:
 
   # #762: branch protection treats skipped jobs as success; always() ensures aggregates report failures.
   check:
-    needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar-test, tsnet-sidecar-build, eval]
+    needs: [changes, check-core, vitest-light, vitest-integration, tsnet-sidecar, eval]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -131,7 +131,7 @@ jobs:
                 [ "${{ needs.changes.outputs.needs-integration }}" = "false" ]; } ||
               exit 1
           fi
-          for result in "${{ needs.tsnet-sidecar-test.result }}" "${{ needs.tsnet-sidecar-build.result }}"; do
+          for result in "${{ needs.tsnet-sidecar.result }}"; do
             if [ "$result" = "success" ]; then
               continue
             fi
@@ -208,7 +208,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -234,7 +234,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -352,7 +352,7 @@ jobs:
           [ "$idle" = "skipped" ]
           [ "$ran" = "success" ] || { [ "${{ needs.changes.outputs.has-code }}" = "false" ] && [ "$ran" = "skipped" ]; }
 
-  tsnet-sidecar-test:
+  tsnet-sidecar:
     needs: changes
     if: needs.changes.outputs.has-sidecar != 'false'
     runs-on: ubuntu-latest
@@ -380,51 +380,27 @@ jobs:
       - name: Test
         run: go test ./...
 
-  tsnet-sidecar-build:
-    needs: changes
-    if: needs.changes.outputs.has-sidecar != 'false'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        target:
-          - { goos: darwin, goarch: arm64 }
-          - { goos: darwin, goarch: amd64 }
-          - { goos: linux, goarch: amd64 }
-          - { goos: linux, goarch: arm64 }
-          - { goos: windows, goarch: amd64 }
-    defaults:
-      run:
-        working-directory: apps/tsnet-sidecar
-    env:
-      CGO_ENABLED: '0'
-      GOOS: ${{ matrix.target.goos }}
-      GOARCH: ${{ matrix.target.goarch }}
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version-file: apps/tsnet-sidecar/go.mod
-          cache-dependency-path: apps/tsnet-sidecar/go.sum
-
       - name: Vet
         run: go vet ./...
 
-      - name: Build
+      - name: Build all targets
         run: |
-          out="$RUNNER_TEMP/tsnet-sidecar-${GOOS}-${GOARCH}"
-          [ "$GOOS" = windows ] && out="$out.exe"
-          go build -trimpath -ldflags '-s -w' -o "$out" .
-          size=$(stat -c %s "$out")
-          echo "tsnet-sidecar ${GOOS}/${GOARCH}: ${size} bytes"
-          [ "$size" -le 41943040 ] || { echo "::error::binary exceeds 40 MiB"; exit 1; }
-          echo "BINARY_PATH=$out" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/tsnet-sidecar-bins"
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64; do
+            goos="${target%/*}"
+            goarch="${target#*/}"
+            out="$RUNNER_TEMP/tsnet-sidecar-bins/tsnet-sidecar-${goos}-${goarch}"
+            [ "$goos" = windows ] && out="$out.exe"
+            GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags '-s -w' -o "$out" .
+            size=$(stat -c %s "$out")
+            echo "tsnet-sidecar ${goos}/${goarch}: ${size} bytes"
+            [ "$size" -le 41943040 ] || { echo "::error::binary exceeds 40 MiB"; exit 1; }
+          done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: tsnet-sidecar-${{ matrix.target.goos }}-${{ matrix.target.goarch }}
-          path: ${{ env.BINARY_PATH }}
+          name: tsnet-sidecar-binaries
+          path: ${{ runner.temp }}/tsnet-sidecar-bins
           retention-days: 7
           if-no-files-found: error
 
@@ -574,26 +550,16 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/langfuse-code-eval.test.mjs
 
-  ops-backup-test:
-    needs: changes
-    if: needs.changes.outputs.ops-selftests == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Server backup script against an rrsync receiver (#2163)
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: |
           command -v sqlite3 >/dev/null || { sudo apt-get update -q && sudo apt-get install -y -q sqlite3; }
           curl -fsSL -o "$RUNNER_TEMP/rrsync" https://raw.githubusercontent.com/RsyncProject/rsync/v3.4.1/support/rrsync
           echo "0bb743f8155907ed2a337c12a4672c67269e372803939ec98dac497edc714c9b  $RUNNER_TEMP/rrsync" | sha256sum -c -
           RRSYNC="$RUNNER_TEMP/rrsync" node --test scripts/ops/backup-server-db.test.mjs scripts/ops/push-test.test.mjs scripts/ops/push-worker.test.mjs
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4.3.0
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
-        with:
-          node-version: 24
-          cache: pnpm
-      - name: Install dependencies for the self-deploy build-settings guard
-        run: pnpm install --frozen-lockfile --ignore-scripts
+
       - name: Self-deploy and deploy-lag watch fixtures (#2288)
+        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
 
   eval:

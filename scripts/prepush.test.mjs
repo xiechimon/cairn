@@ -203,7 +203,7 @@ const workflowJobs = () => {
   );
 };
 
-const sidecarJobs = ['tsnet-sidecar-test', 'tsnet-sidecar-build'];
+const sidecarJobs = ['tsnet-sidecar'];
 
 test('CI classifies before heavy work and skips it only for a classified reason', () => {
   const jobs = workflowJobs();
@@ -306,15 +306,7 @@ test('required aggregates only accept skipped work its classification excused', 
   for (const [name, dependencies] of [
     [
       'check',
-      [
-        'changes',
-        'check-core',
-        'vitest-light',
-        'vitest-integration',
-        'tsnet-sidecar-test',
-        'tsnet-sidecar-build',
-        'eval',
-      ],
+      ['changes', 'check-core', 'vitest-light', 'vitest-integration', 'tsnet-sidecar', 'eval'],
     ],
   ]) {
     const job = jobs.get(name);
