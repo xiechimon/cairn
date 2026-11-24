@@ -63,6 +63,23 @@ export interface Extent {
   rows?: number;
   cols?: number;
   lostElements?: ReadonlySet<string>;
+  textIn?: (page: number | undefined, rect: ArtifactRect) => string;
+  findText?: (text: string) => { page: number; rect: ArtifactRect } | null;
+}
+
+function relocate(
+  comment: DesignCommentRecord,
+  versionId: string | undefined,
+  extent: Extent,
+): DesignCommentRecord | null {
+  const anchor = comment.anchor;
+  if (anchor?.type !== 'region' || comment.text === '' || comment.versionId === versionId)
+    return comment;
+  if (extent.findText === undefined) return comment;
+  const hit = extent.findText(comment.text);
+  return hit === null
+    ? null
+    : { ...comment, anchor: { ...anchor, page: hit.page, rect: hit.rect } };
 }
 
 interface CommentLayer {
@@ -81,7 +98,8 @@ export function useCommentLayer(): CommentLayer | null {
 }
 
 function resolves(anchor: ArtifactAnchor | null, id: string, extent: Extent): boolean {
-  if (anchor === null) return !(extent.lostElements?.has(id) ?? false);
+  if (extent.lostElements?.has(id)) return false;
+  if (anchor === null) return true;
   switch (anchor.type) {
     case 'region':
       return anchor.page === undefined || extent.pages === undefined || anchor.page <= extent.pages;
@@ -162,8 +180,9 @@ export function useFileComments({
     pick.element !== undefined
       ? { ...emptyTarget(pick.element.label), ...pick.element }
       : emptyTarget(pick.anchor === null ? '' : describeAnchor(pick.anchor));
-  const pick = (next: AnchorPick) => {
+  const pick = (picked: AnchorPick) => {
     if (!canComment || versionId === undefined) return;
+    const next = withText(picked);
     if (retargetId !== null) {
       const id = retargetId;
       setRetargetId(null);
@@ -181,6 +200,17 @@ export function useFileComments({
     }
     setDraft(next);
   };
+  const withText = (next: AnchorPick): AnchorPick =>
+    next.anchor?.type === 'region' && next.element === undefined && extent.textIn !== undefined
+      ? {
+          ...next,
+          element: {
+            selector: '',
+            label: describeAnchor(next.anchor),
+            text: extent.textIn(next.anchor.page, next.anchor.rect).slice(0, 200),
+          },
+        }
+      : next;
   const save = (note: string) => {
     if (draft === null || versionId === undefined) return;
     createComment.mutate(
@@ -225,13 +255,30 @@ export function useFileComments({
     (next: Extent) => setExtent((current) => ({ ...current, ...next })),
     [],
   );
+  const placed = useMemo(() => {
+    const lost = new Set<string>();
+    const shown: DesignCommentRecord[] = [];
+    for (const comment of active) {
+      const moved = relocate(comment, versionId, extent);
+      if (moved === null) lost.add(comment.id);
+      else shown.push(moved);
+    }
+    return { shown, lost };
+  }, [active, versionId, extent]);
+  const resolved = useMemo<Extent>(
+    () => ({
+      ...extent,
+      lostElements: new Set([...(extent.lostElements ?? []), ...placed.lost]),
+    }),
+    [extent, placed],
+  );
   const focus = useCallback((id: string) => {
     setFocusedId(id);
     setListOpen(true);
   }, []);
   const layer: CommentLayer = {
     commenting: commenting && canComment,
-    comments: active,
+    comments: placed.shown,
     draftRect: draft?.rect ?? null,
     pick,
     focus,
@@ -270,7 +317,7 @@ export function useFileComments({
           artifactCommentState({
             status: comment.status,
             handledSeq: comment.handledSeq,
-            anchorResolves: resolves(comment.anchor, comment.id, extent),
+            anchorResolves: resolves(comment.anchor, comment.id, resolved),
           })
         }
         readOnly={readOnly || !enabled}

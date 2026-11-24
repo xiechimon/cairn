@@ -1,3 +1,4 @@
+import type { ArtifactRect } from '@cairn/shared';
 import { ChevronLeft, ChevronRight, FileWarning, Play } from 'lucide-react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
@@ -136,6 +137,84 @@ export function PdfCover({
   );
 }
 
+interface PdfWord {
+  page: number;
+  rect: ArtifactRect;
+  text: string;
+}
+
+const MATCH_CHARS = 40;
+
+async function pdfWords(doc: PDFDocumentProxy): Promise<PdfWord[]> {
+  const words: PdfWord[] = [];
+  for (let number = 1; number <= Math.min(doc.numPages, MAX_PAGES); number++) {
+    const page = await doc.getPage(number);
+    const [x0 = 0, y0 = 0, x1 = 0, y1 = 0] = page.view;
+    const width = x1 - x0;
+    const height = y1 - y0;
+    const content = await page.getTextContent();
+    for (const item of content.items) {
+      if (!('str' in item) || item.str.trim() === '') continue;
+      const [, , , , e = 0, f = 0] = item.transform as number[];
+      words.push({
+        page: number,
+        text: item.str.replace(/\s+/g, ''),
+        rect: {
+          x: (e - x0) / width,
+          y: 1 - (f - y0 + item.height) / height,
+          width: item.width / width,
+          height: item.height / height,
+        },
+      });
+    }
+  }
+  return words;
+}
+
+function textIn(words: readonly PdfWord[], page: number | undefined, rect: ArtifactRect): string {
+  return words
+    .filter((word) => {
+      const cx = word.rect.x + word.rect.width / 2;
+      const cy = word.rect.y + word.rect.height / 2;
+      return (
+        word.page === page &&
+        cx >= rect.x &&
+        cx <= rect.x + rect.width &&
+        cy >= rect.y &&
+        cy <= rect.y + rect.height
+      );
+    })
+    .map((word) => word.text)
+    .join('');
+}
+
+function findText(
+  words: readonly PdfWord[],
+  text: string,
+): { page: number; rect: ArtifactRect } | null {
+  const needle = text.replace(/\s+/g, '').slice(0, MATCH_CHARS);
+  if (needle === '') return null;
+  const pages = new Set(words.map((word) => word.page));
+  for (const page of pages) {
+    const onPage = words.filter((word) => word.page === page);
+    const joined = onPage.map((word) => word.text).join('');
+    const at = joined.indexOf(needle);
+    if (at === -1) continue;
+    let offset = 0;
+    const hit = onPage.filter((word) => {
+      const start = offset;
+      offset += word.text.length;
+      return offset > at && start < at + needle.length;
+    });
+    const left = Math.min(...hit.map((word) => word.rect.x));
+    const top = Math.min(...hit.map((word) => word.rect.y));
+    const right = Math.max(...hit.map((word) => word.rect.x + word.rect.width));
+    const bottom = Math.max(...hit.map((word) => word.rect.y + word.rect.height));
+    return { page, rect: { x: left, y: top, width: right - left, height: bottom - top } };
+  }
+  return null;
+}
+
 function useBox() {
   const [element, ref] = useState<HTMLDivElement | null>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
@@ -203,6 +282,20 @@ export function PdfViewer({
     if (opened === null) return;
     onPages?.(opened.doc.numPages);
     report?.({ pages: opened.doc.numPages });
+    let live = true;
+    void pdfWords(opened.doc).then(
+      (words) => {
+        if (!live) return;
+        report?.({
+          textIn: (page, rect) => textIn(words, page, rect),
+          findText: (text) => findText(words, text),
+        });
+      },
+      () => undefined,
+    );
+    return () => {
+      live = false;
+    };
   }, [opened, onPages, report]);
   const scale = zoom === 'fit' ? fit : zoom;
   if (bytesQ.isError || failed)
