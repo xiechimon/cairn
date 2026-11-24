@@ -138,7 +138,7 @@ test('a PDF in a Coordinator reply shows its first page and page count, and open
     .poll(() => card.getByTestId('chat-artifact-cover').evaluate((c: HTMLCanvasElement) => c.width))
     .toBeGreaterThan(0);
   await card.click();
-  await expect(page.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Q3 复盘.pdf');
+  await expect(page.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Q3 复盘');
 });
 
 test('a CSV opens as a table with lettered cells and its source one toggle away', async ({ page }) => {

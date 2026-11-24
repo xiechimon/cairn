@@ -1,11 +1,12 @@
 import { attachmentExtOf } from '@cairn/shared';
 import { cn } from 'cn';
 import { Maximize2 } from 'lucide-react';
-import { useContext } from 'react';
+import { useCallback, useContext, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useArtifactOf } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { artifactTargetOf } from '../board/artifact/artifact-route.js';
+import { PdfCover } from '../board/artifact/viewers/pdf-viewer.js';
 import { attachmentUrl, OpenFileContext } from '../board/file-pane.js';
 import { FileGlyph } from '../components/file-glyph.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -105,18 +106,27 @@ function ArtifactCard({
   const { live } = useLiveData();
   const artifact = useArtifactOf(attachmentIdFromKey(attachmentKey), live).data;
   const ext = attachmentExtOf(attachmentKey).toUpperCase();
+  const pdf = ext === 'PDF';
+  const [pages, setPages] = useState<number | null>(null);
+  const onPages = useCallback((n: number) => setPages(n), []);
   const meta = [
-    t('文件'),
-    ext,
+    t('文件 · {ext}', { ext }),
+    pages === null ? '' : t('{n} 页', { n: pages }),
     artifact != null && artifact.versionSeq > 1 ? t('第 {n} 版', { n: artifact.versionSeq }) : '',
   ]
     .filter((part) => part !== '')
     .join(' · ');
   const body = (
     <>
-      <span className="flex size-8 flex-none items-center justify-center rounded-(--radius-control) bg-(--surface-1) shadow-(--e1)">
-        <FileGlyph name={attachmentKey} />
-      </span>
+      {pdf ? (
+        <span className="flex h-20 w-14 flex-none items-start overflow-hidden rounded-(--radius-sm) bg-(--page-preview) shadow-(--e1)">
+          <PdfCover src={attachmentUrl(attachmentKey)} width={56} onPages={onPages} />
+        </span>
+      ) : (
+        <span className="flex size-8 flex-none items-center justify-center rounded-(--radius-control) bg-(--surface-1) shadow-(--e1)">
+          <FileGlyph name={attachmentKey} />
+        </span>
+      )}
       <span className="flex min-w-0 flex-1 flex-col text-left">
         <span className="truncate text-card-title font-medium text-foreground">
           {stripExt(name)}
@@ -131,7 +141,8 @@ function ArtifactCard({
     </>
   );
   const frame = cn(
-    'flex h-16 w-full max-w-128 items-center gap-3 rounded-(--radius-card) bg-card px-4 text-left shadow-(--e1) transition-colors duration-(--dur-fast) ease-(--ease-standard)',
+    'flex w-128 max-w-full items-center gap-3 rounded-(--radius-card) bg-card px-4 text-left shadow-(--e1) transition-colors duration-(--dur-fast) ease-(--ease-standard)',
+    pdf ? 'h-auto py-3' : 'h-16',
     active && 'shadow-[0_0_0_1px_var(--text-tertiary)]',
   );
   if (onOpen === undefined) {

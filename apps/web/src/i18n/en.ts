@@ -2942,6 +2942,8 @@ export const EN: Record<string, string> = {
   放映: 'Present',
   幻灯片: 'Slides',
   '第 {n} 页': 'Page {n}',
+  '{n} 页': '{n## page|# pages}',
+  '文件 · {ext}': 'File · {ext}',
   处理中: 'In progress',
   已改: 'Changed',
   批注: 'Comments',

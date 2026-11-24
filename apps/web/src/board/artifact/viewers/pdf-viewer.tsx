@@ -91,6 +91,51 @@ function useOpenedPdf(bytes: ArrayBuffer | undefined) {
   return state;
 }
 
+export function PdfCover({
+  src,
+  width,
+  onPages,
+}: {
+  src: string;
+  width: number;
+  onPages: (pages: number) => void;
+}) {
+  const bytes = useFileBytes(src).data;
+  const { opened } = useOpenedPdf(bytes);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    if (opened !== null) onPages(opened.doc.numPages);
+  }, [opened, onPages]);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (opened === null || canvas === null) return;
+    let task: ReturnType<PDFPageProxy['render']> | null = null;
+    let live = true;
+    void opened.doc.getPage(1).then((page) => {
+      if (!live) return;
+      const base = page.getViewport({ scale: 1 });
+      const ratio = window.devicePixelRatio || 1;
+      const viewport = page.getViewport({ scale: (width / base.width) * ratio });
+      canvas.width = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+      task = page.render({ canvas, viewport });
+      task.promise.catch(() => undefined);
+    });
+    return () => {
+      live = false;
+      task?.cancel();
+    };
+  }, [opened, width]);
+  return (
+    <canvas
+      ref={canvasRef}
+      data-testid="chat-artifact-cover"
+      aria-hidden
+      className="block h-auto w-full bg-(--page-preview)"
+    />
+  );
+}
+
 function useBox() {
   const [element, ref] = useState<HTMLDivElement | null>(null);
   const [box, setBox] = useState({ width: 0, height: 0 });
