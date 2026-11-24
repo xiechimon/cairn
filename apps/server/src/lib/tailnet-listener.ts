@@ -67,6 +67,14 @@ export function tailnetOriginOf(c: Context): string | null {
   return `${TAILNET_SCHEME}://${host}`;
 }
 
+export function hasTailscaleIdentityHeaders(c: Context): boolean {
+  return (
+    c.req.header(IDENTITY_LOGIN_HEADER) !== undefined ||
+    c.req.header(IDENTITY_NAME_HEADER) !== undefined ||
+    c.req.header('tailscale-funnel-request') !== undefined
+  );
+}
+
 export function tailnetIdentityOf(c: Context): TailnetIdentity | null {
   if (tailnetListenerOf(c) === null || c.req.header('tailscale-funnel-request') !== undefined)
     return null;

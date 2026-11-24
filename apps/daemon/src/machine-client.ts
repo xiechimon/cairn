@@ -108,6 +108,7 @@ export interface MachineApi {
     claudeCode?: ClaudeCodeReport;
     capabilities?: MachineCapabilities;
     hostKey?: string;
+    legacyHostKeys?: string[];
   }): Promise<MachineEnrollResponse>;
   me(): Promise<MachineRecord>;
   presence(body: MachinePresenceBody, signal?: AbortSignal): Promise<MachinePresenceResponse>;
@@ -225,6 +226,7 @@ export class MachineClient implements MachineApi {
     claudeCode?: ClaudeCodeReport;
     capabilities?: MachineCapabilities;
     hostKey?: string;
+    legacyHostKeys?: string[];
   }): Promise<MachineEnrollResponse> {
     const { apiKey, ...rest } = body;
     return this.request<MachineEnrollResponse>('POST', '/api/machine/enroll', {
@@ -234,7 +236,12 @@ export class MachineClient implements MachineApi {
     });
   }
 
-  async enrollStart(body: { teamId?: string; name?: string; hostKey?: string }): Promise<{
+  async enrollStart(body: {
+    teamId?: string;
+    name?: string;
+    hostKey?: string;
+    legacyHostKeys?: string[];
+  }): Promise<{
     enrollId: string;
     url: string;
     code?: string;

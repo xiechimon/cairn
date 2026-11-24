@@ -1270,10 +1270,12 @@ async function boot(): Promise<void> {
         runner.ensureRunning();
         return Promise.resolve();
       }
-      migrateRunnerHome(join(app.getPath('userData'), 'runner'), runnerHome());
+      const legacyRunnerDir = join(app.getPath('userData'), 'runner');
+      migrateRunnerHome(legacyRunnerDir, runnerHome());
       runnerStarting ??= startLocalRunner({
         root: bundledRoot('runner'),
         home: runnerHome(),
+        legacyHomes: [legacyRunnerDir, join(app.getPath('userData'), 'runner-home')],
         serverHome: cairnHome(),
         origin,
         ownerToken,

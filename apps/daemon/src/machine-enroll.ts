@@ -18,6 +18,7 @@ const pendingSchema = z.object({
   serverUrl: z.string().optional(),
   name: z.string().optional(),
   hostKey: z.string().optional(),
+  legacyHostKeys: z.array(z.string()).optional(),
 });
 
 export type PendingEnrollment = z.infer<typeof pendingSchema>;
@@ -66,10 +67,12 @@ export async function enrollThroughBrowser(
   name: string,
   io: EnrollIo,
   hostKey?: string,
+  legacyHostKeys?: readonly string[],
 ): Promise<EnrolledMachine> {
   const api = asEnrollApi(client);
   const path = pendingPath(paths);
   let pending = readPending(path);
+  const normalizedLegacy = legacyHostKeys?.filter((key) => key !== hostKey) ?? [];
   if (
     pending !== null &&
     (pending.expiresAt <= io.now() ||
@@ -81,7 +84,11 @@ export async function enrollThroughBrowser(
     pending = null;
   }
   if (pending === null) {
-    const started = await api.enrollStart({ name, ...(hostKey !== undefined ? { hostKey } : {}) });
+    const started = await api.enrollStart({
+      name,
+      ...(hostKey !== undefined ? { hostKey } : {}),
+      ...(normalizedLegacy.length > 0 ? { legacyHostKeys: normalizedLegacy } : {}),
+    });
     pending = {
       enrollId: started.enrollId,
       url: started.url,
@@ -90,6 +97,7 @@ export async function enrollThroughBrowser(
       serverUrl,
       name,
       ...(hostKey !== undefined ? { hostKey } : {}),
+      ...(normalizedLegacy.length > 0 ? { legacyHostKeys: normalizedLegacy } : {}),
     };
     writePrivateFile(path, `${JSON.stringify(pending, null, 2)}\n`);
     io.log(

@@ -94,6 +94,11 @@ test('two real runners keep named tasks, workspaces and results isolated across 
         return response;
       },
       idleSleepPrevention: false,
+      hostIdentitySources: {
+        platform: 'linux',
+        readFile: (path) => (path === '/etc/machine-id' ? `two-runner-test-${name}` : null),
+        run: () => null,
+      },
       proxyEnv: {},
       capEnv: {},
       claudeCodeAuthProbe: async () => ({ state: 'not-logged-in', provider: 'firstParty' }),

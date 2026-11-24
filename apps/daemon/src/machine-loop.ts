@@ -22,7 +22,11 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
 } from '@cairn/shared';
-import { probeHostKey } from '@cairn/shared/host-identity';
+import {
+  collectLegacyHostKeys,
+  type HostIdentitySources,
+  probeHostIdentity,
+} from '@cairn/shared/host-identity';
 import { AgentReachProbe } from './agent-reach.js';
 import { createAcpBackend, createGeminiBackend } from './backend/acp.js';
 import {
@@ -116,6 +120,8 @@ export interface MachineLoopOpts {
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
+  hostIdentitySources?: HostIdentitySources;
+  legacyRunnerHomes?: readonly string[];
   hostPermissionsProbe?: HostPermissionsProbe;
   fetchImpl?: typeof fetch;
   client?: MachineApi;
@@ -605,7 +611,17 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
 
   let machineJson = loadMachineJson(paths);
-  const hostKey = machineJson?.hostKey ?? probeHostKey(paths.home);
+  const loadedFromDisk = machineJson !== null;
+  const probedHost = probeHostIdentity(
+    paths.home,
+    opts.hostIdentitySources,
+    opts.legacyRunnerHomes,
+  );
+  const hostKey = probedHost?.hostKey ?? machineJson?.hostKey ?? null;
+  const legacyHostKeys = collectLegacyHostKeys(hostKey, [
+    ...(probedHost?.legacyHostKeys ?? []),
+    machineJson?.hostKey,
+  ]);
   if (machineJson && machineJson.serverUrl !== config.serverUrl) {
     logger.machine(
       `enrolled against ${machineJson.serverUrl} but polling ${config.serverUrl} — if auth fails, re-enroll: logout, then start --api-key <k> --team <id>`,
@@ -624,6 +640,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           log: (line) => logger.raw(line),
         },
         hostKey ?? undefined,
+        legacyHostKeys,
       );
       machineJson = {
         machineId: enrolled.machineId,
@@ -641,6 +658,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         claudeCode: claudeReport(),
         capabilities: capabilitiesReport(),
         hostKey: hostKey ?? undefined,
+        ...(legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
       });
       machineJson = {
         machineId: enrolled.machineId,
@@ -652,7 +670,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.raw(`Enrolled in team ${machineJson.teamId} (machine ${machineJson.machineId})`);
     }
   }
-  if (hostKey !== null && machineJson.hostKey !== hostKey) {
+  if (!loadedFromDisk && hostKey !== null && machineJson.hostKey !== hostKey) {
     machineJson = { ...machineJson, hostKey };
     saveMachineJson(paths, machineJson);
   }
@@ -687,10 +705,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claudeCode: claudeReport(),
       capabilities: capabilitiesReport(),
       hostKey: hostKey ?? undefined,
+      ...(legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
     }),
     timeoutMs: opts.presenceTimeoutMs ?? PRESENCE_TIMEOUT_MS,
     send: async (body, signal) => {
       const response = await client.presence(body, signal);
+      if (hostKey !== null && machineJson !== null && machineJson.hostKey === undefined) {
+        machineJson = { ...machineJson, hostKey };
+        saveMachineJson(paths, machineJson);
+      }
       phones.setConsented(response.phones ?? []);
       if (
         response.installDevin === true &&

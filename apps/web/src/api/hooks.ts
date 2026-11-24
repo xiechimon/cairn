@@ -75,7 +75,6 @@ import type {
   PatchScheduleBody,
   PatchTeamBody,
   PatchUserBody,
-  PhoneActivity,
   PhoneRow,
   PlanResponse as PlanRow,
   ProjectFilesResponse,
@@ -466,20 +465,6 @@ export function usePhones(machineId: string | undefined, enabled: boolean) {
           `/api/machines/${encodeURIComponent(machineId ?? '')}/phones`,
         )
       ).phones,
-    enabled: enabled && machineId !== undefined,
-    refetchInterval: 10_000,
-  });
-}
-
-export function usePhoneActivity(machineId: string | undefined, enabled: boolean) {
-  return useQuery({
-    queryKey: ['phone-activity', machineId],
-    queryFn: async () =>
-      (
-        await api.get<{ activity: PhoneActivity[] }>(
-          `/api/machines/${encodeURIComponent(machineId ?? '')}/phones/activity`,
-        )
-      ).activity,
     enabled: enabled && machineId !== undefined,
     refetchInterval: 10_000,
   });
@@ -1260,17 +1245,30 @@ export function useApiMutations(teamId: string | undefined) {
         api.patch<MachineRecord>(`/api/machines/${input.id}`, input.body),
       onMutate: (input) => {
         const previous = qc.getQueryData<MachineRecord[]>(['machines', teamId]);
+        const previousTeams = qc.getQueryData<TeamRecord[]>(['teams']);
         qc.setQueryData<MachineRecord[]>(['machines', teamId], (rows) =>
           (rows ?? []).map((m) => {
             if (m.id !== input.id) return m;
             return { ...m, ...input.body };
           }),
         );
-        return { previous };
+        if (input.body.isDefault === true) {
+          qc.setQueryData<TeamRecord[]>(['teams'], (teams) =>
+            teams?.map((entry, index) =>
+              (teamId !== undefined ? entry.id === teamId : index === 0)
+                ? { ...entry, defaultMachineId: input.id }
+                : entry,
+            ),
+          );
+        }
+        return { previous, previousTeams };
       },
       onSuccess: invalidateAll,
       onError: (_error, _input, context) => {
         qc.setQueryData<MachineRecord[]>(['machines', teamId], context?.previous ?? []);
+        if (context?.previousTeams !== undefined) {
+          qc.setQueryData<TeamRecord[]>(['teams'], context.previousTeams);
+        }
       },
     }),
     deleteMachine: useMutation({
@@ -1317,7 +1315,6 @@ export function useApiMutations(teamId: string | undefined) {
         ),
       onSuccess: (_result, input) => {
         void qc.invalidateQueries({ queryKey: ['phones', input.machineId] });
-        void qc.invalidateQueries({ queryKey: ['phone-activity', input.machineId] });
       },
     }),
     handbackPhone: useMutation({

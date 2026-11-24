@@ -55,9 +55,8 @@ const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 732 } });
 await page.goto(`${WEB}/app/settings/machines`, { waitUntil: 'networkidle' });
 
-await page.getByTestId('phones-meta').click();
-await page.getByTestId('phones-drawer').waitFor();
-await page.screenshot({ path: join(EVIDENCE, 'phones-drawer.png') });
+await page.getByTestId('phone-row').first().waitFor();
+await page.screenshot({ path: join(EVIDENCE, 'phones-rows.png') });
 
 const states = await page
   .getByTestId('phone-row')

@@ -329,3 +329,28 @@ test('an approval never overwrites a machine.json that appeared meanwhile', asyn
   expect(JSON.parse(readFileSync(paths.machineJson, 'utf8'))).toEqual({ machineId: 'other' });
   releaseTestTempDir(home);
 });
+
+test('browser enrollment forwards legacyHostKeys distinct from hostKey', async () => {
+  const { home, paths } = world();
+  const bodies: unknown[] = [];
+  const client = {
+    enrollStart: async (body: { name?: string; hostKey?: string; legacyHostKeys?: string[] }) => {
+      bodies.push(body);
+      return { enrollId: 'e1', url: AUTHORIZE };
+    },
+    enrollPoll: async (): Promise<Poll> => ({ status: 'authorized', machine: machine() as never }),
+  };
+  const keyV2 = 'a'.repeat(64);
+  const keyV1 = 'b'.repeat(64);
+  await enrollThroughBrowser(
+    client,
+    paths,
+    SERVER,
+    'omarchy',
+    { now: () => 1_000, sleep: async () => {}, log: () => {} },
+    keyV2,
+    [keyV2, keyV1],
+  );
+  expect(bodies).toEqual([{ name: 'omarchy', hostKey: keyV2, legacyHostKeys: [keyV1] }]);
+  releaseTestTempDir(home);
+});
