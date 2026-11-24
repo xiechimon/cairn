@@ -3,13 +3,19 @@ import { mockLive, TASK, THREAD } from './chief-home-mock';
 
 const BOARD_TASK = { ...TASK, id: 'todo-b', title: '画一张流程图', phase: 'done', seqNum: 14 };
 
-function onePagePdf(line: string): Buffer {
-  const stream = `BT /F1 24 Tf 72 720 Td (${line}) Tj ET`;
+function pdf(lines: readonly string[], box: readonly [number, number]): Buffer {
+  const font = 3 + lines.length * 2;
+  const kids = lines.map((_, index) => `${3 + index * 2} 0 R`).join(' ');
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
-    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    `<< /Type /Pages /Kids [${kids}] /Count ${lines.length} >>`,
+    ...lines.flatMap((line, index) => {
+      const stream = `BT /F1 24 Tf 72 ${box[1] - 72} Td (${line}) Tj ET`;
+      return [
+        `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${box[0]} ${box[1]}] /Contents ${4 + index * 2} 0 R /Resources << /Font << /F1 ${font} 0 R >> >> >>`,
+        `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+      ];
+    }),
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
   ];
   let body = '%PDF-1.4\n';
@@ -64,7 +70,11 @@ const SCENE = JSON.stringify({
 
 const FILES: Record<string, { type: string; body: string | Buffer }> = {
   'att-sheet': { type: 'text/csv', body: '姓名,城市,分数\nAda,London,98\nGrace,"New York, NY",95\n' },
-  'att-resume': { type: 'application/pdf', body: onePagePdf('Ada Lovelace, analyst') },
+  'att-resume': { type: 'application/pdf', body: pdf(['Ada Lovelace, analyst'], [612, 792]) },
+  'att-deck': {
+    type: 'application/pdf',
+    body: pdf(['Q3 review', 'Numbers', 'Next steps'], [960, 540]),
+  },
   'att-flow': { type: 'text/plain', body: 'flowchart LR\n  A[需求] --> B[设计] --> C[上线]\n' },
   'att-board': { type: 'application/json', body: SCENE },
 };
@@ -170,4 +180,21 @@ test('a whiteboard opens read-only, edits in place and saves a new version', asy
   const saved = JSON.parse(saves[0] ?? '{}') as { type?: string; elements?: { id: string }[] };
   expect(saved.type).toBe('excalidraw');
   expect(saved.elements?.map((element) => element.id)).toEqual(['box-1']);
+});
+
+test('a landscape PDF opens as a deck with a slide rail, paging and arrow keys', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { panel } = await openArtifact(page, 'att-deck.pdf', 'q3-review.pdf');
+  const stage = panel.getByTestId('artifact-deck-stage');
+  await expect(panel.getByTestId('artifact-deck-thumb')).toHaveCount(3);
+  await expect(panel.getByTestId('artifact-deck-position')).toHaveText('1 / 3');
+  await expect(stage.locator('.textLayer')).toContainText('Q3 review');
+  await panel.getByTestId('artifact-deck-next').click();
+  await expect(stage.locator('.textLayer')).toContainText('Numbers');
+  await page.keyboard.press('ArrowRight');
+  await expect(panel.getByTestId('artifact-deck-position')).toHaveText('3 / 3');
+  await expect(panel.getByTestId('artifact-deck-next')).toBeDisabled();
+  await panel.getByTestId('artifact-deck-thumb').first().click();
+  await expect(stage).toHaveAttribute('data-current', '1');
+  await expect(panel.getByTestId('artifact-deck-thumb').first()).toHaveAttribute('aria-current', 'true');
 });

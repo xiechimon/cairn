@@ -1,7 +1,9 @@
-import { FileWarning } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileWarning, Play } from 'lucide-react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { EmptyState } from '../../../components/empty-state.js';
+import { IconTooltip } from '../../../components/icon-tooltip.js';
+import { Button } from '../../../components/ui/button.js';
 import { Skeleton } from '../../../components/ui/skeleton.js';
 import { useI18n } from '../../../i18n/provider.js';
 import { useFileBytes } from './use-file-bytes.js';
@@ -12,6 +14,14 @@ type PdfJs = typeof import('pdfjs-dist');
 const CSS_UNITS = 96 / 72;
 const PAGE_GAP = 16;
 const MAX_PAGES = 300;
+const DECK_KEYS: Record<string, number> = {
+  ArrowRight: 1,
+  ArrowDown: 1,
+  PageDown: 1,
+  ArrowLeft: -1,
+  ArrowUp: -1,
+  PageUp: -1,
+};
 
 let pdfjsModule: Promise<PdfJs> | null = null;
 
@@ -80,19 +90,43 @@ function useOpenedPdf(bytes: ArrayBuffer | undefined) {
   return state;
 }
 
-function useWidth() {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
+function useBox() {
+  const [element, ref] = useState<HTMLDivElement | null>(null);
+  const [box, setBox] = useState({ width: 0, height: 0 });
   useEffect(() => {
-    const element = ref.current;
     if (element === null) return;
     const observer = new ResizeObserver(([entry]) => {
-      if (entry !== undefined) setWidth(entry.contentRect.width);
+      if (entry !== undefined)
+        setBox({ width: entry.contentRect.width, height: entry.contentRect.height });
     });
     observer.observe(element);
     return () => observer.disconnect();
-  }, []);
-  return { ref, width };
+  }, [element]);
+  return { element, ref, ...box };
+}
+
+export function isDeck(sizes: readonly PageSize[]): boolean {
+  return sizes.length > 1 && sizes.every((size) => size.width > size.height);
+}
+
+function deckFitScale(size: PageSize, box: { width: number; height: number }): number {
+  return Math.max(
+    0.1,
+    Math.min(
+      (box.width - PAGE_GAP * 2) / (size.width * CSS_UNITS),
+      (box.height - PAGE_GAP * 2) / (size.height * CSS_UNITS),
+    ),
+  );
+}
+
+function useFullscreen(element: HTMLElement | null): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const sync = () => setOn(element !== null && document.fullscreenElement === element);
+    document.addEventListener('fullscreenchange', sync);
+    return () => document.removeEventListener('fullscreenchange', sync);
+  }, [element]);
+  return on;
 }
 
 export function pdfFitScale(sizes: readonly PageSize[], width: number): number {
@@ -114,8 +148,9 @@ export function PdfViewer({
   const { t } = useI18n();
   const bytesQ = useFileBytes(src);
   const { opened, failed } = useOpenedPdf(bytesQ.data);
-  const { ref, width } = useWidth();
-  const fit = opened === null || width === 0 ? 1 : pdfFitScale(opened.sizes, width);
+  const { ref, width } = useBox();
+  const deck = opened !== null && isDeck(opened.sizes);
+  const fit = opened === null || width === 0 || deck ? 1 : pdfFitScale(opened.sizes, width);
   useEffect(() => onFitScale(fit), [fit, onFitScale]);
   useEffect(() => {
     if (opened !== null) onPages?.(opened.doc.numPages);
@@ -130,6 +165,7 @@ export function PdfViewer({
         className="mt-[12vh]"
       />
     );
+  if (opened !== null && deck) return <PdfDeck opened={opened} />;
   return (
     <div
       ref={ref}
@@ -171,12 +207,14 @@ function PdfPage({
   number,
   size,
   scale,
+  textLayer = true,
 }: {
   pdfjs: PdfJs;
   doc: PDFDocumentProxy;
   number: number;
   size: PageSize;
   scale: number;
+  textLayer?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const textRef = useRef<HTMLDivElement | null>(null);
@@ -207,6 +245,7 @@ function PdfPage({
       if (!live) return;
       setDrawn(true);
       text.replaceChildren();
+      if (!textLayer) return;
       await new pdfjs.TextLayer({
         textContentSource: page.streamTextContent(),
         container: text,
@@ -217,7 +256,7 @@ function PdfPage({
       live = false;
       task?.cancel();
     };
-  }, [pdfjs, doc, number, cssScale]);
+  }, [pdfjs, doc, number, cssScale, textLayer]);
   const style = {
     width: size.width * cssScale,
     height: size.height * cssScale,
@@ -236,6 +275,137 @@ function PdfPage({
       <canvas ref={canvasRef} className="absolute inset-0 size-full" />
       <div ref={textRef} className="textLayer" />
       {!drawn && <Skeleton className="absolute inset-0 rounded-none" />}
+    </div>
+  );
+}
+
+function PdfDeck({ opened }: { opened: Opened }) {
+  const { t } = useI18n();
+  const count = opened.sizes.length;
+  const [current, setCurrent] = useState(0);
+  const stage = useBox();
+  const presenting = useFullscreen(stage.element);
+  const size = opened.sizes[current] ?? opened.sizes[0] ?? { width: 4, height: 3 };
+  const scale = stage.width === 0 ? 0.1 : deckFitScale(size, stage);
+  const go = (next: number) => setCurrent(Math.min(count - 1, Math.max(0, next)));
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (root === null) return;
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      const step = DECK_KEYS[event.key];
+      if (step === undefined) return;
+      event.preventDefault();
+      setCurrent((at) => Math.min(count - 1, Math.max(0, at + step)));
+    };
+    root.addEventListener('keydown', onKeyDown);
+    return () => root.removeEventListener('keydown', onKeyDown);
+  }, [root, count]);
+  return (
+    <div
+      ref={setRoot}
+      data-testid="artifact-pdf"
+      data-pages={opened.doc.numPages}
+      data-layout="deck"
+      className="flex min-h-0 flex-1 bg-(--surface-1)"
+    >
+      <nav
+        aria-label={t('幻灯片')}
+        className="flex w-36 flex-none flex-col gap-2 overflow-y-auto overscroll-contain border-r border-border p-3 max-[760px]:hidden"
+      >
+        {opened.sizes.map((thumb, index) => (
+          <Button
+            key={index}
+            variant="ghost"
+            data-testid="artifact-deck-thumb"
+            aria-current={index === current ? 'true' : undefined}
+            aria-label={t('第 {n} 页', { n: index + 1 })}
+            onClick={() => go(index)}
+            className={`h-auto flex-none items-start justify-start gap-1.5 p-1 text-meta text-content-tertiary tabular-nums ${index === current ? 'bg-(--hover-1) text-foreground' : ''}`}
+          >
+            <span className="w-3 flex-none text-right">{index + 1}</span>
+            <PdfPage
+              pdfjs={opened.pdfjs}
+              doc={opened.doc}
+              number={index + 1}
+              size={thumb}
+              scale={96 / (thumb.width * CSS_UNITS)}
+              textLayer={false}
+            />
+          </Button>
+        ))}
+      </nav>
+      <div
+        ref={stage.ref}
+        data-testid="artifact-deck-stage"
+        data-current={current + 1}
+        className={`relative flex min-h-0 min-w-0 flex-1 items-center justify-center ${presenting ? 'bg-(--lightbox-scrim)' : ''}`}
+      >
+        <PdfPage
+          key={current}
+          pdfjs={opened.pdfjs}
+          doc={opened.doc}
+          number={current + 1}
+          size={size}
+          scale={scale}
+        />
+        <div className="absolute right-3 bottom-3 flex items-center gap-0.5 rounded-(--radius-control) bg-popover p-0.5 shadow-(--e1)">
+          <IconTooltip
+            label={t('上一页')}
+            side="top"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                data-testid="artifact-deck-prev"
+                disabled={current === 0}
+                onClick={() => go(current - 1)}
+              />
+            }
+          >
+            <ChevronLeft aria-hidden className="size-4" />
+          </IconTooltip>
+          <span
+            data-testid="artifact-deck-position"
+            className="min-w-10 text-center text-meta text-content-secondary tabular-nums"
+          >
+            {current + 1} / {count}
+          </span>
+          <IconTooltip
+            label={t('下一页')}
+            side="top"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                data-testid="artifact-deck-next"
+                disabled={current === count - 1}
+                onClick={() => go(current + 1)}
+              />
+            }
+          >
+            <ChevronRight aria-hidden className="size-4" />
+          </IconTooltip>
+          {!presenting && (
+            <IconTooltip
+              label={t('放映')}
+              side="top"
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  data-testid="artifact-deck-present"
+                  onClick={() => {
+                    root?.querySelector<HTMLElement>('[data-testid="artifact-deck-next"]')?.focus();
+                    void stage.element?.requestFullscreen();
+                  }}
+                />
+              }
+            >
+              <Play aria-hidden className="size-4" />
+            </IconTooltip>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

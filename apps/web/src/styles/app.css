@@ -1466,7 +1466,7 @@ body:has([data-testid="chief-body"]),
   forced-color-adjust: none;
   transform-origin: 0 0;
   --min-font-size: 1;
-  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --pdf-text-scale: calc(var(--total-scale-factor) * var(--min-font-size));
   --min-font-size-inv: calc(1 / var(--min-font-size));
 
   :is(span, br) {
@@ -1481,7 +1481,7 @@ body:has([data-testid="chief-body"]),
   .markedContent span:not(.markedContent) {
     z-index: 1;
     --font-height: 0;
-    font-size: calc(var(--text-scale-factor) * var(--font-height));
+    font-size: calc(var(--pdf-text-scale) * var(--font-height));
     --scale-x: 1;
     --rotate: 0deg;
     transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
