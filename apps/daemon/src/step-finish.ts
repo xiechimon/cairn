@@ -37,6 +37,7 @@ export interface StepFinishInput
   runGit: StepGitRunner;
   env?: NodeJS.ProcessEnv;
   now: () => number;
+  reap?: () => Promise<void>;
 }
 
 export async function finishStepRun(input: StepFinishInput): Promise<void> {
@@ -59,6 +60,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
   input.stopHeartbeat();
   watchdog.stop();
   input.askChannel.abort();
+  await input.reap?.();
   const stopReq = input.stop.settle();
   const outcome = resolveStepPassOutcome({
     pass: passState,

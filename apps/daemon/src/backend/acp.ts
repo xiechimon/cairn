@@ -63,21 +63,21 @@ import { runtimeChildEnv } from './otel.js';
 
 import { appendSkillsCatalog, composeSkillsSection } from './skills.js';
 
-const adapterProcessGroups = new Set<number>();
+const spawnedProcessGroups = new Set<number>();
 
-function terminateAdapterProcessGroup(pid: number, signal: NodeJS.Signals): void {
+function terminateSpawnedProcessGroup(pid: number, signal: NodeJS.Signals): void {
   try {
     process.kill(-pid, signal);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
   }
-  if (signal === 'SIGKILL') adapterProcessGroups.delete(pid);
+  if (signal === 'SIGKILL') spawnedProcessGroups.delete(pid);
 }
 
 process.once('exit', () => {
-  for (const pid of adapterProcessGroups) {
+  for (const pid of spawnedProcessGroups) {
     try {
-      terminateAdapterProcessGroup(pid, 'SIGKILL');
+      terminateSpawnedProcessGroup(pid, 'SIGKILL');
     } catch {}
   }
 });
@@ -739,7 +739,7 @@ class AcpBackend implements AgentBackend {
       child = spawnProcess(confined.command, confined.args, {
         cwd: opts.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
-        ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
+        ...(process.platform !== 'win32' ? { detached: true } : {}),
         env,
       });
     } catch (error) {
@@ -748,8 +748,8 @@ class AcpBackend implements AgentBackend {
       hostTools?.close();
       throw error;
     }
-    const groupPid = adapter && process.platform !== 'win32' ? child.pid : undefined;
-    if (groupPid !== undefined) adapterProcessGroups.add(groupPid);
+    const groupPid = process.platform !== 'win32' ? child.pid : undefined;
+    if (groupPid !== undefined) spawnedProcessGroups.add(groupPid);
     let stderr = '';
     const app = client({ name: 'cairn' });
     const gateOptions = this.options.gate;
@@ -837,7 +837,7 @@ class AcpBackend implements AgentBackend {
     const terminate = (signal: NodeJS.Signals) => {
       if (groupPid !== undefined) {
         try {
-          terminateAdapterProcessGroup(groupPid, signal);
+          terminateSpawnedProcessGroup(groupPid, signal);
         } catch {
           child.kill(signal);
         }

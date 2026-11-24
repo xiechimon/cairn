@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join } from 'node:path';
@@ -26,6 +27,7 @@ import { commitEnv } from './git.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { bindMachineClaim, type MachineApi, MachineApiError } from './machine-client.js';
+import { STEP_TREE_ENV, StepReaper } from './process-tree.js';
 import type { StatePaths } from './state.js';
 import { GitHubAppTokenUnavailableError, StepAppCredential } from './step-app-credential.js';
 import { prepareStepEnv, READONLY_GIT_ENV } from './step-env.js';
@@ -74,6 +76,7 @@ export interface RunStepDeps {
   stepImageSupport?: Map<string, boolean | null>;
   stepSteeringSupport?: Map<string, boolean>;
   stepTranscripts?: Map<string, TranscriptBuffer>;
+  stepTreeMarkers?: Map<string, string>;
   stops?: StepStops;
   heartbeatIntervalMs?: number;
   skillsDir?: string;
@@ -95,6 +98,7 @@ export interface RunStepOptions {
 }
 
 export const PROVIDER_NETWORK_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
+const STEP_REAP_GRACE_MS = 3_000;
 
 export {
   RETRY_STORM_MAX,
@@ -187,6 +191,24 @@ async function runClaimedStep(
   const running = opts.running ?? 1;
   logger.raw(`step ${stepId} for conv ${convId} (${running} running)`);
 
+  const treeMarker = `${stepId}.${randomUUID()}`;
+  const treeEnv: Record<string, string> = { ...opts.env, [STEP_TREE_ENV]: treeMarker };
+  const reaper = new StepReaper({ env: STEP_TREE_ENV, value: treeMarker }, STEP_REAP_GRACE_MS);
+  deps.stepTreeMarkers?.set(stepId, treeMarker);
+  const reapTree = async () => {
+    try {
+      await reaper.reap();
+    } catch (error) {
+      logger.step(
+        `step tree reap failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  };
+  stepCleanups.push(reapTree);
+  stepCleanups.push(() => {
+    deps.stepTreeMarkers?.delete(stepId);
+  });
+
   const { activity, agentTodo } = createStepReporters({
     stepId,
     client: () => client,
@@ -217,6 +239,7 @@ async function runClaimedStep(
     prompt,
     claimed,
     stopRequest: stop.request,
+    treeMarker,
   });
 
   if (claimed.localMerge !== undefined) {
@@ -305,6 +328,7 @@ async function runClaimedStep(
       heartbeat,
       stepId,
       runtimeId !== null ? `${runtimeId} step has no model id` : 'no agent/model on claimed step',
+      reapTree,
     );
     return;
   }
@@ -319,7 +343,7 @@ async function runClaimedStep(
   });
   if (refusal !== null) {
     clearCredentials(creds);
-    await failStep(deps, heartbeat, stepId, refusal);
+    await failStep(deps, heartbeat, stepId, refusal, reapTree);
     return;
   }
   const backend = deps.backendFor(agent?.provider);
@@ -358,12 +382,12 @@ async function runClaimedStep(
     attachmentVerify,
     evidenceDirectory: verifyEvidenceDirectory,
     expectedHeadSha: verifyMeta?.expectedHeadSha,
-    env: attachmentVerify ? { ...opts.env, ...READONLY_GIT_ENV } : opts.env,
+    env: attachmentVerify ? { ...treeEnv, ...READONLY_GIT_ENV } : treeEnv,
     cleanups: stepCleanups,
   });
   if ('error' in setup) {
     clearCredentials(creds);
-    await failStep(deps, heartbeat, stepId, setup.error);
+    await failStep(deps, heartbeat, stepId, setup.error, reapTree);
     return;
   }
   const { ws, cwd, headAtStart, stepStartMs } = setup;
@@ -406,7 +430,7 @@ async function runClaimedStep(
     isPi,
     isChief,
     isReview,
-    metered: opts.env?.CAIRN_ORB !== '1',
+    metered: treeEnv.CAIRN_ORB !== '1',
     creds,
     appCredential,
     refreshGit,
@@ -418,7 +442,7 @@ async function runClaimedStep(
     logger,
   });
   if ('error' in tooling) {
-    await failStep(deps, heartbeat, stepId, tooling.error);
+    await failStep(deps, heartbeat, stepId, tooling.error, reapTree);
     return;
   }
   const {
@@ -438,7 +462,7 @@ async function runClaimedStep(
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
   const stepEnv = prepareStepEnv(
     {
-      inherited: { ...opts.env, ...commitEnv(stepIdentity) },
+      inherited: { ...treeEnv, ...commitEnv(stepIdentity) },
       git: attachmentVerify ? null : repo?.kind === 'github' ? creds.git : null,
       appCredential,
       readonlyGit: attachmentVerify,
@@ -454,7 +478,7 @@ async function runClaimedStep(
     stepCleanups,
   );
   if ('error' in stepEnv) {
-    await failStep(deps, heartbeat, stepId, stepEnv.error);
+    await failStep(deps, heartbeat, stepId, stepEnv.error, reapTree);
     return;
   }
   const sessionOpts = composeStepSessionOpts({
@@ -533,7 +557,7 @@ async function runClaimedStep(
   });
   if (briefError !== null) {
     clearCredentials(creds);
-    await failStep(deps, heartbeat, stepId, briefError);
+    await failStep(deps, heartbeat, stepId, briefError, reapTree);
     return;
   }
 
@@ -642,7 +666,7 @@ async function runClaimedStep(
   await deps.settleSteers?.(stepId);
   if (passes.openError !== null) {
     clearCredentials(creds);
-    await failStep(deps, heartbeat, stepId, passes.openError);
+    await failStep(deps, heartbeat, stepId, passes.openError, reapTree);
     return;
   }
   await finishStepRun({
@@ -678,7 +702,7 @@ async function runClaimedStep(
     stop,
     forgetHandle: () => deps.sessionHandles?.delete(stepId),
     stopHeartbeat: () => {
-      if (opts.env?.CAIRN_ORB !== '1') clearInterval(heartbeat);
+      if (treeEnv.CAIRN_ORB !== '1') clearInterval(heartbeat);
     },
     headAtStart,
     stepStartMs,
@@ -686,8 +710,9 @@ async function runClaimedStep(
     appIdentity,
     identity: stepIdentity,
     runGit: withStepGit,
-    env: opts.env,
+    env: treeEnv,
     now,
+    reap: reapTree,
   });
 }
 
@@ -696,9 +721,11 @@ async function failStep(
   heartbeat: ReturnType<typeof setInterval>,
   stepId: string,
   message: string,
+  reap?: () => Promise<void>,
 ): Promise<void> {
   deps.sessionHandles?.delete(stepId);
   deps.logger.step(`failed: ${message}`);
+  await reap?.();
   try {
     await deps.client.done(stepId, {
       status: 'failed',

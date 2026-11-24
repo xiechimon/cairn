@@ -62,6 +62,7 @@ Thirty-two notes that nothing outside this directory referenced, and their index
 | [review-gate-prior-art-2026-11-11.md](review-gate-prior-art-2026-11-11.md) | none | Why `review-gate` exists, how other teams gate on AI review, and what the 13 PRs on the night of 2026-11-11 actually cost. Recommendation only |
 | [ds-bot-vs-cairn-2026-11-17.md](ds-bot-vs-cairn-2026-11-17.md) | none | First-hand comparison of DS-Bot vs Cairn across positioning, architecture, IM adapters, memory relevance/pin/expiry, and threat-model doc discipline |
 | [personal-agent-monetization-2026-11-17.md](personal-agent-monetization-2026-11-17.md) | none | Landscape of personal-agent monetization models (usage allowances, BYOK + hosted-compute hybrids, pure-OSS outcomes, and takeaways for Cairn) |
+| [step-process-reaping-2026-11-24.md](step-process-reaping-2026-11-24.md) | none | How existing systems kill a whole process tree including setsid'd grandchildren (tini, systemd cgroups, containerd/kubelet, Bazel subreaper, GH Actions env-marker, Job Objects); macOS has no subreaper — recommends cgroup-per-step on Linux and detached+marker+scan+sweep layering on macOS |
 
 ### Recovered research (2026-11-06 to 2026-11-09)
 

@@ -25,6 +25,7 @@ export interface StepJournalEntry {
   stopRequest?: StopRequest | null;
   claimedAt: number;
   updatedAt: number;
+  treeMarker?: string | null;
 }
 
 export type TranscriptMessage = TranscriptUpload['messages'][number];
@@ -93,6 +94,19 @@ export class StepJournal {
         (e) => e.state === 'claimed' || e.state === 'running' || e.state === 'awaiting-upload',
       )
       .sort((a, b) => a.claimedAt - b.claimedAt);
+  }
+
+  treeMarkers(): string[] {
+    if (!existsSync(this.dir)) return [];
+    const markers = new Set<string>();
+    for (const name of readdirSync(this.dir)) {
+      if (!name.startsWith('step-') || !name.endsWith('.json')) continue;
+      try {
+        const entry = JSON.parse(readFileSync(join(this.dir, name), 'utf8')) as StepJournalEntry;
+        if (typeof entry.treeMarker === 'string') markers.add(entry.treeMarker);
+      } catch {}
+    }
+    return [...markers];
   }
 
   remove(stepId: string): void {

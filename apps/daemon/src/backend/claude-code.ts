@@ -1465,6 +1465,7 @@ function spawnClaudeProcess(
       signal,
       stdio: ['pipe', 'pipe', 'ignore', 'pipe'],
       windowsHide: true,
+      ...(process.platform !== 'win32' ? { detached: true } : {}),
     });
     const channel = child.stdio[OAUTH_TOKEN_FD];
     if (fdToken !== undefined && channel !== null && channel !== undefined && 'end' in channel) {

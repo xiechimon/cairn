@@ -15,6 +15,7 @@ import { isAbsolute, join } from 'node:path';
 import { sleep } from '@cairn/shared';
 import { processStartTime } from '@cairn/shared/parent-watch';
 import { childEnv } from '../child-env.js';
+import { processStartTime } from '../process-tree.js';
 import type { OrbEnsureDeps, OrbEnsureService } from './services-ensure.js';
 import { ensureOrbServices } from './services-ensure.js';
 import { loadEnsureServicesFile } from './services-yaml.js';
@@ -178,6 +179,7 @@ function readPidText(path: string): string {
   return readFileSync(path, 'utf8').trim();
 }
 
+export { processStartTime };
 export function readLiveServicePid(path: string): number | null {
   const text = readPidText(path);
   const space = text.indexOf(' ');
