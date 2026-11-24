@@ -3,27 +3,21 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import { type build, message, type step, type todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
-import { githubRepoOfProject, projectOfTodo } from './git.js';
 import { writeWorkerQuestion } from './worker-question-store.js';
 
 type BuildRow = typeof build.$inferSelect;
 
 const UNDELIVERED_EXCERPT_MAX = 1_200;
 
-type Undelivered = 'no-commits' | 'no-pr';
+type Undelivered = 'no-commits';
 
 export function undeliveredEnd(
-  deps: BuildDeps,
   stepRow: typeof step.$inferSelect,
   todoRow: typeof todo.$inferSelect,
-  buildRow: BuildRow,
-  outcome: { hasChanges?: boolean; workBranchDrift?: unknown },
+  outcome: { hasChanges?: boolean },
 ): Undelivered | null {
   if (!isBuildStepKind(stepRow.kind) || isInfoOutput(todoRow.output)) return null;
-  if (outcome.workBranchDrift !== undefined) return null;
-  if (outcome.hasChanges === false) return 'no-commits';
-  const githubProject = githubRepoOfProject(projectOfTodo(deps.db, todoRow)) !== null;
-  return githubProject && buildRow.prNumber === null ? 'no-pr' : null;
+  return outcome.hasChanges === false ? 'no-commits' : null;
 }
 
 function spokenText(content: unknown): string {
@@ -61,7 +55,6 @@ function excerptOf(text: string | null, missing: string): string {
 
 const UNDELIVERED_SUMMARY: Record<Undelivered, string> = {
   'no-commits': 'The step ended without committing anything.',
-  'no-pr': 'The step ended without opening a pull request.',
 };
 
 export function askUndeliveredOnce(deps: BuildDeps, buildRow: BuildRow, kind: Undelivered): void {

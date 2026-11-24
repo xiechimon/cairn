@@ -1097,6 +1097,36 @@ export const gitPrim = {
     return found;
   },
 
+  async fetchBranch(dir: string, branch: string): Promise<boolean> {
+    const r = await runGit(['fetch', '--no-tags', 'origin', '--end-of-options', branch], {
+      cwd: dir,
+      env: machineGitEnv(),
+      timeoutMs: NET_TIMEOUT_MS,
+    });
+    return r.code === 0;
+  },
+
+  async isAncestor(dir: string, ancestor: string, ref: string): Promise<boolean> {
+    const r = await runGit(['merge-base', '--is-ancestor', '--end-of-options', ancestor, ref], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    return r.code === 0;
+  },
+
+  async hasCommitsSince(dir: string, baseCommit: string, sinceMs: number): Promise<boolean> {
+    const r = await runGit(['log', '--format=%ct', `${baseCommit}..HEAD`], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (r.code !== 0) return false;
+    for (const line of r.stdout.split('\n')) {
+      const secs = Number.parseInt(line.trim(), 10);
+      if (!Number.isNaN(secs) && secs * 1_000 >= sinceMs - BRANCH_SCAN_SKEW_MS) return true;
+    }
+    return false;
+  },
+
   async diffAgainstRemoteDefault(dir: string, defaultBranch: string): Promise<string> {
     const r = await runGit(['diff', `origin/${defaultBranch}...HEAD`], {
       cwd: dir,

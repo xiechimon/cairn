@@ -1238,7 +1238,7 @@ describe('#1150 green delivery / delivery questions / scheduler wiring', () => {
     expect(checksReads()).toBe(before);
   });
 
-  test('completeStep: a delivered PR completes; a missing PR still asks the delivery question', () => {
+  test('completeStep: a build with changes completes with or without a PR; zero changes asks the delivery question', () => {
     const withPr = makePrWorld({ checks: [] });
     const stepId = `step-run-${Math.random().toString(36).slice(2, 8)}`;
     withPr.s.db
@@ -1275,7 +1275,28 @@ describe('#1150 green delivery / delivery questions / scheduler wiring', () => {
       })
       .run();
     completeStep(noPr.s.svc, stepId2, { hasChanges: true });
-    expect(noPr.todoRow().phase).toBe('needs_input');
+    expect(noPr.todoRow().phase).toBe('done');
+
+    const zeroChanges = makePrWorld({ checks: [] });
+    zeroChanges.s.db
+      .update(buildTable)
+      .set({ prNumber: null, prUrl: null })
+      .where(eq(buildTable.id, zeroChanges.buildId))
+      .run();
+    const stepIdZero = `step-zero-${Math.random().toString(36).slice(2, 8)}`;
+    zeroChanges.s.db
+      .insert(stepTable)
+      .values({
+        id: stepIdZero,
+        buildId: zeroChanges.buildId,
+        kind: 'build',
+        status: 'claimed',
+        machineId: `machine-ci-${stepIdZero}`,
+        createdAt: zeroChanges.base,
+      })
+      .run();
+    completeStep(zeroChanges.s.svc, stepIdZero, { hasChanges: false });
+    expect(zeroChanges.todoRow().phase).toBe('needs_input');
 
     const hosted = makePrWorld({ checks: [] });
     hosted.s.db
@@ -1574,7 +1595,7 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
       );
       if (state !== 'open') {
         expect(w.buildRow().prNumber).toBeNull();
-        expect(w.todoRow().phase).toBe('needs_input');
+        expect(w.todoRow().phase).toBe('done');
         return;
       }
       expect(w.buildRow().prNumber).toBe(w.prNumber);

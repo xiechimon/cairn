@@ -120,6 +120,10 @@ test.each(['local', 'github', 'local-rejected'] as const)(
           status: 'failed',
           errorMessage: expect.stringContaining(RETRY_PARKED_MARK),
         });
+      } else if (kind === 'github') {
+        expect(api.doneBodies[0]?.body).toMatchObject({ status: 'success', hasChanges: true });
+        expect(commit).not.toBe('');
+        expect(push).not.toHaveBeenCalled();
       } else {
         expect(api.doneBodies[0]?.body).toMatchObject({ status: 'success' });
         expect(commit).not.toBe('');
@@ -127,8 +131,7 @@ test.each(['local', 'github', 'local-rejected'] as const)(
         expect(await runGitOk(['show', `${branch}:delivered.txt`], { cwd: repo })).toBe(
           'Delivered by Thread',
         );
-        if (kind === 'github') expect(push).toHaveBeenCalled();
-        else expect(push).not.toHaveBeenCalled();
+        expect(push).not.toHaveBeenCalled();
       }
     } finally {
       await handle.stop();

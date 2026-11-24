@@ -43,14 +43,60 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
   };
   let duringPush = false;
   try {
+    const repoKind = claimed.project?.repo?.kind;
     const headBranch = (await git.currentBranch?.(ws.cwd)) ?? null;
-    if (headBranch !== null && headBranch !== ws.branch) {
-      outcome.branchDrift = { expected: ws.branch, actual: headBranch };
-      log(`work branch drift: HEAD on ${headBranch}, contract branch ${ws.branch}`);
-      note(
-        `branch-drift-${stepId}`,
-        `检测到工作分支偏离：收尾时 HEAD 在「${headBranch}」，契约工作分支是「${ws.branch}」。本步产物判定已按步窗口内有新提交的任意分支放宽；交付（提交/推送/PR head）应留在契约分支上。`,
-      );
+    const observeOnly =
+      claimed.step.kind !== 'merge' &&
+      (repoKind === 'github' ||
+        (repoKind === 'local' && headBranch !== null && headBranch !== ws.branch));
+    if (observeOnly) {
+      await git.fetchBranch?.(ws.cwd, ws.defaultBranch).catch(() => false);
+      const headCommit = await git.headCommit(ws.cwd);
+      outcome.headCommit = headCommit;
+      const headAhead = await git.countAhead(ws.cwd, ws.defaultBranch);
+      const scanned: string[] = [];
+      if (headAhead === 0 && input.headAtStart !== null && git.branchesWithNewCommits) {
+        try {
+          const candidates = await git.branchesWithNewCommits(
+            ws.cwd,
+            input.headAtStart,
+            input.stepStartMs,
+          );
+          scanned.push(
+            ...candidates.filter((b) => b === ws.branch || !b.startsWith(BRAND.branchPrefix)),
+          );
+        } catch (err) {
+          log(`branch scan failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+      const probeBranches: string[] = [];
+      if (
+        headBranch !== null &&
+        headBranch !== ws.branch &&
+        !headBranch.startsWith(BRAND.branchPrefix)
+      ) {
+        probeBranches.push(headBranch);
+      }
+      for (const b of scanned) {
+        if (!probeBranches.includes(b)) probeBranches.push(b);
+      }
+      outcome.artifactBranches = probeBranches;
+      const landed =
+        headCommit !== null &&
+        input.headAtStart !== null &&
+        headCommit !== input.headAtStart &&
+        (await git.isAncestor?.(ws.cwd, headCommit, `refs/remotes/origin/${ws.defaultBranch}`)) ===
+          true &&
+        (await git.hasCommitsSince?.(ws.cwd, input.headAtStart, input.stepStartMs)) === true;
+      if (landed) {
+        log(`observed landed commit ${headCommit} on origin/${ws.defaultBranch}`);
+        note(
+          `landed-${stepId}`,
+          `Observed landed commit ${headCommit.slice(0, 7)} on origin/${ws.defaultBranch}.`,
+        );
+      }
+      outcome.hasChanges = headAhead > 0 || scanned.length > 0 || landed;
+      return outcome;
     }
     const commitMessage = `${claimed.step.kind}: ${claimed.todo?.title ?? claimed.conversationId}`;
     const committed = await git.commitAll(ws.cwd, commitMessage, input.identity);
@@ -88,7 +134,7 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       duringPush = true;
       const pushSource = await input.push();
       duringPush = false;
-      if (pushSource === 'machine' && claimed.project?.repo?.kind === 'github') {
+      if (pushSource === 'machine' && repoKind === 'github') {
         note(`git-credential-${stepId}`, gitCredentialRowContent('machine'));
       }
       input.logRaw(`pushed ${ws.branch}`);
@@ -142,6 +188,7 @@ export async function preserveFailedBuild(input: {
   logRaw: (message: string) => void;
 }): Promise<PreservedBuild | null> {
   const { git, ws, claimed } = input;
+  if (claimed.project?.repo?.kind === 'github') return null;
   try {
     const currentBranch = await git.currentBranch?.(ws.cwd);
     const pushAllowed =

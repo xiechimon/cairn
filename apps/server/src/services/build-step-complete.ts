@@ -100,13 +100,6 @@ function stepArtifactGate(
         ? deliverableManifestFailure(deps.db, stepRow.id, outcome.deliverables)
         : null;
     }
-    const drift = outcome.workBranchDrift;
-    if (drift !== undefined) {
-      if (outcome.hasChanges === false) {
-        return `agent 偏离工作分支且步窗口内未见任何提交：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
-      }
-      return `agent 偏离工作分支交付，已拒绝自动收工：收尾时 HEAD 在「${drift.actual}」，契约工作分支是「${drift.expected}」`;
-    }
   }
   return null;
 }
@@ -192,7 +185,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     );
     return;
   }
-  const undelivered = undeliveredEnd(deps, stepRow, todoRow, buildRow, outcome);
+  const undelivered = undeliveredEnd(stepRow, todoRow, outcome);
   if (undelivered !== null && pendingWorkerQuestions(deps.db, buildRow.id).length === 0)
     askUndeliveredOnce(deps, buildRow, undelivered);
   const planContract = stepRow.kind === 'plan' ? planContractOfStep(deps, stepRow) : null;
@@ -203,22 +196,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
     planContract,
   );
   if (gateFailure !== null) {
-    const refuseDriftRecord =
-      isBuildStepKind(stepRow.kind) &&
-      outcome.workBranchDrift !== undefined &&
-      outcome.hasChanges !== false;
-    if (refuseDriftRecord) {
-      deps.db
-        .update(build)
-        .set({ prUrl: null, prNumber: null })
-        .where(eq(build.id, stepRow.buildId))
-        .run();
-    }
     applyStepFailure(deps, stepRow, gateFailure, outcome.verdictReport);
-    if (refuseDriftRecord) {
-      const cleared = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-      if (cleared) publishBuild(deps, cleared);
-    }
     return;
   }
   deps.db

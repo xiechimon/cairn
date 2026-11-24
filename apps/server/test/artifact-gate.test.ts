@@ -332,13 +332,13 @@ describe('delivery checks (B-C11/B-C14): zero changes / fake completion -> compl
   });
 });
 
-describe('gate 2 drift naming (#1195): branch drift is no longer "build produced zero changes"', () => {
+describe('branch choice no longer fails the step', () => {
   const DRIFT = {
     expected: 'cairn/conv-0198f6c0-0000-7000-8000-000000000000',
     actual: 'dogfood/tracer-1153-verification-note',
   };
 
-  test('failure mode 6: hasChanges=false + workBranchDrift -> failure reason names the branch drift', async () => {
+  test('hasChanges=false with legacy workBranchDrift asks the zero-change question instead of failing', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -349,18 +349,15 @@ describe('gate 2 drift naming (#1195): branch drift is no longer "build produced
         workBranchDrift: DRIFT,
         sessionId: 'pi-d1',
       });
-      expect(w.todoRow().phase).toBe('failed');
-      expect(w.stepRow(buildStep.step.id).status).toBe('failed');
-      const msg = w.buildRow(buildId).errorMessage ?? '';
-      expect(msg).not.toBe('构建零改动');
-      expect(msg).toContain(DRIFT.actual);
-      expect(msg).toContain(DRIFT.expected);
+      expect(w.todoRow().phase).toBe('needs_input');
+      expect(w.stepRow(buildStep.step.id).status).toBe('done');
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
     } finally {
       w.s.dispose();
     }
   });
 
-  test('failure mode 7: hasChanges=true + workBranchDrift -> hard failure naming both branches, PR not kept', async () => {
+  test('hasChanges=true with legacy workBranchDrift completes and keeps the PR record', async () => {
     const w = await setupWorld();
     try {
       const buildId = await w.startBuild(false);
@@ -373,15 +370,11 @@ describe('gate 2 drift naming (#1195): branch drift is no longer "build produced
         prNumber: 1277,
         sessionId: 'pi-d2',
       });
-      expect(w.todoRow().phase).toBe('failed');
-      expect(w.stepRow(buildStep.step.id).status).toBe('failed');
-      const msg = w.buildRow(buildId).errorMessage ?? '';
-      expect(msg).toContain(DRIFT.actual);
-      expect(msg).toContain(DRIFT.expected);
-      expect(msg).not.toBe('构建零改动');
-      expect(msg).not.toContain('未见任何提交');
-      expect(w.buildRow(buildId).prUrl).toBeNull();
-      expect(w.buildRow(buildId).prNumber).toBeNull();
+      expect(w.todoRow().phase).toBe('done');
+      expect(w.stepRow(buildStep.step.id).status).toBe('done');
+      expect(w.buildRow(buildId).errorMessage).toBeNull();
+      expect(w.buildRow(buildId).prUrl).toBe('https://github.com/example/repo/pull/1277');
+      expect(w.buildRow(buildId).prNumber).toBe(1277);
     } finally {
       w.s.dispose();
     }

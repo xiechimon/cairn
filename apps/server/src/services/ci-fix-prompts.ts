@@ -27,8 +27,7 @@ export function buildMergeConflictPrompt(args: {
   return [
     `${CI_MERGE_CONFLICT_PROMPT_HEAD} 解冲突轮（第 ${args.round} 轮）：PR #${args.prNumber}${args.prUrl ? `（${args.prUrl}）` : ''} 与默认分支「${githubText(args.defaultBranch)}」冲突，GitHub 合并不了。`,
     '',
-    `请在本分支上执行 git fetch origin ${quote(args.defaultBranch)}，再 git merge ${quote(`origin/${args.defaultBranch}`)}，解决冲突后提交，并推送到同一分支。`,
-    '不要 rebase、不要 force-push、不要新开分支或 PR；推送后 CI 会重跑，系统会继续轮询。',
+    `请获取 origin ${quote(args.defaultBranch)} 并按仓库自身规则解决冲突（merge 或 rebase 均可）后推送更新；推送后 CI 会重跑，系统会继续轮询。`,
   ].join('\n');
 }
 

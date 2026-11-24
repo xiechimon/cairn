@@ -980,6 +980,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
     expect((await getTodo(s.app, created.id)).sourceRef).toBe(`github:${REPO}#101`);
+    setRow(s, created.id, { phase: 'review' });
     return { s, id: created.id, projectId, sync: syncOf(s, mock.impl) };
   }
 
@@ -1355,6 +1356,7 @@ describe('task issue sync: the self-created issue follows the task row (#3505)',
     const created = await createTask(s.app, projectId);
     deliver(s, mock.impl, created.id);
     await flushSelfIssueWrites();
+    setRow(s, created.id, { phase: 'review' });
     await call(s.app, 'PATCH', `/api/todos/${created.id}`, { body: { phase: 'closed' } });
     const sync = syncOf(s, mock.impl);
     await sync.sweep();

@@ -216,18 +216,16 @@ describe('a parked question is its own phase and wakes the Coordinator', () => {
 });
 
 describe('a step that delivered nothing asks once (task stall class 2)', () => {
-  test('a GitHub task whose step committed but opened no PR asks, quoting the report line, instead of completing', async () => {
+  test('a GitHub task whose step committed without opening a PR completes without asking', () => {
     const { todoId, buildId, stepRow } = startSession(githubProject());
     H.s.db
       .update(build)
-      .set({ reportLine: 'Pushed the branch; no PR opened, remote CI unverified.' })
+      .set({ reportLine: 'Landed directly onto main via push-queue.' })
       .where(eq(build.id, buildId))
       .run();
     endStep(stepRow.id, { hasChanges: true });
-    expect(phaseOf(todoId)).toBe('needs_input');
-    expect(questionStatus(buildId, zeroChangeId(buildId))).toBe('pending');
-    const wake = coordinatorSteps().find((row) => row.prompt?.includes(zeroChangeId(buildId)));
-    expect(wake?.prompt).toContain('no PR opened, remote CI unverified');
+    expect(phaseOf(todoId)).toBe('done');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBeUndefined();
   });
 
   test('a GitHub task whose step opened a PR asks nothing', () => {
@@ -245,28 +243,18 @@ describe('a step that delivered nothing asks once (task stall class 2)', () => {
     expect(phaseOf(todoId)).toBe('done');
   });
 
-  test('a GitHub task that ends without a PR again after the answer completes, asked once', async () => {
+  test('a GitHub task whose step produced zero commits asks once, quoting the report line', () => {
     const { todoId, buildId, stepRow } = startSession(githubProject());
-    endStep(stepRow.id, { hasChanges: true });
-    await relay('answer_question', {
-      todoId,
-      requestId: zeroChangeId(buildId),
-      answer: 'A verified branch is enough here.',
-    });
-    const [resumed] = pendingWork(buildId);
-    if (resumed === undefined) throw new Error('no resumed step');
     H.s.db
-      .update(step)
-      .set({ status: 'claimed', machineId: stepRow.machineId })
-      .where(eq(step.id, resumed.id))
+      .update(build)
+      .set({ reportLine: 'Blocked on missing credentials; nothing committed.' })
+      .where(eq(build.id, buildId))
       .run();
-    H.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, todoId)).run();
-    ackSteer(deps(), { id: stepRow.machineId, teamId: H.teamId }, resumed.id, {
-      answerIds: [zeroChangeId(buildId)],
-      via: 'session-start',
-    });
-    endStep(resumed.id, { hasChanges: true });
-    expect(phaseOf(todoId)).toBe('done');
+    endStep(stepRow.id, { hasChanges: false });
+    expect(phaseOf(todoId)).toBe('needs_input');
+    expect(questionStatus(buildId, zeroChangeId(buildId))).toBe('pending');
+    const wake = coordinatorSteps().find((row) => row.prompt?.includes(zeroChangeId(buildId)));
+    expect(wake?.prompt).toContain('nothing committed');
   });
 });
 

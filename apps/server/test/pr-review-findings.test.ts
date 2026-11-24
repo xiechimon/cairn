@@ -688,11 +688,33 @@ test('shared matcher, badges and prompts preserve the ready boundary', () => {
     expect(reviewFindingBadge(`**<sub><sub>![${badge} Badge](url)`)).toBe(badge);
   expect(reviewFindingBadge('No badge')).toBeNull();
   const note = buildWorkBranchNote('work');
-  expect(note).toContain('Codex');
-  expect(note).toContain('draft');
+  expect(note).toContain('AGENTS.md');
+  expect(note).not.toContain('ready for review');
   expect(buildReviewFindingsPrompt({ prNumber: 1, round: 1, findings: [] })).toContain(
     'addPullRequestReviewThreadReply',
   );
+});
+
+test('a PR conflict round cap on a done task records the notice without downgrading done to failed', async () => {
+  const f = fixture();
+  f.state.resolved = true;
+  f.s.db.update(todo).set({ phase: 'done' }).where(eq(todo.id, 't')).run();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { conflicts: 2 }, createdAt: 1 })
+    .run();
+  await f.wake({ mergeableState: 'dirty' });
+  expect(f.s.db.select().from(todo).where(eq(todo.id, 't')).get()?.phase).toBe('done');
+  expect(f.s.db.select().from(build).where(eq(build.id, 'b')).get()?.errorMessage).toBeNull();
+  expect(
+    f.s.db
+      .select()
+      .from(message)
+      .where(eq(message.conversationId, 'b'))
+      .all()
+      .some((row) => String(row.content).includes('Conflict round cap (2) reached.')),
+  ).toBe(true);
 });
 
 test('poller runtime witness holds PR 3377 and exposes the durable wake through the PR API', async () => {

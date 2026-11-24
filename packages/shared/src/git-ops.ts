@@ -134,6 +134,9 @@ export interface WorktreeOps {
   commitsAhead?(cwd: string, defaultBranch: string): Promise<string[]>;
   currentBranch?(cwd: string): Promise<string | null>;
   branchesWithNewCommits?(cwd: string, baseCommit: string, sinceMs: number): Promise<string[]>;
+  fetchBranch?(cwd: string, branch: string): Promise<boolean>;
+  isAncestor?(cwd: string, ancestor: string, ref: string): Promise<boolean>;
+  hasCommitsSince?(cwd: string, baseCommit: string, sinceMs: number): Promise<boolean>;
   diffAgainstDefault?(cwd: string, defaultBranch: string): Promise<string>;
   restoreCheckpoint(cwd: string, commit: string): Promise<void>;
   cleanupOrphans(input: OrphanCleanupInput): Promise<string[]>;

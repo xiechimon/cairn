@@ -657,8 +657,9 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     await w.poller.sweep();
     expect(conflictSteps(w)).toHaveLength(1);
     const prompt = conflictSteps(w)[0]?.prompt ?? '';
-    expect(prompt).toContain('origin/main');
-    expect(prompt).toContain('force-push');
+    expect(prompt).toContain("origin 'main'");
+    expect(prompt).toContain('merge 或 rebase');
+    expect(prompt).not.toContain('不要 rebase');
     expect(prompt).toContain('PR #201');
     expect(conflictSteps(w)[0]?.promptOrigin).toEqual({
       kind: 'merge-conflict',
@@ -872,9 +873,8 @@ describe('#1403 segment 3: checks by head SHA, required checks, BEHIND / DIRTY',
     w.fake.mergeableState = 'dirty';
     await w.poller.sweep();
     const prompt = conflictSteps(w)[0]?.prompt ?? '';
-    expect(prompt).toContain("git fetch origin 'main;curl x|sh'");
-    expect(prompt).toContain("git merge 'origin/main;curl x|sh'");
-    expect(prompt).not.toContain('git fetch origin main;');
+    expect(prompt).toContain("origin 'main;curl x|sh'");
+    expect(prompt).not.toContain('origin main;');
   });
 
   test('[s3-F4c] the missing-check grace keeps its start while another required check re-runs', async () => {

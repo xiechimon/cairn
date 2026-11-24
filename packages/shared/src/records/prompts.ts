@@ -448,8 +448,19 @@ const PRE_REVIEW_WORK_BRANCH_NOTE_TAIL = `${LEGACY_WORK_BRANCH_NOTE_TAIL}\n${LEG
 const DRAFT_WORK_BRANCH_NOTE_TAIL = `${PRE_REVIEW_WORK_BRANCH_NOTE_TAIL}\n开 PR 后，Codex 审查意见会通过 wake 发回；不要自行标记 PR ready，cairn 将 PR 转为 draft 表示审查意见仍未处理完。`;
 const PREVIOUS_WORK_BRANCH_NOTE_TAIL = `${LEGACY_WORK_BRANCH_NOTE_TAIL}\n${PREVIOUS_GITHUB_OVERLAP_RULE}\n开 PR 时直接开成 ready for review，不要开 draft。仓库接了审查回路（如 Codex 审查）时，审查意见会通过 wake 发回：意见没处理完，cairn 会把 PR 转为 draft 并加 ${CAIRN_REVIEW_HOLD_LABEL} 标签，处理完再转回 ready；PR 带这个标签时不要自己改它的 draft 状态。用户本人对这个 PR 的直接要求（例如标 ready 或转 draft）优先于本条系统规则。`;
 const WORK_BRANCH_NOTE_TAIL = `${LEGACY_WORK_BRANCH_NOTE_TAIL}\n${GITHUB_OVERLAP_RULE}\n开 PR 时直接开成 ready for review，不要开 draft。仓库接了审查回路（如 Codex 审查）时，审查意见会通过 wake 发回：意见没处理完，cairn 会把 PR 转为 draft 并加 ${CAIRN_REVIEW_HOLD_LABEL} 标签，处理完再转回 ready；PR 带这个标签时不要自己改它的 draft 状态。用户本人对这个 PR 的直接要求（例如标 ready 或转 draft）优先于本条系统规则。`;
+const NEUTRAL_WORK_BRANCH_NOTE_TAIL =
+  '。工作区已检出该分支。请遵循仓库自身的说明（如 AGENTS.md / CLAUDE.md），使用本机 git / gh 完成提交、推送、开 PR 或合入。';
+const HOSTED_WORK_BRANCH_NOTE_TAIL = '。工作区已检出该分支——请在本分支上提交。';
 const WORK_BRANCH_NOTE_SHAPES: readonly { head: string; tails: readonly string[] }[] = [
-  { head: WORK_BRANCH_NOTE_HEAD, tails: [WORK_BRANCH_NOTE_TAIL, PREVIOUS_WORK_BRANCH_NOTE_TAIL] },
+  {
+    head: WORK_BRANCH_NOTE_HEAD,
+    tails: [
+      NEUTRAL_WORK_BRANCH_NOTE_TAIL,
+      HOSTED_WORK_BRANCH_NOTE_TAIL,
+      WORK_BRANCH_NOTE_TAIL,
+      PREVIOUS_WORK_BRANCH_NOTE_TAIL,
+    ],
+  },
   {
     head: LEGACY_WORK_BRANCH_NOTE_HEAD,
     tails: [
@@ -468,13 +479,11 @@ export function buildWorkBranchNote(
   baseBranch?: string | null,
   cairnPushes = false,
 ): string {
-  const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`;
-  const base =
-    baseBranch == null
-      ? ''
-      : `\nPR base branch: ${baseBranch}. When opening a PR, use gh pr create --base ${quote(baseBranch)} --head ${quote(branch)}. Keep this base even when the repository default differs.\n`;
-  const push = cairnPushes ? CAIRN_PUSHES_NOTE : '';
-  return `${WORK_BRANCH_NOTE_HEAD}${branch}${base}${push}${WORK_BRANCH_NOTE_TAIL}`;
+  const base = baseBranch == null ? '' : `\nTarget base branch: ${baseBranch}.`;
+  if (cairnPushes) {
+    return `${WORK_BRANCH_NOTE_HEAD}${branch}${base}${CAIRN_PUSHES_NOTE}${HOSTED_WORK_BRANCH_NOTE_TAIL}`;
+  }
+  return `${WORK_BRANCH_NOTE_HEAD}${branch}${base}${NEUTRAL_WORK_BRANCH_NOTE_TAIL}`;
 }
 
 export function appendWorkBranchNote(

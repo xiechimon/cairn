@@ -554,6 +554,18 @@ export class WorkspaceManager implements WorktreeOps {
     return gitPrim.branchesWithNewCommits(cwd, baseCommit, sinceMs);
   }
 
+  async fetchBranch(cwd: string, branch: string): Promise<boolean> {
+    return gitPrim.fetchBranch(cwd, branch);
+  }
+
+  async isAncestor(cwd: string, ancestor: string, ref: string): Promise<boolean> {
+    return gitPrim.isAncestor(cwd, ancestor, ref);
+  }
+
+  async hasCommitsSince(cwd: string, baseCommit: string, sinceMs: number): Promise<boolean> {
+    return gitPrim.hasCommitsSince(cwd, baseCommit, sinceMs);
+  }
+
   async diffAgainstDefault(cwd: string, defaultBranch: string): Promise<string> {
     return gitPrim.diffAgainstRemoteDefault(cwd, defaultBranch);
   }

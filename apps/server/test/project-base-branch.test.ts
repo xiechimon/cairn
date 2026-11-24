@@ -230,7 +230,7 @@ test('the CI conflict round merges origin/dev when the project base is dev', asy
     .from(step)
     .all()
     .find((row) => row.status === 'pending' && row.kind === 'build');
-  expect(fix?.prompt).toContain("git merge 'origin/dev'");
+  expect(fix?.prompt).toContain("origin 'dev'");
   expect(
     s.db
       .select()

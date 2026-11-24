@@ -5,7 +5,6 @@ import {
   isActiveStepStatus,
   isChiefConversationId,
   isChiefSideThreadId,
-  orchestrationSourceRef,
 } from '@cairn/shared';
 import { and, asc, desc, eq, exists, inArray, isNotNull, ne, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -22,7 +21,7 @@ import {
 } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { messageTodo, requestStop } from './builds.js';
-import { answerChiefQuestion, sendChiefMessage } from './chief.js';
+import { answerChiefQuestion, creatingThreadIdOf, sendChiefMessage } from './chief.js';
 import { askQuestionContentOf } from './chief-question-store.js';
 import type { ChiefToolDeps } from './chief-tools.js';
 import { steerChiefMessage, stopChiefTurn } from './chief-turns.js';
@@ -433,12 +432,16 @@ export async function executeThreadMcpTool(
               ?.watches.filter((watch) => watch.threadId === threadId)
               .map((watch) => watch.todoId) ?? [])
           : [];
-      return db
+      const watchSet = new Set(watches);
+      const rows = db
         .select({
           threadId: todo.id,
           buildId: build.id,
           prUrl: build.prUrl,
           prNumber: build.prNumber,
+          sourceKind: todo.sourceKind,
+          sourceRef: todo.sourceRef,
+          request: todo.request,
         })
         .from(build)
         .innerJoin(todo, eq(build.todoId, todo.id))
@@ -452,16 +455,27 @@ export async function executeThreadMcpTool(
             thread.kind === 'work'
               ? eq(todo.id, threadId)
               : or(
-                  and(
-                    eq(todo.sourceKind, 'orchestration'),
-                    eq(todo.sourceRef, orchestrationSourceRef(threadId)),
-                  ),
+                  eq(todo.sourceKind, 'orchestration'),
+                  eq(todo.sourceKind, 'github-issue-self'),
                   watches.length > 0 ? inArray(todo.id, watches) : undefined,
                 ),
           ),
         )
         .orderBy(desc(build.createdAt))
         .all();
+      return rows
+        .filter(
+          (row) =>
+            thread.kind === 'work' ||
+            watchSet.has(row.threadId) ||
+            creatingThreadIdOf(row) === threadId,
+        )
+        .map(({ threadId: todoId, buildId, prUrl, prNumber }) => ({
+          threadId: todoId,
+          buildId,
+          prUrl,
+          prNumber,
+        }));
     }
     case 'wait_thread': {
       const input = z.object(THREAD_TOOL_SCHEMAS.wait_thread).parse(args);

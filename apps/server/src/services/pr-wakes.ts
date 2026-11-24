@@ -273,14 +273,15 @@ export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
           .get() !== undefined
       )
         return;
-      deps.db
-        .update(build)
-        .set({ errorMessage: notice.content })
-        .where(eq(build.id, row.buildId))
-        .run();
-      if (current.phase === 'done' || current.phase === 'todo')
-        setTodoPhase(deps, current.id, 'queued');
-      setTodoPhase(deps, current.id, 'failed');
+      if (current.phase !== 'done') {
+        deps.db
+          .update(build)
+          .set({ errorMessage: notice.content })
+          .where(eq(build.id, row.buildId))
+          .run();
+        if (current.phase === 'todo') setTodoPhase(deps, current.id, 'queued');
+        setTodoPhase(deps, current.id, 'failed');
+      }
       ledger.pendingNotice = null;
       deps.db.update(message).set({ content: ledger }).where(eq(message.id, ledgerId)).run();
     });
@@ -617,7 +618,7 @@ export function createPrWakes(deps: BuildDeps) {
           .where(eq(threadPr.id, row.id))
           .run();
       }
-      if (notices.length > 0) {
+      if (notices.length > 0 && current.phase !== 'done') {
         ledger.pendingNotice = {
           buildId: row.buildId,
           content: `PR Auto-fix needs you: #${row.number} ${notices.join(' ')}`,
@@ -642,7 +643,13 @@ export function createPrWakes(deps: BuildDeps) {
           .values({ id, conversationId: row.buildId, role: 'system', content, createdAt: now })
           .onConflictDoNothing()
           .run();
-        deps.db.update(build).set({ errorMessage: content }).where(eq(build.id, row.buildId)).run();
+        if (current.phase !== 'done') {
+          deps.db
+            .update(build)
+            .set({ errorMessage: content })
+            .where(eq(build.id, row.buildId))
+            .run();
+        }
       }
     });
     await deliverReviewCap(deps, inFlight, input, findings);

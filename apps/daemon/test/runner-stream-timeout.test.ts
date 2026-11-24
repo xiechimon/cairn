@@ -500,15 +500,24 @@ describe('runner tool-execution liveness (#1591)', () => {
     expect(body.errorMessage).toBe('stream timeout (arm=idle, idle=80ms)');
   });
 
-  test('the total-duration cap applies while a tool is still executing', async () => {
-    const { backend, observations } = toolExecutionBackend({ finish: 'done' });
-    const body = await run({
-      backend,
+  test('a running tool call holds the non-absolute duration cap, while an explicit cap env still applies', async () => {
+    const held = toolExecutionBackend({ finish: 'done' });
+    const heldBody = await run({
+      backend: held.backend,
       timeouts: { first: WIDE, idle: 80, body: WIDE },
       durationCapMs: 160,
     });
-    expect(observations.stoppedDuringTool).toBe(true);
-    expect(body.status).toBe('failed');
-    expect(body.errorMessage).toBe('stream timeout (arm=duration, cap=160ms)');
+    expect(held.observations).toEqual({ completedTools: 1, stoppedDuringTool: false });
+    expect(heldBody.status).toBe('success');
+
+    const capped = toolExecutionBackend({ finish: 'done' });
+    const cappedBody = await run({
+      backend: capped.backend,
+      timeouts: { first: WIDE, idle: 80, body: WIDE },
+      env: { [STREAM_DURATION_CAP_ENV]: '160' },
+    });
+    expect(capped.observations.stoppedDuringTool).toBe(true);
+    expect(cappedBody.status).toBe('failed');
+    expect(cappedBody.errorMessage).toBe('stream timeout (arm=duration, cap=160ms)');
   });
 });

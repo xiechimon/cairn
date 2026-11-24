@@ -863,6 +863,6 @@ test('a configured GitHub base reaches the agent prompt and PR probe', async () 
   const transcript = JSON.stringify(
     client.uploads.findLast((u) => typeof u.body !== 'string')?.body,
   );
-  expect(transcript).toContain("--base 'dev'");
+  expect(transcript).toContain('Target base branch: dev.');
   expect(probeMock).toHaveBeenCalledWith(expect.objectContaining({ baseBranch: 'dev' }));
 });

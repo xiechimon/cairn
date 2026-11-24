@@ -724,10 +724,9 @@ describe('needs you (#1800)', () => {
 
   test('a gate rejection is not retried and enters the current group', async () => {
     const w = openWorld();
-    completeStep(w.deps, w.stepId, {
-      hasChanges: true,
-      workBranchDrift: { expected: 'cairn/conv-1', actual: 'main' },
-    });
+    const step = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get();
+    if (step === undefined) throw new Error('missing step');
+    applyStepFailure(w.deps, step, '方案结构不合格：缺少验证');
     const builds = buildCount(w);
     await sweepFailedRetries(w.deps);
 

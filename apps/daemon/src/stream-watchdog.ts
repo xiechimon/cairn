@@ -89,12 +89,29 @@ export class StreamWatchdog {
     this.runningToolCalls.clear();
     this.armSilence('first');
     this.armBody();
-    if (isFirstPass) this.armDuration();
+    if (isFirstPass || (!this.options.durationCapIsAbsolute && this.duration === null)) {
+      this.armDuration();
+    }
   }
 
   noteToolCall(id: string, running: boolean): void {
-    if (running) this.runningToolCalls.add(id);
-    else this.runningToolCalls.delete(id);
+    if (running) {
+      this.runningToolCalls.add(id);
+      if (!this.options.durationCapIsAbsolute && this.duration) {
+        clearTimeout(this.duration);
+        this.duration = null;
+      }
+    } else {
+      this.runningToolCalls.delete(id);
+      if (
+        this.runningToolCalls.size === 0 &&
+        !this.options.durationCapIsAbsolute &&
+        this.tripped === null &&
+        this.duration === null
+      ) {
+        this.armDuration();
+      }
+    }
   }
 
   noteEvent(): void {
@@ -156,6 +173,8 @@ export class StreamWatchdog {
   private armDuration(): void {
     if (this.duration && this.options.durationCapIsAbsolute) return;
     if (this.duration) clearTimeout(this.duration);
+    this.duration = null;
+    if (!this.options.durationCapIsAbsolute && this.runningToolCalls.size > 0) return;
     this.duration = setTimeout(() => this.trip('duration'), this.options.durationCapMs);
     this.duration.unref?.();
   }

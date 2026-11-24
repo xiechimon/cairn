@@ -316,15 +316,23 @@ function transcriptRows(client: FakeClient): TranscriptUpload['messages'] {
 }
 
 describe('runner push credentials: hosted keeps daemon credentials, external uses host git/gh', () => {
-  test('github repo uses machine credentials directly without per-step token override', async () => {
-    const workspace = fakeWorkspace({});
-    const { client } = await setup(
+  test('github build step is observe-only and does not auto-push; github merge step uses machine credentials directly', async () => {
+    const buildWs = fakeWorkspace({});
+    const buildRun = await setup(
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      { git: GITHUB_TOKEN, workspace },
+      { git: GITHUB_TOKEN, workspace: buildWs },
     );
-    expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
-    expect(client.doneBodies[0]!.body.status).toBe('success');
-    const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
+    expect(buildWs.pushes).toEqual([]);
+    expect(buildRun.client.doneBodies[0]!.body.status).toBe('success');
+
+    const mergeWs = fakeWorkspace({});
+    const mergeRun = await setup(
+      claimedStep('merge', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      { git: GITHUB_TOKEN, workspace: mergeWs },
+    );
+    expect(mergeWs.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
+    expect(mergeRun.client.doneBodies[0]!.body.status).toBe('success');
+    const row = transcriptRows(mergeRun.client).find((r) => r.id === 'git-credential-s1');
     expect(row?.role).toBe('system');
     expect(systemRowOf(row?.content)).toEqual({ kind: GIT_CREDENTIAL_ROW_KIND, source: 'machine' });
   }, 20_000);
@@ -345,8 +353,8 @@ describe('runner push credentials: hosted keeps daemon credentials, external use
           identity: null,
         });
       const pending = setup(
-        claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-        { git: GITHUB_TOKEN, workspace },
+        claimedStep('build', { kind: 'hosted', cloneUrl: 'http://server/git/t/r' }),
+        { git: { username: 'git', password: 'hosted_step_key' }, workspace },
       );
       await vi.runAllTimersAsync();
       const { client } = await pending;

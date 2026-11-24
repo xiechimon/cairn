@@ -54,17 +54,26 @@ describe('StreamWatchdog', () => {
     expect(trips).toEqual(['idle']);
   });
 
-  test('a running tool call holds the idle and body arms until it ends', () => {
+  test('a running tool call holds the idle, body, and non-absolute duration arms until it ends', () => {
     const { watchdog, trips } = watch();
     watchdog.startPass(true);
     watchdog.noteToolCall('call-1', true);
     watchdog.noteEvent();
-    vi.advanceTimersByTime(2000);
+    vi.advanceTimersByTime(10_000);
     expect(trips).toEqual([]);
     watchdog.noteToolCall('call-1', false);
     watchdog.noteEvent();
     vi.advanceTimersByTime(200);
     expect(trips).toEqual(['idle']);
+    watchdog.stop();
+
+    const absolute = watch({ durationCapIsAbsolute: true });
+    absolute.watchdog.startPass(true);
+    absolute.watchdog.noteToolCall('call-2', true);
+    absolute.watchdog.noteEvent();
+    vi.advanceTimersByTime(5000);
+    expect(absolute.trips).toEqual(['duration']);
+    absolute.watchdog.stop();
   });
 
   test('progress extends the duration cap only when the cap is not absolute', () => {

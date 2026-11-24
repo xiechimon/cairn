@@ -13,11 +13,13 @@ const BRANCH = 'cairn/conv-0198f6c0-0000-7000-8000-000000000000';
 const NOTE = buildWorkBranchNote(BRANCH);
 
 describe('note assembly (failure mode 6)', () => {
-  test('note shape: head marker + branch name + hard-constraint tail', () => {
+  test('note shape: head marker + branch name + neutral repo-instructions tail', () => {
     expect(NOTE).toContain('工作分支注记：本步的工作分支是 ');
     expect(NOTE).toContain(BRANCH);
-    expect(NOTE).toContain('不要创建或切换');
-    expect(NOTE).toContain('head 分支');
+    expect(NOTE).toContain('AGENTS.md');
+    expect(NOTE).toContain('git / gh');
+    expect(NOTE).not.toContain('不要创建或切换');
+    expect(NOTE).not.toContain('ready for review');
   });
 
   test('append = single newline join (one line at the prompt tail)', () => {
@@ -30,18 +32,18 @@ describe('note assembly (failure mode 6)', () => {
   });
 });
 
-test('a configured base is explicit in PR creation instructions', () => {
+test('a configured base is noted as target base branch', () => {
   const note = buildWorkBranchNote(BRANCH, 'dev');
-  expect(note).toContain('gh pr create --base');
-  expect(note).toContain("--base 'dev'");
+  expect(note).toContain('Target base branch: dev.');
+  expect(note).not.toContain('gh pr create --base');
   const prompt = appendWorkBranchNote(TASK_TEXT, BRANCH, 'dev');
-  expect(prompt).toContain("--base 'dev'");
+  expect(prompt).toContain('Target base branch: dev.');
 });
 
 test('a resumed head-only note is updated with the configured base without duplication', () => {
   const old = appendWorkBranchNote(TASK_TEXT, BRANCH);
   const updated = appendWorkBranchNote(old, BRANCH, 'dev');
-  expect(updated).toContain("--base 'dev'");
+  expect(updated).toContain('Target base branch: dev.');
   expect(updated.split('工作分支注记：')).toHaveLength(2);
   expect(appendWorkBranchNote(updated, BRANCH, 'dev')).toBe(updated);
 });
@@ -49,22 +51,23 @@ test('a resumed head-only note is updated with the configured base without dupli
 test('resetting the base to null replaces a resumed explicit base note', () => {
   const previous = appendWorkBranchNote(TASK_TEXT, BRANCH, 'dev');
   const reset = appendWorkBranchNote(previous, BRANCH, null);
-  expect(reset).not.toContain('--base');
+  expect(reset).not.toContain('Target base branch:');
   expect(reset).toBe(appendWorkBranchNote(TASK_TEXT, BRANCH, null));
 });
 
-describe('the injected PR rule is a labelled system rule that opens ready PRs', () => {
+test('hosted repositories keep the Cairn-pushes note and stay idempotent', () => {
+  const hosted = buildWorkBranchNote(BRANCH, null, true);
+  expect(hosted).toContain('This repository is hosted by Cairn');
+  expect(hosted).toContain('请在本分支上提交');
+  const once = appendWorkBranchNote(TASK_TEXT, BRANCH, null, true);
+  expect(appendWorkBranchNote(once, BRANCH, null, true)).toBe(once);
+});
+
+describe('the injected note is a labelled system rule and rewrites legacy prompts', () => {
   const LEGACY_NOTE = `工作分支注记：本步的工作分支是 ${BRANCH}。工作区已检出该分支——本步的全部提交与推送都必须落在它上面：不要创建或切换到自己的分支，不要另开 worktree 或 clone 到别处干活；开 Pull Request 时 head 分支也必须是它。`;
 
   test('the note names itself a cairn system rule, not words from the user', () => {
     expect(NOTE.startsWith('[cairn 系统规则，不是用户的消息]')).toBe(true);
-  });
-
-  test('the note opens the PR ready for review and lets a direct user request win', () => {
-    expect(NOTE).not.toContain('不要自行标记 PR ready');
-    expect(NOTE).toContain('ready for review');
-    expect(NOTE).toContain('cairn-review-hold');
-    expect(NOTE).toContain('用户本人');
   });
 
   test('a prompt carrying a legacy note is rewritten to the current note', () => {
@@ -80,14 +83,6 @@ describe('the injected PR rule is a labelled system rule that opens ready PRs', 
     ].join('\n');
     const stored = `${TASK_TEXT}\n${draftNote}`;
     expect(appendWorkBranchNote(stored, BRANCH)).toBe(`${TASK_TEXT}\n${NOTE}`);
-  });
-});
-
-describe('the overlap check names no repository-specific script', () => {
-  test('the note asks for the overlap list in the plan and names no repo-local script', () => {
-    expect(NOTE).not.toContain('github-overlap.mjs');
-    expect(NOTE).toContain('the numbered overlap list in the plan');
-    expect(NOTE).toContain('When intentionally removing work from a recently merged PR');
   });
 });
 

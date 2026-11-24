@@ -17,10 +17,11 @@ import {
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
-import { composeChiefSystemPrompt } from '../src/services/chief.js';
+import { composeChiefSystemPrompt, rewatchCreatingThread } from '../src/services/chief.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { flushSelfIssueWrites, updateAutonomousTodo } from '../src/services/todos.js';
+import { executeThreadMcpTool } from '../src/services/mcp-threads.js';
+import { flushSelfIssueWrites, getTodo, updateAutonomousTodo } from '../src/services/todos.js';
 import {
   bootServer,
   deliverCodeStep,
@@ -205,6 +206,84 @@ describe('A storage surface: create_todo orchestration source (#640 / r14 §5.3)
     await flushSelfIssueWrites();
     const row = s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get();
     expect(row?.sourceRef).toBe(`github:${REPO}#5`);
+  });
+
+  test('A2c github-issue-self todos created by a Coordinator thread remain traceable for rewatchCreatingThread and thread_pull_requests', async () => {
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      { teamId, login: 'octo', accessToken: 'ghp_orch_token', scope: 'repo' },
+    );
+    const res = await req(s.app, 'POST', '/api/projects', {
+      name: 'gh-trace',
+      kind: 'github',
+      githubRepo: REPO,
+    });
+    expect(res.status).toBe(201);
+    const ghProject = ((await res.json()) as { id: string }).id;
+    const created = (await relay(
+      'create_todo',
+      ownerTodo('修复自开发着陆', ghProject),
+      ghFetch,
+    )) as TodoWire;
+    expect(created.sourceKind).toBe('github-issue-self');
+    deliverCodeStep(
+      {
+        ...s.svc,
+        box: s.secretBox,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        githubFetch: ghFetch,
+      },
+      created.id,
+    );
+    await flushSelfIssueWrites();
+    s.db.update(chiefTable).set({ watches: [] }).where(eq(chiefTable.id, chiefId)).run();
+    const record = getTodo(s.svc, created.id);
+    expect(record?.sourceRef).toBe(`github:${REPO}#5`);
+    rewatchCreatingThread(
+      { db: s.db, hub: s.hub, machineHub: s.machineHub, user: s.user },
+      record!,
+    );
+    const watches = s.db.select().from(chiefTable).where(eq(chiefTable.id, chiefId)).get()?.watches;
+    expect(watches?.map((w) => [w.todoId, w.threadId])).toEqual([[created.id, threadId]]);
+
+    s.db.update(chiefTable).set({ watches: [] }).where(eq(chiefTable.id, chiefId)).run();
+    s.db
+      .insert(buildTable)
+      .values({
+        id: 'build-self-issue',
+        todoId: created.id,
+        withPlan: false,
+        triggerSource: 'user',
+        createdAt: nowMs(),
+        prNumber: 77,
+        prUrl: `https://github.com/${REPO}/pull/77`,
+      })
+      .run();
+    const prs = await executeThreadMcpTool(
+      {
+        db: s.db,
+        hub: s.hub,
+        convHub: s.convHub,
+        machineHub: s.machineHub,
+        box: s.secretBox,
+        user: s.user,
+        reposDir: s.reposDir,
+        attachmentsDir: s.attachmentsDir,
+        skillsDir: s.skillsDir,
+      },
+      teamId,
+      'thread_pull_requests',
+      { threadId },
+    );
+    expect(prs).toEqual([
+      {
+        threadId: created.id,
+        buildId: 'build-self-issue',
+        prUrl: `https://github.com/${REPO}/pull/77`,
+        prNumber: 77,
+      },
+    ]);
   });
 
   test('A2b a mail turn on a GitHub-connected project creates no GitHub issue', async () => {

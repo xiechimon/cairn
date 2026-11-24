@@ -160,10 +160,15 @@ interface FakeOpts {
   ahead?: number;
   workBranches?: string[];
   withNewMethods?: boolean;
+  headAfterStep?: string | null;
+  landedOnDefault?: boolean;
+  commitsSince?: boolean;
 }
 
 function fakeWorkspace(cwd: string, opts: FakeOpts) {
   const scanCalls: { base: string; sinceMs: number }[] = [];
+  const mutCalls: string[] = [];
+  let headReads = 0;
   const base: WorktreeOps = {
     async prepare() {
       mkdirSync(cwd, { recursive: true });
@@ -176,13 +181,19 @@ function fakeWorkspace(cwd: string, opts: FakeOpts) {
       };
     },
     async commitAll() {
+      mutCalls.push('commitAll');
       return { committed: false, head: 'def456', setupDrift: [] };
     },
-    async push() {},
+    async push() {
+      mutCalls.push('push');
+    },
     async mergeDefaultBranch() {
+      mutCalls.push('mergeDefaultBranch');
       return { output: 'Already up to date' };
     },
     async headCommit() {
+      headReads += 1;
+      if (headReads > 1 && opts.headAfterStep !== undefined) return opts.headAfterStep;
       return 'abc123';
     },
     async countAhead() {
@@ -202,9 +213,18 @@ function fakeWorkspace(cwd: string, opts: FakeOpts) {
         scanCalls.push({ base: baseCommit, sinceMs });
         return opts.workBranches ?? [];
       },
+      async fetchBranch() {
+        return true;
+      },
+      async isAncestor() {
+        return opts.landedOnDefault ?? false;
+      },
+      async hasCommitsSince() {
+        return opts.commitsSince ?? false;
+      },
     } satisfies Partial<WorktreeOps>);
   }
-  return { ws: base, scanCalls };
+  return { ws: base, scanCalls, mutCalls };
 }
 
 function doneBackend(): AgentBackend {
@@ -245,6 +265,7 @@ async function runOnce(opts: RunOpts): Promise<{
   body: MachineDoneBody;
   client: FakeClient;
   scanCalls: { base: string; sinceMs: number }[];
+  mutCalls: string[];
   lines: string[];
 }> {
   probeMock.mockReset();
@@ -257,7 +278,7 @@ async function runOnce(opts: RunOpts): Promise<{
   const client = new FakeClient();
   const journal = new StepJournal(paths.outboxDir);
   const backend = doneBackend();
-  const { ws, scanCalls } = fakeWorkspace(join(home, 'ws', 'conv-1'), opts.fake);
+  const { ws, scanCalls, mutCalls } = fakeWorkspace(join(home, 'ws', 'conv-1'), opts.fake);
   await runStep(
     {
       client,
@@ -273,7 +294,7 @@ async function runOnce(opts: RunOpts): Promise<{
     opts.claimed ?? claimedGithubStep(),
   );
   expect(client.doneBodies).toHaveLength(1);
-  return { body: client.doneBodies[0]!.body, client, scanCalls, lines };
+  return { body: client.doneBodies[0]!.body, client, scanCalls, mutCalls, lines };
 }
 
 function transcriptOf(client: FakeClient): TranscriptUpload['messages'] {
@@ -287,22 +308,46 @@ beforeEach(() => {
   vi.useRealTimers();
 });
 
-describe('#1195 closing drift detection and artifact-union surface', () => {
-  test('failure mode 1: HEAD on a drifted branch with commits on it → hasChanges=true + drift carried + named in the transcript', async () => {
-    const { body, client } = await runOnce({
+describe('observe-only closing on GitHub repos and passive branch/landing detection', () => {
+  test('HEAD on an agent-chosen branch with commits → observe-only, hasChanges=true, no drift warning, PR probed on that branch', async () => {
+    const { body, client, mutCalls } = await runOnce({
       fake: { headBranch: 'dogfood/tracer-1153', ahead: 1 },
+      probeByBranch: {
+        'dogfood/tracer-1153': {
+          number: 9,
+          url: 'https://github.com/octocat/Hello-World/pull/9',
+        },
+      },
     });
+    expect(mutCalls).toEqual([]);
     expect(body.status).toBe('success');
     expect(body.hasChanges).toBe(true);
-    expect(body.workBranchDrift).toEqual({ expected: CONV_BRANCH, actual: 'dogfood/tracer-1153' });
-    const driftRow = transcriptOf(client).find((m) => m.id === 'branch-drift-s1');
-    expect(driftRow).toBeDefined();
-    expect(driftRow?.content).toContain('dogfood/tracer-1153');
-    expect(driftRow?.content).toContain(CONV_BRANCH);
+    expect(body.workBranchDrift).toBeUndefined();
+    expect(body.prNumber).toBe(9);
+    expect(transcriptOf(client).find((m) => m.id === 'branch-drift-s1')).toBeUndefined();
+  });
+
+  test('commits landed directly onto origin/main (e.g. via push-queue) → hasChanges=true and landed note recorded', async () => {
+    const { body, client, mutCalls } = await runOnce({
+      fake: {
+        headBranch: CONV_BRANCH,
+        ahead: 0,
+        headAfterStep: 'landed7890abcdef1234567890abcdef12345678',
+        landedOnDefault: true,
+        commitsSince: true,
+      },
+    });
+    expect(mutCalls).toEqual([]);
+    expect(body.status).toBe('success');
+    expect(body.hasChanges).toBe(true);
+    expect(body.workBranchDrift).toBeUndefined();
+    const landedRow = transcriptOf(client).find((m) => m.id === 'landed-s1');
+    expect(landedRow?.content).toContain('landed7');
+    expect(landedRow?.content).toContain('origin/main');
   });
 
   test('failure mode 2 (accident shape): HEAD switched back to the session branch, self-created branch keeps new commits → claimed by the union surface + PR backfilled to the candidate head', async () => {
-    const { body } = await runOnce({
+    const { body, mutCalls } = await runOnce({
       fake: { headBranch: CONV_BRANCH, ahead: 0, workBranches: ['dogfood/tracer-1153'] },
       probeByBranch: {
         'dogfood/tracer-1153': {
@@ -311,6 +356,7 @@ describe('#1195 closing drift detection and artifact-union surface', () => {
         },
       },
     });
+    expect(mutCalls).toEqual([]);
     expect(body.hasChanges).toBe(true);
     expect(body.workBranchDrift).toBeUndefined();
     expect(body.prUrl).toBe('https://github.com/octocat/Hello-World/pull/5');
@@ -320,12 +366,13 @@ describe('#1195 closing drift detection and artifact-union surface', () => {
     expect(heads).toContain('dogfood/tracer-1153');
   });
 
-  test('failure mode 3: HEAD drifted with commits nowhere → hasChanges=false + drift carried (gate names it on the input surface)', async () => {
-    const { body } = await runOnce({
+  test('failure mode 3: HEAD on another branch with commits nowhere → hasChanges=false and no drift error', async () => {
+    const { body, mutCalls } = await runOnce({
       fake: { headBranch: 'dogfood/empty', ahead: 0, workBranches: [] },
     });
+    expect(mutCalls).toEqual([]);
     expect(body.hasChanges).toBe(false);
-    expect(body.workBranchDrift).toEqual({ expected: CONV_BRANCH, actual: 'dogfood/empty' });
+    expect(body.workBranchDrift).toBeUndefined();
   });
 
   test('failure mode 4: no drift and no commits → hasChanges=false and no drift field (current behavior pinned)', async () => {

@@ -361,30 +361,44 @@ describe('runner delivery surface reporting (#704)', () => {
 });
 
 describe('#1829 closing push report', () => {
-  test('a local hook rejection reports recovery input and still discovers the agent-opened PR', async () => {
+  test('a local hook rejection on a hosted build reports recovery input', async () => {
     const body = await runOnce({
-      claimed: claimedGithubStep(),
-      probe: { number: 1829, url: 'https://github.com/octocat/Hello-World/pull/1829' },
+      claimed: claimedHostedStep(),
+      probe: null,
       diff: SAMPLE_DIFF,
       pushError: new GitPushHookError('lint stdout\nlint stderr'),
     });
     expect(body).toMatchObject({
       status: 'success',
       pushHookOutput: 'lint stdout\nlint stderr',
-      prNumber: 1829,
       hasChanges: true,
     });
     expect(body.errorMessage).toBeUndefined();
   });
 
-  test('an ordinary push error still fails the step', async () => {
+  test('an ordinary push error on a hosted build still fails the step', async () => {
     const body = await runOnce({
-      claimed: claimedGithubStep(),
+      claimed: claimedHostedStep(),
       probe: null,
       diff: SAMPLE_DIFF,
       pushError: new Error('Connection refused'),
     });
     expect(body).toMatchObject({ status: 'failed', errorMessage: 'Connection refused' });
     expect(body.pushHookOutput).toBeUndefined();
+  });
+
+  test('a github build step observes without invoking closing push and still discovers an opened PR', async () => {
+    const body = await runOnce({
+      claimed: claimedGithubStep(),
+      probe: { number: 1829, url: 'https://github.com/octocat/Hello-World/pull/1829' },
+      diff: SAMPLE_DIFF,
+      pushError: new Error('closing push should not run on github build steps'),
+    });
+    expect(body).toMatchObject({
+      status: 'success',
+      prNumber: 1829,
+      hasChanges: true,
+    });
+    expect(body.errorMessage).toBeUndefined();
   });
 });

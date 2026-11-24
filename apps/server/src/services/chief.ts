@@ -1254,11 +1254,33 @@ export function addChiefWatch(
   appendChiefWatch(deps, ensureChief(deps, input.teamId), input);
 }
 
+export function creatingThreadIdOf(
+  record: Pick<TodoRecord, 'sourceKind' | 'sourceRef' | 'request'>,
+): string | null {
+  if (record.sourceKind === 'orchestration') {
+    return record.sourceRef !== null
+      ? (parseOrchestrationSourceRef(record.sourceRef)?.threadId ?? null)
+      : null;
+  }
+  if (record.sourceKind === 'github-issue-self') {
+    const fromRef =
+      record.sourceRef !== null
+        ? (parseOrchestrationSourceRef(record.sourceRef)?.threadId ?? null)
+        : null;
+    if (fromRef !== null) return fromRef;
+    for (const segment of record.request?.segments ?? []) {
+      if (segment.source.kind === 'chat' || segment.source.kind === 'answer') {
+        return segment.source.threadId;
+      }
+    }
+  }
+  return null;
+}
+
 export function rewatchCreatingThread(deps: ChiefDeps, record: TodoRecord): void {
-  if (record.sourceKind !== 'orchestration' || record.sourceRef === null) return;
-  const threadId = parseOrchestrationSourceRef(record.sourceRef)?.threadId;
-  const threadRow = threadId === undefined ? undefined : getChiefThread(deps, threadId);
-  if (threadId === undefined || threadRow === undefined || threadRow.archivedAt !== null) return;
+  const threadId = creatingThreadIdOf(record);
+  const threadRow = threadId === null ? undefined : getChiefThread(deps, threadId);
+  if (threadId === null || threadRow === undefined || threadRow.archivedAt !== null) return;
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   const projectRow = deps.db
     .select({ name: project.name })
