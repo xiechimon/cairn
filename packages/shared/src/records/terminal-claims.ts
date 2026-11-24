@@ -1,3 +1,5 @@
+import { escapeRegExp } from '../text.js';
+
 export type TerminalOutcome = 'merged' | 'landed' | 'pushed' | 'deployed' | 'tests';
 
 export type MergeRecord = 'none' | 'in-flight' | 'done' | 'failed';
@@ -82,8 +84,6 @@ const CLAIM_PHRASES: readonly ClaimPhrase[] = [
 const LATIN_PHRASE = /^[a-z ]+$/i;
 
 const isLatinPhrase = (text: string): boolean => LATIN_PHRASE.test(text);
-
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 interface ClaimPattern {
   outcome: TerminalOutcome;

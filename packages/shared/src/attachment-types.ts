@@ -127,6 +127,16 @@ const UNSAFE_DECLARED_TEXT = new Set([
 
 export const ATTACHMENT_FALLBACK_MIME = 'application/octet-stream';
 
+export function isValidFileName(fileName: string): boolean {
+  if (fileName.length === 0 || fileName.length > 200) return false;
+  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) return false;
+  if (fileName === '.' || fileName === '..') return false;
+  for (let i = 0; i < fileName.length; i += 1) {
+    if (fileName.charCodeAt(i) < 0x20) return false;
+  }
+  return true;
+}
+
 export function attachmentExtOf(fileName: string): string {
   const lastDot = fileName.lastIndexOf('.');
   if (lastDot < 0 || lastDot === fileName.length - 1) return '';

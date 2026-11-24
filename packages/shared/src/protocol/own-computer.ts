@@ -1,4 +1,5 @@
 import type { RemoteToolDef } from './chief-tools.js';
+import { toolObjectSchema as obj, toolStringSchema as str } from './tool-parameters.js';
 
 export const OWN_COMPUTER_TOOL_NAMES = [
   'user_computer_shell',
@@ -189,13 +190,6 @@ export const OWN_COMPUTER_NO_MAC =
   'No Mac with the Cairn app is connected, so the agent cannot use one now. Nothing ran.';
 export const OWN_COMPUTER_NO_ACCESSIBILITY = (mac: string) =>
   `Cairn lacks the macOS Accessibility permission on ${mac}; the user grants it in Settings, Computers. Nothing ran.`;
-
-const str = (description: string) => ({ type: 'string', description });
-const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
-  type: 'object',
-  properties,
-  ...(required.length > 0 ? { required } : {}),
-});
 
 const OWN_MAC_SCOPE =
   "The user's own Mac, not your VM computer. Use it when the work lives on their Mac (their apps, files, projects or signed-in sessions); use the VM computer for websites the VM browser can open. Every call is logged and shown to the user in the conversation.";

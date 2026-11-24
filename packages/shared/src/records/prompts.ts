@@ -588,7 +588,7 @@ export function orchestrateThreadTitle(seqNum: number): string {
   return chiefThreadTitle(orchestratePromptHead(seqNum));
 }
 
-function wrappedBy(text: string, head: string, tail: string): boolean {
+export function wrappedBy(text: string, head: string, tail: string): boolean {
   return text.length >= head.length + tail.length && text.startsWith(head) && text.endsWith(tail);
 }
 

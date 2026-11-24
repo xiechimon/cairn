@@ -15,6 +15,7 @@ import {
 import { dirname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { COMPUTER_PRESENCE_LIMIT, type ComputerPresence } from '@cairn/shared';
+import { pidAlive } from '@cairn/shared/parent-watch';
 import { z } from 'zod';
 import { childEnv } from '../child-env.js';
 import {
@@ -157,15 +158,6 @@ const savedLogin = z.object({
 });
 
 const sessionList = z.object({ data: z.object({ sessions: z.array(z.string()) }) });
-
-function processAlive(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return (error as NodeJS.ErrnoException).code === 'EPERM';
-  }
-}
 
 async function browserCommand(
   provider: HostComputerProvider,
@@ -551,7 +543,7 @@ export class HostDesktops implements ComputerDesktops {
       const pid = Number(owner.slice(owner.lastIndexOf('-') + 1));
       if (!Number.isInteger(pid) || pid <= 0)
         throw new ComputerRefusal('The browser profile lock is invalid');
-      if (!processAlive(pid)) return;
+      if (!pidAlive(pid)) return;
       if (this.now() >= deadline) throw new ComputerRefusal('The agent browser did not close');
       await sleep(100);
     }

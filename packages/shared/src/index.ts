@@ -53,6 +53,7 @@ export * from './subscription-list.js';
 export * from './tables.js';
 export * from './task-failure.js';
 export * from './task-meta.js';
+export * from './text.js';
 export * from './thinking-binding.js';
 export * from './thinking-levels.js';
 export * from './token-estimate.js';

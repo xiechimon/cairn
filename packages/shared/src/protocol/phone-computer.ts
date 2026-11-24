@@ -6,6 +6,7 @@ import {
   machinePhoneReportSchema,
 } from '../records/machine-capabilities.js';
 import type { RemoteToolDef } from './chief-tools.js';
+import { toolObjectSchema as obj, toolStringSchema as str } from './tool-parameters.js';
 
 export const PHONE_TOOL_NAMES = ['phone_observe', 'phone_act', 'phone_manage'] as const;
 export type PhoneTool = (typeof PHONE_TOOL_NAMES)[number];
@@ -167,14 +168,6 @@ export const PHONE_HANDED_BACK =
 
 export const PHONE_CONSENT_TEXT =
   'Pairing lets the Coordinator see and control this phone like a computer. Everything on its screen — private messages, photos, signed-in accounts — is captured as screenshots and element text and sent to the model provider, the same provider as your other Coordinator work. The agent asks before sending messages, paying or changing settings; the lock screen, Face ID and payment screens are always yours. You can remove the phone any time in Settings.';
-
-const str = (description: string) => ({ type: 'string', description });
-const int = (description: string) => ({ type: 'integer', description });
-const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
-  type: 'object',
-  properties,
-  ...(required.length > 0 ? { required } : {}),
-});
 
 const PHONE_SCOPE =
   "The owner's real phone, not your VM computer or their Mac. Everything on its screen is captured and sent to the model provider. Ask the owner first with ask_user before any action that sends a message or mail, pays or orders, or changes a system or account setting. The lock screen, secure (blank-capture) screens, biometrics prompts and payment sheets are always the owner's: call request_takeover there instead of acting.";

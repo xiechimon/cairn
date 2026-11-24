@@ -1,4 +1,5 @@
 import {
+  escapeRegExp,
   TEAM_MEMORY_MAX_CHARS,
   TEAM_MEMORY_RETIRE_AFTER_DAYS,
   TEAM_MEMORY_RETIRE_MAX_SHARE,
@@ -22,10 +23,6 @@ export function teamMemoryLines(content: string): string[] {
 
 export function teamMemoryChars(content: string): number {
   return Array.from(content).length;
-}
-
-function escapeRegExp(text: string) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function mentionedProject(db: Db | Tx, teamId: string, text: string) {

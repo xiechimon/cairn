@@ -12,6 +12,7 @@ import {
   ATTACHMENT_MAX_BYTES,
   attachmentExtOf,
   attachmentKindOf,
+  isValidFileName,
   resolveAttachmentMime,
 } from '@cairn/shared';
 import { and, eq, or } from 'drizzle-orm';
@@ -31,17 +32,7 @@ import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-
 
 const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
-export { attachmentExtOf as extOf } from '@cairn/shared';
-
-export function isValidFileName(fileName: string): boolean {
-  if (fileName.length === 0 || fileName.length > 200) return false;
-  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) return false;
-  if (fileName === '.' || fileName === '..') return false;
-  for (let i = 0; i < fileName.length; i += 1) {
-    if (fileName.charCodeAt(i) < 0x20) return false;
-  }
-  return true;
-}
+export { attachmentExtOf as extOf, isValidFileName } from '@cairn/shared';
 
 export interface GrantInput {
   fileName: string;

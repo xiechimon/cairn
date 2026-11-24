@@ -15,6 +15,11 @@ import {
 import { isInfoOutput, todoOutputSchema } from '../records/todo.js';
 import { PICKED_PROJECT_OPEN } from '../turn-context.js';
 import { COMPUTER_IMAGES_MAX, computerImageSchema } from './computer.js';
+import {
+  toolArraySchema as arr,
+  toolObjectSchema as obj,
+  toolStringSchema as str,
+} from './tool-parameters.js';
 
 export const remoteToolDefSchema = z.object({
   name: z.string(),
@@ -136,14 +141,7 @@ export const CHIEF_TOOL_NAMES: readonly string[] = Object.values(CHIEF_TOOL_CATE
   .flat()
   .sort();
 
-const str = (description: string) => ({ type: 'string', description });
-const arr = (items: unknown, description: string) => ({ type: 'array', items, description });
 const idArr = (description: string) => arr({ type: 'string' }, description);
-const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
-  type: 'object',
-  properties,
-  ...(required.length > 0 ? { required } : {}),
-});
 const num = (description: string) => ({ type: 'number', description });
 const PROVENANCE_PARAM =
   'What caused this message. Required in event turns (prompt starts with [wake:…]): copy the value after provenance= on the first prompt line. Omit in turns the user started.';

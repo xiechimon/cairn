@@ -1,5 +1,7 @@
-import { ATTACHMENT_MAX_BYTES, resolveAttachmentMime } from '@cairn/shared';
+import { ATTACHMENT_MAX_BYTES, isValidFileName, resolveAttachmentMime } from '@cairn/shared';
 import { fetchWithSession } from './auth.js';
+
+export { isValidFileName };
 
 const MAX_BYTES = ATTACHMENT_MAX_BYTES;
 
@@ -13,16 +15,6 @@ export class AttachmentError extends Error {
     this.name = 'AttachmentError';
     this.reason = reason;
   }
-}
-
-export function isValidFileName(fileName: string): boolean {
-  if (fileName.length === 0 || fileName.length > 200) return false;
-  if (fileName.includes('/') || fileName.includes('\\') || fileName.includes('\0')) return false;
-  if (fileName === '.' || fileName === '..') return false;
-  for (let i = 0; i < fileName.length; i += 1) {
-    if (fileName.charCodeAt(i) < 0x20) return false;
-  }
-  return true;
 }
 
 export interface AttachFileInput {
