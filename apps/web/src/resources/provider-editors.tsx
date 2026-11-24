@@ -10,6 +10,7 @@ import {
 import { cn } from 'cn';
 import { Download, Play, Server, X } from 'lucide-react';
 import { type ReactNode, useRef, useState } from 'react';
+import { keepNewerProvider } from '../api/provider-freshness.js';
 import { relativeTime } from '../board/rel-time.js';
 import { AnthropicMark } from '../components/brand-marks.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
@@ -28,6 +29,15 @@ import { Input } from '../components/ui/input.js';
 import { Popover, PopoverContent } from '../components/ui/popover.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
+import {
+  dropModelCheck,
+  type ModelCheck,
+  type ModelChecks,
+  recordModelResult,
+  retireModelChecks,
+  selectVisibleChecks,
+  startModelChecks,
+} from './provider-check-state.js';
 import { presetMarkOf } from './provider-preset-icon.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
@@ -150,16 +160,12 @@ export interface ProviderEditActions {
     body: Partial<Pick<ProviderRecord, 'label' | 'baseUrl' | 'models'>> & {
       apiKey?: string;
     },
-  ) => Promise<unknown>;
+  ) => Promise<ProviderRecord>;
+  latest?: () => ProviderRecord | undefined;
   test?: (model: string) => Promise<ProviderTestResult>;
   listUpstream?: () => Promise<UpstreamModelsResult>;
   remove?: () => void;
 }
-
-export type ModelCheck =
-  | { phase: 'running' }
-  | { phase: 'done'; result: ProviderTestResult; at: number }
-  | { phase: 'unavailable'; at: number };
 
 export const FAILURE_SHORT: Record<ProviderFailure, string> = {
   auth: 'API key 无效',
@@ -299,51 +305,105 @@ interface ModelReport {
   open: boolean;
 }
 
+interface ModelTestState {
+  fingerprint: string | undefined;
+  checks: ModelChecks;
+  report: ModelReport | null;
+}
+
 export function useModelTests(
   test: ((model: string) => Promise<ProviderTestResult>) | undefined,
   concurrency: number,
+  configuration?: { fingerprint: string | undefined },
 ) {
-  const [checks, setChecks] = useState<Record<string, ModelCheck>>({});
-  const [report, setReport] = useState<ModelReport | null>(null);
-  const generation = useRef(0);
+  const currentFingerprint = configuration?.fingerprint;
+  const [{ fingerprint, checks, report }, setState] = useState<ModelTestState>({
+    fingerprint: currentFingerprint,
+    checks: new Map(),
+    report: null,
+  });
+  if (fingerprint !== currentFingerprint) {
+    const remaining = retireModelChecks(checks, fingerprint);
+    setState({
+      fingerprint: currentFingerprint,
+      checks: remaining,
+      report:
+        remaining === checks ||
+        report?.ids.some((id) =>
+          [...remaining.values()].some((models) => Object.hasOwn(models, id)),
+        )
+          ? report
+          : null,
+    });
+  }
+  const resetEpoch = useRef(0);
   const reset = () => {
-    generation.current += 1;
-    setChecks({});
-    setReport(null);
+    resetEpoch.current += 1;
+    setState({ fingerprint: currentFingerprint, checks: new Map(), report: null });
   };
-  const run = async (ids: readonly string[], anchor: Element | null) => {
-    if (test === undefined || ids.length === 0) return;
-    const started = generation.current;
-    setReport({ ids, anchor, open: true });
-    setChecks((prev) => ({
+  const run = async (
+    ids: readonly string[],
+    anchor: Element | null,
+    testModels = test,
+    configurationFingerprint = configuration?.fingerprint,
+  ) => {
+    if (testModels === undefined || ids.length === 0) return;
+    const started = resetEpoch.current;
+    const pending = { phase: 'running' } as const;
+    setState((prev) => ({
       ...prev,
-      ...Object.fromEntries(ids.map((id) => [id, { phase: 'running' }])),
+      report: { ids, anchor, open: true },
+      checks: startModelChecks(
+        prev.checks,
+        configurationFingerprint,
+        Object.fromEntries(ids.map((id) => [id, pending])),
+      ),
     }));
     const queue = [...ids];
     const worker = async () => {
       for (let id = queue.shift(); id !== undefined; id = queue.shift()) {
         const model = id;
-        const outcome: ModelCheck = await test(model).then(
+        const outcome: Exclude<ModelCheck, { phase: 'running' }> = await testModels(model).then(
           (result) => ({ phase: 'done', result, at: Date.now() }),
-          () => ({
-            phase: 'unavailable',
-            at: Date.now(),
-          }),
+          () => ({ phase: 'unavailable', at: Date.now() }),
         );
-        if (generation.current === started) setChecks((prev) => ({ ...prev, [model]: outcome }));
+        if (resetEpoch.current === started) {
+          setState((prev) => ({
+            ...prev,
+            checks: recordModelResult(
+              prev.checks,
+              configurationFingerprint,
+              model,
+              pending,
+              outcome,
+              configuration !== undefined,
+            ),
+          }));
+        }
       }
     };
     await Promise.all(Array.from({ length: Math.min(concurrency, ids.length) }, worker));
-    if (generation.current === started) {
-      setReport((prev) => (prev?.ids === ids ? { ...prev, open: true } : prev));
+    if (resetEpoch.current === started) {
+      setState((prev) =>
+        prev.report?.ids === ids ? { ...prev, report: { ...prev.report, open: true } } : prev,
+      );
     }
   };
   const drop = (id: string) => {
-    setChecks(({ [id]: _, ...rest }) => rest);
-    setReport((prev) => (prev?.ids.includes(id) ? null : prev));
+    setState((prev) => ({
+      ...prev,
+      checks: dropModelCheck(prev.checks, id),
+      report: prev.report?.ids.includes(id) ? null : prev.report,
+    }));
   };
-  const close = () => setReport((prev) => (prev === null ? null : { ...prev, open: false }));
-  return { checks, report, run, reset, drop, close };
+  const close = () =>
+    setState((prev) =>
+      prev.report === null ? prev : { ...prev, report: { ...prev.report, open: false } },
+    );
+  const visible = selectVisibleChecks(checks, currentFingerprint);
+  const visibleReport =
+    report?.ids.some((id) => Object.hasOwn(visible, id)) === true ? report : null;
+  return { checks: visible, report: visibleReport, run, reset, drop, close };
 }
 
 export function ModelTestReport({
@@ -444,7 +504,6 @@ export function ModelTestReport({
 export function ModelChip({
   id,
   dead,
-  needsUpdate = false,
   check,
   busy,
   meta,
@@ -454,7 +513,6 @@ export function ModelChip({
 }: {
   id: string;
   dead: boolean;
-  needsUpdate?: boolean;
   meta?: ReactNode;
   testId?: string;
   check: ModelCheck | undefined;
@@ -485,11 +543,6 @@ export function ModelChip({
       </span>
       {meta}
       {dead && <span className="flex-none text-meta text-content-tertiary">{t('已下架')}</span>}
-      {!dead && needsUpdate && (
-        <span data-slot="needs-update" className="flex-none text-meta text-content-tertiary">
-          {t('需要更新 Cairn')}
-        </span>
-      )}
       {onTest !== undefined && (
         <IconTooltip
           label={t('测试 {name}', { name: id })}
@@ -546,45 +599,80 @@ export function TeamProviderEditor({
   const [models, setModels] = useState(record.models);
   const [savedModels, setSavedModels] = useState(record.models);
   const [savingModels, setSavingModels] = useState(false);
+  const modelEdits = useRef<{
+    saved: ProviderRecord | null;
+    pending: number;
+    tail: Promise<void>;
+  }>({ saved: null, pending: 0, tail: Promise.resolve() });
+  const newest = useRef(record);
+  const cached = keepNewerProvider(newest.current, record);
+  newest.current =
+    modelEdits.current.saved === null
+      ? cached
+      : keepNewerProvider(cached, modelEdits.current.saved);
   const test = actions.test;
-  const tests = useModelTests(test, TEST_CONCURRENCY);
+  const fingerprint = newest.current.configurationFingerprint;
+  const tests = useModelTests(test, TEST_CONCURRENCY, { fingerprint });
   const { checks } = tests;
   const testAllRef = useRef<HTMLButtonElement>(null);
-  const connection = `${record.api}|${record.baseUrl}|${record.authHeader}`;
-  const [checkedConnection, setCheckedConnection] = useState(connection);
-  if (checkedConnection !== connection) {
-    setCheckedConnection(connection);
-    tests.reset();
-  }
-  if (savedModels !== record.models && !savingModels) {
-    setSavedModels(record.models);
-    setModels(record.models);
+  if (savedModels !== newest.current.models) {
+    setSavedModels(newest.current.models);
+    if (!savingModels) setModels(newest.current.models);
   }
   const oauth = isOAuthPreset(record.providerId);
   const fire = (body: Parameters<NonNullable<ProviderEditActions['patch']>>[0]) => {
-    if (body.apiKey !== undefined || body.baseUrl !== undefined) tests.reset();
-    void actions.patch?.(body).catch(() => undefined);
+    const reconnect = body.baseUrl !== undefined || body.apiKey !== undefined;
+    void actions.patch?.(body).then(
+      (saved) => {
+        if (reconnect && saved.configurationFingerprint === undefined) tests.reset();
+      },
+      () => undefined,
+    );
   };
-  const saveModels = (next: ProviderRecord['models']) => {
-    if (actions.patch === undefined) return Promise.resolve(false);
-    setModels(next);
+  const saveModels = (edit: (saved: ProviderRecord['models']) => ProviderRecord['models']) => {
+    const patch = actions.patch;
+    if (patch === undefined) return Promise.resolve(undefined);
+    const queue = modelEdits.current;
+    queue.pending += 1;
     setSavingModels(true);
-    return actions
-      .patch({ models: next })
-      .then(() => true)
-      .catch(() => {
-        setModels(record.models);
-        return false;
-      })
-      .finally(() => setSavingModels(false));
+    const pending = queue.tail.then(async () => {
+      const freshest = () =>
+        keepNewerProvider(actions.latest?.() ?? newest.current, newest.current);
+      const base = freshest();
+      const next = edit(base.models);
+      setModels(next);
+      try {
+        const response = await patch({ models: next });
+        const saved = keepNewerProvider(freshest(), response);
+        newest.current = saved;
+        queue.saved = saved;
+        setModels(saved.models);
+        return saved;
+      } catch {
+        setModels(newest.current.models);
+        return undefined;
+      } finally {
+        queue.pending -= 1;
+        setSavingModels(queue.pending > 0);
+      }
+    });
+    queue.tail = pending.then(() => undefined);
+    return pending;
   };
   const removeModel = (id: string) => {
-    void saveModels(models.filter((m) => m.id !== id));
+    void saveModels((saved) => saved.filter((model) => model.id !== id));
     tests.drop(id);
   };
   const ids = models.map((m) => m.id);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const summary = ids.length === 0 ? null : t('{n} 个', { n: ids.length });
+  const retired = models.filter((model) => deadModels.has(model.id)).length;
+  const summary =
+    ids.length === 0
+      ? null
+      : [
+          t('{n} 个', { n: ids.length }),
+          ...(retired === 0 ? [] : [`${t('已下架')} · ${t('{n} 个模型', { n: retired })}`]),
+        ].join(' · ');
   return (
     <>
       <ProviderEditorHead
@@ -700,14 +788,22 @@ export function TeamProviderEditor({
           selected={ids}
           load={actions.listUpstream}
           onClose={() => setPicking(false)}
-          onSave={(next, names) => {
+          onSave={(next, names, base) => {
             setPicking(false);
-            const byId = new Map(models.map((m) => [m.id, m]));
-            const added = next.filter((id) => !byId.has(id));
-            void saveModels(
-              next.map((id) => byId.get(id) ?? { id, name: names.get(id) ?? id }),
-            ).then((saved) => {
-              if (saved) void tests.run(added, testAllRef.current);
+            const baseIds = new Set(base);
+            const picked = new Set(next);
+            const added = next.filter((id) => !baseIds.has(id));
+            const removed = new Set(base.filter((id) => !picked.has(id)));
+            void saveModels((saved) => {
+              const merged = saved.filter((model) => !removed.has(model.id));
+              const held = new Set(merged.map((model) => model.id));
+              for (const id of added) {
+                if (!held.has(id)) merged.push({ id, name: names.get(id) ?? id });
+              }
+              return merged;
+            }).then((saved) => {
+              if (saved !== undefined && test !== undefined)
+                void tests.run(added, testAllRef.current, test, saved.configurationFingerprint);
             });
           }}
         />

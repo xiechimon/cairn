@@ -1,8 +1,8 @@
 import {
   type ProviderFailure,
-  type ProviderTestResult,
-  providerTestResultSchema,
   redactSecrets,
+  type TeamProviderTestResult,
+  teamProviderTestResultSchema,
   type UpstreamModelsResult,
   upstreamModelsResultSchema,
 } from '@cairn/shared';
@@ -12,6 +12,11 @@ import { provider } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { providerAccessToken } from './provider-access-token.js';
+import {
+  providerConfigurationFingerprint,
+  providerCredentialId,
+  publicProviderCompat,
+} from './provider-configuration.js';
 import { openProviderKey, type ProviderDeps } from './providers.js';
 import { failureForStatus, fetchUpstreamModels } from './upstream-models.js';
 
@@ -108,8 +113,9 @@ export function testedModel(
 export async function testProviderConnection(
   deps: TestDeps,
   input: { teamId: string; id: string; model?: string },
-): Promise<ProviderTestResult> {
+): Promise<TeamProviderTestResult> {
   const row = providerRow(deps, input.teamId, input.id);
+  const credentialId = providerCredentialId(row);
   const model = testedModel(row.models, input.model);
   deps.limiter?.take(`${row.id}\u0000${model ?? ''}`);
   let apiKey: string | null = null;
@@ -119,7 +125,12 @@ export async function testProviderConnection(
   let errorBody: string | null = null;
   let latencyMs: number | null = null;
   try {
-    apiKey = await accessKey(deps, input.teamId, row.providerId);
+    const resolved = await accessKey(deps, input.teamId, row.providerId);
+    const current = providerRow(deps, input.teamId, input.id);
+    if (providerCredentialId(current) !== credentialId) {
+      throw new Error('Provider credential changed during resolution');
+    }
+    apiKey = resolved;
     if (model === undefined) {
       failure = 'no-model';
       reason = 'No model is configured. Add a model and try again.';
@@ -145,7 +156,7 @@ export async function testProviderConnection(
           baseUrl: row.baseUrl,
           api: row.api,
           authHeader: row.authHeader,
-          compat: row.compat,
+          compat: publicProviderCompat(row.compat),
           models: row.models,
         },
         apiKey,
@@ -170,7 +181,8 @@ export async function testProviderConnection(
   }
   const secrets = apiKey === null ? [] : [apiKey];
   const scrubbedReason = redactSecrets(reason, secrets).value;
-  return providerTestResultSchema.parse({
+  return teamProviderTestResultSchema.parse({
+    configurationFingerprint: providerConfigurationFingerprint(row, credentialId),
     status: redactSecrets(reason === null ? 'ok' : 'failed').value,
     reason:
       typeof scrubbedReason === 'string'

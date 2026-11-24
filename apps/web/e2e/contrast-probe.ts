@@ -1,14 +1,16 @@
 import type { Page } from '@playwright/test';
 
 export interface LowContrast {
-  kind: 'text' | 'kbd' | 'disabled' | 'placeholder';
+  kind: 'text' | 'kbd' | 'disabled' | 'placeholder' | 'glyph';
   text: string;
   ratio: number;
   need: number;
 }
 
-export function findLowContrast(page: Page): Promise<LowContrast[]> {
-  return page.evaluate(() => {
+export function findLowContrast(page: Page, selector = 'body'): Promise<LowContrast[]> {
+  return page.evaluate((selector) => {
+    const root = document.querySelector(selector);
+    if (root === null) throw new Error(`contrast target not found: ${selector}`);
     type Rgba = [number, number, number, number];
     const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
     if (!ctx) throw new Error('canvas 2d unavailable');
@@ -57,7 +59,7 @@ export function findLowContrast(page: Page): Promise<LowContrast[]> {
       const ratio = (hi + 0.05) / (lo + 0.05);
       const size = Number.parseFloat(style.fontSize);
       const large = size >= 24 || (Number(style.fontWeight) >= 700 && size >= 18.66);
-      const need = kind === 'disabled' || large ? 3 : 4.5;
+      const need = kind === 'disabled' || kind === 'glyph' || large ? 3 : 4.5;
       const key = `${kind}|${text}`;
       if (ratio < need && !seen.has(key)) {
         seen.add(key);
@@ -65,7 +67,10 @@ export function findLowContrast(page: Page): Promise<LowContrast[]> {
       }
     };
 
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    for (const mark of root.querySelectorAll('[data-testid="provider-status-mark"][role="img"]')) {
+      check(mark, getComputedStyle(mark).color, 'glyph', mark.getAttribute('aria-label') ?? 'Provider status');
+    }
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       const text = node.textContent?.trim();
       const el = node.parentElement;
@@ -75,16 +80,16 @@ export function findLowContrast(page: Page): Promise<LowContrast[]> {
       const kind = inKbd ? 'kbd' : el.closest(':disabled, [aria-disabled="true"]') ? 'disabled' : 'text';
       check(el, getComputedStyle(el).color, kind, text);
     }
-    for (const mirror of document.querySelectorAll('[data-testid="mention-highlight"]')) {
+    for (const mirror of root.querySelectorAll('[data-testid="mention-highlight"]')) {
       for (const span of mirror.querySelectorAll('span')) {
         const text = span.textContent?.replace(/\u200b/g, '').trim();
         if (text) check(span, getComputedStyle(span).color, 'text', text);
       }
     }
-    for (const el of document.querySelectorAll('input[placeholder], textarea[placeholder]')) {
+    for (const el of root.querySelectorAll('input[placeholder], textarea[placeholder]')) {
       const placeholder = el.getAttribute('placeholder');
       if (placeholder) check(el, getComputedStyle(el, '::placeholder').color, 'placeholder', placeholder);
     }
     return found;
-  });
+  }, selector);
 }

@@ -1,52 +1,31 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
+import { mockLive } from './chief-home-mock';
+import { findLowContrast } from './contrast-probe.js';
 
 const HOME = '/app?scenario=home-c';
 
 const panel = (page: Page) => page.getByRole('complementary', { name: '任务' });
 
-const toLinear = (v: number) => {
-  const s = v / 255;
-  return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-};
-const luminance = ([r, g, b]: number[]) =>
-  0.2126 * toLinear(r as number) + 0.7152 * toLinear(g as number) + 0.0722 * toLinear(b as number);
-const ratio = (a: number[], b: number[]) => {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => (y as number) - (x as number));
-  return ((hi as number) + 0.05) / ((lo as number) + 0.05);
-};
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    document.addEventListener('DOMContentLoaded', () => {
+      const style = document.createElement('style');
+      style.textContent = '*, *::before, *::after { transition: none !important; }';
+      document.head.append(style);
+    }, { once: true });
+  });
+});
 
-async function painted(el: Locator, prop: 'color' | 'background-color') {
-  return el.evaluate((node, key) => {
-    const ctx = document.createElement('canvas').getContext('2d');
-    if (ctx === null) throw new Error('no 2d context');
-    ctx.fillStyle = getComputedStyle(node).getPropertyValue(key);
-    ctx.fillRect(0, 0, 1, 1);
-    const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-    return [r as number, g as number, b as number];
-  }, prop);
-}
-
-async function backplate(el: Locator) {
-  return el.evaluate((node) => {
-    const layers: number[][] = [];
-    for (let cur: HTMLElement | null = node; cur !== null; cur = cur.parentElement) {
-      const match = /rgba?\(([^)]+)\)/.exec(getComputedStyle(cur).backgroundColor);
-      if (match === null) continue;
-      const parts = match[1]!.split(/[\s,/]+/).filter(Boolean).map(Number);
-      const alpha = parts.length === 4 ? (parts[3] as number) : 1;
-      if (alpha === 0) continue;
-      layers.push([parts[0] as number, parts[1] as number, parts[2] as number, alpha]);
-      if (alpha === 1) break;
-    }
-    let r = 255;
-    let g = 255;
-    let b = 255;
-    for (const [lr, lg, lb, la] of layers.reverse()) {
-      r = (lr as number) * (la as number) + r * (1 - (la as number));
-      g = (lg as number) * (la as number) + g * (1 - (la as number));
-      b = (lb as number) * (la as number) + b * (1 - (la as number));
-    }
-    return [Math.round(r), Math.round(g), Math.round(b)];
+for (const background of [
+  'oklab(0% 0 0 / 90%)',
+  'color-mix(in oklab, black 90%, transparent)',
+]) {
+  test(`A3: the contrast probe includes the ${background} background layer`, async ({ page }) => {
+    await page.setContent(`<main style="background: white"><button id="contrast-target" style="color: black; background: ${background}">Remove provider</button><span style="color: white">Unrelated text</span></main>`);
+    const failures = await findLowContrast(page, '#contrast-target');
+    expect(failures).toHaveLength(1);
+    expect(failures[0]).toMatchObject({ kind: 'text', text: 'Remove provider', need: 4.5 });
+    expect(failures[0]!.ratio).toBeLessThan(4.5);
   });
 }
 
@@ -63,17 +42,92 @@ for (const theme of ['light', 'dark'] as const) {
     await page.goto(`${HOME}&pane=tasks`);
     const count = panel(page).locator('[data-section="ready_for_review"] h3 span').first();
     await expect(count).toHaveText('1');
-    expect(ratio(await painted(count, 'color'), await backplate(count))).toBeGreaterThanOrEqual(4.5);
+    expect(await findLowContrast(page, '[data-section="ready_for_review"] h3 span')).toEqual([]);
+  });
+
+  for (const { utilization, percent } of [
+    { utilization: 0.93, percent: '7%' },
+    { utilization: 0.4, percent: '60%' },
+  ]) {
+  test(`${theme}: provider ${percent} quota text meets AA contrast in normal, hover and selected rows`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+      if (path !== '/api/teams/t1/claude-subscriptions') return undefined;
+      return json([
+        {
+          id: 'other-account',
+          kind: 'claude-subscription',
+          label: 'Other subscription',
+          expiresAt: null,
+          createdAt: Date.now(),
+          windows: [],
+          lastUsedAt: null,
+          stepsLast24h: 0,
+        },
+        {
+          id: 'quota-account',
+          kind: 'claude-subscription',
+          label: 'Claude subscription',
+          expiresAt: null,
+          createdAt: Date.now(),
+          windows: [
+            { name: 'billing_period', utilization, resetsAt: null, observedAt: Date.now() },
+          ],
+          lastUsedAt: null,
+          stepsLast24h: 0,
+        },
+      ]);
+    });
+    await page.goto('/app/settings/routing');
+    const row = page.locator('[data-instance-id="subscription:quota-account"]');
+    const badge = row.getByTestId('subscription-quota-mini');
+    await expect(badge).toHaveText(`剩 ${percent}`);
+    await expect(row).not.toHaveAttribute('aria-current');
+    for (const state of ['normal', 'hover', 'selected'] as const) {
+      if (state === 'hover') await row.hover();
+      if (state === 'selected') {
+        await row.getByRole('button').first().click();
+        await expect(row).toHaveAttribute('aria-current', 'true');
+      }
+      for (const testId of ['subscription-quota-mini', 'provider-subtitle']) {
+        expect(
+          await findLowContrast(page, `[data-instance-id="subscription:quota-account"] [data-testid="${testId}"]`),
+          `A3: ${theme} ${state} ${percent} text meets WCAG 1.4.3`,
+        ).toEqual([]);
+      }
+    }
+    const remaining = page.getByTestId('subscription-quota-remaining');
+    await expect(remaining).toHaveText(`剩 ${percent}`);
+    expect(
+      await findLowContrast(page, '[data-testid="subscription-quota-remaining"]'),
+      `A3: ${theme} ${percent} detail text meets WCAG 1.4.3`,
+    ).toEqual([]);
+  });
+  }
+
+  test(`${theme}: provider removal text meets AA contrast at rest and on hover`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
+    await page.goto('/app/settings/routing?scenario=model-routing');
+    const remove = page.getByTestId('provider-editor').getByRole('button', { name: '移除', exact: true });
+    await expect(remove).toBeVisible();
+    for (const state of ['normal', 'hover'] as const) {
+      if (state === 'hover') await remove.hover();
+      expect(
+        await findLowContrast(page, '[data-testid="provider-editor"] button[data-variant="destructive"]'),
+        `A3: ${theme} ${state} destructive text meets WCAG 1.4.3`,
+      ).toEqual([]);
+    }
   });
 
   test(`${theme}: the selected provider's secondary text meets AA contrast`, async ({ page }) => {
     await page.addInitScript((value) => localStorage.setItem('cairn-theme', value), theme);
     await page.goto('/app/settings/routing?scenario=model-routing');
-    const status = page.locator('[data-instance-id][aria-current="true"] .line-clamp-2').first();
+    const status = page
+      .locator('[data-instance-id][aria-current="true"]')
+      .getByTestId('provider-subtitle');
     await expect(status).toBeVisible();
-    expect(ratio(await painted(status, 'color'), await backplate(status))).toBeGreaterThanOrEqual(
-      4.5,
-    );
+    await expect(status).toHaveText(/^订阅 · \d+ 个模型$/);
+    expect(await findLowContrast(page, '[data-instance-id][aria-current="true"] [data-testid="provider-subtitle"]')).toEqual([]);
   });
 }
 

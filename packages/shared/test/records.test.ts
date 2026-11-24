@@ -300,9 +300,24 @@ describe('provider record (r3 §2 measured verbatim, key masked)', () => {
     updatedAt: 1758260000000,
   };
 
-  it('parses the observed custom record', () => {
+  it('parses an older-server custom record without a configuration fingerprint', () => {
     expect(providerRecordSchema.parse(sample)).toEqual(sample);
+    expect(providerRecordSchema.parse(sample).configurationFingerprint).toBeUndefined();
   });
+
+  it('preserves a configuration fingerprint when the server provides it', () => {
+    const fingerprinted = { ...sample, configurationFingerprint: 'a'.repeat(32) };
+    expect(providerRecordSchema.parse(fingerprinted)).toEqual(fingerprinted);
+  });
+
+  it.each(['', 'a'.repeat(31), 'a'.repeat(33), 'g'.repeat(32), null])(
+    'rejects an invalid configuration fingerprint: %s',
+    (configurationFingerprint) => {
+      expect(providerRecordSchema.safeParse({ ...sample, configurationFingerprint }).success).toBe(
+        false,
+      );
+    },
+  );
 
   it('keeps optional per-model contextWindow/maxTokens (#1526) and rejects non-positive values', () => {
     const declared = {

@@ -19,7 +19,17 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { cn } from 'cn';
-import { GripVertical, Pencil } from 'lucide-react';
+import {
+  CircleCheck,
+  CircleHelp,
+  CircleMinus,
+  CircleX,
+  Clock3,
+  GripVertical,
+  OctagonX,
+  Pencil,
+  TriangleAlert,
+} from 'lucide-react';
 import type { ComponentType, CSSProperties, DOMAttributes, ReactNode, Ref, SVGProps } from 'react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
@@ -31,6 +41,17 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
 export type ProviderMark = ComponentType<SVGProps<SVGSVGElement>>;
 
 export type ProviderTone = 'ok' | 'warn' | 'fail' | 'off';
+export type ProviderStatus = keyof typeof PROVIDER_STATUS;
+
+export const PROVIDER_STATUS = {
+  ok: { Icon: CircleCheck, tone: 'ok', label: '可用' },
+  warn: { Icon: TriangleAlert, tone: 'warn', label: '需要处理' },
+  fail: { Icon: OctagonX, tone: 'fail', label: '测试未通过' },
+  off: { Icon: CircleHelp, tone: 'off', label: '未检查' },
+  cooling: { Icon: Clock3, tone: 'off', label: '冷却中' },
+  exhausted: { Icon: CircleMinus, tone: 'off', label: '额度用尽' },
+  expired: { Icon: CircleX, tone: 'warn', label: '已过期' },
+} as const;
 
 export interface ProviderItem {
   id: string;
@@ -38,11 +59,20 @@ export interface ProviderItem {
   Mark: ProviderMark;
   version?: string | null;
   status: string;
+  statusLabel: string;
+  statusGlyph: ProviderStatus;
   tone: ProviderTone;
   aside?: ReactNode;
 }
 
 const MONO_MARK_CLS = '[&_path]:fill-current';
+
+const TONE_INK: Record<ProviderTone, string> = {
+  ok: 'text-running-text',
+  warn: 'text-tint-wait-ink',
+  fail: 'text-tint-fail-ink',
+  off: 'text-content-secondary',
+};
 
 export const TONE_DOT: Record<ProviderTone, string> = {
   ok: 'bg-running',
@@ -82,6 +112,9 @@ export function ProviderInstanceRow({
   style?: CSSProperties;
   dragging?: boolean;
 }) {
+  const { t } = useI18n();
+  const { Icon: StatusIcon, tone, label } = PROVIDER_STATUS[item.statusGlyph];
+  const statusLabel = item.statusLabel || t(label);
   return (
     <div
       ref={rowRef}
@@ -89,7 +122,7 @@ export function ProviderInstanceRow({
       {...rowListeners}
       data-testid="provider-instance"
       data-instance-id={item.id}
-      data-tone={item.tone}
+      data-tone={tone}
       data-dragging={dragging ? 'true' : undefined}
       aria-current={selected ? 'true' : undefined}
       className={cn(
@@ -107,45 +140,54 @@ export function ProviderInstanceRow({
         ref={selectRef}
         variant="ghost"
         {...selectProps}
+        aria-label={[
+          item.name,
+          item.version == null ? null : `v${item.version}`,
+          item.status,
+          statusLabel,
+        ]
+          .filter(Boolean)
+          .join(' ')}
         onClick={onSelect}
-        className={cn(
-          'h-auto min-w-0 flex-auto items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent dark:hover:bg-transparent',
-          item.tone === 'off' && !selected && 'opacity-60',
-        )}
+        className="h-auto min-w-0 flex-1 items-start justify-start gap-2.5 p-0 text-left font-normal whitespace-normal hover:bg-transparent dark:hover:bg-transparent"
       >
         <item.Mark
           aria-hidden
           className={cn('mt-0.5 size-4 flex-none text-content-secondary', MONO_MARK_CLS)}
         />
-        <span className="flex min-w-0 flex-col">
+        <span className="flex min-w-0 flex-1 flex-col">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-ui font-medium text-foreground">{item.name}</span>
+            <span title={item.name} className="truncate text-ui font-medium text-foreground">
+              {item.name}
+            </span>
             {item.version != null && (
-              <code
-                className={cn(
-                  'flex-none text-meta',
-                  selected ? 'text-content-secondary' : 'text-content-tertiary',
-                )}
-              >
-                v{item.version}
-              </code>
+              <code className="flex-none text-meta text-content-secondary">v{item.version}</code>
             )}
           </span>
-          <span
-            className={cn(
-              'flex items-start gap-1.5 text-meta',
-              selected ? 'text-content-secondary' : 'text-content-tertiary',
-            )}
-          >
+          <span className="flex min-w-0 items-center gap-1.5 text-meta tabular-nums">
             <span
-              aria-hidden
-              className={cn('mt-1.5 size-1.5 flex-none rounded-full', TONE_DOT[item.tone])}
-            />
-            <span className="line-clamp-2">{item.status}</span>
+              data-testid="provider-subtitle"
+              title={item.status}
+              className="truncate text-content-secondary"
+            >
+              {item.status}
+            </span>
           </span>
         </span>
       </Button>
-      {item.aside}
+      <span className="flex flex-none flex-col items-end justify-center gap-1 self-stretch">
+        {item.aside}
+        <span
+          data-testid="provider-status-mark"
+          data-status={item.statusGlyph}
+          role="img"
+          aria-label={statusLabel}
+          title={statusLabel}
+          className={cn('flex size-4 items-center justify-center', TONE_INK[tone])}
+        >
+          <StatusIcon aria-hidden className="size-4" />
+        </span>
+      </span>
     </div>
   );
 }
@@ -353,7 +395,10 @@ export function ProviderPanel({
             />
           )}
         </div>
-        <div data-testid="provider-editor" className="flex min-w-0 flex-col gap-6 p-4">
+        <div
+          data-testid="provider-editor"
+          className="flex min-w-0 flex-col gap-6 p-4 [&_.text-content-tertiary]:text-content-secondary [&_[data-variant=destructive]]:text-foreground"
+        >
           {children}
         </div>
       </div>
@@ -441,7 +486,7 @@ export function ProviderEditorHead({
             <RenameTitle key={name} name={name} onRename={onRename} />
           </h2>
         )}
-        <span className="max-w-full truncate text-meta text-content-tertiary" title={kind}>
+        <span className="max-w-full wrap-anywhere text-meta text-content-tertiary tabular-nums">
           {kind}
         </span>
       </div>

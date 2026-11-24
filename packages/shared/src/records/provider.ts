@@ -36,6 +36,8 @@ export const providerCompatSchema = z.object({
 });
 export type ProviderCompat = z.infer<typeof providerCompatSchema>;
 
+const providerConfigurationFingerprintSchema = z.string().regex(/^[a-f0-9]{32}$/);
+
 export const providerRecordSchema = z.object({
   kind: z.literal('custom'),
   providerId: z.string(),
@@ -44,6 +46,7 @@ export const providerRecordSchema = z.object({
   api: providerApiSchema,
   authHeader: z.boolean(),
   compat: providerCompatSchema,
+  configurationFingerprint: providerConfigurationFingerprintSchema.optional(),
   models: z.array(providerModelSchema),
   id: recordId,
   createdBy: recordId,
@@ -92,6 +95,11 @@ export const providerTestResultSchema = z.strictObject({
   latencyMs: z.number().int().nonnegative().nullable(),
 });
 export type ProviderTestResult = z.infer<typeof providerTestResultSchema>;
+
+export const teamProviderTestResultSchema = providerTestResultSchema.extend({
+  configurationFingerprint: providerConfigurationFingerprintSchema,
+});
+export type TeamProviderTestResult = z.infer<typeof teamProviderTestResultSchema>;
 
 export const upstreamModelsResultSchema = z.discriminatedUnion('status', [
   z.strictObject({

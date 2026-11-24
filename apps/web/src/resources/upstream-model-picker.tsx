@@ -82,11 +82,12 @@ export function UpstreamModelPicker({
   testable?: boolean;
   fallbackReasons?: Partial<Record<ProviderFailure, string>>;
   onClose: () => void;
-  onSave: (ids: string[], names: ReadonlyMap<string, string>) => void;
+  onSave: (ids: string[], names: ReadonlyMap<string, string>, base: readonly string[]) => void;
 }) {
   const { t } = useI18n();
   const [state, setState] = useState<Load>({ phase: 'loading' });
   const [draft, setDraft] = useState<string[]>(() => [...selected]);
+  const [opened] = useState(() => selected);
   const [initialLoad] = useState(() => load);
   const [query, setQuery] = useState('');
   const [typed, setTyped] = useState('');
@@ -217,7 +218,7 @@ export function UpstreamModelPicker({
       />
     </div>
   );
-  const added = draft.filter((id) => !selected.includes(id)).length;
+  const added = draft.filter((id) => !opened.includes(id)).length;
   return (
     <DialogShell
       title={t('从上游选择模型')}
@@ -240,7 +241,7 @@ export function UpstreamModelPicker({
             className={DIALOG_PRIMARY_BUTTON}
             data-testid="upstream-save"
             disabled={draft.length === 0}
-            onClick={() => onSave(draft, names)}
+            onClick={() => onSave(draft, names, opened)}
           >
             {testable && added > 0 ? t('保存并测试新选的') : t('保存')}
           </Button>

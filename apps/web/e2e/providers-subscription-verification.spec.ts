@@ -135,9 +135,15 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
   const mode = { current: 'slow' as Verify };
   await open(page, mode);
   await expect(row(page)).toContainText('订阅 · 3 个模型');
-  await expect(row(page).getByTestId('subscription-quota-mini')).toHaveText('5h 62%周 88%');
+  const badge = row(page).getByTestId('subscription-quota-mini');
+  await expect(badge).toHaveText('剩 62%');
+  await expect(badge).toHaveAttribute('aria-label', '5 小时 剩 62%');
+  const remaining = detail(page).getByRole('img', { name: '5 小时 剩 62%', exact: true });
+  await expect(remaining).toBeVisible();
+  await expect(remaining).toHaveText('剩 62%');
+  await expect(badge).toHaveText((await remaining.textContent())!);
   await expect(detail(page).getByTestId('subscription-quota-reset').first()).toHaveText(
-    /^(59|60) 分钟后重置$/,
+    /^· (59|60) 分钟后重置$/,
   );
   await expect(detail(page).getByTestId('subscription-quota-reset').nth(1)).not.toContainText(
     '小时后',

@@ -17,9 +17,12 @@ const RECORD = {
   createdBy: 'u1',
   createdAt: 1,
   updatedAt: 1,
+  configurationFingerprint: 'a'.repeat(32),
 };
+const CHANGED_FINGERPRINT = 'b'.repeat(32);
 
 const OK = {
+  configurationFingerprint: RECORD.configurationFingerprint,
   status: 'ok',
   reason: null,
   failure: null,
@@ -28,6 +31,7 @@ const OK = {
   latencyMs: 412,
 };
 const NOT_FOUND = {
+  configurationFingerprint: RECORD.configurationFingerprint,
   status: 'failed',
   reason: 'The provider request failed. Check the key, model and connection settings.',
   failure: 'not-found',
@@ -140,9 +144,12 @@ test('editing the address drops results, including a test still running', async 
     release = resolve;
   });
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
-    if (path === '/api/teams/t1/providers/prov-relay/test') return held.then(() => json(OK));
+    if (path === '/api/teams/t1/providers/prov-relay/test') {
+      const { configurationFingerprint } = record;
+      return held.then(() => json({ ...OK, configurationFingerprint }));
+    }
     if (path === '/api/teams/t1/providers/prov-relay' && route.request().method() === 'PATCH') {
-      record = { ...record, ...route.request().postDataJSON(), updatedAt: 2 };
+      record = { ...record, ...route.request().postDataJSON(), configurationFingerprint: CHANGED_FINGERPRINT };
       return json(record);
     }
     if (path === '/api/teams/t1/providers')
@@ -151,6 +158,8 @@ test('editing the address drops results, including a test still running', async 
     return undefined;
   });
   await page.goto('/app/resources/providers');
+  const row = page.getByTestId('provider-instance').filter({ hasText: RECORD.label });
+  await expect(row.getByRole('button').first()).toHaveAccessibleName(/未检查/);
   await editor(page).getByRole('button', { name: '测试 small-model' }).click();
   await expect(chip(page, 'small-model')).toHaveAttribute('data-check', 'running');
   const address = editor(page).getByLabel('地址', { exact: true });
@@ -162,6 +171,7 @@ test('editing the address drops results, including a test still running', async 
   await finished;
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
   await expect(chip(page, 'small-model')).toHaveAttribute('data-check', 'none');
+  await expect(row.getByRole('button').first()).toHaveAccessibleName(/未检查/);
 });
 
 test('a transport error reads as not finished', async ({ page }) => {
@@ -178,6 +188,78 @@ test('a transport error reads as not finished', async ({ page }) => {
   await expect(page.getByTestId('model-test-detail').locator('dt:text-is("small-model") + dd')).toContainText('测试未完成');
 });
 
+test('C1: a Cairn 429 retest keeps the last success and only the detail says not finished', async ({ page }) => {
+  let tested = 0;
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/providers/prov-relay/test') {
+      tested += 1;
+      return tested === 1 ? json(OK) : route.fulfill({
+        status: 429,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Too many requests' }),
+      });
+    }
+    if (path === '/api/teams/t1/providers')
+      return json({ presets: [], providers: [RECORD], canTestConnection: true });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  const row = page.getByTestId('provider-instance').filter({ hasText: RECORD.label });
+  await editor(page).getByRole('button', { name: '测试 small-model' }).click();
+  await expect(report(page)).toHaveAttribute('data-phase', 'passed');
+  await expect(row).toHaveAttribute('data-tone', 'ok');
+  const started = Date.now();
+  await page.keyboard.press('Escape');
+  await editor(page).getByRole('button', { name: '测试 small-model' }).click();
+  await expect(page.getByTestId('model-test-detail')).toContainText('测试未完成');
+  expect(Date.now() - started).toBeLessThan(10_000);
+  expect(tested).toBe(2);
+  await expect(row).toHaveAttribute('data-tone', 'ok');
+  await expect(row.getByRole('button').first()).toHaveAccessibleName(/可用/);
+  await expect(row.getByTestId('provider-subtitle')).not.toContainText(/更新|新版|最近使用/);
+});
+
+test('C1: save-and-test after a model change shows the provider failure in both row and detail', async ({ page }) => {
+  let record = { ...RECORD, models: [RECORD.models[0]!] };
+  const fingerprints: string[] = [];
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/providers/prov-relay/upstream-models')
+      return json({ status: 'ok', models: RECORD.models });
+    if (path === '/api/teams/t1/providers/prov-relay/test') {
+      fingerprints.push(record.configurationFingerprint);
+      return json({
+        ...(route.request().postDataJSON().model === 'large-model' ? NOT_FOUND : OK),
+        configurationFingerprint: record.configurationFingerprint,
+      });
+    }
+    if (path === '/api/teams/t1/providers/prov-relay' && route.request().method() === 'PATCH') {
+      record = { ...record, ...route.request().postDataJSON(), configurationFingerprint: CHANGED_FINGERPRINT };
+      return json(record);
+    }
+    if (path === '/api/teams/t1/providers')
+      return json({ presets: [], providers: [record], canTestConnection: true });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    return undefined;
+  });
+  await page.goto('/app/resources/providers');
+  const row = page.getByTestId('provider-instance').filter({ hasText: RECORD.label });
+  await editor(page).getByRole('button', { name: '测试 small-model' }).click();
+  await expect(report(page)).toHaveAttribute('data-phase', 'passed');
+  await expect(row).toHaveAttribute('data-tone', 'ok');
+  await page.keyboard.press('Escape');
+  await editor(page).getByRole('button', { name: '从上游选择' }).click();
+  const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+  await picker.getByRole('checkbox', { name: /large-model/ }).check();
+  await picker.getByTestId('upstream-save').click();
+  await expect(page.getByTestId('model-test-detail')).toContainText('未通过 · 模型不存在');
+  await expect(chip(page, 'large-model')).toHaveAttribute('data-check', 'failed');
+  expect(fingerprints).toEqual([RECORD.configurationFingerprint, CHANGED_FINGERPRINT]);
+  await expect(row).toHaveAttribute('data-tone', 'fail');
+  await expect(row.getByRole('button').first()).toHaveAccessibleName(/模型不存在/);
+  await expect(row.getByTestId('provider-subtitle')).toHaveText('自定义端点 · 2 个模型');
+});
+
 test('an empty provider offers the upstream list; a failed list falls back to adding by ID', async ({
   page,
 }) => {
@@ -186,11 +268,12 @@ test('an empty provider offers the upstream list; a failed list falls back to ad
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/providers/prov-relay/upstream-models')
       return json({ status: 'failed', failure: 'not-found', httpStatus: 404 });
-    if (path === '/api/teams/t1/providers/prov-relay/test') return json(OK);
+    if (path === '/api/teams/t1/providers/prov-relay/test')
+      return json({ ...OK, configurationFingerprint: record.configurationFingerprint });
     if (path === '/api/teams/t1/providers/prov-relay' && route.request().method() === 'PATCH') {
       const body = route.request().postDataJSON();
       patches.push(JSON.stringify(body));
-      record = { ...record, ...body, updatedAt: 2 };
+      record = { ...record, ...body, configurationFingerprint: CHANGED_FINGERPRINT };
       return json(record);
     }
     if (path === '/api/teams/t1/providers')

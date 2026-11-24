@@ -13624,6 +13624,10 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > pro
       },
       "type": "object",
     },
+    "configurationFingerprint": {
+      "pattern": "^[a-f0-9]{32}$",
+      "type": "string",
+    },
     "createdAt": {
       "maximum": 9007199254740991,
       "minimum": -9007199254740991,

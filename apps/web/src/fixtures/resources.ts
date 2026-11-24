@@ -18,6 +18,7 @@ import type { FixtureSet, MachineRow, ResourcesContent } from './records.js';
 
 const PROVIDER_SOURCE_PI: ModelSource = {
   runtime: 'pi',
+  provider: 'r3-gateway',
   installed: true,
   hostname: MACHINE_NAME,
   models: [
@@ -51,6 +52,7 @@ function fixtureProvider(
     id,
     authHeader: true,
     compat: { supportsDeveloperRole: false },
+    configurationFingerprint: '0'.repeat(32),
     createdBy: 'u-fixture',
     createdAt: r7(9, 0),
     updatedAt: r7(9, 0),

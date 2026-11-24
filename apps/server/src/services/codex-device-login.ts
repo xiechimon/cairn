@@ -5,7 +5,8 @@ import type { Db } from '../db/client.js';
 import { provider } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { newRecordId, nowMs } from '../lib/ids.js';
+import { newRecordId } from '../lib/ids.js';
+import { nextProviderVersion, replaceProviderCredential } from './provider-configuration.js';
 import { createProvider } from './providers.js';
 
 const AUTH_BASE_URL = 'https://auth.openai.com';
@@ -282,9 +283,9 @@ function saveSubscription(
       baseUrl: CODEX_BASE_URL,
       api: 'openai-responses',
       authHeader: false,
-      apiKeyCipher: deps.box.seal(input.sealed),
+      ...replaceProviderCredential(existing.compat, deps.box.seal(input.sealed)),
       ...(existing.models.length === 0 ? { models: CODEX_SUBSCRIPTION_MODELS } : {}),
-      updatedAt: nowMs(),
+      updatedAt: nextProviderVersion(),
     })
     .where(and(eq(provider.id, existing.id), eq(provider.apiKeyCipher, input.baselineCipher)))
     .run();
@@ -394,7 +395,7 @@ async function refreshAccess(
   }
   const written = deps.db
     .update(provider)
-    .set({ apiKeyCipher: deps.box.seal(refreshed.sealed), updatedAt: nowMs() })
+    .set({ apiKeyCipher: deps.box.seal(refreshed.sealed), updatedAt: nextProviderVersion() })
     .where(and(eq(provider.id, row.id), eq(provider.apiKeyCipher, row.apiKeyCipher)))
     .run();
   if (written.changes === 0) {

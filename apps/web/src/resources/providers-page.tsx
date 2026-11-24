@@ -4,6 +4,8 @@ import {
   orderByKeys,
   type ProviderRecord,
   type ProviderTestResult,
+  type RoutingConnection,
+  type TeamProviderTestResult,
 } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { Cpu } from 'lucide-react';
@@ -45,12 +47,13 @@ import {
   useUpdateDevinSubscriptionModels,
 } from '../api/devin-subscriptions.js';
 import {
+  type ProvidersEnvelope,
   useApiMutations,
   useModelSources,
   useProviders,
   useSaveProviderOrder,
 } from '../api/hooks.js';
-import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
+import { MODEL_ROUTING_KEY, useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { useClock, VENDORS } from '../components/accounts/account-parts.js';
 import { EmptyState } from '../components/empty-state.js';
@@ -66,19 +69,29 @@ import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
 import { AntigravityRelogin } from './antigravity-subscriptions.js';
 import {
+  applyListResponse,
+  initialProviderRefresh,
+  issueCheckGeneration,
+  needsProviderList,
+  type ProviderRefreshState,
+  type ProviderRowChecks,
+  recordProviderResult,
+} from './provider-check-state.js';
+import {
   type ProviderEditActions,
   providerKind,
   providerMark,
   TeamProviderEditor,
 } from './provider-editors.js';
 import {
-  QuotaMarks,
+  providerRowStatus,
+  QuotaMark,
   type SubscriptionActions,
   SubscriptionDetail,
   subscriptionModels,
-  subscriptionRowTone,
   subscriptionStatusView,
   subscriptionSummary,
+  teamProviderStatusView,
 } from './subscription-detail.js';
 import { groupAntigravityUpstream, groupDevinUpstream } from './upstream-model-groups.js';
 import { UpstreamModelPicker } from './upstream-model-picker.js';
@@ -102,37 +115,53 @@ const SUBSCRIPTION_VIEWS: Record<string, AddProviderView> = {
   [ANTIGRAVITY_SUBSCRIPTION_ADD]: 'antigravity-subscription',
 };
 
-function deadModelIds(sources: readonly ModelSource[]): Set<string> {
-  return new Set(
-    sources
-      .filter((s) => s.runtime === 'pi')
-      .flatMap((s) => s.models.filter((m) => m.liveness === 'dead').map((m) => m.id)),
-  );
+const NO_DEAD_MODELS: ReadonlySet<string> = new Set();
+
+function deadModelIds(sources: readonly ModelSource[]): ReadonlyMap<string, ReadonlySet<string>> {
+  const dead = new Map<string, Set<string>>();
+  for (const source of sources) {
+    if (source.runtime !== 'pi' || source.provider === undefined) continue;
+    const set = dead.get(source.provider) ?? new Set<string>();
+    dead.set(source.provider, set);
+    for (const model of source.models) {
+      if (model.liveness === 'dead') set.add(model.id);
+    }
+  }
+  return dead;
 }
 
 function teamEntries(
   providers: readonly ProviderRecord[],
-  dead: ReadonlySet<string>,
+  dead: ReadonlyMap<string, ReadonlySet<string>>,
+  connections: readonly RoutingConnection[],
+  checks: ProviderRowChecks,
   actionsFor: (record: ProviderRecord) => ProviderEditActions,
   t: TFunc,
 ): Entry[] {
   return providers.map((record) => {
-    const retired = record.models.filter((m) => dead.has(m.id)).length;
+    const deadModels = dead.get(record.providerId) ?? NO_DEAD_MODELS;
+    const status = providerRowStatus(
+      teamProviderStatusView(record, connections, checks[record.id], t),
+      record.models.map((model) => ({
+        ...model,
+        liveness: deadModels.has(model.id) ? 'dead' : 'alive',
+      })),
+      t,
+    );
     const parts = [t(providerKind(record)), t('{n} 个模型', { n: record.models.length })];
-    if (retired > 0) parts.push(t('{n} 个已下架', { n: retired }));
     return {
       item: {
         id: `provider:${record.id}`,
         name: record.label,
         Mark: providerMark(record),
         status: parts.join(' · '),
-        tone: record.models.length === 0 || retired > 0 ? 'warn' : 'ok',
+        ...status,
       },
       editor: (
         <TeamProviderEditor
           key={record.id}
           record={record}
-          deadModels={dead}
+          deadModels={deadModels}
           actions={actionsFor(record)}
         />
       ),
@@ -160,26 +189,24 @@ function subscriptionEntries(
     const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
     const runtimeUpdate = new Map(deps.models.map((model) => [model.id, model.updateRequired]));
     const picked = account.models ?? [];
-    const shown: SubscriptionModel[] = (
+    const shown = (
       picked.length > 0
         ? picked
         : deps.models.map((model): SubscriptionModel => ({ id: model.id, name: model.name }))
     ).map((model) => ({
       ...model,
-      liveness: runtimeLiveness.get(model.id) === 'dead' ? 'dead' : model.liveness,
-      ...(runtimeUpdate.get(model.id) !== undefined
-        ? { updateRequired: runtimeUpdate.get(model.id) }
-        : {}),
+      liveness: runtimeLiveness.get(model.id) === 'dead' ? ('dead' as const) : model.liveness,
+      updateRequired: runtimeUpdate.get(model.id),
     }));
-    const rowModels = shown as ModelSourceModel[];
+    const status = providerRowStatus(view, shown, deps.t);
     return {
       item: {
         id: `subscription:${account.id}`,
         name: account.label,
         Mark: VENDORS[account.vendor].Mark,
-        status: subscriptionSummary(account, view, rowModels, deps.now, deps.t),
-        tone: subscriptionRowTone(view, rowModels),
-        aside: <QuotaMarks windows={account.windows} />,
+        status: subscriptionSummary(shown.length, deps.t),
+        ...status,
+        aside: <QuotaMark windows={account.windows} />,
       },
       editor: (
         <SubscriptionDetail
@@ -213,6 +240,7 @@ export function ProvidersSection() {
   const { live, teamId } = useLiveData();
   const sourcesQ = useModelSources(teamId, live);
   const providersQ = useProviders(teamId, live);
+  const routingQ = useModelRouting(teamId, live);
   const mutations = useApiMutations(teamId);
   const client = useQueryClient();
   const clock = useClock();
@@ -241,6 +269,9 @@ export function ProvidersSection() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const saveOrder = useSaveProviderOrder(teamId);
   const [fixtureOrder, setFixtureOrder] = useState<string[] | null>(null);
+  const [providerChecks, setProviderChecks] = useState<ProviderRowChecks>({});
+  const refreshStates = useRef(new Map<string, ProviderRefreshState>());
+  const refreshing = useRef(new Set<string>());
 
   const sources = live
     ? (sourcesQ.data?.sources ?? [])
@@ -298,11 +329,79 @@ export function ProvidersSection() {
     setSearchParams(params, { replace });
   };
 
+  const writeProviderCheck = (id: string, model: string, result: TeamProviderTestResult) => {
+    setProviderChecks((checks) => recordProviderResult(checks, id, model, result));
+  };
+
+  const reconcileProviderList = async (id: string, fingerprint: string | undefined) => {
+    if (teamId === undefined) return;
+    const cache = client.getQueryCache();
+    const query = cache.find<ProvidersEnvelope>({ queryKey: ['providers', teamId], exact: true });
+    const states = refreshStates.current;
+    const getState = () => states.get(teamId) ?? initialProviderRefresh;
+    const active = refreshing.current;
+    const state = issueCheckGeneration(
+      getState(),
+      id,
+      fingerprint,
+      query?.isActive() === true
+        ? {
+            fingerprint: query.state.data?.providers.find((provider) => provider.id === id)
+              ?.configurationFingerprint,
+            fetching: active.has(teamId) || query.state.fetchStatus !== 'idle',
+          }
+        : undefined,
+    );
+    states.set(teamId, state);
+    if (query === undefined || active.has(teamId)) return;
+
+    active.add(teamId);
+    try {
+      let after: number | null = null;
+      while (query.isActive() && needsProviderList(getState(), after)) {
+        const startedAfter = query.state.fetchStatus === 'idle' ? getState().generation : null;
+        const unsubscribe =
+          startedAfter === null
+            ? undefined
+            : cache.subscribe((event) => {
+                if (
+                  event.query === query &&
+                  event.type === 'updated' &&
+                  event.action.type === 'success' &&
+                  !event.action.manual &&
+                  query.state.data !== undefined
+                ) {
+                  states.set(
+                    teamId,
+                    applyListResponse(getState(), startedAfter, query.state.data.providers),
+                  );
+                }
+              });
+        await query
+          .fetch(undefined, { cancelRefetch: false })
+          .catch(() => undefined)
+          .finally(unsubscribe);
+        after = startedAfter;
+      }
+    } finally {
+      active.delete(teamId);
+    }
+  };
+
   const actionsFor = (record: ProviderRecord): ProviderEditActions =>
     !live
       ? {
-          patch: () => Promise.resolve(),
-          test: () => Promise.resolve(SAMPLE_TEST_RESULT),
+          patch: (body) => Promise.resolve({ ...record, ...body }),
+          test: (model) => {
+            if (record.configurationFingerprint === undefined)
+              return Promise.resolve(SAMPLE_TEST_RESULT);
+            const result = {
+              ...SAMPLE_TEST_RESULT,
+              configurationFingerprint: record.configurationFingerprint,
+            };
+            writeProviderCheck(record.id, model, result);
+            return Promise.resolve(result);
+          },
           listUpstream: () =>
             Promise.resolve({
               status: 'ok' as const,
@@ -316,10 +415,21 @@ export function ProvidersSection() {
               toastError(t('保存失败，请重试。'), error);
               throw error;
             }),
+          latest: () =>
+            client
+              .getQueryData<ProvidersEnvelope>(['providers', teamId])
+              ?.providers.find((provider) => provider.id === record.id),
           ...(providersQ.data?.canTestConnection === true
             ? {
-                test: (model: string) =>
-                  mutations.testProvider.mutateAsync({ id: record.id, model }),
+                test: async (model: string) => {
+                  const result = await mutations.testProvider.mutateAsync({
+                    id: record.id,
+                    model,
+                  });
+                  writeProviderCheck(record.id, model, result);
+                  void reconcileProviderList(record.id, result.configurationFingerprint);
+                  return result;
+                },
                 listUpstream: () => mutations.upstreamModels.mutateAsync(record.id),
               }
             : {}),
@@ -479,7 +589,14 @@ export function ProvidersSection() {
           <AntigravityRelogin onLoggedIn={() => startVerification(account)} />
         ) : undefined,
     }),
-    ...teamEntries(providers, deadModelIds(sources), actionsFor, t),
+    ...teamEntries(
+      providers,
+      deadModelIds(sources),
+      live ? (routingQ.data?.connections ?? []) : (fixtureAccounts?.routing.connections ?? []),
+      providerChecks,
+      actionsFor,
+      t,
+    ),
   ];
   const entries = orderByKeys(defaultEntries, (entry) => [entry.item.id], order);
   const partialFailure =

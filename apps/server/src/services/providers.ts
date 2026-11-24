@@ -57,6 +57,14 @@ import {
   hasActiveDevinSubscription,
 } from './devin-subscriptions.js';
 import { getModelLiveness } from './model-liveness.js';
+import {
+  nextProviderVersion,
+  providerConfigurationFingerprint,
+  providerCredentialId,
+  publicProviderCompat,
+  replaceProviderCredential,
+  withProviderCredentialId,
+} from './provider-configuration.js';
 
 export interface ProviderDeps {
   db: Db;
@@ -82,7 +90,8 @@ export function toProviderRecord(row: ProviderRow): ProviderRecord {
     baseUrl: row.baseUrl,
     api: row.api,
     authHeader: row.authHeader,
-    compat: row.compat,
+    compat: publicProviderCompat(row.compat),
+    configurationFingerprint: providerConfigurationFingerprint(row),
     models: row.models,
     id: row.id,
     createdBy: row.createdBy,
@@ -393,9 +402,11 @@ export function createProvider(
       baseUrl: body.baseUrl,
       api: body.api,
       authHeader: body.authHeader ?? true,
-      compat: body.compat ?? { supportsDeveloperRole: false },
+      ...replaceProviderCredential(
+        body.compat ?? { supportsDeveloperRole: false },
+        body.apiKey ? deps.box.seal(body.apiKey) : null,
+      ),
       models: body.models ?? [],
-      apiKeyCipher: body.apiKey ? deps.box.seal(body.apiKey) : null,
       createdBy: input.createdBy,
       createdAt: now,
       updatedAt: now,
@@ -682,12 +693,16 @@ export function updateProvider(
         ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl } : {}),
         ...(patch.api !== undefined ? { api: patch.api } : {}),
         ...(patch.authHeader !== undefined ? { authHeader: patch.authHeader } : {}),
-        ...(patch.compat !== undefined ? { compat: patch.compat } : {}),
         ...(patch.models !== undefined ? { models: patch.models } : {}),
         ...(patch.apiKey !== undefined
-          ? { apiKeyCipher: patch.apiKey === null ? null : deps.box.seal(patch.apiKey) }
-          : {}),
-        updatedAt: nowMs(),
+          ? replaceProviderCredential(
+              patch.compat ?? row.compat,
+              patch.apiKey === null ? null : deps.box.seal(patch.apiKey),
+            )
+          : patch.compat === undefined
+            ? {}
+            : { compat: withProviderCredentialId(patch.compat, providerCredentialId(row)) }),
+        updatedAt: nextProviderVersion(),
       })
       .where(eq(provider.id, id))
       .run();
@@ -714,7 +729,7 @@ export function markProviderModelTextOnly(
     .update(provider)
     .set({
       models: row.models.map((m) => (m.id === modelId ? { ...m, input: ['text' as const] } : m)),
-      updatedAt: nowMs(),
+      updatedAt: nextProviderVersion(),
     })
     .where(eq(provider.id, row.id))
     .run();
@@ -738,5 +753,8 @@ export function openProviderKey(
     .where(and(eq(provider.teamId, teamId), eq(provider.providerId, providerId)))
     .get();
   if (!row) return null;
-  return { row, apiKey: row.apiKeyCipher === null ? null : deps.box.open(row.apiKeyCipher) };
+  return {
+    row: { ...row, compat: publicProviderCompat(row.compat) },
+    apiKey: row.apiKeyCipher === null ? null : deps.box.open(row.apiKeyCipher),
+  };
 }

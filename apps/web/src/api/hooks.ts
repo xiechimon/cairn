@@ -82,7 +82,6 @@ import type {
   ProjectRecord,
   ProviderPreset,
   ProviderRecord,
-  ProviderTestResult,
   PrPanelRow,
   RemoteRoutesResponse,
   RouteOverride,
@@ -100,6 +99,7 @@ import type {
   TailnetAccess,
   TailscaleAccess,
   TeamMember,
+  TeamProviderTestResult,
   TeamRecord,
   ThreadMessageResult,
   TodoRecord,
@@ -137,6 +137,7 @@ import { fetchWithSession, useAuth } from './auth.js';
 import { ApiError, api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
 import { cacheUserMessage, moveQueueToReplacement } from './message-cache.js';
+import { keepNewerProvider, keepNewerProviders } from './provider-freshness.js';
 import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 import { cachedTodo, optimisticTodo } from './team-stream-cache.js';
 import { keepNewerTasks, keepNewerTodo, keepNewerTodos } from './todo-freshness.js';
@@ -524,6 +525,7 @@ export const useProviders = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['providers', teamId],
     queryFn: () => api.get<ProvidersEnvelope>(`/api/teams/${teamId}/providers`),
+    structuralSharing: keepNewerProviders,
     enabled: enabled && teamId !== undefined,
   });
 
@@ -541,7 +543,9 @@ export function useSaveProviderOrder(teamId: string | undefined) {
       return { previous };
     },
     onError: (_error, _order, context) => {
-      qc.setQueryData(['providers', teamId], context?.previous);
+      qc.setQueryData<ProvidersEnvelope>(['providers', teamId], (envelope) =>
+        envelope === undefined ? envelope : { ...envelope, order: context?.previous?.order },
+      );
     },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['providers', teamId] });
@@ -1554,7 +1558,7 @@ export function useApiMutations(teamId: string | undefined) {
     }),
     testProvider: useMutation({
       mutationFn: (input: { id: string; model: string }) =>
-        api.post<ProviderTestResult>(`/api/teams/${teamId}/providers/${input.id}/test`, {
+        api.post<TeamProviderTestResult>(`/api/teams/${teamId}/providers/${input.id}/test`, {
           model: input.model,
         }),
     }),
@@ -1565,7 +1569,19 @@ export function useApiMutations(teamId: string | undefined) {
     patchProvider: useMutation({
       mutationFn: (input: { id: string; body: PatchProviderBody }) =>
         api.patch<ProviderRecord>(`/api/teams/${teamId}/providers/${input.id}`, input.body),
-      onSuccess: invalidateAll,
+      onSuccess: (record) => {
+        qc.setQueryData<ProvidersEnvelope>(['providers', teamId], (envelope) =>
+          envelope === undefined
+            ? envelope
+            : {
+                ...envelope,
+                providers: envelope.providers.map((provider) =>
+                  provider.id === record.id ? keepNewerProvider(provider, record) : provider,
+                ),
+              },
+        );
+        invalidateAll();
+      },
     }),
     createMcpConnector: useMutation({
       mutationFn: (body: CreateMcpConnectorBody) =>
