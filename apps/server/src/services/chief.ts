@@ -24,6 +24,7 @@ import {
   chiefMemoryThreadId,
   chiefTurnErrorContentSchema,
   conversationBranch,
+  DELIVERABLES_MESSAGE_PREFIX,
   deliverablesMessageSchema,
   fencedTitle,
   isChiefMemoryThreadId,
@@ -109,7 +110,6 @@ import {
 import { runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
-import { DELIVERABLES_MESSAGE_PREFIX } from './machine-deliverables.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';

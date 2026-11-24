@@ -748,17 +748,21 @@ export async function executeChiefTool(
       const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
       const meta = readAttachmentMeta(deps, ctx.teamId, attachmentId);
       const attachmentRow = db
-        .select({ storageKey: attachment.storageKey, fileName: attachment.fileName })
+        .select({
+          scope: attachment.scope,
+          storageKey: attachment.storageKey,
+          fileName: attachment.fileName,
+        })
         .from(attachment)
         .where(and(eq(attachment.id, attachmentId), eq(attachment.teamId, ctx.teamId)))
         .get();
       const token =
-        attachmentRow === undefined
-          ? undefined
-          : formatAttachmentToken(
+        attachmentRow?.scope === 'deliverable'
+          ? formatAttachmentToken(
               attachmentRow.fileName.replace(/[[\]\n\r]/g, '_'),
               attachmentRow.storageKey,
-            );
+            )
+          : undefined;
       const reportOf = db
         .select({ seqNum: todo.seqNum })
         .from(build)

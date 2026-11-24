@@ -4,6 +4,7 @@ import {
   COMPUTER_DIRECT_TOOLS,
   COMPUTER_OBSERVE_TOOLS,
   CONNECTOR_TOOL_PREFIX,
+  DELIVERABLES_MESSAGE_PREFIX,
   deliverablesMessageSchema,
   INSTALL_PACKAGES_TOOL,
   MEMORY_TOOLS,
@@ -17,7 +18,6 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { resolveToolAttachmentId } from './attachments.js';
 import { insertChiefMessageOnce } from './chief.js';
-import { DELIVERABLES_MESSAGE_PREFIX } from './machine-deliverables.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { REPORT_PROVENANCE_PREFIX, reportProvenance, turnProvenance } from './turn-provenance.js';
 

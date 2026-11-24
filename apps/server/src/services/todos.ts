@@ -15,6 +15,7 @@ import type {
 } from '@cairn/shared';
 import {
   canMoveTodoProject,
+  DELIVERABLES_MESSAGE_PREFIX,
   DONE_ANNOUNCEMENT,
   deliverablesMessageSchema,
   derivePlaceholderTitle,
@@ -86,7 +87,7 @@ import {
   correctionFromGithubLabels,
   todoGithubLabelIds,
 } from './github-labels.js';
-import { DELIVERABLES_MESSAGE_PREFIX, retireTodoDeliverables } from './machine-deliverables.js';
+import { retireTodoDeliverables } from './machine-deliverables.js';
 import {
   liveMachineId,
   priorSessionOf,

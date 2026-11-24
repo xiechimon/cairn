@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import {
   attachmentExtOf,
   DELIVERABLE_LIMITS,
+  DELIVERABLES_MESSAGE_PREFIX,
   type DeliverableKind,
   type DeliverablesMessage,
   formatAttachmentToken,
@@ -35,8 +36,6 @@ const MAX_BYTES_BY_KIND: Record<DeliverableKind, number> = {
 const UNSAFE_NAME = /[\p{Cc}\p{Cf}\p{Cs}/\\]/u;
 const PDF_MAGIC = Buffer.from('%PDF-', 'latin1');
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
-
-export const DELIVERABLES_MESSAGE_PREFIX = 'deliverables-';
 
 export interface DeliverableManifest {
   generation: number;
