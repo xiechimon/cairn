@@ -272,7 +272,7 @@ test('a sent comment whose lines are gone in the newer version shows 已失效 a
 test('a PDF box keeps the text it covers, and on a newer version its pin follows that text or turns 已失效', async ({
   page,
 }) => {
-  const sent = (id: string, pin: number, text: string): Comment => ({
+  const sent = (id: string, pin: number, text: string, page: number): Comment => ({
     id,
     todoId: FILE_TASK.id,
     fileName: 'resume.pdf',
@@ -284,12 +284,12 @@ test('a PDF box keeps the text it covers, and on a newer version its pin follows
     markAttachmentId: null,
     status: 'sent',
     messageId: 'm1',
-    anchor: { type: 'region', page: 1, rect: { x: 0.1, y: 0.6, width: 0.8, height: 0.1 } },
+    anchor: { type: 'region', page, rect: { x: 0.1, y: 0.6, width: 0.8, height: 0.1 } },
     sentAt: Date.now() - 120_000,
     handledSeq: 2,
     elementId: '',
     selector: '',
-    label: '第 1 页的选区',
+    label: `第 ${page} 页的选区`,
     text,
     htmlHint: '',
     position: { x: 0, y: 0, width: 0, height: 0 },
@@ -298,8 +298,8 @@ test('a PDF box keeps the text it covers, and on a newer version its pin follows
     updatedAt: Date.now() - 120_000,
   });
   const { panel, state } = await openFile(page, FILES.resume as FileSpec, [
-    sent('cmt-1', 1, 'Lovelace, analyst'),
-    sent('cmt-2', 2, 'Babbage, engineer'),
+    sent('cmt-1', 1, 'Lovelace, analyst', 2),
+    sent('cmt-2', 2, 'Babbage, engineer', 1),
   ]);
   await panel.getByTestId('artifact-comment-toggle').click();
   const moved = panel.locator('[data-testid="design-comment-row"][data-pin="1"]');
