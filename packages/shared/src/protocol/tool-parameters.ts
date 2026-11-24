@@ -57,6 +57,28 @@ function sanitizeNode(node: unknown, depth: number): Record<string, unknown> {
   return withDescription({ type }, node.description);
 }
 
+export function toolStringSchema(description: string): { type: 'string'; description: string } {
+  return { type: 'string', description };
+}
+
+export function toolArraySchema(
+  items: unknown,
+  description: string,
+): { type: 'array'; items: unknown; description: string } {
+  return { type: 'array', items, description };
+}
+
+export function toolObjectSchema(
+  properties: Record<string, unknown>,
+  required: string[] = [],
+): { type: 'object'; properties: Record<string, unknown>; required?: string[] } {
+  return {
+    type: 'object',
+    properties,
+    ...(required.length > 0 ? { required } : {}),
+  };
+}
+
 export function sanitizeToolParameters(inputSchema: unknown): Record<string, unknown> | undefined {
   if (inputSchema === undefined || inputSchema === null) return undefined;
   const node = sanitizeNode(inputSchema, 0);

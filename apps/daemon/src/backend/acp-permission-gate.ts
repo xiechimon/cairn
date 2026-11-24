@@ -1,5 +1,5 @@
 import type { RequestPermissionRequest } from '@agentclientprotocol/sdk';
-import type { SessionOpts } from '@cairn/shared';
+import { escapeRegExp, type SessionOpts } from '@cairn/shared';
 import { decideBashCommand, decideToolCall, type PermissionRule } from './command-gate.js';
 
 export type AcpTurnPolicy = 'relay-only' | 'read-only' | 'normal';
@@ -119,10 +119,6 @@ function nameCandidates(toolCall: AcpToolCall): string[] {
     }
   }
   return found.map((value) => value.trim());
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 export function isHostToolCall(toolCall: AcpToolCall, hostToolNames: readonly string[]): boolean {

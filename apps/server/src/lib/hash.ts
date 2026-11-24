@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
+import { sha256Hex } from './crypto.js';
 
-export function hashCredential(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
-}
+export const hashCredential = sha256Hex;

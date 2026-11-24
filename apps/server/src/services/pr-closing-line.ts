@@ -1,11 +1,9 @@
-import { type GithubRepoRef, parseGithubIssueSourceRef } from '@cairn/shared';
+import { escapeRegExp, type GithubRepoRef, parseGithubIssueSourceRef } from '@cairn/shared';
 import type { todo } from '../db/schema.js';
 import { type FetchLike, githubPull, githubUpdatePullBody } from '../lib/github.js';
 import type { GithubWriteToken } from '../lib/github-token.js';
 
 type TaskSource = Pick<typeof todo.$inferSelect, 'sourceKind' | 'sourceRef'>;
-
-const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 function taskIssueNumber(row: TaskSource, repo: GithubRepoRef): number | null {
   if (row.sourceKind !== 'github-issue' && row.sourceKind !== 'github-issue-self') return null;

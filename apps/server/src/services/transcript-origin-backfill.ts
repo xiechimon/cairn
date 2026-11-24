@@ -16,6 +16,7 @@ import {
   type TaskSource,
   type TranscriptUserOrigin,
   transcriptPromptRowId,
+  wrappedBy,
 } from '@cairn/shared';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -29,10 +30,6 @@ const EXACT_SYNTHETIC_TEXTS: ReadonlySet<string> = new Set([
   buildPlanFirstRoundInstruction(),
   ...LEGACY_PLAN_PROMPTS,
 ]);
-
-function wrappedBy(text: string, head: string, tail: string): boolean {
-  return text.length >= head.length + tail.length && text.startsWith(head) && text.endsWith(tail);
-}
 
 function isGeneratedInstruction(text: string): boolean {
   return (

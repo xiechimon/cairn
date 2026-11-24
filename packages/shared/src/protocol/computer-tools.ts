@@ -1,12 +1,10 @@
 import type { RemoteToolDef } from './chief-tools.js';
+import {
+  toolArraySchema as arr,
+  toolObjectSchema as obj,
+  toolStringSchema as str,
+} from './tool-parameters.js';
 
-const str = (description: string) => ({ type: 'string', description });
-const obj = (properties: Record<string, unknown>, required: string[] = []) => ({
-  type: 'object',
-  properties,
-  ...(required.length > 0 ? { required } : {}),
-});
-const arr = (items: unknown, description: string) => ({ type: 'array', items, description });
 const stealth = {
   type: 'boolean',
   description:

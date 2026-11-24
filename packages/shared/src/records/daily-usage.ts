@@ -2,6 +2,10 @@ import { z } from 'zod';
 
 export const DAILY_USAGE_MAX_DAYS = 371;
 
+export function localDay(ms: number, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(ms));
+}
+
 export const dailyUsageQuerySchema = z.object({
   days: z.coerce.number().int().min(1).max(DAILY_USAGE_MAX_DAYS),
   tz: z.string().min(1),

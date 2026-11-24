@@ -1,5 +1,7 @@
-import { DAILY_USAGE_MAX_DAYS, type DailyUsageDay } from '@cairn/shared';
+import { DAILY_USAGE_MAX_DAYS, type DailyUsageDay, localDay } from '@cairn/shared';
 import { cacheHitShare } from '../api/mappers.js';
+
+export { localDay };
 
 export const USAGE_WEEKS = 53;
 export const USAGE_NARROW_WEEKS = 16;
@@ -35,10 +37,6 @@ export interface UsageSummary {
   cost: number | null;
   models: [string, number][];
   projects: [string, number][];
-}
-
-export function localDay(ms: number, tz: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(ms));
 }
 
 function parts(date: string): [number, number, number] {

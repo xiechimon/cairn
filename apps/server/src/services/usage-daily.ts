@@ -2,6 +2,7 @@ import {
   type DailyUsage,
   type DailyUsageDay,
   type DailyUsageModel,
+  localDay,
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSourceRuntime,
 } from '@cairn/shared';
@@ -20,10 +21,6 @@ interface SlotRow extends TokenCounts {
   model: string;
   projectId: string | null;
   todoId: string | null;
-}
-
-function localDay(ms: number, tz: string): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date(ms));
 }
 
 function windowDates(now: number, days: number, tz: string): { dates: Set<string>; from: number } {
