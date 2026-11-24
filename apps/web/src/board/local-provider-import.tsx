@@ -104,6 +104,9 @@ export function LocalProviderImportCard({
       if (added.length > 0) {
         void client.invalidateQueries({ queryKey: ['providers', teamId] });
         void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+        void client.invalidateQueries({ queryKey: ['chief', teamId] });
+        void client.invalidateQueries({ queryKey: ['model-routing', teamId] });
+        void client.invalidateQueries({ queryKey: ['routing-settings', teamId] });
         onImported(added);
       }
     } catch (error) {
