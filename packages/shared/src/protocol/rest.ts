@@ -12,6 +12,16 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   { method: 'GET', path: '/api/teams/{id}/machines' },
   { method: 'GET', path: '/api/computers', note: 'the team computers (D75 P8a)' },
   {
+    method: 'GET',
+    path: '/api/computers/steps',
+    note: 'the browser or screen step an agent of this user is taking on each machine right now',
+  },
+  {
+    method: 'GET',
+    path: '/api/computers/steps/{callId}/shot',
+    note: 'the screenshot a screen tool call captured, for the machine card',
+  },
+  {
     method: 'POST',
     path: '/api/computers/package-install',
     note: 'owner approves or declines a Coordinator install_packages request',

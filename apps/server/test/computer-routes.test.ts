@@ -303,4 +303,119 @@ describe('computer feed routes', () => {
     };
     expect(list.computers.map((c) => c.id)).toEqual(['c1']);
   });
+
+  test('the step feed shows what an agent does on a machine with its latest screenshot, and only while it acts', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1');
+    addComputer(s, s.team.id, 'c1', 'm1');
+    const png = (width: number, height: number) => {
+      const head = Buffer.alloc(33);
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(head, 0);
+      head.writeUInt32BE(13, 8);
+      head.write('IHDR', 12, 'latin1');
+      head.writeUInt32BE(width, 16);
+      head.writeUInt32BE(height, 20);
+      return { data: head.toString('base64'), mimeType: 'image/png' as const };
+    };
+    const now = Date.now();
+    addCall(s, s.team.id, 'c1', 'm1', 1, {
+      tool: 'browser_navigate',
+      params: { url: 'https://github.example.test/pulls' },
+      createdAt: now - 9_000,
+      startedAt: now - 9_000,
+      finishedAt: now - 8_000,
+    });
+    addCall(s, s.team.id, 'c1', 'm1', 2, {
+      tool: 'computer_act',
+      params: { actions: [{ kind: 'click', x: 320, y: 200 }] },
+      resultImages: [png(1280, 800)],
+      createdAt: now - 7_000,
+      startedAt: now - 7_000,
+      finishedAt: now - 6_000,
+    });
+    addCall(s, s.team.id, 'c1', 'm1', 3, {
+      tool: 'browser_act',
+      params: { actions: [{ kind: 'click', ref: '@e4' }] },
+      state: 'running',
+      createdAt: now - 1_000,
+      startedAt: now - 1_000,
+      finishedAt: null,
+    });
+    const steps = async () =>
+      ((await (await req(s.app, 'GET', '/api/computers/steps')).json()) as { steps: unknown[] })
+        .steps;
+    expect(await steps()).toEqual([
+      {
+        machineId: 'm1',
+        callId: (3).toString(16).padStart(64, '0'),
+        surface: 'browser',
+        inFlight: true,
+        at: now - 1_000,
+        shot: {
+          callId: (2).toString(16).padStart(64, '0'),
+          width: 1280,
+          height: 800,
+          point: { x: 320, y: 200 },
+        },
+        shotMissing: false,
+      },
+    ]);
+    const shot = await req(
+      s.app,
+      'GET',
+      `/api/computers/steps/${(2).toString(16).padStart(64, '0')}/shot`,
+    );
+    expect(shot.status).toBe(200);
+    expect(shot.headers.get('content-type')).toBe('image/png');
+    expect(Buffer.from(await shot.arrayBuffer()).readUInt32BE(16)).toBe(1280);
+    const notAShot = await req(
+      s.app,
+      'GET',
+      `/api/computers/steps/${(1).toString(16).padStart(64, '0')}/shot`,
+    );
+    expect(notAShot.status).toBe(404);
+
+    s.db
+      .update(computerCallTable)
+      .set({ state: 'done', finishedAt: now - 60_000 })
+      .run();
+    expect(await steps()).toEqual([]);
+  });
+
+  test('a screen call that captured no picture is reported so the card can say why', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1');
+    addComputer(s, s.team.id, 'c1', 'm1');
+    const now = Date.now();
+    addCall(s, s.team.id, 'c1', 'm1', 1, {
+      tool: 'user_computer_observe',
+      params: { app: 'Finder' },
+      resultImages: null,
+      createdAt: now - 2_000,
+      startedAt: now - 2_000,
+      finishedAt: now - 1_000,
+    });
+    const body = (await (await req(s.app, 'GET', '/api/computers/steps')).json()) as {
+      steps: { surface: string; shot: unknown; shotMissing: boolean }[];
+    };
+    expect(body.steps).toMatchObject([{ surface: 'app', shot: null, shotMissing: true }]);
+  });
+
+  test('another user agent acting on a shared machine is not shown to this user', async () => {
+    const s = boot();
+    addMachine(s, s.team.id, 'm1');
+    addComputer(s, s.team.id, 'c-other', 'm1', 'someone-else');
+    addCall(s, s.team.id, 'c-other', 'm1', 1, {
+      tool: 'browser_snapshot',
+      params: {},
+      state: 'running',
+      createdAt: Date.now(),
+      startedAt: Date.now(),
+      finishedAt: null,
+    });
+    const body = (await (await req(s.app, 'GET', '/api/computers/steps')).json()) as {
+      steps: unknown[];
+    };
+    expect(body.steps).toEqual([]);
+  });
 });

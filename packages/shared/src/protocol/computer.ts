@@ -255,6 +255,24 @@ export const computerRecordSchema = z.object({
 });
 export type ComputerRecord = z.infer<typeof computerRecordSchema>;
 
+export const computerStepSchema = z.object({
+  machineId: z.string(),
+  callId: z.string(),
+  surface: z.enum(['browser', 'desktop', 'app']),
+  inFlight: z.boolean(),
+  at: epochMs,
+  shot: z
+    .object({
+      callId: z.string(),
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+      point: z.object({ x: z.number(), y: z.number() }).nullable(),
+    })
+    .nullable(),
+  shotMissing: z.boolean(),
+});
+export type ComputerStep = z.infer<typeof computerStepSchema>;
+
 export const COMPUTER_BROWSER_TOOLS = [
   'browser_navigate',
   'browser_snapshot',

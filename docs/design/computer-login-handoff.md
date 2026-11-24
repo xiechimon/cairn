@@ -35,6 +35,10 @@ Owner decision: a pointer on the screen is a control lease, and hover happens al
 - The control VNC server releases every modifier key when a viewer disconnects, so a key held as the pointer left cannot turn the agent's later typing into shortcuts.
 - When a plain `browser_navigate` lands on a page with no interactive elements, the daemon opens the same address in the stealth session and says so in the result. Without a CloakBrowser license it returns the no-license refusal, so the Coordinator posts the license card.
 
+## Explicit take over (2026-11-24)
+
+The screen no longer takes control on hover. A control lease starts only from `接管` in the screen view, the machine row's `接管` during a pending handoff, or the Coordinator's takeover card, and ends with `交还` or by closing the screen. The handoff rule above is unchanged: a control screen opened while a handoff is pending still swaps in the owner browser.
+
 ## Goal
 
 When a page in the Coordinator browser needs a login or a human check, the agent stops driving it. The owner gets a card in the conversation and a push that opens it. While the owner holds control, the agent issues no browser action and no screen capture. When the owner gives control back, the agent continues from a fresh snapshot. Passwords, one-time codes and cookies never reach the model.

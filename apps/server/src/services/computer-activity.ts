@@ -7,7 +7,7 @@ import { nowMs } from '../lib/ids.js';
 const CALLS_SCANNED = 20;
 const IN_FLIGHT_CALL_STATES: readonly string[] = ['dispatched', 'running'];
 
-function userOfStep(
+export function userOfStep(
   db: Db,
   userId: string,
   stepId: string,

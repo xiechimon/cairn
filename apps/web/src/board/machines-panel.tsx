@@ -1,11 +1,18 @@
-import type { ComputerRecord, VmDownload } from '@cairn/shared';
+import type { ComputerRecord, ComputerStep, VmDownload } from '@cairn/shared';
 import { cn } from 'cn';
 import { Laptop, Monitor, Plus } from 'lucide-react';
-import { type FormEvent, type ReactElement, type ReactNode, useEffect, useState } from 'react';
+import {
+  type FormEvent,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Link, useLocation } from 'react-router';
 import { useAuth } from '../api/auth.js';
 import { useConnected } from '../api/connection-state.js';
-import { useApiMutations, useComputers } from '../api/hooks.js';
+import { useApiMutations, useComputerSteps, useComputers } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { useComputerControl } from '../api/use-computer-control.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -29,12 +36,12 @@ import {
   MachineMenu,
   useComputerActions,
 } from './computer-actions-menu.js';
-import { MachineScreenSurface } from './computer-screen.js';
 import { ComputerScreenDialog } from './computer-screen-dialog.js';
 import { fleetStatus, fleetStatusLine } from './fleet-status.js';
 import { desktopControlOnline } from './machine-capabilities.js';
+import { MachineStepPanel } from './machine-step-panel.js';
 import { joinMeta, relativeTime } from './rel-time.js';
-import { useScreenHoverControl } from './screen-hover-control.js';
+import { useScreenControl } from './screen-control.js';
 import { ThreadLink } from './thread-link.js';
 
 export function coordinatorMachine(machines: readonly MachineRow[]): MachineRow | null {
@@ -327,8 +334,9 @@ function useCardLine({
   if (computer?.handoffReason != null)
     return {
       kind: 'wait',
-      node: <span data-testid="machine-screen-note">{t('需要你登录，点屏幕接管')}</span>,
+      node: <span data-testid="machine-screen-note">{t('需要你登录')}</span>,
     };
+  if (computer?.state === 'starting') return { kind: 'quiet', node: t('正在启动') };
   const activity = computer?.activity ?? null;
   if (activity === null || !activity.inUse) return null;
   const linkCls =
@@ -362,11 +370,15 @@ const LINE_INK: Record<CardLine['kind'], string> = {
 function MachineCard({
   machine,
   computer,
+  step,
+  stepsSettled,
   teamId,
   openScreen,
 }: {
   machine: MachineRow;
   computer: ComputerRecord | null;
+  step: ComputerStep | null;
+  stepsSettled: boolean;
   teamId: string | undefined;
   openScreen: boolean;
 }) {
@@ -375,7 +387,7 @@ function MachineCard({
   const [renaming, setRenaming] = useState(false);
   const [screenRequested, setScreenRequested] = useState(openScreen);
   const control = useComputerControl({ teamId, computer });
-  const hover = useScreenHoverControl(control, computer?.handoffReason != null);
+  const screen = useScreenControl(control);
   const actions = useComputerActions(teamId, computer);
   const download = computer?.download?.state === 'ready' ? null : (computer?.download ?? null);
   const screenLive =
@@ -386,6 +398,10 @@ function MachineCard({
   const installing = actions.note?.kind === 'running' && actions.note.action === 'install';
   const vm = computer?.kind === 'vm' && download === null;
   const name = machineDisplayName(machine);
+  const machineSettings =
+    machine.id === undefined
+      ? null
+      : `${settingsHref('machines')}?${new URLSearchParams({ machine: machine.id })}`;
   const line = useCardLine({
     machine,
     computer,
@@ -393,6 +409,11 @@ function MachineCard({
     note:
       download !== null && actions.note !== null && 'action' in actions.note ? null : actions.note,
   });
+  const watch = screenLive ? () => setFullscreen(true) : null;
+  const takeOver = () => {
+    screen.want(true);
+    setFullscreen(true);
+  };
 
   useEffect(() => {
     if (!screenLive) setFullscreen(false);
@@ -423,6 +444,17 @@ function MachineCard({
             </span>
           )}
         </span>
+        {screenLive && computer?.handoffReason != null && (
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="machine-take-over"
+            className="flex-none px-3 pointer-coarse:h-11"
+            onClick={takeOver}
+          >
+            {t('接管')}
+          </Button>
+        )}
         {vm && computer?.state === 'failed' && machine.online === true && (
           <Button
             variant="outline"
@@ -437,12 +469,9 @@ function MachineCard({
         )}
         <MachineMenu
           machineName={name}
-          settingsHref={
-            machine.id === undefined
-              ? null
-              : `${settingsHref('machines')}?${new URLSearchParams({ machine: machine.id })}`
-          }
+          settingsHref={machineSettings}
           onRename={machine.id === undefined ? null : () => setRenaming(true)}
+          onWatch={watch}
           vm={
             vm
               ? { disabled: actions.pending || machine.online !== true, onAction: actions.run }
@@ -459,34 +488,25 @@ function MachineCard({
           />
         </div>
       )}
-      {screenLive && (
-        <>
-          <MachineScreenSurface
-            teamId={teamId}
-            computer={computer}
-            leaseId={control.leaseId}
-            interactive={false}
-            power={
-              computer.state === 'starting'
-                ? 'starting'
-                : computer.state === 'stopped'
-                  ? 'asleep'
-                  : 'on'
-            }
-            {...(computer.handoffReason !== null ? { expandText: t('接管') } : {})}
-            onExpand={() => setFullscreen(true)}
-          />
-          {fullscreen && (
-            <ComputerScreenDialog
-              onClose={() => setFullscreen(false)}
-              title={name}
-              teamId={teamId}
-              computer={computer}
-              control={control}
-              hover={hover}
-            />
-          )}
-        </>
+      {step !== null && machine.online === true && (
+        <MachineStepPanel
+          key={step.machineId}
+          step={step}
+          noScreenPermission={machine.capabilities?.hostPermissions?.screenRecording === 'denied'}
+          settingsHref={machineSettings}
+          onWatch={watch}
+          growOnMount={stepsSettled}
+        />
+      )}
+      {fullscreen && screenLive && (
+        <ComputerScreenDialog
+          onClose={() => setFullscreen(false)}
+          title={name}
+          teamId={teamId}
+          computer={computer}
+          control={control}
+          screen={screen}
+        />
       )}
       {renaming && machine.id !== undefined && (
         <RenameMachineDialog
@@ -513,6 +533,11 @@ export function MachinesPanel({
   const auth = useAuth();
   const { search } = useLocation();
   const computersQ = useComputers(teamId, live && !auth.gateOpen, COMPUTERS_PANEL_REFRESH_MS);
+  const stepsQ = useComputerSteps(teamId, live && !auth.gateOpen);
+  const stepsSettled = useRef(false);
+  useEffect(() => {
+    if (stepsQ.isFetched) stepsSettled.current = true;
+  }, [stepsQ.isFetched]);
   const params = new URLSearchParams(search);
   const linkedMachine = params.get('screen') === '1' ? params.get('machine') : null;
   const computers = computersQ.data ?? [];
@@ -520,6 +545,8 @@ export function MachinesPanel({
   const ordered = host === null ? machines : [host, ...machines.filter((m) => m !== host)];
   const computerFor = (machine: MachineRow): ComputerRecord | null =>
     computers.find((computer) => computer.machine.id === machine.id) ?? null;
+  const stepFor = (machine: MachineRow): ComputerStep | null =>
+    stepsQ.data?.find((step) => step.machineId === machine.id) ?? null;
   const keyOf = (machine: MachineRow) => machine.id ?? machine.name;
   const addRow = (
     <div data-testid="machines-add">
@@ -554,6 +581,8 @@ export function MachinesPanel({
                 key={keyOf(machine)}
                 machine={machine}
                 computer={computerFor(machine)}
+                step={stepFor(machine)}
+                stepsSettled={stepsSettled.current}
                 teamId={teamId}
                 openScreen={linkedMachine !== null && keyOf(machine) === linkedMachine}
               />

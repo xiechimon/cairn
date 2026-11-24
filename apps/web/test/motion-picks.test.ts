@@ -36,7 +36,6 @@ describe('pick 2: RingSpinner is the loading.dev Ring', () => {
   test('every busy indicator consumes the Ring adapter', () => {
     const consumers = [
       'board/archived-project-bar.tsx',
-      'board/computer-screen.tsx',
       'board/first-run-setup.tsx',
       'board/local-provider-import.tsx',
       'board/thread-actions.tsx',

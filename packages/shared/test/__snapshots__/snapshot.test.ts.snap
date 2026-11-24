@@ -11362,6 +11362,16 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
     "path": "/api/computers",
   },
   {
+    "method": "GET",
+    "note": "the browser or screen step an agent of this user is taking on each machine right now",
+    "path": "/api/computers/steps",
+  },
+  {
+    "method": "GET",
+    "note": "the screenshot a screen tool call captured, for the machine card",
+    "path": "/api/computers/steps/{callId}/shot",
+  },
+  {
     "method": "POST",
     "note": "owner approves or declines a Coordinator install_packages request",
     "path": "/api/computers/package-install",

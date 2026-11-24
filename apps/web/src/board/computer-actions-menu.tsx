@@ -87,11 +87,13 @@ export function MachineMenu({
   machineName,
   settingsHref,
   onRename,
+  onWatch,
   vm,
 }: {
   machineName: string;
   settingsHref: string | null;
   onRename: (() => void) | null;
+  onWatch: (() => void) | null;
   vm: { disabled: boolean; onAction: (action: ComputerManageAction) => void } | null;
 }) {
   const { t } = useI18n();
@@ -118,6 +120,11 @@ export function MachineMenu({
           <Ellipsis aria-hidden strokeWidth={1.75} />
         </IconTooltip>
         <KeyedMenuContent side="bottom" align="end" sideOffset={4} className="w-auto min-w-40">
+          {onWatch !== null && (
+            <KeyedMenuItem shortcut="V" data-testid="machine-watch" onClick={onWatch}>
+              {t('查看屏幕')}
+            </KeyedMenuItem>
+          )}
           {onRename !== null && (
             <KeyedMenuItem shortcut="N" data-testid="machine-rename" onClick={onRename}>
               {t('重命名')}

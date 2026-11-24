@@ -19,6 +19,7 @@ import type {
   ComputerManageAction,
   ComputerManageResult,
   ComputerRecord,
+  ComputerStep,
   ConversationMessagesResponse,
   CreateMcpConnectorBody,
   CreateProjectBody,
@@ -152,6 +153,7 @@ const CHIEF_THREADS_INFLIGHT_POLL_MS = 3000;
 const BACKUP_HEALTH_POLL_MS = 5 * 60 * 1000;
 const STREAM_KEPT_FRESH_MS = 60_000;
 const PREFETCH_FRESH_MS = 10_000;
+const COMPUTER_STEPS_REFRESH_MS = 2_000;
 
 export type { ApiKeyRow, PlanRow };
 export type StepRow = StepJournalRow;
@@ -415,6 +417,16 @@ export const useMachines = (teamId: string | undefined, enabled: boolean) =>
     select: registeredMachines,
     enabled: enabled && teamId !== undefined,
   });
+
+export function useComputerSteps(teamId: string | undefined, enabled: boolean) {
+  const auth = useAuth();
+  return useQuery({
+    queryKey: computerQueryKeys(teamId, auth.generation).steps,
+    queryFn: async () => (await api.get<{ steps: ComputerStep[] }>('/api/computers/steps')).steps,
+    enabled: enabled && teamId !== undefined && !auth.gateOpen,
+    refetchInterval: COMPUTER_STEPS_REFRESH_MS,
+  });
+}
 
 export function useComputers(
   teamId: string | undefined,

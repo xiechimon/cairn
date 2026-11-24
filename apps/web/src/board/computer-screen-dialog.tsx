@@ -16,17 +16,13 @@ import { setDesktopWindowControlsVisible } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import { MachineScreenSurface } from './computer-screen.js';
 import { joinMeta } from './rel-time.js';
-import {
-  type ComputerControl,
-  type ScreenHover,
-  screenControlStatus,
-} from './screen-hover-control.js';
+import { type ComputerControl, type ScreenControl, screenControlStatus } from './screen-control.js';
 
 const BAR_ZONE_PX = 56;
 const BAR_HIDE_MS = 1_000;
 const COARSE_QUERY = '(pointer: coarse)';
 
-function useRevealBar() {
+function useRevealBar(pinned: boolean) {
   const bar = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<number | undefined>(undefined);
   const [near, setNear] = useState(false);
@@ -53,7 +49,7 @@ function useRevealBar() {
 
   return {
     bar,
-    shown: near || focused || coarse,
+    shown: near || focused || coarse || pinned,
     onPointerMove: (event: ReactPointerEvent<HTMLElement>) => {
       if (event.pointerType === 'touch') return;
       if (inBar(event.target) || event.clientY <= BAR_ZONE_PX) show();
@@ -74,7 +70,7 @@ export function ComputerScreenDialog({
   teamId,
   computer,
   control,
-  hover,
+  screen,
   note,
 }: {
   onClose: () => void;
@@ -82,13 +78,15 @@ export function ComputerScreenDialog({
   teamId: string;
   computer: ComputerRecord;
   control: ComputerControl;
-  hover: ScreenHover;
+  screen: ScreenControl;
   note?: string;
 }) {
   const { t } = useI18n();
   const root = useRef<HTMLDivElement>(null);
-  const reveal = useRevealBar();
+  const reveal = useRevealBar(!screen.held);
   const { leaseId } = control;
+  const give = useRef(screen.want);
+  give.current = screen.want;
 
   useEffect(() => {
     setDesktopWindowControlsVisible(reveal.shown);
@@ -97,9 +95,9 @@ export function ComputerScreenDialog({
   useEffect(
     () => () => {
       setDesktopWindowControlsVisible(true);
-      hover.leave();
+      give.current(false);
     },
-    [hover],
+    [],
   );
 
   return (
@@ -127,9 +125,6 @@ export function ComputerScreenDialog({
           computer={computer}
           leaseId={leaseId}
           interactive={leaseId !== null}
-          fill
-          autoFocus
-          pointer={hover.pointer}
         />
         <div
           ref={reveal.bar}
@@ -148,9 +143,20 @@ export function ComputerScreenDialog({
               data-testid="machine-screen-status"
               className="truncate text-meta text-content-tertiary"
             >
-              {joinMeta([screenControlStatus(control, t), note])}
+              {joinMeta([screenControlStatus(control, screen.held, t), note])}
             </span>
           </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={screen.held ? 'outline' : 'default'}
+            data-testid="machine-screen-control"
+            data-held={screen.held ? 'true' : 'false'}
+            className="flex-none px-3 pointer-coarse:h-11 pointer-coarse:px-4"
+            onClick={() => screen.want(!screen.held)}
+          >
+            {screen.held ? t('交还') : t('接管')}
+          </Button>
           <IconTooltip
             label={t('缩小')}
             side="bottom"

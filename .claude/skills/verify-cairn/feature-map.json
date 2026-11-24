@@ -992,8 +992,8 @@
     {
       "id": "agent-computer",
       "name": "The agent's computer",
-      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine, with a live screen feed and desktop control. Browser and desktop control are always on wherever the machine reports the capability; there is no setting.",
-      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; live screen enlarged with control; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line — finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready adds nothing to the row (no action log in the product); own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser unsupported (no capabilities.browser) and offline machine. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
+      "summary": "The Coordinator's own persistent computer and guarded access to the user's machine. An idle machine is one quiet row; while an agent acts on it the row shows what it does and the latest step screenshot; the full screen opens on demand with explicit Take over and Give back. Browser and desktop control are always on wherever the machine reports the capability; there is no setting.",
+      "states": "No computer; one machine card per computer with an activity line (in use by a task or the Coordinator, idle with the last user, none) and no line when offline; idle quiet row with no screen box; agent acting: the latest step screenshot with a click dot and no status text, a quiet row for a browser step with no screenshot, a no-picture line with the Screen Recording or unlocked fix; full screen opened from the step screenshot or the menu, watching, taken over, given back; takeover card in the Coordinator conversation waiting, owner in control, refused, handed back, not finished; package install approval card waiting, approved, declined, installed, not answered, failed, owner-only refusal; VM computer actions menu (stop, update, recover, reset with confirmation) with done and failed notes; own-Mac switch on the machine row in Settings, Computers: off with the warning on the switch hover; state folds into the row's meta line — finish setup in the Cairn app, installing, verifying read as plain meta text; install failed, not installed, Accessibility missing and Screen Recording missing expand an inline drawer (open by default) with the reason and their actions; ready adds nothing to the row (no action log in the product); own-Mac approval card in the Coordinator conversation (allow once, allow in this conversation or always allow this command, deny); browser unsupported (no capabilities.browser) and offline machine. Cloak browser prepared, missing credentials, failed acquisition, invalid profile identity, and shared-profile agent/owner/Dock handoff with no debugging port during owner control.",
       "centrality": 1,
       "status": "partial",
       "code": {
@@ -1001,6 +1001,8 @@
           "apps/web/src/board/computer-screen.tsx",
           "apps/web/src/board/machines-panel.tsx",
           "apps/web/src/board/computer-screen-dialog.tsx",
+          "apps/web/src/board/machine-step-panel.tsx",
+          "apps/web/src/board/screen-control.ts",
           "apps/web/src/chief/takeover-card.tsx",
           "apps/web/src/chief/package-install-card.tsx",
           "apps/web/src/board/computer-actions-menu.tsx",
@@ -1013,6 +1015,7 @@
           "apps/server/src/services/computer-control.ts",
           "apps/server/src/services/computer-screen.ts",
           "apps/server/src/services/computer-feed.ts",
+          "apps/server/src/services/computer-steps.ts",
           "apps/server/src/services/machine-computer.ts",
           "apps/server/src/services/machine-claim.ts",
           "apps/server/src/services/own-computer.ts"
@@ -1025,6 +1028,8 @@
       "routes": {
         "server": [
           "/api/computers",
+          "/api/computers/steps",
+          "/api/computers/steps/:callId/shot",
           "/api/teams/:teamId/computers/**",
           "/api/computers/package-install",
           "/api/computers/:id/actions"
@@ -1033,7 +1038,7 @@
       "reach": [
         "open /app",
         "click testid:machines-button",
-        "click testid:machine-screen-expand"
+        "click testid:machine-step-watch"
       ],
       "research": [
         "docs/research/coordinator-computer.md",

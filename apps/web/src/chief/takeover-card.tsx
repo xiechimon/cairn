@@ -5,7 +5,7 @@ import { clockTime } from '../api/mappers.js';
 import { useLiveData } from '../api/provider.js';
 import { useComputerControl } from '../api/use-computer-control.js';
 import { ComputerScreenDialog } from '../board/computer-screen-dialog.js';
-import { useScreenHoverControl } from '../board/screen-hover-control.js';
+import { useScreenControl } from '../board/screen-control.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
@@ -88,7 +88,7 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
   const computersQ = useComputers(teamId, live && waiting && !onPhone, COMPUTERS_REFRESH_MS);
   const computer = computersQ.data?.[0] ?? null;
   const control = useComputerControl({ teamId, computer });
-  const hover = useScreenHoverControl(control, computer?.handoffReason != null);
+  const screen = useScreenControl(control);
   const [open, setOpen] = useState(false);
   const now = useIntervalNow(waiting, TICK_MS, false);
   const push = useDevicePushOff(teamId, waiting);
@@ -170,9 +170,12 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
               className="pointer-coarse:h-11 pointer-coarse:px-4"
               disabled={!online}
               data-testid="chief-takeover-open"
-              onClick={() => setOpen(true)}
+              onClick={() => {
+                screen.want(true);
+                setOpen(true);
+              }}
             >
-              {t('打开画面')}
+              {t('接管')}
             </Button>
             {!online ? (
               <span className="text-meta text-content-tertiary">
@@ -195,7 +198,7 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
           teamId={teamId}
           computer={computer}
           control={control}
-          hover={hover}
+          screen={screen}
           note={timeLeft ?? undefined}
         />
       )}
