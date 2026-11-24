@@ -272,7 +272,6 @@ async function setup(
     sessionText?: string;
     replacement?: GitCredentials;
     refreshError?: MachineApiError;
-    hookNotes?: WorkspaceHookNoteData[];
     now?: () => number;
     tokenExtras?: Record<string, unknown>;
   },
@@ -306,7 +305,6 @@ async function setup(
       heartbeatIntervalMs: 60_000,
     },
     claimed,
-    { hookNotes: opts.hookNotes },
   );
   return { client, lines, paths };
 }
@@ -486,47 +484,48 @@ test('hosted step shell credentials are erased when backend session creation fai
   expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
 });
 
-test.each(
-  ['workspace', 'orb'].flatMap((source) =>
-    (['quote', 'backslash', 'tab'] as const).map((caseName) => [source, caseName] as const),
-  ),
-)('hook credentials are redacted before serialization: %s / %s', async (source, caseName) => {
-  const delimiter = { quote: 34, backslash: 92, tab: 9 }[caseName];
-  const password = `fixture-${String.fromCharCode(delimiter)}-credential-value`;
-  const output = `before ${password} after\n`;
-  const hook: WorkspaceHookNoteData = {
-    name: 'setup',
-    status: 'ok',
-    exitCode: 0,
-    ms: 50,
-    output,
-    totalChars: output.length + 17,
-  };
-  let persisted: TranscriptUpload['messages'] = [];
-  const { client } = await setup(
-    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-    {
-      git: { ...GITHUB_TOKEN, password },
-      workspace: fakeWorkspace(source === 'workspace' ? { hooks: [hook] } : {}),
-      ...(source === 'orb' ? { hookNotes: [hook] } : {}),
-      onSession: (session) => {
-        persisted = JSON.parse(
-          readFileSync(join(session.cwd, '..', '..', 'outbox', 'step-s1.transcript.json'), 'utf8'),
-        ) as TranscriptUpload['messages'];
+test.each(['quote', 'backslash', 'tab'] as const)(
+  'hook credentials are redacted before serialization: %s',
+  async (caseName) => {
+    const delimiter = { quote: 34, backslash: 92, tab: 9 }[caseName];
+    const password = `fixture-${String.fromCharCode(delimiter)}-credential-value`;
+    const output = `before ${password} after\n`;
+    const hook: WorkspaceHookNoteData = {
+      name: 'setup',
+      status: 'ok',
+      exitCode: 0,
+      ms: 50,
+      output,
+      totalChars: output.length + 17,
+    };
+    let persisted: TranscriptUpload['messages'] = [];
+    const { client } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      {
+        git: { ...GITHUB_TOKEN, password },
+        workspace: fakeWorkspace({ hooks: [hook] }),
+        onSession: (session) => {
+          persisted = JSON.parse(
+            readFileSync(
+              join(session.cwd, '..', '..', 'outbox', 'step-s1.transcript.json'),
+              'utf8',
+            ),
+          ) as TranscriptUpload['messages'];
+        },
       },
-    },
-  );
-  expect(client.doneBodies[0]?.body.status).toBe('success');
-  for (const messages of [persisted, transcriptRows(client)]) {
-    const hooks = messages
-      .map((row) => systemRowOf(row.content))
-      .filter((row) => row?.kind === 'workspace-hook');
-    expect(hooks).toHaveLength(1);
-    expect(hooks[0]?.name).toBe('setup');
-    expect.soft(hooks[0]?.output === 'before [REDACTED] after').toBe(true);
-    expect(hooks[0]?.omittedChars).toBe(17);
-  }
-});
+    );
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    for (const messages of [persisted, transcriptRows(client)]) {
+      const hooks = messages
+        .map((row) => systemRowOf(row.content))
+        .filter((row) => row?.kind === 'workspace-hook');
+      expect(hooks).toHaveLength(1);
+      expect(hooks[0]?.name).toBe('setup');
+      expect.soft(hooks[0]?.output === 'before [REDACTED] after').toBe(true);
+      expect(hooks[0]?.omittedChars).toBe(17);
+    }
+  },
+);
 
 test('a granted connector reaches the session and its credential never reaches the transcript', async () => {
   const linear = {

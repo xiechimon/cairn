@@ -501,7 +501,7 @@ test('the product plan retires the optional Cloudflare service without retiring 
     registry.features.some(({ id }) => id === 'relay-service'),
     false,
   );
-  for (const id of ['ios-app', 'remote-access', 'step-claim', 'orb-isolation']) {
+  for (const id of ['ios-app', 'remote-access', 'step-claim']) {
     assert.ok(
       registry.features.some((feature) => feature.id === id),
       `${id} stays registered`,

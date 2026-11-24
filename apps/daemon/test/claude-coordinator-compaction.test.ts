@@ -20,7 +20,6 @@ test('a Coordinator session on the bundled Claude Code auto-compacts at the prod
     sessionId: '00000000-0000-4000-8000-00000000c0de',
     disallowedTools: [],
     mcpServers: {},
-    inOrb: false,
     lockedDown: true,
     compactAt: COORDINATOR_COMPACT_AT,
     abortController: new AbortController(),

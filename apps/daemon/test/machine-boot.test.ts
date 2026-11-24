@@ -5,7 +5,6 @@ import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
 import { MachineApiError } from '../src/machine-client.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
-import { FakeOrbProvider } from './orb-fake.js';
 import { testTempDir } from './test-temp-dir.js';
 
 describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
@@ -90,24 +89,6 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
       executor: 'host',
       codexLogin: { state: 'absent' },
     });
-    await handle.stop();
-    await handle.done;
-  });
-
-  test('D71 an Orb executor daemon reports executor orb on enroll and presence', async () => {
-    const { handle, api } = await boot({
-      capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
-      orbProvider: new FakeOrbProvider({
-        runner: async () => ({ code: 0, stdout: '', stderr: '' }),
-      }),
-    });
-    await waitFor(() => api.presenceBodies.length > 0);
-    expect(
-      (api.enrollBodies[0] as { capabilities?: { executor?: string } }).capabilities?.executor,
-    ).toBe('orb');
-    expect(
-      (api.presenceBodies[0] as { capabilities?: { executor?: string } }).capabilities?.executor,
-    ).toBe('orb');
     await handle.stop();
     await handle.done;
   });

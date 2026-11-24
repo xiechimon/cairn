@@ -130,7 +130,7 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
         env.AGY_CLI_FORCE_FILE_TOKEN_STORAGE = '1';
       }
     }
-    if (input.inherited?.CAIRN_ORB !== '1') Object.assign(env, isolatedConfigEnv(input));
+    Object.assign(env, isolatedConfigEnv(input));
   }
   return {
     env,

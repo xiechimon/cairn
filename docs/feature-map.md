@@ -15,14 +15,14 @@
 
 | Item | Count |
 |---|---|
-| Features | 57 |
+| Features | 55 |
 | status shipped | 45 |
-| status partial | 10 |
+| status partial | 8 |
 | status planned | 2 |
 | research, frontend design and backend design all present or not applicable | 29 |
-| Research gaps | 13 |
-| Frontend design gaps | 15 |
-| Backend design gaps | 18 |
+| Research gaps | 12 |
+| Frontend design gaps | 13 |
+| Backend design gaps | 17 |
 | notes cited but not on main | 19 |
 
 ## Coverage
@@ -39,7 +39,6 @@
 | [Memory](#memory) | 1 | shipped | yes | yes (not on main) | yes |  |
 | [Completed delivery and explicit merge](#merge-gate) | 1 | shipped | yes | yes | yes |  |
 | [Task references and needs-you](#needs-you) | 1 | shipped | yes | yes | gap | B2 |
-| [Per-task orb isolation](#orb-isolation) | 1 | partial | yes | gap | yes | B4 |
 | [Plans, approval and review](#plans-and-review) | 1 | shipped | yes | gap | yes | B3 |
 | [Phone push](#push-notifications) | 1 | shipped | yes | gap | gap | B2 |
 | [Question cards](#questions) | 1 | shipped | gap | yes (not on main) | gap | B2 |
@@ -55,7 +54,6 @@
 | [Machine enrollment](#machine-enrollment) | 2 | shipped | yes | gap | gap | B5 |
 | [Machines](#machines) | 2 | shipped | yes | yes | yes |  |
 | [Mobile web and PWA](#mobile-web) | 2 | shipped | gap | yes | n/a | B6 |
-| [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | partial | gap | gap | gap | B4 |
 | [Phone computers](#phones) | 2 | partial | yes | yes | yes |  |
 | [Model providers and subscriptions](#providers) | 2 | shipped | yes | yes | yes |  |
 | [Remote access over the tailnet](#remote-access) | 2 | partial | yes | gap | yes | B5 |
@@ -118,8 +116,6 @@ The per-task orb differentiator and the execution targets : how a user sees and 
 | Feature | Centrality | Missing |
 |---|---|---|
 | [The agent's computer](#agent-computer) | 1 | Frontend design: the screen view and control handover have no design |
-| [Per-task orb isolation](#orb-isolation) | 1 | Frontend design: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine |
-| [Own-key cloud sandboxes](#own-key-sandboxes) | 2 | Research: no note comparing E2B and Daytona against the dispatch contract<br>Frontend design: no design for adding a sandbox provider and its key<br>Backend design: no design for the E2B and Daytona providers, key injection and teardown |
 
 ### B5 · Remote access and device and machine auth
 
@@ -278,14 +274,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Frontend design: [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md)
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
 
-### orb-isolation
-
-**Per-task orb isolation** (partial). A differentiator: each task runs in its own container orb on a swappable runtime, reached through the dispatch contract; opt-in today, default on capable machines next.
-
-- Research: [docs/research/amp-native-sandbox-orb.md](research/amp-native-sandbox-orb.md), [docs/research/user-computer-model-2026-11-08.md](research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine
-- Backend design: [docs/research/orb-container-runtime.md](research/orb-container-runtime.md)
-
 ### plans-and-review
 
 **Plans, approval and review** (shipped). A thread's plan document with approval, timed auto-approve that can be paused, document diffs, and review that can reject work.
@@ -405,14 +393,6 @@ Work for after phase 2 graduates: the native iOS app . Research and design only 
 - Research: **gap**: no note on how Amp, t3code and Claude handle mobile web and PWA install
 - Frontend design: [docs/design/duet-shaped-clients.md](design/duet-shaped-clients.md), [docs/design/references/coordinator-chat](design/references/coordinator-chat), [docs/design/claude-ai-spec.md](design/claude-ai-spec.md)
 - Backend design: n/a: served by the same server; push is its own feature
-
-### own-key-sandboxes
-
-**Own-key cloud sandboxes** (partial). Execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
-
-- Research: **gap**: no note comparing E2B and Daytona against the dispatch contract
-- Frontend design: **gap**: no design for adding a sandbox provider and its key
-- Backend design: **gap**: no design for the E2B and Daytona providers, key injection and teardown
 
 ### phones
 

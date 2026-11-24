@@ -36,7 +36,6 @@ function budgetOf(c: Context): number {
     case '/api/teams/:teamId/computers/:computerId/screen':
     case '/api/teams/:teamId/computers/:computerId/control':
       return 4 * KIB;
-    case '/api/machine/orbs/closed':
     case '/api/machine/upload-urls/:stepId':
       return 64 * KIB;
     case '/api/machine/antigravity/verify':

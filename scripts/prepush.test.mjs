@@ -511,7 +511,6 @@ test('changes to prepush scripts run the CI self-test files locally', () => {
 
 test('CI ops-selftests paths run the same self-tests locally, once', () => {
   const commands = (paths) => prepushPlan(paths).map((args) => args.join(' '));
-  const canary = 'node --test scripts/ops/orb/canary-stack.test.mjs';
   const vpSelftest = 'node .claude/skills/verify-cairn/scripts/vp-selftest.mjs';
   for (const path of [
     'scripts/ops/rebuild-queue.mjs',
@@ -520,14 +519,12 @@ test('CI ops-selftests paths run the same self-tests locally, once', () => {
     'pnpm-lock.yaml',
   ]) {
     const plan = commands([path]);
-    assert.ok(plan.includes(canary), path);
     assert.ok(plan.includes(vpSelftest), path);
     assert.ok(plan.includes(['node', '--test', ...selfTests].join(' ')), path);
   }
   const workflow = commands(['.github/workflows/ci.yml']);
-  assert.equal(workflow.filter((step) => step === canary).length, 1);
-  for (const step of [canary, vpSelftest])
-    assert.ok(!commands(['apps/web/src/main.tsx']).includes(step), step);
+  assert.equal(workflow.filter((step) => step === vpSelftest).length, 1);
+  assert.ok(!commands(['apps/web/src/main.tsx']).includes(vpSelftest), vpSelftest);
 });
 
 test('drizzle inputs run the chain guard and the drift check locally', () => {

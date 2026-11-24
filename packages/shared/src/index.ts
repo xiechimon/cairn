@@ -31,7 +31,6 @@ export * from './image-caption.js';
 export * from './local-providers.js';
 export * from './mail.js';
 export * from './model-routing.js';
-export * from './orb-services.js';
 export * from './phase.js';
 export * from './protocol/index.js';
 export * from './provider-order.js';

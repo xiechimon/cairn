@@ -202,9 +202,7 @@ test('refuses to apply without root and refuses an invalid task configuration', 
 
 test('shipped tasks name fixed entries inside their directories', () => {
   const config = validateConfig(JSON.parse(readFileSync(join(here, 'tasks.json'), 'utf8')));
-  assert.deepEqual(Object.keys(config.tasks).sort(), ['orb-install-host', 'secret-reach-setup']);
-  assert.equal(config.tasks['orb-install-host'].directory, 'scripts/ops/orb');
-  assert.equal(config.tasks['orb-install-host'].entry, 'install-host.sh');
+  assert.deepEqual(Object.keys(config.tasks).sort(), ['secret-reach-setup']);
   assert.equal(config.tasks['secret-reach-setup'].directory, 'scripts/ops/secret-reach');
   assert.ok(existsSync(join(repository, 'scripts/ops/secret-reach/setup-runner-user.sh')));
   assert.equal(config.source.url, 'https://github.com/xiechimon/cairn.git');

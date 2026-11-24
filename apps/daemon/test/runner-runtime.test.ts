@@ -600,14 +600,6 @@ describe('subscription credential isolation', () => {
     expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).not.toBe(token);
     expect([...claude.lines, ...pi.lines].join('')).not.toContain(token);
   });
-  test('an Orb step gets the token without the subprocess scrub, which cannot run under nspawn', async () => {
-    const orb = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
-      subscriptionToken: token,
-      runEnv: { CAIRN_ORB: '1' },
-    });
-    expect(orb.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
-    expect(orb.sessions[0]?.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBeUndefined();
-  });
   test('backend output and failures cannot put the token into step logs or uploaded results', async () => {
     const result = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
       subscriptionToken: token,

@@ -18,7 +18,6 @@ function parts(over: Partial<ClaudeSdkOptionParts> = {}): ClaudeSdkOptionParts {
     sessionId: 'sess-1307',
     disallowedTools: ['AskUserQuestion'],
     mcpServers: {},
-    inOrb: true,
     lockedDown: false,
     abortController: new AbortController(),
     ...over,

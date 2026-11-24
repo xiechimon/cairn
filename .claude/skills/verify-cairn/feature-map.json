@@ -955,41 +955,6 @@
       ]
     },
     {
-      "id": "orb-isolation",
-      "name": "Per-task orb isolation",
-      "summary": "A differentiator: each task runs in its own container orb on a swappable runtime, reached through the dispatch contract; opt-in today, default on capable machines next.",
-      "states": "Off by default; when on, a thread runs in its own orb and the route override shows the orb choice.",
-      "centrality": 1,
-      "status": "partial",
-      "code": {
-        "daemon": [
-          "apps/daemon/src/orb"
-        ],
-        "server": [
-          "apps/server/src/services/machine-relay.ts"
-        ]
-      },
-      "reach": [
-        "open /app/todo/<id of a thread listed by the todos API>"
-      ],
-      "research": [
-        "docs/research/amp-native-sandbox-orb.md",
-        "docs/research/user-computer-model-2026-11-08.md"
-      ],
-      "frontendDesign": {
-        "gap": "nothing shows whether a thread ran in an orb or how to turn orbs on for a machine"
-      },
-      "backendDesign": [
-        "docs/research/orb-container-runtime.md"
-      ],
-      "evidence": [
-        "apps/daemon/test/orb-runtime.test.ts",
-        "apps/daemon/test/orb-step.test.ts",
-        "apps/server/test/machine-orbs.test.ts"
-      ],
-      "batch": "B4"
-    },
-    {
       "id": "agent-computer",
       "name": "The agent's computer",
       "summary": "The Coordinator's own persistent computer and guarded access to the user's machine. An idle machine is one quiet row; while an agent acts on it the row shows what it does and the latest step screenshot; the full screen opens on demand with explicit Take over and Give back. Browser and desktop control are always on wherever the machine reports the capability; there is no setting.",
@@ -1067,38 +1032,6 @@
         "apps/daemon/test/machine-boot.test.ts",
         "apps/daemon/test/computer-host-desktop.test.ts",
         "apps/daemon/test/computer-cloak-browser.test.ts"
-      ],
-      "batch": "B4"
-    },
-    {
-      "id": "own-key-sandboxes",
-      "name": "Own-key cloud sandboxes",
-      "summary": "Execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.",
-      "states": "Not exposed in the UI yet; the daemon selects E2B when configured.",
-      "centrality": 2,
-      "status": "partial",
-      "code": {
-        "daemon": [
-          "apps/daemon/src/orb/e2b-provider.ts",
-          "apps/daemon/src/orb/e2b-client.ts"
-        ]
-      },
-      "reach": [
-        "settings machines",
-        "click testid:machine-list"
-      ],
-      "research": {
-        "gap": "no note comparing E2B and Daytona against the dispatch contract"
-      },
-      "frontendDesign": {
-        "gap": "no design for adding a sandbox provider and its key"
-      },
-      "backendDesign": {
-        "gap": "no design for the E2B and Daytona providers, key injection and teardown"
-      },
-      "evidence": [
-        "apps/daemon/test/orb-e2b.test.ts",
-        "apps/daemon/test/orb-e2b-client.test.ts"
       ],
       "batch": "B4"
     },

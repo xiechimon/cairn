@@ -222,24 +222,6 @@ Reach:
 - Backend design: **gap**: no design for which records enter the tray, their order and when they leave
 - Evidence: `apps/web/e2e/chief-home-needs-you.spec.ts`, `apps/web/e2e/chief-home-tray.spec.ts`, `apps/server/test/needs-you.test.ts`
 
-### orb-isolation
-
-**Per-task orb isolation** (partial, centrality 1). A differentiator: each task runs in its own container orb on a swappable runtime, reached through the dispatch contract; opt-in today, default on capable machines next.
-
-States: Off by default; when on, a thread runs in its own orb and the route override shows the orb choice.
-
-Reach:
-
-1. `open /app/todo/<id of a thread listed by the todos API>`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: [docs/research/amp-native-sandbox-orb.md](../../../docs/research/amp-native-sandbox-orb.md), [docs/research/user-computer-model-2026-11-08.md](../../../docs/research/user-computer-model-2026-11-08.md) (not on main)
-- Frontend design: **gap**: nothing shows whether a thread ran in an orb or how to turn orbs on for a machine
-- Backend design: [docs/research/orb-container-runtime.md](../../../docs/research/orb-container-runtime.md)
-- Evidence: `apps/daemon/test/orb-runtime.test.ts`, `apps/daemon/test/orb-step.test.ts`, `apps/server/test/machine-orbs.test.ts`
-
 ### plans-and-review
 
 **Plans, approval and review** (shipped, centrality 1). A thread's plan document with approval, timed auto-approve that can be paused, document diffs, and review that can reject work.
@@ -529,25 +511,6 @@ Reach:
 - Frontend design: [docs/design/duet-shaped-clients.md](../../../docs/design/duet-shaped-clients.md), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md)
 - Backend design: n/a: served by the same server; push is its own feature
 - Evidence: `apps/web/e2e/mobile-narrow.spec.ts`, `apps/web/e2e/chief-home-phone-tabs.spec.ts`, `apps/web/e2e/chief-home-narrow-shell.spec.ts`, `apps/web/test/pwa.test.ts`
-
-### own-key-sandboxes
-
-**Own-key cloud sandboxes** (partial, centrality 2). Execution target: orbs on E2B or Daytona with the user's own key, called outbound by the daemon.
-
-States: Not exposed in the UI yet; the daemon selects E2B when configured.
-
-Reach:
-
-1. `settings machines`
-2. `click testid:machine-list`
-
-- Web routes: none
-- Keyboard shortcuts in its code: none
-- Test ids in its code: none
-- Research: **gap**: no note comparing E2B and Daytona against the dispatch contract
-- Frontend design: **gap**: no design for adding a sandbox provider and its key
-- Backend design: **gap**: no design for the E2B and Daytona providers, key injection and teardown
-- Evidence: `apps/daemon/test/orb-e2b.test.ts`, `apps/daemon/test/orb-e2b-client.test.ts`
 
 ### phones
 

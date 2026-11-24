@@ -35,7 +35,7 @@ test('authentication_failed identifies the team subscription and keeps the CLI r
     })();
     return Object.assign(messages, { interrupt: vi.fn(async () => {}) }) as unknown as Query;
   });
-  const handle = await createClaudeCodeBackend({ inOrb: true }).createSession({
+  const handle = await createClaudeCodeBackend({}).createSession({
     provider: { kind: 'http', providerId: 'fake-claude' },
     modelId: 'fake-model',
     cwd: '/tmp',

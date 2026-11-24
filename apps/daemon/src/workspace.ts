@@ -108,7 +108,6 @@ export interface WorkspaceManagerOpts {
   logger: DaemonLogger;
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
-  seedRoot?: string;
 }
 
 export class WorkspaceManager implements WorktreeOps {
@@ -116,11 +115,9 @@ export class WorkspaceManager implements WorktreeOps {
   private readonly logger: DaemonLogger;
   private readonly orphanTtlMs: number;
   private readonly hookTimeoutMs: number;
-  private readonly seedRoot: string | undefined;
 
   constructor(opts: WorkspaceManagerOpts) {
     this.logger = opts.logger;
-    this.seedRoot = opts.seedRoot;
     this.orphanTtlMs = opts.orphanTtlMs ?? ORPHAN_WORKTREE_TTL_MS;
     this.hookTimeoutMs = opts.hookTimeoutMs ?? WORKSPACE_HOOK_TIMEOUT_MS;
   }
@@ -142,8 +139,7 @@ export class WorkspaceManager implements WorktreeOps {
 
   async prepare(input: WorktreePrepareInput): Promise<PreparedWorkspace> {
     return this.withProjectLock(input.projectId, async () => {
-      const seed = this.seedRoot ? join(this.seedRoot, input.projectId, 'repo') : null;
-      const cloneUrl = seed && input.repoKind === 'local' ? seed : input.cloneUrl;
+      const cloneUrl = input.cloneUrl;
       const branch = conversationBranch(input.conversationId);
       const baseRepoDir = join(input.workspacesRoot, input.projectId, 'repo');
       const convDir = join(input.workspacesRoot, input.conversationId);
@@ -157,7 +153,7 @@ export class WorkspaceManager implements WorktreeOps {
         }
       }
 
-      const credFallback = !this.seedRoot && input.machineCredentialFallback === true;
+      const credFallback = input.machineCredentialFallback === true;
       let credentialSource: GitCredentialSource = 'integration';
       let activeCredentials = input.credentials;
       const baseRefresh = input.refresh;
@@ -204,29 +200,18 @@ export class WorkspaceManager implements WorktreeOps {
         return source;
       };
       if (!existsSync(join(baseRepoDir, '.git')) && !isBareish(baseRepoDir)) {
-        let fromSeed = false;
-        if (seed && existsSync(seed)) {
-          await gitPrim.clone(seed, baseRepoDir, null);
-          await gitPrim.setRemoteUrl(baseRepoDir, cloneUrl);
-          await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
-          await runNet('set-head', (cred) => gitPrim.remoteSetHeadAuto(baseRepoDir, cred));
-          this.logger.workspace('Repo source: orb seed');
-          fromSeed = true;
-        }
-        if (!fromSeed) {
-          const label = repoLabel(cloneUrl);
-          const defaultBranchGuess = 'main';
-          this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
-          await runNet(
-            'clone',
-            (cred) => {
-              if (existsSync(baseRepoDir)) rmSync(baseRepoDir, { recursive: true, force: true });
-              return gitPrim.clone(cloneUrl, baseRepoDir, cred);
-            },
-            () => rmSync(baseRepoDir, { recursive: true, force: true }),
-          );
-          await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
-        }
+        const label = repoLabel(cloneUrl);
+        const defaultBranchGuess = 'main';
+        this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
+        await runNet(
+          'clone',
+          (cred) => {
+            if (existsSync(baseRepoDir)) rmSync(baseRepoDir, { recursive: true, force: true });
+            return gitPrim.clone(cloneUrl, baseRepoDir, cred);
+          },
+          () => rmSync(baseRepoDir, { recursive: true, force: true }),
+        );
+        await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));
       } else {
         const origin = await gitPrim.originConfigUrl(baseRepoDir);
         const retargeted = origin !== null && origin !== cloneUrl;

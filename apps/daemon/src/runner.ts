@@ -9,7 +9,6 @@ import type {
   CommitIdentity,
   MachineHeartbeatBody,
   SkillInjectionFacts,
-  WorkspaceHookNoteData,
   WorktreeOps,
 } from '@cairn/shared';
 import { isBuildStepKind, mcpConnectorSecretValues, PLAN_FILE_NAME } from '@cairn/shared';
@@ -90,8 +89,6 @@ export interface RunStepOptions {
   running?: number;
   env?: Record<string, string>;
   stopRequest?: StopRequest;
-  hookNotes?: WorkspaceHookNoteData[];
-  orbStartedAt?: number;
   retryStormMax?: number;
   streamTimeouts?: { first: number; idle: number; body: number };
   streamDurationCapMs?: number;
@@ -406,7 +403,7 @@ async function runClaimedStep(
     isPi,
     isChief,
     isReview,
-    metered: treeEnv.CAIRN_ORB !== '1',
+    metered: true,
     creds,
     gitCredential: hostedGitCred,
     commitIdentity: appIdentity,
@@ -500,8 +497,6 @@ async function runClaimedStep(
     modelKey,
     skippedNoVisionCount,
     prompt,
-    orbHookNotes: opts.hookNotes ?? [],
-    orbStartedAt: opts.orbStartedAt,
     workspaceHooks: ws?.hooks ?? [],
     gitCredentialSource:
       repo !== null && repo.kind === 'github' && ws !== null
@@ -675,7 +670,7 @@ async function runClaimedStep(
     stop,
     forgetHandle: () => deps.sessionHandles?.delete(stepId),
     stopHeartbeat: () => {
-      if (treeEnv.CAIRN_ORB !== '1') clearInterval(heartbeat);
+      clearInterval(heartbeat);
     },
     headAtStart,
     stepStartMs,

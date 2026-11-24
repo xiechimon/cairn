@@ -997,26 +997,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "confinement": {
-      "additionalProperties": false,
-      "properties": {
-        "generation": {
-          "exclusiveMinimum": 0,
-          "maximum": 9007199254740991,
-          "type": "integer",
-        },
-        "invocation": {
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-          "type": "string",
-        },
-      },
-      "required": [
-        "invocation",
-        "generation",
-      ],
-      "type": "object",
-    },
     "maxWorkers": {
       "maximum": 9007199254740991,
       "minimum": 1,
@@ -6143,7 +6123,6 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                         "machine-offline",
                         "machine-retired",
                         "capability-missing",
-                        "sandbox-unavailable",
                         "runtime-disabled",
                         "model-unavailable",
                         "local-path",
@@ -7929,7 +7908,6 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
                 "machine-offline",
                 "machine-retired",
                 "capability-missing",
-                "sandbox-unavailable",
                 "runtime-disabled",
                 "model-unavailable",
                 "local-path",
@@ -10273,7 +10251,6 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                                     "machine-offline",
                                     "machine-retired",
                                     "capability-missing",
-                                    "sandbox-unavailable",
                                     "runtime-disabled",
                                     "model-unavailable",
                                     "local-path",
@@ -10951,8 +10928,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "apiKey": "CAIRN_API_KEY",
     "auth": "CAIRN_AUTH",
     "claudeBin": "CAIRN_CLAUDE_BIN",
-    "confineDeniedRoots": "CAIRN_CONFINE_DENIED_ROOTS",
-    "confinementPlatform": "CAIRN_CONFINEMENT_PLATFORM",
     "coordinatorInServer": "CAIRN_COORDINATOR_IN_SERVER",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
     "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",
@@ -12707,7 +12682,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                     "machine-offline",
                     "machine-retired",
                     "capability-missing",
-                    "sandbox-unavailable",
                     "runtime-disabled",
                     "model-unavailable",
                     "local-path",
@@ -13047,112 +13021,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "minLength": 1,
               "pattern": "^\\P{C}+$",
               "type": "string",
-            },
-            "confinement": {
-              "oneOf": [
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "generation": {
-                      "exclusiveMinimum": 0,
-                      "maximum": 9007199254740991,
-                      "type": "integer",
-                    },
-                    "invocation": {
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-                      "type": "string",
-                    },
-                    "revision": {
-                      "exclusiveMinimum": 0,
-                      "maximum": 9007199254740991,
-                      "type": "integer",
-                    },
-                    "state": {
-                      "enum": [
-                        "checking",
-                        "ready",
-                        "not-applicable",
-                      ],
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "invocation",
-                    "generation",
-                    "state",
-                    "revision",
-                  ],
-                  "type": "object",
-                },
-                {
-                  "additionalProperties": false,
-                  "properties": {
-                    "generation": {
-                      "exclusiveMinimum": 0,
-                      "maximum": 9007199254740991,
-                      "type": "integer",
-                    },
-                    "invocation": {
-                      "format": "uuid",
-                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
-                      "type": "string",
-                    },
-                    "reason": {
-                      "enum": [
-                        "startup-failed",
-                        "cleanup-failed",
-                        "unsupported-platform",
-                      ],
-                      "type": "string",
-                    },
-                    "revision": {
-                      "exclusiveMinimum": 0,
-                      "maximum": 9007199254740991,
-                      "type": "integer",
-                    },
-                    "state": {
-                      "const": "unavailable",
-                      "type": "string",
-                    },
-                  },
-                  "required": [
-                    "invocation",
-                    "generation",
-                    "state",
-                    "revision",
-                    "reason",
-                  ],
-                  "type": "object",
-                },
-              ],
-            },
-            "confinementCause": {
-              "additionalProperties": false,
-              "properties": {
-                "kind": {
-                  "enum": [
-                    "not-own-unit",
-                    "bwrap-missing",
-                    "bwrap-too-old",
-                    "userns-denied",
-                    "home-overlay-failed",
-                    "seatbelt-missing",
-                    "seatbelt-probe-failed",
-                  ],
-                  "type": "string",
-                },
-                "mountPoint": {
-                  "format": "starts_with",
-                  "maxLength": 4096,
-                  "pattern": "^\\/.*",
-                  "type": "string",
-                },
-              },
-              "required": [
-                "kind",
-              ],
-              "type": "object",
             },
             "devin": {
               "additionalProperties": false,

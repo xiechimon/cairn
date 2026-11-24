@@ -8,7 +8,6 @@ import {
   realpathSync,
   statSync,
 } from 'node:fs';
-import { join } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { BRAND, ENV_VARS, PROVIDER_COMMAND_NOTICE, sleep } from '@cairn/shared';
@@ -31,9 +30,6 @@ import { importAgentConfig } from './import-agent-config.js';
 import { createDaemonLogger } from './log.js';
 import { machineNameSuffix, pendingEnrollmentUrl } from './machine-enroll.js';
 import { runMachine } from './machine-loop.js';
-import { ORB_RELAY_TOKEN_ENV } from './orb/protocol.js';
-import { runOrbServicesEnsure } from './orb/services-runtime.js';
-import { orbAgentHome, runOrbWorker } from './orb/worker.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { claudeConfigHome } from './runtime-homes.js';
 import { ensureDaemonShellEnv } from './shell-env.js';
@@ -96,7 +92,6 @@ function reportStarted(started: SupervisorStart): void {
   if (started.unitFailure !== null) {
     process.stderr.write(
       `warning: could not start the daemon as a systemd user unit (${started.unitFailure}).\n` +
-        'The Runner will show Online but cannot start its task sandbox, so it will not take tasks.\n' +
         'Run it under systemd instead: https://github.com/xiechimon/cairn/blob/main/docs/getting-started.md#keep-the-daemon-running-on-linux\n',
     );
   }
@@ -383,28 +378,6 @@ export function buildProgram(): Command {
       process.exitCode = result.status ?? 1;
     });
 
-  program
-    .command('orb-step', { hidden: true })
-    .option('--socket <path>', 'Per-step relay socket')
-    .option('--stdio', 'Carry the relay over stdin and stdout (remote sandbox orbs)')
-    .action(async (opts: { socket?: string; stdio?: boolean }) => {
-      if (process.env.CAIRN_ORB !== '1') throw new Error('Orb worker requires CAIRN_ORB=1');
-      process.env.CAIRN_HOME = join(orbAgentHome(), '.cairn');
-      activateWebTools(process.env.CAIRN_HOME);
-      if (opts.stdio) {
-        const token = process.env[ORB_RELAY_TOKEN_ENV];
-        delete process.env[ORB_RELAY_TOKEN_ENV];
-        if (!token) throw new Error(`Orb stdio worker requires ${ORB_RELAY_TOKEN_ENV}`);
-        await runOrbWorker({
-          stdio: { input: process.stdin, output: process.stdout, token },
-        });
-        process.stdin.destroy();
-        return;
-      }
-      if (!opts.socket) throw new Error('Orb worker requires --socket or --stdio');
-      await runOrbWorker({ socketPath: opts.socket });
-    });
-
   const webTools = program
     .command('web-tools')
     .description('Public-web tools and optional platform channels');
@@ -439,18 +412,6 @@ export function buildProgram(): Command {
         process.stdout.write(
           'Restart the Runner. Installed tools, skills and credentials were not removed.\n',
         );
-    });
-
-  const orb = program.command('orb').description('Orb host helpers');
-  orb
-    .command('services')
-    .command('ensure')
-    .description('Start missing services from .agents/services.yaml and wait until ready')
-    .option('--json', 'print JSON status')
-    .option('--file <path>', 'services file (default .agents/services.yaml)')
-    .action(async (opts: { json?: boolean; file?: string }) => {
-      const code = await runOrbServicesEnsure(opts);
-      if (code !== 0) process.exitCode = code;
     });
 
   return program;

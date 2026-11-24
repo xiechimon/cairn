@@ -12,7 +12,6 @@ import {
   machineAskBodySchema,
   machineBackgroundTaskBodySchema,
   machineClaimBodySchema,
-  machineClosedOrbsBodySchema,
   machineComputerFramesBodySchema,
   machineComputerRelayBodySchema,
   machineDoneBodySchema,
@@ -39,10 +38,9 @@ import {
   SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@cairn/shared';
-import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
-import { build, type machine as machineTable, step, todo } from './db/schema.js';
+import type { machine as machineTable } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
@@ -416,32 +414,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/machine/me', (c) => {
     const row = me(c);
     return c.json(toMachineRecord(row, machineRunningCount(deps.db, row.id)));
-  });
-
-  app.post('/api/machine/orbs/closed', async (c) => {
-    return executeMachineCommand(
-      c,
-      () => jsonBody(c),
-      async (row, decoded) => {
-        const body = parseWith(machineClosedOrbsBodySchema, decoded, 'body');
-        if (body.conversationIds.length === 0) return c.json([]);
-        const closed = ctx.db
-          .selectDistinct({ id: build.id })
-          .from(build)
-          .innerJoin(todo, eq(todo.id, build.todoId))
-          .innerJoin(step, eq(step.buildId, build.id))
-          .where(
-            and(
-              inArray(build.id, body.conversationIds),
-              eq(step.machineId, row.id),
-              eq(todo.teamId, row.teamId),
-              or(inArray(todo.phase, ['closed', 'done']), isNotNull(todo.archivedAt)),
-            ),
-          )
-          .all();
-        return c.json(closed.map((conversation) => conversation.id));
-      },
-    );
   });
 
   app.post('/api/machine/presence', async (c) => {

@@ -145,8 +145,7 @@ test('self-deploy authenticates gh with a GitHub App token', () => {
 });
 
 test('every unit runs from the dedicated deploy clone, not the lanes checkout', () => {
-  const orb = parseUnit('cairn-daemon-orb');
-  for (const [name, unit] of Object.entries({ ...units, 'cairn-daemon-orb': orb })) {
+  for (const [name, unit] of Object.entries(units)) {
     assert.match(
       unit.entries.get('WorkingDirectory')[0],
       /^%h\/Code\/AgentProjects\/cairn-exec\/apps\//,

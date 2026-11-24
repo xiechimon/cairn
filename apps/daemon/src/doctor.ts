@@ -30,53 +30,8 @@ export interface DoctorEnv {
   freeBytes(path: string): number | undefined;
 }
 
-type KnownFamily = 'arch' | 'debian' | 'fedora';
-type Family = KnownFamily | 'unknown';
-
-interface ToolSpec {
-  cmd: string;
-  packages: Record<KnownFamily, string>;
-}
-
-const INSTALL_COMMAND: Record<KnownFamily, string> = {
-  arch: 'sudo pacman -S --needed',
-  debian: 'sudo apt install',
-  fedora: 'sudo dnf install',
-};
-
-const FAMILY_IDS: Record<KnownFamily, string[]> = {
-  arch: ['arch'],
-  debian: ['debian', 'ubuntu'],
-  fedora: ['fedora', 'rhel', 'centos'],
-};
-
 const MIN_NODE = [22, 19, 0];
 const MIN_FREE_BYTES = 10 * 1024 ** 3;
-
-function osReleaseIds(content: string | undefined): string[] {
-  if (content === undefined) return [];
-  const ids: string[] = [];
-  for (const line of content.split('\n')) {
-    const match = /^(ID|ID_LIKE)=(.*)$/.exec(line.trim());
-    if (!match) continue;
-    const value = (match[2] ?? '').replace(/^["']|["']$/g, '');
-    ids.push(...value.toLowerCase().split(/\s+/).filter(Boolean));
-  }
-  return ids;
-}
-
-function distroFamily(content: string | undefined): Family {
-  const ids = osReleaseIds(content);
-  for (const family of ['arch', 'debian', 'fedora'] as const) {
-    if (FAMILY_IDS[family].some((id) => ids.includes(id))) return family;
-  }
-  return 'unknown';
-}
-
-function installFix(tool: ToolSpec, family: Family): string {
-  if (family === 'unknown') return `install the package that provides ${tool.cmd}`;
-  return `${INSTALL_COMMAND[family]} ${tool.packages[family]}`;
-}
 
 function nodeAtLeastMinimum(version: string): boolean {
   const parts = version.split('.').map((part) => Number.parseInt(part, 10));
@@ -154,10 +109,7 @@ function darwinChecks(env: DoctorEnv): Check[] {
 
 function linuxChecks(env: DoctorEnv): Check[] {
   const checks: Check[] = [{ id: 'linux', label: 'Linux host', status: 'pass' }];
-  const family = distroFamily(env.readFile('/etc/os-release'));
-
   checks.push(nodeCheck(env), notRootCheck(env), diskCheck(env));
-
   const kernel = env.run('uname', ['-r']).stdout.trim() || 'unknown';
   checks.push({
     id: 'versions',
@@ -165,54 +117,6 @@ function linuxChecks(env: DoctorEnv): Check[] {
     status: 'info',
     detail: `kernel ${kernel}`,
   });
-
-  checks.push(
-    env.which('podman')
-      ? {
-          id: 'orb:podman',
-          label: 'podman orb backend',
-          status: 'pass',
-          detail: 'available for CAIRN_ORB_RUNTIME=podman',
-        }
-      : {
-          id: 'orb:podman',
-          label: 'podman orb backend',
-          status: 'info',
-          detail: 'not installed; optional — enables CAIRN_ORB_RUNTIME=podman containers',
-          fix: installFix(
-            {
-              cmd: 'podman',
-              packages: { arch: 'podman', debian: 'podman', fedora: 'podman' },
-            },
-            family,
-          ),
-        },
-    env.which('systemd-nspawn') && env.which('machinectl')
-      ? {
-          id: 'orb:nspawn',
-          label: 'nspawn orb backend',
-          status: 'pass',
-          detail: 'available for CAIRN_ORB_RUNTIME=nspawn',
-        }
-      : {
-          id: 'orb:nspawn',
-          label: 'nspawn orb backend',
-          status: 'info',
-          detail: 'not installed; optional — enables CAIRN_ORB_RUNTIME=nspawn',
-          fix: installFix(
-            {
-              cmd: 'systemd-nspawn',
-              packages: {
-                arch: 'systemd',
-                debian: 'systemd-container',
-                fedora: 'systemd-container',
-              },
-            },
-            family,
-          ),
-        },
-  );
-
   return checks;
 }
 

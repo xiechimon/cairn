@@ -32,9 +32,6 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/computer/owner-chrome.ts:sessions':
     'MCP tool-client pool for the daemon-owned Chrome session; a process resource',
   'apps/daemon/src/host-permissions.ts:SETTLED': 'constant lookup table',
-  'apps/daemon/src/orb/podman.ts:RESUMABLE_STATES': 'constant lookup table',
-  'apps/daemon/src/orb/relay.ts:listeningPaths':
-    'socket paths already bound by relay servers in this process; prevents double-bind',
   'apps/daemon/src/step-env.ts:AMBIENT_GOOGLE_AUTH':
     'constant environment-variable name lookup; never mutated or populated from an instance',
   'apps/daemon/src/step-pass-events.ts:CHANGE_TOOLS': 'constant lookup table',

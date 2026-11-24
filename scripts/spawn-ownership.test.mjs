@@ -6,10 +6,7 @@ import test from 'node:test';
 
 const ROOT = join(import.meta.dirname, '..');
 const HELPER = 'scripts/owned-process.mjs';
-const SANDBOXED = {
-  'scripts/ops/orb/canary-attacker.mjs':
-    'runs inside the canary sandbox, which receives only canary-attacker.mjs and canary-model.mjs; the model it leaves running watches its parent pid and stops itself after 10 minutes',
-};
+const SANDBOXED = {};
 const CODE = /\.(c|m)?(j|t)s$/;
 const LAUNCH_DOCS = /\b(nohup|setsid|disown)\b|\S\s+&\s*$/m;
 

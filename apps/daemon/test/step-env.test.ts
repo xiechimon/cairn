@@ -92,13 +92,6 @@ describe('assembleStepEnv', () => {
     });
   });
 
-  test('inside an Orb guest the subprocess scrub stays off', () => {
-    const { env } = assembleStepEnv(
-      input({ inherited: { CAIRN_ORB: '1' }, claudeSubscriptionToken: 'step' }),
-    );
-    expect(env).toEqual({ CAIRN_ORB: '1', CLAUDE_CODE_OAUTH_TOKEN: 'step' });
-  });
-
   test('only a Claude Code Coordinator step gets the idle-compaction threshold', () => {
     expect(assembleStepEnv(input({ claudeCodeCoordinator: true })).env).toEqual({
       CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS: '100000',
@@ -145,13 +138,6 @@ describe('agent config isolation', () => {
       }),
     );
     expect(env.CLAUDE_CONFIG_DIR).toBe(join('/cairn-home', 'homes', 'claude'));
-  });
-
-  test('an Orb guest keeps the image config, whose Claude settings the sandbox needs', () => {
-    const { env } = assembleStepEnv(
-      input({ inherited: { CAIRN_ORB: '1' }, runtimeId: 'claude-code' }),
-    );
-    expect(env.CLAUDE_CONFIG_DIR).toBeUndefined();
   });
 
   test('Antigravity gets a Cairn HOME whose sign-in links follow the user file', () => {

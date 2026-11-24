@@ -153,7 +153,7 @@ describe('the session asks Claude Code for its limits without waiting on the ans
         getContextUsage,
       }) as unknown as Query;
     });
-    const backend = createClaudeCodeBackend({ inOrb: true });
+    const backend = createClaudeCodeBackend({});
     const opts = {
       provider: { kind: 'http' as const, providerId: 'fake-claude' },
       modelId: MODEL,

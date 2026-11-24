@@ -1414,7 +1414,6 @@ export interface ClaudeSdkOptionParts {
   disallowedTools: string[];
   builtinTools?: string[];
   deferredTools?: boolean;
-  inOrb: boolean;
   lockedDown: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
@@ -1439,52 +1438,32 @@ const METERED_CLAUDE_AUTH_BLANK = {
   CLAUDE_CODE_USE_FOUNDRY: '',
 };
 
-const OAUTH_TOKEN_FD = 3;
-
-function spawnClaudeProcess(
-  fdToken: string | undefined,
-  session: SessionProcess | undefined,
-): (options: SpawnOptions) => SpawnedProcess {
+function spawnClaudeProcess(session: SessionProcess): (options: SpawnOptions) => SpawnedProcess {
   return ({ command, args, cwd, env, signal }) => {
     const child = spawn(command, args, {
       ...(cwd !== undefined ? { cwd } : {}),
-      env: session === undefined ? env : { ...env, [SESSION_TREE_ENV]: session.marker },
+      env: { ...env, [SESSION_TREE_ENV]: session.marker },
       signal,
-      stdio: ['pipe', 'pipe', 'ignore', 'pipe'],
+      stdio: ['pipe', 'pipe', 'ignore'],
       windowsHide: true,
       ...(process.platform !== 'win32' ? { detached: true } : {}),
     });
-    const channel = child.stdio[OAUTH_TOKEN_FD];
-    if (fdToken !== undefined && channel !== null && channel !== undefined && 'end' in channel) {
-      channel.on('error', () => {});
-      channel.end(fdToken);
-    }
     const { stdin, stdout } = child;
     if (stdin === null || stdout === null)
       throw new Error('Claude Code process has no stdio pipes');
-    if (session !== undefined) session.child = child;
+    session.child = child;
     return Object.assign(child, { stdin, stdout });
   };
 }
 
 export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
   const managedMcp = parts.strictMcpConfig === true;
-  const locked = !parts.inOrb && parts.lockedDown;
+  const locked = parts.lockedDown;
   const stepToken = parts.env?.CLAUDE_CODE_OAUTH_TOKEN;
-  const inheritedEnv = claudeCliEnv({
+  const env = claudeCliEnv({
     ...parts.env,
     ...(stepToken !== undefined ? METERED_CLAUDE_AUTH_BLANK : {}),
   });
-  const fdToken = parts.inOrb ? stepToken : undefined;
-  const env =
-    fdToken !== undefined
-      ? {
-          ...Object.fromEntries(
-            Object.entries(inheritedEnv).filter(([key]) => key !== 'CLAUDE_CODE_OAUTH_TOKEN'),
-          ),
-          CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: String(OAUTH_TOKEN_FD),
-        }
-      : inheritedEnv;
   const hostMcp = Object.fromEntries(
     Object.entries(parts.mcpServers).filter(([slug]) => slug === HOST_MCP_SERVER_NAME),
   );
@@ -1506,9 +1485,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
             ...(parts.deferredTools === true ? [TOOL_SEARCH_BUILTIN] : []),
           ],
         }
-      : parts.inOrb
-        ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
-        : { permissionMode: 'bypassPermissions' as const }),
+      : { permissionMode: 'bypassPermissions' as const }),
     disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
     ...(locked
       ? {
@@ -1555,8 +1532,8 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
     env,
-    ...(fdToken !== undefined || parts.process !== undefined
-      ? { spawnClaudeCodeProcess: spawnClaudeProcess(fdToken, parts.process) }
+    ...(parts.process !== undefined
+      ? { spawnClaudeCodeProcess: spawnClaudeProcess(parts.process) }
       : {}),
     ...(!locked && parts.plugins !== undefined && parts.plugins.length > 0
       ? { plugins: parts.plugins }
@@ -1572,7 +1549,6 @@ export function claudeSessionEnv(opts: SessionOpts): Record<string, string> | un
 }
 
 export interface ClaudeCodeBackendOpts {
-  inOrb?: boolean;
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
   executablePath?: string;
@@ -1679,7 +1655,6 @@ export class ClaudeCodeBackend implements AgentBackend {
         resumeId,
         sessionId,
         disallowedTools,
-        inOrb: this.opts.inOrb === true,
         lockedDown: opts.lockedDown === true,
         ...(opts.remoteToolsOnly === true
           ? { builtinTools: deferredTools ? [TOOL_SEARCH_BUILTIN] : [] }

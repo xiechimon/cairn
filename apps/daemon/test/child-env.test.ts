@@ -10,7 +10,6 @@ import { redactingMcpTransports } from '../src/backend/mcp-log-redaction.js';
 import { runtimeChildEnv } from '../src/backend/otel.js';
 import { piBashEnv } from '../src/backend/pi.js';
 import { childEnv } from '../src/child-env.js';
-import { HostOrbProvider } from '../src/orb/provider.js';
 import { assembleStepEnv, type StepEnvInput } from '../src/step-env.js';
 import { runWorkspaceHook } from '../src/workspace-hooks.js';
 import { testTempDir } from './test-temp-dir.js';
@@ -278,22 +277,6 @@ describe('spawn sites', () => {
     expect(seen.HOME).toBe(process.env.HOME);
   });
 
-  test('a host orb exec child inherits host env minus Cairn internal tokens', async () => {
-    vi.stubEnv('GH_TOKEN', 'host-gh-token');
-    vi.stubEnv('CAIRN_TOKEN', 'daemon-secret');
-    const captured: NodeJS.ProcessEnv[] = [];
-    const host = new HostOrbProvider(async (_argv, options) => {
-      captured.push(options?.env ?? {});
-      return { code: 0, stdout: '', stderr: '' };
-    });
-    const handle = await host.ensure({ conversationId: 'C', projectId: 'P' });
-    await host.exec(handle, ['env'], { env: { STEP_ONLY: '1' } });
-    expect(captured[0]?.GH_TOKEN).toBe('host-gh-token');
-    expect(captured[0]?.CAIRN_TOKEN).toBeUndefined();
-    expect(captured[0]?.STEP_ONLY).toBe('1');
-    expect(captured[0]?.PATH).toBe(process.env.PATH);
-  });
-
   test('an ACP child inherits host git/gh env while dropping Cairn internal tokens', async () => {
     vi.stubEnv('GH_TOKEN', 'host-gh-token');
     vi.stubEnv('CAIRN_TOKEN', 'daemon-secret');
@@ -331,7 +314,6 @@ describe('spawn sites', () => {
       sessionId: 'env-test',
       disallowedTools: [],
       mcpServers: {},
-      inOrb: false,
       lockedDown: false,
       abortController: new AbortController(),
       env: { CLAUDE_CONFIG_DIR: '/cairn/home', FOO: 'step' },

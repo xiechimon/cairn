@@ -178,10 +178,6 @@ jobs:
           UI_DEBT_BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: pnpm prepush --ci
 
-      - name: Orb canary scratch runner (#2277)
-        if: needs.changes.outputs.ops-selftests == 'true'
-        run: node --test scripts/ops/orb/canary-stack.test.mjs
-
       - name: Prepush self-test
         if: needs.changes.outputs.ops-selftests == 'true'
         run: pnpm prepush --self-test
@@ -527,9 +523,6 @@ jobs:
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/real-smoke.test.mjs scripts/smoke/post-install.test.mjs
 
-      - name: Orb host provisioning fixtures (#2273)
-        if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node --test scripts/ops/orb/egress-relay.test.mjs scripts/ops/orb/orb-host-check.test.mjs scripts/ops/orb/provision.test.mjs scripts/ops/orb/shell.test.mjs scripts/ops/orb/canary.test.mjs scripts/ops/orb/canary-review.test.mjs scripts/ops/orb/canary-container.test.mjs scripts/ops/orb/container-host-check.test.mjs scripts/ops/orb/egress-unit.test.mjs scripts/ops/orb/trial-evidence-check.test.mjs scripts/ops/orb/trial-report.test.mjs
       - name: Host control script fixtures (#2380)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
         run: node --test scripts/ops/host/brake.test.mjs scripts/ops/host/surface-stuck-rebase.test.mjs scripts/ops/host/lane-replaced.test.mjs scripts/ops/host/as-bot.test.mjs scripts/ops/host/dispatch-issue.test.mjs scripts/ops/host/main-watch.test.mjs scripts/ops/host/identity-compat.test.mjs

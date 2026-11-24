@@ -13,8 +13,6 @@ export interface StepTranscriptSeed {
   modelKey: string;
   skippedNoVisionCount: number;
   prompt: string | null;
-  orbHookNotes: readonly WorkspaceHookNoteData[];
-  orbStartedAt: number | undefined;
   workspaceHooks: readonly WorkspaceHookNoteData[];
   gitCredentialSource: GitCredentialSource | null;
   redact: (text: string) => string;
@@ -41,16 +39,11 @@ export function seedStepTranscript(
       createdAt: now(),
     });
   }
-  for (const [index, hook] of [...seed.orbHookNotes, ...seed.workspaceHooks].entries()) {
-    const isOrbNote = seed.orbHookNotes.includes(hook);
-    const output =
-      isOrbNote && hook.output.startsWith('orb: started in') && seed.orbStartedAt !== undefined
-        ? `orb: started in ${Math.max(0, now() - seed.orbStartedAt)}ms`
-        : hook.output;
+  for (const hook of seed.workspaceHooks) {
     transcript.upsert({
-      id: isOrbNote ? `orb-hook-${index}-${stepId}` : `hook-${hook.name}-${stepId}`,
+      id: `hook-${hook.name}-${stepId}`,
       role: 'system',
-      content: workspaceHookRowContent(hook, seed.redact(output)),
+      content: workspaceHookRowContent(hook, seed.redact(hook.output)),
       createdAt: now(),
     });
   }

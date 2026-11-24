@@ -25,7 +25,6 @@ import { loadDaemonConfig } from '../src/config.js';
 import { type DaemonLogger, formatLine } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runMachine } from '../src/machine-loop.js';
-import type { OrbProvider } from '../src/orb/provider.js';
 import { ensureStateDirs, type StatePaths, saveMachineJson, statePaths } from '../src/state.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
@@ -297,7 +296,6 @@ export interface BootOpts {
   preEnrolled?: { serverUrl: string };
   seedJournal?: (paths: StatePaths) => void;
   capEnv?: NodeJS.ProcessEnv;
-  orbProvider?: OrbProvider;
   orbComputer?: ScopedComputerProviders;
   platform?: string;
   strandedUploadReplayMs?: number;
@@ -414,7 +412,6 @@ export function startMachine(opts: BootOpts) {
         : {}),
       claimBackoffBaseMs: 10,
       proxyEnv: {},
-      ...(opts.orbProvider !== undefined ? { orbProvider: opts.orbProvider } : {}),
       ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
       ...(opts.orbComputer !== undefined ? { orbComputer: opts.orbComputer } : {}),
       ...(opts.claudeManaged !== undefined ? { claudeManaged: opts.claudeManaged } : {}),

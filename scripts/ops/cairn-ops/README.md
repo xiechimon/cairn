@@ -11,7 +11,6 @@ Installing this lets any process running as `ian` run main-merged ops scripts as
 ```sh
 sudo cairn-ops-run <task> <full-commit-sha> [--dry-run] [--env NAME=VALUE]...
 sudo cairn-ops-run secret-reach-setup "$(git rev-parse origin/main)" --dry-run
-sudo cairn-ops-run orb-install-host "$(git rev-parse origin/main)" --env CAIRN_ORB_NODE_MAJOR=26
 ```
 
 `--dry-run` is appended to the task's fixed argv. `--env` accepts only names listed for that task in `/etc/cairn-ops/tasks.json`, each with a value pattern matched in full. The caller's environment is never passed on; sudo resets it and the wrapper starts Node with `env -i`. Refusals exit `2`; otherwise the task's exit code is returned.

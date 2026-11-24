@@ -91,20 +91,6 @@ describe('runDoctor on Linux', () => {
     expect(result.checks[0]).toMatchObject({ id: 'platform', status: 'fail' });
   });
 
-  it('reports optional orb backends as info, not failures', () => {
-    const env = linuxEnv({ missing: ['podman', 'systemd-nspawn', 'machinectl'] });
-    expect(check(env, 'orb:podman').status).toBe('info');
-    expect(check(env, 'orb:nspawn').status).toBe('info');
-    expect(runDoctor(env).ok).toBe(true);
-    expect(check(linuxEnv(), 'orb:podman').status).toBe('pass');
-    expect(check(linuxEnv(), 'orb:nspawn').status).toBe('pass');
-  });
-
-  it('passes orb:nspawn only when both nspawn tools exist', () => {
-    const env = linuxEnv({ missing: ['machinectl'] });
-    expect(check(env, 'orb:nspawn').status).toBe('info');
-  });
-
   it('requires Node 22.19 or newer', () => {
     const old = check(linuxEnv({ nodeVersion: '22.18.0' }), 'node');
     expect(old.status).toBe('fail');

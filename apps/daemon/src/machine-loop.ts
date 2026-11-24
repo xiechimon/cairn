@@ -18,7 +18,6 @@ import {
   classifyClaudeCodeLogin,
   ENV_VARS,
   isBackendRuntimeId,
-  MACHINE_ORB_CONVERSATIONS_LIMIT,
   type ManagedUpdateRuntime,
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
@@ -88,15 +87,11 @@ import {
   MachineClient,
 } from './machine-client.js';
 import { enrollThroughBrowser } from './machine-enroll.js';
-import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
-import type { OrbProvider } from './orb/provider.js';
-import { createOrbProvider } from './orb/select.js';
-import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { STEP_TREE_ENV, StepReaper } from './process-tree.js';
 import { setupProxy } from './proxy.js';
 import { performRepoArchive } from './repo-archive.js';
-import type { RunStepOptions } from './runner.js';
+import { type RunStepOptions, runStep } from './runner.js';
 import {
   claudeConfigHome,
   migrateRuntimeHomes,
@@ -153,7 +148,6 @@ export interface MachineLoopOpts {
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
   capEnv?: NodeJS.ProcessEnv;
-  orbProvider?: OrbProvider;
   hostComputer?: ComputerProvider;
   hostScreen?: HostScreen;
   orbComputer?: ScopedComputerProviders;
@@ -341,7 +335,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   await probeAuthAndRemember();
 
   const capEnv = opts.capEnv ?? process.env;
-  const orbProvider = opts.orbProvider ?? createOrbProvider(capEnv, paths.home);
   const capabilitiesProbe =
     opts.capabilitiesProbe ??
     createMachineCapabilitiesProbe({
@@ -525,7 +518,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
               models: install.models,
             };
       })(),
-      executor: orbProvider.kind,
+      executor: 'host' as const,
       antigravityOAuthProfile: true,
       ...(client.claimAntigravityModelProbe && client.finishAntigravityModelProbe
         ? { antigravitySubscriptionModels: true as const }
@@ -912,15 +905,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
   logger.raw(`Online (machineId=${machineId}); polling ${config.serverUrl}`);
 
-  const orbCap = resolveOrbCap(capEnv);
-  const idleStop = Number(capEnv.CAIRN_ORB_IDLE_STOP_MS);
-  const orbs = new OrbLifecycle(orbProvider, {
-    max: orbCap,
-    onStopped: (handle) => relayOrbStopped(stepDeps(), handle),
-    log: (message) => logger.workspace(message),
-    ...(Number.isFinite(idleStop) && idleStop > 0 ? { idleStopMs: idleStop } : {}),
-  });
-
   let caffeinate: ChildProcess | undefined;
   if (opts.idleSleepPrevention !== false && process.platform === 'darwin') {
     try {
@@ -1025,54 +1009,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const stepScratchTimer = setInterval(sweepStepScratch, 24 * 60 * 60 * 1000);
   stepScratchTimer.unref?.();
 
-  let sweepingOrbs = false;
-  let pollingClosedOrbs = false;
-  let orbCleanupStopped = false;
-  let closedConversationIds: string[] = [];
-  const sweepOrbs = () => {
-    if (sweepingOrbs || orbCleanupStopped || orbProvider.kind !== 'orb') return;
-    sweepingOrbs = true;
-    const closed = closedConversationIds;
-    closedConversationIds = [];
-    void orbs
-      .sweep({
-        activeConversationIds: journal.pending().map((entry) => entry.conversationId),
-        closedConversationIds: closed,
-      })
-      .catch((error: unknown) => logger.workspace(`orb cleanup failed: ${String(error)}`))
-      .finally(() => {
-        sweepingOrbs = false;
-      });
-  };
-  const pollClosedOrbs = () => {
-    if (
-      pollingClosedOrbs ||
-      orbCleanupStopped ||
-      orbProvider.kind !== 'orb' ||
-      !client.closedOrbConversations
-    )
-      return;
-    pollingClosedOrbs = true;
-    const request = client.closedOrbConversations.bind(client);
-    void (async () => {
-      const ids = (await orbProvider.list()).map((orb) => orb.conversationId);
-      for (let offset = 0; offset < ids.length; offset += MACHINE_ORB_CONVERSATIONS_LIMIT) {
-        const closed = await request(ids.slice(offset, offset + MACHINE_ORB_CONVERSATIONS_LIMIT));
-        closedConversationIds.push(...closed);
-      }
-    })()
-      .catch((error: unknown) => logger.workspace(`closed orb poll failed: ${String(error)}`))
-      .finally(() => {
-        pollingClosedOrbs = false;
-        sweepOrbs();
-      });
-  };
-  pollClosedOrbs();
-  sweepOrbs();
-  const closedOrbTimer = setInterval(pollClosedOrbs, 60_000);
-  closedOrbTimer.unref?.();
-  const orbTimer = setInterval(sweepOrbs, 1_000);
-  orbTimer.unref?.();
   const desktopSweepTimer = hostDesktops
     ? setInterval(() => {
         void hostDesktops
@@ -1085,7 +1021,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const inFlight = new Map<string, Promise<void>>();
   const launchStepRun = (claimed: ClaimedStep, options: RunStepOptions) => {
     const stepId = claimed.step.id;
-    const launched = runOrbStep(orbs, stepDeps(), claimed, options)
+    const launched = runStep(stepDeps(), claimed, options)
       .catch((err: unknown) => {
         logger.step(
           `runStep crashed (step may need recover): ${
@@ -1113,10 +1049,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         const entry = journal.get(stepRecord.id);
         if (entry?.claimed) {
           if (entry.state === 'awaiting-upload' && entry.doneBody != null) {
-            await resumePendingUpload(stepDeps(), entry, {
-              running: 1,
-              failOnRejectedDone: orbProvider.kind === 'orb' && entry.kind !== 'chief',
-            });
+            await resumePendingUpload(stepDeps(), entry, { running: 1 });
             continue;
           }
           const priorMachineId = entry.claimed.session.priorMachineId;
@@ -1566,7 +1499,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       backendFor,
       devinHome: () => devinManaged.current()?.home,
       antigravityAuth: () => antigravityManaged.current()?.authenticated === true,
-      orbProxyUrl: capEnv.CAIRN_ORB_PROXY_URL,
       logger,
       paths,
       workspace,
@@ -1623,10 +1555,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           }
           continue;
         }
-        await resumePendingUpload(stepDeps(), entry, {
-          running: 1,
-          failOnRejectedDone: orbProvider.kind === 'orb' && entry.kind !== 'chief',
-        });
+        await resumePendingUpload(stepDeps(), entry, { running: 1 });
       }
     } finally {
       replayingStranded = false;
@@ -1644,15 +1573,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const backoffBase = opts.claimBackoffBaseMs ?? 1_000;
     let backoff = backoffBase;
     while (!stopping) {
-      if (orbProvider.kind === 'orb' && inFlight.size >= orbCap) {
-        await Promise.race(inFlight.values());
-        continue;
-      }
       let step: ClaimedStep | null = null;
       try {
         step = await client.claim(
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
-          orbProvider.kind === 'orb' ? { maxWorkers: orbCap } : undefined,
         );
         backoff = backoffBase;
       } catch (err) {
@@ -1687,9 +1611,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     clearInterval(presenceTimer);
     clearInterval(strandedTimer);
     clearInterval(orphanTimer);
-    orbCleanupStopped = true;
-    clearInterval(closedOrbTimer);
-    clearInterval(orbTimer);
     clearInterval(desktopSweepTimer);
     clearInterval(stepScratchTimer);
     streamCtrl.abort();

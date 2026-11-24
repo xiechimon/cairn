@@ -85,7 +85,7 @@ export async function putFinalArtifacts(
 export async function resumePendingUpload(
   deps: Pick<RunStepDeps, 'client' | 'journal' | 'logger' | 'paths' | 'sessionHandles'>,
   entry: StepJournalEntry,
-  opts: { running?: number; failOnRejectedDone?: boolean } = {},
+  opts: { running?: number } = {},
 ): Promise<void> {
   const { journal, logger } = deps;
   const stepId = entry.stepId;
@@ -118,27 +118,7 @@ export async function resumePendingUpload(
     });
   } catch (err) {
     logger.step(`done report failed: ${err instanceof Error ? err.message : String(err)}`);
-    if (
-      !opts.failOnRejectedDone ||
-      !(err instanceof MachineApiError) ||
-      err.status < 400 ||
-      err.status >= 500
-    )
-      return;
-    const failedBody: MachineDoneBody = {
-      status: 'failed',
-      errorMessage: `Orb completion rejected with HTTP ${err.status}: ${err.body}`,
-      ...(generation !== undefined ? { generation } : {}),
-    };
-    journal.update(stepId, { doneBody: failedBody });
-    try {
-      await client.done(stepId, failedBody);
-    } catch (error) {
-      logger.step(
-        `done(failed) report unreachable: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return;
-    }
+    return;
   }
   journal.remove(stepId);
   deps.sessionHandles?.delete(stepId);

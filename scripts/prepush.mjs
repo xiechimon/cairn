@@ -192,12 +192,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     )
       ? [selfTest]
       : []),
-    ...(opsSelftests
-      ? [
-          ['node', '--test', 'scripts/ops/orb/canary-stack.test.mjs'],
-          ['node', '.claude/skills/verify-cairn/scripts/vp-selftest.mjs'],
-        ]
-      : []),
+    ...(opsSelftests ? [['node', '.claude/skills/verify-cairn/scripts/vp-selftest.mjs']] : []),
     ...(paths.some((path) => DRIZZLE_CHANGE.test(path))
       ? [
           ['pnpm', '--filter', '@xiechimon/cairn', 'db:check'],
