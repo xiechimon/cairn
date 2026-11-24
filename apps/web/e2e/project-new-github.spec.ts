@@ -70,7 +70,7 @@ test('4. picker search: q filters hits, no hits go to the empty-face copy', asyn
   await page.goto(PICKER);
   await selectGithub(page);
   const picker = await openPicker(page);
-  const search = picker.getByRole('textbox', { name: '搜索仓库' });
+  const search = picker.getByRole('combobox', { name: '搜索仓库' });
   await search.fill('CAIRN');
   await expect(picker.getByRole('option')).toHaveCount(1);
   await expect(picker.getByRole('option')).toHaveAccessibleName('xiechimon/cairn');
@@ -227,31 +227,36 @@ test('10. grant-and-return: window focus and picker reopen refetch the repo list
   expect(repoCalls).toBeGreaterThan(beforeReopen);
 });
 
-test('11. row-list keyboard contract: focus enters the list, Arrow/typeahead moves, Enter selects and takes effect, focus returns', async ({
+test('11. FilterPicker keyboard contract: focus enters combobox, Arrow/type moves and filters, Enter selects, Escape clears then closes and returns focus', async ({
   page,
 }) => {
   await page.goto(PICKER);
   await selectGithub(page);
   const picker = await openPicker(page);
+  const search = picker.getByRole('combobox', { name: '搜索仓库' });
   const rows = picker.getByRole('option');
   await expect(rows).toHaveCount(3);
-
-  await expect(rows.first()).toBeFocused();
-
-  await page.keyboard.press('ArrowDown');
-  await expect(rows.nth(1)).toBeFocused();
-  await page.keyboard.press('ArrowUp');
-  await page.keyboard.press('ArrowUp');
-  await expect(rows.nth(2)).toBeFocused();
-
-  await page.keyboard.press('x');
-  await expect(rows.nth(2)).toBeFocused();
-  await page.waitForTimeout(550);
-  await page.keyboard.press('o');
-  await expect(rows.first()).toBeFocused();
+  await expect(search).toBeFocused();
 
   await page.keyboard.press('ArrowDown');
-  await expect(rows.nth(1)).toBeFocused();
+  await expect(rows.first()).toHaveAttribute('data-highlighted', '');
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toHaveAttribute('data-highlighted', '');
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toHaveAttribute('data-highlighted', '');
+
+  await page.keyboard.type('cairn');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toHaveAccessibleName('xiechimon/cairn');
+  await expect(rows.first()).toHaveAttribute('data-highlighted', '');
+  await page.keyboard.press('Escape');
+  await expect(picker).toBeVisible();
+  await expect(search).toHaveValue('');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.first()).toHaveAttribute('data-highlighted', '');
+
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toHaveAttribute('data-highlighted', '');
   await page.keyboard.press('Enter');
   await expect(picker).not.toBeVisible();
   await expect(page.locator('#prj-new-repo')).toContainText('octocat/spoon-knife');
@@ -259,10 +264,42 @@ test('11. row-list keyboard contract: focus enters the list, Arrow/typeahead mov
 
   await page.keyboard.press('Enter');
   await expect(picker).toBeVisible();
-  await expect(rows.nth(1)).toBeFocused();
+  await expect(search).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(picker).not.toBeVisible();
   await expect(page.locator('#prj-new-repo')).toBeFocused();
+});
+
+test('13. repo list error maps to plain C5 copy without leaking raw upstream error text', async ({
+  page,
+}) => {
+  await page.route('**/api/**', (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 500, json: { error: 'e2e stub' } });
+  });
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({ json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }] }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
+  );
+  await page.route('**/api/capabilities', (route) =>
+    route.fulfill({ json: { thinkingLevels: [], githubOAuth: true } }),
+  );
+  await page.route('**/api/teams/team-1/github/connection', (route) =>
+    route.fulfill({ json: { connected: true, login: 'octocat' } }),
+  );
+  await page.route('**/api/github/repos', (route) =>
+    route.fulfill({ status: 502, json: { error: 'GitHub API 502 Bad Gateway (upstream timeout)' } }),
+  );
+
+  await page.goto('/app/project/new');
+  await selectGithub(page);
+  const picker = await openPicker(page);
+  const alert = picker.getByRole('alert');
+  await expect(alert).toHaveText('暂时无法加载 GitHub 仓库列表，请稍后重试。');
+  await expect(picker.getByText(/502 Bad Gateway/)).toHaveCount(0);
+  await expect(picker.getByText('没有匹配的仓库')).toHaveCount(0);
 });
 
 test('12. device sign-in: auth button shows a code, completion offers the App install, then the picker lists repos', async ({

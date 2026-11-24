@@ -363,7 +363,6 @@ checkPatternGuard({
       'legacy listbox combobox awaiting FilterPicker migration',
     ],
     ['overlay/mention-inline.tsx', 'inline editor mention popover listbox'],
-    ['pages/project-new-page.tsx', 'legacy repo listbox awaiting owner FilterPicker migration'],
   ]),
   message: 'hand-written role="listbox" — compose from components/filter-picker.tsx',
 });
