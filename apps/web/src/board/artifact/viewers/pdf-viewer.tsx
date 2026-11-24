@@ -146,7 +146,11 @@ interface PdfWord {
 const MATCH_CHARS = 40;
 
 function plainCjk(text: string): string {
-  return text.replace(/[\u2E80-\u2FDF]/g, (glyph) => glyph.normalize('NFKC')).replace(/\s+/g, '');
+  return text.replace(/[\u2E80-\u2FDF]/g, (glyph) => glyph.normalize('NFKC')).replace(/\s+/g, ' ');
+}
+
+function bare(text: string): string {
+  return text.replace(/\s+/g, '');
 }
 
 async function pdfWords(doc: PDFDocumentProxy): Promise<PdfWord[]> {
@@ -157,12 +161,12 @@ async function pdfWords(doc: PDFDocumentProxy): Promise<PdfWord[]> {
     const viewport = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
     for (const item of content.items) {
-      if (!('str' in item) || item.str.trim() === '') continue;
+      if (!('str' in item) || item.str === '') continue;
       const [, , c = 0, d = 0, e = 0, f = 0] = Util.transform(viewport.transform, item.transform);
       const height = Math.hypot(c, d);
       words.push({
         page: number,
-        text: plainCjk(item.str),
+        text: plainCjk(item.hasEOL ? `${item.str} ` : item.str),
         rect: {
           x: e / viewport.width,
           y: (f - height) / viewport.height,
@@ -189,25 +193,27 @@ function textIn(words: readonly PdfWord[], page: number | undefined, rect: Artif
       );
     })
     .map((word) => word.text)
-    .join('');
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function findText(
   words: readonly PdfWord[],
   text: string,
 ): { page: number; rect: ArtifactRect } | null {
-  const needle = plainCjk(text).slice(0, MATCH_CHARS);
+  const needle = bare(plainCjk(text)).slice(0, MATCH_CHARS);
   if (needle === '') return null;
   const pages = new Set(words.map((word) => word.page));
   for (const page of pages) {
-    const onPage = words.filter((word) => word.page === page);
-    const joined = onPage.map((word) => word.text).join('');
+    const onPage = words.filter((word) => word.page === page && bare(word.text) !== '');
+    const joined = onPage.map((word) => bare(word.text)).join('');
     const at = joined.indexOf(needle);
     if (at === -1) continue;
     let offset = 0;
     const hit = onPage.filter((word) => {
       const start = offset;
-      offset += word.text.length;
+      offset += bare(word.text).length;
       return offset > at && start < at + needle.length;
     });
     const left = Math.min(...hit.map((word) => word.rect.x));
