@@ -231,7 +231,7 @@ describe('computer feed routes', () => {
         name: 'name-mac',
         online: true,
         lastSeenAt: 2,
-        capabilities: { mcpServers: [], skills: [], computer: true, computerKind: 'vm' },
+        capabilities: { mcpServers: [], skills: [], computer: true, computerKind: 'host' },
       })
       .run();
     const first = (await (await req(s.app, 'GET', '/api/computers')).json()) as {

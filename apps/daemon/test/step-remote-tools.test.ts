@@ -5,7 +5,6 @@ import type { RemoteToolDef } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import {
   COMPUTER_TOOL_RELAY_TIMEOUT_MS,
-  INSTALL_RELAY_TIMEOUT_MS,
   stepRemoteToolExecutor,
   TAKEOVER_RELAY_TIMEOUT_MS,
   type VerifyEvidenceUploads,
@@ -89,14 +88,6 @@ describe('stepRemoteToolExecutor', () => {
     expect(TAKEOVER_RELAY_TIMEOUT_MS).toBeGreaterThan(15 * 60_000);
     await h.execute('send_message', { text: 'hi' });
     expect(h.relayed.at(-1)?.opts).toEqual({});
-  });
-
-  test('install_packages waits for the owner approval and then the install', async () => {
-    const h = harness({});
-    await h.execute('install_packages', { packages: ['ffmpeg'] });
-    expect(h.relayed[0]?.opts?.timeoutMs).toBe(INSTALL_RELAY_TIMEOUT_MS);
-    expect(INSTALL_RELAY_TIMEOUT_MS).toBeGreaterThan(TAKEOVER_RELAY_TIMEOUT_MS);
-    expect(h.relayed[0]?.opts?.toolCallId).toBeTruthy();
   });
 
   test('request_secret waits as long as a handoff', async () => {

@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test } from 'vitest';
 import { computer, devinSubscription, machine, team } from '../src/db/schema.js';
 import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
-import { computerMachineName, computerVmName } from '../src/services/machine-computer.js';
 import { bootServer, issueApiKey } from './helpers.js';
 
 type Server = ReturnType<typeof bootServer>;
@@ -138,23 +137,6 @@ describe('computer observations in machine presence', () => {
     await post(f.s, '/api/machine/presence', f.token, { computers: [] });
     expect(f.read()?.state).toBe('running');
     expect(f.events).toHaveLength(1);
-  });
-
-  test('a running VM computer created with the host name is shown running, not stopped', async () => {
-    const f = await setup();
-    f.s.db
-      .update(computer)
-      .set({ providerRef: computerMachineName('chief:one') })
-      .where(eq(computer.id, 'computer-one'))
-      .run();
-    await post(
-      f.s,
-      '/api/machine/presence',
-      f.token,
-      f.report('running', { providerRef: computerVmName('chief:one') }),
-    );
-    expect(f.read()?.state).toBe('running');
-    expect(f.read()?.providerRef).toBe(computerVmName('chief:one'));
   });
 
   test('foreign scopes, provider identities and machines cannot change or create a computer', async () => {

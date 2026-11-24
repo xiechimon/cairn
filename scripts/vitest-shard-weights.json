@@ -739,7 +739,6 @@
   "@xiechimon/cairn:test/computer-browser-lease-migration.test.ts": 534,
   "@xiechimon/cairn:test/computer-control-open-migration.test.ts": 590,
   "@xiechimon/cairn:test/computer-login-handoff.test.ts": 1208,
-  "@xiechimon/cairn:test/computer-packages.test.ts": 1114,
   "@xiechimon/cairn:test/computer-private-audience.test.ts": 609,
   "@xiechimon/cairn:test/computer-routes.test.ts": 673,
   "@xiechimon/cairn:test/computer-screen-adapter.test.ts": 4105,

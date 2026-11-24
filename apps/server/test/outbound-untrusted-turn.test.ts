@@ -10,9 +10,6 @@ import {
   chief,
   chiefMessage,
   chiefThread,
-  computer,
-  computerCall,
-  machine,
   mcpConnector,
   step,
 } from '../src/db/schema.js';
@@ -308,49 +305,6 @@ describe('outbound actions in turns that carry untrusted outside content', () =>
     expect(parked.status).toBe('pending');
     expect(w.s.db.select().from(actionProposal).all()).toHaveLength(1);
     expect(w.mcp.calls).toEqual([]);
-    w.s.dispose();
-  });
-
-  test('a mail turn install_packages parks its normal approval card', async () => {
-    const w = world();
-    w.s.db
-      .insert(machine)
-      .values({
-        id: 'mac',
-        teamId: w.s.team.id,
-        name: 'mac',
-        online: true,
-        lastSeenAt: 1,
-        capabilities: { mcpServers: [], skills: [], computer: true, computerKind: 'vm' },
-      })
-      .run();
-    w.s.db
-      .insert(computer)
-      .values({
-        id: 'computer-a',
-        teamId: w.s.team.id,
-        scopeKey: 'chief:chief-agent-a',
-        machineId: 'mac',
-        providerRef: 'p',
-        createdAt: 1,
-        updatedAt: 1,
-      })
-      .run();
-    w.s.machineHub.subscribeMachine(w.s.team.id, 'mac', () => undefined);
-    const abort = new AbortController();
-    await expect(
-      relayComputerTool(
-        w.deps,
-        null,
-        w.turn(MAIL_PROMPT),
-        'install_packages',
-        { packages: ['ffmpeg'] },
-        'install-1',
-        abort.signal,
-      ),
-    ).rejects.toThrow(/mail turn cannot call install_packages/);
-    expect(w.s.db.select().from(computerCall).all()).toEqual([]);
-    expect(w.s.db.select().from(actionProposal).all()).toEqual([]);
     w.s.dispose();
   });
 

@@ -1162,7 +1162,7 @@ describe('Coordinator tool-name errors', () => {
 describe('the owner’s own Chrome behind browser tools', () => {
   function ownerMachine(
     s: TestServer,
-    capabilities: Record<string, unknown> = { computerKind: 'vm' },
+    capabilities: Record<string, unknown> = { computerKind: 'host' },
     kind: 'local' | 'remote' = 'local',
   ) {
     s.db
@@ -1210,7 +1210,7 @@ describe('the owner’s own Chrome behind browser tools', () => {
     setup: (s: TestServer) => void,
     params: Record<string, unknown> = { url: 'https://mail.example.com' },
     kind: 'local' | 'remote' = 'local',
-    capabilities: Record<string, unknown> = { computerKind: 'vm' },
+    capabilities: Record<string, unknown> = { computerKind: 'host' },
   ): Promise<ComputerCall> {
     const { s, deps } = boot();
     ownerMachine(s, capabilities, kind);

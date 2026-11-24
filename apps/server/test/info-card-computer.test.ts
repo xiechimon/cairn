@@ -41,7 +41,7 @@ const VM_CAPABILITIES: MachineCapabilities = {
   skills: [],
   computer: true,
   browser: true,
-  computerKind: 'vm',
+  computerKind: 'host',
 };
 
 const disposables: (() => Promise<void> | void)[] = [];

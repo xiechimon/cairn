@@ -35,8 +35,8 @@ test('a machine whose owner had turned computer control off offers the browser a
     migrate(db, { migrationsFolder: prior });
     sqlite.exec("INSERT INTO team (id, name, createdAt) VALUES ('team', 'Team', 1)");
     sqlite.exec(
-      `INSERT INTO machine (id, teamId, name, online, lastSeenAt, capabilities, browserOverride, desktopOverride) VALUES ('m1', 'team', 'vm', 1, 1, '${JSON.stringify(
-        { mcpServers: [], skills: [], computer: true, browser: true, computerKind: 'vm' },
+      `INSERT INTO machine (id, teamId, name, online, lastSeenAt, capabilities, browserOverride, desktopOverride) VALUES ('m1', 'team', 'desktop', 1, 1, '${JSON.stringify(
+        { mcpServers: [], skills: [], computer: true, browser: true, computerKind: 'host' },
       )}', 0, 0)`,
     );
     migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });

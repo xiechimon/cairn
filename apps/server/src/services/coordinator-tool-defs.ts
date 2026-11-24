@@ -59,13 +59,8 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
     browser_act: { offered: 'always' },
     browser_close_tab: { withheld: 'the server closes a card tab when its step ends' },
     request_takeover: { offered: 'always' },
-    install_packages: {
-      withheld: "the Coordinator VM command channel was removed; use the owner's computer directly",
-    },
-    computer_manage: {
-      withheld:
-        'only the owner stops, updates, recovers or resets the computer from the Computers panel',
-    },
+    install_packages: { withheld: 'the built-in Linux VM runner was removed' },
+    computer_manage: { withheld: 'the built-in Linux VM runner was removed' },
     user_computer_shell: { offered: 'when_owner_thread_and_team_has_mac' },
     user_computer_observe: { offered: 'when_owner_thread_and_team_has_mac' },
     user_computer_act: { offered: 'when_owner_thread_and_team_has_mac' },

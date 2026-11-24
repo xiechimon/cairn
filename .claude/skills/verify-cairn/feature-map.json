@@ -1030,9 +1030,7 @@
           "/api/computers",
           "/api/computers/steps",
           "/api/computers/steps/:callId/shot",
-          "/api/teams/:teamId/computers/**",
-          "/api/computers/package-install",
-          "/api/computers/:id/actions"
+          "/api/teams/:teamId/computers/**"
         ]
       },
       "reach": [

@@ -112,7 +112,7 @@ describe('openResearchThread', () => {
             executor: 'host',
             computer: true,
             browser: true,
-            computerKind: 'vm',
+            computerKind: 'host',
           },
         }),
       )

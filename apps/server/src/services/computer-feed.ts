@@ -39,7 +39,6 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
   return db
     .select({
       row: computer,
-      host: machine,
       machineName: machine.name,
       machineOnline: machine.online,
     })
@@ -48,15 +47,14 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
     .where(privateComputerWhere(teamId, userId))
     .orderBy(computer.createdAt, computer.id)
     .all()
-    .map(({ row, host, machineName, machineOnline }) => ({
+    .map(({ row, machineName, machineOnline }) => ({
       id: row.id,
       scopeKey: row.scopeKey,
       state: row.state,
       controlHolder: row.controlHolder,
       handoffReason: row.handoffReason ?? null,
-      kind: host.capabilities?.computerKind ?? 'host',
-      download:
-        host.capabilities?.computerKind === 'vm' ? (host.capabilities.vmDownload ?? null) : null,
+      kind: 'host' as const,
+      download: null,
       machine: { id: row.machineId, name: machineName, online: machineOnline },
       activity: computerActivity(db, userId, row),
     }));

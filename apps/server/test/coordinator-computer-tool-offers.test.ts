@@ -48,9 +48,10 @@ describe('Coordinator computer tool offers', () => {
       );
   });
 
-  test('the Coordinator VM command channel (shell and install_packages) is withheld', () => {
+  test('the Coordinator VM command channel (shell, install_packages, computer_manage) is withheld', () => {
     expect('withheld' in COORDINATOR_COMPUTER_TOOL_OFFERS.shell).toBe(true);
     expect('withheld' in COORDINATOR_COMPUTER_TOOL_OFFERS.install_packages).toBe(true);
+    expect('withheld' in COORDINATOR_COMPUTER_TOOL_OFFERS.computer_manage).toBe(true);
     expect('withheld' in COORDINATOR_COMPUTER_TOOL_OFFERS.stage_attachment).toBe(true);
     expect(COORDINATOR_COMPUTER_TOOL_OFFERS.attach_file).toEqual({
       offered: 'when_owner_thread_and_team_has_mac',
@@ -60,6 +61,7 @@ describe('Coordinator computer tool offers', () => {
     expect(isCoordinatorComputerTool('attach_file')).toBe(true);
     expect(computerNames(true, true)).not.toContain('shell');
     expect(computerNames(true, true)).not.toContain('install_packages');
+    expect(computerNames(true, true)).not.toContain('computer_manage');
     expect(computerNames(false, true)).toContain('attach_file');
     expect(computerNames(true, false)).not.toContain('attach_file');
   });

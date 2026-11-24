@@ -121,7 +121,7 @@ export function sweepComputerHandoffs(db: Db, now: number): void {
     })
     .where(
       and(
-        inArray(computerCall.tool, ['install_packages', 'computer_manage', 'phone_manage']),
+        eq(computerCall.tool, 'phone_manage'),
         inArray(computerCall.state, ['dispatched', 'running']),
         lte(computerCall.deadlineAt, now),
       ),

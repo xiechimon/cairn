@@ -94,32 +94,23 @@ async function toolNames(s: TestServer): Promise<string[]> {
   return (claimed?.remoteTools ?? []).map((tool) => tool.name);
 }
 
-function addVm(s: TestServer, opts: { kind?: 'vm' | 'host' } = {}) {
-  const id = insertMachine(s, {
-    name: `computer-${opts.kind ?? 'vm'}`,
+function addDesktop(s: TestServer) {
+  return insertMachine(s, {
+    name: 'computer-host',
     capabilities: {
       mcpServers: [],
       skills: [],
       computer: true,
       browser: true,
-      computerKind: opts.kind ?? 'vm',
+      computerKind: 'host',
     },
   });
-  return id;
 }
 
 describe('a Runner-claimed chief turn offers the computer tools the machine reports', () => {
-  test('a capable VM machine puts desktop tools on the claim payload and omits the retired VM command channel', async () => {
+  test('a host-kind computer offers the desktop tools and not the removed VM tools', async () => {
     const s = boot();
-    addVm(s);
-    const names = await toolNames(s);
-    for (const name of DESKTOP_TOOLS) expect(names).toContain(name);
-    for (const name of VM_TOOLS) expect(names).not.toContain(name);
-  });
-
-  test('a host-kind computer offers the desktop tools but not the VM tools', async () => {
-    const s = boot();
-    addVm(s, { kind: 'host' });
+    addDesktop(s);
     const names = await toolNames(s);
     for (const name of DESKTOP_TOOLS) expect(names).toContain(name);
     for (const name of VM_TOOLS) expect(names).not.toContain(name);
