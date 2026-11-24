@@ -64,7 +64,6 @@
   "chief-reply-quote.spec.ts": 7392,
   "chief-send-retry.spec.ts": 17600,
   "chief-stream-markdown.spec.ts": 12623,
-  "chief-task-ref-grow.spec.ts": 3585,
   "chief-thread-report.spec.ts": 12490,
   "chief-turn-error.spec.ts": 4582,
   "collapse-family.spec.ts": 2500,

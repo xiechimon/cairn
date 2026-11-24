@@ -60,14 +60,14 @@ test('two pending decisions are answered one at a time above the composer; the r
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-text')).toContainText('Which model?');
   const panel = page.getByTestId('chief-question');
-  const card = panel.getByTestId('chief-question-chips');
+  const card = panel;
   await expect(panel).toHaveAccessibleName('待回答的提问');
   await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Claude subscription');
-  await expect(card.getByTestId('chief-question-option-0-0')).toHaveAttribute('data-recommended', '');
-  await expect(card.getByTestId('chief-question-option-0-0')).toHaveAccessibleDescription('推荐 · Verified');
+  await expect(card.getByTestId('chief-question-option-0-0').getByTestId('chief-question-recommended')).toHaveText('推荐');
+  await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Verified');
   await expect(card.getByTestId('chief-question-option-0-1')).toContainText('wokey');
-  await expect(card.getByTestId('chief-question-other-0')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '输入你自己的回答…');
+  await expect(card.getByTestId('chief-question-other-0')).toBeVisible();
+  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
   await card.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({
@@ -98,7 +98,7 @@ test('own words: the composer text is the answer', async ({ page }) => {
     },
   );
   await page.goto('/app');
-  const card = page.getByTestId('chief-question').getByTestId('chief-question-chips');
+  const card = page.getByTestId('chief-question');
   await expect(card).toBeVisible();
   await page.getByTestId('chief-composer-input').fill('Use the metered key this once');
   await page.getByTestId('chief-question-primary').click();

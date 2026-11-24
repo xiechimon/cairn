@@ -1,24 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
-import { answerLines, awaitingStream } from '../src/chief/question-lifecycle.js';
-
-type Question = Extract<ChiefStreamItem, { kind: 'question' }>;
-
-const question = (over: Partial<Question> = {}): Question => ({
-  kind: 'question',
-  id: 'row-1',
-  requestId: 'q1',
-  status: 'answered',
-  questions: [
-    {
-      header: 'Merge',
-      question: 'When to merge?',
-      options: [{ label: 'After CI is green' }, { label: 'Now' }],
-    },
-  ],
-  answers: [{ header: 'Merge', choices: ['After CI is green'] }],
-  ...over,
-});
+import { answerLineOf, awaitingStream } from '../src/chief/question-lifecycle.js';
 
 describe('a pending question stops the conversation saying it is working', () => {
   const stream: ChiefStreamItem[] = [
@@ -40,32 +22,11 @@ describe('a pending question stops the conversation saying it is working', () =>
   });
 });
 
-describe('the answered question becomes the lines of one owner bubble', () => {
-  test('a chosen option is the one line', () => {
-    expect(answerLines(question())).toEqual(['After CI is green']);
-  });
-
-  test('several questions give one line each, free text counts', () => {
-    const item = question({
-      questions: [
-        { header: 'A', question: 'a?', options: [{ label: 'x' }] },
-        { header: 'B', question: 'b?', options: [] },
-      ],
-      answers: [
-        { header: 'A', choices: ['x', 'y'] },
-        { header: 'B', text: 'later' },
-      ],
-    });
-    expect(answerLines(item)).toEqual(['x、y', 'later']);
-  });
-
-  test('missing or empty answers give no lines', () => {
-    expect(answerLines(question({ answers: null }))).toEqual([]);
-    expect(answerLines(question({ answers: [{ header: 'Merge' }] }))).toEqual([]);
-  });
-
-  test('a pending or cancelled question gives no lines, whatever it holds', () => {
-    expect(answerLines(question({ status: 'pending' }))).toEqual([]);
-    expect(answerLines(question({ status: 'cancelled' }))).toEqual([]);
+describe('the receipt reads one answer per question', () => {
+  test('choices join with the list mark, free text counts, nothing gives an empty line', () => {
+    expect(answerLineOf({ header: 'A', choices: ['x', 'y'] })).toBe('x、y');
+    expect(answerLineOf({ header: 'B', text: ' later ' })).toBe('later');
+    expect(answerLineOf({ header: 'C' })).toBe('');
+    expect(answerLineOf(undefined)).toBe('');
   });
 });

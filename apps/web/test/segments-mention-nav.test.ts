@@ -92,13 +92,14 @@ describe('a Markdown task link names the task by its title (C15)', () => {
     }
   });
 
-  test('the mention is a chip with its state glyph', () => {
+  test('the mention is an unframed word: its state glyph and title, named with its state', () => {
     const markup = page(
       createElement(ChatMarkdown, { text: 'Started [#7](todo:t7) just now.' }),
       KNOWN,
     );
-    expect(markup).toContain('mention-chip--todo');
-    expect(markup).toContain('<svg');
+    expect(markup).not.toContain('mention-chip');
+    expect(markup).toMatch(/<a [^>]*aria-label="Export the report as CSV，执行中"/);
+    expect(markup).toMatch(/<svg [^>]*data-glyph="working"/);
   });
 
   test('a link label that is not a bare number keeps the words its author chose', () => {
@@ -122,7 +123,7 @@ describe('a Markdown task link names the task by its title (C15)', () => {
       }),
       ESSAY,
     );
-    expect(plain(markup)).toBe('已停掉写作文的那个任务 写一篇 100 字的作文，任务还开着。');
+    expect(plain(markup)).toBe('已停掉写作文的那个任务写一篇 100 字的作文，任务还开着。');
     expect(markup).toMatch(/<a [^>]*data-phase="closed"[^>]*href="\/app\?thread=e6"/);
   });
 

@@ -56,7 +56,7 @@ test('an outbound approval card says the action in one sentence, quotes the body
     },
   );
   await page.goto('/app');
-  const card = page.getByTestId('chief-stream').getByTestId('approval-card');
+  const card = page.getByTestId('chief-composer-block').getByTestId('approval-card');
   await expect(card.getByTestId('approval-card-title')).toHaveText(
     '发送邮件给 lena.hoffmann@example.com',
   );

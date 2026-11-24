@@ -3,7 +3,7 @@ import { mapChiefStream, type MessageRow } from '../src/api/mappers.js';
 import {
   foldTaskCards,
   placeReportCards,
-  placeTaskRefs,
+  placeUnmentionedTasks,
   todoGlanceOf,
 } from '../src/chief/chief-task-refs.js';
 import { groupThreadEvents } from '../src/chief/thread-activity.js';
@@ -111,9 +111,8 @@ describe('research a stuck retry opened', () => {
   const rows = [{ item: reply, i: 0 }];
   const startedBy = new Map([[reply, ['code', 'stuck', 'legacy']]]);
 
-  test('adds no task row, while the code task and an old research card stand as flat rows', () => {
-    const refs = placeTaskRefs(rows, startedBy, map, new Set()).get(reply) ?? [];
-    expect(refs.map((ref) => ref.todoId)).toEqual(['code', 'legacy']);
+  test('adds no task line, while the code task and an old research task are named under the reply', () => {
+    expect(placeUnmentionedTasks(rows, startedBy, map).get(reply)).toEqual(['code', 'legacy']);
   });
 
   test('adds no report line to the reply', () => {

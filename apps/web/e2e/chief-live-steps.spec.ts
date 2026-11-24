@@ -24,14 +24,13 @@ test('the state word stays under the mark for as long as the turn runs', async (
   await expect(word).toHaveAttribute('data-visible', 'true');
 });
 
-test('the task reference row and its chip carry the spinner ring, with the state in the accessible name only', async ({
+test('a running task word carries the spinner ring, with the state in the accessible name only', async ({
   page,
 }) => {
   await page.goto('/app?scenario=chief-draft');
   const stream = page.getByTestId('chief-stream');
-  const ref = stream.getByTestId('chief-task-ref');
-  await expect(ref).not.toContainText('In progress');
-  await expect(ref.locator('svg[data-glyph="progress"]')).toHaveCount(1);
-  await expect(stream.locator('a.mention-chip svg[data-glyph="progress"]')).toHaveCount(1);
-  await expect(stream.locator('svg[data-glyph="progress"]')).toHaveCount(2);
+  const word = stream.locator('a[data-slot="task-mention"]').filter({ has: page.locator('svg[data-glyph="working"]') });
+  await expect(word).toHaveCount(1);
+  await expect(word).not.toContainText('Running');
+  await expect(word).toHaveAccessibleName(/Running/);
 });

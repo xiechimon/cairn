@@ -4,7 +4,7 @@ import type {
   ProjectRecord,
   TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
-import type { ChiefQuestionItem } from '../chief/question-chips.js';
+import type { ChiefQuestionItem } from '../chief/question-item.js';
 import type {
   ChangesContent,
   DocBlock,

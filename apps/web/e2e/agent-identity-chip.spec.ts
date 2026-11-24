@@ -84,7 +84,7 @@ test.describe('lazy face zero change (#741 negative case)', () => {
     await expect(stream.getByTestId('chief-msg').locator('> svg')).toHaveCount(0);
 
     const links = stream.getByRole('link');
-    await expect(links).toHaveCount(2);
+    await expect(links).toHaveCount(1);
     for (const link of await links.all())
       await expect(link).toHaveAttribute('href', /[?&]thread=r3-contributing$/);
     await expect(stream).not.toContainText('r5-scribe');

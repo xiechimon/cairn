@@ -311,7 +311,7 @@
       "reach": [
         "open /app",
         "type a task for the Coordinator and press Enter",
-        "click testid:chief-task-ref"
+        "click testid:task-mention"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/chief-dispatch-judgment.md"
@@ -343,7 +343,7 @@
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/question-chips.tsx",
+          "apps/web/src/chief/decision-dock.tsx",
           "apps/web/src/chief/chief-question.tsx",
           "apps/web/src/chief/question-lifecycle.ts"
         ],
@@ -388,7 +388,6 @@
       "code": {
         "web": [
           "apps/web/src/board/needs-you.ts",
-          "apps/web/src/chief/chief-task-ref-row.tsx",
           "apps/web/src/chief/chief-task-refs.ts"
         ],
         "server": [
@@ -402,7 +401,7 @@
       },
       "reach": [
         "open /app",
-        "click testid:chief-task-ref"
+        "click testid:task-mention"
       ],
       "research": [
         "docs/research/link-roundup-2026-11-01.md",

@@ -1,81 +1,44 @@
+import { cn } from 'cn';
 import { Ban, CircleCheck } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_TEXT_CLS } from '../detail/chat-markdown.js';
+import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalHistoryLine } from './approval-card.js';
 import { approvalCardOf } from './approval-card-model.js';
-import { MessageToolbar } from './message-toolbar.js';
-import type { ChiefQuestionItem } from './question-chips.js';
+import type { ChiefQuestionItem } from './question-item.js';
+import { answerLineOf } from './question-lifecycle.js';
 
-export function QuestionAnsweredLine({ item }: { item: ChiefQuestionItem }) {
+export function QuestionReceipt({ item }: { item: ChiefQuestionItem }) {
   const { t } = useI18n();
-  const cancelled = item.status === 'cancelled';
-  const Icon = cancelled ? Ban : CircleCheck;
-  const text = cancelled ? t('已取消提问') : t('已回答');
-  return (
-    <p
-      data-testid="chief-question-line"
-      data-status={item.status}
-      title={text}
-      className="m-0 flex min-w-0 items-center gap-1.5 text-meta text-content-tertiary"
-    >
-      <Icon aria-hidden strokeWidth={1.75} className="size-4 flex-none" />
-      <span className="min-w-0 truncate">{text}</span>
-    </p>
-  );
-}
-
-export function QuestionAsked({
-  item,
-  onCopy,
-}: {
-  item: ChiefQuestionItem;
-  onCopy?: ((text: string) => void) | undefined;
-}) {
+  const skipped = item.status === 'cancelled';
   return (
     <div
-      data-testid="chief-question-asked"
+      data-testid="chief-question-receipt"
       data-request-id={item.requestId}
-      data-slot="reply-blocks"
-      className="flex w-full max-w-full min-w-0 flex-col items-start gap-1"
+      data-status={item.status}
+      className="flex w-fit max-w-[min(var(--container-reply),100%)] flex-col gap-2 rounded-xl px-3 py-2 font-sans shadow-[0_0_0_1px_var(--border)] wrap-anywhere dark:bg-card"
     >
       {item.questions.map((question, n) => {
-        const bubble = (
-          <div data-slot="reply-bubble" data-testid="chief-reply-bubble" className={REPLY_TEXT_CLS}>
-            <ChatMarkdown text={question.question} />
-          </div>
-        );
+        const answer = skipped ? '' : answerLineOf(item.answers?.[n]);
         return (
-          <div key={n} className={REPLY_BLOCK_CLS} data-slot="reply-block">
-            {question.header === '' ? (
-              bubble
-            ) : (
-              <Tooltip>
-                <TooltipTrigger render={bubble} />
-                <TooltipContent side="top" sideOffset={6} className="max-w-72">
-                  {question.header}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {onCopy !== undefined && (
-              <MessageToolbar
-                placement="right"
-                testId={n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools'}
-                stamp={null}
-                onCopy={() => onCopy(question.question)}
-              />
-            )}
+          <div key={n} className="flex min-w-0 flex-col">
+            <div
+              data-testid="chief-question-receipt-question"
+              className="line-clamp-2 text-meta text-content-tertiary [&_p]:m-0 [&_p]:inline"
+            >
+              <ChatMarkdown text={question.question} />
+            </div>
+            <p
+              data-testid="chief-question-receipt-answer"
+              className={cn(
+                'm-0 text-ui',
+                answer === '' ? 'text-content-tertiary' : 'text-foreground',
+              )}
+            >
+              {answer === '' ? t('已跳过') : answer}
+            </p>
           </div>
         );
       })}
-      {onCopy !== undefined && (
-        <MessageToolbar
-          placement="below-start"
-          testId="chief-msg-tools-touch"
-          stamp={null}
-          onCopy={() => onCopy(item.questions.map((question) => question.question).join('\n'))}
-        />
-      )}
     </div>
   );
 }
@@ -86,9 +49,11 @@ export function ApprovalAnswered({ item }: { item: ChiefQuestionItem }) {
   if (question === undefined) return null;
   const choice = item.answers?.[0]?.choices?.[0] ?? null;
   const index = choice === null ? -1 : question.options.findIndex((o) => o.label === choice);
-  const declined = index > 0 && index === question.options.length - 1;
-  const status =
-    index === 0
+  const skipped = item.status === 'cancelled';
+  const declined = skipped || (index > 0 && index === question.options.length - 1);
+  const status = skipped
+    ? t('已跳过')
+    : index === 0
       ? t('已批准')
       : declined
         ? t('已拒绝')

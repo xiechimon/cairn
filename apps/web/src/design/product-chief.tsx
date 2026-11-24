@@ -1,9 +1,7 @@
 import { useState } from 'react';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
-import { QuestionAnsweredLine, QuestionAsked } from '../chief/question-answered-line.js';
-import { QuestionChips } from '../chief/question-chips.js';
-import { answerLines } from '../chief/question-lifecycle.js';
-import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { DecisionDock } from '../chief/decision-dock.js';
+import { QuestionReceipt } from '../chief/question-answered-line.js';
 import {
   NOW,
   QUESTION_ANSWERED,
@@ -21,41 +19,38 @@ export function ProductChiefSection() {
       lede="The Coordinator's parts: questions it asks you, the home summary line, and outage banners."
     >
       <Specimen
-        id="question-chips"
-        title="Question chips"
+        id="decision-dock"
+        title="Decision dock"
         note={
           last ??
-          'QuestionChips: a chip answers, digits pick, the composer types a free answer; answered, the questions stay as Coordinator replies above one owner bubble'
+          'DecisionDock: docked above the composer; numbered rows with descriptions, the first tagged recommended and never preselected, an Other input, Skip; answered or skipped, one receipt stays in the conversation'
         }
         stage="canvas"
         className="flex-col"
       >
         <Labeled label="Pending, two steps, the second is multi-select">
           <div className="w-160">
-            <QuestionChips
+            <DecisionDock
               item={QUESTION_PENDING}
+              pager={null}
+              onMinimize={() => setLast('Minimized')}
               onAnswer={({ answers }) =>
                 setLast(
                   `Answered: ${answers.map((a) => a.choices?.join(' + ') ?? a.text).join(' / ')}`,
                 )
               }
-              onCancel={() => setLast('Question cancelled')}
+              onCancel={() => setLast('Question skipped')}
             />
           </div>
         </Labeled>
         <Labeled label="Answered">
-          <div className="flex w-160 flex-col gap-6">
-            <QuestionAsked item={QUESTION_ANSWERED} />
-            <div className="flex justify-end">
-              <UserMessageBubble className="w-fit max-w-full whitespace-pre-line">
-                {answerLines(QUESTION_ANSWERED).join('\n')}
-              </UserMessageBubble>
-            </div>
+          <div className="w-160">
+            <QuestionReceipt item={QUESTION_ANSWERED} />
           </div>
         </Labeled>
-        <Labeled label="Cancelled">
+        <Labeled label="Skipped">
           <div className="w-160">
-            <QuestionAnsweredLine item={QUESTION_CANCELLED} />
+            <QuestionReceipt item={QUESTION_CANCELLED} />
           </div>
         </Labeled>
       </Specimen>
