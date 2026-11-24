@@ -9,6 +9,7 @@ import { Input } from '../components/ui/input.js';
 import { PopoverContent } from '../components/ui/popover.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronLeft, ChevronRight, Folder, GitCommit, Search } from '../icons/index.js';
+import { baseName } from '../lib/path-name.js';
 
 const LAST_DIR_KEY = 'cairn.dirBrowser.lastDir';
 const RECENT_KEY = 'cairn.dirBrowser.recent';
@@ -57,10 +58,6 @@ function rememberPick(path: string): void {
     const next = [path, ...readRecent().filter((p) => p !== path)].slice(0, RECENT_MAX);
     window.localStorage.setItem(RECENT_KEY, JSON.stringify(next));
   } catch {}
-}
-
-function baseName(path: string): string {
-  return path.split('/').filter(Boolean).at(-1) ?? path;
 }
 
 function joinPath(dir: string, name: string): string {

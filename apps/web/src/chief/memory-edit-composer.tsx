@@ -10,22 +10,10 @@ import { formatClock } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { COMPOSER_FIELD_CLS } from './composer-surface.js';
-
-const TICK_MS = 1000;
-
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const tick = window.setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => window.clearInterval(tick);
-  }, [active]);
-  return now;
-}
 
 interface DiffLine {
   sign: '-' | '+' | ' ';
@@ -152,7 +140,7 @@ export function MemoryEditComposer({
   const [draft, setDraft] = useState('');
   const restoredFor = useRef<string | null>(null);
   const working = edit?.status === 'working';
-  const now = useNow(working);
+  const now = useIntervalNow(working);
   const elapsed =
     working && edit !== null ? Math.max(0, Math.floor((now - edit.updatedAt) / 1000)) : null;
 

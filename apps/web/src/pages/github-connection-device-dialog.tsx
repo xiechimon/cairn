@@ -9,37 +9,21 @@ import {
   DialogShell,
 } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
+import {
+  githubDeviceEndedCopy,
+  openGithubWindow,
+  useGithubDevicePoll,
+} from '../lib/github-device-flow.js';
 import { DeviceCode } from '../resources/mcp-github-device-dialog.js';
 
-type Translate = (text: string, vars?: Record<string, string | number>) => string;
-
 function ended(
-  t: Translate,
+  t: TFunc,
   reason: 'expired' | 'denied' | 'failed' | 'start',
   userCode?: string,
 ): Step {
-  if (reason === 'expired')
-    return { kind: 'ended', title: t('代码已过期'), body: t('重新开始拿一个新代码。'), userCode };
-  if (reason === 'denied')
-    return {
-      kind: 'ended',
-      title: t('已取消授权'),
-      body: t('你在 GitHub 上取消了授权，这次什么都没有保存。'),
-      userCode,
-    };
-  if (reason === 'start')
-    return {
-      kind: 'ended',
-      title: t('未能开始连接 GitHub'),
-      body: t('暂时无法连接 GitHub，请稍后重试。'),
-    };
-  return {
-    kind: 'ended',
-    title: t('连接失败'),
-    body: t('GitHub 没有完成授权，稍后重新开始一次。'),
-    userCode,
-  };
+  return { kind: 'ended', ...githubDeviceEndedCopy(t, reason), userCode };
 }
 
 type Step =
@@ -96,40 +80,35 @@ export function GithubConnectionDeviceDialog({
     };
   }, [step.kind, start, t]);
 
-  useEffect(() => {
-    if (step.kind !== 'code') return;
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      poll(step.attemptId)
-        .then((result) => {
-          if (cancelled) return;
-          if (result.status === 'pending')
-            setStep({ ...step, intervalSeconds: result.intervalSeconds });
-          else if (result.status === 'complete') setStep({ kind: 'install', opened: false });
-          else setStep(ended(t, result.status, step.userCode));
-        })
-        .catch((error: unknown) => {
-          if (cancelled) return;
-          setStep(
-            ended(
-              t,
-              error instanceof ApiError && error.status === 404 ? 'expired' : 'failed',
-              step.userCode,
-            ),
-          );
-        });
-    }, step.intervalSeconds * 1000);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [step, poll, t]);
+  useGithubDevicePoll({
+    enabled: step.kind === 'code',
+    attemptId: step.kind === 'code' ? step.attemptId : null,
+    intervalSeconds: step.kind === 'code' ? step.intervalSeconds : 0,
+    pollKey: step,
+    poll,
+    onResult: (result) => {
+      if (step.kind !== 'code') return;
+      if (result.status === 'pending')
+        setStep({ ...step, intervalSeconds: result.intervalSeconds });
+      else if (result.status === 'complete') setStep({ kind: 'install', opened: false });
+      else setStep(ended(t, result.status, step.userCode));
+    },
+    onError: (error) => {
+      if (step.kind !== 'code') return;
+      setStep(
+        ended(
+          t,
+          error instanceof ApiError && error.status === 404 ? 'expired' : 'failed',
+          step.userCode,
+        ),
+      );
+    },
+  });
 
   const close = () => {
     if (step.kind === 'code') cancel(step.attemptId);
     onClose();
   };
-  const openGithub = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
   const copyCode = () => {
     if (step.kind !== 'code') return;
     copyTextWithFeedback(step.userCode, () => {
@@ -171,7 +150,7 @@ export function GithubConnectionDeviceDialog({
       </>
     );
     if (canCopy) secondary = { label: copied ? t('已复制') : t('复制验证码'), onClick: copyCode };
-    primary = { label: t('打开 GitHub'), onClick: () => openGithub(step.verificationUri) };
+    primary = { label: t('打开 GitHub'), onClick: () => openGithubWindow(step.verificationUri) };
   } else if (step.kind === 'ended') {
     title = step.title;
     body = (
@@ -192,7 +171,7 @@ export function GithubConnectionDeviceDialog({
       label: t('选择仓库'),
       onClick: () => {
         setStep({ kind: 'install', opened: true });
-        openGithub(installUrl);
+        openGithubWindow(installUrl);
       },
     };
     const done = { label: t('完成'), onClick: onConnected };

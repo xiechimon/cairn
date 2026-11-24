@@ -12,3 +12,11 @@ export function dateTimeFormat(
   }
   return format;
 }
+
+export function formatClockTime(at: number, locale = 'zh'): string {
+  return dateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(at);
+}

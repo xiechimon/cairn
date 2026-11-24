@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button.js';
 import type { DiffFile, DocBlock } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChevronDown, ChevronRight, UnfoldVertical } from '../icons/index.js';
+import { baseName, dirName } from '../lib/path-name.js';
 import { Segments } from './segments.js';
 import { computeHunkWordDiff } from './word-diff.js';
 
@@ -25,14 +26,6 @@ export function unmodifiedBefore(hunks: readonly { header: string }[], index: nu
   const previous = oldRange(hunks[index - 1]?.header ?? '');
   if (previous == null) return 0;
   return Math.max(current.start - (previous.start + previous.length), 0);
-}
-
-function baseName(path: string): string {
-  return path.slice(path.lastIndexOf('/') + 1);
-}
-
-function dirName(path: string): string {
-  return path.slice(0, Math.max(0, path.lastIndexOf('/')));
 }
 
 const DIFF_LINE =

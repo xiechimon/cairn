@@ -13,7 +13,13 @@ import {
 import { toastSuccess } from '../components/ui/toaster.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
+import {
+  githubDeviceEndedCopy,
+  openGithubWindow,
+  useGithubDevicePoll,
+} from '../lib/github-device-flow.js';
 import { ConnectorStatus, DIALOG_FORM_CLS, PALE_DISABLED } from './mcp-connector-dialog.js';
 
 type Step =
@@ -29,8 +35,6 @@ type Step =
   | { kind: 'ended'; title: string; body: string }
   | { kind: 'repos'; connector: McpConnectorRecord; opened: boolean; missing: boolean };
 
-type Translate = (text: string, vars?: Record<string, string | number>) => string;
-
 const SAMPLE_CODE = {
   attemptId: 'fixture',
   userCode: 'WDJB-MJHT',
@@ -40,7 +44,7 @@ const SAMPLE_CODE = {
 };
 
 function fixtureStep(
-  t: Translate,
+  t: TFunc,
   step: GithubDeviceFixtureStep,
   connector: McpConnectorRecord | undefined,
 ): Step {
@@ -56,33 +60,11 @@ function fixtureStep(
   };
 }
 
-function endedStep(t: Translate, reason: 'expired' | 'denied' | 'failed' | 'conflict'): Step {
-  if (reason === 'expired')
-    return {
-      kind: 'ended',
-      title: t('代码已过期'),
-      body: t('重新开始拿一个新代码。'),
-    };
-  if (reason === 'denied')
-    return {
-      kind: 'ended',
-      title: t('已取消授权'),
-      body: t('你在 GitHub 上取消了授权，这次什么都没有保存。'),
-    };
-  if (reason === 'conflict')
-    return {
-      kind: 'ended',
-      title: t('连接失败'),
-      body: t('授权期间这个连接有了变动，这次授权没有保存，重新开始一次。'),
-    };
-  return {
-    kind: 'ended',
-    title: t('连接失败'),
-    body: t('GitHub 没有完成授权，稍后重新开始一次。'),
-  };
+function endedStep(t: TFunc, reason: 'expired' | 'denied' | 'failed' | 'conflict'): Step {
+  return { kind: 'ended', ...githubDeviceEndedCopy(t, reason) };
 }
 
-function startFailure(t: Translate, error: unknown): Step {
+function startFailure(t: TFunc, error: unknown): Step {
   const status = error instanceof ApiError ? error.status : null;
   return {
     kind: 'ended',
@@ -147,39 +129,30 @@ export function GithubDeviceDialog({
     };
   }, [live, connectorId, boundConnector, startGithubDevice.mutateAsync, t]);
 
-  useEffect(() => {
-    if (!live || step.kind !== 'code') return;
-    let cancelled = false;
-    const timer = setTimeout(() => {
-      pollGithubDevice
-        .mutateAsync(step.attemptId)
-        .then((result) => {
-          if (cancelled) return;
-          if (result.status === 'pending')
-            setStep({ ...step, intervalSeconds: result.intervalSeconds });
-          else if (result.status === 'complete')
-            setStep({ kind: 'repos', connector: result.connector, opened: false, missing: false });
-          else setStep(endedStep(t, result.status));
-        })
-        .catch((error: unknown) => {
-          if (cancelled) return;
-          const status = error instanceof ApiError ? error.status : null;
-          setStep(
-            endedStep(t, status === 404 ? 'expired' : status === 409 ? 'conflict' : 'failed'),
-          );
-        });
-    }, step.intervalSeconds * 1000);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [live, step, pollGithubDevice.mutateAsync, t]);
+  useGithubDevicePoll({
+    enabled: live && step.kind === 'code',
+    attemptId: step.kind === 'code' ? step.attemptId : null,
+    intervalSeconds: step.kind === 'code' ? step.intervalSeconds : 0,
+    pollKey: step,
+    poll: pollGithubDevice.mutateAsync,
+    onResult: (result) => {
+      if (step.kind !== 'code') return;
+      if (result.status === 'pending')
+        setStep({ ...step, intervalSeconds: result.intervalSeconds });
+      else if (result.status === 'complete')
+        setStep({ kind: 'repos', connector: result.connector, opened: false, missing: false });
+      else setStep(endedStep(t, result.status));
+    },
+    onError: (error) => {
+      const status = error instanceof ApiError ? error.status : null;
+      setStep(endedStep(t, status === 404 ? 'expired' : status === 409 ? 'conflict' : 'failed'));
+    },
+  });
 
   const close = () => {
     if (live && step.kind === 'code') cancelGithubDevice.mutate(step.attemptId);
     onClose();
   };
-  const openGithub = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
 
   const finish = () => {
     if (step.kind !== 'repos') return onClose();
@@ -215,7 +188,7 @@ export function GithubDeviceDialog({
       </>
     );
     hint = t('授权后自动继续');
-    primary = { label: t('打开 GitHub'), onClick: () => openGithub(step.verificationUri) };
+    primary = { label: t('打开 GitHub'), onClick: () => openGithubWindow(step.verificationUri) };
   } else if (step.kind === 'ended') {
     title = step.title;
     body = <p className="m-0 text-ui text-foreground">{step.body}</p>;
@@ -234,7 +207,7 @@ export function GithubDeviceDialog({
             label: t('选择仓库'),
             onClick: () => {
               setStep({ ...step, opened: true, missing: false });
-              openGithub(installUrl);
+              openGithubWindow(installUrl);
             },
           };
     const done = {
