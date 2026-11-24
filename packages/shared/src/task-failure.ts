@@ -1,5 +1,7 @@
 import semver from 'semver';
 
+export const RETRY_PARKED_MARK = 'Task parked';
+
 export const STEP_FAILURE_KINDS = [
   'quota',
   'capacity',

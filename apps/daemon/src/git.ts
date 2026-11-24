@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { BoundGitCredentials, CommitIdentity, GitCredentialSource } from '@cairn/shared';
+import {
+  type BoundGitCredentials,
+  type CommitIdentity,
+  type GitCredentialSource,
+  RETRY_PARKED_MARK,
+} from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { childEnv } from './child-env.js';
 import { loopbackNoProxy } from './proxy.js';
@@ -359,7 +364,7 @@ export async function landGitSquash(input: {
   });
 }
 
-async function rebaseCommitterEnv(
+export async function rebaseCommitterEnv(
   dir: string,
   branch: string,
   identity: CommitIdentity | null | undefined,
@@ -378,7 +383,7 @@ async function rebaseCommitterEnv(
   return chosen === null ? {} : commitEnv(chosen);
 }
 
-async function rebaseBranchOntoPublishedTip(
+export async function rebaseBranchOntoPublishedTip(
   dir: string,
   branch: string,
   remoteTip: string,
@@ -792,6 +797,15 @@ export const gitPrim = {
     return /^[0-9a-f]{40,64}$/.test(sha) ? sha : null;
   },
 
+  async resolveRef(dir: string, ref: string): Promise<string | null> {
+    const r = await runGit(['rev-parse', '--verify', '--end-of-options', ref], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    const sha = r.stdout.trim();
+    return r.code === 0 && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sha) ? sha : null;
+  },
+
   async push(
     dir: string,
     branch: string,
@@ -950,7 +964,7 @@ export const gitPrim = {
       });
       if ('error' in synced) {
         throw new Error(
-          `${rejection.message}\nrebasing ${branch} on top of the published tip also failed: ${synced.error}`,
+          `${RETRY_PARKED_MARK}: ${branch} cannot be reconciled with the published remote tip — the remote branch holds commits that conflict with this attempt's work. Reconcile ${branch} by hand, then retry the task.\n${rejection.message}\nrebase: ${synced.error}`,
         );
       }
       const retry = await attemptPush();
@@ -1090,7 +1104,12 @@ export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
     } catch (err) {
       lastErr = err;
       const msg = err instanceof Error ? err.message : String(err);
-      if (err instanceof GitPushHookError || isGitAuthFailure(msg)) break;
+      if (
+        msg.startsWith(RETRY_PARKED_MARK) ||
+        err instanceof GitPushHookError ||
+        isGitAuthFailure(msg)
+      )
+        break;
       if (isPushRejectedNoFastForward(msg) || !isGitTransientNetFailure(msg)) break;
       const delay = GIT_NET_RETRY_DELAYS_MS[i];
       if (delay === undefined) break;

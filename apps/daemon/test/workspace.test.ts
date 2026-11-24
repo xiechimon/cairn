@@ -299,6 +299,57 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     await expect(ws.prepare(prepareInput(CONV_A))).rejects.toThrow(/remote branch diverged/);
   }, 30_000);
 
+  test('a reused worktree continues from the published task branch tip', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    writeFileSync(join(prepared.cwd, 'attempt.txt'), 'attempt one\n');
+    await runGit(['add', '-A'], { cwd: prepared.cwd });
+    await runGit(['commit', '-m', 'attempt one'], {
+      cwd: prepared.cwd,
+      env: commitEnv(IDENTITY),
+    });
+    await runGit(['push', 'origin', prepared.branch], { cwd: prepared.cwd });
+    await runGit(['fetch', 'origin', prepared.branch], { cwd: seedDir });
+    await runGit(['checkout', '-B', prepared.branch, 'FETCH_HEAD'], { cwd: seedDir });
+    writeFileSync(join(seedDir, 'autofix.txt'), 'auto-fix\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'auto-fix'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', `HEAD:${prepared.branch}`], { cwd: seedDir });
+    const published = await runGit(
+      ['rev-parse', '--verify', `refs/remotes/origin/${prepared.branch}`],
+      { cwd: prepared.baseRepoDir },
+    ).then((r) => r.stdout.trim());
+
+    const again = await ws.prepare(prepareInput(CONV_A));
+
+    expect(again.reused).toBe(true);
+    expect(
+      await runGit(['merge-base', '--is-ancestor', published, prepared.branch], {
+        cwd: again.cwd,
+      }).then((r) => r.code),
+    ).toBe(0);
+    expect(existsSync(join(again.cwd, 'autofix.txt'))).toBe(true);
+    expect(existsSync(join(again.cwd, 'attempt.txt'))).toBe(true);
+  }, 30_000);
+
+  test('a reused worktree that cannot be replayed onto the moved remote branch stops with the parked reason', async () => {
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    await runGit(['push', 'origin', prepared.branch], { cwd: prepared.cwd });
+    await runGit(['fetch', 'origin', prepared.branch], { cwd: seedDir });
+    await runGit(['checkout', '-B', prepared.branch, 'FETCH_HEAD'], { cwd: seedDir });
+    writeFileSync(join(seedDir, 'shared.txt'), 'published side\n');
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'published side'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', `HEAD:${prepared.branch}`], { cwd: seedDir });
+    writeFileSync(join(prepared.cwd, 'shared.txt'), 'retry side\n');
+    await runGit(['add', '-A'], { cwd: prepared.cwd });
+    await runGit(['commit', '-m', 'retry side'], {
+      cwd: prepared.cwd,
+      env: commitEnv(IDENTITY),
+    });
+
+    await expect(ws.prepare(prepareInput(CONV_A))).rejects.toThrow(/^Task parked/);
+  }, 30_000);
+
   test('orphan reclamation: three-step cleanup of conv worktrees older than the TTL (7×24h); live steps / new directories untouched', async () => {
     const stale = await ws.prepare(prepareInput(CONV_A));
     const fresh = await ws.prepare(prepareInput(CONV_B));

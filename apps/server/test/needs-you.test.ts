@@ -36,6 +36,7 @@ import {
   AUTOMATIC_RETRY_LIMIT,
   automaticRetryDelayMs,
   parkFailedBuild,
+  RETRY_PARKED_MARK,
 } from '../src/services/retry-parking.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import {
@@ -193,6 +194,23 @@ describe('needs you (#1800)', () => {
       ),
     ).rejects.toThrow(/parked/i);
     expect(buildCount(w)).toBe(1);
+  });
+
+  test('a remote-branch divergence the daemon could not reconcile parks on its first failure', async () => {
+    const w = openWorld();
+    const raw = `${RETRY_PARKED_MARK}: cairn/conv-x cannot be reconciled with the published remote tip — the remote branch holds commits that conflict with this attempt's work. Reconcile cairn/conv-x by hand, then retry the task.`;
+    const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, w.stepId)).get()!;
+    applyStepFailure(w.deps, row, raw);
+    await sweepFailedRetries(w.deps);
+    await sweepFailedRetries(w.deps);
+    expect(phaseOf(w)).toBe('failed');
+    expect(buildCount(w)).toBe(1);
+    expect(
+      w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
+    ).toBe(raw);
+    expect(() =>
+      startBuilds(w.deps, { projectId: w.projectId, todoIds: [w.todoId], triggerSource: 'chief' }),
+    ).toThrow(/parked/i);
   });
 
   test('an outdated bundled agent CLI parks on its first failure with a plain notice and no retry', async () => {

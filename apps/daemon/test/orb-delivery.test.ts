@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
-import { type AgentBackend, conversationBranch } from '@cairn/shared';
+import { type AgentBackend, conversationBranch, RETRY_PARKED_MARK } from '@cairn/shared';
 import { afterEach, expect, test, vi } from 'vitest';
 import { gitPrim, runGitOk } from '../src/git.js';
 import { RelayMachineApi, RelayMachineServer } from '../src/orb/relay.js';
@@ -118,7 +118,7 @@ test.each(['local', 'github', 'local-rejected'] as const)(
       if (kind === 'local-rejected') {
         expect(api.doneBodies[0]?.body).toMatchObject({
           status: 'failed',
-          errorMessage: expect.stringContaining('Bundle delivery rejected'),
+          errorMessage: expect.stringContaining(RETRY_PARKED_MARK),
         });
       } else {
         expect(api.doneBodies[0]?.body).toMatchObject({ status: 'success' });
@@ -222,13 +222,15 @@ test.each([
   }
 });
 
-test.each(['fast-forward', 'divergent', 'already-contained'] as const)(
+test.each(['fast-forward', 'divergent', 'conflict', 'checked-out', 'already-contained'] as const)(
   'host bundle delivery preserves %s push semantics',
   async (mode) => {
     const { root, repo, branch, outboxDir } = await fixture();
     const worker = join(root, 'worker');
     await runGitOk(['clone', repo, worker]);
     await runGitOk(['checkout', '-b', branch], { cwd: worker });
+    if (mode === 'conflict') writeFileSync(join(worker, 'shared.txt'), 'worker side\n');
+    await runGitOk(['add', '-A'], { cwd: worker });
     await runGitOk(
       [
         '-c',
@@ -236,7 +238,7 @@ test.each(['fast-forward', 'divergent', 'already-contained'] as const)(
         '-c',
         'user.email=test@example.test',
         'commit',
-        '--allow-empty',
+        ...(mode === 'conflict' ? [] : ['--allow-empty']),
         '-m',
         'Worker',
       ],
@@ -251,6 +253,8 @@ test.each(['fast-forward', 'divergent', 'already-contained'] as const)(
     else await runGitOk(['branch', branch], { cwd: repo });
     if (mode !== 'fast-forward') {
       await runGitOk(['checkout', branch], { cwd: repo });
+      if (mode === 'conflict') writeFileSync(join(repo, 'shared.txt'), 'host side\n');
+      await runGitOk(['add', '-A'], { cwd: repo });
       await runGitOk(
         [
           '-c',
@@ -258,13 +262,14 @@ test.each(['fast-forward', 'divergent', 'already-contained'] as const)(
           '-c',
           'user.email=test@example.test',
           'commit',
-          '--allow-empty',
+          ...(mode === 'conflict' ? [] : ['--allow-empty']),
           '-m',
           'Host',
         ],
         { cwd: repo },
       );
-      await runGitOk(['checkout', 'main'], { cwd: repo });
+      if (mode !== 'checked-out' && mode !== 'already-contained')
+        await runGitOk(['checkout', 'main'], { cwd: repo });
     }
     const before = await runGitOk(['show-ref'], { cwd: repo });
     const server = new RelayMachineServer({
@@ -281,10 +286,27 @@ test.each(['fast-forward', 'divergent', 'already-contained'] as const)(
     );
     try {
       const delivery = relay.call('deliverBundle', ['s1', 'step.bundle']);
-      if (mode === 'divergent') await expect(delivery).rejects.toThrow(/non-fast-forward/);
-      else await delivery;
-      if (mode !== 'fast-forward') expect(await runGitOk(['show-ref'], { cwd: repo })).toBe(before);
-      else expect(await runGitOk(['rev-parse', `refs/heads/${branch}`], { cwd: repo })).toBe(head);
+      if (mode === 'conflict' || mode === 'checked-out') {
+        await expect(delivery).rejects.toThrow(new RegExp(`^${RETRY_PARKED_MARK}`));
+        expect(await runGitOk(['show-ref'], { cwd: repo })).toBe(before);
+      } else if (mode === 'divergent') {
+        await delivery;
+        const tip = await runGitOk(['rev-parse', `refs/heads/${branch}`], { cwd: repo });
+        expect(tip).not.toBe(head);
+        expect(await runGitOk(['merge-base', '--is-ancestor', head, branch], { cwd: repo })).toBe(
+          '',
+        );
+        const parents = await runGitOk(['rev-list', '--parents', '-n', '1', branch], {
+          cwd: repo,
+        });
+        expect(parents.split(' ')).toHaveLength(3);
+      } else {
+        await delivery;
+        if (mode !== 'fast-forward')
+          expect(await runGitOk(['show-ref'], { cwd: repo })).toBe(before);
+        else
+          expect(await runGitOk(['rev-parse', `refs/heads/${branch}`], { cwd: repo })).toBe(head);
+      }
     } finally {
       relay.close();
       await server.close();

@@ -3,6 +3,7 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { join } from 'node:path';
+import { RETRY_PARKED_MARK } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import {
   GIT_NET_RETRY_DELAYS_MS,
@@ -998,7 +999,7 @@ describe('#5378 a retried step that rewrote its branch still pushes without forc
     );
   }, 30_000);
 
-  test('work that collides with the published content still fails and the worktree rewinds', async () => {
+  test('work that collides with the published content stops retries with the parked reason and the worktree rewinds', async () => {
     const { remote, dir } = pushFixture();
     commitFile(dir, 'shared.txt', 'published version\n');
     const published = gitOk(dir, ['rev-parse', 'work']);
@@ -1011,8 +1012,8 @@ describe('#5378 a retried step that rewrote its branch still pushes without forc
     const err = await gitPrim.push(dir, 'work', null).catch((error: unknown) => error);
 
     expect(err).toBeInstanceOf(Error);
-    expect(String(err)).toContain('git push failed');
-    expect(String(err)).toMatch(/non-fast-forward|fetch first/);
+    expect(String(err)).toContain(RETRY_PARKED_MARK);
+    expect(String(err)).toMatch(/non-fast-forward/);
     expect(gitOk(dir, ['rev-parse', 'work'])).toBe(retryHead);
     expect(gitOk(dir, ['status', '--porcelain'])).toBe('');
     expect(gitOk(remote, ['rev-parse', 'refs/heads/work'])).toBe(published);

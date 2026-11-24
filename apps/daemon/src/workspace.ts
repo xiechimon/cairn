@@ -26,6 +26,7 @@ import {
   type PreparedWorkspace,
   type PushPublication,
   READONLY_EXPORT_MARKER,
+  RETRY_PARKED_MARK,
   ReadOnlyWorkspaceError,
   RemoteBranchDivergedError,
   WORKSPACE_HOOK_TIMEOUT_MS,
@@ -37,6 +38,8 @@ import type { SessionConfiner } from './backend/confine-session.js';
 import {
   GIT_NET_RETRY_DELAYS_MS,
   gitPrim,
+  rebaseBranchOntoPublishedTip,
+  rebaseCommitterEnv,
   withGitCredentialFallback,
   withGitNetRetries,
 } from './git.js';
@@ -249,6 +252,27 @@ export class WorkspaceManager implements WorktreeOps {
           const current = await gitPrim.currentBranch(convDir);
           const remoteAhead = await gitPrim.countRemoteAhead(baseRepoDir, branch);
           if (remoteAhead > 0 && current !== branch) throw new RemoteBranchDivergedError(branch);
+          if (remoteAhead > 0) {
+            const remoteTip = await gitPrim.resolveRef(
+              baseRepoDir,
+              `refs/remotes/origin/${branch}`,
+            );
+            if (remoteTip === null) throw new RemoteBranchDivergedError(branch);
+            const synced = await rebaseBranchOntoPublishedTip(
+              convDir,
+              branch,
+              remoteTip,
+              await rebaseCommitterEnv(convDir, branch, null),
+            );
+            if ('error' in synced) {
+              throw new Error(
+                `${RETRY_PARKED_MARK}: ${branch} cannot be reconciled with origin/${branch} — a previous attempt advanced the published branch and the work left in this workspace cannot be replayed onto it (${synced.error}). Reconcile ${branch} by hand, then retry the task.`,
+              );
+            }
+            this.logger.workspace(
+              `Reused worktree rebased onto the published tip (origin/${branch} moved +${remoteAhead})`,
+            );
+          }
         }
         this.logger.workspace('Worktree reused');
         const hooks = await this.runHookStage(

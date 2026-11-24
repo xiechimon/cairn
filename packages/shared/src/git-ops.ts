@@ -1,6 +1,7 @@
 import type { WorkspaceHookNoteData } from './protocol/executor.js';
 import type { CompareFile } from './records/merge-gate.js';
 import type { LocalErrorReason, ProjectRepoKind } from './records/project.js';
+import { RETRY_PARKED_MARK } from './task-failure.js';
 
 export interface GitTreeEntry {
   name: string;
@@ -142,7 +143,9 @@ export const REMOTE_BRANCH_DIVERGED = 'remote branch diverged';
 
 export class RemoteBranchDivergedError extends Error {
   constructor(branch: string) {
-    super(`${REMOTE_BRANCH_DIVERGED}: ${branch}`);
+    super(
+      `${RETRY_PARKED_MARK}: ${REMOTE_BRANCH_DIVERGED}: ${branch} — the published branch advanced while the workspace's worktree was checked out on another branch; reconcile it by hand, then retry the task`,
+    );
     this.name = 'RemoteBranchDivergedError';
   }
 }

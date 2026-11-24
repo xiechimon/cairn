@@ -2,6 +2,7 @@ import {
   CHIEF_NOTICE_KIND,
   classifyStepFailure,
   isProviderAuthFailure,
+  RETRY_PARKED_MARK,
   runtimeUpdateRequired,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
@@ -16,7 +17,7 @@ import { reconcileOwners } from './owner.js';
 import { routeForStep } from './routing-rules.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
-export const RETRY_PARKED_MARK = 'Task parked';
+export { RETRY_PARKED_MARK };
 export const FAILED_BUILDS_PER_HOUR_LIMIT = 3;
 export const FAILED_BUILD_WINDOW_MS = 3_600_000;
 export const AUTOMATIC_RETRY_LIMIT = 3;
