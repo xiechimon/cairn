@@ -46,6 +46,7 @@ export interface TodoGlance {
 }
 
 export const TodoGlanceContext = createContext<ReadonlyMap<string, TodoGlance> | null>(null);
+export const ThreadUnreadContext = createContext<ReadonlySet<string> | null>(null);
 
 const TASK_NUMBER_LABEL = /^#\d+$/;
 const TASK_NUMBER = /(任务\s*)?#(\d+)/g;
@@ -193,6 +194,7 @@ function TaskWord({ todoId, label, href }: { todoId: string; label: string; href
   const { t } = useI18n();
   const phase = useContext(TodoGlanceContext)?.get(todoId)?.phase;
   const startsAfter = useStartsAfter(todoId, phase);
+  const unread = useContext(ThreadUnreadContext)?.has(todoId) === true;
   const lines = [
     label,
     phase === undefined ? null : t(PHASE_UI[phase].chip),
@@ -214,6 +216,14 @@ function TaskWord({ todoId, label, href }: { todoId: string; label: string; href
       >
         {phase !== undefined && <TaskGlyph phase={phase} className="mr-1 self-center" />}
         <span className="min-w-0 truncate">{label}</span>
+        {unread && (
+          <span
+            role="img"
+            aria-label={t('有新动态')}
+            data-slot="task-mention-unread"
+            className="ml-1 size-1.5 flex-none self-center rounded-full bg-(--card-button)"
+          />
+        )}
       </TooltipTrigger>
       <TooltipContent
         side="top"

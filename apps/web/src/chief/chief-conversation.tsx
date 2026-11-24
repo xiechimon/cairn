@@ -23,6 +23,7 @@ import { useConnected } from '../api/connection-state.js';
 import { useArchivedTodos, useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import type { PendingComments } from '../board/design/design-composer.js';
+import { useUnreadThreadIds } from '../board/use-thread-unread.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
 import { FOLLOW_THRESHOLD, JumpToLatestButton } from '../components/chat/jump-to-latest.js';
@@ -42,7 +43,7 @@ import {
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
 import { toastSuccess } from '../components/ui/toaster.js';
-import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
+import { ThreadUnreadContext, type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
@@ -388,6 +389,7 @@ export function ChiefConversation({
     if (archived.length === 0) return active;
     return new Map([...active, ...archived.map((td) => [td.id, todoGlanceOf(td)] as const)]);
   }, [todoGlances, todosQ.data, archivedQ.data]);
+  const unread = useUnreadThreadIds(glances);
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -668,29 +670,31 @@ export function ChiefConversation({
             >
               <MessageScrollerContent className={SCROLLER_CONTENT_CLS} data-testid="chief-stream">
                 <TodoGlanceContext.Provider value={glances}>
-                  <ReplySourceHighlightContext.Provider
-                    value={highlightedSource === replyQuote ? highlightedSource : null}
-                  >
-                    <CardFailureContext.Provider value={cardFailure}>
-                      {lead}
-                      {day == null ? (
-                        <VirtualStream
-                          cacheKey={chief.threadId ?? ''}
-                          keys={streamLayout.keys}
-                          renderRow={(n) => streamEntry(streamLayout, n)}
-                          viewportRef={viewportRef}
-                        />
-                      ) : (
-                        <>
-                          <div data-testid="chief-earlier" className="opacity-60">
-                            {renderRows(earlierLayout)}
-                          </div>
-                          {day.today}
-                          {renderRows(streamLayout)}
-                        </>
-                      )}
-                    </CardFailureContext.Provider>
-                  </ReplySourceHighlightContext.Provider>
+                  <ThreadUnreadContext.Provider value={unread}>
+                    <ReplySourceHighlightContext.Provider
+                      value={highlightedSource === replyQuote ? highlightedSource : null}
+                    >
+                      <CardFailureContext.Provider value={cardFailure}>
+                        {lead}
+                        {day == null ? (
+                          <VirtualStream
+                            cacheKey={chief.threadId ?? ''}
+                            keys={streamLayout.keys}
+                            renderRow={(n) => streamEntry(streamLayout, n)}
+                            viewportRef={viewportRef}
+                          />
+                        ) : (
+                          <>
+                            <div data-testid="chief-earlier" className="opacity-60">
+                              {renderRows(earlierLayout)}
+                            </div>
+                            {day.today}
+                            {renderRows(streamLayout)}
+                          </>
+                        )}
+                      </CardFailureContext.Provider>
+                    </ReplySourceHighlightContext.Provider>
+                  </ThreadUnreadContext.Provider>
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>

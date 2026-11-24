@@ -202,6 +202,26 @@ test('back returns to the tasks list and close leaves the panel area empty', asy
   await expect(page.getByRole('complementary', { name: '任务' })).toHaveCount(0);
 });
 
+test('an unread thread shows a dot on the task named in the reply, and opening the thread clears it', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=home-c-unread');
+  const stream = page.getByTestId('chief-stream');
+  const ref = stream.getByTestId('task-mention').filter({ hasText: 'Orb canary round 7' }).first();
+  await expect(ref).toBeVisible();
+  await expect(ref.locator('[data-slot="task-mention-unread"]')).toBeVisible();
+  await expect(ref.locator('[data-slot="task-mention-unread"]')).toHaveAccessibleName('有新动态');
+  await expect(
+    stream
+      .getByTestId('task-mention')
+      .filter({ hasText: 'Fold finished turns' })
+      .locator('[data-slot="task-mention-unread"]'),
+  ).toHaveCount(0);
+  await ref.click();
+  await expect(page.getByTestId('side-chat')).toBeVisible();
+  await expect(ref.locator('[data-slot="task-mention-unread"]')).toHaveCount(0);
+});
+
 test('the panel width is resizable and remembered', async ({ page }) => {
   await page.goto(`${HOME}&thread=home-c-review`);
   const handle = page.getByTestId('side-panel-resize');

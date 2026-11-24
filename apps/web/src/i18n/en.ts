@@ -2193,6 +2193,7 @@ export const EN: Record<string, string> = {
   '{n} 条更新': '{n#1 update|# updates}',
   在主对话中查看: 'View in the main chat',
   主对话里没有加载这条消息: 'That message is not loaded in the main chat.',
+  有新动态: 'New activity',
   仅自己可见: 'Only you can see this',
   文档: 'Documents',
   设计: 'Designs',
