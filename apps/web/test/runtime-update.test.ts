@@ -3,7 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import type { SubscriptionAccount } from '../src/api/claude-accounts.js';
-import { teamEventInvalidations } from '../src/api/sse-team-events.js';
+import { streamEventQueryEffect } from '../src/api/sse-team-events.js';
 import { TooltipProvider } from '../src/components/ui/tooltip.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 import {
@@ -131,9 +131,12 @@ describe('provider settings runtime update UI', () => {
   });
 
   test('machine_presence SSE invalidates model-sources', () => {
-    expect(teamEventInvalidations({ type: 'machine_presence' }, 'team-1')).toContainEqual([
-      'model-sources',
-      'team-1',
-    ]);
+    expect(
+      streamEventQueryEffect(
+        { type: 'machine_presence', teamId: 'team-1' },
+        ['model-sources', 'team-1'],
+        undefined,
+      ),
+    ).toBe('cancel');
   });
 });

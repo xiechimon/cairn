@@ -245,7 +245,7 @@ async function connectorFields(
   const current = new Set(stepMcpGrant(deps.db, machineRow) ?? []);
   const grant = (claimed.mcpGrant ?? []).filter((slug) => current.has(slug));
   const fields = await stepConnectorEndpoints(mcpConnectorDepsOf(deps), teamId, grant);
-  return stillClaimedBy(deps, claimed) ? fields : {};
+  return fields;
 }
 
 function gatewayMayReceive(

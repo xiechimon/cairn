@@ -112,7 +112,7 @@ describe('chief turns record their own usage per step', () => {
       createdAt: startedAt,
       ranModel: { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: null },
     });
-    await finishStep(deps(), machineId, 'turn-stats', {
+    await finishStepForClaim(deps(), machineId, 'turn-stats', {
       status: 'success',
       usage: [
         usage('claude-code/claude-opus-5-5', 100, 900, {

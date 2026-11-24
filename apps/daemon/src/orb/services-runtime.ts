@@ -13,7 +13,6 @@ import { createServer, Socket } from 'node:net';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { sleep } from '@cairn/shared';
-import { processStartTime } from '@cairn/shared/parent-watch';
 import { childEnv } from '../child-env.js';
 import { processStartTime } from '../process-tree.js';
 import type { OrbEnsureDeps, OrbEnsureService } from './services-ensure.js';
