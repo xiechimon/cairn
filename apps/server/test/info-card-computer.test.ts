@@ -17,7 +17,7 @@ import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdi
 import type { MachineApi } from '../../daemon/src/machine-client.js';
 import { performRepoArchive } from '../../daemon/src/repo-archive.js';
 import { startCoordinator } from '../src/coordinator/index.js';
-import { attachment, build, message, step, todo } from '../src/db/schema.js';
+import { attachment, build, machine, message, step, todo } from '../src/db/schema.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { dropComputerWaiters, receiveComputerFrames } from '../src/services/machine-computer.js';
 import { claimStep } from '../src/services/machines.js';
@@ -570,11 +570,12 @@ describe('info cards run in the agent computer', () => {
     expect(pending?.status).toBe('pending');
   });
 
-  test('with no usable computer the card waits and says why', async () => {
+  test('with no online machine the card waits with no-computer, and an online non-VM machine unblocks it', async () => {
     setCoordinatorInServer(true);
     const s = bootServer();
     disposables.push(() => s.dispose());
-    insertMachine(s, { name: 'windows-box' });
+    const machineId = insertMachine(s, { name: 'windows-box' });
+    s.db.update(machine).set({ online: false }).where(eq(machine.id, machineId)).run();
     createProvider(
       { db: s.db, box: s.secretBox },
       {
@@ -595,15 +596,19 @@ describe('info cards run in the agent computer', () => {
 
     const pending = s.db.select().from(step).where(eq(step.buildId, buildId)).get();
     const todoRow = s.db.select().from(todo).where(eq(todo.id, todoId)).get();
-    const queue = stepQueueProjector(s.db, s.team.id).project({
-      id: pending?.id ?? '',
-      createdAt: pending?.createdAt ?? 0,
-      homeMachineId:
-        todoRow === undefined || pending === undefined
-          ? null
-          : (profileForStep(s.db, todoRow, pending.kind, pending.id)?.machineId ?? null),
-    });
-    expect(queue?.blocked?.kind).toBe('no-computer');
+    const projectQueue = () =>
+      stepQueueProjector(s.db, s.team.id).project({
+        id: pending?.id ?? '',
+        createdAt: pending?.createdAt ?? 0,
+        homeMachineId:
+          todoRow === undefined || pending === undefined
+            ? null
+            : (profileForStep(s.db, todoRow, pending.kind, pending.id)?.machineId ?? null),
+      });
+    expect(projectQueue()?.blocked?.kind).toBe('no-computer');
     expect(s.db.select().from(step).where(eq(step.buildId, buildId)).get()?.status).toBe('pending');
+
+    s.db.update(machine).set({ online: true }).where(eq(machine.id, machineId)).run();
+    expect(projectQueue()?.blocked).toBeUndefined();
   });
 });

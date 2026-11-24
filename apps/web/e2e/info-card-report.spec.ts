@@ -306,7 +306,7 @@ test('a queued info card waiting for a computer shows no stage stepper and no ty
 
   const blocked = panel.getByTestId('queue-blocked');
   await expect(blocked).toBeVisible();
-  await expect(blocked).toContainText('排队中：信息卡要在 Coordinator 的电脑里运行');
+  await expect(blocked).toContainText('排队中：信息卡要在执行机上运行');
   await expect(panel.getByTestId('typing-dots')).toHaveCount(0);
   await expect(panel.getByTestId('typing-dot')).toHaveCount(0);
   await expect(panel.locator('[data-slot="reply-bubble"]')).toHaveCount(0);

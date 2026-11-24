@@ -3056,4 +3056,6 @@ export const EN: Record<string, string> = {
   主机名称: 'Host name',
   '主机地址，例如 http://mac-mini.ts.net:8787': 'Host URL, e.g. http://mac-mini.ts.net:8787',
   主机地址: 'Host URL',
+  '排队中：信息卡要在执行机上运行，团队暂无在线的执行机':
+    'Queued: info cards run on a Runner, and the team has no online Runner',
 };

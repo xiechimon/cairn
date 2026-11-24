@@ -26,12 +26,10 @@ export function infoComputerHosts(db: Pick<Db, 'select'>, teamId: string) {
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .all()
-    .filter(
-      (row) =>
-        row.online &&
-        row.capabilities?.computerKind === 'vm' &&
-        row.capabilities.computer === true &&
-        row.capabilities.browser === true,
+    .filter((row) => row.online)
+    .sort(
+      (a, b) =>
+        Number(b.capabilities?.computer === true) - Number(a.capabilities?.computer === true),
     );
 }
 
