@@ -1,3 +1,4 @@
+import { errorMessage } from '@cairn/shared';
 import { type AgentTodoReporter, parseAgentTodoText } from './agent-todo.js';
 import { DeltaRelay } from './delta-relay.js';
 import type { TranscriptBuffer } from './journal.js';
@@ -15,10 +16,6 @@ export interface StepTranscriptStreamOptions {
   log: (line: string) => void;
 }
 
-function errorText(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
 export class StepTranscriptStream {
   readonly segments: SegmentEmitter;
   private readonly textDeltas: DeltaRelay;
@@ -31,12 +28,12 @@ export class StepTranscriptStream {
     this.textDeltas = new DeltaRelay({
       flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
       send: (text) => client.transcriptDelta(stepId, text),
-      onError: (err) => log(`transcript delta relay failed: ${errorText(err)}`),
+      onError: (err) => log(`transcript delta relay failed: ${errorMessage(err)}`),
     });
     this.thinkingDeltas = new DeltaRelay({
       flushMs: TRANSCRIPT_DELTA_FLUSH_MS,
       send: (text) => client.thinkingDelta?.(stepId, text),
-      onError: (err) => log(`thinking delta relay failed: ${errorText(err)}`),
+      onError: (err) => log(`thinking delta relay failed: ${errorMessage(err)}`),
     });
     this.segments = new SegmentEmitter((seg) => this.emitSegment(seg));
   }
@@ -84,7 +81,7 @@ export class StepTranscriptStream {
     try {
       await client.transcriptRow?.(stepId, row);
     } catch (err: unknown) {
-      log(`segment row relay failed: ${errorText(err)}`);
+      log(`segment row relay failed: ${errorMessage(err)}`);
     }
     if (seg.kind === 'text') {
       const items = parseAgentTodoText(seg.text);

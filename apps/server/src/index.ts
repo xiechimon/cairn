@@ -1,6 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
+import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { ENV_VARS } from '@cairn/shared';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { serve } from '@hono/node-server';
@@ -428,11 +429,11 @@ async function shutdown(): Promise<void> {
   computerScreens.close();
   await Promise.race([
     tailscale.withdraw().catch(() => {}),
-    new Promise((resolve) => setTimeout(resolve, TAILSCALE_WITHDRAW_MS)),
+    waitTimeout(TAILSCALE_WITHDRAW_MS, undefined, { ref: false }),
   ]);
   await Promise.race([
     coordinator?.close(),
-    new Promise((resolve) => setTimeout(resolve, COORDINATOR_CLOSE_MS)),
+    waitTimeout(COORDINATOR_CLOSE_MS, undefined, { ref: false }),
   ]);
   await drainHttp();
   await tailnetReady;

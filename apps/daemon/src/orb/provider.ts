@@ -362,7 +362,7 @@ export class NspawnOrbProvider implements OrbProvider {
             throw new Error('Orb machine is still running after terminate');
           break;
         }
-        await new Promise<void>((resolve) => setTimeout(resolve, 100));
+        await delay(100);
       }
     }
     handle.running = false;

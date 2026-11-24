@@ -11,7 +11,7 @@ import {
 import { join } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { BRAND, ENV_VARS, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
+import { BRAND, ENV_VARS, PROVIDER_COMMAND_NOTICE, sleep } from '@cairn/shared';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
@@ -235,7 +235,7 @@ export function buildProgram(): Command {
       if (!opts.follow) return;
       let offset = statSync(logPath).size;
       for (;;) {
-        await new Promise((r) => setTimeout(r, 500));
+        await sleep(500);
         if (!existsSync(logPath)) continue;
         const size = statSync(logPath).size;
         if (size > offset) {
@@ -472,7 +472,7 @@ async function printEnrollmentUrl(home: string, serverUrl: string, name: string)
     statePaths(home),
     serverUrl,
     2_000,
-    (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    sleep,
     () => Date.now(),
     name,
   );

@@ -28,6 +28,7 @@ import {
   currentAntigravityManagedInstall,
   ensureAntigravityManagedInstall,
 } from '@cairn/shared/antigravity-install';
+import { toolInstallRoot } from '../runtime-homes.js';
 import { DAEMON_VERSION } from '../version.js';
 
 const PROBE_INIT_TIMEOUT_MS = 30_000;
@@ -89,7 +90,7 @@ export interface AntigravityManagedOptions {
 }
 
 export function antigravityInstallRoot(cairnHome: string): string {
-  return join(cairnHome, 'tools', 'antigravity');
+  return toolInstallRoot(cairnHome, 'antigravity');
 }
 
 const PROBE_ENV_KEYS = [

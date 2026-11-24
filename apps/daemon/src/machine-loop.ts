@@ -21,6 +21,7 @@ import {
   MACHINE_ORB_CONVERSATIONS_LIMIT,
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
+  sleep,
 } from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import { probeHostKey } from '@cairn/shared/host-identity';
@@ -159,7 +160,6 @@ export interface MachineHandle {
   recheckConfinement(): Promise<void>;
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const CONFINEMENT_RECHECK_MS = 60_000;
 const STRANDED_UPLOAD_REPLAY_MS = 30_000;
 const STRANDED_UPLOAD_MIN_AGE_MS = 30_000;
@@ -655,7 +655,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         config.name,
         {
           now: () => Date.now(),
-          sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+          sleep,
           log: (line) => logger.raw(line),
         },
         hostKey ?? undefined,

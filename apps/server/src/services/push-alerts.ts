@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { sleep } from '@cairn/shared';
 import { and, eq, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { pushDelivery } from '../db/schema.js';
@@ -136,7 +137,7 @@ async function settleFallback(
         process.stderr.write(`ALERT UNDELIVERED ${id}: fallback claim wait timed out\n`);
         return 'undelivered';
       }
-      await new Promise((resolve) => setTimeout(resolve, Math.min(100, remaining)));
+      await sleep(Math.min(100, remaining));
     }
     let alertStatus: 'fallback-accepted' | 'undelivered' = 'undelivered';
     try {
@@ -241,7 +242,7 @@ export async function sendMustReachAlert(
       }
       const remaining = deadline - Date.now();
       if (remaining <= 0) break;
-      await new Promise((resolve) => setTimeout(resolve, Math.min(1_000, remaining)));
+      await sleep(Math.min(1_000, remaining));
     }
   }
   return { push, alertStatus: await settleFallback(db, id, message, fallback) };

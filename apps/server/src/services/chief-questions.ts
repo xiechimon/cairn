@@ -6,6 +6,7 @@ import {
   askUserAnswerBodySchema,
   askUserQuestionSchema,
   isChiefConversationId,
+  sleep,
   type UserRecord,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
@@ -159,7 +160,7 @@ export async function holdForQuestion(
       return parkedReply(parked);
     }
     if (Date.now() >= deadline) return null;
-    await new Promise((r) => setTimeout(r, ASK_POLL_MS));
+    await sleep(ASK_POLL_MS);
   }
 }
 

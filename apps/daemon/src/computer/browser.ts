@@ -2,6 +2,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import {
   browserSecretFillActionSchema,
   type ComputerCall,
+  escapeRegExp,
   LOGIN_SIGNALS,
   type LoginForm,
   type LoginSignal,
@@ -457,7 +458,7 @@ function actionArgv(action: z.infer<typeof actActionSchema>): string[] {
 }
 
 function refPresent(snapshot: string, ref: string): boolean {
-  const escaped = bareRef(ref).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = escapeRegExp(bareRef(ref));
   return new RegExp(`[[ ]ref=${escaped}[\\],]`).test(snapshot);
 }
 
@@ -625,7 +626,7 @@ export async function runBrowserTool(
       'search',
       '--onlyvisible',
       '--name',
-      `^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} - Chromium$`,
+      `^${escapeRegExp(name)} - Chromium$`,
     ]);
     if (found.code === 1) return 'none';
     if (found.code !== 0) return null;
