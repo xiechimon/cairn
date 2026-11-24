@@ -47,7 +47,7 @@ describe('threadUpdates', () => {
       threadUpdates(
         { phase: 'review', phaseAt: 100, output: 'info', owner: 'coordinator', section: 'working' },
         [
-          { kind: 'report', id: 'r1', attachmentId: 'a1', markdown: '# Exported\nOK', createdAt: 200 },
+          { kind: 'report', id: 'r1', markdown: '# Exported\nOK', createdAt: 200 },
           { kind: 'robot', markdown: 'Done.', createdAt: 300 },
         ],
       ),

@@ -433,7 +433,9 @@ describe('a report turn treats the report as third-party data', () => {
     const turn = w.deliver()!;
     await notify(w, turn);
     expect(w.phaseOf(w.task.todoId)).toBe('review');
-    finishCoordinatorTurn(w.s.svc, turn, { status: 'success' });
+    finishCoordinatorTurn({ ...w.deps, attachmentsDir: w.s.attachmentsDir }, turn, {
+      status: 'success',
+    });
     const settled = getTodo(w.deps, w.task.todoId);
     expect(settled?.phase).toBe('done');
     expect(settled?.owner).toBeNull();
@@ -443,7 +445,9 @@ describe('a report turn treats the report as third-party data', () => {
   test('an unnotified info report wake that ends without complete_todos still hands off rather than silently finishing', () => {
     const w = openWorld();
     const turn = w.deliver()!;
-    finishCoordinatorTurn(w.s.svc, turn, { status: 'success' });
+    finishCoordinatorTurn({ ...w.deps, attachmentsDir: w.s.attachmentsDir }, turn, {
+      status: 'success',
+    });
     const handed = getTodo(w.deps, w.task.todoId);
     expect(handed?.phase).toBe('review');
     expect(handed?.owner).toBe('owner');
