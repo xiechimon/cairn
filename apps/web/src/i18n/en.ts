@@ -1501,6 +1501,9 @@ export const EN: Record<string, string> = {
   '{n} 个模型需要新版 Cairn': '{n#1 model needs|# models need} a Cairn update',
   '更新 Cairn 后再重试。': 'Update Cairn, then try again.',
   '更新 Cairn 后重新运行这个任务。': 'Update Cairn, then run this task again.',
+  '缺少命令 {command}': 'Missing command {command}',
+  '环境准备缺少命令 {command}': 'Setup is missing command {command}',
+  '安装缺少的工具后重新运行这个任务。': 'Install the missing tool, then run this task again.',
   '这个模型需要更新的 Claude Code': 'This model needs a newer Claude Code',
   '这个模型需要 {runtime} {required} 或更新的版本':
     'This model needs {runtime} {required} or newer',

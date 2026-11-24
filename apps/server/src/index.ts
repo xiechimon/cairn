@@ -5,6 +5,7 @@ import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { ENV_VARS } from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
+import { applyLoginShellEnv } from '@cairn/shared/shell-env';
 import { serve } from '@hono/node-server';
 import { and, eq } from 'drizzle-orm';
 import { createApp } from './app.js';
@@ -86,6 +87,8 @@ const commandExit = runServerCommand(process.argv.slice(2), {
   writeErr: (text) => process.stderr.write(text),
 });
 if (commandExit !== null) process.exit(commandExit);
+
+await applyLoginShellEnv({ onlyWhenNonTty: true });
 
 const loadedConfig = loadConfig();
 const logSecrets = [loadedConfig.authToken ?? ''];

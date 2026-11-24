@@ -35,6 +35,7 @@ import { runOrbServicesEnsure } from './orb/services-runtime.js';
 import { orbAgentHome, runOrbWorker } from './orb/worker.js';
 import { ensurePrivateDir } from './private-fs.js';
 import { claudeConfigHome } from './runtime-homes.js';
+import { ensureDaemonShellEnv } from './shell-env.js';
 import { forgetMachine, loadDaemonJson, loadMachineJson, statePaths } from './state.js';
 import {
   isAlive,
@@ -100,7 +101,10 @@ function reportStarted(started: SupervisorStart): void {
   }
 }
 
+export { ensureDaemonShellEnv } from './shell-env.js';
+
 export async function runForeground(opts: StartOptions): Promise<void> {
+  await ensureDaemonShellEnv();
   let config: DaemonConfig;
   try {
     config = loadDaemonConfig(configInput(opts));
@@ -162,6 +166,7 @@ export function buildProgram(): Command {
         await runForeground(opts);
         return;
       }
+      await ensureDaemonShellEnv();
       let config: DaemonConfig;
       try {
         config = loadDaemonConfig(configInput(opts));
@@ -188,6 +193,7 @@ export function buildProgram(): Command {
     .allowExcessArguments(true)
     .helpOption(false)
     .action(async () => {
+      await ensureDaemonShellEnv();
       const argv = process.argv.slice(2);
       const idx = argv.indexOf('supervise');
       const runnerArgv = idx >= 0 ? argv.slice(idx + 1) : argv;
@@ -209,6 +215,7 @@ export function buildProgram(): Command {
     .description('Restart the background daemon')
     .option('--server <url>', 'server URL (default: the one this machine enrolled with)')
     .action(async (_opts: StartOptions, cmd: Command) => {
+      await ensureDaemonShellEnv();
       const config = loadDaemonConfig(configInput(cmd.opts<StartOptions>()));
       await stopSupervisor(config.home);
       reportStarted(

@@ -1,6 +1,6 @@
-import type { ToolCallRecord } from '@cairn/shared';
+import { type ToolCallRecord, workspaceHookRowContent } from '@cairn/shared';
 import { expect, test } from 'vitest';
-import { mapTranscript, type MessageRow } from '../src/api/mappers.js';
+import { mapTranscript, type MessageRow, plainFailureOf } from '../src/api/mappers.js';
 import { todo } from './helpers.js';
 
 function render(messages: MessageRow[]) {
@@ -154,5 +154,63 @@ test('info-card computer tools (shell, read_file, write_file, list_files, submit
       { kind: 'call', action: 'search', description: 'list_files deliverables' },
       { kind: 'call', action: 'tool', target: 'submit_report · report.md' },
     ],
+  });
+});
+
+test('a failed setup hook with a missing command shows plain localized copy in the trace and fail row', () => {
+  const hookRow: MessageRow = {
+    id: 'hook-setup-s1',
+    role: 'system',
+    createdAt: 1000,
+    content: workspaceHookRowContent({
+      name: 'setup',
+      status: 'failed',
+      exitCode: 127,
+      output: '.agents/setup: line 6: pnpm: command not found',
+      totalChars: 46,
+      ms: 80,
+    }),
+  };
+  const items = mapTranscript({
+    messages: [hookRow],
+    steps: [],
+    build: {
+      id: 'build',
+      todoId: 'todo',
+      withPlan: false,
+      prevPhase: null,
+      triggerSource: 'user',
+      planDocId: null,
+      errorMessage: 'workspace hook .agents/setup exited 127 (missing command: pnpm) — .agents/setup: line 6: pnpm: command not found',
+      prUrl: null,
+      prNumber: null,
+      diffHash: null,
+      createdAt: 500,
+    },
+    todo: todo(12, 'failed'),
+    machineName: null,
+    userName: 'Owner',
+    liveText: '',
+  });
+  expect(items.find((item) => item.kind === 'work')).toMatchObject({
+    kind: 'work',
+    steps: [
+      {
+        action: 'setup',
+        description: '缺少命令 {command}',
+        localized: true,
+        localizedVars: { command: 'pnpm' },
+        error: true,
+      },
+    ],
+  });
+  expect(items.find((item) => item.kind === 'fail')).toMatchObject({
+    kind: 'fail',
+    plain: { key: '环境准备缺少命令 {command}', vars: { command: 'pnpm' } },
+    body: '安装缺少的工具后重新运行这个任务。',
+  });
+  expect(plainFailureOf('.../.agents/setup: line 6: uv: command not found')).toEqual({
+    key: '环境准备缺少命令 {command}',
+    vars: { command: 'uv' },
   });
 });

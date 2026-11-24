@@ -370,6 +370,46 @@ const TRANSIENT_5XX_RE =
 const HTTP_401_403_AUTH_RE =
   /\b401\s+unauthorized\b|\bhttp\s+401\b|\bstatus\s*[:=]?\s*401\b|\b403\s+forbidden\b/i;
 
+const MISSING_COMMAND_PATTERNS: readonly RegExp[] = [
+  /missing command[:\s]+['"]?([^\s'"():]+)['"]?/i,
+  /line\s+\d+:\s*['"]?([^\s:'"]+)['"]?:\s*(?:command\s+)?not found/i,
+  /:\s*\d+:\s*['"]?([^\s:'"]+)['"]?:\s*(?:command\s+)?not found/i,
+  /command not found:\s*['"]?([^\s:'"]+)['"]?/i,
+  /unknown command:\s*['"]?([^\s:'"]+)['"]?/i,
+  /\benv:\s*['"]?([^\s:'"]+)['"]?:\s*No such file or directory/i,
+  /The term\s+['"]([^'"]+)['"]\s+is not recognized/i,
+  /['"]([^'"]+)['"]\s+is not recognized as an internal or external command/i,
+  /(?:^|[\n—–-])\s*['"]?([^\s:'"]+)['"]?:\s*(?:command\s+)?not found/i,
+];
+
+const PLAUSIBLE_COMMAND_NAME = /^[A-Za-z0-9._@/+:-]{1,100}$/;
+const SHELL_SCRIPT_NAMES = new Set(['sh', 'bash', 'zsh', 'dash', 'fish', 'setup', 'resume']);
+
+export function missingSetupCommand(text: string): string | null {
+  if (text.trim() === '') return null;
+  for (const pattern of MISSING_COMMAND_PATTERNS) {
+    const match = pattern.exec(text);
+    const raw = match?.[1]?.trim();
+    if (raw === undefined || raw === '') continue;
+    const cleaned = raw.replace(/^['"`]+|['"`,;.)]+$/g, '');
+    if (!PLAUSIBLE_COMMAND_NAME.test(cleaned)) continue;
+    const base = cleaned.includes('/') ? (cleaned.split('/').at(-1) ?? cleaned) : cleaned;
+    if (base === '' || SHELL_SCRIPT_NAMES.has(base)) continue;
+    return cleaned;
+  }
+  return null;
+}
+
+export function isMissingCommandHookNote(note: {
+  status: string;
+  exitCode: number | null;
+  output: string;
+}): boolean {
+  return (
+    note.status === 'failed' && (note.exitCode === 127 || missingSetupCommand(note.output) !== null)
+  );
+}
+
 export function parseRetryAfterMs(rawText: string): number | null {
   const text = scanSlice(rawText);
   const match =

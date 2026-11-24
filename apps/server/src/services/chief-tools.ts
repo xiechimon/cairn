@@ -870,6 +870,10 @@ export async function executeChiefTool(
         link: taskLink(record.id, started?.title ?? record.title),
         sourceBuildId: ctx.chiefId,
         buildId,
+        note:
+          started?.phase === 'failed'
+            ? 'Task already failed before starting; report the failure instead of saying it started.'
+            : 'Queued for a runner to pick up (phase: queued). Workspace setup has not finished and may still fail; tell the owner it is queued, not that it has started running.',
       });
     }
     case 'update_todo': {

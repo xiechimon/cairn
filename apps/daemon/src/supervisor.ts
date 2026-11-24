@@ -35,9 +35,15 @@ const SYSTEMD_OWNED_ENV = new Set([
 ]);
 
 function userUnitArgv(unit: string, daemonLog: string, command: string[]): string[] {
-  const inherited = Object.keys(process.env).filter(
-    (name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) && !SYSTEMD_OWNED_ENV.has(name),
-  );
+  const inherited = Object.keys(process.env).filter((name) => {
+    const value = process.env[name];
+    return (
+      typeof value === 'string' &&
+      !/[\r\n\0]/.test(value) &&
+      /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
+      !SYSTEMD_OWNED_ENV.has(name)
+    );
+  });
   return [
     '--user',
     `--unit=${unit}`,

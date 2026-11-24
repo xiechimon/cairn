@@ -47,6 +47,7 @@ import {
   isOwnComputerTool,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
+  missingSetupCommand,
   orchestratedTodoIdOf,
   orchestratePromptHeadOf,
   PACKAGES_DECLINED,
@@ -322,6 +323,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     waitingOn: w.waitingOn ?? undefined,
     quotaWait: w.quotaWait ?? null,
     ...(w.retry !== undefined ? { retry: w.retry } : {}),
+    ...(w.missingCommand != null ? { missingCommand: w.missingCommand } : {}),
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
@@ -1201,7 +1203,8 @@ const CREDENTIAL_SOURCE_DETAIL = {
 
 function systemRowItem(row: SystemRow, id: string, createdAt: number): TranscriptItem | ToolEntry {
   switch (row.kind) {
-    case WORKSPACE_HOOK_ROW_KIND:
+    case WORKSPACE_HOOK_ROW_KIND: {
+      const missing = row.status !== 'ok' ? missingSetupCommand(row.output) : null;
       return {
         kind: '__work__',
         step: {
@@ -1209,7 +1212,8 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           id,
           action: 'setup',
           label: `.agents/${row.name}`,
-          description: `.agents/${row.name} hook`,
+          description: missing !== null ? '缺少命令 {command}' : `.agents/${row.name} hook`,
+          ...(missing !== null ? { localized: true, localizedVars: { command: missing } } : {}),
           output:
             row.output === ''
               ? null
@@ -1222,6 +1226,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           seconds: row.ms / 1000,
         },
       };
+    }
     case GIT_CREDENTIAL_ROW_KIND:
       return {
         kind: '__work__',
@@ -1302,7 +1307,18 @@ export function runtimeUpdatePlain(
   };
 }
 
-function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
+export function plainFailureOf(raw: string): { key: string; vars: Record<string, string> } | null {
+  const runtime = runtimeUpdatePlain(raw);
+  if (runtime !== null) return runtime;
+  const missing = missingSetupCommand(raw);
+  if (missing !== null) {
+    return { key: '环境准备缺少命令 {command}', vars: { command: missing } };
+  }
+  return null;
+}
+
+function failGuidanceBody(raw: string): string {
+  const kind = classifyStepFailure(raw);
   switch (kind) {
     case 'runtime_outdated':
       return '更新 Cairn 后重新运行这个任务。';
@@ -1313,7 +1329,7 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
     case 'capacity':
       return '请求已触发限流，等待恢复后自动继续。';
     default:
-      return '';
+      return missingSetupCommand(raw) !== null ? '安装缺少的工具后重新运行这个任务。' : '';
   }
 }
 

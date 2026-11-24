@@ -159,6 +159,7 @@ export const todoRecordSchema = z.object({
     .optional(),
   quotaWait: quotaWaitSchema.nullable().optional(),
   retry: todoRetryStateSchema.nullable().optional(),
+  missingCommand: z.string().nullable().optional(),
   lastProgressAt: epochMs.optional(),
   usageCost: usageCostSchema.optional(),
   context: z

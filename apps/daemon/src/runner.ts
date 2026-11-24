@@ -36,7 +36,12 @@ import { createStepPassControls } from './step-pass-controls.js';
 import { newStepPassState } from './step-pass-events.js';
 import { runStepPasses } from './step-pass-loop.js';
 import { agentStepRefusal, prepareStepPromptDelivery } from './step-preflight.js';
-import { composeWorkerSystemPrompt, planStepPrompt, taskMetaOpts } from './step-prompt.js';
+import {
+  composeWorkerSystemPrompt,
+  planStepPrompt,
+  prependFailedSetupHookContext,
+  taskMetaOpts,
+} from './step-prompt.js';
 import { resolveStepProvider } from './step-provider.js';
 import { createStepReporters } from './step-reporters.js';
 import { StepSessionOpener } from './step-session-opener.js';
@@ -362,6 +367,9 @@ async function runClaimedStep(
     return;
   }
   const { ws, cwd, headAtStart, stepStartMs } = setup;
+  if (deliveryPrompt !== null && ws?.hooks && ws.hooks.length > 0) {
+    deliveryPrompt = prependFailedSetupHookContext(deliveryPrompt, ws.hooks, redact);
+  }
   const uploadedVerifyEvidence = new Set<string>();
 
   const systemPrompt =

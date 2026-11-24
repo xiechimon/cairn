@@ -97,7 +97,10 @@ export function taskRowCopy(
       const what: Phrase =
         (todo.blockedBy?.length ?? 0) > 0
           ? { key: '已阻塞，等待你处理。' }
-          : (retryPhrase ?? { key: threadCopy(todo).reason });
+          : (retryPhrase ??
+            (todo.phase === 'failed' && todo.missingCommand != null && todo.missingCommand !== ''
+              ? { key: '缺少命令 {command}', params: { command: todo.missingCommand } }
+              : { key: threadCopy(todo).reason }));
       return { ...base, word: '待处理', what, where: '到任务里处理' };
     }
     case 'working': {
@@ -111,7 +114,9 @@ export function taskRowCopy(
           : todo.owner === 'coordinator'
             ? { key: 'Coordinator 在跟进' }
             : todo.phase === 'failed'
-              ? { key: '即将自动重试（第 {attempt} 次）', params: { attempt: 1 } }
+              ? todo.missingCommand != null && todo.missingCommand !== ''
+                ? { key: '缺少命令 {command}', params: { command: todo.missingCommand } }
+                : { key: '即将自动重试（第 {attempt} 次）', params: { attempt: 1 } }
               : { key: threadCopy(todo).reason };
       return { ...base, running, word: '进行中', what, where: null };
     }

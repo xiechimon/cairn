@@ -19,8 +19,10 @@ import {
   type CommitIdentity,
   conversationBranch,
   type GitCredentialSource,
+  isMissingCommandHookNote,
   LOCAL_ERROR_REASON_COPY,
   LocalRepoUnreachableError,
+  missingSetupCommand,
   ORPHAN_WORKTREE_TTL_MS,
   type OrphanCleanupInput,
   type PreparedWorkspace,
@@ -393,6 +395,13 @@ export class WorkspaceManager implements WorktreeOps {
       if (err instanceof WorkspaceHookError) {
         if (name === 'resume') {
           this.logger.workspace(`resume hook failed (non-fatal, continuing): ${err.message}`);
+          return [err.note];
+        }
+        if (isMissingCommandHookNote(err.note)) {
+          const missing = missingSetupCommand(err.note.output);
+          this.logger.workspace(
+            `setup hook failed due to missing command (${missing ?? `exit ${err.note.exitCode ?? 'unknown'}`}); keeping worktree and handing output to agent session`,
+          );
           return [err.note];
         }
         try {

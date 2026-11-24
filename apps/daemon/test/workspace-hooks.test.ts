@@ -3,6 +3,8 @@ import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
 import { createSessionConfiner } from '../src/backend/confine-session.js';
+import { ensureDaemonShellEnv } from '../src/shell-env.js';
+import { prependFailedSetupHookContext } from '../src/step-prompt.js';
 import {
   HOOK_OUTPUT_CHAR_LIMIT,
   runWorkspaceHook,
@@ -304,5 +306,101 @@ describe('workspace hook primitive (#1149)', () => {
     });
     expect(note!.name).toBe('resume');
     expect(note!.output).toContain('resume-ran');
+  });
+
+  test.runIf(process.platform !== 'win32')(
+    'login shell hydration exposes version-manager tools to .agents/setup when launchd PATH lacks them',
+    async () => {
+      const root = tmpRoot();
+      const toolBin = join(root, 'fnm-bin');
+      mkdirSync(toolBin, { recursive: true });
+      const fakeTool = join(toolBin, 'cairn-fake-pnpm');
+      writeFileSync(fakeTool, '#!/bin/sh\necho fake-pnpm-ready\n');
+      chmodSync(fakeTool, 0o755);
+      const fakeShell = join(root, 'fake-login-shell');
+      writeFileSync(
+        fakeShell,
+        `#!/bin/sh
+if [ "$1" = "-ilc" ]; then
+  export PATH="${toolBin}:$PATH"
+  /bin/sh -c "$2"
+  exit $?
+fi
+exit 2
+`,
+      );
+      chmodSync(fakeShell, 0o755);
+      writeHook(root, 'setup', '#!/bin/sh\ncairn-fake-pnpm\n');
+      const savedPath = process.env.PATH;
+      const savedShell = process.env.SHELL;
+      const savedResolved = process.env.CAIRN_SHELL_ENV_RESOLVED;
+      const savedHome = process.env.HOME;
+      process.env.PATH = '/usr/bin:/bin';
+      process.env.SHELL = fakeShell;
+      process.env.HOME = root;
+      delete process.env.CAIRN_SHELL_ENV_RESOLVED;
+      try {
+        const before = (await runWorkspaceHook({
+          cwd: root,
+          name: 'setup',
+          credentials: null,
+          timeoutMs: 15_000,
+          log: () => {},
+        }).catch((error: unknown) => error)) as WorkspaceHookError;
+        expect(before).toBeInstanceOf(WorkspaceHookError);
+        expect(before.note.exitCode).toBe(127);
+
+        const applied = await ensureDaemonShellEnv({
+          isTty: false,
+          cachePath: join(root, 'shell-cache.json'),
+          userShell: fakeShell,
+        });
+        expect(applied).toBe(true);
+
+        const after = await runWorkspaceHook({
+          cwd: root,
+          name: 'setup',
+          credentials: null,
+          timeoutMs: 15_000,
+          log: () => {},
+        });
+        expect(after?.status).toBe('ok');
+        expect(after?.exitCode).toBe(0);
+        expect(after?.output).toContain('fake-pnpm-ready');
+      } finally {
+        if (savedPath === undefined) delete process.env.PATH;
+        else process.env.PATH = savedPath;
+        if (savedShell === undefined) delete process.env.SHELL;
+        else process.env.SHELL = savedShell;
+        if (savedResolved === undefined) delete process.env.CAIRN_SHELL_ENV_RESOLVED;
+        else process.env.CAIRN_SHELL_ENV_RESOLVED = savedResolved;
+        if (savedHome === undefined) delete process.env.HOME;
+        else process.env.HOME = savedHome;
+      }
+    },
+  );
+
+  test('failed setup hook output reaches the agent prompt as first context with install guidance', () => {
+    const wrapped = prependFailedSetupHookContext(
+      'Fix the failing test.',
+      [
+        {
+          name: 'setup',
+          status: 'failed',
+          exitCode: 127,
+          output: '.agents/setup: line 6: pnpm: command not found\ntoken=secret-val',
+          totalChars: 60,
+          ms: 120,
+        },
+      ],
+      (text) => text.replace('secret-val', '[REDACTED]'),
+    );
+    expect(wrapped.indexOf('[Workspace setup hook failed before the session started]')).toBe(0);
+    expect(wrapped).toContain('command "pnpm" was not found on PATH');
+    expect(wrapped).toContain('corepack enable');
+    expect(wrapped).toContain('npm i -g pnpm');
+    expect(wrapped).toContain('token=[REDACTED]');
+    expect(wrapped).not.toContain('secret-val');
+    expect(wrapped.endsWith('Fix the failing test.')).toBe(true);
   });
 });

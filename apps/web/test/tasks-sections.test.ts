@@ -125,6 +125,20 @@ describe('a needs-you row says what is waiting and where to act', () => {
     });
   });
 
+  test('a failed task with a missing setup command names the missing command in plain words', () => {
+    expect(
+      taskRowCopy(entry(1, 'failed', 'needs_input', { missingCommand: 'pnpm' })),
+    ).toMatchObject({
+      word: '待处理',
+      what: { key: '缺少命令 {command}', params: { command: 'pnpm' } },
+      where: '到任务里处理',
+      waiting: true,
+    });
+    expect(
+      taskRowCopy(entry(1, 'failed', 'working', { missingCommand: 'pnpm' })).what,
+    ).toEqual({ key: '缺少命令 {command}', params: { command: 'pnpm' } });
+  });
+
   test('a blocked task handed to the owner says it is blocked', () => {
     expect(
       taskRowCopy(entry(1, 'building', 'needs_input', { blockedBy: ['todo-blocker'] })),
