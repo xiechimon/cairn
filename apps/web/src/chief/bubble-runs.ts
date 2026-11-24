@@ -10,7 +10,7 @@ type Author = 'user' | 'robot' | null;
 
 function opensAs(item: GroupedRow['item']): Author {
   if (item.kind === 'user') return 'user';
-  if (item.kind === 'robot') return 'robot';
+  if (item.kind === 'robot' || item.kind === 'chat-block') return 'robot';
   return null;
 }
 

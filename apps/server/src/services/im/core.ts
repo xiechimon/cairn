@@ -11,7 +11,12 @@ import type {
   ImWechatLoginPoll,
   ImWechatLoginStart,
 } from '@cairn/shared';
-import { isAllowedAttachmentExt } from '@cairn/shared';
+import {
+  chatBlockSchema,
+  isAllowedAttachmentExt,
+  SHOW_CHART_TOOL,
+  SHOW_DIFF_TOOL,
+} from '@cairn/shared';
 import { and, desc, eq, gte, inArray, ne, sql } from 'drizzle-orm';
 import {
   attachment,
@@ -452,6 +457,35 @@ export function createImService(deps: ImServiceDeps): ImService {
       if (text !== null && text.trim() !== '') return text.trim();
     }
     return null;
+  };
+
+  const blockFallbacks = (stepRow: ImStepRow): string[] => {
+    const since = stepRow.claimedAt ?? stepRow.createdAt;
+    const rows = deps.db
+      .select({ content: chiefMessage.content })
+      .from(chiefMessage)
+      .where(
+        and(
+          eq(chiefMessage.threadId, stepRow.buildId),
+          eq(chiefMessage.role, 'assistant'),
+          gte(chiefMessage.createdAt, since),
+          sql`json_valid(${chiefMessage.content}) AND json_extract(${chiefMessage.content}, '$.call.name') IN (${SHOW_DIFF_TOOL}, ${SHOW_CHART_TOOL})`,
+        ),
+      )
+      .orderBy(chiefMessage.createdAt, sql`rowid`)
+      .all();
+    return rows.flatMap((row) => {
+      const call = (row.content as { call?: { result?: unknown; isError?: boolean } } | null)?.call;
+      if (call?.isError === true) return [];
+      const text = extractText(call?.result);
+      if (text === null) return [];
+      try {
+        const block = chatBlockSchema.safeParse(JSON.parse(text));
+        return block.success ? [block.data.fallbackMarkdown] : [];
+      } catch {
+        return [];
+      }
+    });
   };
 
   const sniffExt = (bytes: Buffer): string | null => {
@@ -952,7 +986,8 @@ export function createImService(deps: ImServiceDeps): ImService {
           return;
         }
         const text = lastAssistantText(stepRow);
-        if (text !== null) sendToOrigin(origin, text, stepRow);
+        const reply = [...blockFallbacks(stepRow), ...(text === null ? [] : [text])];
+        if (reply.length > 0) sendToOrigin(origin, reply.join('\n\n'), stepRow);
       },
     },
 

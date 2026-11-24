@@ -2,11 +2,15 @@ import { useState } from 'react';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
 import { DecisionDock } from '../chief/decision-dock.js';
 import { QuestionReceipt } from '../chief/question-answered-line.js';
+import { ChatChartBlock, ChatChartSkeleton } from '../components/chat/chat-chart.js';
+import { DiffGlanceBlock, DiffGlanceSkeleton } from '../components/chat/diff-glance.js';
 import {
   NOW,
   QUESTION_ANSWERED,
   QUESTION_CANCELLED,
   QUESTION_PENDING,
+  REPLY_CHART,
+  REPLY_GLANCE,
 } from './product-fixtures.js';
 import { Labeled, Section, Specimen } from './specimen.js';
 
@@ -51,6 +55,34 @@ export function ProductChiefSection() {
         <Labeled label="Skipped">
           <div className="w-160">
             <QuestionReceipt item={QUESTION_CANCELLED} />
+          </div>
+        </Labeled>
+      </Specimen>
+      <Specimen
+        id="reply-blocks"
+        title="Reply blocks"
+        note="DiffGlanceBlock, ChatChartBlock: parts of a Coordinator reply at prose width, each with the skeleton of its final shape"
+        stage="canvas"
+        className="flex-col"
+      >
+        <Labeled label="Code change glance">
+          <div className="w-160">
+            <DiffGlanceBlock glance={REPLY_GLANCE} />
+          </div>
+        </Labeled>
+        <Labeled label="Code change, still running">
+          <div className="w-160">
+            <DiffGlanceSkeleton path={null} />
+          </div>
+        </Labeled>
+        <Labeled label="Before and after chart">
+          <div className="w-144">
+            <ChatChartBlock chart={REPLY_CHART} />
+          </div>
+        </Labeled>
+        <Labeled label="Chart, still running">
+          <div className="w-144">
+            <ChatChartSkeleton />
           </div>
         </Labeled>
       </Specimen>

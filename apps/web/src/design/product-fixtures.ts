@@ -1,4 +1,6 @@
 import type {
+  ChatChart,
+  DiffGlance,
   FsListResult,
   GithubIssueEcho,
   ProjectRecord,
@@ -458,3 +460,42 @@ export function sharedTodo(patch: {
     output: 'code',
   };
 }
+
+export const REPLY_GLANCE: DiffGlance = {
+  path: 'apps/server/src/services/coupon-split.ts',
+  lines: [
+    { kind: 'context', old: 15, new: 15, text: 'export function splitCoupon(lines, coupon) {' },
+    {
+      kind: 'del',
+      old: 16,
+      text: '  return lines.map((line) => roundCents(line.total * coupon.rate))',
+    },
+    {
+      kind: 'add',
+      new: 16,
+      text: '  const orderTotal = lines.reduce((sum, line) => sum + line.total, 0)',
+    },
+    {
+      kind: 'add',
+      new: 17,
+      text: '  return settleRemainder(lines, roundCents(orderTotal * coupon.rate))',
+    },
+    {
+      kind: 'note',
+      text: 'The discount is now taken once per order, then split across the lines.',
+    },
+    { kind: 'context', old: 17, new: 18, text: '}' },
+  ],
+};
+
+export const REPLY_CHART: ChatChart = {
+  type: 'bar',
+  title: 'p95 latency, before and after',
+  unit: 'ms',
+  categories: ['Task list', 'Build detail', 'Search'],
+  series: [
+    { name: 'Before', values: [820, 1240, 960], role: 'before' },
+    { name: 'After', values: [210, 380, 450], role: 'after' },
+  ],
+  summary: 'The three endpoints dropped 64% on average.',
+};

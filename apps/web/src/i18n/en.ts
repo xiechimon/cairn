@@ -3007,4 +3007,13 @@ export const EN: Record<string, string> = {
   主机地址: 'Host URL',
   '排队中：信息卡要在执行机上运行，团队暂无在线的执行机':
     'Queued: info cards run on a Runner, and the team has no online Runner',
+  正在生成改动: 'Preparing the change',
+  '图表画不出来，下面是同一份数据。': 'The chart could not be drawn. Here is the same data.',
+  '降了 {n}%': 'Down {n}%',
+  '升了 {n}%': 'Up {n}%',
+  显示哪些数据: 'Series to show',
+  收起表格: 'Hide table',
+  查看表格: 'Show table',
+  '复制 CSV': 'Copy CSV',
+  正在生成图表: 'Preparing the chart',
 };

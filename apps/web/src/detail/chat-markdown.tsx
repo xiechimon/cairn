@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { DiffFence } from '../components/chat/diff-glance.js';
 import { CopyIconButton } from '../components/copy-icon-button.js';
 import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -306,9 +307,11 @@ const FLOW_GAP: Record<Flow, string> = {
 const BUBBLE_SPACED_GAP = 'mt-3';
 
 const StreamingContext = createContext(false);
+const ReplyContext = createContext(false);
 
 function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
   const streaming = useContext(StreamingContext);
+  const reply = useContext(ReplyContext);
   switch (block.kind) {
     case 'head':
       return <HeadingTag level={block.level} segments={block.segments} />;
@@ -318,6 +321,10 @@ function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
       const code = (
         <CodeBlock {...(block.lang !== undefined ? { lang: block.lang } : {})} text={block.text} />
       );
+      if (reply && (block.lang === 'diff' || block.lang === 'patch'))
+        return (
+          <DiffFence text={block.text} open={streaming && block.open === true} fallback={code} />
+        );
       return block.lang === 'mermaid' ? (
         <MermaidBlock text={block.text} source={code} final={!streaming || block.open !== true} />
       ) : (
@@ -483,6 +490,11 @@ export const REPLY_TEXT_CLS =
 export const REPLY_BLOCK_CLS =
   'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply))]';
 
+const isDiffFence = (group: ChatBubbleGroup) =>
+  group.blocks.length === 1 &&
+  group.blocks[0]?.kind === 'code' &&
+  (group.blocks[0].lang === 'diff' || group.blocks[0].lang === 'patch');
+
 function ReplyGroup({
   group,
   tools,
@@ -496,7 +508,11 @@ function ReplyGroup({
 }) {
   return (
     <div
-      className={group.bubble ? REPLY_BLOCK_CLS : 'group/reply-block relative w-fit max-w-full'}
+      className={
+        group.bubble
+          ? REPLY_BLOCK_CLS
+          : cn('group/reply-block relative max-w-full', isDiffFence(group) ? 'w-full' : 'w-fit')
+      }
       data-slot="reply-block"
       data-bubble={group.bubble ? 'true' : 'false'}
     >
@@ -554,5 +570,9 @@ export function ChatMarkdown({
     ) : (
       <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
     );
-  return <StreamingContext.Provider value={streaming}>{body}</StreamingContext.Provider>;
+  return (
+    <StreamingContext.Provider value={streaming}>
+      <ReplyContext.Provider value={bubbles}>{body}</ReplyContext.Provider>
+    </StreamingContext.Provider>
+  );
 }
