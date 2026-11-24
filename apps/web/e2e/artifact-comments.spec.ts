@@ -325,5 +325,5 @@ test('a PDF box keeps the text it covers, and on a newer version its pin follows
   });
   await page.mouse.up();
   await expect.poll(() => state.writes.length).toBe(1);
-  expect(state.comments.find((c) => c.id === 'cmt-2')?.text).toBe('AdaLovelace,analyst');
+  expect(state.comments.find((c) => c.id === 'cmt-2')?.text).toBe('Ada Lovelace, analyst');
 });
