@@ -188,6 +188,7 @@ func screenWindows() -> [ScreenWindow] {
       let box = entry[kCGWindowBounds as String] as? NSDictionary,
       let bounds = CGRect(dictionaryRepresentation: box as CFDictionary)
     else { return nil }
+    guard layer < Int(CGWindowLevelForKey(.cursorWindow)) else { return nil }
     return ScreenWindow(pid: pid, number: number, layer: layer, bounds: bounds)
   }
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
 import { _electron as electron } from '@playwright/test';
@@ -407,7 +407,7 @@ try {
     (await driver.send({ cmd: 'menuItems', pid })).items.map((item) => item.title);
 
   const nativeMenu = {
-    name: 'native menu: skeleton while the page loads, content, keyboard, Esc and Settings',
+    name: 'native menu: skeleton while the page loads, content, keyboard, the keep-awake button, Esc and Settings',
     result: 'red',
     detail: '',
   };
@@ -491,6 +491,41 @@ try {
     );
     await closeNativeMenu(helper);
 
+    const keepAwakeChoice = join(
+      await app.evaluate(({ app: electronApp }) => electronApp.getPath('userData')),
+      'keep-awake',
+    );
+    const keepAwakeTitle = content.includes('Keep the screen on')
+      ? 'Keep the screen on'
+      : '保持屏幕常亮';
+    for (const expected of ['on', 'off']) {
+      await openNativeMenu(helper);
+      const switched = await driver.send({
+        cmd: 'clickMenuItem',
+        pid: helper,
+        title: keepAwakeTitle,
+        hoverMs: 300,
+      });
+      assert.equal(
+        switched.ok,
+        true,
+        `the keep-awake button got no click: ${JSON.stringify(switched)}`,
+      );
+      assert.equal(
+        await waitForNativeMenu(helper, false),
+        true,
+        'clicking the keep-awake button left the menu open',
+      );
+      const saved = () =>
+        existsSync(keepAwakeChoice) ? readFileSync(keepAwakeChoice, 'utf8').trim() : 'off';
+      const switchDeadline = Date.now() + OPEN_TIMEOUT_MS;
+      while (saved() !== expected && Date.now() < switchDeadline) {
+        await driver.send({ cmd: 'sleep', ms: 100 });
+      }
+      assert.equal(saved(), expected, `clicking the keep-awake button did not turn it ${expected}`);
+      await driver.send({ cmd: 'sleep', ms: DISMISS_GAP_MS });
+    }
+
     await popoverWindow(({ BrowserWindow }, width) => {
       for (const candidate of BrowserWindow.getAllWindows())
         if (candidate.getBounds().width !== width) candidate.hide();
@@ -523,7 +558,7 @@ try {
   console.log(`tray ${nativeMenu.result}: ${nativeMenu.name}: ${nativeMenu.detail}`);
 
   async function recordNativeWalkthrough(pid, base) {
-    const seconds = 60;
+    const seconds = 70;
     const recorder = spawn('screencapture', ['-v', `-V${seconds}`, '-x', '-C', `${base}.mov`], {
       stdio: 'ignore',
     });
@@ -584,7 +619,7 @@ try {
       await pause(1_000);
       const light = await walk('light');
       appearance(true);
-      await pause(1_500);
+      await pause(4_000);
       await walk('dark');
       return `recorded ${base}.mov: ${JSON.stringify(light)}`;
     } finally {
