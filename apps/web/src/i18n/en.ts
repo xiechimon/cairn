@@ -2098,6 +2098,7 @@ export const EN: Record<string, string> = {
   '包含全部运行。': 'Across all runs.',
   引擎: 'Engine',
   时长: 'Duration',
+  轮次: 'Turns',
   未知执行机: 'Unknown Runner',
   'Token 数：{tokens}': 'Tokens: {tokens}',
   用量暂不可用: 'Usage unavailable',

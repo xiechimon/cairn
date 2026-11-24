@@ -464,7 +464,7 @@ export function finishCoordinatorTurn(
       ...(reportedSessionId !== undefined ? { sessionId: reportedSessionId } : {}),
       status:
         outcome.status === 'success' ? 'done' : outcome.status === 'stopped' ? 'stopped' : 'failed',
-      ...(outcome.status === 'stopped' ? { finishedAt: nowMs() } : {}),
+      finishedAt: nowMs(),
     })
     .where(eq(step.id, stepRow.id))
     .run();

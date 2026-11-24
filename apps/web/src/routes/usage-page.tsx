@@ -585,7 +585,7 @@ function UsageBody({ usage, today }: { usage: DailyUsage; today: string }) {
           <Ranking
             testId="usage-projects"
             title={t('项目')}
-            total={scoped.tasks}
+            total={scoped.projects.reduce((sum, [, tokens]) => sum + tokens, 0)}
             rows={scoped.projects.map(([id, tokens]) => ({
               id,
               name: projects.get(id) ?? t('已删除的项目'),

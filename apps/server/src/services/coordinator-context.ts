@@ -1,6 +1,6 @@
-import type { ContextCache } from '@cairn/shared';
-import { COORDINATOR_COMPACT_AT, isBackendRuntimeId } from '@cairn/shared';
-import { and, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
+import type { ChiefChannelUsage, ContextCache } from '@cairn/shared';
+import { COORDINATOR_COMPACT_AT, isBackendRuntimeId, tokenUsageSchema } from '@cairn/shared';
+import { and, asc, desc, eq, gt, inArray, type SQL } from 'drizzle-orm';
 import {
   type ContextResume,
   cacheTtlMsFor,
@@ -11,8 +11,9 @@ import {
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import { catalogContextWindow, DEFAULT_CONTEXT_WINDOW } from '../coordinator/runtime/provider.js';
 import type { Db } from '../db/client.js';
-import { chiefThread, chiefTurnUsage, provider } from '../db/schema.js';
+import { chiefThread, chiefTurnUsage, machine, provider, step, tokenUsage } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { stepRuntimeFor } from './dispatch-eligibility.js';
 import { coordinatorProfile } from './routing-rules.js';
 
 export { DEFAULT_CONTEXT_WINDOW };
@@ -257,5 +258,101 @@ export function lastTurnContext(
         }
       : {}),
     cache: { read: last.cacheRead, write: last.cacheWrite, input: last.input },
+  };
+}
+
+const HARNESS_LABELS: Record<string, string> = {
+  'claude-code': 'Claude Code',
+  pi: 'Cairn',
+  devin: 'Devin',
+  antigravity: 'Antigravity',
+  gemini: 'Gemini',
+};
+
+function engineLabelForProvider(providerId: string | null | undefined): string | null {
+  if (providerId == null || providerId === '') return null;
+  const runtime = stepRuntimeFor(providerId);
+  return HARNESS_LABELS[runtime] ?? null;
+}
+
+export function channelUsageSummary(
+  db: Db,
+  chiefRow: { id: string; teamId: string },
+  threadId?: string,
+): ChiefChannelUsage | null {
+  let threadIds: string[];
+  if (threadId !== undefined) {
+    const owned = db
+      .select({ id: chiefThread.id })
+      .from(chiefThread)
+      .where(and(eq(chiefThread.chiefId, chiefRow.id), eq(chiefThread.id, threadId)))
+      .get();
+    if (owned === undefined) return null;
+    threadIds = [owned.id];
+  } else {
+    threadIds = db
+      .select({ id: chiefThread.id })
+      .from(chiefThread)
+      .where(eq(chiefThread.chiefId, chiefRow.id))
+      .all()
+      .map((row) => row.id);
+  }
+  if (threadIds.length === 0) return null;
+  const rows = db
+    .select()
+    .from(tokenUsage)
+    .where(inArray(tokenUsage.buildId, threadIds))
+    .orderBy(asc(tokenUsage.buildId), asc(tokenUsage.model))
+    .all()
+    .map((row) => tokenUsageSchema.parse(row));
+  const steps = db
+    .select({
+      status: step.status,
+      claimedAt: step.claimedAt,
+      finishedAt: step.finishedAt,
+      ranModel: step.ranModel,
+      machineName: machine.name,
+    })
+    .from(step)
+    .leftJoin(machine, eq(machine.id, step.machineId))
+    .where(and(inArray(step.buildId, threadIds), eq(step.kind, 'chief')))
+    .all();
+  const started = steps.filter((row) => row.claimedAt !== null);
+  const turns = started.length;
+  if (rows.length === 0 && turns === 0) return null;
+  const now = nowMs();
+  const measurable = started.filter((row) => row.finishedAt !== null || row.status === 'claimed');
+  const durationSeconds =
+    measurable.length === 0
+      ? null
+      : measurable.reduce(
+          (sum, row) => sum + Math.max(0, (row.finishedAt ?? now) - (row.claimedAt ?? now)),
+          0,
+        ) / 1000;
+  const stepEngines = started
+    .map((row) => engineLabelForProvider(row.ranModel?.provider))
+    .filter((label): label is string => label !== null);
+  const rowEngines =
+    stepEngines.length > 0
+      ? stepEngines
+      : rows
+          .map((row) => {
+            const slash = row.model.indexOf('/');
+            return engineLabelForProvider(slash > 0 ? row.model.slice(0, slash) : null);
+          })
+          .filter((label): label is string => label !== null);
+  const machines = [
+    ...new Set(
+      started
+        .map((row) => row.machineName)
+        .filter((name): name is string => name !== null && name.trim() !== ''),
+    ),
+  ];
+  return {
+    rows,
+    durationSeconds,
+    engines: [...new Set(rowEngines)],
+    machines,
+    turns,
   };
 }

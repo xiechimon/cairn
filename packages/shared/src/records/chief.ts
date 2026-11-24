@@ -5,7 +5,7 @@ import { agentRecordSchema } from './agent.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { designCommentIdsSchema } from './design.js';
 import { stepQueueBlockedSchema } from './machine-capabilities.js';
-import { contextCacheSchema } from './token-usage.js';
+import { contextCacheSchema, tokenUsageSchema } from './token-usage.js';
 
 export const chiefIdFormat = (userId: string, teamId: string) => `chief-${userId}-${teamId}`;
 
@@ -109,6 +109,15 @@ export const chiefMessageEditBodySchema = z.union([
 ]);
 export type ChiefMessageEditBody = z.infer<typeof chiefMessageEditBodySchema>;
 
+export const chiefChannelUsageSchema = z.object({
+  rows: z.array(tokenUsageSchema),
+  durationSeconds: z.number().nonnegative().nullable(),
+  engines: z.array(z.string()),
+  machines: z.array(z.string()),
+  turns: z.number().int().nonnegative(),
+});
+export type ChiefChannelUsage = z.infer<typeof chiefChannelUsageSchema>;
+
 export const chiefGetResponseSchema = z.object({
   chief: chiefRecordSchema,
   agentActor: agentRecordSchema.nullable(),
@@ -123,6 +132,7 @@ export const chiefGetResponseSchema = z.object({
       cache: contextCacheSchema.optional(),
     })
     .nullable(),
+  usage: chiefChannelUsageSchema.nullable().optional(),
   watches: z.array(chiefWatchSchema),
   wakes: z.array(z.record(z.string(), z.unknown())),
   orchestration: z

@@ -104,6 +104,71 @@ describe('chief turns record their own usage per step', () => {
     ]);
   });
 
+  test('finished Coordinator turns stamp finishedAt and expose per-channel usage stats on the envelope', async () => {
+    const machineId = insertMachine(H.s, { name: 'Stats-Runner' });
+    const startedAt = Date.now() - 12_000;
+    claimedStep(machineId, 'turn-stats', {
+      claimedAt: startedAt,
+      createdAt: startedAt,
+      ranModel: { provider: 'claude-code', modelId: 'claude-opus-5-5', thinkingLevel: null },
+    });
+    await finishStep(deps(), machineId, 'turn-stats', {
+      status: 'success',
+      usage: [
+        usage('claude-code/claude-opus-5-5', 100, 900, {
+          output: 50,
+          cacheWrite: 20,
+          contextTokens: 1_200,
+          cost: { input: 0.001, output: 0.002, cacheRead: 0.003, cacheWrite: 0.004, total: 0.01 },
+        }),
+      ],
+    });
+    const finished = H.s.db
+      .select({ finishedAt: stepTable.finishedAt })
+      .from(stepTable)
+      .where(eq(stepTable.id, 'turn-stats'))
+      .get();
+    expect(finished?.finishedAt).toBeGreaterThanOrEqual(startedAt);
+    const envelope = getChiefEnvelope(H.s.svc, H.teamId, H.threadId);
+    expect(envelope.usage).toMatchObject({
+      turns: 1,
+      engines: ['Claude Code'],
+      machines: ['Stats-Runner'],
+    });
+    expect(envelope.usage?.durationSeconds).toBeGreaterThanOrEqual(11);
+    expect(envelope.usage?.rows).toHaveLength(1);
+    expect(envelope.usage?.rows[0]).toMatchObject({
+      buildId: H.threadId,
+      model: 'claude-code/claude-opus-5-5',
+      input: 100,
+      output: 50,
+      cacheRead: 900,
+      cacheWrite: 20,
+      costTotal: 0.01,
+    });
+    const channelId = 'chief-empty-channel';
+    const now = Date.now();
+    H.s.db
+      .insert(chiefThread)
+      .values({
+        id: channelId,
+        chiefId: H.chiefId,
+        userId: H.userId,
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: 'demo',
+        createdAt: now,
+        updatedAt: now,
+        sessionRuntime: 'pi',
+        sessionId: '',
+        sessionOpenedAt: now,
+        toolDefHashes: {},
+        toolResultHashes: {},
+      })
+      .run();
+    expect(getChiefEnvelope(H.s.svc, H.teamId, channelId).usage).toBeNull();
+  });
+
   test('a second turn gets its own row while the cumulative total keeps adding', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-1');

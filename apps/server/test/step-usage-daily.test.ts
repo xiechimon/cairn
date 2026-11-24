@@ -457,6 +457,40 @@ describe('dailyUsage groups tokens by local calendar day', () => {
     report('t1', H.threadId, [u('m', 100)]);
     expect(dailyUsage(H.s.db, 'team-other', { days: 7, tz: SG, now: NOW }).days).toEqual([]);
   });
+
+  test('project-channel Coordinator usage is attributed to its project in daily usage', () => {
+    vi.setSystemTime(NOW);
+    const channelId = 'chief-project-usage';
+    H.s.db
+      .insert(chiefThread)
+      .values({
+        id: channelId,
+        chiefId: H.chiefId,
+        userId: H.userId,
+        teamId: H.teamId,
+        projectId: H.projectId,
+        title: 'demo',
+        createdAt: NOW,
+        updatedAt: NOW,
+        sessionRuntime: 'pi',
+        sessionId: '',
+        sessionOpenedAt: NOW,
+        toolDefHashes: {},
+        toolResultHashes: {},
+      })
+      .run();
+    report('proj-turn', channelId, [u('claude-code/claude-opus-5-5', 4_200)]);
+    const usage = dailyUsage(H.s.db, H.teamId, { days: 7, tz: SG, now: NOW });
+    expect(usage.days).toEqual([
+      expect.objectContaining({
+        date: '2026-11-16',
+        coordinator: 4_200,
+        tasks: 0,
+        projects: { [H.projectId]: 4_200 },
+      }),
+    ]);
+    expect(usage.projects).toEqual([{ id: H.projectId, name: 'demo' }]);
+  });
 });
 
 describe('GET /api/teams/:id/usage/daily', () => {

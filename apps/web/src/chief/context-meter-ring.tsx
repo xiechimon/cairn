@@ -1,9 +1,11 @@
+import type { ChiefChannelUsage } from '@cairn/shared';
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
-import { cacheHitShare } from '../api/mappers.js';
+import { cacheHitShare, formatUsd, mapTokenUsage } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
+import { formatWorkDuration } from '../detail/work-trace.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -286,22 +288,86 @@ export function ContextMeterPanel({
   );
 }
 
+function channelUsageRows(t: TFunc, usage: ChiefChannelUsage): { label: string; value: string }[] {
+  const knownUsage = usage.rows.length > 0 ? usage.rows : null;
+  const tokenUsage = knownUsage === null ? null : mapTokenUsage(knownUsage);
+  const price = knownUsage?.every((row) => row.costTotal !== null)
+    ? knownUsage.reduce((sum, row) => sum + (row.costTotal ?? 0), 0)
+    : null;
+  const models = [...new Set(knownUsage?.map((row) => row.model) ?? [])];
+  const duration = usage.durationSeconds === null ? '' : formatWorkDuration(usage.durationSeconds);
+  return [
+    { label: t('轮次'), value: usage.turns > 0 ? String(usage.turns) : '' },
+    { label: t('引擎'), value: usage.engines.join(' · ') },
+    { label: t('时长'), value: duration },
+    { label: t('花费'), value: price === null ? '' : formatUsd(price) },
+    { label: t('Token 数'), value: tokenUsage?.total ?? '' },
+    {
+      label: t('缓存命中'),
+      value: tokenUsage !== null && tokenUsage.cacheHitRate !== '—' ? tokenUsage.cacheHitRate : '',
+    },
+    { label: t('模型列表'), value: models.join(' · ') },
+    { label: t('执行机'), value: usage.machines.join(' · ') },
+  ].filter((row) => row.value !== '');
+}
+
+function ChannelUsageSection({
+  usage,
+  className,
+}: {
+  usage: ChiefChannelUsage;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  const rows = channelUsageRows(t, usage);
+  if (rows.length === 0) return null;
+  return (
+    <section
+      data-testid="channel-usage"
+      aria-label={t('对话用量')}
+      className={cn('flex min-w-0 flex-col gap-2 text-ui', className)}
+    >
+      <h3 className="m-0 text-ui font-medium text-foreground">{t('用量')}</h3>
+      <dl
+        data-testid="channel-usage-stats"
+        className="m-0 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-ui"
+      >
+        {rows.map((row) => (
+          <div key={row.label} className="contents">
+            <dt className="text-content-secondary">{row.label}</dt>
+            <dd className="m-0 text-right break-words text-foreground tabular-nums">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 export type ContextMeterRingProps = {
   context?: ContextMeterReading | null;
+  usage?: ChiefChannelUsage | null;
   running?: boolean;
   loading?: boolean;
 };
 
 export function ContextMeterRing({
   context = null,
+  usage = null,
   running = false,
   loading = false,
 }: ContextMeterRingProps) {
   const { t } = useI18n();
   const now = useContextClock(context);
-  const filled = contextPercentOf(context) ?? MOCK_CONTEXT_PERCENT;
-  const lines = loading ? [t('正在加载用量…')] : contextMeterLines(t, context, { running, now });
-  const openable = !loading && context != null;
+  const hasUsage = usage != null && channelUsageRows(t, usage).length > 0;
+  const filled = contextPercentOf(context) ?? (hasUsage ? 0 : MOCK_CONTEXT_PERCENT);
+  const lines = loading
+    ? [t('正在加载用量…')]
+    : context != null
+      ? contextMeterLines(t, context, { running, now })
+      : hasUsage
+        ? [t('对话用量')]
+        : contextMeterLines(t, context, { running, now });
+  const openable = !loading && (context != null || hasUsage);
   const trigger = (
     <Button
       variant="ghost"
@@ -310,7 +376,7 @@ export function ContextMeterRing({
       aria-label={lines.join(', ')}
       aria-busy={loading}
       data-testid="composer-context-meter"
-      data-mock={context == null ? '' : undefined}
+      data-mock={context == null && !hasUsage ? '' : undefined}
       data-percent={filled}
       className={cn(METER_BTN_CLS, openable && 'cursor-pointer aria-expanded:bg-(--menu-hover)')}
     />
@@ -344,8 +410,19 @@ export function ContextMeterRing({
         <TooltipTrigger render={<PopoverTrigger render={trigger} />}>{glyph}</TooltipTrigger>
         {tip}
       </Tooltip>
-      <PopoverContent side="top" align="end" sideOffset={8} className="w-65 p-3.5">
-        <ContextMeterPanel context={context} running={running} now={now} />
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={8}
+        className={cn('p-3.5', hasUsage ? 'w-80' : 'w-65')}
+      >
+        {context != null && <ContextMeterPanel context={context} running={running} now={now} />}
+        {hasUsage && usage != null && (
+          <ChannelUsageSection
+            usage={usage}
+            className={context != null ? 'mt-3 border-t border-border pt-3' : undefined}
+          />
+        )}
       </PopoverContent>
     </Popover>
   );
@@ -353,16 +430,31 @@ export function ContextMeterRing({
 
 export function ContextMeterLine({
   context = null,
+  usage = null,
   running = false,
   loading = false,
 }: ContextMeterRingProps) {
   const { t } = useI18n();
   const now = useContextClock(context);
-  const filled = contextPercentOf(context) ?? MOCK_CONTEXT_PERCENT;
-  if (!loading && context != null) {
+  const hasUsage = usage != null && channelUsageRows(t, usage).length > 0;
+  const filled = contextPercentOf(context) ?? (hasUsage ? 0 : MOCK_CONTEXT_PERCENT);
+  if (!loading && (context != null || hasUsage)) {
     return (
       <div data-testid="composer-context-meter" data-percent={filled} aria-busy={false}>
-        <ContextMeterPanel context={context} running={running} now={now} className="px-2.5 py-2" />
+        {context != null && (
+          <ContextMeterPanel
+            context={context}
+            running={running}
+            now={now}
+            className="px-2.5 py-2"
+          />
+        )}
+        {hasUsage && usage != null && (
+          <ChannelUsageSection
+            usage={usage}
+            className={cn('px-2.5 py-2', context != null && 'border-t border-border pt-2.5')}
+          />
+        )}
       </div>
     );
   }

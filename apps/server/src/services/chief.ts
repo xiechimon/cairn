@@ -104,7 +104,12 @@ import {
   findClientMessage,
   replayAfterConflict,
 } from './client-message.js';
-import { coordinatorRunsOnPi, lastTurnContext, wakeCoordinator } from './coordinator-context.js';
+import {
+  channelUsageSummary,
+  coordinatorRunsOnPi,
+  lastTurnContext,
+  wakeCoordinator,
+} from './coordinator-context.js';
 import { runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -272,6 +277,7 @@ export function getChiefEnvelope(
     chief: toChiefRecord(row, agentRow),
     agentActor: agentRow ? coordinatorRecordOf(agentRow) : null,
     context: coordinatorRunsOnPi() ? lastTurnContext(deps.db, row, threadId) : null,
+    usage: channelUsageSummary(deps.db, row, threadId),
     watches: refreshWatches(deps, row.watches),
     wakes: row.wakes,
     orchestration: chiefOrchestration(deps, teamId),

@@ -45,7 +45,8 @@ function usageSlots(db: Db, teamId: string, from: number, to: number): SlotRow[]
   return db.all<SlotRow>(sql`
     WITH
     chief_legacy AS (
-      SELECT ctu.threadId AS threadId, ctu.model AS model, ctu.firstReportAt AS at,
+      SELECT ctu.threadId AS threadId, ct.projectId AS projectId, ctu.model AS model,
+        ctu.firstReportAt AS at,
         ctu.input AS input, ctu.output AS output, ctu.cacheRead AS cacheRead,
         ctu.cacheWrite AS cacheWrite,
         CASE WHEN ${total('ctu')} = 0 THEN 0
@@ -65,25 +66,27 @@ function usageSlots(db: Db, teamId: string, from: number, to: number): SlotRow[]
       FROM chief_legacy GROUP BY threadId, model
     )
     SELECT su.kind = 'chief' AS coordinator, su.createdAt / ${SLOT_MS} AS slot, su.model AS model,
-      td.projectId AS projectId, td.id AS todoId, ${sums((type) => `su.${type}`)}
+      coalesce(td.projectId, ct.projectId) AS projectId, td.id AS todoId,
+      ${sums((type) => `su.${type}`)}
     FROM step_usage su
     LEFT JOIN build b ON b.id = su.buildId AND su.kind != 'chief'
     LEFT JOIN todo td ON td.id = b.todoId
+    LEFT JOIN chief_thread ct ON ct.id = su.buildId AND su.kind = 'chief'
     WHERE su.teamId = ${teamId} AND su.createdAt >= ${from} AND su.createdAt <= ${to}
     GROUP BY 1, 2, 3, 4, 5
     UNION ALL
-    SELECT 1, at / ${SLOT_MS}, model, NULL, NULL, ${sums((type) => `${type} * kept`)}
+    SELECT 1, at / ${SLOT_MS}, model, projectId, NULL, ${sums((type) => `${type} * kept`)}
     FROM chief_legacy WHERE at >= ${from} AND at <= ${to}
-    GROUP BY 2, 3
+    GROUP BY 2, 3, 4
     UNION ALL
-    SELECT 1, ct.createdAt / ${SLOT_MS}, tu.model, NULL, NULL,
+    SELECT 1, ct.createdAt / ${SLOT_MS}, tu.model, ct.projectId, NULL,
       ${sums((type) => `max(0, tu.${type} - coalesce(n.${type}, 0) - coalesce(l.${type}, 0))`)}
     FROM token_usage tu
     JOIN chief_thread ct ON ct.id = tu.buildId AND ct.teamId = ${teamId}
     LEFT JOIN new_by_key n ON n.buildId = tu.buildId AND n.model = tu.model
     LEFT JOIN chief_legacy_by_key l ON l.threadId = tu.buildId AND l.model = tu.model
     WHERE ct.createdAt >= ${from} AND ct.createdAt <= ${to}
-    GROUP BY 2, 3
+    GROUP BY 2, 3, 4
     UNION ALL
     SELECT 0, b.createdAt / ${SLOT_MS}, tu.model, td.projectId, td.id,
       ${sums((type) => `max(0, tu.${type} - coalesce(n.${type}, 0))`)}

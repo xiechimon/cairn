@@ -3,12 +3,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import {
   clampContextPercent,
+  ContextMeterLine,
+  ContextMeterPanel,
   ContextMeterRing,
   type ContextMeterRingProps,
   contextCacheState,
   contextMeterLines,
-  formatContextTokens,
   contextPercentOf,
+  formatContextTokens,
   MOCK_CONTEXT_PERCENT,
 } from '../src/chief/context-meter-ring.js';
 import { I18nProvider } from '../src/i18n/provider.js';
@@ -132,5 +134,65 @@ describe('contextCacheState and the tooltip cache line', () => {
   test('names the room left once usage is within a tenth of the compaction point', () => {
     const near = { ...base, tokens: 88_400 };
     expect(contextMeterLines(t, near, { now })[1]).toBe('再用 3.6K 就自动压缩');
+  });
+});
+
+describe('ContextMeterLine channel usage stats', () => {
+  test('renders channel usage stats alongside context without placeholder dashes', () => {
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(ContextMeterLine, {
+          context: {
+            tokens: 17_367,
+            contextWindow: 183_000,
+            compactAt: 150_000,
+            cache: { read: 44_312, write: 6_545, input: 8 },
+          },
+          usage: {
+            rows: [
+              {
+                buildId: 'chief-offer',
+                model: 'claude-code/claude-opus-5-5',
+                input: 8,
+                output: 355,
+                cacheRead: 44_312,
+                cacheWrite: 6_545,
+                costInput: 0.0001,
+                costOutput: 0.0089,
+                costCacheRead: 0.0222,
+                costCacheWrite: 0.0409,
+                costTotal: 0.0721,
+              },
+            ],
+            durationSeconds: 14,
+            engines: ['Claude Code'],
+            machines: ['Ians-Mac-mini'],
+            turns: 1,
+          },
+        }),
+      }),
+    );
+    expect(html).toContain('data-testid="channel-usage-stats"');
+    expect(html).toContain('用量');
+    expect(html).toContain('轮次');
+    expect(html).toContain('Claude Code');
+    expect(html).toContain('14s');
+    expect(html).toContain('$0.07');
+    expect(html).toContain('Ians-Mac-mini');
+    expect(html).not.toContain('—');
+  });
+
+  test('ContextMeterPanel renders without crashing when rendered directly', () => {
+    const html = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'zh',
+        children: createElement(ContextMeterPanel, {
+          context: { tokens: 10_000, contextWindow: 100_000 },
+          now: 1_000_000,
+        }),
+      }),
+    );
+    expect(html).toContain('10K / 100K');
   });
 });

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mockLive, THREAD } from './chief-home-mock.js';
+import { mockLive, PROJECT, THREAD } from './chief-home-mock.js';
 
 test('the ring under the composer stays still while a turn runs and reads in K', async ({ page }) => {
   await page.goto('/app?scenario=chief-draft');
@@ -143,4 +143,88 @@ test('reduced motion sets the new ring reading at once', async ({ page }) => {
   const arc = page.getByTestId('home-c').getByTestId('composer-context-meter').locator('[data-slot="context-arc"]');
   await expect(arc).toBeVisible();
   expect(await arc.evaluate((el) => getComputedStyle(el).transitionDuration)).toBe('0s');
+});
+
+test('project channel renders reply footer parity and channel usage stats on desktop and phone', async ({
+  page,
+}) => {
+  const channelThread = { ...THREAD, id: `chief-${PROJECT.id}`, projectId: PROJECT.id, title: PROJECT.name };
+  const envelope = {
+    chief: {
+      id: 'chief-u1-t1',
+      userId: 'u1',
+      teamId: 't1',
+      agent: { agentId: 'agent-1' },
+      lastTurnAt: 20,
+      createdAt: 0,
+      tz: 'Asia/Shanghai',
+    },
+    agentActor: null,
+    context: {
+      tokens: 17_367,
+      contextWindow: 183_000,
+      compactAt: 150_000,
+      cache: { read: 44_312, write: 6_545, input: 8 },
+    },
+    usage: {
+      rows: [
+        {
+          buildId: channelThread.id,
+          model: 'claude-code/claude-opus-5-5',
+          input: 8,
+          output: 355,
+          cacheRead: 44_312,
+          cacheWrite: 6_545,
+          costInput: 0.0001,
+          costOutput: 0.0089,
+          costCacheRead: 0.0222,
+          costCacheWrite: 0.0409,
+          costTotal: 0.0721,
+        },
+      ],
+      durationSeconds: 14,
+      engines: ['Claude Code'],
+      machines: ['Ians-Mac-mini'],
+      turns: 1,
+    },
+    watches: [],
+    wakes: [],
+  };
+  await mockLive(
+    page,
+    {
+      threads: [THREAD, channelThread],
+      messages: [],
+      projects: [PROJECT],
+      channels: {
+        [PROJECT.id]: [
+          {
+            id: 'a-greet',
+            role: 'assistant',
+            content: [{ type: 'text', text: '这里是 cairn 项目的频道。' }],
+            createdAt: Date.UTC(2026, 10, 24, 5, 23, 48),
+            projectId: PROJECT.id,
+          },
+        ],
+      },
+    },
+    (path, _route, json) => (path === '/api/teams/t1/chief' ? json(envelope) : undefined),
+  );
+  await page.goto(`/app?project=${PROJECT.id}&chat=1`);
+  const bubble = page.getByTestId('chief-reply-bubble').first();
+  await expect(bubble).toBeVisible();
+  await bubble.hover();
+  await expect(page.getByTestId('chief-msg-foot').first()).toBeVisible();
+  await page.getByTestId('home-c').getByTestId('composer-context-meter').click();
+  const stats = page.getByTestId('channel-usage-stats');
+  await expect(stats).toBeVisible();
+  await expect(stats).toContainText('Claude Code');
+  await expect(stats).toContainText('14s');
+  await expect(stats).toContainText('$0.07');
+  await expect(stats).toContainText('Ians-Mac-mini');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByTestId('composer-plus').click();
+  await expect(page.getByTestId('channel-usage-stats')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

@@ -128,6 +128,7 @@ export function ComposerSurface({
   const { live, teamId } = useLiveData();
   const chiefQ = useChief(teamId, live, threadId);
   const shownContext = live ? chiefQ.data?.context : context;
+  const shownUsage = live ? (chiefQ.data?.usage ?? null) : null;
   const contextPercent = contextPercentOf(shownContext);
   const meterContext = contextPercent == null ? null : (shownContext ?? null);
   const contextLoading = live && (chiefQ.isLoading || (running && meterContext == null));
@@ -191,7 +192,8 @@ export function ComposerSurface({
       : wire.draft !== '' ||
         wire.tokens.length > 0 ||
         pendingAttachments.some((entry) => !entry.failed);
-  const showMeter = !live || contextPercent != null || contextLoading || running;
+  const showMeter =
+    !live || contextPercent != null || shownUsage != null || contextLoading || running;
   const sendRef = useRef<HTMLButtonElement | null>(null);
   const pressTimer = useRef<number | null>(null);
   const longPressed = useRef(false);
@@ -251,7 +253,12 @@ export function ComposerSurface({
         {narrow && showMeter && (
           <>
             <DropdownMenuSeparator />
-            <ContextMeterLine context={meterContext} running={running} loading={contextLoading} />
+            <ContextMeterLine
+              context={meterContext}
+              usage={shownUsage}
+              running={running}
+              loading={contextLoading}
+            />
           </>
         )}
       </KeyedMenuContent>
@@ -483,7 +490,12 @@ export function ComposerSurface({
           {plusMenu}
           {showMeter && (
             <span className="ml-auto flex">
-              <ContextMeterRing context={meterContext} running={running} loading={contextLoading} />
+              <ContextMeterRing
+                context={meterContext}
+                usage={shownUsage}
+                running={running}
+                loading={contextLoading}
+              />
             </span>
           )}
         </div>
