@@ -1,0 +1,95 @@
+name: desktop-win
+
+on:
+  pull_request:
+    paths:
+      - apps/desktop/**
+      - .github/workflows/desktop-win.yml
+  push:
+    branches: [main]
+    paths:
+      - apps/desktop/**
+      - .github/workflows/desktop-win.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-win-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CAIRN_HEAVY_GATE_BYPASS: '1'
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1
+
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: apps/tsnet-sidecar/go.mod
+          cache-dependency-path: apps/tsnet-sidecar/go.sum
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the tsnet sidecar for windows-amd64
+        working-directory: apps/tsnet-sidecar
+        shell: pwsh
+        env:
+          CGO_ENABLED: '0'
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          go build -trimpath -ldflags '-s -w' -o "dist/tsnet-sidecar-windows-amd64.exe" .
+
+      - name: Build the web UI, the server and the Runner
+        shell: pwsh
+        env:
+          CAIRN_DESKTOP_ARCH: x64
+        run: |
+          pnpm --filter @cairn/web build
+          pnpm --filter @xiechimon/cairn build
+          pnpm --filter @xiechimon/cairn-cli build
+          node apps/server/scripts/stage-web.mjs
+          pnpm --filter @cairn/desktop stage-server
+          pnpm --filter @cairn/desktop stage-runner
+
+      - name: Package the Windows x64 installer and zip
+        working-directory: apps/desktop
+        shell: pwsh
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: |
+          node build.mjs
+          pnpm exec electron-builder --win nsis zip --x64 --publish never
+
+      - name: Upload the Windows NSIS installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: desktop-win-installer
+          path: apps/desktop/release/*.exe
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload the Windows portable zip
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: desktop-win-zip
+          path: apps/desktop/release/*-win-*.zip
+          archive: false
+          if-no-files-found: error
+          retention-days: 14

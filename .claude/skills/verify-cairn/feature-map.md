@@ -605,7 +605,7 @@ Reach:
 - Web routes: none
 - Settings: `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `pair-new-device`, `pair-request`, `pairing-blocked`, `pairing-route-select`, `remote-access-switch`, `remote-routes-empty`, `tailnet-login`
+- Test ids in its code: `pair-new-device`, `pair-request`, `pairing-blocked`, `pairing-route-select`, `remote-access-switch`, `remote-account-connect`, `remote-account-signin-btn`, `remote-account-signin-card`, `remote-advanced-details`, `remote-error-feedback`, `remote-footer-feedback`, `remote-routes-empty`, `remote-share-open`, `remote-tunnel-error-banner`, `remote-tunnel-relay-input`, `remote-tunnel-switch`, `tailnet-login`
 - Research: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md), [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the remote access page, route list and pairing flow have no design
 - Backend design: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md)
@@ -1069,7 +1069,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: `A`, `M`, `N`, `R`, `S`, `U`
-- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-footer`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
+- Test ids in its code: `archived-project-bar`, `archived-project-bar-unarchive`, `project-group-header`, `sidebar-archived-empty`, `sidebar-archived-page`, `sidebar-coordinator-memory`, `sidebar-feedback`, `sidebar-footer`, `sidebar-footer-account`, `sidebar-footer-brand`, `sidebar-pinned`, `sidebar-project-filter`, `sidebar-project-filter-*`, `sidebar-projects-error`, `sidebar-projects-loading`, `sidebar-schedules`, `sidebar-settings`, `sidebar-usage`, `team-row`
 - Research: [docs/research/sidebar-coordinator-icon-2026-11-08.md](../../../docs/research/sidebar-coordinator-icon-2026-11-08.md) (not on main), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/design/references/thread-list-sidebar](../../../docs/design/references/thread-list-sidebar), [docs/design/references/coordinator-chat](../../../docs/design/references/coordinator-chat), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
 - Backend design: **gap**: no design for unread and read marks across devices

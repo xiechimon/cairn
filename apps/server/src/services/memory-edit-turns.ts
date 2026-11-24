@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { chiefMessage, machine, memoryEdit, memoryEditReceipt, step } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { stepActivityAt } from './dispatch-timeouts.js';
 import { CHIEF_ABANDONED_STEP_MS, turnProvenance } from './turn-provenance.js';
 
 export const MEMORY_EDIT_PROVENANCE_PREFIX = 'memory-edit:';
@@ -122,8 +123,7 @@ export function sweepAbandonedMemoryEditSteps(
     .all()
     .filter(isMemoryEditStep);
   for (const row of candidates) {
-    const stale =
-      row.lastHeartbeatAt !== null && now - row.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
+    const stale = now - stepActivityAt(row) > CHIEF_ABANDONED_STEP_MS;
     if (!stale) continue;
     const machineRow =
       row.machineId === null

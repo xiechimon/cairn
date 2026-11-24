@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ARCHS = ['arm64', 'x64'];
@@ -17,6 +17,12 @@ const files = Object.fromEntries(
     return [arch, { name, size: statSync(path).size, sha256 }];
   }),
 );
+const winName = `Cairn-${version}-win-x64.exe`;
+const winPath = join(releaseDir, winName);
+if (existsSync(winPath)) {
+  const sha256 = createHash('sha256').update(readFileSync(winPath)).digest('hex');
+  files['win-x64'] = { name: winName, size: statSync(winPath).size, sha256 };
+}
 const target = join(releaseDir, 'desktop-latest.json');
 writeFileSync(target, `${JSON.stringify({ version, files }, null, 2)}\n`);
 console.log(`wrote ${target}`);

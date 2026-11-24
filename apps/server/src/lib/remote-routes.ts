@@ -1,5 +1,5 @@
 import type { NetworkInterfaceInfo } from 'node:os';
-import type { RemoteRoute, RemoteRoutesResponse, TailnetAccess } from '@cairn/shared';
+import type { RemoteRoute, RemoteRoutesResponse, TailnetAccess, TunnelAccess } from '@cairn/shared';
 import { isLoopbackHost } from '../config.js';
 
 const WILDCARD_HOSTS = new Set(['0.0.0.0', '::', '[::]', '*', '']);
@@ -15,6 +15,7 @@ export interface RouteInputs {
   listenPort: number;
   interfaces: InterfaceTable;
   tailnet: TailnetAccess | null;
+  tunnel?: TunnelAccess | null;
 }
 
 function lanAddresses(host: string, interfaces: InterfaceTable): string[] {
@@ -48,6 +49,10 @@ export function buildRemoteRoutes(
   );
   const tailnetRoute = tailnetUrl(inputs.tailnet);
   if (tailnetRoute !== null) routes.push({ kind: 'tailnet', url: tailnetRoute });
+  const tunnelStatus = inputs.tunnel ?? null;
+  if (tunnelStatus !== null && tunnelStatus.state === 'ready' && tunnelStatus.url !== null) {
+    routes.push({ kind: 'tunnel', url: tunnelStatus.url });
+  }
   const status = inputs.tailnet;
   return {
     environmentId,
@@ -63,5 +68,17 @@ export function buildRemoteRoutes(
             authUrl: status.state === 'needs-login' ? status.authUrl : null,
             error: status.state === 'failed' ? status.error : null,
           },
+    ...(tunnelStatus !== null
+      ? {
+          tunnel: {
+            enabled: tunnelStatus.enabled,
+            state: tunnelStatus.state,
+            url: tunnelStatus.state === 'ready' ? tunnelStatus.url : null,
+            relayUrl: tunnelStatus.relayUrl,
+            error: tunnelStatus.state === 'failed' ? tunnelStatus.error : null,
+            account: tunnelStatus.account ?? null,
+          },
+        }
+      : {}),
   };
 }

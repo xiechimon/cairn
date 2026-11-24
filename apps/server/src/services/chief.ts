@@ -108,6 +108,7 @@ import {
   wakeCoordinator,
 } from './coordinator-context.js';
 import { runtimeGatePasses } from './dispatch-eligibility.js';
+import { stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
@@ -2282,8 +2283,7 @@ export function sweepAbandonedChiefSteps(
     const machineRow = row.machineId
       ? deps.db.select().from(machine).where(eq(machine.id, row.machineId)).get()
       : undefined;
-    const stale =
-      row.lastHeartbeatAt !== null && now - row.lastHeartbeatAt > CHIEF_ABANDONED_STEP_MS;
+    const stale = now - stepActivityAt(row) > CHIEF_ABANDONED_STEP_MS;
     const live = machineRow?.online === true && !deps.machineHub?.silentSinceDrop(machineRow.id);
     if (!live) {
       if (!stale) continue;

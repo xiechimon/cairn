@@ -1,7 +1,7 @@
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { constants, createWriteStream, existsSync } from 'node:fs';
-import { access, mkdtemp } from 'node:fs/promises';
+import { access, mkdir, mkdtemp } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import {
@@ -58,6 +58,9 @@ export function runningBundle(): string {
 }
 
 async function updateBlocker(bundle: string): Promise<DesktopUpdateBlocker | null> {
+  if (process.platform === 'win32') {
+    return app.isPackaged ? null : 'development';
+  }
   if (!app.isPackaged || !bundle.endsWith('.app')) return 'development';
   if (bundle.includes('/AppTranslocation/') || bundle.startsWith('/Volumes/')) {
     return 'not-in-applications';
@@ -148,8 +151,11 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
   const statePath = (): string => updateStatePath(app.getPath('userData'));
   const recorded = readUpdateState(statePath());
   const offered = stagedFor(recorded, app.getVersion());
-  const stagedNow =
-    offered !== null && existsSync(join(offered.app, APP_EXECUTABLE)) ? offered : null;
+  const stagedExists = (stagedApp: string): boolean =>
+    process.platform === 'win32'
+      ? existsSync(stagedApp)
+      : existsSync(join(stagedApp, APP_EXECUTABLE));
+  const stagedNow = offered !== null && stagedExists(offered.app) ? offered : null;
   if (recorded.staged !== null && stagedNow === null) {
     writeUpdateState(statePath(), { ...recorded, staged: null });
   }
@@ -167,12 +173,36 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
     current.status === 'restarting';
   const readyVersion = (): string | null => {
     const candidate = stagedFor(readUpdateState(statePath()), app.getVersion());
-    return candidate !== null && existsSync(join(candidate.app, APP_EXECUTABLE))
-      ? candidate.version
-      : null;
+    return candidate !== null && stagedExists(candidate.app) ? candidate.version : null;
   };
 
   async function stage(update: DesktopUpdate): Promise<void> {
+    if (process.platform === 'win32') {
+      const updatesDir = join(app.getPath('userData'), 'updates');
+      await mkdir(updatesDir, { recursive: true });
+      const exePath = join(updatesDir, `Cairn-${update.version}-win-${process.arch}.exe`);
+      try {
+        set({ status: 'downloading', version: update.version, percent: 0 });
+        await download(update, exePath, (percent) =>
+          set({ status: 'downloading', version: update.version, percent }),
+        );
+        const previous = readUpdateState(statePath());
+        writeUpdateState(statePath(), {
+          ...previous,
+          staged: {
+            version: update.version,
+            zip: exePath,
+            app: exePath,
+            previousVersion: app.getVersion(),
+            at: Date.now(),
+          },
+        });
+        set({ status: 'ready', version: update.version });
+      } catch (error) {
+        set(updateFailureState(error, readyVersion()));
+      }
+      return;
+    }
     const bundle = runningBundle();
     const staging = await mkdtemp(join(dirname(bundle), STAGING_PREFIX));
     try {
@@ -226,6 +256,7 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
             desktopReleaseManifestSchema.parse(await response.json()),
             app.getVersion(),
             process.arch,
+            process.platform,
           )
         : null;
       if (pending === null) {
@@ -269,6 +300,24 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
       return;
     }
     if (current.status === 'restarting') return;
+    if (process.platform === 'win32') {
+      try {
+        if (!existsSync(staged.app)) {
+          throw new Error('the staged installer is missing');
+        }
+        set({ status: 'restarting', version: staged.version });
+        writeUpdateState(statePath(), { ...state, staged: null });
+        const child = spawn(staged.app, ['/S'], { detached: true, stdio: 'ignore' });
+        child.unref();
+        if (when === 'none') return;
+        setTimeout(() => app.exit(0), QUIT_FALLBACK_MS).unref();
+        app.quit();
+      } catch (error) {
+        set({ status: 'error', message: messageOf(error) });
+        throw error;
+      }
+      return;
+    }
     const bundle = runningBundle();
     try {
       if (!isStagedBundleFor(bundle, staged.app)) {

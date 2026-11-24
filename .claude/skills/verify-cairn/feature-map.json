@@ -1466,6 +1466,7 @@
         ],
         "server": [
           "/api/remote/**",
+          "/api/feedback",
           "/api/auth/access",
           "/api/auth/stream-ticket"
         ]

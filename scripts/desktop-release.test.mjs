@@ -660,7 +660,7 @@ const publishFixture = (t) => {
   const draftsFile = join(root, 'leftover-drafts.tsv');
   const releaseDir = join(root, 'apps/desktop/release');
   mkdirSync(releaseDir, { recursive: true });
-  for (const name of ASSETS.slice(0, 4)) writeFileSync(join(releaseDir, name), 'fixture bytes');
+  for (const name of ASSETS.slice(0, -1)) writeFileSync(join(releaseDir, name), 'fixture bytes');
   writeFileSync(stateFile, 'none');
   const publish = (over = {}) => {
     writeFileSync(callsFile, '');
@@ -717,6 +717,8 @@ const ASSETS = [
   'Cairn-0.1.2-x64.dmg',
   'Cairn-0.1.2-arm64.zip',
   'Cairn-0.1.2-x64.zip',
+  'Cairn-0.1.2-win-x64.exe',
+  'Cairn-0.1.2-win-x64.zip',
   'desktop-latest.json',
 ];
 
@@ -1184,7 +1186,12 @@ test('both architectures are packaged in parallel and published only after both 
   );
   assert.deepEqual(workflow.jobs.package.strategy.matrix.arch, ['arm64', 'x64']);
   assert.match(manifest, /ARCHS = \['arm64', 'x64'\]/);
-  assert.deepEqual(workflow.jobs.publish.needs, ['decide', 'package', 'live-verify']);
+  assert.deepEqual(workflow.jobs.publish.needs, [
+    'decide',
+    'package',
+    'package-win',
+    'live-verify',
+  ]);
   assert.equal(workflow.jobs.publish.permissions.contents, 'write');
   assert.equal(workflow.jobs.package.permissions, undefined);
 });

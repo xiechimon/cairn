@@ -33,7 +33,7 @@ execFileSync(
     `--cpu=${arch}`,
     target,
   ],
-  { cwd: desktopDir, stdio: 'inherit' },
+  { cwd: desktopDir, stdio: 'inherit', shell: process.platform === 'win32' },
 );
 
 for (const leftover of ['node_modules/.bin', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']) {

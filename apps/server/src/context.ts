@@ -1,5 +1,11 @@
 import type { NetworkInterfaceInfo } from 'node:os';
-import type { GitIdentity, TailnetAccess, TeamRecord, UserRecord } from '@cairn/shared';
+import type {
+  GitIdentity,
+  TailnetAccess,
+  TeamRecord,
+  TunnelAccess,
+  UserRecord,
+} from '@cairn/shared';
 import type { Logger } from 'pino';
 import type { Db } from './db/client.js';
 import type { AccessVerifier } from './lib/cloudflare-access.js';
@@ -23,6 +29,7 @@ import type { VapidKeys } from './services/push.js';
 import type { SkillImportFetch } from './services/skill-import.js';
 import type { TailscaleServe } from './services/tailscale-serve.js';
 import type { TailnetRemote } from './services/tsnet-remote.js';
+import type { TunnelRemote } from './services/tunnel-remote.js';
 import type { XaiDeviceState } from './services/xai-device-login.js';
 
 export interface RemoteAccessContext {
@@ -31,6 +38,8 @@ export interface RemoteAccessContext {
   listenPort: number;
   tailnetStatus: () => TailnetAccess | null;
   tailnet?: TailnetRemote;
+  tunnelStatus?: () => TunnelAccess | null;
+  tunnel?: TunnelRemote;
   tailscale?: TailscaleServe;
   networkInterfaces?: () => NodeJS.Dict<NetworkInterfaceInfo[]>;
 }
