@@ -1,4 +1,7 @@
 import {
+  antigravitySubscriptionModelSchema,
+  claudeSubscriptionModelSchema,
+  devinSubscriptionModelSchema,
   type ModelSource,
   type ModelSourceModel,
   orderByKeys,
@@ -264,8 +267,12 @@ export function ProvidersSection() {
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
   );
-  const [pickingSubscription, setPickingSubscription] = useState<SubscriptionAccount | null>(null);
-  const upstreamCatalogRef = useRef<ReadonlyMap<string, SubscriptionModel>>(new Map());
+  const [subscriptionPicker, setSubscriptionPicker] = useState<{
+    account: SubscriptionAccount;
+    opener: HTMLButtonElement;
+  } | null>(null);
+  const { account: pickingSubscription = null, opener: subscriptionPickerOpener } =
+    subscriptionPicker ?? {};
   const [connectError, setConnectError] = useState<string | null>(null);
   const saveOrder = useSaveProviderOrder(teamId);
   const [fixtureOrder, setFixtureOrder] = useState<string[] | null>(null);
@@ -451,7 +458,7 @@ export function ProvidersSection() {
     update?.mutate(
       { id: account.id, models },
       {
-        onSuccess: () => setPickingSubscription(null),
+        onSuccess: () => setSubscriptionPicker(null),
         onError: (error) => toastError(t('保存失败，请重试。'), error),
       },
     );
@@ -509,7 +516,8 @@ export function ProvidersSection() {
                   account.vendor === 'antigravity' ||
                   account.vendor === 'claude'
                     ? {
-                        onPickUpstream: () => setPickingSubscription(account),
+                        onPickUpstream: (opener: HTMLButtonElement) =>
+                          setSubscriptionPicker({ account, opener }),
                         onRemoveModel: (id: string) =>
                           saveSubscriptionModels(
                             account,
@@ -685,7 +693,8 @@ export function ProvidersSection() {
         }}
       />
       {pickingSubscription !== null && live && teamId !== undefined && (
-        <UpstreamModelPicker
+        <UpstreamModelPicker<SubscriptionModel>
+          key={JSON.stringify([teamId, pickingSubscription.vendor, pickingSubscription.id])}
           endpoint={`${pickingSubscription.vendor} · ${pickingSubscription.label}`}
           selected={(pickingSubscription.vendor === 'claude' &&
           (pickingSubscription.models ?? []).length === 0
@@ -700,25 +709,29 @@ export function ProvidersSection() {
                     ? groupDevinUpstream
                     : groupAntigravityUpstream,
               })}
+          modelIdSchema={
+            pickingSubscription.vendor === 'claude'
+              ? claudeSubscriptionModelSchema.shape.id
+              : pickingSubscription.vendor === 'devin'
+                ? devinSubscriptionModelSchema.shape.id
+                : antigravitySubscriptionModelSchema.shape.id
+          }
           testable={false}
           {...(pickingSubscription.vendor === 'antigravity'
             ? { fallbackReasons: ANTIGRAVITY_FALLBACK_REASONS }
             : {})}
-          load={async () => {
-            const result =
-              pickingSubscription.vendor === 'devin'
-                ? await fetchDevinUpstreamModels(teamId, pickingSubscription.id)
-                : pickingSubscription.vendor === 'claude'
-                  ? await fetchClaudeUpstreamModels(teamId, pickingSubscription.id)
-                  : await fetchAntigravityUpstreamModels(teamId, pickingSubscription.id);
-            if (result.status !== 'failed')
-              upstreamCatalogRef.current = new Map(result.models.map((model) => [model.id, model]));
-            return result;
-          }}
-          onClose={() => setPickingSubscription(null)}
-          onSave={(ids) => {
-            const catalog = upstreamCatalogRef.current;
-            const models = ids.map((id) => catalog.get(id) ?? { id, name: id });
+          load={() =>
+            pickingSubscription.vendor === 'devin'
+              ? fetchDevinUpstreamModels(teamId, pickingSubscription.id)
+              : pickingSubscription.vendor === 'claude'
+                ? fetchClaudeUpstreamModels(teamId, pickingSubscription.id)
+                : fetchAntigravityUpstreamModels(teamId, pickingSubscription.id)
+          }
+          opener={subscriptionPickerOpener}
+          onClose={() => setSubscriptionPicker(null)}
+          onSave={(ids, catalog) => {
+            const saved = new Map(pickingSubscription.models?.map((model) => [model.id, model]));
+            const models = ids.map((id) => catalog.get(id) ?? saved.get(id) ?? { id, name: id });
             saveSubscriptionModels(pickingSubscription, models);
           }}
         />

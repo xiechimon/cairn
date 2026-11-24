@@ -123,6 +123,120 @@ test('the upstream picker groups by vendor and saves the picks', async ({ page }
   await expect(pickedChip(page, 'gemini-4-carbon')).toBeVisible();
 });
 
+for (const textScale of [1, 2]) {
+  test(`C23: retry preserves every 568x320 row box at ${textScale * 100}% text scale and marks all four omissions`, async ({ page }) => {
+    await page.setViewportSize({ width: 568, height: 320 });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const [first, confirmed, ...rest] = [
+      UPSTREAM[0]!,
+      UPSTREAM[1]!,
+      { id: 'gemini-4-pro-preview', name: 'Gemini 4 Pro Preview' },
+      { id: 'gemini-4-flash-lite', name: 'Gemini 4 Flash Lite' },
+      { id: 'gemini-4-flash-preview', name: 'Gemini 4 Flash Preview' },
+    ] as const;
+    const fallbackModels = [first, confirmed, ...rest];
+    const { promise: retry, resolve: settleRetry } = Promise.withResolvers<void>();
+    await mount(page, subscription([]));
+    let calls = 0;
+    await page.route('**/api/teams/t1/antigravity-subscriptions/sub-a1/upstream-models', async (route) => {
+      if (++calls === 1) {
+        await route.fulfill({ json: { status: 'fallback', models: fallbackModels, failure: 'network', httpStatus: null } });
+        return;
+      }
+      await retry;
+      await route.fulfill({ json: { status: 'ok', models: [confirmed] } });
+    });
+    await page.goto('/app/resources/providers');
+    await detail(page).getByTestId('subscription-pick-upstream').click();
+    const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+    const rows = picker.getByTestId('upstream-model');
+    await expect(rows).toHaveCount(5);
+    const modelId = rows.first().locator('code');
+    const baseSize = await modelId.evaluate((node) => parseFloat(getComputedStyle(node).fontSize));
+    await page.addStyleTag({ content: `:root { --type-scale: ${textScale} !important; }` });
+    await expect(modelId).toHaveCSS('font-size', `${baseSize * textScale}px`);
+    await page.evaluate(async () => { await document.fonts.ready; });
+    const boxes = () => rows.evaluateAll((nodes) => nodes.map((node) => {
+      const { height, top } = node.getBoundingClientRect();
+      return { id: node.getAttribute('data-model-id'), height, top };
+    }));
+    await picker.getByRole('button', { name: '重试', exact: true }).click();
+    await picker.getByTestId('dialog-body').evaluate((body) => { body.scrollTop = 0; });
+    const before = await boxes();
+    settleRetry();
+    await expect(picker.getByText('已获取上游模型清单。', { exact: true })).toBeVisible();
+    expect(await boxes()).toEqual(before);
+    await expect(picker.getByTestId('upstream-group')).toHaveText('Gemini · 5');
+    await expect(picker.getByText('第 1 次刷新：上游清单未列出 4 个模型', { exact: true })).toBeVisible();
+    for (const model of [first, ...rest]) {
+      const row = rows.and(picker.locator(`[data-model-id="${model.id}"]`));
+      const mark = row.getByTestId('upstream-provenance');
+      await expect(row).toHaveAttribute('data-model-source', 'missing');
+      await expect(mark).toBeVisible();
+      await expect(mark).toHaveText('不在最新列表');
+      await expect(mark).toHaveAttribute('title', '不在最新列表');
+      await expect(row.getByRole('checkbox')).toHaveAccessibleDescription('不在最新列表');
+    }
+    await expect(rows.nth(1)).toHaveAttribute('data-model-source', 'upstream');
+    await expect(rows.nth(1).getByTestId('upstream-provenance')).toBeEmpty();
+  });
+}
+
+test('all-selected fallback rows keep their own muted provenance at 568x320', async ({ page }) => {
+  await page.setViewportSize({ width: 568, height: 320 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const fallbackModels = [UPSTREAM[2]!, UPSTREAM[0]!];
+  await mount(page, subscription(fallbackModels));
+  let calls = 0;
+  await page.route('**/api/teams/t1/antigravity-subscriptions/sub-a1/upstream-models', (route) =>
+    route.fulfill({
+      json: ++calls === 1
+        ? { status: 'fallback', models: fallbackModels, failure: 'network', httpStatus: null }
+        : { status: 'ok', models: [fallbackModels[0]] },
+    }),
+  );
+  await page.goto('/app/resources/providers');
+  await detail(page).getByTestId('subscription-pick-upstream').click();
+  const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+  await expect(picker.getByTestId('upstream-group')).toHaveText(['打开时已选']);
+  await expect(picker.getByTestId('upstream-group').getByTestId('upstream-provenance')).toHaveCount(0);
+  for (const model of fallbackModels) {
+    const row = picker.locator(`[data-testid="upstream-model"][data-model-id="${model.id}"]`);
+    const mark = row.getByTestId('upstream-provenance');
+    await expect(row).toHaveAttribute('data-model-source', 'fallback');
+    await expect(row.getByRole('checkbox')).toBeChecked();
+    await expect(mark).toHaveText('备用清单，不是上游返回的');
+    await expect(mark).toHaveAttribute('title', '备用清单，不是上游返回的');
+    await expect(row.getByRole('checkbox')).toHaveAccessibleDescription('备用清单，不是上游返回的');
+    await expect(mark).toHaveCSS('white-space', 'nowrap');
+    await expect(mark).toHaveCSS('text-overflow', 'ellipsis');
+    const lineHeight = await mark.evaluate((node) => parseFloat(getComputedStyle(node).lineHeight));
+    expect((await mark.boundingBox())?.height).toBeCloseTo(lineHeight, 1);
+    await expect(mark).toHaveClass(/text-meta/);
+    await expect(mark).toHaveClass(/text-content-tertiary/);
+    await row.scrollIntoViewIfNeeded();
+    await expect(row).toBeInViewport({ ratio: 1 });
+    await expect(mark).toBeInViewport({ ratio: 1 });
+    const bounds = await row.locator('code').boundingBox();
+    const markBounds = await mark.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(markBounds).not.toBeNull();
+    expect(markBounds!.y).toBeGreaterThanOrEqual(bounds!.y + bounds!.height);
+  }
+  await picker.getByRole('button', { name: '重试', exact: true }).click();
+  const confirmed = picker.locator(`[data-model-id="${fallbackModels[0]!.id}"]`);
+  const omitted = picker.locator(`[data-model-id="${fallbackModels[1]!.id}"]`);
+  await expect(confirmed).toHaveAttribute('data-model-source', 'upstream');
+  await expect(confirmed.getByTestId('upstream-provenance')).toBeEmpty();
+  await expect(omitted).toHaveAttribute('data-model-source', 'missing');
+  await omitted.scrollIntoViewIfNeeded();
+  const missingMark = omitted.getByTestId('upstream-provenance');
+  await expect(missingMark).toHaveText('不在最新列表');
+  await expect(missingMark).toBeInViewport({ ratio: 1 });
+  await expect(omitted.getByRole('checkbox')).toBeChecked();
+  await expect(picker.getByTestId('upstream-group')).toHaveText(['打开时已选']);
+});
+
 test('a failed upstream fetch offers the by-id fallback', async ({ page }) => {
   const patches: object[] = [];
   await mount(page, subscription([]), null, patches);

@@ -15,6 +15,11 @@ const requests = vi.hoisted(() => ({ test: vi.fn(), patch: vi.fn(), refetch: vi.
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
   useEffect: () => undefined,
+  useId: () => {
+    const index = hooks.cursor++;
+    if (!(index in hooks.slots)) hooks.slots[index] = `id-${index}`;
+    return hooks.slots[index];
+  },
   useState: (initial: unknown) => {
     const slots = hooks.slots;
     const index = hooks.cursor++;
@@ -210,7 +215,7 @@ it('C1: save-and-test uses the server-tested fingerprint for both the row and th
     requests.providers = [{ ...requests.providers[0]!, baseUrl: 'https://new-gateway.example.invalid/v1', configurationFingerprint: THIRD_FINGERPRINT, updatedAt: 3 }];
     return tested;
   });
-  picker.onSave(['small-model', 'large-model'], new Map([['large-model', 'Large model']]), ['small-model']);
+  picker.onSave(['small-model', 'large-model'], new Map([['large-model', { id: 'large-model', name: 'Large model' }]]), ['small-model']);
   await vi.waitFor(() => expect(requests.test).toHaveBeenCalledWith({ id: RECORD.id, model: 'large-model' }));
   const detail = propsOf<ComponentProps<typeof ModelTestReport>>(editor(), ModelTestReport)[0]!;
   expect(detail.checks['large-model']).toMatchObject({ phase: 'done', result: tested });
@@ -943,7 +948,7 @@ it.each([false, true])(
       ...body,
     }));
     const next = removing ? [] : ['small-model', 'large-model'];
-    picker().onSave(next, new Map([['large-model', 'Large model']]), base);
+    picker().onSave(next, new Map([['large-model', { id: 'large-model', name: 'Large model' }]]), base);
     await vi.waitFor(() => expect(requests.patch).toHaveBeenCalledTimes(1));
     const saved = requests.patch.mock.calls[0]![0].body.models.map(
       (model: { id: string }) => model.id,

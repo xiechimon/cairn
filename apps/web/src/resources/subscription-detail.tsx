@@ -523,7 +523,7 @@ export interface SubscriptionActions {
   onVerify?: () => void;
   onRename?: (label: string) => void;
   onRemove: () => void;
-  onPickUpstream?: () => void;
+  onPickUpstream?: (opener: HTMLButtonElement) => void;
   onRemoveModel?: (id: string) => void;
   onTestModel?: (id: string) => Promise<ProviderTestResult>;
   modelsBusy?: boolean;
@@ -666,7 +666,7 @@ export function SubscriptionDetail({
                 variant="outline"
                 size="sm"
                 data-testid="subscription-pick-upstream"
-                onClick={actions.onPickUpstream}
+                onClick={(event) => actions.onPickUpstream?.(event.currentTarget)}
               >
                 <Download aria-hidden />
                 {t('从上游选择')}

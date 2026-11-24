@@ -46,7 +46,8 @@ export const DIALOG_SUBTITLE_CLS = 'mt-1 text-meta text-content-tertiary';
 export const DIALOG_CLOSE_CLS =
   'absolute top-4 right-4 text-content-tertiary hover:text-foreground pointer-coarse:top-2 pointer-coarse:right-2 pointer-coarse:size-11';
 
-export const DIALOG_BODY_CLS = 'min-h-0 overflow-y-auto px-4 pt-4 pb-4';
+export const DIALOG_BODY_CLS =
+  'min-h-0 overflow-y-auto [overflow-anchor:none] scrollbar-gutter-stable px-4 pt-4 pb-4';
 
 export const DIALOG_FOOT_CLS = 'flex items-center gap-3 px-4 pt-4 pb-4';
 
@@ -94,9 +95,10 @@ interface DialogShellProps {
   stacked?: boolean;
   dismissible?: boolean;
   initialFocus?: DialogPrimitive.Popup.Props['initialFocus'];
+  returnFocusTo?: HTMLElement;
 }
 
-function useReturnFocus(open: boolean) {
+function useReturnFocus(open: boolean, returnFocusTo: HTMLElement | undefined) {
   const shellId = useId();
   const origin = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -116,8 +118,9 @@ function useReturnFocus(open: boolean) {
     return () => document.removeEventListener('focusin', record);
   }, [open, shellId]);
   const restore = useCallback(() => {
-    origin.current?.focus();
-  }, []);
+    if (returnFocusTo !== undefined) return returnFocusTo.isConnected ? returnFocusTo : false;
+    origin.current?.focus({ preventScroll: true });
+  }, [returnFocusTo]);
   return { shellId, restore };
 }
 
@@ -142,12 +145,13 @@ export function DialogShell({
   onEscapeWhileNested,
   viewportRoot = false,
   initialFocus,
+  returnFocusTo,
   backdropClassName,
   stacked = false,
   dismissible = true,
 }: DialogShellProps) {
   const { t } = useI18n();
-  const { shellId, restore } = useReturnFocus(open);
+  const { shellId, restore } = useReturnFocus(open, returnFocusTo);
 
   const handleOpenChange = (next: boolean, details?: { reason?: string; event?: Event }) => {
     if (next || !dismissible) return;

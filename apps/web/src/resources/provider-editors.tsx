@@ -595,7 +595,7 @@ export function TeamProviderEditor({
 }) {
   const { t } = useI18n();
   const [confirming, setConfirming] = useState(false);
-  const [picking, setPicking] = useState(false);
+  const [picker, setPicker] = useState<{ opener?: HTMLButtonElement } | null>(null);
   const [models, setModels] = useState(record.models);
   const [savedModels, setSavedModels] = useState(record.models);
   const [savingModels, setSavingModels] = useState(false);
@@ -725,7 +725,11 @@ export function TeamProviderEditor({
           )}
           <span className="ml-auto flex items-center gap-2 max-sm:w-full max-sm:justify-end">
             {actions.listUpstream !== undefined && (
-              <Button variant="outline" size="sm" onClick={() => setPicking(true)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(event) => setPicker({ opener: event.currentTarget })}
+              >
                 <Download aria-hidden />
                 {t('从上游选择')}
               </Button>
@@ -782,25 +786,38 @@ export function TeamProviderEditor({
           onAction={() => setConfirming(true)}
         />
       </SettingsSection>
-      {actions.listUpstream !== undefined && picking && (
+      {actions.listUpstream !== undefined && picker !== null && (
         <UpstreamModelPicker
           endpoint={modelsEndpoint(record)}
           selected={ids}
           load={actions.listUpstream}
-          onClose={() => setPicking(false)}
-          onSave={(next, names, base) => {
-            setPicking(false);
+          {...(picker.opener === undefined ? {} : { opener: picker.opener })}
+          onClose={() => setPicker(null)}
+          onSave={(next, catalog, base) => {
+            setPicker(null);
             const baseIds = new Set(base);
             const picked = new Set(next);
             const added = next.filter((id) => !baseIds.has(id));
-            const removed = new Set(base.filter((id) => !picked.has(id)));
             void saveModels((saved) => {
-              const merged = saved.filter((model) => !removed.has(model.id));
-              const held = new Set(merged.map((model) => model.id));
-              for (const id of added) {
-                if (!held.has(id)) merged.push({ id, name: names.get(id) ?? id });
-              }
-              return merged;
+              const byId = new Map(saved.map((model) => [model.id, model]));
+              const nextModels = next.flatMap((id) => {
+                const existing = byId.get(id);
+                if (existing !== undefined) {
+                  return [{ ...existing, id, name: catalog.get(id)?.name ?? existing.name }];
+                }
+                if (baseIds.has(id)) return [];
+                return [{ id, name: catalog.get(id)?.name ?? id }];
+              });
+              const external = saved.filter(
+                (model) => !baseIds.has(model.id) && !picked.has(model.id),
+              );
+              if (external.length === 0) return nextModels;
+              const lastSavedIndex = nextModels.findLastIndex((model) => byId.has(model.id));
+              return [
+                ...nextModels.slice(0, lastSavedIndex + 1),
+                ...external,
+                ...nextModels.slice(lastSavedIndex + 1),
+              ];
             }).then((saved) => {
               if (saved !== undefined && test !== undefined)
                 void tests.run(added, testAllRef.current, test, saved.configurationFingerprint);
