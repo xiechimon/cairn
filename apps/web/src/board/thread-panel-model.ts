@@ -1,5 +1,6 @@
 import type { TaskRequest } from '@cairn/shared';
 import type { ChiefStreamItem, TodoRecord, TranscriptItem } from '../fixtures/records.js';
+import { formatClockTime } from '../lib/date-format.js';
 
 export const MAX_UPDATE_LINES = 3;
 
@@ -95,9 +96,5 @@ export function threadOrigin(
 }
 
 export function clockTime(ts: number, locale: string): string {
-  return new Intl.DateTimeFormat(locale === 'zh' ? 'zh-CN' : 'en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(ts);
+  return formatClockTime(ts, locale);
 }

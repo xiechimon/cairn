@@ -122,7 +122,7 @@ import type {
   UsageCostContent,
   WorkStep,
 } from '../fixtures/records.js';
-import { dateTimeFormat } from '../lib/date-format.js';
+import { formatClockTime } from '../lib/date-format.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { activityLabel } from './activity.js';
 import type { MachineProvider } from './claude-accounts.js';
@@ -384,11 +384,7 @@ export function mapUsageCost(cost: UsageCost | undefined): UsageCostContent | nu
 }
 
 export function clockTime(ms: number): string {
-  return dateTimeFormat('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(ms);
+  return formatClockTime(ms, 'zh');
 }
 
 export function textOfContent(content: unknown): string {

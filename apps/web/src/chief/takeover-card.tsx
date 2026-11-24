@@ -9,6 +9,7 @@ import { useScreenHoverControl } from '../board/screen-hover-control.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
+import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
 import {
   currentDeviceSubscription,
@@ -24,16 +25,6 @@ const COMPUTERS_REFRESH_MS = 3_000;
 function minutesLeft(startedAt: number | null, now: number): number | null {
   if (startedAt === null) return null;
   return Math.max(0, Math.ceil((startedAt + COMPUTER_HANDOFF_TIMEOUT_MS - now) / 60_000));
-}
-
-function useNow(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const tick = window.setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => window.clearInterval(tick);
-  }, [active]);
-  return now;
 }
 
 function useDevicePushOff(teamId: string | undefined, active: boolean) {
@@ -99,7 +90,7 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
   const control = useComputerControl({ teamId, computer });
   const hover = useScreenHoverControl(control, computer?.handoffReason != null);
   const [open, setOpen] = useState(false);
-  const now = useNow(waiting);
+  const now = useIntervalNow(waiting, TICK_MS, false);
   const push = useDevicePushOff(teamId, waiting);
   const left = minutesLeft(item.startedAt, now);
   const online = computer?.machine.online === true && computer.state !== 'failed';

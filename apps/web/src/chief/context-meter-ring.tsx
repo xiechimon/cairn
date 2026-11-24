@@ -1,12 +1,12 @@
 import type { ChiefChannelUsage } from '@cairn/shared';
 import { cn } from 'cn';
-import { useEffect, useState } from 'react';
 import { cacheHitShare, formatUsd, mapTokenUsage } from '../api/mappers.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { formatWorkDuration } from '../detail/work-trace.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
+import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -118,19 +118,10 @@ export function contextMeterLines(
   return lines;
 }
 
-function useClock(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    setNow(Date.now());
-    const tick = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(tick);
-  }, [active]);
-  return now;
-}
-
 export function useContextClock(context: ContextMeterReading | null): number {
-  return useClock(context?.resumeExpiresAt !== undefined && context.resumeExpiresAt > Date.now());
+  return useIntervalNow(
+    context?.resumeExpiresAt !== undefined && context.resumeExpiresAt > Date.now(),
+  );
 }
 
 export function ContextMeterGlyph({

@@ -32,6 +32,7 @@ import { SourceIssueLine } from '../detail/source-issue.js';
 import { TranscriptColumn } from '../detail/transcript-column.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { baseName, dirName } from '../lib/path-name.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
 import { useOpenDesignAttachment } from './design/design-route.js';
@@ -353,7 +354,7 @@ function ChangesCard({
           ) : (
             files.map((file) => {
               const fileOpen = openFiles.has(file.path);
-              const dir = file.path.slice(0, Math.max(0, file.path.lastIndexOf('/')));
+              const dir = dirName(file.path);
               return (
                 <div
                   key={file.path}
@@ -408,10 +409,6 @@ function ChangesCard({
       )}
     </TraceCard>
   );
-}
-
-function baseName(path: string): string {
-  return path.slice(path.lastIndexOf('/') + 1);
 }
 
 function ThreadBody({
