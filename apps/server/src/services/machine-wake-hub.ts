@@ -4,6 +4,7 @@ import type {
   ComputerScreenRequest,
   MachineRepoArchiveCommand,
   MachineStreamEvent,
+  ManagedUpdateRuntime,
 } from '@cairn/shared';
 
 export const MACHINE_OFFLINE_GRACE_MS = 45_000;
@@ -333,6 +334,17 @@ export class MachineWakeHub {
     if (!entry) return false;
     try {
       entry.send({ type: 'task.stop', stepId, taskId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  pushRuntimeUpdate(machineId: string, runtime: ManagedUpdateRuntime): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'runtime.update', runtime });
       return true;
     } catch {
       return false;

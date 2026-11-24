@@ -13,6 +13,37 @@ export const MODEL_SOURCE_RUNTIMES = [
 export const modelSourceRuntimeSchema = z.enum(MODEL_SOURCE_RUNTIMES);
 export type ModelSourceRuntime = z.infer<typeof modelSourceRuntimeSchema>;
 
+export const MANAGED_UPDATE_RUNTIMES = ['claude-code', 'devin', 'gemini'] as const;
+export const managedUpdateRuntimeSchema = z.enum(MANAGED_UPDATE_RUNTIMES);
+export type ManagedUpdateRuntime = z.infer<typeof managedUpdateRuntimeSchema>;
+
+export const runtimeUpdateStatusSchema = z
+  .object({
+    installedVersion: z.string().min(1).max(64).nullable().optional(),
+    availableVersion: z.string().min(1).max(64).nullable().optional(),
+    phase: z.enum(['idle', 'updating', 'failed']).optional(),
+  })
+  .strict();
+export type RuntimeUpdateStatus = z.infer<typeof runtimeUpdateStatusSchema>;
+
+export function compareManagedVersions(a: string, b: string): number {
+  const pa = semver.parse(a) ?? semver.coerce(a);
+  const pb = semver.parse(b) ?? semver.coerce(b);
+  if (pa !== null && pb !== null) return semver.compare(pa, pb);
+  return a.localeCompare(b, undefined, { numeric: true });
+}
+
+export function isNewerManagedVersion(
+  candidate: string,
+  current: string | null | undefined,
+): boolean {
+  if (current == null || current === '') return true;
+  const pc = semver.parse(candidate) ?? semver.coerce(candidate);
+  const pi = semver.parse(current) ?? semver.coerce(current);
+  if (pc !== null && pi !== null) return semver.gt(pc, pi);
+  return candidate !== current;
+}
+
 export const MODEL_SOURCE_RUNTIME_LABELS: Record<ModelSourceRuntime, string> = {
   pi: 'pi',
   'claude-code': 'Claude Code',
@@ -109,6 +140,8 @@ export const modelSourceSchema = z.object({
   models: z.array(modelSourceModelSchema),
   bin: claudeBinInfoSchema.nullable().optional(),
   auth: claudeAuthStateSchema.optional(),
+  version: z.string().nullable().optional(),
+  runtimeUpdate: runtimeUpdateStatusSchema.optional(),
 });
 export type ModelSource = z.infer<typeof modelSourceSchema>;
 
@@ -243,6 +276,7 @@ export const claudeCodeReportSchema = z.object({
   auth: claudeAuthStateSchema.optional(),
   login: claudeLoginSchema.optional(),
   customBackend: z.boolean().optional(),
+  update: runtimeUpdateStatusSchema.optional(),
 });
 export type ClaudeCodeReport = z.infer<typeof claudeCodeReportSchema>;
 

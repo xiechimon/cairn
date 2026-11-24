@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { THINKING_LEVELS, thinkingLevelSchema } from '../thinking-levels.js';
-import { reportedModelSchema } from './model-source.js';
+import { reportedModelSchema, runtimeUpdateStatusSchema } from './model-source.js';
 
 export const machineHardwareSchema = z.object({
   cpuCores: z.number().int().positive(),
@@ -129,9 +129,19 @@ export const devinReportSchema = z
     installed: z.boolean(),
     version: z.string().min(1).max(64).optional(),
     models: z.array(reportedModelSchema).optional(),
+    update: runtimeUpdateStatusSchema.optional(),
   })
   .strict();
 export type DevinReport = z.infer<typeof devinReportSchema>;
+
+export const geminiReportSchema = z
+  .object({
+    installed: z.boolean(),
+    version: z.string().min(1).max(64).optional(),
+    update: runtimeUpdateStatusSchema.optional(),
+  })
+  .strict();
+export type GeminiReport = z.infer<typeof geminiReportSchema>;
 
 export const antigravityModelSchema = z.object({
   id: z.string().min(1).max(256),
@@ -242,6 +252,7 @@ export const machineCapabilitiesSchema = z.object({
   mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
   devin: devinReportSchema.optional(),
+  gemini: geminiReportSchema.optional(),
   antigravity: antigravityReportSchema.optional(),
   antigravityOAuthProfile: z.literal(true).optional(),
   antigravitySubscriptionModels: z.literal(true).optional(),
@@ -275,6 +286,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
   const devin = devinReportSchema.safeParse(rec.devin);
+  const gemini = geminiReportSchema.safeParse(rec.gemini);
   const antigravity = antigravityReportSchema.safeParse(rec.antigravity);
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
@@ -299,6 +311,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(devin.success ? { devin: devin.data } : {}),
+    ...(gemini.success ? { gemini: gemini.data } : {}),
     ...(antigravity.success ? { antigravity: antigravity.data } : {}),
     ...(rec.antigravityOAuthProfile === true ? { antigravityOAuthProfile: true } : {}),
     ...(rec.antigravitySubscriptionModels === true ? { antigravitySubscriptionModels: true } : {}),

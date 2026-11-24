@@ -686,6 +686,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
   private released: Promise<void> | null = null;
   private readonly loopDone: Promise<void>;
   private endLoop: () => void = () => {};
+  private readonly onRelease: (() => void) | undefined;
 
   constructor(
     q: Query,
@@ -699,6 +700,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
       process: SessionProcess;
       timeouts: SettleTimeouts;
       onClaudeRateLimit?: (notice: ClaudeRateLimitNotice) => void;
+      onRelease?: () => void;
     },
     private readonly spans?: PiStepSpanSink,
     private readonly telemetryCapture?: ClaudeTelemetryCapture,
@@ -710,6 +712,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     this.abort = opts.abort;
     this.input = opts.input;
     this.onClaudeRateLimit = opts.onClaudeRateLimit;
+    this.onRelease = opts.onRelease;
     this.process = opts.process;
     this.timeouts = opts.timeouts;
     this.loopDone = new Promise((resolve) => {
@@ -921,6 +924,7 @@ class ClaudeSessionHandle implements AgentSessionHandle {
     this.input.end();
     this.queue.end();
     if (!this.abort.signal.aborted) this.abort.abort();
+    this.onRelease?.();
   }
 
   async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
@@ -1593,6 +1597,11 @@ export interface ClaudeCodeBackendOpts {
   confine?: SessionConfiner;
   teamSkillsCacheDir?: string;
   executableVersion?: string | null;
+  resolveExecutable?: () => {
+    path: string;
+    version: string | null;
+    release?: () => void;
+  } | null;
   settleTimeouts?: Partial<SettleTimeouts>;
 }
 
@@ -1630,136 +1639,150 @@ export class ClaudeCodeBackend implements AgentBackend {
   }
 
   private async open(opts: SessionOpts, resumeId: string | null): Promise<AgentSessionHandle> {
-    const managedMcp = opts.mcpServers !== undefined;
-    const hostTools = buildHostTools({
-      remoteTools: opts.remoteTools ?? [],
-      ...(opts.executeRemoteTool ? { relay: opts.executeRemoteTool } : {}),
-      localTools: opts.localTools ?? [],
-    });
-    const mcpServers: Record<string, McpServerConfig> = {};
-    if (hostTools.length > 0) {
-      mcpServers[HOST_MCP_SERVER_NAME] = createHostMcpServer(hostTools);
+    const resolvedExecutable =
+      this.opts.resolveExecutable !== undefined ? this.opts.resolveExecutable() : null;
+    if (this.opts.resolveExecutable !== undefined && resolvedExecutable === null) {
+      throw new Error('Claude Code managed binary is unavailable or failed integrity verification');
     }
-    for (const endpoint of opts.mcpServers ?? []) {
-      if (endpoint.slug === HOST_MCP_SERVER_NAME) {
-        throw new Error(
-          `claude-code backend: mcp server slug '${endpoint.slug}' collides with the host tool server (fail-closed)`,
-        );
-      }
-      mcpServers[endpoint.slug] = mapMcpEndpoint(endpoint);
-    }
-    const effort = toEffort(opts.thinkingLevel);
-    const append = opts.systemPrompt;
-    const disallowedTools = [SDK_ASK_TOOL, ...(opts.readOnly === true ? SDK_WRITE_TOOLS : [])];
-    const abort = new AbortController();
-    const sessionProcess: SessionProcess = { child: null, marker: randomUUID() };
-    const sessionId = resumeId ?? randomUUID();
-    const deniedSkills = collectDeniedSkillDirs(this.opts.skills, opts);
-    const skillDenyRules = buildSkillDenyRules(deniedSkills);
-    if (deniedSkills.length > 0) {
-      this.opts.onSkillsLog?.(`deny: ${deniedSkills.length} skill dir(s) hard-blocked`);
-    }
-    const nativePluginDir = resolveTeamSkillsPluginDir({
-      skills: this.opts.skills,
-      cacheRoot: this.opts.teamSkillsCacheDir,
-      executableVersion: this.opts.executableVersion,
-      session: opts,
-      ...(this.opts.onSkillsLog !== undefined ? { log: this.opts.onSkillsLog } : {}),
-    });
-    const deferredTools = (opts.remoteTools ?? []).some((def) => def.deferred === true);
-    const sessionEnv = claudeSessionEnv(opts);
-    const mergedEnv =
-      sessionEnv === undefined && !deferredTools
-        ? undefined
-        : { ...(sessionEnv ?? {}), ...(deferredTools ? { ENABLE_TOOL_SEARCH: 'true' } : {}) };
-    const sdkOptions: Options = buildClaudeSdkOptions({
-      cwd: opts.cwd,
-      modelId: opts.modelId,
-      resumeId,
-      sessionId,
-      disallowedTools,
-      inOrb: this.opts.inOrb === true,
-      lockedDown: opts.lockedDown === true,
-      ...(opts.remoteToolsOnly === true
-        ? { builtinTools: deferredTools ? [TOOL_SEARCH_BUILTIN] : [] }
-        : {}),
-      deferredTools,
-      mcpServers,
-      ...(managedMcp ? { strictMcpConfig: true } : {}),
-      ...(effort !== undefined ? { effort } : {}),
-      ...(append !== undefined ? { append } : {}),
-      skillDenyRules,
-      ...(this.opts.executablePath !== undefined
-        ? { executablePath: this.opts.executablePath }
-        : {}),
-      ...(mergedEnv !== undefined ? { env: mergedEnv } : {}),
-      ...(opts.compactAt !== undefined ? { compactAt: opts.compactAt } : {}),
-      ...(nativePluginDir !== null && opts.remoteToolsOnly !== true
-        ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
-        : {}),
-      ...(this.opts.confine !== undefined
-        ? {
-            confine: (launch: Launch) =>
-              (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch, {
-                readable: stepCredentialStateDirs(opts.env),
-              }),
-          }
-        : {}),
-      abortController: abort,
-      process: sessionProcess,
-    });
-    const state = createClaudeMapState({ modelId: opts.modelId, resumed: resumeId !== null });
-    const input = new AsyncQueue<SDKUserMessage>();
-    if (opts.prompt !== undefined)
-      input.push({ ...buildUserMessage(opts.prompt, opts.promptImages), uuid: randomUUID() });
-    const redact = stepCredentialRedactor(
-      opts.secrets,
-      sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN ?? sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
-      sdkOptions.env?.ANTHROPIC_API_KEY,
-      sdkOptions.env?.ANTHROPIC_AUTH_TOKEN,
-    );
-    const spans =
-      opts.telemetry !== undefined
-        ? new PiStepSpanSink(
-            opts.telemetry,
-            { provider: opts.provider.providerId, model: opts.modelId },
-            undefined,
-            redact,
-          )
-        : undefined;
-    const capture = spans === undefined ? undefined : await captureClaudeTelemetry(spans, redact);
-    if (capture !== undefined) {
-      sdkOptions.env = { ...sdkOptions.env, ...capture.env };
-      sdkOptions.settings = {
-        ...(typeof sdkOptions.settings === 'object' ? sdkOptions.settings : {}),
-        env: { ...claudeCliEnv({}), ...capture.env },
-      };
-    }
-    let q: Query;
+    const releaseExecutable = resolvedExecutable?.release;
+    let handoffLease = false;
     try {
-      q = query({ prompt: input.iterable(), options: sdkOptions });
-    } catch (error) {
-      await capture?.close();
-      throw error;
-    }
-    return new ClaudeSessionHandle(
-      q,
-      {
-        sessionId,
+      const executablePath = resolvedExecutable?.path ?? this.opts.executablePath;
+      const executableVersion =
+        resolvedExecutable !== null ? resolvedExecutable.version : this.opts.executableVersion;
+      const managedMcp = opts.mcpServers !== undefined;
+      const hostTools = buildHostTools({
+        remoteTools: opts.remoteTools ?? [],
+        ...(opts.executeRemoteTool ? { relay: opts.executeRemoteTool } : {}),
+        localTools: opts.localTools ?? [],
+      });
+      const mcpServers: Record<string, McpServerConfig> = {};
+      if (hostTools.length > 0) {
+        mcpServers[HOST_MCP_SERVER_NAME] = createHostMcpServer(hostTools);
+      }
+      for (const endpoint of opts.mcpServers ?? []) {
+        if (endpoint.slug === HOST_MCP_SERVER_NAME) {
+          throw new Error(
+            `claude-code backend: mcp server slug '${endpoint.slug}' collides with the host tool server (fail-closed)`,
+          );
+        }
+        mcpServers[endpoint.slug] = mapMcpEndpoint(endpoint);
+      }
+      const effort = toEffort(opts.thinkingLevel);
+      const append = opts.systemPrompt;
+      const disallowedTools = [SDK_ASK_TOOL, ...(opts.readOnly === true ? SDK_WRITE_TOOLS : [])];
+      const abort = new AbortController();
+      const sessionProcess: SessionProcess = { child: null, marker: randomUUID() };
+      const sessionId = resumeId ?? randomUUID();
+      const deniedSkills = collectDeniedSkillDirs(this.opts.skills, opts);
+      const skillDenyRules = buildSkillDenyRules(deniedSkills);
+      if (deniedSkills.length > 0) {
+        this.opts.onSkillsLog?.(`deny: ${deniedSkills.length} skill dir(s) hard-blocked`);
+      }
+      const nativePluginDir = resolveTeamSkillsPluginDir({
+        skills: this.opts.skills,
+        cacheRoot: this.opts.teamSkillsCacheDir,
+        executableVersion,
+        session: opts,
+        ...(this.opts.onSkillsLog !== undefined ? { log: this.opts.onSkillsLog } : {}),
+      });
+      const deferredTools = (opts.remoteTools ?? []).some((def) => def.deferred === true);
+      const sessionEnv = claudeSessionEnv(opts);
+      const mergedEnv =
+        sessionEnv === undefined && !deferredTools
+          ? undefined
+          : { ...(sessionEnv ?? {}), ...(deferredTools ? { ENABLE_TOOL_SEARCH: 'true' } : {}) };
+      const sdkOptions: Options = buildClaudeSdkOptions({
         cwd: opts.cwd,
-        configEnv: claudeSessionConfigEnv(opts.env),
-        state,
-        abort,
-        input,
-        process: sessionProcess,
-        timeouts: { ...SETTLE_TIMEOUTS, ...this.opts.settleTimeouts },
-        ...(opts.onClaudeRateLimit !== undefined
-          ? { onClaudeRateLimit: opts.onClaudeRateLimit }
+        modelId: opts.modelId,
+        resumeId,
+        sessionId,
+        disallowedTools,
+        inOrb: this.opts.inOrb === true,
+        lockedDown: opts.lockedDown === true,
+        ...(opts.remoteToolsOnly === true
+          ? { builtinTools: deferredTools ? [TOOL_SEARCH_BUILTIN] : [] }
           : {}),
-      },
-      spans,
-      capture,
-    );
+        deferredTools,
+        mcpServers,
+        ...(managedMcp ? { strictMcpConfig: true } : {}),
+        ...(effort !== undefined ? { effort } : {}),
+        ...(append !== undefined ? { append } : {}),
+        skillDenyRules,
+        ...(executablePath !== undefined ? { executablePath } : {}),
+        ...(mergedEnv !== undefined ? { env: mergedEnv } : {}),
+        ...(opts.compactAt !== undefined ? { compactAt: opts.compactAt } : {}),
+        ...(nativePluginDir !== null && opts.remoteToolsOnly !== true
+          ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
+          : {}),
+        ...(this.opts.confine !== undefined
+          ? {
+              confine: (launch: Launch) =>
+                (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch, {
+                  readable: stepCredentialStateDirs(opts.env),
+                }),
+            }
+          : {}),
+        abortController: abort,
+        process: sessionProcess,
+      });
+      const state = createClaudeMapState({ modelId: opts.modelId, resumed: resumeId !== null });
+      const input = new AsyncQueue<SDKUserMessage>();
+      if (opts.prompt !== undefined)
+        input.push({ ...buildUserMessage(opts.prompt, opts.promptImages), uuid: randomUUID() });
+      const redact = stepCredentialRedactor(
+        opts.secrets,
+        sessionEnv?.CLAUDE_CODE_OAUTH_TOKEN ?? sdkOptions.env?.CLAUDE_CODE_OAUTH_TOKEN,
+        sdkOptions.env?.ANTHROPIC_API_KEY,
+        sdkOptions.env?.ANTHROPIC_AUTH_TOKEN,
+      );
+      const spans =
+        opts.telemetry !== undefined
+          ? new PiStepSpanSink(
+              opts.telemetry,
+              { provider: opts.provider.providerId, model: opts.modelId },
+              undefined,
+              redact,
+            )
+          : undefined;
+      const capture = spans === undefined ? undefined : await captureClaudeTelemetry(spans, redact);
+      if (capture !== undefined) {
+        sdkOptions.env = { ...sdkOptions.env, ...capture.env };
+        sdkOptions.settings = {
+          ...(typeof sdkOptions.settings === 'object' ? sdkOptions.settings : {}),
+          env: { ...claudeCliEnv({}), ...capture.env },
+        };
+      }
+      let q: Query;
+      try {
+        q = query({ prompt: input.iterable(), options: sdkOptions });
+      } catch (error) {
+        await capture?.close();
+        throw error;
+      }
+      handoffLease = true;
+      return new ClaudeSessionHandle(
+        q,
+        {
+          sessionId,
+          cwd: opts.cwd,
+          configEnv: claudeSessionConfigEnv(opts.env),
+          state,
+          abort,
+          input,
+          process: sessionProcess,
+          timeouts: { ...SETTLE_TIMEOUTS, ...this.opts.settleTimeouts },
+          ...(opts.onClaudeRateLimit !== undefined
+            ? { onClaudeRateLimit: opts.onClaudeRateLimit }
+            : {}),
+          ...(releaseExecutable !== undefined ? { onRelease: releaseExecutable } : {}),
+        },
+        spans,
+        capture,
+      );
+    } finally {
+      if (!handoffLease) releaseExecutable?.();
+    }
   }
 }
 

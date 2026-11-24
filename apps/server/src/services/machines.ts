@@ -892,13 +892,37 @@ export function markPresence(
     };
   });
   notifyRetiredMachines(deps, row.teamId, retiredIds);
+  const runtimeFingerprint = (
+    claude: ClaudeCodeReport | null | undefined,
+    caps: MachineCapabilities | null | undefined,
+  ) =>
+    JSON.stringify([
+      claude?.bin?.version ?? null,
+      claude?.update ?? null,
+      caps?.devin?.version ?? null,
+      caps?.devin?.update ?? null,
+      caps?.gemini ?? null,
+    ]);
+  const runtimeUpdateChanged =
+    runtimeFingerprint(row.claudeCodeReport, row.capabilities) !==
+    runtimeFingerprint(
+      body.claudeCode !== undefined ? body.claudeCode : row.claudeCodeReport,
+      merged !== undefined ? merged : row.capabilities,
+    );
   const strainChanged =
     merged !== undefined &&
     machineStrain(row.capabilities?.hardware).join() !== machineStrain(merged.hardware).join();
   const antigravityChanged =
     merged !== undefined &&
     JSON.stringify(merged.antigravity) !== JSON.stringify(row.capabilities?.antigravity);
-  if (becameOnline || loginChanged || computerChanged || strainChanged || antigravityChanged) {
+  if (
+    becameOnline ||
+    loginChanged ||
+    computerChanged ||
+    strainChanged ||
+    antigravityChanged ||
+    runtimeUpdateChanged
+  ) {
     const online = admitOnline || row.online;
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
   }

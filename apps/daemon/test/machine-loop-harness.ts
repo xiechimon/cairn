@@ -282,6 +282,7 @@ function handle(sessionId: string, events: StepEvent[]): AgentSessionHandle {
 }
 
 export interface BootOpts {
+  home?: string;
   api?: FakeMachineApi;
   backend?: AgentBackend;
   useDefaultBackend?: boolean;
@@ -307,14 +308,50 @@ export interface BootOpts {
   confinementRecheckMs?: number;
   strandedUploadReplayMs?: number;
   strandedUploadMinAgeMs?: number;
-  devinManaged?: import('../src/backend/devin-managed.js').DevinManaged;
+  claudeManaged?: import('../src/backend/managed-runtime.js').ManagedRuntime;
+  devinManaged?: import('../src/backend/managed-runtime.js').ManagedRuntime;
+  geminiManaged?: import('../src/backend/managed-runtime.js').ManagedRuntime;
   antigravityManaged?: import('../src/backend/antigravity-managed.js').AntigravityManaged;
+  updateChecksEnabled?: () => boolean;
+  updateCheckIntervalMs?: number;
   otel?: import('../src/backend/otel.js').DaemonOtel | null;
   heartbeatIntervalMs?: number;
 }
 
+export function stubManagedRuntime(
+  overrides: Partial<import('../src/backend/managed-runtime.js').ManagedRuntime> = {},
+): import('../src/backend/managed-runtime.js').ManagedRuntime {
+  const current = overrides.current ?? (() => null);
+  return {
+    current,
+    acquire:
+      overrides.acquire ??
+      (() => {
+        const install = current();
+        return install === null ? null : { ...install, release: () => {} };
+      }),
+    status:
+      overrides.status ??
+      (() => ({
+        installedVersion: current()?.version ?? null,
+        availableVersion: null,
+        phase: 'idle' as const,
+      })),
+    ensure: overrides.ensure ?? (async () => null),
+    checkForUpdate:
+      overrides.checkForUpdate ??
+      (async () => ({
+        installedVersion: current()?.version ?? null,
+        availableVersion: null,
+        phase: 'idle' as const,
+      })),
+    update: overrides.update ?? (async () => current()),
+  };
+}
+
 export function startMachine(opts: BootOpts) {
-  const home = makeTestTempDir('loop-');
+  const ownsHome = opts.home === undefined;
+  const home = opts.home ?? makeTestTempDir('loop-');
   process.env.CAIRN_AGENT_IMPORT_HOME = join(home, 'import-source');
   try {
     const { logger, lines } = captureLogger();
@@ -392,7 +429,13 @@ export function startMachine(opts: BootOpts) {
       ...(opts.orbProvider !== undefined ? { orbProvider: opts.orbProvider } : {}),
       ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
       ...(opts.orbComputer !== undefined ? { orbComputer: opts.orbComputer } : {}),
-      devinManaged: opts.devinManaged ?? { current: () => null, ensure: async () => null },
+      ...(opts.claudeManaged !== undefined ? { claudeManaged: opts.claudeManaged } : {}),
+      devinManaged: opts.devinManaged ?? stubManagedRuntime(),
+      geminiManaged: opts.geminiManaged ?? stubManagedRuntime(),
+      updateChecksEnabled: opts.updateChecksEnabled ?? (() => false),
+      ...(opts.updateCheckIntervalMs !== undefined
+        ? { updateCheckIntervalMs: opts.updateCheckIntervalMs }
+        : {}),
       antigravityManaged: opts.antigravityManaged ?? {
         current: () => null,
         ensure: async () => null,
@@ -400,9 +443,9 @@ export function startMachine(opts: BootOpts) {
       },
       ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
     });
-    return { handlePromise, api, lines, paths, home };
+    return { handlePromise, api, lines, paths, home, ownsHome };
   } catch (error) {
-    releaseTestTempDir(home);
+    if (ownsHome) releaseTestTempDir(home);
     throw error;
   }
 }
@@ -413,7 +456,7 @@ export async function boot(opts: BootOpts) {
   try {
     handle = await started.handlePromise;
   } catch (error) {
-    releaseTestTempDir(started.home);
+    if (started.ownsHome) releaseTestTempDir(started.home);
     throw error;
   }
   onTestFinished(async () => {
@@ -421,7 +464,7 @@ export async function boot(opts: BootOpts) {
       await handle.stop();
       await handle.done;
     } finally {
-      releaseTestTempDir(started.home);
+      if (started.ownsHome) releaseTestTempDir(started.home);
     }
   });
   return {

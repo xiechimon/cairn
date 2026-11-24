@@ -1,4 +1,7 @@
 import {
+  compareManagedVersions,
+  isNewerManagedVersion,
+  type ManagedUpdateRuntime,
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSource,
   type ModelSourceModel,
@@ -319,6 +322,54 @@ const SUBSCRIPTION_RUNTIME: Partial<Record<AccountVendor, ModelSourceRuntime>> =
   devin: 'devin',
   antigravity: 'antigravity',
 };
+
+export interface RuntimeUpdateSummary {
+  runtime: ManagedUpdateRuntime;
+  installedVersion: string | null;
+  availableVersion: string | null;
+  phase: 'idle' | 'updating' | 'failed';
+}
+
+export function runtimeUpdateSummary(
+  sources: readonly ModelSource[],
+  runtime: ManagedUpdateRuntime,
+): RuntimeUpdateSummary | null {
+  const matching = sources.filter(
+    (source) =>
+      source.runtime === runtime && (source.installed || source.runtimeUpdate !== undefined),
+  );
+  if (matching.length === 0) return null;
+  let installedVersion: string | null = null;
+  let availableVersion: string | null = null;
+  let phase: 'idle' | 'updating' | 'failed' = 'idle';
+  for (const source of matching) {
+    const installed =
+      source.version ?? source.bin?.version ?? source.runtimeUpdate?.installedVersion ?? null;
+    if (
+      installed !== null &&
+      (installedVersion === null || compareManagedVersions(installed, installedVersion) > 0)
+    ) {
+      installedVersion = installed;
+    }
+    const available = source.runtimeUpdate?.availableVersion ?? null;
+    if (
+      available !== null &&
+      (availableVersion === null || compareManagedVersions(available, availableVersion) > 0)
+    ) {
+      availableVersion = available;
+    }
+    if (source.runtimeUpdate?.phase === 'updating') phase = 'updating';
+    else if (source.runtimeUpdate?.phase === 'failed' && phase !== 'updating') phase = 'failed';
+  }
+  if (
+    availableVersion !== null &&
+    installedVersion !== null &&
+    !isNewerManagedVersion(availableVersion, installedVersion)
+  ) {
+    availableVersion = null;
+  }
+  return { runtime, installedVersion, availableVersion, phase };
+}
 
 export function subscriptionModels(
   sources: readonly ModelSource[],
@@ -675,6 +726,8 @@ function VerifyResultPopover({
 
 export interface SubscriptionActions {
   onVerify?: () => void;
+  onUpdateRuntime?: () => void;
+  updatingRuntime?: boolean;
   onRename?: (label: string) => void;
   onRemove: () => void;
   onPickUpstream?: (opener: HTMLButtonElement) => void;
@@ -716,6 +769,7 @@ export function SubscriptionDetail({
   now,
   view,
   verification,
+  runtimeUpdate,
   actions,
   relogin,
 }: {
@@ -724,6 +778,7 @@ export function SubscriptionDetail({
   now: number;
   view: SubscriptionStatusView;
   verification: Verification | undefined;
+  runtimeUpdate?: RuntimeUpdateSummary | null;
   actions: SubscriptionActions;
   relogin?: ReactNode;
 }) {
@@ -750,6 +805,13 @@ export function SubscriptionDetail({
   const runtimeLabel =
     runtime === undefined ? VENDORS[account.vendor].label : MODEL_SOURCE_RUNTIME_LABELS[runtime];
   const verifying = verification?.phase === 'verifying';
+  const runtimeUpdating = actions.updatingRuntime === true || runtimeUpdate?.phase === 'updating';
+  const showRuntimeUpdate =
+    actions.onUpdateRuntime !== undefined &&
+    runtimeUpdate != null &&
+    (runtimeUpdate.availableVersion !== null ||
+      runtimeUpdating ||
+      runtimeUpdate.phase === 'failed');
   return (
     <div
       data-testid="subscription-detail"
@@ -760,6 +822,7 @@ export function SubscriptionDetail({
       <ProviderEditorHead
         Mark={VENDORS[account.vendor].Mark}
         name={account.label}
+        version={runtimeUpdate?.installedVersion ?? null}
         kind={[
           t('订阅'),
           ...(account.plan === null ? [] : [account.plan]),
@@ -769,20 +832,55 @@ export function SubscriptionDetail({
         ].join(' · ')}
         {...(actions.onRename === undefined ? {} : { onRename: actions.onRename })}
         aside={
-          actions.onVerify !== undefined && (
-            <Button
-              ref={setVerifyEl}
-              variant="outline"
-              size="sm"
-              data-testid="subscription-verify"
-              disabled={verifying}
-              onClick={actions.onVerify}
-            >
-              {t('验证')}
-            </Button>
+          (showRuntimeUpdate || actions.onVerify !== undefined) && (
+            <span className="flex items-center gap-2">
+              {showRuntimeUpdate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="runtime-update"
+                  disabled={runtimeUpdating}
+                  aria-label={
+                    runtimeUpdate.availableVersion !== null
+                      ? t('更新到 {version}', { version: `v${runtimeUpdate.availableVersion}` })
+                      : t('更新')
+                  }
+                  onClick={actions.onUpdateRuntime}
+                >
+                  {runtimeUpdating ? t('更新中…') : t('更新')}
+                </Button>
+              )}
+              {actions.onVerify !== undefined && (
+                <Button
+                  ref={setVerifyEl}
+                  variant="outline"
+                  size="sm"
+                  data-testid="subscription-verify"
+                  disabled={verifying}
+                  onClick={actions.onVerify}
+                >
+                  {t('验证')}
+                </Button>
+              )}
+            </span>
           )
         }
       />
+      {showRuntimeUpdate && (
+        <p
+          data-testid="runtime-update-status"
+          className={cn(
+            '-mt-3 m-0 text-meta tabular-nums',
+            runtimeUpdate.phase === 'failed' ? 'text-destructive' : 'text-content-tertiary',
+          )}
+        >
+          {runtimeUpdating
+            ? t('正在后台下载并验证新版本，运行中的会话不受影响。')
+            : runtimeUpdate.phase === 'failed'
+              ? t('更新未能通过验证，仍在使用当前版本。')
+              : t('有新版本 v{version} 可用', { version: runtimeUpdate.availableVersion ?? '' })}
+        </p>
+      )}
       {(view.label !== null || view.reason !== null) && (
         <div className="-mt-3 flex flex-col gap-1">
           {view.label !== null && (

@@ -19,8 +19,10 @@ import {
   ENV_VARS,
   isBackendRuntimeId,
   MACHINE_ORB_CONVERSATIONS_LIMIT,
+  type ManagedUpdateRuntime,
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
+  type RuntimeUpdateStatus,
   sleep,
 } from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
@@ -44,12 +46,16 @@ import { serverPortOf } from './backend/confine.js';
 import { createSessionConfiner, type Launch } from './backend/confine-session.js';
 import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
-import { createDevinManaged, type DevinManaged } from './backend/devin-managed.js';
-import { createGeminiManaged, type GeminiManaged } from './backend/gemini-managed.js';
 import { createHostShellConfinement } from './backend/host-shell-confinement.js';
+import type { ManagedRuntime } from './backend/managed-runtime.js';
 import { type DaemonOtel, daemonOtelFromEnv } from './backend/otel.js';
 import { createPiBackend, piSessionPolicyLine } from './backend/pi.js';
 import { backfillRepositoryCaches } from './backend/repo-cache-backfill.js';
+import {
+  createClaudeManaged,
+  createDevinManaged,
+  createGeminiManaged,
+} from './backend/runtime-channels.js';
 import {
   type ClaudeCodeAuthProbe,
   probeClaudeCodeAuth,
@@ -124,9 +130,12 @@ export interface MachineLoopOpts {
   backend?: AgentBackend;
   claudeCodeBackend?: AgentBackend;
   geminiBackend?: AgentBackend;
-  devinManaged?: DevinManaged;
+  claudeManaged?: ManagedRuntime;
+  devinManaged?: ManagedRuntime;
   antigravityManaged?: AntigravityManaged;
-  geminiManaged?: GeminiManaged;
+  geminiManaged?: ManagedRuntime;
+  updateChecksEnabled?: () => boolean;
+  updateCheckIntervalMs?: number;
   claudeCodeAuthProbe?: () => Promise<ClaudeCodeAuthProbe>;
   readClaudeOauthExpiresAt?: () => number | null;
   capabilitiesProbe?: () => MachineCapabilities;
@@ -250,12 +259,71 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const platformOverride =
     opts.capEnv?.[ENV_VARS.confinementPlatform] ?? process.env[ENV_VARS.confinementPlatform];
   const platform = opts.confinementPlatform ?? platformOverride ?? process.platform;
-  let claudeBin: ClaudeBinInfo | null = platform === 'darwin' ? await probeClaudeBin() : null;
+  let claudeSeed: ClaudeBinInfo | null = platform === 'darwin' ? await probeClaudeBin() : null;
   let availability: ConfinementAvailability | undefined;
   let claudeAuth: ClaudeCodeAuthProbe | null = null;
   let claudeLogin: ClaudeLogin | null = null;
   let loginProbe: Promise<ClaudeCodeAuthProbe> | null = null;
   const claudeHome = claudeConfigHome(paths.home);
+  let sendPresenceNow: (() => Promise<void>) | null = null;
+  const installStop = new AbortController();
+  const installFetch: typeof fetch = (url, init) =>
+    fetch(url, {
+      ...init,
+      signal: AbortSignal.any(
+        init?.signal != null ? [init.signal, installStop.signal] : [installStop.signal],
+      ),
+    });
+  const pendingInstalls = new Set<Promise<unknown>>();
+  const trackInstall = <T>(install: Promise<T>): Promise<T> => {
+    pendingInstalls.add(
+      install.then(
+        () => {},
+        () => {},
+      ),
+    );
+    return install;
+  };
+  const reportableUpdate = (status: RuntimeUpdateStatus): RuntimeUpdateStatus | undefined =>
+    status.availableVersion != null || status.phase === 'updating' || status.phase === 'failed'
+      ? status
+      : undefined;
+  const claudeManaged =
+    opts.claudeManaged ??
+    createClaudeManaged({
+      root: toolInstallRoot(paths.home, 'claude'),
+      log: (line) => logger.machine(line),
+      fetchImpl: installFetch,
+      ...(opts.updateChecksEnabled !== undefined
+        ? { updateChecksEnabled: opts.updateChecksEnabled }
+        : {}),
+      ...(opts.updateCheckIntervalMs !== undefined
+        ? { checkIntervalMs: opts.updateCheckIntervalMs }
+        : {}),
+      onChange: () => void sendPresenceNow?.(),
+      resolveSeed: () =>
+        claudeSeed === null
+          ? null
+          : {
+              version: claudeSeed.version,
+              command: claudeSeed.path,
+              args: [],
+              binPath: claudeSeed.path,
+              source: claudeSeed.source === 'override' ? 'override' : 'bundled',
+            },
+    });
+  const activeClaudeBin = (): ClaudeBinInfo | null => {
+    if (platform !== 'darwin' && !availability?.ready && opts.claudeManaged === undefined) {
+      return null;
+    }
+    const active = claudeManaged.current();
+    if (active === null) return null;
+    return {
+      path: active.binPath,
+      version: active.version !== '' ? active.version : null,
+      source: active.source,
+    };
+  };
   const readExpiresAt =
     opts.readClaudeOauthExpiresAt ?? (() => readDefaultClaudeOauthExpiresAt(claudeHome));
   const probeAuthAndRemember = (): Promise<ClaudeCodeAuthProbe> => {
@@ -263,10 +331,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       return Promise.resolve({ state: 'unknown', reason: 'confinement unavailable' });
     if (loginProbe) return loginProbe;
     const pending = (async () => {
+      const currentClaude = activeClaudeBin();
       const probe = await (
         opts.claudeCodeAuthProbe ??
         (() =>
           probeClaudeCodeAuth({
+            ...(currentClaude !== null ? { command: currentClaude.path } : {}),
             env: { ...process.env, CLAUDE_CONFIG_DIR: claudeHome },
           }))
       )();
@@ -285,12 +355,15 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
     return loginProbe;
   };
-  const claudeReport = () =>
-    readClaudeCodeReport(claudeHome, {
-      bin: claudeBin,
+  const claudeReport = () => {
+    const update = reportableUpdate(claudeManaged.status());
+    return readClaudeCodeReport(claudeHome, {
+      bin: activeClaudeBin(),
       ...(claudeAuth !== null ? { auth: claudeAuth } : {}),
       ...(claudeLogin !== null ? { login: claudeLogin } : {}),
+      ...(update !== undefined ? { update } : {}),
     });
+  };
 
   if (platform === 'darwin') await probeAuthAndRemember();
 
@@ -362,24 +435,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const orbComputer = opts.orbComputer ?? hostDesktops;
   const agentReach = new AgentReachProbe(undefined, undefined, () => agentReachEnabled(paths.home));
   const scrapling = new ScraplingProbe(() => readScrapling(paths.home));
-  const installStop = new AbortController();
-  const installFetch: typeof fetch = (url, init) =>
-    fetch(url, {
-      ...init,
-      signal: AbortSignal.any(
-        init?.signal != null ? [init.signal, installStop.signal] : [installStop.signal],
-      ),
-    });
-  const pendingInstalls = new Set<Promise<unknown>>();
-  const trackInstall = <T>(install: Promise<T>): Promise<T> => {
-    pendingInstalls.add(
-      install.then(
-        () => {},
-        () => {},
-      ),
-    );
-    return install;
-  };
   const devinManaged =
     opts.devinManaged ??
     createDevinManaged({
@@ -387,6 +442,13 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       home: runtimeHome(paths.home, 'devin'),
       log: (line) => logger.machine(line),
       fetchImpl: installFetch,
+      ...(opts.updateChecksEnabled !== undefined
+        ? { updateChecksEnabled: opts.updateChecksEnabled }
+        : {}),
+      ...(opts.updateCheckIntervalMs !== undefined
+        ? { checkIntervalMs: opts.updateCheckIntervalMs }
+        : {}),
+      onChange: () => void sendPresenceNow?.(),
     });
   let devinInstalling = false;
   let devinEnsured = false;
@@ -407,8 +469,30 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       root: toolInstallRoot(paths.home, 'gemini'),
       log: (line) => logger.machine(line),
       fetchImpl: installFetch,
+      ...(opts.updateChecksEnabled !== undefined
+        ? { updateChecksEnabled: opts.updateChecksEnabled }
+        : {}),
+      ...(opts.updateCheckIntervalMs !== undefined
+        ? { checkIntervalMs: opts.updateCheckIntervalMs }
+        : {}),
+      onChange: () => void sendPresenceNow?.(),
     });
-  let sendPresenceNow: (() => Promise<void>) | null = null;
+  const managedRuntimes: Record<ManagedUpdateRuntime, ManagedRuntime> = {
+    'claude-code': claudeManaged,
+    devin: devinManaged,
+    gemini: geminiManaged,
+  };
+  const checkRuntimeUpdates = () => {
+    if (!availability?.ready) return;
+    for (const runtime of Object.values(managedRuntimes)) {
+      if (runtime.current() === null) continue;
+      void trackInstall(runtime.checkForUpdate()).catch((error: unknown) => {
+        logger.machine(
+          `runtime update check failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    }
+  };
   const phones = createPhones({
     home: paths.home,
     log: (msg) => logger.machine(msg),
@@ -439,13 +523,30 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       codexLogin: readCodexLogin(paths.agentRuntimeDir),
       devin: (() => {
         const install = devinManaged.current();
+        const update = reportableUpdate(devinManaged.status());
         return install === null
-          ? { installed: false }
+          ? { installed: false, ...(update !== undefined ? { update } : {}) }
           : {
               installed: true,
               version: install.version,
               ...(devinModels.length > 0 ? { models: devinModels } : {}),
+              ...(update !== undefined ? { update } : {}),
             };
+      })(),
+      ...(() => {
+        const install = geminiManaged.current();
+        const update = reportableUpdate(geminiManaged.status());
+        if (install === null && update === undefined) return {};
+        return {
+          gemini:
+            install === null
+              ? { installed: false, ...(update !== undefined ? { update } : {}) }
+              : {
+                  installed: true,
+                  version: install.version,
+                  ...(update !== undefined ? { update } : {}),
+                },
+        };
       })(),
       antigravity: (() => {
         const install = antigravityManaged.current();
@@ -537,8 +638,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       }
       devinBackend ??= createAcpBackend({
         harness: 'devin',
-        command: install.binPath,
+        command: install.command,
         args: install.args,
+        resolveLaunch: () => {
+          const lease = devinManaged.acquire();
+          return lease === null
+            ? null
+            : { command: lease.command, args: lease.args, release: lease.release };
+        },
         permissions: 'allow-once',
         steering: 'mid-turn',
         sessionResume: true,
@@ -592,6 +699,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         geminiBackend = createGeminiBackend({
           executablePath: install.command,
           executableArgs: install.args,
+          resolveLaunch: () => {
+            const lease = geminiManaged.acquire();
+            return lease === null
+              ? null
+              : { command: lease.command, args: lease.args, release: lease.release };
+          },
           gate: { log: (msg) => logger.gate(msg) },
           skills: { skillsDir: config.skillsDir, cwd: config.home },
           onSkillsLog: (msg) => logger.skills(msg),
@@ -632,10 +745,18 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       claudeBackend = createClaudeCodeBackend({
         skills: { skillsDir: config.skillsDir, cwd: config.home },
         onSkillsLog: (msg) => logger.skills(msg),
-        ...(claudeBin !== null ? { executablePath: claudeBin.path } : {}),
+        resolveExecutable: () => {
+          const lease = claudeManaged.acquire();
+          return lease === null
+            ? null
+            : {
+                path: lease.binPath,
+                version: lease.version !== '' ? lease.version : null,
+                release: lease.release,
+              };
+        },
         ...(confine !== null ? { confine } : {}),
         teamSkillsCacheDir: paths.teamSkillsCacheDir,
-        ...(claudeBin !== null ? { executableVersion: claudeBin.version } : {}),
       });
     }
     return claudeBackend;
@@ -817,7 +938,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   sendPresenceNow = () => presenceReporter.send();
   const probeHarnesses = async () => {
     if (!availability?.ready) return;
-    if (platform !== 'darwin') claudeBin = await probeClaudeBin();
+    if (platform !== 'darwin') claudeSeed = await probeClaudeBin();
+    const claudeBin = activeClaudeBin();
     logger.machine(
       claudeBin
         ? `claude binary: ${claudeBin.path}${claudeBin.version !== null ? ` (${claudeBin.version})` : ''} [${claudeBin.source}]`
@@ -825,6 +947,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     );
 
     if (claudeAuth === null) await probeAuthAndRemember();
+    checkRuntimeUpdates();
   };
   try {
     for (let backoff = opts.claimBackoffBaseMs ?? 1_000; ; backoff = nextBackoffMs(backoff)) {
@@ -1358,6 +1481,14 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
+            if (ev.type === 'runtime.update') {
+              const runtime = managedRuntimes[ev.runtime];
+              void trackInstall(runtime.update()).catch((error: unknown) => {
+                logger.machine(
+                  `${ev.runtime} update failed: ${error instanceof Error ? error.message : String(error)}`,
+                );
+              });
+            }
             if (ev.type === 'im.attach' || ev.type === 'im.detach' || ev.type === 'im.send') {
               imsgBridge.handle(ev);
             }
@@ -1446,6 +1577,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         })
         .catch(() => {});
     }
+    checkRuntimeUpdates();
     void probeAuthAndRemember()
       .then(() => presenceReporter.send())
       .catch((err: unknown) => {

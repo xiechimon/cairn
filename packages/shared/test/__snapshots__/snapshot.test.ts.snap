@@ -2680,6 +2680,44 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
           },
           "type": "array",
         },
+        "update": {
+          "additionalProperties": false,
+          "properties": {
+            "availableVersion": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "installedVersion": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "phase": {
+              "enum": [
+                "idle",
+                "updating",
+                "failed",
+              ],
+              "type": "string",
+            },
+          },
+          "type": "object",
+        },
       },
       "required": [
         "installed",
@@ -2925,6 +2963,44 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
             "type": "object",
           },
           "type": "array",
+        },
+        "update": {
+          "additionalProperties": false,
+          "properties": {
+            "availableVersion": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "installedVersion": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
+            "phase": {
+              "enum": [
+                "idle",
+                "updating",
+                "failed",
+              ],
+              "type": "string",
+            },
+          },
+          "type": "object",
         },
       },
       "required": [
@@ -3519,6 +3595,28 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
       "required": [
         "type",
         "channel",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "runtime": {
+          "enum": [
+            "claude-code",
+            "devin",
+            "gemini",
+          ],
+          "type": "string",
+        },
+        "type": {
+          "const": "runtime.update",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "runtime",
       ],
       "type": "object",
     },
@@ -12963,6 +13061,44 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                   },
                   "type": "array",
                 },
+                "update": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "availableVersion": {
+                      "anyOf": [
+                        {
+                          "maxLength": 64,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "installedVersion": {
+                      "anyOf": [
+                        {
+                          "maxLength": 64,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "phase": {
+                      "enum": [
+                        "idle",
+                        "updating",
+                        "failed",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
                 "version": {
                   "maxLength": 64,
                   "minLength": 1,
@@ -12980,6 +13116,61 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "host",
               ],
               "type": "string",
+            },
+            "gemini": {
+              "additionalProperties": false,
+              "properties": {
+                "installed": {
+                  "type": "boolean",
+                },
+                "update": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "availableVersion": {
+                      "anyOf": [
+                        {
+                          "maxLength": 64,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "installedVersion": {
+                      "anyOf": [
+                        {
+                          "maxLength": 64,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        {
+                          "type": "null",
+                        },
+                      ],
+                    },
+                    "phase": {
+                      "enum": [
+                        "idle",
+                        "updating",
+                        "failed",
+                      ],
+                      "type": "string",
+                    },
+                  },
+                  "type": "object",
+                },
+                "version": {
+                  "maxLength": 64,
+                  "minLength": 1,
+                  "type": "string",
+                },
+              },
+              "required": [
+                "installed",
+              ],
+              "type": "object",
             },
             "hardware": {
               "additionalProperties": false,

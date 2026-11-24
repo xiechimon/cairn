@@ -187,6 +187,8 @@ export function listClaudeCodeSources(db: Db, teamId: string): ModelSourcesEnvel
             };
           }),
           ...(report.bin !== undefined ? { bin: report.bin } : {}),
+          ...(report.bin?.version != null ? { version: report.bin.version } : {}),
+          ...(report.update !== undefined ? { runtimeUpdate: report.update } : {}),
         },
       ];
     });
@@ -253,7 +255,37 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
     hostname: row.name,
     machineId: row.id,
     models: models.map((model) => ({ ...model })),
+    ...(row.capabilities?.devin?.version !== undefined
+      ? { version: row.capabilities.devin.version }
+      : {}),
+    ...(row.capabilities?.devin?.update !== undefined
+      ? { runtimeUpdate: row.capabilities.devin.update }
+      : {}),
   }));
+}
+
+export function listGeminiSources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
+  return db
+    .select()
+    .from(machine)
+    .where(eq(machine.teamId, teamId))
+    .orderBy(asc(machine.name))
+    .all()
+    .flatMap((row) => {
+      const gemini = row.capabilities?.gemini;
+      if (gemini === undefined || (!gemini.installed && gemini.update === undefined)) return [];
+      return [
+        {
+          runtime: 'gemini' as const,
+          installed: gemini.installed,
+          hostname: row.name,
+          machineId: row.id,
+          models: [],
+          ...(gemini.version !== undefined ? { version: gemini.version } : {}),
+          ...(gemini.update !== undefined ? { runtimeUpdate: gemini.update } : {}),
+        },
+      ];
+    });
 }
 
 export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
@@ -394,6 +426,7 @@ export function getModelSources(deps: ProviderDeps, teamId: string): ModelSource
           : [{ runtime: 'pi' as const, installed: true, hostname: hostname(), models: [] }]),
         ...listClaudeCodeSources(deps.db, teamId),
         ...listDevinSources(deps.db, teamId),
+        ...listGeminiSources(deps.db, teamId),
         ...listAntigravitySources(deps.db, teamId),
       ],
       keysOf,

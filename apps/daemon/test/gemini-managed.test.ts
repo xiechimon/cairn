@@ -4,7 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { createGeminiManaged } from '../src/backend/gemini-managed.js';
+import { createGeminiManaged } from '../src/backend/runtime-channels.js';
 
 const tempDirs: string[] = [];
 function tempDir(prefix: string): string {
@@ -27,7 +27,10 @@ const REGISTRY_BODY = {
   ],
 };
 
-function makeTarball(dir: string, body = '// gemini bundle\n'): Buffer {
+function makeTarball(
+  dir: string,
+  body = 'if (process.argv.includes("--version")) { console.log("0.70.0"); process.exit(0); }\n',
+): Buffer {
   const src = join(dir, 'pkg-src');
   mkdirSync(join(src, 'package', 'bundle'), { recursive: true });
   writeFileSync(join(src, 'package', 'bundle', 'gemini.js'), body);
@@ -71,12 +74,13 @@ describe('gemini managed install', () => {
     const tarball = makeTarball(dir);
     const managed = createGeminiManaged({
       root: join(dir, 'tools'),
-      nodePath: '/usr/local/bin/node',
+      nodePath: process.execPath,
+      tarballHost: 'example.invalid',
       fetchImpl: fetchFor(tarball),
     });
     const install = await managed.ensure();
     expect(install?.version).toBe('0.70.0');
-    expect(install?.command).toBe('/usr/local/bin/node');
+    expect(install?.command).toBe(process.execPath);
     expect(install?.args[0]).toBe(join(dir, 'tools', 'versions', '0.70.0', 'bundle', 'gemini.js'));
     expect(install?.args[1]).toBe('--acp');
     expect(managed.current()).toEqual(install);
@@ -128,7 +132,11 @@ describe('gemini managed install', () => {
   test('a tampered bundle fails the marker checksum and is not launched', async () => {
     const dir = tempDir('gm-tamper-');
     const tarball = makeTarball(dir);
-    const managed = createGeminiManaged({ root: join(dir, 'tools'), fetchImpl: fetchFor(tarball) });
+    const managed = createGeminiManaged({
+      root: join(dir, 'tools'),
+      tarballHost: 'example.invalid',
+      fetchImpl: fetchFor(tarball),
+    });
     await managed.ensure();
     const bundle = join(dir, 'tools', 'versions', '0.70.0', 'bundle', 'gemini.js');
     writeFileSync(bundle, '// tampered\n');
@@ -166,6 +174,7 @@ describe('gemini managed install', () => {
     const fetched: string[] = [];
     const managed = createGeminiManaged({
       root: join(dir, 'tools'),
+      tarballHost: 'example.invalid',
       fetchImpl: async (url) => {
         fetched.push(String(url));
         return fetchFor(tarball, 'http://example.invalid/g.tgz')(url);
@@ -175,9 +184,36 @@ describe('gemini managed install', () => {
     expect(fetched.some((url) => url === 'http://example.invalid/g.tgz')).toBe(false);
   });
 
+  test('rejects an untrusted npm package name or tarball host', async () => {
+    const dir = tempDir('gm-untrusted-');
+    const tarball = makeTarball(dir);
+    const evilPkg = createGeminiManaged({
+      root: join(dir, 'tools-pkg'),
+      tarballHost: 'example.invalid',
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            agents: [
+              {
+                id: 'gemini',
+                distribution: { npx: { package: '@evil/gemini-cli@9.9.9', args: ['--yolo'] } },
+              },
+            ],
+          }),
+        ),
+    });
+    expect(await evilPkg.ensure()).toBeNull();
+
+    const evilHost = createGeminiManaged({
+      root: join(dir, 'tools-host'),
+      fetchImpl: fetchFor(tarball, 'https://evil.example/g.tgz'),
+    });
+    expect(await evilHost.ensure()).toBeNull();
+  });
+
   test('a live install lock makes ensure() defer to the holder', async () => {
     const dir = tempDir('gm-lock-');
-    mkdirSync(`${join(dir, 'tools')}.lock`, { recursive: true });
+    mkdirSync(join(dir, 'tools', '.install.lock'), { recursive: true });
     let fetched = 0;
     const managed = createGeminiManaged({
       root: join(dir, 'tools'),

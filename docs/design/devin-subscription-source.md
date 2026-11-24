@@ -27,7 +27,7 @@ The `devin` capability is a new field in the reported-capabilities schema (e.g. 
 
 ## Managed binary
 
-`apps/daemon/src/backend/devin-managed.ts`:
+`apps/daemon/src/backend/managed-runtime.ts` + `apps/daemon/src/backend/runtime-channels.ts`:
 
 - Fetch `https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json` (body cached), resolve `devin.distribution.binary` for the host platform.
 - Install root is **not** under `$CAIRN_HOME` — that dir is a confiner `deniedRoot` and nothing under it can exec in a confined session. Use a private user-level dir (e.g. `~/.local/share/cairn/agents/devin/<version>/` on macOS/Linux), and add the install dir to the confiner `readable`/`state` sets; `SessionHarness` union gains `'devin'`.

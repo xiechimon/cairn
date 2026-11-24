@@ -16,6 +16,7 @@ import {
   importSkillBodySchema,
   type MachineRunningThread,
   machineStrain,
+  managedUpdateRuntimeSchema,
   PHASE_VALUES,
   patchMachineBodySchema,
   patchMcpConnectorBodySchema,
@@ -818,6 +819,27 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     refreshAllRelayCatalogs(keysvc, teamId).catch(() => {});
     return c.json(getModelSources(keysvc, teamId));
+  });
+
+  app.post('/api/teams/:id/providers/runtimes/:runtime/update', (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'update managed agent runtimes');
+    const parsed = managedUpdateRuntimeSchema.safeParse(c.req.param('runtime'));
+    if (!parsed.success) throw notFound(`runtime ${c.req.param('runtime')}`);
+    const onlineMachines = ctx.db
+      .select({ id: machine.id })
+      .from(machine)
+      .where(and(eq(machine.teamId, teamId), eq(machine.online, true), isNull(machine.retiredAt)))
+      .all();
+    const pushed: string[] = [];
+    for (const row of onlineMachines) {
+      if (ctx.machineHub.pushRuntimeUpdate(row.id, parsed.data)) pushed.push(row.id);
+    }
+    if (pushed.length === 0) {
+      throw new HttpError(409, 'No online machine is connected to update this runtime');
+    }
+    return c.json({ ok: true, machines: pushed });
   });
 
   app.post('/api/teams/:id/providers', async (c) => {

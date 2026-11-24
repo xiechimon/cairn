@@ -3,17 +3,17 @@ import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { createDevinManaged } from '../src/backend/devin-managed.js';
+import { createDevinManaged } from '../src/backend/runtime-channels.js';
 
 const roots: string[] = [];
 
-function workspace() {
+function workspace(version = '3000.0.2') {
   const dir = makeTestTempDir('cairn-devin-managed-');
   roots.push(dir);
   const pkg = join(dir, 'pkg', 'bin');
   mkdirSync(pkg, { recursive: true });
   const bin = join(pkg, 'devin');
-  writeFileSync(bin, '#!/bin/sh\necho devin\n', { mode: 0o755 });
+  writeFileSync(bin, `#!/bin/sh\necho "devin ${version} (abc1234)"\n`, { mode: 0o755 });
   const tarball = join(dir, 'devin.tar.gz');
   execFileSync('tar', ['-czf', tarball, '-C', join(dir, 'pkg'), '.']);
   return { dir, tarball };
@@ -129,7 +129,7 @@ describe('devin managed install', () => {
   });
 
   test('downloads the manifest entry, verifies and installs into a private root', async () => {
-    const { dir, tarball } = workspace();
+    const { dir, tarball } = workspace('3000.0.1');
     const { createHash } = await import('node:crypto');
     const bytes = new Uint8Array(readFileSync(tarball));
     const sha = createHash('sha256').update(bytes).digest('hex');
@@ -265,7 +265,9 @@ describe('devin managed install', () => {
     const { createHash } = await import('node:crypto');
     const bin = join(dir, 'pkg-clobber', 'bin');
     mkdirSync(bin, { recursive: true });
-    writeFileSync(join(bin, 'devin'), '#!/bin/sh\necho devin\n', { mode: 0o755 });
+    writeFileSync(join(bin, 'devin'), '#!/bin/sh\necho "devin 3000.0.2 (abc1234)"\n', {
+      mode: 0o755,
+    });
     const victim = join(dir, 'victim');
     writeFileSync(victim, 'precious');
     symlinkSync(victim, join(dir, 'pkg-clobber', '.install-complete'));

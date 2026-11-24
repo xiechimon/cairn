@@ -12,12 +12,18 @@ import { describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { createAcpBackend } from '../src/backend/acp.js';
 import { createDevinUpdateNormalizer } from '../src/backend/devin-acp.js';
-import type { DevinManaged } from '../src/backend/devin-managed.js';
+import type { ManagedRuntime } from '../src/backend/managed-runtime.js';
 import { clearCredentials, pushCredential } from '../src/credentials.js';
 import { saveDevinModels } from '../src/state.js';
 import { prepareStepEnv } from '../src/step-env.js';
 import { agentStepRefusal, devinSubscriptionMissingMessage } from '../src/step-preflight.js';
-import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+import {
+  boot,
+  CLAIMED,
+  FakeMachineApi,
+  stubManagedRuntime,
+  waitFor,
+} from './machine-loop-harness.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/acp-agent.mjs', import.meta.url));
 const opts: SessionOpts = {
@@ -292,12 +298,20 @@ describe('devin advertised model catalog', () => {
   function devinInstall(root: string) {
     const home = join(root, 'devin-home');
     mkdirSync(home, { recursive: true });
-    return { version: '1.0.0', binPath: process.execPath, args: [fixture, 'devin'], home };
+    return {
+      version: '1.0.0',
+      command: process.execPath,
+      binPath: process.execPath,
+      args: [fixture, 'devin'],
+      versionDir: null,
+      source: 'managed' as const,
+      home,
+    };
   }
 
-  function fakeDevinManaged(root: string): DevinManaged {
+  function fakeDevinManaged(root: string): ManagedRuntime {
     const install = devinInstall(root);
-    return { current: () => install, ensure: async () => install };
+    return stubManagedRuntime({ current: () => install, ensure: async () => install });
   }
 
   function lastCapabilities(api: FakeMachineApi): MachineCapabilities | undefined {
@@ -348,6 +362,7 @@ describe('devin advertised model catalog', () => {
     const devinRoot = makeTestTempDir('devin-root-');
     try {
       const { handle, paths } = await boot({
+        home: devinRoot,
         api,
         presenceIntervalMs: 50,
         devinManaged: fakeDevinManaged(devinRoot),

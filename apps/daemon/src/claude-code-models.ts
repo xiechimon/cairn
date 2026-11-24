@@ -7,6 +7,7 @@ import {
   type ClaudeLogin,
   DEFAULT_CLAUDE_CODE_MODELS,
   parseClaudeCodeModelSource,
+  type RuntimeUpdateStatus,
 } from '@cairn/shared';
 import type { ClaudeCodeAuthProbe } from './claude-code-auth.js';
 import type { ClaudeBinInfo } from './claude-code-bin.js';
@@ -15,6 +16,7 @@ export interface ClaudeCodeReportExtra {
   bin?: ClaudeBinInfo | null;
   auth?: ClaudeCodeAuthProbe;
   login?: ClaudeLogin;
+  update?: RuntimeUpdateStatus;
 }
 
 export function toWireAuth(probe: ClaudeCodeAuthProbe): ClaudeAuthStateWire {
@@ -68,5 +70,6 @@ export function readClaudeCodeReport(
     ...(extra.auth ? { auth: toWireAuth(extra.auth) } : {}),
     ...(extra.login !== undefined ? { login: extra.login } : {}),
     ...(customBackend ? { customBackend: true } : {}),
+    ...(extra.update !== undefined ? { update: extra.update } : {}),
   };
 }

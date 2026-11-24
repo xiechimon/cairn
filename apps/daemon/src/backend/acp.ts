@@ -558,10 +558,17 @@ export interface AcpGateOptions {
   log?: (message: string) => void;
 }
 
+export interface AcpResolvedLaunch {
+  command: string;
+  args: string[];
+  release?: () => void;
+}
+
 export interface GeminiBackendOptions {
   gate?: AcpGateOptions;
   executablePath?: string;
   executableArgs?: readonly string[];
+  resolveLaunch?: () => AcpResolvedLaunch | null;
   confine?: SessionConfiner;
   permissions?: 'deny' | 'allow-once';
   skills?: { skillsDir: string; cwd: string };
@@ -670,8 +677,18 @@ class AcpBackend implements AgentBackend {
     const hostTools = await openAcpTools(opts);
     const mcpBridges: AcpStdioBridge[] = [];
     const spawnProcess = this.options.spawnProcess ?? spawn;
-    const command = adapter?.command ?? this.options.executablePath;
+    const resolver = adapter?.resolveLaunch ?? this.options.resolveLaunch;
+    const resolvedLaunch = resolver !== undefined ? resolver() : null;
+    if (resolver !== undefined && resolvedLaunch === null) {
+      hostTools?.close();
+      throw new Error(
+        `${adapter?.harness ?? 'Gemini'} managed runtime binary is unavailable or failed integrity verification`,
+      );
+    }
+    const releaseLaunch = resolvedLaunch?.release;
+    const command = resolvedLaunch?.command ?? adapter?.command ?? this.options.executablePath;
     if (command === undefined) {
+      releaseLaunch?.();
       hostTools?.close();
       throw new Error(
         'Gemini managed install is missing: the managed runtime setup did not complete',
@@ -682,7 +699,12 @@ class AcpBackend implements AgentBackend {
     try {
       const launch = {
         command,
-        args: adapter ? (adapter.args ?? []) : [...(this.options.executableArgs ?? ['--acp'])],
+        args:
+          resolvedLaunch !== null
+            ? [...resolvedLaunch.args]
+            : adapter
+              ? (adapter.args ?? [])
+              : [...(this.options.executableArgs ?? ['--acp'])],
       };
       const confined =
         this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch, {
@@ -722,6 +744,7 @@ class AcpBackend implements AgentBackend {
       });
     } catch (error) {
       releaseRuntime?.();
+      releaseLaunch?.();
       hostTools?.close();
       throw error;
     }
@@ -801,9 +824,15 @@ class AcpBackend implements AgentBackend {
     let exited = false;
     let cleanedUp = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
+    let releaseTimer: ReturnType<typeof setTimeout> | undefined;
+    const releaseOnce = () => {
+      clearTimeout(releaseTimer);
+      releaseLaunch?.();
+    };
     child.once('close', () => {
       exited = true;
       if (groupPid === undefined) clearTimeout(killTimer);
+      if (cleanedUp) releaseOnce();
     });
     const terminate = (signal: NodeJS.Signals) => {
       if (groupPid !== undefined) {
@@ -823,6 +852,12 @@ class AcpBackend implements AgentBackend {
       mcpBridges.length = 0;
       connection.close();
       terminate('SIGTERM');
+      if (exited) {
+        releaseOnce();
+      } else {
+        releaseTimer = setTimeout(releaseOnce, 2_000);
+        releaseTimer.unref();
+      }
       if (adapter && (groupPid !== undefined || !exited)) {
         killTimer = setTimeout(() => terminate('SIGKILL'), 1_000);
       }
@@ -1065,6 +1100,7 @@ export interface AcpBackendOptions {
   harness: 'claude-code' | 'devin' | 'antigravity';
   command: string;
   args?: string[];
+  resolveLaunch?: () => AcpResolvedLaunch | null;
   permissions?: 'deny' | 'allow-once';
   gate?: AcpGateOptions;
   steering?: 'mid-turn';
