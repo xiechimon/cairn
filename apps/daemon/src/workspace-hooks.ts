@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { BoundGitCredentials } from '@cairn/shared';
+import { type BoundGitCredentials, missingSetupCommand } from '@cairn/shared';
 import type { Launch, SessionConfiner } from './backend/confine-session.js';
 import { childEnv } from './child-env.js';
 import { gitCredentialEnv } from './git.js';
@@ -147,7 +147,9 @@ export function workspaceHookErrorMessage(note: WorkspaceHookNote): string {
   if (note.status === 'timeout') {
     return `workspace hook .agents/${note.name} timed out after ${Math.round(note.ms / 1000)}s and its process group was killed${tail !== '' ? ` — last output: ${tail}` : ''}`;
   }
-  return `workspace hook .agents/${note.name} exited ${note.exitCode}${tail !== '' ? ` — ${tail}` : ''}`;
+  const missing = missingSetupCommand(note.output);
+  const missingPart = missing !== null ? ` (missing command: ${missing})` : '';
+  return `workspace hook .agents/${note.name} exited ${note.exitCode}${missingPart}${tail !== '' ? ` — ${tail}` : ''}`;
 }
 
 function tailOf(output: string): string {

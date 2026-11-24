@@ -544,6 +544,30 @@ describe('#1149 environment lifecycle hooks (two prepare mount points)', () => {
     ).toBe(false);
   }, 30_000);
 
+  test('setup failure due to missing command (exit 127) keeps worktree and hands hook note to the agent session', async () => {
+    seedHook(
+      'setup',
+      '#!/bin/sh\necho ".agents/setup: line 6: cairn-missing-pnpm: command not found" >&2\nexit 127\n',
+    );
+    await runGit(['add', '-A'], { cwd: seedDir });
+    await runGit(['commit', '-m', 'hooks-missing-cmd'], { cwd: seedDir, env: commitEnv(IDENTITY) });
+    await runGit(['push', 'origin', 'main'], { cwd: seedDir });
+    const prepared = await ws.prepare(prepareInput(CONV_A));
+    expect(existsSync(prepared.cwd)).toBe(true);
+    expect(prepared.hooks).toHaveLength(1);
+    expect(prepared.hooks![0]).toMatchObject({
+      name: 'setup',
+      status: 'failed',
+      exitCode: 127,
+    });
+    expect(prepared.hooks![0]!.output).toContain('cairn-missing-pnpm: command not found');
+    expect(
+      logger.lines.some((line) =>
+        line.includes('setup hook failed due to missing command (cairn-missing-pnpm)'),
+      ),
+    ).toBe(true);
+  }, 30_000);
+
   test('stale rebuild (worktree directory manually deleted) → still goes through fresh → setup rerun', async () => {
     seedHook('setup', '#!/bin/sh\necho setup-again-marker\n');
     await runGit(['add', '-A'], { cwd: seedDir });

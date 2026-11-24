@@ -50,6 +50,7 @@ import {
   isOwnComputerTool,
   liveQuickReplies,
   MODEL_SOURCE_RUNTIME_LABELS,
+  missingSetupCommand,
   orchestratedTodoIdOf,
   orchestratePromptHeadOf,
   PACKAGES_DECLINED,
@@ -317,6 +318,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     chiefCreated: w.sourceBuildId !== null,
     waitingOn: w.waitingOn ?? undefined,
     quotaWait: w.quotaWait ?? null,
+    ...(w.missingCommand != null ? { missingCommand: w.missingCommand } : {}),
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
@@ -1113,12 +1115,12 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         failureReasonKey(item.raw) === failureReasonKey(build.errorMessage ?? ''),
     )
   ) {
-    const plain = runtimeUpdatePlain(build.errorMessage);
+    const plain = plainFailureOf(build.errorMessage);
     items.push({
       kind: 'fail',
       title: stripAnsiEscapes(build.errorMessage),
       createdAt: todo.phaseAt,
-      body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
+      body: failGuidanceBody(build.errorMessage),
       ...(plain !== null ? { plain } : {}),
     });
   }
@@ -1173,7 +1175,8 @@ const CREDENTIAL_SOURCE_DETAIL = {
 
 function systemRowItem(row: SystemRow, id: string, createdAt: number): TranscriptItem | ToolEntry {
   switch (row.kind) {
-    case WORKSPACE_HOOK_ROW_KIND:
+    case WORKSPACE_HOOK_ROW_KIND: {
+      const missing = row.status !== 'ok' ? missingSetupCommand(row.output) : null;
       return {
         kind: '__work__',
         step: {
@@ -1181,7 +1184,8 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           id,
           action: 'setup',
           label: `.agents/${row.name}`,
-          description: `.agents/${row.name} hook`,
+          description: missing !== null ? '缺少命令 {command}' : `.agents/${row.name} hook`,
+          ...(missing !== null ? { localized: true, localizedVars: { command: missing } } : {}),
           output:
             row.output === ''
               ? null
@@ -1194,6 +1198,7 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           seconds: row.ms / 1000,
         },
       };
+    }
     case GIT_CREDENTIAL_ROW_KIND:
       return {
         kind: '__work__',
@@ -1214,13 +1219,13 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
     case BUILD_FAILURE_ROW_KIND: {
       const headline =
         /^(.+?\(exit -?\d+\))/.exec(row.reason)?.[1] ?? row.reason.split('\n')[0] ?? '';
-      const plain = runtimeUpdatePlain(row.reason);
+      const plain = plainFailureOf(row.reason);
       return {
         kind: 'fail',
         id,
         createdAt,
         title: stripAnsiEscapes(headline),
-        body: failGuidanceBody(classifyStepFailure(row.reason)),
+        body: failGuidanceBody(row.reason),
         ...(plain !== null ? { plain } : {}),
         facts: {
           files: row.fileCount,
@@ -1252,7 +1257,18 @@ export function runtimeUpdatePlain(
   };
 }
 
-function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string {
+export function plainFailureOf(raw: string): { key: string; vars: Record<string, string> } | null {
+  const runtime = runtimeUpdatePlain(raw);
+  if (runtime !== null) return runtime;
+  const missing = missingSetupCommand(raw);
+  if (missing !== null) {
+    return { key: '环境准备缺少命令 {command}', vars: { command: missing } };
+  }
+  return null;
+}
+
+function failGuidanceBody(raw: string): string {
+  const kind = classifyStepFailure(raw);
   switch (kind) {
     case 'runtime_outdated':
       return '更新 Cairn 后重新运行这个任务。';
@@ -1263,7 +1279,7 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
     case 'capacity':
       return '请求被限流，请稍后重试。';
     default:
-      return '';
+      return missingSetupCommand(raw) !== null ? '安装缺少的工具后重新运行这个任务。' : '';
   }
 }
 

@@ -88,6 +88,7 @@ export interface TodoRecord {
   chiefCreated?: boolean;
   waitingOn?: TodoWaitingOn;
   quotaWait?: QuotaWait | null;
+  missingCommand?: string | null;
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
@@ -402,6 +403,7 @@ export type WorkStep =
       unfinished: boolean;
       cancelled?: boolean;
       localized?: boolean;
+      localizedVars?: Record<string, string | number>;
       background?: true;
       seconds: number | null;
     };

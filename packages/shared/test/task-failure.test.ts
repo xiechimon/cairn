@@ -4,8 +4,10 @@ import {
   CLAUDE_CODE_AUTH_FAILURE_MARKER,
   classifyAgentFailure,
   classifyStepFailure,
+  isMissingCommandHookNote,
   isProviderAuthFailure,
   isProviderOutage,
+  missingSetupCommand,
   noVisionSignalOf,
   parseRetryAfterMs,
   runtimeUpdateRequired,
@@ -308,5 +310,40 @@ describe('isProviderAuthFailure (#1493 degradation-chain trigger: auth failure)'
     'see PR #401',
   ])('does not match: %s', (msg) => {
     expect(isProviderAuthFailure(msg)).toBe(false);
+  });
+});
+
+describe('missingSetupCommand and isMissingCommandHookNote', () => {
+  test.each([
+    ['.../.agents/setup: line 6: pnpm: command not found', 'pnpm'],
+    ['.agents/setup: 6: uv: not found', 'uv'],
+    ['.agents/setup:6: command not found: cargo', 'cargo'],
+    ['fish: Unknown command: mise', 'mise'],
+    ['env: node: No such file or directory', 'node'],
+    ["The term 'pnpm' is not recognized as the name of a cmdlet", 'pnpm'],
+    ["'yarn' is not recognized as an internal or external command", 'yarn'],
+    ['workspace hook .agents/setup exited 127 (missing command: bun)', 'bun'],
+  ])('extracts missing command from %s -> %s', (raw, expected) => {
+    expect(missingSetupCommand(raw)).toBe(expected);
+  });
+
+  test.each(['', 'build failed: test assertion failed', '.agents/setup exited 3 — boom'])(
+    'returns null for non-missing-command errors: %s',
+    (raw) => {
+      expect(missingSetupCommand(raw)).toBeNull();
+    },
+  );
+
+  test('detects missing-command hook failures by exit 127 or parsed command name', () => {
+    expect(isMissingCommandHookNote({ status: 'failed', exitCode: 127, output: '' })).toBe(true);
+    expect(
+      isMissingCommandHookNote({
+        status: 'failed',
+        exitCode: 1,
+        output: '.agents/setup: line 6: pnpm: command not found',
+      }),
+    ).toBe(true);
+    expect(isMissingCommandHookNote({ status: 'failed', exitCode: 3, output: 'boom' })).toBe(false);
+    expect(isMissingCommandHookNote({ status: 'timeout', exitCode: null, output: '' })).toBe(false);
   });
 });

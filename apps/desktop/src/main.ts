@@ -26,6 +26,12 @@ import {
   parseAccessTokenFile,
 } from '@cairn/shared';
 import {
+  applyShellEnvironment,
+  discoverShellEnvironment,
+  SHELL_ENV_RESOLVED_VAR,
+  type ShellEnvironmentPatch,
+} from '@cairn/shared/shell-env';
+import {
   app,
   BrowserWindow,
   clipboard,
@@ -181,6 +187,7 @@ interface RunningServer {
 
 let server: RunningServer | null = null;
 let serverOtelFile: string | null = null;
+let desktopShellEnv: ShellEnvironmentPatch = {};
 const serverRestartBudget = createRestartBudget(SERVER_RESTART_MAX, SERVER_RESTART_STABLE_MS);
 const serverExited = createServerExitHandler<RunningServer>({
   budget: serverRestartBudget,
@@ -314,6 +321,7 @@ function startServer(
   port: number,
   otelFile: string | null,
   onExit: (dead: RunningServer, code: number | null) => void,
+  shellEnv: ShellEnvironmentPatch = desktopShellEnv,
 ): RunningServer {
   serverRestartBudget.started();
   const env = withOtelFileEnv(
@@ -327,6 +335,8 @@ function startServer(
     },
     otelFile,
   );
+  applyShellEnvironment(env, shellEnv, process.platform);
+  env[SHELL_ENV_RESOLVED_VAR] = '1';
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
   delete env[ENV_VARS.apiKey];
@@ -1247,6 +1257,18 @@ async function boot(): Promise<void> {
   let guard: VersionGuard | null = null;
   try {
     captureMainConsole();
+    const discoveredShell = await discoverShellEnvironment({
+      env: process.env,
+      cachePath: join(userData, 'shell-environment-cache.json'),
+      onWarn: (message) => console.warn(message),
+      onRefresh: (refreshed) => {
+        desktopShellEnv = refreshed.patch;
+        applyShellEnvironment(process.env, refreshed.patch, process.platform);
+      },
+    });
+    desktopShellEnv = discoveredShell.patch;
+    applyShellEnvironment(process.env, discoveredShell.patch, process.platform);
+    process.env[SHELL_ENV_RESOLVED_VAR] = '1';
     if (await restoreIfBundleMissing(runningBundle())) {
       console.warn('restored the previous Cairn after an install was interrupted');
     }
@@ -1258,7 +1280,7 @@ async function boot(): Promise<void> {
     const otelFile = otelEnv.CAIRN_OTEL_ENDPOINT === undefined ? null : otelEnvPath;
     serverOtelFile = otelFile;
     otelHeaderLogSecrets.push(...otelHeaderSecrets(otelEnv.CAIRN_OTEL_HEADERS));
-    server = startServer(await serverPort(), otelFile, serverExited);
+    server = startServer(await serverPort(), otelFile, serverExited, desktopShellEnv);
     await waitUntilServing(server);
     startHealthWatch(server, guard);
     const ownerToken = readOwnerToken();
@@ -1280,6 +1302,7 @@ async function boot(): Promise<void> {
         ownerChannelKey,
         otelFile,
         agentDesktop: agentDesktopBinary(),
+        shellEnv: () => desktopShellEnv,
         isQuitting: () => quitting,
       })
         .then(
