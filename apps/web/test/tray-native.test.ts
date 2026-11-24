@@ -9,9 +9,10 @@ import { EN } from '../src/i18n/en.js';
 import type { Locale } from '../src/i18n/locale.js';
 import { translate } from '../src/i18n/translate.js';
 import type { TrayGroup } from '../src/tray/tray-groups.js';
-import { trayMenuModel } from '../src/tray/tray-native.js';
+import { machineReading, trayMenuModel } from '../src/tray/tray-native.js';
 
 const quotaShare = 72;
+const NOW = 1_000 * 60 * 60_000;
 
 const t = (locale: Locale) => (key: string, vars?: Record<string, string | number>) =>
   translate(locale, EN, key, vars);
@@ -29,13 +30,7 @@ const groups: TrayGroup[] = [
     key: 'machine:m1',
     label: 'build-box',
     literal: true,
-    os: { osPlatform: 'linux', osDistribution: 'arch' },
-    meta: {
-      percent: 94,
-      level: 'full',
-      warn: true,
-      tip: { key: '内存压力 {n}%', vars: { n: 94 } },
-    },
+    machine: { kind: 'online', memory: 0.94, cpu: 0.31, load: 3.1, cores: 12, diskGb: 212, strain: ['memory'] },
     rows: [
       {
         key: 'hung',
@@ -59,6 +54,7 @@ const model = (locale: Locale, extra: Partial<Parameters<typeof trayMenuModel>[0
     coordinatorBusy: true,
     state: state(),
     userName: '本地用户',
+    now: NOW,
     t: t(locale),
     ...extra,
   });
@@ -90,12 +86,22 @@ test('the native menu carries the tray content in order and passes the schema ma
     'quit',
   ]);
   expect(byId(menu, 'coordinator')).toMatchObject({ status: '正在回复', open: { kind: 'path', path: '/app' } });
-  expect(byId(menu, 'machine:m1')).toMatchObject({
+  expect(byId(menu, 'machine:m1')).toEqual({
     kind: 'header',
+    id: 'machine:m1',
     title: 'build-box',
-    os: 'linux',
-    meter: { percent: 94, level: 'full', tip: '内存压力 94%' },
+    reading: {
+      parts: [
+        { text: '内存 94%', strained: true },
+        { text: 'CPU 31%', strained: false },
+        { text: '负载 3.1 / 12 核', strained: false },
+      ],
+      faint: false,
+      spoken: '内存吃紧, 内存 94%, CPU 31%, 负载 3.1 / 12 核',
+      tip: '内存压力 94%；CPU 31%；负载 3.1 / 12 核；剩余磁盘 212 GB',
+    },
   });
+  expect(byId(menu, 'waiting')).not.toHaveProperty('reading');
   expect(byId(menu, 'machine:m1/hung')).toMatchObject({
     title: '审阅发行说明',
     glyph: 'attention',
@@ -125,7 +131,56 @@ test('the menu speaks the app language through the same t() strings', () => {
   expect(byId(menu, 'quit')).toMatchObject({ title: 'Quit Cairn' });
   expect(byId(menu, 'usage')).toMatchObject({ title: 'Used today: 1.2M' });
   expect(byId(menu, 'waiting')).toMatchObject({ title: EN['等你'] ?? '等你' });
-  expect(byId(menu, 'machine:m1')).toMatchObject({ title: 'build-box' });
+  expect(byId(menu, 'machine:m1')).toMatchObject({
+    title: 'build-box',
+    reading: { parts: [{ text: 'Memory 94%' }, { text: 'CPU 31%' }, { text: 'Load 3.1 / 12 cores' }] },
+  });
+});
+
+test('every computer reads its memory and load, including idle, strained, offline and unreported ones', () => {
+  const reading = (state: Parameters<typeof machineReading>[0], locale: Locale = 'zh') =>
+    machineReading(state, NOW, t(locale));
+  const online = { kind: 'online', memory: 0.42, cpu: 0.31, load: 3.1, cores: 12, diskGb: 212, strain: [] } as const;
+  expect(reading(online).parts.map((part) => part.text)).toEqual(['内存 42%', 'CPU 31%', '负载 3.1 / 12 核']);
+  expect(reading(online).parts.every((part) => !part.strained)).toBe(true);
+  expect(reading({ ...online, cpu: 0.97, strain: ['cpu'] }).parts[1]).toEqual({ text: 'CPU 97%', strained: true });
+  expect(reading({ ...online, diskGb: 3, strain: ['disk'] }, 'en')).toMatchObject({
+    parts: [
+      { text: 'Memory 42%', strained: false },
+      { text: 'CPU 31%', strained: false },
+      { text: 'Load 3.1 / 12 cores', strained: false },
+      { text: '3 GB disk free', strained: true },
+    ],
+    spoken: 'Disk almost full, Memory 42%, CPU 31%, Load 3.1 / 12 cores, 3 GB disk free',
+  });
+  expect(reading({ ...online, cpu: null }).parts.map((part) => part.text)).toEqual(['内存 42%', '负载 3.1 / 12 核']);
+  expect(reading({ kind: 'offline', lastSeenAt: NOW - 2 * 24 * 60 * 60_000 })).toEqual({
+    parts: [{ text: '离线 · 最后在线 2 天前', strained: false }],
+    faint: true,
+    spoken: '离线 · 最后在线 2 天前',
+    tip: '离线时读数已过期，不显示',
+  });
+  expect(reading({ kind: 'offline', lastSeenAt: NOW - 2 * 60 * 60_000 }, 'en').parts[0]?.text).toBe(
+    'Offline · Last seen 2h ago',
+  );
+  expect(reading({ kind: 'offline', lastSeenAt: null }).parts[0]?.text).toBe('离线');
+  expect(reading({ kind: 'unreported' }, 'en')).toMatchObject({
+    parts: [{ text: 'No memory or load reported yet', strained: false }],
+    faint: true,
+  });
+});
+
+test('idle computers stay listed under the empty line', () => {
+  const idle: TrayGroup = {
+    key: 'machine:m9',
+    label: 'Mac mini',
+    literal: true,
+    machine: { kind: 'unreported' },
+    rows: [],
+  };
+  const menu = model('zh', { groups: [idle], usage: null });
+  expect(menu.items.slice(0, 3).map((item) => item.id)).toEqual(['coordinator', 'empty', 'machine:m9']);
+  expect(nativeTrayMenuSchema.parse(menu)).toEqual(menu);
 });
 
 test('with nothing waiting and no usage the menu says so and keeps the controls', () => {

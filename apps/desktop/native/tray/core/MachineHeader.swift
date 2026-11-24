@@ -14,15 +14,6 @@ enum Symbols {
     return nil
   }
 
-  static func os(_ platform: String?) -> [String] {
-    switch platform {
-    case "darwin": return ["apple.logo", "desktopcomputer"]
-    case "windows": return ["pc", "desktopcomputer"]
-    case "linux": return ["server.rack", "terminal", "desktopcomputer"]
-    default: return ["desktopcomputer"]
-    }
-  }
-
   static func glyph(_ kind: String?, warn: Bool) -> (names: [String], tint: NSColor?)? {
     switch kind {
     case "attention":
@@ -38,37 +29,27 @@ enum Symbols {
     default: return nil
     }
   }
-
-  static func meterTint(_ level: String) -> NSColor {
-    switch level {
-    case "full": return Palette.warning
-    case "high": return .labelColor
-    default: return .secondaryLabelColor
-    }
-  }
 }
 
 final class MachineHeader: NSView {
-  static let height: CGFloat = 24
+  static let height: CGFloat = 40
   static let inset: CGFloat = 14
 
   private(set) var item: TrayItem
-  let icon = NSImageView()
   let name = NSTextField(labelWithString: "")
-  let meter = NSTextField(labelWithString: "")
-  let gauge = NSImageView()
+  let readingLabel = NSTextField(labelWithString: "")
 
   init(_ item: TrayItem) {
     self.item = item
     super.init(frame: NSRect(x: 0, y: 0, width: BigButton.menuWidth, height: Self.height))
     autoresizingMask = .width
-    for view in [icon, name, meter, gauge] as [NSView] {
-      view.setAccessibilityElement(false)
-      addSubview(view)
+    name.font = .systemFont(ofSize: 12, weight: .semibold)
+    for label in [name, readingLabel] {
+      label.lineBreakMode = .byTruncatingTail
+      label.maximumNumberOfLines = 1
+      label.setAccessibilityElement(false)
+      addSubview(label)
     }
-    name.lineBreakMode = .byTruncatingTail
-    name.font = .systemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
-    meter.font = .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .semibold)
     update(item)
   }
 
@@ -79,44 +60,63 @@ final class MachineHeader: NSView {
   func update(_ next: TrayItem) {
     item = next
     name.stringValue = next.title ?? ""
-    name.textColor = .secondaryLabelColor
-    icon.image = Symbols.image(Symbols.os(next.os), size: 11, weight: .semibold, tint: .secondaryLabelColor)
-    if let value = next.meter {
-      meter.isHidden = false
-      gauge.isHidden = false
-      meter.stringValue = "\(value.percent)%"
-      let tint = Symbols.meterTint(value.level)
-      meter.textColor = tint
-      gauge.image = Symbols.image(["gauge.with.dots.needle.67percent", "gauge"], size: 11, weight: .semibold, tint: tint)
-      toolTip = value.tip
-    } else {
-      meter.isHidden = true
-      gauge.isHidden = true
-      toolTip = nil
-    }
+    name.textColor = next.reading?.faint == true ? .tertiaryLabelColor : .labelColor
+    toolTip = [next.title, next.reading?.tip].compactMap { $0 }.joined(separator: "\n")
     needsLayout = true
   }
 
   var spokenLabel: String {
-    [item.title, item.meter.map { "\($0.percent)%" }, item.meter?.tip].compactMap { $0 }.joined(separator: ", ")
+    [item.title, item.reading?.spoken].compactMap { $0 }.joined(separator: ", ")
   }
+
+  static func reading(_ reading: Reading, dropping drop: Int) -> NSAttributedString {
+    let size: CGFloat = 11
+    let digits = NSFont.monospacedDigitSystemFont(ofSize: size, weight: .regular)
+    let bold = NSFont.monospacedDigitSystemFont(ofSize: size, weight: .bold)
+    let base: NSColor = reading.faint ? .tertiaryLabelColor : .secondaryLabelColor
+    var parts = reading.parts
+    var removed = 0
+    while removed < drop, parts.count > 1, let index = parts.lastIndex(where: { !$0.strained }) {
+      parts.remove(at: index)
+      removed += 1
+    }
+    let out = NSMutableAttributedString()
+    for (index, part) in parts.enumerated() {
+      if index > 0 { out.append(NSAttributedString(string: " · ", attributes: [.font: digits, .foregroundColor: base])) }
+      out.append(
+        NSAttributedString(
+          string: part.text,
+          attributes: [
+            .font: part.strained ? bold : digits, .foregroundColor: part.strained ? Palette.warning : base,
+          ]))
+    }
+    return out
+  }
+
+  var textWidth: CGFloat { max(0, bounds.width - Self.inset * 2) }
 
   override func layout() {
     super.layout()
-    let mid = bounds.midY
-    icon.frame = NSRect(x: Self.inset, y: mid - 7, width: 14, height: 14)
-    meter.sizeToFit()
-    let right = bounds.width - Self.inset
-    meter.setFrameOrigin(NSPoint(x: right - meter.frame.width, y: (mid - meter.frame.height / 2).rounded()))
-    gauge.frame = NSRect(x: meter.frame.minX - 16, y: mid - 7, width: 14, height: 14)
-    name.sizeToFit()
-    let start = icon.frame.maxX + 4
-    let end = meter.isHidden ? right : gauge.frame.minX - 6
-    name.frame = NSRect(
-      x: start, y: (mid - name.frame.height / 2).rounded(), width: max(0, min(name.frame.width, end - start)),
-      height: name.frame.height)
+    if let reading = item.reading {
+      var drop = 0
+      readingLabel.attributedStringValue = Self.reading(reading, dropping: 0)
+      while readingLabel.attributedStringValue.size().width > textWidth, drop < reading.parts.count {
+        drop += 1
+        readingLabel.attributedStringValue = Self.reading(reading, dropping: drop)
+      }
+      readingLabel.isHidden = false
+    } else {
+      readingLabel.isHidden = true
+    }
+    for label in [name, readingLabel] {
+      label.sizeToFit()
+      label.setFrameSize(NSSize(width: min(label.frame.width, textWidth), height: label.frame.height))
+    }
+    name.setFrameOrigin(NSPoint(x: Self.inset, y: 4))
+    readingLabel.setFrameOrigin(NSPoint(x: Self.inset, y: name.frame.maxY + 1))
   }
 
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
   override func isAccessibilityElement() -> Bool { true }
   override func accessibilityRole() -> NSAccessibility.Role? { .staticText }
   override func accessibilityLabel() -> String? { spokenLabel }

@@ -6,9 +6,15 @@ struct OpenTarget: Decodable, Equatable {
   let command: String?
 }
 
-struct Meter: Decodable, Equatable {
-  let percent: Int
-  let level: String
+struct ReadingPart: Decodable, Equatable {
+  let text: String
+  let strained: Bool
+}
+
+struct Reading: Decodable, Equatable {
+  let parts: [ReadingPart]
+  let faint: Bool
+  let spoken: String
   let tip: String
 }
 
@@ -26,8 +32,7 @@ struct TrayItem: Decodable, Equatable {
   var image: String?
   var warn: Bool?
   var open: OpenTarget?
-  var os: String?
-  var meter: Meter?
+  var reading: Reading?
   var detail: String?
   var on: Bool?
   var enabled: Bool?

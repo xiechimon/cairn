@@ -82,7 +82,7 @@ final class TrayMenu: NSObject, NSMenuDelegate {
     case .separator:
       return .separator()
     case .header:
-      if entry.os != nil {
+      if entry.reading != nil {
         let header = MachineHeader(entry)
         let item = NSMenuItem(title: entry.title ?? "", action: nil, keyEquivalent: "")
         item.isEnabled = false

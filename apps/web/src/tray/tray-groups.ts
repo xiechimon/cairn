@@ -1,11 +1,14 @@
 import {
   type ClaudeSubscriptionListEntry,
   type DailyUsage,
+  isRegisteredMachine,
   isStalled,
   type MachineCapabilities,
   type MachineQueuedThread,
   type MachineRecord,
   type MachineRunningThread,
+  type MachineStrainReason,
+  machineStrain,
   RESEARCH_BEFORE_PLAN_SOURCE_KIND,
   RESEARCH_STUCK_SOURCE_KIND,
 } from '@cairn/shared';
@@ -51,12 +54,34 @@ export interface TrayGroup {
   literal?: boolean;
   os?: Pick<MachineCapabilities, 'osPlatform' | 'osDistribution'> | null;
   meta?: { percent: number; level: TrayMetaLevel; warn: boolean; tip: TrayText };
+  machine?: TrayMachineState;
   rows: TrayRow[];
 }
 
+export type TrayMachineState =
+  | {
+      kind: 'online';
+      memory: number | null;
+      cpu: number | null;
+      load: number;
+      cores: number;
+      diskGb: number;
+      strain: readonly MachineStrainReason[];
+    }
+  | { kind: 'unreported' }
+  | { kind: 'offline'; lastSeenAt: number | null };
+
 export type TrayMachine = Pick<
   MachineRecord,
-  'id' | 'name' | 'online' | 'running' | 'queued' | 'strain' | 'capabilities'
+  | 'id'
+  | 'name'
+  | 'kind'
+  | 'online'
+  | 'lastSeenAt'
+  | 'running'
+  | 'queued'
+  | 'strain'
+  | 'capabilities'
 >;
 
 function channelPath(projectId: string | null): string {
@@ -128,14 +153,36 @@ function queuedRow(thread: MachineQueuedThread): TrayRow {
   };
 }
 
+function memoryOf(machine: TrayMachine): number | null {
+  const hardware = machine.capabilities?.hardware;
+  if (hardware == null) return null;
+  const total = hardware.memoryTotalMb;
+  return (
+    hardware.memoryPressure ??
+    (total !== undefined && total > 0 ? 1 - hardware.memoryAvailableMb / total : null)
+  );
+}
+
+function machineState(machine: TrayMachine): TrayMachineState {
+  if (!machine.online) return { kind: 'offline', lastSeenAt: machine.lastSeenAt ?? null };
+  const hardware = machine.capabilities?.hardware;
+  if (hardware == null) return { kind: 'unreported' };
+  return {
+    kind: 'online',
+    memory: memoryOf(machine),
+    cpu: hardware.cpuUtilization ?? null,
+    load: hardware.loadAvg1,
+    cores: hardware.cpuCores,
+    diskGb: Math.round(hardware.diskFreeMb / 1024),
+    strain: machine.strain ?? machineStrain(hardware),
+  };
+}
+
 function machineMeta(machine: TrayMachine): TrayGroup['meta'] {
   const hardware = machine.capabilities?.hardware;
-  if (hardware == null) return undefined;
+  if (hardware == null || !machine.online) return undefined;
   const strain = machine.strain ?? [];
-  const total = hardware.memoryTotalMb;
-  const memory =
-    hardware.memoryPressure ??
-    (total !== undefined && total > 0 ? 1 - hardware.memoryAvailableMb / total : null);
+  const memory = memoryOf(machine);
   const cpu = hardware.cpuUtilization ?? null;
   const pressure = Math.min(1, Math.max(memory ?? 0, cpu ?? 0));
   const level: TrayMetaLevel =
@@ -160,12 +207,9 @@ function machineMeta(machine: TrayMachine): TrayGroup['meta'] {
   };
 }
 
-function machineGroup(machine: TrayMachine, now: number): TrayGroup | null {
+function machineGroup(machine: TrayMachine, now: number): TrayGroup {
   const running = (machine.running ?? []).map((thread) => runningRow(thread, now));
   const queued = (machine.queued ?? []).map(queuedRow);
-  if (running.length === 0 && queued.length === 0 && (machine.strain ?? []).length === 0) {
-    return null;
-  }
   const all = [
     ...running.filter((row) => row.warn).sort((a, b) => a.at - b.at),
     ...running.filter((row) => !row.warn).sort((a, b) => a.at - b.at),
@@ -188,6 +232,7 @@ function machineGroup(machine: TrayMachine, now: number): TrayGroup | null {
     literal: true,
     os: machine.capabilities,
     meta: machineMeta(machine),
+    machine: machineState(machine),
     rows,
   };
 }
@@ -211,9 +256,9 @@ export function trayGroups(
     .sort(newest)
     .slice(0, TRAY_MAX_ROWS);
   const machineGroups = machines
-    .filter((machine) => machine.online)
-    .map((machine) => machineGroup(machine, now))
-    .filter((group) => group !== null);
+    .filter(isRegisteredMachine)
+    .sort((a, b) => Number(b.online) - Number(a.online))
+    .map((machine) => machineGroup(machine, now));
   const onMachine = new Set(
     machines.flatMap((machine) =>
       [...(machine.running ?? []), ...(machine.queued ?? [])].map((thread) => thread.threadId),
@@ -229,7 +274,14 @@ export function trayGroups(
     ...machineGroups,
     { key: 'working', label: '进行中', rows: working },
   ];
-  return groups.filter((group) => group.rows.length > 0 || group.meta?.warn === true);
+  return groups.filter((group) => group.rows.length > 0 || group.machine !== undefined);
+}
+
+export function popoverGroups(groups: readonly TrayGroup[]): TrayGroup[] {
+  return groups.filter(
+    (group) =>
+      group.machine?.kind !== 'offline' && (group.rows.length > 0 || group.meta?.warn === true),
+  );
 }
 
 export interface TrayUsage {

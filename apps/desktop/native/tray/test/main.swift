@@ -47,11 +47,58 @@ let long = tray.items["machine:m1/b"]!
 expect(long.title.contains("…") && long.title.hasSuffix(" · 8 分"), "long row not truncated before its status: \(long.title)")
 expect(long.toolTip?.hasPrefix("把菜单栏弹层换成原生菜单并补齐键盘操作和读屏标签 · 8 分") == true, "long row tip \(long.toolTip ?? "nil")")
 
-let header = tray.headers["machine:m2"]!
-expect(header.spokenLabel == "build-box, 94%, 内存压力 94%；CPU 88%；剩余磁盘 9 GB", "header label \(header.spokenLabel)")
+func strainedRuns(_ text: NSAttributedString) -> [String] {
+  var runs: [String] = []
+  text.enumerateAttribute(.foregroundColor, in: NSRange(location: 0, length: text.length)) { value, range, _ in
+    if (value as? NSColor) == Palette.warning { runs.append(text.attributedSubstring(from: range).string) }
+  }
+  return runs
+}
+
+func laidOut(_ header: MachineHeader, width: CGFloat = BigButton.menuWidth) -> MachineHeader {
+  header.frame = NSRect(x: 0, y: 0, width: width, height: MachineHeader.height)
+  header.layout()
+  return header
+}
+
+let header = laidOut(tray.headers["machine:m2"]!)
+expect(
+  header.spokenLabel == "build-box, 内存吃紧, 磁盘吃紧, 内存 94%, CPU 88%, 负载 15.4 / 16 核, 剩余磁盘 3 GB",
+  "header label \(header.spokenLabel)")
 expect(tray.items["machine:m2"]!.isEnabled == false, "machine header is enabled")
-expect(header.meter.stringValue == "94%", "meter \(header.meter.stringValue)")
-expect(header.icon.image != nil, "machine header has no OS icon")
+expect(tray.items["machine:m2"]!.view === header, "machine header is not a two-line view")
+expect(strainedRuns(header.readingLabel.attributedStringValue) == ["内存 94%", "剩余磁盘 3 GB"], "strained parts \(strainedRuns(header.readingLabel.attributedStringValue))")
+expect(header.readingLabel.frame.minY >= header.name.frame.maxY, "reading is not under the name")
+expect(header.readingLabel.frame.maxY <= MachineHeader.height, "reading falls outside the header")
+expect(header.toolTip == "build-box\n内存压力 94%；CPU 88%；负载 15.4 / 16 核；剩余磁盘 3 GB", "header tip \(header.toolTip ?? "nil")")
+
+let idle = laidOut(tray.headers["machine:m1"]!)
+expect(idle.readingLabel.stringValue == "内存 42% · CPU 31% · 负载 3.1 / 12 核", "idle reading \(idle.readingLabel.stringValue)")
+expect(strainedRuns(idle.readingLabel.attributedStringValue).isEmpty, "a calm computer has a strained part")
+expect(idle.name.textColor == .labelColor, "a live computer name is faint")
+
+let offline = laidOut(tray.headers["machine:m3"]!)
+expect(offline.readingLabel.stringValue == "离线 · 最后在线 2 天前", "offline reading \(offline.readingLabel.stringValue)")
+expect(offline.name.textColor == .tertiaryLabelColor, "an offline computer name is not faint")
+expect(!offline.readingLabel.stringValue.contains("%"), "an offline computer shows stale numbers")
+
+let unreported = laidOut(tray.headers["machine:m4"]!)
+expect(unreported.readingLabel.stringValue == "尚未上报内存和负载", "unreported reading \(unreported.readingLabel.stringValue)")
+expect(unreported.name.frame.maxX <= unreported.bounds.width - MachineHeader.inset + 0.5, "a long computer name overflows")
+expect(unreported.name.lineBreakMode == .byTruncatingTail, "a long computer name does not truncate")
+
+var english = TrayItem(kind: .header, id: "machine:en")
+english.title = "build-linux"
+english.reading = Reading(
+  parts: [
+    ReadingPart(text: "Memory 48%", strained: false), ReadingPart(text: "CPU 97%", strained: true),
+    ReadingPart(text: "Load 15.4 / 16 cores", strained: false), ReadingPart(text: "3 GB disk free", strained: true),
+  ], faint: false, spoken: "", tip: "")
+let narrow = laidOut(MachineHeader(english), width: 270)
+expect(narrow.readingLabel.stringValue == "Memory 48% · CPU 97% · 3 GB disk free", "narrow English reading \(narrow.readingLabel.stringValue)")
+expect(strainedRuns(narrow.readingLabel.attributedStringValue) == ["CPU 97%", "3 GB disk free"], "narrow strained parts")
+let wide = laidOut(MachineHeader(english), width: 600)
+expect(wide.readingLabel.stringValue.contains("Load 15.4 / 16 cores"), "a wide header drops the load")
 
 let user = tray.items["user"]!
 expect(!user.isEnabled, "the user row is enabled")

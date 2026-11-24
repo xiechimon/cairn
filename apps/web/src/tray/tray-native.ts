@@ -6,7 +6,7 @@ import type {
 } from '@cairn/shared';
 import type { TVars } from '../i18n/translate.js';
 import { USAGE_PATH } from '../resources/hrefs.js';
-import type { TrayGroup, TrayText, TrayUsage } from './tray-groups.js';
+import type { TrayGroup, TrayMachineState, TrayText, TrayUsage } from './tray-groups.js';
 
 export const RUNNER_WORD: Record<DesktopRunnerState, string> = {
   starting: '正在启动',
@@ -23,14 +23,71 @@ export interface TrayMenuInput {
   coordinatorBusy: boolean;
   state: DesktopTrayState | null;
   userName: string;
+  now: number;
   t: Translate;
 }
 
-function osOf(group: TrayGroup): 'darwin' | 'windows' | 'linux' | 'unknown' {
-  const platform = group.os?.osPlatform;
-  return platform === 'darwin' || platform === 'windows' || platform === 'linux'
-    ? platform
-    : 'unknown';
+type Reading = NonNullable<Extract<NativeTrayItem, { kind: 'header' }>['reading']>;
+
+const STRAIN_WORD = { memory: '内存吃紧', cpu: 'CPU 吃紧', disk: '磁盘吃紧' } as const;
+
+function ago(lastSeenAt: number, now: number, t: Translate): string {
+  const n = Math.max(0, Math.floor((now - lastSeenAt) / 60_000));
+  if (n < 60) return t('{n} 分钟前', { n });
+  if (n < 24 * 60) return t('{n} 小时前', { n: Math.floor(n / 60) });
+  return t('{n} 天前', { n: Math.floor(n / (24 * 60)) });
+}
+
+export function machineReading(state: TrayMachineState, now: number, t: Translate): Reading {
+  if (state.kind === 'offline') {
+    const text =
+      state.lastSeenAt === null
+        ? t('离线')
+        : t('离线 · 最后在线 {ago}', { ago: ago(state.lastSeenAt, now, t) });
+    return {
+      parts: [{ text, strained: false }],
+      faint: true,
+      spoken: text,
+      tip: t('离线时读数已过期，不显示'),
+    };
+  }
+  if (state.kind === 'unreported') {
+    const text = t('尚未上报内存和负载');
+    return { parts: [{ text, strained: false }], faint: true, spoken: text, tip: text };
+  }
+  const mem = Math.round((state.memory ?? 0) * 100);
+  const load = state.load.toFixed(1);
+  const loadText = t('负载 {load} / {cores} 核', { load, cores: state.cores });
+  const parts: Reading['parts'] = [];
+  if (state.memory !== null) {
+    parts.push({ text: t('内存 {mem}%', { mem }), strained: state.strain.includes('memory') });
+  }
+  const cpu = state.cpu === null ? null : Math.round(state.cpu * 100);
+  if (cpu !== null) parts.push({ text: `CPU ${cpu}%`, strained: state.strain.includes('cpu') });
+  parts.push({ text: loadText, strained: false });
+  if (state.strain.includes('disk')) {
+    parts.push({ text: t('剩余磁盘 {disk} GB', { disk: state.diskGb }), strained: true });
+  }
+  const tip =
+    cpu === null
+      ? t('内存压力 {mem}%；负载 {load} / {cores} 核；剩余磁盘 {disk} GB', {
+          mem,
+          load,
+          cores: state.cores,
+          disk: state.diskGb,
+        })
+      : t('内存压力 {mem}%；CPU {cpu}%；负载 {load} / {cores} 核；剩余磁盘 {disk} GB', {
+          mem,
+          cpu,
+          load,
+          cores: state.cores,
+          disk: state.diskGb,
+        });
+  const spoken = [
+    ...state.strain.map((reason) => t(STRAIN_WORD[reason])),
+    ...parts.map((p) => p.text),
+  ].join(', ');
+  return { parts, faint: false, spoken, tip };
 }
 
 export function trayMenuModel({
@@ -39,6 +96,7 @@ export function trayMenuModel({
   coordinatorBusy,
   state,
   userName,
+  now,
   t,
 }: TrayMenuInput): NativeTrayMenu {
   const say = (text: TrayText) => t(text.key, text.vars);
@@ -52,22 +110,15 @@ export function trayMenuModel({
       open: { kind: 'path', path: '/app' },
     },
   ];
+  if (!groups.some((group) => group.rows.length > 0)) {
+    items.push({ kind: 'row', id: 'empty', title: t('没有等你的事') });
+  }
   for (const group of groups) {
-    const machine = group.literal === true;
     items.push({
       kind: 'header',
       id: group.key,
       title: group.literal ? group.label : t(group.label),
-      ...(machine ? { os: osOf(group) } : {}),
-      ...(group.meta === undefined
-        ? {}
-        : {
-            meter: {
-              percent: group.meta.percent,
-              level: group.meta.level,
-              tip: say(group.meta.tip),
-            },
-          }),
+      ...(group.machine === undefined ? {} : { reading: machineReading(group.machine, now, t) }),
     });
     for (const row of group.rows) {
       items.push({
@@ -82,7 +133,6 @@ export function trayMenuModel({
       });
     }
   }
-  if (groups.length === 0) items.push({ kind: 'row', id: 'empty', title: t('没有等你的事') });
   if (usage !== null) {
     items.push({ kind: 'separator', id: 'usage-rule' });
     items.push({

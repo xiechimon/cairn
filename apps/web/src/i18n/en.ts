@@ -1810,6 +1810,19 @@ export const EN: Record<string, string> = {
   '内存压力 {mem}%；CPU {cpu}%；剩余磁盘 {disk} GB':
     'Memory pressure {mem}%; CPU {cpu}%; {disk} GB disk free',
   '内存压力 {mem}%；剩余磁盘 {disk} GB': 'Memory pressure {mem}%; {disk} GB disk free',
+  '内存压力 {mem}%；CPU {cpu}%；负载 {load} / {cores} 核；剩余磁盘 {disk} GB':
+    'Memory pressure {mem}%; CPU {cpu}%; Load {load} / {cores#1 core|# cores}; {disk} GB disk free',
+  '内存压力 {mem}%；负载 {load} / {cores} 核；剩余磁盘 {disk} GB':
+    'Memory pressure {mem}%; Load {load} / {cores#1 core|# cores}; {disk} GB disk free',
+  '内存 {mem}%': 'Memory {mem}%',
+  '负载 {load} / {cores} 核': 'Load {load} / {cores#1 core|# cores}',
+  '剩余磁盘 {disk} GB': '{disk} GB disk free',
+  '离线 · 最后在线 {ago}': 'Offline · Last seen {ago}',
+  '离线时读数已过期，不显示': 'Readings are stale while offline, so none are shown',
+  尚未上报内存和负载: 'No memory or load reported yet',
+  内存吃紧: 'Memory strained',
+  'CPU 吃紧': 'CPU strained',
+  磁盘吃紧: 'Disk almost full',
   '还有 {n} 个，在 Cairn 里看': '{n} more, see them in Cairn',
   '今天用了 {tokens} tokens': 'Used today: {tokens}',
   '{n} tokens': '{n#1 token|# tokens}',

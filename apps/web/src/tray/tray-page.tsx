@@ -27,6 +27,7 @@ import { desktopTray } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
 import { USAGE_PATH } from '../resources/hrefs.js';
 import {
+  popoverGroups,
   type TrayGroup,
   type TrayText,
   type TrayUsage,
@@ -45,6 +46,7 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
   groups: TrayGroup[];
   usage: TrayUsage | null;
   coordinatorBusy: boolean;
+  now: number;
 } {
   const { live, teamId } = useLiveData();
   const client = useQueryClient();
@@ -95,7 +97,12 @@ function useTrayData(onOpened: (refresh: () => void) => () => void): {
     () => trayUsage(usageQ.data, subscriptionsQ.data, now),
     [usageQ.data, subscriptionsQ.data, now],
   );
-  return { groups, usage, coordinatorBusy: threadsQ.data?.some(threadTurnInFlight) ?? false };
+  return {
+    groups,
+    usage,
+    coordinatorBusy: threadsQ.data?.some(threadTurnInFlight) ?? false,
+    now,
+  };
 }
 
 function moveFocus(event: KeyboardEvent<HTMLDivElement>, hide: () => void) {
@@ -160,7 +167,8 @@ export function TrayPage() {
     (refresh: () => void) => bridge?.onOpened(refresh) ?? (() => {}),
     [bridge],
   );
-  const { groups, usage, coordinatorBusy } = useTrayData(onOpened);
+  const { groups: allGroups, usage, coordinatorBusy, now } = useTrayData(onOpened);
+  const groups = useMemo(() => popoverGroups(allGroups), [allGroups]);
   const say = (text: TrayText) => t(text.key, text.vars);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -187,8 +195,17 @@ export function TrayPage() {
   }, []);
 
   const menu = useMemo(
-    () => trayMenuModel({ groups, usage, coordinatorBusy, state, userName: user.displayName, t }),
-    [groups, usage, coordinatorBusy, state, user.displayName, t],
+    () =>
+      trayMenuModel({
+        groups: allGroups,
+        usage,
+        coordinatorBusy,
+        state,
+        userName: user.displayName,
+        now,
+        t,
+      }),
+    [allGroups, usage, coordinatorBusy, state, user.displayName, now, t],
   );
   useEffect(() => bridge?.publish(menu), [bridge, menu]);
 

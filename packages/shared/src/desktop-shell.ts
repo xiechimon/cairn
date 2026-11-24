@@ -70,11 +70,14 @@ export const nativeTrayItemSchema = z.discriminatedUnion('kind', [
     kind: z.literal('header'),
     id: z.string().min(1).max(200),
     title: trayText,
-    os: z.enum(['darwin', 'windows', 'linux', 'unknown']).optional(),
-    meter: z
+    reading: z
       .strictObject({
-        percent: z.number().int().min(0).max(100),
-        level: z.enum(['normal', 'high', 'full']),
+        parts: z
+          .array(z.strictObject({ text: trayText, strained: z.boolean() }))
+          .min(1)
+          .max(6),
+        faint: z.boolean(),
+        spoken: trayText,
         tip: trayText,
       })
       .optional(),

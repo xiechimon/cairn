@@ -5,6 +5,7 @@ import type { TodoRecord } from '../src/fixtures/records.js';
 import {
   TRAY_MACHINE_MAX_ROWS,
   TRAY_MAX_ROWS,
+  popoverGroups,
   type TrayMachine,
   trayGroups,
   trayUsage,
@@ -69,6 +70,7 @@ const MIN = 60_000;
 const machine = (extra: Partial<TrayMachine>): TrayMachine => ({
   id: 'm1',
   name: 'xmon 的 MacBook Pro',
+  kind: 'remote',
   online: true,
   running: [],
   queued: [],
@@ -101,7 +103,9 @@ test('a computer groups its tasks: stalled first, then running oldest first, the
     ],
     now,
   );
-  expect(groups.map((g) => g.label)).toEqual(['xmon 的 MacBook Pro', '进行中']);
+  expect(groups.map((g) => g.label)).toEqual(['xmon 的 MacBook Pro', 'idle', 'off', '进行中']);
+  expect(groups.map((g) => g.machine?.kind)).toEqual(['unreported', 'unreported', 'offline', undefined]);
+  expect(popoverGroups(groups).map((g) => g.label)).toEqual(['xmon 的 MacBook Pro', '进行中']);
   const rows = groups[0]?.rows ?? [];
   expect(rows.map((r) => [r.title, r.hint?.key, r.hint?.vars?.n, r.warn ?? false])).toEqual([
     ['hung', '{n} 分钟无进展', 16, true],
@@ -109,7 +113,7 @@ test('a computer groups its tasks: stalled first, then running oldest first, the
     ['fresh', '{n} 分', 2, false],
     ['full', '运行中', undefined, false],
   ]);
-  expect(groups[1]?.rows.map((r) => r.title)).toEqual(['loose']);
+  expect(groups[3]?.rows.map((r) => r.title)).toEqual(['loose']);
 });
 
 test('a running task on a computer leaves the 进行中 group, and a long list ends in a more row', () => {
@@ -146,14 +150,23 @@ test('a computer group carries the machine OS for the header icon', () => {
   expect(bare[0]?.os).toBeNull();
 });
 
-test('an idle computer shows only when strained, with a pressure percent and level in the header', () => {
+test('the popover shows an idle computer only when strained, with a pressure percent and level in the header', () => {
   const hardware = { cpuCores: 10, memoryTotalMb: 16_384, memoryAvailableMb: 1_024, loadAvg1: 2, loadAvg5: 7, cpuUtilization: 0.02, memoryPressure: 0.94, diskFreeMb: 2_048 };
   const groups = trayGroups(
     { questions: [], entries: [] },
     [machine({ strain: ['memory', 'disk'], capabilities: { hardware } as TrayMachine['capabilities'] })],
     0,
   );
-  expect(groups).toHaveLength(1);
+  expect(popoverGroups(groups)).toHaveLength(1);
+  expect(groups[0]?.machine).toEqual({
+    kind: 'online',
+    memory: 0.94,
+    cpu: 0.02,
+    load: 2,
+    cores: 10,
+    diskGb: 2,
+    strain: ['memory', 'disk'],
+  });
   expect(groups[0]?.rows).toEqual([]);
   const meta = groups[0]?.meta;
   expect(meta?.warn).toBe(true);
