@@ -640,7 +640,7 @@ export const useRemoteRoutes = (enabled: boolean) =>
     queryFn: () => api.get<RemoteRoutesResponse>('/api/remote/routes'),
     enabled,
     refetchInterval: (query) => {
-      const state = query.state.data?.tailnet.state;
+      const state = query.state.data?.tailnet?.state;
       const tunnelState = query.state.data?.tunnel?.state;
       const transient =
         state === 'starting' ||

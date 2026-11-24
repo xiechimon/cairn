@@ -667,8 +667,8 @@ export function BoardSidebar({
                   className="size-5.5 flex-none rounded-full object-cover"
                 />
               ) : (
-                <span className="flex size-5.5 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background uppercase">
-                  {relayAccount.displayName.slice(0, 1)}
+                <span className="flex size-5.5 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
+                  {relayAccount.displayName.slice(0, 1).toUpperCase()}
                 </span>
               )}
               <span className="truncate text-ui font-medium">{relayAccount.displayName}</span>

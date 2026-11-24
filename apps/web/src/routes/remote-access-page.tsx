@@ -37,6 +37,7 @@ import {
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { copyTextWithFeedback, writeClipboard } from '../lib/clipboard.js';
 import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
 import { PageShell } from '../pages/shell.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
@@ -103,7 +104,7 @@ function PairingDialog({
         <Button
           variant="outline"
           className={DIALOG_PRIMARY_BUTTON}
-          onClick={() => void navigator.clipboard?.writeText(link)}
+          onClick={() => void writeClipboard(link)}
         >
           {t('复制链接')}
         </Button>
@@ -338,7 +339,7 @@ export function RemoteAccessPage() {
                   <Input
                     value={relayInputValue}
                     onChange={(event) => setRelayDraft(event.target.value)}
-                    placeholder="https://relay.example.com"
+                    placeholder={t('例如：https://relay.example.com')}
                     aria-label={t('中继地址')}
                     data-testid="remote-tunnel-relay-input"
                     className="max-w-60 font-mono text-meta"
@@ -377,8 +378,8 @@ export function RemoteAccessPage() {
                         className="size-8 flex-none rounded-full object-cover"
                       />
                     ) : (
-                      <span className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background uppercase">
-                        {relayAccount.displayName.slice(0, 1)}
+                      <span className="inline-flex size-8 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background">
+                        {relayAccount.displayName.slice(0, 1).toUpperCase()}
                       </span>
                     )}
                     <div className="min-w-0">
@@ -509,7 +510,7 @@ export function RemoteAccessPage() {
                     variant="outline"
                     className={DIALOG_PRIMARY_BUTTON}
                     onClick={() => {
-                      void navigator.clipboard?.writeText(loginUrl).then(() => {
+                      copyTextWithFeedback(loginUrl, () => {
                         setLoginCopied(true);
                         setTimeout(() => setLoginCopied(false), 2_000);
                       });
@@ -533,7 +534,7 @@ export function RemoteAccessPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
-                          void navigator.clipboard?.writeText(tunnelUrl).then(() => {
+                          copyTextWithFeedback(tunnelUrl, () => {
                             setTunnelCopied(true);
                             setTimeout(() => setTunnelCopied(false), 2_000);
                           });
@@ -567,7 +568,7 @@ export function RemoteAccessPage() {
                     <Input
                       value={relayInputValue}
                       onChange={(event) => setRelayDraft(event.target.value)}
-                      placeholder="https://relay.example.com"
+                      placeholder={t('例如：https://relay.example.com')}
                       aria-label={t('中继地址')}
                       data-testid="remote-tunnel-relay-input"
                       className="font-mono text-meta"
@@ -710,7 +711,7 @@ export function RemoteAccessPage() {
           <Input
             value={shareEmail}
             onChange={(event) => setShareEmail(event.target.value)}
-            placeholder="friend@example.com"
+            placeholder={t('例如：friend@example.com')}
             aria-label={t('对方邮箱')}
           />
         </DialogShell>

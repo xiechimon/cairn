@@ -191,7 +191,7 @@ export interface DesktopUpdate {
 }
 
 const desktopReleaseFileSchema = z.strictObject({
-  name: z.string().regex(/^Cairn-[0-9A-Za-z.+-]+\.zip$/),
+  name: z.string().regex(/^Cairn-[0-9A-Za-z.+-]+\.(zip|exe)$/),
   size: z.number().int().positive(),
   sha256: z.string().regex(/^[0-9a-f]{64}$/),
 });
@@ -207,9 +207,11 @@ export function desktopUpdateFrom(
   manifest: DesktopReleaseManifest,
   currentVersion: string,
   arch: string,
+  platform: string = 'darwin',
 ): DesktopUpdate | null {
   if (!semver.gt(manifest.version, currentVersion)) return null;
-  const file = manifest.files[arch];
+  const key = platform === 'win32' ? `win-${arch}` : arch;
+  const file = manifest.files[key];
   if (file === undefined) return null;
   return {
     version: manifest.version,

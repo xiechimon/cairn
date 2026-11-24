@@ -2875,6 +2875,8 @@ export const EN: Record<string, string> = {
   '无法发起登录，请检查中继地址后重试':
     'Could not start sign-in. Check the relay URL and try again.',
   '高级：本地 Tailscale 与手动配对': 'Advanced: local Tailscale & manual pairing',
+  '例如：https://relay.example.com': 'e.g. https://relay.example.com',
+  '例如：friend@example.com': 'e.g. friend@example.com',
   授权给其他账号: 'Share with another account',
   退出: 'Sign out',
   本机已在线: 'This computer · online',

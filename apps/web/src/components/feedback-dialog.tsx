@@ -3,6 +3,7 @@ import { useSubmitFeedback } from '../api/hooks.js';
 import { useI18n } from '../i18n/provider.js';
 import { Button } from './ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from './ui/dialog-shell.js';
+import { Textarea } from './ui/textarea.js';
 import { toastError, toastSuccess } from './ui/toaster.js';
 
 export function FeedbackDialog({
@@ -69,13 +70,13 @@ export function FeedbackDialog({
             {errorSummary}
           </p>
         )}
-        <textarea
+        <Textarea
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           placeholder={t('简单描述遇到了什么问题…')}
           rows={4}
           data-testid="feedback-textarea"
-          className="w-full resize-none rounded-lg border border-border bg-surface px-3 py-2 text-ui text-foreground outline-none focus:border-foreground"
+          className="resize-none"
         />
       </div>
     </DialogShell>
