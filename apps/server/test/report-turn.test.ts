@@ -23,6 +23,7 @@ import {
 } from '../src/services/chief.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { addTurnOwnerMessage } from '../src/services/chief-turns.js';
+import { finishCoordinatorTurn } from '../src/services/coordinator-steps.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
 import { executeRelayToolCall, machineAsk } from '../src/services/machine-relay.js';
 import { reconcileOwners } from '../src/services/owner.js';
@@ -425,5 +426,26 @@ describe('a report turn treats the report as third-party data', () => {
         .all()
         .filter((row) => JSON.stringify(row.content).includes('ask-report-1')),
     ).toEqual([]);
+  });
+
+  test('a finished info report wake that already notified the user settles to done without handing off to the owner', async () => {
+    const w = openWorld({ origin: 'live' });
+    const turn = w.deliver()!;
+    await notify(w, turn);
+    expect(w.phaseOf(w.task.todoId)).toBe('review');
+    finishCoordinatorTurn(w.s.svc, turn, { status: 'success' });
+    const settled = getTodo(w.deps, w.task.todoId);
+    expect(settled?.phase).toBe('done');
+    expect(settled?.owner).toBeNull();
+    expect(settled?.section).toBe('resolved');
+  });
+
+  test('an unnotified info report wake that ends without complete_todos still hands off rather than silently finishing', () => {
+    const w = openWorld();
+    const turn = w.deliver()!;
+    finishCoordinatorTurn(w.s.svc, turn, { status: 'success' });
+    const handed = getTodo(w.deps, w.task.todoId);
+    expect(handed?.phase).toBe('review');
+    expect(handed?.owner).toBe('owner');
   });
 });

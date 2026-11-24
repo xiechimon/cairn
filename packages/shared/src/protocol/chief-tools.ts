@@ -33,6 +33,7 @@ export type RemoteToolDef = z.infer<typeof remoteToolDefSchema>;
 
 export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'create_todo',
+  'complete_todos',
   'todos',
   'docs',
   'threads',

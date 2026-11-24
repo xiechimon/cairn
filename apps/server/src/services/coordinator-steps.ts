@@ -2,7 +2,9 @@ import type { MachineDoneBody, ModelUsage, OtelObservation } from '@cairn/shared
 import {
   ACTIVE_STEP_STATUSES,
   CHIEF_TURN_ERROR_KIND,
+  DONE_ANNOUNCEMENT,
   formatSkillRouteSection,
+  isInfoOutput,
   stripTurnContext,
   suggestSkillsForMessage,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
@@ -34,6 +36,7 @@ import {
   type StepRanModel,
   step,
   stepUsage,
+  todo,
   tokenUsage,
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
@@ -70,10 +73,14 @@ import { recallMemorySection } from './memory-recall.js';
 import { ranModel } from './model-fallback.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContextTraced } from './project-instructions.js';
+import { reportAnsweredIn, reportRefCurrent, reportRefOfPrompt } from './report-turn.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { scanLocalSkills } from './skills.js';
+import { setTodoPhase } from './todos.js';
 import { costFromRates, ratesForModel } from './token-usage-cost.js';
+import { insertGateAnnouncement } from './transcript.js';
 import { turnProvenance } from './turn-provenance.js';
+import { pendingWorkerQuestions } from './worker-question-store.js';
 
 type StepRow = typeof step.$inferSelect;
 type ThreadRow = typeof chiefThread.$inferSelect;
@@ -455,6 +462,23 @@ export function latestChiefMemoryUsage(db: Db, teamId: string) {
   };
 }
 
+function settleNotifiedReportTurn(deps: MachineDeps, stepRow: StepRow): void {
+  const ref = reportRefOfPrompt(stepRow.prompt);
+  if (ref === null || !reportRefCurrent(deps.db, ref)) return;
+  const row = deps.db.select().from(todo).where(eq(todo.id, ref.todoId)).get();
+  if (row === undefined || !isInfoOutput(row.output)) return;
+  if (pendingWorkerQuestions(deps.db, ref.buildId).length > 0) return;
+  if (!reportAnsweredIn(deps.db, ref.threadId, row)) return;
+  const settled = setTodoPhase(
+    deps,
+    ref.todoId,
+    'done',
+    {},
+    { silentSettleThreadId: ref.threadId },
+  );
+  if (settled !== null) insertGateAnnouncement(deps, ref.buildId, DONE_ANNOUNCEMENT, 'Coordinator');
+}
+
 export function finishCoordinatorTurn(
   deps: MachineDeps,
   stepRow: StepRow,
@@ -495,6 +519,7 @@ export function finishCoordinatorTurn(
     outcome.status === 'success' ? 'success' : outcome.status === 'stopped' ? 'stopped' : 'failed',
     outcome.errorMessage ?? undefined,
   );
+  if (outcome.status === 'success') settleNotifiedReportTurn(deps, stepRow);
   if (outcome.status === 'success') announcePrimaryRestored(deps, stepRow);
   if (outcome.status === 'success')
     notifyChiefTurn(

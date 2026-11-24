@@ -151,6 +151,53 @@ describe('deferred coordinator tools', () => {
     expect(seenResults[1]).toContain('result of merge_builds');
     await harness.close(ctx);
   });
+
+  it('offers complete_todos immediately in the core set without requiring tool_search', async () => {
+    const offered: string[][] = [];
+    const faux = fauxProvider({ provider: 'stub', models: [{ id: 'm', contextWindow: 200_000 }] });
+    faux.setResponses([
+      (c: FauxContext) => {
+        const declared = new Set<string>();
+        for (const m of c.messages as {
+          role: string;
+          toolsAdded?: { name: string }[];
+          toolsRemoved?: { name: string }[];
+        }[]) {
+          if (m.role !== 'system') continue;
+          for (const t of m.toolsAdded ?? []) declared.add(t.name);
+          for (const t of m.toolsRemoved ?? []) declared.delete(t.name);
+        }
+        offered.push([...declared]);
+        return fauxAssistantMessage([fauxToolCall('complete_todos', { todoIds: ['t1'] })], {
+          stopReason: 'toolUse',
+        });
+      },
+      fauxAssistantMessage('done'),
+    ]);
+    const coordinatorModels = createCoordinatorModels([faux.provider]);
+    const api = fakeMachineApi();
+    const gate = createStepGate();
+    const harness = await openCoordinatorHarness(storagePath(), coordinatorModels.models, ctx, {
+      extensions: [coordinatorToolsExtension(api, gate, { loaded: CORE_COORDINATOR_TOOLS })],
+    });
+    await runCoordinatorTurn(
+      {
+        harness,
+        models: coordinatorModels,
+        api,
+        context: ctx,
+        heartbeatMs: 1000,
+        now: () => 1,
+        gate,
+      },
+      chiefStep('step-core-complete', 'finish report'),
+    );
+    expect(offered[0]).toContain('complete_todos');
+    expect(api.tools).toEqual([
+      { stepId: 'step-core-complete', name: 'complete_todos', params: { todoIds: ['t1'] } },
+    ]);
+    await harness.close(ctx);
+  });
 });
 
 describe('coordinator tools', () => {
