@@ -103,8 +103,17 @@ describe('the schema and migration journal (the 01 §6 list)', () => {
       const db = drizzle(sqlite, { schema });
       migrate(db, { migrationsFolder: directory });
       db.run(sql`INSERT INTO team (id, name, createdAt) VALUES ('legacy', 'Legacy', 0)`);
+      db.run(
+        sql`INSERT INTO antigravity_subscription (id, teamId, label, enabledAt, createdAt) VALUES ('legacy-agy', 'legacy', 'Antigravity', 1, 1)`,
+      );
       migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
       seed(db);
+      expect(db.select().from(schema.antigravitySubscription).get()).toMatchObject({
+        id: 'legacy-agy',
+        teamId: 'legacy',
+        enabledAt: 1,
+        runnerId: null,
+      });
       expect(
         db
           .select()

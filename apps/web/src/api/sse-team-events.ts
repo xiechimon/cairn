@@ -27,6 +27,8 @@ export function teamEventInvalidations(
     case 'machine_presence':
       return [
         ['machines', teamId],
+        ['antigravity-subscriptions', teamId],
+        ['model-sources', teamId],
         ['computers', teamId],
         ['model-routing', teamId],
       ];

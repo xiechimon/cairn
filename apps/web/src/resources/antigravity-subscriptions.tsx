@@ -2,6 +2,8 @@ import type {
   AntigravityLocalStatus,
   AntigravityLoginOutcome,
   AntigravityLoginPhase,
+  AntigravityRunnerLogin,
+  AntigravitySubscriptionListEntry,
   DesktopSubscriptionInput,
   DesktopSubscriptionMetadata,
 } from '@cairn/shared';
@@ -102,26 +104,35 @@ function loginFailCopy(reason: string, t: TFunc): string {
 
 function useAntigravityLocalStatus(bridge: AntigravityBridge | null) {
   const [local, setLocal] = useState<AntigravityLocalStatus | null>(null);
+  const mountedRef = useRef(true);
+  const seqRef = useRef(0);
   const refresh = () => {
     if (bridge === null) return;
+    const seq = ++seqRef.current;
     void bridge.status().then(
-      (status) => setLocal(status),
-      () => setLocal({ installed: false, loggedIn: false, canLogin: false }),
+      (status) => {
+        if (mountedRef.current && seqRef.current === seq) setLocal(status);
+      },
+      () => {
+        if (mountedRef.current && seqRef.current === seq) {
+          setLocal({ installed: false, loggedIn: false, canLogin: false });
+        }
+      },
     );
   };
   useEffect(() => {
-    if (bridge === null) return;
-    let active = true;
-    void bridge.status().then(
-      (status) => {
-        if (active) setLocal(status);
-      },
-      () => {
-        if (active) setLocal({ installed: false, loggedIn: false, canLogin: false });
-      },
-    );
+    mountedRef.current = true;
+    refresh();
+    if (bridge === null) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
+    const onFocus = () => refresh();
+    window.addEventListener('focus', onFocus);
     return () => {
-      active = false;
+      mountedRef.current = false;
+      window.removeEventListener('focus', onFocus);
     };
   }, [bridge]);
   return { local, refresh };
@@ -202,13 +213,7 @@ export function AddAntigravitySubscriptionDialog({
   const defaultMachineId =
     (teamsQ.data?.find((team) => team.id === resolvedTeamId) ?? teamsQ.data?.[0])
       ?.defaultMachineId ?? null;
-  const localRunnerId =
-    local !== null &&
-    'runnerId' in local &&
-    typeof (local as { runnerId?: unknown }).runnerId === 'string'
-      ? (local as { runnerId: string }).runnerId
-      : undefined;
-  const target = defaultRunnerTarget(machinesQ.data, defaultMachineId, localRunnerId);
+  const target = defaultRunnerTarget(machinesQ.data, defaultMachineId, local?.runnerId);
 
   const loginActive = login.phase === 'waiting' || login.phase === 'installing';
   const showLocalRow = bridge !== null && (local === null || local.loggedIn || local.canLogin);
@@ -390,22 +395,48 @@ export function AntigravityRelogin({
   teamId,
   subscription,
   renewOAuth,
+  runnerId,
+  runnerLogin,
+  runnerLogins,
   onLoggedIn,
 }: {
   teamId: string;
   subscription: DesktopSubscriptionMetadata;
   renewOAuth: boolean;
-  onLoggedIn: () => void;
+  runnerId?: string | null | undefined;
+  runnerLogin?: AntigravitySubscriptionListEntry['runnerLogin'];
+  runnerLogins?: readonly AntigravityRunnerLogin[] | undefined;
+  onLoggedIn: (bindRunnerId?: string) => void;
 }) {
   const { t } = useI18n();
   const [bridge] = useState(antigravityBridge);
-  const { local } = useAntigravityLocalStatus(bridge);
+  const { local, refresh } = useAntigravityLocalStatus(bridge);
   const login = useAntigravityLogin(bridge);
 
-  if (bridge === null || local === null || (!local.installed && !local.canLogin)) {
+  if (
+    bridge === null ||
+    local === null ||
+    (!renewOAuth &&
+      (runnerLogin === 'ok' ||
+        (runnerId != null && local.runnerId !== runnerId) ||
+        (runnerId == null &&
+          runnerLogins !== undefined &&
+          runnerLogins.length > 0 &&
+          local.runnerId === undefined) ||
+        (local.loggedIn && (runnerId != null || local.runnerId === undefined)))) ||
+    (!local.loggedIn && !local.installed && !local.canLogin) ||
+    (renewOAuth && !local.installed && !local.canLogin)
+  ) {
     return null;
   }
+  const canUseExistingLocal =
+    !renewOAuth && local.loggedIn && runnerId == null && local.runnerId !== undefined;
   const loginActive = login.phase === 'waiting' || login.phase === 'installing';
+  const helperCopy = renewOAuth
+    ? t('会打开浏览器完成 Google 账号登录。')
+    : canUseExistingLocal
+      ? t('绑定这台 Mac 并立即验证。')
+      : t('登录完成后会重新验证。');
   return (
     <div data-testid="antigravity-relogin" className="-mt-3 flex flex-col gap-1">
       <p className="m-0 flex items-center gap-2">
@@ -432,21 +463,27 @@ export function AntigravityRelogin({
               variant="outline"
               size="sm"
               data-testid="antigravity-detail-login"
-              onClick={() =>
+              onClick={() => {
+                if (canUseExistingLocal) {
+                  onLoggedIn(local.runnerId);
+                  return;
+                }
                 void login
                   .start({ teamId, label: subscription.label }, subscription.id)
                   .then((outcome) => {
-                    if (outcome.ok) onLoggedIn();
-                  })
-              }
+                    if (!outcome.ok) return;
+                    refresh();
+                    onLoggedIn();
+                  });
+              }}
             >
-              {local.installed ? t('在这台 Mac 上登录 Antigravity') : t('安装并登录 Antigravity')}
+              {canUseExistingLocal
+                ? t('使用这台 Mac 的登录')
+                : local.installed
+                  ? t('在这台 Mac 上登录 Antigravity')
+                  : t('安装并登录 Antigravity')}
             </Button>
-            <span className="min-w-0 flex-1 text-meta text-content-tertiary">
-              {renewOAuth
-                ? t('会打开浏览器完成 Google 账号登录。')
-                : t('登录完成后会重新验证；如果执行机是另一台电脑，请在那台电脑上登录。')}
-            </span>
+            <span className="min-w-0 flex-1 text-meta text-content-tertiary">{helperCopy}</span>
           </>
         )}
       </p>

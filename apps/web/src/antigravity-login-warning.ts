@@ -1,4 +1,4 @@
-import type { AntigravitySubscription, MachineRecord } from '@cairn/shared';
+import type { AntigravitySubscription, AntigravitySubscriptionListEntry } from '@cairn/shared';
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -24,23 +24,18 @@ export function antigravitySubscriptionLoginWarning(
   );
 }
 
-export function antigravityRunnersSignedOut(
-  machines: readonly MachineRecord[] | undefined,
-): boolean {
-  const installed = (machines ?? []).filter(
-    (machine) => machine.online && machine.capabilities?.antigravity?.installed === true,
-  );
-  return (
-    installed.length > 0 &&
-    installed.every((machine) => machine.capabilities?.antigravity?.authenticated === false)
-  );
-}
-
 export function antigravitySubscriptionSignedOutWarning(
-  subscription: AntigravitySubscription,
+  subscription: AntigravitySubscriptionListEntry,
   t: Translate,
 ): string | null {
-  if (subscription.enabled === false || subscription.hasToken !== false) return null;
+  if (
+    subscription.enabled === false ||
+    subscription.hasToken !== false ||
+    subscription.runnerLogin === undefined ||
+    subscription.runnerLogin === 'ok'
+  )
+    return null;
+  if (subscription.runnerOffline === true) return t('执行机离线');
   return t(
     '{name}：执行机上没有可用的 Antigravity 登录，Coordinator 和任务暂时无法使用。在「设置 → 模型路由」重新登录。',
     { name: subscription.label },

@@ -43,7 +43,10 @@ import {
 } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
-import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
+import {
+  antigravitySubscriptionAllowsRunner,
+  enabledAntigravitySubscriptionId,
+} from './antigravity-subscriptions.js';
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
@@ -89,6 +92,7 @@ import {
   priorSessionOf,
   routeTargets,
   routeVerdict,
+  runtimeFallbackMachineId,
   teamDefaultMachineId,
   type WorkerStepFacts,
   workerIneligibility,
@@ -495,8 +499,10 @@ async function claimChiefTurn(
   const needsConnectorTools = cands.some((cand) => {
     if (chiefTurnLocked(cand.stepRow) || !cand.agentRow.modelId) return false;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) return false;
-    if (chiefMachineId(db, teamId, cand.agentRow.machineId) !== machineId) return false;
     const model = effectiveModel(cand.agentRow, cand.stepRow);
+    if (chiefMachineId(db, teamId, cand.agentRow.machineId, model.provider) !== machineId) {
+      return false;
+    }
     return chiefIneligibility(db, initialMachine, cand.agentRow, model.provider, nowMs()) === null;
   });
   if (needsConnectorTools) {
@@ -522,7 +528,12 @@ async function claimChiefTurn(
     ) {
       continue;
     }
-    const chiefMachine = chiefMachineId(db, teamId, cand.agentRow.machineId);
+    const chiefMachine = chiefMachineId(
+      db,
+      teamId,
+      cand.agentRow.machineId,
+      effectiveModel(cand.agentRow, cand.stepRow).provider,
+    );
     if (chiefMachine !== machineId) continue;
     const claimed = await buildChiefClaim(
       deps,
@@ -653,23 +664,25 @@ async function tryClaim(
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
-    const sole = platformFallbackMachineId(
-      db,
-      db
-        .select({
-          id: machine.id,
-          online: machine.online,
-          kind: machine.kind,
-          lastSeenAt: machine.lastSeenAt,
-          tokenHash: machine.tokenHash,
-          capabilities: machine.capabilities,
-          retiredAt: machine.retiredAt,
-        })
-        .from(machine)
-        .where(eq(machine.teamId, teamId))
-        .all(),
-      teamDefaultMachineId(db, teamId),
-      agentRow.requiredCapabilities?.os,
+    const sole = runtimeFallbackMachineId(db, teamId, model.provider, () =>
+      platformFallbackMachineId(
+        db,
+        db
+          .select({
+            id: machine.id,
+            online: machine.online,
+            kind: machine.kind,
+            lastSeenAt: machine.lastSeenAt,
+            tokenHash: machine.tokenHash,
+            capabilities: machine.capabilities,
+            retiredAt: machine.retiredAt,
+          })
+          .from(machine)
+          .where(eq(machine.teamId, teamId))
+          .all(),
+        teamDefaultMachineId(db, teamId),
+        agentRow.requiredCapabilities?.os,
+      ),
     );
     const allowed = routeVerdict({
       machineId,
@@ -720,7 +733,9 @@ async function tryClaim(
         if (claimRuntimeIsDevin && boundDevinId !== enabledDevinId) return false;
         if (
           claimRuntimeIsAntigravity &&
-          (boundAntigravityId === null || boundAntigravityId !== enabledAntigravityId)
+          (boundAntigravityId === null ||
+            boundAntigravityId !== enabledAntigravityId ||
+            !antigravitySubscriptionAllowsRunner(tx, teamId, machineId))
         )
           return false;
         const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();

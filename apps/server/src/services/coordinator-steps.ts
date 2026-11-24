@@ -38,7 +38,10 @@ import {
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
-import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
+import {
+  antigravitySubscriptionAllowsRunner,
+  enabledAntigravitySubscriptionId,
+} from './antigravity-subscriptions.js';
 import {
   chiefClaimContext,
   coordinatorTurnState,
@@ -103,7 +106,14 @@ export function claimPendingChiefStep(
       bind?.runtime === 'antigravity'
         ? enabledAntigravitySubscriptionId({ db }, bind.teamId, Math.max(claimedAt, nowMs()))
         : null;
-    if (bind?.runtime === 'antigravity' && antigravitySubscriptionId === null) return null;
+    if (
+      bind?.runtime === 'antigravity' &&
+      (antigravitySubscriptionId === null ||
+        options.machineId === null ||
+        !antigravitySubscriptionAllowsRunner(db, bind.teamId, options.machineId))
+    ) {
+      return null;
+    }
     const res = db
       .update(step)
       .set({

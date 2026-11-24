@@ -16,12 +16,20 @@ interface LocalStatus {
   installed: boolean;
   loggedIn: boolean;
   canLogin: boolean;
+  runnerId?: string;
 }
 
 async function installBridge(
   page: Page,
   opts: { status: LocalStatus; importOk?: boolean },
-  save: (input: DesktopSubscriptionInput, subscriptionId?: string) => AntigravityLoginOutcome,
+  save: (input: DesktopSubscriptionInput, subscriptionId?: string) => AntigravityLoginOutcome = (
+    input,
+    subscriptionId,
+  ) => ({
+    ok: true,
+    subscription: { id: subscriptionId ?? 'ag-sub-1', label: input.label },
+    ...(opts.status.runnerId === undefined ? {} : { runnerId: opts.status.runnerId }),
+  }),
 ) {
   await page.exposeFunction('saveAntigravityOnDesktop', save);
   await page.addInitScript(
@@ -75,7 +83,11 @@ async function openDialog(
   page: Page,
   opts: { status: LocalStatus | null; importOk?: boolean; withSources?: boolean },
 ) {
-  const calls = { created: [] as (string | null)[], desktopLabels: [] as string[], verified: [] as string[] };
+  const calls = {
+    created: [] as { token: string | null; runnerId?: string }[],
+    desktopLabels: [] as string[],
+    verified: [] as string[],
+  };
   const subscriptions: AntigravitySubscriptionListEntry[] = [];
   if (opts.status !== null) {
     await installBridge(page, { status: opts.status, importOk: opts.importOk }, ({ teamId, label }, subscriptionId) => {
@@ -113,12 +125,22 @@ async function openDialog(
     if (path === '/api/teams/t1/antigravity-subscriptions') {
       if (route.request().method() === 'POST') {
         const body = route.request().postDataJSON();
-        calls.created.push(body.token ?? null);
+        calls.created.push({ token: body.token ?? null, runnerId: body.runnerId });
         const created: AntigravitySubscriptionListEntry = {
           id: 'ag-sub-1',
           kind: 'antigravity-subscription',
           label: body.label,
           hasToken: typeof body.token === 'string' && body.token !== '',
+          runnerId: body.runnerId,
+          ...(opts.withSources
+            ? {
+                runnerLogin: 'ok' as const,
+                runnerModels: [
+                  { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+                  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+                ],
+              }
+            : {}),
           expiresAt: body.expiresAt ?? null,
           enabled: true,
           createdAt: Date.now(),
@@ -157,7 +179,7 @@ test('logged-in Mac imports through the privileged bridge without posting a cred
   page,
 }) => {
   const { dialog, calls } = await openDialog(page, {
-    status: { installed: true, loggedIn: true, canLogin: true },
+    status: { installed: true, loggedIn: true, canLogin: true, runnerId: 'm-ready' },
     withSources: true,
   });
   const importButton = dialog.getByTestId('antigravity-local-import');
@@ -185,7 +207,7 @@ test('logged-out Mac runs browser login and continues automatically', async ({ p
   await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
   await page.evaluate(() => {
     const w = window as Window & { __antigravity?: AntigravityCalls };
-    w.__antigravity?.resolve?.({ ok: true });
+    w.__antigravity?.resolve?.({ ok: true, runnerId: 'm-ready' });
   });
   await expect(dialog).not.toBeVisible();
   expect(calls.desktopLabels).toEqual(['Antigravity 订阅']);
@@ -267,7 +289,7 @@ test('timed-out login falls back to pasting GEMINI_API_KEY', async ({ page }) =>
   await dialog.getByTestId('antigravity-subscription-token').fill(`GEMINI_API_KEY="${API_KEY}"`);
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  expect(calls.created).toEqual([API_KEY]);
+  expect(calls.created).toEqual([{ token: API_KEY }]);
   await expect(page.locator('body')).not.toContainText(API_KEY);
 });
 
@@ -277,7 +299,7 @@ test('web-only mode saves host-keyring subscription directly with null token', a
   const { dialog, calls } = await openDialog(page, { status: null });
   await dialog.getByRole('button', { name: '保存', exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  expect(calls.created).toEqual([null]);
+  expect(calls.created).toEqual([{ token: null }]);
 });
 
 test('missing agy installs first, then opens the browser login and verifies green', async ({
@@ -301,7 +323,7 @@ test('missing agy installs first, then opens the browser login and verifies gree
   await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
   await page.evaluate(() => {
     const w = window as Window & { __antigravity?: AntigravityCalls };
-    w.__antigravity?.resolve?.({ ok: true });
+    w.__antigravity?.resolve?.({ ok: true, runnerId: 'm-ready' });
   });
   await expect(dialog).not.toBeVisible();
   expect(calls.desktopLabels).toEqual(['Antigravity 订阅']);
@@ -411,6 +433,8 @@ test('a signed-out runner brings the login banner back on the board', async ({ p
               kind: 'antigravity-subscription',
               label: 'Antigravity 订阅',
               hasToken: false,
+              runnerId: 'm-ready',
+              runnerLogin: 'missing_local_login',
               expiresAt: null,
               enabled: true,
               createdAt: 1,
@@ -426,4 +450,601 @@ test('a signed-out runner brings the login banner back on the board', async ({ p
     'signed-out',
   );
   await expect(banner).toContainText('没有可用的 Antigravity 登录');
+});
+
+test('manual Verify reports real wall time, runs one live check, and keeps remote bound Runner clear', async ({
+  page,
+}) => {
+  await installBridge(page, {
+    status: { installed: true, loggedIn: false, canLogin: true, runnerId: 'm-mac' },
+  });
+  let verifyCalls = 0;
+  const { promise: releaseVerify, resolve: settleVerify } = Promise.withResolvers<void>();
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions') {
+      return json([
+        {
+          id: 'ag-sub-1',
+          kind: 'antigravity-subscription',
+          label: 'Antigravity 订阅',
+          hasToken: false,
+          runnerId: 'm-mini',
+          runnerName: 'Ians-Mac-mini',
+          runnerLogin: 'missing_local_login',
+          runnerModels: [],
+          runnerLogins: [
+            { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
+            { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'missing_local_login' },
+          ],
+          expiresAt: null,
+          enabled: true,
+          createdAt: 1,
+        },
+      ]);
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/verify') {
+      verifyCalls += 1;
+      return releaseVerify.then(() =>
+        json({
+          ok: false,
+          reason: 'missing_local_login',
+          runnerName: 'Ians-Mac-mini',
+          check: {
+            at: Date.now(),
+            ok: false,
+            reason: 'missing_local_login',
+            check: 'sign-in',
+            command: 'agy acp · Ians-Mac-mini',
+            model: null,
+            durationMs: 1,
+          },
+        }),
+      );
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/steps') {
+      return json({ steps: [], hasEarlier: false });
+    }
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="subscription:ag-sub-1"]').click();
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail.getByTestId('subscription-status')).toHaveText('Ians-Mac-mini 未登录');
+  await expect(detail.getByTestId('subscription-reason')).toContainText('这个订阅绑定在 Ians-Mac-mini');
+  await expect(detail.getByTestId('antigravity-relogin')).toHaveCount(0);
+
+  await detail.getByTestId('subscription-verify').click();
+  const feedback = page.getByTestId('subscription-verify-feedback');
+  await expect(feedback).toHaveAttribute('data-phase', 'checking');
+  await expect(feedback).toContainText('正在让 Ians-Mac-mini 上的 Antigravity 检查这个凭据…');
+
+  await page.waitForTimeout(350);
+  settleVerify();
+  await expect(feedback).toHaveAttribute('data-phase', 'failed');
+  await expect(feedback).toContainText('Ians-Mac-mini 尚未登录 Antigravity');
+  const verifyDetail = page.getByTestId('subscription-verify-detail');
+  await expect(verifyDetail).toContainText('未通过 · 执行机未登录');
+  await expect(verifyDetail).toContainText('agy acp · Ians-Mac-mini');
+  await expect(verifyDetail).not.toContainText('0.0 秒');
+  expect(verifyCalls).toBe(1);
+});
+
+test('using this Mac sign-in binds this Mac, refreshes status before showing Passed (C1), and names both runners', async ({
+  page,
+}) => {
+  await installBridge(page, {
+    status: { installed: true, loggedIn: true, canLogin: true, runnerId: 'm-mac' },
+  });
+  let boundRunnerId: string | null = null;
+  let macSignedIn = false;
+  let holdNextRefresh = false;
+  const { promise: releaseRefresh, resolve: settleRefresh } = Promise.withResolvers<void>();
+  const patches: object[] = [];
+
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions') {
+      const respond = () =>
+        json([
+          {
+            id: 'ag-sub-1',
+            kind: 'antigravity-subscription',
+            label: 'Antigravity 订阅',
+            hasToken: false,
+            runnerId: boundRunnerId,
+            runnerName: boundRunnerId === 'm-mac' ? 'xmonsMac' : null,
+            runnerLogin: boundRunnerId === 'm-mac' && macSignedIn ? 'ok' : 'unavailable',
+            runnerModels:
+              boundRunnerId === 'm-mac' && macSignedIn
+                ? [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }]
+                : [],
+            runnerLogins: [
+              { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
+              {
+                runnerId: 'm-mac',
+                name: 'xmonsMac',
+                online: true,
+                status: macSignedIn ? 'ok' : 'missing_local_login',
+              },
+            ],
+            expiresAt: null,
+            enabled: true,
+            createdAt: 1,
+          },
+        ]);
+      if (holdNextRefresh) {
+        holdNextRefresh = false;
+        return releaseRefresh.then(respond);
+      }
+      return respond();
+    }
+    if (
+      path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1' &&
+      route.request().method() === 'PATCH'
+    ) {
+      const body = route.request().postDataJSON() as { runnerId?: string };
+      patches.push(body);
+      if (body.runnerId !== undefined) boundRunnerId = body.runnerId;
+      return json({
+        id: 'ag-sub-1',
+        kind: 'antigravity-subscription',
+        label: 'Antigravity 订阅',
+        hasToken: false,
+        runnerId: boundRunnerId,
+        expiresAt: null,
+        enabled: true,
+        createdAt: 1,
+      });
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/verify') {
+      macSignedIn = true;
+      holdNextRefresh = true;
+      return json({
+        ok: true,
+        runnerName: 'xmonsMac',
+        check: {
+          at: Date.now(),
+          ok: true,
+          reason: null,
+          check: 'sign-in',
+          command: 'agy acp · xmonsMac',
+          model: null,
+          durationMs: 1400,
+        },
+      });
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/steps') {
+      return json({ steps: [], hasEarlier: false });
+    }
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="subscription:ag-sub-1"]').click();
+  const detail = page.getByTestId('subscription-detail');
+  const relogin = detail.getByTestId('antigravity-relogin');
+  await expect(relogin).toBeVisible();
+  await expect(relogin).toContainText('绑定这台 Mac 并立即验证。');
+
+  await detail.getByTestId('antigravity-detail-login').click();
+
+  const feedback = page.getByTestId('subscription-verify-feedback');
+  await expect(feedback).toHaveAttribute('data-phase', 'checking');
+  await expect(feedback).toContainText('正在让 xmonsMac 上的 Antigravity 检查这个凭据…');
+
+  settleRefresh();
+  await expect(feedback).toHaveAttribute('data-phase', 'passed');
+  await expect(feedback).toContainText('xmonsMac 上的 Antigravity 接受了这个凭据。');
+  const verifyDetail = page.getByTestId('subscription-verify-detail');
+  await expect(verifyDetail).toContainText('通过');
+  await expect(verifyDetail).toContainText('1.4 秒');
+  await expect(verifyDetail).toContainText('agy acp · xmonsMac');
+
+  expect(patches).toEqual([{ runnerId: 'm-mac' }]);
+  await expect(detail).toHaveAttribute('data-tone', 'ok');
+  await expect(detail.getByTestId('subscription-status')).toHaveText(
+    '已在 xmonsMac 登录，Ians-Mac-mini 未登录',
+  );
+  await expect(page.locator('[data-instance-id="subscription:ag-sub-1"]')).toHaveAttribute(
+    'data-tone',
+    'ok',
+  );
+  await expect(relogin).toHaveCount(0);
+});
+
+test('dismisses stale verify popover when login finishes elsewhere via SSE, refreshes model-routing, and refreshes local Mac button on focus', async ({
+  page,
+}) => {
+  await installBridge(page, {
+    status: { installed: true, loggedIn: false, canLogin: true, runnerId: 'm-mac' },
+  });
+  let macSignedIn = false;
+  let routingFetches = 0;
+
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/model-routing') {
+      routingFetches += 1;
+      return json({ edges: [], connections: [], quota: [] });
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions') {
+      return json([
+        {
+          id: 'ag-sub-1',
+          kind: 'antigravity-subscription',
+          label: 'Antigravity 订阅',
+          hasToken: false,
+          runnerId: 'm-mac',
+          runnerName: 'xmonsMac',
+          runnerLogin: macSignedIn ? 'ok' : 'missing_local_login',
+          runnerModels: macSignedIn
+            ? [
+                { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+                { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+              ]
+            : [],
+          runnerLogins: [
+            {
+              runnerId: 'm-mac',
+              name: 'xmonsMac',
+              online: true,
+              status: macSignedIn ? 'ok' : 'missing_local_login',
+            },
+          ],
+          expiresAt: null,
+          enabled: true,
+          createdAt: 1,
+        },
+      ]);
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/verify') {
+      return json({
+        ok: false,
+        reason: 'missing_local_login',
+        runnerName: 'xmonsMac',
+        check: {
+          at: Date.now(),
+          ok: false,
+          reason: 'missing_local_login',
+          check: 'sign-in',
+          command: 'agy acp · xmonsMac',
+          model: null,
+          durationMs: 320,
+        },
+      });
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/steps') {
+      return json({ steps: [], hasEarlier: false });
+    }
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="subscription:ag-sub-1"]').click();
+  const detail = page.getByTestId('subscription-detail');
+  const routingBefore = routingFetches;
+  await detail.getByTestId('subscription-verify').click();
+  const feedback = page.getByTestId('subscription-verify-feedback');
+  await expect(feedback).toHaveAttribute('data-phase', 'failed');
+  await expect.poll(() => routingFetches).toBeGreaterThan(routingBefore);
+
+  macSignedIn = true;
+  await page.waitForFunction(() =>
+    window.__es.some((es) => es.url.includes('/api/teams/t1/stream')),
+  );
+  await page.evaluate(() => {
+    for (const es of window.__es) {
+      if (es.url.includes('/api/teams/t1/stream')) {
+        es.emit({ type: 'machine_presence', machineId: 'm-mac', online: true });
+      }
+    }
+  });
+  await expect(detail).toHaveAttribute('data-tone', 'ok');
+  await expect(detail.getByTestId('subscription-status')).toHaveText('已在 xmonsMac 登录');
+  await expect(detail.getByTestId('subscription-models-summary')).toHaveText('2 个');
+  await expect(feedback).toHaveCount(0);
+});
+
+test('local Mac sign-in while a manual Verify is running supersedes the stale check and attaches OAuth', async ({
+  page,
+}) => {
+  let attached = false;
+  await installBridge(
+    page,
+    { status: { installed: true, loggedIn: false, canLogin: true, runnerId: 'm-mac' } },
+    ({ label }, subscriptionId) => {
+      attached = true;
+      return { ok: true, subscription: { id: subscriptionId ?? 'ag-sub-1', label } };
+    },
+  );
+  let verifyAttempt = 0;
+  const { promise: holdFirst, resolve: releaseFirst } = Promise.withResolvers<void>();
+
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions') {
+      return json([
+        {
+          id: 'ag-sub-1',
+          kind: 'antigravity-subscription',
+          label: 'Antigravity 订阅',
+          hasToken: attached,
+          ...(attached
+            ? { oauthPersonal: true }
+            : {
+                runnerId: null,
+                runnerName: null,
+                runnerLogin: 'unavailable',
+                runnerModels: [],
+                runnerLogins: [
+                  {
+                    runnerId: 'm-mini',
+                    name: 'Ians-Mac-mini',
+                    online: true,
+                    status: 'missing_local_login',
+                  },
+                  {
+                    runnerId: 'm-mac',
+                    name: 'xmonsMac',
+                    online: true,
+                    status: 'missing_local_login',
+                  },
+                ],
+              }),
+          expiresAt: attached ? OAUTH_EXPIRES_AT : null,
+          enabled: true,
+          createdAt: 1,
+        },
+      ]);
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/verify') {
+      const n = ++verifyAttempt;
+      if (n === 1) {
+        return holdFirst.then(() =>
+          json({
+            ok: false,
+            reason: 'unavailable',
+            check: {
+              at: Date.now(),
+              ok: false,
+              reason: 'unavailable',
+              check: 'sign-in',
+              command: 'agy acp · Runner sign-in',
+              model: null,
+              durationMs: 20,
+            },
+          }),
+        );
+      }
+      return json({
+        ok: true,
+        check: {
+          at: Date.now(),
+          ok: true,
+          reason: null,
+          check: 'sign-in',
+          command: 'Antigravity account API',
+          model: null,
+          durationMs: 900,
+        },
+      });
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/steps') {
+      return json({ steps: [], hasEarlier: false });
+    }
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="subscription:ag-sub-1"]').click();
+  const detail = page.getByTestId('subscription-detail');
+
+  await detail.getByTestId('subscription-verify').click();
+  await expect(page.getByTestId('subscription-verify-feedback')).toHaveAttribute(
+    'data-phase',
+    'checking',
+  );
+
+  await detail.getByTestId('antigravity-detail-login').click();
+  await page.evaluate(() => {
+    const w = window as Window & { __antigravity?: AntigravityCalls };
+    w.__antigravity?.resolve?.({ ok: true });
+  });
+
+  await expect(page.getByTestId('subscription-verify-feedback')).toHaveAttribute(
+    'data-phase',
+    'passed',
+  );
+  expect(attached).toBe(true);
+
+  releaseFirst();
+  await page.waitForTimeout(150);
+  await expect(page.getByTestId('subscription-verify-feedback')).toHaveAttribute(
+    'data-phase',
+    'passed',
+  );
+  await expect(detail).toHaveAttribute('data-tone', 'ok');
+  await expect(detail.getByTestId('subscription-status')).toHaveCount(0);
+  await expect(detail).not.toContainText('未登录');
+});
+
+test('window focus updates local Mac sign-in button and creation shows checking popover immediately', async ({
+  page,
+}) => {
+  const status = { installed: true, loggedIn: false, canLogin: true, runnerId: 'm-mac' };
+  const subscriptions: AntigravitySubscriptionListEntry[] = [
+    {
+      id: 'ag-sub-1',
+      kind: 'antigravity-subscription',
+      label: 'Antigravity 订阅',
+      hasToken: false,
+      runnerId: null,
+      runnerName: null,
+      runnerLogin: 'unavailable',
+      runnerModels: [],
+      runnerLogins: [
+        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'missing_local_login' },
+      ],
+      expiresAt: null,
+      enabled: true,
+      createdAt: 1,
+    },
+  ];
+  await page.exposeFunction('importAntigravityFocusTest', ({ label }: DesktopSubscriptionInput) => {
+    const created: AntigravitySubscriptionListEntry = {
+      id: 'ag-sub-2',
+      kind: 'antigravity-subscription',
+      label,
+      hasToken: true,
+      oauthPersonal: true,
+      expiresAt: OAUTH_EXPIRES_AT,
+      enabled: false,
+      createdAt: 2,
+    };
+    subscriptions.push(created);
+    return { ok: true, subscription: { id: created.id, label } };
+  });
+  await page.addInitScript((initial) => {
+    const w = window as Window & {
+      cairnDesktop?: unknown;
+      __localStatus?: typeof initial;
+      importAntigravityFocusTest: (input: DesktopSubscriptionInput) => Promise<AntigravityLoginOutcome>;
+    };
+    w.__localStatus = { ...initial };
+    w.cairnDesktop = {
+      antigravity: {
+        status: async () => ({ ...w.__localStatus! }),
+        import: (input: DesktopSubscriptionInput) => w.importAntigravityFocusTest(input),
+        login: (input: DesktopSubscriptionInput) => w.importAntigravityFocusTest(input),
+        cancelLogin: async () => {},
+        onLoginProgress: () => () => {},
+      },
+    };
+  }, status);
+  const { promise: holdVerify, resolve: releaseVerify } = Promise.withResolvers<void>();
+
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions') {
+      return json(subscriptions);
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-2/verify') {
+      return holdVerify.then(() =>
+        json({
+          ok: true,
+          check: {
+            at: Date.now(),
+            ok: true,
+            reason: null,
+            check: 'sign-in',
+            command: 'Antigravity account API',
+            model: null,
+            durationMs: 600,
+          },
+        }),
+      );
+    }
+    if (path.endsWith('/steps')) return json({ steps: [], hasEarlier: false });
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="subscription:ag-sub-1"]').click();
+  await expect(page.getByTestId('antigravity-detail-login')).toHaveText(
+    '在这台 Mac 上登录 Antigravity',
+  );
+
+  await page.evaluate(() => {
+    const w = window as Window & { __localStatus?: { loggedIn: boolean } };
+    if (w.__localStatus) w.__localStatus.loggedIn = true;
+    window.dispatchEvent(new Event('focus'));
+  });
+  await expect(page.getByTestId('antigravity-detail-login')).toHaveText('使用这台 Mac 的登录');
+
+  await page.getByTestId('routing-add-provider').click();
+  await page.locator('[data-preset-id="antigravity-subscription"]').click();
+  const dialog = page.getByRole('dialog', { name: '添加 Antigravity 订阅' });
+  await dialog.getByTestId('antigravity-local-import').click();
+  await expect(dialog).not.toBeVisible();
+
+  await expect(page.getByTestId('subscription-verify-feedback')).toHaveAttribute(
+    'data-phase',
+    'checking',
+  );
+  releaseVerify();
+  await expect(page.getByTestId('subscription-verify-feedback')).toHaveAttribute(
+    'data-phase',
+    'passed',
+  );
+});
+
+test('bound online Runner without agy reports unavailable accurately in both status and verify popover', async ({
+  page,
+}) => {
+  await mockLive(page, { threads: [], messages: [] }, (path, _route, json) => {
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/antigravity-subscriptions') {
+      return json([
+        {
+          id: 'ag-sub-unavail',
+          kind: 'antigravity-subscription',
+          label: 'Mini Antigravity',
+          hasToken: false,
+          runnerId: 'm-mini',
+          runnerName: 'Ians-Mac-mini',
+          runnerLogin: 'unavailable',
+          runnerModels: [],
+          runnerLogins: [
+            { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'unavailable' },
+            { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' },
+          ],
+          expiresAt: null,
+          enabled: true,
+          createdAt: 1,
+        },
+      ]);
+    }
+    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-unavail/verify') {
+      return json({
+        ok: false,
+        reason: 'unavailable',
+        runnerName: 'Ians-Mac-mini',
+        check: {
+          at: Date.now(),
+          ok: false,
+          reason: 'unavailable',
+          check: 'sign-in',
+          command: 'agy acp · Ians-Mac-mini',
+          model: null,
+          durationMs: 120,
+        },
+      });
+    }
+    if (path.endsWith('/steps')) return json({ steps: [], hasEarlier: false });
+    return undefined;
+  });
+
+  await page.goto('/app/settings/routing');
+  await page.locator('[data-instance-id="subscription:ag-sub-unavail"]').click();
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail.getByTestId('subscription-status')).toHaveText(
+    'Ians-Mac-mini 无法验证 · 已在 xmonsMac 登录',
+  );
+  await expect(detail.getByTestId('subscription-reason')).toContainText('Ians-Mac-mini');
+  await expect(detail.getByTestId('subscription-reason')).not.toContainText('登录已失效');
+
+  await detail.getByTestId('subscription-verify').click();
+  const feedback = page.getByTestId('subscription-verify-feedback');
+  await expect(feedback).toHaveAttribute('data-phase', 'failed');
+  await expect(feedback).toContainText('无法在 Ians-Mac-mini 上运行 Antigravity 检查');
+  await expect(feedback).not.toContainText('登录已失效');
 });

@@ -182,6 +182,17 @@ interface SubscriptionEntryDeps {
   clock: (ts: number, now: number) => string;
 }
 
+function displayedSubscriptionModels(
+  account: SubscriptionAccount,
+  runtimeModels: readonly ModelSourceModel[],
+): SubscriptionModel[] {
+  if (account.models?.length) return account.models;
+  if (account.vendor === 'antigravity') {
+    return account.hasToken === false ? (account.runnerModels ?? []) : [];
+  }
+  return runtimeModels.map(({ id, name }) => ({ id, name }));
+}
+
 function subscriptionEntries(
   accounts: readonly SubscriptionAccount[],
   deps: SubscriptionEntryDeps,
@@ -192,15 +203,14 @@ function subscriptionEntries(
     const view = subscriptionStatusView(account, deps.now, deps.t, deps.clock);
     const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
     const runtimeUpdate = new Map(deps.models.map((model) => [model.id, model.updateRequired]));
-    const picked = account.models ?? [];
-    const shown = (
-      picked.length > 0 || account.vendor === 'antigravity'
-        ? picked
-        : deps.models.map((model): SubscriptionModel => ({ id: model.id, name: model.name }))
-    ).map((model) => ({
+    const shown = displayedSubscriptionModels(account, deps.models).map((model) => ({
       ...model,
       liveness: runtimeLiveness.get(model.id) === 'dead' ? ('dead' as const) : model.liveness,
-      updateRequired: runtimeUpdate.get(model.id),
+      updateRequired:
+        runtimeUpdate.get(model.id) ??
+        ('updateRequired' in model
+          ? (model as Pick<ModelSourceModel, 'updateRequired'>).updateRequired
+          : undefined),
     }));
     const status = providerRowStatus(view, shown, deps.t);
     return {
@@ -501,7 +511,17 @@ export function ProvidersSection() {
     antigravity: deleteAntigravitySubscription,
   };
 
-  const startVerification = (ref: { id: string; vendor: AccountVendor }) => {
+  const startVerification = (
+    ref: { id: string; vendor: AccountVendor; runnerName?: string | null },
+    opts: { retryOnMissingLogin?: boolean } = {},
+  ) => {
+    if (ref.vendor === 'antigravity') {
+      void antigravityVerification.verify(ref.id, {
+        ...(ref.runnerName === undefined ? {} : { runnerName: ref.runnerName }),
+        ...(opts.retryOnMissingLogin === true ? { retryOnMissingLogin: true } : {}),
+      });
+      return;
+    }
     void (verifyByVendor[ref.vendor] ?? verification.verify)(ref.id);
   };
 
@@ -531,12 +551,9 @@ export function ProvidersSection() {
                         onRemoveModel: (id: string) =>
                           saveSubscriptionModels(
                             account,
-                            ((account.models ?? []).length === 0
-                              ? subscriptionModels(sources, account.vendor).map((model) => ({
-                                  id: model.id,
-                                  name: model.name,
-                                }))
-                              : (account.models ?? [])
+                            displayedSubscriptionModels(
+                              account,
+                              subscriptionModels(sources, account.vendor),
                             ).filter((model) => model.id !== id),
                           ),
                         modelsBusy:
@@ -611,10 +628,24 @@ export function ProvidersSection() {
             teamId={teamId}
             subscription={account}
             renewOAuth={renewOAuth}
-            onLoggedIn={() => {
+            runnerId={account.runnerId}
+            runnerLogin={account.runnerLogin}
+            runnerLogins={account.runnerLogins}
+            onLoggedIn={(bindRunnerId) => {
+              const targetId = !renewOAuth && account.runnerId == null ? bindRunnerId : undefined;
+              const targetName =
+                targetId !== undefined
+                  ? (account.runnerLogins?.find((entry) => entry.runnerId === targetId)?.name ??
+                    account.runnerName)
+                  : undefined;
               void client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] });
               void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-              startVerification(account);
+              void antigravityVerification.verify(account.id, {
+                ...(targetId === undefined ? {} : { runnerId: targetId }),
+                ...(targetName === undefined ? {} : { runnerName: targetName }),
+                retryOnMissingLogin: true,
+                force: true,
+              });
             }}
           />
         );
@@ -644,7 +675,7 @@ export function ProvidersSection() {
     const target = `subscription:${verifyAfterCreate.id}`;
     if (itemParam !== target || selectedId !== target) return;
     setVerifyAfterCreate(null);
-    startVerification(verifyAfterCreate);
+    startVerification(verifyAfterCreate, { retryOnMissingLogin: true });
   }, [itemParam, selectedId, startVerification, verifyAfterCreate]);
 
   return (

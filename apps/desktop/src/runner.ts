@@ -86,12 +86,12 @@ async function enrollLocalMachine(
   }
 }
 
-function storedHostKey(home: string): string | undefined {
+export function readRunnerRegistration(home: string): MachineJson | undefined {
   try {
     const parsed = machineJsonSchema.safeParse(
       JSON.parse(readFileSync(join(home, 'machine.json'), 'utf8')),
     );
-    return parsed.success ? parsed.data.hostKey : undefined;
+    return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;
   }
@@ -129,7 +129,8 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
 }
 
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
-  const hostKey = storedHostKey(options.home) ?? probeHostKey(options.home) ?? undefined;
+  const hostKey =
+    readRunnerRegistration(options.home)?.hostKey ?? probeHostKey(options.home) ?? undefined;
   writeMachineJson(options.home, {
     ...(await enrollLocalMachine(
       options.origin,

@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
@@ -33,6 +33,7 @@ import { DAEMON_VERSION } from '../version.js';
 const PROBE_INIT_TIMEOUT_MS = 30_000;
 const PROBE_SESSION_TIMEOUT_MS = 30_000;
 const PROBE_UPDATE_IDLE_MS = 200;
+const PROBE_OVERALL_TIMEOUT_MS = 35_000;
 
 export interface AntigravityModel {
   id: string;
@@ -50,10 +51,17 @@ export interface AntigravityInstall {
   models: AntigravityModel[];
 }
 
+export type AntigravityProbeOutcome =
+  | { kind: 'ok'; install: AntigravityInstall }
+  | { kind: 'timeout' }
+  | { kind: 'not-installed' }
+  | { kind: 'error'; message: string };
+
 export interface AntigravityManaged {
   current(): AntigravityInstall | null;
   ensure(): Promise<AntigravityInstall | null>;
   probe(): Promise<AntigravityInstall | null>;
+  probeDetailed?(): Promise<AntigravityProbeOutcome>;
 }
 
 export interface AntigravityManagedOptions {
@@ -69,6 +77,9 @@ export interface AntigravityManagedOptions {
   validateBinary?: (bin: AntigravityManagedBin) => Promise<boolean>;
   env?: NodeJS.ProcessEnv;
   log?: (message: string) => void;
+  probeInitTimeoutMs?: number;
+  probeSessionTimeoutMs?: number;
+  probeOverallTimeoutMs?: number;
   probeBinary?: (
     binPath: string,
     args: string[],
@@ -134,24 +145,40 @@ function thoughtChoiceOf(
   return thinkingDefault === undefined ? { thinkingLevels } : { thinkingLevels, thinkingDefault };
 }
 
-function within<T>(request: Promise<T>, label: string): Promise<T> {
+class ProbeTimeoutError extends Error {
+  constructor(label: string) {
+    super(`${label} timeout`);
+    this.name = 'ProbeTimeoutError';
+  }
+}
+
+function within<T>(request: Promise<T>, label: string, timeoutMs: number): Promise<T> {
+  if (timeoutMs <= 0) return Promise.reject(new ProbeTimeoutError(label));
+  let timer: ReturnType<typeof setTimeout> | undefined;
   return Promise.race([
     request,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`${label} timeout`)), PROBE_SESSION_TIMEOUT_MS),
-    ),
-  ]);
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new ProbeTimeoutError(label)), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer);
+  });
 }
 
 async function withThinkingLevels(
   setModel: (configId: string, modelId: string) => Promise<SetSessionConfigOptionResponse>,
   configOptions: readonly SessionConfigOption[] | null | undefined,
   models: AntigravityModel[],
+  remainingMs: () => number,
 ): Promise<AntigravityModel[]> {
   const modelOption = configOptions?.find((option) => option.category === 'model');
   if (modelOption?.type !== 'select') return models;
   const learned: AntigravityModel[] = [];
   for (const model of models) {
+    if (remainingMs() <= 0) {
+      learned.push(model);
+      continue;
+    }
     try {
       const selected = await setModel(modelOption.id, model.id);
       learned.push({ ...model, ...thoughtChoiceOf(selected.configOptions) });
@@ -159,7 +186,9 @@ async function withThinkingLevels(
       learned.push(model);
     }
   }
-  await setModel(modelOption.id, modelOption.currentValue).catch(() => {});
+  if (remainingMs() > 0) {
+    await setModel(modelOption.id, modelOption.currentValue).catch(() => {});
+  }
   return learned;
 }
 
@@ -234,16 +263,15 @@ export async function validateAntigravityBinary(
   );
 
   try {
-    const initialized = await Promise.race([
+    const initialized = await within(
       connection.agent.request(methods.agent.initialize, {
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, session: {} },
         clientInfo: { name: 'cairn', version: DAEMON_VERSION },
       }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('validate initialize timeout')), PROBE_INIT_TIMEOUT_MS),
-      ),
-    ]);
+      'validate initialize',
+      PROBE_INIT_TIMEOUT_MS,
+    );
     if (initialized.protocolVersion !== PROTOCOL_VERSION) return false;
     if (!reportedVersionMatches(initialized.agentInfo?.version, candidate.version)) return false;
     const caps = initialized.agentCapabilities;
@@ -259,22 +287,28 @@ export async function validateAntigravityBinary(
   }
 }
 
+interface ProbeTimeouts {
+  initMs: number;
+  sessionMs: number;
+  overallMs: number;
+}
+
 async function probeAntigravityBinary(
   binPath: string,
   args: string[],
   source: 'local' | 'managed',
   knownVersion: string | undefined,
   env: NodeJS.ProcessEnv,
-): Promise<AntigravityInstall | null> {
+  timeouts: ProbeTimeouts,
+): Promise<AntigravityProbeOutcome> {
+  const deadline = Date.now() + timeouts.overallMs;
+  const remainingMs = () => deadline - Date.now();
   const probeDir = mkdtempSync(join(tmpdir(), 'cairn-agy-probe-'));
-  const logFile = join(probeDir, 'probe.log');
   const child = spawn(binPath, args, {
     cwd: probeDir,
     stdio: ['pipe', 'pipe', 'pipe'],
     env,
   });
-  const logStream = createWriteStream(logFile);
-  child.stderr.on('data', (chunk: Buffer) => logStream.write(chunk));
   child.stderr.resume();
   const app = client({ name: 'cairn' });
   const bufferedUpdates = new Map<string, readonly SessionConfigOption[]>();
@@ -286,7 +320,12 @@ async function probeAntigravityBinary(
   let childExited = false;
   const extendUpdateWindow = () => {
     clearTimeout(updateTimer);
-    updateTimer = setTimeout(finishUpdates, PROBE_UPDATE_IDLE_MS);
+    const left = remainingMs();
+    if (left <= 0) {
+      finishUpdates();
+      return;
+    }
+    updateTimer = setTimeout(finishUpdates, Math.min(PROBE_UPDATE_IDLE_MS, left));
   };
   app.onNotification(methods.client.session.update, ({ params }) => {
     if (!collectingUpdates || params.update.sessionUpdate !== 'config_option_update') return;
@@ -319,30 +358,28 @@ async function probeAntigravityBinary(
   });
 
   try {
-    const initialized = await Promise.race([
+    const initialized = await within(
       connection.agent.request(methods.agent.initialize, {
         protocolVersion: PROTOCOL_VERSION,
         clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, session: {} },
         clientInfo: { name: 'cairn', version: DAEMON_VERSION },
       }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('probe initialize timeout')), PROBE_INIT_TIMEOUT_MS),
-      ),
-    ]);
+      'probe initialize',
+      Math.min(timeouts.initMs, remainingMs()),
+    );
     const version = initialized.agentInfo?.version ?? knownVersion ?? 'unknown';
     try {
-      const created = await Promise.race([
+      const created = await within(
         connection.agent.request<NewSessionResponse>(methods.agent.session.new, {
           cwd: probeDir,
           mcpServers: [],
         }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('probe session timeout')), PROBE_SESSION_TIMEOUT_MS),
-        ),
-      ]);
+        'probe session',
+        Math.min(timeouts.sessionMs, remainingMs()),
+      );
       sessionId = created.sessionId;
       latestConfigOptions = bufferedUpdates.get(created.sessionId) ?? created.configOptions;
-      if (!childExited) {
+      if (!childExited && remainingMs() > 0) {
         await new Promise<void>((resolve) => {
           finishUpdates = resolve;
           extendUpdateWindow();
@@ -358,23 +395,36 @@ async function probeAntigravityBinary(
               { sessionId: created.sessionId, configId, value },
             ),
             'probe model',
+            Math.min(timeouts.sessionMs, remainingMs()),
           ),
         latestConfigOptions,
         extractModels(latestConfigOptions, created),
+        remainingMs,
       );
-      return { version, binPath, args, source, authenticated: true, models };
-    } catch {
       return {
-        version,
-        binPath,
-        args,
-        source,
-        authenticated: false,
-        models: defaultModels(),
+        kind: 'ok',
+        install: { version, binPath, args, source, authenticated: true, models },
+      };
+    } catch (error) {
+      if (error instanceof ProbeTimeoutError) return { kind: 'timeout' };
+      return {
+        kind: 'ok',
+        install: {
+          version,
+          binPath,
+          args,
+          source,
+          authenticated: false,
+          models: defaultModels(),
+        },
       };
     }
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof ProbeTimeoutError) return { kind: 'timeout' };
+    return {
+      kind: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    };
   } finally {
     collectingUpdates = false;
     clearTimeout(updateTimer);
@@ -382,27 +432,42 @@ async function probeAntigravityBinary(
     child.kill('SIGTERM');
     const killTimer = setTimeout(() => child.kill('SIGKILL'), 500);
     killTimer.unref();
-    logStream.end();
     rmSync(probeDir, { recursive: true, force: true });
   }
 }
 
 export function createAntigravityManaged(
   options: AntigravityManagedOptions = {},
-): AntigravityManaged {
+): AntigravityManaged & { probeDetailed(): Promise<AntigravityProbeOutcome> } {
   const root = options.root ?? antigravityInstallRoot(join(homedir(), BRAND.homeDirName));
   const env = antigravityProbeEnv(options.env ?? process.env);
   const log = options.log ?? (() => {});
-  const probeImpl =
-    options.probeBinary ??
-    ((binPath, args, source, knownVersion) =>
-      probeAntigravityBinary(binPath, args, source, knownVersion, env));
+  const timeouts: ProbeTimeouts = {
+    initMs: options.probeInitTimeoutMs ?? PROBE_INIT_TIMEOUT_MS,
+    sessionMs: options.probeSessionTimeoutMs ?? PROBE_SESSION_TIMEOUT_MS,
+    overallMs: options.probeOverallTimeoutMs ?? PROBE_OVERALL_TIMEOUT_MS,
+  };
+  const probeImpl: (
+    binPath: string,
+    args: string[],
+    source: 'local' | 'managed',
+    knownVersion?: string,
+  ) => Promise<AntigravityProbeOutcome> =
+    options.probeBinary !== undefined
+      ? async (binPath, args, source, knownVersion) => {
+          const result = await options.probeBinary?.(binPath, args, source, knownVersion);
+          return result !== undefined && result !== null
+            ? { kind: 'ok', install: result }
+            : { kind: 'error', message: 'antigravity probe failed' };
+        }
+      : (binPath, args, source, knownVersion) =>
+          probeAntigravityBinary(binPath, args, source, knownVersion, env, timeouts);
   const validate =
     options.validateBinary ??
     (options.probeBinary !== undefined
       ? async (candidate: AntigravityManagedBin) =>
-          (await probeImpl(candidate.binPath, candidate.args, 'managed', candidate.version)) !==
-          null
+          (await probeImpl(candidate.binPath, candidate.args, 'managed', candidate.version))
+            .kind === 'ok'
       : (candidate: AntigravityManagedBin) => validateAntigravityBinary(candidate, env));
   const installOptions = {
     root,
@@ -420,7 +485,7 @@ export function createAntigravityManaged(
 
   let cached: AntigravityInstall | null = null;
   let pendingEnsure: Promise<AntigravityInstall | null> | null = null;
-  let pendingProbe: Promise<AntigravityInstall | null> | null = null;
+  let pendingProbe: Promise<AntigravityProbeOutcome> | null = null;
 
   function cachedInstall(): AntigravityInstall | null {
     if (cached !== null && !existsSync(cached.binPath)) cached = null;
@@ -444,22 +509,32 @@ export function createAntigravityManaged(
     return null;
   }
 
-  async function probe(): Promise<AntigravityInstall | null> {
+  async function probeDetailed(): Promise<AntigravityProbeOutcome> {
     if (pendingProbe !== null) return pendingProbe;
-    pendingProbe = (async () => {
+    pendingProbe = (async (): Promise<AntigravityProbeOutcome> => {
       const managed = currentAntigravityManagedInstall(root);
-      if (managed !== null) {
-        const probed = await probeImpl(managed.binPath, managed.args, 'managed', managed.version);
-        if (probed !== null) {
-          cached = probed;
-          return probed;
-        }
+      if (managed === null) {
+        cached = null;
+        return { kind: 'not-installed' };
       }
-      return current();
+      const outcome = await probeImpl(managed.binPath, managed.args, 'managed', managed.version);
+      if (outcome.kind === 'ok') {
+        cached = outcome.install;
+      } else if (outcome.kind !== 'timeout') {
+        cached = null;
+      }
+      return outcome;
     })().finally(() => {
       pendingProbe = null;
     });
     return pendingProbe;
+  }
+
+  async function probe(): Promise<AntigravityInstall | null> {
+    const outcome = await probeDetailed();
+    if (outcome.kind === 'ok') return outcome.install;
+    if (outcome.kind === 'timeout') return cachedInstall();
+    return null;
   }
 
   async function ensure(): Promise<AntigravityInstall | null> {
@@ -467,10 +542,10 @@ export function createAntigravityManaged(
     pendingEnsure = (async () => {
       const managed = await ensureAntigravityManagedInstall(installOptions);
       if (managed === null) return current();
-      const probed = await probeImpl(managed.binPath, managed.args, 'managed', managed.version);
-      if (probed !== null) {
-        cached = probed;
-        return probed;
+      const outcome = await probeImpl(managed.binPath, managed.args, 'managed', managed.version);
+      if (outcome.kind === 'ok') {
+        cached = outcome.install;
+        return outcome.install;
       }
       return current();
     })().finally(() => {
@@ -479,5 +554,5 @@ export function createAntigravityManaged(
     return pendingEnsure;
   }
 
-  return { current, ensure, probe };
+  return { current, ensure, probe, probeDetailed };
 }

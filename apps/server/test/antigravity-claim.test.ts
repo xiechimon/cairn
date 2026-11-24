@@ -5,13 +5,16 @@ import {
   build as buildTable,
   chief as chiefTable,
   chiefThread as chiefThreadTable,
+  machine as machineTable,
   step as stepTable,
+  team as teamTable,
 } from '../src/db/schema.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { antigravityUsable } from '../src/services/dispatch-eligibility.js';
 import * as machineRouting from '../src/services/machine-routing.js';
 import { claimStep, stepToken } from '../src/services/machines.js';
+import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
   insertAntigravitySubscription,
@@ -72,6 +75,19 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
         antigravity: { installed: true, authenticated: true },
       },
     });
+    expect(antigravityUsable(s.db, s.team.id)).toBe(false);
+
+    s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          antigravity: { installed: true, authenticated: true },
+        },
+      })
+      .where(eq(machineTable.id, machineId))
+      .run();
     expect(antigravityUsable(s.db, s.team.id)).toBe(true);
 
     s.db
@@ -87,17 +103,16 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
     expect(antigravityUsable(s.db, s.team.id)).toBe(true);
   });
 
-  test('claims worker build step with host keyring (omits antigravityToken) and refuses unauthenticated host', async () => {
+  test('claims host-keyring work only on its bound Runner and omits antigravityToken', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
 
-    const subId = insertAntigravitySubscription(s, { label: 'Keyring', token: null });
-    const unauthMachine = insertMachine(s, {
-      name: 'agy-unauth',
+    const otherRunner = insertMachine(s, {
+      name: 'agy-other',
       capabilities: {
         mcpServers: [],
         skills: [],
-        antigravity: { installed: true, authenticated: false },
+        antigravity: { installed: true, authenticated: true },
       },
     });
     const authMachine = insertMachine(s, {
@@ -109,6 +124,12 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       },
     });
 
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Keyring',
+      runnerId: authMachine,
+    });
+    expect(created.status).toBe(201);
+    const { id: subId } = (await created.json()) as { id: string };
     const projectId = await postProject(s.app, 'ag-worker');
     const todo = (await (
       await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
@@ -135,15 +156,29 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
     seedRoute(s, 'session', {
       provider: 'antigravity',
       modelId: 'gemini-4-carbon',
-      machineId: unauthMachine,
+      machineId: otherRunner,
     });
-    await expect(claim(s, unauthMachine)).resolves.toBeNull();
+    await expect(claim(s, otherRunner)).resolves.toBeNull();
 
+    s.db
+      .update(teamTable)
+      .set({ defaultMachineId: otherRunner })
+      .where(eq(teamTable.id, s.team.id))
+      .run();
     seedRoute(s, 'session', {
       provider: 'antigravity',
       modelId: 'gemini-4-carbon',
-      machineId: authMachine,
+      machineId: null,
     });
+    const queued = stepQueueProjector(s.db, s.team.id).project({
+      id: 's1',
+      createdAt: 2,
+      homeMachineId: null,
+      holdReason: null,
+      holdUntil: null,
+    });
+    expect(queued?.waitingFor?.machineId).toBe(authMachine);
+
     const expiry = Date.now() + 60_000;
     s.db
       .update(antigravitySubscriptionTable)
@@ -168,7 +203,11 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
     });
     clock.mockRestore();
     beforeExpiry.mockRestore();
-
+    s.db
+      .update(antigravitySubscriptionTable)
+      .set({ expiresAt: null })
+      .where(eq(antigravitySubscriptionTable.id, subId))
+      .run();
     const claimed = await claim(s, authMachine);
     expect(claimed?.agent).toMatchObject({
       provider: 'antigravity',
@@ -184,6 +223,57 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       's1',
     );
     expect(tokenRes.antigravityToken).toBeUndefined();
+  });
+
+  test('an unpinned Coordinator uses the bound Runner instead of the team default', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const capabilities = {
+      mcpServers: [],
+      skills: [],
+      antigravity: { installed: true, authenticated: true },
+    };
+    const otherRunner = insertMachine(s, { name: 'chief-default', capabilities });
+    const runnerId = insertMachine(s, { name: 'chief-bound', capabilities });
+    s.db
+      .update(teamTable)
+      .set({ defaultMachineId: otherRunner })
+      .where(eq(teamTable.id, s.team.id))
+      .run();
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Bound',
+      runnerId,
+    });
+    expect(created.status).toBe(201);
+    seedRoute(s, 'coordinator', {
+      provider: 'antigravity',
+      modelId: 'gemini-4-carbon',
+      machineId: null,
+    });
+    s.db
+      .insert(chiefTable)
+      .values({ id: 'c1', userId: s.svc.user.id, teamId: s.team.id, createdAt: 1 })
+      .run();
+    s.db
+      .insert(chiefThreadTable)
+      .values({
+        id: 'chief-ag-1',
+        chiefId: 'c1',
+        userId: s.svc.user.id,
+        teamId: s.team.id,
+        title: 'coord',
+        createdAt: 2,
+        updatedAt: 2,
+        sessionId: '',
+        sessionOpenedAt: 2,
+      })
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({ id: 'cs1', buildId: 'chief-ag-1', kind: 'chief', status: 'pending', createdAt: 3 })
+      .run();
+    await expect(claim(s, otherRunner)).resolves.toBeNull();
+    await expect(claim(s, runnerId)).resolves.toMatchObject({ step: { id: 'cs1' } });
   });
 
   test('claims Coordinator chief step with token fallback, delivers antigravityToken, and resets session on switch', async () => {

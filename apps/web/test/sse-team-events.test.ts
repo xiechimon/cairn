@@ -65,9 +65,11 @@ describe('team event → invalidation keys', () => {
     }
   });
 
-  it('machine_presence carries board todo invalidation (#1257 suspended-state derived)', () => {
+  it('machine presence refreshes Runner status and its subscription catalog', () => {
     expect(keysOf({ type: 'machine_presence', machineId: 'm-1', online: true })).toEqual([
       `machines/${TEAM}`,
+      `antigravity-subscriptions/${TEAM}`,
+      `model-sources/${TEAM}`,
       `computers/${TEAM}`,
       `model-routing/${TEAM}`,
     ]);

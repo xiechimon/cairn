@@ -4,6 +4,7 @@ import type {
   AgentBackend,
   AgentSessionHandle,
   ClaimedStep,
+  MachineAntigravityVerifyBody,
   MachineAttachmentResponse,
   MachineCapabilities,
   MachineDoneBody,
@@ -97,6 +98,7 @@ export class FakeMachineApi implements MachineApi {
 
   enrollBodies: unknown[] = [];
   presenceBodies: unknown[] = [];
+  antigravityVerifyBodies: MachineAntigravityVerifyBody[] = [];
   mePatch: Record<string, unknown> = {};
 
   async enroll(body: { teamId: string; apiKey: string; name?: string; claudeCode?: unknown }) {
@@ -240,6 +242,10 @@ export class FakeMachineApi implements MachineApi {
   async stop(stepId: string) {
     this.calls.push(`stop:${stepId}`);
     return this.stopResponse;
+  }
+  async reportAntigravityVerify(body: MachineAntigravityVerifyBody): Promise<void> {
+    this.calls.push(`antigravity-verify:${body.checkId}`);
+    this.antigravityVerifyBodies.push(body);
   }
   async shellPrecheck(): Promise<never> {
     throw new Error('unused');

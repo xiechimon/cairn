@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { THINKING_LEVELS, thinkingLevelSchema } from '../thinking-levels.js';
 import { reportedModelSchema } from './model-source.js';
 
 export const machineHardwareSchema = z.object({
@@ -132,11 +133,11 @@ export const devinReportSchema = z
   .strict();
 export type DevinReport = z.infer<typeof devinReportSchema>;
 
-export const antigravityModelSchema = reportedModelSchema.pick({
-  id: true,
-  name: true,
-  thinkingLevels: true,
-  thinkingDefault: true,
+export const antigravityModelSchema = z.object({
+  id: z.string().min(1).max(256),
+  name: z.string().min(1).max(256),
+  thinkingLevels: z.array(thinkingLevelSchema).max(THINKING_LEVELS.length).optional(),
+  thinkingDefault: thinkingLevelSchema.optional(),
 });
 
 export const antigravityReportSchema = z
@@ -145,7 +146,7 @@ export const antigravityReportSchema = z
     version: z.string().min(1).max(64).optional(),
     authenticated: z.boolean().optional(),
     source: z.enum(['local', 'managed']).optional(),
-    models: z.array(antigravityModelSchema).optional(),
+    models: z.array(antigravityModelSchema).max(500).optional(),
   })
   .strict();
 export type AntigravityReport = z.infer<typeof antigravityReportSchema>;

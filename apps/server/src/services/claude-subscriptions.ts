@@ -153,18 +153,6 @@ export function updateClaudeSubscription(
   return toRecord({ ...row, ...changes });
 }
 
-function fallbackClaudeModels(deps: Deps, teamId: string): { id: string; name: string }[] {
-  const reported = deps.db
-    .select({ report: machine.claudeCodeReport })
-    .from(machine)
-    .where(eq(machine.teamId, teamId))
-    .all()
-    .flatMap((row) => (row.report?.installed ? row.report.models : []));
-  return canonicalClaudeModels([...DEFAULT_CLAUDE_CODE_MODELS, ...reported]).map(
-    ({ id, name }) => ({ id, name }),
-  );
-}
-
 export async function claudeSubscriptionUpstreamModels(
   deps: UpstreamDeps,
   teamId: string,
@@ -176,7 +164,7 @@ export async function claudeSubscriptionUpstreamModels(
     status: 'fallback',
     failure,
     httpStatus,
-    models: fallbackClaudeModels(deps, teamId),
+    models: DEFAULT_CLAUDE_CODE_MODELS.map(({ id, name }) => ({ id, name })),
   });
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return fallback('auth', null);
   let token: string;

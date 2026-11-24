@@ -34,6 +34,7 @@ import {
   type RouteVerdict,
   routeTargets,
   routeVerdict,
+  runtimeFallbackMachineId,
   targetUnavailable,
   teamDefaultMachineId,
   type WorkerStepFacts,
@@ -202,7 +203,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
       facts.model.provider,
     );
     const need = agentRow.requiredCapabilities?.os;
-    const sole = platformFallbackMachineId(db, teamMachines, defaultMachineId, need);
+    const sole = runtimeFallbackMachineId(db, teamId, facts.model.provider, () =>
+      platformFallbackMachineId(db, teamMachines, defaultMachineId, need),
+    );
     const homeRetired =
       target.homeMachineId !== null && !machineCanReturn(db, target.homeMachineId);
     const homePin = homeRetired && !facts.localProject ? null : target.homeMachineId;
@@ -273,15 +276,15 @@ export function stepQueueProjector(db: Db, teamId: string) {
         }
       }
     }
-    const homeMachineId = chiefMachineId(db, teamId, target.homeMachineId);
+    const agentRow = agentForRow(row);
+    const provider =
+      ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow?.provider;
+    const homeMachineId = chiefMachineId(db, teamId, target.homeMachineId, provider);
     const home = teamMachines.find((m) => m.id === homeMachineId);
     if (home === undefined || !home.online) {
       return { kind: 'machine-offline', missing: [] };
     }
-    const agentRow = agentForRow(row);
     if (agentRow?.modelId != null) {
-      const provider =
-        ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow.provider;
       const gap = chiefIneligibility(db, home, agentRow, provider, nowMs());
       if (gap !== null)
         return ineligibleBlocked(gap, MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)]);

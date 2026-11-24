@@ -5,6 +5,7 @@ export interface AntigravityLocalStatus {
   installed: boolean;
   loggedIn: boolean;
   canLogin: boolean;
+  runnerId?: string;
   version?: string;
   source?: 'local' | 'managed';
 }
@@ -21,7 +22,7 @@ export type AntigravityLoginFailure =
   | 'save';
 
 export type AntigravityLoginOutcome =
-  | { ok: true; subscription: DesktopSubscriptionMetadata }
+  | { ok: true; subscription: DesktopSubscriptionMetadata; runnerId?: string }
   | { ok: false; reason: AntigravityLoginFailure };
 
 export type AntigravityLoginPhase = 'installing' | 'authenticating';

@@ -1588,6 +1588,7 @@ export const antigravitySubscription = sqliteTable(
       .references(() => team.id, { onDelete: 'cascade' }),
     label: text('label').notNull(),
     tokenCipher: text('tokenCipher'),
+    runnerId: text('runnerId'),
     expiresAt: epochMs('expiresAt'),
     enabledAt: epochMs('enabledAt'),
     models: json<AntigravitySubscriptionModel[]>('models').notNull().default(sql`'[]'`),

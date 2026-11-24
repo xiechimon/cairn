@@ -90,6 +90,7 @@ export interface AppContext {
   oauthFetch?: FetchLike;
   providerTestFetch?: typeof fetch;
   providerTestTimeoutMs?: number;
+  antigravityVerifyTimeoutMs?: number;
   oauthClient: OAuthClientConfig | null;
   authToken: string | null;
   ownerChannel?: OwnerChannel;

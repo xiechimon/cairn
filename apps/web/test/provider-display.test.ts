@@ -722,6 +722,114 @@ it('does not announce availability for a subscription without a token', () => {
   expect(detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>未登录/);
 });
 
+it('announces availability for a host-login Antigravity subscription only when its bound Runner is signed in', () => {
+  const ready = renderAccount(
+    { ...CLAUDE, vendor: 'antigravity', hasToken: false, runnerLogin: 'ok', runnerModels: [{ id: 'current', name: 'Current' }] },
+    [],
+  );
+  expect(ready.row).toContain('data-tone="ok"');
+  expect(ready.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('可用');
+  expect(ready.detail).not.toContain('data-testid="subscription-status"');
+
+  const signedOut = renderAccount(
+    { ...CLAUDE, vendor: 'antigravity', hasToken: false, runnerLogin: 'missing_local_login', runnerModels: [] },
+    [{ id: 'other-runner-model', name: 'Other runner model' }],
+  );
+  expect(signedOut.row).toContain('data-tone="warn"');
+  expect(signedOut.row).toContain('>订阅 · 0 个模型<');
+  expect(signedOut.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('执行机未登录');
+  expect(signedOut.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).not.toContain('可用');
+  expect(signedOut.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>执行机未登录/);
+
+  const offline = renderAccount(
+    { ...CLAUDE, vendor: 'antigravity', hasToken: false, runnerLogin: 'unavailable', runnerOffline: true, runnerModels: [] },
+    [{ id: 'other-runner-model', name: 'Other runner model' }],
+  );
+  expect(offline.row).toContain('data-tone="warn"');
+  expect(offline.row).toContain('>订阅 · 0 个模型<');
+  expect(offline.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('执行机离线');
+  expect(offline.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).not.toContain('可用');
+  expect(offline.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>执行机离线/);
+});
+
+it('names which runner is logged in and which is not across a multi-runner Antigravity setup', () => {
+  const runnerLogins = [
+    { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' as const },
+    { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' as const },
+  ];
+
+  const onMac = renderAccount(
+    {
+      ...CLAUDE,
+      vendor: 'antigravity',
+      hasToken: false,
+      runnerId: 'm-mac',
+      runnerName: 'xmonsMac',
+      runnerLogin: 'ok',
+      runnerModels: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+      runnerLogins,
+    },
+    [],
+  );
+  expect(onMac.row).toContain('data-tone="ok"');
+  expect(onMac.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('已在 xmonsMac 登录，Ians-Mac-mini 未登录');
+  expect(onMac.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>已在 xmonsMac 登录，Ians-Mac-mini 未登录/);
+
+  const onMini = renderAccount(
+    {
+      ...CLAUDE,
+      vendor: 'antigravity',
+      hasToken: false,
+      runnerId: 'm-mini',
+      runnerName: 'Ians-Mac-mini',
+      runnerLogin: 'missing_local_login',
+      runnerModels: [],
+      runnerLogins,
+    },
+    [],
+  );
+  expect(onMini.row).toContain('data-tone="warn"');
+  expect(onMini.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('Ians-Mac-mini 未登录，已在 xmonsMac 登录');
+  expect(onMini.row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).not.toContain('可用');
+  expect(onMini.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>Ians-Mac-mini 未登录，已在 xmonsMac 登录/);
+
+  const unbound = renderAccount(
+    {
+      ...CLAUDE,
+      vendor: 'antigravity',
+      hasToken: false,
+      runnerId: null,
+      runnerName: null,
+      runnerLogin: 'unavailable',
+      runnerModels: [],
+      runnerLogins,
+    },
+    [],
+  );
+  expect(unbound.row).toContain('data-tone="warn"');
+  expect(unbound.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>已在 xmonsMac 登录，Ians-Mac-mini 未登录/);
+
+  const offlineMini = renderAccount(
+    {
+      ...CLAUDE,
+      vendor: 'antigravity',
+      hasToken: false,
+      runnerId: 'm-mini',
+      runnerName: 'Ians-Mac-mini',
+      runnerLogin: 'unavailable',
+      runnerOffline: true,
+      runnerModels: [],
+      runnerLogins: [
+        { runnerId: 'm-mini', name: 'Ians-Mac-mini', online: false, status: 'unavailable' as const },
+        { runnerId: 'm-mac', name: 'xmonsMac', online: true, status: 'ok' as const },
+      ],
+    },
+    [],
+  );
+  expect(offlineMini.row).toContain('data-tone="warn"');
+  expect(offlineMini.detail).toMatch(/data-testid="subscription-status"[^>]*><span[^>]*><\/span>执行机 Ians-Mac-mini 离线 · 已在 xmonsMac 登录/);
+});
+
 it.each([
   { label: 'Work', state: 'cooling', icon: 'clock-3' },
   { label: 'Old laptop', state: 'expired', icon: 'circle-x' },

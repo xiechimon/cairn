@@ -78,7 +78,7 @@ const UNAVAILABLE_COPY: Record<AccountVendor, string> = {
   codex: '服务器上找不到 codex 命令',
   grok: '服务器上找不到可执行的 agent',
   devin: '服务器上找不到 devin 命令',
-  antigravity: '服务器上找不到 agy 命令',
+  antigravity: AUTH_RENEWAL.antigravity,
 };
 
 function failureCopy(vendor: AccountVendor): Record<VerifyFailure, string> {
@@ -184,6 +184,60 @@ function recoversIn(ts: number, now: number, t: TFunc): string {
   return t('{n} 天后恢复', { n: Math.round((hours * 3_600_000) / DAY) });
 }
 
+function hostRunnerStatusLabel(account: SubscriptionAccount, t: TFunc): string | null {
+  const logins = account.runnerLogins ?? [];
+  const signedIn = logins.filter((entry) => entry.status === 'ok').map((entry) => entry.name);
+  const notSignedIn = logins.filter((entry) => entry.status !== 'ok').map((entry) => entry.name);
+  const boundName = account.runnerName ?? null;
+
+  if (account.runnerOffline === true) {
+    const offline =
+      boundName !== null ? t('执行机 {machine} 离线', { machine: boundName }) : t('执行机离线');
+    return signedIn.length > 0
+      ? `${offline} · ${t('已在 {machine} 登录', { machine: signedIn.join(', ') })}`
+      : offline;
+  }
+  if (account.runnerLogin === 'missing_local_login') {
+    if (boundName !== null && signedIn.length > 0) {
+      return t('{signedOut} 未登录，已在 {signedIn} 登录', {
+        signedOut: boundName,
+        signedIn: signedIn.join(', '),
+      });
+    }
+    if (boundName !== null) return t('{machine} 未登录', { machine: boundName });
+    return t(FAILED_LABEL.missing_local_login);
+  }
+  if (account.runnerLogin === 'unavailable') {
+    if (boundName !== null) {
+      const unavailable = t('{machine} 无法验证', { machine: boundName });
+      return signedIn.length > 0
+        ? `${unavailable} · ${t('已在 {machine} 登录', { machine: signedIn.join(', ') })}`
+        : unavailable;
+    }
+    if (signedIn.length > 0 && notSignedIn.length > 0) {
+      return t('已在 {signedIn} 登录，{signedOut} 未登录', {
+        signedIn: signedIn.join(', '),
+        signedOut: notSignedIn.join(', '),
+      });
+    }
+    if (notSignedIn.length > 0) return t('{machine} 未登录', { machine: notSignedIn.join(', ') });
+    if (signedIn.length > 0) return t('已在 {machine} 登录', { machine: signedIn.join(', ') });
+    return t(FAILED_LABEL.unavailable);
+  }
+  if (account.runnerLogin === 'ok') {
+    if (signedIn.length > 0 && notSignedIn.length > 0) {
+      return t('已在 {signedIn} 登录，{signedOut} 未登录', {
+        signedIn: signedIn.join(', '),
+        signedOut: notSignedIn.join(', '),
+      });
+    }
+    if (boundName !== null) return t('已在 {machine} 登录', { machine: boundName });
+    if (signedIn.length > 0) return t('已在 {machine} 登录', { machine: signedIn.join(', ') });
+    return null;
+  }
+  return null;
+}
+
 export function subscriptionStatusView(
   account: SubscriptionAccount,
   now: number,
@@ -192,6 +246,41 @@ export function subscriptionStatusView(
 ): SubscriptionStatusView {
   switch (account.state) {
     case 'ok':
+      if (account.runnerOffline === true) {
+        return { tone: 'warn', label: hostRunnerStatusLabel(account, t), reason: null };
+      }
+      if (account.runnerLogin === 'unavailable' || account.runnerLogin === 'missing_local_login') {
+        const reason =
+          account.vendor === 'antigravity' &&
+          account.runnerLogin === 'missing_local_login' &&
+          account.runnerName != null
+            ? t('这个订阅绑定在 {machine}。请在 {machine} 上登录 Antigravity，或改用 API key。', {
+                machine: account.runnerName,
+              })
+            : account.vendor === 'antigravity' &&
+                account.runnerLogin === 'unavailable' &&
+                account.runnerName != null
+              ? t(
+                  '{machine} 尚未安装 Antigravity，或暂不可用。请确认执行机在线后重试，或改用 API key。',
+                  {
+                    machine: account.runnerName,
+                  },
+                )
+              : account.vendor === 'antigravity' &&
+                  account.runnerLogin === 'unavailable' &&
+                  account.runnerName == null &&
+                  (account.runnerLogins?.length ?? 0) > 1
+                ? t('这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。')
+                : t(AUTH_RENEWAL[account.vendor]);
+        return {
+          tone: 'warn',
+          label: hostRunnerStatusLabel(account, t),
+          reason,
+        };
+      }
+      if (account.runnerLogin === 'ok') {
+        return { tone: 'ok', label: hostRunnerStatusLabel(account, t), reason: null };
+      }
       return account.hasToken === false
         ? { tone: 'warn', label: t('未登录'), reason: null }
         : { tone: 'ok', label: null, reason: null };
@@ -454,11 +543,18 @@ function verifyDetail(
       : verification.phase === 'not-run'
         ? t('没有运行')
         : t('未通过 · {reason}', { reason: t(FAILED_LABEL[verification.reason]) });
+  const showDuration =
+    check !== undefined &&
+    !(
+      verification.phase === 'failed' &&
+      verification.reason === 'unavailable' &&
+      check.durationMs < 50
+    );
   return [
     { label: t('结果'), value: outcome },
-    ...(check === undefined
-      ? []
-      : [{ label: t('用时'), value: t('{s} 秒', { s: (check.durationMs / 1000).toFixed(1) }) }]),
+    ...(showDuration
+      ? [{ label: t('用时'), value: t('{s} 秒', { s: (check.durationMs / 1000).toFixed(1) }) }]
+      : []),
     { label: t('时间'), value: relativeTime(check?.at ?? at, now, t) },
     ...(check === undefined ? [] : [{ label: t('验证命令'), value: check.command, code: true }]),
   ];
@@ -468,34 +564,63 @@ function VerifyResultPopover({
   vendor,
   verification,
   anchor,
+  runnerId,
+  runnerLogin,
+  runnerOffline,
+  runnerName,
+  multiRunnerUnbound,
 }: {
   vendor: AccountVendor;
   verification: Verification | undefined;
   anchor: Element | null;
+  runnerId: string | null | undefined;
+  runnerLogin: SubscriptionAccount['runnerLogin'];
+  runnerOffline: boolean | undefined;
+  runnerName: string | null | undefined;
+  multiRunnerUnbound: boolean;
 }) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
+  const runnerStateKey = JSON.stringify([
+    runnerId ?? null,
+    runnerLogin ?? null,
+    runnerOffline === true,
+  ]);
+  const [open, setOpen] = useState(() => verification?.phase === 'verifying');
   const [seen, setSeen] = useState(verification);
+  const [seenRunnerState, setSeenRunnerState] = useState(runnerStateKey);
   const [at, setAt] = useState(0);
   if (seen !== verification) {
     setSeen(verification);
+    setSeenRunnerState(runnerStateKey);
     setAt(Date.now());
     setOpen(verification !== undefined);
+  } else if (seenRunnerState !== runnerStateKey) {
+    setSeenRunnerState(runnerStateKey);
+    if (verification !== undefined && verification.phase !== 'verifying') {
+      setOpen(false);
+    }
   }
   if (verification === undefined) return null;
   if (verification.phase === 'verifying') {
+    const checkingRunner = verification.runnerName ?? runnerName ?? null;
     return (
       <CheckResultPopover
         anchor={anchor}
         open={open}
         onClose={() => setOpen(false)}
         tone="checking"
-        sentence={t(VERIFYING_COPY[vendor])}
+        sentence={
+          vendor === 'antigravity' && checkingRunner !== null
+            ? t('正在让 {machine} 上的 Antigravity 检查这个凭据…', { machine: checkingRunner })
+            : t(VERIFYING_COPY[vendor])
+        }
         detail={null}
         testId="subscription-verify-feedback"
       />
     );
   }
+  const checkedRunner =
+    verification.phase === 'not-run' ? null : (verification.runnerName ?? runnerName ?? null);
   return (
     <CheckResultPopover
       anchor={anchor}
@@ -507,10 +632,39 @@ function VerifyResultPopover({
       phase={verification.phase}
       sentence={withCodeSpans(
         verification.phase === 'passed'
-          ? t(PASSED_COPY[vendor])
+          ? vendor === 'antigravity' && checkedRunner !== null
+            ? t('{machine} 上的 Antigravity 接受了这个凭据。', { machine: checkedRunner })
+            : t(PASSED_COPY[vendor])
           : verification.phase === 'not-run'
             ? t(NOT_RUN_COPY[verification.cause])
-            : t(failureCopy(vendor)[verification.reason]),
+            : runnerOffline === true && verification.reason === 'unavailable'
+              ? checkedRunner !== null
+                ? t('执行机 {machine} 离线', { machine: checkedRunner })
+                : t('执行机离线')
+              : verification.reason === 'unavailable' &&
+                  vendor === 'antigravity' &&
+                  checkedRunner !== null
+                ? t(
+                    '无法在 {machine} 上运行 Antigravity 检查，请确认执行机已安装 Antigravity 且在线后重试。',
+                    { machine: checkedRunner },
+                  )
+                : verification.reason === 'unavailable' &&
+                    vendor === 'antigravity' &&
+                    checkedRunner === null &&
+                    multiRunnerUnbound
+                  ? t('这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。')
+                  : verification.reason === 'timeout' &&
+                      vendor === 'antigravity' &&
+                      checkedRunner !== null
+                    ? t('{machine} 上的 Antigravity 验证超时，请重试', { machine: checkedRunner })
+                    : verification.reason === 'missing_local_login' && checkedRunner !== null
+                      ? t(
+                          '{machine} 尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key',
+                          {
+                            machine: checkedRunner,
+                          },
+                        )
+                      : t(failureCopy(vendor)[verification.reason]),
       )}
       detail={verifyDetail(verification, at, Date.now(), t)}
       testId="subscription-verify-feedback"
@@ -578,7 +732,7 @@ export function SubscriptionDetail({
   const tests = useModelTests(test, TEST_CONCURRENCY);
   const { checks } = tests;
   const testAllRef = useRef<HTMLButtonElement>(null);
-  const verifyRef = useRef<HTMLButtonElement>(null);
+  const [verifyEl, setVerifyEl] = useState<HTMLButtonElement | null>(null);
   const [checkedAccount, setCheckedAccount] = useState(account.id);
   if (checkedAccount !== account.id) {
     setCheckedAccount(account.id);
@@ -617,7 +771,7 @@ export function SubscriptionDetail({
         aside={
           actions.onVerify !== undefined && (
             <Button
-              ref={verifyRef}
+              ref={setVerifyEl}
               variant="outline"
               size="sm"
               data-testid="subscription-verify"
@@ -648,8 +802,13 @@ export function SubscriptionDetail({
       <QuotaSection account={account} now={now} />
       <VerifyResultPopover
         vendor={account.vendor}
+        runnerId={account.runnerId}
+        runnerLogin={account.runnerLogin}
+        runnerOffline={account.runnerOffline}
+        runnerName={account.runnerName}
+        multiRunnerUnbound={account.runnerId == null && (account.runnerLogins?.length ?? 0) > 1}
         verification={verification}
-        anchor={verifyRef.current}
+        anchor={verifyEl}
       />
       <section data-testid="subscription-models" className="flex min-w-0 flex-col gap-2.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-2">

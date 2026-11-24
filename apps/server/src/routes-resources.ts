@@ -516,6 +516,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   });
 
   const keysvc = { db: ctx.db, box: ctx.secretBox };
+  const antigravitySvc = {
+    ...keysvc,
+    machineHub: ctx.machineHub,
+    ...(ctx.antigravityVerifyTimeoutMs !== undefined
+      ? { verifyTimeoutMs: ctx.antigravityVerifyTimeoutMs }
+      : {}),
+  };
   const claudeUpstreamSvc = () => ({
     ...keysvc,
     fetch: ctx.providerTestFetch ?? globalThis.fetch,
@@ -724,7 +731,11 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
-    return c.json(await enableAntigravitySubscription(keysvc, teamId, c.req.param('cid')));
+    return c.json(
+      await enableAntigravitySubscription(antigravitySvc, teamId, c.req.param('cid'), {
+        signal: c.req.raw.signal,
+      }),
+    );
   });
 
   app.post('/api/teams/:id/antigravity-subscriptions/:cid/disable', (c) => {
@@ -745,7 +756,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json(
-      await verifyAntigravitySubscriptionConnection(keysvc, teamId, c.req.param('cid')),
+      await verifyAntigravitySubscriptionConnection(antigravitySvc, teamId, c.req.param('cid'), {
+        signal: c.req.raw.signal,
+      }),
     );
   });
 

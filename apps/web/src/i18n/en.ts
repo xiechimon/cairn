@@ -118,8 +118,9 @@ export const EN: Record<string, string> = {
     'Antigravity could not be installed. Try again, or paste below instead.',
   '另一个 Antigravity 登录正在进行，结束后请重试。':
     'Another Antigravity sign-in is in progress. Try again when it finishes.',
-  '登录完成后会重新验证；如果执行机是另一台电脑，请在那台电脑上登录。':
-    'Verification runs again once sign-in finishes; if your Runner is a different computer, sign in there.',
+  '使用这台 Mac 的登录': 'Use this Mac sign-in',
+  '绑定这台 Mac 并立即验证。': 'Binds this Mac and verifies now.',
+  '登录完成后会重新验证。': 'Re-verifies after sign-in.',
   '{name}：执行机上没有可用的 Antigravity 登录，Coordinator 和任务暂时无法使用。在「设置 → 模型路由」重新登录。':
     '{name}: no usable Antigravity sign-in on the Runner, so the Coordinator and tasks cannot run for now. Sign in again under Settings → Model routing.',
   '{count} 处已过期': '{count} expired',
@@ -136,9 +137,30 @@ export const EN: Record<string, string> = {
     'This subscription is no longer signed in. Sign in with Google on your Runner or update the API key, then remove and add it again.',
   '这个订阅已过期。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。':
     'This subscription has expired. Sign in with Google on your Runner or update the API key, then remove and add it again.',
-  '服务器上找不到 agy 命令': 'The agy command was not found on the server',
   '执行机尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key':
     'Antigravity is not signed in on the Runner; run `agy acp --login` or paste an API key',
+  '{machine} 尚未登录 Antigravity，请先运行 `agy acp --login` 或改用 API key':
+    'Antigravity is not signed in on {machine}; run `agy acp --login` or paste an API key',
+  '{machine} 上的 Antigravity 接受了这个凭据。':
+    'Antigravity on {machine} accepted these credentials.',
+  '正在让 {machine} 上的 Antigravity 检查这个凭据…':
+    'Asking Antigravity on {machine} to check these credentials…',
+  '{machine} 上的 Antigravity 验证超时，请重试':
+    'Antigravity verification timed out on {machine}. Retry.',
+  '这个订阅绑定在 {machine}。请在 {machine} 上登录 Antigravity，或改用 API key。':
+    'This subscription is bound to {machine}. Sign in to Antigravity on {machine}, or use an API key.',
+  '{machine} 尚未安装 Antigravity，或暂不可用。请确认执行机在线后重试，或改用 API key。':
+    'Antigravity is not installed or is temporarily unavailable on {machine}. Confirm the Runner is online and retry, or use an API key.',
+  '无法在 {machine} 上运行 Antigravity 检查，请确认执行机已安装 Antigravity 且在线后重试。':
+    'Could not run the Antigravity check on {machine}. Confirm Antigravity is installed and the Runner is online, then retry.',
+  '这个订阅尚未绑定执行机。请先在目标执行机登录 Antigravity，或改用 API key。':
+    'This subscription is not bound to a Runner yet. Sign in to Antigravity on the target Runner, or use an API key.',
+  '已在 {machine} 登录': 'Signed in on {machine}',
+  '{machine} 未登录': 'Not signed in on {machine}',
+  '已在 {signedIn} 登录，{signedOut} 未登录': 'Signed in on {signedIn}, not on {signedOut}',
+  '{signedOut} 未登录，已在 {signedIn} 登录':
+    'Not signed in on {signedOut}, signed in on {signedIn}',
+  '{machine} 无法验证': 'Could not verify on {machine}',
   '{name}：已过期，Coordinator 和任务暂时无法使用。在执行机重新登录 Google 账号或更新 API key 后，添加到「设置 → 模型路由」。':
     '{name}: expired, so the Coordinator and tasks cannot run for now. Sign in with Google on your Runner or update the API key under Settings → Model routing.',
   '{name}：将在 {days} 天后过期。到期前在执行机重新登录 Google 账号或更新 API key 后，添加到「设置 → 模型路由」。':

@@ -1,4 +1,6 @@
 import type {
+  AntigravityRunnerLogin,
+  AntigravitySubscriptionListEntry,
   ClaudeSubscriptionListEntry,
   ClaudeSubscriptionQuotaWindow,
   DevinSubscriptionModel,
@@ -29,6 +31,12 @@ export interface SubscriptionAccount {
   stepsLast24h: number | null;
   models?: SubscriptionModel[];
   hasToken?: boolean;
+  runnerId?: string | null;
+  runnerName?: string | null;
+  runnerLogin?: AntigravitySubscriptionListEntry['runnerLogin'];
+  runnerOffline?: boolean;
+  runnerModels?: SubscriptionModel[];
+  runnerLogins?: AntigravityRunnerLogin[];
 }
 
 const isAccountState = (value: unknown): value is AccountState =>

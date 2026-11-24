@@ -8,6 +8,7 @@ import {
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
   machineAntigravityModelProbeBodySchema,
+  machineAntigravityVerifyBodySchema,
   machineAskBodySchema,
   machineBackgroundTaskBodySchema,
   machineClaimBodySchema,
@@ -58,6 +59,7 @@ import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
 import { localMergeRecheckAuthorization } from './services/local-merge.js';
+import { receiveAntigravityVerify } from './services/machine-antigravity-verify.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
@@ -560,6 +562,18 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
             code: 'probe-authorization-changed',
           });
         }
+        return c.json({ ok: true as const });
+      },
+    );
+  });
+
+  app.post('/api/machine/antigravity/verify', async (c) => {
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      async (row, decoded) => {
+        const body = parseWith(machineAntigravityVerifyBodySchema, decoded ?? {}, 'body');
+        receiveAntigravityVerify(deps, row.id, body);
         return c.json({ ok: true as const });
       },
     );

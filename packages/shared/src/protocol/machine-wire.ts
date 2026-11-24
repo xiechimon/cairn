@@ -10,7 +10,10 @@ import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { hostKeySchema, machineRecordSchema } from '../records/machine.js';
-import { confinementIdentitySchema } from '../records/machine-capabilities.js';
+import {
+  antigravityModelSchema,
+  confinementIdentitySchema,
+} from '../records/machine-capabilities.js';
 import {
   answerDeliveryViaSchema,
   messageRoleSchema,
@@ -342,6 +345,12 @@ export const machineAntigravityModelProbeCredentialSchema = z.object({
   token: z.string().regex(ANTIGRAVITY_TOKEN_REGEX),
 });
 
+export const antigravityCheckIdSchema = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9_-]+$/);
+
 export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('wake') }),
   z.object({ type: z.literal('hello'), connectionId: z.string().min(1).max(64) }),
@@ -355,6 +364,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('antigravity.models'), requestId: z.string().uuid() }),
+  z.object({ type: z.literal('antigravity.verify'), checkId: antigravityCheckIdSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
   z.object({ type: z.literal('im.attach'), connId: z.string().min(1).max(128) }),
@@ -375,6 +385,19 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   }),
 ]);
 export type MachineStreamEvent = z.infer<typeof machineStreamEventSchema>;
+
+export const machineAntigravityVerifyBodySchema = z.object({
+  checkId: antigravityCheckIdSchema,
+  installed: z.boolean(),
+  authenticated: z.boolean(),
+  timedOut: z.boolean().optional(),
+  version: z.string().min(1).max(64).optional(),
+  source: z.enum(['local', 'managed']).optional(),
+  models: z.array(antigravityModelSchema).max(500).optional(),
+  durationMs: z.number().int().nonnegative().max(300_000).optional(),
+  error: z.string().max(500).optional(),
+});
+export type MachineAntigravityVerifyBody = z.infer<typeof machineAntigravityVerifyBodySchema>;
 
 export const steerAnswerSchema = z.object({
   requestId: z.string().min(1),
@@ -651,6 +674,12 @@ export const MACHINE_WIRE_EXTENSIONS = [
     method: 'POST',
     path: '/api/machine/antigravity/model-probes/{requestId}',
     reason: '[design] Claim and complete a subscription model probe on its assigned connection',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/antigravity/verify',
+    reason:
+      '[design] live Antigravity Runner sign-in probe reply correlated by checkId and scoped to the authenticated machine',
   },
   {
     method: 'GET',

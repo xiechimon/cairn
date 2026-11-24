@@ -17,7 +17,7 @@ Defaults do not require the Runner to be online (unchanged rule: a step waits in
 
 Codex: an `openai-codex` row is runnable only when it holds a key (the device-code sign-in stores one). A keyless row with an empty base URL no longer falls back to the server host's `~/.codex/auth.json`, and a Runner's reported `codexLogin` is ignored.
 
-Antigravity follows the same rule: an `antigravity` step requires an enabled `antigravity-subscription` row. In token mode the stored key is opened with `openAntigravitySubscription` and delivered to the Runner at claim time; in host mode (a subscription row with no token) the Runner's reported `antigravity` capability must show `authenticated: true`. With no usable subscription the claim is refused with the `antigravity-subscription` queue reason — a Runner's own `~/.gemini` login never counts as a source on its own.
+Antigravity follows the same rule: an `antigravity` step requires an enabled `antigravity-subscription` row. In token mode the stored key is opened with `openAntigravitySubscription` and delivered to the Runner at claim time; in host mode (a subscription row with no token) only the [bound Runner](antigravity-subscription-source.md#binding-and-upgrade) can run it, and that Runner must report `antigravity.authenticated: true`. With no usable subscription the claim is refused with the `antigravity-subscription` queue reason — a Runner's own `~/.gemini` login never counts as a source on its own.
 
 ## Paths that read the old signals
 

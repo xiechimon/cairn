@@ -281,9 +281,9 @@ describe('managed-runtime sources follow the subscription, not a transient insta
     s.dispose();
   });
 
-  test('antigravity: a machine that reports installed:false under an active subscription still lists its models', () => {
+  test('antigravity: a provisionable Runner lists API key models before installation', () => {
     const s = bootServer();
-    insertAntigravitySubscription(s);
+    insertAntigravitySubscription(s, { token: `AIzaSyA${'t'.repeat(28)}` });
     insertMachine(s, {
       name: 'exec-ag',
       capabilities: {
@@ -300,6 +300,42 @@ describe('managed-runtime sources follow the subscription, not a transient insta
     expect(ag?.hostname).toBe('exec-ag');
     expect(ag?.models.length).toBeGreaterThan(0);
     s.dispose();
+  });
+
+  test('antigravity: an uninstalled bound Runner cannot borrow a signed-in Runner catalog', async () => {
+    const s = bootServer();
+    try {
+      const runnerId = insertMachine(s, {
+        name: 'exec-ag',
+        capabilities: { mcpServers: [], skills: [], antigravity: { installed: false } },
+      });
+      insertMachine(s, {
+        name: 'other-ag',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          antigravity: {
+            installed: true,
+            authenticated: true,
+            models: [{ id: 'other-model', name: 'Other Model' }],
+          },
+        },
+      });
+      const created = await req(
+        s.app,
+        'POST',
+        `/api/teams/${s.team.id}/antigravity-subscriptions`,
+        {
+          label: 'Host',
+          runnerId,
+        },
+      );
+      expect(created.status).toBe(201);
+      const env = getModelSources({ db: s.db, box: s.secretBox }, s.team.id);
+      expect(env.sources.some((src) => src.runtime === 'antigravity')).toBe(false);
+    } finally {
+      s.dispose();
+    }
   });
 
   test('antigravity: installed:false without a subscription keeps the source hidden', () => {

@@ -1,5 +1,6 @@
 import type {
   AntigravityOAuthStepCredential,
+  AntigravityRunnerLogin,
   AntigravitySubscription,
   AntigravitySubscriptionListEntry,
   AntigravitySubscriptionVerifyResult,
@@ -14,8 +15,9 @@ import {
   antigravityOAuthStepCredentialSchema,
   DEFAULT_ANTIGRAVITY_MODELS,
   isAntigravityOAuthAccessToken,
+  isRegisteredMachine,
 } from '@cairn/shared';
-import { and, count, desc, eq, gt, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, or } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { antigravitySubscription, build, chiefThread, machine, step, todo } from '../db/schema.js';
@@ -26,10 +28,8 @@ import {
   fetchAntigravityEntitlements,
 } from './antigravity-entitlements.js';
 import { dispatchAntigravityModelProbe } from './antigravity-model-probes.js';
-import {
-  verifyAntigravityHostLogin,
-  verifyAntigravitySubscription,
-} from './antigravity-subscription-verification.js';
+import { verifyAntigravitySubscription } from './antigravity-subscription-verification.js';
+import { requestAntigravityVerify } from './machine-antigravity-verify.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { timedCheck } from './subscription-check.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
@@ -47,8 +47,26 @@ export type AntigravityAccountStepsPage = {
   hasEarlier: boolean;
 };
 
-type Deps = { db: Db; box: SecretBox };
+type Deps = {
+  db: Db;
+  box: SecretBox;
+  machineHub?: MachineWakeHub;
+  verifyTimeoutMs?: number;
+};
 type Row = typeof antigravitySubscription.$inferSelect;
+type RunnerDb = Pick<Db, 'select' | 'update'>;
+type Runner = Pick<
+  typeof machine.$inferSelect,
+  'id' | 'name' | 'online' | 'kind' | 'lastSeenAt' | 'capabilities'
+>;
+const runnerColumns = {
+  id: machine.id,
+  name: machine.name,
+  online: machine.online,
+  kind: machine.kind,
+  lastSeenAt: machine.lastSeenAt,
+  capabilities: machine.capabilities,
+};
 
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
 const upstreamModelsWindows = new WeakMap<Db, Map<string, number>>();
@@ -64,7 +82,6 @@ const googleTokenInfoSchema = z.object({
   sub: googleSubjectSchema,
 });
 
-type SubscriptionMode = 'none' | 'host' | 'token' | 'oauth-personal';
 type ResolvedSubscription = CreateAntigravitySubscription & { googleSubject?: string };
 
 function openBoundOAuth(box: SecretBox, cipher: string): z.infer<typeof boundOAuthSchema> {
@@ -113,6 +130,7 @@ function toRecord(row: Row): AntigravitySubscription {
     label: row.label,
     hasToken: row.tokenCipher !== null,
     ...(row.tokenCipher?.startsWith(OAUTH_CIPHER_PREFIX) ? { oauthPersonal: true as const } : {}),
+    ...(row.tokenCipher === null ? { runnerId: row.runnerId } : {}),
     expiresAt: row.expiresAt,
     enabled: row.enabledAt !== null,
     enabledAt: row.enabledAt,
@@ -161,11 +179,104 @@ function refuseWhileRunning(db: Pick<Db, 'select'>, row: Row, action: string): v
   }
 }
 
+function registeredRunners(db: Pick<Db, 'select'>, teamId: string): Runner[] {
+  return db
+    .select(runnerColumns)
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), isNull(machine.retiredAt)))
+    .orderBy(asc(machine.name), asc(machine.id))
+    .all()
+    .filter(isRegisteredMachine);
+}
+
+function runnerLoginStatus(runner: Runner): AntigravityRunnerLogin['status'] {
+  const report = runner.capabilities?.antigravity;
+  if (!runner.online || report?.installed !== true) return 'unavailable';
+  return report.authenticated === true ? 'ok' : 'missing_local_login';
+}
+
+function teamRunnerLogins(db: Pick<Db, 'select'>, teamId: string): AntigravityRunnerLogin[] {
+  return registeredRunners(db, teamId).map((runner) => ({
+    runnerId: runner.id,
+    name: runner.name,
+    online: runner.online,
+    status: runnerLoginStatus(runner),
+  }));
+}
+
+function subscriptionRunner(
+  db: Pick<Db, 'select'>,
+  teamId: string,
+  id?: string,
+): Runner | undefined {
+  if (id !== undefined) {
+    return db
+      .select(runnerColumns)
+      .from(machine)
+      .where(and(eq(machine.teamId, teamId), eq(machine.id, id), isNull(machine.retiredAt)))
+      .get();
+  }
+  const registered = registeredRunners(db, teamId);
+  return registered.length === 1 ? registered[0] : undefined;
+}
+
+function bindRunner(db: RunnerDb, row: Row, runnerId: string): string | null {
+  const pinned = db
+    .update(antigravitySubscription)
+    .set({ runnerId })
+    .where(
+      and(
+        eq(antigravitySubscription.teamId, row.teamId),
+        eq(antigravitySubscription.id, row.id),
+        isNull(antigravitySubscription.tokenCipher),
+        isNull(antigravitySubscription.runnerId),
+      ),
+    )
+    .run();
+  return pinned.changes === 1
+    ? runnerId
+    : (subscriptionRow(db, row.teamId, row.id)?.runnerId ?? null);
+}
+
+function resolveBoundRunner(db: Pick<Db, 'select'>, row: Row) {
+  const sole = row.runnerId === null ? subscriptionRunner(db, row.teamId) : undefined;
+  const runnerId = row.runnerId ?? sole?.id ?? null;
+  const runner =
+    sole !== undefined
+      ? sole
+      : runnerId === null
+        ? undefined
+        : subscriptionRunner(db, row.teamId, runnerId);
+  return { runnerId, runner };
+}
+
+function runnerLogin(db: Pick<Db, 'select'>, row: Row) {
+  const { runnerId, runner } = resolveBoundRunner(db, row);
+  const report = runner?.capabilities?.antigravity;
+  if (runner === undefined || !runner.online || report?.installed !== true) {
+    return {
+      status: 'unavailable',
+      runnerId,
+      hostname: runner?.name ?? null,
+      offline: runnerId !== null && runner?.online !== true,
+    } as const;
+  }
+  if (report.authenticated !== true) {
+    return { status: 'missing_local_login', runnerId, hostname: runner.name } as const;
+  }
+  return {
+    status: 'ok',
+    runnerId: runner.id,
+    hostname: runner.name,
+    models: report.models ?? [],
+  } as const;
+}
+
 async function verifyRowCredentials(
   deps: Deps,
-  teamId: string,
   row: Row,
-): Promise<AntigravitySubscriptionVerifyResult> {
+  signal?: AbortSignal,
+): Promise<AntigravitySubscriptionVerifyResult & { reportedDurationMs?: number }> {
   if (row.tokenCipher !== null) {
     const cipher = row.tokenCipher;
     return Promise.resolve()
@@ -185,26 +296,22 @@ async function verifyRowCredentials(
       })
       .catch((): AntigravitySubscriptionVerifyResult => ({ ok: false, reason: 'failed' }));
   }
-  const onlineMachines = deps.db
-    .select({ capabilities: machine.capabilities })
-    .from(machine)
-    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
-    .all();
-  const agReports = onlineMachines
-    .map((m) => m.capabilities?.antigravity)
-    .filter((report): report is NonNullable<typeof report> => report !== undefined);
-  if (agReports.some((report) => report.installed && report.authenticated === true)) {
-    return { ok: true };
+  const { runner } = resolveBoundRunner(deps.db, row);
+  if (runner === undefined) return { ok: false, reason: 'unavailable' };
+  const runnerName = runner.name;
+  if (!runner.online || deps.machineHub === undefined) {
+    return { ok: false, reason: 'unavailable', runnerName };
   }
-  if (agReports.some((report) => report.installed)) {
-    return { ok: false, reason: 'missing_local_login' };
-  }
-  if (onlineMachines.length > 0) {
-    return { ok: false, reason: 'unavailable' };
-  }
-  return verifyAntigravityHostLogin().catch(
-    (): AntigravitySubscriptionVerifyResult => ({ ok: false, reason: 'failed' }),
-  );
+  const outcome = await requestAntigravityVerify({ machineHub: deps.machineHub }, runner.id, {
+    ...(deps.verifyTimeoutMs === undefined ? {} : { timeoutMs: deps.verifyTimeoutMs }),
+    ...(signal === undefined ? {} : { signal }),
+  });
+  return {
+    ok: outcome.ok,
+    ...(outcome.ok ? {} : { reason: outcome.reason }),
+    runnerName,
+    ...(outcome.durationMs !== undefined ? { reportedDurationMs: outcome.durationMs } : {}),
+  };
 }
 
 export function patchAntigravitySubscription(
@@ -230,25 +337,37 @@ export function patchAntigravitySubscription(
       return true;
     });
   }
-  deps.db
-    .update(antigravitySubscription)
-    .set({
+  const updated = deps.db.transaction((tx) => {
+    let runnerId = row.runnerId;
+    if (row.tokenCipher === null && runnerId === null && patch.runnerId !== undefined) {
+      const runner = subscriptionRunner(tx, teamId, patch.runnerId);
+      if (!runner) throw notFound('Runner');
+      runnerId = bindRunner(tx, row, runner.id);
+    }
+    const changes = {
       ...(patch.label !== undefined ? { label: patch.label } : {}),
       ...(models !== undefined ? { models } : {}),
-    })
-    .where(and(eq(antigravitySubscription.teamId, teamId), eq(antigravitySubscription.id, id)))
-    .run();
-  return toRecord({
-    ...row,
-    ...(patch.label !== undefined ? { label: patch.label } : {}),
-    ...(models !== undefined ? { models } : {}),
+    };
+    if (Object.keys(changes).length > 0) {
+      tx.update(antigravitySubscription)
+        .set(changes)
+        .where(and(eq(antigravitySubscription.teamId, teamId), eq(antigravitySubscription.id, id)))
+        .run();
+    }
+    return toRecord({ ...row, ...changes, runnerId });
   });
+  if (row.runnerId === null && updated.runnerId != null) {
+    verificationWindows.get(deps.db)?.delete(id);
+    upstreamModelsWindows.get(deps.db)?.delete(id);
+  }
+  return updated;
 }
 
 export async function enableAntigravitySubscription(
   deps: Deps,
   teamId: string,
   id: string,
+  opts: { signal?: AbortSignal } = {},
 ): Promise<AntigravitySubscription> {
   const target = subscriptionRow(deps.db, teamId, id);
   if (!target) throw notFound('Antigravity subscription connection');
@@ -257,8 +376,8 @@ export async function enableAntigravitySubscription(
   }
   if (target.enabledAt !== null) return toRecord(target);
   const enabledBefore = enabledRow(deps.db, teamId)?.id ?? null;
-  const verified = await verifyRowCredentials(deps, teamId, target);
-  if (!verified.ok) {
+  const verified = await verifyRowCredentials(deps, target, opts.signal);
+  if (opts.signal?.aborted || !verified.ok) {
     throw new HttpError(
       409,
       'The new account did not pass verification; the current account stays enabled.',
@@ -271,6 +390,14 @@ export async function enableAntigravitySubscription(
     return deps.db.transaction((tx) => {
       const fresh = subscriptionRow(tx, teamId, id);
       if (!fresh) throw notFound('Antigravity subscription connection');
+      if (fresh.expiresAt !== null && fresh.expiresAt <= enabledAt) {
+        throw new HttpError(409, 'This token has expired.', undefined, { code: 'expired' });
+      }
+      if (fresh.tokenCipher !== target.tokenCipher || fresh.runnerId !== target.runnerId) {
+        throw new HttpError(409, 'This subscription changed; try again.', undefined, {
+          code: 'conflict',
+        });
+      }
       if (fresh.enabledAt !== null) return toRecord(fresh);
       const current = enabledRow(tx, teamId);
       if ((current?.id ?? null) !== enabledBefore) {
@@ -384,10 +511,22 @@ export function listAntigravitySubscriptions(
     rows.map((row) => row.id),
     nowMs() - DAY_MS,
   );
+  const runnerLogins = teamRunnerLogins(deps.db, teamId);
   return rows.map((row) => {
     const stats = usage.get(row.id);
+    const login = row.tokenCipher === null ? runnerLogin(deps.db, row) : undefined;
+    const runnerModels =
+      login?.status === 'ok' ? login.models.map(({ id, name }) => ({ id, name })) : [];
+    const models =
+      login === undefined
+        ? row.models
+        : row.models.filter((model) => runnerModels.some((entry) => entry.id === model.id));
     return {
-      ...toRecord(row),
+      ...toRecord(login === undefined ? row : { ...row, runnerId: login.runnerId, models }),
+      ...(login !== undefined
+        ? { runnerName: login.hostname, runnerLogin: login.status, runnerModels, runnerLogins }
+        : {}),
+      ...(login?.status === 'unavailable' && login.offline ? { runnerOffline: true } : {}),
       lastUsedAt: stats?.lastUsedAt ?? null,
       stepsLast24h: stats?.stepsLast24h ?? null,
       lastCheck: row.lastCheck,
@@ -471,6 +610,7 @@ export function createAntigravitySubscription(
     teamId,
     label: body.label,
     tokenCipher,
+    runnerId: null,
     expiresAt: body.expiresAt ?? null,
     enabledAt: null,
     models: [],
@@ -497,7 +637,10 @@ export function createAntigravitySubscription(
         .run();
     }
     const shouldEnable = canEnable && (current === undefined || replaceExpired);
-    const stored = shouldEnable ? { ...row, enabledAt: now } : row;
+    const runner = token === null ? subscriptionRunner(tx, teamId, body.runnerId) : undefined;
+    if (token === null && body.runnerId !== undefined && runner === undefined)
+      throw notFound('Runner');
+    const stored = { ...row, runnerId: runner?.id ?? null, enabledAt: shouldEnable ? now : null };
     tx.insert(antigravitySubscription).values(stored).run();
     return toRecord(stored);
   });
@@ -552,6 +695,7 @@ export async function attachAntigravityOAuthCredential(
     }
     const updated = {
       tokenCipher: sealBoundOAuth(deps.box, credential.token, resolved.googleSubject),
+      runnerId: null,
       expiresAt: resolved.expiresAt,
       lastCheck: null,
     };
@@ -570,6 +714,7 @@ export async function verifyAntigravitySubscriptionConnection(
   deps: Deps,
   teamId: string,
   id: string,
+  opts: { signal?: AbortSignal } = {},
 ): Promise<AntigravitySubscriptionVerifyResult> {
   const row = deps.db
     .select()
@@ -579,23 +724,39 @@ export async function verifyAntigravitySubscriptionConnection(
   if (!row) throw notFound('Antigravity subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
   claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
-  const result = await timedCheck(() => verifyRowCredentials(deps, teamId, row), {
+  const raw = await timedCheck(() => verifyRowCredentials(deps, row, opts.signal), {
     check: 'sign-in',
     command: row.tokenCipher === null ? 'agy acp · Runner sign-in' : 'Antigravity account API',
     model: null,
   });
-  deps.db
-    .update(antigravitySubscription)
-    .set({ lastCheck: result.check })
-    .where(
-      and(
-        eq(antigravitySubscription.id, row.id),
-        row.tokenCipher === null
-          ? isNull(antigravitySubscription.tokenCipher)
-          : eq(antigravitySubscription.tokenCipher, row.tokenCipher),
-      ),
-    )
-    .run();
+  const { reportedDurationMs, ...rest } = raw;
+  const check = {
+    ...raw.check,
+    command:
+      row.tokenCipher === null && rest.runnerName
+        ? `agy acp · ${rest.runnerName}`
+        : raw.check.command,
+    durationMs: Math.max(raw.check.durationMs, reportedDurationMs ?? 0),
+  };
+  const result: AntigravitySubscriptionVerifyResult = { ...rest, check };
+  if (!opts.signal?.aborted) {
+    deps.db
+      .update(antigravitySubscription)
+      .set({ lastCheck: check })
+      .where(
+        and(
+          eq(antigravitySubscription.teamId, teamId),
+          eq(antigravitySubscription.id, row.id),
+          row.tokenCipher === null
+            ? isNull(antigravitySubscription.tokenCipher)
+            : eq(antigravitySubscription.tokenCipher, row.tokenCipher),
+          row.runnerId === null
+            ? isNull(antigravitySubscription.runnerId)
+            : eq(antigravitySubscription.runnerId, row.runnerId),
+        ),
+      )
+      .run();
+  }
   return result;
 }
 
@@ -621,27 +782,18 @@ export async function antigravitySubscriptionUpstreamModels(
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return fallback('auth');
   claimRateWindow(upstreamModelsWindows, deps.db, row.id, 'model list attempts');
   if (row.tokenCipher === null) {
-    const runners = deps.db
-      .select({ capabilities: machine.capabilities })
-      .from(machine)
-      .where(and(eq(machine.teamId, teamId), eq(machine.online, true), isNull(machine.retiredAt)))
-      .orderBy(machine.id)
-      .all()
-      .flatMap((m) =>
-        m.capabilities?.antigravity?.installed === true ? [m.capabilities.antigravity] : [],
-      );
-    const seen = new Set<string>();
-    const models = runners
-      .filter((runner) => runner.authenticated === true)
-      .flatMap((runner) => runner.models ?? [])
-      .filter((model) => {
-        if (model.id === '' || seen.has(model.id)) return false;
-        seen.add(model.id);
-        return true;
-      })
-      .map(({ id, name }) => ({ id, name }));
-    if (models.length > 0) return { status: 'ok', models };
-    return fallback(runners.length > 0 ? 'auth' : 'not-found');
+    const login = runnerLogin(deps.db, row);
+    if (login.status === 'ok' && login.models.length > 0) {
+      const models = [...new Map(login.models.map(({ id, name }) => [id, { id, name }])).values()];
+      return { status: 'ok', models };
+    }
+    return fallback(
+      login.status === 'missing_local_login'
+        ? 'auth'
+        : login.status === 'ok'
+          ? 'no-model'
+          : 'not-found',
+    );
   }
 
   let token: string;
@@ -736,40 +888,37 @@ export function enabledAntigravitySubscriptionId(
   return activeSubscriptionRow(deps, teamId, at)?.id ?? null;
 }
 
-export function enabledAntigravitySubscriptionModels(
-  deps: { db: Pick<Db, 'select'> },
-  teamId: string,
-): { id: string; name: string }[] {
-  return (activeSubscriptionRow(deps, teamId)?.models ?? []).map((model) => ({
-    id: model.id,
-    name: model.name,
-  }));
+export function activeAntigravitySource(db: RunnerDb, teamId: string) {
+  const row = activeSubscriptionRow({ db }, teamId);
+  if (row === undefined) return { kind: 'none' } as const;
+  if (row.tokenCipher !== null) {
+    if (row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX)) {
+      return { kind: 'oauth-personal', models: row.models } as const;
+    }
+    return { kind: 'token', models: row.models } as const;
+  }
+  return { kind: 'host', login: runnerLogin(db, row), models: row.models } as const;
 }
 
-export function activeAntigravitySubscriptionMode(
-  deps: { db: Pick<Db, 'select'> },
+export function antigravitySubscriptionAllowsRunner(
+  db: RunnerDb,
   teamId: string,
-): SubscriptionMode {
-  const row = activeSubscriptionRow(deps, teamId);
-  if (!row) return 'none';
-  if (row.tokenCipher === null) return 'host';
-  return row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX) ? 'oauth-personal' : 'token';
-}
-
-export function antigravitySubscriptionRunsOn(
-  mode: SubscriptionMode,
-  capabilities: MachineCapabilities | null,
+  runnerId: string,
+  capabilities?: MachineCapabilities | null,
 ): boolean {
-  if (mode === 'host') return capabilities?.antigravity?.authenticated === true;
-  if (mode === 'oauth-personal') return capabilities?.antigravityOAuthProfile === true;
-  return mode === 'token';
-}
-
-export function hasActiveAntigravitySubscription(
-  deps: { db: Pick<Db, 'select'> },
-  teamId: string,
-): boolean {
-  return activeSubscriptionRow(deps, teamId) !== undefined;
+  const source = activeAntigravitySource(db, teamId);
+  if (source.kind === 'none') return false;
+  if (source.kind === 'token') return true;
+  if (source.kind === 'oauth-personal') {
+    if (capabilities !== undefined) return capabilities?.antigravityOAuthProfile === true;
+    const row = db
+      .select({ capabilities: machine.capabilities })
+      .from(machine)
+      .where(and(eq(machine.teamId, teamId), eq(machine.id, runnerId)))
+      .get();
+    return row?.capabilities?.antigravityOAuthProfile === true;
+  }
+  return source.login.status === 'ok' && source.login.runnerId === runnerId;
 }
 
 function activeSubscriptionRow(

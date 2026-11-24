@@ -90,7 +90,10 @@ export function routingTargets({
       id: `subscription:${account.id}`,
       name: account.label,
       runtime: 'antigravity' as const,
-      unavailable: account.state === 'expired',
+      unavailable:
+        account.state === 'expired' ||
+        account.runnerLogin === 'unavailable' ||
+        account.runnerLogin === 'missing_local_login',
     })),
   );
   for (const record of providers) {

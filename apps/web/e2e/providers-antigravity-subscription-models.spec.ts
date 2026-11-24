@@ -44,18 +44,7 @@ const mount = (
     if (path === '/api/teams/t1/antigravity-subscriptions') return json([record]);
     if (path === '/api/teams/t1/devin-subscriptions') return json([]);
     if (path === '/api/teams/t1/claude-subscriptions') return json([]);
-    if (path === '/api/teams/t1/model-sources')
-      return json({
-        sources: [
-          {
-            runtime: 'antigravity',
-            installed: true,
-            hostname: 'agy-mac',
-            machineId: 'm1',
-            models: UPSTREAM.map(({ id, name }) => ({ id, name })),
-          },
-        ],
-      });
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/antigravity-subscriptions/sub-a1/upstream-models')
       return upstream === null
         ? json({ status: 'failed', failure: 'upstream', httpStatus: null })

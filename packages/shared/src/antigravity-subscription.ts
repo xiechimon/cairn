@@ -38,6 +38,7 @@ export const antigravitySubscriptionSchema = z.object({
   label: z.string(),
   hasToken: z.boolean(),
   oauthPersonal: z.literal(true).optional(),
+  runnerId: z.string().nullable().optional(),
   expiresAt: z.number().int().nullable(),
   enabled: z.boolean().optional(),
   enabledAt: z.number().int().nullable().optional(),
@@ -56,6 +57,7 @@ export const createAntigravitySubscriptionSchema = z.object({
     .nullable()
     .optional(),
   expiresAt: z.number().int().positive().nullable().optional(),
+  runnerId: z.string().min(1).max(256).optional(),
 });
 
 export type CreateAntigravitySubscription = z.infer<typeof createAntigravitySubscriptionSchema>;
@@ -64,16 +66,19 @@ export const renameAntigravitySubscriptionSchema = z
   .object({
     label: z.string().trim().min(1).max(100).optional(),
     models: z.array(antigravitySubscriptionModelSchema).max(2000).optional(),
+    runnerId: z.string().min(1).max(256).optional(),
   })
-  .refine((body) => body.label !== undefined || body.models !== undefined, {
-    message: 'Nothing to update',
-  });
+  .refine(
+    (body) => body.label !== undefined || body.models !== undefined || body.runnerId !== undefined,
+    { message: 'Nothing to update' },
+  );
 
 export type PatchAntigravitySubscription = z.infer<typeof renameAntigravitySubscriptionSchema>;
 
 export const antigravitySubscriptionVerifyResultSchema = z.object({
   ok: z.boolean(),
   reason: z.enum(['auth', 'timeout', 'unavailable', 'failed', 'missing_local_login']).optional(),
+  runnerName: z.string().nullable().optional(),
   check: subscriptionCheckSchema.optional(),
 });
 

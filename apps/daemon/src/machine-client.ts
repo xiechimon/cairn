@@ -5,6 +5,7 @@ import {
   type ClaudeCodeReport,
   type ClaudeRateLimitReport,
   type MachineAntigravityModelProbeResult,
+  type MachineAntigravityVerifyBody,
   type MachineAskBody,
   type MachineAskResponse,
   type MachineAttachmentResponse,
@@ -175,6 +176,7 @@ export interface MachineApi {
     result: MachineAntigravityModelProbeResult,
     signal: AbortSignal,
   ): Promise<void>;
+  reportAntigravityVerify?(body: MachineAntigravityVerifyBody, signal?: AbortSignal): Promise<void>;
   steer(stepId: string): Promise<MachineSteerResponse | null>;
   steerAck?(stepId: string, body?: MachineSteerAckBody): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
@@ -648,6 +650,17 @@ export class MachineClient implements MachineApi {
   async reportClaudeRateLimit(body: ClaudeRateLimitReport): Promise<void> {
     await this.request('POST', '/api/machine/rate-limit', {
       body,
+      parse: (raw) => machineOkResponseSchema.parse(raw),
+    });
+  }
+
+  async reportAntigravityVerify(
+    body: MachineAntigravityVerifyBody,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    await this.request('POST', '/api/machine/antigravity/verify', {
+      body,
+      signal: signal ?? AbortSignal.timeout(REMOTE_TOOL_TIMEOUT_MS),
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }

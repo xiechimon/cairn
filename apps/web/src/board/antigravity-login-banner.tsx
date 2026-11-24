@@ -1,12 +1,10 @@
 import { KeyRound } from 'lucide-react';
 import { Link } from 'react-router';
 import {
-  antigravityRunnersSignedOut,
   antigravitySubscriptionLoginWarning,
   antigravitySubscriptionSignedOutWarning,
 } from '../antigravity-login-warning.js';
 import { useAntigravitySubscriptions } from '../api/antigravity-subscriptions.js';
-import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
@@ -23,8 +21,6 @@ export function useAntigravityLoginWarnings(now: number): AntigravityLoginWarnin
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const subscriptions = useAntigravitySubscriptions(teamId, live);
-  const machines = useMachines(teamId, live);
-  const signedOut = antigravityRunnersSignedOut(machines.data);
   return (subscriptions.data ?? []).flatMap((subscription): AntigravityLoginWarning[] => {
     const expiringText = antigravitySubscriptionLoginWarning(subscription, now, t);
     if (expiringText !== null) {
@@ -39,8 +35,7 @@ export function useAntigravityLoginWarnings(now: number): AntigravityLoginWarnin
         },
       ];
     }
-    const signedOutText =
-      signedOut === true ? antigravitySubscriptionSignedOutWarning(subscription, t) : null;
+    const signedOutText = antigravitySubscriptionSignedOutWarning(subscription, t);
     return signedOutText === null
       ? []
       : [{ key: subscription.id, kind: 'signed-out' as const, text: signedOutText }];

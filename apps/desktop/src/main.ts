@@ -74,7 +74,7 @@ import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './
 import { type CapturePage, createPageCapture } from './page-capture.js';
 import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
 import { createRestartBudget } from './restart-budget.js';
-import { type LocalRunner, startLocalRunner } from './runner.js';
+import { type LocalRunner, readRunnerRegistration, startLocalRunner } from './runner.js';
 import { migrateRunnerHome, runnerHomeFor } from './runner-home.js';
 import { createServerExitHandler } from './server-exit.js';
 import { createServerLog, otelHeaderSecrets, serverLogPath } from './server-log.js';
@@ -1080,11 +1080,12 @@ function serveUpdates(origin: string, notice: UpdateNotice | null, ownerToken: s
   ipcMain.handle('devin:cancel-login', (event) => {
     if (fromMainPage(event)) devinCancelLogin();
   });
-  ipcMain.handle('antigravity:status', (event) =>
-    fromMainPage(event)
-      ? antigravityLocalStatus()
-      : { installed: false, loggedIn: false, canLogin: false },
-  );
+  ipcMain.handle('antigravity:status', async (event) => {
+    if (!fromMainPage(event)) return { installed: false, loggedIn: false, canLogin: false };
+    const status = await antigravityLocalStatus();
+    const runnerId = readRunnerRegistration(runnerHome())?.machineId;
+    return runnerId === undefined ? status : { ...status, runnerId };
+  });
   ipcMain.handle('antigravity:import', (event, input: unknown) =>
     fromMainPage(event) ? credentials.importAntigravity(input) : { ok: false, reason: 'cancelled' },
   );
@@ -1095,7 +1096,7 @@ function serveUpdates(origin: string, notice: UpdateNotice | null, ownerToken: s
     event.sender.once('render-process-gone', cancel);
     event.sender.once('destroyed', cancel);
     try {
-      return await credentials.loginAntigravity(
+      const outcome = await credentials.loginAntigravity(
         input,
         (phase) => {
           if (!event.sender.isDestroyed()) event.sender.send('antigravity:login-progress', phase);
@@ -1103,6 +1104,8 @@ function serveUpdates(origin: string, notice: UpdateNotice | null, ownerToken: s
         controller.signal,
         subscriptionId,
       );
+      const runnerId = readRunnerRegistration(runnerHome())?.machineId;
+      return outcome.ok && runnerId !== undefined ? { ...outcome, runnerId } : outcome;
     } finally {
       event.sender.removeListener('render-process-gone', cancel);
       event.sender.removeListener('destroyed', cancel);

@@ -27,7 +27,9 @@ import { probeHostKey } from '@cairn/shared/host-identity';
 import { AgentReachProbe } from './agent-reach.js';
 import { createAcpBackend, createGeminiBackend } from './backend/acp.js';
 import {
+  type AntigravityInstall,
   type AntigravityManaged,
+  type AntigravityProbeOutcome,
   createAntigravityManaged,
 } from './backend/antigravity-managed.js';
 import { probeAntigravitySubscriptionModels } from './backend/antigravity-subscription-models.js';
@@ -1193,6 +1195,91 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       if (!signal.aborted) logger.machine('Antigravity subscription model probe delivery failed');
     }
   };
+  const MAX_CONCURRENT_ANTIGRAVITY_VERIFIES = 4;
+  let activeAntigravityVerifies = 0;
+  let presenceQueuedAfterVerify = false;
+  const runAntigravityVerify = async (checkId: string) => {
+    if (
+      stopping ||
+      streamCtrl.signal.aborted ||
+      activeAntigravityVerifies >= MAX_CONCURRENT_ANTIGRAVITY_VERIFIES
+    ) {
+      return;
+    }
+    activeAntigravityVerifies += 1;
+    const started = performance.now();
+    try {
+      let outcome: AntigravityProbeOutcome;
+      try {
+        if (antigravityManaged.probeDetailed !== undefined) {
+          outcome = await antigravityManaged.probeDetailed();
+        } else {
+          const probed = await antigravityManaged.probe();
+          outcome = probed !== null ? { kind: 'ok', install: probed } : { kind: 'not-installed' };
+        }
+      } catch (err: unknown) {
+        outcome = {
+          kind: 'error',
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
+      if (stopping || streamCtrl.signal.aborted) return;
+      const durationMs = Math.min(Math.max(0, Math.round(performance.now() - started)), 300_000);
+      const probed = outcome.kind === 'ok' ? outcome.install : null;
+      const version =
+        probed !== null && probed.version.length > 0 ? probed.version.slice(0, 64) : undefined;
+      const models =
+        probed !== null
+          ? probed.models
+              .filter((model) => model.id.length > 0 && model.name.length > 0)
+              .slice(0, 500)
+              .map((model) => ({
+                ...model,
+                id: model.id.slice(0, 256),
+                name: model.name.slice(0, 256),
+              }))
+          : undefined;
+      const installed =
+        outcome.kind === 'ok'
+          ? true
+          : outcome.kind === 'timeout'
+            ? true
+            : outcome.kind === 'not-installed'
+              ? false
+              : antigravityManaged.current() !== null;
+      const signal = AbortSignal.any([streamCtrl.signal, AbortSignal.timeout(15_000)]);
+      await client
+        .reportAntigravityVerify?.(
+          {
+            checkId,
+            installed,
+            authenticated: probed?.authenticated === true,
+            ...(outcome.kind === 'timeout' ? { timedOut: true } : {}),
+            ...(version !== undefined ? { version } : {}),
+            ...(probed !== null ? { source: probed.source } : {}),
+            ...(models !== undefined ? { models } : {}),
+            durationMs,
+            ...(outcome.kind === 'error' ? { error: outcome.message.slice(0, 500) } : {}),
+          },
+          signal,
+        )
+        .catch((reportErr: unknown) =>
+          logger.machine(
+            `antigravity verify report failed: ${reportErr instanceof Error ? reportErr.message : String(reportErr)}`,
+          ),
+        );
+      if (sendPresenceNow !== null && !presenceQueuedAfterVerify) {
+        presenceQueuedAfterVerify = true;
+        void sendPresenceNow()
+          .catch(() => {})
+          .finally(() => {
+            presenceQueuedAfterVerify = false;
+          });
+      }
+    } finally {
+      activeAntigravityVerifies -= 1;
+    }
+  };
   void (async () => {
     let backoff = 1_000;
     let announced = false;
@@ -1227,6 +1314,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             }
             if (ev.type === 'antigravity.models' && connectionId !== null) {
               void deliverAntigravityModelProbe(ev.requestId, connectionId, probeSignal);
+            }
+            if (ev.type === 'antigravity.verify') {
+              void runAntigravityVerify(ev.checkId);
             }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
@@ -1300,11 +1390,23 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             `antigravity managed update check failed: ${error instanceof Error ? error.message : String(error)}`,
           );
         });
-    } else if (!currentAg.authenticated) {
-      void antigravityManaged.probe().catch(() => {});
-    } else if (now >= antigravityReprobeAt) {
-      antigravityReprobeAt = now + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
-      void antigravityManaged.probe().catch(() => {});
+    } else if (!currentAg.authenticated || now >= antigravityReprobeAt) {
+      if (currentAg.authenticated) {
+        antigravityReprobeAt = now + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
+      }
+      const before: AntigravityInstall = currentAg;
+      void antigravityManaged
+        .probe()
+        .then((after) => {
+          if (stopping || sendPresenceNow === null) return;
+          const changed =
+            after === null ||
+            before.authenticated !== after.authenticated ||
+            before.version !== after.version ||
+            JSON.stringify(before.models) !== JSON.stringify(after.models);
+          if (changed) return sendPresenceNow();
+        })
+        .catch(() => {});
     }
     void probeAuthAndRemember()
       .then(() => presenceReporter.send())

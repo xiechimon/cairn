@@ -1,4 +1,8 @@
-import { DEFAULT_ANTIGRAVITY_MODELS, type MachineStreamEvent } from '@cairn/shared';
+import {
+  DEFAULT_ANTIGRAVITY_MODELS,
+  type MachineAntigravityVerifyBody,
+  type MachineStreamEvent,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
@@ -10,10 +14,58 @@ import {
   step as stepTable,
   team,
 } from '../src/db/schema.js';
+import { sha256Hex } from '../src/lib/crypto.js';
 import { openAntigravitySubscription } from '../src/services/antigravity-subscriptions.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
+import { requestAntigravityVerify } from '../src/services/machine-antigravity-verify.js';
+import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import { markPresence } from '../src/services/machines.js';
 import { getModelSources } from '../src/services/providers.js';
-import { bootServer, insertMachine, issueApiKey, postProject, req, seedRoute } from './helpers.js';
+import {
+  bootServer,
+  insertMachine,
+  issueApiKey,
+  postProject,
+  req,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
+
+function attachLiveVerifier(
+  s: TestServer,
+  machineId: string,
+  reply: (
+    checkId: string,
+    token: string,
+  ) =>
+    | Omit<MachineAntigravityVerifyBody, 'checkId'>
+    | Promise<Omit<MachineAntigravityVerifyBody, 'checkId'> | null>
+    | null,
+): { token: string; checkIds: string[]; release: () => void } {
+  const token = `machine-token-${machineId}-${Math.random().toString(36).slice(2)}`;
+  s.db
+    .update(machineTable)
+    .set({ tokenHash: sha256Hex(token) })
+    .where(eq(machineTable.id, machineId))
+    .run();
+  const checkIds: string[] = [];
+  const release = s.machineHub.subscribeMachine(s.team.id, machineId, (ev) => {
+    if (ev.type !== 'antigravity.verify') return;
+    checkIds.push(ev.checkId);
+    void Promise.resolve(reply(ev.checkId, token)).then(async (body) => {
+      if (body === null) return;
+      await s.app.request('/api/machine/antigravity/verify', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ checkId: ev.checkId, ...body }),
+      });
+    });
+  });
+  return { token, checkIds, release };
+}
 
 const disposables: (() => void)[] = [];
 afterEach(() => {
@@ -118,7 +170,7 @@ describe('antigravity subscriptions REST & model sources', () => {
     }
   });
 
-  test('verifies host-login connection from online Runner antigravity capabilities', async () => {
+  test('verifies host-login connection via live probe on the bound Runner', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
 
@@ -137,6 +189,15 @@ describe('antigravity subscriptions REST & model sources', () => {
       },
     });
     expect(machineId).toBeDefined();
+    const verifier = attachLiveVerifier(s, machineId, () => ({
+      installed: true,
+      authenticated: true,
+      version: '1.5.10',
+      source: 'local',
+      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+      durationMs: 240,
+    }));
+    disposables.push(verifier.release);
 
     const sources = getModelSources({ db: s.db, box: s.secretBox }, s.team.id).sources;
     expect(sources).toContainEqual({
@@ -158,7 +219,12 @@ describe('antigravity subscriptions REST & model sources', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/verify`,
     );
     expect(okVerify.status).toBe(200);
-    expect(await okVerify.json()).toMatchObject({ ok: true });
+    expect(await okVerify.json()).toMatchObject({
+      ok: true,
+      runnerName: 'agy-mac',
+      check: { command: 'agy acp · agy-mac', durationMs: expect.any(Number) },
+    });
+    expect(verifier.checkIds).toHaveLength(1);
 
     const createdSecond = await req(
       s.app,
@@ -174,9 +240,538 @@ describe('antigravity subscriptions REST & model sources', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${second.id}/enable`,
     );
     expect(switched.status).toBe(200);
+    expect(verifier.checkIds).toHaveLength(2);
     const dbRows = s.db.select().from(antigravitySubscription).all();
     expect(dbRows.find((r) => r.id === sub.id)?.enabledAt).toBeNull();
     expect(dbRows.find((r) => r.id === second.id)?.enabledAt).not.toBeNull();
+  });
+
+  test('never reports pass without running a live check on the named Runner', async () => {
+    const s = bootServer({
+      githubFetch: async () => new Response('[]'),
+      antigravityVerifyTimeoutMs: 50,
+    });
+    disposables.push(() => s.dispose());
+    const runnerId = insertMachine(s, {
+      name: 'xmonsMac',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+        },
+      },
+    });
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Mac', runnerId });
+    const sub = (await created.json()) as { id: string };
+
+    const disconnected = await req(s.app, 'POST', `${path}/${sub.id}/verify`);
+    expect(disconnected.status).toBe(200);
+    expect(await disconnected.json()).toMatchObject({
+      ok: false,
+      reason: 'unavailable',
+      runnerName: 'xmonsMac',
+      check: { ok: false, reason: 'unavailable', command: 'agy acp · xmonsMac' },
+    });
+
+    const createdSilent = await req(s.app, 'POST', path, { label: 'Silent Mac', runnerId });
+    const silentSub = (await createdSilent.json()) as { id: string };
+    const silent = attachLiveVerifier(s, runnerId, () => null);
+    disposables.push(silent.release);
+
+    const timedOut = await req(s.app, 'POST', `${path}/${silentSub.id}/verify`);
+    expect(timedOut.status).toBe(200);
+    expect(await timedOut.json()).toMatchObject({
+      ok: false,
+      reason: 'timeout',
+      runnerName: 'xmonsMac',
+      check: { ok: false, reason: 'timeout', command: 'agy acp · xmonsMac' },
+    });
+    expect(silent.checkIds).toHaveLength(1);
+  });
+
+  test('daemon-reported timeout and transient probe error preserve stored login and models', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const runnerId = insertMachine(s, {
+      name: 'xmonsMac',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          version: '1.5.15',
+          models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+        },
+      },
+    });
+    let replyMode: 'timeout' | 'error' = 'timeout';
+    const probe = attachLiveVerifier(s, runnerId, () =>
+      replyMode === 'timeout'
+        ? {
+            installed: true,
+            authenticated: false,
+            timedOut: true,
+            durationMs: 35_000,
+          }
+        : {
+            installed: true,
+            authenticated: false,
+            error: 'antigravity probe exited (1)',
+            durationMs: 410,
+          },
+    );
+    disposables.push(probe.release);
+
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Mac', runnerId });
+    const sub = (await created.json()) as { id: string };
+
+    const res = await req(s.app, 'POST', `${path}/${sub.id}/verify`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({
+      ok: false,
+      reason: 'timeout',
+      runnerName: 'xmonsMac',
+      check: { ok: false, reason: 'timeout', command: 'agy acp · xmonsMac', durationMs: 35_000 },
+    });
+    expect(
+      s.db.select().from(machineTable).where(eq(machineTable.id, runnerId)).get()?.capabilities
+        ?.antigravity,
+    ).toMatchObject({
+      installed: true,
+      authenticated: true,
+      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+    });
+
+    replyMode = 'error';
+    const created2 = await req(s.app, 'POST', path, { label: 'Mac 2', runnerId });
+    const sub2 = (await created2.json()) as { id: string };
+    const errRes = await req(s.app, 'POST', `${path}/${sub2.id}/verify`);
+    expect(errRes.status).toBe(200);
+    expect(await errRes.json()).toMatchObject({
+      ok: false,
+      reason: 'failed',
+      runnerName: 'xmonsMac',
+      check: { ok: false, reason: 'failed', command: 'agy acp · xmonsMac', durationMs: 410 },
+    });
+    expect(
+      s.db.select().from(machineTable).where(eq(machineTable.id, runnerId)).get()?.capabilities
+        ?.antigravity,
+    ).toMatchObject({
+      installed: true,
+      authenticated: true,
+      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+    });
+  });
+
+  test('binding a Runner via PATCH clears a stale verify rate-limit window so Verify succeeds immediately', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    insertMachine(s, {
+      name: 'Ians-Mac-mini',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: { installed: true, authenticated: false, models: [] },
+      },
+    });
+    const macId = insertMachine(s, {
+      name: 'xmonsMac',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+        },
+      },
+    });
+    const probe = attachLiveVerifier(s, macId, () => ({
+      installed: true,
+      authenticated: true,
+      version: '1.5.15',
+      source: 'managed',
+      models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+      durationMs: 420,
+    }));
+    disposables.push(probe.release);
+
+    s.db
+      .insert(antigravitySubscription)
+      .values({ id: 'legacy-unbound', label: 'Antigravity 订阅', teamId: s.team.id, createdAt: 1 })
+      .run();
+
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const first = await req(s.app, 'POST', `${path}/legacy-unbound/verify`);
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({ ok: false, reason: 'unavailable' });
+
+    const bound = await req(s.app, 'PATCH', `${path}/legacy-unbound`, { runnerId: macId });
+    expect(bound.status).toBe(200);
+
+    const second = await req(s.app, 'POST', `${path}/legacy-unbound/verify`);
+    expect(second.status).toBe(200);
+    expect(await second.json()).toMatchObject({
+      ok: true,
+      runnerName: 'xmonsMac',
+      check: { command: 'agy acp · xmonsMac' },
+    });
+  });
+
+  test('requestAntigravityVerify settles cleanly without TDZ error when pushAntigravityVerify fails synchronously', async () => {
+    const machineHub = new MachineWakeHub();
+    const release = machineHub.subscribeMachine('team-1', 'm-sync-fail', () => {
+      throw new Error('stream write failed');
+    });
+    try {
+      const outcome = await requestAntigravityVerify({ machineHub }, 'm-sync-fail');
+      expect(outcome).toEqual({ ok: false, reason: 'unavailable' });
+    } finally {
+      release();
+    }
+  });
+
+  test('names which runner is logged in or not, probes only the bound Runner, and rejects cross-runner replies', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const macId = insertMachine(s, {
+      name: 'xmonsMac',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+        },
+      },
+    });
+    const miniId = insertMachine(s, {
+      name: 'Ians-Mac-mini',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: false,
+          models: [],
+        },
+      },
+    });
+    s.db.update(team).set({ defaultMachineId: miniId }).where(eq(team.id, s.team.id)).run();
+
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const createdMac = await req(s.app, 'POST', path, { label: 'Mac Sub', runnerId: macId });
+    const macSub = (await createdMac.json()) as { id: string };
+    const createdMini = await req(s.app, 'POST', path, { label: 'Mini Sub', runnerId: miniId });
+    const miniSub = (await createdMini.json()) as { id: string };
+
+    const listed = (await (await req(s.app, 'GET', path)).json()) as Array<Record<string, unknown>>;
+    expect(listed.find((row) => row.id === macSub.id)).toMatchObject({
+      runnerId: macId,
+      runnerName: 'xmonsMac',
+      runnerLogin: 'ok',
+      runnerLogins: [
+        { runnerId: miniId, name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: macId, name: 'xmonsMac', online: true, status: 'ok' },
+      ],
+    });
+    expect(listed.find((row) => row.id === miniSub.id)).toMatchObject({
+      runnerId: miniId,
+      runnerName: 'Ians-Mac-mini',
+      runnerLogin: 'missing_local_login',
+      runnerLogins: [
+        { runnerId: miniId, name: 'Ians-Mac-mini', online: true, status: 'missing_local_login' },
+        { runnerId: macId, name: 'xmonsMac', online: true, status: 'ok' },
+      ],
+    });
+
+    const miniProbe = attachLiveVerifier(s, miniId, () => ({
+      installed: true,
+      authenticated: false,
+      version: '1.5.10',
+      source: 'managed',
+      models: [],
+      durationMs: 185,
+    }));
+    disposables.push(miniProbe.release);
+
+    let spoofStatus = 0;
+    const macProbe = attachLiveVerifier(s, macId, async (checkId) => {
+      const spoofed = await s.app.request('/api/machine/antigravity/verify', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${miniProbe.token}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          checkId,
+          installed: true,
+          authenticated: false,
+          durationMs: 10,
+        }),
+      });
+      spoofStatus = spoofed.status;
+      return {
+        installed: true,
+        authenticated: true,
+        version: '1.5.10',
+        source: 'managed',
+        models: [
+          { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+          { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+        ],
+        durationMs: 420,
+      };
+    });
+    disposables.push(macProbe.release);
+
+    const macVerified = await req(s.app, 'POST', `${path}/${macSub.id}/verify`);
+    expect(macVerified.status).toBe(200);
+    const macResult = (await macVerified.json()) as {
+      ok: boolean;
+      runnerName?: string;
+      check?: { command: string; durationMs: number };
+    };
+    expect(macResult).toMatchObject({
+      ok: true,
+      runnerName: 'xmonsMac',
+      check: { command: 'agy acp · xmonsMac' },
+    });
+    expect(macResult.check?.durationMs).toBeGreaterThanOrEqual(420);
+    expect(spoofStatus).toBe(404);
+    expect(macProbe.checkIds).toHaveLength(1);
+    expect(miniProbe.checkIds).toHaveLength(0);
+
+    s.db
+      .update(machineTable)
+      .set({
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          antigravity: { installed: true, authenticated: true, models: [] },
+        },
+      })
+      .where(eq(machineTable.id, miniId))
+      .run();
+
+    const miniVerified = await req(s.app, 'POST', `${path}/${miniSub.id}/verify`);
+    expect(miniVerified.status).toBe(200);
+    const miniResult = (await miniVerified.json()) as {
+      ok: boolean;
+      reason?: string;
+      runnerName?: string;
+      check?: { command: string; durationMs: number };
+    };
+    expect(miniResult).toMatchObject({
+      ok: false,
+      reason: 'missing_local_login',
+      runnerName: 'Ians-Mac-mini',
+      check: { command: 'agy acp · Ians-Mac-mini' },
+    });
+    expect(miniResult.check?.durationMs).toBeGreaterThanOrEqual(185);
+    expect(miniProbe.checkIds).toHaveLength(1);
+    expect(
+      s.db.select().from(machineTable).where(eq(machineTable.id, miniId)).get()?.capabilities
+        ?.antigravity?.authenticated,
+    ).toBe(false);
+  });
+
+  test.each([
+    ['signed out', true, false, 'missing_local_login', 'auth'],
+    ['offline', false, true, 'unavailable', 'not-found'],
+    ['signed in', true, true, null, null],
+  ] as const)(
+    'keeps verification and models on the bound Runner when it is %s',
+    async (_state, online, authenticated, reason, failure) => {
+      const s = bootServer({ githubFetch: async () => new Response('[]') });
+      disposables.push(() => s.dispose());
+      const ownModel = { id: 'bound-model', name: 'Bound model' };
+      const otherModel = { id: 'other-model', name: 'Other model' };
+      const runnerId = insertMachine(s, {
+        name: 'bound',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          antigravity: { installed: true, authenticated: true, models: [ownModel] },
+        },
+      });
+      const otherId = insertMachine(s, {
+        name: 'other',
+        capabilities: {
+          mcpServers: [],
+          skills: [],
+          antigravity: { installed: true, authenticated: true, models: [otherModel] },
+        },
+      });
+      const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+      const created = await req(s.app, 'POST', path, { label: 'Bound', runnerId });
+      expect(created.status).toBe(201);
+      const sub = (await created.json()) as { id: string };
+      s.db
+        .update(machineTable)
+        .set({
+          online,
+          capabilities: {
+            mcpServers: [],
+            skills: [],
+            antigravity: { installed: true, authenticated, models: [ownModel] },
+          },
+        })
+        .where(eq(machineTable.id, runnerId))
+        .run();
+      if (online) {
+        const boundVerifier = attachLiveVerifier(s, runnerId, () => ({
+          installed: true,
+          authenticated,
+          models: [ownModel],
+          durationMs: 120,
+        }));
+        disposables.push(boundVerifier.release);
+      }
+      const otherVerifier = attachLiveVerifier(s, otherId, () => ({
+        installed: true,
+        authenticated: true,
+        models: [otherModel],
+        durationMs: 120,
+      }));
+      disposables.push(otherVerifier.release);
+
+      const verified = await req(s.app, 'POST', `${path}/${sub.id}/verify`);
+      expect(verified.status).toBe(200);
+      expect
+        .soft(await verified.json())
+        .toMatchObject(
+          reason === null
+            ? { ok: true, runnerName: 'bound' }
+            : { ok: false, reason, runnerName: 'bound' },
+        );
+      expect(otherVerifier.checkIds).toHaveLength(0);
+
+      const catalog = await req(s.app, 'POST', `${path}/${sub.id}/upstream-models`);
+      expect(catalog.status).toBe(200);
+      expect
+        .soft(await catalog.json())
+        .toMatchObject(
+          failure === null
+            ? { status: 'ok', models: [ownModel] }
+            : { status: 'fallback', failure, models: expect.not.arrayContaining([otherModel]) },
+        );
+
+      const list = await req(s.app, 'GET', path);
+      expect.soft(await list.json()).toMatchObject([
+        {
+          id: sub.id,
+          runnerId,
+          runnerLogin: reason ?? 'ok',
+          models: [],
+          runnerModels: reason === null ? [ownModel] : [],
+          ...(!online ? { runnerOffline: true } : {}),
+        },
+      ]);
+      const sources = getModelSources({ db: s.db, box: s.secretBox }, s.team.id).sources.filter(
+        (source) => source.runtime === 'antigravity',
+      );
+      expect(sources).toEqual(
+        reason === null
+          ? [
+              expect.objectContaining({
+                machineId: runnerId,
+                models: [{ ...ownModel, slot: 'builtin' }],
+              }),
+            ]
+          : [],
+      );
+    },
+  );
+
+  test('does not guess a Runner for a legacy subscription in a multi-Runner team', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const capabilities = (accountId: string) => ({
+      mcpServers: [],
+      skills: [],
+      antigravity: {
+        installed: true,
+        authenticated: true,
+        models: [{ id: accountId, name: accountId }],
+      },
+    });
+    insertMachine(s, { name: 'unexpected', capabilities: capabilities('unexpected') });
+    const matchingRunner = insertMachine(s, {
+      name: 'original',
+      capabilities: capabilities('original'),
+    });
+    s.db
+      .insert(antigravitySubscription)
+      .values({
+        id: 'unknown',
+        label: 'Unknown',
+        teamId: s.team.id,
+        createdAt: 2,
+      })
+      .run();
+
+    const ambiguous = await req(s.app, 'POST', `${path}/unknown/verify`);
+    expect(await ambiguous.json()).toMatchObject({ ok: false, reason: 'unavailable' });
+    expect(await (await req(s.app, 'GET', path)).json()).toMatchObject([
+      { id: 'unknown', runnerId: null, runnerLogin: 'unavailable' },
+    ]);
+    const rebound = await req(s.app, 'PATCH', `${path}/unknown`, { runnerId: matchingRunner });
+    expect(await rebound.json()).toMatchObject({ runnerId: matchingRunner });
+    const catalog = await req(s.app, 'POST', `${path}/unknown/upstream-models`);
+    expect(await catalog.json()).toEqual({
+      status: 'ok',
+      models: [{ id: 'original', name: 'original' }],
+    });
+    const ignored = await req(s.app, 'PATCH', `${path}/unknown`, {
+      runnerId: 'machine-unexpected',
+    });
+    expect(await ignored.json()).toMatchObject({ runnerId: matchingRunner });
+  });
+
+  test('a bound Runner signing out refreshes status without an online transition', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    const capabilities = {
+      mcpServers: [],
+      skills: [],
+      antigravity: { installed: true, authenticated: true },
+    };
+    const runnerId = insertMachine(s, { name: 'bound', capabilities });
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    expect((await req(s.app, 'POST', path, { label: 'Bound' })).status).toBe(201);
+    const events: object[] = [];
+    const unsubscribe = s.hub.subscribe(s.team.id, {
+      nextSeq: () => 1,
+      send: async (event) => {
+        events.push(event);
+      },
+    });
+    disposables.push(unsubscribe);
+    const deps = {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      skillsDir: s.skillsDir,
+    };
+    markPresence(deps, runnerId, { capabilities });
+    expect(events).toEqual([]);
+    markPresence(deps, runnerId, {
+      capabilities: { ...capabilities, antigravity: { installed: true, authenticated: false } },
+    });
+    expect(events).toEqual([{ type: 'machine_presence', machineId: runnerId, online: true }]);
+    expect(await (await req(s.app, 'GET', path)).json()).toMatchObject([
+      { runnerId, runnerLogin: 'missing_local_login' },
+    ]);
   });
 
   test('refuses disabling or deleting an account with running tasks and lists step history', async () => {
@@ -987,6 +1582,66 @@ describe('antigravity upstream models', () => {
     expect(rateLimited.status).toBe(429);
   });
 
+  test('lists distinct models from the explicitly selected Runner', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const runnerId = insertMachine(s, {
+      name: 'agy-one',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [
+            { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+            { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+          ],
+        },
+      },
+    });
+    insertMachine(s, {
+      name: 'agy-two',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [
+            { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+            { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+          ],
+        },
+      },
+    });
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Keyring',
+      runnerId,
+    });
+    const sub = (await created.json()) as { id: string };
+    const res = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/upstream-models`,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      status: 'ok',
+      models: [
+        { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+        { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+      ],
+    });
+
+    const rateLimited = await req(
+      s.app,
+      'POST',
+      `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/upstream-models`,
+    );
+    expect(rateLimited.status).toBe(429);
+  });
+
   test('labels the built-in list as fallback for no probe runner or no stored credential', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
@@ -1024,6 +1679,7 @@ describe('antigravity upstream models', () => {
     });
     const second = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
       label: 'Second',
+      runnerId: 'machine-agy-signed-out',
     });
     const other = (await second.json()) as { id: string };
     const signedOut = await req(
@@ -1137,6 +1793,17 @@ describe('antigravity upstream models', () => {
         { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
       ],
     });
+    expect(
+      await (await req(s.app, 'GET', `/api/teams/${s.team.id}/antigravity-subscriptions`)).json(),
+    ).toMatchObject([
+      {
+        models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' }],
+        runnerModels: [
+          { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+          { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+        ],
+      },
+    ]);
 
     const sources = getModelSources({ db: s.db, box: s.secretBox }, s.team.id).sources;
     expect(sources).toContainEqual({
@@ -1146,10 +1813,41 @@ describe('antigravity upstream models', () => {
       machineId: 'machine-agy-mac',
       models: [
         { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' },
-        { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen', slot: 'builtin' },
         { id: 'gemini-4-argon', name: 'Gemini 4 Argon', slot: 'builtin' },
       ],
     });
+  });
+
+  test('token model choices retain built-in thinking levels without borrowing Runner models', async () => {
+    const s = bootServer();
+    disposables.push(() => s.dispose());
+    insertMachine(s, {
+      name: 'token-runner',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: { installed: true, models: [{ id: 'runner-only', name: 'Runner Only' }] },
+      },
+    });
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, {
+      label: 'Token',
+      token: `AIzaSyA${'x'.repeat(28)}`,
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    expect(
+      (
+        await req(s.app, 'PATCH', `${path}/${id}`, {
+          models: [{ id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }],
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      getModelSources({ db: s.db, box: s.secretBox }, s.team.id).sources.find(
+        (s) => s.runtime === 'antigravity',
+      )?.models,
+    ).toMatchObject([{ id: 'gemini-3.8-flash', thinkingLevels: ['low', 'medium', 'high'] }]);
   });
 
   test('an offline antigravity-capable Runner still contributes its model source', async () => {

@@ -323,7 +323,7 @@ describe('Claude subscription connections', () => {
         hostname: 'mac',
         models: [
           { id: 'opus[1m]', name: 'opus[1m]', slot: 'default' },
-          { id: 'claude-haiku-5-5', name: 'claude-haiku-5-5', slot: 'default-haiku' },
+          { id: 'runner-only-model', name: 'Runner-only model', slot: 'builtin' },
         ],
       },
     });

@@ -637,7 +637,10 @@ export function markPresence(
     merged !== undefined &&
     machineStrain(row.capabilities?.hardware).join() !== machineStrain(merged.hardware).join();
   const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
-  if (becameOnline || loginChanged || computerChanged || strainChanged) {
+  const antigravityChanged =
+    merged !== undefined &&
+    JSON.stringify(merged.antigravity) !== JSON.stringify(row.capabilities?.antigravity);
+  if (becameOnline || loginChanged || computerChanged || strainChanged || antigravityChanged) {
     const online = admitOnline || row.online;
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
   }

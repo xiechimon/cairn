@@ -16,10 +16,7 @@ import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { build, machine, provider, step, todo } from '../db/schema.js';
-import {
-  activeAntigravitySubscriptionMode,
-  antigravitySubscriptionRunsOn,
-} from './antigravity-subscriptions.js';
+import { activeAntigravitySource } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 
@@ -88,9 +85,10 @@ export function devinUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
     .some((row) => machineRuntimeAvailable(row, 'devin'));
 }
 
-export function antigravityUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
-  const mode = activeAntigravitySubscriptionMode({ db }, teamId);
-  if (mode === 'none') return false;
+export function antigravityUsable(db: Pick<Db, 'select' | 'update'>, teamId: string): boolean {
+  const source = activeAntigravitySource(db, teamId);
+  if (source.kind === 'none') return false;
+  if (source.kind === 'host') return source.login.status === 'ok';
   return db
     .select({ claudeCodeReport: machine.claudeCodeReport, capabilities: machine.capabilities })
     .from(machine)
@@ -99,7 +97,7 @@ export function antigravityUsable(db: Pick<Db, 'select'>, teamId: string): boole
     .some(
       (row) =>
         machineRuntimeAvailable(row, 'antigravity') &&
-        antigravitySubscriptionRunsOn(mode, row.capabilities),
+        (source.kind === 'token' || row.capabilities?.antigravityOAuthProfile === true),
     );
 }
 

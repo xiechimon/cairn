@@ -1,0 +1,1 @@
+ALTER TABLE `antigravity_subscription` ADD `runnerId` text;

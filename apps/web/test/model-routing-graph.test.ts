@@ -251,6 +251,18 @@ describe('antigravity subscription targets', () => {
     ]);
   });
 
+  test.each(['unavailable', 'missing_local_login'] as const)(
+    'a host subscription with Runner login %s is unavailable',
+    (runnerLogin) => {
+      expect(routingTargets({
+        subscriptions: [],
+        antigravitySubscriptions: [{ ...liveAntigravity, runnerLogin }],
+        providers: [],
+        routing: undefined,
+      })[0]?.unavailable).toBe(true);
+    },
+  );
+
   test('an antigravity rule wires to the live antigravity subscription', () => {
     const settings: TeamRoutingSettings = {
       rules: [rule('coordinator', 'antigravity', 'gemini-4-carbon')],

@@ -47,10 +47,7 @@ import {
 } from '../db/schema.js';
 import { conflict, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import {
-  enabledAntigravitySubscriptionModels,
-  hasActiveAntigravitySubscription,
-} from './antigravity-subscriptions.js';
+import { activeAntigravitySource } from './antigravity-subscriptions.js';
 import { enabledClaudeSubscriptionModels } from './claude-subscriptions.js';
 import {
   enabledDevinSubscriptionModels,
@@ -260,33 +257,55 @@ export function listDevinSources(db: Db, teamId: string): ModelSourcesEnvelope['
 }
 
 export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnvelope['sources'] {
-  const provisionable = hasActiveAntigravitySubscription({ db }, teamId);
-  const machines = db
+  const source = activeAntigravitySource(db, teamId);
+  if (source.kind === 'host') {
+    if (source.login.status !== 'ok') return [];
+    const reported = source.login.models;
+    const picked = source.models.filter((model) => reported.some((entry) => entry.id === model.id));
+    const models = withKnownThinkingLevels(uniqueModels([...picked, ...reported]), [
+      ...reported,
+      ...DEFAULT_ANTIGRAVITY_MODELS,
+    ]);
+    return [
+      {
+        runtime: 'antigravity',
+        installed: true,
+        hostname: source.login.hostname,
+        machineId: source.login.runnerId,
+        models: models.map((model) => ({ ...model, slot: 'builtin' })),
+      },
+    ];
+  }
+  return db
     .select()
     .from(machine)
     .where(eq(machine.teamId, teamId))
     .orderBy(asc(machine.name))
     .all()
-    .filter((row) => {
-      const antigravity = row.capabilities?.antigravity;
-      return antigravity?.installed === true || (provisionable && antigravity !== undefined);
+    .flatMap((row) => {
+      const report = row.capabilities?.antigravity;
+      if (report === undefined || (!report.installed && source.kind === 'none')) return [];
+      const models = withKnownThinkingLevels(
+        uniqueModels(
+          source.kind === 'token' || source.kind === 'oauth-personal'
+            ? source.models
+            : (report.models ?? []),
+        ),
+        DEFAULT_ANTIGRAVITY_MODELS,
+      );
+      return [
+        {
+          runtime: 'antigravity' as const,
+          installed: report.installed,
+          hostname: row.name,
+          machineId: row.id,
+          models:
+            models.length > 0
+              ? models.map((model) => ({ ...model, slot: 'builtin' as const }))
+              : [...DEFAULT_ANTIGRAVITY_MODELS],
+        },
+      ];
     });
-  const reported = machines.flatMap((row) => row.capabilities?.antigravity?.models ?? []);
-  const merged = withKnownThinkingLevels(
-    uniqueModels([...enabledAntigravitySubscriptionModels({ db }, teamId), ...reported]),
-    [...reported, ...DEFAULT_ANTIGRAVITY_MODELS],
-  );
-  const models: ModelSourceModel[] =
-    merged.length > 0
-      ? merged.map((model) => ({ ...model, slot: 'builtin' }))
-      : [...DEFAULT_ANTIGRAVITY_MODELS];
-  return machines.map((row) => ({
-    runtime: 'antigravity' as const,
-    installed: row.capabilities?.antigravity?.installed === true,
-    hostname: row.name,
-    machineId: row.id,
-    models,
-  }));
 }
 
 export function readProviderOrder(db: Db, teamId: string): string[] | null {

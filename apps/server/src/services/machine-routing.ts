@@ -9,8 +9,8 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, machine, step, team } from '../db/schema.js';
 import {
-  activeAntigravitySubscriptionMode,
-  antigravitySubscriptionRunsOn,
+  activeAntigravitySource,
+  antigravitySubscriptionAllowsRunner,
 } from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
@@ -41,8 +41,6 @@ export function workerIneligibility(
   now: number,
 ): MachineIneligibility | null {
   const runtime = stepRuntimeFor(facts.model.provider);
-  const antigravityMode =
-    runtime === 'antigravity' ? activeAntigravitySubscriptionMode({ db }, machineRow.teamId) : null;
   const ineligible = machineEligibility({
     machine: machineRow,
     agent: facts.agentRow,
@@ -55,14 +53,19 @@ export function workerIneligibility(
     devinSubscriptionMissing:
       runtime === 'devin' && !hasActiveDevinSubscription({ db }, machineRow.teamId),
     antigravitySubscriptionMissing:
-      antigravityMode !== null &&
-      !antigravitySubscriptionRunsOn(antigravityMode, machineRow.capabilities),
+      runtime === 'antigravity' &&
+      !antigravitySubscriptionAllowsRunner(
+        db,
+        machineRow.teamId,
+        machineRow.id,
+        machineRow.capabilities,
+      ),
   });
   return ineligible;
 }
 
 export function chiefIneligibility(
-  db: Pick<Db, 'select'>,
+  db: Pick<Db, 'select' | 'update'>,
   machineRow: MachineRow,
   agentRow: Pick<RouteProfile, 'requiredCapabilities'>,
   provider: string | null | undefined,
@@ -76,37 +79,57 @@ export function chiefIneligibility(
     return { kind: 'claude-login' };
   if (runtime === 'devin' && !hasActiveDevinSubscription({ db }, machineRow.teamId))
     return { kind: 'devin-subscription' };
-  if (runtime === 'antigravity') {
-    const mode = activeAntigravitySubscriptionMode({ db }, machineRow.teamId);
-    if (!antigravitySubscriptionRunsOn(mode, machineRow.capabilities)) {
-      return { kind: 'antigravity-subscription' };
-    }
-  }
+  if (
+    runtime === 'antigravity' &&
+    !antigravitySubscriptionAllowsRunner(
+      db,
+      machineRow.teamId,
+      machineRow.id,
+      machineRow.capabilities,
+    )
+  )
+    return { kind: 'antigravity-subscription' };
   const missing = missingCapabilities(machineRow, agentRow);
   if (missing.length > 0) return { kind: 'capability', missing };
   return null;
 }
 
+export function runtimeFallbackMachineId(
+  db: Pick<Db, 'select' | 'update'>,
+  teamId: string,
+  provider: string | null | undefined,
+  fallback: () => string | null,
+): string | null {
+  if (stepRuntimeFor(provider) === 'antigravity') {
+    const source = activeAntigravitySource(db, teamId);
+    if (source.kind === 'host') return source.login.runnerId;
+  }
+  return fallback();
+}
+
 export function chiefMachineId(
-  db: Pick<Db, 'select'>,
+  db: Pick<Db, 'select' | 'update'>,
   teamId: string,
   pinnedMachineId: string | null,
+  provider: string | null | undefined,
 ): string | null {
   return (
     liveMachineId(db, pinnedMachineId) ??
-    fallbackMachineId(
-      db
-        .select({
-          id: machine.id,
-          online: machine.online,
-          kind: machine.kind,
-          lastSeenAt: machine.lastSeenAt,
-          retiredAt: machine.retiredAt,
-        })
-        .from(machine)
-        .where(eq(machine.teamId, teamId))
-        .all(),
-      teamDefaultMachineId(db, teamId),
+    runtimeFallbackMachineId(db, teamId, provider, () =>
+      fallbackMachineId(
+        db
+          .select({
+            id: machine.id,
+            online: machine.online,
+            kind: machine.kind,
+            lastSeenAt: machine.lastSeenAt,
+            retiredAt: machine.retiredAt,
+          })
+          .from(machine)
+          .where(eq(machine.teamId, teamId))
+          .all(),
+        teamDefaultMachineId(db, teamId),
+      ),
     )
   );
 }

@@ -441,4 +441,86 @@ describe('antigravity managed binary resolution', () => {
       thinkingDefault: 'high',
     });
   });
+
+  test('probe clears stale cached authentication when a subsequent probe fails', async () => {
+    const dir = tempDir('ag-stale-probe-');
+    const root = join(dir, 'managed');
+    writeManagedCliInstall(root, '1.5.15', fakeCliSource('1.5.15'));
+
+    let pass = true;
+    const managed = createAntigravityManaged({
+      root,
+      platform: 'darwin',
+      arch: 'arm64',
+      manifestBaseUrl: MANIFEST_BASE,
+      archiveUrlPrefix: ARCHIVE_PREFIX,
+      fetchImpl: async () => new Response('{}', { status: 500 }),
+      probeBinary: async (binPath, args, source) =>
+        pass
+          ? {
+              version: '1.5.15',
+              binPath,
+              args,
+              source,
+              authenticated: true,
+              models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
+            }
+          : null,
+    });
+
+    expect((await managed.probe())?.authenticated).toBe(true);
+    pass = false;
+    expect(await managed.probe()).toBeNull();
+    expect(managed.current()?.authenticated).toBe(false);
+  });
+
+  test('a session/new timeout reports timeout instead of signed-out and preserves cached login', async () => {
+    const dir = tempDir('ag-timeout-probe-');
+    const root = join(dir, 'managed');
+    const flagFile = join(dir, 'hang-session');
+    const switchableCli = [
+      '#!/bin/sh',
+      `exec ${shQuote(process.execPath)} --input-type=module -e ${shQuote(
+        [
+          "import { existsSync } from 'node:fs';",
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentInfo: { name: "Antigravity ACP Server", version: "1.5.15" }, agentCapabilities: { loadSession: true } } });',
+          '  } else if (msg.method === "session/new") {',
+          `    if (!existsSync(${JSON.stringify(flagFile)})) {`,
+          '      send({ id: msg.id, result: { sessionId: "s-1", configOptions: [{ id: "model", category: "model", type: "select", currentValue: "gemini-4-carbon", options: [{ value: "gemini-4-carbon", name: "Gemini 4 Carbon" }] }] } });',
+          '    }',
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  }',
+          '}',
+        ].join('\n'),
+      )} -- "$0" "$@"`,
+      '',
+    ].join('\n');
+    writeManagedCliInstall(root, '1.5.15', switchableCli);
+
+    const managed = createAntigravityManaged({
+      root,
+      platform: 'darwin',
+      arch: 'arm64',
+      manifestBaseUrl: MANIFEST_BASE,
+      archiveUrlPrefix: ARCHIVE_PREFIX,
+      probeSessionTimeoutMs: 300,
+      probeOverallTimeoutMs: 2_500,
+    });
+
+    const initial = await managed.probeDetailed();
+    expect(initial.kind).toBe('ok');
+    expect(managed.current()?.authenticated).toBe(true);
+
+    writeFileSync(flagFile, '1');
+    const outcome = await managed.probeDetailed();
+    expect(outcome).toEqual({ kind: 'timeout' });
+    expect(managed.current()?.authenticated).toBe(true);
+    expect(managed.current()?.models.map((m) => m.id)).toEqual(['gemini-4-carbon']);
+  });
 });

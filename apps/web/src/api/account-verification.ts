@@ -14,9 +14,14 @@ export type VerifyFailure = (typeof VERIFY_FAILURES)[number];
 export type VerifyNotRun = 'signed-out' | 'network' | 'rate-limited' | 'error';
 
 export type Verification =
-  | { phase: 'verifying' }
-  | { phase: 'passed'; check?: SubscriptionCheck }
-  | { phase: 'failed'; reason: VerifyFailure; check?: SubscriptionCheck }
+  | { phase: 'verifying'; runnerName?: string | null }
+  | { phase: 'passed'; check?: SubscriptionCheck; runnerName?: string | null }
+  | {
+      phase: 'failed';
+      reason: VerifyFailure;
+      check?: SubscriptionCheck;
+      runnerName?: string | null;
+    }
   | { phase: 'not-run'; cause: VerifyNotRun };
 
 export type VerifyOutcome = Exclude<Verification, { phase: 'verifying' }>;
@@ -34,18 +39,32 @@ function requestFailure(error: unknown): VerifyOutcome {
 }
 
 export async function runVerification(
-  post: () => Promise<{ ok: boolean; reason?: VerifyFailure; check?: SubscriptionCheck }>,
+  post: () => Promise<{
+    ok: boolean;
+    reason?: VerifyFailure;
+    check?: SubscriptionCheck;
+    runnerName?: string | null;
+  }>,
   timeoutMs: number = VERIFY_TIMEOUT_MS,
 ): Promise<VerifyOutcome> {
+  const startedAt = Date.now();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<VerifyOutcome>((resolve) => {
     timer = setTimeout(() => resolve({ phase: 'failed', reason: 'timeout' }), timeoutMs);
   });
   const attempt = post().then((result): VerifyOutcome => {
-    const check = result.check === undefined ? {} : { check: result.check };
+    const wallMs = Math.max(0, Date.now() - startedAt);
+    const check =
+      result.check === undefined
+        ? undefined
+        : { ...result.check, durationMs: Math.max(result.check.durationMs, wallMs) };
+    const meta = {
+      ...(check === undefined ? {} : { check }),
+      ...(result.runnerName === undefined ? {} : { runnerName: result.runnerName }),
+    };
     return result.ok
-      ? { phase: 'passed', ...check }
-      : { phase: 'failed', reason: result.reason ?? 'failed', ...check };
+      ? { phase: 'passed', ...meta }
+      : { phase: 'failed', reason: result.reason ?? 'failed', ...meta };
   }, requestFailure);
   try {
     return await Promise.race([attempt, deadline]);
