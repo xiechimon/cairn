@@ -247,12 +247,9 @@ export const EN: Record<string, string> = {
   'machine：执行机本机的 git 凭据': "machine: the Runner's own git credentials",
   未完成: 'Not finished',
 
-  // —— shared chrome / sidebar (r2 §1.1) ——
   搜索: 'Search',
   主导航: 'Primary navigation',
-  // #351 看板更名工作台：'Workbench'（不用 'Workspace'，避撞 daemon workspaces 概念）
   工作台: 'Workbench',
-  // Paper 顶栏等你处理摘要：数字单独着色，后接本串（「3 项等你处理」→「3 waiting on you」）
   '{greeting}，{name}。你想让我做什么？': '{greeting}, {name}. What would you like me to do?',
   夜深了: 'Good night',
   早上好: 'Good morning',
@@ -266,7 +263,7 @@ export const EN: Record<string, string> = {
   已建任务: 'Created task',
   审阅中: 'In review',
   定时: 'Schedules',
-  项目: 'Project', // sidebar group / search group / schedule-form field — one fit
+  项目: 'Project',
   Coordinator: 'Coordinator',
   成果: 'Made',
   电脑: 'Computers',
@@ -502,7 +499,7 @@ export const EN: Record<string, string> = {
   移出分组: 'Remove from group',
   分组名称: 'Group name',
   移入: 'Move',
-  新任务: 'New task', // sidebar action row (#389) — the dialog title stays 新建任务
+  新任务: 'New task',
   看板: 'Board',
   技能: 'Skills',
   密钥: 'Secrets',
@@ -523,10 +520,8 @@ export const EN: Record<string, string> = {
   删除: 'Delete',
   今天: 'today',
 
-  // —— board surface (r2 §4.1, r7 01/02; #351 6→4 列收敛) ——
   任务: 'Tasks',
   待开始: 'To start',
-  // 规划中 survives as the planning phase chip (detail header), not a column
   规划中: 'Planning',
   执行中: 'Running',
   已完成: 'Done',
@@ -538,15 +533,11 @@ export const EN: Record<string, string> = {
   计划: 'Plan',
   分支: 'Branch',
   变更: 'Changes',
-  // 看板顶部通知引导条 (issue #114): components consume the shared
-  // NOTIFICATION_BANNER_COPY canon — these keys match its zh values
-  // verbatim (i18n-coverage liveness via COMPUTED_KEYS)
   浏览器通知未开启: 'Browser notifications are off',
   '标签页切换到后台时，通过桌面通知提醒你。':
     'Get a desktop reminder when this tab is in the background.',
   开启: 'Turn on',
 
-  // —— phase chips / actions / placeholders (phase.ts canon table) ——
   确认: 'Confirm',
   审核: 'Review',
   开始: 'Start',
@@ -557,10 +548,8 @@ export const EN: Record<string, string> = {
   '发送消息以继续这个任务…': 'Send a message to continue this task…',
   '发送消息以重新开始…': 'Send a message to start it again…',
   '请求修改…': 'Request changes…',
-  // #701 审核关口人肉打回（更多菜单入口 + reject 弹层）
   请求修改: 'Request changes',
 
-  // —— relative time (rel-time.ts; compact en forms avoid plural logic) ——
   刚刚: 'just now',
   '{n} 分钟前': '{n}m ago',
   '{n} 小时前': '{n}h ago',
@@ -569,7 +558,6 @@ export const EN: Record<string, string> = {
   '昨天 {time}': 'Yesterday {time}',
   '{n} 天前': '{n}d ago',
 
-  // —— todo detail (r7 §3.3–§3.6) ——
   添加附件: 'Add attachment',
   上下文: 'Context',
   '上下文（示意）': 'Context (mock)',
@@ -627,7 +615,6 @@ export const EN: Record<string, string> = {
   '这条排队消息已经发出，改动没有生效':
     'That queued message was already sent; your edit was not applied',
   '丢弃本轮修改？': 'Discard this round’s changes?',
-  // #1250（ADR 0018 层 1）verify 步状态与 fan-out 面。
   验证通过: 'Verification passed',
   验证未通过: 'Verification failed',
   命令: 'Commands',
@@ -652,13 +639,11 @@ export const EN: Record<string, string> = {
   全部收起: 'Collapse all',
   显示完整文件: 'Show full file',
   显示差异: 'Show diff',
-  // #1101: capped fallback tooltip on oversized diff rows (word-diff.ts)
   '行过长，已退回整行高亮': 'Line too long — whole-line highlight only',
   运行在: 'Running on',
   ' 上': '',
   由定时发起: 'Started by schedule',
   收起: 'Collapse',
-  // #933: the collapsed tool group's identity label (transcript action row).
 
   账号: 'Account',
   'API 密钥': 'API keys',
@@ -666,19 +651,16 @@ export const EN: Record<string, string> = {
   浅色: 'Light',
   深色: 'Dark',
 
-  // —— account / agent settings list ——
   编辑名称: 'Edit name',
   '任务需要你处理时，在系统通知中心提醒':
     'Notify you in the system notification center when a task needs you',
 
-  // —— chip popover / plan dropdown (r7 19/20/29) ——
   待回答: 'Needs input',
   '回答它的问题…': 'Answer its question…',
   '任务已完成，发送消息即可继续。': 'The task is done. Send a message to continue.',
   '你停下了它，发送消息即可重新开始。': 'You stopped it. Send a message to start it again.',
   '任务已归档。': 'The task is archived.',
 
-  // —— ⌘K search panel (r7 05/05b, r2 §8.4) ——
   '搜索任务、项目…': 'Search todos, projects…',
   最近: 'Recent',
   '{dir} 里的仓库': 'Repositories in {dir}',
@@ -698,7 +680,6 @@ export const EN: Record<string, string> = {
   团队: 'Team',
   '没有与“{q}”匹配的结果': 'No results matching “{q}”',
 
-  // —— schedules route (r3 §9, 02 §9.2) ——
   频率: 'Frequency',
   每小时: 'Hourly',
   每天: 'Daily',
@@ -751,7 +732,6 @@ export const EN: Record<string, string> = {
     'Saving creates a webhook URL — an external POST to it runs the schedule once.',
   '这个地址只显示这一次，请立即保存。外部 POST 请求打到它就运行一次。':
     'This URL is shown only once — copy it now. An external POST to it runs the schedule.',
-  // #1037 fixture 模式自我声明 chip（api/provider.tsx）
   '示例数据（场景 {id}）': 'Sample data (scenario {id})',
   演示数据: 'Demo data',
   '只读演示，改动不会被保存。': 'Read-only demo — changes are not saved.',
@@ -762,7 +742,6 @@ export const EN: Record<string, string> = {
   '也可以告诉 Coordinator 某个任务多久重新运行一次，它会替你写好规则':
     'You can also tell the Coordinator how often a task should run again, and it will write the rule for you.',
 
-  // —— account route (r7 13) ——
   更换: 'Change',
   名称: 'Name',
   语言: 'Language',
@@ -773,12 +752,9 @@ export const EN: Record<string, string> = {
   '浏览器已拒绝通知权限，需到站点设置重新允许':
     'Notifications are blocked by the browser — re-allow them in site settings',
 
-  // —— team route (r7 12) ——
   设置: 'Settings',
-  // team empty state, grid and chart (r2 §8.1 17c title)
   ' · 默认': ' · Default',
 
-  // —— api-keys route (r2 19, 02 §8 canon note) ——
   '尚无 API 密钥': 'No API keys yet',
   'API 密钥用于从命令行接入执行机，也让 MCP 客户端能访问你的工作台。':
     'API keys connect Runners from the command line and let MCP clients reach your workbench.',
@@ -814,7 +790,6 @@ export const EN: Record<string, string> = {
   '删除后，用这个 API 密钥的 MCP 客户端、脚本和 Git 访问会立即失效，无法恢复':
     'Deleting this API key cuts off every MCP client, script and Git remote using it at once, and cannot be undone',
 
-  // —— resources routes (r7 06–10, r2 §6) ——
   新建: 'New',
   'MCP 服务器': 'MCP Servers',
   添加执行机: 'Add Runner',
@@ -823,7 +798,6 @@ export const EN: Record<string, string> = {
   排序: 'Sort',
   尚无技能: 'No skills yet',
   '用「导入」或「新建技能」添加。': 'Add skills with Import or New skill.',
-  // XMON-114（spec 13 回摆）技能写面：新建/编辑弹窗与错误态。
   新建技能: 'New skill',
   编辑技能: 'Edit skill',
   'SKILL.md 正文': 'SKILL.md body',
@@ -843,7 +817,6 @@ export const EN: Record<string, string> = {
   '该技能已不存在——可能刚被移动或删除。':
     'This skill no longer exists. It may have been moved or deleted.',
   '内容未通过校验。': 'The content failed validation.',
-  // #1170 技能导入弹窗（SkillImportDialog + 技能页 topbar 导入钮）。
   导入: 'Import',
   导入技能: 'Import skill',
   本地路径: 'Local path',
@@ -962,7 +935,6 @@ export const EN: Record<string, string> = {
   '删除后，使用它的任务和网站代填将无法获取这条登录':
     'Once deleted, tasks and site fills that use it no longer get this login',
 
-  // —— project routes (r2 07/24/24b/24c) ——
   文件: 'Files',
   历史: 'History',
   '1 次运行': '1 run',
@@ -970,8 +942,6 @@ export const EN: Record<string, string> = {
   根目录: 'Root',
   搜索任务: 'Search todos',
   筛选: 'Filter',
-  // #446（ADR 0005 读向）项目页「从 GitHub issue 建任务」入口 + 选择弹层
-  // （状态过滤 / 分页 / 三态行）。
   打开: 'Open',
   已关闭: 'Closed',
   '运行失败，重新运行后才能完成': 'The run failed; rerun it before marking it done',
@@ -980,14 +950,9 @@ export const EN: Record<string, string> = {
     'A question from the Coordinator; answer it in the conversation',
   上一页: 'Previous page',
   下一页: 'Next page',
-  // #452（ADR 0006 写向）详情页来源 issue 行：未建成 + 重试入口 / 回显
-  // （号 + 状态 + 上游现值标题）/ 不一致中性提示（只提示不覆盖）。
   'GitHub issue 未建成': 'GitHub issue not created',
   '来源 issue': 'Source issue',
   与本地标题不一致: 'Differs from the local title',
-  // #476（#473 决策候选 A + C 尾注）右栏方案空态任务元信息块：行 label
-  // （机器复用侧栏键）+ 尾注引导句。#1259 机器行等待标注（归属机离线，
-  // 步只等它上线不自动改派）。
   模型: 'Model',
   接入执行机: 'Connect a Runner',
   在线: 'Online',
@@ -1000,14 +965,10 @@ export const EN: Record<string, string> = {
   '在要执行任务的执行机上运行注册命令，它就会出现在这里。':
     'Run the enroll command on the Runner that should run tasks and it appears here.',
   '删除执行机失败，请重试。': 'Could not delete the Runner. Try again.',
-  // 桌面通知标题（M5 SSE notification 事件面，02 §9.1 三事件；api/sse.ts
-  // 纯函数位消费——非组件 t()，i18n-coverage 以本键位兑现 en 兜底）
   方案已就绪: 'Plan ready',
   构建待审核: 'Build awaiting review',
   需要你决定: 'Waiting for your decision',
-  // #1261 等额度族（桌面通知标题 + 卡芯片 + 横幅 + 详情行标签）。
   等额度: 'Waiting for quota',
-  // #1493 降级链：桌面通知标题。
   已换备用模型: 'Switched to fallback model',
   没有可运行的执行机: 'No Runner can run it',
   '{lane}：额度 {probe} 恢复后自动继续':
@@ -1020,7 +981,6 @@ export const EN: Record<string, string> = {
   '{count} 个任务因额度/限流挂起': '{count## task|# tasks} suspended on quota/rate limits',
   额度空: 'out of quota',
   限流: 'rate limited',
-  // #202 文件查看器三态（loading / error / 不可预览）
   '加载中…': 'Loading…',
   文件加载失败: 'Failed to load file',
   二进制文件暂不支持预览: 'Binary files cannot be previewed',
@@ -1031,15 +991,9 @@ export const EN: Record<string, string> = {
   项目名称: 'Project name',
   仓库: 'Repo',
   选择仓库: 'Select repo',
-  // #360（spec 12）repo 选择面两行：GitHub 仓库 / 本地文件夹（hosted 行
-  // 创建入口移除；下方「Cairn 托管」= 存量 hosted 项目的设置面显示键，
-  // 与本表无关，保留）。
   'GitHub 仓库': 'GitHub repo',
   本地文件夹: 'Local folder',
   创建项目: 'Create project',
-  // #386 本地路径校验错误行：server 400 reason code 的三态分类文案（zh 键
-  // 单源 = shared LOCAL_ERROR_REASON_COPY）；无 code / 未分类 reason 原文直
-  // 透（不进词典）。
   路径不存在: 'Path not found',
   '不是 git 仓库': 'Not a git repository',
   需要绝对路径: 'Absolute path required',
@@ -1048,10 +1002,7 @@ export const EN: Record<string, string> = {
     'System folder dialog is unavailable in this deployment — type the path directly',
   已有一个选取对话框在进行中: 'A folder dialog is already open',
   无法打开系统文件夹对话框: 'Cannot open the system folder dialog',
-  // #441 应用内目录浏览器（ADR 0003 D6 remote/headless 兜底）。
   浏览本地文件夹: 'Browse local folders',
-  // #1152（ADR 0016）localPath 单机器形态常驻标注：真值在该机文件系统，
-  // 不享受换机续跑；可丢性只属 githubRepo 形态。
   '单执行机形态：这台执行机损坏时进度随之丢失。需要在任意执行机上继续运行，请用 GitHub 接入。':
     'Single Runner: progress is lost with this Runner. Use GitHub to continue on any Runner.',
   显示隐藏文件: 'Show hidden files',
@@ -1068,7 +1019,6 @@ export const EN: Record<string, string> = {
   读取失败: 'Could not load',
   '转换后以 GitHub 仓为唯一真值源，任务改从 GitHub 克隆执行，不再使用本机文件夹。':
     'After conversion the GitHub repo is the single source of truth; tasks run from a GitHub clone and the local folder is no longer used.',
-  // #1242 项目身份可变面：设置页名称/描述编辑 + local→github 转换卡。
   更换项目图标: 'Change project icon',
   搜索图标: 'Search icons',
   没有匹配的图标: 'No matching icons',
@@ -1085,7 +1035,6 @@ export const EN: Record<string, string> = {
   'GitHub 仓库格式应为 owner/repo。': 'GitHub repository must be in owner/repo form.',
   转换: 'Convert',
 
-  // —— chief drawer / settings (r5 100–116) ——
   主题: 'Thread',
   新主题: 'New thread',
   '请先在工作路由里配置 Coordinator。': 'Configure the Coordinator in work routing first.',
@@ -1095,29 +1044,12 @@ export const EN: Record<string, string> = {
   技能已更新: 'Skill updated',
   未设置: 'Not set',
   编辑: 'Edit',
-  // #182 设置面接线：选择总管 Agent dialog + 章程编辑弹窗；换绑二次确认
-  // copy 走 shared CHIEF_REBIND_CONFIRM_COPY canon（<agent> 占位，显示层替换，
-  // i18n-coverage COMPUTED_KEYS 登记）。
-  // #615 总管抽屉主模型闭环文案（模型行 aria + 覆盖 dialog 默认行/搜索/空态）。
-  // #615 返工：恢复钮（参考站 live aria 正词）+ 过程折叠 + 确认层 + 工具行失败徽标。
   恢复到此处: 'Restore to here',
   '恢复到此处？该条之后的 {n} 条消息会移除，Coordinator 从这条重发开新回合。':
     'Restore to here? The {n## message after it is removed|# messages after it are removed} and the Coordinator resends from this one as a fresh turn.',
-  // #822 在飞存在行展开面：行开关 aria + 正在调用的工具 + 空面 fallback。
   正在调用: 'Calling',
-  // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
-  // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。
   等执行机: 'Waiting for a Runner',
-  // #873 详情活行披露面：在跑步两行（步类 + 执行机器）；行开关 aria 复用
-  // #822 的「展开/收起实时步骤」——同一手势两面同词。
-  // M7 #312 AI 审核模态文案（r8 §3.1 实测）：Agent 选择 + 关注点 textarea +
-  // 提交按钮。dialog 选 Agent 走 dlg-form-* family 共用层,文案独立。
-  // #1250（ADR 0018 层 1）review fan-out 三视角（ReviewDialog 勾选行）。
-  // #509 审核选人独立性提示：默认值优先跨厂商；无跨厂商可选时出声。两档措辞
-  // ——确证同源 vs 无法判定（未配置厂商 = 没有比对基准），都不静默。
   审核结论: 'Review conclusion',
-  // #700：verdict 提取失败行——daemon findingsError 原因上浮，审核面以
-  // danger 色 tag 与「审核未返回结论」兜底（旧 daemon 无信号）相区分。
   判定提取失败: 'Verdict extraction failed',
   必须修改: 'Must fix',
   可改进: 'Could improve',
@@ -1126,19 +1058,11 @@ export const EN: Record<string, string> = {
   '建议：{body}': 'Suggestion: {body}',
   '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。':
     "Switch the Coordinator's Agent? The Coordinator's memory lives on the Agent it runs on. After switching to <agent>, the memory becomes <agent>'s — the current memory is not migrated.",
-  // #209 编辑分配接线：chip-popover「编辑分配」→ agent 选择弹层（#182 家族
-  // 形态复用）；弹层内容 r2 C.18 从未捕获，文案 [设计]，<agent> 占位显示层
-  // 替换。
 
-  // —— chrome carried inside fixture records (exact-value keys; user and
-  // agent content is deliberately absent — it falls back to the zh
-  // original like any real user data would) ——
   '准备工作区...': 'Preparing workspace...',
   '处理中...': 'Working on it...',
   '正在连接 {machine}...': 'Connecting to {machine}...',
   '执行中...': 'Running...',
-  // #1251 visible pending reasons (queue blocked face): missing capability =
-  // the fix, offline = waiting.
   '排队中：没有执行机满足能力要求（缺 {missing}）——装齐后下一拍心跳即解锁':
     'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed',
   '排队中：暂无 {platform} 执行机 · 需要 {platform}':
@@ -1189,7 +1113,6 @@ export const EN: Record<string, string> = {
     'Locked once the task has run. Start a new task to change the platform.',
   手动: 'Manual',
   推荐: 'Recommended',
-  // #905 activity phases (live row labels) + the freshness disclosure line.
   '正在连接模型...': 'Connecting to the model...',
   '模型思考中...': 'Model is thinking...',
   '模型输出中...': 'Model is responding...',
@@ -1198,12 +1121,8 @@ export const EN: Record<string, string> = {
   '正在压缩上下文...': 'Compacting context...',
   '等待模型响应...': 'Waiting for the model...',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
-  // #918 skill facts: live-panel entries (read / denied) + the detail summary.
   '技能：{n}': 'Skills: {n}',
   '挡下：{n}': 'Blocked: {n}',
-  // #1106 dispatch skill injection: detail-face lookup row (reasons ride as
-  // server data, not t() keys — same law as note #634).
-  // #1288：模型活性标注——dead 模型置灰 +「已下架」（不隐藏）。
   已下架: 'Delisted',
   [PROBE_TOOL_CALL_LABEL]: `Calling tool: ${PROBE_TOOL_PILLS[1]}`,
   '{name} 发起了合并': '{name} started a merge',
@@ -1215,14 +1134,10 @@ export const EN: Record<string, string> = {
   '运行在 ': 'Running on ',
   '远程（HTTP）': 'Remote (HTTP)',
   '2 天前': '2d ago',
-  // —— overlay dialogs (issues #66 / #68) ——
   删除任务: 'Delete todo',
   '确定删除该任务？此操作不可撤销。': 'Delete this todo? This cannot be undone.',
-  // #306 sched-card 菜单删除确认（DeleteConfirm 家族泛化随加）。
   删除定时: 'Delete schedule',
   '确定删除该定时？此操作不可撤销。': 'Delete this schedule? This cannot be undone.',
-  // XMON-19/B2 删除 Agent：三串 = 原版产线 bundle 的 en 语料原文
-  // （agent_modal.remove / remove_title / remove_confirm），非回译。
   复制链接: 'Copy link',
   撤销: 'Undo',
   负责人: 'Owner',
@@ -1236,7 +1151,6 @@ export const EN: Record<string, string> = {
     'No price source: the model declares no rates, or the run reported no cost',
   当前: 'Current',
   重新运行: 'Run again',
-  // run-history rows: fixture-carried chrome (exact-value keys)
   '第 1 次运行': 'Run 1',
   '第 2 次运行': 'Run 2',
   '第 3 次运行': 'Run 3',
@@ -1248,7 +1162,6 @@ export const EN: Record<string, string> = {
   '4 天前 · 执行机离线': '4d ago · Runner offline',
   '2 天前 · 41.7k tokens': '2d ago · 41.7k tokens',
 
-  // —— #75 deep dynamic states: reject loop / failed / reuse plan ——
   '由 Coordinator 发起': 'Started by Coordinator',
   '运行在 {m} 上': 'Running on {m}',
   'CI 修复第 {round}/{max} 轮：推送前检查未通过':
@@ -1271,7 +1184,6 @@ export const EN: Record<string, string> = {
   原始日志: 'Raw log',
   查看完整指令: 'View full instruction',
   完整指令: 'Full instruction',
-  // #1285 失败行指引按分类分族
   '请将这台执行机重新上线。这一步不会改派到其他执行机。':
     'Bring this Runner back online. This step is not reassigned.',
   '连接服务商时超时或断开，通常是暂时的，重新运行即可。':
@@ -1283,19 +1195,13 @@ export const EN: Record<string, string> = {
   重试: 'Retry',
   失败: 'Failed',
   默认: 'Default',
-  // #170 create-agent dialog family
   创建: 'Create',
-  // W4 #287 API key 新建表单弹窗（r3 §6 权限位 [推断]）
   '只能用大写字母、数字和下划线，不能以数字开头。':
     'Capital letters, digits and _ only; no leading digit.',
-  // wayfinder #173 add-secret dialog family (r2 §242 verbatim fields)
   值: 'Value',
   全部: 'All',
   进行中: 'In progress',
   标题: 'Title',
-  // wayfinder #175 add-provider dialog family (field authority = shared
-  // createProviderBodySchema / r3 §2; protocol tab labels stay English
-  // verbatim, never translated)
   '服务商 ID': 'Provider ID',
   '例如 my-relay': 'e.g. my-relay',
   'API 协议': 'API protocol',
@@ -1318,26 +1224,19 @@ export const EN: Record<string, string> = {
   原生鉴权: 'native auth',
   '把 Base URL 中的占位符换成你的账户值':
     'Replace the placeholders in the Base URL with your account values',
-  // #355 picker 形态(spec 11 §A6;preset 显示名 = 品牌串不译,OAuth 徽标
-  // 同为英文字面)
   '搜索服务商...': 'Search providers...',
   自定义端点: 'Custom endpoint',
-  // Paper grouped provider picker: group headings
   订阅登录: 'Subscription sign-in',
   模型厂商: 'Model vendors',
   云平台: 'Cloud platforms',
   推理平台: 'Inference platforms',
   网关与聚合: 'Gateways and routers',
   其他: 'Other',
-  // #356 runtime tabs(spec 11 §A1-A4;tab 名 pi/Claude Code 不译,槽位名
-  // default/opus/… 为配置标识符不译;{hostname} = 上报机器名插值)
   未登录: 'Not signed in',
   尚未添加服务商: 'No providers yet',
-  // #231/#243 OAuth 落地 reason 三译(providers-page 喂 connectError 行)
   '授权已被取消。': 'Authorization was cancelled.',
   '令牌交换失败，请稍后重试。': 'Token exchange failed — please try again.',
   '连接已过期，请重新发起。': 'Connection expired — please start it again.',
-  // #361 GitHub 连接认证 + repo picker（spec 12 G2-T4；错误三译复用 #243 键）
   '认证 GitHub': 'Connect GitHub',
   '选择 GitHub 仓库': 'Choose a GitHub repository',
   搜索仓库: 'Search repositories',
@@ -1348,8 +1247,6 @@ export const EN: Record<string, string> = {
   'GitHub 连接已断开': 'GitHub connection disconnected',
   已连接: 'Connected',
   '手动输入 owner/repo': 'Enter owner/repo manually',
-  // wayfinder #181 add-machine dialog family (r2 11b verbatim copy; the
-  // command strings themselves stay untranslated — brand slots via BRAND)
   '两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。':
     'The two computers connect through Tailscale; this computer has to stay on and online.',
   '用 Tailscale 连通两台电脑': 'Connect the two computers with Tailscale',
@@ -1394,7 +1291,6 @@ export const EN: Record<string, string> = {
   '在云服务器上运行？改用 API key 注册':
     'Running on a cloud server? Register with an API key instead',
   '获取 API key →': 'Get an API key →',
-  // #253 token 门页（鉴权开时 401 落页；auth 单缝 = src/api/auth.ts）
   配对这台电脑: 'Pair this computer',
   '正在配对…': 'Pairing…',
   '在已经能用 Cairn 的电脑上打开「远程访问」，看到这个码就点「批准」。':
@@ -1413,7 +1309,6 @@ export const EN: Record<string, string> = {
   进入: 'Continue',
   '服务器地址 {host} · 令牌只发一次，存在这台设备的浏览器里':
     'Server {host} · the token is issued once and stays in this browser on this device',
-  // W4 #285 浏览器授权页（02 §5.2 路径一；/app/machines/authorize）
   授权执行机: 'Authorize Runner',
   '在要接入的电脑上依次运行这两条命令。终端会给出授权链接，打开它就能确认。':
     'Run these two commands, in order, on the computer you are adding. The terminal prints an authorization link; open it to confirm.',
@@ -1435,37 +1330,17 @@ export const EN: Record<string, string> = {
   '授权链接已过期。在执行机上重新运行 `cairn start` 获取新链接。':
     'This authorization link has expired. Run `cairn start` on the Runner again for a new one.',
   '浏览器授权注册 →': 'Browser authorization →',
-  // W2 #318 桩群校准：新建任务未保存闸（r9 §3.4）。#310 附件：dirty 位由
-  // spec 非空承载（附件 token 注入后归 spec）,标签 add 仍为桩（本票不动）。
-  // （#640：开始任务 dialog 统一面的 规划/执行/在线/离线/选择 Agent 五键随
-  // 选择面撤销退役——开始入口不再有 dialog 选择器。）
 
   没有可引用的对象: 'Nothing to mention',
   '没有与"{query}"匹配的结果': 'No results matching “{query}”',
 
-  // —— #403/#445 看板筛选面（仓库 chip 组 + 类型 popover + 空结果态）——
   类型: 'Type',
 
-  // —— XMON-57 统一筛选面板（两维 + 批次键 + 生效筛选条 + 空词表行）——
-  // #636 批次行照参考站形：全选行（zh「全选」，本域 en 'Select all'）+ 右端
-  // 反选；权限授予面改用「授予全部」避开同形碰撞（zh 源串即 key，两域必须
-  // 分叉）。段内清除钮撤除——清除由全选行满选再点 / 反选 / 顶栏生效筛选条
-  // 三路承接，`清除` 条目随之下架。
-
-  // —— #485 Agent 详情编辑面（三 tab + 概览字段 + 记忆/权限面）——
-  // 含空格/标点的键一律引号形（对象字面量的键不是标识符）。
   权限: 'Permissions',
   工具: 'Tools',
-  // 模型 已在 #476 段登记，本段不重复。
   思考强度: 'Thinking level',
-  // 「状态」键随 XMON-18 撤行一并摘除（概览不再摆状态行，en-coverage gate 也不
-  // 容许死键）。
   未设置模型: 'No model',
-  // 概览「进行中」段空态（原文 = 参考产品 web 包 agent_modal.no_active_tasks）。
-  // XMON-80/P3：零密钥空态旁的出口（落到侧栏密钥页）。
-  // XMON-80/P2：权限 tab 保存失败的可见反馈。
   '保存失败，请重试。': 'Save failed. Try again.',
-  // #1251 机器匹配段（权限 tab 第五组：执行要求写面 + 「哪些机器可跑它」读面）。
   '要求安装 {name}': 'Require {name} installed',
   离线: 'Offline',
   服务器数据库备份: 'Server database backup',
@@ -1483,12 +1358,8 @@ export const EN: Record<string, string> = {
   '{host} 上的服务器数据库备份最近一次运行失败（{detail}），上次成功备份在 {hours} 小时前。在该主机上运行 `systemctl --user status cairn-db-backup.service` 查看原因。':
     'The latest server database backup run on {host} failed ({detail}); the last successful backup was {hours## hour|# hours} ago. On that host run `systemctl --user status cairn-db-backup.service` to see why.',
   '暂无 MCP 服务器。': 'No MCP servers yet.',
-  // #1169 授权技能段（权限 tab）：不限制（null）与限制后全不勾（[] = 显式
-  // 全拒）两态互转；逐技能勾选行只在限制态渲染。
   '该 Agent 执行任务时可读取的团队技能范围。开启「不限制」= 全量可读；关闭后仅勾选的技能可读，未勾选一律拒绝——「不限制」与全不勾是两种状态，可随时互转。':
     'Which team skills this Agent may read. Unrestricted reads everything; once restricted, only the checked skills are readable and every unchecked one is denied. Unrestricted and nothing-checked are two different states, switchable either way.',
-  // shared canon（packages/shared/src/records/agent.ts、memory.ts），经 t()
-  // 消费、不作字面量出现——i18n-coverage COMPUTED_KEYS 登记。
   合并分支: 'Merge branches',
   '、': ', ',
   创建标签: 'Create tags',
@@ -1570,9 +1441,6 @@ export const EN: Record<string, string> = {
   以后再说: 'Not now',
 
   '搜索记忆…': 'Search memories…',
-  // 排序第二档（[设计]，见 agent-detail-page.tsx 的 MEMORY_SORT_OPTIONS）。
-  // 记忆 tab 空态（标题 + 说明）与零命中态：搜不到不等于没存过。
-  // —— #631 总管对话失败闭环（sonner toast + 线程失败行）——
   这一轮没有完成: 'This turn did not finish',
   '排队中：等电脑就绪': 'Queued: waiting for the computer',
   '排队中：等执行机上线': 'Queued: waiting for a Runner to come online',
@@ -1708,16 +1576,11 @@ export const EN: Record<string, string> = {
   '尚未开始，新消息会排在后面': 'New messages queue behind it',
   '发送失败，请重试。': 'Send failed. Try again.',
   '恢复失败，请重试。': 'Restore failed. Try again.',
-  // —— #774 收单回落显式告知（成功 toast，非失败面；用户裁决静默不要）——
-  // —— #729 附件上传失败面（toast 家族同上；大小/类型拒是本地预检可自救，
-  // 各给专名，其余归通用失败）——
   '附件超过 10MB 上限': 'Attachment exceeds the 10 MB limit',
   不支持该文件类型: 'That file type is not supported',
   附件上传失败: 'Attachment upload failed',
-  // —— #757 composer 附件 strip（在途占位 + 落定 chip，同面中文键）——
   附件: 'Attachments',
   上传中: 'Uploading',
-  // —— #640 开始任务单出口（直发总管编排回合；r14 §5.7 前置裁决落地）——
   来源: 'Source',
   'Coordinator 编排会话': 'Coordinator orchestration session',
   '已交给 Coordinator 编排': 'Handed to the Coordinator',
@@ -1730,7 +1593,6 @@ export const EN: Record<string, string> = {
   '多台执行机在线时，开工前要在规则里点名一台。':
     'Name a Runner in routing rules before starting, while several are online.',
   去选择: 'Choose',
-  // —— #1216 在飞编排态（开始/重跑的可见反馈）与详情缺失三态 ——
   '等 {machine} 上线': 'waiting for {machine} to come online',
   等执行机上线: 'waiting for a Runner to come online',
   '缺 {missing}': 'missing {missing}',
@@ -1771,9 +1633,6 @@ export const EN: Record<string, string> = {
   已归档的项目: 'Archived',
   '取消归档失败，请重试。': 'Could not unarchive the project. Try again.',
   '批准失败，请重试。': 'Could not approve. Try again.',
-  // —— #638 全站静默 mutation 失败面接线（toast 标题句；server 原因进
-  // description 透传不译，#631 同律。已有面内 canon 位的面——merge 拒绝行 /
-  // issue 导入内联 / fs-pick 提示行 / OAuth 内联 / 技能弹窗内联——不在此列）——
   '创建项目失败，请重试。': 'Could not create the project. Try again.',
   '删除任务失败，请重试。': 'Could not delete the task. Try again.',
   '重试失败，请稍后重试。': 'Retry failed. Try again later.',

@@ -53,6 +53,13 @@ test('checks only added source comment lines and exact allowlist entries', () =>
     assert.equal(run().status, 0);
     writeFileSync(file, '// existing\n// Browser quirk changed\n');
     assert.equal(run().status, 1);
+    writeFileSync(file, '// existing\nconst ok = 1;\n');
+    const staleResult = run();
+    assert.equal(staleResult.status, 1);
+    assert.match(staleResult.stderr, /stale entry/);
+    writeFileSync(resolve(cwd, 'scripts/comment-discipline-allowlist.json'), '[]');
+    assert.equal(run().status, 0);
+    writeFileSync(file, '// existing\n// Browser quirk changed\n');
     git('add', 'apps/demo/code.ts');
     git('commit', '-m', 'added comment');
     assert.equal(run().status, 1);
