@@ -142,7 +142,7 @@ export function VirtualStream({
           key={item.key}
           data-index={item.index}
           ref={item.index === keys.length - 1 ? measureNewestRow : virtualizer.measureElement}
-          className="absolute top-0 left-0 flex w-full min-w-0 flex-col"
+          className="absolute top-0 left-0 flex w-full min-w-0 flex-col hover:z-10 focus-within:z-10 has-[[aria-expanded=true]]:z-10"
           style={{ transform: `translateY(${item.start - scrollMargin}px)` }}
         >
           {renderRow(item.index)}

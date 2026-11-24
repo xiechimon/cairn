@@ -50,7 +50,6 @@ import {
   REPLY_HIGHLIGHT_ATTR,
   REPLY_HIGHLIGHT_CLS,
   REPLY_SOURCE_ATTR,
-  type ReplyQuoteDraft,
   ReplySourceHighlightContext,
 } from './reply-source-highlight.js';
 import { channelHref, useChannelOf } from './report-route.js';
@@ -65,7 +64,13 @@ import { CardFailureContext } from './turn-failure.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 
-function MessageStamp({ createdAt, fallback }: { createdAt?: number; fallback?: string }) {
+function MessageStamp({
+  createdAt,
+  fallback,
+}: {
+  createdAt?: number | undefined;
+  fallback?: string | undefined;
+}) {
   const { t, locale } = useI18n();
   const now = useMinuteClock();
   if (createdAt != null && !isUsableTimestamp(createdAt, now)) return null;
@@ -482,7 +487,6 @@ interface ChiefStreamRowProps {
   index: number;
   onCopy: (text: string) => void;
   onRewindRequest: (index: number, id: string | null) => void;
-  onReply?: ((draft: ReplyQuoteDraft) => void) | undefined;
   onWithdraw?: ((messageId: string, text: string) => void) | undefined;
   entering?: boolean;
   joinsPrev?: boolean;
@@ -646,12 +650,54 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
   );
 }
 
+function ChiefMessageTools({
+  side,
+  touch = false,
+  testId,
+  createdAt,
+  fallbackAt,
+  note,
+  copyText,
+  onCopy,
+  onRewind,
+  onWithdraw,
+}: {
+  side: 'user' | 'assistant';
+  touch?: boolean;
+  testId: string;
+  createdAt: number | undefined;
+  fallbackAt?: string | undefined;
+  note?: ReactNode;
+  copyText: string;
+  onCopy: (text: string) => void;
+  onRewind?: (() => void) | undefined;
+  onWithdraw?: (() => void) | undefined;
+}) {
+  const placement = touch
+    ? side === 'user'
+      ? 'below-end'
+      : 'below-start'
+    : side === 'user'
+      ? 'left'
+      : 'right';
+  return (
+    <MessageToolbar
+      placement={placement}
+      testId={testId}
+      stamp={<MessageStamp createdAt={createdAt} fallback={fallbackAt} />}
+      note={touch ? undefined : note}
+      onCopy={() => onCopy(copyText)}
+      onRewind={onRewind}
+      onWithdraw={onWithdraw}
+    />
+  );
+}
+
 export const ChiefStreamRow = memo(function ChiefStreamRow({
   item,
   index: i,
   onCopy,
   onRewindRequest,
-  onReply,
   onWithdraw,
   entering = false,
   joinsPrev = false,
@@ -716,25 +762,18 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const sending = item.delivery === 'sending';
     const steering = item.pending === 'steering';
     const fade = sending ? 'opacity-55' : '';
-    const userTools = (placement: 'left' | 'below-end', testId: string) => (
-      <MessageToolbar
-        placement={placement}
-        testId={testId}
-        stamp={<MessageStamp createdAt={item.createdAt} fallback={item.at} />}
-        onReply={
-          onReply !== undefined && item.id != null
-            ? () => onReply({ sourceMessageId: item.id ?? '', quote: reply?.body ?? item.text })
-            : undefined
-        }
-        onCopy={() => onCopy(item.text)}
-        onRewind={() => onRewindRequest(i, item.id ?? null)}
-        onWithdraw={
-          steering && onWithdraw !== undefined && item.id != null
-            ? () => onWithdraw(item.id ?? '', item.text)
-            : undefined
-        }
-      />
-    );
+    const userToolProps = {
+      side: 'user' as const,
+      createdAt: item.createdAt,
+      fallbackAt: item.at,
+      copyText: item.text,
+      onCopy,
+      onRewind: () => onRewindRequest(i, item.id ?? null),
+      onWithdraw:
+        steering && onWithdraw !== undefined && item.id != null
+          ? () => onWithdraw(item.id ?? '', item.text)
+          : undefined,
+    };
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
         <Message
@@ -752,7 +791,9 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 data-slot="reply-block"
               >
                 <SentAttachments files={sentFiles} />
-                {!showBubble && !sending && userTools('left', 'chief-msg-tools')}
+                {!showBubble && !sending && (
+                  <ChiefMessageTools {...userToolProps} testId="chief-msg-tools" />
+                )}
               </div>
             )}
             {showBubble && (
@@ -770,7 +811,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
                 </UserMessageBubble>
-                {!sending && userTools('left', 'chief-msg-tools')}
+                {!sending && <ChiefMessageTools {...userToolProps} testId="chief-msg-tools" />}
               </div>
             )}
             {sending ? (
@@ -778,7 +819,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 {t('发送中')}
               </span>
             ) : (
-              userTools('below-end', 'chief-msg-tools-touch')
+              <ChiefMessageTools {...userToolProps} touch testId="chief-msg-tools-touch" />
             )}
           </MessageContent>
         </Message>
@@ -885,21 +926,12 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         {t('由备用模型 {model} 回答', { model: item.fallbackModel })}
       </span>
     ) : undefined;
-  const robotTools = (
-    placement: 'right' | 'below-start',
-    quote: string,
-    testId: string,
-    withNote = true,
-  ): ReactNode =>
-    settled ? (
-      <MessageToolbar
-        placement={placement}
-        testId={testId}
-        stamp={<MessageStamp createdAt={item.createdAt} />}
-        note={withNote ? fallbackNote : undefined}
-        onCopy={() => onCopy(quote)}
-      />
-    ) : null;
+  const assistantToolProps = {
+    side: 'assistant' as const,
+    createdAt: item.createdAt,
+    note: fallbackNote,
+    onCopy,
+  };
   const sourceHighlighted =
     highlightedSource !== null && highlightedSource.sourceMessageId === item.id;
   const quoted = highlightedSource?.quote ?? '';
@@ -925,11 +957,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 bubbles
                 bubbleFooter={<BubbleReports todoIds={reports} />}
                 bubbleTools={(group, n) =>
-                  robotTools(
-                    'right',
-                    group.source,
-                    n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
-                  )
+                  settled ? (
+                    <ChiefMessageTools
+                      {...assistantToolProps}
+                      copyText={group.source}
+                      testId={n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools'}
+                    />
+                  ) : null
                 }
                 highlight={(group) =>
                   sourceHighlighted &&
@@ -960,12 +994,25 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   )}
                   <BubbleReports todoIds={reports} />
                 </div>
-                {robotTools('right', whole, 'chief-msg-foot')}
+                {settled && (
+                  <ChiefMessageTools
+                    {...assistantToolProps}
+                    copyText={whole}
+                    testId="chief-msg-foot"
+                  />
+                )}
               </div>
             )}
           </div>
           {item.typing === true && <TypingDots className="mt-1" />}
-          {robotTools('below-start', whole, 'chief-msg-tools-touch', false)}
+          {settled && (
+            <ChiefMessageTools
+              {...assistantToolProps}
+              touch
+              copyText={whole}
+              testId="chief-msg-tools-touch"
+            />
+          )}
         </MessageContent>
       </Message>
     </MessageScrollerItem>
