@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, realpathSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join, resolve } from 'node:path';
@@ -521,6 +521,93 @@ try {
     return `helper ${helper}: ${content.length} items`;
   });
   console.log(`tray ${nativeMenu.result}: ${nativeMenu.name}: ${nativeMenu.detail}`);
+
+  async function recordNativeWalkthrough(pid, base) {
+    const seconds = 60;
+    const recorder = spawn('screencapture', ['-v', `-V${seconds}`, '-x', '-C', `${base}.mov`], {
+      stdio: 'ignore',
+    });
+    const finished = new Promise((done) => recorder.once('exit', done));
+    const pause = (ms) => driver.send({ cmd: 'sleep', ms });
+    const shot = (name) => execFileSync('screencapture', ['-x', `${base}-${name}.png`]);
+    const appearance = (dark) =>
+      execFileSync('osascript', [
+        '-e',
+        `tell application "System Events" to tell appearance preferences to set dark mode to ${dark}`,
+      ]);
+    const reopen = async (step) => {
+      for (let attempt = 1; ; attempt += 1) {
+        try {
+          await openNativeMenu(pid);
+          return;
+        } catch (error) {
+          console.log(`tray recording: ${step} open attempt ${attempt} failed: ${error.message}`);
+          if (attempt === 3) throw error;
+          await driver.send({ cmd: 'escape', pid });
+          await pause(1_500);
+        }
+      }
+    };
+    const walk = async (label) => {
+      await reopen(`${label} first`);
+      await pause(800);
+      const titles = await nativeTitles(pid);
+      const awake = titles.find(
+        (title) => title === 'Keep the screen on' || title === '保持屏幕常亮',
+      );
+      for (const title of titles.filter(Boolean).slice(0, 6)) {
+        await driver.send({ cmd: 'clickMenuItem', pid, title, hoverOnly: true, hoverMs: 450 });
+      }
+      shot(`${label}-open`);
+      if (awake !== undefined) {
+        await driver.send({ cmd: 'clickMenuItem', pid, title: awake, hoverMs: 400 });
+        await pause(1_000);
+        await reopen(`${label} after the switch`);
+        await pause(600);
+        shot(`${label}-keep-awake-on`);
+        for (let press = 0; press < 3; press += 1) {
+          await driver.send({ cmd: 'key', pid, code: 126 });
+          await pause(400);
+        }
+        shot(`${label}-keyboard`);
+        await closeNativeMenu(pid);
+        await reopen(`${label} after the keyboard`);
+        await pause(500);
+        await driver.send({ cmd: 'clickMenuItem', pid, title: awake, hoverMs: 400 });
+        await pause(800);
+      } else {
+        await closeNativeMenu(pid);
+      }
+      return titles;
+    };
+    try {
+      await pause(1_000);
+      const light = await walk('light');
+      appearance(true);
+      await pause(1_500);
+      await walk('dark');
+      return `recorded ${base}.mov: ${JSON.stringify(light)}`;
+    } finally {
+      try {
+        appearance(false);
+      } catch {}
+      await finished;
+    }
+  }
+  if (nativeMenu.result === 'green' && trayShotPath !== undefined && helper !== null) {
+    await popoverWindow(({ BrowserWindow }, width) => {
+      for (const candidate of BrowserWindow.getAllWindows())
+        if (candidate.getBounds().width !== width) candidate.hide();
+    });
+    try {
+      console.log(
+        `tray recording: ${await recordNativeWalkthrough(helper, trayShotPath.replace(/\.png$/, '-native-walk'))}`,
+      );
+    } catch (error) {
+      if (error instanceof TrayDriverStopped) throw error;
+      console.log(`tray recording not made: ${error.message}`);
+    }
+  }
 
   await mandatory(nativeFallback, async () => {
     let current = helper ?? (await waitForHelper(null));
