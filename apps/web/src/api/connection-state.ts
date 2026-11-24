@@ -1,28 +1,71 @@
 import { useSyncExternalStore } from 'react';
 
-interface ConnectionWindow {
-  navigator: { onLine: boolean };
-  addEventListener: (type: 'online' | 'offline', listener: () => void) => void;
-  removeEventListener: (type: 'online' | 'offline', listener: () => void) => void;
+interface OnlineWindow {
+  addEventListener: (type: 'online', listener: () => void) => void;
+  removeEventListener: (type: 'online', listener: () => void) => void;
 }
 
-export function createConnectionStore(win: ConnectionWindow | undefined) {
+export interface StreamConnectionHandle {
+  setConnected: (connected: boolean) => void;
+  detach: () => void;
+}
+
+export function createConnectionStore(win: OnlineWindow | undefined) {
+  const streams = new Map<symbol, boolean>();
+  const listeners = new Set<() => void>();
+  const onlineListeners = new Set<() => void>();
+  let snapshot = true;
+
+  const notify = (): void => {
+    const next = [...streams.values()].every(Boolean);
+    if (next === snapshot) return;
+    snapshot = next;
+    for (const listener of listeners) listener();
+  };
+
+  const handleOnline = (): void => {
+    for (const listener of onlineListeners) listener();
+  };
+
   return {
-    getSnapshot: () => win?.navigator.onLine ?? true,
+    getSnapshot: () => snapshot,
     subscribe: (listener: () => void) => {
-      if (win === undefined) return () => {};
-      win.addEventListener('online', listener);
-      win.addEventListener('offline', listener);
+      listeners.add(listener);
       return () => {
-        win.removeEventListener('online', listener);
-        win.removeEventListener('offline', listener);
+        listeners.delete(listener);
+      };
+    },
+    attach: (): StreamConnectionHandle => {
+      const id = Symbol();
+      streams.set(id, true);
+      return {
+        setConnected: (connected: boolean) => {
+          if (!streams.has(id) || streams.get(id) === connected) return;
+          streams.set(id, connected);
+          notify();
+        },
+        detach: () => {
+          if (!streams.delete(id)) return;
+          notify();
+        },
+      };
+    },
+    onOnlineHint: (listener: () => void) => {
+      if (win === undefined) return () => {};
+      if (onlineListeners.size === 0) win.addEventListener('online', handleOnline);
+      onlineListeners.add(listener);
+      return () => {
+        onlineListeners.delete(listener);
+        if (onlineListeners.size === 0) win.removeEventListener('online', handleOnline);
       };
     },
   };
 }
 
-const store = createConnectionStore(typeof window === 'undefined' ? undefined : window);
+export const connectionStore = createConnectionStore(
+  typeof window === 'undefined' ? undefined : window,
+);
 
 export function useConnected(): boolean {
-  return useSyncExternalStore(store.subscribe, store.getSnapshot, () => true);
+  return useSyncExternalStore(connectionStore.subscribe, connectionStore.getSnapshot, () => true);
 }

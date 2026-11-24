@@ -25,6 +25,7 @@ import { activityStore } from './activity.js';
 import { agentTodoStore } from './agent-todo.js';
 import { fetchWithSession, useAuth } from './auth.js';
 import { computerQueryKeys } from './computer-query-scope.js';
+import { connectionStore } from './connection-state.js';
 import {
   attachConnection,
   conversationsInFlight,
@@ -85,6 +86,7 @@ export function startTeamStream(
     void invalidateConverged(qc);
   };
   const guards = streamGuards(qc);
+  const connection = connectionStore.attach();
   const disconnect = connect(
     resolvePath ?? withTicket(`/api/teams/${teamId}/stream`, ticket),
     (ev) => {
@@ -118,9 +120,14 @@ export function startTeamStream(
         void invalidateConverged(qc, { queryKey: ['computers', teamId] });
       },
     },
+    {
+      onConnectionChange: connection.setConnected,
+      onOnlineHint: connectionStore.onOnlineHint,
+    },
   );
   return () => {
     disconnect();
+    connection.detach();
     detachConnection();
     for (const queryKey of Object.values(computerQueryKeys(teamId, generation))) {
       qc.removeQueries({ queryKey });

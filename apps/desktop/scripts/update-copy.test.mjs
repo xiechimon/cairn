@@ -7,6 +7,7 @@ import {
   serverStoppedCopy,
   unsupportedUpdateCopy,
   updateCheckFailedCopy,
+  updateOfflineCopy,
   upToDateCopy,
 } from '../src/update-copy.ts';
 
@@ -39,6 +40,10 @@ test('the up-to-date and check-failed dialogs are localized', () => {
   assert.equal(upToDateCopy('zh', '0.44.0').detail, '当前版本 0.44.0 已是最新。');
   assert.equal(updateCheckFailedCopy('zh', 'offline').title, 'Cairn 未能检查更新');
   assert.equal(updateCheckFailedCopy('zh', 'offline').detail, 'offline');
+  assert.equal(updateOfflineCopy('zh').title, '无法连接网络');
+  assert.equal(updateOfflineCopy('zh').detail, '当前无法连接更新服务器，下次检查时会自动重试。');
+  assert.equal(updateOfflineCopy('en').title, 'Cannot connect to the network');
+  assert.match(updateOfflineCopy('en').detail, /next check/);
 });
 
 test('each unsupported blocker has its own localized detail', () => {

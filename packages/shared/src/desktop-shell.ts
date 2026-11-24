@@ -180,6 +180,7 @@ export type DesktopUpdateState =
   | { status: 'ready'; version: string }
   | { status: 'installing'; version: string }
   | { status: 'restarting'; version: string }
+  | { status: 'offline' }
   | { status: 'error'; message: string };
 
 export interface DesktopUpdate {

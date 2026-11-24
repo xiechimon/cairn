@@ -24,6 +24,8 @@ const COPY = {
       development: '这是开发版。',
     },
     checkFailedTitle: 'Cairn 未能检查更新',
+    offlineTitle: '无法连接网络',
+    offlineDetail: '当前无法连接更新服务器，下次检查时会自动重试。',
     serverStoppedTitle: 'Cairn 服务已停止',
     serverStoppedDetail: (code: number | null) => `Cairn 服务以代码 ${code} 退出。`,
     couldNotStartTitle: 'Cairn 未能启动',
@@ -45,6 +47,9 @@ const COPY = {
       development: 'This is a development build.',
     },
     checkFailedTitle: 'Cairn could not check for updates',
+    offlineTitle: 'Cannot connect to the network',
+    offlineDetail:
+      'Cairn cannot reach the update server right now. It will try again on the next check.',
     serverStoppedTitle: 'Cairn server stopped',
     serverStoppedDetail: (code: number | null) => `The Cairn server exited with code ${code}.`,
     couldNotStartTitle: 'Cairn could not start',
@@ -80,6 +85,11 @@ export function unsupportedUpdateCopy(
 
 export function updateCheckFailedCopy(locale: DesktopLocale, message: string): DialogText {
   return { title: COPY[locale].checkFailedTitle, detail: message };
+}
+
+export function updateOfflineCopy(locale: DesktopLocale): DialogText {
+  const copy = COPY[locale];
+  return { title: copy.offlineTitle, detail: copy.offlineDetail };
 }
 
 export function serverStoppedCopy(locale: DesktopLocale, code: number | null): DialogText {

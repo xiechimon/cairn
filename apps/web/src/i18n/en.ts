@@ -2546,6 +2546,7 @@ export const EN: Record<string, string> = {
   '正在安装…': 'Installing…',
   '正在重启…': 'Restarting…',
   '重新启动以更新到 {version}': 'Restart to update to {version}',
+  '无法连接网络，未能检查更新': 'Cannot connect to the network to check for updates',
   '更新失败：{message}': 'Update failed: {message}',
   'Cairn 回滚了更新': 'Cairn rolled back an update',
   '{failed} 未能启动，Cairn 已恢复到 {restored}。':

@@ -9,15 +9,22 @@ export interface StreamGuards {
   reconcile: () => void | Promise<void>;
 }
 
+export interface StreamConnectionOptions {
+  onConnectionChange?: (connected: boolean) => void;
+  onOnlineHint?: (retry: () => void) => () => void;
+}
+
 export function connect(
   path: string | (() => Promise<string>),
   onEvent: (ev: Record<string, unknown>) => void,
   onResync: () => void,
   guards: StreamGuards,
+  options?: StreamConnectionOptions,
 ): () => void {
   let es: EventSource | null = null;
   let openedOnce = false;
   let disposed = false;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let watchdog: ReturnType<typeof setTimeout> | null = null;
   let bizTimer: ReturnType<typeof setTimeout> | null = null;
   let bizWindow = SSE_BIZ_SILENCE_BASE_MS;
@@ -25,12 +32,21 @@ export function connect(
   let retryDelay = 1_000;
 
   const scheduleRetry = (): void => {
-    if (disposed) return;
+    if (disposed || retryTimer !== null) return;
     const delay = retryDelay;
     retryDelay = Math.min(retryDelay * 2, 30_000);
-    setTimeout(() => {
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
       if (!disposed) open();
     }, delay);
+  };
+
+  const retryNow = (): void => {
+    if (disposed || retryTimer === null) return;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+    retryDelay = 1_000;
+    open();
   };
 
   const armWatchdog = (): void => {
@@ -39,6 +55,8 @@ export function connect(
       watchdog = null;
       if (disposed || es === null || es.readyState !== EventSource.OPEN) return;
       es.close();
+      es = null;
+      options?.onConnectionChange?.(false);
       open();
     }, SSE_SILENCE_WATCHDOG_MS);
   };
@@ -70,7 +88,11 @@ export function connect(
           if (disposed) return;
           attach(url);
         },
-        () => scheduleRetry(),
+        () => {
+          if (disposed) return;
+          options?.onConnectionChange?.(false);
+          scheduleRetry();
+        },
       );
       return;
     }
@@ -80,14 +102,20 @@ export function connect(
   function attach(url: string): void {
     if (disposed) return;
     es?.close();
-    es = new EventSource(url);
-    es.onerror = () => {
-      es?.close();
+    const current = new EventSource(url);
+    es = current;
+    current.onerror = () => {
+      if (disposed || es !== current) return;
+      es = null;
+      current.close();
+      options?.onConnectionChange?.(false);
       if (typeof path === 'function') scheduleRetry();
       else open();
     };
-    es.onopen = () => {
+    current.onopen = () => {
+      if (disposed || es !== current) return;
       retryDelay = 1_000;
+      options?.onConnectionChange?.(true);
       if (openedOnce) onResync();
       openedOnce = true;
       lastSeq = 0;
@@ -95,7 +123,8 @@ export function connect(
       armWatchdog();
       armBizTimer();
     };
-    es.onmessage = (e) => {
+    current.onmessage = (e) => {
+      if (disposed || es !== current) return;
       armWatchdog();
       let ev: Record<string, unknown>;
       try {
@@ -116,12 +145,17 @@ export function connect(
       onEvent(ev);
     };
   }
+
+  const stopOnlineHint = options?.onOnlineHint?.(retryNow);
   open();
 
   return () => {
     disposed = true;
+    stopOnlineHint?.();
+    if (retryTimer !== null) clearTimeout(retryTimer);
     if (watchdog !== null) clearTimeout(watchdog);
     if (bizTimer !== null) clearTimeout(bizTimer);
     es?.close();
+    es = null;
   };
 }

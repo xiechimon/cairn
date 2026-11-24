@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { desktopUpdates } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
+import type { TFunc } from '../i18n/translate.js';
 
 export function canUpdateDesktop(): boolean {
   return desktopUpdates() !== null;
@@ -34,6 +35,50 @@ const WATERLINE =
   'fill-(--mask-keep) transition-transform duration-200 ease-out motion-reduce:transition-none';
 
 type UpdateMark = 'waiting' | 'failed' | null;
+
+export interface DesktopUpdateView {
+  label: string;
+  busy: boolean;
+  mark: UpdateMark;
+}
+
+export function desktopUpdateView(state: DesktopUpdateState, t: TFunc): DesktopUpdateView {
+  const label =
+    state.status === 'available'
+      ? t('更新到 {version}', { version: state.version })
+      : state.status === 'ready'
+        ? t('重新启动以更新到 {version}', { version: state.version })
+        : state.status === 'downloading'
+          ? t('正在更新 {percent}%', { percent: Math.round(state.percent) })
+          : state.status === 'installing'
+            ? t('正在安装…')
+            : state.status === 'restarting'
+              ? t('正在重启…')
+              : state.status === 'unsupported'
+                ? t(BLOCKER_HINTS[state.blocker])
+                : state.status === 'checking'
+                  ? t('正在检查更新…')
+                  : state.status === 'current'
+                    ? t('已是最新版本 {version}', { version: state.version })
+                    : state.status === 'offline'
+                      ? t('无法连接网络，未能检查更新')
+                      : state.status === 'error'
+                        ? t('更新失败：{message}', { message: state.message })
+                        : t('检查更新');
+  const busy =
+    state.status === 'checking' ||
+    state.status === 'downloading' ||
+    state.status === 'installing' ||
+    state.status === 'restarting' ||
+    state.status === 'unsupported';
+  const mark: UpdateMark =
+    state.status === 'available' || state.status === 'ready'
+      ? 'waiting'
+      : state.status === 'error'
+        ? 'failed'
+        : null;
+  return { label, busy, mark };
+}
 
 function fillLevel(state: DesktopUpdateState): number {
   if (state.status === 'downloading') return Math.min(1, Math.max(0, state.percent / 100));
@@ -143,38 +188,7 @@ export function DesktopUpdateButton({
 
   if (bridge === null) return null;
 
-  const label =
-    state.status === 'available'
-      ? t('更新到 {version}', { version: state.version })
-      : state.status === 'ready'
-        ? t('重新启动以更新到 {version}', { version: state.version })
-        : state.status === 'downloading'
-          ? t('正在更新 {percent}%', { percent: Math.round(state.percent) })
-          : state.status === 'installing'
-            ? t('正在安装…')
-            : state.status === 'restarting'
-              ? t('正在重启…')
-              : state.status === 'unsupported'
-                ? t(BLOCKER_HINTS[state.blocker])
-                : state.status === 'checking'
-                  ? t('正在检查更新…')
-                  : state.status === 'current'
-                    ? t('已是最新版本 {version}', { version: state.version })
-                    : state.status === 'error'
-                      ? t('更新失败：{message}', { message: state.message })
-                      : t('检查更新');
-  const busy =
-    state.status === 'checking' ||
-    state.status === 'downloading' ||
-    state.status === 'installing' ||
-    state.status === 'restarting' ||
-    state.status === 'unsupported';
-  const mark: UpdateMark =
-    state.status === 'available' || state.status === 'ready'
-      ? 'waiting'
-      : state.status === 'error'
-        ? 'failed'
-        : null;
+  const { label, busy, mark } = desktopUpdateView(state, t);
 
   return (
     <Tooltip>

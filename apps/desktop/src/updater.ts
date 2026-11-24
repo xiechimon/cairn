@@ -14,6 +14,7 @@ import {
 } from '@cairn/shared';
 import { app } from 'electron';
 import { parseSigningIdentity, signatureMatches } from './signature.js';
+import { messageOf, updateFailureState } from './update-error.js';
 import {
   canonicalPath,
   isStagedBundleFor,
@@ -74,9 +75,7 @@ export async function removeLeftoverUpdates(): Promise<void> {
   await removeStagingFolders(dirname(bundle), staged === null ? [] : [staged.app]);
 }
 
-export function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { messageOf } from './update-error.js';
 
 async function download(
   update: DesktopUpdate,
@@ -166,6 +165,12 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
     current.status === 'downloading' ||
     current.status === 'installing' ||
     current.status === 'restarting';
+  const readyVersion = (): string | null => {
+    const candidate = stagedFor(readUpdateState(statePath()), app.getVersion());
+    return candidate !== null && existsSync(join(candidate.app, APP_EXECUTABLE))
+      ? candidate.version
+      : null;
+  };
 
   async function stage(update: DesktopUpdate): Promise<void> {
     const bundle = runningBundle();
@@ -199,7 +204,7 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
       set({ status: 'ready', version: update.version });
     } catch (error) {
       await removeFolder(staging).catch(() => {});
-      set({ status: 'error', message: messageOf(error) });
+      set(updateFailureState(error, readyVersion()));
     }
   }
 
@@ -239,7 +244,7 @@ export function createUpdater(publish: (state: DesktopUpdateState) => void): Upd
           : { status: 'ready', version: record.staged.version },
       );
     } catch (error) {
-      set({ status: 'error', message: messageOf(error) });
+      set(updateFailureState(error, readyVersion()));
     }
   }
 
