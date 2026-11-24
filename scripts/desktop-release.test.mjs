@@ -45,7 +45,9 @@ test('the decide step releases only a green changed untagged tip; every event fo
       '    *"releases?per_page=100&page="*) printf \'[]\\n\'; exit 0 ;;',
       '    *page=2*|*page=3*) printf \'%s\\n\' "$EMPTY_PAGE"; exit 0 ;;',
       '    *attempts/*/jobs*) printf \'%s\\n\' "$JOBS_PAGE"; exit 0 ;;',
-      '    *workflows/ci.yml/runs*) printf \'%s\\n\' "$RUNS_PAGE"; exit 0 ;;',
+      '    *workflows/ci.yml/runs*)',
+      '      if [ -n "$OLDER_SHA" ] && echo "$2" | grep -q "head_sha=$OLDER_SHA"; then printf \'%s\\n\' "$OLDER_RUNS"; else printf \'%s\\n\' "$RUNS_PAGE"; fi; exit 0 ;;',
+      '    *actions/runs/8) printf \'%s\\n\' "$OLDER_READ"; exit 0 ;;',
       '    *matching-refs*) printf \'%s\\n\' "$TAGS_READ"; exit 0 ;;',
       "    *releases*) printf '[]\\n'; exit 0 ;;",
       '    *actions/runs/*) printf \'%s\\n\' "$RUN_READ"; exit 0 ;;',
@@ -208,6 +210,23 @@ test('the decide step releases only a green changed untagged tip; every event fo
     ci: ciRun(head(), { conclusion: 'failure' }),
   });
   decide(false, { tags: tagsOnMid, page1: baseline2, ci: null });
+
+  const olderGreen = head();
+  git('commit', '--quiet', '--allow-empty', '-m', 'Tip CI still running: run 45409074612');
+  for (const status of ['in_progress', 'queued']) {
+    const older = ciRun(olderGreen, { id: 8 });
+    decide(true, {
+      tags: tagsOnMid,
+      page1: baseline2,
+      ci: ciRun(head(), { status, conclusion: null }),
+      env: {
+        OLDER_SHA: olderGreen,
+        OLDER_RUNS: JSON.stringify({ workflow_runs: [older] }),
+        OLDER_READ: JSON.stringify(older),
+      },
+    });
+    assert.match(readFileSync(output, 'utf8'), new RegExp(`^sha=${olderGreen}$`, 'm'));
+  }
 
   git('tag', 'desktop-v0.1.3');
   decide(true, {
@@ -842,24 +861,18 @@ test('the publish step stages a draft by its numeric id, uploads the assets and 
   assert.equal(run.state, 'public');
 });
 
-test('a main tip that moved during the upload leaves the staged draft behind', (t) => {
-  const { git, publish, tip } = publishFixture(t);
+test('run 45401517056: main advancing during packaging still publishes its green ancestor', (t) => {
+  const { git, publish, tip, built } = publishFixture(t);
   const run = publish({
     BRANCH_READ: JSON.stringify({ commit: { sha: tip } }),
   });
-  assert.notEqual(run.result.status, 0);
-  assert.match(run.result.stderr, /moved past/);
-  assert.equal(run.state, 'draft', 'an aborted publish leaves its draft; it deletes nothing');
-  const create = callIndex(run.calls, /^api -X POST repos\/o\/r\/releases /);
-  const tipRead = callIndex(run.calls, /^api .*branches\/main/);
-  assert.ok(create >= 0 && tipRead > create, 'the draft is staged before the tip read');
-  assert.equal(callIndex(run.calls, /-X DELETE/), -1, 'nothing is deleted');
-  assert.equal(callIndex(run.calls, /^api -X PATCH /), -1, 'nothing is published');
+  assert.equal(run.result.status, 0, run.result.stderr);
+  assert.equal(run.state, 'public');
   assert.equal(
-    git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2'),
-    '',
-    'no tag exists to clean',
+    git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2').split(/\s/)[0],
+    built,
   );
+  assert.equal(callIndex(run.calls, /-X DELETE/), -1);
 });
 
 test('a ci attempt that turned during the upload leaves the staged draft behind', (t) => {
