@@ -79,7 +79,7 @@ const FILES: Record<string, { type: string; body: string | Buffer }> = {
   'att-board': { type: 'application/json', body: SCENE },
 };
 
-async function openArtifact(page: Page, key: string, name: string) {
+async function openArtifact(page: Page, key: string, name: string, messages: unknown[] = []) {
   const saves: string[] = [];
   const base = `/api/todos/${BOARD_TASK.id}/design`;
   const current = {
@@ -93,7 +93,7 @@ async function openArtifact(page: Page, key: string, name: string) {
     restoredFromSeq: null,
     createdAt: Date.now() - 60_000,
   };
-  await mockLive(page, { threads: [THREAD], messages: [], todos: [BOARD_TASK] }, (path, route, json) => {
+  await mockLive(page, { threads: [THREAD], messages, todos: [BOARD_TASK] } as Parameters<typeof mockLive>[1], (path, route, json) => {
     const method = route.request().method();
     if (path === '/api/attachments/att-board/artifact')
       return json({
@@ -125,6 +125,21 @@ async function openArtifact(page: Page, key: string, name: string) {
   await page.goto(`/app?artifact=${encodeURIComponent(key)}&artifactName=${encodeURIComponent(name)}`);
   return { panel: page.getByTestId('artifact-panel'), saves };
 }
+
+test('a PDF in a Coordinator reply shows its first page and page count, and opens in the panel', async ({ page }) => {
+  await openArtifact(page, 'att-deck.pdf', 'q3-review.pdf', [
+    { id: 'm1', role: 'user', content: '把季度复盘导出成 PDF', createdAt: 10 },
+    { id: 'm2', role: 'assistant', content: '导出好了。\n\n![Q3 复盘](attachment:team-1/att-deck.pdf)', createdAt: 20 },
+  ]);
+  await page.goto('/app');
+  const card = page.getByTestId('chat-artifact-card');
+  await expect(card.getByTestId('chat-artifact-meta')).toHaveText('文件 · PDF · 3 页');
+  await expect
+    .poll(() => card.getByTestId('chat-artifact-cover').evaluate((c: HTMLCanvasElement) => c.width))
+    .toBeGreaterThan(0);
+  await card.click();
+  await expect(page.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Q3 复盘.pdf');
+});
 
 test('a CSV opens as a table with lettered cells and its source one toggle away', async ({ page }) => {
   const { panel } = await openArtifact(page, 'att-sheet.csv', 'scores.csv');
