@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import {
   lstatSync,
   mkdirSync,
@@ -18,7 +18,7 @@ import {
   type ManagedUpdateRuntime,
   type RuntimeUpdateStatus,
 } from '@cairn/shared';
-import { unsafeManagedVersion } from '@cairn/shared/managed-bin';
+import { sha256File, unsafeManagedVersion } from '@cairn/shared/managed-bin';
 import { z } from 'zod';
 import { ensurePrivateDir } from '../private-fs.js';
 import { contains } from './confine.js';
@@ -136,10 +136,6 @@ export interface ManagedRuntimeOptions {
 
 export function defaultUpdateChecksEnabled(): boolean {
   return process.env[PROVIDER_UPDATE_CHECKS_ENV] !== '0';
-}
-
-export function sha256File(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
 
 function markerOf(versionDir: string): InstallMarker | null {

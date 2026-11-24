@@ -20,6 +20,7 @@ import { BRAND } from '@cairn/shared';
 import { unsafeManagedVersion } from '@cairn/shared/managed-bin';
 import { z } from 'zod';
 import { childEnv } from '../child-env.js';
+import { toolInstallRoot } from '../runtime-homes.js';
 import { contains } from './confine.js';
 import {
   createManagedRuntime,
@@ -300,7 +301,7 @@ export interface ClaudeManagedOptions extends Omit<ManagedRuntimeOptions, 'root'
 }
 
 export function claudeInstallRoot(cairnHome: string): string {
-  return join(cairnHome, 'tools', 'claude');
+  return toolInstallRoot(cairnHome, 'claude');
 }
 
 export function createClaudeManaged(options: ClaudeManagedOptions = {}): ManagedRuntime {
@@ -436,7 +437,7 @@ export interface DevinManagedOptions extends Omit<ManagedRuntimeOptions, 'root'>
 }
 
 export function devinInstallRoot(cairnHome: string): string {
-  return join(cairnHome, 'tools', 'devin');
+  return toolInstallRoot(cairnHome, 'devin');
 }
 
 export function createDevinManaged(options: DevinManagedOptions = {}): ManagedRuntime {
@@ -595,7 +596,7 @@ export interface GeminiManagedOptions extends Omit<ManagedRuntimeOptions, 'root'
 }
 
 export function geminiInstallRoot(cairnHome: string): string {
-  return join(cairnHome, 'tools', 'gemini');
+  return toolInstallRoot(cairnHome, 'gemini');
 }
 
 export function createGeminiManaged(options: GeminiManagedOptions = {}): ManagedRuntime {

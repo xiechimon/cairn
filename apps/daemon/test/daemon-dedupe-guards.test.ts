@@ -26,8 +26,8 @@ const SLEEP_PROMISE_ALLOWLIST = new Set(['apps/daemon/src/machine-client.ts']);
 describe('daemon and server helper deduplication guards', () => {
   test('managed tool installers reuse unsafeManagedVersion and sha256File from @cairn/shared/managed-bin', () => {
     for (const rel of [
-      'apps/daemon/src/backend/devin-managed.ts',
-      'apps/daemon/src/backend/gemini-managed.ts',
+      'apps/daemon/src/backend/managed-runtime.ts',
+      'apps/daemon/src/backend/runtime-channels.ts',
     ]) {
       const source = readRepo(rel);
       expect(source, rel).not.toMatch(/function\s+unsafeVersion\s*\(/);
@@ -50,7 +50,7 @@ describe('daemon and server helper deduplication guards', () => {
       }
     }
     expect(violations).toEqual([]);
-    expect(readRepo('apps/daemon/src/backend/devin-managed.ts')).not.toContain(
+    expect(readRepo('apps/daemon/src/backend/runtime-channels.ts')).not.toContain(
       "join(homedir(), '.cairn')",
     );
   });
