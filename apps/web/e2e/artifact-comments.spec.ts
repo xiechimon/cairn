@@ -1,3 +1,4 @@
+import { crc32 } from 'node:zlib';
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, TASK, THREAD } from './chief-home-mock';
 
@@ -23,6 +24,57 @@ function pdf(line: string): Buffer {
   body += offsets.map((offset) => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
   body += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return Buffer.from(body, 'latin1');
+}
+
+function storedZip(entries: Record<string, string>): Buffer {
+  const locals: Buffer[] = [];
+  const centrals: Buffer[] = [];
+  let offset = 0;
+  for (const [name, text] of Object.entries(entries)) {
+    const nameBytes = Buffer.from(name);
+    const data = Buffer.from(text);
+    const crc = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt32LE(offset, 42);
+    locals.push(local, nameBytes, data);
+    centrals.push(central, nameBytes);
+    offset += 30 + nameBytes.length + data.length;
+  }
+  const directory = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(Object.keys(entries).length, 8);
+  end.writeUInt16LE(Object.keys(entries).length, 10);
+  end.writeUInt32LE(directory.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, directory, end]);
+}
+
+const REL = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+
+function hostileDocx(): Buffer {
+  return storedZip({
+    '[Content_Types].xml':
+      '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="html" ContentType="text/html"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+    '_rels/.rels': `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/></Relationships>`,
+    'word/_rels/document.xml.rels': `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rLink" Type="${REL}/hyperlink" Target="javascript:window.__docxLink=1" TargetMode="External"/><Relationship Id="rWeb" Type="${REL}/hyperlink" Target="https://example.com/plan" TargetMode="External"/><Relationship Id="rChunk" Type="${REL}/aFChunk" Target="chunk.html"/></Relationships>`,
+    'word/document.xml': `<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="${REL}"><w:body><w:p><w:r><w:t>Quarter plan</w:t></w:r></w:p><w:p><w:hyperlink r:id="rLink"><w:r><w:t>Run me</w:t></w:r></w:hyperlink></w:p><w:p><w:hyperlink r:id="rWeb"><w:r><w:t>Plan page</w:t></w:r></w:hyperlink></w:p><w:altChunk r:id="rChunk"/></w:body></w:document>`,
+    'word/chunk.html': '<html><body><script>parent.__docxChunk=1</script>chunk</body></html>',
+  });
 }
 
 interface FileSpec {
@@ -54,6 +106,13 @@ const FILES: Record<string, FileSpec> = {
     kind: 'code',
     type: 'text/plain',
     body: 'def pace(km, climb):\n    flat = km / 4\n    up = climb / 600\n    return flat + up\n',
+  },
+  plan: {
+    id: 'att-plan',
+    fileName: 'plan.docx',
+    kind: 'docx',
+    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    body: hostileDocx(),
   },
 };
 
@@ -326,4 +385,18 @@ test('a PDF box keeps the text it covers, and on a newer version its pin follows
   await page.mouse.up();
   await expect.poll(() => state.writes.length).toBe(1);
   expect(state.comments.find((c) => c.id === 'cmt-2')?.text).toBe('Ada Lovelace, analyst');
+});
+
+test('a Word file shows its text and links but runs nothing it carries', async ({ page }) => {
+  const { panel } = await openFile(page, FILES.plan as FileSpec);
+  const docx = panel.getByTestId('artifact-docx');
+  await expect(docx).toHaveAttribute('data-state', 'drawn');
+  await expect(docx).toContainText('Quarter plan');
+  await expect(docx.getByRole('link', { name: 'Plan page' })).toHaveAttribute(
+    'href',
+    'https://example.com/plan',
+  );
+  await expect(docx.locator('iframe')).toHaveCount(0);
+  await expect(docx.locator('a[href^="javascript:"]')).toHaveCount(0);
+  expect(await page.evaluate(() => Reflect.get(window, '__docxChunk'))).toBeUndefined();
 });
