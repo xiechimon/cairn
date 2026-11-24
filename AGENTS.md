@@ -42,7 +42,7 @@ Work happens in worktrees, never in the primary checkout: a machine-level pre-co
 ## How to work
 
 - Product prompts, defaults and gates must suit every Cairn user; the owner's personal workflow preferences belong in his own config, not the product.
-- Repository content is English: code, docs, scripts, tests and commits. Product UI strings in `t()`, translations, matching fixtures and selectors, agent-facing product prompts and `README.zh.md` may be Chinese. Follow the user's language in conversation.
+- Repository content is English: code, docs, scripts, tests and commits. Product UI strings in `t()`, translations, matching fixtures and selectors, agent-facing product prompts and `README.zh.md` may be Chinese. Follow the user's language in conversation, and reply to the owner in Chinese: answers, reports, plans, questions and agent wrap-ups he reads.
 - Commit format: `<scope>(<ticket>): <subject>`, in English. Put `Closes #N` on its own line when the commit finishes ticket N, or `Part of #N` for one segment.
 - Read files in full before editing, and check consumers before moving or renaming paths. Ask before removing intentional functionality or changing intended behavior.
 - Do not write code comments; express intent through naming and structure. Only English documentation of a public API or of external behavior the code cannot show is allowed. Delete other legacy comments when touched.
