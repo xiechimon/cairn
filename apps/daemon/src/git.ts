@@ -8,6 +8,7 @@ import {
   type CommitIdentity,
   type GitCredentialSource,
   RETRY_PARKED_MARK,
+  sleep,
 } from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { childEnv } from './child-env.js';
@@ -1131,7 +1132,7 @@ export async function withGitNetRetries<T>(fn: () => Promise<T>): Promise<T> {
       if (isPushRejectedNoFastForward(msg) || !isGitTransientNetFailure(msg)) break;
       const delay = GIT_NET_RETRY_DELAYS_MS[i];
       if (delay === undefined) break;
-      await new Promise((r) => setTimeout(r, delay));
+      await sleep(delay);
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));

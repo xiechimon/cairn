@@ -1,4 +1,4 @@
-import { coordinatorConversationKey, parseCoordinatorConversationKey } from '@cairn/shared';
+import { coordinatorConversationKey, parseCoordinatorConversationKey, sleep } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import {
   type ConversationId,
@@ -165,7 +165,7 @@ export function createInputReceipts(
       } catch (error) {
         report(error);
         if (stopping || error instanceof InputAuthorityError) throw error;
-        await new Promise<void>((resolve) => setTimeout(resolve, 50));
+        await sleep(50);
       }
     }
   };

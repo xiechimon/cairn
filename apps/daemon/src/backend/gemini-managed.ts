@@ -17,7 +17,9 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { BRAND } from '@cairn/shared';
+import { sha256File, unsafeManagedVersion } from '@cairn/shared/managed-bin';
 import { z } from 'zod';
+import { toolInstallRoot } from '../runtime-homes.js';
 import { contains } from './confine.js';
 
 const exec = promisify(execFile);
@@ -93,15 +95,11 @@ function markerOf(versionDir: string): InstallMarker | null {
   }
 }
 
-function unsafeVersion(version: string): boolean {
-  return version === '' || /[/\\]/.test(version) || version.startsWith('.');
-}
-
 function parseNpmPackage(spec: string): { name: string; version: string } | null {
   const at = spec.lastIndexOf('@');
   if (at <= 0) return null;
   const version = spec.slice(at + 1);
-  if (unsafeVersion(version)) return null;
+  if (unsafeManagedVersion(version)) return null;
   return { name: spec.slice(0, at), version };
 }
 
@@ -117,7 +115,7 @@ function verifyTarball(bytes: Buffer, dist: { shasum?: string; integrity?: strin
 }
 
 export function geminiInstallRoot(cairnHome: string): string {
-  return join(cairnHome, 'tools', 'gemini');
+  return toolInstallRoot(cairnHome, 'gemini');
 }
 
 export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiManaged {
@@ -135,8 +133,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
     const binPath = join(versionDir, marker.binRelPath);
     try {
       if (!contains(realpathSync(versionDir), realpathSync(binPath))) return null;
-      const bytes = readFileSync(binPath);
-      if (createHash('sha256').update(bytes).digest('hex') !== marker.binSha256) return null;
+      if (sha256File(binPath) !== marker.binSha256) return null;
     } catch {
       return null;
     }
@@ -148,7 +145,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
       const currentJson = JSON.parse(readFileSync(join(root, 'current.json'), 'utf8')) as {
         version?: unknown;
       };
-      if (typeof currentJson.version === 'string' && !unsafeVersion(currentJson.version)) {
+      if (typeof currentJson.version === 'string' && !unsafeManagedVersion(currentJson.version)) {
         const found = installFor(join(root, 'versions', currentJson.version));
         if (found !== null) return found;
       }
@@ -239,7 +236,7 @@ export function createGeminiManaged(options: GeminiManagedOptions = {}): GeminiM
           log('gemini tarball bundle escapes the archive');
           return null;
         }
-        const binSha256 = createHash('sha256').update(readFileSync(bundle)).digest('hex');
+        const binSha256 = sha256File(bundle);
         const versionDir = join(root, 'versions', parsed.version);
         rmSync(versionDir, { recursive: true, force: true });
         mkdirSync(join(versionDir, 'bundle'), { recursive: true });

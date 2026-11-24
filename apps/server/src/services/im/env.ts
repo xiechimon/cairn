@@ -1,3 +1,4 @@
+import { sleep } from '@cairn/shared';
 import type { ImEnv } from './types.js';
 
 function socketText(data: unknown): string | null {
@@ -12,7 +13,7 @@ function socketText(data: unknown): string | null {
 export const liveImEnv: ImEnv = {
   fetch: globalThis.fetch.bind(globalThis),
   now: () => Date.now(),
-  sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  sleep,
   connectSocket: (url, handlers) => {
     const ws = new WebSocket(url);
     ws.onopen = () => handlers.onOpen?.();

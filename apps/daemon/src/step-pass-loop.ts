@@ -5,6 +5,7 @@ import {
   failureEndsStepNow,
   type ProviderConfig,
   type SessionOpts,
+  sleep,
 } from '@cairn/shared';
 import type { AskChannel } from './ask-channel.js';
 import { credentialSafeEvents } from './credential-output.js';
@@ -159,7 +160,7 @@ export async function runStepPasses(input: StepPassLoopInput): Promise<StepPassL
       logger.step(
         `provider network retry ${networkRetries}: waiting ${retry.delayMs}ms before ${networkRetries === input.networkRetryDelays.length ? 'final' : 'next'} attempt`,
       );
-      await new Promise((r) => setTimeout(r, retry.delayMs));
+      await sleep(retry.delayMs);
       opener.continueId = handle.sessionId;
       input.sessionHandles?.delete(stepId);
       continue;

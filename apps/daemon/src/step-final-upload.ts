@@ -2,6 +2,7 @@ import {
   type MachineDoneBody,
   PLAN_FILE_NAME,
   SESSION_FILE_NAME,
+  sleep,
   type TranscriptUpload,
 } from '@cairn/shared';
 import { type StepJournalEntry, TranscriptBuffer } from './journal.js';
@@ -71,7 +72,7 @@ export async function putFinalArtifacts(
           err instanceof Error ? err.message : String(err)
         }) — re-requesting presigned urls`,
       );
-      await new Promise((r) => setTimeout(r, UPLOAD_RETRY_DELAY_MS));
+      await sleep(UPLOAD_RETRY_DELAY_MS);
     }
   }
 }

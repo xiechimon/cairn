@@ -4,7 +4,12 @@ import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { Duplex, type Readable, type Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
-import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
+import {
+  type AgentBackend,
+  type AgentSessionHandle,
+  conversationBranch,
+  sleep,
+} from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import { createGeminiBackend } from '../backend/acp.js';
 import { createClaudeCodeBackend } from '../backend/claude-code.js';
@@ -118,8 +123,7 @@ export async function runOrbWorker(options: {
   const { socketPath, stdio } = options;
   if (!stdio) {
     if (!socketPath) throw new Error('Orb worker needs a relay socket or stdio');
-    while (!existsSync(socketPath) || !existsSync(`${socketPath}.token`))
-      await new Promise<void>((resolve) => setTimeout(resolve, 100));
+    while (!existsSync(socketPath) || !existsSync(`${socketPath}.token`)) await sleep(100);
   }
   const onFrame = (frame: OrbFrame) => {
     if (frame.type === 'stop') {

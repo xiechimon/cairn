@@ -1,5 +1,5 @@
 import { type VerifyVerdict, verifyEvidenceSchema, verifyVerdictSchema } from '@cairn/shared';
-import { contentToText, extractCodeFence, extractJsonSpan } from './review-findings.js';
+import { capReason, contentToText, extractCodeFence, extractJsonSpan } from './review-findings.js';
 
 type TranscriptMessageLike = {
   role: 'system' | 'user' | 'assistant';
@@ -9,12 +9,6 @@ type TranscriptMessageLike = {
 export type VerifyVerdictExtraction =
   | { status: 'ok'; verdict: VerifyVerdict }
   | { status: 'failed'; reason: string };
-
-const REASON_CHAR_LIMIT = 500;
-
-function capReason(text: string, limit: number = REASON_CHAR_LIMIT): string {
-  return text.length > limit ? `${text.slice(0, limit)}…` : text;
-}
 
 export function extractVerifyVerdict(
   messages: readonly TranscriptMessageLike[],

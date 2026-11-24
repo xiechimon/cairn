@@ -4,6 +4,7 @@ import {
   type MachineAskBody,
   type MachineAskResponse,
   redactSecrets,
+  sleep,
   type TaskDecision,
   THREAD_REPORT_LINE_MAX,
 } from '@cairn/shared';
@@ -120,7 +121,7 @@ export async function askWorkerQuestion(
     if (opts.signal?.aborted === true || Date.now() >= deadline) {
       return responseOf(body.requestId, content);
     }
-    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    await sleep(POLL_MS);
     content = readWorkerQuestion(deps.db, row.buildId, body.requestId) ?? content;
   }
 }

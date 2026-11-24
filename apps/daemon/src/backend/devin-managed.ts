@@ -16,8 +16,11 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { BRAND } from '@cairn/shared';
+import { sha256File, unsafeManagedVersion } from '@cairn/shared/managed-bin';
 import { z } from 'zod';
 import { ensurePrivateDir } from '../private-fs.js';
+import { toolInstallRoot } from '../runtime-homes.js';
 import { contains } from './confine.js';
 
 const exec = promisify(execFile);
@@ -74,15 +77,7 @@ export interface DevinManagedOptions {
 }
 
 export function devinInstallRoot(cairnHome: string): string {
-  return join(cairnHome, 'tools', 'devin');
-}
-
-function sha256File(path: string): string {
-  return createHash('sha256').update(readFileSync(path)).digest('hex');
-}
-
-function unsafeVersion(version: string): boolean {
-  return version === '' || /[/\\]/.test(version) || version.startsWith('.');
+  return toolInstallRoot(cairnHome, 'devin');
 }
 
 function trustedArchive(url: string, host: string): boolean {
@@ -118,7 +113,7 @@ function markerOf(versionDir: string): InstallMarker | null {
 }
 
 export function createDevinManaged(options: DevinManagedOptions = {}): DevinManaged {
-  const root = options.root ?? devinInstallRoot(join(homedir(), '.cairn'));
+  const root = options.root ?? devinInstallRoot(join(homedir(), BRAND.homeDirName));
   const platform = options.platform ?? process.platform;
   const arch = options.arch ?? process.arch;
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -148,7 +143,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
       const current = JSON.parse(readFileSync(join(root, 'current.json'), 'utf8')) as {
         version?: unknown;
       };
-      if (typeof current.version === 'string' && !unsafeVersion(current.version)) {
+      if (typeof current.version === 'string' && !unsafeManagedVersion(current.version)) {
         const found = installFor(join(root, 'versions', current.version));
         if (found !== null) return found;
       }
@@ -214,7 +209,7 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
       log(`devin manifest has no archive for ${target}`);
       return null;
     }
-    if (unsafeVersion(parsed.data.version)) {
+    if (unsafeManagedVersion(parsed.data.version)) {
       log(`devin manifest has an unsafe version: ${parsed.data.version}`);
       return null;
     }

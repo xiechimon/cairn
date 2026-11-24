@@ -37,7 +37,7 @@ export type ReviewVerdictExtraction =
 
 const REASON_CHAR_LIMIT = 500;
 
-function capReason(text: string, limit: number = REASON_CHAR_LIMIT): string {
+export function capReason(text: string, limit: number = REASON_CHAR_LIMIT): string {
   return text.length > limit ? `${text.slice(0, limit)}…` : text;
 }
 

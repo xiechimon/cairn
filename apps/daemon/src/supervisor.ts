@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { openSync } from 'node:fs';
+import { sleep } from '@cairn/shared';
 import { createDaemonLogger } from './log.js';
 import { nextBackoffMs } from './machine-loop.js';
 import { ensurePrivateDir } from './private-fs.js';
@@ -138,7 +139,7 @@ export async function runSupervisor(opts: SupervisorOpts): Promise<void> {
     });
     if (stopping) break;
     logger.supervisor(`runner exited (code ${exitCode ?? 'signal'}) — restarting in ${backoff}ms`);
-    await new Promise((r) => setTimeout(r, backoff));
+    await sleep(backoff);
     backoff = nextBackoffMs(backoff);
   }
   clearDaemonJson(paths);
@@ -156,7 +157,7 @@ export async function stopSupervisor(home: string, timeoutMs = 8_000): Promise<b
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (!isAlive(daemon.pid)) return true;
-    await new Promise((r) => setTimeout(r, 100));
+    await sleep(100);
   }
   return !isAlive(daemon.pid);
 }

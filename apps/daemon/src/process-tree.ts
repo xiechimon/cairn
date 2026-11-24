@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import { sleep } from '@cairn/shared';
 
 const execFileAsync = promisify(execFile);
 const POLL_MS = 25;
@@ -176,8 +177,4 @@ export class ProcessTree {
       await sleep(POLL_MS);
     }
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }

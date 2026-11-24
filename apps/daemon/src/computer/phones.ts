@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ComputerCall, MachinePhoneReport, PhoneManageOutcome } from '@cairn/shared';
-import { phoneManageParamsSchema, phoneManageResultSchema } from '@cairn/shared';
+import type { ComputerCall, MachinePhoneReport } from '@cairn/shared';
+import { phoneManageParamsSchema, phoneManageResultSchema, sleep } from '@cairn/shared';
+import { sha256File } from '@cairn/shared/managed-bin';
 import type { HostScreen } from './host-screen.js';
 import { AndroidPhone } from './phone-android.js';
 import {
@@ -42,7 +43,7 @@ const YADB_FETCH_TIMEOUT_MS = 30_000;
 
 function yadbHashOk(target: string): boolean {
   try {
-    return createHash('sha256').update(readFileSync(target)).digest('hex') === YADB_SHA256;
+    return sha256File(target) === YADB_SHA256;
   } catch {
     return false;
   }
@@ -161,7 +162,7 @@ export function createPhones(opts: PhonesOptions): Phones {
         void refresh().then(() => opts.onStale?.());
         const deadline = Date.now() + 3_000;
         while (Date.now() < deadline && consented.get(stamp.deviceId) !== stamp.phoneId)
-          await new Promise((resolve) => setTimeout(resolve, 50));
+          await sleep(50);
         if (consented.get(stamp.deviceId) !== stamp.phoneId)
           return { text: 'phone_manage carries no consented phone stamp' };
       }

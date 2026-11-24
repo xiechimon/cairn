@@ -13,6 +13,7 @@ import {
 } from './host-screen.js';
 import { fitPngUnderCap, pngSize } from './host-screen-png.js';
 import { type ComputerProvider, ComputerRefusal } from './provider.js';
+import { refuseScreen, ScreenStop } from './screen-stop.js';
 
 export const DESKTOP_SCREENSHOT_SCRIPT =
   'set -o pipefail; xwd -root -silent | xwdtopnm 2>/dev/null | pamdepth 255 2>/dev/null | pnmtopng -force 2>/dev/null | base64 -w0';
@@ -93,16 +94,6 @@ interface RunResult {
   stderr: string;
 }
 
-class Stop extends Error {
-  constructor(readonly outcome: Extract<ScreenOutcome, { kind: 'error' }>) {
-    super(outcome.message);
-  }
-}
-
-function refuse(message: string): Stop {
-  return new Stop({ kind: 'error', message, delivery: 'not_delivered' });
-}
-
 function clip(text: string): string {
   return text.length <= SCREEN_ERROR_MESSAGE_MAX_CHARS
     ? text
@@ -140,7 +131,7 @@ export class DesktopScreen {
       const shot = await this.screenshot(provider, scopeKey, call, this.budget(call));
       return { kind: 'done', text: shot.text, images: shot.images };
     } catch (error) {
-      if (error instanceof Stop) return error.outcome;
+      if (error instanceof ScreenStop) return error.outcome;
       throw error;
     }
   }
@@ -167,23 +158,23 @@ export class DesktopScreen {
         tail = shot.text;
         images = shot.images;
       } catch (error) {
-        if (!(error instanceof Stop) && !call.signal.aborted) throw error;
-        tail = `The actions ran, but the screenshot afterwards failed: ${error instanceof Stop ? error.outcome.message : 'the call was cancelled'}`;
+        if (!(error instanceof ScreenStop) && !call.signal.aborted) throw error;
+        tail = `The actions ran, but the screenshot afterwards failed: ${error instanceof ScreenStop ? error.outcome.message : 'the call was cancelled'}`;
       }
       return { kind: 'done', text: `${done.join('\n')}\n\n${tail}`, images };
     } catch (error) {
-      if (error instanceof Stop) return error.outcome;
+      if (error instanceof ScreenStop) return error.outcome;
       throw error;
     }
   }
 
   private parse(scopeKey: string, params: Record<string, unknown>): DesktopAction[] {
     const parsed = actSchema.safeParse(params);
-    if (!parsed.success) throw refuse('computer_act needs an actions list');
+    if (!parsed.success) throw refuseScreen('computer_act needs an actions list');
     const raw = parsed.data.actions;
-    if (raw.length === 0) throw refuse('computer_act needs at least one action');
+    if (raw.length === 0) throw refuseScreen('computer_act needs at least one action');
     if (raw.length > SCREEN_MAX_ACTIONS) {
-      throw refuse(
+      throw refuseScreen(
         `At most ${SCREEN_MAX_ACTIONS} actions are allowed per call and ${raw.length} were sent; nothing ran`,
       );
     }
@@ -192,7 +183,7 @@ export class DesktopScreen {
       const action = actionSchema.safeParse(entry);
       if (!action.success) {
         const kind = (entry as { kind?: unknown } | null)?.kind;
-        throw refuse(
+        throw refuseScreen(
           typeof kind === 'string' && ACTION_KINDS.includes(kind)
             ? `Action ${index + 1} (${kind}) has invalid arguments; nothing ran`
             : `Action ${index + 1} has an unknown kind; use one of ${ACTION_KINDS.join(', ')}. Nothing ran`,
@@ -200,7 +191,7 @@ export class DesktopScreen {
       }
       if (hasPoint(action.data)) {
         if (!geometry) {
-          throw refuse(
+          throw refuseScreen(
             'Call computer_observe first: x and y are pixels in its latest screenshot. Nothing ran',
           );
         }
@@ -213,7 +204,7 @@ export class DesktopScreen {
             : [[action.data.x, action.data.y]];
         for (const [x = 0, y = 0] of points) {
           if (x >= geometry.imageWidth || y >= geometry.imageHeight) {
-            throw refuse(
+            throw refuseScreen(
               `Action ${index + 1} (${action.data.kind}) is outside the last screenshot (${geometry.imageWidth}x${geometry.imageHeight}); nothing ran`,
             );
           }
@@ -226,7 +217,7 @@ export class DesktopScreen {
   private budget(call: ScreenCall): Budget {
     const endsAt = call.deadlineAt - FINAL_FRAME_MARGIN_MS;
     if (endsAt - this.now() < MIN_BUDGET_MS) {
-      throw refuse('Too little time was left before the call deadline, so nothing ran');
+      throw refuseScreen('Too little time was left before the call deadline, so nothing ran');
     }
     return { endsAt };
   }
@@ -241,7 +232,7 @@ export class DesktopScreen {
   ): Promise<RunResult> {
     const timeoutMs = Math.min(SCREEN_COMMAND_TIMEOUT_MS, budget.endsAt - this.now());
     if (timeoutMs < 1) {
-      throw new Stop({
+      throw new ScreenStop({
         kind: 'error',
         message: 'The call deadline passed before the next step could run',
         delivery: delivered ? 'unknown' : 'not_delivered',
@@ -257,7 +248,7 @@ export class DesktopScreen {
       });
     } catch (error) {
       if (error instanceof ComputerRefusal) {
-        throw new Stop({
+        throw new ScreenStop({
           kind: 'error',
           message: clip(error.message),
           delivery: delivered ? 'unknown' : error.delivery,
@@ -276,7 +267,7 @@ export class DesktopScreen {
       }
       size += event.text.length;
       if (size > SCREEN_OUTPUT_CAP_BYTES) {
-        throw new Stop({
+        throw new ScreenStop({
           kind: 'error',
           message: `The computer produced more than ${SCREEN_OUTPUT_CAP_BYTES} bytes of output`,
           delivery: delivered ? 'unknown' : 'not_delivered',
@@ -300,16 +291,16 @@ export class DesktopScreen {
       budget,
       false,
     );
-    if (result.code === COMMAND_NOT_FOUND) throw refuse(DESKTOP_SCREENSHOT_PROGRAMS);
+    if (result.code === COMMAND_NOT_FOUND) throw refuseScreen(DESKTOP_SCREENSHOT_PROGRAMS);
     const png = Buffer.from(result.stdout.trim(), 'base64');
     const size = pngSize(png);
     if (result.code !== 0 || !size) {
-      throw refuse(
+      throw refuseScreen(
         clip(`The screenshot failed${result.stderr.trim() ? `: ${result.stderr.trim()}` : ''}`),
       );
     }
     const fitted = fitPngUnderCap(png, SCREEN_IMAGE_EDGES, this.imageMaxBase64Chars);
-    if (!fitted) throw refuse('The screenshot could not be reduced under the size cap');
+    if (!fitted) throw refuseScreen('The screenshot could not be reduced under the size cap');
     this.geometry.set(scopeKey, {
       screenWidth: size.width,
       screenHeight: size.height,
@@ -389,14 +380,14 @@ export class DesktopScreen {
     const earlier = ran > 0 ? ` ${ran} earlier action(s) already ran.` : '';
     if (action.kind === 'wait') {
       if (budget.endsAt - this.now() < action.ms) {
-        throw new Stop({
+        throw new ScreenStop({
           kind: 'error',
           message: `${label} would outlive the call deadline; it did not run.${earlier}`,
           delivery: ran > 0 ? 'unknown' : 'not_delivered',
         });
       }
       await sleep(action.ms, undefined, { signal: call.signal }).catch(() => {
-        throw new Stop({
+        throw new ScreenStop({
           kind: 'error',
           message: 'The call was cancelled during a wait',
           delivery: 'unknown',
@@ -424,13 +415,13 @@ export class DesktopScreen {
         );
     if (result.code === 0) return;
     if (result.code === COMMAND_NOT_FOUND) {
-      throw new Stop({
+      throw new ScreenStop({
         kind: 'error',
         message: `${label} needs ${tool} on this computer.${earlier}`,
         delivery: ran > 0 ? 'unknown' : 'not_delivered',
       });
     }
-    throw new Stop({
+    throw new ScreenStop({
       kind: 'error',
       message: clip(
         `${label} failed and may have partly run.${earlier}${result.stderr.trim() ? ` ${tool} said: ${result.stderr.trim()}` : ''}`,

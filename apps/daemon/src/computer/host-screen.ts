@@ -12,6 +12,9 @@ import { hostCommandEnvironment } from './host.js';
 import { fitPngUnderCap } from './host-screen-png.js';
 import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
 import { originHosts, showsCairn } from './host-screen-self.js';
+import { refuseScreen, type ScreenOutcome, ScreenStop } from './screen-stop.js';
+
+export type { ScreenOutcome };
 
 const PERM_DENIED = 'PERM_DENIED';
 export const SCREEN_MAX_ACTIONS = 24;
@@ -28,10 +31,6 @@ const FIND_LIMIT = 50;
 const UNPROVEN_RECEIVER =
   'Raw coordinate clicks are unavailable until their receiver identity can be proven; use an observed element number instead';
 const CAIRN_WINDOW_REFUSAL = 'This window shows the cairn web app; it is never driven';
-
-export type ScreenOutcome =
-  | { kind: 'done'; text: string; images: ComputerImage[] }
-  | { kind: 'error'; message: string; delivery: 'not_delivered' | 'unknown' };
 
 export interface ScreenCall {
   params: Record<string, unknown>;
@@ -69,12 +68,6 @@ interface Target {
   app: string;
   windowId: string;
   title: string;
-}
-
-class Stop extends Error {
-  constructor(readonly outcome: Extract<ScreenOutcome, { kind: 'error' }>) {
-    super(outcome.message);
-  }
 }
 
 const elementNumber = z.number().int().min(1).max(100_000);
@@ -144,10 +137,6 @@ export function createHostScreenFromEnv(
   return new AgentDesktopHostScreen({ env, binary: env.CAIRN_AGENT_DESKTOP, ...options });
 }
 
-function refuse(message: string): Stop {
-  return new Stop({ kind: 'error', message, delivery: 'not_delivered' });
-}
-
 function clip(text: string, max: number): string {
   if (text.length <= max) return text;
   const cut =
@@ -190,14 +179,14 @@ export class AgentDesktopHostScreen implements HostScreen {
     try {
       const parsed = observeSchema.safeParse(call.params);
       if (!parsed.success) {
-        throw refuse('user_computer_observe needs an app name and an optional query string');
+        throw refuseScreen('user_computer_observe needs an app name and an optional query string');
       }
       const budget = this.budget(call);
       const target = await this.target(parsed.data.app, call, budget);
       const text = await this.observation(target, call, budget, parsed.data.query);
       return { kind: 'done', text: text.text, images: text.images };
     } catch (error) {
-      if (error instanceof Stop) return error.outcome;
+      if (error instanceof ScreenStop) return error.outcome;
       throw error;
     }
   }
@@ -205,11 +194,13 @@ export class AgentDesktopHostScreen implements HostScreen {
   async act(call: ScreenCall): Promise<ScreenOutcome> {
     try {
       const parsed = actSchema.safeParse(call.params);
-      if (!parsed.success) throw refuse('user_computer_act needs an app name and an actions list');
+      if (!parsed.success)
+        throw refuseScreen('user_computer_act needs an app name and an actions list');
       const { app, actions: rawActions } = parsed.data;
-      if (rawActions.length === 0) throw refuse('user_computer_act needs at least one action');
+      if (rawActions.length === 0)
+        throw refuseScreen('user_computer_act needs at least one action');
       if (rawActions.length > SCREEN_MAX_ACTIONS) {
-        throw refuse(
+        throw refuseScreen(
           `At most ${SCREEN_MAX_ACTIONS} actions are allowed per call and ${rawActions.length} were sent; nothing ran`,
         );
       }
@@ -217,14 +208,14 @@ export class AgentDesktopHostScreen implements HostScreen {
         const action = actionSchema.safeParse(raw);
         if (!action.success) {
           const kind = (raw as { kind?: unknown } | null)?.kind;
-          throw refuse(
+          throw refuseScreen(
             typeof kind === 'string' && ACTION_KINDS.split(', ').includes(kind)
               ? `Action ${index + 1} (${kind}) has invalid arguments; nothing ran`
               : `Action ${index + 1} has an unknown kind; use one of ${ACTION_KINDS}. Nothing ran`,
           );
         }
         if (action.data.kind === 'click' && action.data.element === undefined) {
-          throw refuse(UNPROVEN_RECEIVER);
+          throw refuseScreen(UNPROVEN_RECEIVER);
         }
         return action.data;
       });
@@ -239,8 +230,8 @@ export class AgentDesktopHostScreen implements HostScreen {
           await this.assertNotCairn(target, call, budget);
           await this.perform(target, action, index, done.length, call, budget);
         } catch (error) {
-          if (error instanceof Stop && done.length > 0) {
-            throw new Stop({ ...error.outcome, delivery: 'unknown' });
+          if (error instanceof ScreenStop && done.length > 0) {
+            throw new ScreenStop({ ...error.outcome, delivery: 'unknown' });
           }
           throw error;
         }
@@ -253,7 +244,7 @@ export class AgentDesktopHostScreen implements HostScreen {
         tail = seen.text;
         images = seen.images;
       } catch (error) {
-        if (!(error instanceof Stop)) throw error;
+        if (!(error instanceof ScreenStop)) throw error;
         tail = `The actions ran, but looking at ${target.app} afterwards failed: ${error.outcome.message}`;
       }
       return {
@@ -262,7 +253,7 @@ export class AgentDesktopHostScreen implements HostScreen {
         images,
       };
     } catch (error) {
-      if (error instanceof Stop) return error.outcome;
+      if (error instanceof ScreenStop) return error.outcome;
       throw error;
     }
   }
@@ -270,7 +261,7 @@ export class AgentDesktopHostScreen implements HostScreen {
   private budget(call: ScreenCall): { endsAt: number } {
     const endsAt = call.deadlineAt - FINAL_FRAME_MARGIN_MS;
     if (endsAt - this.now() < MIN_BUDGET_MS) {
-      throw refuse('Too little time was left before the call deadline, so nothing ran');
+      throw refuseScreen('Too little time was left before the call deadline, so nothing ran');
     }
     return { endsAt };
   }
@@ -327,7 +318,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     result: Extract<RunResult, { kind: 'failed' }>,
     ran: number,
     label: string,
-  ): Stop {
+  ): ScreenStop {
     const messages = {
       missing: `agent-desktop could not be started at ${this.binary}; reinstall the Cairn app`,
       timeout: `${label} timed out and agent-desktop was killed`,
@@ -336,7 +327,7 @@ export class AgentDesktopHostScreen implements HostScreen {
       unusable: `${label} returned output that is not an agent-desktop JSON envelope`,
     };
     const delivery = result.reason === 'missing' && ran === 0 ? 'not_delivered' : 'unknown';
-    return new Stop({ kind: 'error', message: messages[result.reason], delivery });
+    return new ScreenStop({ kind: 'error', message: messages[result.reason], delivery });
   }
 
   private async read(
@@ -351,7 +342,7 @@ export class AgentDesktopHostScreen implements HostScreen {
       result.envelope.error?.code === PERM_DENIED &&
       args[0] !== 'screenshot'
     )
-      throw refuse(OWN_COMPUTER_NO_ACCESSIBILITY(hostname()));
+      throw refuseScreen(OWN_COMPUTER_NO_ACCESSIBILITY(hostname()));
     return result.envelope.ok
       ? { ok: true, data: result.envelope.data }
       : { ok: false, raw: result.raw, code: result.envelope.error?.code ?? 'INTERNAL' };
@@ -363,7 +354,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     budget: { endsAt: number },
   ): Promise<Target> {
     const listed = await this.read(['list-windows'], call, budget);
-    if (!listed.ok) throw refuse(clip(listed.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
+    if (!listed.ok) throw refuseScreen(clip(listed.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
     const windows = (Array.isArray(listed.data) ? (listed.data as ScreenWindow[]) : []).filter(
       (window) => window?.id && window.app_name,
     );
@@ -371,7 +362,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     const matching = windows.filter((window) => window.app_name.toLowerCase() === wanted);
     if (matching.length === 0) {
       const open = [...new Set(windows.map((window) => window.app_name))].slice(0, 12);
-      throw refuse(
+      throw refuseScreen(
         open.length > 0
           ? `No open app is named exactly "${appName}". Open apps with windows: ${open.join(', ')}`
           : `No open app is named exactly "${appName}", and no app has a window agent-desktop can see`,
@@ -382,7 +373,9 @@ export class AgentDesktopHostScreen implements HostScreen {
     );
     const window = usable[0];
     if (!window) {
-      throw refuse(`${matching[0]?.app_name ?? appName} has no visible, restored window to drive`);
+      throw refuseScreen(
+        `${matching[0]?.app_name ?? appName} has no visible, restored window to drive`,
+      );
     }
     const title = window.title ?? '';
     if (
@@ -391,7 +384,7 @@ export class AgentDesktopHostScreen implements HostScreen {
       showsCairn([title], this.hosts)
     ) {
       this.cairnWindows.add(window.id);
-      throw refuse(CAIRN_WINDOW_REFUSAL);
+      throw refuseScreen(CAIRN_WINDOW_REFUSAL);
     }
     return { app: window.app_name, windowId: window.id, title };
   }
@@ -415,12 +408,12 @@ export class AgentDesktopHostScreen implements HostScreen {
       call,
       budget,
     );
-    if (!read.ok) throw refuse(clip(read.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
+    if (!read.ok) throw refuseScreen(clip(read.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
     const data = (read.data ?? {}) as { tree?: AccessibilityNode };
     const rows = accessibilityRows(data.tree ? [data.tree] : [], '', false);
     if (showsCairn(rows.strings, this.hosts)) {
       this.cairnWindows.add(target.windowId);
-      throw refuse(CAIRN_WINDOW_REFUSAL);
+      throw refuseScreen(CAIRN_WINDOW_REFUSAL);
     }
   }
 
@@ -438,7 +431,7 @@ export class AgentDesktopHostScreen implements HostScreen {
       call,
       budget,
     );
-    if (!read.ok) throw refuse(clip(read.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
+    if (!read.ok) throw refuseScreen(clip(read.raw, SCREEN_ERROR_MESSAGE_MAX_CHARS));
     const data = (read.data ?? {}) as {
       snapshot_id?: string;
       complete?: boolean;
@@ -457,7 +450,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     );
     if (showsCairn(rows.strings, this.hosts)) {
       this.cairnWindows.add(target.windowId);
-      throw refuse(CAIRN_WINDOW_REFUSAL);
+      throw refuseScreen(CAIRN_WINDOW_REFUSAL);
     }
     const shot = await this.screenshot(target, call, budget);
     const header = [
@@ -488,7 +481,7 @@ export class AgentDesktopHostScreen implements HostScreen {
       try {
         read = await this.read(args, call, budget);
       } catch (error) {
-        if (error instanceof Stop)
+        if (error instanceof ScreenStop)
           return { note: `screenshot: unavailable (${error.outcome.message})`, images: [] };
         throw error;
       }
@@ -524,7 +517,7 @@ export class AgentDesktopHostScreen implements HostScreen {
   private ref(target: Target, element: number): string {
     const snapshot = this.snapshots.get(target.app.toLowerCase());
     if (!snapshot || snapshot.windowId !== target.windowId) {
-      throw refuse(`Observe ${target.app} before using element numbers; nothing ran`);
+      throw refuseScreen(`Observe ${target.app} before using element numbers; nothing ran`);
     }
     return `@${snapshot.id}:e${element}`;
   }
@@ -542,7 +535,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     if (result.kind === 'failed') throw this.failure(result, ran, label);
     if (result.envelope.ok) return result.envelope.data;
     if (result.envelope.error?.code === PERM_DENIED)
-      throw new Stop({
+      throw new ScreenStop({
         kind: 'error',
         message: OWN_COMPUTER_NO_ACCESSIBILITY(hostname()),
         delivery: ran === 0 ? 'not_delivered' : 'unknown',
@@ -550,7 +543,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     const retry = result.envelope.error?.disposition?.retry;
     const delivery = retry === 'safe' && ran === 0 ? 'not_delivered' : 'unknown';
     const completed = ran > 0 ? ` ${ran} earlier action(s) already ran.` : '';
-    throw new Stop({
+    throw new ScreenStop({
       kind: 'error',
       message: clip(
         `${label} was refused by agent-desktop.${completed} agent-desktop said: ${result.raw}`,
@@ -589,7 +582,7 @@ export class AgentDesktopHostScreen implements HostScreen {
     const scope = ['--window-id', target.windowId];
     switch (action.kind) {
       case 'click': {
-        if (action.element === undefined) throw refuse(UNPROVEN_RECEIVER);
+        if (action.element === undefined) throw refuseScreen(UNPROVEN_RECEIVER);
         const ref = this.ref(target, action.element);
         if (action.double) await go('double-click', '--headed', '--', ref);
         else if (action.button === 'right') await go('right-click', '--', ref);
@@ -615,7 +608,7 @@ export class AgentDesktopHostScreen implements HostScreen {
           action.element !== undefined
             ? this.ref(target, action.element)
             : await find('find', ...scope, '--role', 'scrollarea');
-        if (!area) throw refuse(`Nothing in ${target.app} scrolls`);
+        if (!area) throw refuseScreen(`Nothing in ${target.app} scrolls`);
         await go(
           'scroll',
           '--direction',
@@ -637,7 +630,7 @@ export class AgentDesktopHostScreen implements HostScreen {
           item = await find('find', ...scope, '--surface', 'menu', `--name=${name}`, '--exact');
         }
         if (!item) {
-          throw new Stop({
+          throw new ScreenStop({
             kind: 'error',
             message: `${target.app} has no menu item ${action.path.join(' > ')}`,
             delivery: ran + extra === 0 ? 'not_delivered' : 'unknown',
@@ -649,7 +642,7 @@ export class AgentDesktopHostScreen implements HostScreen {
       case 'wait': {
         const remaining = budget.endsAt - this.now();
         if (remaining < action.ms)
-          throw refuse('The wait would outlive the call deadline; it did not run');
+          throw refuseScreen('The wait would outlive the call deadline; it did not run');
         await sleep(action.ms, undefined, {
           signal: AbortSignal.any([
             call.signal,
@@ -657,7 +650,7 @@ export class AgentDesktopHostScreen implements HostScreen {
             AbortSignal.timeout(Math.max(1, Math.ceil(remaining))),
           ]),
         }).catch(() => {
-          throw new Stop({
+          throw new ScreenStop({
             kind: 'error',
             message: 'The call was cancelled during a wait',
             delivery: 'unknown',

@@ -12,6 +12,7 @@ import {
 import { createServer, Socket } from 'node:net';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
+import { sleep } from '@cairn/shared';
 import { processStartTime } from '@cairn/shared/parent-watch';
 import { childEnv } from '../child-env.js';
 import type { OrbEnsureDeps, OrbEnsureService } from './services-ensure.js';
@@ -73,9 +74,7 @@ export function createNodeEnsureDeps(stateDir: string): OrbEnsureDeps {
       return listener !== null && isInProcessTree(listener, pid);
     },
     now: () => Date.now(),
-    sleep: async (ms) => {
-      await new Promise((resolve) => setTimeout(resolve, ms));
-    },
+    sleep,
     readinessMs: 60_000,
     withLock: async (fn) => withEnsureFileLock(join(stateDir, 'ensure.lock'), fn),
   };
@@ -169,7 +168,7 @@ async function waitForPort(port: number, deadlineMs: number): Promise<boolean> {
       client.connect(port, '127.0.0.1');
     });
     if (open) return true;
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await sleep(20);
   }
   return false;
 }
@@ -201,7 +200,7 @@ async function persistServicePid(path: string, pid: number): Promise<void> {
       writeFileSync(path, `${pid} ${start}\n`);
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await sleep(10);
   }
   throw new Error(`service pid ${pid} vanished before identity was recorded`);
 }
@@ -229,13 +228,11 @@ function tryClaimEnsureLock(lockPath: string): boolean {
 export async function withEnsureFileLock<T>(
   lockPath: string,
   fn: () => Promise<T>,
-  sleep: (ms: number) => Promise<void> = async (ms) => {
-    await new Promise((resolve) => setTimeout(resolve, ms));
-  },
+  wait: (ms: number) => Promise<void> = sleep,
 ): Promise<T> {
   for (;;) {
     if (tryClaimEnsureLock(lockPath)) break;
-    await sleep(20);
+    await wait(20);
   }
   try {
     return await fn();

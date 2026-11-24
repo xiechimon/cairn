@@ -14,6 +14,7 @@ import {
   parseRetryAfterMs,
   REMOTE_TOOL_RETRY_DELAYS_MS,
   skillCallName,
+  sleep,
 } from '@cairn/shared';
 import type { ActivityTracker } from './activity.js';
 import type { AgentTodoReporter } from './agent-todo.js';
@@ -71,7 +72,7 @@ async function withRetries<T>(
       lastErr = err;
       const delay = delaysMs[i - 1];
       if (delay === undefined) break;
-      await new Promise((r) => setTimeout(r, delay));
+      await sleep(delay);
     }
   }
   logger.step(

@@ -13,6 +13,10 @@ export interface VerifiedManagedBin {
   args: string[];
 }
 
+export function sha256File(path: string): string {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
 export function unsafeManagedVersion(version: string): boolean {
   return version === '' || /[/\\]/.test(version) || version.startsWith('.');
 }
@@ -31,8 +35,7 @@ export function verifiedManagedBin(versionDir: string): VerifiedManagedBin | nul
     if (typeof marker.binSha256 !== 'string') return null;
     const command = join(versionDir, marker.binRelPath);
     if (!insidePath(realpathSync(versionDir), realpathSync(command))) return null;
-    const digest = createHash('sha256').update(readFileSync(command)).digest('hex');
-    if (digest !== marker.binSha256.toLowerCase()) return null;
+    if (sha256File(command) !== marker.binSha256.toLowerCase()) return null;
     const args =
       Array.isArray(marker.args) && marker.args.every((arg) => typeof arg === 'string')
         ? marker.args

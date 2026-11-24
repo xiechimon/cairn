@@ -12,6 +12,7 @@ import {
 import { type AccessibilityNode, accessibilityRows } from './host-screen-rows.js';
 import { originHosts, showsCairn } from './host-screen-self.js';
 import { type ComputerProvider, ComputerRefusal } from './provider.js';
+import { refuseScreen, ScreenStop } from './screen-stop.js';
 
 export const AGENT_DESKTOP_BINARY = 'agent-desktop';
 export const DESKTOP_NOT_INSTALLED =
@@ -90,19 +91,6 @@ interface Budget {
   endsAt: number;
 }
 
-class Stop extends Error {
-  constructor(
-    readonly outcome: Extract<ScreenOutcome, { kind: 'error' }>,
-    readonly code?: string,
-  ) {
-    super(outcome.message);
-  }
-}
-
-function refuse(message: string): Stop {
-  return new Stop({ kind: 'error', message, delivery: 'not_delivered' });
-}
-
 function clip(text: string, max: number): string {
   return text.length <= max ? text : text.slice(0, max);
 }
@@ -131,7 +119,9 @@ export class DesktopAccessibility {
     try {
       const parsed = snapshotSchema.safeParse(call.params);
       if (!parsed.success) {
-        throw refuse('desktop_snapshot takes an optional app name and an optional query string');
+        throw refuseScreen(
+          'desktop_snapshot takes an optional app name and an optional query string',
+        );
       }
       const budget = this.budget(call);
       const run = new Runner(provider, call, budget, this.now);
@@ -145,7 +135,7 @@ export class DesktopAccessibility {
         images: [],
       };
     } catch (error) {
-      if (error instanceof Stop) return error.outcome;
+      if (error instanceof ScreenStop) return error.outcome;
       throw error;
     }
   }
@@ -157,11 +147,11 @@ export class DesktopAccessibility {
   ): Promise<ScreenOutcome> {
     try {
       const parsed = actSchema.safeParse(call.params);
-      if (!parsed.success) throw refuse('desktop_act needs an app name and an actions list');
+      if (!parsed.success) throw refuseScreen('desktop_act needs an app name and an actions list');
       const { app, actions: rawActions } = parsed.data;
-      if (rawActions.length === 0) throw refuse('desktop_act needs at least one action');
+      if (rawActions.length === 0) throw refuseScreen('desktop_act needs at least one action');
       if (rawActions.length > SCREEN_MAX_ACTIONS) {
-        throw refuse(
+        throw refuseScreen(
           `At most ${SCREEN_MAX_ACTIONS} actions are allowed per call and ${rawActions.length} were sent; nothing ran`,
         );
       }
@@ -169,7 +159,7 @@ export class DesktopAccessibility {
         const action = actionSchema.safeParse(raw);
         if (action.success) return action.data;
         const kind = (raw as { kind?: unknown } | null)?.kind;
-        throw refuse(
+        throw refuseScreen(
           typeof kind === 'string' && ACTION_KINDS.includes(kind)
             ? `Action ${index + 1} (${kind}) has invalid arguments; nothing ran`
             : `Action ${index + 1} has an unknown kind; use one of ${ACTION_KINDS.join(', ')}. Nothing ran`,
@@ -189,8 +179,8 @@ export class DesktopAccessibility {
           await this.assertNotCairn(run, target);
           done.push(await this.perform(run, scopeKey, target, action, index, done.length));
         } catch (error) {
-          if (error instanceof Stop && done.length > 0) {
-            throw new Stop({ ...error.outcome, delivery: 'unknown' });
+          if (error instanceof ScreenStop && done.length > 0) {
+            throw new ScreenStop({ ...error.outcome, delivery: 'unknown' });
           }
           throw error;
         }
@@ -199,7 +189,7 @@ export class DesktopAccessibility {
       try {
         tail = await this.observation(run, scopeKey, target);
       } catch (error) {
-        if (!(error instanceof Stop)) throw error;
+        if (!(error instanceof ScreenStop)) throw error;
         tail = `The actions ran, but looking at ${target.app} afterwards failed: ${error.outcome.message}`;
       }
       return {
@@ -208,7 +198,7 @@ export class DesktopAccessibility {
         images: [],
       };
     } catch (error) {
-      if (error instanceof Stop) return error.outcome;
+      if (error instanceof ScreenStop) return error.outcome;
       throw error;
     }
   }
@@ -216,7 +206,7 @@ export class DesktopAccessibility {
   private budget(call: ScreenCall): Budget {
     const endsAt = call.deadlineAt - FINAL_FRAME_MARGIN_MS;
     if (endsAt - this.now() < MIN_BUDGET_MS) {
-      throw refuse('Too little time was left before the call deadline, so nothing ran');
+      throw refuseScreen('Too little time was left before the call deadline, so nothing ran');
     }
     return { endsAt };
   }
@@ -244,7 +234,7 @@ export class DesktopAccessibility {
     const matching = windows.filter((window) => window.app_name.toLowerCase() === wanted);
     if (matching.length === 0) {
       const open = [...new Set(windows.map((window) => window.app_name))].slice(0, 12);
-      throw refuse(
+      throw refuseScreen(
         open.length > 0
           ? `No open app is named exactly "${appName}". Open apps with windows: ${open.join(', ')}`
           : `No open app is named exactly "${appName}", and no app has a window the accessibility tree can see; start the app from the shell tool or a dock launcher first`,
@@ -259,7 +249,8 @@ export class DesktopAccessibility {
       ) ??
       usable.find((candidate) => !this.cairnWindows.has(candidate.id)) ??
       usable[0];
-    if (!window) throw refuse(`${matching[0]?.app_name ?? appName} has no visible window to drive`);
+    if (!window)
+      throw refuseScreen(`${matching[0]?.app_name ?? appName} has no visible window to drive`);
     const title = window.title ?? '';
     if (
       this.cairnWindows.has(window.id) ||
@@ -267,7 +258,7 @@ export class DesktopAccessibility {
       showsCairn([title], ['cairn', ...this.hosts])
     ) {
       this.cairnWindows.add(window.id);
-      throw refuse(CAIRN_WINDOW_REFUSAL);
+      throw refuseScreen(CAIRN_WINDOW_REFUSAL);
     }
     return { app: window.app_name, windowId: window.id, title, windowCount: usable.length };
   }
@@ -286,11 +277,11 @@ export class DesktopAccessibility {
       usable.find((candidate) => (candidate.title ?? '') === target.title) ??
       (usable.length === 1 ? usable[0] : undefined);
     if (!window) {
-      throw refuse(
+      throw refuseScreen(
         `The ${target.app} window${target.title ? ` "${target.title}"` : ''} is gone or changed; call desktop_snapshot for ${target.app} again. Nothing ran`,
       );
     }
-    if (this.cairnWindows.has(window.id)) throw refuse(CAIRN_WINDOW_REFUSAL);
+    if (this.cairnWindows.has(window.id)) throw refuseScreen(CAIRN_WINDOW_REFUSAL);
     target.windowId = window.id;
     return window;
   }
@@ -304,7 +295,7 @@ export class DesktopAccessibility {
     try {
       return await send(command(target.windowId));
     } catch (error) {
-      if (!(error instanceof Stop) || error.code !== WINDOW_NOT_FOUND) throw error;
+      if (!(error instanceof ScreenStop) || error.code !== WINDOW_NOT_FOUND) throw error;
       await this.relocate(run, target);
       return send(command(target.windowId));
     }
@@ -324,7 +315,7 @@ export class DesktopAccessibility {
       (args) => run.step(args, label, ran),
     );
     if ((await this.relocate(run, target)).is_focused !== true) {
-      throw new Stop({
+      throw new ScreenStop({
         kind: 'error',
         message: `${label} was not sent: ${target.app} did not come to the front, so input would have gone to another window. Nothing was typed`,
         delivery: ran > 0 ? 'unknown' : 'not_delivered',
@@ -351,7 +342,7 @@ export class DesktopAccessibility {
     const rows = accessibilityRows(data?.tree ? [data.tree] : [], '', false);
     if (showsCairn(rows.strings, ['cairn', ...this.hosts])) {
       this.cairnWindows.add(target.windowId);
-      throw refuse(CAIRN_WINDOW_REFUSAL);
+      throw refuseScreen(CAIRN_WINDOW_REFUSAL);
     }
   }
 
@@ -392,7 +383,7 @@ export class DesktopAccessibility {
     );
     if (showsCairn(rows.strings, ['cairn', ...this.hosts])) {
       this.cairnWindows.add(target.windowId);
-      throw refuse(CAIRN_WINDOW_REFUSAL);
+      throw refuseScreen(CAIRN_WINDOW_REFUSAL);
     }
     const header = [
       `app: ${target.app}`,
@@ -410,12 +401,12 @@ export class DesktopAccessibility {
   ): string {
     const snapshot = this.snapshots.get(`${scopeKey}\0${target.app.toLowerCase()}`);
     if (!snapshot) {
-      throw refuse(
+      throw refuseScreen(
         `Call desktop_snapshot for ${target.app} before using element numbers; nothing ran`,
       );
     }
     if (snapshot.title !== target.title && target.windowCount > 1) {
-      throw refuse(
+      throw refuseScreen(
         `${target.app} has several windows and the one snapshotted ("${snapshot.title}") is no longer there; call desktop_snapshot for ${target.app} again; nothing ran`,
       );
     }
@@ -433,8 +424,8 @@ export class DesktopAccessibility {
     const label = `Action ${index + 1} (${action.kind})`;
     const go = (...args: string[]) =>
       run.step(args, label, ran).catch((error: unknown) => {
-        if (error instanceof Stop && error.code === WINDOW_NOT_FOUND) {
-          throw new Stop(
+        if (error instanceof ScreenStop && error.code === WINDOW_NOT_FOUND) {
+          throw new ScreenStop(
             {
               kind: 'error',
               message: `${label}: agent-desktop no longer finds the window these element numbers belong to; call desktop_snapshot for ${target.app} again and use its new numbers`,
@@ -464,7 +455,7 @@ export class DesktopAccessibility {
           await go('set-value', '--', ref, action.value);
           return delivered;
         } catch (error) {
-          if (!(error instanceof Stop) || error.code !== ACTION_NOT_SUPPORTED) throw error;
+          if (!(error instanceof ScreenStop) || error.code !== ACTION_NOT_SUPPORTED) throw error;
         }
         await this.focusWindow(run, target, label, ran);
         await go('focus', '--headed', '--', ref);
@@ -513,14 +504,14 @@ export class DesktopAccessibility {
       case 'wait': {
         const remaining = run.endsAt - this.now();
         if (remaining < action.ms) {
-          throw new Stop({
+          throw new ScreenStop({
             kind: 'error',
             message: `${label} would outlive the call deadline; it did not run`,
             delivery: ran > 0 ? 'unknown' : 'not_delivered',
           });
         }
         await sleep(action.ms, undefined, { signal: run.signal }).catch(() => {
-          throw new Stop({
+          throw new ScreenStop({
             kind: 'error',
             message: 'The call was cancelled during a wait',
             delivery: 'unknown',
@@ -551,7 +542,7 @@ class Runner {
   async read(args: readonly string[]): Promise<unknown> {
     const envelope = await this.execute(args, `agent-desktop ${args[0]}`, 0);
     if (!envelope.ok) {
-      throw new Stop(
+      throw new ScreenStop(
         {
           kind: 'error',
           message: clip(JSON.stringify(envelope.error), SCREEN_ERROR_MESSAGE_MAX_CHARS),
@@ -568,7 +559,7 @@ class Runner {
     if (envelope.ok) return envelope.data;
     const retry = envelope.error?.disposition?.retry;
     const completed = ran > 0 ? ` ${ran} earlier action(s) already ran.` : '';
-    throw new Stop(
+    throw new ScreenStop(
       {
         kind: 'error',
         message: clip(
@@ -585,7 +576,7 @@ class Runner {
     const timeoutMs = Math.min(COMMAND_TIMEOUT_MS, this.budget.endsAt - this.now());
     const delivery = ran > 0 ? 'unknown' : 'not_delivered';
     if (timeoutMs < 1) {
-      throw new Stop({
+      throw new ScreenStop({
         kind: 'error',
         message: 'The call deadline passed before the next step could run',
         delivery,
@@ -600,7 +591,7 @@ class Runner {
       });
     } catch (error) {
       if (error instanceof ComputerRefusal) {
-        throw new Stop({
+        throw new ScreenStop({
           kind: 'error',
           message: clip(error.message, SCREEN_ERROR_MESSAGE_MAX_CHARS),
           delivery: ran > 0 ? 'unknown' : error.delivery,
@@ -620,7 +611,7 @@ class Runner {
       }
       size += event.text.length;
       if (size > SCREEN_OUTPUT_CAP_BYTES) {
-        throw new Stop({
+        throw new ScreenStop({
           kind: 'error',
           message: `${label} produced more output than the ${SCREEN_OUTPUT_CAP_BYTES} byte cap`,
           delivery,
@@ -629,9 +620,9 @@ class Runner {
       if (event.kind === 'stdout') stdout += event.text;
     }
     if (code === COMMAND_NOT_FOUND)
-      throw new Stop({ kind: 'error', message: DESKTOP_NOT_INSTALLED, delivery });
+      throw new ScreenStop({ kind: 'error', message: DESKTOP_NOT_INSTALLED, delivery });
     if (stopped) {
-      throw new Stop({
+      throw new ScreenStop({
         kind: 'error',
         message: `${label} timed out or was cancelled and agent-desktop was killed`,
         delivery: 'unknown',
@@ -641,7 +632,7 @@ class Runner {
       const envelope = JSON.parse(stdout) as Envelope;
       if (typeof envelope?.ok === 'boolean') return envelope;
     } catch {}
-    throw new Stop({
+    throw new ScreenStop({
       kind: 'error',
       message: `${label} returned output that is not an agent-desktop JSON envelope`,
       delivery: ran > 0 ? 'unknown' : delivery,

@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { parseClaudeMcpEntries } from '@cairn/shared';
 import { parse as parseToml } from 'smol-toml';
 import { z } from 'zod';
-import { claudeConfigHome } from './runtime-homes.js';
+import { agentConfigImportMarker, claudeConfigHome } from './runtime-homes.js';
 
 const IMPORT_VERSION = 1;
 const SECRET_KEY =
@@ -40,13 +40,9 @@ export interface AgentConfigImportOptions {
   force?: boolean;
 }
 
-function markerPath(cairnHome: string): string {
-  return join(cairnHome, 'imports', 'agent-config.json');
-}
-
 export function agentConfigImportDone(cairnHome: string): boolean {
   try {
-    markerSchema.parse(JSON.parse(readFileSync(markerPath(cairnHome), 'utf8')));
+    markerSchema.parse(JSON.parse(readFileSync(agentConfigImportMarker(cairnHome), 'utf8')));
     return true;
   } catch {
     return false;
@@ -342,7 +338,11 @@ export function importAgentConfig(
 
   try {
     mkdirSync(join(cairnHome, 'imports'), { recursive: true });
-    writeJson(markerPath(cairnHome), { version: IMPORT_VERSION, at: Date.now(), ...report });
+    writeJson(agentConfigImportMarker(cairnHome), {
+      version: IMPORT_VERSION,
+      at: Date.now(),
+      ...report,
+    });
   } catch {
     return report;
   }
