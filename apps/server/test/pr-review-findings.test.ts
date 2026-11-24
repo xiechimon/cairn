@@ -5,6 +5,7 @@ import {
   CAIRN_REVIEW_HOLD_LABEL,
   isReviewBotAuthor,
   reviewFindingBadge,
+  WORKFLOW_PUSH_REFUSAL,
 } from '@cairn/shared';
 import { eq, ne } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
@@ -15,7 +16,12 @@ import { type AppToken, type AutonomousToken, registerAppToken } from '../src/li
 import { recordAnswer } from '../src/services/answer-delivery.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { desiredAction, reconcilePrReviewFindings } from '../src/services/pr-review-findings.js';
-import { CAP_REVIEW_FOCUS, createPrWakes, focusedCodexReview } from '../src/services/pr-wakes.js';
+import {
+  CAP_REVIEW_FOCUS,
+  createPrWakes,
+  focusedCodexReview,
+  settlePrWakeNotices,
+} from '../src/services/pr-wakes.js';
 import { createPrWatch } from '../src/services/pr-watch.js';
 import { writeWorkerQuestion } from '../src/services/worker-question-store.js';
 import { stubGithubApp } from './github-identity-fixture.js';
@@ -250,6 +256,7 @@ function fixture() {
     row: row(),
     fetch,
     token: state.token as AutonomousToken,
+    resolveToken: async () => state.token as AutonomousToken,
     owner: 'o',
     repo: 'r',
     now: 1000,
@@ -297,6 +304,42 @@ test.each(['P2', 'P3'])(
     expect(f.s.db.select().from(step).get()?.prompt).toContain(f.state.body);
   },
 );
+
+test('fresh PR feedback does not restart a workflow-refused build', async () => {
+  const f = fixture();
+  f.s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, 't')).run();
+  f.s.db.update(build).set({ errorMessage: WORKFLOW_PUSH_REFUSAL }).where(eq(build.id, 'b')).run();
+
+  await f.wake();
+
+  expect(f.s.db.select().from(step).where(ne(step.kind, 'chief')).all()).toEqual([]);
+  expect(f.s.db.select().from(build).where(eq(build.id, 'b')).get()?.errorMessage).toBe(
+    WORKFLOW_PUSH_REFUSAL,
+  );
+  expect(f.s.db.select().from(todo).where(eq(todo.id, 't')).get()?.phase).toBe('failed');
+  expect(f.row().wakeRounds).toBe(0);
+});
+
+test('a pending PR wake notice does not overwrite a workflow refusal', () => {
+  const f = fixture();
+  f.s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, 't')).run();
+  f.s.db.update(build).set({ errorMessage: WORKFLOW_PUSH_REFUSAL }).where(eq(build.id, 'b')).run();
+  const id = `pr-wakes:${f.row().teamId}:o/r#3377`;
+  const pendingNotice = { buildId: 'b', content: 'PR Auto-fix needs you: review round cap' };
+  f.s.db
+    .insert(message)
+    .values({ id, conversationId: id, role: 'system', content: { pendingNotice }, createdAt: 1 })
+    .run();
+
+  settlePrWakeNotices(f.s.svc, f.row().teamId);
+
+  expect(f.s.db.select().from(build).where(eq(build.id, 'b')).get()?.errorMessage).toBe(
+    WORKFLOW_PUSH_REFUSAL,
+  );
+  expect(f.s.db.select().from(message).where(eq(message.id, id)).get()?.content).toMatchObject({
+    pendingNotice,
+  });
+});
 
 test('a wake whose events are a conflict and a review marks both reasons on the enqueued step', async () => {
   const f = fixture();

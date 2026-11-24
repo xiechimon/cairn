@@ -1,11 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep } from '@cairn/shared';
-import {
-  claimedStepSchema,
-  GITHUB_ACCESS_TOKEN_USERNAME,
-  machineTokenResponseSchema,
-} from '@cairn/shared';
+import { claimedStepSchema, machineTokenResponseSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
 import { afterAll, describe, expect, test } from 'vitest';
@@ -13,8 +9,9 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   apiKey as apiKeyTable,
-  githubConnection,
+  build as buildTable,
   project as projectTable,
+  step as stepTable,
 } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
@@ -47,8 +44,10 @@ afterAll(() => {
 
 interface WireWorld {
   s: TestServer;
-  machineToken: string;
+  buildId: string;
+  claimRaw(): Promise<Response>;
   claim(): Promise<ClaimedStep>;
+  tokenRaw(stepId: string): Promise<Response>;
   tokenOf(
     stepId: string,
   ): Promise<{ raw: string; git: { username: string; password: string } | null }>;
@@ -94,20 +93,35 @@ async function setupWorld(
     body: { todoIds: [todoBody.id] },
   });
   expect(buildRes.status).toBe(201);
+  const { builds } = (await buildRes.json()) as { builds: { id: string }[] };
+  const buildId = builds[0]?.id;
+  if (buildId === undefined) throw new Error('build creation returned no build');
+  const claimRaw = () =>
+    call(s.app, 'POST', '/api/machine/tasks/claim', { cred: machineToken, body: {} });
+  async function tokenRaw(stepId: string): Promise<Response> {
+    const generation = s.db
+      .select({ claimedAt: stepTable.claimedAt })
+      .from(stepTable)
+      .where(eq(stepTable.id, stepId))
+      .get()?.claimedAt;
+    return call(s.app, 'GET', `/api/machine/token/${stepId}?generation=${generation}`, {
+      cred: machineToken,
+    });
+  }
   return {
     s,
-    machineToken,
+    buildId,
+    claimRaw,
+    tokenRaw,
     async claim() {
-      const res = await call(s.app, 'POST', '/api/machine/tasks/claim', {
-        cred: machineToken,
-        body: {},
-      });
+      const res = await claimRaw();
+      expect(res.status).toBe(200);
       const body = (await res.json()) as { step: ClaimedStep | null };
       if (!body.step) throw new Error('claim returned no step');
       return claimedStepSchema.parse(body.step);
     },
     async tokenOf(stepId) {
-      const res = await call(s.app, 'GET', `/api/machine/token/${stepId}`, { cred: machineToken });
+      const res = await tokenRaw(stepId);
       expect(res.status).toBe(200);
       const raw = await res.text();
       const parsed = machineTokenResponseSchema.parse(JSON.parse(raw));
@@ -135,8 +149,13 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
     expect(git).toBeNull();
   });
 
-  test('failure mode 2: github project + connection row -> token git {x-access-token, token}; no gitAccess key sent', async () => {
-    const w = await setupWorld({ name: 'g2t2-gh', kind: 'github', githubRepo: 'octo/alpha' });
+  test('failure mode 2: github project + connection row without an App socket -> 503; the OAuth token never reaches the runner', async () => {
+    const w = await setupWorld(
+      { name: 'g2t2-gh', kind: 'github', githubRepo: 'octo/alpha' },
+      {
+        githubFetch: async () => Response.json({ id: 4242, full_name: 'octo/alpha' }),
+      },
+    );
     upsertGithubConnection(
       { db: w.s.db, box: w.s.secretBox },
       { teamId: w.s.team.id, login: 'octo', accessToken: GH_TOKEN, scope: 'repo' },
@@ -146,46 +165,57 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
       kind: 'github',
       cloneUrl: 'https://github.com/octo/alpha.git',
     });
-    const { git } = await w.tokenOf(claimed.step.id);
-    expect(git).toEqual({
-      username: GITHUB_ACCESS_TOKEN_USERNAME,
-      password: GH_TOKEN,
-      kind: 'unattributed',
-    });
+    const res = await w.tokenRaw(claimed.step.id);
+    expect(res.status).toBe(503);
+    expect(await res.text()).not.toContain(GH_TOKEN);
     const gitKeys = w.s.db.select().from(apiKeyTable).where(eq(apiKeyTable.gitAccess, true)).all();
     expect(gitKeys).toHaveLength(0);
   });
 
-  test('failure mode 3: github project with no connection row -> token git null', async () => {
+  test('failure mode 3: github project with no connection row and no App socket -> 503', async () => {
     const w = await setupWorld({ name: 'g2t2-gh-anon', kind: 'github', githubRepo: 'octo/beta' });
-    const claimed = await w.claim();
-    const { git } = await w.tokenOf(claimed.step.id);
-    expect(git).toBeNull();
+    const res = await w.claimRaw();
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ reason: 'app-token-unconfigured' });
+    const failed = w.s.db.select().from(stepTable).where(eq(stepTable.buildId, w.buildId)).get();
+    expect(failed).toMatchObject({ status: 'failed', machineId: null, claimedRepoId: null });
+    const build = w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get();
+    expect(build?.errorMessage).toContain('GitHub repository lookup has no read credential');
+    const next = await w.claimRaw();
+    expect(next.status).toBe(200);
+    expect(await next.json()).toEqual({ step: null });
   });
 
-  test('failure mode 4: token plaintext appears only in the git.password slot (no leak on other wire slots)', async () => {
-    const w = await setupWorld({ name: 'g2t2-gh-leak', kind: 'github', githubRepo: 'octo/gamma' });
+  test('failure mode 4: the connection token never appears on the runner wire (no leak on any slot)', async () => {
+    const w = await setupWorld(
+      { name: 'g2t2-gh-leak', kind: 'github', githubRepo: 'octo/gamma' },
+      {
+        githubFetch: async () => Response.json({ id: 4242, full_name: 'octo/gamma' }),
+      },
+    );
     upsertGithubConnection(
       { db: w.s.db, box: w.s.secretBox },
       { teamId: w.s.team.id, login: 'octo', accessToken: GH_TOKEN, scope: 'repo' },
     );
     const claimed = await w.claim();
-    const { raw } = await w.tokenOf(claimed.step.id);
-    expect(raw.split(GH_TOKEN)).toHaveLength(2);
+    const res = await w.tokenRaw(claimed.step.id);
+    expect(res.status).toBe(503);
+    expect(await res.text()).not.toContain(GH_TOKEN);
     expect(JSON.stringify(claimed)).not.toContain(GH_TOKEN);
   });
 
-  test('github project with an expired access token -> token git carries the refreshed access token', async () => {
-    const refreshed = 'ghu_refreshed_for_machine';
+  test('github project with an expired access token -> the runner path fails closed without touching the OAuth refresh', async () => {
     const refreshBodies: string[] = [];
     const w = await setupWorld(
       { name: 'g2t2-gh-expired', kind: 'github', githubRepo: 'octo/delta' },
       {
         oauthClient: { clientId: 'cid', clientSecret: 'cs' },
-        githubFetch: async (_input, init) => {
-          refreshBodies.push(init?.body ?? '');
+        githubFetch: async (input, init) => {
+          if (String(input).endsWith('/repos/octo/delta'))
+            return Response.json({ id: 4242, full_name: 'octo/delta' });
+          if (init?.body !== undefined) refreshBodies.push(String(init.body));
           const payload = {
-            access_token: refreshed,
+            access_token: 'ghu_refreshed_for_machine',
             refresh_token: 'ghr_next',
             expires_in: 28_800,
           };
@@ -211,15 +241,12 @@ describe('G2-T2 claim/token execution-surface wiring (spec 12)', () => {
       },
     );
     const claimed = await w.claim();
-    const { git } = await w.tokenOf(claimed.step.id);
-    expect(git).toEqual({
-      username: GITHUB_ACCESS_TOKEN_USERNAME,
-      password: refreshed,
-      kind: 'unattributed',
-    });
-    expect(refreshBodies).toHaveLength(1);
-    expect(refreshBodies[0]).toContain('refresh_token=ghr_first');
-    const row = w.s.db.select().from(githubConnection).get();
-    expect(row?.disconnectedReason).toBeNull();
+    const refreshesAtClaim = refreshBodies.length;
+    const res = await w.tokenRaw(claimed.step.id);
+    expect(res.status).toBe(503);
+    const body = await res.text();
+    expect(body).not.toContain(GH_TOKEN);
+    expect(body).not.toContain('ghu_refreshed_for_machine');
+    expect(refreshBodies).toHaveLength(refreshesAtClaim);
   });
 });

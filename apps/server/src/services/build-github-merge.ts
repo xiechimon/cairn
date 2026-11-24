@@ -205,7 +205,7 @@ export async function mergeThroughGithub(
     const closing = apiMergeGate(deps, row);
     await ensurePullClosesTaskIssue(
       fetchImpl,
-      token,
+      () => Promise.resolve(token),
       repoRef,
       prNumber,
       closing.todoRow,

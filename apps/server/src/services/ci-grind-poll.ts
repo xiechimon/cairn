@@ -10,7 +10,7 @@ import type { KnownRows } from './ci-known-rows.js';
 import { freshGrindRow, githubTarget, pushNotSeen } from './ci-loop-rows.js';
 import type { CiPollCandidate, CiPollRun, CiPollTally, PullCacheEntry } from './ci-poll-types.js';
 import { mergeConflictRound } from './ci-pr-rounds.js';
-import { autonomousToken } from './github-autonomous-token.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import { githubText } from './github-text.js';
 import { setTodoPhase } from './todos.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
@@ -56,7 +56,7 @@ export function createGrindPoller(
       tally.skipped += 1;
       return;
     }
-    const grindToken = await autonomousToken(
+    const grindToken = await githubReadToken(
       { ...deps, githubFetch: run.githubFetch },
       target.teamId,
       target,

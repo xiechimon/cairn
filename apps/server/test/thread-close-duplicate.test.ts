@@ -1,7 +1,7 @@
 import { type ClaimedStep, WORKER_REMOTE_TOOLS_GITHUB } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
@@ -10,7 +10,12 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
+import { githubFake } from './fakes/github.js';
+import { stubGithubApp } from './github-identity-fixture.js';
 import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
+
+const REPO = 'owner/repo';
+afterEach(() => vi.restoreAllMocks());
 
 async function call(
   app: Hono,
@@ -31,7 +36,10 @@ async function call(
 }
 
 async function world(repoKind: 'github' | 'local' = 'github') {
-  const s = bootServer({ claimHoldMs: 250 });
+  const s = bootServer({
+    claimHoldMs: 250,
+    githubFetch: githubFake(REPO, { repositoryId: 4242 }).impl,
+  });
   const plain = await issueApiKey(s);
   const enroll = await call(s.app, 'POST', '/api/machine/enroll', {
     cred: plain,
@@ -41,9 +49,10 @@ async function world(repoKind: 'github' | 'local' = 'github') {
   seedSessionRoute(s, { provider: 'p', modelId: 'm' });
   const projectId = await postProject(s.app);
   if (repoKind === 'github') {
+    stubGithubApp(null);
     s.db
       .update(projectTable)
-      .set({ repoKind: 'github', githubRepo: 'owner/repo' })
+      .set({ repoKind: 'github', githubRepo: REPO })
       .where(eq(projectTable.id, projectId))
       .run();
   }

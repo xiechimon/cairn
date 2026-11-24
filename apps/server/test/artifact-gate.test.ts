@@ -21,6 +21,7 @@ import {
 } from '../src/db/schema.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   seedRoute,
@@ -92,7 +93,10 @@ async function setupWorld() {
     return claimedStepSchema.parse(body.step);
   }
   async function done(stepId: string, body: Record<string, unknown>): Promise<void> {
-    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: token,
+      body: { generation: claimedGeneration(s.db, stepId), ...body },
+    });
     expect(res.status).toBe(200);
   }
   async function uploadPlan(stepId: string, content: string): Promise<void> {
@@ -293,6 +297,7 @@ describe('delivery checks (B-C11/B-C14): zero changes / fake completion -> compl
           kind: 'review',
           status: 'claimed',
           machineId: buildStep.step.machineId,
+          claimedAt: Date.now(),
           createdAt: Date.now(),
         })
         .run();

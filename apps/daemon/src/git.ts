@@ -210,6 +210,7 @@ export function isGitAuthFailure(message: string): boolean {
 const GIT_PERMANENT_FAILURE_PATTERNS: readonly RegExp[] = [
   /returned error: (?:403|404)\b/,
   /\berror: (?:403|404)\b/,
+  /remote rejected/,
   /ssl certificate problem/,
   /server certificate verification failed/,
   /repository not found/,
@@ -223,10 +224,21 @@ function isPushRejectedNoFastForward(message: string): boolean {
   return /(?:non-fast-forward|fetch first)/.test(message);
 }
 
-export function isGitTransientNetFailure(message: string): boolean {
+export function isGitWorkflowPermissionRejection(message: string): boolean {
+  return /without [`'"]?workflows[`'"]? permission/i.test(message);
+}
+
+export function isGitPermanentFailure(message: string): boolean {
   const lower = message.toLowerCase();
+  return (
+    isGitWorkflowPermissionRejection(message) ||
+    GIT_PERMANENT_FAILURE_PATTERNS.some((re) => re.test(lower))
+  );
+}
+
+export function isGitTransientNetFailure(message: string): boolean {
   if (isGitAuthFailure(message)) return false;
-  return !GIT_PERMANENT_FAILURE_PATTERNS.some((re) => re.test(lower));
+  return !isGitPermanentFailure(message);
 }
 
 export type GitFallbackReason = string;

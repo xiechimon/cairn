@@ -1,13 +1,14 @@
 import type { NeedsYouReason, NotificationRecord, UserRecord } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { chiefThread, noticeMark, notification, todo as todoTable } from '../db/schema.js';
 import { notFound } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import type { TeamStreamHub } from './events.js';
 import { imNotice } from './im/runtime.js';
 
-export interface NotificationDeps {
+export interface NotificationDeps extends CommitEffects {
   db: Db;
   hub: TeamStreamHub;
   user: UserRecord;
@@ -241,7 +242,7 @@ export function notifyChiefMessage(
     agent: input.agent,
     snippet: input.message,
   });
-  imNotice(input.threadId, input.message, input.card);
+  runAfterCommit(deps, 'imNotice', () => imNotice(input.threadId, input.message, input.card));
   return record;
 }
 

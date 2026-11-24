@@ -12,6 +12,8 @@ import { build, plan as planTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { NotFoundError } from './builds.js';
+import { assertMachineClaim } from './machine-claim-scope.js';
+import { withFencedTransaction } from './machine-deps.js';
 import { authorizeRepoArchiveUpload } from './machine-repo-archive.js';
 import {
   isChiefConversation,
@@ -28,6 +30,7 @@ export interface PendingUpload {
   stepId: string;
   name: string;
   machineId: string;
+  generation?: number;
 }
 
 export function createUploadUrls(
@@ -37,6 +40,7 @@ export function createUploadUrls(
   files: { name: string }[],
   origin: string,
   uploads: Map<string, PendingUpload>,
+  generation?: number,
 ): { uploads: { name: string; url: string; method: 'PUT'; headers: Record<string, string> }[] } {
   const archiveNames = [REPO_ARCHIVE_FILE_NAME, REPO_ARCHIVE_FAILED_FILE_NAME];
   if (files.some((f) => archiveNames.includes(f.name))) {
@@ -45,11 +49,11 @@ export function createUploadUrls(
     }
     authorizeRepoArchiveUpload(deps.machineHub, machineId, stepId);
   } else {
-    ownedStepRow(deps, machineId, stepId);
+    assertMachineClaim(deps, { machineId, stepId, generation });
   }
   const out = files.map((f) => {
     const uploadId = newRecordId();
-    uploads.set(uploadId, { stepId, name: f.name, machineId });
+    uploads.set(uploadId, { stepId, name: f.name, machineId, generation });
     return {
       name: f.name,
       url: `${origin}/api/machine/upload/${uploadId}`,
@@ -61,6 +65,13 @@ export function createUploadUrls(
 }
 
 export function receivePlanUpload(deps: MachineDeps, upload: PendingUpload, content: string): void {
+  withFencedTransaction(deps, (settled) => {
+    assertMachineClaim(settled, upload);
+    storePlanUpload(settled, upload, content);
+  });
+}
+
+function storePlanUpload(deps: MachineDeps, upload: PendingUpload, content: string): void {
   const stepRow = ownedStepRow(deps, upload.machineId, upload.stepId);
   if (stepRow.kind !== 'plan') {
     throw new HttpError(400, `step ${upload.stepId} is a ${stepRow.kind} step, not a plan step`);
@@ -108,6 +119,17 @@ export function receiveUpload(
   upload: PendingUpload,
   body: TranscriptUpload,
 ): void {
+  withFencedTransaction(deps, (settled) => {
+    assertMachineClaim(settled, upload);
+    storeTranscriptUpload(settled, upload, body);
+  });
+}
+
+function storeTranscriptUpload(
+  deps: MachineDeps,
+  upload: PendingUpload,
+  body: TranscriptUpload,
+): void {
   ownedStep(deps, upload.machineId, upload.stepId);
   if (body.stepId !== upload.stepId) throw new NotFoundError(`upload for step ${upload.stepId}`);
   const stepRow = deps.db.select().from(step).where(eq(step.id, upload.stepId)).get();
@@ -148,6 +170,13 @@ export function receiveSessionUpload(
   upload: PendingUpload,
   content: string,
 ): void {
+  withFencedTransaction(deps, (settled) => {
+    assertMachineClaim(settled, upload);
+    storeSessionUpload(settled, upload, content);
+  });
+}
+
+function storeSessionUpload(deps: MachineDeps, upload: PendingUpload, content: string): void {
   ownedStep(deps, upload.machineId, upload.stepId);
   const size = Buffer.byteLength(content, 'utf8');
   if (size > SESSION_JSONL_MAX_BYTES) {

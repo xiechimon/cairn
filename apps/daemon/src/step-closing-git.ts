@@ -29,7 +29,7 @@ export interface ClosingGitOutcome {
   branchDrift: { expected: string; actual: string } | null;
   artifactBranches: string[];
   hasChanges: boolean | null;
-  error: unknown;
+  error: { cause: unknown; duringPush: boolean } | null;
 }
 
 export async function commitAndPushStep(input: ClosingGitInput): Promise<ClosingGitOutcome> {
@@ -41,6 +41,7 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
     hasChanges: null,
     error: null,
   };
+  let duringPush = false;
   try {
     const headBranch = (await git.currentBranch?.(ws.cwd)) ?? null;
     if (headBranch !== null && headBranch !== ws.branch) {
@@ -84,7 +85,9 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
       );
       log(`push skipped: agent lacks ${AGENT_TOOL_PUSH} permission`);
     } else if (pushWarranted) {
+      duringPush = true;
       const pushSource = await input.push();
+      duringPush = false;
       if (pushSource === 'machine' && claimed.project?.repo?.kind === 'github') {
         note(`git-credential-${stepId}`, gitCredentialRowContent('machine'));
       }
@@ -120,7 +123,7 @@ export async function commitAndPushStep(input: ClosingGitInput): Promise<Closing
     }
     outcome.hasChanges = headAhead > 0 || outcome.artifactBranches.length > 0;
   } catch (err) {
-    outcome.error = err;
+    outcome.error = { cause: err, duringPush };
   }
   return outcome;
 }

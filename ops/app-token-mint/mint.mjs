@@ -6,6 +6,8 @@ import { createConnection } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { appTokenScopeKey, isGithubRepositoryFullName } from './scope-key.mjs';
+import { createScopedTokenCache } from './scoped-cache.mjs';
 
 export function buildJwt(appId, privateKey, now = Date.now()) {
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
@@ -34,13 +36,78 @@ export function canReuseToken(cached, now = Date.now()) {
   );
 }
 
+const ERROR_MESSAGE_LIMIT = 500;
+
 function safeMessage(value, secrets) {
   let message = typeof value === 'string' ? value : 'request failed';
   for (const secret of secrets) if (secret) message = message.split(secret).join('[redacted]');
   return message
     .replace(/-----BEGIN[\s\S]*?-----END[^-]*-----/g, '[redacted]')
-    .replace(/(?:ghs_|ghp_|github_pat_)[A-Za-z0-9_]+/g, '[redacted]')
-    .slice(0, 500);
+    .replace(/(?:ghs_|ghp_|github_pat_)[A-Za-z0-9_]+/g, '[redacted]');
+}
+
+function cachedTokenIndex() {
+  const byLength = new Map();
+  return {
+    track(token, change) {
+      const bucket = byLength.get(token.length) ?? new Map();
+      const count = (bucket.get(token) ?? 0) + change;
+      if (count > 0) bucket.set(token, count);
+      else bucket.delete(token);
+      if (bucket.size > 0) byLength.set(token.length, bucket);
+      else byLength.delete(token.length);
+    },
+    redact(message) {
+      let result = '';
+      for (let offset = 0; offset < message.length && result.length < ERROR_MESSAGE_LIMIT;) {
+        let matchedLength = 0;
+        for (const [length, bucket] of byLength) {
+          if (length > matchedLength && bucket.has(message.slice(offset, offset + length)))
+            matchedLength = length;
+        }
+        if (matchedLength === 0) result += message[offset++];
+        else {
+          result += '[redacted]';
+          offset += matchedLength;
+        }
+      }
+      return result.slice(0, ERROR_MESSAGE_LIMIT);
+    },
+  };
+}
+
+function mintedRepositories(value, owner, repository, repositoryId) {
+  if (
+    !Array.isArray(value) ||
+    value.length !== 1 ||
+    !isGithubRepositoryFullName(value[0]?.full_name)
+  )
+    throw new Error('GitHub 201: invalid token response');
+  if (repositoryId === undefined) {
+    if (value[0].full_name.toLowerCase() !== `${owner}/${repository}`.toLowerCase())
+      throw new Error('GitHub 201: invalid token response');
+  } else if (value[0].id !== repositoryId) {
+    throw new Error('GitHub 201: invalid token response');
+  }
+  return [value[0].full_name];
+}
+
+function mintedPermissions(value, requested) {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    Array.isArray(value) ||
+    Object.values(value).some((level) => typeof level !== 'string')
+  )
+    throw new Error('GitHub 201: invalid token response');
+  const granted = Object.keys(value).sort();
+  const names = Object.keys(requested).sort();
+  if (
+    granted.length !== names.length ||
+    granted.some((name, index) => name !== names[index] || value[name] !== requested[name])
+  )
+    throw new Error('GitHub 201: invalid token response');
+  return value;
 }
 
 export function createTokenSource(
@@ -48,12 +115,17 @@ export function createTokenSource(
   privateKey,
   { fetchImpl = globalThis.fetch, now = Date.now } = {},
 ) {
-  let cached = null;
-  let pending = null;
+  const tokens = cachedTokenIndex();
+  const scopedToken = createScopedTokenCache({
+    now,
+    reuseUntil: (entry) => Date.parse(entry.expiresAt) - 300_000,
+    onInsert: (entry) => tokens.track(entry.token, 1),
+    onRemove: (entry) => tokens.track(entry.token, -1),
+  });
   let appSlug = null;
-  async function mint() {
+  async function mint(owner, repository, permissions, repositoryId) {
     const jwt = buildJwt(config.appId, privateKey, now());
-    async function github(path, method) {
+    async function github(path, method, body) {
       let response;
       try {
         response = await fetchImpl(`https://api.github.com${path}`, {
@@ -63,7 +135,9 @@ export function createTokenSource(
             accept: 'application/vnd.github+json',
             'x-github-api-version': '2022-11-28',
             'user-agent': 'cairn-app-token-mint',
+            ...(body === undefined ? {} : { 'content-type': 'application/json' }),
           },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
           signal: AbortSignal.timeout(15_000),
           redirect: 'error',
         });
@@ -76,10 +150,19 @@ export function createTokenSource(
       } catch {
         throw new Error(`GitHub ${response.status}: invalid JSON`);
       }
-      if (!response.ok)
-        throw new Error(
-          `GitHub ${response.status}: ${safeMessage(data?.message, [privateKey, jwt, cached?.token, data?.token])}`,
+      if (!response.ok) {
+        const error = new Error(
+          `GitHub ${response.status}: ${tokens.redact(safeMessage(data?.message, [privateKey, jwt, data?.token]))}`,
         );
+        error.status = response.status;
+        if (
+          response.status === 422 &&
+          typeof data?.message === 'string' &&
+          data.message.includes(REPO_NOT_INSTALLED_MESSAGE)
+        )
+          error.code = 'repo-not-installed';
+        throw error;
+      }
       return data;
     }
     if (appSlug === null) {
@@ -88,7 +171,15 @@ export function createTokenSource(
         throw new Error('GitHub 200: invalid app slug');
       appSlug = app.slug;
     }
-    const data = await github(`/app/installations/${config.installationId}/access_tokens`, 'POST');
+    const scope =
+      repositoryId === undefined
+        ? { repositories: [repository], permissions }
+        : { repository_ids: [repositoryId], permissions };
+    const data = await github(
+      `/app/installations/${config.installationId}/access_tokens`,
+      'POST',
+      scope,
+    );
     const result = {
       token: data.token,
       expiresAt: data.expires_at,
@@ -97,20 +188,88 @@ export function createTokenSource(
     };
     if (typeof result.token !== 'string' || !result.token || !canReuseToken(result, now()))
       throw new Error('GitHub 201: invalid token response');
-    cached = result;
-    return result;
+    result.repositories = mintedRepositories(data.repositories, owner, repository, repositoryId);
+    if (typeof data.repositories?.[0]?.id === 'number')
+      result.repositoryId = data.repositories[0].id;
+    result.permissions = mintedPermissions(data.permissions, permissions);
+    return Object.freeze(result);
   }
-  return async (force = false) => {
-    if (force) cached = null;
-    if (pending !== null) return pending;
-    if (canReuseToken(cached, now())) return cached;
-    pending = mint();
-    try {
-      return await pending;
-    } finally {
-      pending = null;
-    }
+  return async ({
+    force = false,
+    owner = null,
+    repository = null,
+    permissions = null,
+    repositoryId = undefined,
+  } = {}) => {
+    if (repository === null || owner === null) throw new Error('token repository required');
+    if (permissions === null) throw new Error('token permissions required');
+    if (!validScope(owner, repository, permissions, repositoryId))
+      throw new Error('invalid token scope');
+    const grants = Object.freeze({ ...permissions });
+    const rid = repositoryId === undefined ? undefined : Number(repositoryId);
+    const key = appTokenScopeKey(owner, repository, rid, grants);
+    return scopedToken(key, force, () => mint(owner, repository, grants, rid));
   };
+}
+
+const GRANT_PATTERN = /^[a-z_]+$/;
+const REPO_NOT_INSTALLED_MESSAGE =
+  'repository that does not exist or is not accessible to the parent installation';
+
+function validScope(owner, repository, permissions, repositoryId = undefined) {
+  if (
+    repositoryId !== undefined &&
+    (typeof repositoryId === 'number'
+      ? !Number.isSafeInteger(repositoryId) || repositoryId <= 0
+      : typeof repositoryId !== 'string' ||
+        !/^[1-9]\d*$/.test(repositoryId) ||
+        !Number.isSafeInteger(Number(repositoryId)))
+  )
+    return false;
+  if (
+    typeof owner !== 'string' ||
+    typeof repository !== 'string' ||
+    !isGithubRepositoryFullName(`${owner}/${repository}`) ||
+    typeof permissions !== 'object' ||
+    permissions === null ||
+    Array.isArray(permissions)
+  )
+    return false;
+  const entries = Object.entries(permissions);
+  return (
+    entries.length > 0 &&
+    entries.every(
+      ([name, level]) => GRANT_PATTERN.test(name) && (level === 'read' || level === 'write'),
+    )
+  );
+}
+
+function tokenScope(searchParams) {
+  const repositories = searchParams.getAll('repository');
+  if (repositories.length !== 1) return null;
+  const owners = searchParams.getAll('owner');
+  if (owners.length !== 1) return null;
+  const permissions = searchParams.getAll('permissions');
+  if (permissions.length !== 1) return null;
+  const entries = [];
+  const seen = new Set();
+  for (const entry of permissions[0].split(',')) {
+    const match = /^([a-z_]+):(read|write)$/.exec(entry);
+    if (match === null || seen.has(match[1])) return null;
+    seen.add(match[1]);
+    entries.push([match[1], match[2]]);
+  }
+  const repositoryIds = searchParams.getAll('repository_id');
+  if (repositoryIds.length > 1) return null;
+  const scope = {
+    owner: owners[0],
+    repository: repositories[0],
+    permissions: Object.fromEntries(entries),
+    ...(repositoryIds.length === 1 ? { repositoryId: repositoryIds[0] } : {}),
+  };
+  return validScope(scope.owner, scope.repository, scope.permissions, scope.repositoryId)
+    ? scope
+    : null;
 }
 
 function socketAnswers(path) {
@@ -177,14 +336,43 @@ export async function startMint(config, options = {}) {
       res.end(JSON.stringify({ ok: true }));
       return;
     }
-    if (req.method !== 'GET' || req.url !== '/token') {
+    let url;
+    try {
+      url = new URL(req.url ?? '/', 'http://localhost');
+    } catch {
+      res.writeHead(400).end(JSON.stringify({ error: 'invalid request target' }));
+      return;
+    }
+    if (req.method !== 'GET' || url.pathname !== '/token') {
       res.writeHead(404).end(JSON.stringify({ error: 'not found' }));
       return;
     }
+    if (!url.searchParams.has('repository')) {
+      res.writeHead(400).end(JSON.stringify({ error: 'token repository required' }));
+      return;
+    }
+    const scope = tokenScope(url.searchParams);
+    if (scope === null) {
+      res.writeHead(400).end(JSON.stringify({ error: 'invalid token scope' }));
+      return;
+    }
     try {
-      res.end(JSON.stringify(await source(req.headers['x-cairn-refresh'] === '1')));
+      res.end(
+        JSON.stringify(await source({ force: req.headers['x-cairn-refresh'] === '1', ...scope })),
+      );
     } catch (error) {
-      res.writeHead(502).end(JSON.stringify({ error: safeMessage(error.message, [privateKey]) }));
+      const message = error instanceof Error ? error.message : String(error);
+      const repoNotInstalled =
+        error instanceof Error && error.status === 422 && error.code === 'repo-not-installed';
+      res
+        .writeHead(repoNotInstalled ? 422 : 502)
+        .end(
+          JSON.stringify(
+            repoNotInstalled
+              ? { error: 'repo-not-installed' }
+              : { error: safeMessage(message, [privateKey]).slice(0, ERROR_MESSAGE_LIMIT) },
+          ),
+        );
     }
   });
   const mask = process.umask(0o177);

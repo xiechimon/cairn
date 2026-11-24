@@ -9,7 +9,7 @@ import {
   hasPullFields,
   isOwnPull,
 } from '../lib/github.js';
-import type { AutonomousToken } from '../lib/github-token.js';
+import type { AppToken, UserToken } from '../lib/github-token.js';
 import { nowMs } from '../lib/ids.js';
 import {
   type BuildDeps,
@@ -36,7 +36,7 @@ import {
   settleMergedPull,
 } from './ci-pr-rounds.js';
 import { DONE_ROW, prClosedUnmergedRow } from './delivery-rows.js';
-import { autonomousToken } from './github-autonomous-token.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import { githubText } from './github-text.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
 
@@ -69,7 +69,7 @@ interface ReviewCase {
   key: string;
   prNumber: number;
   target: ReviewTarget;
-  token: AutonomousToken | null;
+  token: AppToken | UserToken | null;
   pull: ReadPull;
   teamId: string;
   since: number;
@@ -326,7 +326,7 @@ export function createReviewReconciler(
       tally.reviewSkipped += 1;
       return;
     }
-    const token = await autonomousToken(
+    const token = await githubReadToken(
       { ...deps, githubFetch: run.githubFetch },
       target.teamId,
       target,

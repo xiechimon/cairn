@@ -154,6 +154,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
       authMachine,
       's1',
+      claimed?.step.generation,
     );
     expect(tokenRes.antigravityToken).toBeUndefined();
   });
@@ -215,6 +216,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
       machineId,
       'cs1',
+      firstClaim?.step.generation,
     );
     expect(firstToken.antigravityToken).toBe(tokenA);
 
@@ -252,6 +254,7 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
       machineId,
       'cs2',
+      secondClaim?.step.generation,
     );
     expect(secondToken.antigravityToken).toBe(tokenB);
   });

@@ -6,7 +6,7 @@ import {
   buildSecondPrWarningNote,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   build as buildTable,
@@ -17,37 +17,30 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
-import type { FetchLike } from '../src/lib/github.js';
 import { newUuidv7, nowMs } from '../src/lib/ids.js';
 import { requestMerge } from '../src/services/build-merge-request.js';
 import type { BuildDeps } from '../src/services/builds.js';
-import { claimStep, finishStep, type MachineDeps } from '../src/services/machines.js';
-import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
+import { claimStep, type MachineDeps } from '../src/services/machines.js';
+import { githubFake } from './fakes/github.js';
+import { stubGithubApp } from './github-identity-fixture.js';
+import { bootServer, finishStepForClaim, seedSessionRoute } from './helpers.js';
 
 const PR1_URL = 'https://github.com/demo-owner/demo-repo/pull/888';
 const PR1_NUMBER = 888;
 const PR2_URL = 'https://github.com/demo-owner/demo-repo/pull/999';
 const PR2_NUMBER = 999;
+const REPO = 'demo-owner/demo-repo';
+const REPO_PATH = `/repos/${REPO}`;
+
+afterEach(() => vi.restoreAllMocks());
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const d of disposables) d();
 });
 
-interface World {
-  s: TestServer;
-  deps: BuildDeps;
-  machineDeps: MachineDeps;
-  teamId: string;
-  todoId: string;
-  b1Id: string;
-  b2Id: string;
-  machineAId: string;
-  machineBId: string;
-}
-
 interface WorldOpts {
-  githubFetch?: FetchLike;
+  pulls?: Record<number, { state: 'open' | 'closed'; merged: boolean }>;
   b1PrFields?: boolean;
   b2PrFields?: boolean;
   todoPhase?: (typeof todoTable.$inferSelect)['phase'];
@@ -55,8 +48,14 @@ interface WorldOpts {
   stepCount?: number;
 }
 
-function makeWorld(opts: WorldOpts = {}): World {
-  const s = bootServer(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {});
+function makeWorld(opts: WorldOpts = {}) {
+  const github = githubFake(REPO, { repositoryId: 4242 });
+  for (const [number, state] of Object.entries(opts.pulls ?? {})) {
+    github.state.pulls.set(Number(number), state);
+  }
+  const githubFetch = github.impl;
+  const s = bootServer({ githubFetch });
+  stubGithubApp(null);
   disposables.push(() => s.dispose());
   const base = nowMs();
   const suffix = Math.random().toString(36).slice(2);
@@ -73,7 +72,7 @@ function makeWorld(opts: WorldOpts = {}): World {
       name: `second-pr-${suffix}`,
       teamId: s.team.id,
       repoKind: 'github',
-      githubRepo: 'demo-owner/demo-repo',
+      githubRepo: REPO,
     })
     .run();
   for (const [id, name] of [
@@ -159,37 +158,19 @@ function makeWorld(opts: WorldOpts = {}): World {
     ...s.svc,
     reposDir: s.reposDir,
     box: s.secretBox,
-    ...(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {}),
+    githubFetch,
   };
-  const machineDeps = {
+  const machineDeps: MachineDeps = {
     ...s.svc,
     reposDir: s.reposDir,
     attachmentsDir: s.attachmentsDir,
     box: s.secretBox,
-    ...(opts.githubFetch !== undefined ? { githubFetch: opts.githubFetch } : {}),
+    githubFetch,
   };
-  return { s, deps, machineDeps, teamId: s.team.id, todoId, b1Id, b2Id, machineAId, machineBId };
+  return { s, deps, machineDeps, github, teamId: s.team.id, todoId, b1Id, b2Id, machineBId };
 }
 
-function prFetchMock(
-  states: Record<number, { state: 'open' | 'closed'; merged: boolean }>,
-): FetchLike {
-  return (async (url: string) => {
-    for (const [num, st] of Object.entries(states)) {
-      if (String(url).endsWith(`/pulls/${num}`)) {
-        return {
-          ok: true,
-          status: 200,
-          json: async () => ({ state: st.state, merged: st.merged }),
-          headers: { get: () => null },
-        };
-      }
-    }
-    return { ok: false, status: 404, json: async () => ({}), headers: { get: () => null } };
-  }) as unknown as FetchLike;
-}
-
-function messagesOf(w: World, conversationId: string) {
+function messagesOf(w: ReturnType<typeof makeWorld>, conversationId: string) {
   return w.s.db
     .select()
     .from(messageTable)
@@ -197,14 +178,14 @@ function messagesOf(w: World, conversationId: string) {
     .all();
 }
 
-function stepsOf(w: World, buildId: string) {
+function stepsOf(w: ReturnType<typeof makeWorld>, buildId: string) {
   return w.s.db.select().from(stepTable).where(eq(stepTable.buildId, buildId)).all();
 }
 
 describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + backfill surface)', () => {
   test('failure mode 1: the first PR merged -> the next build first-step claim carries the guard + the conv gets a guard note', async () => {
     const w = makeWorld({
-      githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: true } }),
+      pulls: { [PR1_NUMBER]: { state: 'closed', merged: true } },
     });
     const got = (await claimStep(
       w.machineDeps,
@@ -231,7 +212,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
     const w = makeWorld({
       todoPhase: 'queued',
       stepKind: 'plan',
-      githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: true } }),
+      pulls: { [PR1_NUMBER]: { state: 'closed', merged: true } },
     });
     const restartPrompt = buildRestartPrompt('合并后再补一步');
     w.s.db
@@ -256,7 +237,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
     const w = makeWorld({
       todoPhase: 'review',
       b2PrFields: true,
-      githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: true } }),
+      pulls: { [PR1_NUMBER]: { state: 'closed', merged: true } },
     });
     let refused: unknown;
     try {
@@ -278,7 +259,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
       todoPhase: 'review',
       b1PrFields: false,
       b2PrFields: true,
-      githubFetch: prFetchMock({ [PR2_NUMBER]: { state: 'closed', merged: true } }),
+      pulls: { [PR2_NUMBER]: { state: 'closed', merged: true } },
     });
     const refused = await requestMerge(w.deps, w.b2Id, 'tester').then(
       () => null,
@@ -294,7 +275,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
 
   test('failure mode 5: the first PR closed-unmerged -> no guard on claim, the merge-surface guard does not block (a legitimate rework re-submission)', async () => {
     const w = makeWorld({
-      githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: false } }),
+      pulls: { [PR1_NUMBER]: { state: 'closed', merged: false } },
     });
     const got = (await claimStep(
       w.machineDeps,
@@ -326,14 +307,10 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
     expect((refused as HttpError).message).not.toContain(`#${PR1_NUMBER}`);
   });
 
-  test('failure mode 6: the probe fails -> fail-open (no guard on claim, merge 202)', async () => {
-    const fetchMock: FetchLike = (async () => ({
-      ok: false,
-      status: 503,
-      json: async () => ({}),
-      headers: { get: () => null },
-    })) as unknown as FetchLike;
-    const w = makeWorld({ githubFetch: fetchMock });
+  test('failure mode 6: the PR probe fails -> no guard on claim', async () => {
+    const w = makeWorld();
+    const prPath = `${REPO_PATH}/pulls/${PR1_NUMBER}`;
+    w.github.overrides.set(prPath, () => ({ status: 503 }));
     const got = (await claimStep(
       w.machineDeps,
       w.machineBId,
@@ -342,17 +319,16 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
       'http://localhost',
     )) as ClaimedStep | null;
     expect(got).not.toBeNull();
+    expect(w.github.calls.map(({ path, status }) => [path, status])).toEqual([
+      [prPath, 503],
+      [REPO_PATH, 200],
+    ]);
     expect(got!.instruction).toBeUndefined();
     expect(messagesOf(w, w.b2Id)).toHaveLength(0);
   });
 
-  test('failure mode 7: no earlier PR build -> claim probes nothing outbound (the sentinel mock turning red if called), instruction default', async () => {
-    let probed = false;
-    const sentinel: FetchLike = (async () => {
-      probed = true;
-      throw new Error('guard probed github with no prior PR build');
-    }) as unknown as FetchLike;
-    const w = makeWorld({ b1PrFields: false, githubFetch: sentinel });
+  test('failure mode 7: no earlier PR build -> claim only probes the repository, instruction default', async () => {
+    const w = makeWorld({ b1PrFields: false });
     const got = (await claimStep(
       w.machineDeps,
       w.machineBId,
@@ -361,7 +337,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
       'http://localhost',
     )) as ClaimedStep | null;
     expect(got).not.toBeNull();
-    expect(probed).toBe(false);
+    expect(w.github.calls.map((call) => call.path)).toEqual([REPO_PATH]);
     expect(got!.instruction).toBeUndefined();
     expect(messagesOf(w, w.b2Id)).toHaveLength(0);
   });
@@ -369,7 +345,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
   test('failure mode 8: two steps of one build claim in turn -> the guard note does not stack (idempotent)', async () => {
     const w = makeWorld({
       stepCount: 2,
-      githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: true } }),
+      pulls: { [PR1_NUMBER]: { state: 'closed', merged: true } },
     });
     const first = await claimStep(w.machineDeps, w.machineBId, w.teamId, 10, 'http://localhost');
     expect(first).not.toBeNull();
@@ -386,7 +362,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
   test('failure mode 8b: the agent ignores the guard and opens a second PR -> the done backfill surface writes a warning note', async () => {
     const w = makeWorld({
       todoPhase: 'building',
-      githubFetch: prFetchMock({ [PR1_NUMBER]: { state: 'closed', merged: true } }),
+      pulls: { [PR1_NUMBER]: { state: 'closed', merged: true } },
     });
     const stepId = stepsOf(w, w.b2Id)[0]!.id;
     w.s.db
@@ -405,7 +381,7 @@ describe('#1217 the second-PR-per-todo guard (claim surface + merge surface + ba
       prUrl: PR2_URL,
       prNumber: PR2_NUMBER,
     };
-    await finishStep(w.machineDeps, w.machineBId, stepId, body);
+    await finishStepForClaim(w.machineDeps, w.machineBId, stepId, body);
     const warnings = messagesOf(w, w.b2Id).filter(
       (m) =>
         m.role === 'system' &&

@@ -97,7 +97,7 @@ describe('thread_report relay tool', () => {
     s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, step.step.id)).run();
     const res = await relay(s.app, token, step.step.id, { line: 'late word' });
     expect(res.status).toBe(409);
-    expect(await res.text()).toContain('thread_report requires a currently claimed step');
+    expect(await res.text()).toContain('not claimed');
     expect(
       s.db.select().from(buildTable).where(eq(buildTable.id, step.step.buildId)).get()!.reportLine,
     ).toBeNull();

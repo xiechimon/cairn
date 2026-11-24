@@ -8,6 +8,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { runAfterCommit } from '../db/commit-effects.js';
 import { build, message, queuedMessage, step, stopPending, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
@@ -232,7 +233,9 @@ export function cancelBuild(
   recordStop(db, buildId, by);
   if (active.status === 'pending' || active.status === 'waiting_quota') {
     applyStoppedStep(deps, active.id);
-    emitRuntimeBuildSpan(deps.db, buildId, 'cancelled');
+    runAfterCommit(deps, 'emitRuntimeBuildSpan', () =>
+      emitRuntimeBuildSpan(deps.db, buildId, 'cancelled'),
+    );
     return 'stopped';
   }
   const now = nowMs();
@@ -245,7 +248,9 @@ export function cancelBuild(
     .run();
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (todoRow) deps.machineHub?.stopSignal(todoRow.teamId, active.id);
-  emitRuntimeBuildSpan(deps.db, buildId, 'cancelled');
+  runAfterCommit(deps, 'emitRuntimeBuildSpan', () =>
+    emitRuntimeBuildSpan(deps.db, buildId, 'cancelled'),
+  );
   return 'delegated';
 }
 

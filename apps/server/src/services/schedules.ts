@@ -14,6 +14,8 @@ import {
 import { CronExpressionParser } from 'cron-parser';
 import { and, desc, eq, inArray, isNotNull, isNull, like, lte, max, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
+import { databaseIdentity } from '../db/identity.js';
 import { build, message, project, schedule, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
@@ -22,7 +24,7 @@ import type { TeamStreamHub } from './events.js';
 import { projectOfTodo } from './git.js';
 import { notifyScheduleRun } from './notifications.js';
 
-export interface ScheduleDeps {
+export interface ScheduleDeps extends CommitEffects {
   db: Db;
   hub: TeamStreamHub;
 }
@@ -231,7 +233,7 @@ export function createSchedule(
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   const record = row ? toScheduleRecord(deps, row) : null;
   if (!record) throw new Error('schedule missing after insert');
-  notifyScheduleClock(deps.db);
+  notifyScheduleClock(deps.db, deps);
   return record;
 }
 
@@ -243,7 +245,7 @@ export function deleteSchedule(
   const row = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
   if (!row || row.teamId !== teamId) return false;
   deps.db.delete(schedule).where(eq(schedule.id, id)).run();
-  notifyScheduleClock(deps.db);
+  notifyScheduleClock(deps.db, deps);
   return true;
 }
 
@@ -277,7 +279,7 @@ export function setScheduleEnabled(
     }
   }
   const updated = deps.db.select().from(schedule).where(eq(schedule.id, id)).get();
-  notifyScheduleClock(deps.db);
+  notifyScheduleClock(deps.db, deps);
   return updated ? toScheduleRecord(deps, updated) : null;
 }
 
@@ -302,17 +304,19 @@ export function dueSchedules(deps: ScheduleDeps, nowMsValue: number): ScheduleRo
 const scheduleClocks = new WeakMap<Db, () => void>();
 
 export function setScheduleClockListener(db: Db, listener: (() => void) | null): void {
-  if (listener === null) scheduleClocks.delete(db);
-  else scheduleClocks.set(db, listener);
+  if (listener === null) scheduleClocks.delete(databaseIdentity(db));
+  else scheduleClocks.set(databaseIdentity(db), listener);
 }
 
-export function notifyScheduleClock(db: Db): void {
-  scheduleClocks.get(db)?.();
+export function notifyScheduleClock(db: Db, effects: CommitEffects = {}): void {
+  runAfterCommit(effects, 'notifyScheduleClock', () =>
+    scheduleClocks.get(databaseIdentity(db))?.(),
+  );
 }
 
 export function updateNextRunAt(deps: ScheduleDeps, id: string, nextRunAt: number | null): void {
   deps.db.update(schedule).set({ nextRunAt }).where(eq(schedule.id, id)).run();
-  notifyScheduleClock(deps.db);
+  notifyScheduleClock(deps.db, deps);
 }
 
 export function updateNextRunAtIfUnmoved(
@@ -331,7 +335,7 @@ export function updateNextRunAtIfUnmoved(
       ),
     )
     .run();
-  notifyScheduleClock(deps.db);
+  notifyScheduleClock(deps.db, deps);
 }
 
 export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): void {
@@ -340,7 +344,7 @@ export function pauseSchedule(deps: ScheduleDeps, id: string, reason: string): v
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.id, id))
     .run();
-  notifyScheduleClock(deps.db);
+  notifyScheduleClock(deps.db, deps);
 }
 
 export const ARCHIVED_SCHEDULE_PAUSE_REASON = 'Task archived';
@@ -351,7 +355,7 @@ export function pauseTodoSchedule(deps: ScheduleDeps, todoId: string, reason: st
     .set({ enabled: false, nextRunAt: null, pausedReason: reason })
     .where(eq(schedule.todoId, todoId))
     .run();
-  notifyScheduleClock(deps.db);
+  notifyScheduleClock(deps.db, deps);
 }
 
 export function parseThreadCadence(

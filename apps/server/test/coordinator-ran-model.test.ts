@@ -16,6 +16,7 @@ import { providerHealth } from '../src/services/provider-health.js';
 import { createProvider } from '../src/services/providers.js';
 import {
   bootServer,
+  claimedGeneration,
   insertClaudeSubscription,
   issueApiKey,
   seedRoute,
@@ -111,7 +112,10 @@ async function claim(s: TestServer, token: string) {
 }
 
 async function done(s: TestServer, token: string, stepId: string, body: Record<string, unknown>) {
-  const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+  const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+    cred: token,
+    body: { generation: claimedGeneration(s.db, stepId), ...body },
+  });
   expect(res.status).toBe(200);
 }
 
@@ -204,7 +208,12 @@ describe('the model a Coordinator step ran is recorded at claim, not re-derived 
       modelId: 'claude-sonnet-5-5',
       machineId,
     });
-    const res = await call(s.app, 'GET', `/api/machine/token/${stepId}`, { cred: token });
+    const res = await call(
+      s.app,
+      'GET',
+      `/api/machine/token/${stepId}?generation=${stepRow(s, stepId).claimedAt}`,
+      { cred: token },
+    );
     expect(res.status).toBe(200);
     const tok = (await res.json()) as { provider: { providerId: string } | null };
     expect(tok.provider?.providerId).toBe('workbuddy');

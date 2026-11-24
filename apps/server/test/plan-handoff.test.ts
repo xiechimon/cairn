@@ -19,6 +19,7 @@ import {
 } from '../src/db/schema.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   openConvStream,
   postProject,
@@ -93,7 +94,10 @@ async function setupWorld() {
     return claimedStepSchema.parse(body.step);
   }
   async function done(stepId: string, body: Record<string, unknown>): Promise<void> {
-    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: token,
+      body: { generation: claimedGeneration(s.db, stepId), ...body },
+    });
     expect(res.status).toBe(200);
   }
   async function uploadPlan(stepId: string, content: string): Promise<void> {
@@ -415,8 +419,19 @@ describe('#1026/#1027 the plan upload receiving end: input validation + step-and
       const buildId = w.startBuild(true);
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, withVerification('# 方案 v1'));
+      const grantResponse = await call(
+        w.s.app,
+        'POST',
+        `/api/machine/upload-urls/${planStep.step.id}`,
+        { cred: w.token, body: { files: [{ name: PLAN_FILE_NAME }] } },
+      );
+      const grant = machineUploadUrlsResponseSchema.parse(await grantResponse.json()).uploads[0]!;
       await w.done(planStep.step.id, { status: 'success', sessionId: 'pi-1' });
-      const res = await w.tryUploadPlan(planStep.step.id, withVerification('# 方案 v1'));
+      const res = await call(w.s.app, 'PUT', new URL(grant.url).pathname, {
+        cred: w.token,
+        text: withVerification('# 方案 v1'),
+        contentType: 'text/markdown',
+      });
       expect(res.status).toBe(409);
       expect(w.plansOf(buildId)).toHaveLength(1);
       expect(w.buildRowOf(buildId).planDocId).toBe(w.plansOf(buildId)[0]!.id);

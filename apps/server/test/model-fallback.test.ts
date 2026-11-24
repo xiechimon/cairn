@@ -15,6 +15,7 @@ import { providerHealth } from '../src/services/provider-health.js';
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   seedRoute,
@@ -151,7 +152,10 @@ async function claim(w: World): Promise<Claimed> {
 }
 
 async function done(w: World, stepId: string, body: Record<string, unknown>): Promise<void> {
-  const res = await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, { cred: w.token, body });
+  const res = await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, {
+    cred: w.token,
+    body: { generation: claimedGeneration(w.s.db, stepId), ...body },
+  });
   expect(res.status).toBe(200);
 }
 
@@ -192,9 +196,17 @@ describe('model fallback chain (#1493)', () => {
     expect(again.provider).toBe('relay-b');
     expect(again.modelId).toBe('model-b');
     expect(again.session.action).toBe('new');
-    const tokRes = await call(w.s.app, 'GET', `/api/machine/token/${again.stepId}`, {
-      cred: w.token,
-    });
+    const claimedAt = w.s.db
+      .select({ claimedAt: stepTable.claimedAt })
+      .from(stepTable)
+      .where(eq(stepTable.id, again.stepId))
+      .get()?.claimedAt;
+    const tokRes = await call(
+      w.s.app,
+      'GET',
+      `/api/machine/token/${again.stepId}?generation=${claimedAt}`,
+      { cred: w.token },
+    );
     expect(tokRes.status).toBe(200);
     const tok = (await tokRes.json()) as { provider: { providerId: string } | null };
     expect(tok.provider?.providerId).toBe('relay-b');

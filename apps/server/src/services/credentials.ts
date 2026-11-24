@@ -1,4 +1,4 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   BRAND,
   type ProviderApi,
@@ -42,7 +42,11 @@ export function issueStepGitCredential(
   const name = stepGitKeyName(input.stepId);
   const hash = hashCredential(plaintext);
   const existing = deps.db.select().from(apiKey).where(eq(apiKey.name, name)).all();
-  if (existing.length !== 1 || existing[0]?.keyHash !== hash) {
+  if (
+    existing.length !== 1 ||
+    existing[0]?.keyHash !== hash ||
+    existing[0]?.claimGeneration !== input.claimedAt
+  ) {
     deps.db.delete(apiKey).where(eq(apiKey.name, name)).run();
     createApiKey(deps, {
       teamId: input.teamId,
@@ -52,6 +56,7 @@ export function issueStepGitCredential(
       machineAccess: false,
       toolGrants: { read: [], write: [] },
       plaintext,
+      claimGeneration: input.claimedAt,
     });
   }
   return { username: 'git', password: plaintext };
@@ -76,22 +81,46 @@ export function stepIdOfGitKey(name: string | null): string | null {
     : null;
 }
 
-export function claimedStepGitScope(db: Db, name: string | null): StepGitScope | null {
-  const stepId = stepIdOfGitKey(name);
-  if (stepId === null) return null;
-  return (
-    db
-      .select({ projectId: todo.projectId, buildId: build.id })
+export interface ResolvedGitAuth {
+  keyId: string;
+  stepScope: StepGitScope | null;
+}
+
+export function resolveGitAuth(db: Db, secretHash: Buffer): ResolvedGitAuth | null {
+  return db.transaction((tx) => {
+    const rows = tx
+      .select({
+        id: apiKey.id,
+        name: apiKey.name,
+        keyHash: apiKey.keyHash,
+        claimGeneration: apiKey.claimGeneration,
+      })
+      .from(apiKey)
+      .where(eq(apiKey.gitAccess, true))
+      .all();
+    const row = rows.find(
+      (candidate) =>
+        candidate.keyHash.length === secretHash.byteLength &&
+        timingSafeEqual(Buffer.from(candidate.keyHash), secretHash),
+    );
+    if (row === undefined) return null;
+    const stepId = stepIdOfGitKey(row.name);
+    if (stepId === null) return { keyId: row.id, stepScope: null };
+    const scope = tx
+      .select({ projectId: todo.projectId, buildId: build.id, claimedAt: step.claimedAt })
       .from(step)
       .innerJoin(build, eq(build.id, step.buildId))
       .innerJoin(todo, eq(todo.id, build.todoId))
       .where(and(eq(step.id, stepId), eq(step.status, 'claimed')))
-      .get() ?? null
-  );
-}
-
-export function gitKeyUsable(db: Db, name: string | null): boolean {
-  return stepIdOfGitKey(name) === null || claimedStepGitScope(db, name) !== null;
+      .get();
+    if (
+      scope === undefined ||
+      row.claimGeneration === null ||
+      row.claimGeneration !== scope.claimedAt
+    )
+      return null;
+    return { keyId: row.id, stepScope: { projectId: scope.projectId, buildId: scope.buildId } };
+  });
 }
 
 export interface StepCredentialBundle {

@@ -23,6 +23,7 @@ import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { compareFilesFromResponse, computePatchDigest } from '../src/services/merge-gate/digest.js';
 import {
   bootServer,
+  claimedGeneration,
   dropQueuedVerify,
   issueApiKey,
   postProject,
@@ -231,7 +232,7 @@ async function setup(opts: { githubFetch?: FetchLike } = {}) {
     async done(stepId: string, body: Record<string, unknown>) {
       const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: machineToken,
-        body,
+        body: { generation: claimedGeneration(s.db, stepId), ...body },
       });
       expect(res.status).toBe(200);
     },
@@ -254,8 +255,10 @@ afterEach(async () => {
   world = undefined;
 });
 
-const unreachableGithub: FetchLike = async () => {
-  throw new Error('getaddrinfo ENOTFOUND api.github.com');
+const unreachableGithub: FetchLike = async (input) => {
+  const match = /^https:\/\/api\.github\.com\/repos\/([^/]+\/[^/]+)$/.exec(String(input));
+  if (match === null) throw new Error('getaddrinfo ENOTFOUND api.github.com');
+  return Response.json({ id: 4242, full_name: match[1] });
 };
 
 async function reachReviewGate(w: World): Promise<string> {
@@ -684,7 +687,9 @@ describe('#1404 historical verdict binding', () => {
       releaseHungGithub = resolve;
     });
     world = await setup({
-      githubFetch: async (_input, init) => {
+      githubFetch: async (input, init) => {
+        const match = /^https:\/\/api\.github\.com\/repos\/([^/]+\/[^/]+)$/.exec(String(input));
+        if (match !== null) return Response.json({ id: 4242, full_name: match[1] });
         const signal = (init as { signal?: AbortSignal } | undefined)?.signal;
         await new Promise<void>((_resolve, reject) => {
           const abort = () => reject(new Error('aborted'));

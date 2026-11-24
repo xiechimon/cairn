@@ -178,7 +178,12 @@ describe('Coordinator rule that selects Devin', () => {
       .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
       .where(eq(machineTable.id, machineId))
       .run();
-    const response = await s.app.request('/api/machine/token/s1', {
+    const generation = s.db
+      .select({ claimedAt: stepTable.claimedAt })
+      .from(stepTable)
+      .where(eq(stepTable.id, 's1'))
+      .get()?.claimedAt;
+    const response = await s.app.request(`/api/machine/token/s1?generation=${generation}`, {
       headers: { authorization: `Bearer ${machineToken}` },
     });
     expect(machineTokenResponseSchema.parse(await response.json())).toMatchObject({

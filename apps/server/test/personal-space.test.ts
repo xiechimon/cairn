@@ -8,6 +8,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { project, step, todo, user } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
+import { nowMs } from '../src/lib/ids.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
 import { repoDirFor } from '../src/services/git.js';
@@ -101,10 +102,15 @@ function statusOf(error: unknown): number {
 function claimedStepKey(projectId: string): string {
   const machineId = insertMachine(s);
   const stepId = queueConnectorStep(s, projectId, machineId);
-  s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, stepId)).run();
+  const claimedAt = nowMs();
+  s.db
+    .update(step)
+    .set({ status: 'claimed', machineId, claimedAt })
+    .where(eq(step.id, stepId))
+    .run();
   return issueStepGitCredential(
     { db: s.db, box: s.secretBox },
-    { teamId: s.team.id, stepId, claimedAt: null },
+    { teamId: s.team.id, stepId, claimedAt },
   ).password;
 }
 

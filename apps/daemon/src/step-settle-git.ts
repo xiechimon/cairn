@@ -5,8 +5,14 @@ import type {
   PreparedWorkspace,
   WorktreeOps,
 } from '@cairn/shared';
-import { isBuildStepKind, stripAnsiEscapes } from '@cairn/shared';
-import { GitPushHookError, isGitAuthFailure } from './git.js';
+import { isBuildStepKind, stripAnsiEscapes, WORKFLOW_PUSH_REFUSAL } from '@cairn/shared';
+import {
+  GitPushHookError,
+  isGitAuthFailure,
+  isGitPermanentFailure,
+  isGitWorkflowPermissionRejection,
+} from './git.js';
+import { GitHubAppTokenUnavailableError } from './step-app-credential.js';
 import { commitAndPushStep, preserveFailedBuild } from './step-closing-git.js';
 import type { StepGitRunner } from './step-git-tools.js';
 
@@ -44,13 +50,22 @@ export interface SettledStepGit {
 
 export async function settleStepGit(input: SettleStepGitInput): Promise<SettledStepGit> {
   const { git, ws, claimed } = input;
-  const pushStep = (gitOps: WorktreeOps, workspace: PreparedWorkspace) =>
-    input.runGit(async (credential) => {
-      await gitOps.push(workspace.cwd, workspace.branch, credential, {
-        base: input.headAtStart,
-        identity: input.appIdentity,
-      });
-    });
+  let workflowPushRefused = false;
+  const pushStep = async (gitOps: WorktreeOps, workspace: PreparedWorkspace) => {
+    try {
+      return await input.runGit((credential) =>
+        gitOps.push(workspace.cwd, workspace.branch, credential, {
+          base: input.headAtStart,
+          identity: input.appIdentity,
+        }),
+      );
+    } catch (error) {
+      workflowPushRefused =
+        !(error instanceof GitPushHookError) &&
+        isGitWorkflowPermissionRejection(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
+  };
   const settled: SettledStepGit = {
     headCommit: input.headCommit,
     branchDrift: null,
@@ -61,6 +76,7 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
     lastError: input.lastError,
   };
   let closingPushHookError: GitPushHookError | null = null;
+  let closingPushCannotRetry = false;
   if (ws !== null && ws.readonly !== true && git && input.closes) {
     const closing = await commitAndPushStep({
       git,
@@ -82,9 +98,16 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
     settled.artifactBranches = closing.artifactBranches;
     if (closing.hasChanges !== null) settled.hasChanges = closing.hasChanges;
     if (closing.error !== null) {
-      const err = closing.error;
-      if (err instanceof GitPushHookError) closingPushHookError = err;
-      settled.lastError = err instanceof Error ? err.message : String(err);
+      const { cause, duringPush } = closing.error;
+      const message = cause instanceof Error ? cause.message : String(cause);
+      settled.lastError = message;
+      if (duringPush) {
+        if (cause instanceof GitPushHookError) closingPushHookError = cause;
+        closingPushCannotRetry =
+          cause instanceof GitHubAppTokenUnavailableError ||
+          isGitAuthFailure(message) ||
+          isGitPermanentFailure(message);
+      }
     }
   }
 
@@ -100,7 +123,7 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
   if (
     isBuildStepKind(claimed.step.kind) &&
     settled.lastError !== null &&
-    !isGitAuthFailure(settled.lastError) &&
+    !closingPushCannotRetry &&
     !input.stopped &&
     ws !== null &&
     ws.readonly !== true &&
@@ -120,5 +143,6 @@ export async function settleStepGit(input: SettleStepGitInput): Promise<SettledS
       settled.hasChanges = true;
     }
   }
+  if (workflowPushRefused) settled.lastError = WORKFLOW_PUSH_REFUSAL;
   return settled;
 }

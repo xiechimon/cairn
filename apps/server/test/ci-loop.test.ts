@@ -30,12 +30,14 @@ import {
   verdictOfCheckRuns,
 } from '../src/services/ci-loop.js';
 import { DONE_ROW, prClosedUnmergedRow } from '../src/services/delivery-rows.js';
+import * as provider from '../src/services/github-app-token.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
-import { finishStep } from '../src/services/machine-finish-step.js';
+
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   bootServer,
+  finishStepForClaim,
   insertMachine,
   seedSessionRoute,
   type TestServer,
@@ -428,6 +430,27 @@ describe('#1150 (1) scan-surface discipline: batch scan + conditional requests (
     expect(req.url).toContain('per_page=');
     expect(req.headers['if-none-match']).toBeUndefined();
     expect(req.headers.accept).toContain('vnd.github+json');
+  });
+
+  test('the poll resolves its GitHub read token under the read policy', async () => {
+    const w = makePrWorld({
+      checks: [{ name: 'lint', status: 'completed', conclusion: 'success' }],
+    });
+    const seen: string[] = [];
+    const spy = vi
+      .spyOn(provider, 'appTokenOrNull')
+      .mockImplementation((_deps, _repo, _force, _minValidity, policy) => {
+        seen.push(policy);
+        return Promise.resolve(null);
+      });
+    try {
+      await w.poller.sweep();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(w.mock.requests).toHaveLength(1);
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every((policy) => policy === 'server-read')).toBe(true);
   });
 
   test('ETag round-trip: first round 200 stores etag, next round carries if-none-match -> 304 -> criteria reused (body not parsed)', async () => {
@@ -1442,7 +1465,7 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
         })
         .run();
       const hookOutput = 'pre-push: lint failed: README.md:12 invalid evidence link';
-      await finishStep(
+      await finishStepForClaim(
         {
           ...w.s.svc,
           reposDir: w.s.reposDir,
@@ -1537,7 +1560,7 @@ describe('#1829 closing push and agent-opened PR recovery', () => {
           ]);
         return w.mock.fetch(input, init);
       };
-      await finishStep(
+      await finishStepForClaim(
         {
           ...w.s.svc,
           reposDir: w.s.reposDir,

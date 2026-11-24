@@ -38,16 +38,6 @@ export function deliverableGrantId(stepId: string, generation: number): string {
   return `deliverable:${stepId}:${generation}`;
 }
 
-export function hasDeliverableRows(db: Db, stepId: string, generation: number): boolean {
-  return (
-    db
-      .select({ id: attachment.id })
-      .from(attachment)
-      .where(eq(attachment.grantId, deliverableGrantId(stepId, generation)))
-      .get() !== undefined
-  );
-}
-
 function failRows(db: Db, rows: { id: string; status: string }[]): void {
   const pending = rows.filter((r) => r.status === 'pending').map((r) => r.id);
   const received = rows.filter((r) => r.status !== 'pending').map((r) => r.id);
@@ -256,36 +246,6 @@ export function retireTodoDeliverables(db: Db, todoIds: string[]): void {
     .all()
     .map((b) => `${DELIVERABLES_MESSAGE_PREFIX}${b.id}`);
   if (buildIds.length > 0) db.delete(message).where(inArray(message.id, buildIds)).run();
-}
-
-const DEFERRED_SIGNALS = new Set(['wake', 'steerSignal', 'stopSignal']);
-
-function deferSignals<T extends object>(hub: T, queue: (() => void)[]): T {
-  return new Proxy(hub, {
-    get(target, key) {
-      const value: unknown = Reflect.get(target, key, target);
-      if (typeof value !== 'function') return value;
-      const call = value as (...args: unknown[]) => unknown;
-      if (typeof key === 'string' && (key.startsWith('publish') || DEFERRED_SIGNALS.has(key))) {
-        return (...args: unknown[]) => {
-          queue.push(() => call.apply(target, args));
-        };
-      }
-      return call.bind(target);
-    },
-  });
-}
-
-export function withEventsAfterCommit(deps: MachineDeps, run: (deps: MachineDeps) => void): void {
-  const queue: (() => void)[] = [];
-  const deferred: MachineDeps = {
-    ...deps,
-    hub: deferSignals(deps.hub, queue),
-    machineHub: deferSignals(deps.machineHub, queue),
-    ...(deps.convHub !== undefined ? { convHub: deferSignals(deps.convHub, queue) } : {}),
-  };
-  deps.db.transaction(() => run(deferred));
-  for (const publish of queue) publish();
 }
 
 export interface VmDeliverableFile {

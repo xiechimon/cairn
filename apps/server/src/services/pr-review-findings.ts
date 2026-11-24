@@ -9,7 +9,11 @@ import {
   githubSetPullDraft,
   githubSetReviewHoldLabel,
 } from '../lib/github-review-findings.js';
-import { type AutonomousToken, githubTokenFetch } from '../lib/github-token.js';
+import {
+  type AutonomousToken,
+  type GithubWriteToken,
+  githubTokenFetch,
+} from '../lib/github-token.js';
 import type { BuildDeps } from './builds.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
 
@@ -46,7 +50,8 @@ export async function reconcilePrReviewFindings(
   input: {
     row: typeof threadPr.$inferSelect;
     fetch: FetchLike;
-    token: AutonomousToken;
+    token: GithubWriteToken;
+    resolveToken: () => Promise<AutonomousToken | null>;
     owner: string;
     repo: string;
     now: number;
@@ -69,12 +74,21 @@ export async function reconcilePrReviewFindings(
   });
   if (action !== null) {
     try {
+      const write = await input.resolveToken();
+      if (write === null) throw new Error('GitHub write credential unavailable');
+      const writeFetch = githubTokenFetch(inner, write, { owner, repo });
       if (action === 'addLabel' && pull.labelId === null)
-        await githubCreateReviewHoldLabel(fetch, token, owner, repo);
+        await githubCreateReviewHoldLabel(writeFetch, write, owner, repo);
       else if (action === 'addLabel' || action === 'removeLabel') {
         if (pull.labelId === null) throw new Error('GitHub review hold label missing');
-        await githubSetReviewHoldLabel(fetch, token, pull.id, pull.labelId, action === 'addLabel');
-      } else await githubSetPullDraft(fetch, token, pull.id, action === 'convertToDraft');
+        await githubSetReviewHoldLabel(
+          writeFetch,
+          write,
+          pull.id,
+          pull.labelId,
+          action === 'addLabel',
+        );
+      } else await githubSetPullDraft(writeFetch, write, pull.id, action === 'convertToDraft');
     } catch (error) {
       if (error instanceof GithubRateLimitedError) throw error;
       console.warn('GitHub review hold transition unconfirmed', {

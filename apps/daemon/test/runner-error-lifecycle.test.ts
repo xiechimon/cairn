@@ -17,6 +17,7 @@ import { adaptProviderCompat, PI_CAPABILITIES } from '../src/backend/pi.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
+import { MachineApiError } from '../src/machine-client.js';
 import { RETRY_STORM_MAX, runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { combineTimeoutWithRootCause } from '../src/step-pass-outcome.js';
@@ -68,6 +69,7 @@ class FakeClient implements MachineApi {
   doneBodies: { stepId: string; body: MachineDoneBody }[] = [];
   uploadNames: string[][] = [];
   rows: TranscriptRow[] = [];
+  tokenError: unknown = null;
 
   constructor(private readonly providerId: string) {}
 
@@ -96,6 +98,7 @@ class FakeClient implements MachineApi {
     return '{}';
   }
   async token() {
+    if (this.tokenError !== null) throw this.tokenError;
     return {
       provider: {
         kind: 'http' as const,
@@ -221,13 +224,14 @@ function errorCycles(
 
 async function runLifecycleCase(
   scripts: StepEvent[][],
-  opts?: { providerId?: string; retryStormMax?: number },
+  opts?: { providerId?: string; retryStormMax?: number; tokenError?: unknown },
 ) {
   const providerId = opts?.providerId ?? 'gw-lc';
   const home = testTempDir('cairn-runner-lc-');
   const paths = statePaths(home, join(home, 'workspaces'));
   const { logger, lines } = captureLogger();
   const client = new FakeClient(providerId);
+  client.tokenError = opts?.tokenError ?? null;
   const journal = new StepJournal(paths.outboxDir);
   const { backend, providers, counts } = scriptedStormBackend(scripts);
   const deps = {
@@ -498,6 +502,38 @@ describe('runner done.errorMessage ANSI stripping (#1262)', () => {
     ];
     const { client } = await runLifecycleCase([script], { providerId: 'gw-lc-ansi-clean' });
     expect(client.doneBodies[0]?.body.errorMessage).toBe(TRANSIENT_503);
+  });
+});
+
+describe('step credential acquisition', () => {
+  test('a renamed repository failure reports reconnect instructions before starting a session', async () => {
+    const { client, providers } = await runLifecycleCase([], {
+      tokenError: new MachineApiError(
+        503,
+        JSON.stringify({
+          reason: 'repo-renamed',
+          error: 'GitHub repository was renamed; reconnect it.',
+        }),
+      ),
+    });
+    expect(client.doneBodies).toHaveLength(1);
+    expect(client.doneBodies[0]?.body).toMatchObject({
+      status: 'failed',
+      errorMessage: 'GitHub repository was renamed; reconnect it.',
+    });
+    expect(providers).toHaveLength(0);
+  });
+
+  test('a token 503 finishes the step as a reported failure naming the App token service, not a crash', async () => {
+    const { client, providers } = await runLifecycleCase([], {
+      providerId: 'gw-lc-token-503',
+      tokenError: new MachineApiError(503, '{"error":"github app credential unavailable"}'),
+    });
+    expect(client.doneBodies).toHaveLength(1);
+    expect(client.doneBodies[0]?.stepId).toBe('s1');
+    expect(client.doneBodies[0]?.body.status).toBe('failed');
+    expect(client.doneBodies[0]?.body.errorMessage).toBe('GitHub App token service unavailable');
+    expect(providers).toHaveLength(0);
   });
 });
 

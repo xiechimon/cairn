@@ -35,6 +35,7 @@ import { refuseRestrictedTurnTool } from '../src/services/report-turn.js';
 import { createSecret, openSecretValues } from '../src/services/secrets.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   machineIdByName,
   req,
@@ -522,7 +523,11 @@ describe('mail connector slice 1', () => {
     const done = await s.app.request(`/api/machine/done/${eventId}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ status: 'success', sessionId: 'sess-mail' }),
+      body: JSON.stringify({
+        status: 'success',
+        sessionId: 'sess-mail',
+        generation: claimedGeneration(s.db, eventId),
+      }),
     });
     expect(done.status).toBe(200);
     expect(

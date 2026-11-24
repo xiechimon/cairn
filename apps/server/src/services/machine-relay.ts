@@ -83,7 +83,9 @@ export async function machineAsk(
   const row = ownedStepRow(deps, machineId, stepId);
   refuseRestrictedTurnTool(deps.db, row.prompt, 'ask_user', {}, row.ownerMessageIds ?? []);
   if (row.kind === 'session') {
-    return askWorkerQuestion(deps, row, body, opts);
+    const result = await askWorkerQuestion(deps, row, body, opts);
+    deps.assertClaim?.();
+    return result;
   }
   if (row.kind !== 'chief' || !isChiefConversation(row.buildId)) {
     throw new HttpError(400, `step ${stepId} is not a chief step`);
@@ -117,6 +119,7 @@ export async function machineAsk(
         })
       : content;
   const settled = final ?? content;
+  deps.assertClaim?.();
   return {
     status: settled.status,
     requestId: body.requestId,
@@ -226,8 +229,14 @@ export async function executeRelayToolCall(
       db: deps.db,
       box: deps.box,
       mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(),
-      fetch: deps.mcpFetch ?? globalThis.fetch,
-      oauthFetch: deps.mcpFetch ?? publicOAuthFetch,
+      fetch: (...args) => {
+        deps.assertClaim?.();
+        return (deps.mcpFetch ?? globalThis.fetch)(...args);
+      },
+      oauthFetch: (...args) => {
+        deps.assertClaim?.();
+        return (deps.mcpFetch ?? publicOAuthFetch)(...args);
+      },
       oauthState: deps.mcpOAuthState ?? newMcpOAuthState(),
       ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
       ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
@@ -235,6 +244,7 @@ export async function executeRelayToolCall(
     return executeConnectorToolCall(
       {
         db: deps.db,
+        assertClaim: deps.assertClaim,
         mcp,
         hub: deps.hub,
         user: deps.user,
@@ -324,12 +334,14 @@ export async function executeRelayToolCall(
       params,
     );
   } catch (error) {
+    deps.assertClaim?.();
     if (captured !== undefined && tool !== undefined)
       captureToolResult(stepId, tool, {
         toolError: error instanceof Error ? error.message : String(error),
       });
     throw error;
   }
+  deps.assertClaim?.();
   if (captured !== undefined && tool !== undefined) captureToolResult(stepId, tool, result);
   return result;
 }

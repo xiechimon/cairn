@@ -12,6 +12,7 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { CI_CLOSED_CONFIRM_MS } from '../src/services/ci-loop.js';
+import * as provider from '../src/services/github-app-token.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { createPrWatch, PR_WATCH_SLOW_INTERVAL_MS } from '../src/services/pr-watch.js';
 import { listThreadPrs } from '../src/services/thread-pr.js';
@@ -19,6 +20,7 @@ import { bootServer, req, type TestServer } from './helpers.js';
 
 const servers: TestServer[] = [];
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const s of servers.splice(0)) s.dispose();
 });
 
@@ -1194,5 +1196,44 @@ describe('F8 the PR body carries a closing keyword for the task issue', () => {
     mock.pulls.set('octo/demo#1051', { state: 'closed', merged: false, body: 'x' });
     await watchFor(s, mock).sweep(1_000);
     expect(mock.bodyEdits).toEqual([]);
+  });
+});
+
+describe('the PR watch token policy', () => {
+  const policies = () => {
+    const seen: string[] = [];
+    vi.spyOn(provider, 'appTokenOrNull').mockImplementation(
+      (_deps, _repo, _force, _minValidity, policy) => {
+        seen.push(policy);
+        return Promise.resolve(null);
+      },
+    );
+    return seen;
+  };
+
+  test('a sweep that only reads never asks for a write grant', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    const t = seedThread(s);
+    mock.pulls.set(`octo/demo#${t.prNumber}`, {});
+    const seen = policies();
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.count(`/pulls/${t.prNumber}`)).toBe(1);
+    expect(seen).toEqual(['server-read']);
+  });
+
+  test('a missing closing line asks for a write grant at the write, not for the reads', async () => {
+    const s = boot();
+    const mock = new GithubMock();
+    seedThread(s, {
+      prNumber: 1010,
+      sourceKind: 'github-issue-self',
+      sourceRef: 'github:octo/demo#77',
+    });
+    mock.pulls.set('octo/demo#1010', { body: '## What\n\nNo keyword.' });
+    const seen = policies();
+    await watchFor(s, mock).sweep(1_000);
+    expect(mock.bodyEdits).toHaveLength(1);
+    expect(seen).toEqual(['server-read', 'server-write']);
   });
 });

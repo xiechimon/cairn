@@ -113,6 +113,7 @@ function boot(authToken: string | null = null) {
       kind: 'chief',
       machineId: 'sidecar',
       status: 'claimed',
+      claimedAt: 2,
       prompt: 'work',
       createdAt: 2,
     })

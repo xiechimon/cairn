@@ -15,7 +15,14 @@ import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import { chiefMessage } from '../src/db/schema.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
-import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  machineIdByName,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 
 async function call(
@@ -122,7 +129,11 @@ async function setup(): Promise<World> {
       });
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
-        body: { status: 'success', sessionId: `sess-${stepId}` },
+        body: {
+          status: 'success',
+          sessionId: `sess-${stepId}`,
+          generation: claimedGeneration(s.db, stepId),
+        },
       });
       expect(doneRes.status).toBe(200);
     },

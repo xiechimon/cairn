@@ -17,7 +17,7 @@ import * as builds from '../src/services/builds.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
-import { finishStep } from '../src/services/machine-finish-step.js';
+
 import { sweepFailedRetries } from '../src/services/needs-you.js';
 import * as notifications from '../src/services/notifications.js';
 import { PhaseTransitionError } from '../src/services/phase.js';
@@ -30,7 +30,14 @@ import {
 } from '../src/services/schedules.js';
 import { executeThreadScheduleTool } from '../src/services/thread-schedule-tools.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  finishStepForClaim,
+  insertMachine,
+  postProject,
+  req,
+  seedSessionRoute,
+} from './helpers.js';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -525,7 +532,7 @@ test.each(['once', 'cron'] as const)(
     };
     const claimed = await claimStep(deps, s.machineId, s.team.id, 1, 'http://localhost');
     expect(claimed).not.toBeNull();
-    await finishStep(deps, s.machineId, claimed!.step.id, {
+    await finishStepForClaim(deps, s.machineId, claimed!.step.id, {
       status: 'success',
       hasChanges: true,
       pushHookOutput: 'pre-push: lint failed',

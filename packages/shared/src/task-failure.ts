@@ -12,6 +12,14 @@ export const STEP_FAILURE_KINDS = [
 ] as const;
 export type StepFailureKind = (typeof STEP_FAILURE_KINDS)[number];
 
+export const WORKFLOW_PUSH_REFUSAL =
+  'GitHub refused to push workflow changes: the runner credential lacks Workflows permission. Remove the workflow changes or ask a repository maintainer to push them separately before retrying.';
+
+export const GITHUB_REPOSITORY_RENAMED = {
+  reason: 'repo-renamed',
+  message: 'GitHub repository was renamed; reconnect it.',
+} as const;
+
 const digitBounded = (codes: string): RegExp => new RegExp(`(^|[^0-9])(${codes})([^0-9]|$)`);
 
 const httpQuotaCodeRe = digitBounded('402');

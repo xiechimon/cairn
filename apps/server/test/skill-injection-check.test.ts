@@ -11,8 +11,8 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
-import { finishStep, type MachineDeps } from '../src/services/machines.js';
-import { bootServer, seedSessionRoute, type TestServer } from './helpers.js';
+import type { MachineDeps } from '../src/services/machines.js';
+import { bootServer, finishStepForClaim, seedSessionRoute, type TestServer } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -171,7 +171,7 @@ describe('the finishStep skill-injection assertion (#1186)', () => {
         hits: [{ id: 'demo-skill', rule: 'explicit-mention', reason: '点名' }],
       },
     });
-    await finishStep(
+    await finishStepForClaim(
       w.deps,
       w.machineId,
       w.stepId,
@@ -192,7 +192,7 @@ describe('the finishStep skill-injection assertion (#1186)', () => {
       skillsAllowlist: [],
       skillInjection: { hits: [] },
     });
-    await finishStep(
+    await finishStepForClaim(
       w.deps,
       w.machineId,
       w.stepId,
@@ -222,7 +222,7 @@ describe('the finishStep skill-injection assertion (#1186)', () => {
         },
       },
     });
-    await finishStep(
+    await finishStepForClaim(
       w.deps,
       w.machineId,
       w.stepId,

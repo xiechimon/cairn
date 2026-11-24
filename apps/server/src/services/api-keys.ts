@@ -52,6 +52,7 @@ export function createApiKey(
     machineAccess?: boolean;
     toolGrants: { read: string[]; write: string[] };
     plaintext?: string;
+    claimGeneration?: number | null;
   },
 ): ApiKeyRowView & { plaintext: string } {
   const plaintext = input.plaintext ?? newApiKeyPlaintext();
@@ -71,6 +72,7 @@ export function createApiKey(
       keyHash: hashCredential(plaintext),
       masked: maskApiKey(plaintext),
       createdAt,
+      claimGeneration: input.claimGeneration ?? null,
     })
     .run();
   return {

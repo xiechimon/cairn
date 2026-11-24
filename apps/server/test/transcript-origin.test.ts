@@ -5,7 +5,14 @@ import { message, step, todo } from '../src/db/schema.js';
 import { messageTodo, startBuilds } from '../src/services/builds.js';
 import { upsertMessage } from '../src/services/machine-deps.js';
 import { receiveUpload } from '../src/services/machine-uploads.js';
-import { bootServer, insertMachine, postProject, req, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  insertMachine,
+  postProject,
+  req,
+  seedSessionRoute,
+} from './helpers.js';
 
 async function claimedStep(s: ReturnType<typeof bootServer>, machineId: string) {
   const projectId = await postProject(s.app, 'Prompt provenance');
@@ -16,7 +23,11 @@ async function claimedStep(s: ReturnType<typeof bootServer>, machineId: string) 
   const { id: todoId } = (await response.json()) as { id: string };
   const [started] = startBuilds(s.svc, { projectId, todoIds: [todoId] });
   const row = s.db.select().from(step).where(eq(step.buildId, started!.id)).get()!;
-  s.db.update(step).set({ machineId, status: 'claimed' }).where(eq(step.id, row.id)).run();
+  s.db
+    .update(step)
+    .set({ machineId, status: 'claimed', claimedAt: 1 })
+    .where(eq(step.id, row.id))
+    .run();
   return { buildId: started!.id, stepId: row.id };
 }
 
@@ -33,7 +44,7 @@ test('receiveUpload stamps the step prompt row task-prompt and leaves other rows
   };
   receiveUpload(
     deps,
-    { stepId, name: 'transcript', machineId },
+    { stepId, name: 'transcript', machineId, generation: claimedGeneration(s.db, stepId) },
     {
       stepId,
       messages: [

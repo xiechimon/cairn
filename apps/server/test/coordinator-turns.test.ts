@@ -26,7 +26,7 @@ import {
 import { CORRECTION_PROMPT } from '../src/services/merge-gate/correction.js';
 import { createScheduler } from '../src/services/scheduler.js';
 import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
-import { issueApiKey, postProject, req } from './helpers.js';
+import { claimedGeneration, issueApiKey, postProject, req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -506,7 +506,7 @@ describe('a daemon that heartbeats but ignores its stop request is force-stopped
     expect((await beat()).status).toBe(404);
     const done = await call(H.s.app, 'POST', `/api/machine/done/${stepId}`, {
       cred: token,
-      body: { status: 'success' },
+      body: { status: 'success', generation: claimedGeneration(H.s.db, stepId) },
     });
     expect(done.status).toBe(200);
     expect(stepRow(stepId).status).toBe('stopped');

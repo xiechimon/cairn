@@ -83,6 +83,7 @@ export function acceptedInfoReport(
     .where(
       and(
         eq(attachment.grantId, `report-${stepRow.buildId}`),
+        eq(attachment.status, 'ready'),
         gte(attachment.createdAt, stepRow.claimedAt ?? stepRow.createdAt),
       ),
     )

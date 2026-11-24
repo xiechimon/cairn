@@ -14,7 +14,9 @@ afterEach(async () => {
   for (const close of cleanup.splice(0).reverse()) await close();
 });
 
-async function fixture(opts: { withholdMcpConnectors?: boolean; token?: unknown } = {}) {
+async function fixture(
+  opts: { withholdMcpConnectors?: boolean; token?: unknown; generation?: number } = {},
+) {
   const home = testTempDir('relay-');
   const socketPath = join(home, 'step.sock');
   const forwarded = vi.fn(async (method: string, args: unknown[]): Promise<unknown> => {
@@ -40,6 +42,7 @@ async function fixture(opts: { withholdMcpConnectors?: boolean; token?: unknown 
     machineId: 'host',
     upstream,
     ...(opts.withholdMcpConnectors ? { withholdMcpConnectors: true } : {}),
+    ...(opts.generation !== undefined ? { generation: opts.generation } : {}),
   });
   await server.listen();
   const client = await RelayMachineApi.connect(socketPath, orbTestRelease(socketPath));
@@ -65,7 +68,10 @@ test.each(ORB_STEP_METHODS)(
             ? ['step', { status: 'success', hasChanges: true, sessionId: 'session' }]
             : ['step', { nested: ['unchanged', 42, false], text: 'body' }];
     await client.call(method, args);
-    expect(forwarded).toHaveBeenLastCalledWith(method, args);
+    expect(forwarded).toHaveBeenLastCalledWith(
+      method,
+      method === 'token' ? ['step', undefined] : args,
+    );
   },
 );
 
@@ -160,6 +166,75 @@ test('cancels a held tool call over the socket', async () => {
   controller.abort();
   await rejected;
   await vi.waitFor(() => expect(upstreamSignal?.aborted).toBe(true));
+});
+
+test('binds credential and completion generation to the claim the host holds', async () => {
+  const { client, forwarded } = await fixture({ generation: 1730000000000 });
+  await client.api.token('step', 999);
+  expect(forwarded).toHaveBeenLastCalledWith('token', ['step', 1730000000000]);
+  await client.api.token('step');
+  expect(forwarded).toHaveBeenLastCalledWith('token', ['step', 1730000000000]);
+  await client.api.token('step', 999, { refresh: true });
+  expect(forwarded).toHaveBeenLastCalledWith('token', ['step', 1730000000000, { refresh: true }]);
+  await client.api.done('step', { status: 'success', generation: 999 });
+  expect(forwarded).toHaveBeenLastCalledWith('done', [
+    'step',
+    { status: 'success', generation: 1730000000000 },
+  ]);
+});
+
+test('Orb binds every upstream claim request without changing an older relay', async () => {
+  const requests: URL[] = [];
+  const upstream = new MachineClient({
+    serverUrl: 'https://server.test',
+    fetchImpl: async (input) => {
+      const url = new URL(String(input));
+      requests.push(url);
+      if (url.pathname.includes('/upload-urls/')) return Response.json({ uploads: [] });
+      if (url.pathname.includes('/tool/')) return Response.json({ ok: true, text: 'ok' });
+      if (url.pathname.includes('/stop')) return Response.json({ discard: null });
+      if (url.pathname.includes('/steer')) return Response.json({ content: null, ok: true });
+      return Response.json({ ok: true });
+    },
+  });
+  const home = testTempDir('relay-claim-');
+  const relays: { server: RelayMachineServer; client: RelayMachineApi }[] = [];
+  try {
+    for (const generation of [1, 2]) {
+      const socketPath = join(home, `${generation}.sock`);
+      const release = orbTestRelease(socketPath);
+      const server = new RelayMachineServer({
+        socketPath,
+        release,
+        stepId: 'step',
+        generation,
+        upstream,
+      });
+      await server.listen();
+      const client = await RelayMachineApi.connect(socketPath, release);
+      relays.push({ server, client });
+    }
+    for (const index of [0, 1, 0]) {
+      const client = relays[index]!.client.api;
+      await client.heartbeat('step');
+      await client.transcriptDelta('step', 'text');
+      await client.relayTool('step', 'thread_report', { line: 'report' });
+      await client.uploadUrls('step', []);
+      await client.steer('step');
+      await client.steerAck?.('step');
+      await client.stop('step');
+    }
+    expect(requests.map((url) => url.searchParams.get('generation'))).toEqual([
+      ...Array(7).fill('1'),
+      ...Array(7).fill('2'),
+      ...Array(7).fill('1'),
+    ]);
+  } finally {
+    for (const relay of relays) {
+      relay.client.close();
+      await relay.server.close();
+    }
+  }
 });
 
 test('refuses a second completion while the first is in flight and after it settles', async () => {
@@ -364,8 +439,8 @@ test('destroys a socket when an unterminated frame exceeds the byte limit', asyn
 test('disconnects a non-reading worker when queued output exceeds the frame budget', async () => {
   const home = testTempDir('relay-output-limit-');
   const socketPath = join(home, 'step.sock');
-  const upstream = new MachineClient({ serverUrl: 'http://unused.test' });
-  const heartbeat = vi.spyOn(upstream, 'heartbeat').mockResolvedValue(undefined);
+  const heartbeat = vi.fn<typeof fetch>(async () => Response.json({ ok: true }));
+  const upstream = new MachineClient({ serverUrl: 'http://unused.test', fetchImpl: heartbeat });
   const server = new RelayMachineServer({
     socketPath,
     release: orbTestRelease(socketPath),
@@ -382,6 +457,9 @@ test('disconnects a non-reading worker when queued output exceeds the frame budg
     );
     socket.write('cairn-orb-rpc:{"type":"call","id":0,"method":"heartbeat","args":["step"]}\n');
     await vi.waitFor(() => expect(heartbeat).toHaveBeenCalledTimes(1));
+    expect(new URL(String(heartbeat.mock.calls[0]?.[0])).pathname).toBe(
+      '/api/machine/heartbeat/step',
+    );
     const message = 'x'.repeat(1024 * 1024);
     for (let index = 0; index < 20; index++) server.send({ type: 'log', message });
     socket.resume();
