@@ -1,5 +1,5 @@
 import { liveImEnv } from './env.js';
-import { asSendError, ImSendError } from './errors.js';
+import { asSendError, classifyHttpSendError, ImSendError, scrubSecrets } from './errors.js';
 import { chunkText } from './telegram.js';
 import type {
   ImAdapter,
@@ -156,14 +156,6 @@ async function slackApi<T>(
   );
 }
 
-function scrub(message: string, ...secrets: string[]): string {
-  let out = message;
-  for (const secret of secrets) {
-    if (secret !== '') out = out.split(secret).join('<redacted>');
-  }
-  return out;
-}
-
 function isAuthFailure(err: unknown): boolean {
   return (
     err instanceof SlackApiError &&
@@ -175,21 +167,14 @@ function isAuthFailure(err: unknown): boolean {
 
 function toSendError(err: unknown, ...secrets: string[]): ImSendError {
   if (err instanceof SlackApiError) {
-    const detail = scrub(err.message, ...secrets);
-    if (isAuthFailure(err)) {
-      return new ImSendError('permanent', detail, {
-        retryAfterMs: err.retryAfterMs,
-        authExpired: true,
-      });
-    }
-    if (err.status === 429 || err.error === 'ratelimited') {
-      return new ImSendError('retry', detail, { retryAfterMs: err.retryAfterMs });
-    }
-    if (err.error !== undefined && PERMANENT_ERRORS.has(err.error)) {
-      return new ImSendError('permanent', detail);
-    }
-    if (err.status === 0 || err.status >= 500) return new ImSendError('retry', detail);
-    return new ImSendError('drop', detail);
+    return classifyHttpSendError({
+      status: err.status,
+      detail: scrubSecrets(err.message, ...secrets),
+      retryAfterMs: err.retryAfterMs,
+      authExpired: isAuthFailure(err),
+      rateLimited: err.error === 'ratelimited',
+      permanent: err.error !== undefined && PERMANENT_ERRORS.has(err.error),
+    });
   }
   return asSendError(err);
 }
@@ -289,7 +274,11 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
       } catch (err) {
         return {
           ok: false,
-          reason: scrub(err instanceof Error ? err.message : String(err), appToken, botToken),
+          reason: scrubSecrets(
+            err instanceof Error ? err.message : String(err),
+            appToken,
+            botToken,
+          ),
         };
       }
     },
@@ -476,12 +465,14 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
             if (isAuthFailure(err)) {
               handlers.onStatus(
                 'expired',
-                scrub(err instanceof Error ? err.message : String(err), appToken, botToken),
+                scrubSecrets(err instanceof Error ? err.message : String(err), appToken, botToken),
               );
               return;
             }
             failures += 1;
-            degraded(scrub(err instanceof Error ? err.message : String(err), appToken, botToken));
+            degraded(
+              scrubSecrets(err instanceof Error ? err.message : String(err), appToken, botToken),
+            );
             await env.sleep(Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS));
             continue;
           }
@@ -492,7 +483,9 @@ export function createSlackAdapter(checkEnv: ImEnv = liveImEnv): ImAdapter {
           } catch (err) {
             if (stopped) return;
             failures += 1;
-            degraded(scrub(err instanceof Error ? err.message : String(err), appToken, botToken));
+            degraded(
+              scrubSecrets(err instanceof Error ? err.message : String(err), appToken, botToken),
+            );
             await env.sleep(Math.min(RECONNECT_BASE_MS * 2 ** (failures - 1), RECONNECT_MAX_MS));
             continue;
           }

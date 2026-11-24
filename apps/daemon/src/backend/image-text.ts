@@ -1,13 +1,16 @@
-import type { DescribableImage, ImageDescription } from '@cairn/shared';
+import {
+  type DescribableImage,
+  extractCaptionReplyText,
+  IMAGE_CAPTION_ASK,
+  IMAGE_CAPTION_MAX_TOKENS,
+  IMAGE_CAPTION_TIMEOUT_MS,
+  type ImageDescription,
+  rankImageCaptionModels,
+} from '@cairn/shared';
 import type { Message } from '@earendil-works/pi-ai';
 import type { Models } from '@earendil-works/pi-ai/models';
 
-const CAPTION_TIMEOUT_MS = 45_000;
-const CAPTION_MAX_TOKENS = 1200;
-const CAPTION_CANDIDATE_LIMIT = 3;
-
-export const IMAGE_CAPTION_ASK =
-  'Transcribe all visible text verbatim, then briefly describe the image for an agent that cannot see it.';
+export { IMAGE_CAPTION_ASK };
 
 export async function describeImageWithModels(
   models: Pick<Models, 'getModels' | 'completeSimple'>,
@@ -15,16 +18,7 @@ export async function describeImageWithModels(
   image: DescribableImage,
   signal?: AbortSignal,
 ): Promise<ImageDescription | undefined> {
-  const candidates = models
-    .getModels()
-    .filter((model) => model.input.includes('image'))
-    .sort(
-      (a, b) =>
-        Number(b.provider === preferProvider) - Number(a.provider === preferProvider) ||
-        a.cost.input - b.cost.input ||
-        a.id.localeCompare(b.id),
-    )
-    .slice(0, CAPTION_CANDIDATE_LIMIT);
+  const candidates = rankImageCaptionModels(models.getModels(), preferProvider);
   if (candidates.length === 0) return undefined;
   const messages: Message[] = [
     {
@@ -43,17 +37,13 @@ export async function describeImageWithModels(
         { messages },
         {
           toolChoice: 'none',
-          maxTokens: CAPTION_MAX_TOKENS,
-          timeoutMs: CAPTION_TIMEOUT_MS,
+          maxTokens: IMAGE_CAPTION_MAX_TOKENS,
+          timeoutMs: IMAGE_CAPTION_TIMEOUT_MS,
           signal,
         },
       );
-      const text = reply.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text)
-        .join('')
-        .trim();
-      if (reply.stopReason === 'stop' && text !== '') {
+      const text = extractCaptionReplyText(reply);
+      if (text !== null) {
         return { text, attribution: `${model.provider}/${model.id}` };
       }
     } catch {}

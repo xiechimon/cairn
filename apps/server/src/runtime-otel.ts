@@ -23,10 +23,10 @@ import {
 } from '@cairn/shared';
 import {
   type CairnSpan,
-  type CairnTracing,
-  createCairnTracing,
+  createTracingPool,
   type OtlpTarget,
   otelConfigEnv,
+  otelJsonText,
   otlpRootSpanIdOfBuild,
   otlpStepSpanIdOfBuild,
   otlpTraceIdOfBuild,
@@ -43,7 +43,7 @@ import { storedStepRoute } from './services/step-route.js';
 
 const SCOPE = 'cairn.server';
 const COORDINATOR_TURN_SPAN = 'coordinator turn';
-const tracings = new Map<string, CairnTracing>();
+const tracings = createTracingPool(SCOPE);
 let sealed = false;
 let droppedAfterSeal = 0;
 
@@ -62,23 +62,15 @@ function push(target: OtlpTarget, env: NodeJS.ProcessEnv, spans: CairnSpan[]): v
     return;
   }
   const environment = otelEnvironment(otelConfigEnv(env));
-  const key = JSON.stringify([target.url.href, target.headers, environment]);
-  let tracing = tracings.get(key);
-  if (tracing === undefined) {
-    tracing = createCairnTracing(target, otelResourceAttributes(environment), SCOPE);
-    tracings.set(key, tracing);
-  }
-  tracing.record(spans);
+  tracings.get(target, otelResourceAttributes(environment), environment).record(spans);
 }
 
 export async function flushRuntimeOtel(): Promise<void> {
-  await Promise.all([...tracings.values()].map((tracing) => tracing.forceFlush()));
+  await tracings.forceFlush();
 }
 
 export async function shutdownRuntimeOtel(): Promise<void> {
-  const open = [...tracings.values()];
-  tracings.clear();
-  await Promise.all(open.map((tracing) => tracing.shutdown()));
+  await tracings.shutdown();
 }
 
 export async function sealRuntimeOtel(): Promise<void> {
@@ -395,10 +387,6 @@ export type CoordinatorTurnSpanRecord =
       maxEventLoopDelayMs?: number;
     };
 
-function jsonText(value: unknown): string {
-  return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
-}
-
 export function emitCoordinatorTurnSpans(
   turn: {
     threadId: string;
@@ -478,8 +466,8 @@ export function emitCoordinatorTurnSpans(
         },
       };
     }
-    const argumentText = jsonText(record.arguments);
-    const resultText = jsonText(record.result);
+    const argumentText = otelJsonText(record.arguments);
+    const resultText = otelJsonText(record.result);
     return {
       parent,
       name: `execute_tool ${record.name}`,

@@ -4,14 +4,18 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
+import {
+  extractCaptionReplyText,
+  IMAGE_CAPTION_ASK,
+  IMAGE_CAPTION_MAX_TOKENS,
+  IMAGE_CAPTION_TIMEOUT_MS,
+  rankImageCaptionModels,
+} from '@cairn/shared';
 import type { ImageContent, Message } from '@earendil-works/pi-ai';
 import type { Models } from '@earendil-works/pi-ai/models';
 
 const execFileAsync = promisify(execFile);
 
-const CAPTION_TIMEOUT_MS = 45_000;
-const CAPTION_MAX_TOKENS = 1200;
-const CAPTION_CANDIDATE_LIMIT = 3;
 const OCR_TIMEOUT_MS = 30_000;
 const OCR_MAX_OUTPUT_BYTES = 512 * 1024;
 const OCR_PREFERRED_LANGS = ['eng', 'chi_sim'];
@@ -23,8 +27,7 @@ const OCR_EXT_BY_MIME: Readonly<Record<string, string>> = {
   'image/bmp': '.bmp',
 };
 
-export const ATTACHMENT_CAPTION_ASK =
-  'Transcribe all visible text verbatim, then briefly describe the image for an agent that cannot see it.';
+export const ATTACHMENT_CAPTION_ASK = IMAGE_CAPTION_ASK;
 
 export interface AttachmentImageInput {
   fileName: string;
@@ -67,16 +70,7 @@ function attachmentLabel(image: AttachmentImageInput): string {
 async function visionCaption(
   deps: AttachmentImageTextDeps,
 ): Promise<{ text: string; by: string } | undefined> {
-  const candidates = deps.models
-    .getModels()
-    .filter((model) => model.input.includes('image'))
-    .sort(
-      (a, b) =>
-        Number(b.provider === deps.preferProvider) - Number(a.provider === deps.preferProvider) ||
-        a.cost.input - b.cost.input ||
-        a.id.localeCompare(b.id),
-    )
-    .slice(0, CAPTION_CANDIDATE_LIMIT);
+  const candidates = rankImageCaptionModels(deps.models.getModels(), deps.preferProvider);
   if (candidates.length === 0) return undefined;
   let prepared: ImageContent;
   try {
@@ -98,17 +92,13 @@ async function visionCaption(
         { messages },
         {
           toolChoice: 'none',
-          maxTokens: CAPTION_MAX_TOKENS,
-          timeoutMs: CAPTION_TIMEOUT_MS,
+          maxTokens: IMAGE_CAPTION_MAX_TOKENS,
+          timeoutMs: IMAGE_CAPTION_TIMEOUT_MS,
           signal: deps.signal,
         },
       );
-      const text = reply.content
-        .filter((block) => block.type === 'text')
-        .map((block) => block.text)
-        .join('')
-        .trim();
-      if (reply.stopReason === 'stop' && text !== '') {
+      const text = extractCaptionReplyText(reply);
+      if (text !== null) {
         return { text, by: `${model.provider}/${model.id}` };
       }
     } catch {}

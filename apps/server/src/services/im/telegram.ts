@@ -1,5 +1,5 @@
 import { liveImEnv } from './env.js';
-import { asSendError, ImSendError } from './errors.js';
+import { asSendError, classifyHttpSendError, ImSendError } from './errors.js';
 import type {
   ImAdapter,
   ImConnectionHandlers,
@@ -267,24 +267,16 @@ function isMarkupRejection(err: TelegramApiError): boolean {
 
 function toSendError(err: unknown, token: string): ImSendError {
   if (err instanceof TelegramApiError) {
-    const detail = scrubToken(err.message, token);
-    if (err.status === 401) {
-      return new ImSendError('permanent', detail, {
-        retryAfterMs: err.retryAfterMs,
-        authExpired: true,
-      });
-    }
-    if (err.status === 403 || err.status === 404) {
-      return new ImSendError('permanent', detail);
-    }
-    if (err.status === 400 && /chat not found/i.test(err.message)) {
-      return new ImSendError('permanent', detail);
-    }
-    if (err.status === 429) {
-      return new ImSendError('retry', detail, { retryAfterMs: err.retryAfterMs });
-    }
-    if (err.status === 0 || err.status >= 500) return new ImSendError('retry', detail);
-    return new ImSendError('drop', detail);
+    return classifyHttpSendError({
+      status: err.status,
+      detail: scrubToken(err.message, token),
+      retryAfterMs: err.retryAfterMs,
+      authExpired: err.status === 401,
+      permanent:
+        err.status === 403 ||
+        err.status === 404 ||
+        (err.status === 400 && /chat not found/i.test(err.message)),
+    });
   }
   return asSendError(err);
 }

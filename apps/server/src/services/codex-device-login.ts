@@ -6,6 +6,14 @@ import { provider } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId } from '../lib/ids.js';
+import {
+  createRefreshInflightMap,
+  ownDeviceState,
+  postDeviceForm,
+  postDeviceJson,
+  requiredDeviceString,
+  sweepExpiredStates,
+} from './device-login-helpers.js';
 import { nextProviderVersion, replaceProviderCredential } from './provider-configuration.js';
 import { createProvider } from './providers.js';
 
@@ -56,70 +64,14 @@ export interface CodexDeviceDeps {
   states: Map<string, CodexDeviceState>;
 }
 
-interface JsonResponse {
-  ok: boolean;
-  status: number;
-  body: Record<string, unknown>;
-}
-
-const refreshInflights = new WeakMap<Db, Map<string, Promise<string>>>();
-
-function refreshInflightOf(db: Db): Map<string, Promise<string>> {
-  let map = refreshInflights.get(db);
-  if (map === undefined) {
-    map = new Map<string, Promise<string>>();
-    refreshInflights.set(db, map);
-  }
-  return map;
-}
-
-function requiredString(body: Record<string, unknown>, field: string): string {
-  const value = body[field];
-  if (typeof value !== 'string' || value.length === 0) {
-    throw new HttpError(502, `Codex device login returned an invalid ${field}`);
-  }
-  return value;
-}
-
-async function send(
-  fetchImpl: FetchLike,
-  url: string,
-  contentType: string,
-  body: string,
-): Promise<JsonResponse> {
-  let response: Awaited<ReturnType<FetchLike>>;
-  try {
-    response = await fetchImpl(url, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': contentType },
-      body,
-    });
-  } catch {
-    throw new HttpError(502, 'Codex device login request failed');
-  }
-  let parsed: unknown = {};
-  try {
-    parsed = await response.json();
-  } catch {
-    if (response.ok) {
-      throw new HttpError(
-        502,
-        `Codex device login returned invalid JSON (HTTP ${response.status})`,
-      );
-    }
-  }
-  const record =
-    parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? (parsed as Record<string, unknown>)
-      : {};
-  return { ok: response.ok, status: response.status, body: record };
-}
-
+const DEVICE_LABEL = 'Codex device login';
+const refreshInflightOf = createRefreshInflightMap<string>();
+const requiredString = (body: Record<string, unknown>, field: string) =>
+  requiredDeviceString(body, field, DEVICE_LABEL);
 const postJson = (fetchImpl: FetchLike, url: string, payload: Record<string, string>) =>
-  send(fetchImpl, url, 'application/json', JSON.stringify(payload));
-
+  postDeviceJson(fetchImpl, url, payload, { label: DEVICE_LABEL });
 const postForm = (fetchImpl: FetchLike, url: string, fields: Record<string, string>) =>
-  send(fetchImpl, url, 'application/x-www-form-urlencoded', new URLSearchParams(fields).toString());
+  postDeviceForm(fetchImpl, url, fields, { label: DEVICE_LABEL });
 
 function accountIdOf(accessToken: string): string {
   const payload = accessToken.split('.')[1];
@@ -188,13 +140,6 @@ function sealedTokens(body: Record<string, unknown>, previousRefresh?: string) {
   return { secret, sealed: JSON.stringify(secret) };
 }
 
-function sweep(states: Map<string, CodexDeviceState>): void {
-  const now = Date.now();
-  for (const [state, entry] of states) {
-    if (entry.expiresAt <= now) states.delete(state);
-  }
-}
-
 const providerRow = (db: Db, teamId: string) =>
   db
     .select()
@@ -212,7 +157,7 @@ export async function startCodexDeviceLogin(
   intervalSeconds: number;
   expiresInSeconds: number;
 }> {
-  sweep(deps.states);
+  sweepExpiredStates(deps.states);
   const response = await postJson(deps.fetch, CODEX_DEVICE_USER_CODE_URL, {
     client_id: CODEX_PI_PUBLIC_CLIENT_ID,
   });
@@ -242,12 +187,6 @@ export async function startCodexDeviceLogin(
     intervalSeconds,
     expiresInSeconds: DEVICE_CODE_LIFETIME_SECONDS,
   };
-}
-
-function ownState(deps: CodexDeviceDeps, teamId: string, state: string): CodexDeviceState {
-  const entry = deps.states.get(state);
-  if (!entry || entry.teamId !== teamId) throw new HttpError(404, 'Codex device login not found');
-  return entry;
 }
 
 function saveSubscription(
@@ -323,7 +262,7 @@ export async function pollCodexDeviceLogin(
   | { status: 'denied' }
   | { status: 'expired' }
 > {
-  const entry = ownState(deps, input.teamId, input.state);
+  const entry = ownDeviceState(deps.states, input.teamId, input.state, DEVICE_LABEL);
   if (entry.expiresAt <= Date.now()) {
     deps.states.delete(input.state);
     return { status: 'expired' };

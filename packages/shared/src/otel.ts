@@ -311,6 +311,44 @@ export interface CairnTracing {
   shutdown(): Promise<void>;
 }
 
+export interface CairnTracingPool {
+  get(
+    target: OtlpTarget,
+    resource: Attributes,
+    environment: string | null,
+    onError?: (error: Error) => void,
+  ): CairnTracing;
+  forceFlush(): Promise<void>;
+  shutdown(): Promise<void>;
+}
+
+export function otelJsonText(value: unknown): string {
+  return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
+}
+
+export function createTracingPool(scope: string): CairnTracingPool {
+  const tracings = new Map<string, CairnTracing>();
+  return {
+    get(target, resource, environment, onError) {
+      const key = JSON.stringify([target.url.href, target.headers, environment]);
+      let tracing = tracings.get(key);
+      if (tracing === undefined) {
+        tracing = createCairnTracing(target, resource, scope, onError);
+        tracings.set(key, tracing);
+      }
+      return tracing;
+    },
+    async forceFlush() {
+      await Promise.all([...tracings.values()].map((tracing) => tracing.forceFlush()));
+    },
+    async shutdown() {
+      const open = [...tracings.values()];
+      tracings.clear();
+      await Promise.all(open.map((tracing) => tracing.shutdown()));
+    },
+  };
+}
+
 export function createCairnTracing(
   target: OtlpTarget,
   resource: Attributes,

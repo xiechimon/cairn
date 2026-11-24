@@ -12,9 +12,9 @@ import {
 } from '@cairn/shared';
 import {
   type CairnSpan,
-  type CairnTracing,
-  createCairnTracing,
+  createTracingPool,
   otelConfigEnv,
+  otelJsonText,
   parseOtlpTarget,
   type StepOtelContext,
   stepOtelContext,
@@ -24,32 +24,24 @@ import { childEnv } from '../child-env.js';
 
 const SCOPE = 'cairn.daemon';
 
-const tracings = new Map<string, CairnTracing>();
+const tracings = createTracingPool(SCOPE);
 
-function tracingFor(ctx: StepOtelContext, log?: (message: string) => void): CairnTracing {
+function tracingFor(ctx: StepOtelContext, log?: (message: string) => void) {
   const environment = ctx.environment ?? null;
-  const key = JSON.stringify([ctx.tracesUrl, ctx.headers, environment]);
-  let tracing = tracings.get(key);
-  if (tracing === undefined) {
-    tracing = createCairnTracing(
-      { url: new URL(ctx.tracesUrl), headers: ctx.headers },
-      otelResourceAttributes(environment),
-      SCOPE,
-      (error) => log?.(`otel push failed: ${error.message}`),
-    );
-    tracings.set(key, tracing);
-  }
-  return tracing;
+  return tracings.get(
+    { url: new URL(ctx.tracesUrl), headers: ctx.headers },
+    otelResourceAttributes(environment),
+    environment,
+    (error) => log?.(`otel push failed: ${error.message}`),
+  );
 }
 
 export async function flushDaemonOtel(): Promise<void> {
-  await Promise.all([...tracings.values()].map((tracing) => tracing.forceFlush()));
+  await tracings.forceFlush();
 }
 
 export async function shutdownDaemonOtel(): Promise<void> {
-  const open = [...tracings.values()];
-  tracings.clear();
-  await Promise.all(open.map((tracing) => tracing.shutdown()));
+  await tracings.shutdown();
 }
 
 export interface DaemonOtel {
@@ -128,10 +120,6 @@ interface OpenToolSpan {
   at: number;
 }
 
-function jsonText(value: unknown): string {
-  return typeof value === 'string' ? value : (JSON.stringify(value) ?? '');
-}
-
 export class PiStepSpanSink {
   private readonly spans: CairnSpan[] = [];
   private readonly openTools = new Map<string, OpenToolSpan>();
@@ -204,8 +192,8 @@ export class PiStepSpanSink {
         ...executeToolAttributes({
           name: open.name,
           callId: id,
-          arguments: jsonText(open.args),
-          result: jsonText(result),
+          arguments: otelJsonText(open.args),
+          result: otelJsonText(result),
         }),
         ...langfuseEnvironmentAttributes(this.ctx.environment),
       },
