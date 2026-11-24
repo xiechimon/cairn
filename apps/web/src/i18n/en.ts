@@ -733,11 +733,9 @@ export const EN: Record<string, string> = {
   名称: 'Name',
   语言: 'Language',
   推送通知: 'Push notifications',
-  在这台设备上接收推送: 'Push on this device',
-  '需要你决定时立即推送，其余进展并入每日两次简报':
-    'Push immediately when a decision is needed; everything else lands in the twice-daily digest',
-  // #1031: the switch is a preference; when it's on but the browser permission
-  // is denied, the row explains why nothing will actually fire.
+  '需要你处理时提醒，不急的邮件定时汇总':
+    'Alerts you when something needs you; anything that can wait arrives in a scheduled email digest',
+  开启锁屏推送: 'Turn on lock-screen push',
   '浏览器已拒绝通知权限，需到站点设置重新允许':
     'Notifications are blocked by the browser — re-allow them in site settings',
 
@@ -2869,7 +2867,6 @@ export const EN: Record<string, string> = {
     'Site logins for browser fill live here. The Coordinator fills the username and password only on sites you approved, and neither value ever appears on a page or in a conversation.',
   'Coordinator 第一次在某个网站代填时会请求批准；撤销后重新请求。':
     'The Coordinator asks for approval the first time it fills on a site; revoking makes it ask again.',
-  锁屏也能收到: 'Arrives even on the lock screen',
   '按钮和回复都支持。': 'Buttons and replies are supported.',
   '在私聊里和 Coordinator 对话。': 'Talk to the Coordinator in DMs.',
   '在平时的聊天里和 Coordinator 对话。': 'Talk to the Coordinator in your usual chat.',
