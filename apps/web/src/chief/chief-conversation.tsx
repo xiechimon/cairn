@@ -580,7 +580,6 @@ export function ChiefConversation({
       onCopy={copyText}
       onRewindRequest={requestRewind}
       entering={enteringKey !== null && chiefStreamRowKey(item, i) === enteringKey}
-      onReply={onSend != null && composerReplacement == null ? stageReply : undefined}
       onWithdraw={onWithdraw != null ? withdrawSteer : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}

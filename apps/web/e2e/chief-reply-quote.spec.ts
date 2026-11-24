@@ -17,22 +17,48 @@ async function openChat(page: Page) {
 }
 
 async function replyTo(page: Page, sourceId: string) {
-  const bubble = page.locator(`[data-reply-source="${sourceId}"]`);
-  await bubble.hover();
-  await bubble
-    .locator('xpath=..')
-    .locator('[data-placement="left"] [data-testid="chief-msg-reply"]')
-    .click();
+  const source = page.locator(`[data-reply-source="${sourceId}"]`);
+  const bubble = source.locator('[data-slot="reply-bubble"]').first();
+  const target = (await bubble.count()) > 0 ? bubble : source;
+  await target.scrollIntoViewIfNeeded();
+  const box = await target.boundingBox();
+  if (box === null) throw new Error(`no box for ${sourceId}`);
+  await page.mouse.move(box.x + 4, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2, { steps: 6 });
+  await page.mouse.up();
+  const bar = page.getByTestId('selection-reply-bar');
+  await expect(bar).toBeVisible();
+  await bar.getByTestId('selection-quote').click();
+  await page.getByTestId('selection-quote-input').press('Enter');
 }
 
-test('a Coordinator message offers copy but no reply arrow and no more menu', async ({ page }) => {
-  await openChat(page);
+test('neither user nor Coordinator hover toolbar shows a reply button; select-to-quote quotes Coordinator replies', async ({
+  page,
+}) => {
+  const { sent, stream } = await openChat(page);
   const source = page.locator('[data-reply-source="m6"]');
   await source.locator('[data-slot="reply-bubble"]').first().hover();
   const tools = source.locator('[data-placement="right"]').first();
   await expect(tools.getByTestId('chief-msg-copy')).toBeVisible();
   await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
   await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);
+
+  const ownSource = page.locator('[data-reply-source="m4"]');
+  await ownSource.hover();
+  const ownTools = ownSource.locator('xpath=..').locator('[data-placement="left"]');
+  await expect(ownTools.getByTestId('chief-msg-copy')).toBeVisible();
+  await expect(ownTools.getByTestId('chief-msg-reply')).toHaveCount(0);
+
+  await replyTo(page, 'm6');
+  await expect(page.getByTestId('composer-reply-quote')).toContainText(LAST_REPLY);
+  const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  await input.fill('好的，收到');
+  await input.press('Enter');
+  await expect.poll(() => sent.at(-1)).toBe(`${LAST_WIRE}\n\n好的，收到`);
+  await expect(stream.getByTestId('chief-bubble').last().getByTestId('reply-quote')).toHaveText(
+    LAST_REPLY,
+  );
 });
 
 test.describe('reply to your own message from its toolbar', () => {

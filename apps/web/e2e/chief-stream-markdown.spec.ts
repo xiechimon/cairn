@@ -373,7 +373,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     await expect(children.getByTestId('md-code')).toContainText('pnpm migrate');
   });
 
-  test('F-R15: copy payload = markdown source (not rendered output); the tool row (reply/copy/more) is unaffected', async ({
+  test('F-R15: copy payload = markdown source (not rendered output); the tool row (copy/more) is unaffected', async ({
     page,
   }) => {
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
@@ -381,7 +381,8 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
     const firstUser = coordinator.getByTestId('chief-msg').first();
     const tools = firstUser.getByTestId('chief-msg-tools');
     await firstUser.getByTestId('chief-bubble').hover();
-    await expect(tools.getByTestId('chief-msg-reply')).toBeVisible();
+    await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
+    await expect(tools.getByTestId('chief-msg-more')).toBeVisible();
     await tools.getByTestId('chief-msg-copy').click();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
 
