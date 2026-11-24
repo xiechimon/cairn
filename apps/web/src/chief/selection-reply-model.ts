@@ -38,10 +38,3 @@ export function replyableText(raw: string): string | null {
 export function scrolledAway(shownTop: number, currentTop: number): boolean {
   return Math.abs(currentTop - shownTop) > SCROLL_DISMISS;
 }
-
-export function sideChatSeed(quote: string): string {
-  return `${quote
-    .split('\n')
-    .map((line) => (line.trim() === '' ? '>' : `> ${line}`))
-    .join('\n')}\n\n`;
-}

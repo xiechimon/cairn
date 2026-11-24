@@ -15,6 +15,7 @@ import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
+import { FailureMarker } from '../components/chat/failure-marker.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
@@ -60,7 +61,7 @@ import { TakeoverCard } from './takeover-card.js';
 import { growDelays, hoverTaskRef, markGrown, useTaskRefSignal } from './task-ref-signal.js';
 import type { ChannelMirror } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
-import { CardFailureContext, TurnFailureMarker } from './turn-failure.js';
+import { CardFailureContext } from './turn-failure.js';
 
 const STAMP_CLS = 'text-caption whitespace-nowrap tabular-nums';
 
@@ -673,7 +674,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'error')
     return item.id !== undefined && item.id === cardFailure ? null : (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
-        <TurnFailureMarker />
+        <FailureMarker label={t('未完成')} testId="chief-turn-error" />
       </MessageScrollerItem>
     );
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;

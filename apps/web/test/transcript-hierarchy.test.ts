@@ -202,7 +202,7 @@ describe('task thread hierarchy', () => {
     const fails = items.filter((item) => item.kind === 'fail');
     expect(fails).toHaveLength(1);
     expect(fails[0]).toMatchObject({
-      title: 'git commit failed (exit 1)',
+      label: '本步异常结束',
       body: '',
       facts: { files: 2, commits: ['a1cfe71e8'], pr: null },
       raw: GIT_ERROR,
@@ -280,5 +280,26 @@ describe('task thread hierarchy', () => {
   test('a failed build without a failure row still shows its error once', () => {
     const items = render(rows([['user', '哪个 pr']]));
     expect(occurrences(items, "Your branch and 'origin/main' have diverged")).toBe(1);
+  });
+
+  test('a parked task shows one failure marker with a plain reason, its raw error behind details', () => {
+    const parked = `Task parked: automatic retries exhausted (3). Last error: ${GIT_ERROR}`;
+    const items = mapTranscript({
+      messages: [{ id: 'retry-parked-build-1', role: 'system', content: parked, createdAt: NOW - 1000 }],
+      steps: [],
+      build: { ...FAILED_BUILD, errorMessage: parked },
+      todo: todo(1, 'failed'),
+      machineName: null,
+      userName: 'ian',
+      liveText: '',
+    });
+    expect(items.filter((item) => item.kind === 'note')).toEqual([]);
+    expect(items.filter((item) => item.kind === 'fail')).toEqual([
+      expect.objectContaining({
+        label: '自动重试 {n} 次后仍失败，已暂停',
+        labelVars: { n: '3' },
+        raw: parked,
+      }),
+    ]);
   });
 });

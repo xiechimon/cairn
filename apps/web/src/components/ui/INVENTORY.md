@@ -42,7 +42,7 @@ input.tsx
 input-group.tsx          # input composition piece (InputGroupInput/InputGroupAddon/InputGroupButton…): use it when a button/icon/prefix/suffix must live inside the input — do not stuff a bare Input into a homemade box
 kbd.tsx                  # key-cap primitive (the ⌘K cap in doc body text); floating shortcut hints = Kbd inside TooltipContent (the official-site composition, #1008)
 label.tsx                # form label primitive (used with field.tsx's FieldLabel; use directly for standalone label cases)
-marker.tsx               # shadcn Marker family (Marker/Icon/Content, separator/border tiers): annotation rows inside the chat stream (system notes / failure rows / separators, etc., centered annotations)
+marker.tsx               # shadcn Marker family (Marker/Icon/Content, separator/border tiers): annotation rows inside the chat stream (system notes / separators, centered annotations); a failure row is never composed here — render `components/chat/failure-marker.tsx` `FailureMarker` (C31)
 message-scroller.tsx     # shadcn MessageScroller family (Provider/Root/Viewport/Content/Item/Button + useMessageScroller hooks): the single implementation of the chat-stream scroll container (autoScroll bottom-follow + jump-to-latest + messageId pass-through); do not hand-write overflow-y-auto conversation columns anymore
 message.tsx              # shadcn Message family (Message/Avatar/Content/Header/Footer/Group): the chat-stream message row skeleton (avatar column + content column); row skinning belongs to bubble/marker
 popover.tsx              # in-repo semantic mapping: z goes through the single --z-dialog ladder (#733); motion = upstream defaults (#991 Q9)

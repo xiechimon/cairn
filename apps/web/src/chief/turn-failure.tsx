@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, CircleAlert, Copy, X } from 'lucide-react';
+import { CircleAlert, X } from 'lucide-react';
 import { createContext, type KeyboardEvent, type ReactNode, useId, useState } from 'react';
 import { Link } from 'react-router';
 import {
@@ -9,9 +9,8 @@ import {
 } from '../api/mappers.js';
 import { canUpdateDesktop, updateDesktopNow } from '../board/desktop-update.js';
 import { PANE_PARAM } from '../board/work-panel.js';
+import { FailureDetailToggle, RawError } from '../components/chat/failure-marker.js';
 import { Button } from '../components/ui/button.js';
-import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
-import { toastSuccess } from '../components/ui/toaster.js';
 import type { QueueWait } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
@@ -51,49 +50,7 @@ function useCopyText() {
   };
 }
 
-function RawError({ id, text }: { id: string; text: string }) {
-  const { t } = useI18n();
-  return (
-    <span
-      id={id}
-      data-testid="chief-turn-error-raw"
-      className="relative mt-1 block rounded-lg bg-card py-2 pr-9 pl-2.5 font-mono text-caption whitespace-pre-wrap text-content-secondary shadow-(--edge-ring) [overflow-wrap:anywhere]"
-    >
-      {text}
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        className="absolute top-1 right-1 text-content-tertiary pointer-coarse:size-11"
-        aria-label={t('复制原始错误')}
-        title={t('复制原始错误')}
-        onClick={() =>
-          void navigator.clipboard?.writeText(text).then(() => toastSuccess(t('已复制')))
-        }
-      >
-        <Copy className="size-4" />
-      </Button>
-    </span>
-  );
-}
-
 export const CardFailureContext = createContext<string | null>(null);
-
-export function TurnFailureMarker() {
-  const { t } = useI18n();
-  return (
-    <Marker
-      variant="separator"
-      role="note"
-      data-testid="chief-turn-error"
-      className="gap-1.5 text-meta text-content-tertiary"
-    >
-      <MarkerIcon>
-        <CircleAlert />
-      </MarkerIcon>
-      <MarkerContent>{t('未完成')}</MarkerContent>
-    </Marker>
-  );
-}
 
 function NoticeCard({
   testId,
@@ -209,19 +166,9 @@ export function TurnFailureCard({
             </Button>
           );
         })}
-        <Button
-          variant="ghost"
-          size="sm"
-          aria-expanded={open}
-          aria-controls={detailId}
-          className="gap-0.5 px-1 font-normal text-content-tertiary pointer-coarse:h-11"
-          onClick={() => setOpen((v) => !v)}
-        >
-          {t('详情')}
-          {open ? <ChevronUp aria-hidden="true" /> : <ChevronDown aria-hidden="true" />}
-        </Button>
+        <FailureDetailToggle open={open} controls={detailId} onToggle={() => setOpen((v) => !v)} />
       </span>
-      {open && <RawError id={detailId} text={error.message} />}
+      {open && <RawError id={detailId} text={error.message} testId="chief-turn-error-raw" />}
     </NoticeCard>
   );
 }

@@ -19,14 +19,10 @@ import {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { useSearchParams } from 'react-router';
 import { useConnected } from '../api/connection-state.js';
 import { useArchivedTodos, useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import type { PendingComments } from '../board/design/design-composer.js';
-import { seedSideChat } from '../board/side-chat-seed.js';
-import { THREAD_PARAM } from '../board/thread-copy.js';
-import { useOpenThread } from '../board/thread-link.js';
 import { useNarrow } from '../board/use-narrow.js';
 import { EarlierLoader, type EarlierPages } from '../components/chat/earlier-loader.js';
 import { FadeScrollerViewport } from '../components/chat/fade-scroller-viewport.js';
@@ -85,7 +81,6 @@ import { ReaderFollowContext, useReaderFollow } from './reader-follow.js';
 import { ReplyingToBar } from './reply-quote-block.js';
 import { type ReplyQuoteDraft, ReplySourceHighlightContext } from './reply-source-highlight.js';
 import { SelectionReply } from './selection-reply.js';
-import { sideChatSeed } from './selection-reply-model.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
@@ -421,9 +416,6 @@ export function ChiefConversation({
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const [searchParams] = useSearchParams();
-  const openThreadId = searchParams.get(THREAD_PARAM);
-  const openThread = useOpenThread();
   const canStop = chief.running === true && onStop != null;
   const connected = useConnected();
   const restoreSent = (text: string) => {
@@ -642,33 +634,12 @@ export function ChiefConversation({
       layoutStream(rows.slice(dayEarlier), glances, before.lastAt, seen, reportSeen),
     ] as const;
   }, [rows, glances, dayEarlier]);
-  const sideChatFor = useCallback(
-    (sourceMessageId: string) => {
-      if (openThreadId !== null) return openThreadId;
-      let nearest: string | null = null;
-      for (const layout of [earlierLayout, streamLayout]) {
-        for (const { item } of layout.grouped) {
-          const own =
-            layout.taskRefs.get(item)?.[0]?.todoId ??
-            (item.kind === 'task-card' ? item.todoId : null);
-          if ('id' in item && item.id === sourceMessageId) return own ?? nearest;
-          if (own !== null) nearest = own;
-        }
-      }
-      return null;
-    },
-    [openThreadId, earlierLayout, streamLayout],
-  );
   const addQuote = (draft: ReplyQuoteDraft, text: string) => {
     stageReply(draft);
     if (text !== '')
       restoreToThread((current) =>
         current.trim() === '' ? text : `${current.trimEnd()}\n${text}`,
       );
-  };
-  const askSideChat = (todoId: string, quote: string) => {
-    seedSideChat(todoId, sideChatSeed(quote));
-    if (openThreadId !== todoId) openThread(todoId);
   };
   const row = (
     item: GroupedRow['item'],
@@ -823,10 +794,8 @@ export function ChiefConversation({
           <SelectionReply
             containerRef={viewportRef}
             enabled={sendQuoted !== undefined && composerReplacement == null}
-            sideChatFor={sideChatFor}
             onAddQuote={addQuote}
             onSendQuote={(draft, text) => void sendQuoted?.(draft, text)}
-            onAskSideChat={askSideChat}
           />
         </>
       )}

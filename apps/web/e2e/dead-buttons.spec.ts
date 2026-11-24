@@ -301,22 +301,26 @@ test('detail transcript message tools carry no restore action (#884)', async ({ 
   await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);
 });
 
-test('fail row `查看原始错误` opens the raw-error dialog with the full text (#1258)', async ({
+test('fail marker `详情` expands the guidance and raw error inline, like the chat card (#1258)', async ({
   page,
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
 
-  await expect(page.locator('.chat-para--fail')).toHaveText('运行该任务的执行机已离线');
-  await page.getByRole('button', { name: '查看原始错误' }).click();
-  const dialog = page.getByRole('dialog', { name: '原始错误' });
-  await expect(dialog).toBeVisible();
+  const marker = page.getByTestId('transcript-fail');
+  await expect(marker.getByTestId('failure-marker-label')).toHaveText('运行该任务的执行机已离线');
+  await expect(marker).not.toContainText('machine offline');
+  const toggle = marker.getByTestId('failure-marker-detail');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  const raw = page.getByTestId('fail-raw-error');
+  await expect(raw).toContainText('请将这台执行机重新上线');
+  await expect(raw).toContainText('machine offline: dev-mac stopped heartbeating');
 
-  await expect(dialog.locator('[data-testid="fail-raw-error"]')).toHaveText(
-    '运行该任务的执行机已离线',
-  );
-
-  await dialog.getByRole('button', { name: '关闭' }).click();
-  await expect(dialog).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(raw).toHaveCount(0);
 });
 
 test('fail row drops the `排查指南` dead link — no doc target, no shape (#1258)', async ({
@@ -324,9 +328,9 @@ test('fail row drops the `排查指南` dead link — no doc target, no shape (#
 }) => {
   await page.goto('/app/todo/r8-12?scenario=54');
 
-  await expect(page.locator('.chat-para--fail')).toBeVisible();
+  await expect(page.getByTestId('transcript-fail')).toBeVisible();
 
   await expect(page.getByText('排查指南')).toHaveCount(0);
 
-  await expect(page.getByRole('button', { name: '查看原始错误' })).toBeVisible();
+  await expect(page.getByTestId('failure-marker-detail')).toBeVisible();
 });
