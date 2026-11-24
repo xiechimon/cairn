@@ -368,9 +368,10 @@ jobs:
         working-directory: apps/desktop/release
         run: |
           arm64=$(ls Cairn-*-arm64.zip | sed -n 's/^Cairn-\(.*\)-arm64\.zip$/\1/p')
-          x64=$(ls Cairn-*-x64.zip | sed -n 's/^Cairn-\(.*\)-x64\.zip$/\1/p')
-          if [ "$arm64" != "$VERSION" ] || [ "$x64" != "$VERSION" ]; then
-            echo "the packaged archives carry arm64=${arm64:-none} x64=${x64:-none}, not the decided $VERSION" >&2
+          x64=$(ls Cairn-*-x64.zip | grep -v -- '-win-x64\.zip$' | sed -n 's/^Cairn-\(.*\)-x64\.zip$/\1/p')
+          win=$(ls Cairn-*-win-x64.zip | sed -n 's/^Cairn-\(.*\)-win-x64\.zip$/\1/p')
+          if [ "$arm64" != "$VERSION" ] || [ "$x64" != "$VERSION" ] || [ "$win" != "$VERSION" ]; then
+            echo "the packaged archives carry arm64=${arm64:-none} x64=${x64:-none} win-x64=${win:-none}, not the decided $VERSION" >&2
             exit 1
           fi
 
