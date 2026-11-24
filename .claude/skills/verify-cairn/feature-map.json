@@ -2105,6 +2105,7 @@
           "/api/todos/:id/design/comments/:commentId",
           "/api/todos/:id/design/marks",
           "/api/todos/:id/design/:fileName/share",
+          "/api/attachments/:id/artifact",
           "/s/:token"
         ]
       },

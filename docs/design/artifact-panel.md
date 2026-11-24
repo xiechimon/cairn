@@ -63,10 +63,10 @@ Stored `status` stays `open` / `sent` / `resolved` with the design-surface trans
 
 | Shown | Rule |
 |---|---|
-| 待处理 | `open` |
-| 处理中 | `sent` and no version of the file is newer than `sentAt` |
-| 已改 | `resolved`, or `sent` with a newer version where the anchor resolves |
-| 已失效 | `sent` with a newer version where the anchor does not resolve |
+| Pending | `open` |
+| In progress | `sent` and no version of the file is newer than `sentAt` |
+| Changed | `resolved`, or `sent` with a newer version where the anchor resolves |
+| Stale | `sent` with a newer version where the anchor does not resolve |
 
 "Newer version" is a server-computed field on the record, `handledSeq`: the first version `seq` created after `sentAt`, or `null`. Anchor resolution runs in the browser on the version being viewed (design-surface's ladder for elements; text search for regions on PDF/DOCX; line text for code; header and row key for cells; shape id for whiteboards; image and video regions always resolve). `重新指位置` on an `已失效` comment moves its anchor to a new spot and reopens it (`PATCH` with a new target, status back to `open`, `sentAt` cleared).
 

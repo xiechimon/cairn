@@ -68,7 +68,8 @@ describe('attachment token contract (#730)', () => {
   test('failure mode 2: key segment charset pinned (recordId alphabet + lowercase extension)', () => {
     expect(parseAttachmentTokenLines('![x](attachment:t1/id-XYZ_9.png)')).toHaveLength(1);
     expect(parseAttachmentTokenLines('![x](attachment:t1/id1.PNG)')).toHaveLength(0);
-    expect(parseAttachmentTokenLines('![x](attachment:t1/id1.toolongext)')).toHaveLength(0);
+    expect(parseAttachmentTokenLines('![x](attachment:t1/id1.excalidraw)')).toHaveLength(1);
+    expect(parseAttachmentTokenLines('![x](attachment:t1/id1.toolongexts)')).toHaveLength(0);
     expect(parseAttachmentTokenLines('![x](attachment:t1/id1!.png)')).toHaveLength(0);
   });
 
