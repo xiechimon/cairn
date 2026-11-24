@@ -11,7 +11,8 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { openMemoryDb } from '../src/db/client.js';
@@ -19,7 +20,7 @@ import { dataMigration } from '../src/db/schema.js';
 import { seed } from '../src/db/seed.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
 import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
-import { rollbackLocalSkillCreate } from '../src/services/skills.js';
+import { pathsOverlap, rollbackLocalSkillCreate } from '../src/services/skills.js';
 import { prepareSkillsHome, SKILLS_HOME_MIGRATION_ID } from '../src/services/skills-home.js';
 import { bootServer, req } from './helpers.js';
 
@@ -332,6 +333,41 @@ describe('Cairn never writes into a skills directory other agent tools share', (
     } finally {
       s.dispose();
     }
+  });
+
+  test('dangling symlink pointing into a shared skill root is detected and refused with 409', async () => {
+    const shared = join(home, '.agents', 'skills');
+    mkdirSync(shared, { recursive: true });
+    const danglingSkillsDir = join(home, 'dangling-skills-link');
+    symlinkSync(join(shared, 'nonexistent-subdir'), danglingSkillsDir);
+    expect(pathsOverlap(danglingSkillsDir, shared)).toBe(true);
+    expect(pathsOverlap(`${danglingSkillsDir}/`, shared)).toBe(true);
+    expect(pathsOverlap('/', shared)).toBe(true);
+    const s = bootServer({ skillsDir: danglingSkillsDir });
+    try {
+      const created = await req(s.app, 'POST', '/api/skills', body('made', '新建'));
+      expect(created.status).toBe(409);
+    } finally {
+      s.dispose();
+    }
+    const ownedDir = join(home, '.cairn', 'owned-skills');
+    mkdirSync(ownedDir, { recursive: true });
+    symlinkSync(join(home, 'nowhere'), join(ownedDir, 'occupied'));
+    const owned = bootServer({ skillsDir: ownedDir });
+    try {
+      const created = await req(owned.app, 'POST', '/api/skills', body('occupied', '占位'));
+      expect(created.status).toBe(409);
+    } finally {
+      owned.dispose();
+    }
+  });
+
+  test('skills service reuses shared realpathOfNearest instead of hand-rolling one', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/services/skills.ts'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/function\s+realpathOfNearest\b/);
   });
 
   test('a linked skill in the Cairn directory is not served when the link chain leaves the managed root', async () => {

@@ -6,16 +6,22 @@ import {
   lstatSync,
   mkdirSync,
   readdirSync,
-  realpathSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, isAbsolute, join } from 'node:path';
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
+import { realpathOfNearest } from '@cairn/shared/realpath-nearest';
 import { executableOnPath } from '../computer/contained-spawn.js';
 import { ComputerRefusal } from '../computer/provider.js';
-import { CONTAINER_SOCKETS, contains, DENIED_DIRECTORIES, DENIED_FILES } from './confine.js';
+import {
+  CONTAINER_SOCKETS,
+  canonicalDeny,
+  contains,
+  DENIED_DIRECTORIES,
+  DENIED_FILES,
+} from './confine.js';
 import {
   HOST_SHELL_WRITE_DENY_DIRECTORIES,
   HOST_SHELL_WRITE_DENY_FILES,
@@ -71,25 +77,13 @@ export interface HostShellConfinement {
   wrap(command: string, args: readonly string[]): { command: string; args: string[] };
 }
 
-function canonicalDeny(path: string): string {
+function canonicalize(path: string): string {
   if (!isAbsolute(path)) return path;
-  let cursor = path;
-  const missing: string[] = [];
-  while (true) {
-    try {
-      const resolved = realpathSync(cursor);
-      return join(resolved, ...missing);
-    } catch {
-      const parent = dirname(cursor);
-      if (parent === cursor) return path;
-      missing.unshift(basename(cursor));
-      cursor = parent;
-    }
-  }
+  return resolve(path) === path ? canonicalDeny(path) : realpathOfNearest(path);
 }
 
 function denyVariants(paths: readonly string[]): string[] {
-  return [...new Set(paths.flatMap((path) => [path, canonicalDeny(path)]))];
+  return [...new Set(paths.flatMap((path) => [path, canonicalize(path)]))];
 }
 
 function agentDesktopDir(binary: string): string | undefined {
@@ -136,7 +130,7 @@ export function createHostShellConfinement(
       : ['bus', 'ssh-agent.socket', 'docker.sock', 'containerd.sock'].map((name) =>
           join(runtimeDir, name),
         );
-  const deniedDirectories = denyVariants([
+  const rawDeniedDirectories = [
     ...(options.deniedRoots ?? []),
     ...(desktopDir !== undefined ? [desktopDir] : []),
     ...runtimeDirectories,
@@ -144,20 +138,22 @@ export function createHostShellConfinement(
       ? [...DENIED_DIRECTORIES, ...MAC_DENIED_DIRECTORIES].map((entry) => join(home, entry))
       : DENIED_DIRECTORIES.map((entry) => join(home, entry))),
     ...(platform === 'darwin' ? MAC_DENIED_ROOTS : []),
-  ]);
-  const deniedFiles = denyVariants([
+  ];
+  const rawDeniedFiles = [
     ...DENIED_FILES.map((entry) => join(home, entry)),
     ...(platform === 'darwin' ? MAC_AGENT_SOCKETS.map((entry) => join(home, entry)) : []),
     ...(platform !== 'win32' ? CONTAINER_SOCKETS : []),
     ...runtimeFiles,
-  ]);
-  const deniedWriteDirectories = denyVariants([
+  ];
+  const rawDeniedWriteDirectories = [
     ...(platform === 'darwin' ? HOST_SHELL_WRITE_DENY_ROOTS : []),
     ...HOST_SHELL_WRITE_DENY_DIRECTORIES.map((entry) => join(home, entry)),
-  ]);
-  const deniedWriteFiles = denyVariants(
-    HOST_SHELL_WRITE_DENY_FILES.map((entry) => join(home, entry)),
-  );
+  ];
+  const rawDeniedWriteFiles = HOST_SHELL_WRITE_DENY_FILES.map((entry) => join(home, entry));
+  const deniedDirectories = denyVariants(rawDeniedDirectories);
+  const deniedFiles = denyVariants(rawDeniedFiles);
+  const deniedWriteDirectories = denyVariants(rawDeniedWriteDirectories);
+  const deniedWriteFiles = denyVariants(rawDeniedWriteFiles);
   const protectedDirs = new Set(
     denyVariants([
       ...(options.deniedRoots ?? []),
@@ -171,14 +167,37 @@ export function createHostShellConfinement(
   const foldedWriteDirectories = deniedWriteDirectories.map(fold);
   const foldedWriteFiles = new Set(deniedWriteFiles.map(fold));
   const denied = (target: string): boolean => {
-    const probe = fold(canonicalDeny(target));
+    if (target.includes('\0')) return true;
+    const lexical = fold(isAbsolute(target) ? resolve(target) : target);
+    if (foldedPaths.some((root) => contains(root, lexical))) return true;
+    let probe: string;
+    try {
+      probe = fold(isAbsolute(target) ? realpathOfNearest(target, { onLoop: 'throw' }) : target);
+    } catch {
+      return true;
+    }
     return foldedPaths.some((root) => contains(root, probe));
   };
   const writeDenied = (target: string): boolean => {
+    if (target.includes('\0')) return true;
     const gitSegment = (path: string) =>
       path.split('/').some((segment) => segment === '.git' || segment.endsWith('.git'));
-    const probe = fold(canonicalDeny(target));
-    if (gitSegment(fold(target)) || gitSegment(probe)) return true;
+    const lexical = fold(isAbsolute(target) ? resolve(target) : target);
+    if (
+      gitSegment(fold(target)) ||
+      gitSegment(lexical) ||
+      foldedWriteDirectories.some((root) => contains(root, lexical)) ||
+      foldedWriteFiles.has(lexical)
+    ) {
+      return true;
+    }
+    let probe: string;
+    try {
+      probe = fold(isAbsolute(target) ? realpathOfNearest(target, { onLoop: 'throw' }) : target);
+    } catch {
+      return true;
+    }
+    if (gitSegment(probe)) return true;
     return (
       foldedWriteDirectories.some((root) => contains(root, probe)) || foldedWriteFiles.has(probe)
     );
@@ -263,9 +282,7 @@ export function createHostShellConfinement(
           } else if (dirMode !== undefined) {
             mkdirSync(target, { mode: dirMode });
           }
-        } catch {
-          // best effort; the mask below still pins the name
-        }
+        } catch {}
         return probe(target);
       };
       const probeTarget = (target: string) => {
@@ -273,19 +290,22 @@ export function createHostShellConfinement(
         if (stat?.isSymbolicLink() === true && !existsSync(target)) {
           try {
             unlinkSync(target);
-          } catch {
-            // If the unlink raced or failed, fall through to the missing-path
-            // mask; a lingering link makes bwrap resolve the mountpoint
-            // target, which fails closed rather than leaving the name open.
+          } catch {}
+          const after = probe(target);
+          if (after?.isSymbolicLink() === true && !existsSync(target)) {
+            throw new ComputerRefusal(
+              `host shell confinement cannot remove dangling symlink at ${target}`,
+            );
           }
-          return undefined;
+          return after;
         }
         return stat;
       };
-      for (const directory of deniedDirectories) {
-        const canon = canonicalDeny(directory);
-        if (covered(canon)) continue;
+      for (const directory of rawDeniedDirectories) {
+        if (covered(canonicalize(dirname(directory)))) continue;
         let stat = probeTarget(directory);
+        const canon = canonicalize(directory);
+        if (covered(canon)) continue;
         if (stat === undefined) {
           if (!protectedDirs.has(directory) && !contains(home, directory)) continue;
           if (!writableAncestor(directory)) continue;
@@ -298,10 +318,11 @@ export function createHostShellConfinement(
           mounts.push('--ro-bind', '/dev/null', canon);
         }
       }
-      for (const file of deniedFiles) {
-        const canon = canonicalDeny(file);
-        if (covered(canon)) continue;
+      for (const file of rawDeniedFiles) {
+        if (covered(canonicalize(dirname(file)))) continue;
         let stat = probeTarget(file);
+        const canon = canonicalize(file);
+        if (covered(canon)) continue;
         if (stat !== undefined && (stat.isDirectory() || resolvedIsDirectory(file))) {
           mounted.add(canon);
           mounts.push('--tmpfs', canon);
@@ -315,12 +336,13 @@ export function createHostShellConfinement(
         mounts.push('--ro-bind', '/dev/null', canon);
       }
       for (const path of [
-        ...deniedWriteDirectories.map((entry) => ({ entry, directory: true })),
-        ...deniedWriteFiles.map((entry) => ({ entry, directory: false })),
+        ...rawDeniedWriteDirectories.map((entry) => ({ entry, directory: true })),
+        ...rawDeniedWriteFiles.map((entry) => ({ entry, directory: false })),
       ]) {
-        const canon = canonicalDeny(path.entry);
-        if (covered(canon)) continue;
+        if (covered(canonicalize(dirname(path.entry)))) continue;
         let stat = probeTarget(path.entry);
+        const canon = canonicalize(path.entry);
+        if (covered(canon)) continue;
         if (stat === undefined) {
           if (!writableAncestor(path.entry)) continue;
           stat = materialize(path.entry);
@@ -334,7 +356,7 @@ export function createHostShellConfinement(
         }
       }
       for (const binary of LINUX_WRITE_DENY_MASKED_BINARIES) {
-        const canon = canonicalDeny(binary);
+        const canon = canonicalize(binary);
         if (covered(canon) || !existsSync(binary)) continue;
         mounted.add(canon);
         mounts.push('--ro-bind', '/dev/null', canon);
@@ -349,7 +371,7 @@ export function createHostShellConfinement(
         for (const entry of entries) {
           try {
             const target = join(runtimeDir, entry.name);
-            const canon = canonicalDeny(target);
+            const canon = canonicalize(target);
             const socket =
               entry.isSocket() ||
               (entry.isSymbolicLink() === true && statSync(target).isSocket() === true);

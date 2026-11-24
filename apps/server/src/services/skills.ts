@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { homedir } from 'node:os';
-import { basename, dirname, join, relative, resolve, sep } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import {
   type CreateSkillBody,
   MAX_SKILL_FILE_BYTES,
@@ -22,6 +22,7 @@ import {
   type SkillRecord,
   skillRecordSchema,
 } from '@cairn/shared';
+import { realpathOfNearest } from '@cairn/shared/realpath-nearest';
 import { parseSkillFrontmatter } from '@cairn/shared/skill-frontmatter';
 import { and, eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -99,32 +100,27 @@ export function sharedAgentSkillRoots(): [agents: string, claude: string] {
   return [join(homedir(), '.agents', 'skills'), join(homedir(), '.claude', 'skills')];
 }
 
-export function realpathOfNearest(path: string): string {
-  const missing: string[] = [];
-  let cur = resolve(path);
-  for (;;) {
-    try {
-      return join(realpathSync(cur), ...missing);
-    } catch {}
-    const parent = dirname(cur);
-    if (parent === cur) return resolve(path);
-    missing.unshift(basename(cur));
-    cur = parent;
+export { realpathOfNearest };
+
+export function pathsOverlap(a: string, b: string): boolean {
+  try {
+    const ra = realpathOfNearest(a, { onLoop: 'throw' });
+    const rb = realpathOfNearest(b, { onLoop: 'throw' });
+    return samePathOrInside(ra, rb) || samePathOrInside(rb, ra);
+  } catch {
+    return true;
   }
 }
 
-export function pathsOverlap(a: string, b: string): boolean {
-  const ra = realpathOfNearest(a);
-  const rb = realpathOfNearest(b);
-  return ra === rb || ra.startsWith(rb + sep) || rb.startsWith(ra + sep);
-}
-
 function isInsideSharedSkillRoot(path: string): boolean {
-  const target = realpathOfNearest(path);
-  return sharedAgentSkillRoots().some((root) => {
-    const real = realpathOfNearest(root);
-    return target === real || target.startsWith(real + sep);
-  });
+  try {
+    const target = realpathOfNearest(path, { onLoop: 'throw' });
+    return sharedAgentSkillRoots().some((root) =>
+      samePathOrInside(target, realpathOfNearest(root)),
+    );
+  } catch {
+    return true;
+  }
 }
 
 function assertCairnWritable(path: string): void {
@@ -388,13 +384,7 @@ export function createLocalSkill(
   const truth = assertFrontmatterCoherence(entry.content, body);
   const dir = join(opts.skillsDir, body.name);
   assertCairnWritable(dir);
-  let occupied = true;
-  try {
-    statSync(dir);
-  } catch {
-    occupied = false;
-  }
-  if (occupied) {
+  if (lstatSync(dir, { throwIfNoEntry: false }) !== undefined) {
     throw new HttpError(409, `skill directory ${body.name} already exists`);
   }
   const clash = scanLocalSkills(opts.skillsDir).find((s) => s.id === body.name);
