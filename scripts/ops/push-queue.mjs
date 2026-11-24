@@ -95,6 +95,35 @@ export function stampCommand(lane) {
   return `git log -1 --format=%B | grep -Eq '^(Amp-Thread-ID|Lane):' || git commit -q --amend --allow-empty --no-edit --trailer 'Lane: ${lane}'`;
 }
 
+export function stampUnownedCommits({
+  lane,
+  upstream = 'origin/main',
+  prefix = '[push-queue]',
+  cwd,
+} = {}) {
+  const execOpts = cwd ? { encoding: 'utf8', cwd } : { encoding: 'utf8' };
+  const spawnOpts = cwd ? { stdio: 'inherit', cwd } : { stdio: 'inherit' };
+  const git = (args) => execFileSync('git', args, execOpts).trim();
+  const commits = git(['log', '--reverse', '--format=%H%x1f%B%x1e', `${upstream}..HEAD`])
+    .split('\x1e')
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [sha, body] = entry.split('\x1f');
+      return { sha, body };
+    });
+  if (unownedCommits(commits).length === 0) {
+    return { ok: true, stamped: false, sha: git(['rev-parse', 'HEAD']) };
+  }
+  console.log(`${prefix} stamping the commits that have no owner trailer with Lane: ${lane}`);
+  const stamp = spawnSync('git', ['rebase', '--exec', stampCommand(lane), upstream], spawnOpts);
+  if (stamp.status !== 0) {
+    spawnSync('git', ['rebase', '--abort'], spawnOpts);
+    return { ok: false, stamped: false, sha: git(['rev-parse', 'HEAD']) };
+  }
+  return { ok: true, stamped: true, sha: git(['rev-parse', 'HEAD']) };
+}
+
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
@@ -249,27 +278,13 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   }
 
   const preStampSha = git(['rev-parse', 'HEAD']);
-  const commits = git(['log', '--reverse', '--format=%H%x1f%B%x1e', 'origin/main..HEAD'])
-    .split('\x1e')
-    .map((entry) => entry.trim())
-    .filter(Boolean)
-    .map((entry) => {
-      const [sha, body] = entry.split('\x1f');
-      return { sha, body };
-    });
-  if (unownedCommits(commits).length > 0) {
-    const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
-    console.log(`[push-queue] stamping the commits that have no owner trailer with Lane: ${lane}`);
-    const stamp = spawnSync('git', ['rebase', '--exec', stampCommand(lane), 'origin/main'], {
-      stdio: 'inherit',
-    });
-    if (stamp.status !== 0) {
-      spawnSync('git', ['rebase', '--abort'], { stdio: 'inherit' });
-      console.error(
-        '[push-queue] could not stamp the owner trailer (a dirty tree or a conflict); fix that and run it again. Nothing was pushed.',
-      );
-      process.exit(1);
-    }
+  const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
+  const stamped = stampUnownedCommits({ lane, prefix: '[push-queue]' });
+  if (!stamped.ok) {
+    console.error(
+      '[push-queue] could not stamp the owner trailer (a dirty tree or a conflict); fix that and run it again. Nothing was pushed.',
+    );
+    process.exit(1);
   }
   const english = spawnSync(
     process.execPath,

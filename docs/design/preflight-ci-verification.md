@@ -11,10 +11,10 @@ become the fast, optional preview, not the gate.
 A lane verifies on GitHub before it occupies `queue/main`:
 
 - `refs/heads/preflight/<lane>` is a scratch ref per lane
-  (`<lane>` = `laneName(host, worktree)`, the same name the push script stamps
-  into `Lane:` trailers). `node scripts/ops/preflight.mjs` pushes
-  `HEAD` there with `--force-with-lease` and, with `--wait`, follows the `ci`
-  run to a conclusion.
+  (`<lane>` = `laneName(host, worktree)`, the same name stamped into `Lane:`
+  trailers). `node scripts/ops/preflight.mjs` stamps any unowned commits in
+  `origin/main..HEAD` with `Lane: <lane>` first, then pushes `HEAD` there with
+  `--force-with-lease` and, with `--wait`, follows the `ci` run to a conclusion.
 - `ci.yml` triggers on `preflight/**` pushes and the `changes` job classifies
   them like queue pushes: base is `git merge-base origin/main HEAD` on every
   push, never `github.event.before` (which would make a second push to the
@@ -30,13 +30,15 @@ A lane verifies on GitHub before it occupies `queue/main`:
 
 ## Gate predicate
 
-`push-queue.mjs` computes `S = HEAD` after owner-trailer stamping, then for
-`S` (and the pre-stamp SHA, which shares `S`'s tree) requires the check runs
-GitHub reports for that commit to contain all of `check`, `pack-smoke` and
-`e2e-gate` with `conclusion: success` — the same three contexts the
-`green-main` ruleset requires and `promote-queue.mjs` inspects. A green run on
-a tree-identical SHA counts because trailer stamping rewrites commit metadata
-without touching the tree; a green run on a different tree does not.
+Because `preflight.mjs` stamps unowned commits before pushing `preflight/<lane>`,
+`push-queue.mjs` finds nothing left to stamp: `S = HEAD` is the exact SHA that
+already passed pre-flight, so `push-queue.mjs` can fast-forward `main` directly
+without a second CI run on `queue/main`. If a lane still has an unowned commit
+at push time, `push-queue.mjs` runs the same stamping step and requires the
+three contexts (`check`, `pack-smoke` and `e2e-gate`) with `conclusion: success`
+on `S` (or on the pre-stamp SHA, which shares `S`'s tree). A green run on a
+tree-identical SHA counts as pre-flight evidence, while `fast-forward-main`
+requires the green checks on `S` itself.
 
 ## States and failure behaviour
 

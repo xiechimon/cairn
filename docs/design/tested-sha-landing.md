@@ -195,9 +195,12 @@ the `queue-guard` run for the head SHA and waited on `check` forever.
 - `ci` no longer cancels queue runs: queue pushes use the per-SHA group like
   `main`, so a refused stacked push cannot cancel the running candidate.
 - Only `push-queue.mjs` touches `queue/main`. It refuses while a candidate is
-  live, names the commit, its `ci` state and its owner, and stamps
-  `Lane: <host>/<worktree>` on commits that carry no `Amp-Thread-ID` or `Lane`
-  trailer, so Claude Code sessions and Cairn tasks have an owner too.
+  live, names the commit, its `ci` state and its owner, and both `preflight.mjs`
+  and `push-queue.mjs` share the owner-trailer stamping (`Lane: <host>/<worktree>`
+  on commits in `origin/main..HEAD` that carry no `Amp-Thread-ID` or `Lane`
+  trailer), so Claude Code sessions and Cairn tasks have an owner too. Stamping
+  in `preflight.mjs` before pushing `preflight/<lane>` ensures the preflight-green
+  SHA is already stamped.
 - A candidate is live while it has not landed on `main` and has no
   `queue/main release:` comment. `queue-guard.yml` keeps the live candidate in
   `queue-state/main`, a branch that no workflow watches and that keeps the
@@ -227,8 +230,9 @@ the `queue-guard` run for the head SHA and waited on `check` forever.
   `pack-smoke` + `e2e-gate` on its exact SHA from `preflight/*`, and `HEAD`
   contains `origin/main`; if another lane fast-forwards `main` first, the
   non-fast-forward push fails and the loser rebases onto `origin/main`.
-  `queue/main` is only pushed when `Lane:` trailer stamping produced a new
-  untested SHA with the same tree.
+  `queue/main` is only pushed when the exact `pushedSha` lacks green preflight
+  evidence (for example, if `Lane:` stamping occurred after preflight and
+  produced a new SHA with the same tree).
 - `push-queue.mjs --wait` automates the competitive entry path: while a
   candidate is live it rebases the lane's commits onto that candidate (the
   landed candidate becomes `main`, so a head that contains it fast-forwards

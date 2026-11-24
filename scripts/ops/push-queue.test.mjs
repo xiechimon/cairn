@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { test } from 'node:test';
+import { fileURLToPath } from 'node:url';
+import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
 import {
   failedGreenContexts,
@@ -287,5 +292,81 @@ test('--wait rebases onto origin/main when main moved ahead of HEAD while queue/
       failed: [],
     }),
     { action: 'rebase', onto: 'origin/main' },
+  );
+});
+
+test('preflight stamps unowned commits with Lane: before pushing the preflight ref', () => {
+  const root = makeTestTempDir('preflight-stamp-');
+  try {
+    const bare = join(root, 'origin.git');
+    const work = join(root, 'wt');
+    const bin = join(root, 'bin');
+    mkdirSync(bare, { recursive: true });
+    mkdirSync(bin, { recursive: true });
+    const git = (cwd, args) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+    git(bare, ['init', '--bare', '-b', 'main']);
+    git(root, ['clone', bare, work]);
+    git(work, ['config', 'user.email', 'test@example.com']);
+    git(work, ['config', 'user.name', 'Test']);
+    git(work, ['commit', '--allow-empty', '-m', 'init']);
+    git(work, ['push', '-u', 'origin', 'main']);
+    git(work, ['checkout', '-b', 'feature']);
+    git(work, ['commit', '--allow-empty', '-m', 'unowned change']);
+
+    const ghStub = join(bin, 'gh');
+    writeFileSync(
+      ghStub,
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const apiArg = args.find((a) => a.includes('head_sha=')) || '';
+const sha = (apiArg.match(/head_sha=([0-9a-f]+)/) || [])[1] || '';
+const branch = process.env.EXPECTED_PREFLIGHT_REF || '';
+console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_branch: branch, html_url: 'https://example/run/1' }] }));
+`,
+    );
+    chmodSync(ghStub, 0o755);
+
+    const preflightScript = join(dirname(fileURLToPath(import.meta.url)), 'preflight.mjs');
+    const run = spawnSync(process.execPath, [preflightScript], {
+      cwd: work,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        EXPECTED_PREFLIGHT_REF: `preflight/${laneName(execFileSync('hostname', { encoding: 'utf8' }).trim(), 'wt')}`,
+      },
+    });
+    assert.equal(run.status, 0, run.stderr);
+    const body = git(work, ['log', '-1', '--format=%B', 'HEAD']);
+    assert.match(body, /^Lane:\s+\S+\/wt$/m);
+    const headSha = git(work, ['rev-parse', 'HEAD']);
+    const lane = laneName(execFileSync('hostname', { encoding: 'utf8' }).trim(), 'wt');
+    const remoteSha = git(work, ['ls-remote', 'origin', preflightRef(lane)]).split(/\s+/)[0];
+    assert.equal(remoteSha, headSha);
+  } finally {
+    releaseTestTempDir(root);
+  }
+});
+
+test('stamp-then-preflight produces evidence on pushedSha so landingTarget fast-forwards main', () => {
+  const stampedSha = 'c'.repeat(40);
+  const tree = 't'.repeat(40);
+  const evidence = preflightEvidence({
+    shas: [stampedSha],
+    pushedTree: tree,
+    treeOf: () => tree,
+    checkRunsOf: (sha) =>
+      sha === stampedSha
+        ? [
+            { name: 'check', conclusion: 'success' },
+            { name: 'pack-smoke', conclusion: 'success' },
+            { name: 'e2e-gate', conclusion: 'success' },
+          ]
+        : null,
+  });
+  assert.deepEqual(evidence, { ok: true, sha: stampedSha });
+  assert.deepEqual(
+    landingTarget({ pushedSha: stampedSha, evidenceSha: evidence.sha, containsMain: true }),
+    { action: 'fast-forward-main', sha: stampedSha },
   );
 });

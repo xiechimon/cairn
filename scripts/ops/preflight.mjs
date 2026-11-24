@@ -3,7 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename } from 'node:path';
-import { laneName } from './push-queue.mjs';
+import { laneName, stampUnownedCommits } from './push-queue.mjs';
 
 export function preflightRef(lane) {
   return `refs/heads/preflight/${lane}`;
@@ -27,7 +27,14 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const lane = laneName(hostname(), basename(git(['rev-parse', '--show-toplevel'])));
   const ref = `preflight/${lane}`;
-  const sha = git(['rev-parse', 'HEAD']);
+  const stamped = stampUnownedCommits({ lane, prefix: '[preflight]' });
+  if (!stamped.ok) {
+    console.error(
+      '[preflight] could not stamp the owner trailer (a dirty tree or a conflict); fix that and run it again. Nothing was pushed.',
+    );
+    process.exit(1);
+  }
+  const sha = stamped.sha;
   const push = spawnSync(
     'git',
     ['push', `--force-with-lease=${preflightRef(lane)}`, 'origin', `HEAD:${preflightRef(lane)}`],
