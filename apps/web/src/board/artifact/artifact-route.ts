@@ -1,6 +1,7 @@
 import { attachmentExtOf } from '@cairn/shared';
 import { useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { safeSessionStorage } from '../../safe-storage.js';
 import { ARTIFACT_NAME_PARAM, ARTIFACT_PARAM, type FileTarget } from '../file-pane.js';
 import { PANE_PARAM, TASKS_TAB_PARAM } from '../work-panel.js';
 
@@ -35,9 +36,12 @@ export function withArtifact(prev: URLSearchParams, target: FileTarget | null): 
 const listeners = new Set<() => void>();
 let cachedRaw: string | null = null;
 let cachedTabs: readonly FileTarget[] = [];
+let memoryOnly = false;
 
 function readTabs(): readonly FileTarget[] {
-  const raw = window.sessionStorage.getItem(TABS_KEY);
+  const storage = safeSessionStorage();
+  if (storage === null || memoryOnly) return cachedTabs;
+  const raw = storage.getItem(TABS_KEY);
   if (raw === cachedRaw) return cachedTabs;
   cachedRaw = raw;
   try {
@@ -58,7 +62,13 @@ function readTabs(): readonly FileTarget[] {
 }
 
 function writeTabs(tabs: readonly FileTarget[]): void {
-  window.sessionStorage.setItem(TABS_KEY, JSON.stringify(tabs.slice(-MAX_TABS)));
+  cachedTabs = tabs.slice(-MAX_TABS);
+  cachedRaw = JSON.stringify(cachedTabs);
+  try {
+    safeSessionStorage()?.setItem(TABS_KEY, cachedRaw);
+  } catch {
+    memoryOnly = true;
+  }
   for (const listener of listeners) listener();
 }
 

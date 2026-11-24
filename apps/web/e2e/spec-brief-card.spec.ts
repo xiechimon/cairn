@@ -91,26 +91,27 @@ test('1. spec block-level markdown rendering: headings/lists/fences become eleme
   await expect(block).not.toContainText('```');
 });
 
-test('2. attachment token rows render as chips: images with thumbnail constraints, files with name and endpoint link', async ({ page }) => {
+test('2. attachment tokens render inline: the image at prose width, the file as a card that opens in the panel', async ({ page }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
   const block = page.locator('.spec-block');
   await expect(block).not.toContainText('attachment:');
-  const imageChip = block.locator('a.spec-chip--image');
-  await expect(imageChip).toHaveAttribute('href', '/api/attachments/att-img-1');
-  await expect(imageChip.locator('img.spec-chip-img')).toHaveAttribute('alt', '设计稿.png');
-  const fileChip = block.locator('a.spec-chip', { hasText: '说明文档.pdf' });
-  await expect(fileChip).toHaveAttribute('href', '/api/attachments/att-doc-7');
+  await expect(block.getByTestId('chat-artifact-image').locator('img')).toHaveAttribute('alt', '设计稿.png');
+  const card = block.getByTestId('chat-artifact-card');
+  await expect(card).toContainText('说明文档');
+  await card.click();
+  await expect(page.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('说明文档.pdf');
 });
 
-test('3. image attachments constrained by thumbnails — no longer naked original-size images breaking the page', async ({ page }) => {
+test('3. an inline image never grows past the text column or a screen of height', async ({ page }) => {
   await stubWorld(page);
   await page.goto(`/app/todo/${BRIEF_ID}`);
-  const img = page.locator('.spec-block img.spec-chip-img');
-  const maxHeight = await img.evaluate((el) => getComputedStyle(el).maxHeight);
-  expect(maxHeight).toBe('160px');
-  const maxWidth = await img.evaluate((el) => getComputedStyle(el).maxWidth);
-  expect(maxWidth).toBe('100%');
+  const block = page.locator('.spec-block');
+  const img = block.getByTestId('chat-artifact-image').locator('img');
+  await expect(img).toBeVisible();
+  const [imgBox, blockBox] = await Promise.all([img.boundingBox(), block.boundingBox()]);
+  expect(imgBox?.width ?? Infinity).toBeLessThanOrEqual(blockBox?.width ?? 0);
+  expect(imgBox?.height ?? Infinity).toBeLessThanOrEqual(448);
 });
 
 test('4. the task description reads as plain conversation text, not a framed card (thread panel 1:1 pass)', async ({
