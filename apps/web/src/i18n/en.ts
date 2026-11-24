@@ -2844,6 +2844,19 @@ export const EN: Record<string, string> = {
   标注工具: 'Mark-up tools',
   标注说明: 'Mark-up note',
   说说要怎么改: 'Say what to change',
+  公网隧道: 'Public tunnel',
+  中继地址: 'Relay URL',
+  公网隧道已开启: 'Public tunnel is active',
+  '正在连接公网隧道…': 'Connecting to public tunnel…',
+  '公网隧道未能打开，请检查中继地址后重试':
+    'Could not enable public tunnel. Check the relay URL and try again.',
+  '打开后，无需 Tailscale，手机和其他电脑也能通过加密中继隧道访问这台电脑':
+    'Reach this computer from a phone or another computer through an encrypted relay tunnel without Tailscale',
+  公网隧道需要开启访问认证: 'Public tunnel requires access authentication',
+  '中继地址无效，请填写完整的 https:// 地址': 'Invalid relay URL. Enter a full https:// address.',
+  '中继服务器拒绝了连接，请稍后重试': 'The relay server rejected the connection. Try again later.',
+  '无法连接到中继服务器，请检查网络或中继地址':
+    'Could not reach the relay server. Check your network or relay URL.',
   标注: 'Mark up',
   标注画布: 'Mark-up canvas',
   标注文字: 'Mark-up text',

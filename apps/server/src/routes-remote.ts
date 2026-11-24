@@ -6,6 +6,7 @@ import {
   REMOTE_DESCRIPTOR_VERSION,
   type RemoteDescriptor,
   tailnetSetBodySchema,
+  tunnelSetBodySchema,
 } from '@cairn/shared';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
@@ -67,6 +68,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
       listenPort: remote.listenPort,
       interfaces: (remote.networkInterfaces ?? networkInterfaces)(),
       tailnet: remote.tailnetStatus(),
+      tunnel: remote.tunnelStatus?.() ?? null,
     });
     if (ctx.authToken !== null && c.get('ownerIdentity') === undefined) {
       routes.tailnet.authUrl = null;
@@ -114,6 +116,14 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     if (remote.tailnet === undefined) throw new HttpError(404, 'tailnet access unavailable');
     const body = parseWith(tailnetSetBodySchema, await jsonBody(c), 'body');
     return c.json(await remote.tailnet.setEnabled(body.enabled));
+  });
+
+  app.post('/api/remote/tunnel', async (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
+    const body = parseWith(tunnelSetBodySchema, await jsonBody(c), 'body');
+    return c.json(await remote.tunnel.setEnabled(body.enabled, body.relayUrl));
   });
 
   const requireTokenAuth = (): void => {

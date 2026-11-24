@@ -10,6 +10,7 @@ import {
   useRemoteMutations,
   useRemoteRoutes,
   useSetTailnetAccess,
+  useSetTunnelAccess,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { joinMeta, relativeTime } from '../board/rel-time.js';
@@ -20,6 +21,7 @@ import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import { Input } from '../components/ui/input.js';
 import {
   Select,
   SelectContent,
@@ -39,6 +41,7 @@ export const REMOTE_ACCESS_ROUTE = 'remote-access';
 
 function sourceName(source: PairingCandidate['source'], t: (key: string) => string): string {
   if (source === 'page') return t('当前页面地址');
+  if (source === 'tunnel') return t('公网隧道');
   return source === 'tailnet' ? t('Tailscale') : t('局域网');
 }
 
@@ -137,14 +140,46 @@ export function RemoteAccessPage() {
   const requestsQ = usePairingRequests(live);
   const mutations = useRemoteMutations();
   const setTailnet = useSetTailnetAccess();
+  const setTunnel = useSetTunnelAccess();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const [toggleFailed, setToggleFailed] = useState(false);
+  const [tunnelToggleFailed, setTunnelToggleFailed] = useState(false);
+  const [relayDraft, setRelayDraft] = useState<string | null>(null);
+  const [tunnelCopied, setTunnelCopied] = useState(false);
   const [loginCopied, setLoginCopied] = useState(false);
   const routes = routesQ.data?.routes ?? [];
   const candidates =
     routesQ.data === undefined ? [] : pairingCandidates(routes, window.location.origin);
   const pairingBlocked = live && routesQ.data !== undefined && candidates.length === 0;
   const tailnet = routesQ.data?.tailnet;
+  const tunnel = routesQ.data?.tunnel;
+  const tunnelOn = tunnel?.enabled === true;
+  const tunnelState = tunnelOn ? tunnel.state : 'off';
+  const tunnelFailed = tunnelOn && (tunnelState === 'failed' || tunnelToggleFailed);
+  const tunnelUrl = tunnelOn && tunnelState === 'ready' ? tunnel.url : null;
+  const relayInputValue = relayDraft ?? tunnel?.relayUrl ?? '';
+  const tunnelHint: ReactNode = (() => {
+    if (!tunnelOn)
+      return tunnelToggleFailed
+        ? t('公网隧道未能打开，请检查中继地址后重试')
+        : t('打开后，无需 Tailscale，手机和其他电脑也能通过加密中继隧道访问这台电脑');
+    if (tunnelFailed) {
+      const kind = tunnel?.error;
+      if (kind === 'auth-off') return t('公网隧道需要开启访问认证');
+      if (kind === 'invalid-relay') return t('中继地址无效，请填写完整的 https:// 地址');
+      if (kind === 'rejected') return t('中继服务器拒绝了连接，请稍后重试');
+      return t('无法连接到中继服务器，请检查网络或中继地址');
+    }
+    if (tunnelUrl !== null)
+      return (
+        <>
+          {t('公网隧道已开启')}
+          <br />
+          <span className="font-mono">{tunnelUrl}</span>
+        </>
+      );
+    return t('正在连接公网隧道…');
+  })();
   const tailnetOn = tailnet?.enabled === true;
   const tailnetState = tailnetOn ? tailnet.state : 'off';
   const tailnetFailed = tailnetOn && (tailnetState === 'failed' || toggleFailed);
@@ -292,6 +327,62 @@ export function RemoteAccessPage() {
                 </Button>
               </div>
             </div>
+          )}
+          {tunnel !== undefined && (
+            <>
+              <SettingsRow
+                label={t('公网隧道')}
+                hint={tunnelHint}
+                hintClassName={tunnelFailed ? 'text-destructive' : undefined}
+              >
+                <div className="flex items-center gap-2">
+                  {tunnelUrl !== null && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        void navigator.clipboard?.writeText(tunnelUrl).then(() => {
+                          setTunnelCopied(true);
+                          setTimeout(() => setTunnelCopied(false), 2_000);
+                        });
+                      }}
+                    >
+                      {tunnelCopied ? t('已复制') : t('复制链接')}
+                    </Button>
+                  )}
+                  <ToggleSwitch
+                    checked={tunnelOn}
+                    disabled={!live || setTunnel.isPending}
+                    aria-label={t('公网隧道')}
+                    data-testid="remote-tunnel-switch"
+                    onCheckedChange={(checked) => {
+                      setTunnelToggleFailed(false);
+                      setTunnel.reset();
+                      const trimmed = relayInputValue.trim();
+                      setTunnel.mutate(
+                        {
+                          enabled: checked,
+                          ...(checked && trimmed !== '' ? { relayUrl: trimmed } : {}),
+                        },
+                        { onError: () => setTunnelToggleFailed(true) },
+                      );
+                    }}
+                  />
+                </div>
+              </SettingsRow>
+              {(!tunnelOn || tunnelFailed) && (
+                <div className="flex items-center gap-2 px-4 pb-3">
+                  <Input
+                    value={relayInputValue}
+                    onChange={(event) => setRelayDraft(event.target.value)}
+                    placeholder="https://relay.example.com"
+                    aria-label={t('中继地址')}
+                    data-testid="remote-tunnel-relay-input"
+                    className="font-mono text-meta"
+                  />
+                </div>
+              )}
+            </>
           )}
         </SettingsCard>
       )}

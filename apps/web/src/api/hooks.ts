@@ -103,6 +103,7 @@ import type {
   ThreadMessageResult,
   TodoRecord,
   TranscriptRow,
+  TunnelAccess,
   UpdateSkillBody,
   UpstreamModelsResult,
   UserRecord,
@@ -637,7 +638,13 @@ export const useRemoteRoutes = (enabled: boolean) =>
     enabled,
     refetchInterval: (query) => {
       const state = query.state.data?.tailnet.state;
-      const transient = state === 'starting' || state === 'restarting' || state === 'needs-login';
+      const tunnelState = query.state.data?.tunnel?.state;
+      const transient =
+        state === 'starting' ||
+        state === 'restarting' ||
+        state === 'needs-login' ||
+        tunnelState === 'connecting' ||
+        tunnelState === 'reconnecting';
       return transient ? REMOTE_STARTING_POLL_MS : REMOTE_POLL_MS;
     },
   });
@@ -672,6 +679,20 @@ export function useSetTailnetAccess() {
     onSuccess: (tailnet) => {
       queryClient.setQueryData<RemoteRoutesResponse>(['remoteRoutes'], (old) =>
         old === undefined ? old : { ...old, tailnet },
+      );
+    },
+  });
+}
+
+export function useSetTunnelAccess() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { enabled: boolean; relayUrl?: string }) =>
+      api.post<TunnelAccess>('/api/remote/tunnel', input),
+    onSuccess: (tunnel) => {
+      void queryClient.invalidateQueries({ queryKey: ['remoteRoutes'] });
+      queryClient.setQueryData<RemoteRoutesResponse>(['remoteRoutes'], (old) =>
+        old === undefined ? old : { ...old, tunnel },
       );
     },
   });
