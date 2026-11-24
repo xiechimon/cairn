@@ -26,12 +26,16 @@ import {
   parseReportedCapabilities,
   transcriptPromptRowId,
 } from '@cairn/shared';
-import { and, asc, eq, isNotNull, isNull, lt, ne } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, lt, ne, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   apiKey,
   build,
+  computer,
+  computerCall,
   machine,
+  phone,
+  routingRule,
   steerPending,
   step,
   stopPending,
@@ -296,6 +300,12 @@ function mergeReportedCapabilities(
 
 function localMachineRow(db: Db, teamId: string, name: string) {
   if (name !== hostname()) return undefined;
+  const byKind = db
+    .select()
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.kind, 'local')))
+    .get();
+  if (byKind !== undefined) return byKind;
   return db
     .select()
     .from(machine)
@@ -303,12 +313,46 @@ function localMachineRow(db: Db, teamId: string, name: string) {
     .get();
 }
 
-function machineByHostKey(db: Db, teamId: string, hostKey: string) {
+function presentedHostKeys(
+  hostKey: string | null | undefined,
+  legacyHostKeys: readonly string[] | undefined,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const key of [hostKey, ...(legacyHostKeys ?? [])]) {
+    if (key == null || key === '' || seen.has(key)) continue;
+    seen.add(key);
+    out.push(key);
+  }
+  return out;
+}
+
+function machinesByHostKeys(db: Db, teamId: string, keys: readonly string[]) {
+  if (keys.length === 0) return [];
   return db
     .select()
     .from(machine)
-    .where(and(eq(machine.teamId, teamId), eq(machine.hostKey, hostKey)))
-    .get();
+    .where(and(eq(machine.teamId, teamId), inArray(machine.hostKey, [...keys])))
+    .all();
+}
+
+function pickPrimaryHostMatch(
+  matches: readonly (typeof machine.$inferSelect)[],
+  hostKey: string | null,
+  legacyHostKeys: readonly string[],
+): typeof machine.$inferSelect | undefined {
+  if (matches.length === 0) return undefined;
+  const local = matches.find((row) => row.kind === 'local');
+  if (local !== undefined) return local;
+  if (hostKey !== null) {
+    const exact = matches.find((row) => row.hostKey === hostKey);
+    if (exact !== undefined) return exact;
+  }
+  for (const key of legacyHostKeys) {
+    const legacy = matches.find((row) => row.hostKey === key);
+    if (legacy !== undefined) return legacy;
+  }
+  return matches[0];
 }
 
 function hostKeyHeldByOther(db: Db, teamId: string, hostKey: string, machineId: string): boolean {
@@ -380,6 +424,40 @@ export function beginMachineStarting(
   }));
 }
 
+function upgradedHostKeyOf(
+  db: Db,
+  teamId: string,
+  machineId: string,
+  currentHostKey: string | null,
+  nextHostKey: string | null,
+  legacyHostKeys: readonly string[],
+): string | undefined {
+  if (
+    nextHostKey !== null &&
+    currentHostKey !== nextHostKey &&
+    (currentHostKey === null || legacyHostKeys.includes(currentHostKey)) &&
+    !hostKeyHeldByOther(db, teamId, nextHostKey, machineId)
+  ) {
+    return nextHostKey;
+  }
+  return undefined;
+}
+
+function notifyRetiredMachines(
+  deps: Pick<MachineDeps, 'hub' | 'machineHub'>,
+  teamId: string,
+  retiredIds: readonly string[],
+): void {
+  for (const id of retiredIds) {
+    deps.machineHub.revokeMachine(id);
+    deps.hub.publish(teamId, () => ({
+      type: 'machine_presence',
+      machineId: id,
+      online: false,
+    }));
+  }
+}
+
 export function enrollMachine(
   deps: MachineDeps,
   input: {
@@ -391,6 +469,7 @@ export function enrollMachine(
     claudeCode?: ClaudeCodeReport;
     capabilities?: unknown;
     hostKey?: string;
+    legacyHostKeys?: readonly string[];
   },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
@@ -400,7 +479,13 @@ export function enrollMachine(
   const token = newMachineToken();
   const capabilities = parseCapabilitiesField(input.capabilities);
   const hostKey = input.hostKey ?? null;
-  const byHost = hostKey === null ? undefined : machineByHostKey(db, input.teamId, hostKey);
+  const legacyHostKeys = input.legacyHostKeys ?? [];
+  const keys = presentedHostKeys(hostKey, legacyHostKeys);
+  const byHost = pickPrimaryHostMatch(
+    machinesByHostKeys(db, input.teamId, keys),
+    hostKey,
+    legacyHostKeys,
+  );
   const byKey =
     byHost === undefined
       ? db
@@ -420,29 +505,58 @@ export function enrollMachine(
     throw new HttpError(403, 'a revoked machine re-registers through the authorize page');
   }
   if (existing !== undefined) {
-    db.update(machine)
-      .set({
-        tokenHash: token.hash,
-        name: input.name,
-        apiKeyId: input.keyId,
-        retiredAt: null,
-        ...(existing.hostKey === null && hostKey !== null ? { hostKey } : {}),
-        ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
-        ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-        ...(capabilities !== undefined || existing.capabilities?.confinement
-          ? {
-              capabilities: mergeReportedCapabilities(
-                existing.capabilities,
-                capabilities ?? {
-                  ...(existing.capabilities ?? { mcpServers: [], skills: [] }),
-                  confinement: undefined,
-                },
-              ),
-            }
-          : {}),
-      })
-      .where(eq(machine.id, existing.id))
-      .run();
+    const retiredIds = db.transaction(() => {
+      const upgradedHostKey = upgradedHostKeyOf(
+        db,
+        input.teamId,
+        existing.id,
+        existing.hostKey,
+        hostKey,
+        legacyHostKeys,
+      );
+      db.update(machine)
+        .set({
+          tokenHash: token.hash,
+          name: input.name,
+          apiKeyId: input.keyId,
+          retiredAt: null,
+          ...(upgradedHostKey !== undefined ? { hostKey: upgradedHostKey } : {}),
+          ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
+          ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
+          ...(capabilities !== undefined || existing.capabilities?.confinement
+            ? {
+                capabilities: mergeReportedCapabilities(
+                  existing.capabilities,
+                  capabilities ?? {
+                    ...(existing.capabilities ?? { mcpServers: [], skills: [] }),
+                    confinement: undefined,
+                  },
+                ),
+              }
+            : {}),
+        })
+        .where(eq(machine.id, existing.id))
+        .run();
+      const updated = db.select().from(machine).where(eq(machine.id, existing.id)).get();
+      if (updated === undefined) return [];
+      const retired = retireVerifiedDuplicatesInTx(deps, updated, { hostKeys: keys });
+      const postRetireHostKey = upgradedHostKeyOf(
+        db,
+        input.teamId,
+        existing.id,
+        updated.hostKey,
+        hostKey,
+        legacyHostKeys,
+      );
+      if (postRetireHostKey !== undefined) {
+        db.update(machine)
+          .set({ hostKey: postRetireHostKey })
+          .where(eq(machine.id, existing.id))
+          .run();
+      }
+      return retired;
+    });
+    notifyRetiredMachines(deps, input.teamId, retiredIds);
     if (deps.machineHub.isConnected(existing.id)) deps.machineHub.revokeMachine(existing.id);
     beginMachineStarting(deps, existing);
     adoptAsDefaultIfUnset(db, input.teamId, existing.id);
@@ -454,23 +568,30 @@ export function enrollMachine(
     };
   }
   const machineId = newRecordId();
-  db.insert(machine)
-    .values({
-      id: machineId,
-      teamId: input.teamId,
-      name: input.name,
-      online: false,
-      tokenHash: token.hash,
-      apiKeyId: input.keyId,
-      latestCliVersion: input.cliVersion ?? null,
-      kind: 'remote',
-      ...(hostKey !== null ? { hostKey } : {}),
-      ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-      ...(capabilities !== undefined
-        ? { capabilities: mergeReportedCapabilities(null, capabilities) }
-        : {}),
-    })
-    .run();
+  const retiredIds = db.transaction(() => {
+    db.insert(machine)
+      .values({
+        id: machineId,
+        teamId: input.teamId,
+        name: input.name,
+        online: false,
+        tokenHash: token.hash,
+        apiKeyId: input.keyId,
+        latestCliVersion: input.cliVersion ?? null,
+        kind: 'remote',
+        ...(hostKey !== null ? { hostKey } : {}),
+        ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
+        ...(capabilities !== undefined
+          ? { capabilities: mergeReportedCapabilities(null, capabilities) }
+          : {}),
+      })
+      .run();
+    const inserted = db.select().from(machine).where(eq(machine.id, machineId)).get();
+    return inserted !== undefined && keys.length > 0
+      ? retireVerifiedDuplicatesInTx(deps, inserted, { hostKeys: keys })
+      : [];
+  });
+  notifyRetiredMachines(deps, input.teamId, retiredIds);
   beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
   adoptAsDefaultIfUnset(db, input.teamId, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
@@ -481,8 +602,14 @@ function enrollmentExistingRow(
   teamId: string,
   name: string | undefined,
   hostKey: string | null,
+  legacyHostKeys: readonly string[] = [],
 ) {
-  const byHost = hostKey === null ? undefined : machineByHostKey(db, teamId, hostKey);
+  const keys = presentedHostKeys(hostKey, legacyHostKeys);
+  const byHost = pickPrimaryHostMatch(
+    machinesByHostKeys(db, teamId, keys),
+    hostKey,
+    legacyHostKeys,
+  );
   if (byHost !== undefined) return byHost;
   return name === undefined ? undefined : localMachineRow(db, teamId, name);
 }
@@ -494,18 +621,53 @@ function enrollmentExistingRow(
  * that same one. */
 export function localEnrollmentRefusal(
   db: Db,
-  input: { teamId: string; name?: string; hostKey?: string; fromLocalHost: boolean },
+  input: {
+    teamId: string;
+    name?: string;
+    hostKey?: string;
+    legacyHostKeys?: readonly string[];
+    fromLocalHost: boolean;
+  },
 ): string | null {
   const namesThisHost = input.name === hostname();
   const hostKey = input.hostKey ?? null;
-  const row = enrollmentExistingRow(db, input.teamId, input.name, hostKey);
+  const legacyHostKeys = input.legacyHostKeys ?? [];
+  const keys = presentedHostKeys(hostKey, legacyHostKeys);
+  const keySet = new Set(keys);
+  const byHost = pickPrimaryHostMatch(
+    machinesByHostKeys(db, input.teamId, keys),
+    hostKey,
+    legacyHostKeys,
+  );
+  const row =
+    byHost ??
+    (input.name === undefined ? undefined : localMachineRow(db, input.teamId, input.name));
   if (row?.kind !== 'local' && !namesThisHost) return null;
   if (row !== undefined && row.kind !== 'local') {
-    return 'another enrolled machine already holds this host name';
+    if (byHost === undefined) {
+      return 'another enrolled machine already holds this host name';
+    }
+    if (!input.fromLocalHost) {
+      return 'this enrollment does not prove it is the local host runner';
+    }
+    const localRow = db
+      .select()
+      .from(machine)
+      .where(and(eq(machine.teamId, input.teamId), eq(machine.kind, 'local')))
+      .get();
+    if (
+      localRow !== undefined &&
+      (localRow.tokenHash !== null ||
+        localRow.retiredAt !== null ||
+        (localRow.hostKey !== null && !keySet.has(localRow.hostKey)))
+    ) {
+      return 'this enrollment does not prove it is the local host runner';
+    }
+    return null;
   }
   if (
     !input.fromLocalHost ||
-    (row !== undefined && row.hostKey !== null && hostKey !== row.hostKey)
+    (row !== undefined && row.hostKey !== null && !keySet.has(row.hostKey))
   ) {
     return 'this enrollment does not prove it is the local host runner';
   }
@@ -521,13 +683,17 @@ export function authorizeEnrollmentMachine(
     ownerApproved: boolean;
     fromLocalHost: boolean;
     hostKey?: string;
+    legacyHostKeys?: readonly string[];
+    retireToken?: string;
   },
 ): { machineId: string; token: string; teamId: string; serverUrl: string } {
   const { db } = deps;
   const token = newMachineToken();
   const isLocal = input.name === hostname();
   const hostKey = input.hostKey ?? null;
-  const existing = enrollmentExistingRow(db, input.teamId, input.name, hostKey);
+  const legacyHostKeys = input.legacyHostKeys ?? [];
+  const keys = presentedHostKeys(hostKey, legacyHostKeys);
+  const existing = enrollmentExistingRow(db, input.teamId, input.name, hostKey, legacyHostKeys);
   const claimsLocal = existing?.kind === 'local' || isLocal;
   if (claimsLocal && !input.ownerApproved) {
     throw new HttpError(403, 'local machine requires owner approval');
@@ -535,34 +701,97 @@ export function authorizeEnrollmentMachine(
   if (existing !== undefined && existing.retiredAt !== null && !input.ownerApproved) {
     throw new HttpError(403, 'a revoked machine requires owner approval to re-register');
   }
+  if (existing !== undefined && existing.apiKeyId !== null && !input.ownerApproved) {
+    throw new HttpError(403, 'only the owner can adopt an api-key machine');
+  }
   const refusal = localEnrollmentRefusal(db, {
     teamId: input.teamId,
     name: input.name,
     hostKey: input.hostKey,
+    legacyHostKeys,
     fromLocalHost: input.fromLocalHost,
   });
   if (refusal !== null) {
     throw new HttpError(403, refusal);
   }
+  const retireToken = input.ownerApproved ? input.retireToken : undefined;
   if (existing) {
-    db.update(machine)
-      .set({
-        tokenHash: token.hash,
-        name: existing.kind === 'local' ? hostname() : input.name,
-        apiKeyId: null,
-        retiredAt: null,
-        ...(existing.kind === 'local' || isLocal ? { kind: 'local' as const } : {}),
-        ...(existing.hostKey === null && hostKey !== null ? { hostKey } : {}),
-        capabilities:
-          existing.capabilities === null
-            ? null
-            : mergeReportedCapabilities(existing.capabilities, {
-                ...existing.capabilities,
-                confinement: undefined,
-              }),
-      })
-      .where(eq(machine.id, existing.id))
-      .run();
+    const promotesToLocal = existing.kind !== 'local' && isLocal;
+    const retiredIds = db.transaction(() => {
+      const upgradedHostKey = upgradedHostKeyOf(
+        db,
+        input.teamId,
+        existing.id,
+        existing.hostKey,
+        hostKey,
+        legacyHostKeys,
+      );
+      db.update(machine)
+        .set({
+          tokenHash: token.hash,
+          name: existing.kind === 'local' || isLocal ? hostname() : input.name,
+          apiKeyId: null,
+          retiredAt: null,
+          ...(existing.kind === 'local' || isLocal ? { kind: 'local' as const } : {}),
+          ...(upgradedHostKey !== undefined ? { hostKey: upgradedHostKey } : {}),
+          capabilities:
+            existing.capabilities === null
+              ? null
+              : mergeReportedCapabilities(existing.capabilities, {
+                  ...existing.capabilities,
+                  confinement: undefined,
+                }),
+        })
+        .where(eq(machine.id, existing.id))
+        .run();
+      const retired: string[] = [];
+      if (promotesToLocal) {
+        const unclaimedLocal = db
+          .select()
+          .from(machine)
+          .where(
+            and(
+              eq(machine.teamId, input.teamId),
+              eq(machine.kind, 'local'),
+              ne(machine.id, existing.id),
+              isNull(machine.tokenHash),
+              isNull(machine.hostKey),
+              isNull(machine.retiredAt),
+            ),
+          )
+          .get();
+        if (unclaimedLocal !== undefined) {
+          mergeMachineRowInTx(db, existing, unclaimedLocal);
+          retired.push(unclaimedLocal.id);
+        }
+      }
+      const updated = db.select().from(machine).where(eq(machine.id, existing.id)).get();
+      if (updated !== undefined && input.ownerApproved) {
+        retired.push(
+          ...retireVerifiedDuplicatesInTx(deps, updated, {
+            hostKeys: keys,
+            allowCrossApiKey: true,
+            ...(retireToken !== undefined ? { retireToken } : {}),
+          }),
+        );
+        const postRetireHostKey = upgradedHostKeyOf(
+          db,
+          input.teamId,
+          existing.id,
+          updated.hostKey,
+          hostKey,
+          legacyHostKeys,
+        );
+        if (postRetireHostKey !== undefined) {
+          db.update(machine)
+            .set({ hostKey: postRetireHostKey })
+            .where(eq(machine.id, existing.id))
+            .run();
+        }
+      }
+      return retired;
+    });
+    notifyRetiredMachines(deps, input.teamId, retiredIds);
     if (deps.machineHub.isConnected(existing.id)) deps.machineHub.revokeMachine(existing.id);
     beginMachineStarting(deps, existing);
     adoptAsDefaultIfUnset(db, input.teamId, existing.id);
@@ -574,19 +803,30 @@ export function authorizeEnrollmentMachine(
     };
   }
   const machineId = newRecordId();
-  db.insert(machine)
-    .values({
-      id: machineId,
-      teamId: input.teamId,
-      name: input.name,
-      online: false,
-      tokenHash: token.hash,
-      apiKeyId: null,
-      latestCliVersion: null,
-      kind: isLocal ? 'local' : 'remote',
-      ...(hostKey !== null ? { hostKey } : {}),
-    })
-    .run();
+  const retiredIds = db.transaction(() => {
+    db.insert(machine)
+      .values({
+        id: machineId,
+        teamId: input.teamId,
+        name: input.name,
+        online: false,
+        tokenHash: token.hash,
+        apiKeyId: null,
+        latestCliVersion: null,
+        kind: isLocal ? 'local' : 'remote',
+        ...(hostKey !== null ? { hostKey } : {}),
+      })
+      .run();
+    const inserted = db.select().from(machine).where(eq(machine.id, machineId)).get();
+    if (inserted === undefined || !input.ownerApproved) return [];
+    if (keys.length === 0 && retireToken === undefined) return [];
+    return retireVerifiedDuplicatesInTx(deps, inserted, {
+      hostKeys: keys,
+      allowCrossApiKey: true,
+      ...(retireToken !== undefined ? { retireToken } : {}),
+    });
+  });
+  notifyRetiredMachines(deps, input.teamId, retiredIds);
   beginMachineStarting(deps, { id: machineId, teamId: input.teamId, online: false });
   adoptAsDefaultIfUnset(db, input.teamId, machineId);
   return { machineId, token: token.plain, teamId: input.teamId, serverUrl: input.serverUrl };
@@ -616,27 +856,45 @@ export function markPresence(
       ? mergeReportedCapabilities(row.capabilities, capabilities)
       : undefined;
   const reportedHostKey = body.hostKey ?? null;
-  const backfilledHostKey =
-    reportedHostKey !== null &&
-    row.hostKey === null &&
-    !hostKeyHeldByOther(db, row.teamId, reportedHostKey, machineId)
-      ? reportedHostKey
-      : undefined;
-  db.update(machine)
-    .set({
-      ...(admitOnline ? { online: true } : {}),
-      ...(backfilledHostKey !== undefined ? { hostKey: backfilledHostKey } : {}),
-      lastSeenAt: nowMs(),
-      ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
-      ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
-      ...(merged !== undefined ? { capabilities: merged } : {}),
-    })
-    .where(eq(machine.id, machineId))
-    .run();
+  const legacyHostKeys = body.legacyHostKeys ?? [];
+  const { retiredIds, computerChanged } = db.transaction(() => {
+    const canRetireOnPresence =
+      row.hostKey !== null &&
+      legacyHostKeys.length > 0 &&
+      (row.kind === 'local' || row.apiKeyId !== null) &&
+      (row.hostKey === reportedHostKey || legacyHostKeys.includes(row.hostKey));
+    const retired = canRetireOnPresence
+      ? retireVerifiedDuplicatesInTx(deps, row, {
+          hostKeys: legacyHostKeys,
+          allowCrossApiKey: row.kind === 'local',
+        })
+      : [];
+    const backfilledHostKey =
+      reportedHostKey !== null &&
+      row.hostKey === null &&
+      !hostKeyHeldByOther(db, row.teamId, reportedHostKey, machineId)
+        ? reportedHostKey
+        : undefined;
+    db.update(machine)
+      .set({
+        ...(admitOnline ? { online: true } : {}),
+        ...(backfilledHostKey !== undefined ? { hostKey: backfilledHostKey } : {}),
+        lastSeenAt: nowMs(),
+        ...(body.cliVersion !== undefined ? { latestCliVersion: body.cliVersion } : {}),
+        ...(body.claudeCode !== undefined ? { claudeCodeReport: body.claudeCode } : {}),
+        ...(merged !== undefined ? { capabilities: merged } : {}),
+      })
+      .where(eq(machine.id, machineId))
+      .run();
+    return {
+      retiredIds: retired,
+      computerChanged: applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs()),
+    };
+  });
+  notifyRetiredMachines(deps, row.teamId, retiredIds);
   const strainChanged =
     merged !== undefined &&
     machineStrain(row.capabilities?.hardware).join() !== machineStrain(merged.hardware).join();
-  const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
   const antigravityChanged =
     merged !== undefined &&
     JSON.stringify(merged.antigravity) !== JSON.stringify(row.capabilities?.antigravity);
@@ -644,6 +902,131 @@ export function markPresence(
     const online = admitOnline || row.online;
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
   }
+}
+
+function mergeMachineRowInTx(
+  db: Db,
+  target: Pick<typeof machine.$inferSelect, 'id' | 'teamId'>,
+  dup: Pick<typeof machine.$inferSelect, 'id' | 'teamId'>,
+): void {
+  if (target.teamId !== dup.teamId) {
+    throw new Error('cannot merge machines across teams');
+  }
+  db.update(routingRule)
+    .set({ machineId: target.id, updatedAt: nowMs() })
+    .where(eq(routingRule.machineId, dup.id))
+    .run();
+  db.update(team)
+    .set({ defaultMachineId: target.id })
+    .where(eq(team.defaultMachineId, dup.id))
+    .run();
+  for (const entry of db
+    .select({ id: todo.id, v: todo.v, routeOverride: todo.routeOverride })
+    .from(todo)
+    .where(and(eq(todo.teamId, dup.teamId), isNotNull(todo.routeOverride)))
+    .all()) {
+    if (entry.routeOverride?.machineId !== dup.id) continue;
+    db.update(todo)
+      .set({ routeOverride: { ...entry.routeOverride, machineId: target.id }, v: entry.v + 1 })
+      .where(eq(todo.id, entry.id))
+      .run();
+  }
+  db.update(step)
+    .set({ machineId: target.id })
+    .where(and(eq(step.machineId, dup.id), ne(step.status, 'claimed')))
+    .run();
+  for (const entry of db
+    .select({ id: phone.id, deviceId: phone.deviceId })
+    .from(phone)
+    .where(eq(phone.machineId, dup.id))
+    .all()) {
+    const clash = db
+      .select({ id: phone.id })
+      .from(phone)
+      .where(and(eq(phone.machineId, target.id), eq(phone.deviceId, entry.deviceId)))
+      .get();
+    if (clash === undefined) {
+      db.update(phone).set({ machineId: target.id }).where(eq(phone.id, entry.id)).run();
+    } else {
+      db.update(computerCall)
+        .set({ phoneId: clash.id })
+        .where(eq(computerCall.phoneId, entry.id))
+        .run();
+      db.delete(phone).where(eq(phone.id, entry.id)).run();
+    }
+  }
+  db.update(computer).set({ machineId: target.id }).where(eq(computer.machineId, dup.id)).run();
+  db.update(computerCall)
+    .set({ machineId: target.id })
+    .where(eq(computerCall.machineId, dup.id))
+    .run();
+  db.delete(machine).where(eq(machine.id, dup.id)).run();
+}
+
+function hasActiveMachineWork(db: Db, machineId: string): boolean {
+  const claimedStep = db
+    .select({ id: step.id })
+    .from(step)
+    .where(and(eq(step.machineId, machineId), eq(step.status, 'claimed')))
+    .get();
+  if (claimedStep !== undefined) return true;
+  const activeCall = db
+    .select({ id: computerCall.id })
+    .from(computerCall)
+    .where(
+      and(
+        eq(computerCall.machineId, machineId),
+        inArray(computerCall.state, ['dispatched', 'running']),
+      ),
+    )
+    .get();
+  return activeCall !== undefined;
+}
+
+function retireVerifiedDuplicatesInTx(
+  deps: Pick<MachineDeps, 'db' | 'machineHub'>,
+  target: typeof machine.$inferSelect,
+  proof: {
+    hostKeys?: readonly string[];
+    retireToken?: string;
+    allowCrossApiKey?: boolean;
+  },
+): string[] {
+  const keys = (proof.hostKeys ?? []).filter((key) => key !== '');
+  const tokenHash = proof.retireToken !== undefined ? hashCredential(proof.retireToken) : null;
+  if (keys.length === 0 && tokenHash === null) return [];
+  const credentialMatch =
+    keys.length > 0 && tokenHash !== null
+      ? or(inArray(machine.hostKey, keys), eq(machine.tokenHash, tokenHash))
+      : keys.length > 0
+        ? inArray(machine.hostKey, keys)
+        : eq(machine.tokenHash, tokenHash as string);
+  const candidates = deps.db
+    .select()
+    .from(machine)
+    .where(
+      and(
+        eq(machine.teamId, target.teamId),
+        eq(machine.online, false),
+        isNull(machine.retiredAt),
+        ne(machine.id, target.id),
+        ne(machine.kind, 'local'),
+        credentialMatch,
+      ),
+    )
+    .all();
+  const keySet = new Set(keys);
+  const retiredIds: string[] = [];
+  for (const dup of candidates) {
+    if (deps.machineHub.isConnected(dup.id) || hasActiveMachineWork(deps.db, dup.id)) continue;
+    const provedByHostKey = dup.hostKey !== null && keySet.has(dup.hostKey);
+    const provedByToken = tokenHash !== null && dup.tokenHash === tokenHash;
+    if (!provedByHostKey && !provedByToken) continue;
+    if (proof.allowCrossApiKey !== true && dup.apiKeyId !== target.apiKeyId) continue;
+    mergeMachineRowInTx(deps.db, target, dup);
+    retiredIds.push(dup.id);
+  }
+  return retiredIds;
 }
 
 export function markConnected(deps: Pick<MachineDeps, 'db' | 'hub'>, machineId: string): void {

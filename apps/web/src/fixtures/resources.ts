@@ -802,7 +802,6 @@ export const resourcesMailError: FixtureSet = {
   },
 };
 
-const MINUTE = 60_000;
 const PHONE_NOW = Date.now();
 
 function phoneRow(
@@ -850,32 +849,6 @@ export const phoneStates: FixtureSet = {
               }),
               phoneRow({ id: 'ph-away', deviceId: '192.168.1.23:42155', name: '带走的手机' }),
             ],
-            activity: [
-              {
-                callId: 'e'.repeat(64),
-                tool: 'phone_act',
-                phoneName: 'Pixel 8a',
-                summary: 'Pixel 8a: tap, type',
-                state: 'done',
-                exitCode: null,
-                error: null,
-                threadId: 'chief-thread-1',
-                threadTitle: '回一条微信',
-                createdAt: PHONE_NOW - 5 * MINUTE,
-              },
-              {
-                callId: 'f'.repeat(64),
-                tool: 'phone_observe',
-                phoneName: 'Pixel 8a',
-                summary: 'Pixel 8a',
-                state: 'done',
-                exitCode: null,
-                error: null,
-                threadId: 'chief-thread-1',
-                threadTitle: '回一条微信',
-                createdAt: PHONE_NOW - 6 * MINUTE,
-              },
-            ],
           },
         },
         {
@@ -907,6 +880,12 @@ export const phoneStates: FixtureSet = {
               name: '旧手机',
               link: 'offline',
             },
+            {
+              deviceId: '192.168.1.99:40001',
+              platform: 'android',
+              name: '离线未配对手机',
+              link: 'offline',
+            },
           ],
         },
       ),
@@ -925,8 +904,63 @@ export const phoneStates: FixtureSet = {
             ],
           },
         },
-        {},
+        { phoneHost: true },
       ),
+      ownMac('ph-empty', 'empty-mac', {}, { phoneHost: true }),
+    ],
+  },
+};
+
+export const runnersOrder: FixtureSet = {
+  ...resourcesDefault,
+  resources: {
+    ...RESOURCES,
+    machines: [
+      {
+        id: 'ro-local',
+        kind: 'local',
+        name: 'studio-mac.local',
+        hostname: 'studio-mac.local',
+        online: true,
+        enabledRuntimes: ['pi', 'claude-code'],
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin' },
+      },
+      {
+        id: 'ro-offline-mac',
+        kind: 'remote',
+        name: 'travel-mac',
+        hostname: 'travel-mac.local',
+        online: false,
+        enabledRuntimes: ['pi'],
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin' },
+      },
+      {
+        id: 'ro-mini',
+        kind: 'remote',
+        name: 'mac-mini',
+        hostname: 'mac-mini.local',
+        online: true,
+        isDefault: true,
+        enabledRuntimes: ['pi', 'claude-code'],
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'darwin' },
+      },
+      {
+        id: 'ro-linux',
+        kind: 'remote',
+        name: 'build-linux',
+        hostname: 'build-linux',
+        online: true,
+        enabledRuntimes: ['pi'],
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'linux' },
+      },
+      {
+        id: 'ro-offline',
+        kind: 'remote',
+        name: 'old-laptop',
+        online: false,
+        enabledRuntimes: ['pi'],
+        capabilities: { mcpServers: [], skills: [], osPlatform: 'linux' },
+      },
     ],
   },
 };

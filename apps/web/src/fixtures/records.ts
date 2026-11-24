@@ -341,7 +341,6 @@ export interface MachineRow {
 
 export interface PhonesFixture {
   phones?: import('@cairn/shared').PhoneRow[];
-  activity?: import('@cairn/shared').PhoneActivity[];
 }
 
 export interface ResourcesContent {

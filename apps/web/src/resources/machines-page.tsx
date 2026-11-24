@@ -1,5 +1,5 @@
 import { Monitor, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
@@ -14,7 +14,9 @@ import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
 import { MACHINES_HREF } from './hrefs.js';
+import { orderMachines } from './machine-order.js';
 import { MachineRowView } from './machine-row.js';
+import { MachinePhoneRows } from './phones-panel.js';
 
 export function MachinesPage() {
   const { t } = useI18n();
@@ -22,13 +24,24 @@ export function MachinesPage() {
   const fixture = resolveScenario(searchParams);
   const { live, teamId } = useLiveData();
   const machinesQ = useMachines(teamId, live);
-  const machines = live ? mapMachines(machinesQ.data ?? []) : (fixture.resources?.machines ?? []);
+  const rawMachines = live
+    ? mapMachines(machinesQ.data ?? [])
+    : (fixture.resources?.machines ?? []);
   const teamsQ = useTeams(live);
   const teamName = live ? (teamsQ.data?.[0]?.name ?? t('团队')) : TEAM_NAME;
   const defaultMachineId = live
     ? (teamsQ.data?.[0]?.defaultMachineId ?? null)
-    : (machines.find((machine) => machine.isDefault === true)?.id ?? null);
+    : (rawMachines.find((machine) => machine.isDefault === true)?.id ?? null);
+  const machines = orderMachines(rawMachines, defaultMachineId);
   const [addOpen, setAddOpen] = useState(false);
+  const phoneHost =
+    machines.find(
+      (machine) =>
+        machine.kind === 'local' &&
+        machine.capabilities?.osPlatform === 'darwin' &&
+        machine.capabilities?.phoneHost === true &&
+        machine.id != null,
+    ) ?? null;
 
   const noMachines = (
     <EmptyState
@@ -80,12 +93,14 @@ export function MachinesPage() {
           >
             <div data-testid="machine-list" className="flex min-w-0 flex-col">
               {machines.map((machine) => (
-                <MachineRowView
-                  key={machine.id ?? machine.name}
-                  machine={machine}
-                  machines={machines}
-                  isDefault={machine.id != null && machine.id === defaultMachineId}
-                />
+                <Fragment key={machine.id ?? machine.name}>
+                  <MachineRowView
+                    machine={machine}
+                    machines={machines}
+                    isDefault={machine.id != null && machine.id === defaultMachineId}
+                  />
+                  <MachinePhoneRows machine={machine} />
+                </Fragment>
               ))}
             </div>
           </SettingsPanel>
@@ -96,6 +111,11 @@ export function MachinesPage() {
         onClose={() => setAddOpen(false)}
         teamName={teamName}
         teamId={teamId}
+        phoneHost={
+          phoneHost === null
+            ? null
+            : { id: phoneHost.id ?? '', name: phoneHost.name ?? phoneHost.id ?? '' }
+        }
       />
     </PageShell>
   );

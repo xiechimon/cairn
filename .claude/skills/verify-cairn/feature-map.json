@@ -1427,7 +1427,8 @@
       },
       "reach": [
         "settings machines",
-        "click testid:phones-meta"
+        "click label:添加执行机",
+        "click testid:phone-pair-entry"
       ],
       "research": [
         "docs/research/phone-agents-2026-11-20.md"

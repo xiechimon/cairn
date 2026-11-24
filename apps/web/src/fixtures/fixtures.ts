@@ -146,6 +146,7 @@ export {
   resourcesMcpManageNeedsAuth,
   resourcesMcpOAuthDenied,
   resourcesSkillsList,
+  runnersOrder,
 } from './resources.js';
 export { schedulesEmpty, schedulesList } from './schedules.js';
 export { TEAM_R7, teamGrid } from './team.js';

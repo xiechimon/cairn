@@ -46,7 +46,7 @@ import { build, type machine as machineTable, step, todo } from './db/schema.js'
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
-import { isLoopbackPeer } from './lib/request-origin.js';
+import { isDirectLoopbackPeer, isLoopbackPeer } from './lib/request-origin.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
@@ -324,6 +324,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ...(body.claudeCode !== undefined ? { claudeCode: body.claudeCode } : {}),
       ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
       ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
+      ...(body.legacyHostKeys !== undefined ? { legacyHostKeys: body.legacyHostKeys } : {}),
       serverUrl: originOf(c),
     });
     if (body.claudeCode !== undefined) await resumeRuntimeHeldBuilds(deps, body.teamId);
@@ -333,11 +334,12 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
   const ENROLL_CAP = 100;
   app.post('/api/machine/enroll/start', async (c) => {
     const body = parseWith(machineEnrollStartBodySchema, await jsonBody(c), 'body');
-    const fromLocalHost = isLoopbackPeer(c);
+    const fromLocalHost = isDirectLoopbackPeer(c);
     const refusal = localEnrollmentRefusal(ctx.db, {
       teamId: body.teamId ?? ctx.team.id,
       name: body.name,
       hostKey: body.hostKey,
+      ...(body.legacyHostKeys !== undefined ? { legacyHostKeys: body.legacyHostKeys } : {}),
       fromLocalHost,
     });
     if (refusal !== null) throw new HttpError(409, refusal);
@@ -359,6 +361,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       createdAt: now,
       fromLocalHost,
       ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
+      ...(body.legacyHostKeys !== undefined ? { legacyHostKeys: body.legacyHostKeys } : {}),
     });
     return c.json({
       enrollId,
@@ -398,6 +401,8 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ownerApproved: pairedDeviceIdOf(c) === null,
       fromLocalHost: entry.fromLocalHost === true,
       ...(entry.hostKey !== undefined ? { hostKey: entry.hostKey } : {}),
+      ...(entry.legacyHostKeys !== undefined ? { legacyHostKeys: entry.legacyHostKeys } : {}),
+      ...(body.retireToken !== undefined ? { retireToken: body.retireToken } : {}),
     });
     entry.machine = machineJson;
     return c.json({ machine: machineJson });

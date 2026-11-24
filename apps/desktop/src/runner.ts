@@ -1,8 +1,18 @@
 import { type ChildProcess, execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { hostname } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 import {
   ENV_VARS,
   type MachineJson,
@@ -11,7 +21,7 @@ import {
   machineJsonSchema,
   OWNER_CHANNEL_HEADER,
 } from '@cairn/shared';
-import { probeHostKey } from '@cairn/shared/host-identity';
+import { collectLegacyHostKeys, probeHostIdentity } from '@cairn/shared/host-identity';
 import {
   applyShellEnvironment,
   SHELL_ENV_RESOLVED_VAR,
@@ -30,6 +40,7 @@ const STABLE_RUN_MS = 60_000;
 export interface RunnerOptions {
   root: string;
   home: string;
+  legacyHomes?: readonly string[];
   serverHome: string;
   origin: string;
   ownerToken: string;
@@ -65,18 +76,24 @@ async function enrollLocalMachine(
   ownerToken: string,
   ownerChannelKey: string,
   hostKey: string | undefined,
+  legacyHostKeys: readonly string[],
+  retireToken: string | undefined,
 ): Promise<MachineJson> {
   const started = machineEnrollStartResponseSchema.parse(
     await postJson(`${origin}/api/machine/enroll/start`, {
       name: hostname(),
       ...(hostKey !== undefined ? { hostKey } : {}),
+      ...(legacyHostKeys.length > 0 ? { legacyHostKeys } : {}),
     }),
   );
   for (let attempt = 0; ; attempt++) {
     try {
       const confirmed = (await postJson(
         `${origin}/api/machine/enroll/confirm`,
-        { enrollId: started.enrollId },
+        {
+          enrollId: started.enrollId,
+          ...(retireToken !== undefined ? { retireToken } : {}),
+        },
         {
           Authorization: `Bearer ${ownerToken}`,
           [OWNER_CHANNEL_HEADER]: ownerChannelKey,
@@ -92,14 +109,26 @@ async function enrollLocalMachine(
   }
 }
 
-export function readRunnerRegistration(home: string): MachineJson | undefined {
+const MAX_MACHINE_JSON_BYTES = 16_384;
+
+function readStoredMachine(home: string, rejectSymlinkDir = false): MachineJson | undefined {
+  let fd: number | undefined;
   try {
-    const parsed = machineJsonSchema.safeParse(
-      JSON.parse(readFileSync(join(home, 'machine.json'), 'utf8')),
-    );
+    if (rejectSymlinkDir && lstatSync(home).isSymbolicLink()) return undefined;
+    const path = join(home, 'machine.json');
+    fd = openSync(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+    const stat = fstatSync(fd);
+    if (!stat.isFile() || stat.size > MAX_MACHINE_JSON_BYTES) return undefined;
+    const parsed = machineJsonSchema.safeParse(JSON.parse(readFileSync(fd, 'utf8')));
     return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;
+  } finally {
+    if (fd !== undefined) {
+      try {
+        closeSync(fd);
+      } catch {}
+    }
   }
 }
 
@@ -118,7 +147,9 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       ELECTRON_RUN_AS_NODE: '1',
       [ENV_VARS.home]: options.home,
       [ENV_VARS.parentPid]: String(process.pid),
-      [ENV_VARS.confineDeniedRoots]: options.serverHome,
+      [ENV_VARS.confineDeniedRoots]: [options.serverHome, ...(options.legacyHomes ?? [])].join(
+        delimiter,
+      ),
       [ENV_VARS.server]: options.origin,
       [ENV_VARS.skillsDir]: join(options.home, 'skills'),
       [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),
@@ -138,14 +169,31 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
 }
 
 export async function startLocalRunner(options: RunnerOptions): Promise<LocalRunner> {
-  const hostKey =
-    readRunnerRegistration(options.home)?.hostKey ?? probeHostKey(options.home) ?? undefined;
+  const previous = readStoredMachine(options.home);
+  const previousForOrigin =
+    previous !== undefined && previous.serverUrl === options.origin ? previous : undefined;
+  const legacyHomes = options.legacyHomes ?? [];
+  const siblingStored = legacyHomes
+    .map((dir) => readStoredMachine(dir, true))
+    .filter(
+      (entry): entry is MachineJson => entry !== undefined && entry.serverUrl === options.origin,
+    );
+  const probed = probeHostIdentity(options.home, undefined, legacyHomes);
+  const hostKey = probed?.hostKey ?? previousForOrigin?.hostKey ?? undefined;
+  const legacyHostKeys = collectLegacyHostKeys(hostKey, [
+    ...(probed?.legacyHostKeys ?? []),
+    previousForOrigin?.hostKey,
+    ...siblingStored.map((entry) => entry.hostKey),
+  ]);
+  const retireToken = previousForOrigin?.token ?? siblingStored[0]?.token;
   writeMachineJson(options.home, {
     ...(await enrollLocalMachine(
       options.origin,
       options.ownerToken,
       options.ownerChannelKey,
       hostKey,
+      legacyHostKeys,
+      retireToken,
     )),
     ...(hostKey !== undefined ? { hostKey } : {}),
   });

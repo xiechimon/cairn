@@ -485,7 +485,7 @@ Reach:
 
 - Web routes: `/app/machines/authorize`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `enrollment-code-hint`, `tailscale-ready`
+- Test ids in its code: `enrollment-code-hint`, `phone-pair-entry`, `tailscale-ready`
 - Research: [docs/research/machine-execution-plane.md](../../../docs/research/machine-execution-plane.md)
 - Frontend design: **gap**: the add-machine dialog and authorize page have no design
 - Backend design: **gap**: no design for the browser enrollment handshake and its failure modes
@@ -558,11 +558,12 @@ States: Each phone row shows not paired, pairing, ready, busy, locked, handoff o
 Reach:
 
 1. `settings machines`
-2. `click testid:phones-meta`
+2. `click label:添加执行机`
+3. `click testid:phone-pair-entry`
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `phone-activity`, `phone-activity-row`, `phone-forget`, `phone-name`, `phone-pair`, `phone-pair-code`, `phone-pair-consent`, `phone-pair-dialog`, `phone-pair-endpoint`, `phone-pair-manual`, `phone-pair-name`, `phone-pair-submit`, `phone-retry`, `phone-row`, `phone-state`, `phones-drawer`, `phones-empty`, `phones-list`, `phones-meta`, `phones-no-adb`
+- Test ids in its code: `phone-forget`, `phone-name`, `phone-pair`, `phone-pair-code`, `phone-pair-consent`, `phone-pair-dialog`, `phone-pair-endpoint`, `phone-pair-name`, `phone-pair-submit`, `phone-retry`, `phone-row`, `phone-state`
 - Research: [docs/research/phone-agents-2026-11-20.md](../../../docs/research/phone-agents-2026-11-20.md)
 - Frontend design: [docs/design/phone-computer.md](../../../docs/design/phone-computer.md)
 - Backend design: [docs/design/phone-computer.md](../../../docs/design/phone-computer.md)

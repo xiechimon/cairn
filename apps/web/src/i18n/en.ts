@@ -2714,7 +2714,6 @@ export const EN: Record<string, string> = {
   '尚未勾选模型。从上游获取模型清单后勾选。':
     'No models picked. Fetch the upstream list and pick some.',
   手机: 'Phone',
-  '{n} 台手机': '{n#1 phone|# phones}',
   未配对: 'Not paired',
   配对中: 'Pairing',
   就绪: 'Ready',
@@ -2724,7 +2723,6 @@ export const EN: Record<string, string> = {
   主人正在操作: 'The owner is using it',
   签名已过期: 'Signature expired',
   操作手机: 'Used the phone',
-  查看手机: 'Looked at the phone',
   配对手机: 'Pair a phone',
   '在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。{name} 会通过 adb 连接手机。':
     'On the phone: Developer options → Wireless debugging → Pair device with pairing code, then enter the IP:port and 6-digit code it shows. {name} then connects to the phone over adb.',
@@ -2736,10 +2734,6 @@ export const EN: Record<string, string> = {
     'I understand that once paired the Coordinator can see and use this phone like a computer: screenshots and element text go to the provider. It asks me before messaging, paying, or changing settings.',
   '配对失败，请重试。': 'Pairing failed. Try again.',
   '移除手机失败，请重试。': 'Could not remove the phone. Try again.',
-  '这台执行机上没有找到 adb。安装 Android platform-tools（brew install --cask android-platform-tools）后重启 runner。':
-    'adb was not found on this runner. Install Android platform-tools (brew install --cask android-platform-tools) and restart the runner.',
-  '没有发现手机。打开手机的无线调试后会出现在这里，或直接配对。':
-    'No phone found. It appears here once wireless debugging is on, or pair it directly.',
   '确定移除这台手机？Coordinator 会立刻失去对它的访问。':
     'Remove this phone? The Coordinator loses access to it right away.',
   移除手机: 'Remove phone',

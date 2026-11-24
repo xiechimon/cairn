@@ -15,7 +15,6 @@ import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { useOwnComputerRow } from './own-computer-panel.js';
-import { usePhonesRow } from './phones-panel.js';
 
 export function MachineRowView({
   machine,
@@ -35,7 +34,6 @@ export function MachineRowView({
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const ownComputer = useOwnComputerRow(machine);
-  const phones = usePhonesRow(machine);
 
   const makeDefault = () => {
     if (!live) {
@@ -118,7 +116,6 @@ export function MachineRowView({
               {online ? t('在线') : t('离线')}
             </span>
             {ownComputer.meta}
-            {phones.meta}
           </div>
         </div>
         <DropdownMenu>
@@ -152,7 +149,7 @@ export function MachineRowView({
               shortcut="D"
               confirms
               data-testid="machine-menu-delete"
-              disabled={mutations.deleteMachine.isPending}
+              disabled={machine.id == null || mutations.deleteMachine.isPending}
               title={t('删除后，这台执行机要重新注册才能再接任务')}
               onClick={() => setConfirmOpen(true)}
             >
@@ -162,7 +159,6 @@ export function MachineRowView({
         </DropdownMenu>
       </div>
       {ownComputer.drawer}
-      {phones.drawer}
       <DeleteConfirm
         open={confirmOpen}
         title={t('确定删除这台执行机？此操作不可撤销。')}

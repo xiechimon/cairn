@@ -14,6 +14,7 @@ import { Input } from '../components/ui/input.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
+import { PhonePairDialog } from './phones-panel.js';
 
 const CMD_CLS =
   'flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 dark:bg-input/30';
@@ -261,12 +262,20 @@ interface CreateMachineDialogProps {
   onClose: () => void;
   teamName: string;
   teamId?: string;
+  phoneHost?: { id: string; name: string } | null;
 }
 
-export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateMachineDialogProps) {
+export function CreateMachineDialog({
+  open,
+  onClose,
+  teamName,
+  teamId,
+  phoneHost = null,
+}: CreateMachineDialogProps) {
   const { t } = useI18n();
   const { search } = useLocation();
   const [apiKeyOpen, setApiKeyOpen] = useState(false);
+  const [pairOpen, setPairOpen] = useState(false);
   const apiKeyRef = useRef<HTMLDivElement>(null);
   const { access, failed, recheck } = useRunnerServerAccess(open !== false);
   const enable = useEnableTailscaleAccess();
@@ -311,88 +320,113 @@ export function CreateMachineDialog({ open, onClose, teamName, teamId }: CreateM
     );
   })();
   return (
-    <DialogShell
-      title={t('添加执行机')}
-      info={t('让另一台电脑帮你运行任务')}
-      open={open}
-      onClose={onClose}
-      size="l"
-      hint={
-        <Link className="text-meta" to={{ pathname: '/app/machines/authorize', search }}>
-          {t('浏览器授权注册 →')}
-        </Link>
-      }
-      footer={footer}
-    >
-      <div className="flex flex-col gap-4">
-        <p className="m-0 text-ui text-content-secondary">
-          {t('两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。')}
-        </p>
-        <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
-          <li className={STEP_CLS}>
-            <span className={STEP_NUM_CLS}>1</span>
-            <div className={STEP_BODY_CLS}>
-              <span className={STEP_TITLE_CLS}>{t('用 Tailscale 连通两台电脑')}</span>
-              <TailscaleStatus access={access} failed={failed} />
-            </div>
-          </li>
+    <>
+      <DialogShell
+        title={t('添加执行机')}
+        info={t('让另一台电脑帮你运行任务')}
+        open={open}
+        onClose={onClose}
+        size="l"
+        hint={
+          <Link className="text-meta" to={{ pathname: '/app/machines/authorize', search }}>
+            {t('浏览器授权注册 →')}
+          </Link>
+        }
+        footer={footer}
+      >
+        <div className="flex flex-col gap-4">
+          <p className="m-0 text-ui text-content-secondary">
+            {t('两台电脑通过 Tailscale 连接，这台电脑要保持开机联网。')}
+          </p>
+          <ol className="m-0 flex list-none flex-col gap-3.5 p-0">
+            <li className={STEP_CLS}>
+              <span className={STEP_NUM_CLS}>1</span>
+              <div className={STEP_BODY_CLS}>
+                <span className={STEP_TITLE_CLS}>{t('用 Tailscale 连通两台电脑')}</span>
+                <TailscaleStatus access={access} failed={failed} />
+              </div>
+            </li>
+            {startCmd !== null && (
+              <>
+                <li className={STEP_CLS}>
+                  <span className={STEP_NUM_CLS}>2</span>
+                  <div className={STEP_BODY_CLS}>
+                    <span className={STEP_TITLE_CLS}>{t('在另一台电脑上安装 CLI')}</span>
+                    <CopyCommand command={INSTALL_COMMAND} />
+                  </div>
+                </li>
+                <li className={STEP_CLS}>
+                  <span className={STEP_NUM_CLS}>3</span>
+                  <div className={STEP_BODY_CLS}>
+                    <span className={STEP_TITLE_CLS}>{t('在另一台电脑上启动执行机')}</span>
+                    <CopyCommand command={startCmd} />
+                    <p className="m-0 text-meta text-content-tertiary">
+                      {t('之后它在后台运行，可以关掉终端。')}
+                    </p>
+                  </div>
+                </li>
+                <li className={STEP_CLS}>
+                  <span className={STEP_NUM_CLS}>4</span>
+                  <div className={STEP_BODY_CLS}>
+                    <span className={STEP_TITLE_CLS}>{t('在这里批准')}</span>
+                    <p className={STEP_NOTE_CLS} data-testid="enrollment-code-hint">
+                      {t('终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 {team}。', {
+                        team: teamName,
+                      })}
+                    </p>
+                    <ApproveByCode teamId={teamId} />
+                  </div>
+                </li>
+              </>
+            )}
+          </ol>
           {startCmd !== null && (
             <>
-              <li className={STEP_CLS}>
-                <span className={STEP_NUM_CLS}>2</span>
-                <div className={STEP_BODY_CLS}>
-                  <span className={STEP_TITLE_CLS}>{t('在另一台电脑上安装 CLI')}</span>
-                  <CopyCommand command={INSTALL_COMMAND} />
+              <Button
+                variant="ghost"
+                className={`${INLINE_ACTION_CLS} px-0 text-content-secondary hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary dark:hover:bg-transparent font-normal`}
+                aria-expanded={apiKeyOpen}
+                onClick={() => setApiKeyOpen((value) => !value)}
+              >
+                {t('在云服务器上运行？改用 API key 注册')}
+              </Button>
+              {apiKeyOpen && (
+                <div ref={apiKeyRef} className="flex flex-col gap-2">
+                  <CopyCommand
+                    command={`${startCmd} --api-key <key> --team ${teamId ?? '<teamId>'}`}
+                  />
+                  <Link className={INLINE_ACTION_CLS} to={{ pathname: '/app/api-keys', search }}>
+                    {t('获取 API key →')}
+                  </Link>
                 </div>
-              </li>
-              <li className={STEP_CLS}>
-                <span className={STEP_NUM_CLS}>3</span>
-                <div className={STEP_BODY_CLS}>
-                  <span className={STEP_TITLE_CLS}>{t('在另一台电脑上启动执行机')}</span>
-                  <CopyCommand command={startCmd} />
-                  <p className="m-0 text-meta text-content-tertiary">
-                    {t('之后它在后台运行，可以关掉终端。')}
-                  </p>
-                </div>
-              </li>
-              <li className={STEP_CLS}>
-                <span className={STEP_NUM_CLS}>4</span>
-                <div className={STEP_BODY_CLS}>
-                  <span className={STEP_TITLE_CLS}>{t('在这里批准')}</span>
-                  <p className={STEP_NOTE_CLS} data-testid="enrollment-code-hint">
-                    {t('终端会显示一个批准码。把它填在下面，确认把那台电脑加入团队 {team}。', {
-                      team: teamName,
-                    })}
-                  </p>
-                  <ApproveByCode teamId={teamId} />
-                </div>
-              </li>
+              )}
             </>
           )}
-        </ol>
-        {startCmd !== null && (
-          <>
-            <Button
-              variant="ghost"
-              className={`${INLINE_ACTION_CLS} px-0 text-content-secondary hover:bg-transparent hover:text-content-secondary aria-expanded:bg-transparent aria-expanded:text-content-secondary dark:hover:bg-transparent font-normal`}
-              aria-expanded={apiKeyOpen}
-              onClick={() => setApiKeyOpen((value) => !value)}
-            >
-              {t('在云服务器上运行？改用 API key 注册')}
-            </Button>
-            {apiKeyOpen && (
-              <div ref={apiKeyRef} className="flex flex-col gap-2">
-                <CopyCommand
-                  command={`${startCmd} --api-key <key> --team ${teamId ?? '<teamId>'}`}
-                />
-                <Link className={INLINE_ACTION_CLS} to={{ pathname: '/app/api-keys', search }}>
-                  {t('获取 API key →')}
-                </Link>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </DialogShell>
+          {phoneHost !== null && (
+            <div className="border-t border-border pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                className="self-start"
+                data-testid="phone-pair-entry"
+                onClick={() => setPairOpen(true)}
+              >
+                {t('配对手机')}
+              </Button>
+            </div>
+          )}
+        </div>
+      </DialogShell>
+      {phoneHost !== null && (
+        <PhonePairDialog
+          open={pairOpen}
+          machineId={phoneHost.id}
+          machineName={phoneHost.name}
+          phoneId={null}
+          prefillEndpoint=""
+          onClose={() => setPairOpen(false)}
+        />
+      )}
+    </>
   );
 }

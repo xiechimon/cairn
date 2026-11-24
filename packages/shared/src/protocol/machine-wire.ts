@@ -7,6 +7,7 @@ import {
 } from '../antigravity-subscription.js';
 import { backgroundTaskSchema } from '../background-task.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
+import { MACHINE_TOKEN_PATTERN } from '../brand.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
 import { epochMs, recordId } from '../records/common.js';
 import { hostKeySchema, machineRecordSchema } from '../records/machine.js';
@@ -41,6 +42,9 @@ import { computerPresenceListSchema } from './computer-presence.js';
 import { computerScreenRequestSchema } from './computer-screen.js';
 import { machineJsonSchema } from './executor.js';
 
+const legacyHostKeysSchema = z.array(hostKeySchema).max(8);
+const retireMachineTokenSchema = z.string().regex(MACHINE_TOKEN_PATTERN);
+
 export const machineEnrollBodySchema = z.object({
   teamId: recordId,
   name: z.string().optional(),
@@ -48,6 +52,7 @@ export const machineEnrollBodySchema = z.object({
   claudeCode: claudeCodeReportSchema.optional(),
   capabilities: z.unknown().optional(),
   hostKey: hostKeySchema.optional(),
+  legacyHostKeys: legacyHostKeysSchema.optional(),
 });
 export type MachineEnrollBody = z.infer<typeof machineEnrollBodySchema>;
 
@@ -60,6 +65,7 @@ export const machineEnrollStartBodySchema = z.object({
   teamId: recordId.optional(),
   name: z.string().optional(),
   hostKey: hostKeySchema.optional(),
+  legacyHostKeys: legacyHostKeysSchema.optional(),
 });
 export const machineEnrollStartResponseSchema = z.object({
   enrollId: z.string(),
@@ -82,8 +88,8 @@ export function enrollDisplayName(name: string | undefined): string | undefined 
 }
 
 export const machineEnrollConfirmBodySchema = z.union([
-  z.object({ enrollId: z.string() }),
-  z.object({ code: z.string().max(32) }),
+  z.object({ enrollId: z.string(), retireToken: retireMachineTokenSchema.optional() }),
+  z.object({ code: z.string().max(32), retireToken: retireMachineTokenSchema.optional() }),
 ]);
 
 export function normalizeEnrollCode(code: string): string {
@@ -116,6 +122,7 @@ export const machinePresenceBodySchema = z.object({
   capabilities: z.unknown().optional(),
   connectionId: z.string().min(1).max(64).nullable().optional(),
   hostKey: hostKeySchema.optional(),
+  legacyHostKeys: legacyHostKeysSchema.optional(),
 });
 export type MachinePresenceBody = z.infer<typeof machinePresenceBodySchema>;
 export const machineOkResponseSchema = z.object({ ok: z.literal(true) });

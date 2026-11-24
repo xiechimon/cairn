@@ -1,10 +1,7 @@
-import type { MachinePhoneReport, PhoneActivity, PhoneRow } from '@cairn/shared';
-import { cn } from 'cn';
-import { ChevronDown, Smartphone } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
-import { useApiMutations, usePhoneActivity, usePhones } from '../api/hooks.js';
+import { Smartphone } from 'lucide-react';
+import { useState } from 'react';
+import { useApiMutations, usePhones } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { relativeTime } from '../board/rel-time.js';
 import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -17,77 +14,10 @@ import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { MachineRow } from '../fixtures/records.js';
-import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
-
-export function shouldShowPhones(machine: MachineRow): boolean {
-  return (
-    machine.capabilities?.phoneHost === true ||
-    (machine.capabilities?.phones?.length ?? 0) > 0 ||
-    (machine.phonesFixture?.phones?.length ?? 0) > 0
-  );
-}
-
-type PhoneViewState =
-  | 'not_paired'
-  | 'pairing'
-  | 'ready'
-  | 'busy'
-  | 'locked'
-  | 'handoff'
-  | 'unreachable'
-  | 'signing_expired';
-
-interface PhoneView {
-  key: string;
-  deviceId: string;
-  name: string;
-  row: PhoneRow | null;
-  link: MachinePhoneReport['link'] | null;
-  state: PhoneViewState;
-}
-
-function viewOf(row: PhoneRow | null, link: MachinePhoneReport['link'] | null): PhoneViewState {
-  if (row === null) return 'not_paired';
-  if (row.handoff) return 'handoff';
-  if (row.pairing || link === 'seen' || link === 'unauthorized') return 'pairing';
-  if (link === 'ready') return row.busy ? 'busy' : 'ready';
-  if (link === 'locked') return 'locked';
-  if (link === 'signing_expired') return 'signing_expired';
-  return 'unreachable';
-}
-
-function mergeViews(
-  reported: readonly MachinePhoneReport[],
-  rows: readonly PhoneRow[],
-): PhoneView[] {
-  const views = new Map<string, PhoneView>();
-  for (const phone of reported) {
-    const row = rows.find((entry) => entry.deviceId === phone.deviceId) ?? null;
-    views.set(phone.deviceId, {
-      key: phone.deviceId,
-      deviceId: phone.deviceId,
-      name: row?.name ?? phone.name,
-      row,
-      link: phone.link,
-      state: viewOf(row, phone.link),
-    });
-  }
-  for (const row of rows) {
-    if (views.has(row.deviceId)) continue;
-    views.set(row.deviceId, {
-      key: row.deviceId,
-      deviceId: row.deviceId,
-      name: row.name,
-      row,
-      link: null,
-      state: viewOf(row, null),
-    });
-  }
-  return [...views.values()];
-}
+import { mergePhoneViews, type PhoneView } from './phone-views.js';
 
 function stateText(view: PhoneView, t: TFunc): string {
   switch (view.state) {
@@ -108,12 +38,6 @@ function stateText(view: PhoneView, t: TFunc): string {
     case 'unreachable':
       return t('无法连接');
   }
-}
-
-function activityVerb(row: PhoneActivity, t: TFunc): string {
-  if (row.tool === 'phone_act') return t('操作手机');
-  if (row.tool === 'phone_manage') return t('管理');
-  return t('查看手机');
 }
 
 const ENDPOINT_RE = /^\d{1,3}(\.\d{1,3}){3}:\d{1,5}$/;
@@ -250,31 +174,22 @@ export function PhonePairDialog({
   );
 }
 
-export function usePhonesRow(machine: MachineRow): {
-  shown: boolean;
-  meta: ReactNode;
-  drawer: ReactNode;
-} {
+export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const machineId = machine.id ?? '';
   const machineName = machine.name ?? machineId;
-  const shown = shouldShowPhones(machine);
-  const phonesQ = usePhones(machineId, live && shown);
-  const activityQ = usePhoneActivity(machineId, live && shown);
-  const now = useMinuteClock();
+  const hostable =
+    machine.id != null && machine.kind === 'local' && machine.capabilities?.osPlatform === 'darwin';
+  const phonesQ = usePhones(machine.id, live && hostable);
   const rows = live ? (phonesQ.data ?? []) : (machine.phonesFixture?.phones ?? []);
-  const activity = live ? (activityQ.data ?? []) : (machine.phonesFixture?.activity ?? []);
-  const reported = machine.capabilities?.phones ?? [];
-  const views = mergeViews(reported, rows);
-  const [open, setOpen] = useState(false);
+  const reported = machine.online === false ? [] : (machine.capabilities?.phones ?? []);
+  const views = mergePhoneViews(reported, rows);
   const [pairOpen, setPairOpen] = useState<{ phoneId: string | null; endpoint: string } | null>(
     null,
   );
   const [forgetTarget, setForgetTarget] = useState<PhoneView | null>(null);
-  const phoneHost = machine.capabilities?.phoneHost === true;
-  const expanded = open;
 
   const forget = (view: PhoneView) => {
     setForgetTarget(null);
@@ -289,200 +204,105 @@ export function usePhonesRow(machine: MachineRow): {
     );
   };
 
-  if (!shown) return { shown: false, meta: null, drawer: null };
-
-  const readyCount = views.filter((view) => view.row !== null).length;
-  const meta = (
+  return (
     <>
-      <span aria-hidden className="text-content-dim">
-        ·
-      </span>
-      <Button
-        variant="ghost"
-        data-testid="phones-meta"
-        aria-expanded={expanded}
-        onClick={() => setOpen(!expanded)}
-        className="h-auto min-h-0 gap-0.5 rounded-sm px-0 py-0 text-meta font-normal whitespace-nowrap text-content-tertiary hover:bg-transparent hover:text-foreground focus-visible:ring-2 focus-visible:ring-(--focus-ring) dark:hover:bg-transparent pointer-coarse:min-h-11"
-      >
-        {readyCount > 0 ? t('{n} 台手机', { n: readyCount }) : t('手机')}
-        <ChevronDown
-          aria-hidden
-          className={cn(
-            'size-4 flex-none transition-transform duration-(--dur-fast)',
-            expanded && 'rotate-180',
-          )}
+      {views.map((view) => (
+        <div
+          key={view.key}
+          data-testid="phone-row"
+          data-state={view.state}
+          className="flex min-w-0 items-center gap-3 border-b border-border px-4 py-2 last:border-b-0 pointer-coarse:pb-3"
+        >
+          <Smartphone
+            aria-hidden
+            strokeWidth={1.75}
+            className="size-4 flex-none text-content-tertiary"
+          />
+          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span
+              className="min-w-0 truncate text-ui font-medium text-foreground"
+              data-testid="phone-name"
+            >
+              {view.name}
+            </span>
+            <span className="truncate text-meta text-content-secondary" data-testid="phone-state">
+              {stateText(view, t)}
+              {view.row?.lastError != null && view.row.lastError !== '' && (
+                <span className="text-destructive"> · {view.row.lastError}</span>
+              )}
+            </span>
+          </div>
+          <span className="flex flex-none items-center gap-1">
+            {view.state === 'not_paired' && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="phone-pair"
+                onClick={() => {
+                  if (!live) {
+                    blockDemoWrite();
+                    return;
+                  }
+                  const prefill = ENDPOINT_RE.test(view.deviceId)
+                    ? `${view.deviceId.slice(0, view.deviceId.lastIndexOf(':'))}:`
+                    : '';
+                  setPairOpen({ phoneId: null, endpoint: prefill });
+                }}
+              >
+                {t('配对')}
+              </Button>
+            )}
+            {view.row !== null && view.row.lastError !== null && view.row.lastError !== '' && (
+              <Button
+                variant="outline"
+                size="sm"
+                data-testid="phone-retry"
+                onClick={() => {
+                  if (!live) {
+                    blockDemoWrite();
+                    return;
+                  }
+                  if (view.row === null) return;
+                  setPairOpen({ phoneId: view.row.id, endpoint: '' });
+                }}
+              >
+                {t('重试')}
+              </Button>
+            )}
+            {view.row !== null && (
+              <Button
+                variant="ghost"
+                size="sm"
+                data-testid="phone-forget"
+                className="text-content-tertiary"
+                onClick={() => setForgetTarget(view)}
+              >
+                {t('移除')}
+              </Button>
+            )}
+          </span>
+        </div>
+      ))}
+      {pairOpen !== null && (
+        <PhonePairDialog
+          open
+          machineId={machineId}
+          machineName={machineName}
+          phoneId={pairOpen.phoneId}
+          prefillEndpoint={pairOpen.endpoint}
+          onClose={() => setPairOpen(null)}
         />
-      </Button>
+      )}
+      {forgetTarget !== null && (
+        <DeleteConfirm
+          open
+          title={t('确定移除这台手机？Coordinator 会立刻失去对它的访问。')}
+          summary={<span>{forgetTarget.name}</span>}
+          ariaLabel={t('移除手机')}
+          onClose={() => setForgetTarget(null)}
+          onConfirm={() => forget(forgetTarget)}
+        />
+      )}
     </>
   );
-
-  const drawer = !expanded ? null : (
-    <div
-      data-testid="phones-drawer"
-      className="flex min-w-0 flex-col gap-2 border-t border-border px-4 py-2"
-    >
-      {!phoneHost && live && (
-        <p className="m-0 text-meta text-content-secondary" data-testid="phones-no-adb">
-          {t(
-            '这台执行机上没有找到 adb。安装 Android platform-tools（brew install --cask android-platform-tools）后重启 runner。',
-          )}
-        </p>
-      )}
-      {views.length === 0 && (
-        <p className="m-0 text-meta text-content-secondary" data-testid="phones-empty">
-          {t('没有发现手机。打开手机的无线调试后会出现在这里，或直接配对。')}
-        </p>
-      )}
-      <ul data-testid="phones-list" className="m-0 flex list-none flex-col p-0">
-        {views.map((view) => (
-          <li
-            key={view.key}
-            data-testid="phone-row"
-            data-state={view.state}
-            className="flex min-w-0 items-center gap-3 py-1.5"
-          >
-            <Smartphone
-              aria-hidden
-              strokeWidth={1.75}
-              className="size-4 flex-none text-content-tertiary"
-            />
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="min-w-0 truncate text-ui text-foreground" data-testid="phone-name">
-                {view.name}
-              </span>
-              <span className="truncate text-meta text-content-tertiary" data-testid="phone-state">
-                {stateText(view, t)}
-                {view.row?.lastError != null && view.row.lastError !== '' && (
-                  <span className="text-destructive"> · {view.row.lastError}</span>
-                )}
-              </span>
-            </span>
-            <span className="flex flex-none items-center gap-1">
-              {view.state === 'not_paired' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="phone-pair"
-                  onClick={() => {
-                    if (!live) {
-                      blockDemoWrite();
-                      return;
-                    }
-                    const prefill = ENDPOINT_RE.test(view.deviceId)
-                      ? `${view.deviceId.slice(0, view.deviceId.lastIndexOf(':'))}:`
-                      : '';
-                    setPairOpen({ phoneId: null, endpoint: prefill });
-                  }}
-                >
-                  {t('配对')}
-                </Button>
-              )}
-              {view.row !== null && view.row.lastError !== null && view.row.lastError !== '' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="phone-retry"
-                  onClick={() => {
-                    if (!live) {
-                      blockDemoWrite();
-                      return;
-                    }
-                    const row = view.row;
-                    if (row !== null) setPairOpen({ phoneId: row.id, endpoint: '' });
-                  }}
-                >
-                  {t('重试')}
-                </Button>
-              )}
-              {view.row !== null && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  data-testid="phone-forget"
-                  className="text-content-tertiary"
-                  onClick={() => setForgetTarget(view)}
-                >
-                  {t('移除')}
-                </Button>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-      {phoneHost && (
-        <div>
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="phone-pair-manual"
-            onClick={() => {
-              if (!live) {
-                blockDemoWrite();
-                return;
-              }
-              setPairOpen({ phoneId: null, endpoint: '' });
-            }}
-          >
-            {t('配对手机')}
-          </Button>
-        </div>
-      )}
-      {activity.length > 0 && (
-        <ul data-testid="phone-activity" className="m-0 flex list-none flex-col p-0">
-          {activity.map((row) => (
-            <li
-              key={row.callId}
-              data-testid="phone-activity-row"
-              className="flex min-w-0 items-center gap-3 py-1"
-            >
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-mono text-meta text-foreground">{row.summary}</span>
-                <span className="truncate text-meta text-content-tertiary">
-                  {activityVerb(row, t)}
-                  {row.phoneName !== null && ` · ${row.phoneName}`}
-                  {row.threadTitle !== null && ` · ${row.threadTitle}`}
-                  {(row.error !== null || (row.exitCode !== null && row.exitCode !== 0)) && (
-                    <span className="text-destructive"> · {t('没有成功')}</span>
-                  )}
-                </span>
-              </span>
-              <span className="flex-none text-meta text-content-tertiary">
-                {relativeTime(row.createdAt, now, t)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-
-  return {
-    shown,
-    meta,
-    drawer: (
-      <>
-        {drawer}
-        {pairOpen !== null && (
-          <PhonePairDialog
-            open
-            machineId={machineId}
-            machineName={machineName}
-            phoneId={pairOpen.phoneId}
-            prefillEndpoint={pairOpen.endpoint}
-            onClose={() => setPairOpen(null)}
-          />
-        )}
-        {forgetTarget !== null && (
-          <DeleteConfirm
-            open
-            title={t('确定移除这台手机？Coordinator 会立刻失去对它的访问。')}
-            summary={<span>{forgetTarget.name}</span>}
-            ariaLabel={t('移除手机')}
-            onClose={() => setForgetTarget(null)}
-            onConfirm={() => forget(forgetTarget)}
-          />
-        )}
-      </>
-    ),
-  };
 }
