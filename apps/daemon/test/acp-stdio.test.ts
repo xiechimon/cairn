@@ -1,5 +1,5 @@
 import { ChildProcess } from 'node:child_process';
-import { mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 import {
@@ -365,7 +365,7 @@ test.each([
       }),
     ).rejects.toThrow('captured environment');
     const settingsPath = inherited?.GEMINI_CLI_SYSTEM_SETTINGS_PATH;
-    expect(settingsPath?.startsWith(home)).toBe(true);
+    expect(settingsPath?.startsWith(realpathSync(home))).toBe(true);
     const settings = JSON.parse(readFileSync(settingsPath as string, 'utf8'));
     expect(settings).toEqual({ model: { compressionThreshold: fraction } });
     releaseTestTempDir(home);

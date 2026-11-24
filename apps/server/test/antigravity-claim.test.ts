@@ -508,10 +508,13 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
         ?.antigravitySubscriptionId,
     ).toBe(subId);
 
+    const workerGeneration =
+      s.db.select().from(stepTable).where(eq(stepTable.id, 's-port')).get()?.claimedAt ?? undefined;
     const workerToken = await stepToken(
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
       unauthMachine,
       's-port',
+      workerGeneration,
     );
     expect(workerToken.antigravityToken).toBeDefined();
     expect(JSON.parse(workerToken.antigravityToken ?? '')).toMatchObject({
@@ -526,12 +529,14 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       .set({ status: 'done', finishedAt: 5 })
       .where(eq(stepTable.id, 's-port'))
       .run();
-    const afterDoneToken = await stepToken(
-      { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
-      unauthMachine,
-      's-port',
-    );
-    expect(afterDoneToken.antigravityToken).toBeUndefined();
+    await expect(
+      stepToken(
+        { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
+        unauthMachine,
+        's-port',
+        workerGeneration,
+      ),
+    ).rejects.toThrow('step claim no longer matches this runner');
 
     seedRoute(s, 'coordinator', {
       provider: 'antigravity',
@@ -569,10 +574,14 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
 
     const chiefClaim = await claim(s, unauthMachine);
     expect(chiefClaim?.agent).toMatchObject({ provider: 'antigravity' });
+    const chiefGeneration =
+      s.db.select().from(stepTable).where(eq(stepTable.id, 'cs-port')).get()?.claimedAt ??
+      undefined;
     const chiefToken = await stepToken(
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
       unauthMachine,
       'cs-port',
+      chiefGeneration,
     );
     expect(chiefToken.antigravityToken).toBeDefined();
     expect(JSON.parse(chiefToken.antigravityToken ?? '')).toMatchObject({
