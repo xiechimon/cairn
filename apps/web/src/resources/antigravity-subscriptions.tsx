@@ -7,7 +7,9 @@ import type {
 } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import type { CreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
-import { extractAntigravityToken } from '../api/antigravity-subscriptions.js';
+import { defaultRunnerTarget, extractAntigravityToken } from '../api/antigravity-subscriptions.js';
+import { useMachines, useTeams } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { InfoTip } from '../components/info-tip.js';
 import { withCodeSpans } from '../components/notice-banner.js';
@@ -15,6 +17,7 @@ import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
+import { Skeleton } from '../components/ui/skeleton.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
@@ -103,10 +106,24 @@ function useAntigravityLocalStatus(bridge: AntigravityBridge | null) {
     if (bridge === null) return;
     void bridge.status().then(
       (status) => setLocal(status),
-      () => {},
+      () => setLocal({ installed: false, loggedIn: false, canLogin: false }),
     );
   };
-  useEffect(refresh, [bridge]);
+  useEffect(() => {
+    if (bridge === null) return;
+    let active = true;
+    void bridge.status().then(
+      (status) => {
+        if (active) setLocal(status);
+      },
+      () => {
+        if (active) setLocal({ installed: false, loggedIn: false, canLogin: false });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [bridge]);
   return { local, refresh };
 }
 
@@ -126,6 +143,10 @@ export function AddAntigravitySubscriptionDialog({
   error: boolean;
 }) {
   const { t } = useI18n();
+  const { live, teamId: liveTeamId } = useLiveData();
+  const resolvedTeamId = teamId ?? liveTeamId;
+  const teamsQ = useTeams(live);
+  const machinesQ = useMachines(resolvedTeamId, live);
   const [label, setLabel] = useState(t('Antigravity 订阅'));
   const [token, setToken] = useState('');
   const [bridge] = useState(antigravityBridge);
@@ -178,13 +199,49 @@ export function AddAntigravitySubscriptionDialog({
     }
   };
 
+  const defaultMachineId =
+    (teamsQ.data?.find((team) => team.id === resolvedTeamId) ?? teamsQ.data?.[0])
+      ?.defaultMachineId ?? null;
+  const localRunnerId =
+    local !== null &&
+    'runnerId' in local &&
+    typeof (local as { runnerId?: unknown }).runnerId === 'string'
+      ? (local as { runnerId: string }).runnerId
+      : undefined;
+  const target = defaultRunnerTarget(machinesQ.data, defaultMachineId, localRunnerId);
+
   const loginActive = login.phase === 'waiting' || login.phase === 'installing';
-  const localAction =
-    local !== null && (local.loggedIn || local.canLogin) ? (
-      loginActive ? (
-        <p className="m-0 flex items-center gap-2">
-          <RingSpinner className="size-4" />
-          <span className="min-w-0 flex-1">
+  const showLocalRow = bridge !== null && (local === null || local.loggedIn || local.canLogin);
+  const loginLabel = target.isThisComputer
+    ? t('在这台 Mac 上登录 Antigravity')
+    : t('在 {machine} 上登录 Antigravity', { machine: target.label ?? '' });
+  const installLoginLabel = target.isThisComputer
+    ? t('安装并登录 Antigravity')
+    : t('在 {machine} 上安装并登录 Antigravity', { machine: target.label ?? '' });
+  const loggedInNote = target.isThisComputer
+    ? t('这台 Mac 已登录 Antigravity。')
+    : t('{machine} 已登录 Antigravity。', { machine: target.label ?? '' });
+
+  const localAction = showLocalRow ? (
+    <div data-testid="antigravity-local-row" className="flex min-w-0 flex-col">
+      {local === null ? (
+        <div
+          data-testid="antigravity-local-skeleton"
+          aria-busy="true"
+          className="flex min-w-0 flex-col"
+        >
+          <span role="status" className="sr-only">
+            {t('正在检查 Antigravity 登录状态')}
+          </span>
+          <Skeleton
+            aria-hidden="true"
+            className="h-8 w-full animate-none rounded-md bg-border pointer-coarse:h-11"
+          />
+        </div>
+      ) : loginActive ? (
+        <div className="flex min-h-8 items-center gap-2 pointer-coarse:min-h-11">
+          <RingSpinner className="size-4 flex-none" />
+          <span className="min-w-0 flex-1 text-meta text-content-secondary">
             {login.phase === 'installing'
               ? t('正在下载安装 Antigravity，完成后会打开浏览器登录。')
               : t('已在浏览器中打开 Antigravity 登录页，完成后会自动继续。')}
@@ -192,57 +249,53 @@ export function AddAntigravitySubscriptionDialog({
           <Button
             variant="ghost"
             size="sm"
+            className="flex-none pointer-coarse:h-11"
             data-testid="antigravity-local-login-cancel"
             onClick={login.cancel}
           >
             {t('取消')}
           </Button>
-        </p>
+        </div>
       ) : local.loggedIn && !importFailed ? (
-        <p className="m-0 flex items-center gap-2">
-          <span className="min-w-0 flex-1">{t('这台 Mac 已登录 Antigravity。')}</span>
+        <div className="flex h-8 min-w-0 items-center justify-between gap-2 pointer-coarse:h-11">
+          <span className="min-w-0 truncate text-meta text-content-secondary" title={loggedInNote}>
+            {loggedInNote}
+          </span>
           <Button
             variant="outline"
-            size="sm"
+            className="flex-none rounded-md text-ui pointer-coarse:h-11"
             data-testid="antigravity-local-import"
             disabled={busy || !label.trim()}
             onClick={() => void importLocal()}
           >
-            {t('从这台 Mac 接入')}
+            {t('接入')}
           </Button>
-        </p>
+        </div>
       ) : local.installed ? (
-        <p className="m-0 flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="antigravity-local-login"
-            disabled={busy || !label.trim()}
-            onClick={() => void startLogin()}
-          >
-            {t('在这台 Mac 上登录 Antigravity')}
-          </Button>
-          <span className="min-w-0 flex-1 text-meta text-content-tertiary">
-            {t('会打开浏览器完成 Google 账号登录。')}
-          </span>
-        </p>
+        <Button
+          variant="outline"
+          className="w-full min-w-0 justify-center rounded-md text-ui pointer-coarse:h-11"
+          data-testid="antigravity-local-login"
+          disabled={busy || !label.trim()}
+          title={loginLabel}
+          onClick={() => void startLogin()}
+        >
+          <span className="truncate">{loginLabel}</span>
+        </Button>
       ) : (
-        <p className="m-0 flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="antigravity-local-login"
-            disabled={busy || !label.trim()}
-            onClick={() => void startLogin()}
-          >
-            {t('安装并登录 Antigravity')}
-          </Button>
-          <span className="min-w-0 flex-1 text-meta text-content-tertiary">
-            {t('会先下载 Antigravity，再打开浏览器完成 Google 账号登录。')}
-          </span>
-        </p>
-      )
-    ) : null;
+        <Button
+          variant="outline"
+          className="w-full min-w-0 justify-center rounded-md text-ui pointer-coarse:h-11"
+          data-testid="antigravity-local-login"
+          disabled={busy || !label.trim()}
+          title={installLoginLabel}
+          onClick={() => void startLogin()}
+        >
+          <span className="truncate">{installLoginLabel}</span>
+        </Button>
+      )}
+    </div>
+  ) : null;
 
   return (
     <DialogShell
@@ -284,10 +337,8 @@ export function AddAntigravitySubscriptionDialog({
           </p>
         )}
         {!pasteOpen && (
-          <p className="m-0 text-meta text-content-tertiary">
-            {withCodeSpans(
-              t('在这台 Mac 上登录后接入该账号，也可以展开下方粘贴 `GEMINI_API_KEY`。'),
-            )}{' '}
+          <p data-testid="antigravity-local-hint" className="m-0 text-meta text-content-tertiary">
+            {t('默认使用执行机上已登录的 Antigravity。')}{' '}
             <InfoTip info={t('账号访问令牌加密保存，到期后需重新接入')} />
           </p>
         )}
@@ -308,7 +359,7 @@ export function AddAntigravitySubscriptionDialog({
             data-testid="antigravity-paste-toggle"
             onClick={() => setPasteOpen(true)}
           >
-            {t('也可以粘贴 API key')}
+            {t('改用 API key')}
           </Button>
         ) : (
           <>

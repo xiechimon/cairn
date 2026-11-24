@@ -3,6 +3,7 @@ import type {
   AntigravitySubscriptionListEntry,
   AntigravitySubscriptionVerifyResult,
   CreateAntigravitySubscription,
+  MachineRecord,
   ProviderFailure,
 } from '@cairn/shared';
 import { antigravityKeyFromText } from '@cairn/shared';
@@ -176,4 +177,49 @@ export function useUpdateAntigravitySubscriptionModels(teamId: string | undefine
       void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
     },
   });
+}
+
+export interface AntigravityRunnerTarget {
+  isThisComputer: boolean;
+  label: string | null;
+}
+
+export interface RunnerTargetMachine {
+  id: string;
+  name: string;
+  kind?: MachineRecord['kind'];
+  online: boolean;
+  capabilities?: { computerName?: string; hostname?: string } | null;
+}
+
+export function defaultRunnerTarget(
+  machines: readonly RunnerTargetMachine[] | undefined,
+  defaultMachineId: string | null | undefined,
+  localRunnerId?: string,
+): AntigravityRunnerTarget {
+  if (machines === undefined || machines.length === 0) {
+    return { isThisComputer: true, label: null };
+  }
+  const online = machines.filter((machine) => machine.online);
+  const runner =
+    (defaultMachineId != null
+      ? machines.find((machine) => machine.id === defaultMachineId)
+      : undefined) ??
+    (online.length === 1 ? online[0] : undefined) ??
+    (machines.length === 1 ? machines[0] : undefined) ??
+    machines.find((machine) => machine.kind === 'local');
+  if (runner === undefined) {
+    return { isThisComputer: true, label: null };
+  }
+  const isThisComputer =
+    localRunnerId !== undefined ? runner.id === localRunnerId : runner.kind !== 'remote';
+  if (isThisComputer) {
+    return { isThisComputer: true, label: null };
+  }
+  const reported = runner.capabilities;
+  const label =
+    reported?.computerName !== undefined && reported.hostname === runner.name
+      ? reported.computerName
+      : runner.name;
+  return { isThisComputer: false, label };
 }

@@ -105,12 +105,13 @@ export const EN: Record<string, string> = {
   '已在浏览器中打开 Antigravity 登录页，完成后会自动继续。':
     'The Antigravity sign-in page is open in your browser; this continues automatically when it finishes.',
   '这台 Mac 已登录 Antigravity。': 'This Mac is signed in to Antigravity.',
-  '从这台 Mac 接入': 'Connect from this Mac',
+  '{machine} 已登录 Antigravity。': '{machine} is signed in to Antigravity.',
   '在这台 Mac 上登录 Antigravity': 'Sign in to Antigravity on this Mac',
+  '在 {machine} 上登录 Antigravity': 'Sign in to Antigravity on {machine}',
   '安装并登录 Antigravity': 'Install and sign in to Antigravity',
+  '在 {machine} 上安装并登录 Antigravity': 'Install and sign in to Antigravity on {machine}',
+  '正在检查 Antigravity 登录状态': 'Checking Antigravity sign-in status',
   '会打开浏览器完成 Google 账号登录。': 'A browser opens to sign in with your Google account.',
-  '会先下载 Antigravity，再打开浏览器完成 Google 账号登录。':
-    'Downloads Antigravity first, then opens a browser to sign in with your Google account.',
   '正在下载安装 Antigravity，完成后会打开浏览器登录。':
     'Downloading and installing Antigravity; a browser opens to sign in when it finishes.',
   'Antigravity 未能安装。请重试，或改用下方粘贴。':
@@ -124,11 +125,11 @@ export const EN: Record<string, string> = {
   '{count} 处已过期': '{count} expired',
   '{count} 处登录失效': '{count} signed out',
   '{count} 处即将过期': '{count} about to expire',
-  '在这台 Mac 上登录后接入该账号，也可以展开下方粘贴 `GEMINI_API_KEY`。':
-    'Connect the account you sign in to on this Mac, or expand below to paste a `GEMINI_API_KEY`.',
+  '默认使用执行机上已登录的 Antigravity。':
+    'Uses the Antigravity sign-in on your Runner by default.',
   '未能导入登录凭据，请在这台 Mac 上重新登录 Antigravity。':
     'Unable to import the sign-in credential. Sign in to Antigravity again on this Mac.',
-  '也可以粘贴 API key': 'Or paste an API key',
+  '改用 API key': 'Use an API key instead',
   '粘贴 `GEMINI_API_KEY` 或 `.env` 片段。保存后无法再查看。':
     'Paste a `GEMINI_API_KEY` or `.env` snippet. It cannot be viewed after saving.',
   '这个订阅的登录已失效。在执行机重新登录 Google 账号或更新 API key 后，移除并重新添加。':
