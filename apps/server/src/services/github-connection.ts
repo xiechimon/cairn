@@ -61,8 +61,8 @@ function matchesConnection(left: GithubConnectionPin, right: GithubConnectionPin
   );
 }
 
-function getRow(deps: GithubConnectionDeps, teamId: string) {
-  return deps.db.select().from(githubConnection).where(eq(githubConnection.teamId, teamId)).get();
+function getRow(db: Db, teamId: string) {
+  return db.select().from(githubConnection).where(eq(githubConnection.teamId, teamId)).get();
 }
 
 export function upsertGithubConnection(
@@ -153,13 +153,13 @@ export function saveRefreshedTokens(
 }
 
 export function deleteGithubConnection(deps: GithubConnectionDeps, teamId: string): boolean {
-  const existed = getRow(deps, teamId) !== undefined;
+  const existed = getRow(deps.db, teamId) !== undefined;
   deps.db.delete(githubConnection).where(eq(githubConnection.teamId, teamId)).run();
   return existed;
 }
 
 export function openGithubToken(deps: GithubConnectionDeps, teamId: string): string | null {
-  const row = getRow(deps, teamId);
+  const row = getRow(deps.db, teamId);
   if (!row || row.disconnectedReason !== null) return null;
   return deps.box.open(row.accessTokenCipher);
 }
@@ -175,6 +175,61 @@ function refreshChainsOf(db: Db): Map<string, Promise<GithubTokenAccess>> {
   return map;
 }
 
+interface TokenRotation {
+  token: string;
+  pin: GithubConnectionPin;
+}
+
+const ROTATION_ALIAS_LIMIT = 64;
+const rotationsByDb = new WeakMap<Db, Map<string, TokenRotation>>();
+
+function rotationsOf(db: Db): Map<string, TokenRotation> {
+  let rotations = rotationsByDb.get(db);
+  if (rotations === undefined) {
+    rotations = new Map<string, TokenRotation>();
+    rotationsByDb.set(db, rotations);
+  }
+  return rotations;
+}
+
+function recordTokenRotation(db: Db, staleToken: string, access: GithubTokenAccess): void {
+  if (!('token' in access) || access.token === staleToken) return;
+  const rotations = rotationsOf(db);
+  for (const [older, current] of rotations) {
+    if (current.token === staleToken) {
+      rotations.set(older, { token: access.token, pin: access.pin });
+    }
+  }
+  rotations.set(staleToken, { token: access.token, pin: access.pin });
+  if (rotations.size > ROTATION_ALIAS_LIMIT) {
+    const oldest = rotations.keys().next().value;
+    if (oldest !== undefined) rotations.delete(oldest);
+  }
+}
+
+function usableRotation(
+  db: Db,
+  sentToken: string,
+  teamId: string | undefined,
+  pin: GithubConnectionPin | undefined,
+): string | undefined {
+  const rotations = rotationsByDb.get(db);
+  const rotation = rotations?.get(sentToken);
+  if (rotation === undefined || rotations === undefined) return undefined;
+  const row = getRow(db, rotation.pin.teamId);
+  if (
+    row === undefined ||
+    row.disconnectedReason !== null ||
+    !matchesConnection(row, rotation.pin) ||
+    (teamId !== undefined && row.teamId !== teamId) ||
+    (pin !== undefined && !matchesConnection(row, pin))
+  ) {
+    rotations.delete(sentToken);
+    return undefined;
+  }
+  return rotation.token;
+}
+
 export async function connectionToken(
   deps: GithubTokenDeps,
   teamId: string,
@@ -183,7 +238,7 @@ export async function connectionToken(
   const box = deps.box;
   if (box === undefined) return { reason: 'no-secret-box' };
   const connectionDeps = { db: deps.db, box };
-  const row = getRow(connectionDeps, teamId);
+  const row = getRow(connectionDeps.db, teamId);
   if (!row || (pin !== undefined && !matchesConnection(row, pin))) {
     return { reason: 'no-github-connection' };
   }
@@ -213,58 +268,17 @@ function refreshConnectionToken(
   row: GithubConnectionRow,
   staleToken: string,
 ): Promise<GithubTokenAccess> {
-  const { box } = connectionDeps;
   const pin = connectionPin(row);
   const key = JSON.stringify([pin.teamId, pin.createdAt, pin.connectionGeneration]);
   const refreshChains = refreshChainsOf(connectionDeps.db);
   const chained = refreshChains.get(key);
   if (chained !== undefined) return chained;
-  const refresh = (async (): Promise<GithubTokenAccess> => {
-    const client = deps.oauthClient ?? null;
-    if (row.refreshTokenCipher === null || (client === null && row.appClientId === null))
-      return { token: staleToken, box, pin };
-    const fetchImpl = deps.githubFetch ?? globalThis.fetch;
-    let refreshToken: string;
-    try {
-      refreshToken = box.open(row.refreshTokenCipher);
-    } catch {
-      markGithubConnectionDisconnected(
-        connectionDeps,
-        row.teamId,
-        'stored refresh token unreadable',
-      );
-      return { reason: 'github-disconnected' };
-    }
-    if (row.appClientId !== null)
-      return refreshDeviceGrant(
-        connectionDeps,
-        fetchImpl,
-        row,
-        row.appClientId,
-        refreshToken,
-        staleToken,
-      );
-    if (client === null) return { token: staleToken, box, pin };
-    try {
-      const tokens = await refreshOAuthAccessToken(fetchImpl, {
-        tokenUrl: onGithubOauthBase(GITHUB_CONNECTION_OAUTH.tokenUrl),
-        clientId: client.clientId,
-        clientSecret: client.clientSecret,
-        refreshToken,
-      });
-      if (saveRefreshedTokens(connectionDeps, row, tokens) === 0)
-        return currentConnectionToken(connectionDeps, row.teamId);
-      return { token: tokens.accessToken, box, pin };
-    } catch (err) {
-      const why = err instanceof Error ? err.message : String(err);
-      connectionDeps.db
-        .update(githubConnection)
-        .set({ disconnectedReason: `oauth refresh failed: ${why}` })
-        .where(and(sameConnectionRow(row), isNull(githubConnection.appClientId)))
-        .run();
-      return currentConnectionToken(connectionDeps, row.teamId);
-    }
-  })();
+  const refresh = refreshStaleConnectionToken(deps, connectionDeps, row, staleToken).then(
+    (access) => {
+      recordTokenRotation(connectionDeps.db, staleToken, access);
+      return access;
+    },
+  );
   refreshChains.set(key, refresh);
   refresh
     .finally(() => {
@@ -272,6 +286,56 @@ function refreshConnectionToken(
     })
     .catch(() => undefined);
   return refresh;
+}
+
+async function refreshStaleConnectionToken(
+  deps: GithubTokenDeps,
+  connectionDeps: GithubConnectionDeps,
+  row: GithubConnectionRow,
+  staleToken: string,
+): Promise<GithubTokenAccess> {
+  const { box } = connectionDeps;
+  const pin = connectionPin(row);
+  const client = deps.oauthClient ?? null;
+  if (row.refreshTokenCipher === null || (client === null && row.appClientId === null))
+    return { token: staleToken, box, pin };
+  const fetchImpl = deps.githubFetch ?? globalThis.fetch;
+  let refreshToken: string;
+  try {
+    refreshToken = box.open(row.refreshTokenCipher);
+  } catch {
+    markGithubConnectionDisconnected(connectionDeps, row.teamId, 'stored refresh token unreadable');
+    return { reason: 'github-disconnected' };
+  }
+  if (row.appClientId !== null)
+    return refreshDeviceGrant(
+      connectionDeps,
+      fetchImpl,
+      row,
+      row.appClientId,
+      refreshToken,
+      staleToken,
+    );
+  if (client === null) return { token: staleToken, box, pin };
+  try {
+    const tokens = await refreshOAuthAccessToken(fetchImpl, {
+      tokenUrl: onGithubOauthBase(GITHUB_CONNECTION_OAUTH.tokenUrl),
+      clientId: client.clientId,
+      clientSecret: client.clientSecret,
+      refreshToken,
+    });
+    if (saveRefreshedTokens(connectionDeps, row, tokens) === 0)
+      return currentConnectionToken(connectionDeps, row.teamId);
+    return { token: tokens.accessToken, box, pin };
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    connectionDeps.db
+      .update(githubConnection)
+      .set({ disconnectedReason: `oauth refresh failed: ${why}` })
+      .where(and(sameConnectionRow(row), isNull(githubConnection.appClientId)))
+      .run();
+    return currentConnectionToken(connectionDeps, row.teamId);
+  }
 }
 
 async function refreshDeviceGrant(
@@ -312,7 +376,7 @@ async function refreshDeviceGrant(
 }
 
 function currentConnectionToken(deps: GithubConnectionDeps, teamId: string): GithubTokenAccess {
-  const current = getRow(deps, teamId);
+  const current = getRow(deps.db, teamId);
   if (!current) return { reason: 'no-github-connection' };
   if (current.disconnectedReason !== null) return { reason: 'github-disconnected' };
   try {
@@ -335,12 +399,28 @@ export function refreshingGithubFetch(
   const pin = typeof scope === 'string' ? undefined : scope;
   const teamId = typeof scope === 'string' ? scope : scope?.teamId;
   return async (input, init) => {
-    const header = init?.headers?.authorization;
-    if (header?.startsWith('Bearer ') && isAppToken(header.slice(7))) return inner(input, init);
-    const res = await inner(input, init);
+    const sent = init?.headers?.authorization;
+    const rotated = sent?.startsWith('Bearer ')
+      ? usableRotation(deps.db, sent.slice(7), teamId, pin)
+      : undefined;
+    const forwarded =
+      rotated === undefined
+        ? init
+        : { ...init, headers: { ...init?.headers, authorization: `Bearer ${rotated}` } };
+    const header = forwarded?.headers?.authorization;
+    if (header?.startsWith('Bearer ') && isAppToken(header.slice(7)))
+      return inner(input, forwarded);
+    const res = await inner(input, forwarded);
     if (res.status !== 401 || deps.box === undefined || !header?.startsWith('Bearer ')) return res;
     const box = deps.box;
     const rejected = header.slice('Bearer '.length);
+    const shared = usableRotation(deps.db, rejected, teamId, pin);
+    if (shared !== undefined) {
+      return inner(input, {
+        ...forwarded,
+        headers: { ...forwarded?.headers, authorization: `Bearer ${shared}` },
+      });
+    }
     const connectionDeps = { db: deps.db, box };
     const rows = deps.db
       .select()
@@ -380,8 +460,8 @@ export function refreshingGithubFetch(
       return res;
     }
     return inner(input, {
-      ...init,
-      headers: { ...init?.headers, authorization: `Bearer ${access.token}` },
+      ...forwarded,
+      headers: { ...forwarded?.headers, authorization: `Bearer ${access.token}` },
     });
   };
 }
@@ -433,7 +513,7 @@ export function readGithubConnectionStatus(
   deps: GithubConnectionDeps,
   teamId: string,
 ): GithubConnectionStatus {
-  const row = getRow(deps, teamId);
+  const row = getRow(deps.db, teamId);
   if (!row) return { connected: false };
   const webhook = {
     ...(row.webhookMasked !== null ? { webhookMasked: row.webhookMasked } : {}),

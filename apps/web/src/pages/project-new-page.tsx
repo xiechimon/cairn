@@ -166,6 +166,9 @@ export function ProjectNewPage() {
   const disconnectReason = live ? (connectionQ.data?.disconnectReason ?? null) : null;
   const reposQ = useGithubRepos(live && githubSelected && connected && !manualRepo);
   const repos = live ? (reposQ.data?.repos ?? []) : (fixture.github?.repos ?? []);
+  const grantReposUrl = live
+    ? (reposQ.data?.grantReposUrl ?? null)
+    : (fixture.github?.grantReposUrl ?? null);
   const query = repoQuery.trim().toLowerCase();
   const hits =
     query === '' ? repos : repos.filter((r) => r.full_name.toLowerCase().includes(query));
@@ -252,6 +255,10 @@ export function ProjectNewPage() {
   const showGithubField = githubSelected && !manualEntry;
 
   const pickerVisible = showGithubField && connected && pickerOpen;
+  const refetchRepos = reposQ.refetch;
+  useEffect(() => {
+    if (pickerVisible && live) void refetchRepos();
+  }, [pickerVisible, live, refetchRepos]);
   const ghListRef = useRef<HTMLDivElement>(null);
   const ghFocusDelivered = useRef(false);
   const ghTypeBuf = useRef({ text: '', ts: 0 });
@@ -672,6 +679,20 @@ export function ProjectNewPage() {
                       {(reposQ.error as Error).message}
                     </div>
                   ) : null}
+                  {grantReposUrl !== null && (
+                    <div className="px-1 text-xs leading-4 text-muted-foreground">
+                      {t('只显示已授权给 Cairn 的仓库')}
+                      {' · '}
+                      <a
+                        href={grantReposUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-foreground underline underline-offset-2"
+                      >
+                        {t('去 GitHub 授权更多仓库')}
+                      </a>
+                    </div>
+                  )}
                 </PopoverContent>
               </div>
             </Popover>

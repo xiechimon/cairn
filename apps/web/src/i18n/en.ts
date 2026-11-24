@@ -1317,6 +1317,8 @@ export const EN: Record<string, string> = {
   搜索仓库: 'Search repositories',
   没有匹配的仓库: 'No matching repositories',
   断开连接: 'Disconnect',
+  '只显示已授权给 Cairn 的仓库': 'Only repositories granted to Cairn are listed',
+  '去 GitHub 授权更多仓库': 'Grant more repositories on GitHub',
   'GitHub 连接已断开': 'GitHub connection disconnected',
   已连接: 'Connected',
   '手动输入 owner/repo': 'Enter owner/repo manually',

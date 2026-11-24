@@ -102,8 +102,8 @@ export async function runGithubAuthEmulatorCase() {
       world.team.id,
     );
     assert.match(token ?? '', /^ghu_/);
-    const repos = await githubAppUserRepos(globalThis.fetch, token ?? '');
-    assert(repos.some((r) => r.fullName === 'octo/demo'));
+    const repoList = await githubAppUserRepos(globalThis.fetch, token ?? '');
+    assert(repoList.repos.some((r) => r.fullName === 'octo/demo'));
 
     db.update(githubConnection)
       .set({ accessTokenExpiresAt: Date.now() + 30_000 })
@@ -131,7 +131,12 @@ export async function runGithubAuthEmulatorCase() {
       'GitHub authorization expired',
     );
 
-    const result = { provider: 'cairn githubAuthFake over loopback HTTP', saved, repos, requests };
+    const result = {
+      provider: 'cairn githubAuthFake over loopback HTTP',
+      saved,
+      repos: repoList.repos,
+      requests,
+    };
     const evidence = process.env.VERIFY_EVIDENCE_DIR;
     if (evidence) {
       await mkdir(evidence, { recursive: true });

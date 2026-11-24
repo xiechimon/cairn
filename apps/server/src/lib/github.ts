@@ -524,25 +524,35 @@ export async function githubUserRepos(
   return repos;
 }
 
+export interface GithubAppRepoList {
+  repos: GithubUserRepo[];
+  selectionLimited: boolean;
+  installations: number;
+}
+
 export async function githubAppUserRepos(
   fetchImpl: FetchLike,
   token: string,
-): Promise<GithubUserRepo[]> {
+): Promise<GithubAppRepoList> {
   const headers = { ...API_HEADERS, authorization: `Bearer ${token}` };
-  const installationIds: number[] = [];
+  const installations: number[] = [];
+  let selectionLimited = false;
   for (let page = 1; page <= MAX_REPO_PAGES; page++) {
     const url = `${githubApiBaseUrl()}/user/installations?per_page=${USER_REPOS_PER_PAGE}&page=${page}`;
     const data = (await readJson(fetchImpl, url, headers)) as { installations?: unknown };
     const list = Array.isArray(data.installations) ? data.installations : [];
     for (const raw of list as Array<Record<string, unknown>>) {
-      if (typeof raw.id === 'number') installationIds.push(raw.id);
+      if (typeof raw.id === 'number') {
+        installations.push(raw.id);
+        if (raw.repository_selection === 'selected') selectionLimited = true;
+      }
     }
     if (list.length === 0 || page * USER_REPOS_PER_PAGE >= pageTotal(data)) break;
   }
   const found: { repo: GithubUserRepo; pushedAt: number }[] = [];
-  for (const installationId of installationIds) {
+  for (const installation of installations) {
     for (let page = 1; page <= MAX_REPO_PAGES; page++) {
-      const url = `${githubApiBaseUrl()}/user/installations/${installationId}/repositories?per_page=${USER_REPOS_PER_PAGE}&page=${page}`;
+      const url = `${githubApiBaseUrl()}/user/installations/${installation}/repositories?per_page=${USER_REPOS_PER_PAGE}&page=${page}`;
       const data = (await readJson(fetchImpl, url, headers)) as { repositories?: unknown };
       const list = Array.isArray(data.repositories) ? data.repositories : [];
       for (const raw of list as Array<Record<string, unknown>>) {
@@ -556,7 +566,11 @@ export async function githubAppUserRepos(
     }
   }
   found.sort((a, b) => b.pushedAt - a.pushedAt);
-  return found.map((entry) => entry.repo);
+  return {
+    repos: found.map((entry) => entry.repo),
+    selectionLimited,
+    installations: installations.length,
+  };
 }
 
 export async function githubUserIdentity(

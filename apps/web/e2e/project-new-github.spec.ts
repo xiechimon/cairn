@@ -156,7 +156,78 @@ test('9. disconnect button → back to the unconnected face (fixture accept law)
   await expect(page.locator('#prj-new-repo')).toHaveText('认证 GitHub');
 });
 
-test('10. row-list keyboard contract: focus enters the list, Arrow/typeahead moves, Enter selects and takes effect, focus returns', async ({
+test('9b. limited App grant: one plain line names the limit and links to the app installations page', async ({
+  page,
+}) => {
+  await page.goto('/app/project/new?scenario=github-picker-limited');
+  await selectGithub(page);
+  const picker = await openPicker(page);
+  await expect(picker.getByText('只显示已授权给 Cairn 的仓库')).toBeVisible();
+  const link = picker.getByRole('link', { name: '去 GitHub 授权更多仓库' });
+  await expect(link).toHaveAttribute(
+    'href',
+    'https://github.com/apps/cairnwright/installations/new',
+  );
+});
+
+test('10. grant-and-return: window focus and picker reopen refetch the repo list', async ({
+  page,
+}) => {
+  let granted = [
+    { id: 1, owner: 'octo', name: 'alpha', full_name: 'octo/alpha', private: true },
+  ];
+  let repoCalls = 0;
+  await page.route('**/api/**', (route, request) => {
+    if (request.method() !== 'GET') return route.fallback();
+    return route.fulfill({ status: 500, json: { error: 'e2e stub' } });
+  });
+  await page.route('**/api/teams', (route) =>
+    route.fulfill({
+      json: [{ id: 'team-1', name: 'Team', createdAt: 0, plan: 'free', avatarStyle: null }],
+    }),
+  );
+  await page.route('**/api/user/me', (route) =>
+    route.fulfill({ json: { id: 'user-1', displayName: '我', avatarUrl: null } }),
+  );
+  await page.route('**/api/capabilities', (route) =>
+    route.fulfill({ json: { thinkingLevels: [], githubOAuth: true } }),
+  );
+  await page.route('**/api/teams/team-1/github/connection', (route) =>
+    route.fulfill({ json: { connected: true, login: 'octo' } }),
+  );
+  await page.route('**/api/github/repos', (route) => {
+    repoCalls += 1;
+    return route.fulfill({ json: { repos: granted } });
+  });
+
+  await page.goto('/app/project/new');
+  await selectGithub(page);
+  const picker = await openPicker(page);
+  await expect(picker.getByRole('option')).toHaveCount(1);
+  const afterOpen = repoCalls;
+  expect(afterOpen).toBeGreaterThan(0);
+
+  granted = [
+    ...granted,
+    { id: 2, owner: 'acme', name: 'beta', full_name: 'acme/beta', private: false },
+  ];
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect(picker.getByRole('option')).toHaveCount(2);
+  expect(repoCalls).toBeGreaterThan(afterOpen);
+
+  granted = [
+    ...granted,
+    { id: 3, owner: 'acme', name: 'gamma', full_name: 'acme/gamma', private: false },
+  ];
+  await page.keyboard.press('Escape');
+  await expect(picker).not.toBeVisible();
+  const beforeReopen = repoCalls;
+  await openPicker(page);
+  await expect(picker.getByRole('option')).toHaveCount(3);
+  expect(repoCalls).toBeGreaterThan(beforeReopen);
+});
+
+test('11. row-list keyboard contract: focus enters the list, Arrow/typeahead moves, Enter selects and takes effect, focus returns', async ({
   page,
 }) => {
   await page.goto(PICKER);
@@ -194,7 +265,7 @@ test('10. row-list keyboard contract: focus enters the list, Arrow/typeahead mov
   await expect(page.locator('#prj-new-repo')).toBeFocused();
 });
 
-test('11. device sign-in: auth button shows a code, completion offers the App install, then the picker lists repos', async ({
+test('12. device sign-in: auth button shows a code, completion offers the App install, then the picker lists repos', async ({
   page,
 }) => {
   let connected = false;

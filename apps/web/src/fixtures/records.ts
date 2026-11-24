@@ -282,6 +282,7 @@ export interface GithubFixture {
   login?: string;
   scope?: string;
   repos?: GithubRepoSummary[];
+  grantReposUrl?: string;
 }
 
 export interface SkillRow {

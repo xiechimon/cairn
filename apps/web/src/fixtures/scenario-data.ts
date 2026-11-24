@@ -227,6 +227,14 @@ const scenarios = {
   'newtask-projects': boardProjectPicker,
   'newtask-machines': boardMachinePicker,
   'github-picker': boardGithubPicker,
+  'github-picker-limited': {
+    ...boardGithubPicker,
+    github: {
+      ...boardGithubPicker.github,
+      connected: true,
+      grantReposUrl: 'https://github.com/apps/cairnwright/installations/new',
+    },
+  },
   'board-tags': boardTagFilter,
   'board-repos': boardRepoFilter,
   'sidebar-threads': sidebarThreads,

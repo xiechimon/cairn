@@ -28,6 +28,16 @@ function seedConnection(
   });
 }
 
+function seedAppConnection(s: TestServer): void {
+  upsertGithubConnection(depsOf(s), {
+    teamId: s.team.id,
+    login: 'octo',
+    accessToken: 'ghu_device_grant_token',
+    scope: '',
+    device: { clientId: 'Iv23shared', refreshTokenExpiresAt: Date.now() + 86_400_000 },
+  });
+}
+
 interface CapturedCall {
   url: string;
   headers: Record<string, string>;
@@ -330,18 +340,236 @@ describe('GET /api/github/repos?q= proxy (spec 12 data-contract surface)', () =>
     });
     const s = bootServer({ githubFetch: impl });
     try {
-      upsertGithubConnection(depsOf(s), {
-        teamId: s.team.id,
-        login: 'octo',
-        accessToken: 'ghu_device_grant_token',
-        scope: '',
-        device: { clientId: 'Iv23shared', refreshTokenExpiresAt: Date.now() + 86_400_000 },
-      });
+      seedAppConnection(s);
       const res = await req(s.app, 'GET', '/api/github/repos');
       expect(res.status).toBe(200);
       const parsed = githubReposResponseSchema.parse(await res.json());
       expect(parsed.repos.map((r) => r.full_name)).toEqual(['octo/beta-private', 'octo/alpha']);
+      expect(parsed.grantReposUrl).toBeUndefined();
       expect(calls.every((u) => !u.startsWith('/user/repos'))).toBe(true);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('app token, >100 repos across installation pages incl. org and private; q reaches a page-3 repo', async () => {
+    const pageOf = (start: number, count: number) =>
+      Array.from({ length: count }, (_, i) => {
+        const id = start + i;
+        return {
+          id,
+          name: `app-repo-${id}`,
+          full_name: `octo/app-repo-${id}`,
+          private: id % 3 === 0,
+          owner: { login: 'octo' },
+          pushed_at: '2026-11-01T00:00:00Z',
+        };
+      });
+    const pages = [
+      pageOf(0, 100),
+      pageOf(100, 100),
+      [
+        ...pageOf(200, 48),
+        {
+          id: 248,
+          name: 'page3-target',
+          full_name: 'octo/page3-target',
+          private: true,
+          owner: { login: 'octo' },
+          pushed_at: '2026-11-03T00:00:00Z',
+        },
+        {
+          id: 249,
+          name: 'org-repo',
+          full_name: 'acme-org/org-repo',
+          private: false,
+          owner: { login: 'acme-org' },
+          pushed_at: '2026-11-02T00:00:00Z',
+        },
+      ],
+    ];
+    const { impl } = mockGithubRoutes((url) => {
+      if (url.pathname === '/user/installations') {
+        return {
+          body: {
+            total_count: 1,
+            installations: [
+              {
+                id: 7,
+                repository_selection: 'all',
+                html_url: 'https://github.com/settings/installations/7',
+              },
+            ],
+          },
+        };
+      }
+      if (url.pathname === '/user/installations/7/repositories') {
+        const page = Number(url.searchParams.get('page') ?? '1');
+        return {
+          body: {
+            total_count: 250,
+            repository_selection: 'all',
+            repositories: pages[page - 1] ?? [],
+          },
+        };
+      }
+      return null;
+    });
+    const s = bootServer({ githubFetch: impl });
+    try {
+      seedAppConnection(s);
+      const res = await req(s.app, 'GET', '/api/github/repos');
+      expect(res.status).toBe(200);
+      const parsed = githubReposResponseSchema.parse(await res.json());
+      expect(parsed.repos).toHaveLength(250);
+      expect(parsed.grantReposUrl).toBeUndefined();
+      const hit = githubReposResponseSchema.parse(
+        await (await req(s.app, 'GET', '/api/github/repos?q=page3-target')).json(),
+      );
+      expect(hit.repos.map((r) => r.full_name)).toEqual(['octo/page3-target']);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('app token, selected-repos installation: grantReposUrl = the app installations page', async () => {
+    const { impl } = mockGithubRoutes((url) => {
+      if (url.pathname === '/user/installations') {
+        return {
+          body: {
+            total_count: 1,
+            installations: [
+              {
+                id: 7,
+                repository_selection: 'selected',
+                html_url: 'https://github.com/settings/installations/7',
+              },
+            ],
+          },
+        };
+      }
+      if (url.pathname === '/user/installations/7/repositories') {
+        return {
+          body: {
+            total_count: 1,
+            repository_selection: 'selected',
+            repositories: [REPOS_PAYLOAD[0]],
+          },
+        };
+      }
+      return null;
+    });
+    const s = bootServer({ githubFetch: impl });
+    try {
+      seedAppConnection(s);
+      const res = await req(s.app, 'GET', '/api/github/repos');
+      expect(res.status).toBe(200);
+      const parsed = githubReposResponseSchema.parse(await res.json());
+      expect(parsed.grantReposUrl).toBe('https://github.com/apps/cairnwright/installations/new');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('app token, several selected-scope installations: grantReposUrl still the one app installations page', async () => {
+    const { impl } = mockGithubRoutes((url) => {
+      if (url.pathname === '/user/installations') {
+        return {
+          body: {
+            total_count: 3,
+            installations: [
+              {
+                id: 7,
+                repository_selection: 'selected',
+                html_url: 'https://github.com/settings/installations/7',
+              },
+              {
+                id: 9,
+                repository_selection: 'selected',
+                html_url: 'https://github.com/organizations/acme/settings/installations/9',
+              },
+              { id: 11, repository_selection: 'all' },
+            ],
+          },
+        };
+      }
+      const repos = url.pathname.match(/^\/user\/installations\/(\d+)\/repositories$/);
+      if (repos !== null) {
+        return {
+          body: {
+            total_count: 1,
+            repositories: [{ ...REPOS_PAYLOAD[0], id: Number(repos[1]) }],
+          },
+        };
+      }
+      return null;
+    });
+    const s = bootServer({ githubFetch: impl });
+    try {
+      seedAppConnection(s);
+      const res = await req(s.app, 'GET', '/api/github/repos');
+      expect(res.status).toBe(200);
+      const parsed = githubReposResponseSchema.parse(await res.json());
+      expect(parsed.repos).toHaveLength(3);
+      expect(parsed.grantReposUrl).toBe('https://github.com/apps/cairnwright/installations/new');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('app token, every installation sees all repositories: no grantReposUrl', async () => {
+    const { impl } = mockGithubRoutes((url) => {
+      if (url.pathname === '/user/installations') {
+        return {
+          body: {
+            total_count: 1,
+            installations: [
+              {
+                id: 7,
+                repository_selection: 'all',
+                html_url: 'https://github.com/settings/installations/7',
+              },
+            ],
+          },
+        };
+      }
+      if (url.pathname === '/user/installations/7/repositories') {
+        return {
+          body: {
+            total_count: 1,
+            repository_selection: 'all',
+            repositories: [REPOS_PAYLOAD[0]],
+          },
+        };
+      }
+      return null;
+    });
+    const s = bootServer({ githubFetch: impl });
+    try {
+      seedAppConnection(s);
+      const res = await req(s.app, 'GET', '/api/github/repos');
+      expect(res.status).toBe(200);
+      const parsed = githubReposResponseSchema.parse(await res.json());
+      expect(parsed.grantReposUrl).toBeUndefined();
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('app token with no installations: grantReposUrl = the app install page', async () => {
+    const { impl } = mockGithubRoutes((url) =>
+      url.pathname === '/user/installations'
+        ? { body: { total_count: 0, installations: [] } }
+        : null,
+    );
+    const s = bootServer({ githubFetch: impl });
+    try {
+      seedAppConnection(s);
+      const res = await req(s.app, 'GET', '/api/github/repos');
+      expect(res.status).toBe(200);
+      const parsed = githubReposResponseSchema.parse(await res.json());
+      expect(parsed.repos).toEqual([]);
+      expect(parsed.grantReposUrl).toBe('https://github.com/apps/cairnwright/installations/new');
     } finally {
       s.dispose();
     }

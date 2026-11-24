@@ -1,9 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { githubConnection, team } from '../src/db/schema.js';
-import { type FetchLike, githubUserRepos } from '../src/lib/github.js';
+import { type FetchLike, githubAppUserRepos, githubUserRepos } from '../src/lib/github.js';
 import {
   hasGithubConnection,
+  markGithubConnectionDisconnected,
   openGithubToken,
   readGithubConnectionStatus,
   refreshingGithubFetch,
@@ -229,6 +230,108 @@ describe('github connection token refresh (#1731)', () => {
       const rotated = [...gh.grants.keys()].at(-1);
       expect(repoAuth).toEqual([`Bearer ${access}`, `Bearer ${rotated}`]);
       expect(openGithubToken({ db: s.db, box: s.secretBox }, s.team.id)).toBe(rotated);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a 401 mid-pagination keeps later pages on the rotated token (oauth connection)', async () => {
+    const { s, gh } = boot();
+    try {
+      const { access } = await connect(s, gh);
+      gh.revokeAccess(access);
+      const pageAuths: (string | undefined)[] = [];
+      const paging: FetchLike = async (input, init) => {
+        const url = new URL(String(input));
+        if (url.pathname !== REPOS_PATH) return gh.fetch(input, init);
+        pageAuths.push(init?.headers?.authorization);
+        if (init?.headers?.authorization === `Bearer ${access}`) {
+          return {
+            ok: false,
+            status: 401,
+            headers: { get: () => null },
+            json: async () => ({ message: 'Bad credentials' }),
+            text: async () => JSON.stringify({ message: 'Bad credentials' }),
+          };
+        }
+        const page = Number(url.searchParams.get('page') ?? '1');
+        const body =
+          page === 1
+            ? Array.from({ length: 100 }, (_, i) => ({
+                id: i + 1,
+                name: `r${i}`,
+                full_name: `octo/r${i}`,
+                private: false,
+                owner: { login: 'octo' },
+              }))
+            : [
+                {
+                  id: 101,
+                  name: 'tail',
+                  full_name: 'octo/tail',
+                  private: false,
+                  owner: { login: 'octo' },
+                },
+              ];
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: () => null },
+          json: async () => body,
+          text: async () => JSON.stringify(body),
+        };
+      };
+      const wrapped = refreshingGithubFetch(
+        { db: s.db, box: s.secretBox, oauthClient: CLIENT },
+        paging,
+      );
+      const repos = await githubUserRepos(wrapped, access);
+      expect(repos).toHaveLength(101);
+      const rotated = [...gh.grants.keys()].at(-1);
+      expect(rotated).not.toBe(access);
+      expect(pageAuths).toEqual([`Bearer ${access}`, `Bearer ${rotated}`, `Bearer ${rotated}`]);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a 401 mid-pagination keeps later pages on the rotated token (app device grant)', async () => {
+    const gh = githubAuthFake({
+      user: OCTO,
+      repos: Array.from({ length: 101 }, (_, i) => ({
+        id: i + 1,
+        name: `r${i}`,
+        full_name: `octo/r${i}`,
+        private: false,
+        owner: { login: 'octo' },
+      })),
+    });
+    gh.knowGrant('ghu_stale', 'ghr_stale');
+    const s = bootServer({ oauthClient: CLIENT, oauthFetch: gh.fetch, githubFetch: gh.fetch });
+    try {
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          login: 'octo',
+          accessToken: 'ghu_stale',
+          refreshToken: 'ghr_stale',
+          scope: '',
+          device: { clientId: 'Iv23shared', refreshTokenExpiresAt: Date.now() + 86_400_000 },
+        },
+      );
+      gh.revokeAccess('ghu_stale');
+      const wrapped = refreshingGithubFetch(
+        { db: s.db, box: s.secretBox, oauthClient: CLIENT },
+        gh.fetch,
+        s.team.id,
+      );
+      const listed = await githubAppUserRepos(wrapped, 'ghu_stale');
+      expect(listed.repos).toHaveLength(101);
+      const rotated = [...gh.grants.keys()].at(-1);
+      expect(rotated).not.toBe('ghu_stale');
+      const repoAuths = gh.calls.filter((c) => c.url.includes('/repositories')).map((c) => c.auth);
+      expect(repoAuths.at(-1)).toBe(`Bearer ${rotated}`);
     } finally {
       s.dispose();
     }
@@ -476,6 +579,102 @@ describe('github connection token refresh (#1731)', () => {
       expect(res.status).toBe(502);
       expect(refreshCallsOf(gh)).toHaveLength(0);
       expect(openGithubToken({ db: s.db, box: s.secretBox }, other)).toBe('gho_shared');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a listing whose stale token another request already rotated retries on the shared replacement', async () => {
+    const { s, gh } = boot();
+    try {
+      const { access } = await connect(s, gh);
+      gh.revokeAccess(access);
+      const deps = { db: s.db, box: s.secretBox, oauthClient: CLIENT };
+      const second = refreshingGithubFetch(
+        deps,
+        async (input, init) => {
+          if (init?.headers?.authorization === `Bearer ${access}`) {
+            await githubUserRepos(refreshingGithubFetch(deps, gh.fetch, s.team.id), access);
+            return new Response(JSON.stringify({ message: 'Bad credentials' }), { status: 401 });
+          }
+          return gh.fetch(input, init);
+        },
+        s.team.id,
+      );
+      const repos = await githubUserRepos(second, access);
+      expect(repos).toHaveLength(1);
+      const rotated = [...gh.grants.keys()].at(-1);
+      expect(rotated).not.toBe(access);
+      const repoAuths = gh.calls.filter((c) => c.url.includes(REPOS_PATH)).map((c) => c.auth);
+      expect(repoAuths).toEqual([`Bearer ${access}`, `Bearer ${rotated}`, `Bearer ${rotated}`]);
+      expect(refreshCallsOf(gh)).toHaveLength(1);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a rotated token is not substituted once the connection row is replaced', async () => {
+    const { s, gh } = boot();
+    try {
+      const { access } = await connect(s, gh);
+      gh.revokeAccess(access);
+      const seen: (string | undefined)[] = [];
+      const wrapped = refreshingGithubFetch(
+        { db: s.db, box: s.secretBox, oauthClient: CLIENT },
+        async (input, init) => {
+          seen.push(init?.headers?.authorization);
+          return gh.fetch(input, init);
+        },
+      );
+      const repos = await githubUserRepos(wrapped, access);
+      expect(repos).toHaveLength(1);
+      upsertGithubConnection(
+        { db: s.db, box: s.secretBox },
+        {
+          teamId: s.team.id,
+          login: 'octo',
+          accessToken: 'gho_reconnected',
+          refreshToken: 'ghr_reconnected',
+          scope: 'repo',
+        },
+      );
+      const res = await wrapped(`https://api.github.com${REPOS_PATH}`, {
+        headers: { authorization: `Bearer ${access}` },
+      });
+      expect(res.status).toBe(401);
+      expect(seen.at(-1)).toBe(`Bearer ${access}`);
+      expect(refreshCallsOf(gh)).toHaveLength(1);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('a rotated token is not substituted once the connection is disconnected', async () => {
+    const { s, gh } = boot();
+    try {
+      const { access } = await connect(s, gh);
+      gh.revokeAccess(access);
+      const seen: (string | undefined)[] = [];
+      const wrapped = refreshingGithubFetch(
+        { db: s.db, box: s.secretBox, oauthClient: CLIENT },
+        async (input, init) => {
+          seen.push(init?.headers?.authorization);
+          return gh.fetch(input, init);
+        },
+      );
+      const repos = await githubUserRepos(wrapped, access);
+      expect(repos).toHaveLength(1);
+      markGithubConnectionDisconnected(
+        { db: s.db, box: s.secretBox },
+        s.team.id,
+        'reconnect later',
+      );
+      const res = await wrapped(`https://api.github.com${REPOS_PATH}`, {
+        headers: { authorization: `Bearer ${access}` },
+      });
+      expect(res.status).toBe(401);
+      expect(seen.at(-1)).toBe(`Bearer ${access}`);
+      expect(refreshCallsOf(gh)).toHaveLength(1);
     } finally {
       s.dispose();
     }

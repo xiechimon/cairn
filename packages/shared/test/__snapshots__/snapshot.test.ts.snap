@@ -6773,6 +6773,9 @@ exports[`body/envelope schema snapshots > githubReposResponse > githubReposRespo
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "grantReposUrl": {
+      "type": "string",
+    },
     "repos": {
       "items": {
         "additionalProperties": false,

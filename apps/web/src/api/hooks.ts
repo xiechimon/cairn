@@ -612,12 +612,22 @@ export const useGithubConnection = (teamId: string | undefined, enabled: boolean
     enabled: enabled && teamId !== undefined,
   });
 
-export const useGithubRepos = (enabled: boolean) =>
-  useQuery({
+export function useGithubRepos(enabled: boolean) {
+  const query = useQuery({
     queryKey: ['github-repos'],
     queryFn: () => api.get<GithubReposResponse>('/api/github/repos'),
     enabled,
+    refetchOnWindowFocus: 'always',
   });
+  const refetch = query.refetch;
+  useEffect(() => {
+    if (!enabled) return;
+    const onFocus = () => void refetch();
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [enabled, refetch]);
+  return query;
+}
 
 export const useFsList = (dir: string | null, enabled: boolean) =>
   useQuery({

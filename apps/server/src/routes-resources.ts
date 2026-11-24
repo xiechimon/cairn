@@ -41,7 +41,12 @@ import type { Db } from './db/client.js';
 import { build, machine, provider, routingRule, step, team, todo } from './db/schema.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, notFound, parseWith } from './lib/errors.js';
-import { githubAppUserRepos, githubUserRepos, isGithubAppUserToken } from './lib/github.js';
+import {
+  type GithubUserRepo,
+  githubAppUserRepos,
+  githubUserRepos,
+  isGithubAppUserToken,
+} from './lib/github.js';
 import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { newWebhookToken } from './lib/webhook-token.js';
@@ -1086,9 +1091,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       ctx.githubBaseFetch ?? ctx.githubFetch ?? fetch,
       teamId,
     );
-    const repos = isGithubAppUserToken(access.token)
-      ? await githubAppUserRepos(fetchImpl, access.token)
-      : await githubUserRepos(fetchImpl, access.token);
+    let repos: GithubUserRepo[];
+    let grantReposUrl: string | null = null;
+    if (isGithubAppUserToken(access.token)) {
+      const listed = await githubAppUserRepos(fetchImpl, access.token);
+      repos = listed.repos;
+      if (listed.installations === 0 || listed.selectionLimited) {
+        grantReposUrl = githubConnectionInstallUrl(
+          githubAppOfDeps(ctx.mcpGithubApp === undefined ? {} : { githubApp: ctx.mcpGithubApp }),
+        );
+      }
+    } else {
+      repos = await githubUserRepos(fetchImpl, access.token);
+    }
     const q = c.req.query('q')?.trim().toLowerCase() ?? '';
     const hits = q === '' ? repos : repos.filter((r) => r.fullName.toLowerCase().includes(q));
     return c.json(
@@ -1100,6 +1115,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
           full_name: r.fullName,
           private: r.isPrivate,
         })),
+        ...(grantReposUrl !== null ? { grantReposUrl } : {}),
       }),
     );
   });

@@ -11,6 +11,7 @@ export type GithubRepoSummary = z.infer<typeof githubRepoSummarySchema>;
 
 export const githubReposResponseSchema = z.object({
   repos: z.array(githubRepoSummarySchema),
+  grantReposUrl: z.string().optional(),
 });
 export type GithubReposResponse = z.infer<typeof githubReposResponseSchema>;
 
