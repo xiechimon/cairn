@@ -75,6 +75,7 @@ export function insertLegacyUserAndTeam(
 export function bootServer(
   opts: {
     db?: Db;
+    identity?: Pick<AppContext, 'team' | 'user'>;
     pingIntervalMs?: number;
     offlineGraceMs?: number;
     claimHoldMs?: number;
@@ -119,7 +120,7 @@ export function bootServer(
   } = {},
 ) {
   const db = opts.db ?? openMemoryDb();
-  const { user, team } = seed(db);
+  const { user, team } = opts.identity ?? seed(db);
   const hub = new TeamStreamHub();
   const machineHub = opts.machineHub ?? new MachineWakeHub(opts.offlineGraceMs);
   const convHub = new ConversationStreamHub();
