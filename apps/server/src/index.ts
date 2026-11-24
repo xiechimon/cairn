@@ -6,6 +6,7 @@ import { ENV_VARS } from '@cairn/shared';
 import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { serve } from '@hono/node-server';
+import { and, eq } from 'drizzle-orm';
 import { createApp } from './app.js';
 import { BUNDLED_FORM } from './bundle-form.js';
 import {
@@ -24,6 +25,7 @@ import {
 import { warnTeamsWithoutCoordinatorRule } from './coordinator/boot-guard.js';
 import { coordinatorStoreDir, startCoordinator } from './coordinator/index.js';
 import { openDbWithHandle } from './db/client.js';
+import { todo } from './db/schema.js';
 import { seed } from './db/seed.js';
 import { createAccessVerifier } from './lib/cloudflare-access.js';
 import { installEnvProxy } from './lib/env-proxy.js';
@@ -170,7 +172,14 @@ const ownersSeeded = runDataMigrationOnce(db, 'owner-checkpoints-seed', () =>
 );
 if ((ownersSeeded ?? 0) > 0)
   logger.info({ tasks: ownersSeeded }, 'thread owner checkpoints seeded');
-const hub = new TeamStreamHub();
+const hub = new TeamStreamHub(
+  (teamId, todoId) =>
+    db
+      .select({ projectId: todo.projectId })
+      .from(todo)
+      .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
+      .get()?.projectId,
+);
 const convHub = new ConversationStreamHub();
 const machineHub = new MachineWakeHub();
 const reposDir = reposDirOf(config);

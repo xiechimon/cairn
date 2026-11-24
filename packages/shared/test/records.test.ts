@@ -724,11 +724,9 @@ describe('team stream SSE events (02 §1.2, r5 §7.2 measured extension)', () =>
     sourceRef: null,
   });
 
-  it('parses the ~15s ping heartbeat', () => {
-    expect(teamStreamEventSchema.parse({ type: 'ping', seq: 16 })).toEqual({
-      type: 'ping',
-      seq: 16,
-    });
+  it('parses the ~15s ping heartbeat without a payload sequence', () => {
+    const ping = { type: 'ping' };
+    expect(teamStreamEventSchema.parse(ping)).toEqual(ping);
   });
 
   it('parses machine_presence', () => {
@@ -741,10 +739,30 @@ describe('team stream SSE events (02 §1.2, r5 §7.2 measured extension)', () =>
     ).toMatchObject({ type: 'machine_presence', online: true });
   });
 
-  it('parses todo/build full-document events with seq/v', () => {
-    expect(teamStreamEventSchema.parse({ type: 'todo', seq: 6, v: 3, doc: todoDoc })).toMatchObject(
-      { type: 'todo', seq: 6, v: 3 },
-    );
+  it('parses the full todo document and its version without a payload sequence', () => {
+    const event = { type: 'todo', v: todoDoc.v, doc: todoDoc };
+    expect(teamStreamEventSchema.parse(event)).toEqual(event);
+  });
+
+  it('parses the full build document and its version without a payload sequence', () => {
+    const event = {
+      type: 'build',
+      v: 1,
+      doc: {
+        id: 'build_01',
+        todoId: todoDoc.id,
+        withPlan: false,
+        prevPhase: 'todo',
+        triggerSource: 'user',
+        planDocId: null,
+        errorMessage: null,
+        prUrl: null,
+        prNumber: null,
+        diffHash: null,
+        createdAt: 0,
+      },
+    };
+    expect(teamStreamEventSchema.parse(event)).toEqual(event);
   });
 
   it('parses the notification envelope {type:"notification", notification:{…}}', () => {

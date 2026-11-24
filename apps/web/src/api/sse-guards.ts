@@ -5,26 +5,6 @@ import {
 } from '@cairn/shared';
 import type { InfiniteData, QueryClient } from '@tanstack/react-query';
 import { isInFlightPhase } from '../phase.js';
-import { invalidateConverged } from './invalidate.js';
-import type { StreamGuards } from './sse-connection.js';
-
-export const STREAM_QUERY_KEYS: readonly (readonly string[])[] = [
-  ['todos'],
-  ['todo'],
-  ['tasks'],
-  ['schedules'],
-  ['build'],
-  ['steps'],
-  ['notifications'],
-  ['chiefThreads'],
-  ['chief'],
-  ['machines'],
-  ['antigravity-subscriptions'],
-  ['model-sources'],
-  ['messages'],
-  ['plans'],
-  ['changes'],
-];
 
 export function hasInFlightWork(qc: QueryClient): boolean {
   return qc
@@ -58,13 +38,4 @@ function isInFlightRow(row: unknown): boolean {
   if (typeof row !== 'object' || row === null) return false;
   const phase = (row as { phase?: unknown }).phase;
   return typeof phase === 'string' && isInFlightPhase(phase);
-}
-
-export function streamGuards(qc: QueryClient): StreamGuards {
-  return {
-    inFlight: () => hasInFlightWork(qc),
-    reconcile: async () => {
-      await Promise.all(STREAM_QUERY_KEYS.map((queryKey) => invalidateConverged(qc, { queryKey })));
-    },
-  };
 }

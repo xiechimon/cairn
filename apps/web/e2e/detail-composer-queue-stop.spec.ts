@@ -88,6 +88,9 @@ async function runningTask(page: Page, readDelay = 0, targetRead: 'answer' | 're
   await page.addInitScript(() => {
     const streams: FakeEventSource[] = [];
     class FakeEventSource extends EventTarget {
+      static readonly CONNECTING = 0;
+      static readonly OPEN = 1;
+      static readonly CLOSED = 2;
       readonly url: string;
       readyState = 1;
       onmessage: ((event: { data: string }) => void) | null = null;

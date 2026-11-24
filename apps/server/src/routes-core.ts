@@ -50,6 +50,8 @@ import { filterKnownSkillIds } from './services/skills.js';
 import { readTopModels, writeTopModels } from './services/top-models.js';
 import { dailyUsage } from './services/usage-daily.js';
 
+const TEAM_PING = JSON.stringify({ type: 'ping' });
+
 const ACCESS_REFUSALS = {
   invalid: { status: 401, error: 'Unauthorized' },
   'not-allowed': { status: 403, error: 'this account is not allowed' },
@@ -265,10 +267,14 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     return openSseStream(c, async (stream) => {
       const conn = createSerialConnection(
-        (payload) => stream.writeSSE({ data: JSON.stringify(payload) }),
+        (data: string, seq) => stream.writeSSE({ data, id: String(seq) }),
         { onOverflow: () => stream.abort() },
       );
-      const unsubscribe = ctx.hub.subscribe(teamId, conn, ctx.user.id);
+      const unsubscribe = ctx.hub.subscribe(
+        teamId,
+        { send: (_payload, encoded) => conn.send(encoded) },
+        ctx.user.id,
+      );
       const deviceId = pairedDeviceIdOf(c);
       const connectionId = randomUUID();
       const closeSession = streamSessions.open(connectionId, { conn, teamId, deviceId });
@@ -277,7 +283,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
           stream.abort();
           return;
         }
-        void conn.send({ type: 'ping', seq: conn.nextSeq() });
+        void conn.send(TEAM_PING);
       }, ctx.pingIntervalMs);
       let release: () => void = () => {};
       const held = new Promise<void>((resolve) => {
@@ -291,19 +297,29 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
         unbindDevice();
         release();
       });
-      void conn.send({ type: 'hello', connectionId });
-      await conn.send({ type: 'ping', seq: conn.nextSeq() });
+      void conn.send(JSON.stringify({ type: 'hello', connectionId, followRevision: true }));
+      await conn.send(TEAM_PING);
       await held;
     });
   });
 
   app.put('/api/streams/:connectionId/conversations', async (c) => {
+    const body = parseWith(streamConversationsBodySchema, await jsonBody(c), 'body');
     const session = streamSessions.get(c.req.param('connectionId'));
     if (session === undefined || session.deviceId !== pairedDeviceIdOf(c)) {
       return c.json({ error: 'unknown stream connection' }, 404);
     }
-    const body = parseWith(streamConversationsBodySchema, await jsonBody(c), 'body');
-    streamSessions.setConversations(session, body.conversationIds, ctx.convHub);
-    return c.body(null, 204);
+    requireTeam(ctx, session.teamId);
+    if (body.revision === undefined && session.revision !== undefined) {
+      return c.json({ error: 'revision required for this stream connection' }, 409);
+    }
+    const revision = streamSessions.setConversations(
+      session,
+      body.conversationIds,
+      ctx.convHub,
+      body.revision,
+    );
+    if (session.closed) return c.json({ error: 'unknown stream connection' }, 404);
+    return revision === undefined ? c.body(null, 204) : c.json({ revision });
   });
 }

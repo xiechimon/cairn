@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { liveTextStore } from '../src/api/live-text.js';
 import { mapChief, type MessageRow } from '../src/api/mappers.js';
-import { type ConvHandle, FakeEventSource, startConv, stopAllTabStreams } from './tab-stream-harness.js';
+import { type ConvHandle, FakeEventSource, startConv, stopAllTabStreams, stubTabFollow } from './tab-stream-harness.js';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
 
 const CONV = 'chief-t-857';
@@ -93,6 +93,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   FakeEventSource.instances = [];
   vi.stubGlobal('EventSource', FakeEventSource);
+  stubTabFollow();
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(cb, 16));
   liveTextStore.clear(CONV);
 });
@@ -202,22 +203,33 @@ describe('chief streaming handoff (#857 F-H1..H6)', () => {
 
   test('F-H8 a failed or stopped step refetches the Coordinator record so the outage banner appears', () => {
     const qc = freshClient();
-    const spy = vi.spyOn(qc, 'invalidateQueries');
+    const teamKey = ['chief', 'team-1', null];
+    const threadKey = ['chief', 'team-1', CONV];
+    const unrelated = ['session'];
+    qc.setQueryData(teamKey, {});
+    qc.setQueryData(threadKey, {});
+    qc.setQueryData(unrelated, {});
     const es = startStream(qc);
     es.push(stepEvent('failed'));
 
-    const keys = spy.mock.calls.map(([filters]) => filters?.queryKey);
-    expect(keys).toContainEqual(['chief']);
+    expect(qc.getQueryState(teamKey)?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(threadKey)?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(unrelated)?.isInvalidated).toBe(false);
   });
 
-  test('F-H6 resubscribe still clears first (#740 unchanged)', () => {
+  test('F-H6 same-turn listener replacement keeps the preview until a fresh hello', async () => {
     const qc = freshClient();
     const es = startStream(qc);
     es.push({ type: 'text_delta', text: '段' });
     es.push({ type: 'message', message: textRow('m1', '段') });
+    await vi.advanceTimersByTimeAsync(0);
+    es.stop();
+    const replacement = startConv(CONV, qc);
+    expect(liveTextStore.get(CONV)).toBe('段');
+    expect(FakeEventSource.instances).toHaveLength(1);
 
-    FakeEventSource.instances = [];
-    const started = startConv(CONV, qc, {});
+    FakeEventSource.instances[0]?.onerror?.();
+    replacement.fireOpen();
     expect(liveTextStore.get(CONV)).toBe('');
   });
 

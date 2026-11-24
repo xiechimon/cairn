@@ -16,7 +16,7 @@ class FakeEventSource {
   readonly url: string;
   readyState: number = FakeEventSource.CONNECTING;
   onopen: (() => void) | null = null;
-  onmessage: ((e: { data: string }) => void) | null = null;
+  onmessage: ((e: { data: string; lastEventId: string }) => void) | null = null;
   onerror: (() => void) | null = null;
 
   constructor(url: string) {
@@ -33,20 +33,20 @@ class FakeEventSource {
     this.onopen?.();
   }
 
-  push(payload: unknown): void {
-    this.onmessage?.({ data: JSON.stringify(payload) });
+  push(payload: unknown, frameId?: number): void {
+    this.onmessage?.({ data: JSON.stringify(payload), lastEventId: frameId?.toString() ?? '' });
   }
 }
 
 function advanceWithPings(
   es: FakeEventSource,
   seconds: number,
-  clock: { t: number; seq: number },
+  clock: { t: number; frameId: number },
 ): void {
   for (let i = 0; i < seconds; i++) {
     vi.advanceTimersByTime(1_000);
     clock.t += 1;
-    if (clock.t % (PING_MS / 1_000) === 0) es.push({ type: 'ping', seq: ++clock.seq });
+    if (clock.t % (PING_MS / 1_000) === 0) es.push({ type: 'ping' }, ++clock.frameId);
   }
 }
 
@@ -59,7 +59,6 @@ it('a rejected ticket resolver retries instead of staying disconnected', async (
       attempts += 1;
       return Promise.reject(new Error('offline'));
     },
-    () => {},
     () => {},
     { inFlight: () => false, reconcile: () => {} },
   );
@@ -74,7 +73,6 @@ it('a rejected ticket resolver retries instead of staying disconnected', async (
 it('a failed stream backs off instead of retrying every second', async () => {
   const dispose = connect(
     () => Promise.resolve(URL),
-    () => {},
     () => {},
     { inFlight: () => false, reconcile: () => {} },
   );
@@ -96,11 +94,16 @@ it('a failed stream backs off instead of retrying every second', async () => {
 function openStream(
   guards: StreamGuards,
   onEvent: (ev: Record<string, unknown>) => void = () => {},
-  onResync: () => void = () => {},
 ): { es: FakeEventSource; dispose: () => void } {
-  const dispose = connect(URL, onEvent, onResync, guards);
+  const dispose = connect(URL, (ev, transport) => {
+    if (ev.type === 'hello') {
+      transport.establish();
+      transport.acknowledge(() => true, async () => {});
+    } else onEvent(ev);
+  }, guards);
   const es = FakeEventSource.instances[0] as FakeEventSource;
   es.fireOpen();
+  es.push({ type: 'hello' });
   return { es, dispose };
 }
 
@@ -115,38 +118,59 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('seq gaps = proof of dropped frames', () => {
+describe('gaps in attachment sequences', () => {
+  it('uses the SSE id without a JSON sequence and does not deliver a repeated id', () => {
+    const reconcile = vi.fn();
+    const onEvent = vi.fn();
+    const { es } = openStream({ inFlight: () => false, reconcile }, onEvent);
+    es.push({ type: 'todo' }, 1);
+    es.push({ type: 'todo' }, 1);
+    es.push({ type: 'ping' }, 3);
+    expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(reconcile).toHaveBeenCalledOnce();
+  });
+
+  it('delivers unnumbered legacy frames without reconciling on a payload sequence', () => {
+    const reconcile = vi.fn();
+    const onEvent = vi.fn();
+    const { es } = openStream({ inFlight: () => false, reconcile }, onEvent);
+    es.push({ type: 'ping', seq: 1 });
+    es.push({ type: 'ping', seq: 3 });
+    expect(onEvent).toHaveBeenCalledTimes(2);
+    expect(reconcile).not.toHaveBeenCalled();
+  });
+
   it('a skipped number range reconciles on sight, and sets no gate (a gap is evidence, not a guess)', () => {
     const reconcile = vi.fn();
 
     const { es } = openStream({ inFlight: () => false, reconcile });
 
-    es.push({ type: 'ping', seq: 1 });
-    es.push({ type: 'todo', seq: 2, v: 1, doc: { id: 'todo-1' } });
-    es.push({ type: 'ping', seq: 3 });
+    es.push({ type: 'ping' }, 1);
+    es.push({ type: 'todo', v: 1, doc: { id: 'todo-1' } }, 2);
+    es.push({ type: 'ping' }, 3);
     expect(reconcile).not.toHaveBeenCalled();
 
-    es.push({ type: 'ping', seq: 5 });
+    es.push({ type: 'ping' }, 5);
     expect(reconcile).toHaveBeenCalledTimes(1);
 
-    es.push({ type: 'ping', seq: 6 });
-    es.push({ type: 'ping', seq: 7 });
+    es.push({ type: 'ping' }, 6);
+    es.push({ type: 'ping' }, 7);
     expect(reconcile).toHaveBeenCalledTimes(1);
   });
 
   it('a gap re-arms the silent window — after a frame-drop history the judgment turns more alert', () => {
     const reconcile = vi.fn();
     const { es } = openStream({ inFlight: () => true, reconcile });
-    const clock = { t: 0, seq: 0 };
+    const clock = { t: 0, frameId: 0 };
 
-    es.push({ type: 'ping', seq: ++clock.seq });
-    es.push({ type: 'todo', seq: ++clock.seq, v: 1, doc: { id: 'todo-1' } });
+    es.push({ type: 'ping' }, ++clock.frameId);
+    es.push({ type: 'todo', v: 1, doc: { id: 'todo-1' } }, ++clock.frameId);
 
     advanceWithPings(es, 20, clock);
     expect(reconcile).toHaveBeenCalledTimes(1);
 
-    clock.seq += 2;
-    es.push({ type: 'ping', seq: clock.seq });
+    clock.frameId += 2;
+    es.push({ type: 'ping' }, clock.frameId);
     expect(reconcile).toHaveBeenCalledTimes(2);
 
     advanceWithPings(es, 19, clock);
@@ -155,18 +179,21 @@ describe('seq gaps = proof of dropped frames', () => {
     expect(reconcile).toHaveBeenCalledTimes(3);
   });
 
-  it('after reconnect seq restarts from 1, not counted as a gap', () => {
+  it('after reconnect frame ids restart from 1, not counted as duplicates or a gap', () => {
     const reconcile = vi.fn();
-    const { es } = openStream({ inFlight: () => false, reconcile });
+    const onEvent = vi.fn();
+    const { es } = openStream({ inFlight: () => false, reconcile }, onEvent);
 
-    es.push({ type: 'ping', seq: 1 });
-    es.push({ type: 'ping', seq: 2 });
-    es.push({ type: 'ping', seq: 3 });
+    es.push({ type: 'ping' }, 1);
+    es.push({ type: 'ping' }, 2);
+    es.push({ type: 'ping' }, 3);
+    onEvent.mockClear();
 
     vi.advanceTimersByTime(20_000);
     const rebuilt = FakeEventSource.instances[1] as FakeEventSource;
     rebuilt.fireOpen();
-    rebuilt.push({ type: 'ping', seq: 1 });
+    rebuilt.push({ type: 'ping' }, 1);
+    expect(onEvent).toHaveBeenCalledOnce();
     expect(reconcile).not.toHaveBeenCalled();
   });
 });
@@ -175,10 +202,10 @@ describe('business-frame silence (pings not counted) = the 150-second shape of X
   it('reconciles while there is work in flight, and the interval doubles — does not degrade into fixed-frequency polling', () => {
     const reconcile = vi.fn();
     const { es } = openStream({ inFlight: () => true, reconcile });
-    const clock = { t: 0, seq: 0 };
+    const clock = { t: 0, frameId: 0 };
 
-    es.push({ type: 'ping', seq: ++clock.seq });
-    es.push({ type: 'todo', seq: ++clock.seq, v: 2, doc: { id: 'todo-1' } });
+    es.push({ type: 'ping' }, ++clock.frameId);
+    es.push({ type: 'todo', v: 2, doc: { id: 'todo-1' } }, ++clock.frameId);
 
     advanceWithPings(es, 19, clock);
     expect(reconcile).not.toHaveBeenCalled();
@@ -196,12 +223,9 @@ describe('business-frame silence (pings not counted) = the 150-second shape of X
   it('a business frame resets the window on arrival: zero extra requests under normal traffic', () => {
     const reconcile = vi.fn();
     const { es } = openStream({ inFlight: () => true, reconcile });
-    const clock = { t: 0, seq: 0 };
-
     for (let i = 0; i < 30; i++) {
       vi.advanceTimersByTime(10_000);
-      clock.t += 10;
-      es.push({ type: 'build', seq: ++clock.seq, v: 1, doc: { id: 'build-1', todoId: 't1' } });
+      es.push({ type: 'build', v: 1, doc: { id: 'build-1', todoId: 't1' } }, i + 1);
     }
 
     expect(reconcile).not.toHaveBeenCalled();
@@ -210,14 +234,13 @@ describe('business-frame silence (pings not counted) = the 150-second shape of X
 
   it('pure ping stream with nothing in flight → no false trigger, no connection rebuild', () => {
     const reconcile = vi.fn();
-    const onResync = vi.fn();
-    const { es } = openStream({ inFlight: () => false, reconcile }, () => {}, onResync);
-    const clock = { t: 0, seq: 0 };
+    const onTransportLost = vi.fn();
+    const { es } = openStream({ inFlight: () => false, reconcile, onTransportLost });
 
-    advanceWithPings(es, 180, clock);
+    advanceWithPings(es, 180, { t: 0, frameId: 0 });
 
     expect(reconcile).not.toHaveBeenCalled();
-    expect(onResync).not.toHaveBeenCalled();
+    expect(onTransportLost).not.toHaveBeenCalled();
     expect(FakeEventSource.instances).toHaveLength(1);
   });
 
@@ -225,22 +248,21 @@ describe('business-frame silence (pings not counted) = the 150-second shape of X
     const onEvent = vi.fn();
     const { es } = openStream({ inFlight: () => false, reconcile: vi.fn() }, onEvent);
 
-    es.push({ type: 'ping', seq: 1 });
-    es.push({ type: 'todo', seq: 2, v: 1, doc: { id: 'todo-1' } });
+    es.push({ type: 'ping' }, 1);
+    es.push({ type: 'todo', v: 1, doc: { id: 'todo-1' } }, 2);
 
     expect(onEvent).toHaveBeenCalledTimes(2);
-    expect(onEvent).toHaveBeenLastCalledWith(
-      expect.objectContaining({ type: 'todo', seq: 2, doc: { id: 'todo-1' } }),
-    );
+    expect(onEvent).toHaveBeenLastCalledWith({ type: 'todo', v: 1, doc: { id: 'todo-1' } });
   });
 });
 
 describe('#462 existing faces unchanged', () => {
-  it('complete silence (not even pings) → rebuild the connection + resync on reconnect', () => {
-    const onResync = vi.fn();
-    const { es } = openStream({ inFlight: () => true, reconcile: vi.fn() }, () => {}, onResync);
+  it('complete silence closes the old connection and reports reconnecting', () => {
+    const onReconnecting = vi.fn();
+    const onTransportLost = vi.fn();
+    const { es } = openStream({ inFlight: () => true, reconcile: vi.fn(), onReconnecting, onTransportLost });
 
-    es.push({ type: 'ping', seq: 1 });
+    es.push({ type: 'ping' }, 1);
     vi.advanceTimersByTime(19_000);
     expect(FakeEventSource.instances).toHaveLength(1);
 
@@ -249,17 +271,18 @@ describe('#462 existing faces unchanged', () => {
     expect(es.readyState).toBe(FakeEventSource.CLOSED);
 
     (FakeEventSource.instances[1] as FakeEventSource).fireOpen();
-    expect(onResync).toHaveBeenCalledTimes(1);
+    expect(onTransportLost).toHaveBeenCalledOnce();
+    expect(onReconnecting).toHaveBeenLastCalledWith(true);
   });
 
-  it('not OPEN (browser reconnecting on its own) → the watchdog does not take over', () => {
-    const reconcile = vi.fn();
-    const { es } = openStream({ inFlight: () => true, reconcile });
+  it('a stalled connecting source is retired rather than waiting for native retry', () => {
+    const { es } = openStream({ inFlight: () => true, reconcile: vi.fn() });
     es.readyState = FakeEventSource.CONNECTING;
 
-    vi.advanceTimersByTime(60_000);
+    vi.advanceTimersByTime(20_000);
 
-    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(es.readyState).toBe(FakeEventSource.CLOSED);
+    expect(FakeEventSource.instances).toHaveLength(2);
   });
 
   it('after dispose the timer does not act again', () => {

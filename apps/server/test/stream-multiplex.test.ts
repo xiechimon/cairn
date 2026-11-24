@@ -1,6 +1,7 @@
 import { conversationEnvelopeEventSchema, streamHelloEventSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { bootServer, openStream, req } from './helpers.js';
+import { openStream, req } from './helpers.js';
+import { bootStreamServer as bootServer } from './sse-fixture.js';
 
 async function connect(s: ReturnType<typeof bootServer>) {
   const stream = await openStream(s.app, s.team.id);
@@ -40,7 +41,7 @@ describe('one team stream carries the conversations a tab follows', () => {
     stream.close();
   });
 
-  test('subscribing replays the buffered live state like the old conversation stream', async () => {
+  test('subscribing sends the current live preview', async () => {
     const s = bootServer({ pingIntervalMs: 60_000 });
     s.convHub.publishTextDelta('conv-a', 'partial');
     const { stream, connectionId } = await connect(s);
@@ -60,6 +61,30 @@ describe('one team stream carries the conversations a tab follows', () => {
     await subscribe(s, connectionId, ['conv-b']);
     expect(s.convHub.subscriberCount('conv-a')).toBe(0);
     expect(s.convHub.subscriberCount('conv-b')).toBe(1);
+    stream.close();
+  });
+
+  test('acknowledges the installed revision without letting older writes change it', async () => {
+    const s = bootServer({ pingIntervalMs: 60_000 });
+    const { stream, connectionId } = await connect(s);
+    const path = `/api/streams/${connectionId}/conversations`;
+    await expect(
+      (await req(s.app, 'PUT', path, { conversationIds: ['conv-b'], revision: 2 })).json(),
+    ).resolves.toEqual({ revision: 2 });
+    await expect(
+      (await req(s.app, 'PUT', path, { conversationIds: ['conv-a'], revision: 1 })).json(),
+    ).resolves.toEqual({ revision: 2 });
+    expect(s.convHub.subscriberCount('conv-a')).toBe(0);
+    expect(s.convHub.subscriberCount('conv-b')).toBe(1);
+    const reset = conversationEnvelopeEventSchema.parse(
+      await stream.next((ev) => ev.type === 'conversation'),
+    );
+    expect(reset).toEqual({
+      type: 'conversation',
+      conversationId: 'conv-b',
+      event: { type: 'preview_reset' },
+    });
+    expect((await subscribe(s, connectionId, ['conv-a'])).status).toBe(409);
     stream.close();
   });
 

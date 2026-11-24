@@ -1,4 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
+import { vi } from 'vitest';
 import {
   type ConversationStreamHandlers,
   startConversationStream,
@@ -13,7 +14,7 @@ export class FakeEventSource {
   readonly url: string;
   readyState: number = FakeEventSource.CONNECTING;
   onopen: (() => void) | null = null;
-  onmessage: ((e: { data: string }) => void) | null = null;
+  onmessage: ((e: { data: string; lastEventId: string }) => void) | null = null;
   onerror: (() => void) | null = null;
   constructor(url: string) {
     this.url = url;
@@ -26,12 +27,23 @@ export class FakeEventSource {
     this.readyState = FakeEventSource.OPEN;
     this.onopen?.();
   }
-  push(payload: unknown): void {
-    this.onmessage?.({ data: JSON.stringify(payload) });
+  push(payload: unknown, frameId?: number): void {
+    this.onmessage?.({ data: JSON.stringify(payload), lastEventId: frameId?.toString() ?? '' });
   }
 }
 
 let helloCount = 0;
+const greeted = new WeakSet<FakeEventSource>();
+
+export function stubTabFollow(): void {
+  const fetch = globalThis.fetch;
+  vi.stubGlobal('fetch', (path: string, init?: RequestInit) => {
+    if (!String(path).startsWith('/api/streams/')) return fetch(path, init);
+    const { revision } = JSON.parse(String(init?.body)) as { revision: number };
+    return Promise.resolve(Response.json({ revision }));
+  });
+}
+
 const teamStops: (() => void)[] = [];
 const convStops: (() => void)[] = [];
 
@@ -61,8 +73,11 @@ export function startConv(
     stop,
     fireOpen() {
       const es = FakeEventSource.instances.at(-1) as FakeEventSource;
+      if (greeted.has(es)) return;
+      greeted.add(es);
       es.fireOpen();
-      es.push({ type: 'hello', connectionId: `conn-${++helloCount}` });
+      es.push({ type: 'hello', connectionId: `conn-${++helloCount}`, followRevision: true });
+      es.push({ type: 'ping' });
     },
     push(ev) {
       const es = FakeEventSource.instances.at(-1) as FakeEventSource;

@@ -44,15 +44,14 @@ export const machinePresenceEventSchema = z.object({
 
 export const todoDocEventSchema = z.object({
   type: z.literal('todo'),
-  seq: z.number().int(),
   v: z.number().int(),
   doc: todoRecordSchema,
 });
 
 export const buildDocEventSchema = z.object({
   type: z.literal('build'),
-  seq: z.number().int(),
   v: z.number().int(),
+  projectId: recordId.optional(),
   doc: buildRecordSchema,
 });
 
@@ -119,24 +118,30 @@ export type ConversationStreamEvent = z.infer<typeof conversationStreamEventSche
 export const streamHelloEventSchema = z.object({
   type: z.literal('hello'),
   connectionId: z.string().min(1),
+  followRevision: z.literal(true).optional(),
 });
 export type StreamHelloEvent = z.infer<typeof streamHelloEventSchema>;
 
 export const conversationEnvelopeEventSchema = z.object({
   type: z.literal('conversation'),
   conversationId: recordId,
-  event: conversationStreamEventSchema,
+  event: conversationStreamEventSchema.or(z.object({ type: z.literal('preview_reset') })),
 });
 export type ConversationEnvelopeEvent = z.infer<typeof conversationEnvelopeEventSchema>;
 
 export const MAX_STREAM_CONVERSATIONS = 16;
 
+const followRevisionSchema = z.number().int().nonnegative();
+
 export const streamConversationsBodySchema = z.object({
   conversationIds: z.array(recordId).max(MAX_STREAM_CONVERSATIONS),
+  revision: followRevisionSchema.optional(),
 });
 
+export const streamFollowAckSchema = z.object({ revision: followRevisionSchema });
+
 export const teamStreamEventSchema = z.discriminatedUnion('type', [
-  pingEventSchema,
+  z.object({ type: z.literal('ping') }),
   machinePresenceEventSchema,
   todoDocEventSchema,
   buildDocEventSchema,

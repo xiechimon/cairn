@@ -91,6 +91,8 @@ Six read-only passes over `apps/`, `packages/shared` and the design docs; verdic
 
 ### Migrated open items (from `docs/design/home-redesign-backend-todo.md`, now on the board)
 
+[Browser SSE v2](../design/sse-resume.md) reconnects with a fresh subscription and refetches active data; it does not replay events.
+
 - AI-native action registry: remaining faces generation + undo (owner route)
 - G1: store and return machine hostname (owner route)
 - G2: report/store/enforce agent-usable folders per machine (owner route, design first)
@@ -99,7 +101,6 @@ Six read-only passes over `apps/`, `packages/shared` and the design docs; verdic
 - Save-for-later task without choosing a project (team-level create or default project)
 - G5: finer result kinds than code/document
 - Windowed rendering for long conversation lists (virtualization)
-- SSE resume via Last-Event-ID + quiet reconnecting state
 - GitHub webhooks instead of polling
 - Conditional requests (ETag / 304)
 - Whole-account data export
