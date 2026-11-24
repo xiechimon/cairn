@@ -26,8 +26,6 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/backend/confine-session.ts:STATE_FILES': 'constant lookup table',
   'apps/daemon/src/backend/image-support.ts:learnedNoVision':
     'learned capability memo keyed on model id; an environment fact, not instance state',
-  'apps/daemon/src/backend/otel.ts:tracings':
-    'process-wide tracing registry; one OTel pipeline per daemon process',
   'apps/daemon/src/backend/pi.ts:learnedCompat':
     'learned endpoint compatibility keyed on baseUrl+provider; environment facts',
   'apps/daemon/src/backend/pi.ts:lastServerCompat': 'same learned-compat memo as above',
@@ -56,7 +54,6 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/orb/podman.ts:RESUMABLE_STATES': 'constant lookup table',
   'apps/daemon/src/orb/relay.ts:listeningPaths':
     'socket paths already bound by relay servers in this process; prevents double-bind',
-  'apps/daemon/src/orb/services-yaml.ts:RESERVED_ENV': 'constant lookup table',
   'apps/daemon/src/step-env.ts:AMBIENT_GOOGLE_AUTH':
     'constant environment-variable name lookup; never mutated or populated from an instance',
   'apps/daemon/src/step-pass-events.ts:CHANGE_TOOLS': 'constant lookup table',
@@ -84,8 +81,6 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/lib/request-origin.ts:LOOPBACK_PEER_ADDRESSES': 'constant lookup table',
   'apps/server/src/lib/token-auth.ts:READ_METHODS': 'constant lookup table',
   'apps/server/src/lib/tsnet-sidecar.ts:INHERITED_ENV_NAMES': 'constant lookup table',
-  'apps/server/src/runtime-otel.ts:tracings':
-    'process-wide tracing registry; one OTel pipeline per server process',
   'apps/server/src/services/apns.ts:DEAD_TOKEN_REASONS': 'constant lookup table',
   'apps/server/src/services/apns.ts:sessions':
     'HTTP/2 connection pool keyed on APNs origin; a process network resource',

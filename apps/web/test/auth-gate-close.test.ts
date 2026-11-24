@@ -1,11 +1,15 @@
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
   useSyncExternalStore: (_subscribe: unknown, getSnapshot: () => unknown) => getSnapshot(),
+}));
+
+vi.mock('../src/components/ui/dialog-shell.js', () => ({
+  DialogShell: ({ children }: { children: ReactNode }) => createElement('div', null, children),
 }));
 
 const SESSION = '/api/auth/session';

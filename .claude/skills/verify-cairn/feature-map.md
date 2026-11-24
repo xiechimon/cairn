@@ -583,7 +583,7 @@ Reach:
 - Web routes: `/app/resources/providers`
 - Settings: `设置` (Settings) › `模型` (Model) › `模型` (Model)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `antigravity-detail-login`, `antigravity-local-hint`, `antigravity-local-import`, `antigravity-local-login`, `antigravity-local-login-cancel`, `antigravity-local-row`, `antigravity-local-skeleton`, `antigravity-login-banner`, `antigravity-login-summary`, `antigravity-login-warning`, `antigravity-paste-toggle`, `antigravity-relogin`, `antigravity-relogin-cancel`, `antigravity-subscription-label`, `antigravity-subscription-token`, `devin-local-import`, `devin-local-login`, `devin-local-login-cancel`, `devin-paste-toggle`, `devin-subscription-label`, `devin-subscription-token`, `providers-empty`, `providers-partial-error`, `subscription-label`, `subscription-token`
+- Test ids in its code: `antigravity-detail-login`, `antigravity-local-hint`, `antigravity-local-import`, `antigravity-local-login`, `antigravity-local-login-cancel`, `antigravity-local-row`, `antigravity-local-skeleton`, `antigravity-paste-toggle`, `antigravity-relogin`, `antigravity-relogin-cancel`, `antigravity-subscription-label`, `antigravity-subscription-token`, `devin-local-import`, `devin-local-login`, `devin-local-login-cancel`, `devin-paste-toggle`, `devin-subscription-label`, `devin-subscription-token`, `providers-empty`, `providers-partial-error`, `subscription-label`, `subscription-token`
 - Verify recipes: [.claude/skills/verify-cairn/features/providers-tabs.md](features/providers-tabs.md), [.claude/skills/verify-cairn/features/provider-picker.md](features/provider-picker.md)
 - Research: [docs/research/r16-model-catalog-liveness.md](../../../docs/research/r16-model-catalog-liveness.md), [docs/research/2330-claude-entrypoint-and-setup-token-quota.md](../../../docs/research/2330-claude-entrypoint-and-setup-token-quota.md), [docs/design/devin-subscription-source.md](../../../docs/design/devin-subscription-source.md), [docs/design/antigravity-subscription-source.md](../../../docs/design/antigravity-subscription-source.md)
 - Frontend design: [docs/design/references/settings](../../../docs/design/references/settings), [docs/spec/11-model-service-and-machine-localization.md](../../../docs/spec/11-model-service-and-machine-localization.md)
@@ -702,7 +702,7 @@ Reach:
 
 - Web routes: `/app/settings/:section?`
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `settings-backdrop`, `settings-body`, `settings-content`, `settings-head`, `settings-title`
+- Test ids in its code: `settings-body`, `settings-content`, `settings-head`, `settings-title`
 - Verify recipes: [.claude/skills/verify-cairn/features/hotkeys.md](features/hotkeys.md), [.claude/skills/verify-cairn/features/persona-verify.md](features/persona-verify.md)
 - Research: [docs/research/ai-frontend-quality-2026-11-06.md](../../../docs/research/ai-frontend-quality-2026-11-06.md) (not on main), [docs/research/ui-ux-audit-2026-11-06.md](../../../docs/research/ui-ux-audit-2026-11-06.md) (not on main)
 - Frontend design: [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/references/settings](../../../docs/design/references/settings)
@@ -927,7 +927,7 @@ Reach:
 
 - Web routes: `/app/project/:id`, `/app/project/:id/settings`, `/app/project/:id/tasks`, `/app/project/new`
 - Keyboard shortcuts in its code: `G`, `L`, `M`
-- Test ids in its code: `github-picker`, `project-archive`, `project-goal-input`, `project-model-coordinator`, `project-name-input`, `project-new-blocked`, `project-settings-body`, `project-settings-missing`
+- Test ids in its code: `project-archive`, `project-goal-input`, `project-model-coordinator`, `project-name-input`, `project-new-blocked`, `project-settings-body`, `project-settings-missing`
 - Verify recipes: [.claude/skills/verify-cairn/features/project-new-form.md](features/project-new-form.md), [.claude/skills/verify-cairn/features/github-oauth-picker.md](features/github-oauth-picker.md), [.claude/skills/verify-cairn/features/local-repo-api.md](features/local-repo-api.md)
 - Research: [docs/research/project-coordinators.md](../../../docs/research/project-coordinators.md) (not on main), [docs/research/project-files-retirement-2026-11-09.md](../../../docs/research/project-files-retirement-2026-11-09.md), [docs/research/archived-projects-entry-2026-11-09.md](../../../docs/research/archived-projects-entry-2026-11-09.md)
 - Frontend design: [docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md](../../../docs/spec/12-new-project-local-repo-and-github-auth-repo-selection.md), [docs/design/claude-ai-spec.md](../../../docs/design/claude-ai-spec.md), [docs/design/archived-projects-settings.md](../../../docs/design/archived-projects-settings.md)
