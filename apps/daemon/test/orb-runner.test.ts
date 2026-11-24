@@ -187,6 +187,8 @@ test('a dead container receives a host failure report', async () => {
 });
 
 test('a scripted relay completes one fake-backend step and keeps credentials out of runtime files', async () => {
+  const generation = 1730000000000;
+  const claimed = { ...CLAIMED, step: { ...CLAIMED.step, generation } };
   const root = testTempDir('orb-scripted-');
   const socketPath = join(root, 'step.sock');
   const api = new FakeMachineApi();
@@ -206,9 +208,10 @@ test('a scripted relay completes one fake-backend step and keeps credentials out
     socketPath,
     release: orbTestRelease(socketPath),
     stepId: 's1',
+    generation: claimed.step.generation,
     upstream: api,
     input: {
-      claimed: CLAIMED,
+      claimed,
       options: {},
       methods: ORB_STEP_METHODS.filter((method) => method in api),
     },
@@ -222,9 +225,9 @@ test('a scripted relay completes one fake-backend step and keeps credentials out
       home: join(root, 'state'),
       workspacesRoot: join(root, 'work'),
     });
-    expect(api.token).toHaveBeenCalledExactlyOnceWith('s1');
+    expect(api.token).toHaveBeenCalledExactlyOnceWith('s1', generation);
     expect(done).toHaveBeenCalledTimes(1);
-    expect(api.doneBodies[0]?.body.status).toBe('success');
+    expect(api.doneBodies[0]?.body).toMatchObject({ status: 'success', generation });
     for (const file of readdirSync(root, { recursive: true, withFileTypes: true })) {
       if (file.isFile())
         expect(readFileSync(join(file.parentPath, file.name), 'utf8')).not.toContain(credential);

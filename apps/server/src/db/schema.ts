@@ -342,6 +342,8 @@ export const step = sqliteTable(
     holdCount: integer('holdCount').notNull().default(0),
     claimCount: integer('claimCount').notNull().default(0),
     mcpGrant: json<string[]>('mcpGrant'),
+    claimedRepo: text('claimedRepo'),
+    claimedRepoId: integer('claimedRepoId'),
     memoryTrace: json<ChiefMemoryTrace>('memoryTrace'),
     createdAt: epochMs('createdAt').notNull(),
   },
@@ -937,6 +939,7 @@ export const apiKey = sqliteTable('api_key', {
   keyHash: text('keyHash').notNull(),
   masked: text('masked').notNull(),
   createdAt: epochMs('createdAt').notNull(),
+  claimGeneration: integer('claimGeneration'),
 });
 
 export const pairedDevice = sqliteTable(

@@ -58,11 +58,12 @@ function setup(credentialTable: 'machine' | 'paired_device') {
 }
 
 function expectCommitAuthorization(events: ReturnType<typeof setup>['events']) {
-  expect(events).toEqual([
-    { kind: 'probe', inTransaction: false },
-    { kind: 'credential', inTransaction: true },
-    { kind: 'write', inTransaction: true },
-  ]);
+  expect(events[0]).toEqual({ kind: 'probe', inTransaction: false });
+  expect(events.at(-1)).toEqual({ kind: 'write', inTransaction: true });
+  expect(events.length).toBeGreaterThanOrEqual(3);
+  expect(
+    events.slice(1, -1).every((event) => event.kind === 'credential' && event.inTransaction),
+  ).toBe(true);
 }
 
 test('Runner repository binding checks the submitting credential in the write transaction', async () => {

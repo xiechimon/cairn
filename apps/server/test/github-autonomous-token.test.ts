@@ -32,6 +32,14 @@ import { bootServer, deliverCodeStep, req } from './helpers.js';
 const repo = { owner: 'octo', repo: 'alpha' };
 afterEach(() => vi.restoreAllMocks());
 
+test('each resolver requests the narrowest policy for its use', async () => {
+  const db = openMemoryDb();
+  const provider = vi.spyOn(app, 'appTokenOrNull').mockResolvedValue('fake-app' as AppToken);
+  await githubReadToken({ db }, 'team', repo);
+  await autonomousToken({ db }, 'team', repo);
+  expect(provider.mock.calls.map((call) => call[4])).toEqual(['server-read', 'server-write']);
+});
+
 test('autonomous resolver prefers App and records only safe fallback context', async () => {
   const db = openMemoryDb();
   const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined);

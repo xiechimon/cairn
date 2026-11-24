@@ -116,8 +116,8 @@ export async function sendBuildSteer(
   if (replay !== undefined) return replay;
   let buildRow = db.select().from(build).where(eq(build.id, conversationId)).get();
   if (!buildRow) throw new HttpError(404, `conversation ${conversationId}`);
-  if ((continuationOptions.human ?? deps.steerOptions?.human) !== true)
-    assertAutomaticRetryAllowed(deps, buildRow.todoId);
+  const automatic = (continuationOptions.human ?? deps.steerOptions?.human) !== true;
+  if (automatic) assertAutomaticRetryAllowed(deps, buildRow.todoId);
   else assertParkedBuildIdle(deps, buildRow);
   const running = db
     .select()
@@ -188,6 +188,7 @@ export async function sendBuildSteer(
   let sent: BuildSteerResult;
   try {
     sent = db.transaction((): BuildSteerResult => {
+      if (automatic) assertAutomaticRetryAllowed(deps, buildRow.todoId);
       claimClientMessage(db, conversationId, body.clientMessageId);
       if (continuationOptions.schedule) {
         const wake = continuationOptions.schedule;

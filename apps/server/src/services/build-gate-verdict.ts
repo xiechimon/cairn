@@ -6,6 +6,7 @@ import {
   parseVerifyPromptMeta,
 } from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { build, gateVerdict, type step, todo } from '../db/schema.js';
 import { isFullSha } from '../lib/github.js';
 import { nowMs } from '../lib/ids.js';
@@ -62,7 +63,7 @@ export async function flushVerdictDigests(): Promise<void> {
 }
 
 export function persistGateVerdict(
-  deps: GithubTokenDeps,
+  deps: GithubTokenDeps & CommitEffects,
   stepRow: typeof step.$inferSelect,
   facts: { stepFailed: boolean; extracted: boolean; blocked: boolean; report: VerdictReport },
 ): void {
@@ -97,82 +98,88 @@ export function persistGateVerdict(
     .run();
   if (inserted.changes === 0) return;
   const driftedHeads = facts.report.driftedHeads;
-  const pending = (async (): Promise<void> => {
-    const row = deps.db.select().from(gateVerdict).where(eq(gateVerdict.stepId, stepRow.id)).get();
-    if (row === undefined || row.patchDigest !== null || row.headSha === null) return;
-    const expected = row.expectedHeadSha;
-    const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-    if (buildRow?.prNumber == null) return;
-    const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
-    if (todoRow === undefined) return;
-    const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
-    if (repo === null) return;
-    const token = await githubReadToken(deps, todoRow.teamId, repo);
-    if (token === null) return;
-    const port = githubGateReadPort(
-      deps.githubFetch ?? fetch,
-      token,
-      repo.owner,
-      repo.repo,
-      10_000,
-    );
-    let pathsAfterExpected: string[] | null = null;
-    if (row.kind === 'verify' && driftedHeads.length > 0) {
-      const names = new Set<string>();
-      for (const head of driftedHeads) {
-        const read = await readCompareAt(port, expected, head);
-        const files = typeof read.compare === 'object' ? read.compare.files : null;
-        if (files === null || files.length === 0 || files.length >= GATE_LIMITS.compareFileCap) {
-          return;
+  runAfterCommit(deps, 'enrichGateVerdict', () => {
+    const pending = (async (): Promise<void> => {
+      const row = deps.db
+        .select()
+        .from(gateVerdict)
+        .where(eq(gateVerdict.stepId, stepRow.id))
+        .get();
+      if (row === undefined || row.patchDigest !== null || row.headSha === null) return;
+      const expected = row.expectedHeadSha;
+      const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
+      if (buildRow?.prNumber == null) return;
+      const todoRow = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
+      if (todoRow === undefined) return;
+      const repo = githubRepoOfProject(projectOfTodo(deps.db, todoRow));
+      if (repo === null) return;
+      const token = await githubReadToken(deps, todoRow.teamId, repo);
+      if (token === null) return;
+      const port = githubGateReadPort(
+        deps.githubFetch ?? fetch,
+        token,
+        repo.owner,
+        repo.repo,
+        10_000,
+      );
+      let pathsAfterExpected: string[] | null = null;
+      if (row.kind === 'verify' && driftedHeads.length > 0) {
+        const names = new Set<string>();
+        for (const head of driftedHeads) {
+          const read = await readCompareAt(port, expected, head);
+          const files = typeof read.compare === 'object' ? read.compare.files : null;
+          if (files === null || files.length === 0 || files.length >= GATE_LIMITS.compareFileCap) {
+            return;
+          }
+          for (const f of files) {
+            names.add(f.filename);
+            if (f.previousFilename !== null) names.add(f.previousFilename);
+          }
         }
-        for (const f of files) {
-          names.add(f.filename);
-          if (f.previousFilename !== null) names.add(f.previousFilename);
-        }
+        pathsAfterExpected = [...names];
+      } else if (row.headSha !== expected) {
+        return;
       }
-      pathsAfterExpected = [...names];
-    } else if (row.headSha !== expected) {
-      return;
-    }
-    let baseSha: string | null = null;
-    const pull = await port.pull(buildRow.prNumber, { etag: null });
-    const base = asRecord(pull.kind === 'ok' ? asRecord(pull.body)?.base : null);
-    if (typeof base?.sha === 'string' && isFullSha(base.sha)) {
-      baseSha = base.sha;
-    } else if (typeof base?.ref === 'string' && base.ref !== '') {
-      const branch = await port.branch(base.ref, { etag: null });
-      const commit = asRecord(branch.kind === 'ok' ? asRecord(branch.body)?.commit : null);
-      if (typeof commit?.sha === 'string' && isFullSha(commit.sha)) baseSha = commit.sha;
-    }
-    if (baseSha === null) return;
-    const delivery = await readCompareAt(port, baseSha, expected);
-    if (typeof delivery.compare !== 'object') return;
-    const bound = bindGateVerdict({
-      kind: row.kind,
-      perspective: row.perspective,
-      expectedHeadSha: expected,
-      reportedHeadSha: row.headSha,
-      stepFailed: false,
-      extracted: true,
-      blocked: false,
-      compareFiles: delivery.compare.files,
-      pathsAfterExpected,
-      evidenceDir: `${EVIDENCE_PREFIX}${ticketRefOf(todoRow)}/`,
-    });
-    if (bound?.patchDigest == null) return;
-    deps.db
-      .update(gateVerdict)
-      .set({ patchDigest: bound.patchDigest })
-      .where(
-        and(
-          eq(gateVerdict.stepId, row.stepId),
-          eq(gateVerdict.createdAt, row.createdAt),
-          isNull(gateVerdict.patchDigest),
-        ),
-      )
-      .run();
-  })()
-    .catch(() => undefined)
-    .finally(() => verdictDigestsInFlight.delete(pending));
-  verdictDigestsInFlight.add(pending);
+      let baseSha: string | null = null;
+      const pull = await port.pull(buildRow.prNumber, { etag: null });
+      const base = asRecord(pull.kind === 'ok' ? asRecord(pull.body)?.base : null);
+      if (typeof base?.sha === 'string' && isFullSha(base.sha)) {
+        baseSha = base.sha;
+      } else if (typeof base?.ref === 'string' && base.ref !== '') {
+        const branch = await port.branch(base.ref, { etag: null });
+        const commit = asRecord(branch.kind === 'ok' ? asRecord(branch.body)?.commit : null);
+        if (typeof commit?.sha === 'string' && isFullSha(commit.sha)) baseSha = commit.sha;
+      }
+      if (baseSha === null) return;
+      const delivery = await readCompareAt(port, baseSha, expected);
+      if (typeof delivery.compare !== 'object') return;
+      const bound = bindGateVerdict({
+        kind: row.kind,
+        perspective: row.perspective,
+        expectedHeadSha: expected,
+        reportedHeadSha: row.headSha,
+        stepFailed: false,
+        extracted: true,
+        blocked: false,
+        compareFiles: delivery.compare.files,
+        pathsAfterExpected,
+        evidenceDir: `${EVIDENCE_PREFIX}${ticketRefOf(todoRow)}/`,
+      });
+      if (bound?.patchDigest == null) return;
+      deps.db
+        .update(gateVerdict)
+        .set({ patchDigest: bound.patchDigest })
+        .where(
+          and(
+            eq(gateVerdict.stepId, row.stepId),
+            eq(gateVerdict.createdAt, row.createdAt),
+            isNull(gateVerdict.patchDigest),
+          ),
+        )
+        .run();
+    })()
+      .catch(() => undefined)
+      .finally(() => verdictDigestsInFlight.delete(pending));
+    verdictDigestsInFlight.add(pending);
+  });
 }

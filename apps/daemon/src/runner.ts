@@ -17,7 +17,7 @@ import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { composeSessionBrief } from './brief-file.js';
 import {
-  credentialRedactor,
+  CredentialRegistry,
   credentialSecretValues,
   guardCredentialOutputs,
 } from './credential-output.js';
@@ -25,9 +25,9 @@ import { clearCredentials, pushCredential } from './credentials.js';
 import { commitEnv } from './git.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
-import { type MachineApi, MachineApiError } from './machine-client.js';
+import { bindMachineClaim, type MachineApi, MachineApiError } from './machine-client.js';
 import type { StatePaths } from './state.js';
-import { StepAppCredential } from './step-app-credential.js';
+import { GitHubAppTokenUnavailableError, StepAppCredential } from './step-app-credential.js';
 import { prepareStepEnv, READONLY_GIT_ENV } from './step-env.js';
 import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
@@ -105,6 +105,7 @@ export async function runStep(
   opts: RunStepOptions = {},
 ): Promise<void> {
   const stepId = claimed.step.id;
+  deps = { ...deps, client: bindMachineClaim(deps.client, stepId, claimed.step.generation) };
   const stop = (deps.stops ?? new StepStops()).enter(stepId, (stopRequest) => {
     try {
       deps.journal.update(stepId, { stopRequest });
@@ -119,7 +120,7 @@ export async function runStep(
     deps.client.heartbeat(stepId, provenance).catch((err: unknown) => {
       if (
         !(err instanceof MachineApiError) ||
-        (err.status !== 410 && err.status !== 404) ||
+        (err.status !== 410 && err.status !== 404 && err.status !== 409) ||
         stop.request !== null
       )
         return;
@@ -222,37 +223,49 @@ async function runClaimedStep(
     return;
   }
 
-  const tokenRes = await client.token(stepId);
+  const fetchStepToken = async (refresh = false) => {
+    try {
+      return await client.token(stepId, claimed.step.generation, refresh ? { refresh } : undefined);
+    } catch (error) {
+      if (error instanceof MachineApiError && error.status === 503)
+        throw new GitHubAppTokenUnavailableError(error.body);
+      throw error;
+    }
+  };
+  const tokenRes = await fetchStepToken().catch(async (error: unknown) => {
+    if (!(error instanceof GitHubAppTokenUnavailableError)) throw error;
+    await failStep(deps, heartbeat, stepId, error.message);
+    return null;
+  });
+  if (tokenRes === null) return;
   const creds = pushCredential(tokenRes, claimed.project?.repo?.cloneUrl ?? null);
   stepCleanups.push(() => clearCredentials(creds));
-  const credentialValues = [
+  const credentials = new CredentialRegistry(now);
+  stepCleanups.push(() => credentials.dispose());
+  for (const value of [
     creds.claudeSubscriptionToken,
     creds.devinToken,
     ...credentialSecretValues(creds.antigravityToken),
-    creds.git?.password,
     ...(tokenRes.mcpConnectors ?? []).flatMap((c) => mcpConnectorSecretValues(c.headers)),
-  ];
-  const redactors = [credentialRedactor(...credentialValues)];
-  const redact = <T>(value: T): T => redactors.reduce((result, next) => next(result), value);
+  ])
+    credentials.remember(value);
+  credentials.remember(
+    creds.git?.password,
+    creds.git?.expiresAt ?? (creds.git?.kind === 'app' ? now() + 60 * 60_000 : Infinity),
+  );
+  const redact = <T>(value: T): T => credentials.redact(value);
   const appCredential =
     creds.git?.kind === 'app' && !attachmentVerify
       ? new StepAppCredential(
           join(deps.paths.credsDir, `step-${stepId}-github`),
           creds.git,
           async () => {
-            const fresh = (await client.token(stepId)).git;
-            if (fresh?.password) {
-              credentialValues.push(fresh.password);
-              redactors.push(credentialRedactor(fresh.password));
-            }
+            const fresh = (await fetchStepToken(true)).git;
             if (fresh?.kind !== 'app' || creds.git === null)
               throw new Error('App credential refresh unavailable');
             return { ...fresh, url: creds.git.url };
           },
-          (value) => {
-            credentialValues.push(value);
-            redactors.push(credentialRedactor(value));
-          },
+          (value, expiresAt) => credentials.remember(value, expiresAt),
           now,
           () => logger.step('App credential timer refresh failed; retrying next minute'),
         )
@@ -467,7 +480,7 @@ async function runClaimedStep(
     remoteToolsOnly: claimed.remoteToolsOnly === true,
     telemetry,
     env: stepEnv.env,
-    secrets: () => credentialValues,
+    secrets: () => credentials.values(),
   });
 
   const transcript = guardCredentialOutputs(
@@ -612,7 +625,7 @@ async function runClaimedStep(
     stop,
     askChannel,
     journal,
-    credentialValues: () => credentialValues,
+    credentialValues: () => credentials.values(),
     sessionHandles: deps.sessionHandles,
     networkRetryDelays,
   });
@@ -638,9 +651,9 @@ async function runClaimedStep(
     ws,
     repo,
     creds,
-    credentialValues,
+    credentialValues: credentials.values(),
     refreshGitToken:
-      creds.git !== null && !attachmentVerify ? async () => (await refreshGit()).password : null,
+      appCredential !== null && !attachmentVerify ? async () => (await refreshGit()).password : null,
     transcript,
     isReview,
     attachmentVerify,

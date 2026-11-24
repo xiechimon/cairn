@@ -23,9 +23,15 @@ import {
   sendBuildSteer,
 } from '../src/services/builds.js';
 import { type ChiefToolDeps, transitionTodos } from '../src/services/chief-tools.js';
-import { claimStep, finishStep } from '../src/services/machines.js';
+import { claimStep } from '../src/services/machines.js';
 import { RETRY_PARKED_MARK } from '../src/services/retry-parking.js';
-import { bootServer, req, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  finishStepForClaim,
+  req,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -398,7 +404,7 @@ describe('#1453 a step finishing while a stop is in flight: no advance, no re-qu
     ...extra,
   });
   const report = (w: World, body: MachineDoneBody) =>
-    finishStep(machineDepsOf(w.s), w.machineId, w.stepId, body);
+    finishStepForClaim(machineDepsOf(w.s), w.machineId, w.stepId, body);
   const withPlanDoc = (w: World) =>
     w.s.db
       .insert(planTable)
@@ -458,7 +464,7 @@ describe('#1453 a step finishing while a stop is in flight: no advance, no re-qu
 
 describe('#1453 other shapes of the same race', () => {
   const report = (w: World, body: MachineDoneBody) =>
-    finishStep(machineDepsOf(w.s), w.machineId, w.stepId, body);
+    finishStepForClaim(machineDepsOf(w.s), w.machineId, w.stepId, body);
   const move = async (w: World, phase: string) =>
     expect((await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase })).status).toBe(200);
   const buildError = (w: World) =>
@@ -574,7 +580,7 @@ describe('the phase reserved for after a stop lives on the build row', () => {
     await req(w.s.app, 'POST', `/api/todos/${w.todoId}/stop-and-done`, {});
 
     const after = restarted(dbPath);
-    await finishStep(machineDepsOf(after), w.machineId, w.stepId, {
+    await finishStepForClaim(machineDepsOf(after), w.machineId, w.stepId, {
       status: 'success',
       hasChanges: true,
     });
@@ -646,7 +652,7 @@ describe('the phase reserved for after a stop lives on the build row', () => {
     });
     await req(w.s.app, 'POST', `/api/todos/${w.todoId}/stop-and-done`, {});
     expect(reservedPhase(w)).toBe('done');
-    await finishStep(machineDepsOf(w.s), w.machineId, w.stepId, {
+    await finishStepForClaim(machineDepsOf(w.s), w.machineId, w.stepId, {
       status: 'failed',
       errorMessage: 'worker crashed',
     });
@@ -671,7 +677,7 @@ describe('the phase reserved for after a stop lives on the build row', () => {
     );
     expect(continuation?.step.kind).toBe('build');
     expect(todoPhase(w)).toBe('building');
-    await finishStep(machineDepsOf(after), w.machineId, continuation!.step.id, {
+    await finishStepForClaim(machineDepsOf(after), w.machineId, continuation!.step.id, {
       status: 'success',
       hasChanges: true,
     });

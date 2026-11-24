@@ -17,7 +17,7 @@ import {
 import { claimClientMessage, findClientMessage } from './client-message.js';
 import { planAutoConfirmation } from './plan-auto-confirm.js';
 import { holdSecondRejectionRework } from './research-stuck.js';
-import { assertAutomaticRetryAllowed } from './retry-parking.js';
+import { assertAutomaticRetryAllowed, assertPermanentRefusalCleared } from './retry-parking.js';
 import { assertSplitProposalExecutable } from './split-proposal.js';
 import { getTodo, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -47,7 +47,10 @@ export async function applyBuildStepAction(
   if (todoRecord.archivedAt != null) throw new HttpError(409, 'Unarchive to continue');
   const actorName = actor ?? deps.user.displayName;
   if (origin === 'retry') assertAutomaticRetryAllowed(deps, row.todoId);
-  else assertParkedBuildIdle(deps, row);
+  else {
+    if (origin !== 'person') assertPermanentRefusalCleared(row.errorMessage);
+    assertParkedBuildIdle(deps, row);
+  }
 
   if (body.action === 'restart') {
     await restartFailedBuild(deps, row, todoRecord, body, actorName, origin, beforeCommit);

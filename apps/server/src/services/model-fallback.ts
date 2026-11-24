@@ -8,6 +8,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { machine, type routingRule, type StepFallbackRow, type step } from '../db/schema.js';
 import { runtimeGatePasses } from './dispatch-eligibility.js';
 import { getModelLiveness } from './model-liveness.js';
@@ -131,7 +132,7 @@ export interface FallbackPlan {
 }
 
 export function planModelFallback(
-  db: Db,
+  deps: CommitEffects & { db: Db },
   stepRow: StepRow,
   agentRow: AgentRow | null,
   outcome: MachineDoneBody,
@@ -142,7 +143,7 @@ export function planModelFallback(
   const chain = agentRow?.fallbackModels ?? [];
   if (agentRow === null || chain.length === 0) return null;
   if (!agentRow.provider || !agentRow.modelId) return null;
-  const hosts = db
+  const hosts = deps.db
     .select()
     .from(machine)
     .where(
@@ -161,9 +162,12 @@ export function planModelFallback(
       !tried.has(modelKey(m)) &&
       hosts.some((host) => runtimeGatePasses(host, m.provider)) &&
       getModelLiveness(agentRow.teamId, m.provider, m.modelId) !== 'dead' &&
-      providerHealth.tryAcquire(`${agentRow.teamId}/${m.provider}`),
+      providerHealth.canAcquire(`${agentRow.teamId}/${m.provider}`),
   );
   if (to === undefined) return null;
+  runAfterCommit(deps, 'reserveProviderProbe', () => {
+    providerHealth.tryAcquire(`${agentRow.teamId}/${to.provider}`);
+  });
   return {
     trigger,
     from,

@@ -107,6 +107,7 @@ describe('Coordinator rule that selects Devin', () => {
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
       machineId,
       's1',
+      claimed?.step.generation,
     );
     expect(tokenRes.devinToken).toBe(firstToken);
 
@@ -145,6 +146,7 @@ describe('Coordinator rule that selects Devin', () => {
       { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
       machineId,
       's2',
+      nextClaim?.step.generation,
     );
     expect(nextToken.devinToken).toBe(secondToken);
   });

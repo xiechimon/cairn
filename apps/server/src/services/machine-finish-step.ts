@@ -18,8 +18,10 @@ import {
   type SkillInjectionFacts,
   secondPrWarningNoteRowId,
   skillFactsFromContents,
+  WORKFLOW_PUSH_REFUSAL,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import { runAfterCommit } from '../db/commit-effects.js';
 import {
   build,
   chiefMessage,
@@ -65,12 +67,7 @@ import { githubReadToken } from './github-autonomous-token.js';
 import { acceptedInfoReport } from './info-card.js';
 import { applyLocalMergeReport } from './local-merge.js';
 import { closeInfoCardTab, stopStepComputer } from './machine-computer.js';
-import {
-  deliverableManifestOf,
-  failUnpublishedDeliverables,
-  hasDeliverableRows,
-  withEventsAfterCommit,
-} from './machine-deliverables.js';
+import { deliverableManifestOf, failUnpublishedDeliverables } from './machine-deliverables.js';
 import {
   isChiefConversation,
   type MachineDeps,
@@ -80,6 +77,7 @@ import {
   stepTeamId,
   upsertChiefRow,
   upsertMessage,
+  withFencedTransaction,
 } from './machine-deps.js';
 import {
   applyMergeLanding,
@@ -104,6 +102,36 @@ import { applyQuotaWaitStep } from './quota-wait.js';
 import { coordinatorProfile, type RouteProfile } from './routing-rules.js';
 import { finishScheduledStep } from './schedules.js';
 import { drainTaskMessageQueue } from './task-message-queue.js';
+
+function recordReportedProviderOutcome(
+  deps: MachineDeps,
+  row: typeof step.$inferSelect,
+  agent: RouteProfile,
+  outcome: MachineDoneBody,
+  silent: boolean,
+): void {
+  const teamId = stepTeamId(deps, row);
+  const { provider } = ranModel(agent, row);
+  runAfterCommit(deps, 'recordProviderOutcome', () =>
+    recordProviderOutcome(teamId, provider, outcome, silent),
+  );
+}
+
+function markReportedModelDead(
+  deps: MachineDeps,
+  row: typeof step.$inferSelect,
+  model: { provider: string; modelId: string },
+): void {
+  const teamId = stepTeamId(deps, row);
+  if (teamId !== null)
+    runAfterCommit(deps, 'markModelDead', () =>
+      markModelDead(teamId, model.provider, model.modelId),
+    );
+}
+
+function emitSettledStepSpan(deps: MachineDeps, stepId: string): void {
+  runAfterCommit(deps, 'emitRuntimeStepSpan', () => emitRuntimeStepSpan(deps.db, stepId));
+}
 
 function holdStepForQuota(
   deps: MachineDeps,
@@ -238,26 +266,38 @@ export async function finishStep(
   stepId: string,
   body: MachineDoneBody,
 ): Promise<void> {
-  const claimed = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (body.generation !== undefined && claimed?.claimedAt !== body.generation) {
-    throw conflict(`step ${stepId} was claimed again after generation ${body.generation}`);
+  const prepared = withFencedTransaction(deps, (settleDeps) =>
+    prepareStepReport(settleDeps, machineId, stepId, body),
+  );
+  if ('changeFiles' in prepared) {
+    await finishStepReport(deps, prepared.stepRow, body, prepared.changeFiles);
   }
-  await finishStepReport(deps, machineId, stepId, body);
-  stopStepComputer(deps, stepId);
-  const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
-  if (row && row.status !== 'pending') closeInfoCardTab(deps, row);
-  if (row && row.kind !== 'review' && row.kind !== 'verify' && !isChiefConversation(row.buildId))
-    await drainTaskMessageQueue(deps, row.buildId);
+  const buildToDrain = withFencedTransaction(deps, (settled) => {
+    const row = settled.db.select().from(step).where(eq(step.id, stepId)).get();
+    if (row === undefined || row.claimedAt !== prepared.stepRow.claimedAt) return null;
+    stopStepComputer(settled, stepId);
+    if (row.status !== 'pending') closeInfoCardTab(settled, row);
+    return row.kind !== 'review' && row.kind !== 'verify' && !isChiefConversation(row.buildId)
+      ? row.buildId
+      : null;
+  });
+  if (buildToDrain !== null) await drainTaskMessageQueue(deps, buildToDrain);
 }
 
-async function finishStepReport(
+function prepareStepReport(
   deps: MachineDeps,
   machineId: string | null,
   stepId: string,
   body: MachineDoneBody,
-): Promise<void> {
+) {
   const { db } = deps;
   const found = db.select().from(step).where(eq(step.id, stepId)).get();
+  if (machineId !== null && body.generation === undefined) {
+    throw conflict(`step ${stepId} completion requires its claim generation`);
+  }
+  if (body.generation !== undefined && found?.claimedAt !== body.generation) {
+    throw conflict(`step ${stepId} was claimed again after generation ${body.generation}`);
+  }
   if (found && found.status !== 'claimed') {
     const released =
       machineId !== null &&
@@ -270,15 +310,16 @@ async function finishStepReport(
         failUnpublishedDeliverables(db, stepId, found.claimedAt);
       }
       revokeStepGitCredential(deps, stepId);
-      if (found.machineId === machineId && settleRetiredGateStep(deps, found, body)) return;
-      if (body.status === 'failed') {
-        noteDeliveredPlanResidual(
-          deps,
-          found,
-          body.errorMessage?.trim() ? body.errorMessage : 'no reason reported',
-        );
+      if (!(found.machineId === machineId && settleRetiredGateStep(deps, found, body))) {
+        if (body.status === 'failed') {
+          noteDeliveredPlanResidual(
+            deps,
+            found,
+            body.errorMessage?.trim() ? body.errorMessage : 'no reason reported',
+          );
+        }
       }
-      return;
+      return { stepRow: found };
     }
   }
   const stepRow = ownedStep(deps, machineId, stepId);
@@ -293,35 +334,27 @@ async function finishStepReport(
   ) {
     const gateWorker = workerStepContext(deps, stepRow);
     const plan = gateWorker?.agentRow
-      ? planModelFallback(db, stepRow, gateWorker.agentRow, body)
+      ? planModelFallback(deps, stepRow, gateWorker.agentRow, body)
       : null;
     if (plan !== null && gateWorker?.agentRow) {
       recordStepUsage(deps, stepRow, body.usage ?? []);
-      recordProviderOutcome(
-        stepTeamId(deps, stepRow),
-        ranModel(gateWorker.agentRow, stepRow).provider,
-        body,
-        false,
-      );
-      if (plan.trigger === 'model_unavailable') {
-        const teamId = stepTeamId(deps, stepRow);
-        if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
-      }
+      recordReportedProviderOutcome(deps, stepRow, gateWorker.agentRow, body, false);
+      if (plan.trigger === 'model_unavailable') markReportedModelDead(deps, stepRow, plan.from);
       requeueStep(deps, stepRow, plan.row, {
         id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
         content: plan.note,
       });
       notifyModelFallback(deps, gateWorker.todoRow, gateWorker.agentRow, plan.note);
       revokeStepGitCredential(deps, stepId);
-      emitRuntimeStepSpan(db, stepId);
-      return;
+      emitSettledStepSpan(deps, stepId);
+      return { stepRow };
     }
   }
   if (settleRetiredGateStep(deps, stepRow, body)) {
     recordStepUsage(deps, stepRow, body.usage ?? []);
     revokeStepGitCredential(deps, stepId);
-    emitRuntimeStepSpan(db, stepId);
-    return;
+    emitSettledStepSpan(deps, stepId);
+    return { stepRow };
   }
   let changeFiles: DocumentDiffFile[] | undefined;
   if (body.changesDiff !== undefined && body.changesDiff.length <= CHANGES_DIFF_MAX_BYTES) {
@@ -332,6 +365,27 @@ async function finishStepReport(
     }
   }
   revokeStepGitCredential(deps, stepId);
+  return { stepRow, changeFiles };
+}
+
+function assertCurrentStepClaim(deps: MachineDeps, stepRow: typeof step.$inferSelect): void {
+  const current = deps.db.select().from(step).where(eq(step.id, stepRow.id)).get();
+  if (
+    current?.status !== 'claimed' ||
+    current.machineId !== stepRow.machineId ||
+    current.claimedAt !== stepRow.claimedAt
+  ) {
+    throw conflict(`step ${stepRow.id} was released or claimed again while its report was applied`);
+  }
+}
+
+async function finishStepReport(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  body: MachineDoneBody,
+  changeFiles: DocumentDiffFile[] | undefined,
+): Promise<void> {
+  const { db } = deps;
   if (isBuildStepKind(stepRow.kind)) {
     const buildRow = db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
     const todoRow = buildRow
@@ -379,11 +433,16 @@ async function finishStepReport(
   if (body.localMerge !== undefined) {
     if (body.status !== 'success')
       throw conflict('Local merge results require a successful command report');
-    applyLocalMergeReport(deps, stepRow, body.localMerge);
+    const localMerge = body.localMerge;
+    withFencedTransaction(deps, (settleDeps) => {
+      assertCurrentStepClaim(settleDeps, stepRow);
+      applyLocalMergeReport(settleDeps, stepRow, localMerge);
+    });
     return;
   }
   if (body.status === 'success' && parseLocalMergeInstruction(stepRow.prompt) !== null)
     throw conflict('Local merge command reported no landing result');
+  assertCurrentStepClaim(deps, stepRow);
   const mergeSuccess = stepRow.kind === 'merge' && body.status === 'success';
   let landingSkipped = mergeSuccess && mergeCardLeftReview(deps, stepRow);
   let landingError: string | null = null;
@@ -398,31 +457,23 @@ async function finishStepReport(
     if (space !== null && 'error' in space) landingError = space.error;
     else if (space !== null) spaceNote = space.note;
   }
-  const report: StepReport = {
-    machineId,
-    stepId,
-    stepRow,
-    body,
-    changeFiles,
-    priorMerged,
-    landingSkipped,
-    landingError,
-    spaceNote,
-  };
-  const grantGeneration = stepRow.claimedAt;
-  if (grantGeneration !== null && hasDeliverableRows(db, stepId, grantGeneration)) {
-    withEventsAfterCommit(deps, (settleDeps) => {
-      applyStepReport(settleDeps, report);
-      failUnpublishedDeliverables(settleDeps.db, stepId, grantGeneration);
+  withFencedTransaction(deps, (settleDeps) => {
+    assertCurrentStepClaim(settleDeps, stepRow);
+    applyStepReport(settleDeps, {
+      stepRow,
+      body,
+      changeFiles,
+      priorMerged,
+      landingSkipped,
+      landingError,
+      spaceNote,
     });
-    return;
-  }
-  applyStepReport(deps, report);
+    if (stepRow.claimedAt !== null)
+      failUnpublishedDeliverables(settleDeps.db, stepRow.id, stepRow.claimedAt);
+  });
 }
 
 interface StepReport {
-  machineId: string | null;
-  stepId: string;
   stepRow: typeof step.$inferSelect;
   body: MachineDoneBody;
   changeFiles: DocumentDiffFile[] | undefined;
@@ -434,27 +485,9 @@ interface StepReport {
 
 function applyStepReport(deps: MachineDeps, report: StepReport): void {
   const { db } = deps;
-  const {
-    machineId,
-    stepId,
-    stepRow,
-    body,
-    changeFiles,
-    priorMerged,
-    landingSkipped,
-    landingError,
-    spaceNote,
-  } = report;
-  {
-    const current = db.select().from(step).where(eq(step.id, stepId)).get();
-    if (
-      current?.status !== 'claimed' ||
-      current.machineId !== machineId ||
-      current.claimedAt !== stepRow.claimedAt
-    ) {
-      throw conflict(`step ${stepId} was released or claimed again while its report was applied`);
-    }
-  }
+  const { stepRow, body, changeFiles, priorMerged, landingSkipped, landingError, spaceNote } =
+    report;
+  const stepId = stepRow.id;
   {
     const teamId = stepTeamId(deps, stepRow);
     if (teamId !== null) deps.machineHub.wake(teamId);
@@ -532,51 +565,49 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   ) {
     releaseUnconsumedSteer(db, stepRow);
     if (worker?.agentRow)
-      recordProviderOutcome(
-        stepTeamId(deps, stepRow),
-        ranModel(worker.agentRow, stepRow).provider,
-        outcome,
-        false,
-      );
+      recordReportedProviderOutcome(deps, stepRow, worker.agentRow, outcome, false);
     if (outcome.skillInjectionFacts !== undefined)
       recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
     applyStoppedStep(deps, stepId);
     publishStepStatus(deps, stepId);
-    emitRuntimeStepSpan(deps.db, stepId);
+    emitSettledStepSpan(deps, stepId);
     return;
   }
   if (worker !== null && settleParkedStep(deps, stepRow, outcome)) {
     if (worker.agentRow)
-      recordProviderOutcome(
-        stepTeamId(deps, stepRow),
-        ranModel(worker.agentRow, stepRow).provider,
+      recordReportedProviderOutcome(
+        deps,
+        stepRow,
+        worker.agentRow,
         outcome,
         isZeroUsageSilentSuccess(stepRow.kind, outcome),
       );
     if (outcome.skillInjectionFacts !== undefined)
       recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
-    emitRuntimeStepSpan(deps.db, stepId);
+    emitSettledStepSpan(deps, stepId);
+    return;
+  }
+  if (outcome.status === 'failed' && outcome.errorMessage === WORKFLOW_PUSH_REFUSAL) {
+    applyStepFailure(
+      deps,
+      stepRow,
+      WORKFLOW_PUSH_REFUSAL,
+      reportedVerdictHeads(stepRow, body),
+      body.preservedCommits,
+    );
+    publishStepStatus(deps, stepId);
+    emitSettledStepSpan(deps, stepId);
     return;
   }
   if (recoverClaudeRateLimitFailure(deps, stepRow, outcome)) return;
   const zeroUsage = worker !== null && isZeroUsageSilentSuccess(stepRow.kind, outcome);
   if (worker?.agentRow) {
-    recordProviderOutcome(
-      stepTeamId(deps, stepRow),
-      ranModel(worker.agentRow, stepRow).provider,
-      outcome,
-      zeroUsage,
-    );
+    recordReportedProviderOutcome(deps, stepRow, worker.agentRow, outcome, zeroUsage);
   }
   const chiefAgent = chiefStepAgent(deps, stepRow);
   if (chiefAgent !== null) {
     releaseUnconsumedSteer(db, stepRow);
-    recordProviderOutcome(
-      stepTeamId(deps, stepRow),
-      ranModel(chiefAgent, stepRow).provider,
-      outcome,
-      false,
-    );
+    recordReportedProviderOutcome(deps, stepRow, chiefAgent, outcome, false);
   }
   if (requeueChiefStepOnFallback(deps, stepRow, chiefAgent, outcome)) return;
   if (
@@ -585,10 +616,8 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     classifyStepFailure(outcome.errorMessage ?? '') === 'model_unavailable'
   ) {
     const ran = worker.agentRow ? ranModel(worker.agentRow, stepRow) : null;
-    if (ran?.provider && ran.modelId) {
-      const teamId = stepTeamId(deps, stepRow);
-      if (teamId !== null) markModelDead(teamId, ran.provider, ran.modelId);
-    }
+    if (ran?.provider && ran.modelId)
+      markReportedModelDead(deps, stepRow, { provider: ran.provider, modelId: ran.modelId });
     if (outcome.skillInjectionFacts !== undefined)
       recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
     applyStepFailure(
@@ -598,16 +627,13 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       reportedVerdictHeads(stepRow, { gateHeadSha: body.gateHeadSha, commit: body.commit }),
     );
     publishStepStatus(deps, stepId);
-    emitRuntimeStepSpan(deps.db, stepId);
+    emitSettledStepSpan(deps, stepId);
     return;
   }
   if (worker !== null) {
-    const plan = planModelFallback(db, stepRow, worker.agentRow, outcome);
+    const plan = planModelFallback(deps, stepRow, worker.agentRow, outcome);
     if (plan !== null) {
-      if (plan.trigger === 'model_unavailable') {
-        const teamId = stepTeamId(deps, stepRow);
-        if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
-      }
+      if (plan.trigger === 'model_unavailable') markReportedModelDead(deps, stepRow, plan.from);
       requeueStep(deps, stepRow, plan.row, {
         id: `model-fallback-${stepRow.id}-${plan.row.tried.length}`,
         content: plan.note,
@@ -645,10 +671,8 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   ) {
     const ranAgent = worker?.agentRow ?? chiefAgent;
     const ran = ranAgent ? ranModel(ranAgent, stepRow) : { provider: null, modelId: null };
-    if (ran.provider && ran.modelId) {
-      const teamId = stepTeamId(deps, stepRow);
-      if (teamId !== null) markModelDead(teamId, ran.provider, ran.modelId);
-    }
+    if (ran.provider && ran.modelId)
+      markReportedModelDead(deps, stepRow, { provider: ran.provider, modelId: ran.modelId });
   }
   if (outcome.skillInjectionFacts !== undefined) {
     recordSkillInjectionCheck(deps, stepRow, outcome.skillInjectionFacts);
@@ -677,7 +701,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     }
     applyStepFailure(deps, stepRow, ZERO_USAGE_FAILURE, verdictReport);
     publishStepStatus(deps, stepId);
-    emitRuntimeStepSpan(deps.db, stepId);
+    emitSettledStepSpan(deps, stepId);
     return;
   }
   if (
@@ -716,7 +740,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       );
     }
     publishStepStatus(deps, stepId);
-    emitRuntimeStepSpan(deps.db, stepId);
+    emitSettledStepSpan(deps, stepId);
     return;
   }
   if (outcome.status === 'success') {
@@ -744,13 +768,13 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
       });
     complete(deps);
     publishStepStatus(deps, stepId);
-    emitRuntimeStepSpan(deps.db, stepId);
+    emitSettledStepSpan(deps, stepId);
     return;
   }
   if (outcome.status === 'stopped') {
     applyStoppedStep(deps, stepId);
     publishStepStatus(deps, stepId);
-    emitRuntimeStepSpan(deps.db, stepId);
+    emitSettledStepSpan(deps, stepId);
     return;
   }
   applyStepFailure(
@@ -761,7 +785,7 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
     body.preservedCommits,
   );
   publishStepStatus(deps, stepId);
-  emitRuntimeStepSpan(deps.db, stepId);
+  emitSettledStepSpan(deps, stepId);
 }
 
 function workerStepContext(
@@ -820,12 +844,9 @@ export function requeueChiefStepOnFallback(
   outcome: MachineDoneBody,
 ): boolean {
   if (agentRow === null) return false;
-  const plan = planModelFallback(deps.db, stepRow, agentRow, outcome);
+  const plan = planModelFallback(deps, stepRow, agentRow, outcome);
   if (plan === null) return false;
-  if (plan.trigger === 'model_unavailable') {
-    const teamId = stepTeamId(deps, stepRow);
-    if (teamId !== null) markModelDead(teamId, plan.from.provider, plan.from.modelId);
-  }
+  if (plan.trigger === 'model_unavailable') markReportedModelDead(deps, stepRow, plan.from);
   const content: ChiefModelFallbackContent = {
     kind: CHIEF_MODEL_FALLBACK_KIND,
     from: modelKey(plan.from),

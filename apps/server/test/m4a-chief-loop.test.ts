@@ -22,7 +22,14 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { setTodoPhase } from '../src/services/todos.js';
-import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  machineIdByName,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -121,7 +128,10 @@ async function setupChiefWorld(opts?: {
       return JSON.parse(body.text ?? 'null') as unknown;
     },
     async done(stepId, body) {
-      return call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+      return call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+        cred: token,
+        body: { generation: claimedGeneration(s.db, stepId), ...body },
+      });
     },
     async uploadTranscript(stepId, messages) {
       const urlsRes = await call(s.app, 'POST', `/api/machine/upload-urls/${stepId}`, {
@@ -336,7 +346,12 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     const w = await setupChiefWorld();
     const claimed = await w.claim();
     const stepId = claimed.step.id;
-    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${stepId}`, { cred: w.token });
+    const tokenRes = await call(
+      w.s.app,
+      'GET',
+      `/api/machine/token/${stepId}?generation=${claimed.step.generation}`,
+      { cred: w.token },
+    );
     expect(tokenRes.status).toBe(200);
     const body = (await tokenRes.json()) as {
       provider: unknown;
@@ -357,9 +372,12 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
       })
       .where(eq(machineTable.id, machineIdByName(w.s, 'm4a-mbp')))
       .run();
-    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
-      cred: w.token,
-    });
+    const tokenRes = await call(
+      w.s.app,
+      'GET',
+      `/api/machine/token/${claimed.step.id}?generation=${claimed.step.generation}`,
+      { cred: w.token },
+    );
     expect(tokenRes.status).toBe(200);
     const body = (await tokenRes.json()) as Record<string, unknown>;
     expect(body.secrets).toEqual({});
@@ -374,9 +392,12 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
     };
     const w = await setupChiefWorld({ githubAppIdentity: bot });
     const claimed = await w.claim();
-    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${claimed.step.id}`, {
-      cred: w.token,
-    });
+    const tokenRes = await call(
+      w.s.app,
+      'GET',
+      `/api/machine/token/${claimed.step.id}?generation=${claimed.step.generation}`,
+      { cred: w.token },
+    );
     expect(tokenRes.status).toBe(200);
     expect(((await tokenRes.json()) as { commitIdentity: unknown }).commitIdentity).toEqual(bot);
   });

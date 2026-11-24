@@ -25,15 +25,18 @@ export class ProviderHealthTracker {
     return e.failures >= DEGRADED_AFTER_FAILURES ? 'degraded' : 'healthy';
   }
 
+  canAcquire(providerId: string): boolean {
+    const state = this.state(providerId);
+    if (state === 'open') return false;
+    if (state !== 'half_open') return true;
+    const probeAt = this.entries.get(providerId)?.probeAt;
+    return probeAt == null || this.now() - probeAt >= PROBE_LEASE_MS;
+  }
+
   tryAcquire(providerId: string): boolean {
-    const s = this.state(providerId);
-    if (s === 'healthy' || s === 'degraded') return true;
-    if (s === 'open') return false;
-    const e = this.entries.get(providerId);
-    if (e === undefined) return true;
-    const now = this.now();
-    if (e.probeAt !== null && now - e.probeAt < PROBE_LEASE_MS) return false;
-    e.probeAt = now;
+    if (!this.canAcquire(providerId)) return false;
+    const entry = this.entries.get(providerId);
+    if (entry?.openedAt != null) entry.probeAt = this.now();
     return true;
   }
 

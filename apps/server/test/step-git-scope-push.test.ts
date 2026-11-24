@@ -8,6 +8,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { step } from '../src/db/schema.js';
 import { runGit } from '../src/lib/git.js';
+import { nowMs } from '../src/lib/ids.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
 import {
   bootServer,
@@ -52,7 +53,11 @@ test('the runner clones the hosted repo and pushes its own work branch with the 
   const projectId = await postProject(s.app, 'scope-repo', { repoKind: 'hosted' });
   const machineId = insertMachine(s);
   const stepId = queueConnectorStep(s, projectId, machineId);
-  s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, stepId)).run();
+  s.db
+    .update(step)
+    .set({ status: 'claimed', machineId, claimedAt: nowMs() })
+    .where(eq(step.id, stepId))
+    .run();
   const stepRow = s.db.select().from(step).where(eq(step.id, stepId)).get()!;
   const { password } = issueStepGitCredential(
     { db: s.db, box: s.secretBox },

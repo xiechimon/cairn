@@ -1,9 +1,9 @@
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { notification, step } from '../src/db/schema.js';
-import { finishStep } from '../src/services/machines.js';
+
 import { H, registerChiefHarness } from './chief-harness.js';
-import { insertMachine, req } from './helpers.js';
+import { finishStepForClaim, insertMachine, req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -28,7 +28,7 @@ test('context length failure ends orchestration and exposes its reason on the th
       events.push(event);
     },
   });
-  await finishStep(
+  await finishStepForClaim(
     {
       ...H.s.svc,
       box: H.s.secretBox,

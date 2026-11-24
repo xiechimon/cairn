@@ -13,6 +13,7 @@ import { dirname, resolve } from 'node:path';
 import { and, eq } from 'drizzle-orm';
 import webpush from 'web-push';
 import type { Db } from '../db/client.js';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { apnsDevice, pushDelivery, pushDigestItem, pushSubscription, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type ApnsConfig, sendApns } from './apns.js';
@@ -301,6 +302,7 @@ export function pushToUserSafely(
   teamId: string,
   msg: PushMessage,
   deliveryId?: string,
+  effects: CommitEffects = {},
 ): void {
   if (
     vapid === null ||
@@ -337,11 +339,13 @@ export function pushToUserSafely(
     dedupeKey: effectDedupeKey('web-push', userId, msg.tag),
     payload: { userId, teamId, msg, deliveryId },
   });
-  void runEffectRow(db, effectRegistry, row.id).catch(() => {
-    process.stderr.write('web push delivery failed\n');
-  });
-  void drainEffects(db, effectRegistry).catch(() => {
-    process.stderr.write('web push delivery failed\n');
+  runAfterCommit(effects, 'dispatchPush', () => {
+    void runEffectRow(db, effectRegistry, row.id).catch(() => {
+      process.stderr.write('web push delivery failed\n');
+    });
+    void drainEffects(db, effectRegistry).catch(() => {
+      process.stderr.write('web push delivery failed\n');
+    });
   });
 }
 

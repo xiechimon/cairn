@@ -2,6 +2,12 @@ import type { GitIdentity, StepRecord, TranscriptUserOrigin, UserRecord } from '
 import { isChiefConversationId } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import {
+  type CommitEffects,
+  type EffectHubs,
+  type ScheduleEffect,
+  withCommitEffects,
+} from '../db/commit-effects.js';
 import { build, chiefThread, message, step, todo } from '../db/schema.js';
 import type { FetchLike } from '../lib/github.js';
 import type { KeySecretBox } from '../lib/secret-box.js';
@@ -19,10 +25,11 @@ export function isChiefConversation(id: string): boolean {
   return isChiefConversationId(id);
 }
 
-export interface MachineDeps {
+export interface MachineDeps extends CommitEffects {
   githubAppTokenSocket?: string | null | undefined;
   githubAppIdentity?: GitIdentity | null | undefined;
   db: Db;
+  assertClaim?: () => void;
   hub: TeamStreamHub;
   machineHub: MachineWakeHub;
   box: KeySecretBox;
@@ -42,6 +49,37 @@ export interface MachineDeps {
   mcpFetch?: typeof fetch;
   mailSend?: SendMail;
   mcpOAuthState?: McpOAuthState;
+}
+
+const DEFERRED_SIGNALS = new Set(['wake', 'steerSignal', 'stopSignal']);
+
+function deferSignals<T extends object>(hub: T, schedule: ScheduleEffect): T {
+  return new Proxy(hub, {
+    get(target, key) {
+      const value: unknown = Reflect.get(target, key, target);
+      if (typeof value !== 'function') return value;
+      const call = value as (...args: unknown[]) => unknown;
+      if (typeof key === 'string' && (key.startsWith('publish') || DEFERRED_SIGNALS.has(key))) {
+        return (...args: unknown[]) => {
+          schedule(key, () => call.apply(target, args));
+        };
+      }
+      return call.bind(target);
+    },
+  });
+}
+
+export function withFencedTransaction<D extends EffectHubs & CommitEffects & { db: Db }, T>(
+  deps: D,
+  run: (deps: D) => T,
+): T {
+  return withCommitEffects(deps, run, (hubs, schedule) => ({
+    hub: deferSignals(hubs.hub, schedule),
+    ...(hubs.machineHub !== undefined
+      ? { machineHub: deferSignals(hubs.machineHub, schedule) }
+      : {}),
+    ...(hubs.convHub !== undefined ? { convHub: deferSignals(hubs.convHub, schedule) } : {}),
+  }));
 }
 
 export function publishStepStatus(deps: MachineDeps, stepId: string): void {
@@ -70,6 +108,7 @@ export function profileForStep(
 }
 
 export function ownedStepRow(deps: MachineDeps, machineId: string | null, stepId: string) {
+  deps.assertClaim?.();
   const row = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   if (!row) throw new NotFoundError(`step ${stepId}`);
   if (row.machineId !== machineId) throw new NotFoundError(`step ${stepId} (not yours)`);

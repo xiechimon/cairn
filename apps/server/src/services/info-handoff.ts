@@ -2,10 +2,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { type CommitEffects, runAfterCommit } from '../db/commit-effects.js';
 import { attachment, build, message } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 
-export interface InfoReportDeps {
+export interface InfoReportDeps extends CommitEffects {
   db: Db;
   attachmentsDir: string;
 }
@@ -17,8 +18,19 @@ export function storeInfoReport(
   const id = newRecordId();
   const storageKey = `${input.teamId}/${id}.md`;
   const path = join(deps.attachmentsDir, storageKey);
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, input.report, 'utf8');
+  const deferred = deps.commitEffects !== undefined;
+  runAfterCommit(deps, 'writeInfoReport', () => {
+    try {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, input.report, 'utf8');
+    } catch (error) {
+      if (deferred)
+        deps.db.update(attachment).set({ status: 'failed' }).where(eq(attachment.id, id)).run();
+      throw error;
+    }
+    if (deferred)
+      deps.db.update(attachment).set({ status: 'ready' }).where(eq(attachment.id, id)).run();
+  });
   const createdAt = nowMs();
   deps.db
     .insert(attachment)
@@ -32,7 +44,7 @@ export function storeInfoReport(
       storageKey,
       grantId: `report-${input.buildId}`,
       scope: 'message',
-      status: 'ready',
+      status: deferred ? 'pending' : 'ready',
       createdAt,
     })
     .run();

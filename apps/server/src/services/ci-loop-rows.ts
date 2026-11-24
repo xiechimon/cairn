@@ -1,4 +1,5 @@
 import { and, desc, eq, isNotNull, ne } from 'drizzle-orm';
+import { runAfterCommit } from '../db/commit-effects.js';
 import { build, step, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
@@ -19,7 +20,9 @@ export function failWithMessage(
   const row = deps.db.select().from(build).where(eq(build.id, cand.buildId)).get();
   if (row) deps.hub.publishBuildDoc(teamId, toBuildRecord(row));
   setTodoPhase(deps, cand.todoId, 'failed');
-  emitRuntimeBuildSpan(deps.db, cand.buildId, 'failed');
+  runAfterCommit(deps, 'emitRuntimeBuildSpan', () =>
+    emitRuntimeBuildSpan(deps.db, cand.buildId, 'failed'),
+  );
 }
 
 export function writeSystemRow(deps: BuildDeps, buildId: string, content: string): void {

@@ -22,10 +22,10 @@ import {
   setCoordinatorInServer,
 } from '../src/services/coordinator-context.js';
 import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
-import { finishStep } from '../src/services/machines.js';
+
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import { H, registerChiefHarness } from './chief-harness.js';
-import { insertMachine } from './helpers.js';
+import { finishStepForClaim, insertMachine } from './helpers.js';
 
 registerChiefHarness();
 beforeEach(() => setCoordinatorInServer(true));
@@ -86,7 +86,7 @@ describe('chief turns record their own usage per step', () => {
   test('one turn writes one row with that turn tokens and its time to first token', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-1');
-    await finishStep(deps(), machineId, 'turn-1', {
+    await finishStepForClaim(deps(), machineId, 'turn-1', {
       status: 'success',
       usage: [usage('pi/glm', 1000, 800, { ttftMs: 412 })],
     });
@@ -172,12 +172,12 @@ describe('chief turns record their own usage per step', () => {
   test('a second turn gets its own row while the cumulative total keeps adding', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-1');
-    await finishStep(deps(), machineId, 'turn-1', {
+    await finishStepForClaim(deps(), machineId, 'turn-1', {
       status: 'success',
       usage: [usage('pi/glm', 1000, 800)],
     });
     claimedStep(machineId, 'turn-2');
-    await finishStep(deps(), machineId, 'turn-2', {
+    await finishStepForClaim(deps(), machineId, 'turn-2', {
       status: 'success',
       usage: [usage('pi/glm', 1500, 1200)],
     });
@@ -193,7 +193,7 @@ describe('chief turns record their own usage per step', () => {
   test('a turn that used two models writes one row per model', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-1');
-    await finishStep(deps(), machineId, 'turn-1', {
+    await finishStepForClaim(deps(), machineId, 'turn-1', {
       status: 'success',
       usage: [usage('pi/a', 10, 0), usage('pi/b', 20, 5)],
     });
@@ -206,12 +206,12 @@ describe('chief turns record their own usage per step', () => {
   test('a reclaimed step reporting again adds to its row and keeps the first measured ttft', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-1');
-    await finishStep(deps(), machineId, 'turn-1', {
+    await finishStepForClaim(deps(), machineId, 'turn-1', {
       status: 'stopped',
       usage: [usage('pi/glm', 100, 50, { ttftMs: 900 })],
     });
     reclaim(machineId, 'turn-1');
-    await finishStep(deps(), machineId, 'turn-1', {
+    await finishStepForClaim(deps(), machineId, 'turn-1', {
       status: 'success',
       usage: [usage('pi/glm', 200, 150, { ttftMs: 300 })],
     });
@@ -229,7 +229,7 @@ describe('chief turns record their own usage per step', () => {
       .where(eq(routingRule.use, 'coordinator'))
       .run();
     claimedStep(machineId, 'turn-quota');
-    await finishStep(deps(), machineId, 'turn-quota', {
+    await finishStepForClaim(deps(), machineId, 'turn-quota', {
       status: 'failed',
       errorMessage: '402: quota exceeded',
       quotaBlock: { kind: 'quota', providerId: 'anthropic', reason: '402: quota exceeded' },
@@ -251,7 +251,7 @@ describe('chief turns record their own usage per step', () => {
       claimPendingChiefStep(H.s.db, pending as NonNullable<typeof pending>, { machineId })?.status,
     ).toBe('claimed');
     const retryAt = Date.now();
-    await finishStep(deps(), machineId, 'turn-quota', {
+    await finishStepForClaim(deps(), machineId, 'turn-quota', {
       status: 'success',
       usage: [usage(anthropic, 200, 150, { contextTokens: 2_000 })],
     });
@@ -269,7 +269,7 @@ describe('chief turns record their own usage per step', () => {
   test('a failed or stopped turn still records the tokens it spent', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-1');
-    await finishStep(deps(), machineId, 'turn-1', {
+    await finishStepForClaim(deps(), machineId, 'turn-1', {
       status: 'stopped',
       usage: [usage('pi/glm', 40, 0)],
     });
@@ -279,7 +279,7 @@ describe('chief turns record their own usage per step', () => {
   test('a late report for a step that is no longer claimed writes nothing', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-1', { status: 'done' });
-    await finishStep(deps(), machineId, 'turn-1', {
+    await finishStepForClaim(deps(), machineId, 'turn-1', {
       status: 'success',
       usage: [usage('pi/glm', 40, 0)],
     });
@@ -291,7 +291,10 @@ describe('chief turns record their own usage per step', () => {
     const other = insertMachine(H.s);
     claimedStep(owner, 'turn-1');
     await expect(
-      finishStep(deps(), other, 'turn-1', { status: 'success', usage: [usage('pi/glm', 40, 0)] }),
+      finishStepForClaim(deps(), other, 'turn-1', {
+        status: 'success',
+        usage: [usage('pi/glm', 40, 0)],
+      }),
     ).rejects.toThrow();
     expect(turnRows()).toEqual([]);
   });
@@ -324,7 +327,7 @@ describe('chief turns record their own usage per step', () => {
       })
       .run();
     claimedStep(machineId, 'build-step', { buildId: 'build-1', kind: 'build' });
-    await finishStep(deps(), machineId, 'build-step', {
+    await finishStepForClaim(deps(), machineId, 'build-step', {
       status: 'success',
       usage: [usage('pi/glm', 40, 0)],
     });
@@ -353,7 +356,7 @@ describe('the context meter under the in-server Coordinator', () => {
     setCoordinatorInServer(false);
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-off');
-    await finishStep(deps(), machineId, 'turn-off', {
+    await finishStepForClaim(deps(), machineId, 'turn-off', {
       status: 'success',
       usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
     });
@@ -364,7 +367,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag off after prior rows: retained turn usage does not keep the meter lit', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-prior');
-    await finishStep(deps(), machineId, 'turn-prior', {
+    await finishStepForClaim(deps(), machineId, 'turn-prior', {
       status: 'success',
       usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
     });
@@ -379,7 +382,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('threadId scopes the meter to that thread, not the newest chief-wide turn', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-scope-a');
-    await finishStep(deps(), machineId, 'turn-scope-a', {
+    await finishStepForClaim(deps(), machineId, 'turn-scope-a', {
       status: 'success',
       usage: [usage('pi/glm', 100, 0, { contextTokens: 1_000 })],
     });
@@ -434,7 +437,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('a subscription model with no window on its provider row reads its window from the catalog', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-codex');
-    await finishStep(deps(), machineId, 'turn-codex', {
+    await finishStepForClaim(deps(), machineId, 'turn-codex', {
       status: 'success',
       usage: [usage('openai-codex/gpt-6.1-sol', 37_321, 23, { contextTokens: 49_376 })],
     });
@@ -448,7 +451,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('a Claude Code turn shows the window and threshold Claude Code measured', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-cc');
-    await finishStep(deps(), machineId, 'turn-cc', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc', {
       status: 'success',
       usage: [
         usage('claude-code/claude-sonnet-5-5', 4, 50_819, {
@@ -468,7 +471,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('a Claude Code turn without measured limits shows no Cairn compaction threshold', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-cc');
-    await finishStep(deps(), machineId, 'turn-cc', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc', {
       status: 'success',
       usage: [usage('claude-code/claude-sonnet-5-5', 4, 50_819, { contextTokens: 53_350 })],
     });
@@ -482,26 +485,26 @@ describe('the context meter under the in-server Coordinator', () => {
     const cc = 'claude-code/claude-sonnet-5-5';
     const limitsOf = () => turnRows().map((r) => [r.contextTokens, r.contextWindow, r.compactAt]);
     claimedStep(machineId, 'turn-cc');
-    await finishStep(deps(), machineId, 'turn-cc', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc', {
       status: 'stopped',
       usage: [
         usage(cc, 10, 0, { contextTokens: 120_000, contextWindow: 200_000, compactAt: 167_000 }),
       ],
     });
     reclaim(machineId, 'turn-cc');
-    await finishStep(deps(), machineId, 'turn-cc', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc', {
       status: 'stopped',
       usage: [usage(cc, 10, 0)],
     });
     expect(limitsOf()).toEqual([[120_000, 200_000, 167_000]]);
     reclaim(machineId, 'turn-cc');
-    await finishStep(deps(), machineId, 'turn-cc', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc', {
       status: 'stopped',
       usage: [usage(cc, 10, 0, { contextTokens: 130_000, contextWindow: 200_000 })],
     });
     expect(limitsOf()).toEqual([[130_000, 200_000, null]]);
     reclaim(machineId, 'turn-cc');
-    await finishStep(deps(), machineId, 'turn-cc', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc', {
       status: 'success',
       usage: [usage(cc, 10, 0, { contextTokens: 140_000 })],
     });
@@ -511,12 +514,12 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag on: the meter shows the last turn context the provider reported, not the running sum', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-a');
-    await finishStep(deps(), machineId, 'turn-a', {
+    await finishStepForClaim(deps(), machineId, 'turn-a', {
       status: 'success',
       usage: [usage('stub-gw/stub-model', 9000, 40000, { contextTokens: 21_000 })],
     });
     claimedStep(machineId, 'turn-b', { createdAt: Date.now() + 5 });
-    await finishStep(deps(), machineId, 'turn-b', {
+    await finishStepForClaim(deps(), machineId, 'turn-b', {
       status: 'success',
       usage: [usage('stub-gw/stub-model', 6000, 50000, { contextTokens: 23_456 })],
     });
@@ -538,7 +541,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag on: a coordinator model-route change reports cold resume', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-route-a');
-    await finishStep(deps(), machineId, 'turn-route-a', {
+    await finishStepForClaim(deps(), machineId, 'turn-route-a', {
       status: 'success',
       usage: [usage('stub-gw/stub-model', 1000, 800, { contextTokens: 1810 })],
     });
@@ -564,7 +567,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag on: a turn without contextTokens (claude-code) leaves the meter empty', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-cc');
-    await finishStep(deps(), machineId, 'turn-cc', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc', {
       status: 'success',
       usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
     });
@@ -574,7 +577,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag on: a stored context size of 0 counts as no data and leaves the meter empty', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-zero');
-    await finishStep(deps(), machineId, 'turn-zero', {
+    await finishStepForClaim(deps(), machineId, 'turn-zero', {
       status: 'success',
       usage: [usage('stub-gw/stub-model', 0, 0, { contextTokens: 0 })],
     });
@@ -585,7 +588,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag on: cold-resume still sees a context-less turn model for route mismatch', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-cc-cold');
-    await finishStep(deps(), machineId, 'turn-cc-cold', {
+    await finishStepForClaim(deps(), machineId, 'turn-cc-cold', {
       status: 'success',
       usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
     });
@@ -617,7 +620,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag on: a multi-model turn keeps the context-bearing model for the meter', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-multi');
-    await finishStep(deps(), machineId, 'turn-multi', {
+    await finishStepForClaim(deps(), machineId, 'turn-multi', {
       status: 'success',
       usage: [usage('pi/model-a', 100, 0, { contextTokens: 5_000 }), usage('pi/model-b', 50, 0)],
     });
@@ -636,7 +639,7 @@ describe('the context meter under the in-server Coordinator', () => {
     const modelA = 'stub-gw/stub-model';
     const modelB = 'stub-gw/other-model';
     claimedStep(machineId, 'turn-aba');
-    await finishStep(deps(), machineId, 'turn-aba', {
+    await finishStepForClaim(deps(), machineId, 'turn-aba', {
       status: 'success',
       usage: [
         usage(modelA, 100, 0, { contextTokens: 1_000 }),
@@ -715,7 +718,7 @@ describe('the context meter under the in-server Coordinator', () => {
   test('flag on: a later turn without contextTokens hides the meter instead of keeping the prior percent', async () => {
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-prior-ctx');
-    await finishStep(deps(), machineId, 'turn-prior-ctx', {
+    await finishStepForClaim(deps(), machineId, 'turn-prior-ctx', {
       status: 'success',
       usage: [usage('pi/glm', 1000, 800, { contextTokens: 1810 })],
     });
@@ -724,7 +727,7 @@ describe('the context meter under the in-server Coordinator', () => {
       contextWindow: DEFAULT_CONTEXT_WINDOW,
     });
     claimedStep(machineId, 'turn-no-ctx', { createdAt: Date.now() + 5 });
-    await finishStep(deps(), machineId, 'turn-no-ctx', {
+    await finishStepForClaim(deps(), machineId, 'turn-no-ctx', {
       status: 'success',
       usage: [usage('claude-code/claude-haiku-5-5', 9000, 40000)],
     });
@@ -757,7 +760,7 @@ describe('the context meter under the in-server Coordinator', () => {
       .run();
     const machineId = insertMachine(H.s);
     claimedStep(machineId, 'turn-w');
-    await finishStep(deps(), machineId, 'turn-w', {
+    await finishStepForClaim(deps(), machineId, 'turn-w', {
       status: 'success',
       usage: [usage('stub-gw/stub-model', 100, 0, { contextTokens: 110 })],
     });
@@ -767,7 +770,7 @@ describe('the context meter under the in-server Coordinator', () => {
       resume: 'warm',
     });
     claimedStep(machineId, 'turn-fallback', { createdAt: Date.now() + 5 });
-    await finishStep(deps(), machineId, 'turn-fallback', {
+    await finishStepForClaim(deps(), machineId, 'turn-fallback', {
       status: 'success',
       usage: [usage('other-gw/fallback-model', 100, 800, { contextTokens: 120 })],
     });

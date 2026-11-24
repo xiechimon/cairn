@@ -60,7 +60,9 @@ import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
 import { localMergeRecheckAuthorization } from './services/local-merge.js';
 import { receiveAntigravityVerify } from './services/machine-antigravity-verify.js';
+import { scopeMachineClaim } from './services/machine-claim-scope.js';
 import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
+import { withFencedTransaction } from './services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
 import {
@@ -274,6 +276,25 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const row = token ? findMachineByToken(ctx.db, token) : undefined;
     if (!row) throw unauthorized();
     return row;
+  };
+
+  const generationOf = (c: Context): number | undefined => {
+    const raw = c.req.query('generation');
+    const generation = raw !== undefined && /^\d{1,20}$/.test(raw) ? Number(raw) : undefined;
+    return Number.isSafeInteger(generation) ? generation : undefined;
+  };
+  const claimDeps = (c: Context, row: MachineRow, stepId = c.req.param('stepId') ?? '') => {
+    if (c.req.path.startsWith('/api/machine/heartbeat/')) {
+      const current = ctx.db.select().from(step).where(eq(step.id, stepId)).get();
+      if (current === undefined) throw new HttpError(410, `step ${stepId} no longer exists`);
+      if (current.status !== 'claimed') throw new HttpError(404, `step ${stepId} is not claimed`);
+    }
+    return scopeMachineClaim(deps, {
+      machineId: row.id,
+      stepId,
+      generation: generationOf(c),
+      tokenHash: row.tokenHash,
+    });
   };
 
   const executeMachineCommand = async <T, R>(
@@ -510,7 +531,6 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       lastWrite = stream
         .writeSSE({ data: JSON.stringify({ type: 'hello', connectionId }) })
         .catch(() => {});
-      // undici's default 300s body timeout (measured per received chunk) silently drops an idle SSE stream.
       const pingTimer = setInterval(() => {
         if (findMachineByToken(ctx.db, token)?.id !== row.id) {
           if (ctx.machineHub.endConnection(row.id, connectionId)) markOffline(deps, row.id);
@@ -585,7 +605,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
     return c.json(
-      fetchSteer({ db: ctx.db }, row, stepId, { batches: c.req.query('batches') === '1' }),
+      fetchSteer(claimDeps(c, row, stepId), row, stepId, {
+        batches: c.req.query('batches') === '1',
+      }),
     );
   });
 
@@ -594,16 +616,14 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
     const body = parseWith(machineSteerAckBodySchema, (await jsonBody(c)) ?? {}, 'body');
-    return c.json(
-      ackSteer({ db: ctx.db, convHub: ctx.convHub, machineHub: ctx.machineHub }, row, stepId, body),
-    );
+    return c.json(ackSteer(claimDeps(c, row, stepId), row, stepId, body));
   });
 
   app.get('/api/machine/stop', (c) => {
     const row = me(c);
     const stepId = c.req.query('stepId');
     if (!stepId) throw new HttpError(400, 'stepId required');
-    return c.json(fetchStop({ db: ctx.db }, row, stepId));
+    return c.json(fetchStop(claimDeps(c, row, stepId), row, stepId));
   });
 
   app.post('/api/machine/heartbeat/:stepId', async (c) => {
@@ -612,8 +632,10 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       () => jsonBody(c),
       async (row, decoded) => {
         const body = parseWith(machineHeartbeatBodySchema, decoded ?? {}, 'body');
-        heartbeatStep(deps, row.id, c.req.param('stepId'));
-        recordBuildProvenance(ctx.db, c.req.param('stepId'), body);
+        withFencedTransaction(claimDeps(c, row), (settled) => {
+          heartbeatStep(settled, row.id, c.req.param('stepId'));
+          recordBuildProvenance(settled.db, c.req.param('stepId'), body);
+        });
         return c.json({ ok: true as const });
       },
     );
@@ -624,6 +646,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       c,
       () => jsonBody(c),
       async (row, raw) => {
+        const deps = claimDeps(c, row);
         if (isDeltaBody(raw)) {
           const delta = parseWith(machineTranscriptDeltaBodySchema, raw, 'body');
           reportTranscriptDelta(deps, row.id, c.req.param('stepId'), delta.text);
@@ -688,6 +711,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       c,
       () => jsonBody(c),
       async (row, decoded) => {
+        const deps = claimDeps(c, row);
         const body = parseWith(machineAskBodySchema, decoded, 'body');
         const rawHold = Number(c.req.query('holdMs'));
         const holdMs =
@@ -704,21 +728,23 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/machine/token/:stepId', async (c) => {
     const row = me(c);
+    c.header('cache-control', 'no-store');
+    const raw = c.req.query('generation');
+    const generation = raw !== undefined && /^\d{1,20}$/.test(raw) ? Number(raw) : undefined;
+    const refresh = c.req.query('refresh') === '1';
     return c.json(
-      await stepToken(deps, row.id, c.req.param('stepId'), 'host', {
-        forceGithubRefresh: c.req.query('refresh') === '1',
-      }),
+      await stepToken(deps, row.id, c.req.param('stepId'), generation, 'host', refresh),
     );
   });
 
   app.get('/api/machine/skills/:stepId', (c) => {
     const row = me(c);
-    return c.json(machineSkillsManifest(deps, row.id, c.req.param('stepId')));
+    return c.json(machineSkillsManifest(claimDeps(c, row), row.id, c.req.param('stepId')));
   });
   app.get('/api/machine/skills/:stepId/file', (c) => {
     const row = me(c);
     const bytes = machineSkillFile(
-      deps,
+      claimDeps(c, row),
       row.id,
       c.req.param('stepId'),
       c.req.query('dirName') ?? '',
@@ -734,7 +760,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const row = me(c);
     return c.json(
       machineAttachmentDownload(
-        deps,
+        claimDeps(c, row),
         row.id,
         row.teamId,
         c.req.param('stepId'),
@@ -751,7 +777,17 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       async (row, decoded) => {
         const body = parseWith(machineUploadUrlsBodySchema, decoded, 'body');
         const stepId = c.req.param('stepId');
-        return c.json(createUploadUrls(deps, row.id, stepId, body.files, originOf(c), ctx.uploads));
+        return c.json(
+          createUploadUrls(
+            deps,
+            row.id,
+            stepId,
+            body.files,
+            originOf(c),
+            ctx.uploads,
+            generationOf(c),
+          ),
+        );
       },
     );
   });
@@ -810,7 +846,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/machine/session/:stepId', (c) => {
     const row = me(c);
-    return c.json(getStepSession(deps, row.id, c.req.param('stepId')));
+    return c.json(getStepSession(claimDeps(c, row), row.id, c.req.param('stepId')));
   });
 
   app.post('/api/machine/local-merge-recheck/:stepId', async (c) => {
@@ -819,7 +855,9 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       () => jsonBody(c),
       async (row, decoded) => {
         const body = parseWith(machineLocalMergeRecheckBodySchema, decoded, 'body');
-        return c.json(localMergeRecheckAuthorization(deps, row.id, c.req.param('stepId'), body));
+        return c.json(
+          localMergeRecheckAuthorization(claimDeps(c, row), row.id, c.req.param('stepId'), body),
+        );
       },
     );
   });

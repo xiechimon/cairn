@@ -1,5 +1,6 @@
 import { BUILD_FAILURE_ROW_KIND, failureReasonKey, systemRowOf } from '@cairn/shared';
 import { and, desc, eq, gte, inArray } from 'drizzle-orm';
+import { runAfterCommit } from '../db/commit-effects.js';
 import { message, step, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
@@ -80,5 +81,7 @@ export function finishTodoDone(
     content: DONE_ROW,
     createdAt: nowMs(),
   });
-  emitRuntimeBuildSpan(deps.db, buildId, 'done');
+  runAfterCommit(deps, 'emitRuntimeBuildSpan', () =>
+    emitRuntimeBuildSpan(deps.db, buildId, 'done'),
+  );
 }

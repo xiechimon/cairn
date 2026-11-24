@@ -27,7 +27,7 @@ function closesIssue(body: string, issueNumber: number, repo: GithubRepoRef): bo
 
 export async function ensurePullClosesTaskIssue(
   fetchImpl: FetchLike,
-  token: GithubWriteToken,
+  resolveToken: () => Promise<GithubWriteToken | null>,
   repo: GithubRepoRef,
   prNumber: number,
   row: TaskSource,
@@ -35,6 +35,8 @@ export async function ensurePullClosesTaskIssue(
 ): Promise<string | null> {
   const issueNumber = taskIssueNumber(row, repo);
   if (issueNumber === null || closesIssue(seenBody, issueNumber, repo)) return null;
+  const token = await resolveToken();
+  if (token === null) throw new Error(`PR #${prNumber} body unreadable`);
   const page = await githubPull(fetchImpl, token, repo.owner, repo.repo, prNumber);
   if (page?.pull == null) throw new Error(`PR #${prNumber} body unreadable`);
   const current = page.pull.body;

@@ -85,9 +85,12 @@ async function teamApi(
 async function machineAskOnce(
   stepId: string,
   requestId: string,
+  generation?: number | null,
   holdMs = 0,
 ): Promise<{ status: number; body: Record<string, unknown> }> {
-  const res = await fetch(`${server.url}/api/machine/ask/${stepId}?holdMs=${holdMs}`, {
+  const query = new URLSearchParams({ holdMs: String(holdMs) });
+  if (generation != null) query.set('generation', String(generation));
+  const res = await fetch(`${server.url}/api/machine/ask/${stepId}?${query.toString()}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -202,7 +205,7 @@ describe('#1049 chief ask_user blocking Q&A full chain (pi backend)', () => {
       .find((n) => n.type === 'chief_message' && n.entityId === threadId);
     expect(notif).toBeDefined();
 
-    const reAsk = await machineAskOnce(midStep?.id ?? '', requestId);
+    const reAsk = await machineAskOnce(midStep?.id ?? '', requestId, midStep?.claimedAt);
     expect(reAsk.status).toBe(200);
     expect(reAsk.body.status).toBe('pending');
     expect(askRowsOf(threadId)).toHaveLength(1);

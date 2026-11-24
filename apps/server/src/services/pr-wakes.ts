@@ -34,7 +34,12 @@ import {
   isCairnIdentity,
 } from '../lib/github-feedback.js';
 import { conditionalFeedbackFetch } from '../lib/github-feedback-cache.js';
-import { type AutonomousToken, githubAppBotLogin, githubTokenFetch } from '../lib/github-token.js';
+import {
+  type AutonomousToken,
+  type GithubWriteToken,
+  githubAppBotLogin,
+  githubTokenFetch,
+} from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { type BuildDeps, enqueueStep } from './builds.js';
 import {
@@ -44,7 +49,7 @@ import {
   verdictOfCheckRuns,
 } from './ci-loop.js';
 import { reconcilePrReviewFindings } from './pr-review-findings.js';
-import { retryIsParked } from './retry-parking.js';
+import { automaticRestartBlocked } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
 import { blockingWorkerQuestions } from './worker-question-store.js';
@@ -147,13 +152,13 @@ async function deliverReviewCap(
   input: {
     row: typeof threadPr.$inferSelect;
     fetch: FetchLike;
-    token: AutonomousToken;
+    resolveToken: () => Promise<AutonomousToken | null>;
     owner: string;
     repo: string;
   },
   findings: PrReviewFinding[] | null,
 ): Promise<void> {
-  const { row, token, owner, repo } = input;
+  const { row, owner, repo } = input;
   const ledgerId = `pr-wakes:${row.teamId}:${row.repo}#${row.number}`;
   const read = () =>
     ledgerSchema.parse(
@@ -184,14 +189,16 @@ async function deliverReviewCap(
         .onConflictDoUpdate({ target: message.id, set: { content: latest } })
         .run();
     });
-  const fetch = githubTokenFetch(input.fetch, token, { owner, repo });
+  const write = await input.resolveToken();
+  if (write === null) return;
+  const fetch = githubTokenFetch(input.fetch, write, { owner, repo });
   inFlight.add(ledgerId);
   try {
-    const comments = await githubIssueComments(fetch, token, owner, repo, row.number);
+    const comments = await githubIssueComments(fetch, write, owner, repo, row.number);
     if (comments === null) return;
     const own = new Set(
       [
-        githubAppBotLogin(token),
+        githubAppBotLogin(write),
         deps.db.select().from(githubConnection).where(eq(githubConnection.teamId, row.teamId)).get()
           ?.login,
       ].flatMap((login) => (login ? [login.toLowerCase()] : [])),
@@ -206,7 +213,7 @@ async function deliverReviewCap(
       const title = reviewFindingTitle(finding.body);
       if (title !== '' && !classes.includes(title)) classes.push(title);
     }
-    await githubComment(fetch, token, owner, repo, row.number, capComment(row.number, classes));
+    await githubComment(fetch, write, owner, repo, row.number, capComment(row.number, classes));
     settle('delivered');
   } catch (error) {
     if (error instanceof GithubRateLimitedError) throw error;
@@ -253,7 +260,7 @@ export function settlePrWakeNotices(deps: BuildDeps, teamId: string): void {
         !current ||
         current.latestBuildId !== row.buildId ||
         currentBuild?.prNumber !== row.number ||
-        retryIsParked(currentBuild?.errorMessage ?? '') ||
+        automaticRestartBlocked(currentBuild?.errorMessage ?? '') ||
         current.archivedAt !== null ||
         current.phase === 'closed' ||
         blockingWorkerQuestions(deps.db, row.buildId).length > 0 ||
@@ -288,7 +295,8 @@ export function createPrWakes(deps: BuildDeps) {
     pull: GithubPullPanel;
     runs: GithubCheckRun[] | null;
     fetch: FetchLike;
-    token: AutonomousToken;
+    token: GithubWriteToken;
+    resolveToken: () => Promise<AutonomousToken | null>;
     owner: string;
     repo: string;
     now: number;
@@ -518,7 +526,7 @@ export function createPrWakes(deps: BuildDeps) {
         currentPr.repo !== row.repo ||
         currentPr.head !== row.head ||
         currentBuild?.prNumber !== row.number ||
-        retryIsParked(currentBuild?.errorMessage ?? '')
+        automaticRestartBlocked(currentBuild?.errorMessage ?? '')
       )
         return;
       const active = deps.db

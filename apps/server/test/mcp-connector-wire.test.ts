@@ -94,7 +94,12 @@ function claim(s: TestServer, machineId: string) {
 }
 
 async function tokenOf(s: TestServer, machineToken: string, stepId: string) {
-  const res = await s.app.request(`/api/machine/token/${stepId}`, {
+  const generation = s.db
+    .select({ claimedAt: stepTable.claimedAt })
+    .from(stepTable)
+    .where(eq(stepTable.id, stepId))
+    .get()?.claimedAt;
+  const res = await s.app.request(`/api/machine/token/${stepId}?generation=${generation}`, {
     headers: { authorization: `Bearer ${machineToken}` },
   });
   expect(res.status).toBe(200);
@@ -251,7 +256,7 @@ describe('MCP connectors for the Coordinator on a Runner', () => {
     const { machineId, deps, s } = coordinatorWorld(true);
     const claimed = await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
     expect(claimed?.mcpServers).toEqual(['files', 'linear']);
-    const token = await stepToken(deps, machineId, 's1');
+    const token = await stepToken(deps, machineId, 's1', claimed?.step.generation);
     expect(token.mcpConnectors?.map((c) => c.slug)).toEqual(['linear']);
   });
 
@@ -260,7 +265,9 @@ describe('MCP connectors for the Coordinator on a Runner', () => {
     const claimed = await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
     expect(claimed?.step.id).toBe('s1');
     expect(claimed?.mcpServers).toEqual(['files']);
-    expect((await stepToken(deps, machineId, 's1')).mcpConnectors).toBeUndefined();
+    expect(
+      (await stepToken(deps, machineId, 's1', claimed?.step.generation)).mcpConnectors,
+    ).toBeUndefined();
     expect(
       s.db.select().from(chiefMessageTable).where(eq(chiefMessageTable.threadId, THREAD)).all(),
     ).toEqual([]);
@@ -268,9 +275,9 @@ describe('MCP connectors for the Coordinator on a Runner', () => {
 
   test('a connector added between claim and token is not delivered for a Coordinator turn', async () => {
     const { machineId, deps, s } = coordinatorWorld(true);
-    await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
+    const claimed = await claimStep(deps, machineId, s.team.id, 10, 'http://localhost');
     connector(s, 'notion', { headers: { Authorization: 'Bearer notion-token' } });
-    const token = await stepToken(deps, machineId, 's1');
+    const token = await stepToken(deps, machineId, 's1', claimed?.step.generation);
     expect(token.mcpConnectors?.map((c) => c.slug)).toEqual(['linear']);
   });
 

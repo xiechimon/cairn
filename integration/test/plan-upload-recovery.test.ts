@@ -297,11 +297,14 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
     const claimedDirect = claimedStepSchema.parse(
       ((await claimRes.json()) as { step: ClaimedStep }).step,
     );
-    const urlsRes = await fetch(`${server.url}/api/machine/upload-urls/${claimedDirect.step.id}`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ files: [{ name: PLAN_FILE_NAME }] }),
-    });
+    const urlsRes = await fetch(
+      `${server.url}/api/machine/upload-urls/${claimedDirect.step.id}?generation=${claimedDirect.step.generation}`,
+      {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ files: [{ name: PLAN_FILE_NAME }] }),
+      },
+    );
     const oldUrl = ((await urlsRes.json()) as { uploads: { url: string }[] }).uploads[0]!.url;
 
     const daemonWorld = await startBuild(
@@ -347,7 +350,7 @@ describe('#1026/#1028 final-report failure recovery (real process restarts)', ()
     expect(await staleRes.json()).toMatchObject({ error: 'upload not found' });
 
     const reissueRes = await fetch(
-      `${server.url}/api/machine/upload-urls/${claimedDirect.step.id}`,
+      `${server.url}/api/machine/upload-urls/${claimedDirect.step.id}?generation=${claimedDirect.step.generation}`,
       {
         method: 'POST',
         headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },

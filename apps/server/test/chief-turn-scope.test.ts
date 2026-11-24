@@ -7,6 +7,7 @@ import {
   step as stepTable,
   todo as todoTable,
 } from '../src/db/schema.js';
+import { HttpError } from '../src/lib/errors.js';
 import { newRecordId, nowMs } from '../src/lib/ids.js';
 import { NotFoundError } from '../src/services/builds.js';
 import {
@@ -267,7 +268,7 @@ describe('a turn force-stopped on the server keeps its scope on late writes (#25
           ],
         },
       ),
-    ).toThrow(NotFoundError);
+    ).toThrow(HttpError);
     expect(storedProjectId('a-late-reply')).toBeUndefined();
   });
 

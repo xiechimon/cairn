@@ -1,7 +1,12 @@
-import { createHash } from 'node:crypto';
-import type { GitIdentity } from '@cairn/shared';
+import { createHash, generateKeyPairSync } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import { join } from 'node:path';
+import { claimedStepSchema, GITHUB_REPOSITORY_RENAMED, type GitIdentity } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
+import { startMint } from '../../../ops/app-token-mint/mint.mjs';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   claudeSubscription,
   machine as machineTable,
@@ -12,6 +17,7 @@ import {
 import { createEphemeralSecretBox, SecretBoxError } from '../src/lib/secret-box.js';
 import { startBuilds } from '../src/services/builds.js';
 import { resolveStepCredentials } from '../src/services/credentials.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { stepToken } from '../src/services/machine-step-token.js';
 import { createProvider } from '../src/services/providers.js';
 import { createSecret } from '../src/services/secrets.js';
@@ -23,6 +29,7 @@ import {
   seedPolicy,
   seedRoute,
   seedSessionRoute,
+  startLegacyBuild,
   type TestServer,
 } from './helpers.js';
 
@@ -38,11 +45,18 @@ function setSessionProvider(s: TestServer, provider: string): void {
 }
 
 async function withRoutedStack(
-  opts: { secretsGranted?: boolean; githubAppIdentity?: GitIdentity } = {},
+  opts: {
+    secretsGranted?: boolean;
+    githubAppIdentity?: GitIdentity;
+    githubAppTokenSocket?: string;
+  } = {},
 ) {
-  const s = bootServer(
-    opts.githubAppIdentity === undefined ? {} : { githubAppIdentity: opts.githubAppIdentity },
-  );
+  const s = bootServer({
+    ...(opts.githubAppIdentity === undefined ? {} : { githubAppIdentity: opts.githubAppIdentity }),
+    ...(opts.githubAppTokenSocket === undefined
+      ? {}
+      : { githubAppTokenSocket: opts.githubAppTokenSocket }),
+  });
   const keysvc = { db: s.db, box: s.secretBox };
   createProvider(keysvc, {
     teamId: s.team.id,
@@ -155,9 +169,10 @@ describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
     seedPolicy(s, 'session', { secrets: [secret.id] });
     const machineId = insertMachine(s, { name: 'followup-secrets' });
     const stepId = addStep(s, s.buildId, 'build');
+    const generation = Date.now();
     s.db
       .update(stepTable)
-      .set({ status: 'claimed', machineId })
+      .set({ status: 'claimed', machineId, claimedAt: generation })
       .where(eq(stepTable.id, stepId))
       .run();
     const bundle = await stepToken(
@@ -170,6 +185,7 @@ describe('resolveStepCredentials (per-step dispatch interface surface)', () => {
       },
       machineId,
       stepId,
+      generation,
     );
     expect(bundle.secrets).toEqual({ FOLLOWUP_SECRET: 'followup-secret-value' });
     expect(bundle.provider).toMatchObject({ apiKey: RELAY_KEY });
@@ -262,7 +278,7 @@ test('a review route on a pi provider cannot receive the session subscription', 
   expect(resolveStepCredentials(s.keysvc, reviewStep).claudeSubscriptionToken).toBeUndefined();
 });
 
-test('finished steps retain provider-key responses', async () => {
+test('only a live claim receives provider-key responses; a finished step is refused', async () => {
   const s = await withRoutedStack();
   const machineId = insertMachine(s, { name: 'finished-provider' });
   const stepId = addStep(s, s.buildId, 'build');
@@ -273,21 +289,265 @@ test('finished steps retain provider-key responses', async () => {
     attachmentsDir: s.attachmentsDir,
     skillsDir: s.skillsDir,
   };
-  for (const status of ['claimed', 'done'] as const) {
-    s.db.update(stepTable).set({ machineId, status }).where(eq(stepTable.id, stepId)).run();
-    expect((await stepToken(deps, machineId, stepId)).provider).toMatchObject({
-      apiKey: RELAY_KEY,
+  const generation = Date.now();
+  s.db
+    .update(stepTable)
+    .set({ machineId, status: 'claimed', claimedAt: generation })
+    .where(eq(stepTable.id, stepId))
+    .run();
+  expect((await stepToken(deps, machineId, stepId, generation)).provider).toMatchObject({
+    apiKey: RELAY_KEY,
+  });
+  s.db.update(stepTable).set({ status: 'done' }).where(eq(stepTable.id, stepId)).run();
+  await expect(stepToken(deps, machineId, stepId, generation)).rejects.toMatchObject({
+    status: 409,
+  });
+});
+
+test('a stale-generation claim is refused before any credential work runs', async () => {
+  const s = await withRoutedStack();
+  const machineId = insertMachine(s, { name: 'stale-generation' });
+  const stepId = addStep(s, s.buildId, 'build');
+  s.db
+    .update(stepTable)
+    .set({ machineId, status: 'claimed', claimedAt: 33, claimedRepo: 'octo/alpha' })
+    .where(eq(stepTable.id, stepId))
+    .run();
+  const mintCalls: string[] = [];
+  const mint = createServer((req, res) => {
+    mintCalls.push(req.url ?? '');
+    res.statusCode = 500;
+    res.end();
+  });
+  const socketPath = join(s.reposDir, 'mint.sock');
+  await new Promise<void>((resolve) => mint.listen(socketPath, resolve));
+  try {
+    const deps = {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      skillsDir: s.skillsDir,
+      githubAppTokenSocket: socketPath,
+    };
+    await expect(stepToken(deps, machineId, stepId, 22)).rejects.toMatchObject({
+      status: 409,
+      reason: 'claim-moved',
     });
+    expect(mintCalls).toEqual([]);
+  } finally {
+    await new Promise((resolve) => mint.close(resolve));
   }
+});
+
+test('concurrent and sequential token fetches share one mint exchange; a flagged refresh forces once', async () => {
+  const dir = makeTestTempDir('app-provider-');
+  const socketPath = join(dir, 'mint.sock');
+  const s = await withRoutedStack({ githubAppTokenSocket: socketPath });
+  const machineId = insertMachine(s, { name: 'coalesced-fetch' });
+  const stepId = addStep(s, s.buildId, 'build');
+  const generation = Date.now();
+  s.db
+    .update(stepTable)
+    .set({
+      machineId,
+      status: 'claimed',
+      claimedAt: generation,
+      claimedRepo: 'octo/alpha',
+      claimedRepoId: 4242,
+    })
+    .where(eq(stepTable.id, stepId))
+    .run();
+  const mintCalls: { url: string; refresh: string | undefined }[] = [];
+  const mint = createServer((req, res) => {
+    mintCalls.push({ url: req.url ?? '', refresh: req.headers['x-cairn-refresh'] as string });
+    const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
+    res.statusCode = 200;
+    res.setHeader('content-type', 'application/json');
+    res.end(
+      JSON.stringify({
+        token: `app-${mintCalls.length}`,
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+        installationId: 456,
+        appSlug: 'cairnwright',
+        repositories: [`${params.get('owner')}/${params.get('repository')}`.toLowerCase()],
+        ...(params.get('repository_id') === null
+          ? {}
+          : { repositoryId: Number(params.get('repository_id')) }),
+        permissions: Object.fromEntries(
+          (params.get('permissions') ?? '')
+            .split(',')
+            .filter((entry) => entry.includes(':'))
+            .map((entry) => entry.split(':') as [string, string]),
+        ),
+      }),
+    );
+  });
+  await new Promise<void>((resolve) => mint.listen(socketPath, resolve));
+  try {
+    const deps = {
+      ...s.svc,
+      box: s.secretBox,
+      reposDir: s.reposDir,
+      attachmentsDir: s.attachmentsDir,
+      skillsDir: s.skillsDir,
+      githubAppTokenSocket: socketPath,
+    };
+    const results = await Promise.all([
+      stepToken(deps, machineId, stepId, generation),
+      stepToken(deps, machineId, stepId, generation),
+      stepToken(deps, machineId, stepId, generation),
+    ]);
+    expect(results.every((r) => r.git?.kind === 'app')).toBe(true);
+    expect(mintCalls.map((call) => call.refresh)).toEqual([undefined]);
+    const machineToken = 'coalesced-fetch-auth';
+    s.db
+      .update(machineTable)
+      .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+      .where(eq(machineTable.id, machineId))
+      .run();
+    const path = `/api/machine/token/${stepId}?generation=${generation}`;
+    const headers = { authorization: `Bearer ${machineToken}` };
+    const ordinary = await s.app.request(path, { headers });
+    expect(ordinary.status).toBe(200);
+    expect(await ordinary.json()).toMatchObject({ git: { kind: 'app', password: 'app-1' } });
+    expect(mintCalls.map((call) => call.refresh)).toEqual([undefined]);
+
+    const refreshed = await s.app.request(`${path}&refresh=1`, { headers });
+    expect(refreshed.status).toBe(200);
+    expect(await refreshed.json()).toMatchObject({ git: { kind: 'app', password: 'app-2' } });
+    const afterRefresh = await s.app.request(path, { headers });
+    expect(afterRefresh.status).toBe(200);
+    expect(await afterRefresh.json()).toMatchObject({ git: { kind: 'app', password: 'app-2' } });
+    expect(mintCalls.map((call) => call.refresh)).toEqual([undefined, '1']);
+    expect(mintCalls.every((call) => call.url.includes('repository=alpha'))).toBe(true);
+  } finally {
+    await new Promise((resolve) => mint.close(resolve));
+    await releaseTestTempDir(dir);
+  }
+});
+
+test('reconnecting after a repository rename unblocks the next ordinary runner credential fetch', async ({
+  onTestFinished,
+}) => {
+  const dir = makeTestTempDir('app-provider-');
+  const socketPath = join(dir, 'mint.sock');
+  const privateKeyPath = join(dir, 'key.pem');
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  await writeFile(privateKeyPath, privateKey.export({ type: 'pkcs8', format: 'pem' }), {
+    mode: 0o600,
+  });
+  let fullName = 'octo/alpha';
+  const repositoryId = 4242;
+  let runnerExchanges = 0;
+  const expiresAt = new Date(Date.now() + 3600_000).toISOString();
+  const mint = await startMint(
+    { appId: '123', installationId: 456, privateKeyPath, socketPath },
+    {
+      fetchImpl: async (url, init) => {
+        if (String(url).endsWith('/app')) return Response.json({ slug: 'cairnwright' });
+        if (typeof init?.body !== 'string') throw new Error('expected a mint request body');
+        const { repository_ids, permissions } = JSON.parse(init.body) as {
+          repository_ids?: number[];
+          permissions: Record<string, string>;
+        };
+        if (repository_ids !== undefined) expect(repository_ids).toEqual([repositoryId]);
+        return Response.json({
+          token: repository_ids === undefined ? 'app-read' : `app-runner-${++runnerExchanges}`,
+          expires_at: expiresAt,
+          repositories: [{ id: repositoryId, full_name: fullName }],
+          permissions,
+        });
+      },
+    },
+  );
+  onTestFinished(() => new Promise<void>((resolve) => mint.close(() => resolve())));
+  const s = bootServer({
+    claimHoldMs: 100,
+    githubAppTokenSocket: socketPath,
+    githubFetch: async () => Response.json({ id: repositoryId, full_name: fullName }),
+  });
+  upsertGithubConnection(
+    { db: s.db, box: s.secretBox },
+    {
+      teamId: s.team.id,
+      login: 'octo',
+      githubUserId: 12,
+      githubName: 'Octo',
+      accessToken: 'fixture-oauth-token',
+      scope: 'repo',
+    },
+  );
+  const created = await req(s.app, 'POST', '/api/projects', {
+    name: 'rename-reconnect',
+    kind: 'github',
+    githubRepo: fullName,
+  });
+  expect(created.status).toBe(201);
+  const { id: projectId } = (await created.json()) as { id: string };
+  const machineId = insertMachine(s, { name: 'rename-reconnect' });
+  seedSessionRoute(s, { provider: 'stub-gw', modelId: 'm', machineId });
+  const machineToken = 'rename-reconnect-auth';
+  s.db
+    .update(machineTable)
+    .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
+    .where(eq(machineTable.id, machineId))
+    .run();
+  const headers = { authorization: `Bearer ${machineToken}`, 'content-type': 'application/json' };
+  const claim = async (title: string) => {
+    const todo = await req(s.app, 'POST', `/api/projects/${projectId}/todos`, { title, spec: '' });
+    expect(todo.status).toBe(201);
+    const { id } = (await todo.json()) as { id: string };
+    startLegacyBuild(s, id, { withPlan: true });
+    const response = await s.app.request('/api/machine/tasks/claim', {
+      method: 'POST',
+      headers,
+      body: '{}',
+    });
+    expect(response.status).toBe(200);
+    const { step } = (await response.json()) as { step: unknown };
+    return claimedStepSchema.parse(step).step;
+  };
+  const first = await claim('Before reconnecting');
+  const firstPath = `/api/machine/token/${first.id}?generation=${first.generation}`;
+  const warm = await s.app.request(firstPath, { headers });
+  expect(warm.status).toBe(200);
+  expect(await warm.json()).toMatchObject({ git: { kind: 'app', password: 'app-runner-1' } });
+
+  fullName = 'octo/beta';
+  const refused = await s.app.request(`${firstPath}&refresh=1`, { headers });
+  expect(refused.status).toBe(503);
+  expect(await refused.json()).toEqual({
+    error: GITHUB_REPOSITORY_RENAMED.message,
+    reason: GITHUB_REPOSITORY_RENAMED.reason,
+  });
+  expect(runnerExchanges).toBe(2);
+  s.db.update(stepTable).set({ status: 'failed' }).where(eq(stepTable.id, first.id)).run();
+
+  fullName = 'octo/gamma';
+  const reconnected = await req(s.app, 'PATCH', `/api/projects/${projectId}`, {
+    githubRepo: fullName,
+  });
+  expect(reconnected.status).toBe(200);
+  expect(await reconnected.json()).toMatchObject({ githubRepo: fullName });
+  const next = await claim('After reconnecting');
+  const nextPath = `/api/machine/token/${next.id}?generation=${next.generation}`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await s.app.request(nextPath, { headers });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ git: { kind: 'app', password: 'app-runner-3' } });
+  }
+  expect(runnerExchanges).toBe(3);
 });
 
 test('a step commits as the configured App bot user from configuration, and as nobody in particular without one', async () => {
   const s = await withRoutedStack();
   const machineId = insertMachine(s, { name: 'identity' });
   const stepId = addStep(s, s.buildId, 'build');
+  const generation = Date.now();
   s.db
     .update(stepTable)
-    .set({ machineId, status: 'claimed' })
+    .set({ machineId, status: 'claimed', claimedAt: generation })
     .where(eq(stepTable.id, stepId))
     .run();
   const deps = {
@@ -297,7 +557,7 @@ test('a step commits as the configured App bot user from configuration, and as n
     attachmentsDir: s.attachmentsDir,
     skillsDir: s.skillsDir,
   };
-  expect((await stepToken(deps, machineId, stepId)).commitIdentity).toBeNull();
+  expect((await stepToken(deps, machineId, stepId, generation)).commitIdentity).toBeNull();
   const bot = {
     name: 'cairnwright[bot]',
     email: '347615582+cairnwright[bot]@users.noreply.github.com',
@@ -308,6 +568,7 @@ test('a step commits as the configured App bot user from configuration, and as n
         { ...deps, githubAppTokenSocket: null, githubAppIdentity: bot },
         machineId,
         stepId,
+        generation,
       )
     ).commitIdentity,
   ).toEqual(bot);
@@ -329,16 +590,20 @@ test('the machine token route hands the configured App identity to a first claim
   const headers = { authorization: `Bearer ${machineToken}` };
   s.db
     .update(stepTable)
-    .set({ machineId, status: 'claimed' })
+    .set({ machineId, status: 'claimed', claimedAt: 11 })
     .where(eq(stepTable.id, s.stepId))
     .run();
-  const first = await s.app.request(`/api/machine/token/${s.stepId}`, { headers });
+  const first = await s.app.request(`/api/machine/token/${s.stepId}?generation=11`, { headers });
   expect(first.status).toBe(200);
   expect(((await first.json()) as { commitIdentity: unknown }).commitIdentity).toEqual(bot);
   s.db.update(stepTable).set({ status: 'failed' }).where(eq(stepTable.id, s.stepId)).run();
   const retry = addStep(s, s.buildId, 'build');
-  s.db.update(stepTable).set({ machineId, status: 'claimed' }).where(eq(stepTable.id, retry)).run();
-  const retried = await s.app.request(`/api/machine/token/${retry}`, { headers });
+  s.db
+    .update(stepTable)
+    .set({ machineId, status: 'claimed', claimedAt: 22 })
+    .where(eq(stepTable.id, retry))
+    .run();
+  const retried = await s.app.request(`/api/machine/token/${retry}?generation=22`, { headers });
   expect(retried.status).toBe(200);
   expect(((await retried.json()) as { commitIdentity: unknown }).commitIdentity).toEqual(bot);
 });

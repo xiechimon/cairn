@@ -1,6 +1,7 @@
 import type { MachineDoneBody } from '@cairn/shared';
 import { buildFailureRowContent, isBuildStepKind } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
+import { runAfterCommit } from '../db/commit-effects.js';
 import { build, message, plan as planTable, step, stopPending, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { emitRuntimeBuildSpan } from '../runtime-otel.js';
@@ -177,7 +178,9 @@ export function applyStepFailure(
   const todoRow = db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
   const failedStep = finished ?? stepRow;
-  emitRuntimeBuildSpan(db, buildRow.id, 'failed');
+  runAfterCommit(deps, 'emitRuntimeBuildSpan', () =>
+    emitRuntimeBuildSpan(db, buildRow.id, 'failed'),
+  );
   persistGateVerdict(deps, failedStep, {
     stepFailed: true,
     extracted: false,

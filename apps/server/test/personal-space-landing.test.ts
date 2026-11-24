@@ -6,7 +6,7 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { build, message, type project, step, todo } from '../src/db/schema.js';
 import { runGit, systemGitOps } from '../src/lib/git.js';
 import { repoDirFor } from '../src/services/git.js';
-import { finishStep } from '../src/services/machines.js';
+
 import {
   ensurePersonalSpace,
   landSpaceCommit,
@@ -14,7 +14,7 @@ import {
   SPACE_REFUSAL_TEXT,
   spaceFileHistory,
 } from '../src/services/personal-space.js';
-import { bootServer, insertMachine, type TestServer } from './helpers.js';
+import { bootServer, finishStepForClaim, insertMachine, type TestServer } from './helpers.js';
 
 const GIT_ENV = {
   GIT_TERMINAL_PROMPT: '0',
@@ -284,7 +284,7 @@ describe('a space task finishing (P3 through the step report)', () => {
         createdAt: Date.now(),
       })
       .run();
-    await finishStep(
+    await finishStepForClaim(
       { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
       machineId,
       id,

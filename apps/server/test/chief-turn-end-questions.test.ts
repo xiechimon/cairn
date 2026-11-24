@@ -21,7 +21,7 @@ import {
 import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { CHIEF_ABANDONED_STEP_MS } from '../src/services/turn-provenance.js';
 import { AGENT_ID, H, registerChiefHarness } from './chief-harness.js';
-import { issueApiKey, req } from './helpers.js';
+import { claimedGeneration, issueApiKey, req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -134,7 +134,7 @@ describe('a pending ask_user card closes when its chief turn ends (#5400)', () =
     seedPendingQuestion('ask-daemonfin1');
     const done = await call(H.s.app, 'POST', `/api/machine/done/${stepId}`, {
       cred: token,
-      body: { status: 'success' },
+      body: { status: 'success', generation: claimedGeneration(H.s.db, stepId) },
     });
     expect(done.status).toBe(200);
     expect(stepRow(stepId).status).toBe('done');

@@ -12,6 +12,7 @@ import {
 import { backfillTokenUsageCost } from '../src/services/token-usage-cost.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   req,
@@ -114,10 +115,15 @@ async function claimStep(app: Hono, token: string) {
   };
 }
 
-async function reportDone(app: Hono, token: string, stepId: string, usage: unknown[]) {
-  const res = await call(app, 'POST', `/api/machine/done/${stepId}`, {
+async function reportDone(s: TestServer, token: string, stepId: string, usage: unknown[]) {
+  const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
     cred: token,
-    body: { status: 'success', usage, hasChanges: true },
+    body: {
+      status: 'success',
+      usage,
+      hasChanges: true,
+      generation: claimedGeneration(s.db, stepId),
+    },
   });
   expect(res.status).toBe(200);
 }
@@ -170,7 +176,7 @@ describe('token usage cost at write time', () => {
       const todoId = await createTodo(w.s, w.projectId, 'Priced and unknown');
       await startBuild(w.s, w.projectId, todoId);
       const claimed = await claimStep(w.s.app, w.token);
-      await reportDone(w.s.app, w.token, claimed.stepId, [
+      await reportDone(w.s, w.token, claimed.stepId, [
         { model: PRICED_MODEL, ...TOKENS, cost: ZERO_COST },
         { model: UNKNOWN_MODEL, ...TOKENS },
       ]);
@@ -191,7 +197,7 @@ describe('token usage cost at write time', () => {
       const todoId = await createTodo(w.s, w.projectId, 'Free reported and zero report');
       await startBuild(w.s, w.projectId, todoId);
       const claimed = await claimStep(w.s.app, w.token);
-      await reportDone(w.s.app, w.token, claimed.stepId, [
+      await reportDone(w.s, w.token, claimed.stepId, [
         { model: FREE_MODEL, ...TOKENS },
         { model: REPORTED_MODEL, ...TOKENS, cost: REPORTED_COST },
         { model: 'relay-186/mystery', ...TOKENS, cost: ZERO_COST },
@@ -226,7 +232,7 @@ describe('token usage cost at write time', () => {
       const idleTodo = await createTodo(w.s, w.projectId, 'Never ran');
       await startBuild(w.s, w.projectId, pricedTodo);
       const first = await claimStep(w.s.app, w.token);
-      await reportDone(w.s.app, w.token, first.stepId, [
+      await reportDone(w.s, w.token, first.stepId, [
         { model: PRICED_MODEL, ...TOKENS },
         { model: UNKNOWN_MODEL, ...TOKENS },
         { model: REPORTED_MODEL, ...TOKENS, cost: REPORTED_COST },
@@ -244,7 +250,7 @@ describe('token usage cost at write time', () => {
           createdAt: Date.now(),
         })
         .run();
-      await reportDone(w.s.app, w.token, 'step-cost-2', [
+      await reportDone(w.s, w.token, 'step-cost-2', [
         {
           model: PRICED_MODEL,
           ...TOKENS,
@@ -281,7 +287,7 @@ describe('token usage cost at write time', () => {
 
       await startBuild(w.s, w.projectId, unknownTodo);
       const onlyUnknown = await claimStep(w.s.app, w.token);
-      await reportDone(w.s.app, w.token, onlyUnknown.stepId, [
+      await reportDone(w.s, w.token, onlyUnknown.stepId, [
         { model: 'relay-186/mystery', ...TOKENS, cost: ZERO_COST },
       ]);
       expect(await readTodo(w.s, unknownTodo)).toMatchObject({
@@ -302,7 +308,7 @@ describe('token usage cost at write time', () => {
         const todoId = await createTodo(w.s, w.projectId, 'Historical cost');
         await startBuild(w.s, w.projectId, todoId);
         const claimed = await claimStep(w.s.app, w.token);
-        await reportDone(w.s.app, w.token, claimed.stepId, [
+        await reportDone(w.s, w.token, claimed.stepId, [
           { model: FREE_MODEL, ...TOKENS },
           { model: PRICED_MODEL, ...TOKENS },
           { model: REPORTED_MODEL, ...TOKENS, cost: REPORTED_COST },

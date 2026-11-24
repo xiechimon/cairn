@@ -12,6 +12,7 @@ import {
 } from '../src/db/schema.js';
 import {
   bootServer,
+  claimedGeneration,
   insertClaudeSubscription,
   postProject,
   seedRoute,
@@ -529,7 +530,11 @@ describe('claude rate limit (#1852)', () => {
     expect(stepOfBuild(s, buildId).status).toBe('claimed');
     const done = await call(s.app, 'POST', `/api/machine/done/${claimed!.step.id}`, {
       cred: machine.token,
-      body: { status: 'failed', errorMessage: 'Claude subscription rejected' },
+      body: {
+        status: 'failed',
+        errorMessage: 'Claude subscription rejected',
+        generation: claimedGeneration(s.db, claimed!.step.id),
+      },
     });
     expect(done.status).toBe(200);
     const row = stepOfBuild(s, buildId);
@@ -551,6 +556,7 @@ describe('claude rate limit (#1852)', () => {
       body: {
         status: 'failed',
         errorMessage: 'rate limit',
+        generation: claimedGeneration(s.db, claimed!.step.id),
         quotaBlock: {
           kind: 'quota',
           providerId: 'claude-code',
@@ -596,7 +602,11 @@ describe('claude rate limit (#1852)', () => {
     expect(claimed?.step.buildId).toBe(piBuild);
     const done = await call(s.app, 'POST', `/api/machine/done/${claimed!.step.id}`, {
       cred: machine.token,
-      body: { status: 'failed', errorMessage: 'disk full' },
+      body: {
+        status: 'failed',
+        errorMessage: 'disk full',
+        generation: claimedGeneration(s.db, claimed!.step.id),
+      },
     });
     expect(done.status).toBe(200);
     expect(stepOfBuild(s, piBuild).status).toBe('stopped');

@@ -7,7 +7,7 @@ import { githubApiBaseUrl } from '../lib/github-api-base.js';
 import { type GithubWriteToken, githubTokenFetch } from '../lib/github-token.js';
 import { newRecordId } from '../lib/ids.js';
 import { githubRepoOfProject } from './git.js';
-import { autonomousToken } from './github-autonomous-token.js';
+import { autonomousToken, githubReadToken } from './github-autonomous-token.js';
 import { type GithubTokenDeps, userTokenOrNull } from './github-connection.js';
 import type { GateReadCache } from './merge-gate/github-facts.js';
 
@@ -232,7 +232,7 @@ async function markerClosed(
 ): Promise<boolean> {
   const [owner, repo] = marker.repo.split('/');
   if (!owner || !repo) return false;
-  const token = await autonomousToken(deps, teamId, { owner, repo });
+  const token = await githubReadToken(deps, teamId, { owner, repo });
   if (token === null) return false;
   try {
     const response = await brakeRequest(

@@ -41,6 +41,9 @@ import {
   step,
   todo,
 } from '../db/schema.js';
+import { HttpError } from '../lib/errors.js';
+import { githubRepoReachable } from '../lib/github.js';
+import { type AppTokenReason, tokenValue } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
 import {
@@ -70,7 +73,8 @@ import {
   unassignedStepReason,
 } from './dispatch-eligibility.js';
 import { interruptedEffectsNote } from './external-effects.js';
-import { projectOfTodo, projectRepoRef } from './git.js';
+import { githubRepoOfProject, projectOfTodo, projectRepoRef } from './git.js';
+import { githubReadToken } from './github-autonomous-token.js';
 import { listProjectGithubLabelVocab } from './github-labels.js';
 import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { infoCardPlan, infoCardRemoteTools } from './info-card.js';
@@ -83,6 +87,7 @@ import {
   profileForStep,
   publishStepStatus,
   upsertMessage,
+  withFencedTransaction,
 } from './machine-deps.js';
 import {
   chiefIneligibility,
@@ -553,6 +558,22 @@ async function claimChiefTurn(
   return null;
 }
 
+function pendingClaim(stepRow: typeof step.$inferSelect, now: number) {
+  return and(
+    eq(step.id, stepRow.id),
+    eq(step.status, 'pending'),
+    stepRow.claimedAt === null ? isNull(step.claimedAt) : eq(step.claimedAt, stepRow.claimedAt),
+    or(isNull(step.holdUntil), lte(step.holdUntil, now)),
+  );
+}
+
+function failPendingClaim(deps: MachineDeps, candidate: typeof step.$inferSelect, reason: string) {
+  const current = deps.db.select().from(step).where(pendingClaim(candidate, nowMs())).get();
+  if (current === undefined) return false;
+  failStepWithEvents(deps, current, reason);
+  return true;
+}
+
 async function tryClaim(
   deps: MachineDeps,
   machineId: string,
@@ -604,10 +625,12 @@ async function tryClaim(
       localMerge !== null &&
       localMergeAuthorizationRefusal(db, localMerge, cand.todoRow) !== null
     ) {
-      failStepWithEvents(
-        deps,
-        cand.stepRow,
-        'Local merge authorization changed; request the merge again',
+      withFencedTransaction(deps, (settleDeps) =>
+        failPendingClaim(
+          settleDeps,
+          cand.stepRow,
+          'Local merge authorization changed; request the merge again',
+        ),
       );
       continue;
     }
@@ -616,7 +639,9 @@ async function tryClaim(
     if (infoPlan !== null && infoPlan.kind !== 'runner') continue;
     const agentRow = profileForStep(deps, cand.todoRow, cand.stepRow.kind, cand.stepRow.id);
     if (agentRow === null) {
-      failStepWithEvents(deps, cand.stepRow, unassignedStepReason(cand.stepRow.kind));
+      withFencedTransaction(deps, (settleDeps) =>
+        failPendingClaim(settleDeps, cand.stepRow, unassignedStepReason(cand.stepRow.kind)),
+      );
       continue;
     }
     if (!agentRow.modelId) continue;
@@ -701,11 +726,18 @@ async function tryClaim(
     if (!stillAuthorized()) return null;
     const blockerHandoff = await blockerHandoffForClaim(deps, cand.stepRow, cand.todoRow);
     if (!stillAuthorized()) return null;
-    const claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
     const workerMcp = stepMcpGrant(db, machineRow, infoPlan !== null);
-    let won = false;
+    const claimRepoRef = infoCard ? null : githubRepoOfProject(projectOfTodo(db, cand.todoRow));
+    const repoResolution =
+      claimRepoRef === null
+        ? { id: null, error: null }
+        : await resolveClaimRepoId(deps, teamId, claimRepoRef);
+    let won: boolean | Error;
+    let claimedAt = 0;
+    let claimProject: ReturnType<typeof projectOfTodo>;
     try {
-      won = db.transaction((tx) => {
+      won = withFencedTransaction(deps, (settleDeps) => {
+        const tx = settleDeps.db;
         if (!stillAuthorized()) return false;
         if (projectFull(tx)) return false;
         const boundId = enabledSubscriptionId({ db: tx }, teamId);
@@ -738,7 +770,7 @@ async function tryClaim(
             !antigravitySubscriptionAllowsRunner(tx, teamId, machineId))
         )
           return false;
-        const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
+        const latestTodo = tx.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
         if (latestTodo === undefined) return false;
         if (
           cand.stepRow.kind === 'merge' &&
@@ -753,13 +785,31 @@ async function tryClaim(
           localMergeAuthorizationRefusal(db, localMerge, latestTodo) !== null
         )
           return false;
-        holdBlockedBuild(db, cand.stepRow.buildId);
+        holdBlockedBuild(tx, cand.stepRow.buildId);
+        claimProject = projectOfTodo(tx, latestTodo);
+        const claimRepo = infoCard ? null : githubRepoOfProject(claimProject);
+        if (
+          (claimRepo === null) !== (claimRepoRef === null) ||
+          (claimRepo !== null &&
+            claimRepoRef !== null &&
+            `${claimRepo.owner}/${claimRepo.repo}`.toLowerCase() !==
+              `${claimRepoRef.owner}/${claimRepoRef.repo}`.toLowerCase())
+        )
+          return false;
+        claimedAt = Math.max(nowMs(), (cand.stepRow.claimedAt ?? 0) + 1);
+        if (repoResolution.error !== null) {
+          return failPendingClaim(settleDeps, cand.stepRow, repoResolution.error.message)
+            ? repoResolution.error
+            : false;
+        }
         const res = tx
           .update(step)
           .set({
             status: 'claimed',
             machineId,
             claimedAt,
+            claimedRepo: claimRepo === null ? null : `${claimRepo.owner}/${claimRepo.repo}`,
+            claimedRepoId: repoResolution.id,
             lastHeartbeatAt: claimedAt,
             skillInjection,
             blockerHandoff,
@@ -771,16 +821,10 @@ async function tryClaim(
             ranModel: pinnedModel,
             mcpGrant: workerMcp ?? null,
           })
-          .where(
-            and(
-              eq(step.id, cand.stepRow.id),
-              eq(step.status, 'pending'),
-              or(isNull(step.holdUntil), lte(step.holdUntil, claimedAt)),
-            ),
-          )
+          .where(pendingClaim(cand.stepRow, claimedAt))
           .run();
         if (res.changes === 0) return false;
-        if (infoCard) failEarlierClaimDeliverables(db, cand.stepRow.id);
+        if (infoCard) failEarlierClaimDeliverables(tx, cand.stepRow.id);
         if (cand.stepRow.kind !== 'review') {
           recordStepRoute(tx, cand.stepRow, cand.todoRow, machineId, agentRow);
         }
@@ -799,26 +843,32 @@ async function tryClaim(
             )
             .run();
         }
+        if (guardPr !== null) {
+          upsertMessage(settleDeps, {
+            id: mergedPrGuardNoteRowId(cand.stepRow.buildId),
+            conversationId: cand.stepRow.buildId,
+            role: 'system',
+            content: buildMergedPrGuardNote({ prNumber: guardPr.prNumber, prUrl: guardPr.prUrl }),
+            createdAt: nowMs(),
+          });
+        }
+        if (latestTodo.phase === 'queued' && latestTodo.latestBuildId === cand.stepRow.buildId) {
+          setTodoPhase(
+            settleDeps,
+            latestTodo.id,
+            cand.stepRow.kind === 'plan' ? 'planning' : 'building',
+          );
+        }
+        publishStepStatus(settleDeps, cand.stepRow.id);
         return true;
       });
-    } catch {
+    } catch (error) {
+      if (error instanceof HttpError) throw error;
       continue;
     }
-    if (!won) continue;
-    if (guardPr !== null) {
-      upsertMessage(deps, {
-        id: mergedPrGuardNoteRowId(cand.stepRow.buildId),
-        conversationId: cand.stepRow.buildId,
-        role: 'system',
-        content: buildMergedPrGuardNote({
-          prNumber: guardPr.prNumber,
-          prUrl: guardPr.prUrl,
-        }),
-        createdAt: nowMs(),
-      });
-    }
-    if (cand.todoRow.phase === 'queued') {
-      setTodoPhase(deps, cand.todoRow.id, cand.stepRow.kind === 'plan' ? 'planning' : 'building');
+    if (won !== true) {
+      if (won instanceof HttpError) throw won;
+      continue;
     }
     const session = freshSession
       ? { action: 'new' as const, sessionId: null }
@@ -827,7 +877,7 @@ async function tryClaim(
           sessionId: priorSessionId,
           ...(priorMachineId !== null && sessionOnOtherMachine ? { priorMachineId } : {}),
         };
-    const projectRow = projectOfTodo(db, cand.todoRow);
+    const projectRow = claimProject;
     const repoRef = infoCard ? null : projectRepoRef(projectRow, origin);
     const mergeTarget =
       cand.stepRow.kind === 'merge' ? parseHostedMergeInstruction(cand.stepRow.prompt) : null;
@@ -848,7 +898,6 @@ async function tryClaim(
             vocab: listProjectGithubLabelVocab(db, projectRow.id),
           }
         : undefined;
-    publishStepStatus(deps, cand.stepRow.id);
     const guardInstruction =
       guardPr === null
         ? cand.stepRow.prompt
@@ -974,6 +1023,44 @@ export function workerRemoteTools(
     WORKER_THREAD_REPORT_TOOL,
     ...(isGithubProject ? [WORKER_CLOSE_AS_DUPLICATE_TOOL] : []),
   ];
+}
+
+async function resolveClaimRepoId(
+  deps: MachineDeps,
+  teamId: string,
+  ref: { owner: string; repo: string },
+): Promise<{ id: number | null; error: Error | null }> {
+  let appReason: AppTokenReason = 'app-token-unavailable';
+  try {
+    const token = await githubReadToken(deps, teamId, ref, (reason) => {
+      appReason = reason;
+    });
+    if (token === null)
+      return {
+        id: null,
+        error: new HttpError(
+          503,
+          `GitHub repository lookup has no read credential (${appReason})`,
+          appReason,
+        ),
+      };
+    const probe = await githubRepoReachable(
+      deps.githubFetch ?? fetch,
+      tokenValue(token),
+      ref.owner,
+      ref.repo,
+    );
+    return { id: probe.id, error: null };
+  } catch (error) {
+    return {
+      id: null,
+      error: new Error(
+        error instanceof HttpError && error.status === 429
+          ? 'GitHub repository lookup was rate limited; retry the step'
+          : 'GitHub repository lookup failed; retry the step',
+      ),
+    };
+  }
 }
 
 export async function claimStep(

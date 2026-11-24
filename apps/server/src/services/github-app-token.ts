@@ -1,8 +1,15 @@
 import { request } from 'node:http';
+import { GITHUB_REPOSITORY_RENAMED } from '@cairn/shared';
 import { z } from 'zod';
+import {
+  appTokenScopeKey,
+  isGithubRepositoryFullName,
+  permissionKey,
+} from '../../../../ops/app-token-mint/scope-key.mjs';
+import { createScopedTokenCache } from '../../../../ops/app-token-mint/scoped-cache.mjs';
 import type { ServerConfig } from '../config.js';
 import type { FetchLike } from '../lib/github.js';
-import { githubApiBaseUrl, isGithubApiUrl } from '../lib/github-api-base.js';
+import { isGithubApiUrl } from '../lib/github-api-base.js';
 import {
   type AppToken,
   type AppTokenReason,
@@ -12,7 +19,7 @@ import {
 
 export type { AppTokenReason } from '../lib/github-token.js';
 
-type Repository = { owner: string; repo: string };
+type Repository = { owner: string; repo: string; repositoryId?: number };
 
 export interface GithubAppTokenDeps {
   config: Pick<ServerConfig, 'githubAppTokenSocket'>;
@@ -20,33 +27,113 @@ export interface GithubAppTokenDeps {
   onReason?: (failure: Repository & { reason: AppTokenReason }) => void;
 }
 
+export type AppTokenPolicy = 'runner' | 'server-read' | 'server-write';
+
 const mintResponseSchema = z.object({
   token: z.string().min(1),
   expiresAt: z.string().datetime(),
   installationId: z.union([z.number().int().positive(), z.string().regex(/^[1-9]\d*$/)]),
   appSlug: z.string().min(1),
-});
-const repositoriesSchema = z.object({
-  total_count: z.number().int().nonnegative(),
-  repositories: z.array(z.object({ full_name: z.string().min(1) })),
+  repositories: z.array(z.string().min(1)).optional(),
+  repositoryId: z.number().int().positive().optional(),
+  permissions: z.unknown(),
 });
 
-type CachedInstallation = {
-  token: AppToken;
-  expiresAt: number;
-  appSlug: string;
-  repositories: Set<string>;
+const WRITE_TOKEN_PERMISSIONS = {
+  actions: 'read',
+  checks: 'read',
+  contents: 'write',
+  issues: 'write',
+  metadata: 'read',
+  pull_requests: 'write',
+  statuses: 'read',
+} as const;
+
+const SERVER_READ_PERMISSIONS = {
+  actions: 'read',
+  checks: 'read',
+  contents: 'read',
+  issues: 'read',
+  metadata: 'read',
+  pull_requests: 'read',
+  statuses: 'read',
+} as const;
+
+const POLICY_PERMISSIONS: Record<AppTokenPolicy, Readonly<Record<string, string>>> = {
+  runner: WRITE_TOKEN_PERMISSIONS,
+  'server-read': SERVER_READ_PERMISSIONS,
+  'server-write': WRITE_TOKEN_PERMISSIONS,
 };
 
-const installations = new Map<string, CachedInstallation>();
-const pendingInstallations = new Map<string, Promise<CachedInstallation | null>>();
+type MintScope = {
+  repository: Repository;
+  permissions: Readonly<Record<string, string>>;
+};
 
-async function mintToken(socketPath: string, force: boolean) {
+type MintedRepository = { id: number | undefined; fullName: string };
+type ScopedEntry = Awaited<ReturnType<typeof mintToken>> | { token: null; expiresAt: number };
+
+const cachedScopedToken = createScopedTokenCache<ScopedEntry>({
+  reuseUntil: (entry) => entry.expiresAt - (entry.token === null ? 0 : 300_000),
+});
+
+const REPO_NOT_INSTALLED_TTL_MS = 60_000;
+
+class MintRepoNotInstalled extends Error {}
+class MintRepoNameMismatch extends Error {
+  constructor(readonly fresh: boolean) {
+    super();
+  }
+}
+
+function mintRepoNotInstalled(body: string): boolean {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    return (
+      typeof parsed === 'object' &&
+      parsed !== null &&
+      'error' in parsed &&
+      parsed.error === 'repo-not-installed'
+    );
+  } catch {
+    return false;
+  }
+}
+
+function verifyMintRepository(
+  minted: MintedRepository,
+  requested: Repository,
+  fresh: boolean,
+): void {
+  const { owner, repo, repositoryId } = requested;
+  if (repositoryId !== undefined && minted.id !== repositoryId)
+    throw new Error('mint scope unverifiable');
+  if (minted.fullName.toLowerCase() !== `${owner}/${repo}`.toLowerCase())
+    throw new MintRepoNameMismatch(fresh);
+}
+
+function verifyMintPermissions(permissions: unknown, requested: MintScope['permissions']): void {
+  if (typeof permissions !== 'object' || permissions === null || Array.isArray(permissions))
+    throw new Error('mint scope unverifiable');
+  const granted: [string, unknown][] = Object.entries(permissions);
+  if (
+    granted.length !== Object.keys(requested).length ||
+    granted.some(([name, level]) => !Object.hasOwn(requested, name) || level !== requested[name])
+  )
+    throw new Error('mint scope differs from requested');
+}
+
+async function mintToken(socketPath: string, force: boolean, scope: MintScope) {
+  const query = new URLSearchParams({ repository: scope.repository.repo });
+  query.set('owner', scope.repository.owner);
+  query.set('permissions', permissionKey(scope.permissions));
+  if (scope.repository.repositoryId !== undefined)
+    query.set('repository_id', String(scope.repository.repositoryId));
   const payload = await new Promise<unknown>((resolve, reject) => {
     const req = request(
       {
         socketPath,
-        path: '/token',
+        path: `/token?${query.toString()}`,
         method: 'GET',
         headers: force ? { 'x-cairn-refresh': '1' } : {},
         signal: AbortSignal.timeout(15_000),
@@ -60,6 +147,14 @@ async function mintToken(socketPath: string, force: boolean) {
           if (body.length > 65_536) req.destroy(new Error('mint response too large'));
         });
         res.on('end', () => {
+          if (res.statusCode === 422) {
+            reject(
+              mintRepoNotInstalled(body)
+                ? new MintRepoNotInstalled()
+                : new Error('mint unavailable'),
+            );
+            return;
+          }
           if (res.statusCode !== 200) {
             reject(new Error('mint unavailable'));
             return;
@@ -77,102 +172,112 @@ async function mintToken(socketPath: string, force: boolean) {
   });
   const value = mintResponseSchema.parse(payload);
   if (Date.parse(value.expiresAt) <= Date.now() + 300_000) throw new Error('mint token expiring');
+  const [fullName, extraRepository] = value.repositories ?? [];
+  if (!isGithubRepositoryFullName(fullName) || extraRepository !== undefined)
+    throw new Error('mint scope unverifiable');
+  verifyMintPermissions(value.permissions, scope.permissions);
   return {
     token: value.token as AppToken,
     expiresAt: Date.parse(value.expiresAt),
     appSlug: value.appSlug,
+    repository: { id: value.repositoryId, fullName },
   };
 }
 
-async function installation(deps: GithubAppTokenDeps, force: boolean) {
-  const path = deps.config.githubAppTokenSocket;
-  if (!path) return null;
-  const pending = pendingInstallations.get(path);
-  if (pending) return pending;
-  const cached = installations.get(path);
-  if (!force && cached && Date.now() < cached.expiresAt - 300_000) return cached;
-  installations.delete(path);
-  const loading = loadInstallation(deps, path, force);
-  pendingInstallations.set(path, loading);
-  try {
-    return await loading;
-  } finally {
-    pendingInstallations.delete(path);
-  }
+async function scopedToken(
+  path: string,
+  repo: Repository,
+  force: boolean,
+  policy: AppTokenPolicy,
+): Promise<ScopedEntry> {
+  if (!isGithubRepositoryFullName(`${repo.owner}/${repo.repo}`))
+    throw new Error('invalid repository name');
+  if (
+    repo.repositoryId !== undefined &&
+    (!Number.isSafeInteger(repo.repositoryId) || repo.repositoryId <= 0)
+  )
+    throw new Error('invalid repository id');
+  const scope = appTokenScopeKey(
+    repo.owner,
+    repo.repo,
+    repo.repositoryId,
+    POLICY_PERMISSIONS[policy],
+  );
+  return cachedScopedToken(`${path}\0${scope}`, force, () =>
+    loadScopedToken(path, repo, force, policy),
+  );
 }
 
-async function loadInstallation(deps: GithubAppTokenDeps, path: string, force: boolean) {
-  const fetchImpl = deps.fetchImpl ?? fetch;
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const minted = await mintToken(path, force || attempt > 0);
-    registerAppToken(
-      minted.token,
-      minted.expiresAt,
-      (inner, target) => async (input, init) => {
-        const response = await appGithubFetch({ ...deps, fetchImpl: inner }, target, input, init);
-        if (response === null) throw new Error('GitHub App token refresh unavailable');
-        return response;
-      },
-      minted.appSlug,
-    );
-    const repositories = new Set<string>();
-    let retry = false;
-    for (let page = 1; ; page++) {
-      const response = await fetchImpl(
-        `${githubApiBaseUrl()}/installation/repositories?per_page=100&page=${page}`,
-        {
-          headers: {
-            authorization: `Bearer ${tokenValue(minted.token)}`,
-            accept: 'application/vnd.github+json',
-            'x-github-api-version': '2022-11-28',
-            'user-agent': 'cairn-server',
-          },
-          redirect: 'error',
-          signal: AbortSignal.timeout(15_000),
-        },
-      );
-      if (response.status === 401 && attempt === 0 && !force) {
-        retry = true;
-        break;
-      }
-      if (!response.ok) throw new Error('installation unavailable');
-      const data = repositoriesSchema.parse(await response.json());
-      for (const repository of data.repositories)
-        repositories.add(repository.full_name.toLowerCase());
-      if (page * 100 >= data.total_count) break;
-      if (data.repositories.length === 0 || page >= 10_000)
-        throw new Error('invalid repository page');
-    }
-    if (retry) continue;
-    const value = { ...minted, repositories };
-    installations.set(path, value);
-    return value;
+async function loadScopedToken(
+  path: string,
+  repo: Repository,
+  force: boolean,
+  policy: AppTokenPolicy,
+): Promise<ScopedEntry> {
+  try {
+    const minted = await mintToken(path, force, {
+      repository: repo,
+      permissions: POLICY_PERMISSIONS[policy],
+    });
+    verifyMintRepository(minted.repository, repo, force);
+    return minted;
+  } catch (error) {
+    if (!(error instanceof MintRepoNotInstalled)) throw error;
+    return { token: null, expiresAt: Date.now() + REPO_NOT_INSTALLED_TTL_MS };
   }
-  return null;
 }
 
 async function repoToken(
   deps: GithubAppTokenDeps,
   repo: Repository,
   force: boolean,
-  minimumValidityMs = 300_000,
+  minimumValidityMs: number,
+  policy: AppTokenPolicy,
 ) {
   let reason: AppTokenReason;
-  if (!deps.config.githubAppTokenSocket) reason = 'app-token-unconfigured';
+  const path = deps.config.githubAppTokenSocket;
+  if (!path) reason = 'app-token-unconfigured';
   else {
     try {
-      let value = await installation(deps, force);
-      if (value && value.expiresAt - Date.now() < minimumValidityMs) {
-        value = await installation(deps, true);
-        if (value && value.expiresAt - Date.now() < minimumValidityMs)
+      let scoped = force
+        ? null
+        : await scopedToken(path, repo, false, policy).catch((error: unknown) => {
+            if (error instanceof MintRepoNameMismatch && !error.fresh) return null;
+            throw error;
+          });
+      if (
+        scoped === null ||
+        (scoped.token !== null && scoped.expiresAt - Date.now() < minimumValidityMs)
+      ) {
+        scoped = await scopedToken(path, repo, true, policy);
+      }
+      if (scoped.token !== null) {
+        if (scoped.expiresAt - Date.now() < minimumValidityMs)
           throw new Error('mint token expiring');
+        registerAppToken(
+          scoped.token,
+          scoped.expiresAt,
+          (inner, target) => async (input, init) => {
+            const response = await appGithubFetch(
+              { ...deps, fetchImpl: inner },
+              target,
+              input,
+              init,
+              policy,
+            );
+            if (response === null) throw new Error('GitHub App token refresh unavailable');
+            return response;
+          },
+          scoped.appSlug,
+        );
+        return scoped.token;
       }
-      if (value?.repositories.has(`${repo.owner}/${repo.repo}`.toLowerCase())) {
-        return value.token;
-      }
-      reason = value ? 'repo-not-installed' : 'app-token-unavailable';
-    } catch {
-      reason = 'app-token-unavailable';
+      reason = 'repo-not-installed';
+    } catch (error) {
+      reason =
+        error instanceof MintRepoNameMismatch && error.fresh && repo.repositoryId !== undefined
+          ? GITHUB_REPOSITORY_RENAMED.reason
+          : 'app-token-unavailable';
     }
   }
   try {
@@ -188,20 +293,22 @@ export function appTokenOrNull(
   repo: Repository,
   force = false,
   minimumValidityMs = 300_000,
+  policy: AppTokenPolicy,
 ): Promise<AppToken | null> {
-  return repoToken(deps, repo, force, minimumValidityMs);
+  return repoToken(deps, repo, force, minimumValidityMs, policy);
 }
 
 export async function appGithubFetch(
   deps: GithubAppTokenDeps,
   repo: Repository,
   input: string | URL,
-  init: NonNullable<Parameters<FetchLike>[1]> & Pick<RequestInit, 'redirect'> = {},
+  init: (NonNullable<Parameters<FetchLike>[1]> & Pick<RequestInit, 'redirect'>) | undefined = {},
+  policy: AppTokenPolicy,
 ): Promise<Awaited<ReturnType<FetchLike>> | null> {
   if (!isGithubApiUrl(String(input))) throw new Error('App tokens require a GitHub API URL');
   const fetchImpl = deps.fetchImpl ?? fetch;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const token = await repoToken(deps, repo, attempt > 0);
+    const token = await repoToken(deps, repo, attempt > 0, 300_000, policy);
     if (token === null) return null;
     const headers = new Headers(init.headers);
     headers.set('authorization', `Bearer ${tokenValue(token)}`);

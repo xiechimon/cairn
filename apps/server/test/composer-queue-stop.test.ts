@@ -12,7 +12,7 @@ import {
 } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { failStepWithEvents } from '../src/services/builds.js';
-import { bootServer, issueApiKey, postProject, req } from './helpers.js';
+import { bootServer, claimedGeneration, issueApiKey, postProject, req } from './helpers.js';
 
 async function runningTask(opts: { githubFetch?: FetchLike } = {}) {
   const s = bootServer(opts);
@@ -73,7 +73,12 @@ async function runningTask(opts: { githubFetch?: FetchLike } = {}) {
     s.app.request(`/api/machine/done/${stepId}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${machine.token}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ status, sessionId: 'builder-session', hasChanges: true }),
+      body: JSON.stringify({
+        status,
+        sessionId: 'builder-session',
+        hasChanges: true,
+        generation: claimedGeneration(s.db, stepId),
+      }),
     });
   return { s, send, face, finish };
 }
@@ -442,7 +447,7 @@ test.each(['success', 'stopped', 'manual', 'local'] as const)(
     const machineId = w.s.db.select().from(step).where(eq(step.id, 'running')).get()!.machineId;
     w.s.db
       .update(step)
-      .set({ status: 'claimed', machineId, sessionId: 'builder-session' })
+      .set({ status: 'claimed', machineId, sessionId: 'builder-session', claimedAt: 3 })
       .where(eq(step.id, next.id))
       .run();
     w.s.db.update(todo).set({ phase: 'building' }).where(eq(todo.id, 'task')).run();

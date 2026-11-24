@@ -5,12 +5,20 @@ import type {
   ProviderConfig,
   SecretSurface,
 } from '@cairn/shared';
-import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
+import {
+  GITHUB_ACCESS_TOKEN_USERNAME,
+  GITHUB_REPOSITORY_RENAMED,
+  isBackendRuntimeId,
+  isBuildStepKind,
+  isInfoOutput,
+  parseGithubRepoRef,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, step, todo } from '../db/schema.js';
-import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
+import { HttpError } from '../lib/errors.js';
+import { type AppTokenReason, githubAppTokenExpiry } from '../lib/github-token.js';
 import { materializeCodexAccessToken } from './codex-device-login.js';
 import type { StepCredentialBundle } from './credentials.js';
 import {
@@ -18,8 +26,9 @@ import {
   resolveChiefStepCredentials,
   resolveStepCredentials,
 } from './credentials.js';
-import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { autonomousToken, softwareCommitIdentity } from './github-autonomous-token.js';
+import { projectOfTodo } from './git.js';
+import { appTokenOrNull } from './github-app-token.js';
+import { softwareCommitIdentity } from './github-autonomous-token.js';
 import { stepMcpGrant } from './machine-claim.js';
 import {
   isChiefConversation,
@@ -56,12 +65,56 @@ export async function stepToken(
   deps: MachineDeps,
   machineId: string,
   stepId: string,
+  generation?: number,
   surface: SecretSurface = 'host',
-  opts?: { forceGithubRefresh?: boolean },
+  refresh = false,
 ): Promise<MachineTokenResponse> {
   const owned = ownedStepRow(deps, machineId, stepId);
-  if (isChiefConversation(owned.buildId))
-    return chiefStepToken(deps, stepId, owned.buildId, owned.status === 'claimed');
+  fenceClaimSnapshot(owned, generation);
+  const response = isChiefConversation(owned.buildId)
+    ? await chiefStepToken(deps, stepId, owned.buildId, true)
+    : await workerStepToken(deps, machineId, stepId, surface, owned, refresh);
+  fenceLiveClaim(deps, machineId, stepId, generation);
+  return response;
+}
+
+function fenceClaimSnapshot(
+  owned: ReturnType<typeof ownedStepRow>,
+  generation: number | undefined,
+): void {
+  if (owned.status !== 'claimed' || generation === undefined || owned.claimedAt !== generation)
+    throw new HttpError(409, 'step claim no longer matches this runner', 'claim-moved');
+}
+
+function fenceLiveClaim(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  generation: number | undefined,
+): void {
+  const current = deps.db
+    .select({ status: step.status, machineId: step.machineId, claimedAt: step.claimedAt })
+    .from(step)
+    .where(eq(step.id, stepId))
+    .get();
+  if (
+    current === undefined ||
+    current.status !== 'claimed' ||
+    current.machineId !== machineId ||
+    generation === undefined ||
+    current.claimedAt !== generation
+  )
+    throw new HttpError(409, 'step claim no longer matches this runner', 'claim-moved');
+}
+
+async function workerStepToken(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  surface: SecretSurface,
+  owned: ReturnType<typeof ownedStepRow>,
+  refresh: boolean,
+): Promise<MachineTokenResponse> {
   const bundle = resolveStepCredentials({ db: deps.db, box: deps.box }, stepId);
   const stepRow = deps.db.select().from(step).where(eq(step.id, stepId)).get();
   const buildRow = stepRow
@@ -73,36 +126,80 @@ export async function stepToken(
   const agentRow =
     stepRow && todoRow ? profileForStep(deps, todoRow, stepRow.kind, stepRow.id) : null;
   const projectRow = todoRow ? projectOfTodo(deps.db, todoRow) : undefined;
+  const pinnedRepo =
+    stepRow?.claimedRepo === null || stepRow?.claimedRepo === undefined
+      ? null
+      : parseGithubRepoRef(stepRow.claimedRepo);
+  const pinnedRepoId = stepRow?.claimedRepoId ?? null;
+  const infoCard =
+    stepRow !== undefined && todoRow !== undefined
+      ? isBuildStepKind(stepRow.kind) && isInfoOutput(todoRow.output)
+      : false;
   let git: GitCredentials | null = null;
-  if (projectRow?.repoKind === 'hosted' && todoRow && owned.status === 'claimed') {
+  if (
+    !infoCard &&
+    pinnedRepo === null &&
+    projectRow?.repoKind === 'hosted' &&
+    todoRow &&
+    owned.status === 'claimed'
+  ) {
     git = issueStepGitCredential(deps, {
       teamId: todoRow.teamId,
       stepId,
       claimedAt: owned.claimedAt,
     });
-  } else if (projectRow?.repoKind === 'github' && todoRow && owned.status === 'claimed') {
-    const ref = githubRepoOfProject(projectRow);
-    const forceUserRefresh =
-      opts?.forceGithubRefresh === true && admitForceGithubRefresh(deps.db, todoRow.teamId);
-    const githubToken =
-      ref === null
-        ? null
-        : await autonomousToken(deps, todoRow.teamId, ref, true, 50 * 60_000, {
-            forceUserRefresh,
-          });
-    console.info('github step credential', {
-      stepId,
-      kind: githubToken === null ? 'none' : isAppToken(githubToken) ? 'app' : 'unattributed',
-    });
-    git =
-      githubToken !== null
-        ? {
-            username: GITHUB_ACCESS_TOKEN_USERNAME,
-            password: githubToken,
-            kind: isAppToken(githubToken) ? 'app' : 'unattributed',
-            ...(isAppToken(githubToken) ? { expiresAt: githubAppTokenExpiry(githubToken) } : {}),
-          }
-        : null;
+  } else if (
+    !infoCard &&
+    (pinnedRepo !== null || projectRow?.repoKind === 'github') &&
+    todoRow &&
+    owned.status === 'claimed'
+  ) {
+    if (pinnedRepo === null) {
+      throw new HttpError(503, 'github step claim has no repository pin', 'claim-pin-missing');
+    }
+    if (pinnedRepoId === null) {
+      throw new HttpError(
+        503,
+        'github step claim could not resolve a repository id pin',
+        'claim-pin-unresolved',
+      );
+    }
+    const ref = { ...pinnedRepo, repositoryId: pinnedRepoId };
+    const mintFailure: { reason: AppTokenReason } = { reason: 'app-token-unavailable' };
+    const appToken = await appTokenOrNull(
+      {
+        config: {
+          githubAppTokenSocket:
+            deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket,
+        },
+        ...(deps.githubFetch ? { fetchImpl: deps.githubFetch } : {}),
+        onReason: (failure) => {
+          mintFailure.reason = failure.reason;
+        },
+      },
+      ref,
+      refresh,
+      50 * 60_000,
+      'runner',
+    );
+    if (appToken === null) {
+      const { reason } = mintFailure;
+      throw new HttpError(
+        503,
+        reason === GITHUB_REPOSITORY_RENAMED.reason
+          ? GITHUB_REPOSITORY_RENAMED.message
+          : 'github app credential unavailable for the claimed step',
+        reason,
+      );
+    }
+    console.info('github step credential', { stepId, kind: 'app' });
+    const expiresAt = githubAppTokenExpiry(appToken);
+    git = {
+      username: GITHUB_ACCESS_TOKEN_USERNAME,
+      password: appToken,
+      kind: 'app',
+      ...(expiresAt !== undefined ? { expiresAt } : {}),
+    };
   }
   const provider = await dispatchProvider(
     deps,
@@ -135,20 +232,7 @@ export async function stepToken(
   };
 }
 
-type ClaimedStepRow = Pick<typeof step.$inferSelect, 'id' | 'machineId' | 'claimedAt' | 'mcpGrant'>;
-
-function stillClaimedBy(deps: MachineDeps, claimed: ClaimedStepRow): boolean {
-  const current = deps.db
-    .select({ status: step.status, machineId: step.machineId, claimedAt: step.claimedAt })
-    .from(step)
-    .where(eq(step.id, claimed.id))
-    .get();
-  return (
-    current?.status === 'claimed' &&
-    current.machineId === claimed.machineId &&
-    current.claimedAt === claimed.claimedAt
-  );
-}
+type ClaimedStepRow = Pick<typeof step.$inferSelect, 'machineId' | 'mcpGrant'>;
 
 async function connectorFields(
   deps: MachineDeps,

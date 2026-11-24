@@ -6,9 +6,10 @@ import { expect, onTestFinished, test } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import * as schema from '../src/db/schema.js';
 import { build, message, step, todo } from '../src/db/schema.js';
-import { finishStep } from '../src/services/machines.js';
+
 import {
   bootServer,
+  finishStepForClaim,
   insertBuildIntoOldSchema,
   insertMachineIntoOldSchema,
   insertStepIntoOldSchema,
@@ -87,7 +88,7 @@ test('an upgrade stops only active retired research steps and discards their lat
   const stopped = s.db.select().from(step).all();
   const messages = s.db.select().from(message).all();
   for (const id of ['research-0-claimed', 'research-1-claimed']) {
-    await finishStep(
+    await finishStepForClaim(
       { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
       machineId,
       id,

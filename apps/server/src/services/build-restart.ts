@@ -30,6 +30,7 @@ import { claimClientMessage, completeClientMessage } from './client-message.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import {
   assertAutomaticRetryAllowed,
+  assertPermanentRefusalCleared,
   retryIsParked,
   UNKNOWN_RETRY_LIMIT,
 } from './retry-parking.js';
@@ -119,11 +120,18 @@ export async function restartFailedBuild(
       );
     todoRecord = current;
     if (origin === 'retry') assertAutomaticRetryAllowed(deps, current.id);
-    else assertParkedBuildIdle(deps, row);
+    else {
+      const liveBuild = deps.db.select().from(build).where(eq(build.id, row.id)).get() ?? row;
+      if (origin !== 'person') assertPermanentRefusalCleared(liveBuild.errorMessage);
+      assertParkedBuildIdle(deps, liveBuild);
+    }
     rewatchCreatingThread(deps, current);
     if (reworkTarget !== null && prClosed === null) {
       const currentTarget = deps.db.select().from(build).where(eq(build.id, reworkTarget.id)).get();
-      if (currentTarget) assertParkedBuildIdle(deps, currentTarget);
+      if (currentTarget) {
+        if (origin !== 'person') assertPermanentRefusalCleared(currentTarget.errorMessage);
+        assertParkedBuildIdle(deps, currentTarget);
+      }
       if (hasActiveStep(deps, reworkTarget.id))
         throw new HttpError(409, 'Wait for active steps to finish before restarting this build.');
       const now = nowMs();

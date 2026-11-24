@@ -19,6 +19,7 @@ import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
 import type { TestServer } from './helpers.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   req,
@@ -123,7 +124,11 @@ async function finishBuild(w: World): Promise<string> {
   expect(claimed).not.toBeNull();
   const done = await call(w.s.app, 'POST', `/api/machine/done/${claimed?.step.id}`, {
     cred: w.token,
-    body: { status: 'success', sessionId: 'previous-session' },
+    body: {
+      status: 'success',
+      sessionId: 'previous-session',
+      generation: claimedGeneration(w.s.db, claimed?.step.id ?? ''),
+    },
   });
   expect(done.status).toBe(200);
   const finished = await req(w.s.app, 'PATCH', `/api/todos/${w.todoId}`, { phase: 'done' });
@@ -646,7 +651,7 @@ describe('the steer server write surface (W3 #278)', () => {
     ).json()) as { steerSentAt?: number };
     await call(w.s.app, 'POST', `/api/machine/done/${oldStepId}`, {
       cred: w.token,
-      body: { status: 'success' },
+      body: { status: 'success', generation: claimedGeneration(w.s.db, oldStepId) },
     });
     await req(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { action: 'confirm' });
     const next = await w.claim();
@@ -671,7 +676,7 @@ describe('the steer server write surface (W3 #278)', () => {
     await req(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, { content: '旧步的补充' });
     await call(w.s.app, 'POST', `/api/machine/done/${oldStepId}`, {
       cred: w.token,
-      body: { status: 'success' },
+      body: { status: 'success', generation: claimedGeneration(w.s.db, oldStepId) },
     });
     await req(w.s.app, 'POST', `/api/builds/${buildId}/steps`, { action: 'confirm' });
     const next = await w.claim();

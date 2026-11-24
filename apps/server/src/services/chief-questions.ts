@@ -12,6 +12,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { Db } from '../db/client.js';
+import type { CommitEffects } from '../db/commit-effects.js';
 import { chief, chiefThread } from '../db/schema.js';
 import { HttpError, parseWith } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
@@ -29,7 +30,7 @@ import { notifyChiefMessage } from './notifications.js';
 import { pushToUserSafely, type VapidKeys } from './push.js';
 import { coordinatorProfile } from './routing-rules.js';
 
-export interface ChiefQuestionDeps {
+export interface ChiefQuestionDeps extends CommitEffects {
   db: Db;
   hub?: TeamStreamHub;
   convHub?: ConversationStreamHub;
@@ -93,7 +94,7 @@ function notifyQuestion(
       : deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   const agentRow = chiefRow === undefined ? null : coordinatorProfile(deps.db, chiefRow.teamId);
   notifyChiefMessage(
-    { db: deps.db, hub: deps.hub, user: deps.user },
+    { ...deps, hub: deps.hub, user: deps.user },
     {
       threadId,
       message: questions[0]?.question ?? '',
@@ -122,12 +123,20 @@ function pushQuestion(
     const options = q.options.map((o) => o.label).join(' / ');
     return options.length > 0 ? `${q.question}（${options}）` : q.question;
   });
-  pushToUserSafely(deps.db, deps.vapidKeys ?? null, deps.user.id, teamId, {
-    title: '需要你决定',
-    body: questionLines.join('\n'),
-    href: `/app?chief=${encodeURIComponent(threadId)}`,
-    tag: `${deps.user.id}:${requestId}`,
-  });
+  pushToUserSafely(
+    deps.db,
+    deps.vapidKeys ?? null,
+    deps.user.id,
+    teamId,
+    {
+      title: '需要你决定',
+      body: questionLines.join('\n'),
+      href: `/app?chief=${encodeURIComponent(threadId)}`,
+      tag: `${deps.user.id}:${requestId}`,
+    },
+    undefined,
+    deps,
+  );
 }
 
 export function announceQuestion(

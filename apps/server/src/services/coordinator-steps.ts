@@ -25,6 +25,7 @@ import {
   sql,
 } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { runAfterCommit } from '../db/commit-effects.js';
 import {
   chiefMessage,
   chiefThread,
@@ -106,8 +107,8 @@ export function claimPendingChiefStep(
       ? { runtime: 'claude-code' as const, teamId: options.bind }
       : (options.bind ?? null);
   if (options.model?.provider === 'antigravity' && bind?.runtime !== 'antigravity') return null;
-  const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
   const claimed = db.transaction(() => {
+    const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
     if (options.stillAuthorized !== undefined && !options.stillAuthorized()) return null;
     const antigravitySubscriptionId =
       bind?.runtime === 'antigravity'
@@ -151,6 +152,9 @@ export function claimPendingChiefStep(
           eq(step.id, stepRow.id),
           eq(step.status, 'pending'),
           or(isNull(step.holdUntil), lte(step.holdUntil, claimedAt)),
+          stepRow.claimedAt === null
+            ? isNull(step.claimedAt)
+            : eq(step.claimedAt, stepRow.claimedAt),
           notInArray(
             step.id,
             db
@@ -488,7 +492,10 @@ export function finishCoordinatorTurn(
   const { db } = deps;
   try {
     const teamId = stepTeamId(deps, stepRow);
-    if (teamId !== null) sealCoordinatorTurnSnapshot(db, stepRow, teamId, outcome.status, nowMs());
+    if (teamId !== null)
+      runAfterCommit(deps, 'sealCoordinatorTurnSnapshot', () =>
+        sealCoordinatorTurnSnapshot(db, stepRow, teamId, outcome.status, nowMs()),
+      );
   } catch {}
   const provenance = turnProvenance(stepRow.prompt);
   const reportedSessionId =
@@ -546,8 +553,11 @@ export function finishCoordinatorTurn(
     });
   }
   const finished = db.select().from(step).where(eq(step.id, stepRow.id)).get();
-  if (finished !== undefined) imTurnFinished(finished);
-  emitRuntimeStepSpan(deps.db, stepRow.id, process.env, observation);
+  if (finished !== undefined)
+    runAfterCommit(deps, 'imTurnFinished', () => imTurnFinished(finished));
+  runAfterCommit(deps, 'emitRuntimeStepSpan', () =>
+    emitRuntimeStepSpan(db, stepRow.id, process.env, observation),
+  );
 }
 
 function turnErrorFacts(deps: MachineDeps, stepRow: StepRow) {

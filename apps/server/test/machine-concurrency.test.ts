@@ -1,5 +1,5 @@
 import { type MachineHardware, type MachineStrainReason, machineRecordSchema } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { afterAll, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
@@ -13,6 +13,7 @@ import {
 import { listSteps } from '../src/services/builds.js';
 import { listChiefThreads } from '../src/services/chief.js';
 import { claimStep, markPresence, reportActivity, reportTool } from '../src/services/machines.js';
+import { providerHealth } from '../src/services/provider-health.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import { toTodoRecord } from '../src/services/todos.js';
 import {
@@ -317,16 +318,48 @@ describe('#1108 write surface and wire contract (PATCH validation / record proje
     expect(parsed.runningSteps).toBeUndefined();
   });
 
-  test('failure mode 2b: finishStep terminal sends a team wake (free slot handover immediately)', async () => {
+  test('a rolled-back completion report does not update in-memory provider health', async () => {
     const w = await setupWorld();
-    const { stepId } = insertPendingBuildStep(w.s, w);
+    const { stepId } = pendingTask(w);
     const claimed = await claimAs(w);
     expect(claimed?.step.id).toBe(stepId);
+    w.s.db.run(sql`
+      CREATE TEMP TRIGGER abort_completion BEFORE UPDATE OF status ON step
+      WHEN NEW.status = 'done'
+      BEGIN SELECT RAISE(ABORT, 'simulated completion failure'); END
+    `);
+    const health = vi.spyOn(providerHealth, 'recordSuccess');
+    try {
+      const res = await w.s.app.request(`/api/machine/done/${stepId}`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${w.tokenA}`, 'content-type': 'application/json' },
+        body: JSON.stringify({ status: 'success', generation: claimed?.step.generation }),
+      });
+      expect(res.status).toBe(500);
+      expect(w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()?.status).toBe(
+        'claimed',
+      );
+      expect(health).not.toHaveBeenCalled();
+    } finally {
+      health.mockRestore();
+    }
+  });
+
+  test('failure mode 2b: finishStep terminal sends a team wake (free slot handover immediately)', async () => {
+    const w = await setupWorld();
+    const { stepId, todoId } = pendingTask(w);
+    const claimed = await claimAs(w);
+    expect(claimed?.step).toMatchObject({ id: stepId, generation: expect.any(Number) });
+    expect(todoRowOf(w, todoId).phase).toBe('building');
     const wake = vi.spyOn(w.s.machineHub, 'wake');
     const res = await w.s.app.request(`/api/machine/done/${stepId}`, {
       method: 'POST',
       headers: { authorization: `Bearer ${w.tokenA}`, 'content-type': 'application/json' },
-      body: JSON.stringify({ status: 'success', sessionId: 'sess-cap' }),
+      body: JSON.stringify({
+        status: 'success',
+        sessionId: 'sess-cap',
+        generation: claimed?.step.generation,
+      }),
     });
     expect(res.status).toBe(200);
     expect(wake).toHaveBeenCalledWith(w.s.team.id);

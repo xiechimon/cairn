@@ -123,7 +123,8 @@ function credentialsOf(s: TestServer, machineId: string, stepId: string) {
     .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
     .where(eq(machineTable.id, machineId))
     .run();
-  return s.app.request(`/api/machine/token/${stepId}`, {
+  const generation = stepRow(s, stepId)?.claimedAt;
+  return s.app.request(`/api/machine/token/${stepId}?generation=${generation}`, {
     headers: { authorization: `Bearer ${machineToken}` },
   });
 }
@@ -218,8 +219,8 @@ describe('claimStep and the Devin subscription', () => {
     for (const status of ['done', 'failed', 'stopped', 'waiting_quota', 'pending'] as const) {
       s.db.update(stepTable).set({ status }).where(eq(stepTable.id, stepId)).run();
       const finished = await credentialsOf(s, machineId, stepId);
-      expect(finished.status).toBe(200);
-      const finishedBody = machineTokenResponseSchema.parse(await finished.json());
+      expect(finished.status).toBe(409);
+      const finishedBody = await finished.json();
       expect(finishedBody).not.toHaveProperty('devinToken');
       expect(JSON.stringify(finishedBody)).not.toContain(token);
     }

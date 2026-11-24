@@ -24,6 +24,7 @@ import { queueTaskMessage, readQueuedMessages } from '../src/services/task-messa
 import { getTodo } from '../src/services/todos.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   seedRoute,
@@ -111,7 +112,10 @@ async function setupWorld() {
     },
 
     async done(stepId: string, body: Record<string, unknown>): Promise<void> {
-      const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+      const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+        cred: token,
+        body: { generation: claimedGeneration(s.db, stepId), ...body },
+      });
       expect(res.status).toBe(200);
     },
 
@@ -242,16 +246,30 @@ describe('#1791 server auto-confirm after plan step', () => {
 
   test('a confirmation that throws at delivery leaves the plan at confirm for the next sweep', async () => {
     const w = await setupWorld();
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const stepPublished = vi.spyOn(w.s.convHub, 'publishStep');
+    const publish = w.s.hub.publishTodoDoc.bind(w.s.hub);
+    const publishError = new Error('publish failed');
+    const failing = vi.spyOn(w.s.hub, 'publishTodoDoc').mockImplementation((teamId, record) => {
+      if (record.phase === 'building') throw publishError;
+      publish(teamId, record);
+    });
     try {
       const buildId = w.startBuild();
       const planStep = await w.claim();
       await w.uploadPlan(planStep.step.id, GOOD_PLAN);
-      const publish = w.s.hub.publishTodoDoc.bind(w.s.hub);
-      const failing = vi.spyOn(w.s.hub, 'publishTodoDoc').mockImplementation((teamId, record) => {
-        if (record.phase === 'building') throw new Error('publish failed');
-        publish(teamId, record);
-      });
       await w.done(planStep.step.id, { status: 'success' });
+      expect(log).toHaveBeenCalledWith('post-commit effect failed', {
+        effect: 'confirmDeliveredPlan',
+        error: publishError,
+      });
+      expect(
+        w.s.db.select().from(stepTable).where(eq(stepTable.id, planStep.step.id)).get()?.status,
+      ).toBe('done');
+      expect(stepPublished).toHaveBeenCalledWith(
+        buildId,
+        expect.objectContaining({ id: planStep.step.id, status: 'done' }),
+      );
       failing.mockRestore();
       expect(w.todoRow().phase).toBe('confirm');
       const buildSteps = () =>
@@ -269,6 +287,9 @@ describe('#1791 server auto-confirm after plan step', () => {
       expect(w.todoRow().phase).toBe('building');
       expect(buildSteps()).toHaveLength(1);
     } finally {
+      failing.mockRestore();
+      stepPublished.mockRestore();
+      log.mockRestore();
       w.s.dispose();
     }
   });

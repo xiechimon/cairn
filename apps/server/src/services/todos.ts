@@ -80,7 +80,7 @@ import {
   settleEffectRow,
 } from './external-effects.js';
 import { githubRepoOfProject, projectOfTodo } from './git.js';
-import { autonomousToken } from './github-autonomous-token.js';
+import { autonomousToken, githubReadToken } from './github-autonomous-token.js';
 import { hasGithubConnection, userTokenOrNull } from './github-connection.js';
 import {
   assertGithubLabelsInProject,
@@ -1215,7 +1215,7 @@ async function probeSelfIssueCreated(
 ): Promise<EffectProbeVerdict> {
   const p = selfIssuePayloadOf(effectRow);
   if (p === null) return { verdict: 'unknown' };
-  const token = await autonomousToken(deps, effectRow.teamId, { owner: p.owner, repo: p.repo });
+  const token = await githubReadToken(deps, effectRow.teamId, { owner: p.owner, repo: p.repo });
   if (token === null) return { verdict: 'unknown' };
   const marker = selfIssueMarker(p.todoId);
   for (let page = 1; ; page += 1) {

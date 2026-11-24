@@ -9,6 +9,7 @@ import {
   type RetryReasonCode,
   runtimeUpdateRequired,
   UNSTARTED_STEP_STATUSES,
+  WORKFLOW_PUSH_REFUSAL,
 } from '@cairn/shared';
 import { and, eq, gt, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -62,11 +63,27 @@ export {
   UNKNOWN_RETRY_WINDOW_MS,
 } from './retry-policy.js';
 
+function workflowPushRefused(error: string): boolean {
+  return (
+    error === WORKFLOW_PUSH_REFUSAL ||
+    (error.startsWith(RETRY_PARKED_MARK) && error.endsWith(`Last error: ${WORKFLOW_PUSH_REFUSAL}`))
+  );
+}
+
+export function automaticRestartBlocked(error: string): boolean {
+  return workflowPushRefused(error) || retryIsParked(error);
+}
+
+export function assertPermanentRefusalCleared(error: string | null): void {
+  if (error !== null && workflowPushRefused(error)) throw new HttpError(409, WORKFLOW_PUSH_REFUSAL);
+}
+
 export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): void {
   const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
   if (!row?.latestBuildId) return;
   if (row.phase === 'failed') parkFailedBuild(deps, row.latestBuildId);
   const latest = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  assertPermanentRefusalCleared(latest?.errorMessage ?? null);
   if (latest && (latest.retryParkReason != null || retryIsParked(latest.errorMessage ?? ''))) {
     const update = runtimeUpdateRequired(latest.errorMessage ?? '');
     throw new HttpError(
@@ -187,7 +204,7 @@ function formatParkedMessage(input: {
 
 export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs()): boolean {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  if (!row) return false;
+  if (!row || workflowPushRefused(row.errorMessage ?? '')) return false;
   const owner = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!owner || owner.latestBuildId !== buildId || owner.archivedAt !== null) return false;
   const failures = deps.db

@@ -18,6 +18,7 @@ import { sendChiefMessage } from '../src/services/chief.js';
 import { providerHealth } from '../src/services/provider-health.js';
 import {
   bootServer,
+  claimedGeneration,
   insertClaudeSubscription,
   issueApiKey,
   seedRoute,
@@ -142,7 +143,10 @@ async function setupWorld(fallbackModels: { provider: string; modelId: string }[
       return body.step ? claimedStepSchema.parse(body.step) : null;
     },
     async done(stepId: string, body: Record<string, unknown>): Promise<void> {
-      const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+      const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+        cred: token,
+        body: { generation: claimedGeneration(s.db, stepId), ...body },
+      });
       expect(res.status).toBe(200);
     },
     async relay(stepId: string, name: string, params: Record<string, unknown>) {

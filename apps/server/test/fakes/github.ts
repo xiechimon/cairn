@@ -50,6 +50,7 @@ export interface GateAnswers {
 }
 
 interface GithubFakeOptions {
+  repositoryId?: number;
   issues?: RawIssue[];
   events?: RawEvent[];
   permissions?: Array<[string, GhResponse]>;
@@ -151,6 +152,8 @@ export function githubFake(repo: string, options: GithubFakeOptions = {}) {
 
   function resolve(url: URL, headers: Record<string, string>): GhResponse {
     const path = url.pathname.toLowerCase();
+    if (path === base && options.repositoryId !== undefined)
+      return { body: { id: options.repositoryId, full_name: repo } };
     if (path === `${base}/issues`) {
       const wanted = (url.searchParams.get('labels') ?? '')
         .split(',')

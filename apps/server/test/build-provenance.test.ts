@@ -161,7 +161,7 @@ describe('#1513 build provenance and human feedback', () => {
       )!;
       w.s.db
         .update(step)
-        .set({ status: 'claimed', machineId: machineRow.id })
+        .set({ status: 'claimed', machineId: machineRow.id, claimedAt: Date.now() })
         .where(eq(step.id, w.stepId))
         .run();
       const send = (stepId: string, body: unknown) =>
@@ -196,6 +196,7 @@ describe('#1513 build provenance and human feedback', () => {
         kind: 'build' as const,
         status: 'claimed' as const,
         machineId: machineRow.id,
+        claimedAt: Date.now(),
         createdAt: Date.now() + 1,
       };
       w.s.db.insert(step).values(later).run();

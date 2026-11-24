@@ -32,6 +32,7 @@ import {
 } from '../src/db/schema.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   seedPolicy,
@@ -420,7 +421,12 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     });
     expect(machineOkResponseSchema.parse(await toolRes.json())).toEqual({ ok: true });
 
-    const tokenRes = await call(w.s.app, 'GET', `/api/machine/token/${stepId}`, cred);
+    const tokenRes = await call(
+      w.s.app,
+      'GET',
+      `/api/machine/token/${stepId}?generation=${claimed.step.generation}`,
+      cred,
+    );
     const token = machineTokenResponseSchema.parse(await tokenRes.json());
     expect(token.provider).toMatchObject({
       kind: 'http',
@@ -501,6 +507,7 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
           { model: 'stub-gw/stub-model', input: 12, output: 980, cacheRead: 100, cacheWrite: 50 },
         ],
         hasChanges: true,
+        generation: claimedGeneration(w.s.db, stepId),
       },
     });
     expect(machineOkResponseSchema.parse(await doneRes.json())).toEqual({ ok: true });
@@ -539,6 +546,7 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
         sessionId: 'pi-session-1',
         hasChanges: true,
         commit: 'a'.repeat(40),
+        generation: claimedGeneration(w.s.db, step2.step.id),
       },
     });
     expect(todoNow().phase).toBe('done');
@@ -553,7 +561,11 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     expect(step3.session.action).toBe('continue');
     await call(w.s.app, 'POST', `/api/machine/done/${step3.step.id}`, {
       ...cred,
-      body: { status: 'success', sessionId: 'pi-session-1' },
+      body: {
+        status: 'success',
+        sessionId: 'pi-session-1',
+        generation: claimedGeneration(w.s.db, step3.step.id),
+      },
     });
     expect(todoNow().phase).toBe('done');
     expect(w.s.db.select().from(tokenUsage).all()).toHaveLength(1);
@@ -566,7 +578,11 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     const claimed = claimedStepSchema.parse(body.step);
     const res = await call(w.s.app, 'POST', `/api/machine/done/${claimed.step.id}`, {
       cred: w.token,
-      body: { status: 'failed', errorMessage: '模型连接失败' },
+      body: {
+        status: 'failed',
+        errorMessage: '模型连接失败',
+        generation: claimedGeneration(w.s.db, claimed.step.id),
+      },
     });
     expect(res.status).toBe(200);
     const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, w.todoId)).get()!;
@@ -612,14 +628,20 @@ describe('step journal full chain (02 section 5.4 vocabulary + section 4.2 main 
     ]);
     await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, {
       cred: w.token,
-      body: { status: 'failed', errorMessage: 'daemon lost' },
+      body: {
+        status: 'failed',
+        errorMessage: 'daemon lost',
+        generation: claimedGeneration(w.s.db, stepId),
+      },
     });
     expect(rows().map((row) => [row.id, row.task.status])).toEqual([
       [`bg-${stepId}-t1`, 'orphaned'],
       [`bg-${stepId}-t2`, 'done'],
     ]);
-    await report({ taskId: 't3', description: 'late retry', status: 'running' });
-    expect(rows().find((row) => row.id === `bg-${stepId}-t3`)?.task.status).toBe('orphaned');
+    expect(
+      (await report({ taskId: 't3', description: 'late retry', status: 'running' })).status,
+    ).toBe(409);
+    expect(rows().find((row) => row.id === `bg-${stepId}-t3`)).toBeUndefined();
   });
 
   test('stopping one background task signals the computer running its step; a settled task or a disconnected computer is 409', async () => {

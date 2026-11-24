@@ -10,7 +10,14 @@ import {
   ConversationStreamHub,
   type TeamStreamConnection,
 } from '../src/services/events.js';
-import { bootServer, issueApiKey, machineIdByName, openConvStream, seedRoute } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  machineIdByName,
+  openConvStream,
+  seedRoute,
+} from './helpers.js';
 
 class FakeConn implements TeamStreamConnection {
   readonly frames: object[] = [];
@@ -347,7 +354,7 @@ describe('chief wire surface: mid-way entry catch-up (#740 ticket symptom path)'
       }
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
-        body: { status: 'success' },
+        body: { status: 'success', generation: claimedGeneration(s.db, stepId) },
       });
       expect(doneRes.status).toBe(200);
       const after = await openConvStream(s.app, threadId);
@@ -371,7 +378,7 @@ describe('chief wire surface: mid-way entry catch-up (#740 ticket symptom path)'
     try {
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
-        body: { status: 'success' },
+        body: { status: 'success', generation: claimedGeneration(s.db, stepId) },
       });
       expect(doneRes.status).toBe(200);
       s.convHub.publishTextDelta(threadId, '死回合残段');

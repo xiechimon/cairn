@@ -46,6 +46,7 @@ import { openMailPassword } from './secrets.js';
 
 export interface ConnectorBrokerDeps {
   db: Db;
+  assertClaim?: () => void;
   mcp: McpConnectorDeps;
   hub?: TeamStreamHub;
   convHub?: ConversationStreamHub;
@@ -424,6 +425,7 @@ function mailSendPayloadOf(row: EffectRow): MailSendPayload | null {
 }
 
 async function sendMailEffect(deps: ConnectorBrokerDeps, effectRow: EffectRow): Promise<unknown> {
+  deps.assertClaim?.();
   const p = mailSendPayloadOf(effectRow);
   if (p === null) throw failEffect('mail-send payload is malformed');
   const account = deps.db

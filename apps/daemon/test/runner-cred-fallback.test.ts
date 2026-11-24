@@ -19,7 +19,7 @@ import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import { gitPrim } from '../src/git.js';
 import { StepJournal } from '../src/journal.js';
 import type { DaemonLogger } from '../src/log.js';
-import type { MachineApi } from '../src/machine-client.js';
+import { type MachineApi, MachineApiError } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
 import { WorkspaceManager } from '../src/workspace.js';
@@ -90,6 +90,7 @@ class FakeClient implements MachineApi {
   sessionUploads: string[] = [];
   git: GitCredentials | null = null;
   replacement: GitCredentials | null = null;
+  refreshError: MachineApiError | undefined;
   tokenExtras: Record<string, unknown> = {};
 
   async enroll(): Promise<never> {
@@ -113,8 +114,9 @@ class FakeClient implements MachineApi {
   async relayTool() {
     return '{}';
   }
-  async token() {
+  async token(_stepId: string, _generation: number | undefined, opts?: { refresh?: boolean }) {
     this.calls.push('token');
+    if (opts?.refresh && this.refreshError !== undefined) throw this.refreshError;
     return {
       provider: {
         kind: 'http' as const,
@@ -270,6 +272,7 @@ async function setup(
     echo?: string;
     sessionText?: string;
     replacement?: GitCredentials;
+    refreshError?: MachineApiError;
     hookNotes?: WorkspaceHookNoteData[];
     now?: () => number;
     tokenExtras?: Record<string, unknown>;
@@ -285,6 +288,7 @@ async function setup(
   const client = new FakeClient();
   client.git = opts.git ?? null;
   client.replacement = opts.replacement ?? null;
+  client.refreshError = opts.refreshError;
   client.tokenExtras = opts.tokenExtras ?? {};
   const journal = new StepJournal(paths.outboxDir);
   mkdirSync(join(home, 'workspaces'), { recursive: true });
@@ -627,6 +631,70 @@ test.each(['auth', 'age', 'twice'] as const)(
     ).toBe(false);
   },
 );
+
+test.each(['auth', 'age'] as const)(
+  'reports a required App credential refresh 503 without retrying settlement: %s',
+  async (scenario) => {
+    let clock = 1000;
+    const workspace = fakeWorkspace({
+      currentBranch: 'cairn/conv-conv-1',
+      pushWithToken: async () => {
+        throw new Error(MEA_AUTH_FAILURE);
+      },
+    });
+    const { client } = await setup(
+      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+      {
+        git: { ...GITHUB_TOKEN, kind: 'app' },
+        workspace,
+        refreshError: new MachineApiError(503, '{"error":"fixture mint unavailable"}'),
+        now: () => clock,
+        onSession: () => {
+          if (scenario === 'age') clock += 51 * 60000;
+        },
+      },
+    );
+    expect(client.doneBodies).toHaveLength(1);
+    expect(client.doneBodies[0]?.body).toMatchObject({
+      status: 'failed',
+      errorMessage: 'GitHub App token service unavailable',
+    });
+    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
+    expect(workspace.pushes).toHaveLength(scenario === 'auth' ? 1 : 0);
+    expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
+  },
+);
+
+test('a background credential refresh 503 leaves the running step and its current token intact', async () => {
+  vi.useFakeTimers();
+  try {
+    const workspace = fakeWorkspace({});
+    const { client, lines } = await setup(
+      claimedStep(
+        'build',
+        { kind: 'github', cloneUrl: 'https://github.com/o/r.git' },
+        { tools: [] },
+      ),
+      {
+        git: { ...GITHUB_TOKEN, kind: 'app', expiresAt: Date.now() + 16 * 60000 },
+        workspace,
+        refreshError: new MachineApiError(503, '{"error":"fixture mint unavailable"}'),
+        onSession: async (opts) => {
+          await vi.advanceTimersByTimeAsync(2 * 60000);
+          expect(readFileSync(opts.env?.CAIRN_GIT_CRED_FILE ?? '', 'utf8')).toBe(
+            GITHUB_TOKEN.password,
+          );
+        },
+      },
+    );
+    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
+    expect(client.doneBodies[0]?.body.status).toBe('success');
+    expect(lines.some((line) => line.includes('timer refresh failed'))).toBe(true);
+    expect(workspace.pushes).toHaveLength(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 test('App agent environment uses the step private credential files and cleanup erases them', async () => {
   let files: string[] = [];

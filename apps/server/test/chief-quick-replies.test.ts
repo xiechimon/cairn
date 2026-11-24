@@ -15,7 +15,14 @@ import { createCoordinatorServerApi } from '../src/coordinator/server-api.js';
 import { chiefMessage } from '../src/db/schema.js';
 import { enqueueChiefStep } from '../src/services/chief.js';
 import { chiefRemoteTools } from '../src/services/routing-rules.js';
-import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  machineIdByName,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 import { seedOwnerMessage } from './owner-message.js';
 
 async function call(
@@ -135,6 +142,7 @@ async function setup(): Promise<World> {
           ...(extra?.skillInjectionFacts !== undefined
             ? { skillInjectionFacts: extra.skillInjectionFacts }
             : {}),
+          generation: claimedGeneration(s.db, stepId),
         },
       });
       expect(doneRes.status).toBe(200);

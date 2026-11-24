@@ -48,12 +48,18 @@ function setCapabilities(capabilities: MachineCapabilities | null): void {
   s.db.update(machineTable).set({ capabilities }).where(eq(machineTable.id, machineId)).run();
 }
 
+const GENERATION = 7;
+
 function setStatus(status: 'claimed' | 'done'): void {
-  s.db.update(stepTable).set({ status, machineId }).where(eq(stepTable.id, stepId)).run();
+  s.db
+    .update(stepTable)
+    .set({ status, machineId, claimedAt: GENERATION })
+    .where(eq(stepTable.id, stepId))
+    .run();
 }
 
 const token = (surface?: 'orb' | 'host'): Promise<MachineTokenResponse> =>
-  stepToken(machineDeps(), machineId, stepId, surface);
+  stepToken(machineDeps(), machineId, stepId, GENERATION, surface);
 
 beforeEach(async () => {
   s = bootServer();
@@ -107,7 +113,6 @@ describe('secret gateway token rule', () => {
     ['no gateway capability', 'orb', { ...GATEWAY, secretGateway: undefined }, 'claimed'],
     ['a host executor', 'orb', { ...GATEWAY, executor: 'host' }, 'claimed'],
     ['no reported capabilities', 'orb', null, 'claimed'],
-    ['a step that is no longer claimed', 'orb', GATEWAY, 'done'],
   ] as const)(
     'withholds the http secret by name with %s',
     async (_label, surface, caps, status) => {
@@ -120,6 +125,11 @@ describe('secret gateway token rule', () => {
       expect(JSON.stringify(body)).not.toContain('gateway-only-value');
     },
   );
+
+  test('a step that is no longer claimed is refused outright', async () => {
+    setStatus('done');
+    await expect(token('orb')).rejects.toMatchObject({ status: 409 });
+  });
 
   test('a step kind that takes no team secrets gets neither field', async () => {
     s.db.update(stepTable).set({ kind: 'review' }).where(eq(stepTable.id, stepId)).run();

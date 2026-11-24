@@ -346,6 +346,7 @@ export async function githubBranchPulls(
 export interface GithubRepoProbe {
   reachable: boolean;
   fullName: string | null;
+  id: number | null;
 }
 
 export async function githubRepoReachable(
@@ -359,13 +360,18 @@ export async function githubRepoReachable(
     const data = (await readJson(fetchImpl, url, {
       ...API_HEADERS,
       ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
-    })) as { full_name?: unknown };
+    })) as { full_name?: unknown; id?: unknown };
     return {
       reachable: true,
       fullName: typeof data.full_name === 'string' ? data.full_name : null,
+      id:
+        typeof data.id === 'number' && Number.isSafeInteger(data.id) && data.id > 0
+          ? data.id
+          : null,
     };
   } catch (err) {
-    if (err instanceof HttpError && err.status === 404) return { reachable: false, fullName: null };
+    if (err instanceof HttpError && err.status === 404)
+      return { reachable: false, fullName: null, id: null };
     throw err;
   }
 }

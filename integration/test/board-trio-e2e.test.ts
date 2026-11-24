@@ -64,6 +64,7 @@ interface ClaimedStep {
   id: string;
   kind: string;
   buildId: string;
+  generation: number;
 }
 
 async function claimStep(token: string): Promise<ClaimedStep | null> {
@@ -78,20 +79,26 @@ type ThreadTool =
   | { name: 'open_thread'; params: { todoId: string } }
   | { name: 'message_thread'; params: { todoId: string; content: string } };
 
-async function relayThreadTool(stepId: string, token: string, tool: ThreadTool): Promise<void> {
-  const res = await machineFetch(token, 'POST', `/api/machine/tool/${stepId}`, tool);
+async function relayThreadTool(step: ClaimedStep, token: string, tool: ThreadTool): Promise<void> {
+  const res = await machineFetch(
+    token,
+    'POST',
+    `/api/machine/tool/${step.id}?generation=${step.generation}`,
+    tool,
+  );
   if (res.status !== 200)
     throw new Error(`relay ${tool.name} → ${res.status} ${JSON.stringify(res.body).slice(0, 300)}`);
 }
 
 async function doneStep(
   token: string,
-  stepId: string,
+  step: ClaimedStep,
   status: 'success' | 'failed',
   extra?: { errorMessage?: string; hasChanges?: boolean },
 ): Promise<void> {
-  const res = await machineFetch(token, 'POST', `/api/machine/done/${stepId}`, {
+  const res = await machineFetch(token, 'POST', `/api/machine/done/${step.id}`, {
     status,
+    generation: step.generation,
     ...(extra?.errorMessage !== undefined ? { errorMessage: extra.errorMessage } : {}),
     ...(extra?.hasChanges !== undefined ? { hasChanges: extra.hasChanges } : {}),
   });
@@ -110,7 +117,7 @@ async function waitForStep(
     if (step !== null) {
       if (predicate(step)) return step;
       if (step.kind === 'chief') {
-        await doneStep(token, step.id, 'success');
+        await doneStep(token, step, 'success');
         continue;
       }
       throw new Error(`claimed an unexpected step: ${JSON.stringify(step)}`);
@@ -123,8 +130,8 @@ async function waitForStep(
 
 async function runChiefDispatch(token: string, threadId: string, tool: ThreadTool): Promise<void> {
   const claimed = await waitForStep(token, (s) => s.buildId === threadId && s.kind === 'chief');
-  await relayThreadTool(claimed.id, token, tool);
-  await doneStep(token, claimed.id, 'success');
+  await relayThreadTool(claimed, token, tool);
+  await doneStep(token, claimed, 'success');
 }
 
 async function seedFailedTodo(
@@ -146,7 +153,7 @@ async function seedFailedTodo(
   if (buildId == null)
     throw new Error(`startBuilds response has no build: ${JSON.stringify(started.body)}`);
   const step = await waitForStep(claimToken, (s) => s.buildId === buildId && s.kind === 'session');
-  await doneStep(claimToken, step.id, 'failed', { errorMessage: '探针：让这一轮失败' });
+  await doneStep(claimToken, step, 'failed', { errorMessage: '探针：让这一轮失败' });
   await waitFor(() => server.todoPhase(record.id) === 'failed', 15_000);
   return record;
 }
@@ -298,7 +305,7 @@ describe('#1216 task UI reliability triple defect (real web dist + real server +
       tokens.m1,
       (s) => s.buildId === rerunBuildId && s.kind === 'session',
     );
-    await doneStep(tokens.m1, buildStep.id, 'success', { hasChanges: false });
+    await doneStep(tokens.m1, buildStep, 'success', { hasChanges: false });
     await waitFor(() => server.todoPhase(seeded.id) === 'needs_input', 15_000);
   }, 180_000);
 

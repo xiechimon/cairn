@@ -19,7 +19,12 @@ import {
   normalizeClaudeResetsAt,
 } from '@cairn/shared';
 import { z } from 'zod';
-import { type MachineApi, MachineApiError, RelayToolError } from '../machine-client.js';
+import {
+  bindMachineClaim,
+  type MachineApi,
+  MachineApiError,
+  RelayToolError,
+} from '../machine-client.js';
 import { deliverOrbBundle, type OrbLocalDelivery } from './delivery.js';
 import {
   decodeOrbFrame,
@@ -85,6 +90,7 @@ export class RelayMachineServer {
       socketPath: string;
       stepId: string;
       release: string;
+      generation?: number;
       authTimeoutMs?: number;
       onAuthenticated?: (release: string) => void;
       onStaleRelease?: (release: string) => void;
@@ -356,7 +362,12 @@ export class RelayMachineServer {
         return;
       }
       if (method === 'done' && this.delivery) await this.delivery;
-      const operation = this.options.upstream[method as (typeof ORB_STEP_METHODS)[number]];
+      const upstream = bindMachineClaim(
+        this.options.upstream,
+        this.options.stepId,
+        this.options.generation,
+      );
+      const operation = upstream[method as (typeof ORB_STEP_METHODS)[number]];
       if (typeof operation !== 'function')
         throw new RelayMachineError('Relay method is unavailable');
       if (cancellable && (method === 'relayTool' || method === 'askUser')) {
@@ -373,11 +384,16 @@ export class RelayMachineServer {
         if (this.reporting) throw new RelayMachineError('Relay completion is already in flight');
         const body = machineDoneBodySchema.safeParse(args[1]);
         if (!body.success) throw new RelayMachineError('Invalid relay done body');
-        args[1] = body.data;
-        this.options.onReporting?.(body.data);
+        const bound = { ...body.data, generation: this.options.generation };
+        args[1] = bound;
+        this.options.onReporting?.(bound);
+      }
+      if (method === 'token') {
+        args[1] = this.options.generation;
+        if (args[2] == null) args.length = 2;
       }
       this.options.onActivity?.();
-      const result = Promise.resolve(Reflect.apply(operation, this.options.upstream, args));
+      const result = Promise.resolve(Reflect.apply(operation, upstream, args));
       if (method === 'done') {
         report = result;
         this.reporting = result;

@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterAll, describe, expect, test } from 'vitest';
+import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import {
   apiKey as apiKeyTable,
@@ -11,15 +11,16 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { HttpError } from '../src/lib/errors.js';
-import type { FetchLike } from '../src/lib/github.js';
 import { nowMs } from '../src/lib/ids.js';
 import {
   BUILD_ABANDONED_STEP_MS,
   sweepAbandonedBuildSteps,
 } from '../src/services/build-abandoned-sweep.js';
 import { issueStepGitCredential } from '../src/services/credentials.js';
-import { claimStep, finishStep, type MachineDeps } from '../src/services/machines.js';
-import { bootServer, seedSessionRoute } from './helpers.js';
+import { claimStep, type MachineDeps } from '../src/services/machines.js';
+import { githubFake } from './fakes/github.js';
+import { stubGithubApp } from './github-identity-fixture.js';
+import { bootServer, finishStepForClaim, seedSessionRoute } from './helpers.js';
 
 const disposables: (() => void)[] = [];
 afterAll(() => {
@@ -30,15 +31,15 @@ const MACHINE = 'machine-m1';
 const STEP = 'step-1473';
 const CARD_ID = 'todo-1473';
 const PRIOR_PR = 777;
+const REPO = 'demo-owner/demo-repo';
 
-interface WorldOpts {
-  githubFetch?: FetchLike;
-  priorPr?: boolean;
-}
+afterEach(() => vi.restoreAllMocks());
 
-function makeWorld(opts: WorldOpts = {}) {
-  const githubFetch: FetchLike = opts.githubFetch ?? (async () => new Response('[]'));
+function makeWorld(priorPr = false) {
+  const github = githubFake(REPO, { repositoryId: 4242 });
+  const githubFetch = github.impl;
   const s = bootServer({ githubFetch });
+  stubGithubApp(null);
   disposables.push(() => s.dispose());
   const teamId = s.team.id;
   const base = nowMs();
@@ -49,7 +50,7 @@ function makeWorld(opts: WorldOpts = {}) {
       name: 'p1473',
       teamId,
       repoKind: 'github',
-      githubRepo: 'demo-owner/demo-repo',
+      githubRepo: REPO,
     })
     .run();
   s.db
@@ -70,7 +71,7 @@ function makeWorld(opts: WorldOpts = {}) {
       seqNum: 1,
     })
     .run();
-  if (opts.priorPr) {
+  if (priorPr) {
     s.db
       .insert(buildTable)
       .values({
@@ -78,7 +79,7 @@ function makeWorld(opts: WorldOpts = {}) {
         todoId: CARD_ID,
         withPlan: false,
         triggerSource: 'user',
-        prUrl: `https://github.com/demo-owner/demo-repo/pull/${PRIOR_PR}`,
+        prUrl: `https://github.com/${REPO}/pull/${PRIOR_PR}`,
         prNumber: PRIOR_PR,
         createdAt: base - 60_000,
       })
@@ -126,7 +127,7 @@ function makeWorld(opts: WorldOpts = {}) {
       .from(apiKeyTable)
       .where(eq(apiKeyTable.name, `git-step-${STEP}`))
       .all().length;
-  return { s, deps, teamId, stepRow, todoRow, claim, sweep, credentialCount };
+  return { s, deps, teamId, stepRow, todoRow, claim, sweep, credentialCount, github };
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 5));
@@ -139,11 +140,14 @@ describe('#1473 a report counts only for the current claim', () => {
     expect(w.stepRow()).toMatchObject({ status: 'pending', machineId: null });
     await tick();
     expect((await w.claim())?.step.id).toBe(STEP);
-    await finishStep(w.deps, MACHINE, STEP, { status: 'success', hasChanges: true });
+    await finishStepForClaim(w.deps, MACHINE, STEP, { status: 'success', hasChanges: true });
     expect(w.stepRow().status).toBe('done');
     const settled = w.todoRow().phase;
     const before = w.todoRow();
-    await finishStep(w.deps, MACHINE, STEP, { status: 'failed', errorMessage: 'second report' });
+    await finishStepForClaim(w.deps, MACHINE, STEP, {
+      status: 'failed',
+      errorMessage: 'second report',
+    });
     expect(w.stepRow().status).toBe('done');
     expect(w.todoRow().phase).toBe(settled);
     expect(w.todoRow().v).toBe(before.v);
@@ -159,7 +163,7 @@ describe('#1473 a report counts only for the current claim', () => {
     w.s.db.update(todoTable).set({ phase: 'closed' }).where(eq(todoTable.id, CARD_ID)).run();
     w.sweep();
     expect(w.stepRow().status).toBe('stopped');
-    await finishStep(w.deps, MACHINE, STEP, {
+    await finishStepForClaim(w.deps, MACHINE, STEP, {
       status: 'success',
       hasChanges: true,
       sessionId: 'late-session',
@@ -185,9 +189,12 @@ describe('#1473 a report counts only for the current claim', () => {
       )
       .run();
     await expect(
-      finishStep(w.deps, 'machine-other-team', STEP, { status: 'failed', errorMessage: 'x' }),
+      finishStepForClaim(w.deps, 'machine-other-team', STEP, {
+        status: 'failed',
+        errorMessage: 'x',
+      }),
     ).rejects.toThrow(/not yours/);
-    await finishStep(w.deps, MACHINE, STEP, { status: 'failed', errorMessage: 'late' });
+    await finishStepForClaim(w.deps, MACHINE, STEP, { status: 'failed', errorMessage: 'late' });
     expect(w.stepRow()).toMatchObject({ status: 'pending', machineId: null });
     expect(w.todoRow().phase).toBe('building');
     expect(w.credentialCount()).toBe(0);
@@ -203,24 +210,18 @@ describe('#1473 a report counts only for the current claim', () => {
     const released = new Promise<void>((r) => {
       releaseProbe = r;
     });
-    const githubFetch = (async () => {
+    const w = makeWorld(true);
+    w.github.overrides.set(`/repos/${REPO}/pulls/${PRIOR_PR}`, async () => {
       if (gateProbe) {
         gateProbe = false;
         probeEntered();
         await released;
       }
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({ state: 'open', merged: false }),
-        text: async () => '',
-        headers: { get: () => null },
-      };
-    }) as unknown as FetchLike;
-    const w = makeWorld({ githubFetch, priorPr: true });
-    await w.claim();
+      return { body: { state: 'open', merged: false } };
+    });
+    expect((await w.claim())?.step.id).toBe(STEP);
     gateProbe = true;
-    const report = finishStep(w.deps, MACHINE, STEP, {
+    const report = finishStepForClaim(w.deps, MACHINE, STEP, {
       status: 'success',
       hasChanges: true,
       prUrl: 'https://github.com/demo-owner/demo-repo/pull/778',

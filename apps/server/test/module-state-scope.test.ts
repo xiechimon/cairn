@@ -93,17 +93,13 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/computer-screen.ts:LOOPBACK_ADDRESSES': 'constant lookup table',
   'apps/server/src/services/coordinator-turn-capture.ts:liveCaptures':
     'in-server coordinator capture registry keyed on unique stepIds; the coordinator is a process-level singleton',
-  'apps/server/src/services/github-app-token.ts:installations':
-    'installation cache keyed on app-token socket path; deduping one shared socket is pinned by test',
-  'apps/server/src/services/github-app-token.ts:pendingInstallations':
-    'same socket-path dedupe for in-flight installation lookups',
   'apps/server/src/services/im/slack.ts:AUTH_ERRORS': 'constant lookup table',
   'apps/server/src/services/im/slack.ts:PERMANENT_ERRORS': 'constant lookup table',
   'apps/server/src/services/machine-computer.ts:pendingOutput':
     'in-flight computer-call buffers keyed on unique callIds; dropComputerWaiters is the process-wide test cleanup seam',
   'apps/server/src/services/machine-computer.ts:pendingCalls':
     'in-flight computer calls keyed on unique callIds; same cleanup seam',
-  'apps/server/src/services/machine-deliverables.ts:DEFERRED_SIGNALS': 'constant lookup table',
+  'apps/server/src/services/machine-deps.ts:DEFERRED_SIGNALS': 'constant lookup table',
   'apps/server/src/services/mail.ts:ACTIVE_ACCOUNT': 'constant lookup table',
   'apps/server/src/services/mcp-face.ts:CHIEF_DESCRIPTIONS':
     'constant map built from the constant CHIEF_REMOTE_TOOLS list',

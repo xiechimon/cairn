@@ -13,6 +13,7 @@ import {
 import { sweepQuotaWaitSteps } from '../src/services/quota-wait.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   seedSessionRoute,
@@ -112,7 +113,10 @@ async function claim(w: QuotaWorld): Promise<{ stepId: string }> {
 }
 
 async function done(w: QuotaWorld, stepId: string, body: Record<string, unknown>): Promise<void> {
-  const res = await call(w.s.app, `POST`, `/api/machine/done/${stepId}`, { cred: w.token, body });
+  const res = await call(w.s.app, `POST`, `/api/machine/done/${stepId}`, {
+    cred: w.token,
+    body: { generation: claimedGeneration(w.s.db, stepId), ...body },
+  });
   expect(res.status).toBe(200);
 }
 

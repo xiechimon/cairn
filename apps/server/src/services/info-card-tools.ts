@@ -29,7 +29,7 @@ import { storeInfoReport } from './info-handoff.js';
 import { infoRepoOffered, infoRepoSnapshot } from './info-repo-snapshot.js';
 import { COMPUTER_BUSY, COMPUTER_USER_CONTROL, forwardComputerCall } from './machine-computer.js';
 import { replaceVmDeliverables, type VmDeliverableFile } from './machine-deliverables.js';
-import type { MachineDeps } from './machine-deps.js';
+import { type MachineDeps, withFencedTransaction } from './machine-deps.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -278,10 +278,15 @@ async function submitInfoReport(
   const report = bytes.toString('utf8');
   if (report.trim() === '') throw new HttpError(400, `${path} has no text; write the report first`);
   if (deps.attachmentsDir === undefined) throw new HttpError(500, 'attachments are not configured');
-  storeInfoReport(
-    { db: deps.db, attachmentsDir: deps.attachmentsDir },
-    { buildId: row.buildId, teamId: todoRow.teamId, createdBy: deps.user.id, report },
-  );
+  withFencedTransaction(deps, (settled) => {
+    settled.assertClaim?.();
+    storeInfoReport(settled, {
+      buildId: row.buildId,
+      teamId: todoRow.teamId,
+      createdBy: deps.user.id,
+      report,
+    });
+  });
   const stored = deps.db.select().from(build).where(eq(build.id, row.buildId)).get();
   if (stored) publishBuild(deps, stored);
   const deliverables = await collectDeliverables(deps, machineId, row, todoRow, signal);
@@ -335,6 +340,7 @@ async function collectDeliverables(
       : [{ path, name, kind: folder.kind, size: Number(size) }];
   });
   if (entries.length === 0) {
+    deps.assertClaim?.();
     replaceVmDeliverables(deps, row, todoRow, []);
     return '';
   }
@@ -357,6 +363,7 @@ async function collectDeliverables(
       skipped.push({ name: entry.name, reason: error.message.slice(0, 120) });
     }
   }
+  deps.assertClaim?.();
   const stored = replaceVmDeliverables(deps, row, todoRow, files);
   const all = [...skipped, ...stored.skipped];
   return ` ${files.length - stored.skipped.length} deliverable file(s) kept.${

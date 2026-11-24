@@ -711,15 +711,17 @@ describe('MCP connector OAuth', () => {
         .run();
       return id;
     });
-    const token = async (id: string) =>
-      machineTokenResponseSchema.parse(
-        await (
-          await t.s.app.request(`/api/machine/token/${id}`, {
-            headers: { authorization: `Bearer ${runner.token}` },
-          })
-        ).json(),
-      );
-    const pending = [token(finished ?? ''), token(kept ?? '')];
+    const token = (id: string) => {
+      const generation = t.s.db
+        .select({ claimedAt: stepTable.claimedAt })
+        .from(stepTable)
+        .where(eq(stepTable.id, id))
+        .get()?.claimedAt;
+      return t.s.app.request(`/api/machine/token/${id}?generation=${generation}`, {
+        headers: { authorization: `Bearer ${runner.token}` },
+      });
+    };
+    const pending = [token(finished ?? ''), token(kept ?? '')] as const;
     await vi.waitFor(() =>
       expect(t.world.tokenRequests.some((p) => p.get('grant_type') === 'refresh_token')).toBe(true),
     );
@@ -730,9 +732,12 @@ describe('MCP connector OAuth', () => {
       .run();
     release();
     const [gone, live] = await Promise.all(pending);
-    expect(gone?.mcpConnectors).toBeUndefined();
-    expect(JSON.stringify(gone)).not.toContain('at-2');
-    expect(live?.mcpConnectors?.[0]?.headers).toEqual({ Authorization: 'Bearer at-2' });
+    expect(gone.status).toBe(409);
+    expect(await gone.text()).not.toContain('at-2');
+    expect(live.status).toBe(200);
+    expect(machineTokenResponseSchema.parse(await live.json()).mcpConnectors?.[0]?.headers).toEqual(
+      { Authorization: 'Bearer at-2' },
+    );
   });
 
   test('a refresh that finishes after a reconnect does not overwrite the new tokens', async () => {
