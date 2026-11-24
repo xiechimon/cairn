@@ -90,6 +90,8 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/chief-tools.ts:PROJECT_WRITE_TOOLS': 'constant lookup table',
   'apps/server/src/services/ci-check-verdict.ts:FIXABLE': 'constant lookup table',
   'apps/server/src/services/ci-check-verdict.ts:BLOCKING_UNREQUIRED': 'constant lookup table',
+  'apps/server/src/services/computer-call-store.ts:pendingCalls':
+    'in-flight computer calls keyed on unique callIds; dropComputerWaiters is the process-wide test cleanup seam',
   'apps/server/src/services/computer-screen.ts:LOOPBACK_ADDRESSES': 'constant lookup table',
   'apps/server/src/services/coordinator-turn-capture.ts:liveCaptures':
     'in-server coordinator capture registry keyed on unique stepIds; the coordinator is a process-level singleton',
@@ -98,8 +100,6 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/im/slack.ts:PERMANENT_ERRORS': 'constant lookup table',
   'apps/server/src/services/machine-computer.ts:pendingOutput':
     'in-flight computer-call buffers keyed on unique callIds; dropComputerWaiters is the process-wide test cleanup seam',
-  'apps/server/src/services/machine-computer.ts:pendingCalls':
-    'in-flight computer calls keyed on unique callIds; same cleanup seam',
   'apps/server/src/services/machine-deps.ts:DEFERRED_SIGNALS': 'constant lookup table',
   'apps/server/src/services/mail.ts:ACTIVE_ACCOUNT': 'constant lookup table',
   'apps/server/src/services/mcp-face.ts:CHIEF_DESCRIPTIONS':

@@ -229,8 +229,6 @@ export function hostShellEscalationWakePrompt(
 
 type ProposalRow = typeof actionProposal.$inferSelect;
 
-const inFlightEscalations = new Set<string>();
-
 export type ApprovedEscalationPoll = { state: 'ready'; resultText: string } | { state: 'pending' };
 
 export function pollOrStartApprovedHostShellEscalation(
@@ -246,7 +244,7 @@ export function pollOrStartApprovedHostShellEscalation(
     if (isFinalComputerCallState(existing.state)) {
       return { state: 'ready', resultText: resultOfComputerCallRow(existing).text };
     }
-    if (getPendingComputerCall(callId) !== undefined || inFlightEscalations.has(proposal.id)) {
+    if (getPendingComputerCall(callId) !== undefined) {
       return { state: 'pending' };
     }
     deps.db
@@ -354,13 +352,11 @@ export function pollOrStartApprovedHostShellEscalation(
     };
   }
 
-  inFlightEscalations.add(proposal.id);
   const pending = openPendingComputerCall(
     { db: deps.db, hub: deps.hub, machineHub: deps.machineHub },
     call,
   );
   void pending.result.finally(() => {
-    inFlightEscalations.delete(proposal.id);
     onSettled();
   });
   return { state: 'pending' };
