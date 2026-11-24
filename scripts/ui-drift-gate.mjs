@@ -304,7 +304,6 @@ checkPatternGuard({
   pattern: /\.writeText\(/,
   skip: (relPath) => relPath === 'lib/clipboard.ts',
   allowlist: new Map([
-    ['chief/turn-failure.tsx', 'active-lane file; migrate to lib/clipboard.ts when lane lands'],
     ['detail/transcript.tsx', 'active-lane file; migrate to lib/clipboard.ts when lane lands'],
   ]),
   message: 'direct .writeText( — route clipboard writes through lib/clipboard.ts or CopyIconButton',

@@ -1,4 +1,4 @@
-import type { QuotaWait, RetryReasonCode, TodoRetryState } from '@cairn/shared';
+import type { RetryReasonCode, TodoRetryState } from '@cairn/shared';
 import type { TodoRecord } from '../fixtures/records.js';
 import { dateTimeFormat } from '../lib/date-format.js';
 
@@ -167,8 +167,4 @@ export function todoRetryPhrase(todo: TodoRecord): RetryPhrase | null {
 export function canRetryNow(todo: TodoRecord): boolean {
   if (todo.archivedAt != null) return false;
   return todo.phase === 'failed' || todo.quotaWait != null || todo.waitingOn?.on === 'quota';
-}
-
-export function quotaWaitBannerLine(q: Pick<QuotaWait, 'kind' | 'probeAt'>): RetryPhrase {
-  return quotaResumePhrase(q.kind, q.probeAt);
 }
