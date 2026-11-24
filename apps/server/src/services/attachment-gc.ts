@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
+import { ATTACHMENT_KEY_SOURCE } from '@cairn/shared';
 import { eq, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, step } from '../db/schema.js';
@@ -24,7 +25,7 @@ export interface AttachmentGcStats {
   reclaimedBytes: number;
 }
 
-const KEY_RE = /attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]{1,8})/g;
+const KEY_RE = new RegExp(`attachment:(${ATTACHMENT_KEY_SOURCE})`, 'g');
 const TOOL_ID_RE = /"attachmentId"\s*:\s*"([A-Za-z0-9_-]+)"/g;
 
 interface RefCorpus {

@@ -21,6 +21,7 @@ import { userRecordSchema } from './user.js';
 export * from '../failure-review.js';
 export * from './agent.js';
 export * from './api-key.js';
+export * from './artifact.js';
 export * from './backup-status.js';
 export * from './build.js';
 export * from './capabilities.js';

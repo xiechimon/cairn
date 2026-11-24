@@ -191,13 +191,18 @@ export const chiefThreadSchema = z.object({
 });
 export type ChiefThread = z.infer<typeof chiefThreadSchema>;
 
-export const chiefSendMessageBodySchema = z.object({
-  threadId: z.string().nullable(),
-  content: z.string().min(1),
-  projectId: z.string().min(1).nullish(),
-  clientMessageId: z.string().min(1).max(200),
-  designCommentIds: designCommentIdsSchema.optional(),
-});
+export const chiefSendMessageBodySchema = z
+  .object({
+    threadId: z.string().nullable(),
+    content: z.string(),
+    projectId: z.string().min(1).nullish(),
+    clientMessageId: z.string().min(1).max(200),
+    designCommentIds: designCommentIdsSchema.optional(),
+  })
+  .refine(
+    (body) => body.content.length > 0 || body.designCommentIds !== undefined,
+    'content is required',
+  );
 export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
 
 export const chiefMemoryTraceSchema = z.object({

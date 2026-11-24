@@ -48,7 +48,7 @@ This changes persisted state and the Coordinator message wire, so this section i
 
 `design_version` (unchanged columns): now versions every artifact kind, not only html. `source` gains `user` (a whiteboard saved from the panel).
 
-`design_comment`, two new nullable columns (migration `0250_artifact_comments`):
+`design_comment`, two new nullable columns (migration `0252_artifact_comments`):
 
 | Column | Meaning |
 |---|---|

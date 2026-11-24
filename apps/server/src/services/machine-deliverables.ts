@@ -212,7 +212,7 @@ export function publishDeliverables(
   };
   const createdAt = nowMs();
   for (const r of accepted) {
-    if (r.todoId === null || deliverableKindOf(r.fileName) !== 'page') continue;
+    if (r.todoId === null) continue;
     recordDesignVersion(db, {
       teamId: r.teamId,
       todoId: r.todoId,

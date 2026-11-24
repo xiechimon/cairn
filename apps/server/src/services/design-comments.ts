@@ -1,13 +1,17 @@
 import {
+  anchorFitsKind,
+  artifactKindOf,
   type ChiefSendMessageBody,
   DESIGN_LIMITS,
   type DesignCommentCreate,
   type DesignCommentPatch,
   type DesignCommentRecord,
+  type DesignCommentRetarget,
   formatAttachmentToken,
+  renderArtifactCommentSummary,
   renderDesignCommentBlock,
 } from '@cairn/shared';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, clientMessage, designComment, designVersion, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -34,7 +38,11 @@ function requireWritableTodo(db: Db, teamId: string, todoId: string): typeof tod
   return row;
 }
 
-function commentRecord(row: CommentRow, versionSeq: number): DesignCommentRecord {
+function commentRecord(
+  row: CommentRow,
+  versionSeq: number,
+  handledSeq: number | null,
+): DesignCommentRecord {
   return {
     id: row.id,
     todoId: row.todoId,
@@ -54,9 +62,30 @@ function commentRecord(row: CommentRow, versionSeq: number): DesignCommentRecord
     markAttachmentId: row.markAttachmentId,
     status: row.status,
     messageId: row.messageId,
+    anchor: row.anchor ?? null,
+    sentAt: row.sentAt ?? null,
+    handledSeq,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
+}
+
+function handledSeqOf(db: Db, row: CommentRow): number | null {
+  if (row.sentAt === null || row.status !== 'sent') return null;
+  return (
+    db
+      .select({ seq: designVersion.seq })
+      .from(designVersion)
+      .where(
+        and(
+          eq(designVersion.todoId, row.todoId),
+          eq(designVersion.fileName, row.fileName),
+          gte(designVersion.createdAt, row.sentAt),
+        ),
+      )
+      .orderBy(designVersion.seq)
+      .get()?.seq ?? null
+  );
 }
 
 function versionSeqs(db: Db, versionIds: string[]): Map<string, number> {
@@ -73,7 +102,7 @@ function versionSeqs(db: Db, versionIds: string[]): Map<string, number> {
 
 function recordsOf(db: Db, rows: CommentRow[]): DesignCommentRecord[] {
   const seqs = versionSeqs(db, [...new Set(rows.map((r) => r.versionId))]);
-  return rows.map((r) => commentRecord(r, seqs.get(r.versionId) ?? 1));
+  return rows.map((r) => commentRecord(r, seqs.get(r.versionId) ?? 1, handledSeqOf(db, r)));
 }
 
 export function listDesignComments(
@@ -154,6 +183,10 @@ export function createDesignComment(
     )
     .get();
   if (!version) throw new HttpError(404, `design version ${input.body.versionId}`);
+  const anchor = input.body.anchor ?? null;
+  if (!anchorFitsKind(artifactKindOf(version.fileName), anchor)) {
+    throw new HttpError(400, 'this kind of file cannot take that comment target');
+  }
   const markId = input.body.markAttachmentId ?? null;
   if (markId !== null) {
     const mark = db
@@ -200,6 +233,8 @@ export function createDesignComment(
       markAttachmentId: markId,
       status: 'open',
       messageId: null,
+      anchor,
+      sentAt: null,
       createdBy: input.userId,
       createdAt: now,
       updatedAt: now,
@@ -207,7 +242,7 @@ export function createDesignComment(
     db.insert(designComment).values(next).run();
     return next;
   });
-  return commentRecord(row, version.seq);
+  return commentRecord(row, version.seq, null);
 }
 
 function requireComment(db: Db, teamId: string, todoId: string, commentId: string): CommentRow {
@@ -224,6 +259,41 @@ function requireComment(db: Db, teamId: string, todoId: string, commentId: strin
     .get();
   if (!row) throw new HttpError(404, `design comment ${commentId}`);
   return row;
+}
+
+function retargetFields(db: Db, row: CommentRow, body: DesignCommentRetarget) {
+  if (row.status === 'open') throw new HttpError(409, 'an open comment is moved by editing it');
+  const version = db
+    .select()
+    .from(designVersion)
+    .where(
+      and(
+        eq(designVersion.id, body.versionId),
+        eq(designVersion.todoId, row.todoId),
+        eq(designVersion.fileName, row.fileName),
+      ),
+    )
+    .get();
+  if (!version) throw new HttpError(404, `design version ${body.versionId}`);
+  const anchor = body.anchor ?? null;
+  if (!anchorFitsKind(artifactKindOf(row.fileName), anchor)) {
+    throw new HttpError(400, 'this kind of file cannot take that comment target');
+  }
+  return {
+    versionId: version.id,
+    elementId: body.elementId,
+    selector: body.selector,
+    label: body.label,
+    text: body.text,
+    htmlHint: body.htmlHint,
+    position: body.position,
+    viewport: body.viewport,
+    style: body.style,
+    anchor,
+    status: 'open' as const,
+    messageId: null,
+    sentAt: null,
+  };
 }
 
 export function patchDesignComment(
@@ -243,7 +313,10 @@ export function patchDesignComment(
   }
   const next = {
     ...(input.body.note !== undefined ? { note: input.body.note } : {}),
-    ...(status !== undefined ? { status, ...(status === 'open' ? { messageId: null } : {}) } : {}),
+    ...(status !== undefined
+      ? { status, ...(status === 'open' ? { messageId: null, sentAt: null } : {}) }
+      : {}),
+    ...(input.body.retarget !== undefined ? retargetFields(db, row, input.body.retarget) : {}),
     updatedAt: nowMs(),
   };
   db.update(designComment).set(next).where(eq(designComment.id, row.id)).run();
@@ -300,11 +373,14 @@ export async function sendDesignComments(
           .all()
     ).map((m) => [m.id, formatAttachmentToken('mark.png', m.storageKey)]),
   );
+  const records = recordsOf(deps.db, rows);
   const block = renderDesignCommentBlock({
     todoRef: `#${todoRow.seqNum} ${todoRow.title}`,
-    comments: recordsOf(deps.db, rows),
+    comments: records,
     markTokens,
   });
+  const summary = renderArtifactCommentSummary(records);
+  const note = body.content.trim();
   await messageThreadAsUser(
     deps,
     teamId,
@@ -314,11 +390,16 @@ export async function sendDesignComments(
   );
   const sent = sendChiefMessageFromComposer(deps, teamId, {
     ...body,
-    content: `${body.content}\n\n${block}\n\n（Cairn 已把以上评论转给任务 #${todoRow.seqNum}。）`,
+    content: `${note === '' ? '' : `${note}\n\n`}${summary}\n\n（Cairn 已把这些批注转给任务 #${todoRow.seqNum}。）`,
   });
   deps.db
     .update(designComment)
-    .set({ status: 'sent', messageId: sent.result.message.id, updatedAt: nowMs() })
+    .set({
+      status: 'sent',
+      messageId: sent.result.message.id,
+      sentAt: nowMs(),
+      updatedAt: nowMs(),
+    })
     .where(
       and(
         inArray(

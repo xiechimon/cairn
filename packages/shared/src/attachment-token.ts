@@ -2,7 +2,12 @@ export const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
 export const ATTACHMENT_TOKEN_LINE = /^ {0,3}!\[([^\]\n]*)\]\(attachment:([^)\s]+)\)\s*$/;
 
-const ATTACHMENT_KEY = /^([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\.([a-z0-9]{1,8})$/;
+export const ATTACHMENT_EXT_SOURCE = '[a-z0-9]{1,10}';
+export const ATTACHMENT_KEY_SOURCE = `[A-Za-z0-9_-]+\\/[A-Za-z0-9_-]+\\.${ATTACHMENT_EXT_SOURCE}`;
+
+const ATTACHMENT_KEY = new RegExp(
+  `^([A-Za-z0-9_-]+)\\/([A-Za-z0-9_-]+)\\.(${ATTACHMENT_EXT_SOURCE})$`,
+);
 
 export interface AttachmentTokenRef {
   line: string;

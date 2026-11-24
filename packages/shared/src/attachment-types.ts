@@ -1,4 +1,6 @@
-import { INLINE_IMAGE_MIME_BY_EXT } from './attachment-token.js';
+import { ATTACHMENT_EXT_SOURCE, INLINE_IMAGE_MIME_BY_EXT } from './attachment-token.js';
+
+const EXT_ONLY = new RegExp(`^${ATTACHMENT_EXT_SOURCE}$`);
 
 export type AttachmentKind = 'image' | 'pdf' | 'text' | 'download';
 
@@ -35,6 +37,9 @@ const ATTACHMENT_TYPES: Readonly<Record<string, AttachmentTypeEntry>> = {
     extraMimes: ['application/csv', 'application/vnd.ms-excel'],
   },
   tsv: { kind: 'text', mime: 'text/tab-separated-values' },
+  excalidraw: { kind: 'text', mime: 'text/plain', extraMimes: ['application/json'] },
+  mmd: { kind: 'text', mime: 'text/plain' },
+  mermaid: { kind: 'text', mime: 'text/plain' },
   html: { kind: 'text', mime: 'text/html' },
   htm: { kind: 'text', mime: 'text/html' },
   css: { kind: 'text', mime: 'text/css' },
@@ -143,7 +148,7 @@ export function attachmentExtOf(fileName: string): string {
   const lastDot = fileName.lastIndexOf('.');
   if (lastDot < 0 || lastDot === fileName.length - 1) return '';
   const ext = fileName.slice(lastDot + 1).toLowerCase();
-  return /^[a-z0-9]{1,8}$/.test(ext) ? ext : '';
+  return EXT_ONLY.test(ext) ? ext : '';
 }
 
 export function isAllowedAttachmentExt(ext: string): boolean {

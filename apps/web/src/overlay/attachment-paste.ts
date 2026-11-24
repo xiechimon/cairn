@@ -1,3 +1,4 @@
+import { attachmentExtOf } from '@cairn/shared';
 import { toast } from 'sonner';
 import { AttachmentError, attachFile } from '../api/attachments.js';
 
@@ -120,10 +121,7 @@ export function pastedImageExt(mime: string): string | null {
 }
 
 function extOfName(name: string): string | null {
-  const lastDot = name.lastIndexOf('.');
-  if (lastDot < 0 || lastDot === name.length - 1) return null;
-  const ext = name.slice(lastDot + 1).toLowerCase();
-  return /^[a-z0-9]{1,8}$/.test(ext) ? ext : null;
+  return attachmentExtOf(name) || null;
 }
 
 export interface PastedNameCounter {

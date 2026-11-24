@@ -1,4 +1,4 @@
-import type { AgentTodoItem } from '@cairn/shared';
+import { type AgentTodoItem, ATTACHMENT_KEY_SOURCE } from '@cairn/shared';
 import { Lexer, Marked, type Token, type Tokens } from 'marked';
 import markedCjkFriendly from 'marked-cjk-friendly';
 import type { DocSegment } from '../fixtures/records.js';
@@ -41,7 +41,7 @@ const md = new Marked({ gfm: true, breaks: true }, markedCjkFriendly());
 
 const MENTION_TARGET = /^(agent|skill|project|machine|todo):([A-Za-z0-9_-]+)$/;
 const WEB_TARGET = /^https?:\/\/\S+$/;
-const ATTACHMENT_TARGET = /^attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]{1,8})$/;
+const ATTACHMENT_TARGET = new RegExp(`^attachment:(${ATTACHMENT_KEY_SOURCE})$`);
 const AGENT_PROGRESS = /^\[([~/])\]\s+/;
 const ITEM_MARKER = /^\[[ xX~/]\]\s+/;
 const FENCE = /^ {0,3}(`{3,}|~{3,})/;

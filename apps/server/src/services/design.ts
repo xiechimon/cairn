@@ -1,18 +1,24 @@
-import { randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
+import { readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  type ArtifactOfAttachment,
+  ATTACHMENT_MAX_BYTES,
+  artifactKindOf,
   type DesignPageRecord,
   type DesignShareRecord,
   type DesignVersionRecord,
   designSharePath,
-  isDesignPageName,
+  isArtifactName,
+  isExcalidrawScene,
 } from '@cairn/shared';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { attachment, designComment, designShare, designVersion } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { TEAM_ATTACHMENTS_QUOTA_BYTES, teamAttachmentBytes } from './attachment-gc.js';
+import { writeAttachmentFile } from './attachments.js';
 import { requireTeamTodo } from './tool-guards.js';
 
 type VersionRow = typeof designVersion.$inferSelect;
@@ -37,7 +43,7 @@ function currentVersion(db: Db, todoId: string, fileName: string): VersionRow | 
 }
 
 export function recordDesignVersion(db: Db, input: DesignVersionInput): VersionRow | undefined {
-  if (!isDesignPageName(input.fileName)) return undefined;
+  if (!isArtifactName(input.fileName)) return undefined;
   const current = currentVersion(db, input.todoId, input.fileName);
   if (current !== undefined && input.sha256 !== null && current.sha256 === input.sha256) {
     return undefined;
@@ -103,17 +109,6 @@ export function listDesignPages(db: Db, teamId: string, todoId: string): DesignP
   return [...pages.entries()]
     .sort((a, b) => a[1].current.createdAt - b[1].current.createdAt)
     .map(([fileName, page]) => {
-      const open = db
-        .select({ n: sql<number>`count(*)` })
-        .from(designComment)
-        .where(
-          and(
-            eq(designComment.todoId, todoId),
-            eq(designComment.fileName, fileName),
-            eq(designComment.status, 'open'),
-          ),
-        )
-        .get();
       const share = db
         .select({ token: designShare.token })
         .from(designShare)
@@ -127,12 +122,59 @@ export function listDesignPages(db: Db, teamId: string, todoId: string): DesignP
         .get();
       return {
         fileName,
+        kind: artifactKindOf(fileName),
         current: versionRecord(db, page.current),
         versionCount: page.count,
-        openComments: open?.n ?? 0,
+        openComments: openCommentCount(db, todoId, fileName),
         shareToken: share?.token ?? null,
       };
     });
+}
+
+function openCommentCount(db: Db, todoId: string, fileName: string): number {
+  return (
+    db
+      .select({ n: sql<number>`count(*)` })
+      .from(designComment)
+      .where(
+        and(
+          eq(designComment.todoId, todoId),
+          eq(designComment.fileName, fileName),
+          eq(designComment.status, 'open'),
+        ),
+      )
+      .get()?.n ?? 0
+  );
+}
+
+export function artifactOfAttachment(
+  db: Db,
+  teamId: string,
+  attachmentId: string,
+): ArtifactOfAttachment {
+  const version = db
+    .select()
+    .from(designVersion)
+    .where(and(eq(designVersion.attachmentId, attachmentId), eq(designVersion.teamId, teamId)))
+    .orderBy(desc(designVersion.seq))
+    .get();
+  if (!version) throw new HttpError(404, `artifact of attachment ${attachmentId}`);
+  const count = db
+    .select({ n: sql<number>`count(*)` })
+    .from(designVersion)
+    .where(
+      and(eq(designVersion.todoId, version.todoId), eq(designVersion.fileName, version.fileName)),
+    )
+    .get();
+  return {
+    todoId: version.todoId,
+    fileName: version.fileName,
+    kind: artifactKindOf(version.fileName),
+    versionId: version.id,
+    versionSeq: version.seq,
+    versionCount: count?.n ?? 1,
+    openComments: openCommentCount(db, version.todoId, version.fileName),
+  };
 }
 
 export function listDesignVersions(
@@ -194,6 +236,75 @@ export function restoreDesignVersion(
     return next;
   });
   return versionRecord(db, row);
+}
+
+export function saveUserVersion(
+  deps: { db: Db; attachmentsDir: string },
+  input: { teamId: string; todoId: string; fileName: string; userId: string; content: string },
+): DesignVersionRecord {
+  const { db } = deps;
+  const todoRow = requireTeamTodo(db, input.todoId, input.teamId);
+  if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
+  if (artifactKindOf(input.fileName) !== 'whiteboard') {
+    throw new HttpError(400, 'only a whiteboard can be saved from the panel');
+  }
+  if (currentVersion(db, input.todoId, input.fileName) === undefined) {
+    throw new HttpError(404, `artifact ${input.fileName}`);
+  }
+  if (!isExcalidrawScene(input.content)) throw new HttpError(400, 'not an Excalidraw scene');
+  const bytes = Buffer.from(input.content, 'utf8');
+  if (bytes.length > ATTACHMENT_MAX_BYTES) {
+    throw new HttpError(400, 'the whiteboard exceeds the 10 MiB attachment cap');
+  }
+  if (teamAttachmentBytes(db, input.teamId) + bytes.length > TEAM_ATTACHMENTS_QUOTA_BYTES) {
+    throw new HttpError(413, 'attachment quota exceeded');
+  }
+  const id = newRecordId();
+  const storageKey = `${input.teamId}/${id}.excalidraw`;
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  writeAttachmentFile(deps.attachmentsDir, storageKey, bytes);
+  try {
+    const row = db.transaction(() => {
+      const now = nowMs();
+      db.insert(attachment)
+        .values({
+          id,
+          teamId: input.teamId,
+          todoId: input.todoId,
+          sha256,
+          createdBy: input.userId,
+          fileName: input.fileName,
+          mimeType: 'text/plain',
+          sizeBytes: bytes.length,
+          storageKey,
+          grantId: newRecordId(),
+          scope: 'design',
+          status: 'ready',
+          createdAt: now,
+        })
+        .run();
+      const current = currentVersion(db, input.todoId, input.fileName);
+      const next: VersionRow = {
+        id: newRecordId(),
+        teamId: input.teamId,
+        todoId: input.todoId,
+        fileName: input.fileName,
+        seq: (current?.seq ?? 0) + 1,
+        attachmentId: id,
+        sha256,
+        source: 'user',
+        restoredFromVersionId: null,
+        createdBy: input.userId,
+        createdAt: now,
+      };
+      db.insert(designVersion).values(next).run();
+      return next;
+    });
+    return versionRecord(db, row);
+  } catch (error) {
+    rmSync(join(deps.attachmentsDir, storageKey), { force: true });
+    throw error;
+  }
 }
 
 export function requireDesignVersion(db: Db, teamId: string, versionId: string): VersionRow {

@@ -1,4 +1,4 @@
-import { isDesignPageName } from '@cairn/shared';
+import { ATTACHMENT_KEY_SOURCE, isDesignPageName } from '@cairn/shared';
 import { createContext } from 'react';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
 import { type FileViewerKind, kindFor } from '../vendor-open-design/viewers/file-kind.js';
@@ -30,8 +30,10 @@ export function opensInLightbox(target: FileTarget): boolean {
   return LIGHTBOX_KINDS.has(kindFor(target.key));
 }
 
-const ATTACHMENT_REF =
-  /!?\[([^\]]*)\]\(attachment:([A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.[a-z0-9]{1,8})\)/g;
+const ATTACHMENT_REF = new RegExp(
+  `!?\\[([^\\]]*)\\]\\(attachment:(${ATTACHMENT_KEY_SOURCE})\\)`,
+  'g',
+);
 
 export function fileSetOf(text: string): FileTarget[] {
   const seen = new Set<string>();

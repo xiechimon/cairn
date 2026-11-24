@@ -15,35 +15,69 @@ import { extOf, validateAttachmentUpload, writeAttachmentFile } from './attachme
 import { recordDesignVersion } from './design.js';
 import { type MachineDeps, upsertMessage } from './machine-deps.js';
 
+const BINARY_MIME_BY_EXT: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  pdf: 'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  webm: 'video/webm',
+};
+
+const BINARY_KIND_BY_EXT: Readonly<Record<string, string>> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  pdf: 'pdf',
+  docx: 'zip',
+  xlsx: 'zip',
+  pptx: 'zip',
+  mp4: 'isobmff',
+  mov: 'isobmff',
+  webm: 'ebml',
+};
+
+function binaryKindOfBytes(bytes: Buffer): string | null {
+  const image = inlineImageMimeOfBytes(bytes);
+  if (image !== null) return image;
+  if (bytes.subarray(0, 5).toString('latin1') === '%PDF-') return 'pdf';
+  if (bytes.subarray(0, 4).equals(Buffer.from([0x50, 0x4b, 0x03, 0x04]))) return 'zip';
+  if (bytes.subarray(4, 8).toString('latin1') === 'ftyp') return 'isobmff';
+  if (bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]))) return 'ebml';
+  return null;
+}
+
 export function attachmentMime(fileName: string, bytes: Buffer): string {
   const ext = extOf(fileName);
   if (isImageAttachmentExt(ext) && !['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
     throw new HttpError(400, 'attach_file image type is not allowed; use PNG, JPEG, GIF, or WebP');
   }
-  const detected =
-    inlineImageMimeOfBytes(bytes) ??
-    (bytes.subarray(0, 5).toString('latin1') === '%PDF-' ? 'application/pdf' : null);
-  const expected: Record<string, string> = {
-    png: 'image/png',
-    jpg: 'image/jpeg',
-    jpeg: 'image/jpeg',
-    gif: 'image/gif',
-    webp: 'image/webp',
-    pdf: 'application/pdf',
-  };
+  const detected = binaryKindOfBytes(bytes);
   if (detected !== null) {
-    if (expected[ext] !== detected)
+    const mime = BINARY_MIME_BY_EXT[ext];
+    if (mime === undefined || BINARY_KIND_BY_EXT[ext] !== detected)
       throw new HttpError(400, 'attach_file content does not match its file extension');
-    return detected;
+    return mime;
   }
-  if (isImageAttachmentExt(ext) || ext === 'pdf') {
+  if (isImageAttachmentExt(ext) || ext in BINARY_MIME_BY_EXT) {
     throw new HttpError(400, 'attach_file content does not match its file extension');
   }
   let text: string;
   try {
     text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    throw new HttpError(400, 'attach_file requires a supported image, PDF, or UTF-8 text file');
+    throw new HttpError(
+      400,
+      'attach_file requires a supported image, PDF, Office document, video, or UTF-8 text file',
+    );
   }
   for (const char of text) {
     const code = char.charCodeAt(0);

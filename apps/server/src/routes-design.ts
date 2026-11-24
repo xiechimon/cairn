@@ -1,5 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { DESIGN_LIMITS, designCommentCreateSchema, designCommentPatchSchema } from '@cairn/shared';
+import {
+  artifactUserVersionSchema,
+  DESIGN_LIMITS,
+  designCommentCreateSchema,
+  designCommentPatchSchema,
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
@@ -7,6 +12,7 @@ import { HttpError, parseWith } from './lib/errors.js';
 import { jsonBody } from './routes-helpers.js';
 import { readAttachment } from './services/attachments.js';
 import {
+  artifactOfAttachment,
   createDesignShare,
   designPageResponse,
   listDesignPages,
@@ -16,6 +22,7 @@ import {
   requireDesignVersion,
   restoreDesignVersion,
   revokeDesignShare,
+  saveUserVersion,
 } from './services/design.js';
 import {
   createDesignComment,
@@ -46,6 +53,27 @@ export function registerDesignRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/todos/:id/design/:fileName/versions', (c) =>
     c.json(listDesignVersions(ctx.db, ctx.team.id, c.req.param('id'), c.req.param('fileName'))),
+  );
+
+  app.post('/api/todos/:id/design/:fileName/versions', async (c) => {
+    const body = parseWith(artifactUserVersionSchema, await jsonBody(c), 'body');
+    return c.json(
+      saveUserVersion(
+        { db: ctx.db, attachmentsDir: ctx.attachmentsDir },
+        {
+          teamId: ctx.team.id,
+          todoId: c.req.param('id'),
+          fileName: c.req.param('fileName'),
+          userId: ctx.user.id,
+          content: body.content,
+        },
+      ),
+      201,
+    );
+  });
+
+  app.get('/api/attachments/:id/artifact', (c) =>
+    c.json(artifactOfAttachment(ctx.db, ctx.team.id, c.req.param('id'))),
   );
 
   app.post('/api/todos/:id/design/versions/:versionId/restore', (c) =>

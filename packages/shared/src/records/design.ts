@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  type ArtifactAnchor,
+  artifactAnchorSchema,
+  artifactKindSchema,
+  describeAnchor,
+} from './artifact.js';
 
 export const DESIGN_LIMITS = {
   noteChars: 2000,
@@ -16,7 +22,7 @@ export const DESIGN_VIEWPORTS = ['desktop', 'tablet', 'mobile'] as const;
 export const designViewportSchema = z.enum(DESIGN_VIEWPORTS);
 export type DesignViewport = z.infer<typeof designViewportSchema>;
 
-export const designVersionSourceSchema = z.enum(['agent', 'restore']);
+export const designVersionSourceSchema = z.enum(['agent', 'restore', 'user']);
 export type DesignVersionSource = z.infer<typeof designVersionSourceSchema>;
 
 export const designCommentStatusSchema = z.enum(['open', 'sent', 'resolved']);
@@ -52,7 +58,7 @@ export type DesignStyle = z.infer<typeof designStyleSchema>;
 
 export const designTargetSchema = z.object({
   elementId: z.string().max(DESIGN_LIMITS.elementIdChars),
-  selector: z.string().min(1).max(DESIGN_LIMITS.selectorChars),
+  selector: z.string().max(DESIGN_LIMITS.selectorChars),
   label: z.string().max(DESIGN_LIMITS.labelChars),
   text: z.string().max(DESIGN_LIMITS.textChars),
   htmlHint: z.string().max(DESIGN_LIMITS.htmlHintChars),
@@ -76,6 +82,7 @@ export type DesignVersionRecord = z.infer<typeof designVersionRecordSchema>;
 
 export const designPageRecordSchema = z.object({
   fileName: z.string(),
+  kind: artifactKindSchema,
   current: designVersionRecordSchema,
   versionCount: z.number().int().min(1),
   openComments: z.number().int().min(0),
@@ -95,25 +102,48 @@ export const designCommentRecordSchema = designTargetSchema.extend({
   markAttachmentId: z.string().nullable(),
   status: designCommentStatusSchema,
   messageId: z.string().nullable(),
+  anchor: artifactAnchorSchema.nullable(),
+  sentAt: z.number().int().nullable(),
+  handledSeq: z.number().int().min(1).nullable(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
 export type DesignCommentRecord = z.infer<typeof designCommentRecordSchema>;
 
-export const designCommentCreateSchema = designTargetSchema.extend({
+const designCommentTargetSchema = designTargetSchema.extend({
   versionId: z.string().min(1),
   viewport: designViewportSchema,
-  note: z.string().trim().min(1).max(DESIGN_LIMITS.noteChars),
-  markAttachmentId: z.string().min(1).optional(),
+  anchor: artifactAnchorSchema.nullable().optional(),
 });
+
+function hasTarget(v: { selector: string; anchor?: ArtifactAnchor | null | undefined }): boolean {
+  return v.selector !== '' || (v.anchor ?? null) !== null;
+}
+
+export const designCommentRetargetSchema = designCommentTargetSchema.refine(
+  hasTarget,
+  'a comment needs an element or an anchor',
+);
+export type DesignCommentRetarget = z.infer<typeof designCommentRetargetSchema>;
+
+export const designCommentCreateSchema = designCommentTargetSchema
+  .extend({
+    note: z.string().trim().min(1).max(DESIGN_LIMITS.noteChars),
+    markAttachmentId: z.string().min(1).optional(),
+  })
+  .refine(hasTarget, 'a comment needs an element or an anchor');
 export type DesignCommentCreate = z.infer<typeof designCommentCreateSchema>;
 
 export const designCommentPatchSchema = z
   .object({
     note: z.string().trim().min(1).max(DESIGN_LIMITS.noteChars).optional(),
     status: z.enum(['open', 'resolved']).optional(),
+    retarget: designCommentRetargetSchema.optional(),
   })
-  .refine((v) => v.note !== undefined || v.status !== undefined, 'nothing to change');
+  .refine(
+    (v) => [v.note, v.status, v.retarget].filter((x) => x !== undefined).length === 1,
+    'change one thing at a time',
+  );
 export type DesignCommentPatch = z.infer<typeof designCommentPatchSchema>;
 
 export const designCommentIdsSchema = z
@@ -147,37 +177,66 @@ function oneLine(value: string): string {
   }).join('');
 }
 
+type BlockComment = Pick<
+  DesignCommentRecord,
+  | 'fileName'
+  | 'versionSeq'
+  | 'pin'
+  | 'label'
+  | 'elementId'
+  | 'selector'
+  | 'text'
+  | 'note'
+  | 'markAttachmentId'
+  | 'anchor'
+>;
+
+function targetOf(c: BlockComment): string {
+  if (c.anchor !== null) {
+    const inSlide = c.anchor.type === 'slide' && c.elementId !== '';
+    const where = describeAnchor(c.anchor);
+    return inSlide ? `${where} · ${oneLine(c.label)}[data-od-id="${oneLine(c.elementId)}"]` : where;
+  }
+  if (c.elementId !== '') return `${oneLine(c.label)}[data-od-id="${oneLine(c.elementId)}"]`;
+  if (c.markAttachmentId !== null) return '页面标注（画在下面的标注图上）';
+  return oneLine(c.selector);
+}
+
 export function renderDesignCommentBlock(input: {
   todoRef: string;
-  comments: readonly Pick<
-    DesignCommentRecord,
-    | 'fileName'
-    | 'versionSeq'
-    | 'pin'
-    | 'label'
-    | 'elementId'
-    | 'selector'
-    | 'text'
-    | 'note'
-    | 'markAttachmentId'
-  >[];
+  comments: readonly BlockComment[];
   markTokens?: ReadonlyMap<string, string>;
 }): string {
   const lines = [
-    `【设计评论 · ${input.todoRef}】只改这些评论点到的元素；别的改动先列成后续建议，不要顺手改。`,
+    `【批注 · ${input.todoRef}】只改这些批注点到的位置；别的改动先列成后续建议，不要顺手改。`,
   ];
   for (const c of input.comments) {
-    const target =
-      c.elementId !== ''
-        ? `${oneLine(c.label)}[data-od-id="${oneLine(c.elementId)}"]`
-        : c.markAttachmentId !== null
-          ? '页面标注（画在下面的标注图上）'
-          : oneLine(c.selector);
     const text = c.text !== '' ? `（当前文字：「${oneLine(c.text)}」）` : '';
-    lines.push(`${c.pin}. ${c.fileName} v${c.versionSeq} · ${target}${text}：${c.note}`);
+    lines.push(`${c.pin}. ${c.fileName} v${c.versionSeq} · ${targetOf(c)}${text}：${c.note}`);
     const mark =
       c.markAttachmentId === null ? undefined : input.markTokens?.get(c.markAttachmentId);
     if (mark !== undefined) lines.push('   标注图：', mark);
+  }
+  return lines.join('\n');
+}
+
+const CIRCLED = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
+
+function pinMark(pin: number): string {
+  return pin >= 1 && pin <= CIRCLED.length ? (CIRCLED[pin - 1] as string) : `(${pin})`;
+}
+
+export function renderArtifactCommentSummary(
+  comments: readonly Pick<
+    DesignCommentRecord,
+    'fileName' | 'versionSeq' | 'pin' | 'text' | 'note'
+  >[],
+): string {
+  const files = [...new Set(comments.map((c) => `${c.fileName} 第 ${c.versionSeq} 版`))];
+  const lines = [`批注 ${comments.length} 条 · ${files.join('、')}`];
+  for (const c of comments) {
+    lines.push(`${pinMark(c.pin)} ${oneLine(c.note)}`);
+    if (c.text !== '') lines.push(`「${oneLine(c.text)}」`);
   }
   return lines.join('\n');
 }
