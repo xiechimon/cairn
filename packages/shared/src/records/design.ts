@@ -158,10 +158,6 @@ export const designShareRecordSchema = z.object({
 });
 export type DesignShareRecord = z.infer<typeof designShareRecordSchema>;
 
-export function isDesignPageName(fileName: string): boolean {
-  return /\.html?$/i.test(fileName);
-}
-
 export function designPagePath(versionId: string): string {
   return `/api/design/versions/${encodeURIComponent(versionId)}/page`;
 }
