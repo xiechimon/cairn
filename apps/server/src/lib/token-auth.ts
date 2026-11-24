@@ -33,6 +33,8 @@ export function isOwnerOnlyRoute(method: string, pathname: string): boolean {
   if (
     pathname === '/api/remote/pairing' ||
     pathname.startsWith('/api/remote/pairing/') ||
+    pathname === '/api/remote/pairing-requests' ||
+    pathname.startsWith('/api/remote/pairing-requests/') ||
     pathname === '/api/remote/tailnet' ||
     (pathname === '/api/remote/tailscale' && !read) ||
     (pathname.startsWith('/api/remote/devices') && !read)
@@ -137,6 +139,8 @@ export function registerTokenAuth(
 ): void {
   app.use(BROWSER_SESSION_PATH, requireBrowserOriginProof);
   app.on('POST', '/api/remote/pair', requireBrowserOriginProof);
+  app.on('POST', '/api/remote/pair/request', requireBrowserOriginProof);
+  app.on('POST', '/api/remote/pair/claim', requireBrowserOriginProof);
   if (token === null) return;
   const verifyOwner = makeVerifier(token);
   app.use('*', async (c, next) => {

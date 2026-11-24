@@ -961,6 +961,25 @@ export const pairingGrant = sqliteTable(
   (t) => [uniqueIndex('pairing_grant_codeHash_unique').on(t.codeHash)],
 );
 
+export const pairingRequest = sqliteTable(
+  'pairing_request',
+  {
+    id: text('id').primaryKey(),
+    secretHash: text('secretHash').notNull(),
+    code: text('code').notNull(),
+    name: text('name').notNull(),
+    detail: text('detail'),
+    source: text('source').notNull(),
+    peer: text('peer').notNull(),
+    status: text('status').notNull().default('pending'),
+    expiresAt: epochMs('expiresAt').notNull(),
+    createdAt: epochMs('createdAt').notNull(),
+    decidedAt: epochMs('decidedAt'),
+    deviceId: text('deviceId'),
+  },
+  (t) => [uniqueIndex('pairing_request_secretHash_unique').on(t.secretHash)],
+);
+
 export const browserSession = sqliteTable(
   'browser_session',
   {

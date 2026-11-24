@@ -1,66 +1,50 @@
 import { cn } from 'cn';
-import { type FormEvent, type MouseEvent, useEffect, useRef, useState } from 'react';
-import { consumePairFragment, redeemPairingCode, useAuth } from '../api/auth.js';
+import { useEffect, useState } from 'react';
+import {
+  consumePairFragment,
+  ensurePairRequest,
+  requestNewPairAttempt,
+  useAuth,
+} from '../api/auth.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
-import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
 
-const PAIR_CODE_CELLS = 32;
+function formatCode(code: string): string {
+  return code.length > 4 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+}
 
 export function TokenGate() {
   const { t } = useI18n();
   const auth = useAuth();
-  const [value, setValue] = useState('');
-  const [caret, setCaret] = useState<number | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const cellsRef = useRef<HTMLDivElement>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const pending = auth.pair?.phase === 'pending';
 
   useEffect(() => {
     void consumePairFragment();
   }, []);
 
   useEffect(() => {
-    if (!auth.gateOpen) return;
-    setValue('');
-    inputRef.current?.focus();
-  }, [auth.gateOpen]);
+    if (auth.gateOpen && !auth.pairing && !auth.retrying) ensurePairRequest();
+  }, [auth.gateOpen, auth.pairing, auth.retrying]);
+
+  useEffect(() => {
+    if (!pending) return;
+    const timer = setInterval(() => setNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [pending]);
 
   if (!auth.gateOpen) return null;
-
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    const candidate = value.trim();
-    if (candidate === '' || auth.pairing) return;
-    void redeemPairingCode(candidate);
-  };
-
-  const cellCount = Math.max(PAIR_CODE_CELLS, value.length);
-  const errCell = Math.min(value.length, cellCount - 1);
-  const pickCell = (event: MouseEvent<HTMLInputElement>): void => {
-    event.preventDefault();
-    const input = inputRef.current;
-    if (input === null) return;
-    input.focus();
-    const { clientX, clientY } = event;
-    let at = value.length;
-    const cells = cellsRef.current?.children ?? [];
-    for (const [i, cell] of [...cells].entries()) {
-      const rect = cell.getBoundingClientRect();
-      if (
-        clientY >= rect.top &&
-        clientY <= rect.bottom &&
-        clientX >= rect.left &&
-        clientX <= rect.right
-      ) {
-        at = Math.min(i, value.length);
-        break;
-      }
-    }
-    input.setSelectionRange(at, at);
-    setCaret(at);
-  };
+  const pair = auth.pair;
+  const terminal = pair !== null && pair.phase !== 'requesting' && pair.phase !== 'pending';
+  const remainingMs = pair?.expiresAt == null ? null : Math.max(0, pair.expiresAt - now);
+  const remaining =
+    remainingMs === null
+      ? null
+      : `${Math.floor(remainingMs / 60_000)}:${String(
+          Math.floor((remainingMs % 60_000) / 1_000),
+        ).padStart(2, '0')}`;
 
   return (
     <div className="fixed inset-0 z-(--z-gate) flex items-center justify-center bg-(--overlay-scrim)">
@@ -71,76 +55,69 @@ export function TokenGate() {
           aria-label={t('配对这台电脑')}
           className="token-gate w-full rounded-(--cds-radius-xl) p-6 shadow-lg"
         >
-          <form className="flex flex-col gap-3" onSubmit={submit}>
+          <div className="flex flex-col gap-3">
             <h1 className="token-gate-title text-base font-semibold text-foreground">
               {t('配对这台电脑')}
             </h1>
-            <p className="text-[13px] leading-normal text-content-secondary">
-              {t(
-                '输入一次性配对码。码在运行服务的电脑的远程访问设置里生成，5 分钟内有效，只能用一次。',
-              )}
+            <p
+              className="text-[13px] leading-normal text-content-secondary"
+              data-testid={
+                terminal
+                  ? pair.phase === 'denied'
+                    ? 'pair-request-denied'
+                    : pair.phase === 'expired'
+                      ? 'pair-request-expired'
+                      : 'pair-request-unavailable'
+                  : undefined
+              }
+            >
+              {terminal
+                ? pair.phase === 'denied'
+                  ? t('那台电脑拒绝了这次配对。')
+                  : pair.phase === 'expired'
+                    ? t('5 分钟内没有人批准，这个码已过期。')
+                    : t('配对请求发送失败，请重试。')
+                : t('在已经能用 Cairn 的电脑上打开「远程访问」，看到这个码就点「批准」。')}
             </p>
-            <label className="text-xs text-content-tertiary" htmlFor="cairn-pair-input">
-              {t('配对码')}
-            </label>
-            <div className="relative">
-              <div ref={cellsRef} className="grid grid-cols-8 gap-1.5" aria-hidden="true">
-                {Array.from({ length: cellCount }, (_, i) => (
-                  <span
-                    key={i}
-                    className={cn(
-                      'flex h-10 items-center justify-center rounded-md border border-input bg-popover font-mono text-brand text-foreground select-none',
-                      caret === i && 'border-ring',
-                      auth.rejected && i === errCell && 'border-foreground',
-                    )}
-                  >
-                    {value[i] ?? ''}
-                  </span>
-                ))}
+            {pair?.code != null && (
+              <div
+                data-testid="pair-request-code"
+                className={cn(
+                  'py-2 text-center font-mono text-2xl font-semibold text-foreground tabular-nums select-none',
+                  pair.phase === 'denied' && 'text-content-tertiary line-through',
+                  pair.phase === 'expired' && 'text-content-tertiary',
+                )}
+              >
+                {formatCode(pair.code)}
               </div>
-              <Input
-                ref={inputRef}
-                id="cairn-pair-input"
-                className="absolute inset-0 h-full w-full cursor-text opacity-0"
-                value={value}
-                autoComplete="off"
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-                aria-invalid={auth.rejected || undefined}
-                aria-describedby={auth.rejected ? 'cairn-pair-error' : undefined}
-                onMouseDown={pickCell}
-                onChange={(event) => {
-                  setValue(event.target.value);
-                  setCaret(event.target.selectionStart);
-                }}
-                onSelect={(event) => setCaret(event.currentTarget.selectionStart)}
-                onFocus={(event) =>
-                  setCaret(event.currentTarget.selectionStart ?? event.currentTarget.value.length)
-                }
-                onBlur={() => setCaret(null)}
-              />
-            </div>
-            {auth.rejected && (
-              <p id="cairn-pair-error" className="text-xs text-destructive" role="alert">
-                {t('配对码无效，请重试。')}
+            )}
+            {terminal ? (
+              <Button
+                className="border-0 rounded-md px-3 text-[13px] font-normal"
+                data-testid="pair-request-retry"
+                onClick={() => requestNewPairAttempt()}
+              >
+                {pair.phase === 'unavailable' ? t('重新发送') : t('换一个码')}
+              </Button>
+            ) : (
+              <p
+                className="m-0 flex items-center justify-center gap-2 text-center text-meta text-content-tertiary"
+                role="status"
+              >
+                <RingSpinner aria-hidden="true" className="size-4" />
+                {auth.pairing
+                  ? t('正在配对…')
+                  : pair?.phase === 'pending' && remaining !== null
+                    ? t('等待批准 · {remaining} 后失效', { remaining })
+                    : t('正在发送配对请求…')}
               </p>
             )}
-            <Button
-              type="submit"
-              className="border-0 rounded-md px-3 text-[13px] font-normal"
-              disabled={auth.pairing || value.trim() === ''}
-            >
-              {auth.pairing ? (
-                <>
-                  <RingSpinner data-icon="inline-start" />
-                  {t('正在配对…')}
-                </>
-              ) : (
-                t('进入')
-              )}
-            </Button>
-          </form>
+            {auth.rejected && (
+              <p className="text-xs text-destructive" role="alert">
+                {t('配对链接无效或已过期。')}
+              </p>
+            )}
+          </div>
         </Card>
         <p className="m-0 text-center text-caption leading-normal text-content-tertiary">
           <span className="block" role="status">

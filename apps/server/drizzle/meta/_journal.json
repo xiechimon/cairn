@@ -1709,6 +1709,13 @@
       "when": 1795329456766,
       "tag": "0248_no_machine_reason_marks",
       "breakpoints": true
+    },
+    {
+      "idx": 249,
+      "version": "6",
+      "when": 1795481952100,
+      "tag": "0249_motionless_human_torch",
+      "breakpoints": true
     }
   ]
 }

@@ -35,9 +35,19 @@ async function issuePairingCode(request: APIRequestContext, base: string): Promi
   return ((await res.json()) as { code: string }).code;
 }
 
-async function redeemAtGate(page: Page, code: string): Promise<void> {
-  await page.locator('#cairn-pair-input').fill(code);
-  await page.locator('#cairn-pair-input').press('Enter');
+async function environmentId(request: APIRequestContext, base: string): Promise<string> {
+  const res = await request.get(`${base}/api/remote/descriptor`);
+  expect(res.status()).toBe(200);
+  return ((await res.json()) as { environmentId: string }).environmentId;
+}
+
+async function redeemViaLink(page: Page, request: APIRequestContext, base: string): Promise<void> {
+  const [code, env] = await Promise.all([
+    issuePairingCode(request, base),
+    environmentId(request, base),
+  ]);
+  await page.goto('about:blank');
+  await page.goto(`${base}/app#pair=${encodeURIComponent(code)}&env=${encodeURIComponent(env)}`);
 }
 
 let authed: LiveServer;
@@ -60,8 +70,7 @@ test('auth on, loopback: the gate blocks the board until a pairing code opens it
   await page.goto(`${authed.base}/app`);
   await expect(page.locator('.token-gate')).toBeVisible();
 
-  const code = await issuePairingCode(request, authed.base);
-  await redeemAtGate(page, code);
+  await redeemViaLink(page, request, authed.base);
 
   await expect(page.locator('.token-gate')).toHaveCount(0);
   await expect(page.locator('.board-sidebar')).toBeVisible();
@@ -81,8 +90,7 @@ test('auth on: a stored owner token is cleared and is not sent', async ({ page, 
   await expect(page.locator('.token-gate')).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem('cairn.token'))).toBeNull();
 
-  const code = await issuePairingCode(request, authed.base);
-  await redeemAtGate(page, code);
+  await redeemViaLink(page, request, authed.base);
   await expect(page.locator('.board-sidebar')).toBeVisible();
   for (const url of await streamUrls(page)) expect(url).not.toContain('stale-bad-token');
 });

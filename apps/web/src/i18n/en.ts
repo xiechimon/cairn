@@ -1369,10 +1369,17 @@ export const EN: Record<string, string> = {
   // #253 token 门页（鉴权开时 401 落页；auth 单缝 = src/api/auth.ts）
   配对这台电脑: 'Pair this computer',
   '正在配对…': 'Pairing…',
-  '输入一次性配对码。码在运行服务的电脑的远程访问设置里生成，5 分钟内有效，只能用一次。':
-    'Enter a one-time pairing code. Create it in Remote access on the computer running the server. It works once, for 5 minutes.',
+  '在已经能用 Cairn 的电脑上打开「远程访问」，看到这个码就点「批准」。':
+    'On a computer already signed in to Cairn, open Remote access and approve the request with this code.',
+  '等待批准 · {remaining} 后失效': 'Waiting for approval · expires in {remaining}',
+  '正在发送配对请求…': 'Sending the pairing request…',
+  '那台电脑拒绝了这次配对。': 'The other computer denied this pairing.',
+  '5 分钟内没有人批准，这个码已过期。': 'Nobody approved within 5 minutes. This code has expired.',
+  换一个码: 'Get a new code',
+  '配对请求发送失败，请重试。': 'Could not send the pairing request. Try again.',
+  重新发送: 'Send again',
+  '配对链接无效或已过期。': 'The pairing link is invalid or expired.',
   配对码: 'Pairing code',
-  '配对码无效，请重试。': 'Pairing code is invalid. Try again.',
   未使用的配对码: 'Unused pairing codes',
   作废配对码: 'Revoke code',
   进入: 'Continue',
@@ -2195,6 +2202,13 @@ export const EN: Record<string, string> = {
   '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。':
     'Pairing is off: this page is open on an address that only works on this computer, so a phone would connect to itself. Turn on remote access above, or open this page through its LAN or Tailscale address.',
   当前页面地址: 'This page’s address',
+  新设备请求配对: 'A new device is asking to pair',
+  '先确认这个码和那台电脑屏幕上的一样，再批准。':
+    'Check that this code matches the one on that computer’s screen, then approve.',
+  这台电脑: 'This computer',
+  外部网络: 'External network',
+  不明: 'Unknown',
+  '操作失败，请重试。': 'The action failed. Try again.',
   暂无已配对的设备: 'No paired devices',
   撤销设备: 'Revoke',
   '撤销设备失败，请重试。': 'Could not revoke the device. Try again.',

@@ -1,21 +1,24 @@
-import { type PairingCodeResponse, pairingLink } from '@cairn/shared';
+import { type PairingCodeResponse, type PairRequestSource, pairingLink } from '@cairn/shared';
 import { Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 import {
   usePairingGrants,
+  usePairingRequests,
   useRemoteDevices,
   useRemoteMutations,
   useRemoteRoutes,
   useSetTailnetAccess,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
 import { QrCode } from '../components/qr-code.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
+import { Card } from '../components/ui/card.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
 import {
   Select,
@@ -36,6 +39,25 @@ export const REMOTE_ACCESS_ROUTE = 'remote-access';
 function sourceName(source: PairingCandidate['source'], t: (key: string) => string): string {
   if (source === 'page') return t('当前页面地址');
   return source === 'tailnet' ? t('Tailscale') : t('局域网');
+}
+
+function pairRequestSourceName(source: PairRequestSource, t: (key: string) => string): string {
+  switch (source) {
+    case 'loopback':
+      return t('这台电脑');
+    case 'lan':
+      return t('局域网');
+    case 'tailnet':
+      return t('Tailscale');
+    case 'public':
+      return t('外部网络');
+    default:
+      return t('不明');
+  }
+}
+
+function displayPairCode(code: string): string {
+  return code.length > 4 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
 }
 
 function sourceLabel(
@@ -111,6 +133,7 @@ export function RemoteAccessPage() {
   const routesQ = useRemoteRoutes(live);
   const devicesQ = useRemoteDevices(live);
   const grantsQ = usePairingGrants(live);
+  const requestsQ = usePairingRequests(live);
   const mutations = useRemoteMutations();
   const setTailnet = useSetTailnetAccess();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
@@ -154,11 +177,17 @@ export function RemoteAccessPage() {
   const awaitingTailnetLogin = loginUrl !== null;
   const devices = devicesQ.data ?? [];
   const grants = grantsQ.data ?? [];
+  const requests = requestsQ.data ?? [];
   const startPairing = () =>
     mutations.createPairingCode.mutate(undefined, {
       onSuccess: setPairing,
       onError: (error) => toastError(t('生成配对码失败，请重试。'), error),
     });
+  const decideRequest = (id: string, decision: 'approve' | 'deny') =>
+    mutations.decidePairRequest.mutate(
+      { id, decision },
+      { onError: (error) => toastError(t('操作失败，请重试。'), error) },
+    );
   return (
     <PageShell
       route={REMOTE_ACCESS_ROUTE}
@@ -178,6 +207,46 @@ export function RemoteAccessPage() {
         ) : null
       }
     >
+      {requests.map((request) => (
+        <Card key={request.id} className="mt-3 gap-2 p-4" data-testid="pair-request">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="m-0 text-ui font-medium">{t('新设备请求配对')}</p>
+            <p className="m-0 text-meta text-content-tertiary">
+              {joinMeta([
+                request.name,
+                request.detail,
+                pairRequestSourceName(request.source, t),
+                relativeTime(request.createdAt, Date.now(), t),
+              ])}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="font-mono text-2xl font-semibold text-foreground tabular-nums select-none">
+              {displayPairCode(request.code)}
+            </span>
+            <span className="flex-1" />
+            <Button
+              variant="ghost"
+              className={DIALOG_PRIMARY_BUTTON}
+              disabled={mutations.decidePairRequest.isPending}
+              onClick={() => decideRequest(request.id, 'deny')}
+            >
+              {t('拒绝')}
+            </Button>
+            <Button
+              variant="outline"
+              className={DIALOG_PRIMARY_BUTTON}
+              disabled={mutations.decidePairRequest.isPending}
+              onClick={() => decideRequest(request.id, 'approve')}
+            >
+              {t('批准')}
+            </Button>
+          </div>
+          <p className="m-0 text-meta text-content-tertiary">
+            {t('先确认这个码和那台电脑屏幕上的一样，再批准。')}
+          </p>
+        </Card>
+      ))}
       {(live || routesQ.data !== undefined) && (
         <SettingsCard className="mt-3">
           <SettingsRow

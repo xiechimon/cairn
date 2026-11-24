@@ -1,6 +1,8 @@
 import { networkInterfaces } from 'node:os';
 import {
   pairBodySchema,
+  pairClaimBodySchema,
+  pairRequestBodySchema,
   REMOTE_DESCRIPTOR_VERSION,
   type RemoteDescriptor,
   tailnetSetBodySchema,
@@ -10,6 +12,7 @@ import type { AppContext } from './context.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { buildRemoteRoutes } from './lib/remote-routes.js';
+import { pairRequestPeerOf } from './lib/request-origin.js';
 import { matchesAuthToken } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
@@ -21,6 +24,12 @@ import {
   revokePairedDevice,
   revokePairingGrant,
 } from './services/paired-devices.js';
+import {
+  claimPairRequest,
+  createPairRequest,
+  decidePairRequest,
+  listPairRequests,
+} from './services/pairing-requests.js';
 
 function bearerToken(c: Context): string | null {
   const match = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
@@ -105,6 +114,81 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     if (remote.tailnet === undefined) throw new HttpError(404, 'tailnet access unavailable');
     const body = parseWith(tailnetSetBodySchema, await jsonBody(c), 'body');
     return c.json(await remote.tailnet.setEnabled(body.enabled));
+  });
+
+  const requireTokenAuth = (): void => {
+    if (ctx.authToken === null) {
+      throw new HttpError(409, 'pairing needs token auth, which is turned off');
+    }
+  };
+
+  app.post('/api/remote/pair/request', async (c) => {
+    if (
+      c.req.header('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json'
+    ) {
+      return c.json({ error: 'application/json required' }, 415);
+    }
+    requireTokenAuth();
+    c.header('cache-control', 'no-store');
+    const body = parseWith(pairRequestBodySchema, await jsonBody(c), 'body');
+    const { source, peer } = pairRequestPeerOf(c);
+    const issued = createPairRequest(ctx.db, {
+      name: body.name,
+      detail: body.detail,
+      source,
+      peer,
+    });
+    return c.json(issued, 201);
+  });
+
+  app.post('/api/remote/pair/claim', async (c) => {
+    if (
+      c.req.header('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json'
+    ) {
+      return c.json({ error: 'application/json required' }, 415);
+    }
+    requireTokenAuth();
+    c.header('cache-control', 'no-store');
+    const body = parseWith(pairClaimBodySchema, await jsonBody(c), 'body');
+    const outcome = claimPairRequest(ctx.db, {
+      id: body.id,
+      secret: body.secret,
+      teamId: ctx.team.id,
+    });
+    if (outcome.status === 'missing') throw new HttpError(404, 'pairing request not found');
+    if (outcome.status !== 'approved') return c.json({ status: outcome.status });
+    setAuthCookie(c, outcome.sessionToken, requestIsSecure(c), outcome.sessionExpiresAt);
+    return c.json({
+      status: 'approved',
+      token: outcome.token,
+      deviceId: outcome.device.id,
+      environmentId: remote.environmentId,
+    });
+  });
+
+  app.get('/api/remote/pairing-requests', (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    return c.json(listPairRequests(ctx.db));
+  });
+
+  app.post('/api/remote/pairing-requests/:id/:decision', (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    const decision = c.req.param('decision');
+    if (decision !== 'approve' && decision !== 'deny') {
+      throw new HttpError(404, 'Not found');
+    }
+    const result = decidePairRequest(
+      ctx.db,
+      c.req.param('id'),
+      decision === 'approve' ? 'approved' : 'denied',
+    );
+    if (result === 'missing') throw new HttpError(404, 'pairing request not found');
+    if (result === 'decided') {
+      throw new HttpError(409, 'pairing request already decided or expired');
+    }
+    return c.json({ id: c.req.param('id') });
   });
 
   app.post('/api/remote/pair', async (c) => {

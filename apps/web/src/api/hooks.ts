@@ -66,6 +66,7 @@ import type {
   PackageInstallDecisionBody,
   PairedDevice,
   PairingCodeResponse,
+  PairingRequestView,
   PatchMachineBody,
   PatchMcpConnectorBody,
   PatchMemoryBody,
@@ -762,8 +763,25 @@ export function useRemoteMutations() {
       mutationFn: (id: string) => api.del<void>(`/api/remote/pairing/${encodeURIComponent(id)}`),
       onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairingGrants'] }),
     }),
+    decidePairRequest: useMutation({
+      mutationFn: ({ id, decision }: { id: string; decision: 'approve' | 'deny' }) =>
+        api.post<void>(`/api/remote/pairing-requests/${encodeURIComponent(id)}/${decision}`, {}),
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['pairingRequests'] });
+        void queryClient.invalidateQueries({ queryKey: ['remoteDevices'] });
+      },
+    }),
   };
 }
+
+export const usePairingRequests = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['pairingRequests'],
+    queryFn: () => api.get<PairingRequestView[]>('/api/remote/pairing-requests'),
+    enabled,
+    retry: false,
+    refetchInterval: DEVICES_POLL_MS,
+  });
 
 export const usePairingGrants = (enabled: boolean) =>
   useQuery({

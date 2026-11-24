@@ -1,22 +1,44 @@
 import { TLSSocket } from 'node:tls';
+import type { PairRequestSource } from '@cairn/shared';
 import type { Http2Bindings, HttpBindings } from '@hono/node-server';
 import { getConnInfo } from '@hono/node-server/conninfo';
 import type { Context } from 'hono';
 import { forwardedOrigin } from './forwarded-origin.js';
-import { tailnetOriginOf } from './tailnet-listener.js';
+import { tailnetIdentityOf, tailnetOriginOf } from './tailnet-listener.js';
 
 type NodeBindings = HttpBindings | Http2Bindings;
 
 const LOOPBACK_PEER_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
-export function isLoopbackPeer(c: Context): boolean {
-  let peerAddress: string | undefined;
+function peerAddressOf(c: Context): string | undefined {
   try {
-    peerAddress = getConnInfo(c).remote.address;
+    return getConnInfo(c).remote.address;
   } catch (error) {
     if (!(error instanceof TypeError)) throw error;
+    return undefined;
   }
+}
+
+export function isLoopbackPeer(c: Context): boolean {
+  const peerAddress = peerAddressOf(c);
   return peerAddress !== undefined && LOOPBACK_PEER_ADDRESSES.has(peerAddress);
+}
+
+const TAILSCALE_PEER = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])(?:\.\d{1,3}){2}$/;
+const LAN_PEER =
+  /^(?:10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|169\.254(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}|f[cd][0-9a-f]*:|fe80:)/i;
+
+export function pairRequestPeerOf(c: Context): { source: PairRequestSource; peer: string } {
+  const tailnetIdentity = tailnetIdentityOf(c);
+  let address = peerAddressOf(c);
+  if (address?.startsWith('::ffff:')) address = address.slice('::ffff:'.length);
+  const peer = tailnetIdentity?.login ?? address ?? 'unknown';
+  if (tailnetOriginOf(c) !== null) return { source: 'tailnet', peer };
+  if (address === undefined) return { source: 'unknown', peer };
+  if (LOOPBACK_PEER_ADDRESSES.has(address)) return { source: 'loopback', peer };
+  if (TAILSCALE_PEER.test(address)) return { source: 'tailnet', peer };
+  if (LAN_PEER.test(address)) return { source: 'lan', peer };
+  return { source: 'public', peer };
 }
 
 export function requestOrigin(c: Context): string {

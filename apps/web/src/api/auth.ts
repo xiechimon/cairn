@@ -2,6 +2,7 @@ import {
   BROWSER_AUTH_HEADER,
   BROWSER_SESSION_PATH,
   isBrowserAuthExempt,
+  type PairClaimResponse,
   parsePairFragment,
   type RemoteDescriptor,
 } from '@cairn/shared';
@@ -39,11 +40,20 @@ export function clearLegacyBrowserToken(): void {
   } catch {}
 }
 
+export type PairAttemptPhase = 'requesting' | 'pending' | 'denied' | 'expired' | 'unavailable';
+
+export interface PairAttempt {
+  phase: PairAttemptPhase;
+  code: string | null;
+  expiresAt: number | null;
+}
+
 export interface AuthSnapshot {
   gateOpen: boolean;
   rejected: boolean;
   pairing: boolean;
   retrying: boolean;
+  pair: PairAttempt | null;
   generation: number;
 }
 
@@ -59,11 +69,14 @@ type SessionRecovery = {
 let gate: Gate = 'hidden';
 let recovery: SessionRecovery | null = null;
 let retrying = false;
+let pairAttempt: PairAttempt | null = null;
+let pairAbort: AbortController | null = null;
 let snapshot: AuthSnapshot = {
   gateOpen: false,
   rejected: false,
   pairing: false,
   retrying: false,
+  pair: null,
   generation: 0,
 };
 const listeners = new Set<() => void>();
@@ -72,17 +85,19 @@ function publish(confirmedReplacement = false): void {
   const gateOpen = retrying || gate !== 'hidden';
   const rejected = !retrying && gate === 'rejected';
   const busy = recovery?.phase === 'redeeming';
+  const pair = pairAttempt;
   const generation =
     snapshot.generation + Number(confirmedReplacement || gateOpen !== snapshot.gateOpen);
   if (
     generation === snapshot.generation &&
     rejected === snapshot.rejected &&
     busy === snapshot.pairing &&
-    retrying === snapshot.retrying
+    retrying === snapshot.retrying &&
+    pair === snapshot.pair
   ) {
     return;
   }
-  snapshot = { gateOpen, rejected, pairing: busy, retrying, generation };
+  snapshot = { gateOpen, rejected, pairing: busy, retrying, pair, generation };
   for (const listener of listeners) listener();
 }
 
@@ -104,6 +119,9 @@ export function useAuth(): AuthSnapshot {
 const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 const DESCRIPTOR_PATH = '/api/remote/descriptor';
 const PAIR_PATH = '/api/remote/pair';
+const PAIR_REQUEST_PATH = '/api/remote/pair/request';
+const PAIR_CLAIM_PATH = '/api/remote/pair/claim';
+const PAIR_CLAIM_POLL_MS = 2_000;
 const SESSION_REQUEST_TIMEOUT_MS = 5_000;
 const PROBE_RETRY_INITIAL_MS = 250;
 const PROBE_RETRY_MAX_MS = 4_000;
@@ -177,6 +195,7 @@ function applyVerdict(
   retrying = false;
   const authenticated = verdict === 'authenticated';
   if (authenticated) {
+    abortPairAttempt();
     if (gate !== 'hidden' || replacement) clearLegacyBrowserToken();
     gate = 'hidden';
   } else if (verdict === 'signed-out' && (gate === 'hidden' || signedOutGate === 'rejected')) {
@@ -185,6 +204,151 @@ function applyVerdict(
   }
   publish(authenticated && replacement);
   return authenticated;
+}
+
+function browserDetail(): string | undefined {
+  const ua = navigator.userAgent;
+  const found =
+    /Edg(?:e|A|iOS)?\/(\d+)/.exec(ua) ??
+    /Chrome\/(\d+)/.exec(ua) ??
+    /Firefox\/(\d+)/.exec(ua) ??
+    (/Safari\//.test(ua) ? /Version\/(\d+)/.exec(ua) : null);
+  if (found === null) return undefined;
+  const name = ua.includes('Edg')
+    ? 'Edge'
+    : ua.includes('Chrome')
+      ? 'Chrome'
+      : ua.includes('Firefox')
+        ? 'Firefox'
+        : 'Safari';
+  return `${name} ${found[1]}`;
+}
+
+function sleepOrAbort(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener('abort', done, { once: true });
+  });
+}
+
+function abortPairAttempt(): void {
+  pairAbort?.abort();
+  pairAbort = null;
+  pairAttempt = null;
+}
+
+export function ensurePairRequest(): void {
+  if (
+    DEMO_MODE ||
+    retrying ||
+    recovery?.phase === 'redeeming' ||
+    recovery?.phase === 'looking-up'
+  ) {
+    return;
+  }
+  if (
+    pairAttempt !== null &&
+    (pairAttempt.phase === 'requesting' || pairAttempt.phase === 'pending')
+  ) {
+    return;
+  }
+  pairAbort?.abort();
+  const controller = new AbortController();
+  pairAbort = controller;
+  pairAttempt = { phase: 'requesting', code: null, expiresAt: null };
+  publish();
+  void runPairAttempt(controller);
+}
+
+export function requestNewPairAttempt(): void {
+  abortPairAttempt();
+  if (gate === 'hidden') return;
+  ensurePairRequest();
+}
+
+async function runPairAttempt(controller: AbortController): Promise<void> {
+  const { signal } = controller;
+  const platform =
+    typeof navigator === 'undefined'
+      ? 'Browser'
+      : ((navigator as { userAgentData?: { platform?: string } }).userAgentData?.platform ??
+        'Browser');
+  const detail = typeof navigator === 'undefined' ? undefined : browserDetail();
+  let issued: { id: string; secret: string; code: string; expiresAt: number } | null = null;
+  try {
+    const response = await fetch(PAIR_REQUEST_PATH, {
+      method: 'POST',
+      redirect: 'error',
+      credentials: 'same-origin',
+      headers: { 'content-type': 'application/json', [BROWSER_AUTH_HEADER]: '1' },
+      body: JSON.stringify({
+        name: platform ?? 'Browser',
+        ...(detail === undefined ? {} : { detail }),
+      }),
+      signal,
+    });
+    if (response.status === 201 && !response.redirected) {
+      issued = (await response.json()) as {
+        id: string;
+        secret: string;
+        code: string;
+        expiresAt: number;
+      };
+    }
+  } catch {}
+  if (signal.aborted) return;
+  if (issued === null) {
+    pairAttempt = { phase: 'unavailable', code: null, expiresAt: null };
+    publish();
+    return;
+  }
+  pairAttempt = { phase: 'pending', code: issued.code, expiresAt: issued.expiresAt };
+  publish();
+  while (!signal.aborted) {
+    const wait = Math.min(PAIR_CLAIM_POLL_MS, issued.expiresAt - Date.now());
+    if (wait <= 0) break;
+    await sleepOrAbort(wait, signal);
+    if (signal.aborted) return;
+    let outcome: PairClaimResponse['status'] | 'gone' | 'retry' = 'retry';
+    try {
+      const response = await fetch(PAIR_CLAIM_PATH, {
+        method: 'POST',
+        redirect: 'error',
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json', [BROWSER_AUTH_HEADER]: '1' },
+        body: JSON.stringify({ id: issued.id, secret: issued.secret }),
+        signal,
+      });
+      if (signal.aborted) return;
+      if (response.status === 404) outcome = 'gone';
+      else if (response.ok && !response.redirected) {
+        outcome = ((await response.json()) as PairClaimResponse).status;
+      }
+    } catch {}
+    if (outcome === 'retry' || outcome === 'pending') continue;
+    if (outcome === 'approved') {
+      const verdict = await probeSession(signal);
+      if (signal.aborted) return;
+      if (verdict !== null && applyVerdict(verdict, 'waiting')) return;
+      continue;
+    }
+    pairAttempt = {
+      phase: outcome === 'denied' ? 'denied' : 'expired',
+      code: pairAttempt?.code ?? issued.code,
+      expiresAt: pairAttempt?.expiresAt ?? issued.expiresAt,
+    };
+    publish();
+    return;
+  }
+  if (!signal.aborted && pairAttempt?.phase === 'pending') {
+    pairAttempt = { ...pairAttempt, phase: 'expired' };
+    publish();
+  }
 }
 
 async function exchangeAccessIdentity(signal: AbortSignal): Promise<boolean> {

@@ -6,6 +6,10 @@ export const PAIRING_CODE_TTL_MS = 300_000;
 export const PAIRING_CODE_CAP = 20;
 export const PAIRED_DEVICE_CAP = 50;
 export const DEVICE_NAME_MAX_CHARS = 80;
+export const PAIRING_REQUEST_CLAIM_GRACE_MS = 120_000;
+export const PAIRING_REQUEST_CAP = 20;
+export const PAIRING_REQUEST_RATE_CAP = 20;
+export const PAIRING_REQUEST_RATE_WINDOW_MS = 600_000;
 export const PAIR_FRAGMENT_KEY = 'pair';
 export const PAIR_FRAGMENT_ENVIRONMENT_KEY = 'env';
 export const DEVICE_TOKEN_PREFIX = 'cairn_dev_';
@@ -13,7 +17,12 @@ export const BROWSER_AUTH_HEADER = 'x-cairn-browser-auth';
 export const BROWSER_SESSION_PATH = '/api/auth/session';
 
 export function isOpenRemotePath(pathname: string): boolean {
-  return pathname === '/api/remote/descriptor' || pathname === '/api/remote/pair';
+  return (
+    pathname === '/api/remote/descriptor' ||
+    pathname === '/api/remote/pair' ||
+    pathname === '/api/remote/pair/request' ||
+    pathname === '/api/remote/pair/claim'
+  );
 }
 
 export function isBrowserAuthExempt(pathname: string): boolean {
@@ -123,6 +132,57 @@ export const pairResponseSchema = z.object({
   environmentId: z.string().min(1),
 });
 export type PairResponse = z.infer<typeof pairResponseSchema>;
+
+export const pairRequestSourceSchema = z.enum(['loopback', 'lan', 'tailnet', 'public', 'unknown']);
+export type PairRequestSource = z.infer<typeof pairRequestSourceSchema>;
+
+export const pairRequestBodySchema = z
+  .object({
+    name: deviceNameSchema,
+    detail: z.string().trim().min(1).max(120).optional(),
+  })
+  .strict();
+export type PairRequestBody = z.infer<typeof pairRequestBodySchema>;
+
+export const pairRequestResponseSchema = z.object({
+  id: recordId,
+  secret: z.string().min(1),
+  code: z.string().min(1),
+  expiresAt: epochMs,
+});
+export type PairRequestResponse = z.infer<typeof pairRequestResponseSchema>;
+
+export const pairClaimBodySchema = z
+  .object({
+    id: z.string().min(1).max(128),
+    secret: z.string().min(1).max(256),
+  })
+  .strict();
+export type PairClaimBody = z.infer<typeof pairClaimBodySchema>;
+
+export const pairClaimResponseSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('pending') }),
+  z.object({
+    status: z.literal('approved'),
+    token: z.string().min(1),
+    deviceId: recordId,
+    environmentId: z.string().min(1),
+  }),
+  z.object({ status: z.literal('denied') }),
+  z.object({ status: z.literal('expired') }),
+]);
+export type PairClaimResponse = z.infer<typeof pairClaimResponseSchema>;
+
+export const pairingRequestViewSchema = z.object({
+  id: recordId,
+  code: z.string(),
+  name: z.string(),
+  detail: z.string().nullable(),
+  source: pairRequestSourceSchema,
+  createdAt: epochMs,
+  expiresAt: epochMs,
+});
+export type PairingRequestView = z.infer<typeof pairingRequestViewSchema>;
 
 export const pairedDeviceSchema = z.object({
   id: recordId,
