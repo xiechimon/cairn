@@ -20,6 +20,7 @@ function version(fileName: string, seq: number, attachmentId: string): DesignVer
 const pages: DesignPageRecord[] = [
   {
     fileName: 'index.html',
+    kind: 'page',
     current: version('index.html', 1, 'att-index'),
     versionCount: 1,
     openComments: 0,
@@ -27,6 +28,7 @@ const pages: DesignPageRecord[] = [
   },
   {
     fileName: 'pricing.html',
+    kind: 'page',
     current: version('pricing.html', 2, 'att-v2'),
     versionCount: 2,
     openComments: 0,

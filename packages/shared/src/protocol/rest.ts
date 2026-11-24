@@ -149,9 +149,19 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   {
     method: 'GET',
     path: '/api/todos/{id}/design',
-    note: 'design pages of the task: current version, version count, open comments, live share token; shareOrigin is the relay origin or null',
+    note: 'artifacts of the task with their kind: current version, version count, open comments, live share token; shareOrigin is the relay origin or null',
   },
   { method: 'GET', path: '/api/todos/{id}/design/{fileName}/versions', note: 'by seq descending' },
+  {
+    method: 'POST',
+    path: '/api/todos/{id}/design/{fileName}/versions',
+    note: 'saves a whiteboard edited in the artifact panel as a user version',
+  },
+  {
+    method: 'GET',
+    path: '/api/attachments/{id}/artifact',
+    note: 'the task artifact this attachment is a version of: file, kind, version seq and count, open comments',
+  },
   {
     method: 'POST',
     path: '/api/todos/{id}/design/versions/{versionId}/restore',
