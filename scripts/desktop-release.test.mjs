@@ -1186,7 +1186,12 @@ test('both architectures are packaged in parallel and published only after both 
   );
   assert.deepEqual(workflow.jobs.package.strategy.matrix.arch, ['arm64', 'x64']);
   assert.match(manifest, /ARCHS = \['arm64', 'x64'\]/);
-  assert.deepEqual(workflow.jobs.publish.needs, ['decide', 'package', 'package-win', 'live-verify']);
+  assert.deepEqual(workflow.jobs.publish.needs, [
+    'decide',
+    'package',
+    'package-win',
+    'live-verify',
+  ]);
   assert.equal(workflow.jobs.publish.permissions.contents, 'write');
   assert.equal(workflow.jobs.package.permissions, undefined);
 });

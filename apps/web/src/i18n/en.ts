@@ -2878,7 +2878,6 @@ export const EN: Record<string, string> = {
   '例如：https://relay.example.com': 'e.g. https://relay.example.com',
   '例如：friend@example.com': 'e.g. friend@example.com',
   授权给其他账号: 'Share with another account',
-  退出: 'Sign out',
   本机已在线: 'This computer · online',
   点击连接: 'Connect',
   未开机: 'Offline',
