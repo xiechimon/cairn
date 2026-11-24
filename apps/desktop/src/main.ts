@@ -1,8 +1,9 @@
+import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { homedir, release } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { format } from 'node:util';
 import {
   ACCESS_TOKEN_FILE_NAME,
@@ -16,6 +17,8 @@ import {
   ENV_VARS,
   isAppPath,
   isDesktopNotifyPayload,
+  type NativeTrayMenu,
+  nativeTrayMenuSchema,
   OWNER_CHANNEL_HEADER,
   OWNER_CHANNEL_MESSAGE,
   OWNER_CHANNEL_READY,
@@ -65,6 +68,13 @@ import {
 import { createKeepAwake } from './keep-awake.js';
 import { readLocalProviders, scanLocalProviders } from './local-providers.js';
 import { type DesktopLocale, desktopLocale } from './locale.js';
+import {
+  type NativeTray,
+  nativeTrayAction,
+  skeletonTrayMenu,
+  startNativeTray,
+  withHostState,
+} from './native-tray.js';
 import { desktopOtelEnv, withOtelFileEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type CapturePage, createPageCapture } from './page-capture.js';
@@ -153,6 +163,8 @@ const TRAY_QUEUED_OPEN_MS = 2_000;
 const ERR_ABORTED = -3;
 const TRAY_LIGHT_FILL = '#f6f6f6';
 const TRAY_DARK_FILL = '#2b2b2b';
+const NATIVE_TRAY_RESTART_MAX = 3;
+const NATIVE_TRAY_STABLE_MS = 60_000;
 const IS_MAC = process.platform === 'darwin';
 const BACKGROUND_LAUNCH = process.argv.includes(BACKGROUND_LAUNCH_FLAG);
 const MENU_COMMANDS: ReadonlySet<string> = new Set<DesktopMenuCommand>([
@@ -193,7 +205,7 @@ const serverExited = createServerExitHandler<RunningServer>({
 });
 let mainWindow: BrowserWindow | null = null;
 let windowState: WindowStateStore | null = null;
-let tray: Tray | null = null;
+let tray: { destroy: () => void } | null = null;
 let trayOpenUntil = 0;
 let runner: LocalRunner | null = null;
 let runnerStarting: Promise<void> | null = null;
@@ -568,6 +580,7 @@ function createTrayPopover(): BrowserWindow {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      backgroundThrottling: false,
       preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
     },
   });
@@ -603,7 +616,15 @@ async function windowLocale(): Promise<DesktopLocale> {
   return desktopLocale(app.getLocale());
 }
 
-function showTray(origin: string, controls: TrayControls): Tray {
+function nativeTrayHelper(): string | null {
+  if (!IS_MAC) return null;
+  const helper = app.isPackaged
+    ? join(process.resourcesPath, 'tray', 'CairnTray')
+    : join(app.getAppPath(), 'tray-helper', process.arch, 'CairnTray');
+  return existsSync(helper) ? helper : null;
+}
+
+function showTray(origin: string, controls: TrayControls): { destroy: () => void } {
   const trayIcon = (name: string): NativeImage => {
     const image = nativeImage.createFromPath(join(app.getAppPath(), 'assets', name));
     image.setTemplateImage(true);
@@ -612,10 +633,30 @@ function showTray(origin: string, controls: TrayControls): Tray {
   const idleIcon = trayIcon('trayTemplate.png');
   const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
-  const created = new Tray(keepAwake.isHolding() ? awakeIcon : idleIcon);
-  if (IS_MAC) created.setIgnoreDoubleClickEvents(true);
+  const tooltip = `Cairn · ${new URL(origin).host}`;
+  let created: Tray | null = null;
+  let native: NativeTray | null = null;
+  let pageMenu: NativeTrayMenu | null = null;
+  let sentMenu: NativeTrayMenu = skeletonTrayMenu(desktopLocale(app.getLocale()));
+  let sentMenuJson = '';
+  const sendIcon = (): void => {
+    native?.send({ type: 'icon', awake: keepAwake.isHolding(), tooltip });
+  };
   const refreshIcon = (): void => {
-    created.setImage(keepAwake.isHolding() ? awakeIcon : idleIcon);
+    created?.setImage(keepAwake.isHolding() ? awakeIcon : idleIcon);
+    sendIcon();
+  };
+  const pushMenu = (force = false): void => {
+    if (native === null) return;
+    const menu = withHostState(pageMenu ?? sentMenu, {
+      keepAwake: keepAwake.isOn(),
+      runner: controls.runner(),
+    });
+    const json = JSON.stringify(menu);
+    if (!force && json === sentMenuJson) return;
+    sentMenu = menu;
+    sentMenuJson = json;
+    native.send({ type: 'menu', menu });
   };
   const fallbackMenu = (): Menu =>
     Menu.buildFromTemplate(
@@ -625,11 +666,10 @@ function showTray(origin: string, controls: TrayControls): Tray {
         quit: () => app.quit(),
       }),
     );
-  created.setToolTip(`Cairn · ${new URL(origin).host}`);
   const setKeepAwake = (on: boolean): void => {
     keepAwake.set(on);
     refreshIcon();
-    if (!IS_MAC) created.setContextMenu(fallbackMenu());
+    if (!IS_MAC) created?.setContextMenu(fallbackMenu());
   };
   if (controls.nextRunAt !== undefined) {
     const nextRunAt = controls.nextRunAt;
@@ -658,9 +698,11 @@ function showTray(origin: string, controls: TrayControls): Tray {
     accent: systemAccent(),
   });
   const publish = (): void => {
-    if (popover.isVisible()) popover.webContents.send('desktop-tray:state', state());
+    if (!contents.isDestroyed()) contents.send('desktop-tray:state', state());
+    pushMenu();
   };
   const place = (): void => {
+    if (created === null) return;
     const iconBounds = created.getBounds();
     popover.setBounds(
       trayPopoverBounds(iconBounds, screen.getDisplayMatching(iconBounds).workArea, height),
@@ -763,9 +805,63 @@ function showTray(origin: string, controls: TrayControls): Tray {
   });
   contents.on('did-stop-loading', () => reconcileStoppedLoad());
   contents.on('render-process-gone', failDocument);
-  created.on('click', toggle);
-  if (IS_MAC) created.on('right-click', toggle);
-  else created.setContextMenu(fallbackMenu());
+  const showFallback = (): void => {
+    if (created !== null || quitting) return;
+    const fallback = new Tray(keepAwake.isHolding() ? awakeIcon : idleIcon);
+    if (IS_MAC) fallback.setIgnoreDoubleClickEvents(true);
+    fallback.setToolTip(tooltip);
+    fallback.on('click', toggle);
+    if (IS_MAC) fallback.on('right-click', toggle);
+    else fallback.setContextMenu(fallbackMenu());
+    created = fallback;
+  };
+  const hideFallback = (): void => {
+    hide();
+    created?.destroy();
+    created = null;
+  };
+  const runNativeAction = (id: string): void => {
+    const action = nativeTrayAction(sentMenu, id);
+    if (action === null) return;
+    if (action.kind === 'open') {
+      app.focus({ steal: true });
+      openFromTray(action.target);
+    } else if (action.kind === 'runner') {
+      void controls.setRunner(action.on).then(publish);
+    } else if (action.kind === 'keep-awake') {
+      setKeepAwake(action.on);
+      publish();
+    } else {
+      app.quit();
+    }
+  };
+  const helper = nativeTrayHelper();
+  if (helper === null) {
+    showFallback();
+  } else {
+    native = startNativeTray({
+      command: helper,
+      args: [dirname(helper)],
+      spawn,
+      budget: createRestartBudget(NATIVE_TRAY_RESTART_MAX, NATIVE_TRAY_STABLE_MS),
+      host: {
+        up: () => {
+          hideFallback();
+          pushMenu(true);
+          sendIcon();
+        },
+        down: showFallback,
+        event: (event) => {
+          if (event.type === 'opened' && !contents.isDestroyed()) {
+            contents.send('desktop-tray:opened');
+          } else if (event.type === 'action') {
+            runNativeAction(event.id);
+          }
+        },
+        log: (line) => console.error(`Cairn tray: ${line}`),
+      },
+    });
+  }
   setInterval(publish, TRAY_REFRESH_MS);
   const fromPopover = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
     event.sender === popover.webContents && event.senderFrame?.origin === origin;
@@ -797,8 +893,25 @@ function showTray(origin: string, controls: TrayControls): Tray {
   ipcMain.on('desktop-tray:quit', (event) => {
     if (fromPopover(event)) app.quit();
   });
+  ipcMain.on('desktop-tray:menu', (event, menu: unknown) => {
+    if (!fromPopover(event)) return;
+    const parsed = nativeTrayMenuSchema.safeParse(menu);
+    if (!parsed.success) {
+      console.error('Cairn tray: the page sent a menu that does not match the schema');
+      return;
+    }
+    pageMenu = parsed.data;
+    pushMenu();
+  });
   loadTray();
-  return created;
+  return {
+    destroy: () => {
+      native?.stop();
+      native = null;
+      created?.destroy();
+      created = null;
+    },
+  };
 }
 
 function serveNotifications(origin: string): void {

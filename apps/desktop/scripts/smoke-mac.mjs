@@ -19,6 +19,10 @@ const DISMISS_GAP_MS = 400;
 const QUEUED_OPEN_MS = 2_000;
 const QUEUED_OPEN_EXPIRY_WAIT_MS = 2_250;
 const EVALUATE_TIMEOUT_MS = 15_000;
+const NATIVE_TRAY_HELPER = 'Contents/Resources/tray/CairnTray';
+const NATIVE_RESTARTS = 3;
+const NATIVE_READY_TIMEOUT_MS = 20_000;
+const NATIVE_CONTENT_TIMEOUT_MS = 30_000;
 const PAIRING_INPUT = '#cairn-pair-input';
 const FIRST_RUN_SETUP = '[data-testid="first-run-setup"]';
 const RUNNER_ONLINE_TIMEOUT_MS = 90_000;
@@ -136,7 +140,6 @@ try {
       const on = Tray.prototype.on;
       Tray.prototype.on = function (name, listener) {
         if (name === 'click') {
-          Tray.prototype.on = on;
           this.prependListener('click', () => {
             cold.clickTimes.push(performance.now());
             cold.beforeClick?.();
@@ -350,12 +353,70 @@ try {
           : error.message;
     }
   };
-  const firstPaint = {
-    name: 'first click waits for the held first document',
+  const helperPids = () =>
+    childPids(appPid).filter((pid) => commandOf(pid).includes(`${appRoot}/${NATIVE_TRAY_HELPER}`));
+  async function waitForHelper(previous) {
+    const deadline = Date.now() + NATIVE_READY_TIMEOUT_MS;
+    for (;;) {
+      const pid = helperPids().find((candidate) => candidate !== previous);
+      if (
+        pid !== undefined &&
+        (await driver.send({ cmd: 'statusItem', pid: Number(pid) })).ok === true
+      )
+        return Number(pid);
+      if (Date.now() > deadline)
+        throw new Error(
+          `no native tray helper with a status item after ${NATIVE_READY_TIMEOUT_MS} ms`,
+        );
+      await new Promise((wake) => setTimeout(wake, 200));
+    }
+  }
+  const nativeMenuOpen = async (pid) =>
+    (await driver.send({ cmd: 'windows', pid })).windows.some(
+      (entry) => entry.onscreen === 1 && entry.layer >= 100,
+    );
+  async function waitForNativeMenu(pid, open) {
+    const deadline = Date.now() + OPEN_TIMEOUT_MS;
+    for (;;) {
+      if ((await nativeMenuOpen(pid)) === open) return true;
+      if (Date.now() > deadline) return false;
+      await new Promise((wake) => setTimeout(wake, 100));
+    }
+  }
+  async function openNativeMenu(pid) {
+    const clicked = await driver.send({ cmd: 'clickStatus', pid, button: 'left' });
+    assert.equal(
+      clicked.statusPid,
+      pid,
+      `the native status item got no click: ${JSON.stringify(clicked)}`,
+    );
+    assert.equal(
+      await waitForNativeMenu(pid, true),
+      true,
+      'the native menu did not open on a click',
+    );
+    await driver.send({ cmd: 'sleep', ms: 600 });
+    assert.equal(await nativeMenuOpen(pid), true, 'the native menu closed after mouse-up');
+  }
+  async function closeNativeMenu(pid) {
+    await driver.send({ cmd: 'escape', pid });
+    assert.equal(await waitForNativeMenu(pid, false), true, 'Escape did not close the native menu');
+    await driver.send({ cmd: 'sleep', ms: DISMISS_GAP_MS });
+  }
+  const nativeTitles = async (pid) =>
+    (await driver.send({ cmd: 'menuItems', pid })).items.map((item) => item.title);
+
+  const nativeMenu = {
+    name: 'native menu: skeleton while the page loads, content, keyboard, Esc and Settings',
     result: 'red',
     detail: '',
   };
-  const outcomes = [firstPaint];
+  const nativeFallback = {
+    name: 'native menu falls back to the web popover after repeated helper crashes',
+    result: 'red',
+    detail: '',
+  };
+  const outcomes = [nativeMenu, nativeFallback];
   const coldTrayState = () =>
     popoverWindow(({ BrowserWindow, webContents }) => {
       const { contentsId, painted, finished, release } = globalThis.__cairnColdTray;
@@ -368,7 +429,8 @@ try {
         visible: contents != null && BrowserWindow.fromWebContents(contents)?.isVisible() === true,
       };
     });
-  await mandatory(firstPaint, async () => {
+  let helper = null;
+  await mandatory(nativeMenu, async () => {
     const unpainted = {
       painted: false,
       finished: false,
@@ -376,20 +438,16 @@ try {
       loading: true,
       visible: false,
     };
+    helper = await waitForHelper(null);
     try {
       assert.deepEqual(await coldTrayState(), unpainted, 'the first tray document was not held');
-      assert.equal((await popoverOnScreen()).onScreen, false, 'the cold panel opened by itself');
-      await clickStatusItem();
-      assert.equal(
-        (await popoverOnScreen()).onScreen,
-        false,
-        'the cold panel was on screen after the click with its first document held',
+      await openNativeMenu(helper);
+      const skeleton = await nativeTitles(helper);
+      assert.ok(
+        skeleton.includes('Open Cairn') || skeleton.includes('打开 Cairn'),
+        `the native menu did not show the skeleton while the page was held: ${JSON.stringify(skeleton)}`,
       );
-      assert.deepEqual(
-        await coldTrayState(),
-        unpainted,
-        'the first document or paint was no longer held after the click',
-      );
+      await closeNativeMenu(helper);
     } finally {
       await popoverWindow(({ session }) => {
         const cold = globalThis.__cairnColdTray;
@@ -398,21 +456,91 @@ try {
         session.defaultSession.webRequest.onBeforeRequest(null);
       });
     }
-    const shown = await waitForScreen(true);
-    assert.equal(
-      shown.onScreen,
-      true,
-      `the queued click did not show the panel after the first document loaded: ${shown.reason}`,
+    const deadline = Date.now() + NATIVE_CONTENT_TIMEOUT_MS;
+    let content = [];
+    for (;;) {
+      await openNativeMenu(helper);
+      content = await nativeTitles(helper);
+      if (content.some((title) => title.startsWith('Coordinator'))) break;
+      await closeNativeMenu(helper);
+      assert.ok(
+        Date.now() < deadline,
+        `the page never filled the native menu: ${JSON.stringify(content)}`,
+      );
+      await driver.send({ cmd: 'sleep', ms: 1_000 });
+    }
+    const settings = content.includes('Settings') ? 'Settings' : '设置';
+    for (const title of [settings, content.includes('Quit Cairn') ? 'Quit Cairn' : '退出 Cairn']) {
+      assert.ok(
+        content.includes(title),
+        `the native menu lacks ${title}: ${JSON.stringify(content)}`,
+      );
+    }
+    if (trayShotPath !== undefined) {
+      execFileSync('screencapture', ['-x', trayShotPath.replace(/\.png$/, '-native.png')]);
+    }
+    await driver.send({ cmd: 'key', pid: helper, code: 125 });
+    await driver.send({ cmd: 'sleep', ms: 300 });
+    const selected = (await driver.send({ cmd: 'menuItems', pid: helper })).items.filter(
+      (item) => item.selected,
     );
     assert.equal(
-      (await coldTrayState()).finished,
-      true,
-      'the panel opened before its first load finished',
+      selected.length,
+      1,
+      `the Down arrow did not highlight one item: ${JSON.stringify(selected)}`,
     );
-    return JSON.stringify(shown.entry);
+    await closeNativeMenu(helper);
+
+    await popoverWindow(({ BrowserWindow }, width) => {
+      for (const candidate of BrowserWindow.getAllWindows())
+        if (candidate.getBounds().width !== width) candidate.hide();
+    });
+    await openNativeMenu(helper);
+    const picked = await driver.send({ cmd: 'clickMenuItem', pid: helper, title: settings });
+    assert.equal(picked.ok, true, `the Settings item got no click: ${JSON.stringify(picked)}`);
+    assert.equal(
+      await waitForNativeMenu(helper, false),
+      true,
+      'picking Settings left the menu open',
+    );
+    const settingsDeadline = Date.now() + OPEN_TIMEOUT_MS * 2;
+    for (;;) {
+      const shown = await popoverWindow(({ BrowserWindow }, width) => {
+        const main = BrowserWindow.getAllWindows().find(
+          (candidate) => candidate.getBounds().width !== width,
+        );
+        return { visible: main?.isVisible() ?? false, url: main?.webContents.getURL() ?? '' };
+      });
+      if (shown.visible && new URL(shown.url).pathname.startsWith('/app/settings')) break;
+      assert.ok(
+        Date.now() < settingsDeadline,
+        `Settings from the native menu did not show the main window on Settings: ${JSON.stringify(shown)}`,
+      );
+      await driver.send({ cmd: 'sleep', ms: 200 });
+    }
+    return `helper ${helper}: ${content.length} items`;
   });
-  console.log(`tray ${firstPaint.result}: ${firstPaint.name}: ${firstPaint.detail}`);
-  await dismiss();
+  console.log(`tray ${nativeMenu.result}: ${nativeMenu.name}: ${nativeMenu.detail}`);
+
+  await mandatory(nativeFallback, async () => {
+    let current = helper ?? (await waitForHelper(null));
+    for (let crash = 0; crash <= NATIVE_RESTARTS; crash += 1) {
+      process.kill(current, 'SIGKILL');
+      if (crash < NATIVE_RESTARTS) current = await waitForHelper(String(current));
+    }
+    await driver.send({ cmd: 'sleep', ms: 6_000 });
+    assert.deepEqual(helperPids(), [], 'the helper restarted after the restart budget ran out');
+    const item = await driver.send({ cmd: 'statusItem', pid: appPid });
+    assert.equal(
+      item.ok,
+      true,
+      `the web popover status item did not appear: ${JSON.stringify(item)}`,
+    );
+    return JSON.stringify(item.items);
+  });
+  console.log(`tray ${nativeFallback.result}: ${nativeFallback.name}: ${nativeFallback.detail}`);
+  assert.equal(nativeFallback.result, 'green', 'the popover checks need the fallback status item');
+  await waitForScreen(false);
 
   const tray =
     app.windows().find(isTrayPage) ??
@@ -1358,12 +1486,17 @@ try {
           () => false,
           () => true,
         );
-        if (serverProcesses().length === 0 && unreachable) return true;
+        if (
+          serverProcesses().length === 0 &&
+          unreachable &&
+          matchingPids(`${appRoot}/${NATIVE_TRAY_HELPER}`).length === 0
+        )
+          return true;
         await new Promise((wake) => setTimeout(wake, 500));
       }
       return false;
     })();
-    assert.equal(drained, true, 'the server outlived a killed app');
+    assert.equal(drained, true, 'the server or the native tray helper outlived a killed app');
     assert.equal(runnerProcesses(), '', 'the local Runner outlived a killed app');
     console.log('abrupt kill: server and Runner died with the app');
   } finally {

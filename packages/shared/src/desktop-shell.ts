@@ -7,7 +7,9 @@ export const DESKTOP_RELEASE_MANIFEST = 'desktop-latest.json';
 export const DESKTOP_RELEASES_BASE = 'https://github.com/xiechimon/cairn/releases';
 export const DESKTOP_MANIFEST_URL = `${DESKTOP_RELEASES_BASE}/latest/download/${DESKTOP_RELEASE_MANIFEST}`;
 
-export type DesktopMenuCommand = 'settings' | 'new-task' | 'search';
+const DESKTOP_MENU_COMMANDS = ['settings', 'new-task', 'search'] as const;
+
+export type DesktopMenuCommand = (typeof DESKTOP_MENU_COMMANDS)[number];
 
 export const DESKTOP_TRAY_PATH = '/tray';
 
@@ -26,6 +28,82 @@ export type DesktopTrayOpen =
 export function isAppPath(path: unknown): path is string {
   return typeof path === 'string' && /^\/app(?:[/?]|$)/.test(path);
 }
+
+const desktopTrayOpenSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('path'),
+    path: z.string().refine(isAppPath, 'not an app path'),
+  }),
+  z.strictObject({ kind: z.literal('command'), command: z.enum(DESKTOP_MENU_COMMANDS) }),
+]);
+
+const trayText = z.string().max(500);
+
+export const NATIVE_TRAY_GLYPHS = [
+  'todo',
+  'queued',
+  'ring',
+  'working',
+  'progress',
+  'attention',
+  'quarter',
+  'half',
+  'three-quarter',
+  'done',
+  'failed',
+  'closed',
+] as const;
+
+export const nativeTrayItemSchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('row'),
+    id: z.string().min(1).max(200),
+    title: trayText,
+    status: trayText.optional(),
+    tip: trayText.optional(),
+    glyph: z.enum(NATIVE_TRAY_GLYPHS).optional(),
+    image: z.enum(['brand', 'usage', 'user']).optional(),
+    warn: z.boolean().optional(),
+    open: desktopTrayOpenSchema.optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('header'),
+    id: z.string().min(1).max(200),
+    title: trayText,
+    os: z.enum(['darwin', 'windows', 'linux', 'unknown']).optional(),
+    meter: z
+      .strictObject({
+        percent: z.number().int().min(0).max(100),
+        level: z.enum(['normal', 'high', 'full']),
+        tip: trayText,
+      })
+      .optional(),
+  }),
+  z.strictObject({
+    kind: z.literal('switch'),
+    id: z.enum(['runner', 'keep-awake']),
+    title: trayText,
+    detail: trayText.optional(),
+    warn: z.boolean().optional(),
+    on: z.boolean(),
+    enabled: z.boolean(),
+  }),
+  z.strictObject({
+    kind: z.literal('command'),
+    id: z.enum(['settings', 'quit']),
+    title: trayText,
+    key: z.string().max(1),
+  }),
+  z.strictObject({ kind: z.literal('separator'), id: z.string().min(1).max(200) }),
+]);
+
+export const nativeTrayMenuSchema = z.strictObject({
+  label: trayText,
+  items: z.array(nativeTrayItemSchema).max(200),
+});
+
+export type NativeTrayItem = z.infer<typeof nativeTrayItemSchema>;
+export type NativeTrayMenu = z.infer<typeof nativeTrayMenuSchema>;
 
 export interface DesktopNotifyDialog {
   title: string;

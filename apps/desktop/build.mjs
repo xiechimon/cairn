@@ -1,5 +1,6 @@
 import { build } from 'esbuild';
 import { acquireSlot } from '../../scripts/heavy-slots.mjs';
+import { buildTrayHelpers } from './scripts/build-tray-helper.mjs';
 
 await acquireSlot({ label: 'desktop:build' });
 
@@ -19,3 +20,5 @@ await build({
   outfile: 'dist/preload.cjs',
   format: 'cjs',
 });
+
+if (process.platform === 'darwin') buildTrayHelpers();

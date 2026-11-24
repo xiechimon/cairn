@@ -74,6 +74,69 @@ func statusItems(pid: pid_t) -> [AXUIElement] {
   return axChildren(barValue as! AXUIElement).filter { axRole($0) == kAXMenuBarItemRole }
 }
 
+func axString(_ element: AXUIElement, _ attribute: String) -> String? {
+  var valueRef: CFTypeRef?
+  guard AXUIElementCopyAttributeValue(element, attribute as CFString, &valueRef) == .success else {
+    return nil
+  }
+  return valueRef as? String
+}
+
+func axBool(_ element: AXUIElement, _ attribute: String) -> Bool {
+  var valueRef: CFTypeRef?
+  guard AXUIElementCopyAttributeValue(element, attribute as CFString, &valueRef) == .success else {
+    return false
+  }
+  return (valueRef as? Bool) ?? false
+}
+
+func openMenuItems(pid: pid_t) -> [AXUIElement] {
+  guard let item = statusItems(pid: pid).first else { return [] }
+  let menus = axChildren(item).filter { axRole($0) == kAXMenuRole }
+  return menus.flatMap { axChildren($0) }.filter { axRole($0) == kAXMenuItemRole }
+}
+
+func describeMenuItem(_ element: AXUIElement) -> [String: Any] {
+  var entry: [String: Any] = [
+    "title": axString(element, kAXTitleAttribute) ?? "",
+    "label": axString(element, kAXDescriptionAttribute) ?? "",
+    "enabled": axBool(element, kAXEnabledAttribute),
+    "selected": axBool(element, kAXSelectedAttribute),
+  ]
+  let inner = axChildren(element).first
+  if let inner {
+    entry["viewRole"] = axRole(inner)
+    entry["viewLabel"] = axString(inner, kAXDescriptionAttribute) ?? ""
+  }
+  if let rect = axRect(element) {
+    entry["x"] = rect.minX
+    entry["y"] = rect.minY
+    entry["width"] = rect.width
+    entry["height"] = rect.height
+  }
+  return entry
+}
+
+func matchesMenuItem(_ element: AXUIElement, _ title: String) -> Bool {
+  let names = [
+    axString(element, kAXTitleAttribute), axString(element, kAXDescriptionAttribute),
+    axChildren(element).first.flatMap { axString($0, kAXDescriptionAttribute) },
+  ]
+  return names.contains { $0 == title }
+}
+
+func postKey(pid: pid_t, code: CGKeyCode) -> Bool {
+  let source = CGEventSource(stateID: .hidSystemState)
+  guard app(pid) != nil,
+    let down = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: true),
+    let up = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: false)
+  else { return false }
+  down.postToPid(pid)
+  usleep(60_000)
+  up.postToPid(pid)
+  return true
+}
+
 func post(_ point: CGPoint, _ button: CGMouseButton, down: Bool, count: Int64) {
   let source = CGEventSource(stateID: .hidSystemState)
   let type: CGEventType
@@ -134,7 +197,9 @@ func statusItemHit(
 ) -> Bool {
   guard top.layer >= CGWindowLevelForKey(.mainMenuWindow) else { return false }
   if top.pid == pid && top.bounds == rect { return true }
-  guard app(top.pid)?.bundleIdentifier == "com.apple.controlcenter" else { return false }
+  guard app(top.pid)?.bundleIdentifier == "com.apple.controlcenter" || isWindowServer(top.pid) else {
+    return false
+  }
   var hit: AXUIElement?
   var owner: pid_t = 0
   let system = AXUIElementCreateSystemWide()
@@ -352,6 +417,12 @@ func app(_ pid: pid_t) -> NSRunningApplication? {
   NSRunningApplication(processIdentifier: pid)
 }
 
+func isWindowServer(_ pid: pid_t) -> Bool {
+  var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+  guard proc_pidpath(pid, &buffer, UInt32(buffer.count)) > 0 else { return false }
+  return String(cString: buffer).hasSuffix("/WindowServer")
+}
+
 let application = NSApplication.shared
 application.setActivationPolicy(.accessory)
 application.finishLaunching()
@@ -447,15 +518,42 @@ func run(_ step: [String: Any]) -> [String: Any] {
   case "windows":
     return ["ok": true, "windows": windows(of: pid)]
   case "escape":
-    let source = CGEventSource(stateID: .hidSystemState)
-    guard app(pid) != nil,
-      let down = CGEvent(keyboardEventSource: source, virtualKey: 53, keyDown: true),
-      let up = CGEvent(keyboardEventSource: source, virtualKey: 53, keyDown: false)
-    else { return ["ok": false, "error": "could not send Escape to pid \(pid)"] }
-    down.postToPid(pid)
-    usleep(60_000)
-    up.postToPid(pid)
+    guard postKey(pid: pid, code: 53) else {
+      return ["ok": false, "error": "could not send Escape to pid \(pid)"]
+    }
     return ["ok": true]
+  case "key":
+    guard let code = step["code"] as? Int, postKey(pid: pid, code: CGKeyCode(code)) else {
+      return ["ok": false, "error": "could not send key to pid \(pid)"]
+    }
+    return ["ok": true]
+  case "menuItems":
+    return ["ok": true, "items": openMenuItems(pid: pid).map(describeMenuItem)]
+  case "clickMenuItem":
+    guard let title = step["title"] as? String else { return ["ok": false, "error": "no title"] }
+    var found: CGRect?
+    let deadline = ProcessInfo.processInfo.systemUptime + 2
+    repeat {
+      if let element = openMenuItems(pid: pid).first(where: { matchesMenuItem($0, title) }),
+        let rect = axRect(element), !rect.isEmpty
+      {
+        found = rect
+      } else {
+        usleep(100_000)
+      }
+    } while found == nil && ProcessInfo.processInfo.systemUptime < deadline
+    guard let rect = found else {
+      return ["ok": false, "error": "no open menu item \(title) for pid \(pid)"]
+    }
+    let point = CGPoint(x: rect.midX, y: rect.midY)
+    hover(point)
+    usleep(useconds_t((step["hoverMs"] as? Int ?? 120) * 1000))
+    let top = screenWindows().first { $0.bounds.contains(point) }
+    guard let top, top.pid == pid else {
+      return ["ok": false, "error": "the menu item is not on top", "top": top?.diagnostic ?? [:]]
+    }
+    if step["hoverOnly"] as? Bool != true { click(point, button: .left) }
+    return ["ok": true, "top": top.diagnostic, "x": point.x, "y": point.y]
   default:
     return ["ok": false, "error": "unknown cmd \(command)"]
   }

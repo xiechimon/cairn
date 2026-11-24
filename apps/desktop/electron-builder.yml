@@ -38,6 +38,8 @@ mac:
       filter: ['darwin-*/*.node']
     - from: node_modules/electron-liquid-glass/LICENSE
       to: liquid-glass/LICENSE
+    - from: tray-helper/${arch}
+      to: tray
   identity: '-'
   sign: scripts/sign-mac.cjs
   timestamp: none

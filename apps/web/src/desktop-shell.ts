@@ -7,6 +7,7 @@ import {
   type DesktopTrayOpen,
   type DesktopTrayState,
   type DesktopUpdateState,
+  type NativeTrayMenu,
 } from '@cairn/shared';
 import { useEffect } from 'react';
 import { EN } from './i18n/en.js';
@@ -86,6 +87,8 @@ export interface DesktopTrayBridge {
   resize: (height: number) => void;
   hide: () => void;
   quit: () => void;
+  publish: (menu: NativeTrayMenu) => void;
+  onOpened: (listener: () => void) => () => void;
 }
 
 export function desktopTray(): DesktopTrayBridge | null {

@@ -13,6 +13,7 @@ import type {
   HostPermissions,
   LocalProvider,
   LocalProviderImport,
+  NativeTrayMenu,
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 
@@ -53,6 +54,14 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     resize: (height: number): void => ipcRenderer.send('desktop-tray:resize', height),
     hide: (): void => ipcRenderer.send('desktop-tray:hide'),
     quit: (): void => ipcRenderer.send('desktop-tray:quit'),
+    publish: (menu: NativeTrayMenu): void => ipcRenderer.send('desktop-tray:menu', menu),
+    onOpened: (listener: () => void): (() => void) => {
+      const relay = () => listener();
+      ipcRenderer.on('desktop-tray:opened', relay);
+      return () => {
+        ipcRenderer.removeListener('desktop-tray:opened', relay);
+      };
+    },
   },
   localProviders: {
     scan: (): Promise<LocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),

@@ -1,4 +1,4 @@
-import type { DesktopRunnerState, DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
+import type { DesktopTrayOpen, DesktopTrayState } from '@cairn/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { ChartColumn, Coffee, Laptop, Settings } from 'lucide-react';
@@ -6,6 +6,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -33,20 +34,18 @@ import {
   trayUsage,
 } from './tray-groups.js';
 import { TrayHeadMeta } from './tray-meta.js';
+import { RUNNER_WORD, trayMenuModel } from './tray-native.js';
 
 const ON_MAC = typeof navigator !== 'undefined' && navigator.userAgent.includes('Macintosh');
-
-const RUNNER_WORD: Record<DesktopRunnerState, string> = {
-  starting: '正在启动',
-  on: '运行中',
-  off: '已关闭',
-  failed: '已停止',
-};
 
 const TRAY_REFRESH_MS = 30_000;
 const TIME_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-function useTrayData(): { groups: TrayGroup[]; usage: TrayUsage | null; coordinatorBusy: boolean } {
+function useTrayData(onOpened: (refresh: () => void) => () => void): {
+  groups: TrayGroup[];
+  usage: TrayUsage | null;
+  coordinatorBusy: boolean;
+} {
   const { live, teamId } = useLiveData();
   const client = useQueryClient();
   const [now, setNow] = useState(Date.now);
@@ -76,6 +75,17 @@ function useTrayData(): { groups: TrayGroup[]; usage: TrayUsage | null; coordina
     document.addEventListener('visibilitychange', onShow);
     return () => document.removeEventListener('visibilitychange', onShow);
   }, [live, teamId, refreshQuota]);
+
+  useEffect(
+    () =>
+      onOpened(() => {
+        setNow(Date.now());
+        void client.invalidateQueries({ queryKey: ['machines', teamId] });
+        void client.invalidateQueries({ queryKey: ['usage-daily', teamId] });
+        if (live && teamId !== undefined) refreshQuota();
+      }),
+    [onOpened, client, live, teamId, refreshQuota],
+  );
 
   const groups = useMemo(
     () => trayGroups(tasksFromQuery(tasksQ.data), machinesQ.data, now),
@@ -146,7 +156,11 @@ export function TrayPage() {
   const { user } = useLiveData();
   const bridge = useMemo(desktopTray, []);
   const [state, setState] = useState<DesktopTrayState | null>(null);
-  const { groups, usage, coordinatorBusy } = useTrayData();
+  const onOpened = useCallback(
+    (refresh: () => void) => bridge?.onOpened(refresh) ?? (() => {}),
+    [bridge],
+  );
+  const { groups, usage, coordinatorBusy } = useTrayData(onOpened);
   const say = (text: TrayText) => t(text.key, text.vars);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -171,6 +185,12 @@ export function TrayPage() {
     window.addEventListener('blur', forget);
     return () => window.removeEventListener('blur', forget);
   }, []);
+
+  const menu = useMemo(
+    () => trayMenuModel({ groups, usage, coordinatorBusy, state, userName: user.displayName, t }),
+    [groups, usage, coordinatorBusy, state, user.displayName, t],
+  );
+  useEffect(() => bridge?.publish(menu), [bridge, menu]);
 
   const open = (target: DesktopTrayOpen) => bridge?.open(target);
   const runner = state?.runner ?? 'starting';
