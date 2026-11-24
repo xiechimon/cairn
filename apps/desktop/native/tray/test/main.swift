@@ -68,6 +68,24 @@ expect(
 expect(tray.items["machine:m2"]!.isEnabled == false, "machine header is enabled")
 expect(tray.items["machine:m2"]!.view === header, "machine header is not a two-line view")
 expect(strainedRuns(header.readingLabel.attributedStringValue) == ["内存 94%", "剩余磁盘 3 GB"], "strained parts \(strainedRuns(header.readingLabel.attributedStringValue))")
+func clipped(_ label: NSTextField) -> Bool {
+  guard let host = label.superview else { return true }
+  let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+  host.cacheDisplay(in: host.bounds, to: rep)
+  let scale = CGFloat(rep.pixelsWide) / host.bounds.width
+  let band = Int(label.frame.minY * scale)..<min(rep.pixelsHigh, Int(label.frame.maxY * scale))
+  var right = 0
+  for x in stride(from: rep.pixelsWide - 1, through: 0, by: -1) where right == 0 {
+    for y in band where (rep.colorAt(x: x, y: y)?.alphaComponent ?? 0) > 0.2 {
+      right = x
+      break
+    }
+  }
+  let drawn = CGFloat(right) / scale - label.frame.minX
+  return drawn + 3 < label.attributedStringValue.size().width
+}
+expect(!clipped(header.readingLabel), "the strained reading is cut off: \(header.readingLabel.stringValue)")
+expect(header.readingLabel.stringValue.hasSuffix("剩余磁盘 3 GB"), "the strained disk part is missing: \(header.readingLabel.stringValue)")
 expect(header.readingLabel.frame.minY >= header.name.frame.maxY, "reading is not under the name")
 expect(header.readingLabel.frame.maxY <= MachineHeader.height, "reading falls outside the header")
 expect(header.toolTip == "build-box\n内存压力 94%；CPU 88%；负载 15.4 / 16 核；剩余磁盘 3 GB", "header tip \(header.toolTip ?? "nil")")
@@ -95,6 +113,7 @@ english.reading = Reading(
     ReadingPart(text: "Load 15.4 / 16 cores", strained: false), ReadingPart(text: "3 GB disk free", strained: true),
   ], faint: false, spoken: "", tip: "")
 let narrow = laidOut(MachineHeader(english), width: 270)
+expect(!clipped(narrow.readingLabel), "the narrow reading is cut off: \(narrow.readingLabel.stringValue)")
 expect(narrow.readingLabel.stringValue == "Memory 48% · CPU 97% · 3 GB disk free", "narrow English reading \(narrow.readingLabel.stringValue)")
 expect(strainedRuns(narrow.readingLabel.attributedStringValue) == ["CPU 97%", "3 GB disk free"], "narrow strained parts")
 let wide = laidOut(MachineHeader(english), width: 600)

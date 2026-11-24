@@ -90,8 +90,13 @@ final class MachineHeader: NSView {
             .font: part.strained ? bold : digits, .foregroundColor: part.strained ? Palette.warning : base,
           ]))
     }
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.lineBreakMode = .byTruncatingTail
+    out.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: out.length))
     return out
   }
+
+  static let drawingSlack: CGFloat = 4
 
   var textWidth: CGFloat { max(0, bounds.width - Self.inset * 2) }
 
@@ -100,7 +105,7 @@ final class MachineHeader: NSView {
     if let reading = item.reading {
       var drop = 0
       readingLabel.attributedStringValue = Self.reading(reading, dropping: 0)
-      while readingLabel.attributedStringValue.size().width > textWidth, drop < reading.parts.count {
+      while ceil(readingLabel.attributedStringValue.size().width) + Self.drawingSlack > textWidth, drop < reading.parts.count {
         drop += 1
         readingLabel.attributedStringValue = Self.reading(reading, dropping: drop)
       }
