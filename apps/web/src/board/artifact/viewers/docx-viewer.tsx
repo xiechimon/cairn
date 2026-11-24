@@ -3,6 +3,14 @@ import { Skeleton } from '../../../components/ui/skeleton.js';
 import { RegionSurface } from '../file-comments.js';
 import { useFileBytes } from './use-file-bytes.js';
 
+const SAFE_LINK = /^(https?:|mailto:|#)/i;
+
+function keepSafeLinks(root: HTMLElement): void {
+  for (const link of root.querySelectorAll('a[href]')) {
+    if (!SAFE_LINK.test(link.getAttribute('href') ?? '')) link.removeAttribute('href');
+  }
+}
+
 export function DocxViewer({ src, fallback }: { src: string; fallback: ReactNode }) {
   const bytesQ = useFileBytes(src);
   const host = useRef<HTMLDivElement | null>(null);
@@ -20,10 +28,14 @@ export function DocxViewer({ src, fallback }: { src: string; fallback: ReactNode
           ignoreLastRenderedPageBreak: false,
           experimental: true,
           useBase64URL: true,
+          renderAltChunks: false,
         }),
       )
       .then(
-        () => live && setState('drawn'),
+        () => {
+          keepSafeLinks(element);
+          if (live) setState('drawn');
+        },
         () => live && setState('failed'),
       );
     return () => {
