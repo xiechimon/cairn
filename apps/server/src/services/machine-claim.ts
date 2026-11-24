@@ -91,7 +91,13 @@ import {
   type WorkerStepFacts,
   workerIneligibility,
 } from './machine-routing.js';
-import { connectorSlugs, localBrowserConnector } from './mcp-servers.js';
+import {
+  CONNECTOR_TOOL_HYDRATE_BOUND_MS,
+  connectorSlugs,
+  hydrateMissingConnectorTools,
+  localBrowserConnector,
+  mcpConnectorDepsOf,
+} from './mcp-servers.js';
 import { injectMemories } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { effectiveModel } from './model-fallback.js';
@@ -431,21 +437,45 @@ function runnerFull(
   return maxWorkers !== undefined && machineRunningCount(db, machineId) >= maxWorkers;
 }
 
-function claimChiefTurn(
+async function claimChiefTurn(
   deps: MachineDeps,
   machineId: string,
   teamId: string,
   maxWorkers: number | undefined,
   createdUpTo: number,
-): ClaimedStep | null {
+  stillAuthorized: () => boolean,
+): Promise<ClaimedStep | null> {
   const { db } = deps;
-  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
-  if (!machineRow) return null;
+  const initialMachine = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!initialMachine) return null;
+  let machineRow = initialMachine;
   if (runnerFull(db, machineId, maxWorkers)) return null;
-  const cands = claimChiefCandidates(deps, machineId, teamId).filter(
+  let cands = claimChiefCandidates(deps, machineId, teamId).filter(
     (cand) => cand.stepRow.createdAt <= createdUpTo,
   );
+  const needsConnectorTools = cands.some((cand) => {
+    if (chiefTurnLocked(cand.stepRow) || !cand.agentRow.modelId) return false;
+    if (hasEarlierLiveChiefStep(db, cand.stepRow)) return false;
+    if (chiefMachineId(db, teamId, cand.agentRow.machineId) !== machineId) return false;
+    const model = effectiveModel(cand.agentRow, cand.stepRow);
+    return chiefIneligibility(db, initialMachine, cand.agentRow, model.provider, nowMs()) === null;
+  });
+  if (needsConnectorTools) {
+    await hydrateMissingConnectorTools(mcpConnectorDepsOf(deps), {
+      teamId,
+      boundMs: CONNECTOR_TOOL_HYDRATE_BOUND_MS,
+    });
+    if (!stillAuthorized()) return null;
+    const freshMachine = db.select().from(machine).where(eq(machine.id, machineId)).get();
+    if (!freshMachine) return null;
+    machineRow = freshMachine;
+    if (runnerFull(db, machineId, maxWorkers)) return null;
+    cands = claimChiefCandidates(deps, machineId, teamId).filter(
+      (cand) => cand.stepRow.createdAt <= createdUpTo,
+    );
+  }
   for (const cand of cands) {
+    if (!stillAuthorized()) return null;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
     if (
       turnProvenance(cand.stepRow.prompt)?.startsWith('mail:') === true &&
@@ -482,7 +512,7 @@ async function tryClaim(
 ): Promise<ClaimedStep | null> {
   if (!stillAuthorized()) return null;
   const { db } = deps;
-  const machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  let machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
   const catalog = mergedCatalogModels(teamId);
@@ -494,8 +524,18 @@ async function tryClaim(
     ...queued.filter((cand) => cand.stepRow.byPerson),
     ...queued.filter((cand) => !cand.stepRow.byPerson),
   ];
-  const chiefAhead = claimChiefTurn(deps, machineId, teamId, maxWorkers, earliestWorker);
+  const chiefAhead = await claimChiefTurn(
+    deps,
+    machineId,
+    teamId,
+    maxWorkers,
+    earliestWorker,
+    stillAuthorized,
+  );
   if (chiefAhead) return chiefAhead;
+  if (!stillAuthorized()) return null;
+  machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (!machineRow || runnerFull(db, machineId, maxWorkers)) return null;
 
   for (const cand of workerCands) {
     if (
@@ -847,7 +887,14 @@ async function tryClaim(
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
-  return claimChiefTurn(deps, machineId, teamId, maxWorkers, Number.POSITIVE_INFINITY);
+  return claimChiefTurn(
+    deps,
+    machineId,
+    teamId,
+    maxWorkers,
+    Number.POSITIVE_INFINITY,
+    stillAuthorized,
+  );
 }
 
 export function workerRemoteTools(

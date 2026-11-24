@@ -36,7 +36,13 @@ import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTurnModel } from '../services/machine-claim.js';
 import { teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
-import { connectorSlugs, localBrowserConnector } from '../services/mcp-servers.js';
+import {
+  CONNECTOR_TOOL_HYDRATE_BOUND_MS,
+  connectorSlugs,
+  hydrateMissingConnectorTools,
+  localBrowserConnector,
+  mcpConnectorDepsOf,
+} from '../services/mcp-servers.js';
 import { ownComputerOffered } from '../services/own-computer.js';
 import { ownershipOf } from '../services/owner.js';
 import { listedProjects } from '../services/personal-space.js';
@@ -614,6 +620,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     );
     try {
       if (providers === null) throw new Error('Coordinator route resolves to no keyed provider');
+      await hydrateMissingConnectorTools(mcpConnectorDepsOf(machine), {
+        teamId,
+        boundMs: CONNECTOR_TOOL_HYDRATE_BOUND_MS,
+      });
+      if (closing) return;
       const payload = claimedPayload(row, providers);
       if (payload === null) throw new Error('Coordinator step has no chief thread');
       await runtime.runTurn({

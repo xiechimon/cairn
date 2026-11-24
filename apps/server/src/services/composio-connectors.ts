@@ -90,6 +90,8 @@ async function ensureSession(
   return { row: connectorRow(deps.mcp, teamId, row.id), sessionId: session.sessionId };
 }
 
+const CLEAR_CACHED_TOOLS = { toolCount: null, toolsJson: null } as const;
+
 function setStatus(
   deps: ComposioConnectorDeps,
   row: ConnectorRow,
@@ -154,7 +156,12 @@ export async function authorizeComposioApp(
     row.composioAccount ?? (await findActiveComposioAccount(deps.composio, teamId, row.slug));
   if (active !== null) {
     if (row.composioAccount === null)
-      setStatus(deps, row, { composioAccount: active, status: 'unchecked', statusReason: null });
+      setStatus(deps, row, {
+        composioAccount: active,
+        status: 'unchecked',
+        statusReason: null,
+        ...CLEAR_CACHED_TOOLS,
+      });
     const record = await checkMcpConnector(deps.mcp, teamId, id);
     return { redirectUrl: null, connector: record };
   }
@@ -164,6 +171,7 @@ export async function authorizeComposioApp(
     composioAccount: link.connectedAccountId,
     status: 'needs_auth',
     statusReason: 'authorizing',
+    ...CLEAR_CACHED_TOOLS,
   });
   return {
     redirectUrl: link.redirectUrl,
@@ -183,17 +191,29 @@ export async function pollComposioApp(
     row.composioAccount ?? (await findActiveComposioAccount(deps.composio, teamId, row.slug));
   if (accountId === null) {
     if (row.status !== 'needs_auth')
-      setStatus(deps, row, { status: 'needs_auth', statusReason: 'no connected account' });
+      setStatus(deps, row, {
+        status: 'needs_auth',
+        statusReason: 'no connected account',
+        ...CLEAR_CACHED_TOOLS,
+      });
     return toConnectorRecord(deps.mcp, connectorRow(deps.mcp, teamId, id));
   }
   const account = await getComposioAccount(deps.composio, teamId, accountId);
   row = connectorRow(deps.mcp, teamId, id);
   if (account === null) {
-    setStatus(deps, row, { status: 'revoked', statusReason: 'account removed', toolCount: null });
+    setStatus(deps, row, {
+      status: 'revoked',
+      statusReason: 'account removed',
+      ...CLEAR_CACHED_TOOLS,
+    });
     return toConnectorRecord(deps.mcp, connectorRow(deps.mcp, teamId, id));
   }
   if (account.isDisabled || account.status === 'INACTIVE') {
-    setStatus(deps, row, { status: 'revoked', statusReason: 'account disabled', toolCount: null });
+    setStatus(deps, row, {
+      status: 'revoked',
+      statusReason: 'account disabled',
+      ...CLEAR_CACHED_TOOLS,
+    });
   } else if (account.status === 'ACTIVE') {
     if (row.composioAccount !== accountId) setStatus(deps, row, { composioAccount: accountId });
     const record = await checkMcpConnector(deps.mcp, teamId, id);
@@ -203,21 +223,35 @@ export async function pollComposioApp(
         composioSession: session.sessionId,
         url: session.mcpUrl,
         status: 'unchecked',
+        ...CLEAR_CACHED_TOOLS,
       });
       return checkMcpConnector(deps.mcp, teamId, id);
     }
     return record;
   } else if (account.status === 'INITIALIZING' || account.status === 'INITIATED') {
-    setStatus(deps, row, { status: 'needs_auth', statusReason: 'authorizing' });
+    setStatus(deps, row, {
+      status: 'needs_auth',
+      statusReason: 'authorizing',
+      ...CLEAR_CACHED_TOOLS,
+    });
   } else if (account.status === 'FAILED') {
     setStatus(deps, row, {
       status: 'needs_auth',
       statusReason: account.statusReason ?? 'authorization failed',
+      ...CLEAR_CACHED_TOOLS,
     });
   } else if (account.status === 'EXPIRED') {
-    setStatus(deps, row, { status: 'needs_auth', statusReason: 'expired' });
+    setStatus(deps, row, {
+      status: 'needs_auth',
+      statusReason: 'expired',
+      ...CLEAR_CACHED_TOOLS,
+    });
   } else {
-    setStatus(deps, row, { status: 'needs_auth', statusReason: account.statusReason ?? 'waiting' });
+    setStatus(deps, row, {
+      status: 'needs_auth',
+      statusReason: account.statusReason ?? 'waiting',
+      ...CLEAR_CACHED_TOOLS,
+    });
   }
   return toConnectorRecord(deps.mcp, connectorRow(deps.mcp, teamId, id));
 }
@@ -230,7 +264,11 @@ export async function revokeComposioApp(
   const row = composioRow(deps, teamId, id);
   if (row.composioAccount !== null && readComposioKey(deps.composio, teamId) !== null)
     await revokeComposioAccount(deps.composio, teamId, row.composioAccount);
-  setStatus(deps, row, { status: 'revoked', statusReason: 'revoked', toolCount: null });
+  setStatus(deps, row, {
+    status: 'revoked',
+    statusReason: 'revoked',
+    ...CLEAR_CACHED_TOOLS,
+  });
   return toConnectorRecord(deps.mcp, connectorRow(deps.mcp, teamId, id));
 }
 
@@ -252,8 +290,16 @@ export async function reconnectComposioApp(
 ): Promise<ComposioAuthorizeResponse> {
   const row = composioRow(deps, teamId, id);
   if (row.status === 'revoked')
-    setStatus(deps, row, { status: 'needs_auth', statusReason: 'reconnect' });
+    setStatus(deps, row, {
+      status: 'needs_auth',
+      statusReason: 'reconnect',
+      ...CLEAR_CACHED_TOOLS,
+    });
   else if (row.status === 'error')
-    setStatus(deps, row, { status: 'unchecked', statusReason: null });
+    setStatus(deps, row, {
+      status: 'unchecked',
+      statusReason: null,
+      ...CLEAR_CACHED_TOOLS,
+    });
   return authorizeComposioApp(deps, teamId, id);
 }

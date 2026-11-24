@@ -26,12 +26,7 @@ import {
   ownedStepRow,
   profileForStep,
 } from './machine-deps.js';
-import {
-  defaultMcpConfigPath,
-  newMcpOAuthState,
-  publicOAuthFetch,
-  stepConnectorEndpoints,
-} from './mcp-servers.js';
+import { mcpConnectorDepsOf, stepConnectorEndpoints } from './mcp-servers.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { materializeXaiAccessToken } from './xai-device-login.js';
 
@@ -136,20 +131,7 @@ async function connectorFields(
   if (machineRow?.capabilities?.mcpConnectors !== true) return {};
   const current = new Set(stepMcpGrant(deps.db, machineRow) ?? []);
   const grant = (claimed.mcpGrant ?? []).filter((slug) => current.has(slug));
-  const fields = await stepConnectorEndpoints(
-    {
-      db: deps.db,
-      box: deps.box,
-      mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(),
-      fetch: deps.mcpFetch ?? globalThis.fetch,
-      oauthFetch: deps.mcpFetch ?? publicOAuthFetch,
-      oauthState: deps.mcpOAuthState ?? newMcpOAuthState(),
-      githubFetch: deps.githubFetch,
-      oauthClient: deps.oauthClient,
-    },
-    teamId,
-    grant,
-  );
+  const fields = await stepConnectorEndpoints(mcpConnectorDepsOf(deps), teamId, grant);
   return stillClaimedBy(deps, claimed) ? fields : {};
 }
 

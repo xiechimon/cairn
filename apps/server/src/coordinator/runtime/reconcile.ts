@@ -8,6 +8,7 @@ import {
   type Extension,
   type Harness,
   type HarnessSettings,
+  type Registry,
   ToolResultEntry,
   UserEntry,
 } from '@earendil-works/pi-durable';
@@ -54,6 +55,7 @@ export type ReconcileOutcome =
 
 export interface ReconcileOptions {
   extensions?: readonly Extension[];
+  registry?: Registry;
   settings?: () => HarnessSettings;
   beforeReconcile?: (harness: Harness, storeId?: string) => Promise<void>;
   storeIdentity?: (harness: Harness) => Promise<string>;

@@ -19,6 +19,7 @@ import {
   createMcpConnector,
   createPublicOAuthFetch,
   type GithubAppRegistration,
+  hydrateMissingConnectorTools,
   localBrowserConnector,
   type McpConnectorDeps,
   refreshMcpConnectorToken,
@@ -1470,5 +1471,358 @@ describe('a connector that runs on the owner’s machine', () => {
       expect((await req(s.app, 'PATCH', `${base}/${created.id}`, patch)).status).toBe(400);
     expect((await req(s.app, 'DELETE', `${base}/${created.id}`)).status).toBe(204);
     expect(localBrowserConnector(s.db, s.team.id)).toBeNull();
+  });
+});
+
+describe('connector tool cache hydration and null-column invariants', () => {
+  test('hydrates a connected github-app row with null toolsJson and leaves local and non-connected rows alone', async () => {
+    const t = bootGithub();
+    await t.connect();
+    const ghId = t.githubRow()?.id ?? '';
+    t.s.db
+      .update(mcpConnector)
+      .set({ toolCount: 49, toolsJson: null, checkedAt: 1_700_000_000_000 })
+      .where(eq(mcpConnector.id, ghId))
+      .run();
+    await req(t.s.app, 'POST', t.base, {
+      kind: 'catalog',
+      catalogId: 'browsermcp',
+      slug: 'browsermcp',
+    });
+    t.s.db
+      .insert(mcpConnector)
+      .values({
+        id: 'conn-needs-auth',
+        teamId: t.s.team.id,
+        slug: 'linear',
+        label: 'Linear',
+        catalogId: null,
+        url: 'https://mcp.linear.test/mcp',
+        headerNames: [],
+        valuesCipher: null,
+        authKind: 'none',
+        status: 'needs_auth',
+        statusReason: 'unauthorized',
+        toolCount: null,
+        toolsJson: null,
+        checkedAt: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+
+    await hydrateMissingConnectorTools(t.deps);
+
+    const gh = t.s.db.select().from(mcpConnector).where(eq(mcpConnector.id, ghId)).get();
+    expect(gh?.status).toBe('connected');
+    expect(gh?.toolCount).toBe(2);
+    expect(gh?.toolsJson?.map((tool) => tool.name)).toEqual(['one', 'two']);
+    expect(
+      t.s.db.select().from(mcpConnector).where(eq(mcpConnector.id, 'conn-needs-auth')).get()
+        ?.status,
+    ).toBe('needs_auth');
+    expect(localBrowserConnector(t.s.db, t.s.team.id)).toBe('browsermcp');
+  });
+
+  test('dedupes concurrent hydrations and returns on boundMs while background check finishes caching', async () => {
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let listRequests = 0;
+    const real = fakeMcp({ gate }).fetch;
+    const countedFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const body = await request.clone().text();
+      if (body.includes('"tools/list"')) listRequests += 1;
+      return real(request);
+    }) as typeof globalThis.fetch;
+    const { s, deps } = boot(countedFetch);
+    s.db
+      .insert(mcpConnector)
+      .values({
+        id: 'conn-slow',
+        teamId: s.team.id,
+        slug: 'acme',
+        label: 'Acme',
+        catalogId: null,
+        url: 'https://mcp.acme.test/mcp',
+        headerNames: [],
+        valuesCipher: null,
+        authKind: 'none',
+        status: 'connected',
+        toolCount: 2,
+        toolsJson: null,
+        checkedAt: 1,
+        createdAt: 1,
+        updatedAt: 1,
+      })
+      .run();
+
+    const first = hydrateMissingConnectorTools(deps, { teamId: s.team.id, boundMs: 40 });
+    const second = hydrateMissingConnectorTools(deps, { teamId: s.team.id, boundMs: 40 });
+    await Promise.all([first, second]);
+    expect(
+      s.db.select().from(mcpConnector).where(eq(mcpConnector.id, 'conn-slow')).get()?.toolsJson,
+    ).toBeNull();
+
+    release();
+    await hydrateMissingConnectorTools(deps, { teamId: s.team.id });
+    expect(listRequests).toBe(1);
+    expect(
+      s.db
+        .select()
+        .from(mcpConnector)
+        .where(eq(mcpConnector.id, 'conn-slow'))
+        .get()
+        ?.toolsJson?.map((tool) => tool.name),
+    ).toEqual(['one', 'two']);
+  });
+
+  test('isolates a corrupt connector with cooldown without blocking healthy siblings', async () => {
+    const mcp = fakeMcp();
+    const { s, deps } = boot(mcp.fetch);
+    s.db
+      .insert(mcpConnector)
+      .values([
+        {
+          id: 'conn-bad-cipher',
+          teamId: s.team.id,
+          slug: 'broken',
+          label: 'Broken',
+          catalogId: null,
+          url: 'https://mcp.broken.test/mcp',
+          headerNames: ['Authorization'],
+          valuesCipher: 'not-valid-cipher',
+          authKind: 'static',
+          status: 'connected',
+          toolCount: 1,
+          toolsJson: null,
+          checkedAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        {
+          id: 'conn-good',
+          teamId: s.team.id,
+          slug: 'good',
+          label: 'Good',
+          catalogId: null,
+          url: 'https://mcp.good.test/mcp',
+          headerNames: [],
+          valuesCipher: null,
+          authKind: 'none',
+          status: 'connected',
+          toolCount: 2,
+          toolsJson: null,
+          checkedAt: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      ])
+      .run();
+
+    await expect(
+      hydrateMissingConnectorTools(deps, { teamId: s.team.id }),
+    ).resolves.toBeUndefined();
+    expect(
+      s.db
+        .select()
+        .from(mcpConnector)
+        .where(eq(mcpConnector.id, 'conn-good'))
+        .get()
+        ?.toolsJson?.map((tool) => tool.name),
+    ).toEqual(['one', 'two']);
+    const before = mcp.seen.length;
+    await hydrateMissingConnectorTools(deps, { teamId: s.team.id });
+    expect(mcp.seen.length).toBe(before);
+  });
+
+  test('editing a connector target clears stale toolsJson and refresh recovery restores toolCount', async () => {
+    const mcp = fakeMcp();
+    const { s, deps } = boot(mcp.fetch);
+    const created = createMcpConnector(deps, s.team.id, {
+      kind: 'custom',
+      slug: 'acme',
+      label: 'Acme',
+      url: 'https://mcp.acme.test/mcp',
+    });
+    await checkMcpConnector(deps, s.team.id, created.id);
+    expect(
+      s.db.select().from(mcpConnector).where(eq(mcpConnector.id, created.id)).get()?.toolsJson,
+    ).toHaveLength(2);
+    updateMcpConnector(deps, s.team.id, created.id, { headers: { 'X-Key': 'k2' } });
+    expect(
+      s.db.select().from(mcpConnector).where(eq(mcpConnector.id, created.id)).get(),
+    ).toMatchObject({ status: 'unchecked', toolCount: null, toolsJson: null });
+
+    let failRefresh = true;
+    const base = authWorld({
+      metadata: { authorization_response_iss_parameter_supported: true },
+    });
+    const flakyFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (url.origin === AS && url.pathname === '/token') {
+        const body = await request.clone().text();
+        if (new URLSearchParams(body).get('grant_type') === 'refresh_token' && failRefresh) {
+          return new Response('down', { status: 503 });
+        }
+      }
+      return base.fetch(request);
+    }) as typeof globalThis.fetch;
+    const oauth = boot(flakyFetch);
+    const started = await oauth.s.app.request(`${oauth.base}/oauth/start`, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify(linearStart),
+    });
+    const authUrl = new URL(
+      ((await started.json()) as { authorizationUrl: string }).authorizationUrl,
+    );
+    await oauth.s.app.request(
+      `/api/oauth/callback?${new URLSearchParams({
+        code: 'code-ok',
+        state: authUrl.searchParams.get('state') ?? '',
+        iss: AS,
+      })}`,
+      { redirect: 'manual' },
+    );
+    const id = oauth.s.db.select().from(mcpConnector).get()?.id ?? '';
+    await refreshMcpConnectorToken(oauth.deps, oauth.s.team.id, id);
+    expect(
+      oauth.s.db.select().from(mcpConnector).where(eq(mcpConnector.id, id)).get(),
+    ).toMatchObject({ status: 'error', statusReason: 'refresh_failed', toolCount: null });
+
+    failRefresh = false;
+    await refreshMcpConnectorToken(oauth.deps, oauth.s.team.id, id);
+    expect(
+      oauth.s.db.select().from(mcpConnector).where(eq(mcpConnector.id, id)).get(),
+    ).toMatchObject({ status: 'connected', statusReason: null, toolCount: 2 });
+  });
+
+  test('same-origin edit during refresh_failed recovery keeps unchecked status and null toolCount', async () => {
+    let failRefresh = true;
+    const secondRefresh: { entered?: () => void; release?: () => void } = {};
+    const secondRefreshEntered = new Promise<void>((resolve) => {
+      secondRefresh.entered = resolve;
+    });
+    const base = authWorld({
+      metadata: { authorization_response_iss_parameter_supported: true },
+    });
+    const racingFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (url.origin === AS && url.pathname === '/token') {
+        const body = await request.clone().text();
+        if (new URLSearchParams(body).get('grant_type') === 'refresh_token') {
+          if (failRefresh) return new Response('down', { status: 503 });
+          secondRefresh.entered?.();
+          await new Promise<void>((resolve) => {
+            secondRefresh.release = resolve;
+          });
+        }
+      }
+      return base.fetch(request);
+    }) as typeof globalThis.fetch;
+
+    const oauth = boot(racingFetch);
+    const started = await oauth.s.app.request(`${oauth.base}/oauth/start`, {
+      method: 'POST',
+      headers: { origin: ORIGIN, 'content-type': 'application/json' },
+      body: JSON.stringify({ kind: 'custom', slug: 'custom-linear', label: 'Linear', url: LINEAR }),
+    });
+    expect(started.status).toBe(200);
+    const authUrl = new URL(
+      ((await started.json()) as { authorizationUrl: string }).authorizationUrl,
+    );
+    await oauth.s.app.request(
+      `/api/oauth/callback?${new URLSearchParams({
+        code: 'code-ok',
+        state: authUrl.searchParams.get('state') ?? '',
+        iss: AS,
+      })}`,
+      { redirect: 'manual' },
+    );
+    const id = oauth.s.db.select().from(mcpConnector).get()?.id ?? '';
+    await refreshMcpConnectorToken(oauth.deps, oauth.s.team.id, id);
+    expect(
+      oauth.s.db.select().from(mcpConnector).where(eq(mcpConnector.id, id)).get(),
+    ).toMatchObject({ status: 'error', statusReason: 'refresh_failed' });
+
+    failRefresh = false;
+    const refreshing = refreshMcpConnectorToken(oauth.deps, oauth.s.team.id, id);
+    await secondRefreshEntered;
+    updateMcpConnector(oauth.deps, oauth.s.team.id, id, {
+      url: `${LINEAR}-v2`,
+    });
+    secondRefresh.release?.();
+    await refreshing;
+
+    expect(
+      oauth.s.db.select().from(mcpConnector).where(eq(mcpConnector.id, id)).get(),
+    ).toMatchObject({
+      status: 'unchecked',
+      statusReason: null,
+      toolCount: null,
+      toolsJson: null,
+      tokenGeneration: 2,
+    });
+  });
+
+  test('deduplicates duplicate MCP tool names on probe and reserves cairn-mail slug', async () => {
+    const dupFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      const request = new Request(input, init);
+      const body = (await request.json().catch(() => ({}))) as { id?: number; method?: string };
+      if (body.method === 'initialize') {
+        return Response.json({
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            protocolVersion: '2025-03-26',
+            capabilities: { tools: {} },
+            serverInfo: { name: 'dup-mcp', version: '1.0.0' },
+          },
+        });
+      }
+      if (body.method === 'notifications/initialized') return new Response(null, { status: 202 });
+      if (body.method === 'tools/list') {
+        return Response.json({
+          jsonrpc: '2.0',
+          id: body.id,
+          result: {
+            tools: [
+              { name: 'same', description: 'first', inputSchema: { type: 'object' } },
+              { name: 'same', description: 'second', inputSchema: { type: 'object' } },
+              { name: 'other', description: 'other', inputSchema: { type: 'object' } },
+            ],
+          },
+        });
+      }
+      return new Response(null, { status: 404 });
+    }) as typeof globalThis.fetch;
+
+    const { s, deps, base } = boot(dupFetch);
+    const reserved = await req(s.app, 'POST', base, {
+      kind: 'custom',
+      slug: 'cairn-mail',
+      label: 'Spoof',
+      url: 'https://mcp.spoof.test/mcp',
+    });
+    expect(reserved.status).toBe(400);
+
+    const created = createMcpConnector(deps, s.team.id, {
+      kind: 'custom',
+      slug: 'dup-probe',
+      label: 'Dup',
+      url: 'https://mcp.dup.test/mcp',
+    });
+    await checkMcpConnector(deps, s.team.id, created.id);
+    const row = s.db.select().from(mcpConnector).where(eq(mcpConnector.id, created.id)).get();
+    expect(row?.toolCount).toBe(2);
+    expect(row?.toolsJson?.map((tool) => [tool.name, tool.description])).toEqual([
+      ['same', 'first'],
+      ['other', 'other'],
+    ]);
   });
 });

@@ -6,6 +6,7 @@ import {
   type Harness,
   type HarnessSettings,
   Harness as PiHarness,
+  type Registry,
 } from '@earendil-works/pi-durable';
 import { openNodeSqliteStorage } from '@earendil-works/pi-durable/storage/sqlite/node';
 
@@ -15,13 +16,14 @@ export async function openCoordinatorHarness(
   context: Context,
   options: {
     extensions?: readonly Extension[];
+    registry?: Registry;
     settings?: () => HarnessSettings;
     beforeResume?: (harness: Harness) => Promise<void>;
     resume?: boolean;
   } = {},
 ): Promise<Harness> {
   const storage = await openNodeSqliteStorage(storagePath);
-  const registry = createRegistry();
+  const registry = options.registry ?? createRegistry();
   for (const extension of options.extensions ?? []) registry.install(extension);
   const harness = await PiHarness.open(
     storage,

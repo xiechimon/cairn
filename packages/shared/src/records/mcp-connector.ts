@@ -188,7 +188,7 @@ export function mcpConnectorSecretValues(headers: Record<string, string> | undef
   return [...values];
 }
 
-export const MCP_RESERVED_SLUGS: readonly string[] = ['cairn'];
+export const MCP_RESERVED_SLUGS: readonly string[] = ['cairn', 'cairn-mail'];
 
 export const mcpConnectorSlugSchema = z
   .string()

@@ -117,21 +117,17 @@ describe('in-server Coordinator connector path', () => {
     const w = await world('one', KEY, { mcpFetch: mcp.fetch });
     const connectorId = insertConnector(w.s);
     const faux = scriptedTurn({
-      2: () => callConnector('connector_gmail__GMAIL_FETCH', {}),
-      3: sayDone,
+      1: () => {
+        w.s.db
+          .update(mcpConnector)
+          .set({ status: 'needs_auth' })
+          .where(eq(mcpConnector.id, connectorId))
+          .run();
+        return callConnector('connector_gmail__GMAIL_FETCH', {});
+      },
+      2: sayDone,
     });
     const coordinator = boot(w, faux);
-    await runTurn(w, coordinator);
-
-    w.s.db
-      .update(mcpConnector)
-      .set({ status: 'needs_auth' })
-      .where(eq(mcpConnector.id, connectorId))
-      .run();
-    const again = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
-      content: 'two',
-    });
-    expect(again.status).toBe(201);
     await runTurn(w, coordinator);
 
     expect(mcp.calls).toHaveLength(0);
@@ -148,6 +144,174 @@ describe('in-server Coordinator connector path', () => {
         .from(step)
         .all()
         .map((row) => row.status),
-    ).toEqual(['done', 'done']);
+    ).toEqual(['done']);
+  }, 30_000);
+
+  it('drops disconnected connector tools from an open Coordinator thread on the next turn', async () => {
+    const mcp = fakeMcp();
+    const w = await world('first turn', KEY, { mcpFetch: mcp.fetch });
+    const connectorId = insertConnector(w.s);
+    const turnToolSearch: string[] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    faux.setResponses(
+      Array(8).fill(
+        (c: {
+          messages: {
+            role: string;
+            toolsAdded?: { name: string; description?: string }[];
+          }[];
+        }) => {
+          let latest = '';
+          for (const m of c.messages) {
+            if (m.role !== 'system') continue;
+            const searchTool = m.toolsAdded?.find((tool) => tool.name === 'tool_search');
+            if (searchTool?.description !== undefined) latest = searchTool.description;
+          }
+          turnToolSearch.push(latest);
+          return sayDone();
+        },
+      ),
+    );
+    const coordinator = boot(w, faux);
+
+    await runTurn(w, coordinator);
+
+    w.s.db
+      .update(mcpConnector)
+      .set({ status: 'needs_auth' })
+      .where(eq(mcpConnector.id, connectorId))
+      .run();
+    const again = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      content: 'second turn after disconnect',
+    });
+    expect(again.status).toBe(201);
+    await runTurn(w, coordinator);
+
+    expect(turnToolSearch[0]).toContain('connector_gmail__GMAIL_FETCH');
+    expect(turnToolSearch[1]).not.toContain('connector_gmail__GMAIL_FETCH');
+  }, 30_000);
+
+  it('hydrates a connected connector with null toolsJson so the Coordinator sees and runs its tools', async () => {
+    const mcp = fakeMcp();
+    const w = await world('check the inbox', KEY, { mcpFetch: mcp.fetch });
+    const connectorId = insertConnector(w.s, {
+      toolsJson: null,
+      toolCount: 49,
+      checkedAt: 1_700_000_000_000,
+    });
+    const seenToolSearch: string[] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    let generation = 0;
+    faux.setResponses(
+      Array(8).fill(
+        (c: {
+          messages: {
+            role: string;
+            toolsAdded?: { name: string; description?: string }[];
+          }[];
+        }) => {
+          generation += 1;
+          for (const m of c.messages) {
+            if (m.role !== 'system') continue;
+            const searchTool = m.toolsAdded?.find((tool) => tool.name === 'tool_search');
+            if (searchTool?.description !== undefined) seenToolSearch.push(searchTool.description);
+          }
+          if (generation === 1) {
+            return fauxAssistantMessage([fauxToolCall('tool_search', { query: 'GMAIL_FETCH' })], {
+              stopReason: 'toolUse',
+            });
+          }
+          if (generation === 2) return callConnector('connector_gmail__GMAIL_FETCH', { max: 3 });
+          return sayDone();
+        },
+      ),
+    );
+    const coordinator = boot(w, faux);
+
+    await runTurn(w, coordinator);
+
+    expect(seenToolSearch.at(-1)).toContain('connector_gmail__GMAIL_FETCH');
+    expect(mcp.calls).toMatchObject([{ name: 'GMAIL_FETCH', args: { max: 3 } }]);
+    const hydrated = w.s.db
+      .select()
+      .from(mcpConnector)
+      .where(eq(mcpConnector.id, connectorId))
+      .get();
+    expect(hydrated?.status).toBe('connected');
+    expect(hydrated?.toolCount).toBe(3);
+    expect(hydrated?.toolsJson?.map((tool) => tool.name)).toEqual([
+      'GMAIL_FETCH',
+      'GMAIL_SEND',
+      'GMAIL_DELETE',
+    ]);
+    const record = toolCallRecords(w.s).find(
+      (call) =>
+        call.name === 'call_tool' &&
+        (call.arguments as { name?: string }).name === 'connector_gmail__GMAIL_FETCH',
+    );
+    expect(record?.isError ?? false).toBe(false);
+    expect(JSON.stringify(record?.result)).toContain('inbox-ok');
+  }, 30_000);
+
+  it('refreshes an open Coordinator thread when a connector gains cached tools before the next turn', async () => {
+    const mcp = fakeMcp();
+    const w = await world('first turn', KEY, { mcpFetch: mcp.fetch });
+    const turnToolSearch: string[] = [];
+    const faux = fauxProvider({
+      provider: 'stub',
+      models: [{ id: 'm', contextWindow: 200_000 }],
+      tokensPerSecond: 1e9,
+    });
+    let generation = 0;
+    faux.setResponses(
+      Array(8).fill(
+        (c: {
+          messages: {
+            role: string;
+            toolsAdded?: { name: string; description?: string }[];
+          }[];
+        }) => {
+          generation += 1;
+          let latest = '';
+          for (const m of c.messages) {
+            if (m.role !== 'system') continue;
+            const searchTool = m.toolsAdded?.find((tool) => tool.name === 'tool_search');
+            if (searchTool?.description !== undefined) latest = searchTool.description;
+          }
+          turnToolSearch.push(latest);
+          if (generation === 2) return callConnector('connector_gmail__GMAIL_FETCH', { max: 2 });
+          return sayDone();
+        },
+      ),
+    );
+    const coordinator = boot(w, faux);
+
+    await runTurn(w, coordinator);
+
+    insertConnector(w.s, { toolsJson: null, toolCount: 49, checkedAt: 1 });
+    const again = await req(w.s.app, 'POST', `/api/conversations/${w.threadId}/messages`, {
+      content: 'now check inbox',
+    });
+    expect(again.status).toBe(201);
+    await runTurn(w, coordinator);
+
+    expect(turnToolSearch[0]).not.toContain('connector_gmail__GMAIL_FETCH');
+    expect(turnToolSearch[1]).toContain('connector_gmail__GMAIL_FETCH');
+    expect(mcp.calls).toMatchObject([{ name: 'GMAIL_FETCH', args: { max: 2 } }]);
+    const record = toolCallRecords(w.s).find(
+      (call) =>
+        call.name === 'call_tool' &&
+        (call.arguments as { name?: string }).name === 'connector_gmail__GMAIL_FETCH',
+    );
+    expect(record?.isError ?? false).toBe(false);
+    expect(JSON.stringify(record?.result)).toContain('inbox-ok');
   }, 30_000);
 });

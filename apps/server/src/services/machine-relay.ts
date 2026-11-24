@@ -51,12 +51,7 @@ import { resolveProjectGithubLabelIds } from './github-labels.js';
 import { executeInfoCardTool } from './info-card-tools.js';
 import { forwardComputerCall } from './machine-computer.js';
 import { isChiefConversation, type MachineDeps, ownedStepRow } from './machines.js';
-import {
-  defaultMcpConfigPath,
-  type McpConnectorDeps,
-  newMcpOAuthState,
-  publicOAuthFetch,
-} from './mcp-servers.js';
+import { mcpConnectorDepsOf } from './mcp-servers.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { refuseRestrictedTurnTool, turnForcesOutboundApproval } from './report-turn.js';
 import {
@@ -221,21 +216,31 @@ export async function executeRelayToolCall(
   if (!threadRow) throw new NotFoundError(`chief thread ${threadId}`);
   const chiefRow = deps.db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
   if (!chiefRow) throw new NotFoundError(`chief ${threadRow.chiefId}`);
+  const assertTurnClaim = () => {
+    if (machineId !== null) {
+      const runner = deps.db
+        .select({ tokenHash: machine.tokenHash, retiredAt: machine.retiredAt })
+        .from(machine)
+        .where(eq(machine.id, machineId))
+        .get();
+      if (
+        runnerTokenHash == null ||
+        runner?.tokenHash !== runnerTokenHash ||
+        runner.retiredAt !== null
+      ) {
+        throw new HttpError(401, 'unauthorized');
+      }
+    }
+    const current = ownedStepRow(deps, machineId, stepId);
+    if (current.status !== 'claimed' || current.claimedAt !== row.claimedAt) {
+      throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
+    }
+  };
   if (name.startsWith(CONNECTOR_TOOL_PREFIX)) {
-    const mcp: McpConnectorDeps = {
-      db: deps.db,
-      box: deps.box,
-      mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(),
-      fetch: deps.mcpFetch ?? globalThis.fetch,
-      oauthFetch: deps.mcpFetch ?? publicOAuthFetch,
-      oauthState: deps.mcpOAuthState ?? newMcpOAuthState(),
-      ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
-      ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
-    };
     return executeConnectorToolCall(
       {
         db: deps.db,
-        mcp,
+        mcp: mcpConnectorDepsOf(deps),
         hub: deps.hub,
         user: deps.user,
         vapidKeys: deps.vapidKeys,
@@ -248,6 +253,7 @@ export async function executeRelayToolCall(
         threadId,
         scopeProjectId: stepScopeProjectId(row),
         mcpGrant: row.mcpGrant,
+        assertTurnClaim,
         ...(turnForcesOutboundApproval(deps.db, row.prompt) ? { untrustedTurn: true } : {}),
       },
       name,
@@ -299,26 +305,7 @@ export async function executeRelayToolCall(
         turnMessageIds: row.ownerMessageIds ?? [],
         turnScopeProjectId: stepScopeProjectId(row),
         turnScopeMixed: steeredFromAnotherScope(deps, row),
-        assertTurnClaim: () => {
-          if (machineId !== null) {
-            const runner = deps.db
-              .select({ tokenHash: machine.tokenHash, retiredAt: machine.retiredAt })
-              .from(machine)
-              .where(eq(machine.id, machineId))
-              .get();
-            if (
-              runnerTokenHash == null ||
-              runner?.tokenHash !== runnerTokenHash ||
-              runner.retiredAt !== null
-            ) {
-              throw new HttpError(401, 'unauthorized');
-            }
-          }
-          const current = ownedStepRow(deps, machineId, stepId);
-          if (current.status !== 'claimed' || current.claimedAt !== row.claimedAt) {
-            throw new HttpError(409, 'Coordinator tools require a currently claimed turn');
-          }
-        },
+        assertTurnClaim,
       },
       name,
       params,

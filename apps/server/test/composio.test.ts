@@ -258,6 +258,9 @@ describe('composio connector routes', () => {
     ).json()) as { status: string };
     expect(revoked.status).toBe('revoked');
     expect(
+      s.db.select().from(mcpConnector).where(eq(mcpConnector.id, created.id)).get()?.toolsJson,
+    ).toBeNull();
+    expect(
       composio.calls.some(
         (call) =>
           call.method === 'DELETE' && call.pathname === `${BASE_COMPOSIO}/connected_accounts/ca-1`,
@@ -324,5 +327,35 @@ describe('composio connector routes', () => {
     const bad = await req(s.app, 'POST', `${base}/composio/toolkits`, { slug: 'NOT_A_SLUG' });
     expect(bad.status).toBe(400);
     expect(composio.calls.filter((call) => call.method === 'POST')).toHaveLength(0);
+  });
+
+  test('poll transitioning a connected app to expired clears toolCount and toolsJson', async () => {
+    const { s, composio, base } = boot({
+      account: { id: 'ca-exp', status: 'ACTIVE', status_reason: null, is_disabled: false },
+    });
+    await putKey(s);
+    const created = (await (
+      await req(s.app, 'POST', `${base}/composio/toolkits`, { slug: 'gmail' })
+    ).json()) as { id: string; status: string; toolCount: number };
+    expect(created).toMatchObject({ status: 'connected', toolCount: 3 });
+
+    composio.setAccount({
+      id: 'ca-exp',
+      status: 'EXPIRED',
+      status_reason: null,
+      is_disabled: false,
+    });
+    const expired = (await (
+      await req(s.app, 'POST', `${base}/composio/${created.id}/poll`)
+    ).json()) as { status: string; toolCount: number | null };
+    expect(expired).toMatchObject({ status: 'needs_auth', toolCount: null });
+    expect(
+      s.db.select().from(mcpConnector).where(eq(mcpConnector.id, created.id)).get(),
+    ).toMatchObject({
+      status: 'needs_auth',
+      statusReason: 'expired',
+      toolCount: null,
+      toolsJson: null,
+    });
   });
 });
