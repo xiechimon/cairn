@@ -263,7 +263,7 @@ export function useFileComments({
       if (moved === null) lost.add(comment.id);
       else shown.push(moved);
     }
-    return { shown, lost };
+    return { shown, lost, byId: new Map(shown.map((comment) => [comment.id, comment])) };
   }, [active, versionId, extent]);
   const resolved = useMemo<Extent>(
     () => ({
@@ -317,7 +317,11 @@ export function useFileComments({
           artifactCommentState({
             status: comment.status,
             handledSeq: comment.handledSeq,
-            anchorResolves: resolves(comment.anchor, comment.id, resolved),
+            anchorResolves: resolves(
+              (placed.byId.get(comment.id) ?? comment).anchor,
+              comment.id,
+              resolved,
+            ),
           })
         }
         readOnly={readOnly || !enabled}
