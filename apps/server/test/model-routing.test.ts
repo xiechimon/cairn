@@ -2,8 +2,19 @@ import type { RoutingConnection, RoutingEdge, RoutingQuota } from '@cairn/shared
 import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
-import { build, chief, chiefThread, machine, project, step, todo } from '../src/db/schema.js';
+import {
+  antigravitySubscription,
+  build,
+  chief,
+  chiefThread,
+  devinSubscription,
+  machine,
+  project,
+  step,
+  todo,
+} from '../src/db/schema.js';
 import { refreshClaudeRateParks } from '../src/services/claude-rate-limit.js';
+import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { claimStep } from '../src/services/machine-claim.js';
 import { createProvider } from '../src/services/providers.js';
 import {
@@ -62,6 +73,152 @@ test('a Runner Claude login and its rate windows are no routing connection; a st
   }
   expect(JSON.stringify(subscribed)).not.toMatch(/Cipher|apiKey|tokenHash|test-subscription-token/);
   expect((await req(s.app, 'GET', '/api/teams/other/model-routing')).status).toBe(404);
+});
+
+test('model-routing reports active Antigravity and Devin subscriptions as available connections', async () => {
+  const s = bootServer();
+  const path = `/api/teams/${s.team.id}/model-routing`;
+  const runnerId = insertMachine(
+    s,
+    readyMachine({
+      online: true,
+      capabilities: {
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }],
+        },
+        devin: { installed: true, authenticated: true },
+      },
+    }),
+  );
+  s.db
+    .insert(antigravitySubscription)
+    .values({
+      id: 'agy-conn-1',
+      teamId: s.team.id,
+      label: 'Antigravity',
+      tokenCipher: null,
+      runnerId,
+      models: [],
+      enabledAt: Date.now(),
+      createdAt: Date.now(),
+    })
+    .run();
+  s.db
+    .insert(devinSubscription)
+    .values({
+      id: 'devin-conn-1',
+      teamId: s.team.id,
+      label: 'Devin',
+      tokenCipher: s.secretBox.seal('wsk-test-token'),
+      models: [{ id: 'swe-2-high', name: 'SWE-2 High' }],
+      enabledAt: Date.now(),
+      createdAt: Date.now(),
+    })
+    .run();
+
+  const body = (await (await req(s.app, 'GET', path)).json()) as {
+    connections: RoutingConnection[];
+  };
+  expect(body.connections).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        id: 'agy-conn-1',
+        kind: 'subscription',
+        available: true,
+        models: ['gemini-3.8-flash'],
+      }),
+      expect.objectContaining({
+        id: 'devin-conn-1',
+        kind: 'subscription',
+        available: true,
+        models: ['swe-2-high'],
+      }),
+    ]),
+  );
+});
+
+test('a Runner claims a chief step using the default Antigravity subscription when no Coordinator rule is stored', async () => {
+  const s = bootServer();
+  const runnerId = insertMachine(
+    s,
+    readyMachine({
+      online: true,
+      capabilities: {
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }],
+        },
+      },
+    }),
+  );
+  s.db
+    .insert(antigravitySubscription)
+    .values({
+      id: 'agy-claim-sub',
+      teamId: s.team.id,
+      label: 'Antigravity',
+      tokenCipher: null,
+      runnerId,
+      models: [],
+      enabledAt: Date.now(),
+      createdAt: Date.now(),
+    })
+    .run();
+  const chiefId = `chief-${s.team.id}`;
+  const threadId = `chief-thread-${s.team.id}`;
+  s.db
+    .insert(chief)
+    .values({
+      id: chiefId,
+      teamId: s.team.id,
+      userId: s.user.id,
+      createdAt: 1,
+    })
+    .run();
+  s.db
+    .insert(chiefThread)
+    .values({
+      id: threadId,
+      chiefId,
+      userId: s.user.id,
+      teamId: s.team.id,
+      title: 'Coordinator',
+      sessionId: '',
+      sessionRuntime: 'pi',
+      sessionOpenedAt: 1,
+      createdAt: 1,
+      updatedAt: 1,
+    })
+    .run();
+  s.db
+    .insert(step)
+    .values({
+      id: 'chief-step-default-agy',
+      buildId: threadId,
+      kind: 'chief',
+      prompt: 'hi',
+      createdAt: 1,
+    })
+    .run();
+  const deps = {
+    ...s.svc,
+    box: s.secretBox,
+    reposDir: s.reposDir,
+    attachmentsDir: s.attachmentsDir,
+  };
+  setCoordinatorInServer(true);
+  try {
+    const claimed = await claimStep(deps, runnerId, s.team.id, 0, 'http://localhost');
+    expect(claimed).toMatchObject({
+      step: { id: 'chief-step-default-agy' },
+      agent: { provider: 'antigravity', modelId: 'gemini-3.8-flash' },
+    });
+  } finally {
+    setCoordinatorInServer(false);
+  }
 });
 
 test('a non-Claude model using Anthropic messages stays runnable under subscription-only', async () => {

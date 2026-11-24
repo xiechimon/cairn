@@ -233,6 +233,42 @@ describe('agent config isolation', () => {
     expect(lstatSync(join(home, '.gemini', 'antigravity-cli')).isDirectory()).toBe(true);
   });
 
+  test('a host Antigravity step materializes antigravity-cli/antigravity-oauth-token from acp_token.json when the cli token file is absent', () => {
+    const root = realpathSync(testTempDir('agent-home-acp-'));
+    const realHome = join(root, 'real');
+    mkdirSync(join(realHome, '.gemini', 'antigravity-acp'), { recursive: true });
+    writeFileSync(
+      join(realHome, '.gemini', 'antigravity-acp', 'acp_token.json'),
+      JSON.stringify({
+        access_token: 'ya29.host-acp-access',
+        refresh_token: '1//0g-host-acp-refresh',
+        expiry: '2099-01-01T00:00:00Z',
+      }),
+    );
+    const { env } = assembleStepEnv(
+      input({
+        inherited: { HOME: realHome },
+        runtimeId: 'antigravity',
+        agentConfig: { cairnHome: join(root, 'cairn'), realHome },
+      }),
+    );
+    const home = env.HOME ?? '';
+    for (const dir of ['antigravity-cli', 'antigravity-acp']) {
+      const tokenPath = join(home, '.gemini', dir, 'antigravity-oauth-token');
+      expect(existsSync(tokenPath)).toBe(true);
+      expect(lstatSync(tokenPath).mode & 0o777).toBe(0o600);
+      expect(JSON.parse(readFileSync(tokenPath, 'utf8'))).toEqual({
+        token: {
+          access_token: 'ya29.host-acp-access',
+          token_type: 'Bearer',
+          refresh_token: '1//0g-host-acp-refresh',
+          expiry: '2099-01-01T00:00:00Z',
+        },
+        auth_method: 'consumer',
+      });
+    }
+  });
+
   test('an Antigravity API key step gets its own HOME with the Gemini provider and no sign-in', () => {
     const root = realpathSync(testTempDir('agent-home-'));
     const realHome = join(root, 'real');

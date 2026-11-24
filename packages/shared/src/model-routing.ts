@@ -9,7 +9,7 @@ export const ROUTING_USES = [
   'nightly-scan',
 ] as const;
 export type RoutingUse = (typeof ROUTING_USES)[number];
-export type RoutingVendor = 'anthropic' | 'openai';
+export type RoutingVendor = 'anthropic' | 'openai' | 'antigravity' | 'devin';
 
 export interface RoutingConnection {
   id: string;

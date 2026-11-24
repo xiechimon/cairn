@@ -1,5 +1,6 @@
 import { CircleDashed } from 'lucide-react';
 import { useState } from 'react';
+import { thinkingPreview } from '../components/chat/agent-rows.js';
 import { formatLiveElapsed, liveTokensLabel, useLiveSeconds } from '../components/chat/live-row.js';
 import {
   EMPTY_TRACE_COUNTS,
@@ -273,7 +274,7 @@ function WorkStepRow({
       : call.background === true
         ? t('后台')
         : t(running ? RUNNING_VERBS[call.action] : DONE_VERBS[call.action]);
-  const preview = step.kind === 'think' ? step.text.trim().split('\n')[0] : undefined;
+  const preview = step.kind === 'think' ? thinkingPreview(step.text, '') || undefined : undefined;
   return (
     <div
       className={

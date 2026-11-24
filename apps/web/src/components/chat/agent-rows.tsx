@@ -10,6 +10,19 @@ import {
 } from '../ui/trace.js';
 
 const PREVIEW_CHARS = 150;
+const GENERIC_THINKING_OPENER =
+  /^(?:i['’]?m |i am |let me )?(?:think(?:ing)?(?:\s+(?:through|about)\b[^.!?]*)?|reason(?:ing)?(?:\s+(?:through|about)\b[^.!?]*)?)[.!?…]*$/i;
+
+export function thinkingPreview(text: string, fallback: string): string {
+  const firstLine =
+    text
+      .trim()
+      .split('\n')
+      .find((line) => line.trim() !== '')
+      ?.trim() ?? '';
+  if (firstLine === '' || GENERIC_THINKING_OPENER.test(firstLine)) return fallback;
+  return firstLine.length > PREVIEW_CHARS ? `${firstLine.slice(0, PREVIEW_CHARS)}…` : firstLine;
+}
 
 const AGENT_LINE_CLS =
   'text-meta leading-5 text-content-tertiary data-[status=error]:text-content-tertiary';
@@ -23,13 +36,7 @@ export function ThinkingRow({
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
-  const firstLine =
-    text
-      .trim()
-      .split('\n')
-      .find((l) => l.trim() !== '') ?? '';
-  const preview =
-    firstLine.length > PREVIEW_CHARS ? `${firstLine.slice(0, PREVIEW_CHARS)}…` : firstLine;
+  const preview = thinkingPreview(text, t('思考'));
   return (
     <Trace>
       <TraceCollapsible open={open} onOpenChange={setOpen}>

@@ -64,7 +64,14 @@ export const patchRoutingRuleBodySchema = z
   .refine((body) => Object.keys(body).length > 0, { message: 'empty patch' });
 export type PatchRoutingRuleBody = z.infer<typeof patchRoutingRuleBodySchema>;
 
-export const SESSION_DEFAULT_REASONS = ['coordinator', 'claude-code', 'provider', 'none'] as const;
+export const SESSION_DEFAULT_REASONS = [
+  'coordinator',
+  'claude-code',
+  'antigravity',
+  'devin',
+  'provider',
+  'none',
+] as const;
 
 export const sessionDefaultSchema = z.object({
   reason: z.enum(SESSION_DEFAULT_REASONS),
@@ -77,6 +84,8 @@ export const COORDINATOR_DEFAULT_REASONS = [
   'anthropic-key',
   'provider',
   'claude-code',
+  'antigravity',
+  'devin',
   'none',
 ] as const;
 

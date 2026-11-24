@@ -1,7 +1,10 @@
 import {
   CODEX_MODEL,
   type CoordinatorDefault,
+  DEFAULT_ANTIGRAVITY_MODELS,
+  DEFAULT_DEVIN_MODELS,
   filterAgentTools,
+  isInternalAntigravityModelId,
   isSessionStepKind,
   type PatchRoutingRuleBody,
   type PatchWorkPolicyBody,
@@ -31,6 +34,7 @@ import type { Db } from '../db/client.js';
 import {
   build,
   chief,
+  devinSubscription,
   machine,
   project,
   provider,
@@ -41,10 +45,13 @@ import {
 } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { activeAntigravitySource } from './antigravity-subscriptions.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { coordinatorToolDefs } from './coordinator-tool-defs.js';
 import {
+  antigravityUsable,
   claudeCodeUsable,
+  devinUsable,
   machineRuntimeAvailable,
   stepRuntimeFor,
 } from './dispatch-eligibility.js';
@@ -188,6 +195,41 @@ function providerSessionChoice(
   return null;
 }
 
+function antigravityDefaultModelId(db: Pick<Db, 'select'>, teamId: string): string | null {
+  if (!antigravityUsable(db, teamId)) return null;
+  const source = activeAntigravitySource(db, teamId);
+  if (source.kind === 'none') return null;
+  const raw =
+    source.models.length > 0
+      ? source.models
+      : source.kind === 'host' && source.login.status === 'ok' && source.login.models.length > 0
+        ? source.login.models
+        : DEFAULT_ANTIGRAVITY_MODELS;
+  const usable = raw.filter((model) => model.id !== '' && !isInternalAntigravityModelId(model.id));
+  return usable.find((model) => model.id === 'gemini-3.8-flash')?.id ?? usable[0]?.id ?? null;
+}
+
+function devinDefaultModelId(db: Pick<Db, 'select'>, teamId: string): string | null {
+  if (!devinUsable(db, teamId)) return null;
+  const now = nowMs();
+  const row = db
+    .select({ models: devinSubscription.models })
+    .from(devinSubscription)
+    .where(
+      and(
+        eq(devinSubscription.teamId, teamId),
+        isNotNull(devinSubscription.enabledAt),
+        or(
+          sql`${devinSubscription.expiresAt} is null`,
+          sql`${devinSubscription.expiresAt} > ${now}`,
+        ),
+      ),
+    )
+    .get();
+  const raw = row && row.models.length > 0 ? row.models : DEFAULT_DEVIN_MODELS;
+  return raw.find((model) => model.id !== '')?.id ?? null;
+}
+
 export function defaultSessionChoice(
   db: Pick<Db, 'select'>,
   teamId: string,
@@ -204,7 +246,13 @@ export function defaultSessionChoice(
     };
   }
   const choice = providerSessionChoice(db, teamId);
-  return choice === null ? null : { reason: 'provider', ...choice };
+  if (choice !== null) return { reason: 'provider', ...choice };
+  const antigravityModel = antigravityDefaultModelId(db, teamId);
+  if (antigravityModel !== null) {
+    return { reason: 'antigravity', provider: 'antigravity', modelId: antigravityModel };
+  }
+  const devinModel = devinDefaultModelId(db, teamId);
+  return devinModel === null ? null : { reason: 'devin', provider: 'devin', modelId: devinModel };
 }
 
 function isAnthropicApi(baseUrl: string): boolean {
@@ -264,9 +312,19 @@ export function defaultCoordinatorChoice(
       return { reason: 'provider', provider: row.providerId, modelId: model.id };
     }
   }
-  return claudeCodeUsable(db, teamId)
-    ? { reason: 'claude-code', provider: 'claude-code', modelId: CLAUDE_CODE_COORDINATOR_MODEL }
-    : null;
+  if (claudeCodeUsable(db, teamId)) {
+    return {
+      reason: 'claude-code',
+      provider: 'claude-code',
+      modelId: CLAUDE_CODE_COORDINATOR_MODEL,
+    };
+  }
+  const antigravityModel = antigravityDefaultModelId(db, teamId);
+  if (antigravityModel !== null) {
+    return { reason: 'antigravity', provider: 'antigravity', modelId: antigravityModel };
+  }
+  const devinModel = devinDefaultModelId(db, teamId);
+  return devinModel === null ? null : { reason: 'devin', provider: 'devin', modelId: devinModel };
 }
 
 export function defaultCoordinatorRule(

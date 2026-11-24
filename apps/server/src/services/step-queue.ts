@@ -13,7 +13,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { build, chiefThread, machine, routingRule, step, todo } from '../db/schema.js';
+import { build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import { BLOCKED_BY_HOLD, unmetBlockerTitles } from './blockers.js';
@@ -137,16 +137,12 @@ export function stepQueueProjector(db: Db, teamId: string) {
     })
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .innerJoin(
-      routingRule,
-      and(eq(routingRule.teamId, chiefThread.teamId), eq(routingRule.use, 'coordinator')),
-    )
     .where(and(eq(step.status, 'pending'), eq(step.kind, 'chief'), eq(chiefThread.teamId, teamId)))
     .all()
-    .map((row) => ({
-      ...row,
-      home: coordinatorProfile(db, teamId, row.projectId)?.machineId ?? null,
-    }));
+    .flatMap((row) => {
+      const profile = coordinatorProfile(db, teamId, row.projectId);
+      return profile === null ? [] : [{ ...row, home: profile.machineId ?? null }];
+    });
   const queue = [...workerQueue, ...chiefRows].sort(
     (a, b) => a.createdAt - b.createdAt || (a.id < b.id ? -1 : 1),
   );

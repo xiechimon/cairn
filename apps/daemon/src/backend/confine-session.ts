@@ -436,6 +436,17 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const extraReadable = (extra.readable ?? []).map(daemonChild);
     const gitDirectories = gitDirectoriesOf(workspace);
     const resolvedCaches = sharedCaches.map((path) => grantPath(path));
+    const antigravityConfigDirs =
+      harness === 'antigravity'
+        ? state
+            .filter((entry) => entry.dir)
+            .flatMap((entry) => [
+              join(entry.lexical, '.gemini'),
+              join(entry.lexical, '.gemini', 'antigravity-cli'),
+              join(entry.lexical, '.gemini', 'antigravity-acp'),
+            ])
+            .filter((path) => lstatSync(path, { throwIfNoEntry: false })?.isDirectory() === true)
+        : [];
     const pinnedInodes = [
       ...new Set([
         workspace,
@@ -445,6 +456,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         ...(harnessTemp === null ? [] : [harnessTemp]),
         ...resolvedCaches,
         ...state.filter((entry) => entry.dir).map((entry) => entry.lexical),
+        ...antigravityConfigDirs,
         ...handoff,
         ...extraState.filter(
           (path) => lstatSync(path, { throwIfNoEntry: false })?.isDirectory() === true,

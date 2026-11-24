@@ -35,7 +35,6 @@ import {
   chief,
   chiefThread,
   machine,
-  routingRule,
   type StepRanModel,
   skillAudit,
   step,
@@ -181,10 +180,6 @@ function claimChiefCandidates(deps: MachineDeps, _machineId: string, teamId: str
     .from(step)
     .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
     .innerJoin(chief, eq(chiefThread.chiefId, chief.id))
-    .innerJoin(
-      routingRule,
-      and(eq(routingRule.teamId, chiefThread.teamId), eq(routingRule.use, 'coordinator')),
-    )
     .where(
       and(
         eq(step.status, 'pending'),

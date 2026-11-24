@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
 import type { AntigravityOAuthStepCredential } from '@cairn/shared';
+import { readRegularCredentialFile } from '@cairn/shared/credential-profile';
 import { claudeConfigHome, runtimeHome } from './runtime-homes.js';
 
 export const ANTIGRAVITY_OAUTH_SHARED_HOME = 'antigravity-oauth';
@@ -28,6 +29,7 @@ export function antigravityOAuthPersistentDirs(cairnHome: string): string[] {
 
 export const ANTIGRAVITY_CREDENTIAL_FILES = [
   '.gemini/antigravity-cli/antigravity-oauth-token',
+  '.gemini/antigravity-acp/antigravity-oauth-token',
   '.gemini/antigravity-acp/acp_token.json',
   '.gemini/antigravity-acp/acp_business_token.json',
   '.gemini/jetski-standalone-oauth-token',
@@ -127,6 +129,65 @@ export function writeJsonObject(
   return path;
 }
 
+function readRegularJsonObject(path: string): Record<string, unknown> {
+  try {
+    const raw = readRegularCredentialFile(path);
+    if (raw === null) return {};
+    const parsed: unknown = JSON.parse(raw);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function materializeHostAntigravityOAuthTokens(home: string, realHome: string): void {
+  const cliRel = '.gemini/antigravity-cli/antigravity-oauth-token';
+  const acpRel = '.gemini/antigravity-acp/antigravity-oauth-token';
+  const hostCli = join(realHome, cliRel);
+  const hostAcp = join(realHome, acpRel);
+  const hasHostCli = lstatOrNull(hostCli)?.isFile() === true;
+  const hasHostAcp = lstatOrNull(hostAcp)?.isFile() === true;
+  const linkIfMissing = (source: string, rel: string) => {
+    const target = join(realDirectory(home, dirname(rel)), 'antigravity-oauth-token');
+    clearNonLink(target);
+    const staging = `${target}.${randomUUID()}`;
+    symlinkSync(source, staging);
+    renameSync(staging, target);
+  };
+  if (hasHostCli && !hasHostAcp) {
+    linkIfMissing(hostCli, acpRel);
+    return;
+  }
+  if (hasHostAcp && !hasHostCli) {
+    linkIfMissing(hostAcp, cliRel);
+    return;
+  }
+  if (hasHostCli || hasHostAcp) return;
+  const acpJson = readRegularJsonObject(
+    join(realHome, '.gemini', 'antigravity-acp', 'acp_token.json'),
+  );
+  const accessToken = typeof acpJson.access_token === 'string' ? acpJson.access_token : '';
+  const refreshToken = typeof acpJson.refresh_token === 'string' ? acpJson.refresh_token : '';
+  if (accessToken === '' && refreshToken === '') return;
+  const expiry =
+    typeof acpJson.expiry === 'string' && acpJson.expiry.trim() !== ''
+      ? acpJson.expiry
+      : '2020-01-01T00:00:00Z';
+  const payload = {
+    token: {
+      access_token: accessToken,
+      token_type: 'Bearer',
+      ...(refreshToken !== '' ? { refresh_token: refreshToken } : {}),
+      expiry,
+    },
+    auth_method: 'consumer',
+  };
+  writeJsonObject(home, cliRel, payload);
+  writeJsonObject(home, acpRel, payload);
+}
+
 export function prepareAntigravityHome(input: {
   cairnHome: string;
   realHome: string;
@@ -135,6 +196,7 @@ export function prepareAntigravityHome(input: {
   const home = agentHomeDir(input.cairnHome, input.apiKey ? 'antigravity-api-key' : 'antigravity');
   mkdirSync(home, { recursive: true, mode: 0o700 });
   linkCredentials(home, input.realHome, input.apiKey ? [] : ANTIGRAVITY_CREDENTIAL_FILES);
+  if (!input.apiKey) materializeHostAntigravityOAuthTokens(home, input.realHome);
   writeAntigravityAuthSettings(
     home,
     input.apiKey ? 'gemini-api-key' : 'oauth-personal',

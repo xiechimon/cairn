@@ -85,7 +85,7 @@ export function devinUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
     .some((row) => machineRuntimeAvailable(row, 'devin'));
 }
 
-export function antigravityUsable(db: Pick<Db, 'select' | 'update'>, teamId: string): boolean {
+export function antigravityUsable(db: Pick<Db, 'select'>, teamId: string): boolean {
   const source = activeAntigravitySource(db, teamId);
   if (source.kind === 'none') return false;
   if (source.kind === 'host') return source.login.status === 'ok';

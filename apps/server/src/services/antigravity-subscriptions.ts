@@ -306,6 +306,7 @@ async function verifyRowCredentials(
   deps: Deps,
   row: Row,
   signal?: AbortSignal,
+  ownerInitiated = true,
 ): Promise<VerifiedCredentials> {
   if (row.tokenCipher !== null) {
     const cipher = row.tokenCipher;
@@ -346,24 +347,26 @@ async function verifyRowCredentials(
             via: 'api',
           };
         }
-        const probed = await probeAntigravityOAuthAccessToken(
-          { token: stored.token, expiresAt: row.expiresAt },
-          { dataDir: deps.dataDir, signal },
-        );
-        if (probed.result.ok) {
-          return {
-            ok: true,
-            command: 'agy acp · Google OAuth',
-            via: 'cli',
-            seededModels: probed.models.length > 0 ? probed.models : defaultSeedModels(),
-          };
-        }
-        if (probed.result.reason !== 'unavailable') {
-          return {
-            ...probed.result,
-            command: 'agy acp · Google OAuth',
-            via: 'cli',
-          };
+        if (ownerInitiated) {
+          const probed = await probeAntigravityOAuthAccessToken(
+            { token: stored.token, expiresAt: row.expiresAt },
+            { dataDir: deps.dataDir, signal },
+          );
+          if (probed.result.ok) {
+            return {
+              ok: true,
+              command: 'agy acp · Google OAuth',
+              via: 'cli',
+              seededModels: probed.models.length > 0 ? probed.models : defaultSeedModels(),
+            };
+          }
+          if (probed.result.reason !== 'unavailable') {
+            return {
+              ...probed.result,
+              command: 'agy acp · Google OAuth',
+              via: 'cli',
+            };
+          }
         }
         const result = await fetchAntigravityEntitlements(stored.token, signal);
         if (result.status === 'ok') {
@@ -600,7 +603,7 @@ export function listAntigravitySubscriptionSteps(
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function listAntigravitySubscriptions(
-  deps: Deps,
+  deps: Pick<Deps, 'db'>,
   teamId: string,
 ): AntigravitySubscriptionListEntry[] {
   const rows = deps.db
@@ -1012,12 +1015,16 @@ export async function verifyAntigravitySubscriptionConnection(
   inFlight.add(row.id);
   activeVerifications.set(deps.db, inFlight);
   try {
-    const raw = await timedCheck(() => verifyRowCredentials(deps, row, options.signal), {
-      check: 'sign-in',
-      command: row.tokenCipher === null ? 'agy acp · Runner sign-in' : 'Antigravity account API',
-      via: row.tokenCipher === null || isRefreshRow ? 'cli' : 'api',
-      model: null,
-    });
+    const ownerInitiated = options.ownerInitiated !== false;
+    const raw = await timedCheck(
+      () => verifyRowCredentials(deps, row, options.signal, ownerInitiated),
+      {
+        check: 'sign-in',
+        command: row.tokenCipher === null ? 'agy acp · Runner sign-in' : 'Antigravity account API',
+        via: row.tokenCipher === null || isRefreshRow ? 'cli' : 'api',
+        model: null,
+      },
+    );
     const { reportedDurationMs, command, via, seededModels, ...rest } = raw;
     const check = {
       ...raw.check,
@@ -1037,6 +1044,7 @@ export async function verifyAntigravitySubscriptionConnection(
           return;
         }
         const modelsToSeed =
+          ownerInitiated &&
           rest.ok &&
           fresh.tokenCipher !== null &&
           fresh.models.length === 0 &&
@@ -1256,7 +1264,7 @@ export function enabledAntigravitySubscriptionId(
   return activeSubscriptionRow(deps, teamId, at)?.id ?? null;
 }
 
-export function activeAntigravitySource(db: RunnerDb, teamId: string) {
+export function activeAntigravitySource(db: Pick<Db, 'select'>, teamId: string) {
   const row = activeSubscriptionRow({ db }, teamId);
   if (row === undefined) return { kind: 'none' } as const;
   if (row.tokenCipher !== null) {

@@ -5,6 +5,8 @@ import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { builtinModelIds } from '../src/coordinator/runtime/provider.js';
 import {
+  antigravitySubscription,
+  devinSubscription,
   machine as machineTable,
   provider as providerTable,
   routingRule,
@@ -895,6 +897,94 @@ describe('rules store provider ids, with a read-time default for Session', () =>
     const s = bare();
     claudeRunner(s);
     expect(memoryOwnerOf(s.db, s.team.id, 'verify')).toBe(`${s.team.id}:verify`);
+  });
+
+  test('an enabled Antigravity or Devin subscription is the Coordinator default when no API key or Claude subscription can run it', () => {
+    const s = bare();
+    const coordinatorDefault = () => listRoutingSettings(s.db, s.team.id, true).coordinatorDefault;
+    const none = { reason: 'none', provider: null, modelId: null };
+    expect(coordinatorDefault()).toEqual(none);
+
+    const runnerId = insertMachine(
+      s,
+      readyMachine({
+        online: true,
+        capabilities: {
+          antigravity: {
+            installed: true,
+            authenticated: true,
+            models: [
+              { id: 'gemini-4-neon', name: 'Gemini 4 Neon' },
+              { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+            ],
+          },
+          antigravityOAuthProfile: true,
+          devin: { installed: true, authenticated: true },
+        },
+      }),
+    );
+
+    s.db
+      .insert(antigravitySubscription)
+      .values({
+        id: 'agy-sub-1',
+        teamId: s.team.id,
+        label: 'Antigravity',
+        tokenCipher: null,
+        runnerId,
+        models: [],
+        enabledAt: Date.now(),
+        createdAt: Date.now(),
+      })
+      .run();
+
+    expect(coordinatorDefault()).toEqual({
+      reason: 'antigravity',
+      provider: 'antigravity',
+      modelId: 'gemini-3.8-flash',
+    });
+    setCoordinatorInServer(true);
+    try {
+      expect(coordinatorProfile(s.db, s.team.id)).toMatchObject({
+        provider: 'antigravity',
+        modelId: 'gemini-3.8-flash',
+      });
+    } finally {
+      setCoordinatorInServer(false);
+    }
+
+    s.db
+      .update(antigravitySubscription)
+      .set({ models: [{ id: 'gemini-4-neon', name: 'Gemini 4 Neon' }] })
+      .where(eq(antigravitySubscription.id, 'agy-sub-1'))
+      .run();
+    expect(coordinatorDefault()).toEqual({
+      reason: 'antigravity',
+      provider: 'antigravity',
+      modelId: 'gemini-4-neon',
+    });
+
+    s.db.delete(antigravitySubscription).where(eq(antigravitySubscription.id, 'agy-sub-1')).run();
+    s.db
+      .insert(devinSubscription)
+      .values({
+        id: 'devin-sub-1',
+        teamId: s.team.id,
+        label: 'Devin',
+        tokenCipher: s.secretBox.seal('wsk-test-token'),
+        models: [{ id: 'swe-2-high', name: 'SWE-2 High' }],
+        enabledAt: Date.now(),
+        createdAt: Date.now(),
+      })
+      .run();
+    expect(coordinatorDefault()).toEqual({
+      reason: 'devin',
+      provider: 'devin',
+      modelId: 'swe-2-high',
+    });
+
+    addProvider(s, 'vani', { models: ['m1'] });
+    expect(coordinatorDefault()).toEqual({ reason: 'provider', provider: 'vani', modelId: 'm1' });
   });
 
   test('naming a Runner on an empty Session rule creates it with the default provider and model', () => {
