@@ -125,6 +125,7 @@ import {
   homeCMade,
   homeCMadeMany,
   homeCQuiet,
+  homeCRetry,
   makeRef,
   sessionsRef,
 } from './home-c.js';
@@ -251,6 +252,7 @@ const scenarios = {
   'home-c-made-many': homeCMadeMany,
   'home-c-machines': homeCMachines,
   'home-c-engine': homeCEngine,
+  'home-c-retry': homeCRetry,
   'sessions-ref': sessionsRef,
   'make-ref': makeRef,
   'readme-en': readmeEn,

@@ -10,7 +10,7 @@ test('home banner names the relay lane and the event type', async ({ page }) => 
   await expect(banner).toContainText('Relay 186');
   await expect(banner).toContainText('额度空');
 
-  await expect(banner).toContainText(/\d{2}:\d{2} 自动探测/);
+  await expect(banner).toContainText(/额度 \d{2}:\d{2} 恢复后自动继续/);
 });
 
 test('side chat status says `等额度` not `运行中`', async ({ page }) => {

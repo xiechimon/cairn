@@ -23,9 +23,11 @@ export function ThreadPrPanel({ status, rows, onViewChanges, onRetry }: ThreadPr
         data-testid="thread-pr-error"
         className="mt-5 flex items-center gap-2 py-1 pr-1.5 pl-3 text-meta text-content-tertiary"
       >
-        <span className="min-w-0 flex-1">{t('PR 状态加载失败，稍后会自动重试。')}</span>
+        <span className="min-w-0 flex-1 tabular-nums">
+          {t('PR 状态未能加载，30 秒后自动重试。')}
+        </span>
         <Button variant="ghost" size="sm" onClick={onRetry} className="h-6.5 text-meta">
-          {t('重试')}
+          {t('立即重试')}
         </Button>
       </TraceCard>
     );

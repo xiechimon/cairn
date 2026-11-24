@@ -93,6 +93,11 @@ import {
   WORKSPACE_HOOK_ROW_KIND,
 } from '@cairn/shared';
 import { relativeTime } from '../board/rel-time.js';
+import {
+  parkedRetryCopy,
+  scheduledFailureHeadline,
+  scheduledRetryPhrase,
+} from '../board/retry-copy.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type {
   BranchInfoContent,
@@ -167,7 +172,7 @@ function queueLabel(queue: NonNullable<StepRow['queue']>): {
 } | null {
   if (queue.hold != null) {
     return {
-      label: '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）',
+      label: '额度 {time} 恢复后自动继续',
       vars: { time: clockTime(queue.hold.retryAt) },
     };
   }
@@ -221,10 +226,12 @@ function quotaWaitLabel(q: NonNullable<StepRow['quotaWait']>): {
   vars: Record<string, string | number>;
 } {
   return {
-    label: '等额度：{lane} {kind}，{probe} 自动探测后继续运行',
+    label:
+      q.kind === 'quota'
+        ? '{lane}：额度 {probe} 恢复后自动继续'
+        : '{lane}：限流 {probe} 恢复后自动继续',
     vars: {
       lane: q.label ?? q.providerId,
-      kind: q.kind === 'quota' ? '额度空' : '限流',
       probe: clockTime(q.probeAt),
     },
   };
@@ -318,6 +325,7 @@ export function toDisplayTodo(w: WireTodo): DisplayTodo {
     chiefCreated: w.sourceBuildId !== null,
     waitingOn: w.waitingOn ?? undefined,
     quotaWait: w.quotaWait ?? null,
+    ...(w.retry !== undefined ? { retry: w.retry } : {}),
     sourceKind: w.sourceKind,
     sourceRef: w.sourceRef,
     usageCost: w.usageCost,
@@ -1079,6 +1087,9 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         ...(queued != null && running.queue?.blocked != null
           ? { blocked: true as const, blockedKind: running.queue.blocked.kind }
           : {}),
+        ...(quota != null || (queued != null && running.queue?.hold != null)
+          ? { quotaHeld: true as const }
+          : {}),
         label:
           queued != null
             ? queued.label
@@ -1122,6 +1133,32 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     )
   ) {
     items.push({ ...failItem(build.errorMessage), createdAt: todo.phaseAt });
+  }
+  if (todo.phase === 'failed' && todo.retry != null) {
+    for (let i = items.length - 1; i >= 0; i--) {
+      const candidate = items[i];
+      if (candidate?.kind !== 'fail') continue;
+      if (todo.retry.state === 'scheduled') {
+        const headline = scheduledFailureHeadline(todo.retry.reasonCode);
+        const schedule = scheduledRetryPhrase(todo.retry);
+        items[i] = {
+          ...candidate,
+          label: headline.key,
+          labelVars: headline.params ?? {},
+          schedule: { key: schedule.key, vars: schedule.params ?? {} },
+        };
+      } else {
+        const parked = parkedRetryCopy(todo.retry);
+        items[i] = {
+          ...candidate,
+          label: parked.title.key,
+          labelVars: parked.title.params ?? {},
+          body: parked.fix.key,
+          ...(parked.fix.params !== undefined ? { bodyVars: parked.fix.params } : {}),
+        };
+      }
+      break;
+    }
   }
   if (
     !running &&
@@ -1284,7 +1321,7 @@ function failGuidanceBody(kind: ReturnType<typeof classifyStepFailure>): string 
     case 'quota':
       return '模型额度已用尽，请等待额度恢复后重试。';
     case 'capacity':
-      return '请求被限流，请稍后重试。';
+      return '请求已触发限流，等待恢复后自动继续。';
     default:
       return '';
   }

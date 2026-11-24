@@ -33,6 +33,7 @@ import {
   type TodoDeliverables,
   type TodoOutputKind,
   type TodoOwner,
+  type TodoRetryState,
   type TodoSection,
   type TodoWaitingOn,
   type TokenUsage,
@@ -88,6 +89,7 @@ export interface TodoRecord {
   chiefCreated?: boolean;
   waitingOn?: TodoWaitingOn;
   quotaWait?: QuotaWait | null;
+  retry?: TodoRetryState | null;
   sourceKind?: string | null;
   sourceRef?: string | null;
   usageCost?: UsageCost;
@@ -447,6 +449,7 @@ export type TranscriptItem =
       outputTokens?: number;
       blocked?: true;
       blockedKind?: StepQueueBlocked['kind'];
+      quotaHeld?: true;
     }
   | { kind: 'skills'; read: string[]; denied: string[] }
   | {
@@ -473,8 +476,10 @@ export type TranscriptItem =
   | {
       kind: 'fail';
       label: string;
-      labelVars?: Record<string, string>;
+      labelVars?: Record<string, string | number>;
       body: string;
+      bodyVars?: Record<string, string | number>;
+      schedule?: { key: string; vars: Record<string, string | number> };
       raw: string;
       facts?: FailFacts;
       id?: string;

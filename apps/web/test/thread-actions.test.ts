@@ -9,6 +9,21 @@ describe('the side chat action card', () => {
     expect(threadActionOf(todo({ phase: 'todo' }), false)).toBe('start');
     expect(threadActionOf(todo({ phase: 'confirm' }), false)).toBe('approve');
     expect(threadActionOf(todo({ phase: 'failed' }), false)).toBe('retry');
+    expect(
+      threadActionOf(
+        todo({
+          phase: 'building',
+          quotaWait: {
+            kind: 'quota',
+            providerId: 'anthropic',
+            label: 'Claude',
+            retryAfterMs: 60_000,
+            probeAt: Date.now() + 60_000,
+          },
+        }),
+        true,
+      ),
+    ).toBe('retry');
   });
 
   it('leaves finishing a reviewed thread to the more menu', () => {

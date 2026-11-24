@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, CircleAlert, Copy } from 'lucide-react';
+import { ChevronDown, ChevronUp, CircleAlert, Clock, Copy } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { Button } from '../ui/button.js';
@@ -83,10 +83,12 @@ export function FailureMarker({
   label,
   testId,
   detail,
+  waiting = false,
 }: {
   label: string;
   testId: string;
   detail?: FailureDetail | undefined;
+  waiting?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const detailId = useId();
@@ -94,16 +96,15 @@ export function FailureMarker({
     <div>
       <Marker
         variant="separator"
-        role="note"
+        role={waiting ? 'status' : 'note'}
         data-testid={testId}
+        data-waiting={waiting ? '' : undefined}
         className="gap-1.5 text-meta text-content-tertiary"
       >
-        <MarkerIcon>
-          <CircleAlert />
-        </MarkerIcon>
+        <MarkerIcon>{waiting ? <Clock /> : <CircleAlert />}</MarkerIcon>
         <MarkerContent
           data-testid="failure-marker-label"
-          className="text-pretty group-data-[variant=separator]/marker:flex-initial"
+          className="text-pretty tabular-nums group-data-[variant=separator]/marker:flex-initial"
         >
           {label}
         </MarkerContent>

@@ -3,6 +3,7 @@ import { toDisplayTodo } from '../api/mappers.js';
 import type { GlyphKind } from '../components/status-glyph.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
 import { pendingQuestions } from './needs-you.js';
+import { isWaitingToRetry, todoRetryPhrase } from './retry-copy.js';
 import { threadCopy } from './thread-copy.js';
 
 export type TaskSection = TodoSection;
@@ -79,6 +80,7 @@ export function taskRowCopy(
 ): TaskRowCopy {
   const { todo, section } = entry;
   const base = { waiting: isWaiting(section), running: false };
+  const retryPhrase = todoRetryPhrase(todo);
   switch (section) {
     case 'ready_for_review':
       return {
@@ -95,17 +97,22 @@ export function taskRowCopy(
       const what: Phrase =
         (todo.blockedBy?.length ?? 0) > 0
           ? { key: '已阻塞，等待你处理。' }
-          : { key: threadCopy(todo).reason };
+          : (retryPhrase ?? { key: threadCopy(todo).reason });
       return { ...base, word: '待处理', what, where: '到任务里处理' };
     }
     case 'working': {
-      const running = todo.phase === 'planning' || todo.phase === 'building';
+      const running =
+        (todo.phase === 'planning' || todo.phase === 'building') &&
+        todo.quotaWait == null &&
+        todo.waitingOn?.on !== 'quota';
       const what: Phrase =
-        todo.owner === 'coordinator'
-          ? { key: 'Coordinator 在跟进' }
-          : todo.phase === 'failed'
-            ? { key: '失败了，等自动重试' }
-            : { key: threadCopy(todo).reason };
+        retryPhrase !== null
+          ? retryPhrase
+          : todo.owner === 'coordinator'
+            ? { key: 'Coordinator 在跟进' }
+            : todo.phase === 'failed'
+              ? { key: '即将自动重试（第 {attempt} 次）', params: { attempt: 1 } }
+              : { key: threadCopy(todo).reason };
       return { ...base, running, word: '进行中', what, where: null };
     }
     case 'resolved': {
@@ -141,6 +148,16 @@ export function titlesNeedingProject(entries: readonly TaskEntry[]): ReadonlySet
   );
 }
 
+export function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: string } {
+  if (isWaitingToRetry(todo)) {
+    return { glyph: 'queued', why: '等待自动重试，重新运行后才能完成' };
+  }
+  if (todo.phase === 'failed') return { glyph: 'failed', why: '运行失败，重新运行后才能完成' };
+  if (todo.phase === 'closed') return { glyph: 'closed', why: '已归档' };
+  if (todo.phase === 'done') return { glyph: 'done', why: '已完成' };
+  return { glyph: 'todo', why: '已归档，不能标记完成' };
+}
+
 export function glyphOf(entry: TaskEntry): GlyphKind {
   switch (entry.section) {
     case 'ready_for_review':
@@ -152,7 +169,11 @@ export function glyphOf(entry: TaskEntry): GlyphKind {
     case 'up_next':
       return 'todo';
     case 'working':
-      return 'ring';
+      return entry.todo.quotaWait != null ||
+        entry.todo.waitingOn?.on === 'quota' ||
+        isWaitingToRetry(entry.todo)
+        ? 'queued'
+        : 'ring';
   }
 }
 

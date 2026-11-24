@@ -1,5 +1,6 @@
 import type { StepPromptOrigin } from '@cairn/shared';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { joinMeta } from '../board/rel-time.js';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
@@ -329,6 +330,16 @@ function Row({
     case 'fail':
       return <FailRow item={item} t={t} />;
     case 'streaming':
+      if (item.quotaHeld === true)
+        return (
+          <div className="my-3" data-row="fail">
+            <FailureMarker
+              label={t(item.label, item.labelVars)}
+              testId="transcript-quota-wait"
+              waiting
+            />
+          </div>
+        );
       return (
         <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
           {item.blocked === true ? (
@@ -483,14 +494,21 @@ function Row({
 }
 
 function FailRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'fail' }>; t: TFunc }) {
-  const lines = [item.body === '' ? '' : t(item.body), failFactsText(item.facts, t)].filter(
-    (line) => line !== '',
-  );
+  const lines = [
+    item.body === '' ? '' : t(item.body, item.bodyVars),
+    failFactsText(item.facts, t),
+  ].filter((line) => line !== '');
+  const reason = t(item.label, item.labelVars);
   return (
     <div className="my-3" data-row="fail">
       <FailureMarker
-        label={t(item.label, item.labelVars)}
+        label={
+          item.schedule === undefined
+            ? reason
+            : joinMeta([reason, t(item.schedule.key, item.schedule.vars)])
+        }
         testId="transcript-fail"
+        waiting={item.schedule !== undefined}
         detail={{ lines, raw: item.raw }}
       />
     </div>

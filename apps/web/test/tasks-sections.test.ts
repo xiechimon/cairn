@@ -1,5 +1,6 @@
 import type { PrPanelRow } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { formatRetryClock } from '../src/board/retry-copy.js';
 import {
   ACTIVE_SECTIONS,
   bySection,
@@ -168,10 +169,47 @@ describe('rows that do not wait on the owner', () => {
     expect(copy.waiting).toBe(false);
   });
 
-  test('a failed task nobody owns yet waits for its automatic retry, not for the owner', () => {
-    const copy = taskRowCopy(entry(1, 'failed', 'working'));
-    expect(copy.what.key).toBe('失败了，等自动重试');
-    expect(copy.where).toBeNull();
+  test('a failed task nobody owns yet waits for its automatic retry with time and count', () => {
+    const now = 1_700_000_000_000;
+    const retryAt = now + 2 * 60_000;
+    const scheduled = taskRowCopy(
+      entry(1, 'failed', 'working', {
+        retry: {
+          state: 'scheduled',
+          failureClass: 'transient',
+          reasonCode: 'server_error',
+          attempt: 2,
+          maxAttempts: null,
+          nextRetryAt: retryAt,
+          windowEndsAt: now + 6 * 3_600_000,
+        },
+      }),
+    );
+    expect(scheduled.what).toEqual({
+      key: '{time} 自动重试（第 {attempt} 次）',
+      params: { time: formatRetryClock(retryAt), attempt: 2 },
+    });
+    expect(scheduled.where).toBeNull();
+
+    const parked = taskRowCopy(
+      entry(2, 'failed', 'working', {
+        owner: 'coordinator',
+        retry: {
+          state: 'parked',
+          failureClass: 'permanent',
+          reasonCode: 'setup_hook',
+          attemptsMade: 0,
+          detail: null,
+        },
+      }),
+    );
+    expect(parked.what).toEqual({ key: '环境初始化失败，已停止自动重试' });
+
+    const fallback = taskRowCopy(entry(3, 'failed', 'working'));
+    expect(fallback.what).toEqual({
+      key: '即将自动重试（第 {attempt} 次）',
+      params: { attempt: 1 },
+    });
   });
 
   test('resolved rows name the phase and a merged PR', () => {

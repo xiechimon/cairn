@@ -942,6 +942,11 @@ export function useMailMutations(teamId: string | undefined) {
         api.del<void>(`${base}/${encodeURIComponent(id)}/rules/${encodeURIComponent(ruleId)}`),
       onSuccess: invalidate,
     }),
+    retry: useMutation({
+      mutationFn: (id: string) =>
+        api.post<{ ok: true }>(`${base}/${encodeURIComponent(id)}/retry`, {}),
+      onSuccess: invalidate,
+    }),
   };
 }
 
@@ -1230,6 +1235,15 @@ export function useApiMutations(teamId: string | undefined) {
         api.post<{ delegated: boolean }>(`/api/builds/${input.buildId}/stop`, {
           discard: input.discard,
         }),
+      onSuccess: invalidateAll,
+      onError: invalidateAll,
+    }),
+    retryBuildNow: useMutation({
+      mutationFn: (input: { buildId: string; clientMessageId?: string }) =>
+        api.post<{ delegated: true; mode: 'quota_resumed' | 'restarted' }>(
+          `/api/builds/${encodeURIComponent(input.buildId)}/retry-now`,
+          { clientMessageId: input.clientMessageId ?? crypto.randomUUID() },
+        ),
       onSuccess: invalidateAll,
       onError: invalidateAll,
     }),

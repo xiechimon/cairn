@@ -20,6 +20,7 @@ export interface TaskRowProps {
   stamp?: string;
   date?: string;
   waiting: boolean;
+  showWhat?: boolean;
   place?: { name: string; shown: boolean };
   muted?: boolean;
   prLink?: { number: number; url: string };
@@ -51,6 +52,7 @@ export function TaskRow({
   stamp,
   date,
   waiting,
+  showWhat = false,
   place,
   muted = false,
   prLink,
@@ -130,11 +132,13 @@ export function TaskRow({
               </span>
             )}
           </span>
-          {(waiting || placeLine !== undefined) && (
-            <span className="min-w-0 truncate text-meta leading-4.5 text-content-tertiary">
+          {(waiting || showWhat || placeLine !== undefined) && (
+            <span className="min-w-0 truncate text-meta leading-4.5 tabular-nums text-content-tertiary">
               {placeLine !== undefined && <span data-slot="task-row-place">{placeLine}</span>}
-              {placeLine !== undefined && waiting && <span aria-hidden="true">{' · '}</span>}
-              {waiting && <span data-slot="task-row-what">{what}</span>}
+              {placeLine !== undefined && (waiting || showWhat) && (
+                <span aria-hidden="true">{' · '}</span>
+              )}
+              {(waiting || showWhat) && <span data-slot="task-row-what">{what}</span>}
             </span>
           )}
         </span>

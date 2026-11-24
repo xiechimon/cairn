@@ -1,4 +1,4 @@
-import { Archive, ArrowUpRight, Check, Ellipsis, Pencil } from 'lucide-react';
+import { Archive, ArrowUpRight, Check, Ellipsis, Pencil, RotateCw } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -23,6 +23,7 @@ import { useI18n } from '../i18n/provider.js';
 import { Trash2 } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { toastArchived } from './archive-toast.js';
+import { canRetryNow } from './retry-copy.js';
 import { MoveToProjectSub } from './task-move-menu.js';
 import { canMarkDone } from './use-mark-done.js';
 
@@ -129,6 +130,17 @@ export function TaskRowMenu({
       onError: (error) => toastError(t('删除任务失败，请重试。'), error),
     });
   };
+  const retryNow = () => {
+    if (!live) {
+      blockDemoWrite();
+      return;
+    }
+    if (todo.latestBuildId == null) return;
+    mutations.retryBuildNow.mutate(
+      { buildId: todo.latestBuildId },
+      { onError: (error) => toastError(t('立即重试失败，请重试。'), error) },
+    );
+  };
   return (
     <>
       <DropdownMenu>
@@ -164,6 +176,12 @@ export function TaskRowMenu({
             <ArrowUpRight />
             {t('打开任务')}
           </KeyedMenuItem>
+          {canRetryNow(todo) && todo.latestBuildId != null && (
+            <KeyedMenuItem shortcut="T" data-action="retry-now" onClick={retryNow}>
+              <RotateCw />
+              {t('立即重试')}
+            </KeyedMenuItem>
+          )}
           <MoveToProjectSub todo={todo} />
           {canMarkDone(todo) && (
             <KeyedMenuItem shortcut="C" data-action="done" onClick={onMarkDone}>

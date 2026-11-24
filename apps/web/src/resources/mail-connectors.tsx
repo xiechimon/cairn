@@ -7,6 +7,7 @@ import {
 } from '@cairn/shared';
 import { type ReactNode, useState } from 'react';
 import { useMailAccounts, useMailMutations } from '../api/hooks.js';
+import { formatRetryClock } from '../board/retry-copy.js';
 import { FormField, FormStack } from '../components/form-layout.js';
 import { SettingsSegmented } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
@@ -50,8 +51,8 @@ const ERROR_TEXT: Record<MailErrorCode, string> = {
   'auth-rejected': '登录被拒绝。请检查邮箱地址，并确认填的是授权码或应用专用密码，不是登录密码。',
   'host-not-found': '找不到邮件服务器，请检查 IMAP 地址。',
   'connection-refused': '服务器拒绝了连接，请检查端口。',
-  timeout: '连接超时，稍后会自动重试。',
-  'connection-lost': '连接中断，稍后会自动重试。',
+  timeout: '连接超时，将按 5 秒至 5 分钟间隔自动退避重试。',
+  'connection-lost': '连接中断，将按 5 秒至 5 分钟间隔自动退避重试。',
 };
 
 const PROVIDER_FORM: Record<
@@ -341,6 +342,16 @@ function describeAccount(
   t: (key: string, vars?: Record<string, string | number>) => string,
 ): string {
   if (account.lastError !== null && account.status !== 'watching') {
+    if (
+      (account.lastError === 'timeout' || account.lastError === 'connection-lost') &&
+      account.nextRetryAt != null
+    ) {
+      const attempt = Math.max(1, account.retryAttempt ?? 1);
+      const time = formatRetryClock(account.nextRetryAt);
+      return account.lastError === 'timeout'
+        ? t('连接超时，{time} 自动重试（第 {attempt} 次）。', { time, attempt })
+        : t('连接中断，{time} 自动重试（第 {attempt} 次）。', { time, attempt });
+    }
     return t(ERROR_TEXT[account.lastError]);
   }
   const wake =
@@ -421,6 +432,7 @@ function ManageMailboxDialog({
   onClose,
   onAdd,
   onRules,
+  onRetry,
   onRemove,
 }: {
   provider: MailProvider;
@@ -430,6 +442,7 @@ function ManageMailboxDialog({
   onClose: () => void;
   onAdd: () => void;
   onRules: (id: string) => void;
+  onRetry: (id: string) => void;
   onRemove: (id: string) => void;
 }) {
   const { t } = useI18n();
@@ -450,13 +463,26 @@ function ManageMailboxDialog({
           <ResourceRow key={account.id} data-testid={`mail-account-${account.id}`}>
             <RowText>
               <RowTitle>{account.address}</RowTitle>
-              <RowDesc className="whitespace-normal">{describeAccount(account, t)}</RowDesc>
+              <RowDesc className="whitespace-normal tabular-nums">
+                {describeAccount(account, t)}
+              </RowDesc>
             </RowText>
             <StatusChip tone={MAIL_STATUS_TONE[account.status]}>
               {t(MAIL_STATUS_LABEL[account.status])}
             </StatusChip>
             {live && (
               <>
+                {account.status === 'degraded' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => onRetry(account.id)}
+                    data-testid={`mail-retry-${account.id}`}
+                  >
+                    {t('立即重试')}
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -529,10 +555,15 @@ export function useMailConnectors({
           provider={managing}
           accounts={managedAccounts}
           live={live}
-          busy={mutations.remove.isPending}
+          busy={mutations.remove.isPending || mutations.retry.isPending}
           onClose={() => setManaging(null)}
           onAdd={() => setAdding(managing)}
           onRules={setRulesFor}
+          onRetry={(id) =>
+            mutations.retry.mutate(id, {
+              onError: failed('立即重试失败，请重试。'),
+            })
+          }
           onRemove={(id) =>
             mutations.remove.mutate(id, {
               onSuccess: () => managedAccounts.length === 1 && setManaging(null),

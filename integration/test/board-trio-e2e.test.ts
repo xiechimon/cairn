@@ -273,29 +273,15 @@ describe('#1216 task UI reliability triple defect (real web dist + real server +
     expect(orchestrationTurns(seqNum).length).toBe(1);
   }, 180_000);
 
-  test('② failed rerun: thread must land + visible in-flight + buildHistory grows after chief dispatch', async () => {
+  test('② failed rerun: immediate retry restarts directly and grows buildHistory', async () => {
     const seeded = await seedFailedTodo('重跑探针卡', SPECS.rerun, tokens.m1);
     await openDetail(seeded.id);
 
     await pexpect(page.getByTestId('side-chat-action').getByRole('button').last()).toHaveText(
-      '重试',
+      '立即重试',
     );
     await page.getByTestId('side-chat-action').getByRole('button').last().click();
 
-    await waitFor(() => orchestrationTurns(seeded.seqNum).length === 1, 15_000);
-    await pexpect(
-      page.locator('[data-testid="side-chat-action"] [data-orchestrating="true"]'),
-    ).toHaveText('编排中', { timeout: 15_000 });
-    await pexpect(
-      page.locator('[data-testid="side-chat-action"] [data-orchestrating="true"]'),
-    ).toBeDisabled();
-
-    const turn = orchestrationTurns(seeded.seqNum)[0];
-    if (turn === undefined) throw new Error('rerun orchestration turn missing');
-    await runChiefDispatch(tokens.m1, turn.buildId, {
-      name: 'message_thread',
-      params: { todoId: seeded.id, content: '重跑这张失败的卡。' },
-    });
     await waitFor(() => server.todoPhase(seeded.id) === 'queued', 15_000);
     const record = (await api(server.url, 'GET', `/api/todos/${seeded.id}`)).body as {
       buildHistory: unknown[];
@@ -321,7 +307,7 @@ describe('#1216 task UI reliability triple defect (real web dist + real server +
 
     await openDetail(seeded.id);
     await pexpect(page.getByTestId('side-chat-action').getByRole('button').last()).toHaveText(
-      '重试',
+      '立即重试',
     );
 
     await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();

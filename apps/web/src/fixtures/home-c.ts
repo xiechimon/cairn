@@ -1,4 +1,5 @@
 import type { TokenUsage } from '@cairn/shared';
+import { formatRetryClock } from '../board/retry-copy.js';
 import { boardDefault } from './board.js';
 import { chiefDefault } from './chief.js';
 import { at, PROJECT_ID, probeTodo, r7 } from './core.js';
@@ -499,4 +500,93 @@ export const makeRef: FixtureSet = {
     refMade('ref-earlier-page', 2531, '0.8 版本发布落地页', 'page', at('2026-09-08', 11, 0)),
   ],
   now: at(MADE_DAY, 20, 30),
+};
+
+const RETRY_NOW = r7(20, 30);
+const RETRY_AT = r7(20, 33);
+const QUOTA_AT = r7(21, 38);
+
+const retryWaiting: TodoRecord = {
+  ...homeTodo('home-c-retry-waiting', 2321, '修复上游接口超时重试', 'failed', PROJECT_ID),
+  section: 'working',
+  retry: {
+    state: 'scheduled',
+    failureClass: 'transient',
+    reasonCode: 'network',
+    attempt: 2,
+    maxAttempts: 20,
+    nextRetryAt: RETRY_AT,
+    windowEndsAt: RETRY_NOW + 6 * 3_600_000,
+  },
+};
+
+const retryParked: TodoRecord = {
+  ...homeTodo('home-c-retry-parked', 2322, '初始化工作区依赖', 'failed', PROJECT_ID),
+  section: 'needs_input',
+  retry: {
+    state: 'parked',
+    failureClass: 'permanent',
+    reasonCode: 'setup_hook',
+    attemptsMade: 0,
+    detail: null,
+  },
+};
+
+const quotaWaiting: TodoRecord = {
+  ...homeTodo('home-c-quota-wait', 2323, '生成每周变更摘要', 'building', PROJECT_ID),
+  quotaWait: {
+    kind: 'quota',
+    providerId: 'claude',
+    label: 'Claude Pro',
+    retryAfterMs: null,
+    probeAt: QUOTA_AT,
+  },
+};
+
+export const homeCRetry: FixtureSet = {
+  ...homeCEmpty,
+  todos: [retryParked, retryWaiting, quotaWaiting],
+  details: {
+    [retryWaiting.id]: {
+      transcript: [
+        { kind: 'user', text: '检查网关连接并重试失败的请求', at: '20:12' },
+        {
+          kind: 'fail',
+          label: '网络中断',
+          labelVars: {},
+          schedule: {
+            key: '{time} 自动重试（第 {attempt} 次）',
+            vars: { time: formatRetryClock(RETRY_AT), attempt: 2 },
+          },
+          body: '',
+          raw: 'fetch failed: ECONNRESET (upstream gateway closed the connection)',
+        },
+      ],
+    },
+    [retryParked.id]: {
+      transcript: [
+        { kind: 'user', text: '安装依赖并跑一遍测试', at: '20:05' },
+        {
+          kind: 'fail',
+          label: '环境初始化失败，已停止自动重试',
+          labelVars: {},
+          body: '请修复项目的环境初始化脚本后重试。',
+          raw: 'setup hook failed (exit 1): corepack: command not found',
+        },
+      ],
+    },
+    [quotaWaiting.id]: {
+      transcript: [
+        { kind: 'user', text: '汇总本周合并的改动', at: '20:20' },
+        {
+          kind: 'streaming',
+          startedAt: RETRY_NOW - 304_000,
+          quotaHeld: true,
+          label: '{lane}：额度 {probe} 恢复后自动继续',
+          labelVars: { lane: 'Claude Pro', probe: formatRetryClock(QUOTA_AT) },
+        },
+      ],
+    },
+  },
+  now: RETRY_NOW,
 };

@@ -40,6 +40,7 @@ import { EngineQuestion, EngineRawView } from './engine-run-view.js';
 import { OpenDesignPageContext } from './file-pane.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
+import { isWaitingToRetry, todoRetryPhrase } from './retry-copy.js';
 import { STATUS_WORDS } from './status-words.js';
 import { isWaiting, SECTION_LABEL } from './tasks-sections.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
@@ -92,14 +93,20 @@ function StatusLine({
   const need = platformWait?.platform ?? todo.routeOverride?.requiredCapabilities?.os;
   const needText =
     need === undefined ? null : t('需要 {platform}', { platform: RUNNER_OS_LABELS[need] });
+  const retryPhrase = todoRetryPhrase(todo);
+  const retryText = retryPhrase === null ? null : t(retryPhrase.key, retryPhrase.params);
+  const quotaHeld = todo.quotaWait != null || todo.waitingOn?.on === 'quota';
+  const scheduledRetry = isWaitingToRetry(todo);
   const meta =
     platformWait !== null
       ? platformWait.machine !== null
         ? (needText ?? '')
         : ''
-      : needsYou && updates !== null
-        ? t('{n} 条更新', { n: updates.lines.length })
-        : joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
+      : retryText !== null
+        ? joinMeta([needText, retryText])
+        : needsYou && updates !== null
+          ? t('{n} 条更新', { n: updates.lines.length })
+          : joinMeta([needText, relativeTime(todo.phaseAt, now, t)]);
   return (
     <p
       data-testid="side-chat-status"
@@ -110,22 +117,24 @@ function StatusLine({
           'flex-none',
           platformWait !== null
             ? 'text-tint-wait-ink'
-            : todo.quotaWait == null
-              ? taskStatusInk(todo.phase)
-              : 'text-content-secondary',
+            : quotaHeld || scheduledRetry
+              ? 'text-content-secondary'
+              : taskStatusInk(todo.phase),
         )}
       >
         {platformWait !== null
           ? platformWait.machine !== null
             ? t('等 {machine} 上线', { machine: platformWait.machine })
             : t('暂无 {platform} 执行机', { platform: RUNNER_OS_LABELS[platformWait.platform] })
-          : todo.quotaWait != null
+          : quotaHeld
             ? t('等额度')
-            : waitingOnChecks
-              ? t(STATUS_WORDS.waitingChecks)
-              : needsYou && todo.section != null && isWaiting(todo.section)
-                ? t(SECTION_LABEL[todo.section])
-                : t(threadCopy(todo).state)}
+            : scheduledRetry
+              ? t('等待重试')
+              : waitingOnChecks
+                ? t(STATUS_WORDS.waitingChecks)
+                : needsYou && todo.section != null && isWaiting(todo.section)
+                  ? t(SECTION_LABEL[todo.section])
+                  : t(threadCopy(todo).state)}
       </span>
       {meta !== '' && (
         <>

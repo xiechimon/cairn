@@ -40,7 +40,7 @@ export function activityLabel(activity: StepActivity): { label: string; vars?: T
     case 'tool':
       return { label: '正在执行工具：{n}', vars: { n: activity.tool ?? 'tool' } };
     case 'retrying':
-      return { label: '自动重试中（第 {n} 轮）...', vars: { n: activity.attempt ?? 1 } };
+      return { label: '正在自动重试（第 {n} 次）…', vars: { n: activity.attempt ?? 1 } };
     case 'compacting':
       return { label: '正在压缩上下文...' };
     case 'awaiting_model':

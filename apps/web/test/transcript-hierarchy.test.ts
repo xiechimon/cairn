@@ -1,6 +1,7 @@
 import type { BuildRecord } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { type MessageRow, mapTranscript } from '../src/api/mappers.js';
+import { formatRetryClock } from '../src/board/retry-copy.js';
 import { inlineSegments } from '../src/lib/markdown.js';
 import type { TranscriptItem } from '../src/fixtures/records.js';
 import { NOW, todo } from './helpers.js';
@@ -301,5 +302,63 @@ describe('task thread hierarchy', () => {
         raw: parked,
       }),
     ]);
+  });
+
+  test('a failed build with retry state carries a short reason and the schedule while keeping the raw error once', () => {
+    const retryAt = NOW + 120_000;
+    const scheduledItems = mapTranscript({
+      messages: rows([['user', '跑一下']]),
+      steps: [],
+      build: { ...FAILED_BUILD, errorMessage: '502 Bad Gateway from upstream' },
+      todo: {
+        ...todo(1, 'failed'),
+        retry: {
+          state: 'scheduled',
+          failureClass: 'transient',
+          reasonCode: 'server_error',
+          attempt: 2,
+          maxAttempts: 20,
+          nextRetryAt: retryAt,
+          windowEndsAt: NOW + 6 * 3_600_000,
+        },
+      },
+      machineName: null,
+      userName: 'ian',
+      liveText: '',
+    });
+    expect(occurrences(scheduledItems, '502 Bad Gateway from upstream')).toBe(1);
+    expect(scheduledItems.find((item) => item.kind === 'fail')).toMatchObject({
+      label: '服务商暂时异常',
+      schedule: {
+        key: '{time} 自动重试（第 {attempt} 次）',
+        vars: { time: formatRetryClock(retryAt), attempt: 2 },
+      },
+    });
+
+    const parkedItems = mapTranscript({
+      messages: rows([['user', '跑一下']]),
+      steps: [],
+      build: { ...FAILED_BUILD, errorMessage: 'setup hook failed (exit 1): corepack not found' },
+      todo: {
+        ...todo(1, 'failed'),
+        retry: {
+          state: 'parked',
+          failureClass: 'permanent',
+          reasonCode: 'setup_hook',
+          attemptsMade: 0,
+          detail: null,
+        },
+      },
+      machineName: null,
+      userName: 'ian',
+      liveText: '',
+    });
+    expect(occurrences(parkedItems, 'corepack not found')).toBe(1);
+    const parkedFail = parkedItems.find((item) => item.kind === 'fail');
+    expect(parkedFail).toMatchObject({
+      label: '环境初始化失败，已停止自动重试',
+      body: '请修复项目的环境初始化脚本后重试。',
+    });
+    expect(parkedFail?.kind === 'fail' ? parkedFail.schedule : undefined).toBeUndefined();
   });
 });

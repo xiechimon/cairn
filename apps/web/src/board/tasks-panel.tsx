@@ -12,7 +12,6 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
-import type { GlyphKind } from '../components/status-glyph.js';
 import { TaskPrLine, TaskPrLineSkeleton } from '../components/thread/task-pr-line.js';
 import { TaskRow } from '../components/thread/task-row.js';
 import { Button } from '../components/ui/button.js';
@@ -43,6 +42,7 @@ import {
   type TaskSection,
   taskRowCopy,
   titlesNeedingProject,
+  unfinishableLead,
 } from './tasks-sections.js';
 import { usePrefetchThread } from './thread-link.js';
 import { canMarkDone, useMarkDone } from './use-mark-done.js';
@@ -205,13 +205,6 @@ function SelectionBar({
   );
 }
 
-function unfinishableLead(todo: TaskEntry['todo']): { glyph: GlyphKind; why: string } {
-  if (todo.phase === 'failed') return { glyph: 'failed', why: '运行失败，重新运行后才能完成' };
-  if (todo.phase === 'closed') return { glyph: 'closed', why: '已归档' };
-  if (todo.phase === 'done') return { glyph: 'done', why: '已完成' };
-  return { glyph: 'todo', why: '已归档，不能标记完成' };
-}
-
 function PanelTaskRow({
   entry,
   lookup,
@@ -247,6 +240,11 @@ function PanelTaskRow({
     prs.find((pr) => pr.state !== 'merged') ?? prs[0],
     lookup,
   );
+  const showWorkingRetry =
+    entry.section === 'working' &&
+    (entry.todo.retry != null ||
+      entry.todo.quotaWait != null ||
+      entry.todo.waitingOn?.on === 'quota');
   const open = () => onOpenThread(entry.todo.id);
   const unfinishable = canMarkDone(entry.todo) ? null : unfinishableLead(entry.todo);
   return (
@@ -262,6 +260,7 @@ function PanelTaskRow({
         stamp={compactAge(entry.todo.phaseAt, now)}
         {...(entry.section === 'resolved' ? { date: shortDate(entry.todo.phaseAt, t) } : {})}
         waiting={copy.waiting}
+        showWhat={showWorkingRetry}
         {...(place !== undefined ? { place } : {})}
         muted={entry.section === 'resolved'}
         check={

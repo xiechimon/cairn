@@ -988,16 +988,14 @@ export const EN: Record<string, string> = {
   // #1493 降级链：桌面通知标题。
   已换备用模型: 'Switched to fallback model',
   没有可运行的执行机: 'No Runner can run it',
-  '等额度：{lane} {kind}，{probe} 自动探测后继续运行':
-    'Waiting for quota: {lane} {kind}, auto-probe at {probe}',
+  '{lane}：额度 {probe} 恢复后自动继续':
+    '{lane}: resumes automatically when quota resets at {probe}',
+  '{lane}：限流 {probe} 恢复后自动继续':
+    '{lane}: resumes automatically after rate limit at {probe}',
   '{lane} {kind}，{count} 个任务挂起等额度':
     '{lane} {kind}, {count## task|# tasks} waiting for quota',
-  '额度恢复后自动继续运行；{probe} 自动探测':
-    'Runs resume automatically once quota recovers; next probe at {probe}',
+  '最早 {probe} 恢复后自动继续': 'Earliest task resumes automatically at {probe}',
   '{count} 个任务因额度/限流挂起': '{count## task|# tasks} suspended on quota/rate limits',
-  '额度恢复后自动继续运行，无需人工操作':
-    'Runs resume automatically once quota recovers; no action needed',
-  // #1261 标签 vars 值（kind 位的中英对译——vars 插值不查词典，单列键位）。
   额度空: 'out of quota',
   限流: 'rate limited',
   // #202 文件查看器三态（loading / error / 不可预览）
@@ -1088,9 +1086,6 @@ export const EN: Record<string, string> = {
   // #1257 板面挂起态：等机器 / 等额度 chip + 等额度 tooltip（下次尝试时刻）。
   // 等额度 chip 词复用 #1261 的同名键（上面等额度族）。
   等执行机: 'Waiting for a Runner',
-  '下次尝试 {time}': 'Next attempt at {time}',
-  '等额度：模型额度用尽，挂起等待恢复（下次尝试 {time}）':
-    'Waiting for quota: model quota exhausted, suspended until it recovers (next attempt {time})',
   // #873 详情活行披露面：在跑步两行（步类 + 执行机器）；行开关 aria 复用
   // #822 的「展开/收起实时步骤」——同一手势两面同词。
   // M7 #312 AI 审核模态文案（r8 §3.1 实测）：Agent 选择 + 关注点 textarea +
@@ -1177,7 +1172,7 @@ export const EN: Record<string, string> = {
   '模型思考中...': 'Model is thinking...',
   '模型输出中...': 'Model is responding...',
   '正在执行工具：{n}': 'Running tool: {n}',
-  '自动重试中（第 {n} 轮）...': 'Auto-retrying (attempt {n})...',
+  '正在自动重试（第 {n} 次）…': 'Retrying automatically (attempt {n})…',
   '正在压缩上下文...': 'Compacting context...',
   '等待模型响应...': 'Waiting for the model...',
   '最近信号：{n}s 前': 'Last signal {n}s ago',
@@ -1261,7 +1256,8 @@ export const EN: Record<string, string> = {
     'The connection to the provider timed out or dropped. This is usually temporary; run it again.',
   '模型额度已用尽，请等待额度恢复后重试。':
     'Model quota exhausted — wait for it to recover, then retry.',
-  '请求被限流，请稍后重试。': 'Rate limited — retry later.',
+  '请求已触发限流，等待恢复后自动继续。':
+    'Rate limited. The task will resume automatically once the limit clears.',
   重试: 'Retry',
   失败: 'Failed',
   默认: 'Default',
@@ -1746,8 +1742,8 @@ export const EN: Record<string, string> = {
   查看计划: 'View plan',
   '计划已就绪。要改计划，直接在下面回复。': 'The plan is ready. To change it, reply below.',
   批准计划: 'Approve plan',
-  '失败了。可以重试，或在下面回复说明怎么改。':
-    'It failed. Retry, or reply below with what to change.',
+  '立即重新运行这个任务，或在下面回复说明怎么改。':
+    'Run this task again now, or reply below with what to change.',
   取消归档: 'Unarchive',
   筛选项目: 'Filter projects',
   '筛选项目：{value}': 'Filter projects: {value}',
@@ -2156,7 +2152,8 @@ export const EN: Record<string, string> = {
   'PR #{n} 的菜单': 'Menu for PR #{n}',
   已复制链接: 'Link copied',
   显示更多: 'Show more',
-  'PR 状态加载失败，稍后会自动重试。': 'Could not load the PR status; retrying shortly.',
+  'PR 状态未能加载，30 秒后自动重试。':
+    'Could not load the PR status. Retrying automatically in 30s.',
   能力: 'Capabilities',
   管理: 'Manage',
   登录已过期: 'Sign-in expired',
@@ -2315,7 +2312,6 @@ export const EN: Record<string, string> = {
   '{n} 个任务已标记完成。': 'Marked complete: {n}',
   '{n} 个任务未能标记完成，请重试。': 'Could not complete {n} of them. Try again.',
   '检查 {checks}': 'Checks {checks}',
-  '失败了，等自动重试': 'Failed; an automatic retry is coming',
   '{n} 件进行中': '{n} in progress',
   对话: 'Chat',
   '对话、任务和成果': 'Chat, tasks and results',
@@ -2753,8 +2749,14 @@ export const EN: Record<string, string> = {
     'Login was rejected. Check the address and make sure you entered the authorization code or app password, not the account password.',
   '找不到邮件服务器，请检查 IMAP 地址。': 'The mail server was not found. Check the IMAP address.',
   '服务器拒绝了连接，请检查端口。': 'The server refused the connection. Check the port.',
-  '连接超时，稍后会自动重试。': 'The connection timed out. It will retry automatically.',
-  '连接中断，稍后会自动重试。': 'The connection dropped. It will retry automatically.',
+  '连接超时，将按 5 秒至 5 分钟间隔自动退避重试。':
+    'The connection timed out. Retrying automatically with 5s to 5m backoff.',
+  '连接中断，将按 5 秒至 5 分钟间隔自动退避重试。':
+    'The connection dropped. Retrying automatically with 5s to 5m backoff.',
+  '连接超时，{time} 自动重试（第 {attempt} 次）。':
+    'The connection timed out. Retrying automatically at {time} (attempt {attempt}).',
+  '连接中断，{time} 自动重试（第 {attempt} 次）。':
+    'The connection dropped. Retrying automatically at {time} (attempt {attempt}).',
   添加邮箱: 'Add mailbox',
   连接邮箱: 'Connect mailbox',
   邮箱地址: 'Email address',
@@ -2997,4 +2999,58 @@ export const EN: Record<string, string> = {
   该服务商: 'the provider',
   '排队中：信息卡要在 Coordinator 的电脑里运行，团队暂无可用的电脑（需要 macOS 26 以上的 Apple 芯片 Mac，并开启 Linux 虚拟机）':
     'Queued: info cards run on the Coordinator computer, and the team has no usable computer (it needs an Apple silicon Mac on macOS 26 or later with the Linux VM turned on)',
+  立即重试: 'Retry now',
+  '立即重试失败，请重试。': 'Could not retry now. Try again.',
+  等待重试: 'Waiting to retry',
+  额度恢复后自动继续: 'Resumes automatically when quota resets',
+  限流恢复后自动继续: 'Resumes automatically after rate limit',
+  '额度 {time} 恢复后自动继续': 'Resumes automatically when quota resets at {time}',
+  '限流 {time} 恢复后自动继续': 'Resumes automatically after rate limit at {time}',
+  '即将自动重试（第 {attempt} 次）': 'Retrying automatically soon (attempt {attempt})',
+  网络中断: 'Network interrupted',
+  服务商暂时异常: 'Provider temporarily unavailable',
+  执行机连接中断: 'Runner disconnected',
+  额度已用尽: 'Quota exhausted',
+  已触发限流: 'Rate limited',
+  '{time} 自动重试（第 {attempt} 次）': 'Retrying automatically at {time} (attempt {attempt})',
+  '等待自动重试，重新运行后才能完成':
+    'Waiting to retry automatically; rerun it before marking it done',
+  '环境初始化失败，已停止自动重试': 'Setup hook failed; automatic retries stopped',
+  '请修复项目的环境初始化脚本后重试。': 'Fix the workspace setup hook or environment, then retry.',
+  '缺少所需工具，已停止自动重试': 'Required tool missing; automatic retries stopped',
+  '请在执行机安装缺少的工具后重试。': 'Install the missing tool on the Runner, then retry.',
+  '凭据或登录失效，已停止自动重试': 'Authentication failed; automatic retries stopped',
+  '请检查凭据或重新连接服务商后重试。': 'Check credentials or reconnect the provider, then retry.',
+  '已达到费用上限，已停止自动重试': 'Spend limit reached; automatic retries stopped',
+  '请调整服务商预算上限或更换服务商后重试。':
+    'Raise the provider budget limit or switch providers, then retry.',
+  '配置或请求参数有误，已停止自动重试': 'Configuration error; automatic retries stopped',
+  '请检查任务或服务商配置后重试。': 'Check the task or provider configuration, then retry.',
+  '模型 {model} 不可用，已停止自动重试': 'Model {model} is unavailable; automatic retries stopped',
+  '所选模型不可用，已停止自动重试': 'Selected model is unavailable; automatic retries stopped',
+  '请在模型路由中更换可用模型后重试。':
+    'Switch to an available model in model routing, then retry.',
+  '内置运行环境版本过旧（需 {need}），已停止自动重试':
+    'Built-in runtime is outdated (needs {need}); automatic retries stopped',
+  '内置运行环境版本过旧，已停止自动重试': 'Built-in runtime is outdated; automatic retries stopped',
+  '未通过验收检查，已停止自动重试': 'Stopped at verification gate; automatic retries stopped',
+  '请查看检查说明并处理后再重试。': 'Review the check feedback before retrying.',
+  '远端分支存在冲突改动，已停止自动重试': 'Remote branch diverged; automatic retries stopped',
+  '请先处理远端分支冲突后再重试。': 'Reconcile the remote branch conflict, then retry.',
+  '连续重试 6 小时未恢复，已停止自动重试': 'Automatic retries stopped after 6 hours',
+  '服务商或网络持续异常，确认恢复后可点击立即重试。':
+    'The provider or network stayed unavailable. Click Retry now once it recovers.',
+  '限流等待已超过 24 小时，已停止自动重试': 'Rate-limit wait stopped after 24 hours',
+  '请确认额度或限流状态后点击立即重试。': 'Check quota or rate-limit status, then click Retry now.',
+  '自动重试 {n} 次未恢复，已停止自动重试':
+    'Automatic retries stopped after {n#1 attempt|# attempts}',
+  '请查看原始错误并处理后点击立即重试。':
+    'Inspect the raw error, fix the issue, and click Retry now.',
+  '一小时内连续失败过多，已停止自动重试':
+    'Too many failures in one hour; automatic retries stopped',
+  '请查看原始错误并排查原因后点击立即重试。':
+    'Inspect the raw error and resolve the cause before retrying.',
+  已停止自动重试: 'Automatic retries stopped',
+  '请查看原始错误后点击立即重试，或在下方回复说明修改方式。':
+    'Inspect the raw error and click Retry now, or reply below with instructions.',
 };
