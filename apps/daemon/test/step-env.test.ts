@@ -187,15 +187,24 @@ describe('agent config isolation', () => {
     const step = () =>
       assembleStepEnv(
         input({
-          inherited: { HOME: realHome },
+          inherited: {
+            HOME: realHome,
+            GEMINI_HOME: '/host/.gemini',
+            GEMINI_CLI_HOME: '/host/cli',
+          },
           runtimeId: 'antigravity',
           agentConfig: { cairnHome: join(root, 'cairn'), realHome },
         }),
       ).env;
 
     expect(step().CAIRN_ANTIGRAVITY_AUTH_MODE).toBe('host');
+    expect(step().GEMINI_HOME).toBeUndefined();
+    expect(step().GEMINI_CLI_HOME).toBeUndefined();
+    expect(step().AGY_ACP_FORCE_FILE_STORAGE).toBe('1');
+    expect(step().AGY_CLI_FORCE_FILE_TOKEN_STORAGE).toBe('1');
     const home = step().HOME ?? '';
     expect(home.startsWith(join(root, 'cairn'))).toBe(true);
+    expect(existsSync(join(home, 'Library', 'Keychains'))).toBe(false);
     const linked = join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
     expect(readFileSync(linked, 'utf8')).toBe('token-v1');
     expect(existsSync(join(home, '.gemini', 'config', 'hooks.json'))).toBe(false);

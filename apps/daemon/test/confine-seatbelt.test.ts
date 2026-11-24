@@ -120,8 +120,6 @@ describe('seatbelt profile', () => {
     expect(lines).toContain(
       '(deny mach-lookup (global-name-prefix "com.apple.securityd") (global-name-prefix "com.apple.SecurityServer") (global-name-prefix "com.apple.secd") (global-name-prefix "com.apple.trustd"))',
     );
-    const keyed = seatbeltProfile({ ...policy, allowKeychainServices: true });
-    expect(keyed).not.toContain('com.apple.secd');
   });
 
   test.runIf(process.platform === 'darwin')(
@@ -190,7 +188,7 @@ describe('seatbelt profile', () => {
     expect(root).toBeTruthy();
   });
 
-  test('a readable dir equal to a denied path is refused unless explicitly allowed', () => {
+  test('a readable dir equal to a denied path is always refused', () => {
     const { policy, root } = layout();
     const home = policy.home;
     const sshDir = join(home, '.ssh');
@@ -205,12 +203,6 @@ describe('seatbelt profile', () => {
     expect(() => seatbeltProfile({ ...policy, readable: [sshDir] })).toThrow(
       'Unsafe confinement readable overlap',
     );
-    const carved = seatbeltProfile({
-      ...policy,
-      readable: [sshDir],
-      readableDeniedAllowed: [sshDir, elsewhere],
-    });
-    expect(carved).toContain(`(subpath "${elsewhere}")`);
   });
 
   test('a readable symlink to a safe target emits the resolved variant too', () => {

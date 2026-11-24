@@ -80,7 +80,7 @@ Cairn already persists almost every raw signal RSI needs in SQLite (`apps/server
   1. **Linux**: `createSessionConfiner` returns `null` off-darwin (`confine-session.ts:230`); `bwrap` + systemd `launchConfined` is implemented and probed, but not wired into task session launches.
   2. **Claude Code skips `command-gate.ts`**: Normal task steps run with `permissionMode: 'bypassPermissions'` ([`claude-code.ts:1523-1525`](../../apps/daemon/src/backend/claude-code.ts#L1523-L1525)), whereas `pi` (`pi.ts:1165`) and ACP (`acp-permission-gate.ts:208`) invoke `command-gate.ts`.
   3. **No Trash wrapper**: `rm` permanently unlinks files inside writable paths; only catastrophic patterns (`/`, `~`, `$HOME`, `/root`) are blocked in `command-gate.ts`.
-  4. **Antigravity host-login carve-out**: Re-exposes `~/Library/Keychains` and `allowKeychainServices: true` when `CAIRN_ANTIGRAVITY_AUTH_MODE === 'host'` (`confine-session.ts:254-255,453-460`).
+  4. ~~**Antigravity host-login carve-out**~~ (**fixed**): host mode now forces file-token storage (`AGY_ACP_FORCE_FILE_STORAGE`/`AGY_CLI_FORCE_FILE_TOKEN_STORAGE`) and keeps `~/Library/Keychains` and all keychain Mach services denied like every other runtime.
 - **Coordinator**: In-server `pi-durable` has no direct local FS/shell tools; daemon-backed Coordinator runs `lockedDown: true` (disabling `Bash` on Claude Code, `read-only`/`relay-only` on ACP). Host shell access goes through `user_computer_shell` (`HostComputerProvider` + `hostShellProfile` + `ownComputerHardlineRefusal`), whose read-deny narrowing and `attach_file` delivery are being handled on branch `open-confine`.
 
 ---
@@ -353,7 +353,7 @@ Coordinates directly with `open-confine` (Coordinator `user_computer_shell` + `a
 
 1. **Wire `command-gate.ts` into `claude-code` task steps**: Replace unconstrained `permissionMode: 'bypassPermissions'` in [`apps/daemon/src/backend/claude-code.ts`](../../apps/daemon/src/backend/claude-code.ts#L1523-L1525) with a fast in-process `canUseTool` callback calling `decideBashCommand` / `decideToolCall` (auto-allowing everything except `DEFAULT_BASH_PATTERNS` + user `PermissionRule`s), bringing `claude-code` to parity with `pi` and ACP with zero extra user prompts.
 2. **Wire Linux `bwrap` session confinement**: Enable `launchConfined` inside [`apps/daemon/src/backend/confine-session.ts`](../../apps/daemon/src/backend/confine-session.ts#L230) on Linux so read-deny / write-allow / Trash rules match macOS.
-3. **Audit Antigravity `Library/Keychains` carve-out**: Verify whether Antigravity's managed auth still requires host Keychain access (`confine-session.ts:254-255,453-460`); if removable, drop it so no task runtime can read login Keychain items.
+3. ~~**Audit Antigravity `Library/Keychains` carve-out**~~ (**done**): removed — host mode uses file-token storage; no task runtime can read login Keychain items.
 
 ---
 

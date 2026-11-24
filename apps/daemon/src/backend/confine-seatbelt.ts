@@ -263,11 +263,9 @@ export interface SeatbeltPolicy {
   state: string[];
   caches: string[];
   readable?: string[];
-  readableDeniedAllowed?: string[];
   postReadableDenies?: string[];
   traversalLinks?: string[];
   pinnedInodes?: string[];
-  allowKeychainServices?: boolean;
   serverPort?: number;
 }
 
@@ -399,10 +397,8 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     if (everythingDenied.some((secret) => contains(secret, path)) && !own && !insideRoot)
       throw new Error('Unsafe confinement state overlap');
   }
-  const allowedReadableDenied = new Set(policy.readableDeniedAllowed ?? []);
   for (const path of readable) {
-    if (everythingDenied.includes(path) && !allowedReadableDenied.has(path))
-      throw new Error('Unsafe confinement readable overlap');
+    if (everythingDenied.includes(path)) throw new Error('Unsafe confinement readable overlap');
   }
   const traversable = [
     ...new Set(
@@ -482,7 +478,7 @@ export function seatbeltProfile(policy: SeatbeltPolicy): string {
     ]),
     ...ESCAPE_DENIALS,
     ...MACH_SERVICE_DENIALS,
-    ...(policy.allowKeychainServices === true ? [] : KEYCHAIN_MACH_DENIALS),
+    ...KEYCHAIN_MACH_DENIALS,
     ...OUTSIDE_PROCESS_DENIALS,
   ];
   if (policy.serverPort !== undefined) serverPortDenies(lines, policy.serverPort);

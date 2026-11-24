@@ -55,7 +55,7 @@ import {
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
 import type { PermissionRule } from './command-gate.js';
 import { SANDBOX_EXEC } from './confine-seatbelt.js';
-import { type SessionConfiner, usesHostAntigravityAuth } from './confine-session.js';
+import { type SessionConfiner } from './confine-session.js';
 
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -731,7 +731,6 @@ class AcpBackend implements AgentBackend {
       if (
         adapter?.harness === 'antigravity' &&
         confined.command === SANDBOX_EXEC &&
-        !usesHostAntigravityAuth('antigravity', sessionEnv) &&
         (env.SSL_CERT_FILE === undefined || env.SSL_CERT_FILE === '')
       ) {
         env.SSL_CERT_FILE = '/etc/ssl/cert.pem';

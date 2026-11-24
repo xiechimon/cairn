@@ -132,8 +132,14 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
   } else {
     if (input.antigravityToken !== undefined) env.GEMINI_API_KEY = input.antigravityToken;
     if (input.runtimeId === 'antigravity') {
+      delete env.GEMINI_HOME;
+      delete env.GEMINI_CLI_HOME;
       env.CAIRN_ANTIGRAVITY_AUTH_MODE =
         input.antigravityToken === undefined ? 'host' : 'gemini-api-key';
+      if (input.antigravityToken === undefined) {
+        env.AGY_ACP_FORCE_FILE_STORAGE = '1';
+        env.AGY_CLI_FORCE_FILE_TOKEN_STORAGE = '1';
+      }
     }
     if (input.inherited?.CAIRN_ORB !== '1') Object.assign(env, isolatedConfigEnv(input));
   }

@@ -36,7 +36,6 @@ export const GEMINI_CREDENTIAL_FILES = [
   '.gemini/oauth_creds.json',
   '.gemini/google_accounts.json',
 ] as const;
-const MAC_KEYCHAINS = 'Library/Keychains';
 
 export function claudeConfigDir(cairnHome: string): string {
   return claudeConfigHome(cairnHome);
@@ -128,22 +127,14 @@ export function writeJsonObject(
   return path;
 }
 
-function keychainFiles(platform: NodeJS.Platform): string[] {
-  return platform === 'darwin' ? [MAC_KEYCHAINS] : [];
-}
-
 export function prepareAntigravityHome(input: {
   cairnHome: string;
   realHome: string;
   apiKey: boolean;
-  platform?: NodeJS.Platform;
 }): string {
   const home = agentHomeDir(input.cairnHome, input.apiKey ? 'antigravity-api-key' : 'antigravity');
   mkdirSync(home, { recursive: true, mode: 0o700 });
-  linkCredentials(home, input.realHome, [
-    ...(input.apiKey ? [] : ANTIGRAVITY_CREDENTIAL_FILES),
-    ...keychainFiles(input.platform ?? process.platform),
-  ]);
+  linkCredentials(home, input.realHome, input.apiKey ? [] : ANTIGRAVITY_CREDENTIAL_FILES);
   writeAntigravityAuthSettings(
     home,
     input.apiKey ? 'gemini-api-key' : 'oauth-personal',
@@ -231,17 +222,10 @@ export function writeAntigravityAuthSettings(
   });
 }
 
-export function prepareGeminiHome(input: {
-  cairnHome: string;
-  realHome: string;
-  platform?: NodeJS.Platform;
-}): string {
+export function prepareGeminiHome(input: { cairnHome: string; realHome: string }): string {
   const home = agentHomeDir(input.cairnHome, 'gemini');
   mkdirSync(home, { recursive: true, mode: 0o700 });
-  linkCredentials(home, input.realHome, [
-    ...GEMINI_CREDENTIAL_FILES,
-    ...keychainFiles(input.platform ?? process.platform),
-  ]);
+  linkCredentials(home, input.realHome, GEMINI_CREDENTIAL_FILES);
   const settingsFile = '.gemini/settings.json';
   const userSecurity = readJsonObject(join(input.realHome, settingsFile)).security;
   const userAuth =

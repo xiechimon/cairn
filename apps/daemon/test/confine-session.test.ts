@@ -928,7 +928,8 @@ describe('session confiner', () => {
         HOME: hostHome,
         CAIRN_ANTIGRAVITY_AUTH_MODE: 'host',
       });
-      expect(host.env.SSL_CERT_FILE).toBeUndefined();
+      expect(host.env.SSL_CERT_FILE).toBe('/etc/ssl/cert.pem');
+      expect(host.profile).toContain('global-name-prefix "com.apple.secd"');
     } finally {
       if (prevCert !== undefined) process.env.SSL_CERT_FILE = prevCert;
     }
@@ -1164,7 +1165,10 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
       },
     }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
     const readableLine = (profile: string) =>
-      profile.split('\n').find((line) => line.startsWith('(allow file-read* (')) ?? '';
+      profile
+        .split('\n')
+        .filter((line) => line.startsWith('(allow file-read*'))
+        .join('\n');
     const plain = confiner(
       { cwd: worktree, env: { CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' } },
       'antigravity',
@@ -1173,7 +1177,7 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
         args: [],
       },
     );
-    expect(readableLine(plain.args[1] as string)).toContain(`(subpath "${keychains}")`);
+    expect(readableLine(plain.args[1] as string)).not.toContain(keychains);
     const keyed = confiner(
       { cwd: worktree, env: { GEMINI_API_KEY: 'session-key' } },
       'antigravity',
@@ -1261,7 +1265,7 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
   });
 
   test.runIf(process.platform === 'darwin')(
-    'antigravity grants read-only Library/Keychains only in explicit host mode and denies all other harnesses',
+    'every harness denies Library/Keychains reads, including explicit host-mode antigravity',
     () => {
       const { root, runnerHome, worktree, serverHome } = fixture();
       const home = join(root, 'user');
@@ -1287,7 +1291,8 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
           args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
         },
       );
-      expect(execFileSync(agLaunch.command, agLaunch.args, { encoding: 'utf8' })).toBe('kc-secret');
+      expect(agLaunch.args[1]).toContain('global-name-prefix "com.apple.secd"');
+      expect(() => execFileSync(agLaunch.command, agLaunch.args, { stdio: 'pipe' })).toThrow();
 
       const agWrite = confine(
         { cwd: worktree, env: { CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' } },
@@ -1450,10 +1455,11 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     ).toThrow('Unsafe confinement symlink');
   });
 
-  test('bootstrap and keychain service lookups are denied except explicit host-login antigravity', () => {
+  test('bootstrap and keychain service lookups are denied for every antigravity auth mode', () => {
     const { confine, worktree, runnerHome, root } = fixture();
     const home = join(root, 'user');
-    mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
+    const keychains = join(home, 'Library', 'Keychains');
+    mkdirSync(keychains, { recursive: true });
     mkdirSync(join(runnerHome, 'homes', 'antigravity'), { recursive: true });
     const profileFor = (harness: 'claude-code' | 'antigravity', env: Record<string, string>) =>
       confine({ cwd: worktree, env }, harness, { command: '/bin/true', args: [] })
@@ -1467,7 +1473,14 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
       HOME: join(runnerHome, 'homes', 'antigravity'),
       CAIRN_ANTIGRAVITY_AUTH_MODE: 'host',
     });
-    expect(host).not.toContain('com.apple.secd');
+    expect(host).toContain('global-name-prefix "com.apple.secd"');
+    expect(host).toContain('global-name-prefix "com.apple.trustd"');
+    expect(
+      host
+        .split('\n')
+        .filter((line) => line.startsWith('(allow file-read*'))
+        .join('\n'),
+    ).not.toContain(keychains);
     const keyed = profileFor('antigravity', { GEMINI_API_KEY: 'AIza-step' });
     expect(keyed).toContain('global-name-prefix "com.apple.secd"');
   });

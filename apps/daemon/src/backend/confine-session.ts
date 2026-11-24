@@ -20,7 +20,6 @@ import {
   contains,
   DENIED_DIRECTORIES,
   DENIED_FILES,
-  deniedVariants,
   serverPortOf,
 } from './confine.js';
 import {
@@ -268,7 +267,6 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       HOME: opts.env?.HOME ?? environment.HOME,
       TMPDIR: opts.env?.TMPDIR ?? environment.TMPDIR,
     };
-    const antigravityHostLogin = usesHostAntigravityAuth(harness, env);
     const workspace = realpathSync(opts.cwd);
     const tempEnv = env.TMPDIR;
     const tempInput = resolve(
@@ -472,14 +470,9 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         join(home, '.config', 'git'),
         `${daemonHome}-web-tools`,
         ...extraReadable,
-        ...(antigravityHostLogin ? [join(home, 'Library', 'Keychains')] : []),
       ]
         .filter((path) => existsSync(path))
         .map((path) => grantPath(path)),
-      readableDeniedAllowed: antigravityHostLogin
-        ? deniedVariants(join(home, 'Library', 'Keychains'))
-        : [],
-      allowKeychainServices: antigravityHostLogin,
       postReadableDenies: [join(home, '.config', 'git', 'credentials')],
       traversalLinks: [...links],
       ...(port !== null ? { serverPort: port } : {}),
