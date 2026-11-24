@@ -88,7 +88,12 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const row = requireProject(ctx, c.req.param('id'));
     return c.json(
       await readFiles(
-        { ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) },
+        {
+          ...ctx,
+          box: ctx.secretBox,
+          githubApp: ctx.mcpGithubApp,
+          discloseLocalPath: isOwnerSession(c),
+        },
         row.id,
         c.req.query('ref'),
         c.req.query('limit'),
@@ -100,7 +105,12 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
     const row = requireProject(ctx, c.req.param('id'));
     return c.json(
       await readBranches(
-        { ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) },
+        {
+          ...ctx,
+          box: ctx.secretBox,
+          githubApp: ctx.mcpGithubApp,
+          discloseLocalPath: isOwnerSession(c),
+        },
         row.id,
       ),
     );

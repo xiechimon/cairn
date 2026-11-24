@@ -208,7 +208,7 @@ export async function appGithubFetch(
     const response = await fetchImpl(input, {
       ...init,
       headers: Object.fromEntries(headers),
-      redirect: 'error',
+      redirect: init.redirect === 'manual' ? 'manual' : 'error',
       signal: init.signal ?? AbortSignal.timeout(15_000),
     });
     if (response.status !== 401 || attempt === 1) return response;

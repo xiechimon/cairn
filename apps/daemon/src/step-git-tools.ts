@@ -22,7 +22,13 @@ export function stepGitRunner(input: {
   return async (operation) => {
     let refreshed = false;
     const refresh = async () => {
-      if (refreshed) throw new Error('App credential authentication failed after refresh');
+      if (refreshed) {
+        throw new Error(
+          input.credential?.kind === 'app'
+            ? 'App credential authentication failed after refresh'
+            : 'GitHub credential authentication failed after refresh',
+        );
+      }
       refreshed = true;
       return input.refresh();
     };

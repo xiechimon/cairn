@@ -146,5 +146,7 @@ export function githubIssueDepsOf(ctx: AppContext): GithubIssueFaceDeps {
     box: ctx.secretBox,
     oauthClient: ctx.oauthClient,
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
+    ...(ctx.githubBaseFetch !== undefined ? { githubBaseFetch: ctx.githubBaseFetch } : {}),
+    ...(ctx.mcpGithubApp !== undefined ? { githubApp: ctx.mcpGithubApp } : {}),
   };
 }

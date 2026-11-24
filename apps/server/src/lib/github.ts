@@ -22,6 +22,7 @@ export type FetchLike = (
     headers?: Record<string, string>;
     body?: string;
     signal?: AbortSignal;
+    redirect?: 'follow' | 'error' | 'manual';
   },
 ) => Promise<{
   ok: boolean;

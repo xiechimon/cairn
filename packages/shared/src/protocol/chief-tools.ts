@@ -29,6 +29,7 @@ export type RemoteToolDef = z.infer<typeof remoteToolDefSchema>;
 export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'create_todo',
   'todos',
+  'docs',
   'threads',
   'message_thread',
   'answer_question',
@@ -405,14 +406,23 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'docs',
     description:
-      'Read repository documents (files at a ref) for a project. Pass several paths at once to read them in one call.',
+      "Inspect a project's bound repository (including private GitHub repositories) through Cairn's connected GitHub account — works on every machine without local git or gh credentials. Omit paths (or set tree: true) to list the file tree; pass several paths at once to batch-read files (README, docs, source) in one call. Always use docs instead of shell git clone or gh to read a bound project repository.",
     parameters: obj(
       {
         projectId: str('Project id.'),
-        paths: idArr('File paths to read — batch them; one call may read many files.'),
+        paths: idArr(
+          'Optional file paths to read — batch them; one call may read many files. Omit paths (or set tree: true) to list the repository file tree.',
+        ),
+        tree: {
+          type: 'boolean',
+          description:
+            'Optional: set true to include the repository file tree (returned automatically when paths is omitted).',
+        },
+        prefix: str('Optional directory or path prefix filter when listing the file tree.'),
+        limit: num('Optional maximum file tree entries to return (default 200, max 2000).'),
         ref: str('Optional git ref; defaults to the default branch.'),
       },
-      ['projectId', 'paths'],
+      ['projectId'],
     ),
     replaySafe: true,
   },

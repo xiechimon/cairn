@@ -260,6 +260,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     skillsDir: ctx.skillsDir,
     convHub: ctx.convHub,
     oauthClient: ctx.oauthClient,
+    ...(ctx.mcpGithubApp !== undefined ? { githubApp: ctx.mcpGithubApp } : {}),
     ...(ctx.githubFetch !== undefined ? { githubFetch: ctx.githubFetch } : {}),
     ...(ctx.githubBaseFetch !== undefined ? { githubBaseFetch: ctx.githubBaseFetch } : {}),
     ...(ctx.oauthFetch !== undefined ? { oauthFetch: ctx.oauthFetch } : {}),
@@ -703,7 +704,11 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.get('/api/machine/token/:stepId', async (c) => {
     const row = me(c);
-    return c.json(await stepToken(deps, row.id, c.req.param('stepId')));
+    return c.json(
+      await stepToken(deps, row.id, c.req.param('stepId'), 'host', {
+        forceGithubRefresh: c.req.query('refresh') === '1',
+      }),
+    );
   });
 
   app.get('/api/machine/skills/:stepId', (c) => {

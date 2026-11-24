@@ -171,6 +171,93 @@ describe('session confiner', () => {
     expect(readAllow).toContain(`(subpath "${realpathSync(tools)}")`);
   });
 
+  test('a symlinked daemonHome allows its own extra readable/state children and emits canonical paths', () => {
+    const { worktree, runnerHome, root } = fixture();
+    const credDir = join(runnerHome, 'creds', 'step-1');
+    const stateDir = join(runnerHome, 'state', 'step-1');
+    mkdirSync(credDir, { recursive: true });
+    mkdirSync(stateDir, { recursive: true });
+    const linkedRunner = join(root, 'daemon-home-link');
+    symlinkSync(runnerHome, linkedRunner);
+    const linkedHome = join(root, 'user-home-link');
+    symlinkSync(join(root, 'user'), linkedHome);
+    const systemTemp = join(root, 'sys-temp', 'T');
+    mkdirSync(systemTemp, { recursive: true });
+    const linkedConfine = createSessionConfiner({
+      daemonHome: linkedRunner,
+      extraDeniedRoots: [],
+      readable: [],
+      handoffDirectories: [],
+      serverUrl: 'http://127.0.0.1:1',
+      platform: 'darwin',
+      home: linkedHome,
+      systemTempDirectory: systemTemp,
+      environment: { TMPDIR: join(root, 'tmp-user', 'T') },
+    }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
+    const agentHome = join(linkedRunner, 'homes', 'antigravity');
+    mkdirSync(agentHome, { recursive: true });
+    const launch = linkedConfine(
+      { cwd: worktree, env: { HOME: agentHome } },
+      'antigravity',
+      { command: '/bin/true', args: [] },
+      {
+        readable: [join(linkedRunner, 'creds', 'step-1')],
+        state: [join(linkedRunner, 'state', 'step-1')],
+      },
+    );
+    const profile = launch.args[1] as string;
+    const readAllow = profile
+      .split('\n')
+      .find((line) => line.startsWith('(allow file-read*') && !line.includes('file-write*'));
+    const rwAllow = profile
+      .split('\n')
+      .find((line) => line.startsWith('(allow file-read* file-write*'));
+    expect(readAllow).toContain(`(subpath "${realpathSync(credDir)}")`);
+    expect(rwAllow).toContain(`(subpath "${realpathSync(stateDir)}")`);
+    expect(rwAllow).toContain(`(subpath "${realpathSync(agentHome)}")`);
+
+    const outside = join(root, 'outside-secret');
+    mkdirSync(outside, { recursive: true });
+    symlinkSync(outside, join(runnerHome, 'creds', 'escape'));
+    expect(() =>
+      linkedConfine(
+        { cwd: worktree },
+        'antigravity',
+        { command: '/bin/true', args: [] },
+        { readable: [join(linkedRunner, 'creds', 'escape')] },
+      ),
+    ).toThrow('Unsafe confinement');
+
+    symlinkSync(join(runnerHome, 'machine.json'), join(runnerHome, 'creds', 'pivot'));
+    expect(() =>
+      linkedConfine(
+        { cwd: worktree },
+        'antigravity',
+        { command: '/bin/true', args: [] },
+        { readable: [join(linkedRunner, 'creds', 'pivot')] },
+      ),
+    ).toThrow('Unsafe confinement');
+
+    symlinkSync(outside, join(runnerHome, 'state', 'escape-state'));
+    expect(() =>
+      linkedConfine(
+        { cwd: worktree },
+        'antigravity',
+        { command: '/bin/true', args: [] },
+        { state: [join(linkedRunner, 'state', 'escape-state')] },
+      ),
+    ).toThrow('Unsafe confinement');
+
+    expect(() =>
+      linkedConfine(
+        { cwd: worktree },
+        'antigravity',
+        { command: '/bin/true', args: [] },
+        { state: [linkedRunner] },
+      ),
+    ).toThrow('Unsafe confinement state path');
+  });
+
   test('a linked worktree re-exposes only a real worktree git dir that points back', () => {
     const { confine, worktree, root } = fixture();
     const repo = join(root, 'repo');

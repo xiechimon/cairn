@@ -15,7 +15,7 @@ import type { FetchLike } from '../lib/github.js';
 import { githubRepoIssue, githubRepoLabels } from '../lib/github.js';
 import { githubRepoOfProject } from './git.js';
 import { githubReadToken } from './github-autonomous-token.js';
-import { teamUserToken } from './github-connection.js';
+import { refreshingGithubFetch, teamUserToken } from './github-connection.js';
 import { resolveProjectGithubLabelIds, syncGithubLabels } from './github-labels.js';
 import { CORRECTION_PROMPT } from './merge-gate/correction.js';
 import type { OAuthClientConfig } from './oauth.js';
@@ -27,7 +27,9 @@ export interface GithubIssueFaceDeps {
   db: Db;
   box: SecretBox;
   githubFetch?: FetchLike;
+  githubBaseFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
+  githubApp?: Readonly<{ clientId: string; slug: string }> | null | undefined;
 }
 
 function requireGithubRepo(row: ProjectRow): GithubRepoRef {
@@ -87,7 +89,11 @@ export async function importGithubIssue(
   issueNumber: number,
 ): Promise<TodoRecord> {
   const { owner, repo } = requireGithubRepo(row);
-  const fetchImpl = deps.githubFetch ?? fetch;
+  const fetchImpl = refreshingGithubFetch(
+    deps,
+    deps.githubBaseFetch ?? deps.githubFetch ?? fetch,
+    row.teamId,
+  );
   const ref = githubIssueSourceRef(owner, repo, issueNumber);
   if (claimedSourceRefs(deps.db, row.teamId, [ref]).has(ref.toLowerCase())) {
     throw new HttpError(409, `issue ${ref} already has a task`);
@@ -145,7 +151,7 @@ export async function readSourceIssueEcho(
   if (!parsed) throw notFound('source issue');
   const token = await requireToken(deps, row.teamId, parsed);
   const detail = await githubRepoIssue(
-    deps.githubFetch ?? fetch,
+    refreshingGithubFetch(deps, deps.githubBaseFetch ?? deps.githubFetch ?? fetch, row.teamId),
     token,
     parsed.owner,
     parsed.repo,

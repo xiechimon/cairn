@@ -8,6 +8,7 @@ import type {
 import { GITHUB_ACCESS_TOKEN_USERNAME, isBackendRuntimeId } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
+import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { githubAppTokenExpiry, isAppToken } from '../lib/github-token.js';
 import { materializeCodexAccessToken } from './codex-device-login.js';
@@ -30,11 +31,33 @@ import { mcpConnectorDepsOf, stepConnectorEndpoints } from './mcp-servers.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { materializeXaiAccessToken } from './xai-device-login.js';
 
+const FORCE_GITHUB_REFRESH_COOLDOWN_MS = 30_000;
+const lastForceRefreshByDb = new WeakMap<Db, Map<string, number>>();
+
+function admitForceGithubRefresh(db: Db, teamId: string): boolean {
+  let byTeam = lastForceRefreshByDb.get(db);
+  if (byTeam === undefined) {
+    byTeam = new Map<string, number>();
+    lastForceRefreshByDb.set(db, byTeam);
+  }
+  const now = Date.now();
+  for (const [id, at] of byTeam) {
+    if (now - at >= FORCE_GITHUB_REFRESH_COOLDOWN_MS) byTeam.delete(id);
+  }
+  const previous = byTeam.get(teamId);
+  if (previous !== undefined && now - previous < FORCE_GITHUB_REFRESH_COOLDOWN_MS) {
+    return false;
+  }
+  byTeam.set(teamId, now);
+  return true;
+}
+
 export async function stepToken(
   deps: MachineDeps,
   machineId: string,
   stepId: string,
   surface: SecretSurface = 'host',
+  opts?: { forceGithubRefresh?: boolean },
 ): Promise<MachineTokenResponse> {
   const owned = ownedStepRow(deps, machineId, stepId);
   if (isChiefConversation(owned.buildId))
@@ -59,8 +82,14 @@ export async function stepToken(
     });
   } else if (projectRow?.repoKind === 'github' && todoRow && owned.status === 'claimed') {
     const ref = githubRepoOfProject(projectRow);
+    const forceUserRefresh =
+      opts?.forceGithubRefresh === true && admitForceGithubRefresh(deps.db, todoRow.teamId);
     const githubToken =
-      ref === null ? null : await autonomousToken(deps, todoRow.teamId, ref, true, 50 * 60_000);
+      ref === null
+        ? null
+        : await autonomousToken(deps, todoRow.teamId, ref, true, 50 * 60_000, {
+            forceUserRefresh,
+          });
     console.info('github step credential', {
       stepId,
       kind: githubToken === null ? 'none' : isAppToken(githubToken) ? 'app' : 'unattributed',

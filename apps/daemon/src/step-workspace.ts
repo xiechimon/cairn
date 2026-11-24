@@ -8,9 +8,13 @@ import type {
 } from '@cairn/shared';
 import { LocalRepoUnreachableError } from '@cairn/shared';
 import { createVerificationClone } from './backend/verification-clone.js';
-import { type GitCredentialFallbackOpts, withGitCredentialFallback } from './git.js';
+import {
+  type GitCredentialFallbackOpts,
+  isGitAuthFailure,
+  withGitCredentialFallback,
+} from './git.js';
 import type { TranscriptBuffer } from './journal.js';
-import { localRepoUnreachableMessage } from './workspace.js';
+import { localRepoUnreachableMessage, repoLabel } from './workspace.js';
 
 export type StepRepo = NonNullable<NonNullable<ClaimedStep['project']>['repo']>;
 
@@ -28,12 +32,42 @@ export interface StepWorkspaceInput {
 
 export type StepWorkspaceResult = { ws: PreparedWorkspace | null } | { error: string };
 
+function formatGithubPrepareError(
+  repo: StepRepo,
+  credentials: BoundGitCredentials | null,
+  message: string,
+): string {
+  if (repo.kind !== 'github') return message;
+  const label = repoLabel(repo.cloneUrl);
+  if (credentials === null && isGitAuthFailure(message)) {
+    return `GitHub repository ${label} requires Cairn's GitHub connection — connect GitHub in Settings → Apps → GitHub (${message})`;
+  }
+  if (
+    credentials !== null &&
+    (credentials.kind === 'app' || credentials.password.startsWith('ghu_')) &&
+    /repository not found|returned error: 403|\berror: 403\b/i.test(message)
+  ) {
+    return `GitHub repository ${label} is not accessible — Only repositories granted to Cairn are accessible through the Cairn GitHub App; grant ${label} on GitHub (${message})`;
+  }
+  return message;
+}
+
 export async function prepareStepWorkspace(
   input: StepWorkspaceInput,
 ): Promise<StepWorkspaceResult> {
   const { workspace, claimed, repo } = input;
   try {
-    const prepare = () =>
+    let refreshed = false;
+    const baseRefresh = input.refresh;
+    const onceRefresh =
+      baseRefresh === undefined
+        ? undefined
+        : async () => {
+            if (refreshed) throw new Error('GitHub credential refresh already attempted');
+            refreshed = true;
+            return baseRefresh();
+          };
+    const prepare = (cred: BoundGitCredentials | null) =>
       workspace.prepare({
         projectId: claimed.project?.id ?? '',
         conversationId: claimed.conversationId,
@@ -41,32 +75,32 @@ export async function prepareStepWorkspace(
         repoKind: repo.kind,
         baseBranch: repo.baseBranch,
         workspacesRoot: input.workspacesRoot,
-        credentials: input.credentials,
+        credentials: cred,
         hookCredentials: input.hookCredentials,
+        refresh: onceRefresh,
         machineCredentialFallback: repo.kind === 'github',
         env: input.env,
       });
     const prepared: { workspace: PreparedWorkspace | null } = { workspace: null };
     await withGitCredentialFallback(
-      async () => {
-        prepared.workspace = await prepare();
+      async (cred) => {
+        prepared.workspace = await prepare(cred);
       },
       input.credentials,
       {
         what: 'prepare',
         allowMachineFallback: false,
-        refresh: input.refresh,
+        refresh: onceRefresh,
       },
     );
     return { ws: prepared.workspace };
   } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
     return {
       error:
         err instanceof LocalRepoUnreachableError
           ? localRepoUnreachableMessage(input.machineName, err)
-          : err instanceof Error
-            ? err.message
-            : String(err),
+          : formatGithubPrepareError(repo, input.credentials, raw),
     };
   }
 }

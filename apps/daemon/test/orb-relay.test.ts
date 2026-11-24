@@ -63,7 +63,9 @@ test.each(ORB_STEP_METHODS)(
           ? [{ machineId: 'host', status: 'rejected', resetsAt: Date.now() + 1000 }]
           : method === 'done'
             ? ['step', { status: 'success', hasChanges: true, sessionId: 'session' }]
-            : ['step', { nested: ['unchanged', 42, false], text: 'body' }];
+            : method === 'token'
+              ? ['step', { refresh: true }]
+              : ['step', { nested: ['unchanged', 42, false], text: 'body' }];
     await client.call(method, args);
     expect(forwarded).toHaveBeenLastCalledWith(method, args);
   },
@@ -255,6 +257,16 @@ test('validates rate-limit reports before forwarding', async () => {
   await expect(
     client.call('reportClaudeRateLimit', [{ machineId: 'host', status: 'forged' }]),
   ).rejects.toBeInstanceOf(RelayMachineError);
+  expect(forwarded).not.toHaveBeenCalled();
+});
+
+test.each([
+  ['step', { extra: true }],
+  ['step', { refresh: 'yes' }],
+  ['step', { refresh: true }, 'extra'],
+])('rejects invalid relay token args %j before forwarding', async (...args) => {
+  const { client, forwarded } = await fixture();
+  await expect(client.call('token', args)).rejects.toThrow('Invalid relay token args');
   expect(forwarded).not.toHaveBeenCalled();
 });
 
