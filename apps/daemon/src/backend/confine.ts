@@ -8,9 +8,10 @@ import {
   readlinkSync,
   realpathSync,
 } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { promisify } from 'node:util';
+import { realpathOfNearest } from '@cairn/shared/realpath-nearest';
 
 export interface ConfinementPolicy {
   home: string;
@@ -143,24 +144,7 @@ export function canonical(path: string, required = false): string {
 
 export function canonicalDeny(path: string): string {
   if (!isAbsolute(path) || resolve(path) !== path) throw new Error('Unsafe confinement path');
-  let cursor = path;
-  const missing: string[] = [];
-  let hops = 0;
-  while (true) {
-    try {
-      return join(realpathSync(cursor), ...missing);
-    } catch {
-      const stat = lstatSync(cursor, { throwIfNoEntry: false });
-      if (stat?.isSymbolicLink() === true && ++hops <= 40) {
-        cursor = resolve(dirname(cursor), readlinkSync(cursor));
-        continue;
-      }
-      const parent = dirname(cursor);
-      if (parent === cursor) return path;
-      missing.unshift(basename(cursor));
-      cursor = parent;
-    }
-  }
+  return realpathOfNearest(path);
 }
 
 export function confinementArgs(

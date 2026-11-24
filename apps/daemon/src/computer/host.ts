@@ -170,6 +170,9 @@ export class HostComputerProvider implements ComputerProvider {
         `${label} must be inside the home folder; cd elsewhere within the command`,
       );
     }
+    if (this.options.confinement?.denied(resolved) === true) {
+      throw new ComputerRefusal(`${label} is inside a protected directory`);
+    }
     let existing = resolved;
     const missing: string[] = [];
     while (true) {

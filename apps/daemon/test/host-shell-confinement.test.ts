@@ -10,7 +10,8 @@ import {
 } from 'node:fs';
 import { createServer } from 'node:http';
 import { createServer as createUnixServer } from 'node:net';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import { createHostShellConfinement } from '../src/backend/host-shell-confinement.js';
 import { executableOnPath } from '../src/computer/contained-spawn.js';
@@ -422,6 +423,79 @@ describe('createHostShellConfinement', () => {
       path: '/nonexistent',
     });
     expect(() => conf.wrap('true', [])).toThrow(/bubblewrap/);
+  });
+
+  test('dangling symlinks targeting denied or write-denied paths are refused', async () => {
+    const { home, serverHome } = layout();
+    const conf = createHostShellConfinement({
+      home,
+      deniedRoots: [serverHome],
+      platform: 'darwin',
+    });
+    const escapeSsh = join(home, 'work', 'escape-ssh');
+    symlinkSync(join(home, '.ssh', 'new_key'), escapeSsh);
+    expect(conf.denied(escapeSsh)).toBe(true);
+    expect(conf.denied(`${escapeSsh}/`)).toBe(true);
+    expect(conf.denied(`${escapeSsh}//nested`)).toBe(true);
+
+    const escapeChained = join(home, 'work', 'escape-chained');
+    symlinkSync(`${escapeSsh}/`, escapeChained);
+    expect(conf.denied(escapeChained)).toBe(true);
+
+    const escapeSshSub = join(home, 'work', 'escape-ssh-dir');
+    symlinkSync(join(home, '.ssh', 'missing-dir'), escapeSshSub);
+    expect(conf.denied(join(escapeSshSub, 'nested', 'id_ed25519'))).toBe(true);
+
+    const escapeRel = join(home, 'work', 'escape-rel');
+    symlinkSync('../.ssh/new_key', escapeRel);
+    expect(conf.denied(escapeRel)).toBe(true);
+
+    const escapeServer = join(home, 'work', 'escape-server');
+    symlinkSync(join(serverHome, 'missing-token'), escapeServer);
+    expect(conf.denied(escapeServer)).toBe(true);
+
+    const escapeGitconfig = join(home, 'work', 'escape-gitconfig');
+    symlinkSync(join(home, '.gitconfig'), escapeGitconfig);
+    expect(conf.writeDenied(escapeGitconfig)).toBe(true);
+
+    const escapeHook = join(home, 'work', 'escape-hook');
+    symlinkSync(join(home, 'repo', '.git', 'hooks', 'pre-commit'), escapeHook);
+    expect(conf.writeDenied(escapeHook)).toBe(true);
+
+    const loopA = join(home, 'work', 'loop-a');
+    const loopB = join(home, 'work', 'loop-b');
+    symlinkSync(loopB, loopA);
+    symlinkSync(loopA, loopB);
+    expect(conf.denied(loopA)).toBe(true);
+    expect(conf.writeDenied(loopA)).toBe(true);
+    expect(conf.denied(`${join(home, 'work', 'ok')}\0`)).toBe(true);
+
+    const dotfiles = join(home, 'dotfiles');
+    mkdirSync(dotfiles, { recursive: true });
+    writeFileSync(join(dotfiles, 'netrc'), 'secret-netrc');
+    writeFileSync(join(dotfiles, 'gitconfig'), '[user]\n');
+    symlinkSync(join(dotfiles, 'netrc'), join(home, '.netrc'));
+    symlinkSync(join(dotfiles, 'gitconfig'), join(home, '.gitconfig'));
+    expect(conf.denied(join(home, '.netrc'))).toBe(true);
+    expect(conf.writeDenied(join(home, '.gitconfig'))).toBe(true);
+
+    const host = provider(home, [serverHome]);
+    await expect(host.readFile(join(home, '.netrc'))).rejects.toBeInstanceOf(ComputerRefusal);
+    await expect(host.writeFile(join(home, '.gitconfig'), 'x')).rejects.toBeInstanceOf(
+      ComputerRefusal,
+    );
+    await expect(host.writeFile(escapeGitconfig, 'x')).rejects.toBeInstanceOf(ComputerRefusal);
+    await expect(host.writeFile(join(escapeSshSub, 'new'), 'x')).rejects.toBeInstanceOf(
+      ComputerRefusal,
+    );
+  });
+
+  test('host-shell-confinement reuses confine.ts canonicalDeny instead of hand-rolling one', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/backend/host-shell-confinement.ts'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/function\s+canonicalDeny\b/);
   });
 
   test('unsupported platforms refuse instead of running unconfined', () => {
