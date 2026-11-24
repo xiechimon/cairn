@@ -6,7 +6,7 @@ import {
   releaseComputerControl,
   renewComputerControl,
 } from './computer-screen.js';
-import { invalidateConverged } from './invalidate.js';
+import { refreshQueries } from './invalidate.js';
 
 const RENEW_MS = 10 * 60_000;
 
@@ -57,7 +57,7 @@ export function useComputerControl({
           setLeaseId(null);
         });
     void run
-      .then(() => invalidateConverged(qc, { queryKey: ['computers', teamId] }))
+      .then(() => refreshQueries(qc, { queryKey: ['computers', teamId] }))
       .catch(() => setFailed(true))
       .finally(() => setBusy(false));
   };

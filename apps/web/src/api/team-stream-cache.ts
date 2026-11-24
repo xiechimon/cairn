@@ -1,19 +1,24 @@
-import type { TasksQuery, TodoRecord } from '@cairn/shared';
-import { buildRecordSchema, notificationRecordSchema, todoRecordSchema } from '@cairn/shared';
+import {
+  buildRecordSchema,
+  type NotificationRecord,
+  notificationRecordSchema,
+  type TasksQuery,
+  type TodoRecord,
+  todoRecordSchema,
+} from '@cairn/shared';
 import type { QueryClient } from '@tanstack/react-query';
-import { holdTodoPatch } from './todo-freshness.js';
-
-export const TEAM_LIST_KEYS = ['todos', 'tasks'] as const;
-
-const LIST_REFETCH_MS = 5_000;
-const lastListRefetchAt = new WeakMap<QueryClient, number>();
+import { invalidateEventQueries, patchQueryData } from './invalidate.js';
+import { hasPendingTodoPatch, holdTodoPatch, withPendingTodoPatch } from './todo-freshness.js';
 
 function patchTodo(records: TodoRecord[] | undefined, doc: TodoRecord): TodoRecord[] | undefined {
   if (records === undefined) return records;
-  if (doc.archivedAt != null) return records.filter((row) => row.id !== doc.id);
-  return records.some((row) => row.id === doc.id)
-    ? records.map((row) => (row.id === doc.id ? doc : row))
-    : [...records, doc];
+  const present = records.find((row) => row.id === doc.id);
+  if (present !== undefined && present.v > doc.v) return records;
+  if (doc.archivedAt != null)
+    return present === undefined ? records : records.filter((row) => row.id !== doc.id);
+  return present === undefined
+    ? [...records, doc]
+    : records.map((row) => (row.id === doc.id ? doc : row));
 }
 
 function sectioned(doc: TodoRecord): boolean {
@@ -22,11 +27,17 @@ function sectioned(doc: TodoRecord): boolean {
 
 function patchTaskEntries(data: TasksQuery | undefined, doc: TodoRecord): TasksQuery | undefined {
   if (data === undefined) return data;
-  const present = data.entries.some((entry) => entry.kind === 'todo' && entry.id === doc.id);
+  const present = data.entries.find((entry) => entry.kind === 'todo' && entry.id === doc.id);
+  if (present?.kind === 'todo' && present.v > doc.v) return data;
   if (!sectioned(doc)) {
-    return present
-      ? { entries: data.entries.filter((entry) => entry.kind !== 'todo' || entry.id !== doc.id) }
-      : data;
+    if (present?.kind !== 'todo') return data;
+    if (hasPendingTodoPatch(doc.id))
+      return {
+        entries: data.entries.map((entry) =>
+          entry === present ? { ...entry, ...doc, section: present.section } : entry,
+        ),
+      };
+    return { entries: data.entries.filter((entry) => entry !== present) };
   }
   const next: TasksQuery['entries'][number] = {
     kind: 'todo',
@@ -41,19 +52,27 @@ function patchTaskEntries(data: TasksQuery | undefined, doc: TodoRecord): TasksQ
 }
 
 function applyTodoDoc(qc: QueryClient, teamId: string, doc: TodoRecord): void {
-  qc.setQueryData<TodoRecord>(['todo', doc.id], doc);
-  qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) => patchTodo(records, doc));
-  qc.setQueryData<TasksQuery>(['tasks', teamId], (data) => patchTaskEntries(data, doc));
+  const visible = withPendingTodoPatch(doc);
+  patchQueryData<TodoRecord>(qc, ['todo', doc.id], (current) =>
+    current !== undefined && current.v > doc.v ? current : visible,
+  );
+  patchQueryData<TodoRecord[]>(qc, ['todos', teamId], (records) => patchTodo(records, visible));
+  patchQueryData<TasksQuery>(qc, ['tasks', teamId], (data) => patchTaskEntries(data, visible));
 }
 
 export function cachedTodo(qc: QueryClient, teamId: string, id: string): TodoRecord | undefined {
   const entry = qc
     .getQueryData<TasksQuery>(['tasks', teamId])
     ?.entries.find((row) => row.kind === 'todo' && row.id === id);
-  return (
-    (entry?.kind === 'todo' ? (entry as TodoRecord) : undefined) ??
-    qc.getQueryData<TodoRecord[]>(['todos', teamId])?.find((row) => row.id === id) ??
-    qc.getQueryData<TodoRecord>(['todo', id])
+  const rows = [
+    entry?.kind === 'todo' ? entry : undefined,
+    qc.getQueryData<TodoRecord>(['todo', id]),
+    qc.getQueryData<TodoRecord[]>(['todos', teamId])?.find((row) => row.id === id),
+    qc.getQueryData<TodoRecord[]>(['todos', teamId, 'archived'])?.find((row) => row.id === id),
+  ];
+  return rows.reduce<TodoRecord | undefined>(
+    (latest, row) => (row?.id === id && (latest === undefined || row.v > latest.v) ? row : latest),
+    undefined,
   );
 }
 
@@ -68,32 +87,57 @@ export async function optimisticTodo(
   id: string,
   patch: Partial<TodoRecord>,
 ): Promise<OptimisticTodo> {
-  const keys = [
-    ['todo', id],
-    ['todos', teamId],
-    ['tasks', teamId],
-  ];
-  await Promise.all(keys.map((queryKey) => qc.cancelQueries({ queryKey })));
-  const before = keys.map((queryKey) => [queryKey, qc.getQueryData(queryKey)] as const);
-  const release = holdTodoPatch(id, patch);
-  qc.setQueryData<TodoRecord>(['todo', id], (record) => record && { ...record, ...patch });
-  qc.setQueryData<TodoRecord[]>(['todos', teamId], (records) =>
-    records?.map((row) => (row.id === id ? { ...row, ...patch } : row)),
+  const detailKey = ['todo', id];
+  const boardKey = ['todos', teamId];
+  const tasksKey = ['tasks', teamId];
+  await Promise.all(
+    [detailKey, boardKey, tasksKey].map((queryKey) => qc.cancelQueries({ queryKey })),
   );
-  qc.setQueryData<TasksQuery>(['tasks', teamId], (data) =>
-    data === undefined
-      ? data
-      : {
+  const cachedBefore = cachedTodo(qc, teamId, id);
+  const detailBefore = qc.getQueryData<TodoRecord>(detailKey);
+  const boardBefore = qc.getQueryData<TodoRecord[]>(boardKey)?.find((row) => row.id === id);
+  const taskBefore = qc
+    .getQueryData<TasksQuery>(tasksKey)
+    ?.entries.find((entry) => entry.kind === 'todo' && entry.id === id);
+  const release = holdTodoPatch(id, patch);
+  const updateCaches = (
+    update: <T extends TodoRecord>(row: T, before: TodoRecord | undefined) => T,
+  ) => {
+    qc.setQueryData<TodoRecord>(detailKey, (row) =>
+      row?.id === id ? update(row, detailBefore) : row,
+    );
+    qc.setQueryData<TodoRecord[]>(boardKey, (rows) =>
+      rows?.map((row) => (row.id === id ? update(row, boardBefore) : row)),
+    );
+    qc.setQueryData<TasksQuery>(
+      tasksKey,
+      (data) =>
+        data && {
+          ...data,
           entries: data.entries.map((entry) =>
-            entry.kind === 'todo' && entry.id === id ? { ...entry, ...patch } : entry,
+            entry.kind === 'todo' && entry.id === id
+              ? update(entry, taskBefore?.kind === 'todo' ? taskBefore : undefined)
+              : entry,
           ),
         },
-  );
+    );
+  };
+  updateCaches(withPendingTodoPatch);
   return {
     settle: release,
     rollback: () => {
       release();
-      for (const [queryKey, data] of before) qc.setQueryData(queryKey, data);
+      updateCaches((row, before) => {
+        const previous = before?.id === id ? before : cachedBefore;
+        if (previous === undefined) return row;
+        const fields = (Object.keys(patch) as (keyof TodoRecord)[]).filter((key) =>
+          Object.is(row[key], patch[key]),
+        );
+        return withPendingTodoPatch({
+          ...row,
+          ...Object.fromEntries(fields.map((key) => [key, previous[key]])),
+        });
+      });
     },
   };
 }
@@ -102,50 +146,45 @@ export function applyTeamStreamEvent(
   qc: QueryClient,
   teamId: string,
   ev: Record<string, unknown>,
-): boolean {
-  if (ev.type === 'todo') {
-    const parsed = todoRecordSchema.safeParse(ev.doc);
-    if (!parsed.success) return false;
-    applyTodoDoc(qc, teamId, parsed.data);
-    return true;
-  }
-  if (ev.type === 'build') {
-    const parsed = buildRecordSchema.safeParse(ev.doc);
-    if (!parsed.success) return false;
-    qc.setQueryData(['build', parsed.data.id], parsed.data);
-    return false;
-  }
-  if (ev.type === 'notification') {
-    const parsed = notificationRecordSchema.safeParse(ev.notification);
-    if (!parsed.success) return false;
-    const record = parsed.data;
-    qc.setQueryData<{ unreadThreadIds: string[] }>(['notifications', teamId], (data) => {
-      if (data === undefined) return data;
-      const ids = data.unreadThreadIds.filter((id) => id !== record.entityId);
-      return { unreadThreadIds: record.readAt === null ? [...ids, record.entityId] : ids };
-    });
-    return false;
-  }
-  return false;
-}
-
-export function listRefetchDue(qc: QueryClient, teamId: string, now = Date.now()): boolean {
-  const loaded = TEAM_LIST_KEYS.some((head) => qc.getQueryData([head, teamId]) !== undefined);
-  if (!loaded) return false;
-  const last = lastListRefetchAt.get(qc);
-  return last === undefined || now - last >= LIST_REFETCH_MS;
-}
-
-export function notePatchedEvent(qc: QueryClient, teamId: string, now = Date.now()): boolean {
-  if (!listRefetchDue(qc, teamId, now)) return false;
-  refetchTeamLists(qc, teamId, now);
-  return true;
-}
-
-export function refetchTeamLists(qc: QueryClient, teamId: string, now = Date.now()): void {
-  lastListRefetchAt.set(qc, now);
-  for (const head of TEAM_LIST_KEYS) {
-    if (qc.getQueryData([head, teamId]) === undefined) continue;
-    void qc.refetchQueries({ queryKey: [head, teamId], type: 'active' });
+): NotificationRecord | undefined {
+  switch (ev.type) {
+    case 'todo': {
+      const { data: doc } = todoRecordSchema.safeParse(ev.doc);
+      if (doc === undefined || doc.teamId !== teamId) break;
+      void invalidateEventQueries(
+        qc,
+        { type: 'todo', teamId, doc, previous: cachedTodo(qc, teamId, doc.id) },
+        () => applyTodoDoc(qc, teamId, doc),
+      );
+      break;
+    }
+    case 'build': {
+      const { data: doc } = buildRecordSchema.safeParse(ev.doc);
+      if (doc === undefined) break;
+      void invalidateEventQueries(qc, {
+        type: 'build',
+        teamId,
+        doc,
+        projectId: typeof ev.projectId === 'string' ? ev.projectId : undefined,
+        parent: cachedTodo(qc, teamId, doc.todoId),
+      });
+      break;
+    }
+    case 'notification': {
+      const { data: record } = notificationRecordSchema.safeParse(ev.notification);
+      if (record === undefined || record.teamId !== teamId) break;
+      void invalidateEventQueries(qc, { type: 'notification', teamId }, () => {
+        patchQueryData<{ unreadThreadIds: string[] }>(qc, ['notifications', teamId], (data) => {
+          if (data === undefined) return data;
+          const ids = data.unreadThreadIds.filter((id) => id !== record.entityId);
+          return { unreadThreadIds: record.readAt === null ? [...ids, record.entityId] : ids };
+        });
+      });
+      return record;
+    }
+    case 'machine_presence':
+    case 'computer.state':
+      void invalidateEventQueries(qc, { type: ev.type, teamId });
+      break;
   }
 }

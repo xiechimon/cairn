@@ -84,7 +84,7 @@ describe('the team stream route closes a reader that stops reading', () => {
     expect(res.status).toBe(200);
     await vi.waitFor(() => expect(s.hub.subscriberCount(s.team.id)).toBe(1));
     for (let i = 0; i < SSE_MAX_PENDING_WRITES + 100; i++) {
-      s.hub.publish(s.team.id, () => ({ type: 'ping', seq: i }));
+      s.hub.publish(s.team.id, () => ({ type: 'ping' }));
     }
     await vi.waitFor(() => expect(s.hub.subscriberCount(s.team.id)).toBe(0));
     ctrl.abort();

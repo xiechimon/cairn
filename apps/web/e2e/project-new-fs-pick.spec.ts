@@ -73,8 +73,10 @@ test('cancel = silent no-op: input untouched, no error/hint row', async ({ page 
 
   await expect(page.getByRole('button', { name: '浏览' })).toBeEnabled();
   await expect(input).toHaveValue('/x/y');
-  await expect(page.getByRole('alert')).toHaveCount(0);
-  await expect(page.getByRole('status')).toHaveCount(0);
+  const dialog = page.getByRole('dialog', { name: '新建项目' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  await expect(dialog.getByRole('status')).toHaveCount(0);
 });
 
 test('unavailable 422: hint row + in-app browser fallback opens automatically; after closing the hint stays, editing dismisses', async ({
@@ -87,9 +89,8 @@ test('unavailable 422: hint row + in-app browser fallback opens automatically; a
   }));
   const input = await openLocalFace(page);
   await page.getByRole('button', { name: '浏览' }).click();
-  const hint = page.getByRole('status');
+  const hint = page.getByRole('status').filter({ hasText: '请直接输入路径' });
   await expect(hint).toBeVisible();
-  await expect(hint).toContainText('请直接输入路径');
 
   await expect(page.getByRole('alert')).toHaveCount(0);
 
@@ -132,7 +133,7 @@ test('local pick state stays in the single-machine form annotation and does not 
   await page.goto(NEW_PROJECT_LIVE);
   await expect(page.getByText(/单执行机形态/)).toHaveCount(0);
   await openLocalFace(page);
-  await expect(page.getByText(/单执行机形态：这台执行机损坏时进度随之丢失/)).toBeVisible();
-
-  await expect(page.getByRole('status')).toHaveCount(0);
+  const dialog = page.getByRole('dialog', { name: '新建项目' });
+  await expect(dialog.getByText(/单执行机形态：这台执行机损坏时进度随之丢失/)).toBeVisible();
+  await expect(dialog.getByRole('status')).toHaveCount(0);
 });

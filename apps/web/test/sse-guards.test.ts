@@ -1,6 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
-import { hasInFlightWork, streamGuards } from '../src/api/sse-guards.js';
+import { describe, expect, it } from 'vitest';
+import { invalidateEventQueries } from '../src/api/invalidate.js';
+import { hasInFlightWork } from '../src/api/sse-guards.js';
 import { todo } from './helpers.js';
 
 const TEAM = 'team-1';
@@ -57,42 +58,16 @@ describe('gate: the cache still has work in flight', () => {
 });
 
 describe('reconcile action: invalidation face', () => {
-  it('invalidates the union of SSE-related keys, does not touch keys that are not SSE-driven but constantly active', () => {
-    const qc = clientWith((c) => c.setQueryData(['todos', TEAM], [todo(1, 'planning')]));
-    const spy = vi.spyOn(qc, 'invalidateQueries');
+  it('invalidates stream-backed cache entries while leaving session, teams, and providers alone', async () => {
+    const related = [['todos', TEAM], ['messages', 'build-a'], ['search', 'release'], ['computers', TEAM, 1]];
+    const unrelated = [['session'], ['teams'], ['providers', TEAM]];
+    const qc = clientWith((c) => {
+      for (const key of [...related, ...unrelated]) c.setQueryData(key, []);
+    });
 
-    streamGuards(qc).reconcile();
+    await invalidateEventQueries(qc, { type: 'reconcile', teamId: TEAM });
 
-    const keys = spy.mock.calls.map(([filters]) => (filters?.queryKey as string[])[0]);
-
-    for (const head of [
-      'todos',
-      'todo',
-      'schedules',
-      'build',
-      'steps',
-      'notifications',
-      'chiefThreads',
-      'chief',
-      'machines',
-      'messages',
-      'plans',
-      'changes',
-    ]) {
-      expect(keys).toContain(head);
-    }
-
-    expect(keys).not.toContain('session');
-    expect(keys).not.toContain('teams');
-    expect(keys).not.toContain('providers');
-  });
-
-  it('the gate is the inFlight of the reconcile face', () => {
-    const qc = clientWith((c) => c.setQueryData(['todos', TEAM], [todo(1, 'building')]));
-    const guards = streamGuards(qc);
-    expect(guards.inFlight()).toBe(true);
-
-    qc.setQueryData(['todos', TEAM], [todo(1, 'confirm')]);
-    expect(guards.inFlight()).toBe(false);
+    for (const key of related) expect(qc.getQueryState(key)?.isInvalidated).toBe(true);
+    for (const key of unrelated) expect(qc.getQueryState(key)?.isInvalidated).toBe(false);
   });
 });

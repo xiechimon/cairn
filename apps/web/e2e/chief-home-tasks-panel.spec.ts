@@ -1,3 +1,4 @@
+import { todoDocEventSchema } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, TASK, taskEntry, THREAD } from './chief-home-mock';
 import { tops } from './live-stability';
@@ -973,9 +974,11 @@ test('a schedule deleted while its editor is open says so and cannot be saved', 
   await expect(editor.getByRole('button', { name: '保存' })).toBeEnabled();
   rows = [];
   await page.waitForFunction(() => window.__es.some((entry) => entry.url.includes('/api/teams/t1/stream')));
-  await page.evaluate(() => {
-    window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'))?.emit({ type: 'todo', doc: { id: 'todo-1' } });
-  });
+  await page.evaluate((frame) => {
+    const stream = window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'));
+    if (stream === undefined) throw new Error('team stream did not connect');
+    stream.emit(frame);
+  }, todoDocEventSchema.parse({ type: 'todo', v: 2, doc: taskEntry({ ...embed, v: 2 }) }));
   await expect(editor.getByRole('status')).toHaveText('这条定时已被删除');
   await expect(editor.getByRole('button', { name: '保存' })).toHaveCount(0);
   expect(posted).toHaveLength(0);
@@ -1025,15 +1028,17 @@ for (const outcome of ['lands', 'fails'] as const) {
   }) => {
     const review = taskEntry({ id: 'todo-1', title: 'Fold finished turns', phase: 'review', section: 'ready_for_review' });
     const other = taskEntry({ id: 'todo-2', title: 'Sweep dependencies', seqNum: 12, section: 'working' });
-    const state = { threads: [THREAD], messages: [], tasks: [review, other] };
+    const state = { threads: [THREAD], messages: [], tasks: [review, other], todos: [review, other] };
     let release = () => {};
     const held = new Promise<void>((resolve) => { release = resolve; });
     await mockLive(page, state, (path, route, json) => {
+      if (path === '/api/todos/todo-1' && route.request().method() === 'GET') return json(state.tasks[0]);
       if (path !== '/api/todos/todo-1/stop-and-done' || route.request().method() !== 'POST') return undefined;
       return held.then(() => {
         if (outcome === 'fails') return json({ error: 'boom' }, 500);
-        state.tasks = [{ ...review, phase: 'done', section: 'resolved', v: 2 }, other];
-        return json({ state: 'done', todo: { ...review, phase: 'done', v: 2 } });
+        const done = { ...review, phase: 'done', section: 'resolved', v: 2 };
+        state.tasks = state.todos = [done, other];
+        return json({ state: 'done', todo: done });
       });
     });
     await page.goto('/app?pane=tasks');

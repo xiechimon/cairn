@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router';
 import { MachineIdentityContext } from '../components/machine-label.js';
+import { Badge } from '../components/ui/badge.js';
 import { DemoBanner } from '../demo/demo-banner.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { USER_NAME } from '../fixtures/core.js';
@@ -79,7 +80,8 @@ export function LiveDataBridge() {
   const session = useSession(live);
   const teamId = teams.data?.[0]?.id;
   const machines = useMachines(teamId, live);
-  useTeamStream(teamId, live);
+  const reconnecting = useTeamStream(teamId, live);
+  const { t } = useI18n();
   const value = useMemo<LiveData>(
     () => ({
       live,
@@ -99,6 +101,13 @@ export function LiveDataBridge() {
     live || !SCENARIOS_ENABLED ? null : new URLSearchParams(search).get(SCENARIO_PARAM);
   return (
     <LiveDataContext.Provider value={value}>
+      {reconnecting && (
+        <div role="status" className="pointer-events-none fixed top-2 right-3 z-40">
+          <Badge variant="secondary" className="bg-popover text-muted-foreground transition-none">
+            {t('正在重新连接…')}
+          </Badge>
+        </div>
+      )}
       <MachineIdentityContext.Provider
         value={
           live

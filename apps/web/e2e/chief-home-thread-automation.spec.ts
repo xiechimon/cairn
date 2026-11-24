@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
-import type { ScheduleRecord } from '@cairn/shared';
+import { type ScheduleRecord, todoDocEventSchema } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
-import { mockLive, TASK } from './chief-home-mock.js';
+import { mockLive, TASK, taskEntry } from './chief-home-mock.js';
 import { evidencePanelShot, evidenceShot } from './evidence.js';
 import { settleTransitions } from './helpers.js';
 
@@ -58,11 +58,11 @@ async function refreshSchedules(page: Page) {
   await page.waitForFunction(() =>
     window.__es.some((entry) => entry.url.includes('/api/teams/t1/stream')),
   );
-  await page.evaluate(() => {
+  await page.evaluate((frame) => {
     const stream = window.__es.find((entry) => entry.url.includes('/api/teams/t1/stream'));
     if (stream === undefined) throw new Error('team stream did not connect');
-    stream.emit({ type: 'todo', doc: { id: 'todo-1' } });
-  });
+    stream.emit(frame);
+  }, todoDocEventSchema.parse({ type: 'todo', v: 2, doc: taskEntry({ v: 2 }) }));
 }
 
 async function automationEvidenceShot(page: Page, name: string) {

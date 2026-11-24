@@ -1,21 +1,18 @@
-import {
-  buildDocEventSchema,
-  pingEventSchema,
-  teamStreamEventSchema,
-  todoDocEventSchema,
-} from '@cairn/shared';
+import { buildDocEventSchema, teamStreamEventSchema, todoDocEventSchema } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
-import { bootServer, insertMachine, openStream, req, seedSessionRoute } from './helpers.js';
+import { insertMachine, openStream, req, seedSessionRoute } from './helpers.js';
+import { bootStreamServer as bootServer } from './sse-fixture.js';
 
 describe('the SSE team stream (the r5 §7.2 document event shape)', () => {
-  test('the first frame on connect is a ping; todo/build changes push full document events, seq increasing within the connection', async () => {
+  test('ping and full todo/build documents carry no payload sequence', async () => {
     const s = bootServer({ pingIntervalMs: 50 });
     insertMachine(s);
     seedSessionRoute(s);
     const stream = await openStream(s.app, s.team.id);
     try {
-      const ping1 = pingEventSchema.parse(await stream.next((ev) => ev.type === 'ping'));
-      expect(ping1.seq).toBe(1);
+      const ping = await stream.next((ev) => ev.type === 'ping');
+      expect(ping).toEqual({ type: 'ping' });
+      expect(teamStreamEventSchema.safeParse(ping).success).toBe(true);
 
       const project = (await (
         await req(s.app, 'POST', '/api/projects', { name: 'demo' })
@@ -24,16 +21,19 @@ describe('the SSE team stream (the r5 §7.2 document event shape)', () => {
         await req(s.app, 'POST', `/api/projects/${project.id}/todos`, { title: '写文档', spec: '' })
       ).json()) as { id: string; v: number };
 
-      const todoEv = todoDocEventSchema.parse(await stream.next((ev) => ev.type === 'todo'));
+      const rawTodo = await stream.next((ev) => ev.type === 'todo');
+      expect(rawTodo).not.toHaveProperty('seq');
+      const todoEv = todoDocEventSchema.parse(rawTodo);
       expect(todoEv.doc.id).toBe(created.id);
       expect(todoEv.v).toBe(created.v);
-      expect(todoEv.seq).toBeGreaterThan(ping1.seq);
       expect(teamStreamEventSchema.safeParse(todoEv).success).toBe(true);
 
       await req(s.app, 'POST', `/api/projects/${project.id}/builds`, {
         todoIds: [created.id],
       });
-      const buildEv = buildDocEventSchema.parse(await stream.next((ev) => ev.type === 'build'));
+      const rawBuild = await stream.next((ev) => ev.type === 'build');
+      expect(rawBuild).not.toHaveProperty('seq');
+      const buildEv = buildDocEventSchema.parse(rawBuild);
       expect(buildEv.doc.todoId).toBe(created.id);
       expect(buildEv.doc.triggerSource).toBe('user');
       const queuedEv = todoDocEventSchema.parse(
@@ -50,14 +50,37 @@ describe('the SSE team stream (the r5 §7.2 document event shape)', () => {
         ),
       );
       expect(patchedEv.v).toBe(created.v + 2);
-
-      const lastSeq = Math.max(patchedEv.seq, buildEv.seq, queuedEv.seq);
-      const ping2 = pingEventSchema.parse(
-        await stream.next((ev) => ev.type === 'ping' && (ev.seq as number) > lastSeq),
-      );
-      expect(ping2.seq).toBeGreaterThan(lastSeq);
     } finally {
       stream.close();
+    }
+  });
+
+  test('each fresh attachment starts its own wire sequence in the id line', async () => {
+    const s = bootServer({ pingIntervalMs: 60_000 });
+    for (let index = 0; index < 2; index++) {
+      const controller = new AbortController();
+      const response = await s.app.request(`/api/teams/${s.team.id}/stream`, {
+        signal: controller.signal,
+      });
+      const reader = response.body?.getReader();
+      if (reader === undefined) throw new Error('Expected stream response');
+      try {
+        const decoder = new TextDecoder();
+        let raw = '';
+        while (raw.split('\n\n').length < 3) {
+          const { done, value } = await reader.read();
+          if (done) throw new Error('Stream ended before hello and ping');
+          raw += decoder.decode(value, { stream: true });
+        }
+        const [hello, ping] = raw.split('\n\n');
+        expect(hello).toMatch(/(?:^|\n)id: 1(?:\n|$)/);
+        expect(hello).toContain('"followRevision":true');
+        expect(ping).toMatch(/(?:^|\n)id: 2(?:\n|$)/);
+        expect(ping).toContain('data: {"type":"ping"}');
+      } finally {
+        controller.abort();
+        await reader.cancel().catch(() => {});
+      }
     }
   });
 

@@ -1,23 +1,24 @@
 # One SSE stream per browser tab
 
-Why: over HTTP/1.1 a browser allows 6 connections per origin. Each tab held a team stream and one conversation stream, so three tabs exhausted the pool and ordinary fetches to the same origin hung (measured in `docs/research/streaming-transport-sse-vs-websocket-2026-11-17.md`, section 6).
+A new Cairn user can leave a task open in several tabs and still load ordinary pages. The browser opens one team event stream per tab; the open task and Coordinator transcripts share it. No extra account, key, or user action is required. On HTTP/1.1, the previous two-stream design could consume all six connections to the origin with only three tabs (see `docs/research/streaming-transport-sse-vs-websocket-2026-11-17.md`, section 6).
 
-## Before
+## Attachment and follow state
 
-- Team stream `GET /api/teams/:id/stream`: `ping`, `machine_presence`, `todo`, `build`, `notification`, `branch_sync`, `computer.state`. Hub: `TeamStreamHub`.
-- Conversation stream `GET /api/conversations/:id/stream`, one per followed conversation (the open task thread or the open Coordinator thread): `ping`, `message`, `text_delta`, `thinking_delta`, `step`, `activity`, `agent_todo`. Hub: `ConversationStreamHub`, which replays the buffered live text, thinking, activity and agent todo to a new subscriber.
+1. `GET /api/teams/:id/stream` begins with `hello` (a connection ID and, on current servers, `followRevision: true`), then `ping`. Business frames share the connection; conversation frames carry the followed conversation ID in their envelope. A message can separately name its destination conversation during queue rollover.
+2. The client sends the full desired set (at most 16) to `PUT /api/streams/:connectionId/conversations`. Versioned writes include a monotonically increasing revision. The server acknowledges the applied revision and does not apply older revisions or a plain write after a versioned one. The client accepts recovery only for the current attachment and desired revision. A legacy `204` or an explicit rejection of the revision field negotiates the unversioned follow protocol.
+3. A versioned subscription resets its preview, then receives buffered live text, thinking, and activity for the followed conversation. These are live previews, not a history of missed frames. Frame IDs are attachment-local; there is no event replay, resume cursor, or `Last-Event-ID` recovery.
+4. On transport failure the client closes the old `EventSource`, retires its follow writes, and opens a new attachment. Its `hello` clears old previews and the client sends its entire follow set again. Recovering reads start after the current follow acknowledgment. Failed follow writes can retry on the current attachment; a missing attachment, an invalid versioned acknowledgment, or an ambiguous legacy timeout can force replacement.
 
-## After
+The standalone conversation stream remains available to iOS; the browser does not open it.
 
-The browser opens only the team stream. Conversation events ride on it.
+## Saved data and query refresh
 
-1. On connect the team stream sends `{type:'hello', connectionId}` first, then the usual first `ping`.
-2. The client sets the followed conversations with `PUT /api/streams/:connectionId/conversations` and `{conversationIds}` (at most 16). The body is the whole set, so a repeat is idempotent and a removed id unsubscribes. The server diffs against the connection's current subscriptions and subscribes new ids on `ConversationStreamHub`, which replays buffered live state exactly as before.
-3. A conversation event reaches the tab as `{type:'conversation', conversationId, event}` where `event` is the unchanged conversation event. The envelope keeps the existing `conversationId` field of `message` (the delivered-queue source) meaning what it meant.
-4. Conversation `ping` is gone: the team stream's ping is the liveness signal and counts for every conversation.
+The tab has one event-to-query mapping. It uses the frame's team, project, task, and conversation IDs (including both ends of a message rollover) to select related keys. Build frames include the owning project ID; for an older frame the tab can use a known parent task or a build already in the matching project result. A task frame also refreshes the task transcript in legacy follow mode: a saved row need not have a corresponding conversation message frame.
 
-Reconnect: the server forgets a closed connection and all of its subscriptions. The client's reconnect path runs `resyncConversations` (clears live text, thinking, activity and agent todo, invalidates all queries), the new connection sends a new `hello`, the client sends its full set again, and the hub replays buffers. Sending the set again after a failed `PUT` retries every 2 s while the connection id is current. A `PUT` for an unknown or closed connection is 404 and is dropped; the next `hello` restores the set.
-
-Silence handling is shared: any event counts as business activity, in-flight work is the team guards or any followed conversation, and a reconcile refetches once and lets each followed conversation run its post-refetch check.
-
-`GET /api/conversations/:id/stream` stays for the iOS client, which does not share the browser pool. No browser code opens it.
+| Situation | Query transition and user-visible result |
+|---|---|
+| A frame affects a query | Cancel any pre-frame read, with or without existing data. Apply any authoritative frame patch to the committed snapshot, mark matching keys stale, and start fresh reads for active queries and interrupted prefetches. An idle inactive entry waits for its next reader. A failed replacement does not publish the cancelled response. |
+| A frame cannot affect the query | Leave its cache and running request alone. A build in one project cannot interrupt the builds list for another. |
+| Membership in a search cannot be decided from the frame or local data | Mark the search stale without cancelling its read. Coalesce hints for that key, then refresh an active search once after the quiet period and any running read. Older build frames without an identifiable project use the same deferred treatment for possible project lists. |
+| A replacement attachment acknowledges the current follow set | Run the same refresh against all watched keys; inactive cached entries are marked stale. Ignore acknowledgments belonging to older attachments or follow sets. |
+| A frame gap or business silence calls for reconciliation | Refresh the stream-backed keys once for the tab. A followed Coordinator clears its live preview only when a new successful transcript read confirms the turn ended and no conversation activity intervened. |

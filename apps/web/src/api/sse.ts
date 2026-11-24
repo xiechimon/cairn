@@ -11,9 +11,10 @@ import {
   DESKTOP_TRAY_PATH,
   isChiefConversationId,
   SILENT_NOTIFICATION_TYPES,
+  streamHelloEventSchema,
 } from '@cairn/shared';
 import { type InfiniteData, type QueryClient, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { readNotifyPref } from '../board/notify-pref.js';
 import { DEMO_MODE } from '../demo/demo-gate.js';
 import { desktopNotify } from '../desktop-shell.js';
@@ -31,22 +32,23 @@ import {
   deliverConversationEvent,
   detachConnection,
   reconcileConversations,
-  resyncConversations,
   subscribeConversation,
 } from './conversation-subscriptions.js';
-import { invalidateConverged } from './invalidate.js';
+import { invalidateEventQueries, recoverQueries, refreshQueries } from './invalidate.js';
 import { liveTextStore } from './live-text.js';
 import { liveThinkingStore } from './live-thinking.js';
 import { textOfContent, thinkingOfContent } from './mappers.js';
-import { cacheUserMessage } from './message-cache.js';
-import { connect } from './sse-connection.js';
-import { streamGuards } from './sse-guards.js';
-import { teamEventInvalidations } from './sse-team-events.js';
-import { applyTeamStreamEvent, notePatchedEvent } from './team-stream-cache.js';
+import { cacheUserMessage, trackQueueConfirmations } from './message-cache.js';
+import { connect, SSE_SILENCE_WATCHDOG_MS } from './sse-connection.js';
+import { hasInFlightWork } from './sse-guards.js';
+import { applyTeamStreamEvent } from './team-stream-cache.js';
 
 async function streamUrl(path: string): Promise<string> {
   if (DEMO_MODE) return path;
-  const res = await fetchWithSession('/api/auth/stream-ticket', { method: 'POST' });
+  const res = await fetchWithSession('/api/auth/stream-ticket', {
+    method: 'POST',
+    signal: AbortSignal.timeout(SSE_SILENCE_WATCHDOG_MS),
+  });
   if (!res.ok) return path;
   const body = (await res.json()) as { ticket?: string };
   if (body.ticket === undefined || body.ticket === '') return path;
@@ -58,18 +60,23 @@ function withTicket(path: string, ticket: string | null): string {
   return `${path}?ticket=${encodeURIComponent(ticket)}`;
 }
 
-export function useTeamStream(teamId: string | undefined, enabled: boolean): void {
+export function useTeamStream(teamId: string | undefined, enabled: boolean): boolean {
   const qc = useQueryClient();
   const auth = useAuth();
+  const [reconnecting, setReconnecting] = useState(false);
   useEffect(() => {
+    setReconnecting(false);
     if (teamId === undefined || !enabled || auth.gateOpen) return;
-    const stop = startTeamStream(teamId, qc, auth.generation, null, () =>
-      streamUrl(`/api/teams/${teamId}/stream`),
+    return startTeamStream(
+      teamId,
+      qc,
+      auth.generation,
+      null,
+      () => streamUrl(`/api/teams/${teamId}/stream`),
+      setReconnecting,
     );
-    return () => {
-      stop();
-    };
   }, [teamId, enabled, qc, auth]);
+  return enabled && !auth.gateOpen && reconnecting;
 }
 
 export function startTeamStream(
@@ -78,45 +85,53 @@ export function startTeamStream(
   generation = 0,
   ticket: string | null = null,
   resolvePath: (() => Promise<string>) | null = null,
+  onReconnecting?: (reconnecting: boolean) => void,
 ): () => void {
-  const resync = () => {
-    detachConnection();
-    resyncConversations();
-    void invalidateConverged(qc);
-  };
-  const guards = streamGuards(qc);
+  trackQueueConfirmations(qc);
   const disconnect = connect(
     resolvePath ?? withTicket(`/api/teams/${teamId}/stream`, ticket),
-    (ev) => {
+    (ev, attachment) => {
       if (ev.type === 'hello') {
-        attachConnection(ev.connectionId as string);
+        const hello = streamHelloEventSchema.safeParse(ev);
+        if (!hello.success) return;
+        attachment.establish();
+        attachConnection(
+          hello.data.connectionId,
+          hello.data.followRevision === true,
+          (isCurrent, followedIds) => {
+            const recovering = attachment.acknowledge(isCurrent, (signal) =>
+              recoverQueries(qc, signal),
+            );
+            const streams = conversationStreams.get(qc);
+            if (streams === undefined) return;
+            for (const id of followedIds) {
+              const stream = streams.get(id);
+              if (stream === undefined || !stream.pendingInitialRefresh) continue;
+              stream.pendingInitialRefresh = false;
+              if (!recovering) void refreshQueries(qc, { queryKey: ['messages', id] });
+            }
+          },
+          attachment.replace,
+        );
         return;
       }
       if (ev.type === 'conversation') {
-        deliverConversationEvent(ev.conversationId as string, ev.event as Record<string, unknown>);
+        deliverConversationEvent(
+          teamId,
+          ev.conversationId as string,
+          ev.event as Record<string, unknown>,
+        );
         return;
       }
-      const patched = applyTeamStreamEvent(qc, teamId, ev);
-      for (const queryKey of teamEventInvalidations(ev, teamId)) {
-        void invalidateConverged(qc, { queryKey });
-      }
-      if (patched) {
-        notePatchedEvent(qc, teamId);
-      }
-      if (ev.type === 'computer.state') {
-        void invalidateConverged(qc, { queryKey: ['computers', teamId] });
-      }
-      if (ev.type === 'notification') {
-        fireDesktopNotification(ev.notification as NotificationRecord);
-      }
+      const notification = applyTeamStreamEvent(qc, teamId, ev);
+      if (notification !== undefined) fireDesktopNotification(notification);
     },
-    resync,
     {
-      inFlight: () => guards.inFlight() || conversationsInFlight(),
-      reconcile: () => {
-        void reconcileConversations(() => guards.reconcile());
-        void invalidateConverged(qc, { queryKey: ['computers', teamId] });
-      },
+      onReconnecting,
+      onTransportLost: detachConnection,
+      inFlight: () => hasInFlightWork(qc) || conversationsInFlight(),
+      reconcile: () =>
+        reconcileConversations(() => invalidateEventQueries(qc, { type: 'reconcile', teamId })),
     },
   );
   return () => {
@@ -128,8 +143,6 @@ export function startTeamStream(
   };
 }
 
-/** Desktop-notification titles per record type; each value is a `t()` source
- *  key the EN dict must carry (the i18n-coverage gate checks every entry). */
 export const NOTIFICATION_TITLES: Partial<Record<NotificationRecord['type'], string>> = {
   plan_ready: '方案已就绪',
   coordinator_handoff: '需要你决定',
@@ -194,6 +207,7 @@ function fireDesktopNotification(record: NotificationRecord): void {
 }
 
 export interface ConversationStreamHandlers {
+  todoId?: string;
   onMessage?: (row: TranscriptRow, clientMessageId?: string) => void;
   onStep?: (step: ConversationStepEvent['step']) => void;
 }
@@ -204,51 +218,91 @@ export function useConversationStream(
   handlers: ConversationStreamHandlers,
 ): void {
   const qc = useQueryClient();
-  const onMessage = handlers.onMessage;
-  const onStep = handlers.onStep;
+  const { onMessage, onStep, todoId } = handlers;
   const auth = useAuth();
   useEffect(() => {
     if (conversationId === undefined || !enabled || auth.gateOpen) return;
-    const stop = startConversationStream(conversationId, qc, { onMessage, onStep });
-    return () => {
-      stop();
-    };
-  }, [conversationId, enabled, qc, onMessage, onStep, auth]);
+    return startConversationStream(conversationId, qc, {
+      onMessage,
+      onStep,
+      ...(todoId === undefined ? {} : { todoId }),
+    });
+  }, [conversationId, enabled, qc, onMessage, onStep, todoId, auth]);
 }
+
+type SharedConversationStream = {
+  listeners: Set<ConversationStreamHandlers>;
+  stop: () => void;
+  pendingInitialRefresh: boolean;
+};
+
+const conversationStreams = new WeakMap<QueryClient, Map<string, SharedConversationStream>>();
 
 export function startConversationStream(
   conversationId: string,
   qc: QueryClient,
   handlers: ConversationStreamHandlers,
 ): () => void {
-  const onMessage = handlers.onMessage;
-  const onStep = handlers.onStep;
-  const guards = streamGuards(qc);
+  let streams = conversationStreams.get(qc);
+  if (streams === undefined) {
+    streams = new Map();
+    conversationStreams.set(qc, streams);
+  }
+  let stream = streams.get(conversationId);
+  if (stream === undefined) {
+    const listeners = new Set<ConversationStreamHandlers>();
+    const pendingInitialRefresh = qc
+      .getQueryCache()
+      .findAll({ queryKey: ['messages', conversationId] })
+      .some((query) => query.state.data !== undefined);
+    stream = {
+      listeners,
+      stop: connectConversation(conversationId, qc, listeners),
+      pendingInitialRefresh,
+    };
+    streams.set(conversationId, stream);
+  }
+  const listener = { ...handlers };
+  stream.listeners.add(listener);
+  const current = stream;
+  const owned = streams;
+  return () => {
+    if (!current.listeners.delete(listener) || current.listeners.size !== 0) return;
+    queueMicrotask(() => {
+      if (current.listeners.size !== 0 || owned.get(conversationId) !== current) return;
+      owned.delete(conversationId);
+      current.stop();
+    });
+  };
+}
+
+function connectConversation(
+  conversationId: string,
+  qc: QueryClient,
+  listeners: ReadonlySet<ConversationStreamHandlers>,
+): () => void {
   const messagesKey = ['messages', conversationId, 'pages'];
   let businessRevision = 0;
   let disposed = false;
-  liveTextStore.clear(conversationId);
-  liveThinkingStore.clear(conversationId);
-  activityStore.clear(conversationId);
-  agentTodoStore.clear(conversationId);
   const resync = () => {
+    businessRevision++;
     liveTextStore.clear(conversationId);
     liveThinkingStore.clear(conversationId);
     activityStore.clear(conversationId);
     agentTodoStore.clear(conversationId);
-    void invalidateConverged(qc);
   };
   const disconnect = subscribeConversation(conversationId, {
-    onEvent: (ev) => {
+    onEvent: (ev, legacy, teamId) => {
       businessRevision++;
       switch (ev.type) {
         case 'text_delta':
-          liveTextStore.append(conversationId, ev.text as string);
+          if (!legacy) liveTextStore.append(conversationId, ev.text as string);
           break;
         case 'thinking_delta':
-          liveThinkingStore.append(conversationId, ev.text as string);
+          if (!legacy) liveThinkingStore.append(conversationId, ev.text as string);
           break;
         case 'activity': {
+          if (legacy) break;
           const activity = (ev as ConversationActivityEvent).activity;
           if (activity.resetLive === true) {
             liveTextStore.clear(conversationId);
@@ -258,6 +312,7 @@ export function startConversationStream(
           break;
         }
         case 'agent_todo': {
+          if (legacy) break;
           const todo = (ev as ConversationAgentTodoEvent).todo;
           agentTodoStore.set(conversationId, todo);
           break;
@@ -267,59 +322,57 @@ export function startConversationStream(
           const targetConversationId =
             conversationMessageEventSchema.shape.conversationId.safeParse(ev.conversationId).data ??
             conversationId;
-          cacheUserMessage(
+          const delivered = conversationMessageEventSchema.shape.deliveredQueue.safeParse(
+            ev.deliveredQueue,
+          ).data;
+          if (!legacy) {
+            if (row.role === 'assistant' && textOfContent(row.content).trim() !== '') {
+              liveTextStore.noteSettled(conversationId, row.id);
+            }
+            if (row.role === 'assistant' && thinkingOfContent(row.content) !== null) {
+              liveThinkingStore.noteSettled(conversationId, row.id);
+            }
+          }
+          void invalidateEventQueries(
             qc,
-            targetConversationId,
-            row,
-            conversationMessageEventSchema.shape.deliveredQueue.safeParse(ev.deliveredQueue).data,
+            {
+              type: 'message',
+              teamId,
+              conversationId,
+              targetId: targetConversationId,
+              deliveredFromId: delivered?.conversationId,
+              todoId: [...listeners].find((listener) => listener.todoId !== undefined)?.todoId,
+            },
+            legacy ? undefined : () => cacheUserMessage(qc, targetConversationId, row, delivered),
           );
-          if (row.role === 'assistant' && textOfContent(row.content).trim() !== '') {
-            liveTextStore.noteSettled(conversationId, row.id);
-          }
-          if (row.role === 'assistant' && thinkingOfContent(row.content) !== null) {
-            liveThinkingStore.noteSettled(conversationId, row.id);
-          }
-          void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
-          if (targetConversationId !== conversationId)
-            void invalidateConverged(qc, { queryKey: ['messages', targetConversationId] });
-          void invalidateConverged(qc, { queryKey: ['plans'] });
-          if (isChiefConversationId(conversationId)) {
-            void invalidateConverged(qc, { queryKey: ['tasks'] });
-          }
           const clientMessageId = conversationMessageEventSchema.shape.clientMessageId.safeParse(
             ev.clientMessageId,
           ).data;
-          if (clientMessageId === undefined) onMessage?.(row);
-          else onMessage?.(row, clientMessageId);
+          for (const { onMessage } of listeners) {
+            if (clientMessageId === undefined) onMessage?.(row);
+            else onMessage?.(row, clientMessageId);
+          }
           break;
         }
         case 'step': {
           const step = (ev as ConversationStepEvent).step;
-          if (step.status === 'done' || step.status === 'failed' || step.status === 'stopped') {
+          if (
+            !legacy &&
+            (step.status === 'done' || step.status === 'failed' || step.status === 'stopped')
+          ) {
             liveTextStore.clearUnlessSettling(conversationId);
             liveThinkingStore.clear(conversationId);
             activityStore.clear(conversationId);
             agentTodoStore.clear(conversationId);
           }
-          void invalidateConverged(qc, { queryKey: ['steps', conversationId] });
-          void invalidateConverged(qc, { queryKey: ['build', conversationId] });
-          void invalidateConverged(qc, { queryKey: ['changes', conversationId] });
-          void invalidateConverged(qc, { queryKey: ['plans'] });
-          if (isChiefConversationId(conversationId)) {
-            if (
-              step.status === 'claimed' ||
-              step.status === 'done' ||
-              step.status === 'failed' ||
-              step.status === 'stopped'
-            ) {
-              void invalidateConverged(qc, { queryKey: ['messages', conversationId] });
-            }
-            void invalidateConverged(qc, { queryKey: ['chiefThreads'] });
-            if (step.status === 'done' || step.status === 'failed' || step.status === 'stopped') {
-              void invalidateConverged(qc, { queryKey: ['chief'] });
-            }
-          }
-          onStep?.(step);
+          void invalidateEventQueries(qc, {
+            type: 'step',
+            teamId,
+            conversationId,
+            status: step.status,
+            todoId: [...listeners].find((listener) => listener.todoId !== undefined)?.todoId,
+          });
+          for (const { onStep } of listeners) onStep?.(step);
           break;
         }
         default:
@@ -328,7 +381,7 @@ export function startConversationStream(
     },
     onResync: resync,
     inFlight: () =>
-      guards.inFlight() ||
+      hasInFlightWork(qc) ||
       liveTextStore.get(conversationId) !== '' ||
       liveThinkingStore.get(conversationId) !== '',
     reconcile: async (refetch) => {
