@@ -183,16 +183,36 @@ describe('ContextMeterLine channel usage stats', () => {
     expect(html).not.toContain('—');
   });
 
-  test('ContextMeterPanel renders without crashing when rendered directly', () => {
-    const html = renderToStaticMarkup(
+  test('ContextMeterPanel labels the prompt cache hit rate as the last turn hit rate', () => {
+    const zh = renderToStaticMarkup(
       createElement(I18nProvider, {
         initialLocale: 'zh',
         children: createElement(ContextMeterPanel, {
-          context: { tokens: 10_000, contextWindow: 100_000 },
+          context: {
+            tokens: 17_367,
+            contextWindow: 183_000,
+            cache: { read: 44_312, write: 6_545, input: 8 },
+          },
           now: 1_000_000,
         }),
       }),
     );
-    expect(html).toContain('10K / 100K');
+    expect(zh).toContain('17K / 183K');
+    expect(zh).toContain('上轮命中率');
+    expect(zh).toContain('87%');
+    const en = renderToStaticMarkup(
+      createElement(I18nProvider, {
+        initialLocale: 'en',
+        children: createElement(ContextMeterPanel, {
+          context: {
+            tokens: 17_367,
+            contextWindow: 183_000,
+            cache: { read: 44_312, write: 6_545, input: 8 },
+          },
+          now: 1_000_000,
+        }),
+      }),
+    );
+    expect(en).toContain('Last turn hit rate');
   });
 });

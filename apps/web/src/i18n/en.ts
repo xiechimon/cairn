@@ -562,7 +562,7 @@ export const EN: Record<string, string> = {
   '上下文 {used} / {window}': 'Context {used} / {window}',
   自动压缩: 'Auto-compact',
   缓存: 'Cache',
-  命中率: 'Hit rate',
+  上轮命中率: 'Last turn hit rate',
   回复中保持有效: 'Warm while replying',
   下一条不命中: 'Misses next',
   '{time} 后失效': 'Expires in {time}',

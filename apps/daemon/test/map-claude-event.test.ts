@@ -698,4 +698,120 @@ describe('mapClaudeMessage (spec 17 event mapping table, vocabulary locked by 01
       { status: 'rejected' },
     ]);
   });
+
+  test('resumed session reports per-turn usage instead of cumulative result.modelUsage', () => {
+    const state = createClaudeMapState({ modelId: 'claude-opus-5-5', resumed: true });
+    const { events } = feed(
+      [
+        {
+          type: 'assistant',
+          parent_tool_use_id: null,
+          message: {
+            id: 'msg_turn2_main',
+            role: 'assistant',
+            model: 'claude-opus-5-5',
+            content: [{ type: 'text', text: '收到' }],
+            usage: {
+              input_tokens: 4,
+              output_tokens: 62,
+              cache_read_input_tokens: 17_322,
+              cache_creation_input_tokens: 670,
+            },
+          },
+        } as unknown as SDKMessage,
+        {
+          type: 'result',
+          subtype: 'success',
+          result: '收到',
+          is_error: false,
+          usage: {
+            input_tokens: 4,
+            output_tokens: 62,
+            cache_read_input_tokens: 17_322,
+            cache_creation_input_tokens: 670,
+            cache_creation: { ephemeral_5m_input_tokens: 0, ephemeral_1h_input_tokens: 670 },
+          },
+          modelUsage: {
+            'claude-opus-5-5': {
+              inputTokens: 12,
+              outputTokens: 417,
+              cacheReadInputTokens: 61_634,
+              cacheCreationInputTokens: 7_215,
+              contextWindow: 183_000,
+              costUSD: 0.14,
+            },
+            'claude-haiku-4-5': {
+              inputTokens: 1_994,
+              outputTokens: 17,
+              cacheReadInputTokens: 0,
+              cacheCreationInputTokens: 0,
+              costUSD: 0.002,
+            },
+          },
+          session_id: 'sdk-sess-resumed',
+        } as unknown as SDKMessage,
+      ],
+      state,
+    );
+    const done = events.find((e) => e.type === 'done');
+    expect(done).toEqual({
+      type: 'done',
+      usage: [
+        {
+          model: 'claude-code/claude-opus-5-5',
+          input: 4,
+          output: 62,
+          cacheRead: 17_322,
+          cacheWrite: 670,
+          cacheWrite1h: 670,
+          contextTokens: 4 + 62 + 17_322 + 670,
+          contextWindow: 183_000,
+        },
+      ],
+    });
+  });
+
+  test('resumed session falls back to per-turn result.usage when assistant messages had no usage', () => {
+    const state = createClaudeMapState({ modelId: 'claude-opus-5-5', resumed: true });
+    const { events } = feed(
+      [
+        {
+          type: 'result',
+          subtype: 'success',
+          result: 'ok',
+          is_error: false,
+          usage: {
+            input_tokens: 5,
+            output_tokens: 15,
+            cache_read_input_tokens: 100,
+            cache_creation_input_tokens: 20,
+          },
+          modelUsage: {
+            'claude-opus-5-5': {
+              inputTokens: 500,
+              outputTokens: 900,
+              cacheReadInputTokens: 50_000,
+              cacheCreationInputTokens: 6_000,
+              contextWindow: 200_000,
+            },
+          },
+          session_id: 'sdk-sess-resumed',
+        } as unknown as SDKMessage,
+      ],
+      state,
+    );
+    const done = events.find((e) => e.type === 'done');
+    expect(done).toEqual({
+      type: 'done',
+      usage: [
+        {
+          model: 'claude-code/claude-opus-5-5',
+          input: 5,
+          output: 15,
+          cacheRead: 100,
+          cacheWrite: 20,
+        },
+      ],
+    });
+  });
 });

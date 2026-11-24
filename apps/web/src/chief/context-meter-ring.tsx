@@ -239,7 +239,7 @@ export function ContextMeterPanel({
             : formatContextTokens(context.compactAt),
         },
     cache === null ? null : { id: 'cache', label: t('缓存'), value: cachePanelValue(t, cache) },
-    hit === null ? null : { id: 'hit', label: t('命中率'), value: `${Math.round(hit * 100)}%` },
+    hit === null ? null : { id: 'hit', label: t('上轮命中率'), value: `${Math.round(hit * 100)}%` },
   ].filter((row) => row !== null);
   return (
     <section

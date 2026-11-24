@@ -94,6 +94,8 @@ export interface ClaudeMapState {
   interrupted: boolean;
   usage: AgentTokenUsage;
   liveUsage: Map<string, ModelUsage>;
+  turnUsage: Map<string, ModelUsage>;
+  resumed?: boolean;
   lastContext?: { model: string; tokens: number };
   contextLimits?: { model: string; window: number; compactAt?: number };
   sessionId: string | null;
@@ -102,33 +104,42 @@ export interface ClaudeMapState {
   authFailed?: boolean;
 }
 
-function liveUsageRows(state: ClaudeMapState): ModelUsage[] {
+function aggregateUsageRows(rows: Iterable<ModelUsage>): ModelUsage[] {
   const byModel = new Map<string, ModelUsage>();
-  for (const row of state.liveUsage.values()) {
+  for (const row of rows) {
     const prev = byModel.get(row.model);
-    byModel.set(
-      row.model,
-      prev === undefined
-        ? { ...row }
-        : {
-            model: row.model,
-            input: prev.input + row.input,
-            output: prev.output + row.output,
-            cacheRead: prev.cacheRead + row.cacheRead,
-            cacheWrite: prev.cacheWrite + row.cacheWrite,
-          },
-    );
+    if (prev === undefined) {
+      byModel.set(row.model, { ...row });
+      continue;
+    }
+    const cacheWrite1h =
+      prev.cacheWrite1h !== undefined || row.cacheWrite1h !== undefined
+        ? (prev.cacheWrite1h ?? 0) + (row.cacheWrite1h ?? 0)
+        : undefined;
+    byModel.set(row.model, {
+      model: row.model,
+      input: prev.input + row.input,
+      output: prev.output + row.output,
+      cacheRead: prev.cacheRead + row.cacheRead,
+      cacheWrite: prev.cacheWrite + row.cacheWrite,
+      ...(cacheWrite1h !== undefined ? { cacheWrite1h } : {}),
+    });
   }
   return [...byModel.values()];
 }
 
-export function createClaudeMapState(opts?: { modelId?: string }): ClaudeMapState {
+export function createClaudeMapState(opts?: {
+  modelId?: string;
+  resumed?: boolean;
+}): ClaudeMapState {
   return {
     calls: new Map(),
     runningTools: new Set(),
     interrupted: false,
     usage: [],
     liveUsage: new Map(),
+    turnUsage: new Map(),
+    ...(opts?.resumed === true ? { resumed: true } : {}),
     sessionId: null,
     rateLimits: [],
     ...(opts?.modelId !== undefined ? { modelId: opts.modelId } : {}),
@@ -262,29 +273,53 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
             output_tokens?: number;
             cache_read_input_tokens?: number;
             cache_creation_input_tokens?: number;
+            cache_creation?: {
+              ephemeral_5m_input_tokens?: number;
+              ephemeral_1h_input_tokens?: number;
+            };
           };
         };
       };
       const content = assistant.message?.content;
       const callModel = assistant.message?.model;
       const callUsage = assistant.message?.usage;
-      if (assistant.parent_tool_use_id == null && callModel !== undefined && callUsage) {
-        const tokens = contextTokensOf({
-          input: callUsage.input_tokens,
-          output: callUsage.output_tokens,
-          cacheRead: callUsage.cache_read_input_tokens,
-          cacheWrite: callUsage.cache_creation_input_tokens,
-        });
-        if (tokens > 0) state.lastContext = { model: callModel, tokens };
-        const messageId = assistant.message?.id;
-        if (messageId !== undefined)
-          state.liveUsage.set(messageId, {
+      const messageId = assistant.message?.id;
+      if (callModel !== undefined && callUsage) {
+        const flatWrite = callUsage.cache_creation_input_tokens ?? 0;
+        const nested = callUsage.cache_creation;
+        const cacheWrite =
+          flatWrite > 0
+            ? flatWrite
+            : (nested?.ephemeral_5m_input_tokens ?? 0) + (nested?.ephemeral_1h_input_tokens ?? 0);
+        if (messageId !== undefined) {
+          state.turnUsage.set(messageId, {
             model: `${USAGE_MODEL_PREFIX}/${callModel}`,
             input: callUsage.input_tokens ?? 0,
             output: callUsage.output_tokens ?? 0,
             cacheRead: callUsage.cache_read_input_tokens ?? 0,
-            cacheWrite: callUsage.cache_creation_input_tokens ?? 0,
+            cacheWrite,
+            ...(nested?.ephemeral_1h_input_tokens !== undefined
+              ? { cacheWrite1h: nested.ephemeral_1h_input_tokens }
+              : {}),
           });
+        }
+        if (assistant.parent_tool_use_id == null) {
+          const tokens = contextTokensOf({
+            input: callUsage.input_tokens,
+            output: callUsage.output_tokens,
+            cacheRead: callUsage.cache_read_input_tokens,
+            cacheWrite,
+          });
+          if (tokens > 0) state.lastContext = { model: callModel, tokens };
+          if (messageId !== undefined)
+            state.liveUsage.set(messageId, {
+              model: `${USAGE_MODEL_PREFIX}/${callModel}`,
+              input: callUsage.input_tokens ?? 0,
+              output: callUsage.output_tokens ?? 0,
+              cacheRead: callUsage.cache_read_input_tokens ?? 0,
+              cacheWrite,
+            });
+        }
       }
       const apiError = (msg as { error?: unknown }).error;
       if (apiError === 'authentication_failed') {
@@ -292,7 +327,7 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       }
       const out: StepEvent[] = [];
       if (assistant.parent_tool_use_id == null && callModel !== undefined && callUsage) {
-        const live = liveUsageRows(state);
+        const live = aggregateUsageRows(state.liveUsage.values());
         if (live.length > 0) out.push({ type: 'usage', usage: live });
       }
       if (!Array.isArray(content)) return out;
@@ -378,7 +413,25 @@ export function mapClaudeMessage(msg: SDKMessage, state: ClaudeMapState): StepEv
       if (typeof sessionId === 'string' && state.sessionId === null) {
         state.sessionId = sessionId;
       }
-      const usageRows = toUsageRows(msg as Parameters<typeof toUsageRows>[0], state.modelId);
+      const resultMsg = msg as Parameters<typeof toUsageRows>[0];
+      const usageRows =
+        state.resumed === true
+          ? (() => {
+              if (state.turnUsage.size === 0) {
+                return toUsageRows(
+                  resultMsg.usage !== undefined ? { usage: resultMsg.usage } : {},
+                  state.modelId,
+                );
+              }
+              const aggregated = aggregateUsageRows(state.turnUsage.values());
+              const only = aggregated.length === 1 ? aggregated[0] : undefined;
+              const oneHour = resultMsg.usage?.cache_creation?.ephemeral_1h_input_tokens;
+              if (only !== undefined && oneHour !== undefined && only.cacheWrite1h === undefined) {
+                return [{ ...only, cacheWrite1h: oneHour }];
+              }
+              return aggregated;
+            })()
+          : toUsageRows(resultMsg, state.modelId);
       const context = state.lastContext;
       const contextRow =
         context === undefined
@@ -1655,7 +1708,7 @@ export class ClaudeCodeBackend implements AgentBackend {
       abortController: abort,
       process: sessionProcess,
     });
-    const state = createClaudeMapState({ modelId: opts.modelId });
+    const state = createClaudeMapState({ modelId: opts.modelId, resumed: resumeId !== null });
     const input = new AsyncQueue<SDKUserMessage>();
     if (opts.prompt !== undefined)
       input.push({ ...buildUserMessage(opts.prompt, opts.promptImages), uuid: randomUUID() });
