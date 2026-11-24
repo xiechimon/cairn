@@ -8703,6 +8703,158 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                 },
               ],
             },
+            "retry": {
+              "anyOf": [
+                {
+                  "oneOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "attempt": {
+                          "maximum": 9007199254740991,
+                          "minimum": 1,
+                          "type": "integer",
+                        },
+                        "failureClass": {
+                          "enum": [
+                            "transient",
+                            "rate_limit",
+                            "unknown",
+                          ],
+                          "type": "string",
+                        },
+                        "maxAttempts": {
+                          "anyOf": [
+                            {
+                              "maximum": 9007199254740991,
+                              "minimum": 1,
+                              "type": "integer",
+                            },
+                            {
+                              "type": "null",
+                            },
+                          ],
+                        },
+                        "nextRetryAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
+                        "reasonCode": {
+                          "enum": [
+                            "setup_hook",
+                            "missing_tool",
+                            "auth",
+                            "config",
+                            "model_unavailable",
+                            "runtime_outdated",
+                            "gate_rejection",
+                            "branch_divergence",
+                            "spend_limit",
+                            "window_exhausted",
+                            "retries_exhausted",
+                            "rate_limit_exhausted",
+                            "breaker",
+                            "parked",
+                            "network",
+                            "server_error",
+                            "runner_disconnect",
+                            "rate_limit",
+                            "quota",
+                            "unknown",
+                          ],
+                          "type": "string",
+                        },
+                        "state": {
+                          "const": "scheduled",
+                          "type": "string",
+                        },
+                        "windowEndsAt": {
+                          "maximum": 9007199254740991,
+                          "minimum": -9007199254740991,
+                          "type": "integer",
+                        },
+                      },
+                      "required": [
+                        "state",
+                        "failureClass",
+                        "reasonCode",
+                        "attempt",
+                        "maxAttempts",
+                        "nextRetryAt",
+                        "windowEndsAt",
+                      ],
+                      "type": "object",
+                    },
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "attemptsMade": {
+                          "maximum": 9007199254740991,
+                          "minimum": 0,
+                          "type": "integer",
+                        },
+                        "detail": {
+                          "type": [
+                            "string",
+                            "null",
+                          ],
+                        },
+                        "failureClass": {
+                          "enum": [
+                            "permanent",
+                            "transient",
+                            "rate_limit",
+                            "unknown",
+                          ],
+                          "type": "string",
+                        },
+                        "reasonCode": {
+                          "enum": [
+                            "setup_hook",
+                            "missing_tool",
+                            "auth",
+                            "config",
+                            "model_unavailable",
+                            "runtime_outdated",
+                            "gate_rejection",
+                            "branch_divergence",
+                            "spend_limit",
+                            "window_exhausted",
+                            "retries_exhausted",
+                            "rate_limit_exhausted",
+                            "breaker",
+                            "parked",
+                            "network",
+                            "server_error",
+                            "runner_disconnect",
+                            "rate_limit",
+                            "quota",
+                            "unknown",
+                          ],
+                          "type": "string",
+                        },
+                        "state": {
+                          "const": "parked",
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "state",
+                        "failureClass",
+                        "reasonCode",
+                        "attemptsMade",
+                        "detail",
+                      ],
+                      "type": "object",
+                    },
+                  ],
+                },
+                {
+                  "type": "null",
+                },
+              ],
+            },
             "routeOverride": {
               "anyOf": [
                 {
@@ -14923,6 +15075,158 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > tod
             "titleSourceRef",
           ],
           "type": "object",
+        },
+        {
+          "type": "null",
+        },
+      ],
+    },
+    "retry": {
+      "anyOf": [
+        {
+          "oneOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "attempt": {
+                  "maximum": 9007199254740991,
+                  "minimum": 1,
+                  "type": "integer",
+                },
+                "failureClass": {
+                  "enum": [
+                    "transient",
+                    "rate_limit",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+                "maxAttempts": {
+                  "anyOf": [
+                    {
+                      "maximum": 9007199254740991,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    {
+                      "type": "null",
+                    },
+                  ],
+                },
+                "nextRetryAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+                "reasonCode": {
+                  "enum": [
+                    "setup_hook",
+                    "missing_tool",
+                    "auth",
+                    "config",
+                    "model_unavailable",
+                    "runtime_outdated",
+                    "gate_rejection",
+                    "branch_divergence",
+                    "spend_limit",
+                    "window_exhausted",
+                    "retries_exhausted",
+                    "rate_limit_exhausted",
+                    "breaker",
+                    "parked",
+                    "network",
+                    "server_error",
+                    "runner_disconnect",
+                    "rate_limit",
+                    "quota",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+                "state": {
+                  "const": "scheduled",
+                  "type": "string",
+                },
+                "windowEndsAt": {
+                  "maximum": 9007199254740991,
+                  "minimum": -9007199254740991,
+                  "type": "integer",
+                },
+              },
+              "required": [
+                "state",
+                "failureClass",
+                "reasonCode",
+                "attempt",
+                "maxAttempts",
+                "nextRetryAt",
+                "windowEndsAt",
+              ],
+              "type": "object",
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "attemptsMade": {
+                  "maximum": 9007199254740991,
+                  "minimum": 0,
+                  "type": "integer",
+                },
+                "detail": {
+                  "type": [
+                    "string",
+                    "null",
+                  ],
+                },
+                "failureClass": {
+                  "enum": [
+                    "permanent",
+                    "transient",
+                    "rate_limit",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+                "reasonCode": {
+                  "enum": [
+                    "setup_hook",
+                    "missing_tool",
+                    "auth",
+                    "config",
+                    "model_unavailable",
+                    "runtime_outdated",
+                    "gate_rejection",
+                    "branch_divergence",
+                    "spend_limit",
+                    "window_exhausted",
+                    "retries_exhausted",
+                    "rate_limit_exhausted",
+                    "breaker",
+                    "parked",
+                    "network",
+                    "server_error",
+                    "runner_disconnect",
+                    "rate_limit",
+                    "quota",
+                    "unknown",
+                  ],
+                  "type": "string",
+                },
+                "state": {
+                  "const": "parked",
+                  "type": "string",
+                },
+              },
+              "required": [
+                "state",
+                "failureClass",
+                "reasonCode",
+                "attemptsMade",
+                "detail",
+              ],
+              "type": "object",
+            },
+          ],
         },
         {
           "type": "null",

@@ -126,14 +126,28 @@ export function startBuilds(
           };
     const id = newUuidv7();
     const createdAt = nowMs();
-    const previousAttempt =
+    const previousRetry =
       triggerSource !== 'user' && todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
         ? deps.db
-            .select({ retryAttempt: build.retryAttempt })
+            .select({
+              retryAttempt: build.retryAttempt,
+              retryClass: build.retryClass,
+              retryWindowStartedAt: build.retryWindowStartedAt,
+            })
             .from(build)
             .where(eq(build.id, todoRecord.latestBuildId))
-            .get()?.retryAttempt
+            .get()
         : undefined;
+    const nextRetryAttempt =
+      previousRetry === undefined
+        ? 0
+        : previousRetry.retryClass === 'rate_limit'
+          ? previousRetry.retryAttempt
+          : previousRetry.retryAttempt + 1;
+    const nextRetryWindowStartedAt =
+      previousRetry === undefined
+        ? null
+        : (previousRetry.retryWindowStartedAt ?? todoRecord.phaseAt);
     const afterCommit: (() => void)[] = [];
     deps.db.transaction(() => {
       deps.db
@@ -144,7 +158,11 @@ export function startBuilds(
           withPlan: false,
           prevPhase: todoRecord.phase,
           triggerSource,
-          retryAttempt: previousAttempt === undefined ? 0 : previousAttempt + 1,
+          retryAttempt: nextRetryAttempt,
+          retryClass: null,
+          retryNextAt: null,
+          retryWindowStartedAt: nextRetryWindowStartedAt,
+          retryParkReason: null,
           scheduledBy: input.scheduledBy ?? null,
           planDocId: null,
           errorMessage: null,

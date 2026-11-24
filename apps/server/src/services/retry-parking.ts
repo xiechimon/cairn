@@ -1,12 +1,16 @@
 import {
+  type BuildRecord,
   CHIEF_NOTICE_KIND,
-  classifyStepFailure,
-  isProviderAuthFailure,
+  classifyRetryFailure,
+  RETRY_AFTER_MAX_MS,
+  RETRY_AFTER_MIN_MS,
   RETRY_PARKED_MARK,
+  type RetryFailureClass,
+  type RetryReasonCode,
   runtimeUpdateRequired,
   UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
-import { and, eq, gt, inArray, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefMessage, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -14,103 +18,56 @@ import { nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { coordinatorThreadRow, ensureChief } from './chief.js';
 import { reconcileOwners } from './owner.js';
+import {
+  automaticRetryOwed,
+  budgetExhaustedReason,
+  ERROR_SCAN_LIMIT,
+  FAILED_BUILD_WINDOW_MS,
+  FAILED_BUILDS_PER_HOUR_LIMIT,
+  jitteredRetryDelayMs,
+  nominalDelayForClass,
+  resolvedClassFor,
+  retryIsParked,
+  runtimeUpdateReason,
+  sanitizeDetail,
+  UNKNOWN_RETRY_LIMIT,
+} from './retry-policy.js';
 import { routeForStep } from './routing-rules.js';
-import { pendingWorkerQuestions } from './worker-question-store.js';
 
-export { RETRY_PARKED_MARK };
-export const FAILED_BUILDS_PER_HOUR_LIMIT = 3;
-export const FAILED_BUILD_WINDOW_MS = 3_600_000;
-export const AUTOMATIC_RETRY_LIMIT = 3;
-export const AUTOMATIC_RETRY_BASE_MS = 60_000;
-
-const GATE_REJECTION = [
-  '方案结构不合格',
-  '规划未产出方案',
-  '信息卡未产出报告',
-  '偏离工作分支',
-  '构建零改动',
-  '转人工处理',
-  '死循环闸',
-  '请人工复核',
-] as const;
-
-const MISSING_CREDENTIALS = [
-  'no team secret is available',
-  'api key is missing',
-  'api key is not configured',
-  'gemini login',
-  'reconnect github',
-  '重新连接 github',
-  '未配置模型',
-  '尚未上报模型清单',
-  '未启用',
-] as const;
-
-export function retryIsParked(error: string): boolean {
-  if (error.startsWith(RETRY_PARKED_MARK)) return true;
-  const kind = classifyStepFailure(error);
-  return kind === 'model_unavailable' || kind === 'runtime_outdated';
-}
-
-function runtimeUpdateReason(
-  update: NonNullable<ReturnType<typeof runtimeUpdateRequired>>,
-): string {
-  const runtime = update.runtime ?? 'the agent runtime';
-  const need = `this model needs ${runtime} ${update.required} or newer`;
-  return update.current === null
-    ? `${RETRY_PARKED_MARK}: ${need}. Update Cairn, then retry.`
-    : `${RETRY_PARKED_MARK}: Cairn's built-in ${runtime} ${update.current} is too old: ${need}. Update Cairn, then retry.`;
-}
-
-export function failureNeedsHuman(errorMessage: string): boolean {
-  if (retryIsParked(errorMessage)) return true;
-  if (errorMessage.startsWith('PR Auto-fix needs you:')) return true;
-  if (isProviderAuthFailure(errorMessage)) return true;
-  if (GATE_REJECTION.some((mark) => errorMessage.includes(mark))) return true;
-  const lower = errorMessage.toLowerCase();
-  return MISSING_CREDENTIALS.some((mark) => lower.includes(mark.toLowerCase()));
-}
-
-export function automaticRetryDelayMs(retryAttempt: number): number {
-  return AUTOMATIC_RETRY_BASE_MS * 2 ** retryAttempt;
-}
-
-export function automaticRetryDueAt(phaseAt: number, retryAttempt: number): number {
-  return phaseAt + automaticRetryDelayMs(retryAttempt);
-}
-
-function lastStepScheduledBuildIds(db: Db, buildIds: string[]): Set<string> {
-  if (buildIds.length === 0) return new Set();
-  const latestByBuild = new Map<string, { scheduleId: string | null; createdAt: number }>();
-  for (const row of db
-    .select({ buildId: step.buildId, scheduleId: step.scheduleId, createdAt: step.createdAt })
-    .from(step)
-    .where(inArray(step.buildId, buildIds))
-    .all()) {
-    const seen = latestByBuild.get(row.buildId);
-    if (seen === undefined || row.createdAt >= seen.createdAt) latestByBuild.set(row.buildId, row);
-  }
-  return new Set(
-    [...latestByBuild].flatMap(([buildId, row]) => (row.scheduleId === null ? [] : [buildId])),
-  );
-}
-
-export function automaticRetryOwed(
-  db: Db,
-  buildRow: { id: string; errorMessage: string | null; retryAttempt: number },
-): boolean {
-  if (buildRow.retryAttempt >= AUTOMATIC_RETRY_LIMIT) return false;
-  if (failureNeedsHuman(buildRow.errorMessage ?? '')) return false;
-  if (pendingWorkerQuestions(db, buildRow.id).length > 0) return false;
-  return !lastStepScheduledBuildIds(db, [buildRow.id]).has(buildRow.id);
-}
+export {
+  AUTOMATIC_RETRY_BASE_MS,
+  AUTOMATIC_RETRY_LIMIT,
+  automaticRetryDelayMs,
+  automaticRetryDueAt,
+  automaticRetryOwed,
+  FAILED_BUILD_WINDOW_MS,
+  FAILED_BUILDS_PER_HOUR_LIMIT,
+  failureNeedsHuman,
+  jitteredRetryDelayMs,
+  RATE_LIMIT_RETRY_BASE_MS,
+  RATE_LIMIT_RETRY_CAP_MS,
+  RATE_LIMIT_RETRY_MAX_ATTEMPTS,
+  RATE_LIMIT_RETRY_WINDOW_MS,
+  RETRY_PARKED_MARK,
+  type RetryBuildSlice,
+  retryIsParked,
+  TRANSIENT_RETRY_BASE_MS,
+  TRANSIENT_RETRY_CAP_MS,
+  TRANSIENT_RETRY_MAX_ATTEMPTS,
+  TRANSIENT_RETRY_WINDOW_MS,
+  todoRetryStateOf,
+  UNKNOWN_RETRY_BASE_MS,
+  UNKNOWN_RETRY_CAP_MS,
+  UNKNOWN_RETRY_LIMIT,
+  UNKNOWN_RETRY_WINDOW_MS,
+} from './retry-policy.js';
 
 export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): void {
   const row = deps.db.select().from(todo).where(eq(todo.id, todoId)).get();
   if (!row?.latestBuildId) return;
   if (row.phase === 'failed') parkFailedBuild(deps, row.latestBuildId);
   const latest = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
-  if (latest && retryIsParked(latest.errorMessage ?? '')) {
+  if (latest && (latest.retryParkReason != null || retryIsParked(latest.errorMessage ?? ''))) {
     const update = runtimeUpdateRequired(latest.errorMessage ?? '');
     throw new HttpError(
       409,
@@ -121,6 +78,111 @@ export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): vo
           : `${RETRY_PARKED_MARK}: ${latest.errorMessage}`,
     );
   }
+}
+
+function rejectedModelOf(db: Db, owner: typeof todo.$inferSelect, error: string): string {
+  const slice = error.length <= ERROR_SCAN_LIMIT ? error : error.slice(0, ERROR_SCAN_LIMIT);
+  const namedModel = /\bmodel\s+[^a-z0-9\r\n]{0,8}([a-z0-9][a-z0-9./:_-]{0,80})/i.exec(slice)?.[1];
+  const candidate =
+    (namedModel && !['not', 'unavailable', 'unsupported', 'is'].includes(namedModel.toLowerCase())
+      ? namedModel
+      : null) ??
+    /(?:model_not_found|unsupported[ _-]model)\s*:\s*([\w./:-]{1,80})/i.exec(slice)?.[1] ??
+    routeForStep(db, owner, 'session')?.modelId ??
+    'unknown';
+  return sanitizeDetail(candidate) ?? 'unknown';
+}
+
+function formatChiefParkNotice(input: {
+  reasonCode: RetryReasonCode;
+  runtimeUpdate: ReturnType<typeof runtimeUpdateRequired>;
+  rejectedModel: string | null;
+  retryAttempt: number;
+  failures: number;
+}): string {
+  const { reasonCode, runtimeUpdate, rejectedModel, retryAttempt, failures } = input;
+  if (runtimeUpdate !== null) return runtimeUpdateReason(runtimeUpdate);
+  if (reasonCode === 'model_unavailable') {
+    return `${RETRY_PARKED_MARK}: model unavailable (${sanitizeDetail(rejectedModel) ?? 'unknown'}). Update model routing before retrying.`;
+  }
+  if (reasonCode === 'setup_hook') {
+    return `${RETRY_PARKED_MARK}: setup hook failed. Fix the workspace setup hook or environment, then retry. Open the task to see the error.`;
+  }
+  if (reasonCode === 'missing_tool') {
+    return `${RETRY_PARKED_MARK}: required tool not found. Install the missing tool on the Runner, then retry. Open the task to see the error.`;
+  }
+  if (reasonCode === 'auth') {
+    return `${RETRY_PARKED_MARK}: authentication failed. Check credentials or reconnect the provider, then retry. Open the task to see the error.`;
+  }
+  if (reasonCode === 'spend_limit') {
+    return `${RETRY_PARKED_MARK}: provider spend limit reached. Raise the budget or switch providers, then retry. Open the task to see the error.`;
+  }
+  if (reasonCode === 'config') {
+    return `${RETRY_PARKED_MARK}: configuration or request error. Fix the task or provider configuration, then retry. Open the task to see the error.`;
+  }
+  if (reasonCode === 'gate_rejection') {
+    return `${RETRY_PARKED_MARK}: stopped at a verification gate. Review the feedback before retrying. Open the task to see the error.`;
+  }
+  if (reasonCode === 'branch_divergence') {
+    return `${RETRY_PARKED_MARK}: remote branch diverged. Reconcile the branch before retrying. Open the task to see the error.`;
+  }
+  if (reasonCode === 'window_exhausted') {
+    return `${RETRY_PARKED_MARK}: transient retry window exhausted (6h, ${retryAttempt} retries). Open the task to see the error.`;
+  }
+  if (reasonCode === 'rate_limit_exhausted') {
+    return `${RETRY_PARKED_MARK}: rate limit wait exhausted (24h). Open the task to see the error.`;
+  }
+  if (reasonCode === 'retries_exhausted') {
+    return `${RETRY_PARKED_MARK}: automatic retries exhausted (${UNKNOWN_RETRY_LIMIT}). Open the task to see the error.`;
+  }
+  if (reasonCode === 'breaker') {
+    return `${RETRY_PARKED_MARK}: ${failures} failed builds in one hour (limit ${FAILED_BUILDS_PER_HOUR_LIMIT}). Open the task to see the error.`;
+  }
+  return `${RETRY_PARKED_MARK}: automatic retries stopped. Open the task to see the error.`;
+}
+
+function formatParkedMessage(input: {
+  error: string;
+  reasonCode: RetryReasonCode;
+  runtimeUpdate: ReturnType<typeof runtimeUpdateRequired>;
+  rejectedModel: string | null;
+  retryAttempt: number;
+  failures: number;
+}): string {
+  const { error, reasonCode, runtimeUpdate, rejectedModel, retryAttempt, failures } = input;
+  if (error.startsWith(RETRY_PARKED_MARK)) return error;
+  if (runtimeUpdate !== null) return `${runtimeUpdateReason(runtimeUpdate)}\n${error}`;
+  if (reasonCode === 'model_unavailable') {
+    return `${RETRY_PARKED_MARK}: model unavailable (${rejectedModel ?? 'unknown'}). Update model routing before retrying.`;
+  }
+  if (reasonCode === 'setup_hook') {
+    return `${RETRY_PARKED_MARK}: setup hook failed. Fix the workspace setup hook or environment, then retry. Last error: ${error}`;
+  }
+  if (reasonCode === 'missing_tool') {
+    return `${RETRY_PARKED_MARK}: required tool not found. Install the missing tool on the Runner, then retry. Last error: ${error}`;
+  }
+  if (reasonCode === 'auth') {
+    return `${RETRY_PARKED_MARK}: authentication failed. Check credentials or reconnect the provider, then retry. Last error: ${error}`;
+  }
+  if (reasonCode === 'spend_limit') {
+    return `${RETRY_PARKED_MARK}: provider spend limit reached. Raise the budget or switch providers, then retry. Last error: ${error}`;
+  }
+  if (reasonCode === 'config') {
+    return `${RETRY_PARKED_MARK}: configuration or request error. Fix the task or provider configuration, then retry. Last error: ${error}`;
+  }
+  if (reasonCode === 'gate_rejection') {
+    return error;
+  }
+  if (reasonCode === 'window_exhausted') {
+    return `${RETRY_PARKED_MARK}: transient retry window exhausted (6h, ${retryAttempt} retries). Last error: ${error}`;
+  }
+  if (reasonCode === 'rate_limit_exhausted') {
+    return `${RETRY_PARKED_MARK}: rate limit wait exhausted (24h). Last error: ${error}`;
+  }
+  if (reasonCode === 'retries_exhausted') {
+    return `${RETRY_PARKED_MARK}: automatic retries exhausted (${UNKNOWN_RETRY_LIMIT}). Last error: ${error}`;
+  }
+  return `${RETRY_PARKED_MARK}: ${failures} failed builds in one hour (limit ${FAILED_BUILDS_PER_HOUR_LIMIT}). Last error: ${error}`;
 }
 
 export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs()): boolean {
@@ -135,6 +197,7 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
     .where(
       and(
         eq(build.todoId, owner.id),
+        ne(build.triggerSource, 'retry'),
         eq(step.status, 'failed'),
         isNotNull(build.errorMessage),
         gt(sql`coalesce(${step.finishedAt}, ${build.createdAt})`, now - FAILED_BUILD_WINDOW_MS),
@@ -143,33 +206,42 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
     )
     .all().length;
   const error = row.errorMessage ?? '';
-  const modelUnavailable = classifyStepFailure(error) === 'model_unavailable';
-  const retriesExhausted = row.retryAttempt >= AUTOMATIC_RETRY_LIMIT;
-  if (!retryIsParked(error) && !retriesExhausted && failures <= FAILED_BUILDS_PER_HOUR_LIMIT)
-    return false;
-  const namedModel = /\bmodel\s+[^a-z0-9]*([a-z0-9][a-z0-9./:_-]*)/i.exec(error)?.[1];
-  const rejectedModel =
-    (namedModel && !['not', 'unavailable', 'unsupported', 'is'].includes(namedModel.toLowerCase())
-      ? namedModel
-      : null) ??
-    /(?:model_not_found|unsupported[ _-]model)\s*:\s*([\w./:-]+)/i.exec(error)?.[1] ??
-    routeForStep(deps.db, owner, 'session')?.modelId ??
-    'unknown';
+  const { failureClass, classified } = resolvedClassFor(row, now);
+  const exhausted = budgetExhaustedReason(deps.db, row, now);
+  const permanentParked = retryIsParked(error);
+  const breakerTripped = failures > FAILED_BUILDS_PER_HOUR_LIMIT;
+  if (!permanentParked && exhausted === null && !breakerTripped) return false;
+
+  const reasonCode: RetryReasonCode = permanentParked
+    ? classified.reasonCode
+    : exhausted !== null
+      ? exhausted
+      : 'breaker';
+  const parkedClass: RetryFailureClass = permanentParked ? 'permanent' : failureClass;
+  const modelUnavailable = reasonCode === 'model_unavailable';
+  const rejectedModel = modelUnavailable ? rejectedModelOf(deps.db, owner, error) : null;
   const runtimeUpdate = runtimeUpdateRequired(error);
-  const reason = error.startsWith(RETRY_PARKED_MARK)
-    ? error
-    : runtimeUpdate !== null
-      ? `${runtimeUpdateReason(runtimeUpdate)}\n${error}`
-      : modelUnavailable
-        ? `${RETRY_PARKED_MARK}: model unavailable (${rejectedModel}). Update model routing before retrying.`
-        : retriesExhausted
-          ? `${RETRY_PARKED_MARK}: automatic retries exhausted (${AUTOMATIC_RETRY_LIMIT}). Last error: ${error}`
-          : `${RETRY_PARKED_MARK}: ${failures} failed builds in one hour (limit ${FAILED_BUILDS_PER_HOUR_LIMIT}). Last error: ${error}`;
-  const noticeReason =
-    runtimeUpdate !== null
-      ? runtimeUpdateReason(runtimeUpdate)
-      : reason.replace(/\. Last error: [\s\S]*$/, '. Open the task to see the error.');
-  const id = `retry-parked-${buildId}`;
+  const reason = formatParkedMessage({
+    error,
+    reasonCode,
+    runtimeUpdate,
+    rejectedModel,
+    retryAttempt: row.retryAttempt,
+    failures,
+  });
+  const noticeReason = formatChiefParkNotice({
+    reasonCode,
+    runtimeUpdate,
+    rejectedModel,
+    retryAttempt: row.retryAttempt,
+    failures,
+  });
+  const baseId = `retry-parked-${buildId}`;
+  const priorBase =
+    row.retryParkReason === null
+      ? deps.db.select({ id: message.id }).from(message).where(eq(message.id, baseId)).get()
+      : undefined;
+  const id = priorBase === undefined ? baseId : `${baseId}-${owner.phaseAt}`;
   const taskNotice = {
     id,
     role: 'system' as const,
@@ -177,7 +249,16 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
     createdAt: now,
   };
   const parked = deps.db.transaction(() => {
-    deps.db.update(build).set({ errorMessage: reason }).where(eq(build.id, buildId)).run();
+    deps.db
+      .update(build)
+      .set({
+        errorMessage: reason,
+        retryClass: parkedClass,
+        retryNextAt: null,
+        retryParkReason: reasonCode,
+      })
+      .where(eq(build.id, buildId))
+      .run();
     deps.db
       .update(step)
       .set({ status: 'stopped', finishedAt: now })
@@ -213,9 +294,87 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
   });
   if (parked !== null) {
     deps.convHub?.publishMessage(buildId, taskNotice);
-    deps.hub.publishBuildDoc(owner.teamId, { ...row, errorMessage: reason });
+    const buildRecord: BuildRecord = {
+      id: row.id,
+      todoId: row.todoId,
+      withPlan: row.withPlan,
+      prevPhase: row.prevPhase ?? null,
+      triggerSource: row.triggerSource,
+      planDocId: row.planDocId,
+      errorMessage: reason,
+      prUrl: row.prUrl,
+      prNumber: row.prNumber,
+      diffHash: row.diffHash,
+      reportAttachmentId: row.reportAttachmentId,
+      stop: row.stop,
+      createdAt: row.createdAt,
+    };
+    deps.hub.publishBuildDoc(owner.teamId, buildRecord);
     deps.convHub?.publishMessage(parked.threadId, parked.notice);
   }
   reconcileOwners(deps, [owner.id]);
   return true;
+}
+
+export function scheduleOrParkFailedBuild(
+  deps: BuildDeps,
+  buildId: string,
+  now = nowMs(),
+  random: () => number = Math.random,
+): { parked: boolean; nextRetryAt: number | null } {
+  if (parkFailedBuild(deps, buildId, now)) return { parked: true, nextRetryAt: null };
+  const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (!row) return { parked: false, nextRetryAt: null };
+  const owner = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
+  if (!owner || owner.latestBuildId !== buildId || owner.archivedAt !== null) {
+    return { parked: false, nextRetryAt: null };
+  }
+  const classified = classifyRetryFailure(row.errorMessage ?? '', now);
+  if (classified.failureClass === 'permanent') {
+    deps.db
+      .update(build)
+      .set({
+        retryClass: 'permanent',
+        retryNextAt: null,
+        retryParkReason: classified.reasonCode,
+      })
+      .where(eq(build.id, buildId))
+      .run();
+    return { parked: true, nextRetryAt: null };
+  }
+  if (!automaticRetryOwed(deps.db, row, now)) {
+    deps.db
+      .update(build)
+      .set({ retryClass: classified.failureClass, retryNextAt: null })
+      .where(eq(build.id, buildId))
+      .run();
+    return { parked: false, nextRetryAt: null };
+  }
+  const windowStartedAt = row.retryWindowStartedAt ?? now;
+  const nextRetryAt =
+    classified.failureClass === 'rate_limit'
+      ? classified.resetAt !== null
+        ? Math.max(now + RETRY_AFTER_MIN_MS, Math.min(classified.resetAt, now + RETRY_AFTER_MAX_MS))
+        : classified.retryAfterMs !== null
+          ? now +
+            Math.max(RETRY_AFTER_MIN_MS, Math.min(classified.retryAfterMs, RETRY_AFTER_MAX_MS))
+          : now +
+            jitteredRetryDelayMs(nominalDelayForClass('rate_limit', row.retryAttempt), 0.1, random)
+      : now +
+        jitteredRetryDelayMs(
+          nominalDelayForClass(classified.failureClass, row.retryAttempt),
+          0.2,
+          random,
+        );
+  deps.db
+    .update(build)
+    .set({
+      retryClass: classified.failureClass,
+      retryNextAt: nextRetryAt,
+      retryWindowStartedAt: windowStartedAt,
+      retryParkReason: null,
+    })
+    .where(eq(build.id, buildId))
+    .run();
+  return { parked: false, nextRetryAt };
 }

@@ -19,7 +19,7 @@ import { type BuildDeps, clearStop, publishBuild } from './builds.js';
 import { announceMergeStepOutcome } from './merge-announcement.js';
 import { canTransitionPhase } from './phase.js';
 import { publishStepRow } from './quota-wait.js';
-import { parkFailedBuild, retryIsParked } from './retry-parking.js';
+import { parkFailedBuild, retryIsParked, scheduleOrParkFailedBuild } from './retry-parking.js';
 import { finishScheduledStep } from './schedules.js';
 import { setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -74,7 +74,11 @@ export function settleParkedStep(
   outcome: Pick<MachineDoneBody, 'status' | 'errorMessage'>,
 ): boolean {
   const buildRow = deps.db.select().from(build).where(eq(build.id, stepRow.buildId)).get();
-  if (!buildRow || !retryIsParked(buildRow.errorMessage ?? '')) return false;
+  if (
+    !buildRow ||
+    (buildRow.retryParkReason == null && !retryIsParked(buildRow.errorMessage ?? ''))
+  )
+    return false;
   parkFailedBuild(deps, buildRow.id);
   const owner = deps.db.select().from(todo).where(eq(todo.id, buildRow.todoId)).get();
   if (
@@ -180,7 +184,7 @@ export function applyStepFailure(
     blocked: false,
     report: report ?? reportedVerdictHeads(failedStep, { commit: failedStep.checkpointCommit }),
   });
-  parkFailedBuild(deps, buildRow.id);
+  scheduleOrParkFailedBuild(deps, buildRow.id);
   if (
     todoRow &&
     todoRow.latestBuildId === buildRow.id &&

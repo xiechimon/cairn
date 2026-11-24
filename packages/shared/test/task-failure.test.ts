@@ -3,11 +3,15 @@ import {
   AGENT_FAILURE_KINDS,
   CLAUDE_CODE_AUTH_FAILURE_MARKER,
   classifyAgentFailure,
+  classifyRetryFailure,
   classifyStepFailure,
   isProviderAuthFailure,
   isProviderOutage,
   noVisionSignalOf,
+  parseQuotaResetAt,
   parseRetryAfterMs,
+  parseRetryDelayMs,
+  RETRY_FAILURE_CLASSES,
   runtimeUpdateRequired,
   STEP_FAILURE_KINDS,
 } from '../src/task-failure.js';
@@ -308,5 +312,113 @@ describe('isProviderAuthFailure (#1493 degradation-chain trigger: auth failure)'
     'see PR #401',
   ])('does not match: %s', (msg) => {
     expect(isProviderAuthFailure(msg)).toBe(false);
+  });
+});
+
+describe('classifyRetryFailure & parseRetryDelayMs / parseQuotaResetAt', () => {
+  test('vocabulary is closed', () => {
+    expect(RETRY_FAILURE_CLASSES).toEqual(['permanent', 'transient', 'rate_limit', 'unknown']);
+  });
+
+  test('permanent errors park immediately with a specific reason code', () => {
+    expect(
+      classifyRetryFailure('workspace hook .agents/setup exited 1 — corepack: command not found'),
+    ).toMatchObject({ failureClass: 'permanent', reasonCode: 'setup_hook' });
+    expect(classifyRetryFailure('spawn pnpm ENOENT')).toMatchObject({
+      failureClass: 'permanent',
+      reasonCode: 'missing_tool',
+    });
+    expect(classifyRetryFailure('401 Unauthorized: invalid api key')).toMatchObject({
+      failureClass: 'permanent',
+      reasonCode: 'auth',
+    });
+    expect(classifyRetryFailure('Not logged in · Please run /login')).toMatchObject({
+      failureClass: 'permanent',
+      reasonCode: 'auth',
+    });
+    expect(classifyRetryFailure('400 invalid_request_error: bad schema')).toMatchObject({
+      failureClass: 'permanent',
+      reasonCode: 'config',
+    });
+    expect(classifyRetryFailure('model_not_found: glm-5.3')).toMatchObject({
+      failureClass: 'permanent',
+      reasonCode: 'model_unavailable',
+    });
+    expect(classifyRetryFailure(OUTDATED_CLI)).toMatchObject({
+      failureClass: 'permanent',
+      reasonCode: 'runtime_outdated',
+    });
+    expect(classifyRetryFailure('PR Auto-fix needs you: #12 CI fix cap reached')).toMatchObject({
+      failureClass: 'permanent',
+      reasonCode: 'gate_rejection',
+    });
+  });
+
+  test('rate_limit / quota errors extract Retry-After, HTTP-date, natural duration and reset clocks', () => {
+    const now = Date.UTC(2026, 10, 24, 6, 0, 0);
+    expect(classifyRetryFailure('429 Too Many Requests; Retry-After: 5400', now)).toEqual({
+      failureClass: 'rate_limit',
+      reasonCode: 'rate_limit',
+      retryAfterMs: 5_400_000,
+      resetAt: now + 5_400_000,
+    });
+    expect(parseRetryDelayMs('retry-after: Tue, 24 Nov 2026 07:30:00 GMT', now)).toBe(90 * 60_000);
+    expect(parseRetryDelayMs('retry-after-ms: 1500', now)).toBe(1500);
+    expect(parseRetryDelayMs('Rate limited, please try again in 2m 30s', now)).toBe(150_000);
+    expect(parseQuotaResetAt('usage limit reached, wait until 07:30 UTC', now)).toBe(
+      Date.UTC(2026, 10, 24, 7, 30, 0),
+    );
+    expect(
+      classifyRetryFailure('402 quota exceeded; available at 2026-11-24T08:00:00Z', now),
+    ).toEqual({
+      failureClass: 'rate_limit',
+      reasonCode: 'quota',
+      retryAfterMs: 2 * 3_600_000,
+      resetAt: Date.UTC(2026, 10, 24, 8, 0, 0),
+    });
+  });
+
+  test('transient errors classify network, 5xx and runner disconnects', () => {
+    expect(classifyRetryFailure('upstream error: HTTP 503 Service Unavailable')).toMatchObject({
+      failureClass: 'transient',
+      reasonCode: 'server_error',
+    });
+    expect(classifyRetryFailure('connection reset by peer')).toMatchObject({
+      failureClass: 'transient',
+      reasonCode: 'network',
+    });
+    expect(
+      classifyRetryFailure('这一轮已经结束，但任务没有收到结果，系统把它标为失败。'),
+    ).toMatchObject({
+      failureClass: 'transient',
+      reasonCode: 'runner_disconnect',
+    });
+  });
+
+  test('unknown errors fall back cleanly without false positives', () => {
+    expect(classifyRetryFailure('TypeError: unexpected widget invariant mismatch')).toMatchObject({
+      failureClass: 'unknown',
+      reasonCode: 'unknown',
+    });
+    expect(classifyRetryFailure('build failed: test assertion failed')).toMatchObject({
+      failureClass: 'unknown',
+      reasonCode: 'unknown',
+    });
+  });
+
+  test('regex unit boundaries do not misread trailing words or milliseconds as minutes/hours', () => {
+    expect(parseRetryAfterMs('Retry-After: 5\nMore info')).toBe(5_000);
+    expect(parseRetryAfterMs('Retry-After: 30ms')).toBe(30);
+    expect(parseRetryAfterMs('Retry-After: 10 headers')).toBe(10_000);
+    expect(parseRetryDelayMs('retry in 500ms')).toBe(500);
+    expect(parseRetryDelayMs('Please retry in a moment. Retry in 30s')).toBe(30_000);
+  });
+
+  test('adversarial long error strings complete without quadratic regex backtracking', () => {
+    const start = Date.now();
+    expect(runtimeUpdateRequired(`a${' '.repeat(50_000)}x`)).toBeNull();
+    expect(classifyRetryFailure(`${'hook '.repeat(20_000)}x`).failureClass).toBe('unknown');
+    expect(classifyRetryFailure(`${'enoent '.repeat(20_000)}x`).failureClass).toBe('unknown');
+    expect(Date.now() - start).toBeLessThan(200);
   });
 });

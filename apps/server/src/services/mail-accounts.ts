@@ -16,13 +16,19 @@ type AccountRow = typeof mailAccount.$inferSelect;
 
 const WAKE_RANK = { all: 'needs_you', rules: 'can_wait' } as const;
 
-function toRecord(db: Db, row: AccountRow): MailAccountRecord {
+type MailRetryLookup = (accountId: string) => {
+  nextRetryAt: number | null;
+  retryAttempt: number;
+};
+
+function toRecord(db: Db, row: AccountRow, retryOf?: MailRetryLookup): MailAccountRecord {
   const rules = db
     .select()
     .from(mailRule)
     .where(eq(mailRule.accountId, row.id))
     .orderBy(asc(mailRule.createdAt), asc(mailRule.id))
     .all();
+  const retry = row.status === 'degraded' && retryOf !== undefined ? retryOf(row.id) : null;
   return {
     id: row.id,
     address: row.address ?? '',
@@ -33,6 +39,7 @@ function toRecord(db: Db, row: AccountRow): MailAccountRecord {
     status: row.status,
     lastError: row.lastError as MailErrorCode | null,
     lastMailAt: row.lastMailAt,
+    ...(retry !== null ? { nextRetryAt: retry.nextRetryAt, retryAttempt: retry.retryAttempt } : {}),
     wakeMode: row.defaultRank === 'needs_you' ? 'all' : 'rules',
     rules: rules.map((rule) => ({
       id: rule.id,
@@ -42,7 +49,11 @@ function toRecord(db: Db, row: AccountRow): MailAccountRecord {
   };
 }
 
-export function listMailAccounts(db: Db, teamId: string): MailAccountRecord[] {
+export function listMailAccounts(
+  db: Db,
+  teamId: string,
+  retryOf?: MailRetryLookup,
+): MailAccountRecord[] {
   return db
     .select()
     .from(mailAccount)
@@ -50,7 +61,7 @@ export function listMailAccounts(db: Db, teamId: string): MailAccountRecord[] {
     .orderBy(asc(mailAccount.createdAt), asc(mailAccount.id))
     .all()
     .filter((row) => row.provider === 'imap')
-    .map((row) => toRecord(db, row));
+    .map((row) => toRecord(db, row, retryOf));
 }
 
 export function requireMailAccount(db: Db, teamId: string, id: string): AccountRow {

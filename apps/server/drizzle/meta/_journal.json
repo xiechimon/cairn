@@ -1716,6 +1716,13 @@
       "when": 1795481952100,
       "tag": "0249_motionless_human_torch",
       "breakpoints": true
+    },
+    {
+      "idx": 250,
+      "version": "6",
+      "when": 1795509519150,
+      "tag": "0250_retry_policy",
+      "breakpoints": true
     }
   ]
 }

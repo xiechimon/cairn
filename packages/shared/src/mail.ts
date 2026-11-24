@@ -129,6 +129,8 @@ export interface MailAccountRecord {
   status: MailAccountStatus;
   lastError: MailErrorCode | null;
   lastMailAt: number | null;
+  nextRetryAt?: number | null;
+  retryAttempt?: number;
   wakeMode: MailWakeMode;
   rules: MailRuleRecord[];
 }

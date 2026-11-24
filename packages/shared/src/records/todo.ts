@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { RETRY_FAILURE_CLASSES, RETRY_REASON_CODES } from '../task-failure.js';
 import { CHIEF_THREAD_ID_PREFIX } from './chief.js';
 import { epochMs, phaseSchema, recordId } from './common.js';
 import { parseGithubRepoRef } from './project.js';
@@ -99,6 +100,29 @@ export const todoSectionSchema = z.enum([
 ]);
 export type TodoSection = z.infer<typeof todoSectionSchema>;
 
+export const retryFailureClassSchema = z.enum(RETRY_FAILURE_CLASSES);
+export const retryReasonCodeSchema = z.enum(RETRY_REASON_CODES);
+
+export const todoRetryStateSchema = z.discriminatedUnion('state', [
+  z.object({
+    state: z.literal('scheduled'),
+    failureClass: z.enum(['transient', 'rate_limit', 'unknown']),
+    reasonCode: retryReasonCodeSchema,
+    attempt: z.number().int().min(1),
+    maxAttempts: z.number().int().min(1).nullable(),
+    nextRetryAt: epochMs,
+    windowEndsAt: epochMs,
+  }),
+  z.object({
+    state: z.literal('parked'),
+    failureClass: retryFailureClassSchema,
+    reasonCode: retryReasonCodeSchema,
+    attemptsMade: z.number().int().min(0),
+    detail: z.string().nullable(),
+  }),
+]);
+export type TodoRetryState = z.infer<typeof todoRetryStateSchema>;
+
 export const todoRecordSchema = z.object({
   id: recordId,
   teamId: recordId,
@@ -134,6 +158,7 @@ export const todoRecordSchema = z.object({
     })
     .optional(),
   quotaWait: quotaWaitSchema.nullable().optional(),
+  retry: todoRetryStateSchema.nullable().optional(),
   lastProgressAt: epochMs.optional(),
   usageCost: usageCostSchema.optional(),
   context: z

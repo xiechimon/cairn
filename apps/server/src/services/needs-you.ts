@@ -7,7 +7,12 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 import { applyBuildStepAction, type BuildDeps, NotFoundError } from './builds.js';
 import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { PhaseTransitionError } from './phase.js';
-import { automaticRetryDueAt, automaticRetryOwed, failureNeedsHuman } from './retry-parking.js';
+import {
+  automaticRetryDueAt,
+  automaticRetryOwed,
+  failureNeedsHuman,
+  type RetryBuildSlice,
+} from './retry-parking.js';
 import { getTodo } from './todos.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -15,10 +20,7 @@ export { failureNeedsHuman };
 
 export const NEEDS_YOU_STALE_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function failureAwaitsAutomaticRetry(
-  db: Db,
-  buildRow: { id: string; errorMessage: string | null; retryAttempt: number },
-): boolean {
+export function failureAwaitsAutomaticRetry(db: Db, buildRow: RetryBuildSlice): boolean {
   return automaticRetryOwed(db, buildRow);
 }
 
@@ -68,7 +70,7 @@ export async function sweepFailedRetries(deps: BuildDeps): Promise<void> {
     if (pendingWorkerQuestions(deps.db, row.latestBuildId).length > 0) continue;
     const buildRow = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
     if (buildRow === undefined || !automaticRetryOwed(deps.db, buildRow)) continue;
-    if (nowMs() < automaticRetryDueAt(row.phaseAt, buildRow.retryAttempt)) continue;
+    if (nowMs() < automaticRetryDueAt(row.phaseAt, buildRow)) continue;
     try {
       await applyBuildStepAction(
         deps,

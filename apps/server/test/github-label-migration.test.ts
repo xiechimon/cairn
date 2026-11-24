@@ -91,6 +91,10 @@ test('cutover preserves exact label identities and metadata, moved origins and s
         ...(row as object),
         afterStopPhase: null,
         retryAttempt: 0,
+        retryClass: null,
+        retryNextAt: null,
+        retryWindowStartedAt: null,
+        retryParkReason: null,
       })),
     );
     expect(opened.db.all('PRAGMA foreign_key_check')).toEqual([]);

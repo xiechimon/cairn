@@ -35,7 +35,18 @@ export function registerMailRoutes(app: Hono, ctx: AppContext): void {
   app.get('/api/teams/:id/mail/accounts', (c) => {
     requireTeam(ctx, c.req.param('id'));
     c.header('Cache-Control', 'no-store');
-    return c.json({ accounts: listMailAccounts(ctx.db, ctx.team.id) });
+    return c.json({
+      accounts: listMailAccounts(ctx.db, ctx.team.id, (accountId) =>
+        ctx.mail ? ctx.mail.retryState(accountId) : { nextRetryAt: null, retryAttempt: 0 },
+      ),
+    });
+  });
+
+  app.post('/api/teams/:id/mail/accounts/:accountId/retry', (c) => {
+    requireTeam(ctx, c.req.param('id'));
+    requireOwnerSession(c);
+    requireMail(ctx).retryNow(ctx.team.id, c.req.param('accountId'));
+    return c.json({ ok: true });
   });
 
   app.post('/api/teams/:id/mail/accounts', async (c) => {

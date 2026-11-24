@@ -698,12 +698,13 @@ describe('needs you (#1800)', () => {
 
   test('a failure after the automatic retry budget stays failed and hands to the Coordinator', async () => {
     const w = openWorld();
+    const unknownError = 'unexpected worker invariant mismatch';
     let stepId = w.stepId;
     for (let attempt = 0; attempt < AUTOMATIC_RETRY_LIMIT; attempt++) {
       const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
       if (row === undefined) throw new Error('missing step');
-      applyStepFailure(w.deps, row, 'connection reset by peer');
-      agePhase(w, nowMs() - automaticRetryDelayMs(attempt) - 1);
+      applyStepFailure(w.deps, row, unknownError);
+      agePhase(w, nowMs() - automaticRetryDelayMs(attempt, 'unknown') - 1);
       await sweepFailedRetries(w.deps);
       const retried = w.s.db.select().from(stepTable).where(eq(stepTable.status, 'pending')).get();
       if (retried === undefined) throw new Error('missing retry step');
@@ -711,7 +712,7 @@ describe('needs you (#1800)', () => {
     }
     const last = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get();
     if (last === undefined) throw new Error('missing step');
-    applyStepFailure(w.deps, last, 'connection reset by peer');
+    applyStepFailure(w.deps, last, unknownError);
     const buildsAfterRetry = buildCount(w);
     await sweepFailedRetries(w.deps);
 
@@ -759,10 +760,18 @@ describe('needs you (#1800)', () => {
     if (step === undefined) throw new Error('missing step');
     applyStepFailure(w.deps, step, errorMessage);
     expect(phaseOf(w)).toBe('failed');
-    expect(
-      w.s.db.select().from(buildTable).where(eq(buildTable.id, w.buildId)).get()?.errorMessage,
-    ).toBe(errorMessage);
     const needsHuman = kind !== 'ordinary failure';
+    const stored = w.s.db
+      .select()
+      .from(buildTable)
+      .where(eq(buildTable.id, w.buildId))
+      .get()?.errorMessage;
+    if (needsHuman) {
+      expect(stored).toContain(RETRY_PARKED_MARK);
+      expect(stored).toContain(errorMessage);
+    } else {
+      expect(stored).toBe(errorMessage);
+    }
 
     agePhase(w, nowMs() - AUTOMATIC_RETRY_BASE_MS - 1);
     await sweepFailedRetries(w.deps);

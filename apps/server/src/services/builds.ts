@@ -244,7 +244,11 @@ export function enqueueStep(
   promptOrigin?: StepPromptOrigin,
 ): StepRecord {
   const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  if (byPerson !== true && current && retryIsParked(current.errorMessage ?? ''))
+  if (
+    byPerson !== true &&
+    current &&
+    (current.retryParkReason != null || retryIsParked(current.errorMessage ?? ''))
+  )
     throw new HttpError(409, current.errorMessage ?? 'Task parked');
   const id = newRecordId();
   const createdAt = nowMs();

@@ -12,6 +12,7 @@ import {
 } from '@cairn/shared';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
+import { z } from 'zod';
 import type { AppContext } from './context.js';
 import { chiefMessage, message, plan as planTable, todo, tokenUsage } from './db/schema.js';
 import { AGENTS_REMOVED_MESSAGE } from './lib/agents-removed.js';
@@ -20,6 +21,7 @@ import { conflict, HttpError, notFound, parseWith } from './lib/errors.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody, requireProject, svcOf } from './routes-helpers.js';
+import { retryBuildNow } from './services/build-retry-now.js';
 import {
   applyBuildStepAction,
   buildMergePermission,
@@ -42,6 +44,10 @@ import { deviceStreamsOf, pairedDeviceExists } from './services/paired-devices.j
 import { PhaseTransitionError } from './services/phase.js';
 import { drainTaskMessageQueue, readQueuedMessages } from './services/task-message-queue.js';
 import { listThreadPrs } from './services/thread-pr.js';
+
+const buildRetryNowBodySchema = z.object({
+  clientMessageId: z.string().min(1).max(128).optional(),
+});
 
 export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
   const svc = svcOf(ctx);
@@ -196,6 +202,27 @@ export function registerBuildRoutes(app: Hono, ctx: AppContext): void {
       throw err;
     }
     return c.json({ delegated: true }, 202);
+  });
+
+  app.post('/api/builds/:id/retry-now', async (c) => {
+    const buildId = c.req.param('id');
+    const raw = await jsonBody(c);
+    const body = parseWith(buildRetryNowBodySchema, raw ?? {}, 'body');
+    if (body.clientMessageId !== undefined) {
+      const stored = findClientMessage(svc.db, buildId, body.clientMessageId);
+      if (stored !== undefined) return c.json({ delegated: true, mode: 'restarted' }, 202);
+    }
+    try {
+      const result = await retryBuildNow(svc, buildId, body.clientMessageId);
+      return c.json({ delegated: true, ...result }, 202);
+    } catch (err) {
+      if (err instanceof ClientMessageConflict && body.clientMessageId !== undefined) {
+        const raced = findClientMessage(svc.db, buildId, body.clientMessageId);
+        if (raced !== undefined) return c.json({ delegated: true, mode: 'restarted' }, 202);
+      }
+      if (err instanceof PhaseTransitionError) throw conflict(err.message);
+      throw err;
+    }
   });
 
   app.post('/api/builds/:id/stop', async (c) => {

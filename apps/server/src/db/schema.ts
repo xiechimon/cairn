@@ -53,6 +53,8 @@ import type {
   ProviderModel,
   PrPanelState,
   RequiredCapabilities,
+  RetryFailureClass,
+  RetryReasonCode,
   RouteOverride,
   RouteUse,
   ScheduleKind,
@@ -270,6 +272,10 @@ export const build = sqliteTable('build', {
   evidenceStore: text('evidenceStore').$type<EvidenceStore>(),
   stop: json<BuildStop | null>('stop'),
   retryAttempt: integer('retryAttempt').notNull().default(0),
+  retryClass: text('retryClass').$type<RetryFailureClass | null>(),
+  retryNextAt: epochMs('retryNextAt'),
+  retryWindowStartedAt: epochMs('retryWindowStartedAt'),
+  retryParkReason: text('retryParkReason').$type<RetryReasonCode | null>(),
   createdAt: epochMs('createdAt').notNull(),
 });
 

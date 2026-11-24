@@ -28,9 +28,9 @@ import { rewatchCreatingThread } from './chief.js';
 import { claimClientMessage, completeClientMessage } from './client-message.js';
 import { retryLessonsOf } from './retry-lessons.js';
 import {
-  AUTOMATIC_RETRY_LIMIT,
   assertAutomaticRetryAllowed,
   retryIsParked,
+  UNKNOWN_RETRY_LIMIT,
 } from './retry-parking.js';
 import { getTodo, setTodoPhase } from './todos.js';
 import { insertMessageRow } from './transcript.js';
@@ -56,7 +56,17 @@ export async function restartFailedBuild(
   if (todoRecord.phase !== 'failed') {
     throw new HttpError(409, `restart 仅适用于 failed 相位（当前 ${todoRecord.phase}）`);
   }
-  const resuming = retryIsParked(row.errorMessage ?? '');
+  const resuming = row.retryParkReason != null || retryIsParked(row.errorMessage ?? '');
+  const isRateLimit = row.retryClass === 'rate_limit';
+  const nextRetryAttempt =
+    origin === 'person' || resuming ? 0 : isRateLimit ? row.retryAttempt : row.retryAttempt + 1;
+  const nextWindowStartedAt =
+    origin === 'person' || resuming ? null : (row.retryWindowStartedAt ?? todoRecord.phaseAt);
+  const autoRetryNote = isRateLimit
+    ? 'Automatic retry after rate limit'
+    : row.retryClass === 'unknown' || row.retryClass == null
+      ? `Automatic retry ${nextRetryAttempt}/${UNKNOWN_RETRY_LIMIT}`
+      : `Automatic retry ${nextRetryAttempt}`;
   const feedbackText = body.feedback.trim() === '' ? null : body.feedback;
   const preservedStep = deps.db
     .select({ id: step.id })
@@ -154,7 +164,7 @@ export async function restartFailedBuild(
         insertMessageRow(transcriptDeps, reworkTarget.id, {
           id: newRecordId(),
           role: 'system',
-          content: `Automatic retry ${row.retryAttempt + 1}/${AUTOMATIC_RETRY_LIMIT}`,
+          content: autoRetryNote,
           createdAt: now,
         });
       }
@@ -169,7 +179,11 @@ export async function restartFailedBuild(
         .set({
           errorMessage: null,
           prevPhase: 'failed',
-          retryAttempt: origin === 'person' || resuming ? 0 : row.retryAttempt + 1,
+          retryAttempt: nextRetryAttempt,
+          retryClass: null,
+          retryNextAt: null,
+          retryWindowStartedAt: nextWindowStartedAt,
+          retryParkReason: null,
         })
         .where(eq(build.id, reworkTarget.id))
         .run();
@@ -209,7 +223,11 @@ export async function restartFailedBuild(
         withPlan: false,
         prevPhase: todoRecord.phase,
         triggerSource: RESTART_TRIGGER_SOURCE[origin],
-        retryAttempt: origin === 'person' || resuming ? 0 : row.retryAttempt + 1,
+        retryAttempt: nextRetryAttempt,
+        retryClass: null,
+        retryNextAt: null,
+        retryWindowStartedAt: nextWindowStartedAt,
+        retryParkReason: null,
         planDocId: null,
         errorMessage: null,
         prUrl: null,
@@ -245,7 +263,7 @@ export async function restartFailedBuild(
       insertMessageRow(transcriptDeps, newId, {
         id: newRecordId(),
         role: 'system',
-        content: `Automatic retry ${row.retryAttempt + 1}/${AUTOMATIC_RETRY_LIMIT}`,
+        content: autoRetryNote,
         createdAt,
       });
     }

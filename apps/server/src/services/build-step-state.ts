@@ -47,7 +47,10 @@ export function hasActiveStep(deps: BuildDeps, buildId: string): boolean {
 }
 
 export function assertParkedBuildIdle(deps: BuildDeps, row: BuildRow): void {
-  if (retryIsParked(row.errorMessage ?? '') && hasActiveStep(deps, row.id))
+  if (
+    (row.retryParkReason != null || retryIsParked(row.errorMessage ?? '')) &&
+    hasActiveStep(deps, row.id)
+  )
     throw new HttpError(
       409,
       `${row.errorMessage} Wait for active steps to finish before retrying.`,

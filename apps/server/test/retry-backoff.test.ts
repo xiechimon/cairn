@@ -133,8 +133,13 @@ function pendingStep(w: World, buildId: string) {
   return row;
 }
 
-async function failThenRetry(w: World, stepId: string, waitMs: number): Promise<string> {
-  failStep(w, stepId, 'connection reset by peer');
+async function failThenRetry(
+  w: World,
+  stepId: string,
+  waitMs: number,
+  error = 'connection reset by peer',
+): Promise<string> {
+  failStep(w, stepId, error);
   const failedId = getTodo(w.deps, w.todoId)?.latestBuildId;
   agePhase(w, nowMs() - waitMs - 1);
   await sweepFailedRetries(w.deps);
@@ -166,7 +171,7 @@ describe('automatic retry backoff and cap', () => {
         .from(message)
         .where(eq(message.conversationId, latestBuild(w)?.id ?? ''))
         .all()
-        .some((m) => String(m.content).includes(`Automatic retry 1/${RETRY_LIMIT}`)),
+        .some((m) => String(m.content).includes('Automatic retry 1')),
     ).toBe(true);
   });
 
@@ -191,14 +196,25 @@ describe('automatic retry backoff and cap', () => {
     expect(latestBuild(w)?.retryAttempt).toBe(2);
   });
 
-  test('the third retry failure parks the task and notifies the Coordinator once', async () => {
+  test('the third retry failure on an unknown error parks the task and notifies the Coordinator once', async () => {
     const w = openWorld();
-    const retry1Id = await failThenRetry(w, w.stepId, RETRY_BASE_MS);
-    const retry2Id = await failThenRetry(w, pendingStep(w, retry1Id).id, 2 * RETRY_BASE_MS);
-    const retry3Id = await failThenRetry(w, pendingStep(w, retry2Id).id, 4 * RETRY_BASE_MS);
+    const unknownError = 'unexpected worker invariant mismatch';
+    const retry1Id = await failThenRetry(w, w.stepId, RETRY_BASE_MS, unknownError);
+    const retry2Id = await failThenRetry(
+      w,
+      pendingStep(w, retry1Id).id,
+      2 * RETRY_BASE_MS,
+      unknownError,
+    );
+    const retry3Id = await failThenRetry(
+      w,
+      pendingStep(w, retry2Id).id,
+      4 * RETRY_BASE_MS,
+      unknownError,
+    );
     expect(latestBuild(w)?.retryAttempt).toBe(RETRY_LIMIT);
 
-    failStep(w, pendingStep(w, retry3Id).id);
+    failStep(w, pendingStep(w, retry3Id).id, unknownError);
     const reason = latestBuild(w)?.errorMessage ?? '';
     expect(reason).toContain('Task parked');
     expect(reason).toMatch(new RegExp(`automatic retries exhausted \\(${RETRY_LIMIT}\\)`));
@@ -216,12 +232,13 @@ describe('automatic retry backoff and cap', () => {
     expect(String(notices[0]?.content)).toContain('automatic retries exhausted');
   });
 
-  test('failures spaced beyond the rolling hour still park at the total cap', async () => {
+  test('unknown failures spaced beyond the rolling hour still park at the total cap', async () => {
     const w = openWorld();
+    const unknownError = 'unexpected worker invariant mismatch';
     let stepId = w.stepId;
     let buildId = w.buildId;
     for (let k = 0; k < RETRY_LIMIT; k++) {
-      failStep(w, stepId);
+      failStep(w, stepId, unknownError);
       w.s.db
         .update(stepTable)
         .set({ finishedAt: nowMs() - 3_700_000 })
@@ -232,7 +249,7 @@ describe('automatic retry backoff and cap', () => {
       buildId = getTodo(w.deps, w.todoId)?.latestBuildId ?? '';
       stepId = pendingStep(w, buildId).id;
     }
-    failStep(w, stepId);
+    failStep(w, stepId, unknownError);
     expect(phaseOf(w)).toBe('failed');
     expect(buildCount(w)).toBe(RETRY_LIMIT + 1);
     const reason = latestBuild(w)?.errorMessage ?? '';
@@ -244,7 +261,8 @@ describe('automatic retry backoff and cap', () => {
 
   test('software launches on a failed task skip the backoff but share the budget', async () => {
     const w = openWorld();
-    failStep(w, w.stepId);
+    const unknownError = 'unexpected worker invariant mismatch';
+    failStep(w, w.stepId, unknownError);
     const [started] = startBuilds(w.deps, {
       projectId: w.projectId,
       todoIds: [w.todoId],
@@ -253,7 +271,7 @@ describe('automatic retry backoff and cap', () => {
     expect(phaseOf(w)).toBe('queued');
     expect(latestBuild(w)?.retryAttempt).toBe(1);
 
-    failStep(w, pendingStep(w, started?.id ?? '').id);
+    failStep(w, pendingStep(w, started?.id ?? '').id, unknownError);
     await applyBuildStepAction(
       w.deps,
       started?.id ?? '',
@@ -266,7 +284,7 @@ describe('automatic retry backoff and cap', () => {
     expect(restartId).not.toBe(started?.id);
     expect(latestBuild(w)?.retryAttempt).toBe(2);
 
-    failStep(w, pendingStep(w, restartId).id);
+    failStep(w, pendingStep(w, restartId).id, unknownError);
     await sendBuildSteer(
       w.deps,
       restartId,
@@ -276,16 +294,17 @@ describe('automatic retry backoff and cap', () => {
     expect(phaseOf(w)).toBe('queued');
     expect(latestBuild(w)?.retryAttempt).toBe(3);
 
-    failStep(w, pendingStep(w, restartId).id);
+    failStep(w, pendingStep(w, restartId).id, unknownError);
     expect(latestBuild(w)?.errorMessage).toMatch(/automatic retries exhausted/);
   });
 
   test('coordinator restarts share the episode budget and resume a parked task with a fresh episode', async () => {
     const w = openWorld();
+    const unknownError = 'unexpected worker invariant mismatch';
     let stepId = w.stepId;
     let buildId = w.buildId;
     for (let k = 0; k < RETRY_LIMIT; k++) {
-      failStep(w, stepId);
+      failStep(w, stepId, unknownError);
       w.s.db
         .update(stepTable)
         .set({ finishedAt: nowMs() - 3_700_000 })
@@ -301,7 +320,7 @@ describe('automatic retry backoff and cap', () => {
       buildId = getTodo(w.deps, w.todoId)?.latestBuildId ?? '';
       stepId = pendingStep(w, buildId).id;
     }
-    failStep(w, stepId);
+    failStep(w, stepId, unknownError);
     expect(latestBuild(w)?.errorMessage).toMatch(/automatic retries exhausted/);
     await applyBuildStepAction(
       w.deps,

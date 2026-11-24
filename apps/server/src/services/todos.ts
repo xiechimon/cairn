@@ -100,6 +100,7 @@ import { heldByBlockers, ownershipOf, reconcileOwners, sectionOf } from './owner
 import { isPersonalSpace } from './personal-space.js';
 import { assertPhaseTransition, canManualMovePhase } from './phase.js';
 import type { VapidKeys } from './push.js';
+import { type RetryBuildSlice, todoRetryStateOf } from './retry-policy.js';
 import { profileForStep } from './routing-rules.js';
 import { ARCHIVED_SCHEDULE_PAUSE_REASON, pauseTodoSchedule } from './schedules.js';
 import { insertGateAnnouncement } from './transcript.js';
@@ -319,11 +320,30 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
             return set === null ? [] : [[m.id.slice(DELIVERABLES_MESSAGE_PREFIX.length), set]];
           }),
   );
+  const latestBuilds = new Map<string, RetryBuildSlice>(
+    latestBuildIds.length === 0
+      ? []
+      : db
+          .select({
+            id: build.id,
+            errorMessage: build.errorMessage,
+            retryAttempt: build.retryAttempt,
+            retryClass: build.retryClass,
+            retryNextAt: build.retryNextAt,
+            retryWindowStartedAt: build.retryWindowStartedAt,
+            retryParkReason: build.retryParkReason,
+          })
+          .from(build)
+          .where(inArray(build.id, latestBuildIds))
+          .all()
+          .map((row) => [row.id, row]),
+  );
   return (row: TodoRow) => ({
     deliverables: row.latestBuildId === null ? undefined : deliverables.get(row.latestBuildId),
     githubLabelIds: (labels.get(row.id) ?? []).map((r) => r.labelId),
     history: (history.get(row.id) ?? []).map(({ buildId, createdAt }) => ({ buildId, createdAt })),
     quotaWait: row.latestBuildId === null ? null : (quotaWaits.get(row.latestBuildId) ?? null),
+    latestBuild: row.latestBuildId === null ? undefined : latestBuilds.get(row.latestBuildId),
     usage: usage.get(row.id),
     context: contextByTodo.get(row.id),
   });
@@ -355,6 +375,7 @@ function todoRecordOf(
     githubLabelIds,
     history,
     quotaWait,
+    latestBuild,
     usage,
     context,
   }: ReturnType<ReturnType<typeof todoRelations>>,
@@ -363,6 +384,7 @@ function todoRecordOf(
   const waitingOn = waitingOnOf(deps, row);
   const lastProgressAt = lastProgressOf(deps, row);
   const ownership = ownershipOf(deps.db, row);
+  const retry = todoRetryStateOf(deps.db, row, latestBuild, now);
   return {
     id: row.id,
     teamId: row.teamId,
@@ -394,6 +416,7 @@ function todoRecordOf(
     section: sectionOf(row, ownership, now, heldByBlockers(deps.db, row)),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     quotaWait,
+    ...(retry !== null ? { retry } : {}),
     ...(lastProgressAt !== undefined ? { lastProgressAt } : {}),
     ...(usage !== undefined && usage.rows > 0
       ? {

@@ -4,6 +4,7 @@ import { build, queuedMessage, steerPending, step, todo } from '../db/schema.js'
 import { nowMs } from '../lib/ids.js';
 import { BUILD_ABANDONED_STEP_MS } from './build-abandoned-sweep.js';
 import { type BuildDeps, publishBuild } from './builds.js';
+import { scheduleOrParkFailedBuild } from './retry-parking.js';
 import { setTodoPhase } from './todos.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
@@ -48,6 +49,7 @@ export function sweepStalledRunningTodos(deps: BuildDeps, now: number = nowMs())
       .set({ errorMessage: STALLED_RUN_MESSAGE })
       .where(and(eq(build.id, buildId), isNull(build.errorMessage)))
       .run();
+    scheduleOrParkFailedBuild(deps, buildId, now);
     const buildRow = db.select().from(build).where(eq(build.id, buildId)).get();
     if (buildRow) publishBuild(deps, buildRow);
     setTodoPhase(deps, row.id, 'failed');

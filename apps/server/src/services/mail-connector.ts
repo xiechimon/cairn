@@ -40,6 +40,8 @@ export interface MailConnectorOptions {
 export interface MailConnector {
   resume(): void;
   connect(accountId: string): void;
+  retryNow(teamId: string, accountId: string): void;
+  retryState(accountId: string): { nextRetryAt: number | null; retryAttempt: number };
   disconnect(teamId: string, accountId: string): Promise<void>;
   shutdown(): Promise<void>;
 }
@@ -48,6 +50,9 @@ interface Runner {
   abort: AbortController;
   session: MailboxSession | null;
   done: Promise<void>;
+  nextRetryAt: number | null;
+  retryAttempt: number;
+  wakeRetry: (() => void) | null;
 }
 
 class Stopped extends Error {}
@@ -262,6 +267,8 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
           throw error;
         }
         runner.session = session;
+        runner.nextRetryAt = null;
+        runner.retryAttempt = 0;
         baseline(accountId, generation, session);
         markMailAccount(db, accountId, generation, 'watching', null);
         delay = backoff.initialMs;
@@ -277,18 +284,41 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
       } catch (error) {
         if (error instanceof Stopped || signal.aborted) return;
         if (error instanceof MailAuthError) {
+          runner.nextRetryAt = null;
           markMailAccount(db, accountId, generation, 'revoked', 'auth-rejected');
           return;
         }
         const code = errorCode(error);
         options.log?.warn({ accountId, code }, 'mailbox connection failed');
+        runner.retryAttempt += 1;
+        runner.nextRetryAt = nowMs() + delay;
         markMailAccount(db, accountId, generation, 'degraded', code);
+        let wokenEarly = false;
         try {
-          await sleep(delay, signal);
+          await new Promise<void>((resolve, reject) => {
+            const onAbort = () => {
+              clearTimeout(timer);
+              runner.wakeRetry = null;
+              reject(new Stopped());
+            };
+            const finish = () => {
+              signal.removeEventListener('abort', onAbort);
+              runner.wakeRetry = null;
+              resolve();
+            };
+            const timer = setTimeout(finish, delay);
+            runner.wakeRetry = () => {
+              clearTimeout(timer);
+              wokenEarly = true;
+              finish();
+            };
+            signal.addEventListener('abort', onAbort, { once: true });
+          });
         } catch {
           return;
         }
-        delay = Math.min(delay * 2, backoff.maxMs);
+        runner.nextRetryAt = null;
+        delay = wokenEarly ? backoff.initialMs : Math.min(delay * 2, backoff.maxMs);
       } finally {
         runner.session = null;
         await session?.close().catch(() => {});
@@ -304,6 +334,9 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
       abort: new AbortController(),
       session: null,
       done: Promise.resolve(),
+      nextRetryAt: null,
+      retryAttempt: 0,
+      wakeRetry: null,
     };
     runner.done = run(accountId, row.generation, runner).finally(() => {
       if (runners.get(accountId) === runner) runners.delete(accountId);
@@ -335,6 +368,32 @@ export function createMailConnector(options: MailConnectorOptions): MailConnecto
       for (const row of rows) connect(row.id);
     },
     connect,
+    retryNow(teamId, accountId) {
+      const row = account(accountId);
+      if (
+        row === undefined ||
+        row.teamId !== teamId ||
+        row.provider !== 'imap' ||
+        row.status === 'disconnected'
+      ) {
+        throw notFound(`mail account ${accountId}`);
+      }
+      const runner = runners.get(accountId);
+      if (runner?.wakeRetry !== null && runner?.wakeRetry !== undefined) {
+        runner.wakeRetry();
+        return;
+      }
+      if (!runners.has(accountId) && LIVE_STATUSES.includes(row.status)) {
+        connect(accountId);
+      }
+    },
+    retryState(accountId) {
+      const runner = runners.get(accountId);
+      return {
+        nextRetryAt: runner?.nextRetryAt ?? null,
+        retryAttempt: runner?.retryAttempt ?? 0,
+      };
+    },
     async disconnect(teamId, accountId) {
       const row = account(accountId);
       if (row === undefined || row.teamId !== teamId || row.status === 'disconnected') {

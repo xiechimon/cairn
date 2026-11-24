@@ -229,6 +229,15 @@ export async function sendBuildSteer(
         createdAt: now,
         origin: continuationOptions.origin ?? (human ? 'user' : 'synthetic'),
       };
+      const keepRetryEpisode = human !== true && todoRow?.phase === 'failed';
+      const nextRetryAttempt = !keepRetryEpisode
+        ? 0
+        : buildRow.retryClass === 'rate_limit'
+          ? buildRow.retryAttempt
+          : buildRow.retryAttempt + 1;
+      const nextRetryWindowStartedAt = keepRetryEpisode
+        ? (buildRow.retryWindowStartedAt ?? todoRow?.phaseAt ?? now)
+        : null;
       if (targetBuildId !== conversationId) {
         db.insert(build)
           .values({
@@ -237,8 +246,11 @@ export async function sendBuildSteer(
             withPlan: false,
             prevPhase: todoRow?.phase ?? 'done',
             triggerSource: 'user',
-            retryAttempt:
-              human === true || todoRow?.phase !== 'failed' ? 0 : buildRow.retryAttempt + 1,
+            retryAttempt: nextRetryAttempt,
+            retryClass: null,
+            retryNextAt: null,
+            retryWindowStartedAt: nextRetryWindowStartedAt,
+            retryParkReason: null,
             createdAt: now,
           })
           .run();
@@ -304,8 +316,11 @@ export async function sendBuildSteer(
             .set({
               errorMessage: null,
               prevPhase: todoRow?.phase ?? 'done',
-              retryAttempt:
-                human === true || todoRow?.phase !== 'failed' ? 0 : buildRow.retryAttempt + 1,
+              retryAttempt: nextRetryAttempt,
+              retryClass: null,
+              retryNextAt: null,
+              retryWindowStartedAt: nextRetryWindowStartedAt,
+              retryParkReason: null,
             })
             .where(eq(build.id, targetBuildId))
             .run();

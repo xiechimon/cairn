@@ -10,7 +10,10 @@ import {
   isBuildStepKind,
   isInfoOutput,
   parseLocalMergeInstruction,
+  parseRetryDelayMs,
   QUOTA_BLOCK_REASON_MAX_CHARS,
+  RETRY_AFTER_MAX_MS,
+  RETRY_AFTER_MIN_MS,
   SKILL_INJECTION_CHECK_KIND,
   type SkillInjectionFacts,
   secondPrWarningNoteRowId,
@@ -108,8 +111,21 @@ function holdStepForQuota(
   outcome: MachineDoneBody,
 ): void {
   const { db } = deps;
+  const now = nowMs();
   const holdCount = stepRow.holdCount + 1;
-  const holdUntil = nowMs() + quotaHoldBackoffMs(holdCount);
+  const parsedDelay = parseRetryDelayMs(outcome.errorMessage ?? '', now);
+  const clampedDelay =
+    parsedDelay !== null
+      ? Math.max(RETRY_AFTER_MIN_MS, Math.min(parsedDelay, RETRY_AFTER_MAX_MS))
+      : null;
+  const backoffDelay = quotaHoldBackoffMs(holdCount);
+  const delay =
+    clampedDelay === null
+      ? backoffDelay
+      : holdCount > 1
+        ? Math.max(clampedDelay, backoffDelay)
+        : clampedDelay;
+  const holdUntil = now + delay;
   db.update(step)
     .set({
       status: 'pending',
@@ -614,10 +630,12 @@ function applyStepReport(deps: MachineDeps, report: StepReport): void {
   ) {
     const ranAgent = worker?.agentRow ?? chiefAgent;
     const ran = ranAgent ? ranModel(ranAgent, stepRow) : null;
+    const retryAfterMs = parseRetryDelayMs(outcome.errorMessage ?? '') ?? undefined;
     applyQuotaWaitStep(deps, stepRow, {
       kind: 'capacity',
       providerId: ran?.provider ?? '',
       reason: (outcome.errorMessage ?? '').slice(0, QUOTA_BLOCK_REASON_MAX_CHARS),
+      ...(retryAfterMs !== undefined ? { retryAfterMs } : {}),
     });
     return;
   }

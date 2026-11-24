@@ -1,8 +1,14 @@
-import type { QuotaBlock, QuotaWait, UserRecord } from '@cairn/shared';
-import { eq } from 'drizzle-orm';
+import {
+  type QuotaBlock,
+  type QuotaWait,
+  RETRY_AFTER_MAX_MS,
+  type UserRecord,
+} from '@cairn/shared';
+import { and, eq, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, chiefThread, type QuotaWaitRow, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
+import { holdBlockedBuild } from './blockers.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { notifyQuotaWait } from './notifications.js';
@@ -34,8 +40,13 @@ export function toQuotaWait(row: QuotaWaitRow): QuotaWait {
   };
 }
 
-function probeWindowMs(base: number, attempts: number): number {
-  return Math.min(base * 2 ** (attempts - 1), QUOTA_PROBE_MAX_MS);
+function probeWindowMs(retryAfterMs: number | null | undefined, attempts: number): number {
+  const backoff = Math.min(QUOTA_PROBE_BASE_MS * 2 ** (attempts - 1), QUOTA_PROBE_MAX_MS);
+  if (retryAfterMs != null && Number.isFinite(retryAfterMs) && retryAfterMs > 0) {
+    const bounded = Math.min(retryAfterMs, RETRY_AFTER_MAX_MS);
+    return attempts > 1 ? Math.max(bounded, backoff) : bounded;
+  }
+  return backoff;
 }
 
 export function publishStepRow(deps: Pick<QuotaWaitDeps, 'convHub'>, row: StepRow): void {
@@ -59,7 +70,6 @@ export function applyQuotaWaitStep(deps: QuotaWaitDeps, stepRow: StepRow, block:
   const prev = stepRow.quotaBlock;
   const sameLane = prev !== null && prev.providerId === block.providerId;
   const attempts = sameLane ? prev.attempts + 1 : 1;
-  const base = block.retryAfterMs ?? QUOTA_PROBE_BASE_MS;
   const row: QuotaWaitRow = {
     kind: block.kind,
     providerId: block.providerId,
@@ -69,7 +79,7 @@ export function applyQuotaWaitStep(deps: QuotaWaitDeps, stepRow: StepRow, block:
     firstSeenAt: sameLane ? prev.firstSeenAt : now,
     lastAt: now,
     attempts,
-    probeAt: now + probeWindowMs(base, attempts),
+    probeAt: now + probeWindowMs(block.retryAfterMs, attempts),
   };
   deps.db
     .update(step)
@@ -130,4 +140,66 @@ export function sweepQuotaWaitSteps(deps: QuotaWaitDeps, now: number = nowMs()):
     }
   }
   return released;
+}
+
+export function retryQuotaWaitNow(deps: QuotaWaitDeps, buildId: string): boolean {
+  const releasedIds = deps.db.transaction(() => {
+    const held = deps.db
+      .select({ id: step.id })
+      .from(step)
+      .where(
+        and(
+          eq(step.buildId, buildId),
+          or(
+            eq(step.status, 'waiting_quota'),
+            and(eq(step.status, 'pending'), eq(step.holdReason, 'quota')),
+          ),
+        ),
+      )
+      .all();
+    if (held.length === 0) return [];
+    const updated: string[] = [];
+    for (const row of held) {
+      const res = deps.db
+        .update(step)
+        .set({
+          status: 'pending',
+          quotaBlock: null,
+          holdReason: null,
+          holdUntil: null,
+          machineId: null,
+          mcpGrant: null,
+        })
+        .where(
+          and(
+            eq(step.id, row.id),
+            or(
+              eq(step.status, 'waiting_quota'),
+              and(eq(step.status, 'pending'), eq(step.holdReason, 'quota')),
+            ),
+          ),
+        )
+        .run();
+      if (res.changes > 0) updated.push(row.id);
+    }
+    if (updated.length > 0) holdBlockedBuild(deps.db, buildId);
+    return updated;
+  });
+  if (releasedIds.length === 0) return false;
+  let teamId: string | null = null;
+  let wakeable = false;
+  for (const id of releasedIds) {
+    const fresh = deps.db.select().from(step).where(eq(step.id, id)).get();
+    if (fresh === undefined) continue;
+    publishStepRow(deps, fresh);
+    if (fresh.status === 'pending' && fresh.holdReason === null) wakeable = true;
+    if (teamId === null) teamId = teamOfStep(deps.db, fresh);
+  }
+  const buildRow = deps.db.select().from(build).where(eq(build.id, buildId)).get();
+  if (buildRow !== undefined) {
+    const record = getTodo(deps, buildRow.todoId);
+    if (record) deps.hub.publishTodoDoc(record.teamId, record);
+  }
+  if (wakeable && teamId !== null) deps.machineHub?.wake(teamId);
+  return true;
 }
