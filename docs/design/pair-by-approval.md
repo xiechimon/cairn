@@ -22,11 +22,12 @@ offers one button to request again.
 
 ## Why
 
-The owner's review of the gate: "Pair this computer，你搞那么多输入框干嘛呀？"
-and on 选 2 vs 3: "我比较倾向于方便…这是用户自己部署" — a self-hosted
-install always has a signed-in device (the desktop), so approval there is
-cheaper than transcribing a code. Prior art: the machine-enroll flow in this
-repo already runs request→poll→confirm (`/api/machine/enroll/*`); the
+The owner's review of the gate: "Pair this computer — why all those input
+fields?" and on options 2 vs 3: "I lean toward convenient… the user deploys
+this themselves" — a self-hosted install always has a signed-in device (the
+desktop), so approval there is cheaper than transcribing a code. Prior art:
+the machine-enroll flow in this repo already runs request→poll→confirm
+(`/api/machine/enroll/*`); the
 number-comparison check is the Bluetooth pairing pattern; Tailscale's device
 list is the reference for showing who asked. Rejected alternatives, from the
 prototype: direction 1 (paste the whole link — still one field) and direction
@@ -103,7 +104,7 @@ grid, its input and the manual-entry submit are deleted in this change.
 ## Approver side
 
 A pending-request section on Remote access (polled every 3 s): the code in
-large tabular mono, `name · detail · source class · age`, 拒绝 / 批准, and the
+large tabular mono, `name · detail · source class · age`, `拒绝` / `批准`, and the
 hint to compare the code with the new device's screen — a stranger's request is
 recognisable by a code that matches nothing the owner is holding.
 

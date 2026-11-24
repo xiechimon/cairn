@@ -605,7 +605,7 @@ Reach:
 - Web routes: none
 - Settings: `设置` (Settings) › `安全` (Security) › `远程访问` (Remote access)
 - Keyboard shortcuts in its code: none
-- Test ids in its code: `pair-new-device`, `pairing-blocked`, `pairing-route-select`, `remote-access-switch`, `remote-routes-empty`, `tailnet-login`
+- Test ids in its code: `pair-new-device`, `pair-request`, `pairing-blocked`, `pairing-route-select`, `remote-access-switch`, `remote-routes-empty`, `tailnet-login`
 - Research: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md), [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the remote access page, route list and pairing flow have no design
 - Backend design: [docs/research/remote-access-tsnet.md](../../../docs/research/remote-access-tsnet.md)
@@ -623,7 +623,7 @@ Reach:
 
 - Web routes: none
 - Keyboard shortcuts in its code: none
-- Test ids in its code: none
+- Test ids in its code: `denied`, `expired`, `pair-request-code`, `pair-request-denied`, `pair-request-expired`, `pair-request-retry`, `pair-request-unavailable`
 - Research: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main)
 - Frontend design: **gap**: the sign-in gate and the signed-in-by-tailnet state have no design
 - Backend design: [docs/research/seamless-device-auth-2026-11-08.md](../../../docs/research/seamless-device-auth-2026-11-08.md) (not on main), [docs/design/pairing-gate-close.md](../../../docs/design/pairing-gate-close.md)
