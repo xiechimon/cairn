@@ -301,6 +301,7 @@ export function ChiefConversation({
     (index: number, id: string | null) => setRewindConfirm({ index, id }),
     [],
   );
+  const [typing, setTyping] = useState(false);
   const [liveDraft, setLiveDraft] = useServerDraft({
     teamId,
     scope: 'chief',
@@ -347,6 +348,7 @@ export function ChiefConversation({
     onSend != null
       ? (value: string) => {
           setLiveDraft(value);
+          setTyping(value.trim() !== '');
           if (value === '') setThreadOverride(false);
         }
       : undefined,
@@ -590,7 +592,7 @@ export function ChiefConversation({
   const quickReplies = (
     <QuickReplies
       replies={chief.quickReplies}
-      hidden={questionPending || answerActive}
+      hidden={questionPending || answerActive || typing}
       onPreview={(text) => setPreview(text === null ? null : { key: quickKey, text })}
       onSend={
         onSend == null

@@ -164,6 +164,20 @@ test('a pending question hides the suggested replies: the question card wins', a
   await page.goto('/app');
   await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toBeVisible();
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
+  await page.getByTestId('chief-question-minimize').click();
+  await expect(page.getByTestId('chief-question')).toHaveCount(0);
+  await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
+});
+
+test('typing in the composer hides the suggested replies, and clearing it brings them back', async ({ page }) => {
+  await mockLive(page, state());
+  await page.goto('/app');
+  await expect(chips(page).first()).toBeVisible();
+  const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
+  await input.fill('我自己来写');
+  await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
+  await input.fill('');
+  await expect(chips(page).first()).toBeVisible();
 });
 
 const STREAM = `/api/conversations/${THREAD.id}/stream`;
