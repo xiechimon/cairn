@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
-import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import type { MachineHandle } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { message as messageTable, todo as todoTable } from '../../apps/server/src/db/schema.js';
 import { createApiKey } from '../../apps/server/src/services/api-keys.js';
@@ -17,6 +17,7 @@ import {
   bootRealServer,
   daemonLogLines,
   type RealServer,
+  runTestDaemon,
   seedWorld,
   startExternalMcp,
   waitFor,
@@ -81,7 +82,7 @@ beforeAll(async () => {
   );
   paths = statePaths(config.home, config.workspacesDir);
   const logger = createDaemonLogger({ logFile: paths.daemonLog });
-  handle = await runMachine({
+  handle = await runTestDaemon({
     config,
     paths,
     logger,

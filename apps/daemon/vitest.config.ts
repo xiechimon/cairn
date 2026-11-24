@@ -7,6 +7,7 @@ export default defineConfig({
   test: {
     fsModuleCache: true,
     maxWorkers: workers,
+    setupFiles: ['./test/setup.ts'],
     testTimeout: 20_000,
   },
 });

@@ -3,11 +3,17 @@ import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
-import { runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { statePaths } from '../../apps/daemon/src/state.js';
 import { step } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, daemonLogLines, seedWorld, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  daemonLogLines,
+  runTestDaemon,
+  seedWorld,
+  waitFor,
+} from './helpers.js';
 import { startStubLlm } from './stub-llm.js';
 
 test('message_todo reaches a running daemon and logs the delivered step', async () => {
@@ -27,7 +33,7 @@ test('message_todo reaches a running daemon and logs the delivered step', async 
     {},
   );
   const paths = statePaths(config.home, config.workspacesDir);
-  const handle = await runMachine({
+  const handle = await runTestDaemon({
     config,
     paths,
     logger: createDaemonLogger({ logFile: paths.daemonLog }),

@@ -26,6 +26,13 @@ import { type DaemonLogger, formatLine } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runMachine } from '../src/machine-loop.js';
 import { ensureStateDirs, type StatePaths, saveMachineJson, statePaths } from '../src/state.js';
+import { offlineDaemonRuntimeOpts } from './runtime-stubs.js';
+
+export {
+  offlineDaemonRuntimeOpts,
+  stubAntigravityManaged,
+  stubManagedRuntime,
+} from './runtime-stubs.js';
 
 function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   const lines: string[] = [];
@@ -310,37 +317,6 @@ export interface BootOpts {
   heartbeatIntervalMs?: number;
 }
 
-export function stubManagedRuntime(
-  overrides: Partial<import('../src/backend/managed-runtime.js').ManagedRuntime> = {},
-): import('../src/backend/managed-runtime.js').ManagedRuntime {
-  const current = overrides.current ?? (() => null);
-  return {
-    current,
-    acquire:
-      overrides.acquire ??
-      (() => {
-        const install = current();
-        return install === null ? null : { ...install, release: () => {} };
-      }),
-    status:
-      overrides.status ??
-      (() => ({
-        installedVersion: current()?.version ?? null,
-        availableVersion: null,
-        phase: 'idle' as const,
-      })),
-    ensure: overrides.ensure ?? (async () => null),
-    checkForUpdate:
-      overrides.checkForUpdate ??
-      (async () => ({
-        installedVersion: current()?.version ?? null,
-        availableVersion: null,
-        phase: 'idle' as const,
-      })),
-    update: overrides.update ?? (async () => current()),
-  };
-}
-
 export function startMachine(opts: BootOpts) {
   const ownsHome = opts.home === undefined;
   const home = opts.home ?? makeTestTempDir('loop-');
@@ -415,17 +391,18 @@ export function startMachine(opts: BootOpts) {
       ...(opts.capEnv !== undefined ? { capEnv: opts.capEnv } : {}),
       ...(opts.orbComputer !== undefined ? { orbComputer: opts.orbComputer } : {}),
       ...(opts.claudeManaged !== undefined ? { claudeManaged: opts.claudeManaged } : {}),
-      devinManaged: opts.devinManaged ?? stubManagedRuntime(),
-      geminiManaged: opts.geminiManaged ?? stubManagedRuntime(),
-      updateChecksEnabled: opts.updateChecksEnabled ?? (() => false),
+      ...offlineDaemonRuntimeOpts(),
+      ...(opts.devinManaged !== undefined ? { devinManaged: opts.devinManaged } : {}),
+      ...(opts.geminiManaged !== undefined ? { geminiManaged: opts.geminiManaged } : {}),
+      ...(opts.updateChecksEnabled !== undefined
+        ? { updateChecksEnabled: opts.updateChecksEnabled }
+        : {}),
       ...(opts.updateCheckIntervalMs !== undefined
         ? { updateCheckIntervalMs: opts.updateCheckIntervalMs }
         : {}),
-      antigravityManaged: opts.antigravityManaged ?? {
-        current: () => null,
-        ensure: async () => null,
-        probe: async () => null,
-      },
+      ...(opts.antigravityManaged !== undefined
+        ? { antigravityManaged: opts.antigravityManaged }
+        : {}),
       ...(opts.otel !== undefined ? { otel: opts.otel } : {}),
     });
     return { handlePromise, api, lines, paths, home, ownsHome };

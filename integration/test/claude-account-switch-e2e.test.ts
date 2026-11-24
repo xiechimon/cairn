@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
-import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import type { MachineHandle } from '../../apps/daemon/src/machine-loop.js';
 import { claudeConfigHome } from '../../apps/daemon/src/runtime-homes.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
@@ -23,6 +23,7 @@ import {
   bootRealServer,
   daemonLogLines,
   type RealServer,
+  runTestDaemon,
   seedWorld,
   startLegacyBuild,
   waitFor,
@@ -146,7 +147,7 @@ beforeAll(async () => {
     {},
   );
   paths = statePaths(config.home, config.workspacesDir);
-  handle = await runMachine({
+  handle = await runTestDaemon({
     config,
     paths,
     logger: createDaemonLogger({ logFile: paths.daemonLog }),

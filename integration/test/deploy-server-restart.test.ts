@@ -6,11 +6,10 @@ import { expect, test } from 'vitest';
 import { PI_CAPABILITIES } from '../../apps/daemon/src/backend/pi.js';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
-import { runMachine } from '../../apps/daemon/src/machine-loop.js';
 import { statePaths } from '../../apps/daemon/src/state.js';
 import { step } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, seedWorld, waitFor } from './helpers.js';
+import { api, bootRealServer, runTestDaemon, seedWorld, waitFor } from './helpers.js';
 
 test('a running daemon step completes after a same-port server restart without a daemon restart', async () => {
   const dbPath = join(makeTestTempDir('deploy-restart-db-'), 'server.db');
@@ -53,7 +52,7 @@ test('a running daemon step completes after a same-port server restart without a
     teamId: server.teamId,
     name: 'deploy-survivor',
   });
-  const daemon = await runMachine({
+  const daemon = await runTestDaemon({
     config,
     paths: statePaths(home, config.workspacesDir),
     logger: createDaemonLogger({}),

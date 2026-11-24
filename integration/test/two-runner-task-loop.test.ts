@@ -6,7 +6,7 @@ import { createPiBackend } from '../../apps/daemon/src/backend/pi.js';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
 import { MachineClient } from '../../apps/daemon/src/machine-client.js';
-import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import type { MachineHandle } from '../../apps/daemon/src/machine-loop.js';
 import {
   loadMachineJson,
   recordSession,
@@ -15,7 +15,7 @@ import {
 } from '../../apps/daemon/src/state.js';
 import { machine, step } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, seedWorld, waitFor } from './helpers.js';
+import { api, bootRealServer, runTestDaemon, seedWorld, waitFor } from './helpers.js';
 import { startStubLlm } from './stub-llm.js';
 
 test('two real runners keep named tasks, workspaces and results isolated across an offline restart', async () => {
@@ -73,7 +73,7 @@ test('two real runners keep named tasks, workspaces and results isolated across 
       },
       {},
     );
-    const handle = await runMachine({
+    const handle = await runTestDaemon({
       config,
       paths,
       logger: createDaemonLogger({ logFile: paths.daemonLog }),

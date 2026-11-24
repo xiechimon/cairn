@@ -15,7 +15,7 @@ import { statePaths } from '../src/state.js';
 import {
   FakeMachineApi,
   fakeBackend,
-  stubManagedRuntime,
+  offlineDaemonRuntimeOpts,
   waitFor,
 } from './machine-loop-harness.js';
 
@@ -77,14 +77,7 @@ describe('computer presence machine wiring', () => {
       idleSleepPrevention: false,
       proxyEnv: {},
       capEnv: {},
-      devinManaged: stubManagedRuntime(),
-      geminiManaged: stubManagedRuntime(),
-      updateChecksEnabled: () => false,
-      antigravityManaged: {
-        current: () => null,
-        ensure: async () => null,
-        probe: async () => null,
-      },
+      ...offlineDaemonRuntimeOpts(),
       otel: null,
     });
     try {
@@ -167,14 +160,7 @@ describe('computer presence machine wiring', () => {
       proxyEnv: {},
       capEnv: { PATH: bin },
       platform: 'linux',
-      devinManaged: stubManagedRuntime(),
-      geminiManaged: stubManagedRuntime(),
-      updateChecksEnabled: () => false,
-      antigravityManaged: {
-        current: () => null,
-        ensure: async () => null,
-        probe: async () => null,
-      },
+      ...offlineDaemonRuntimeOpts(),
       otel: null,
     });
     try {

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
-import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import type { MachineHandle } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
@@ -11,6 +11,7 @@ import {
   bootRealServer,
   daemonLogLines,
   type RealServer,
+  runTestDaemon,
   seedWorld,
   waitFor,
 } from './helpers.js';
@@ -66,7 +67,7 @@ beforeAll(async () => {
   );
   paths = statePaths(config.home, config.workspacesDir);
   const logger = createDaemonLogger({ logFile: paths.daemonLog });
-  handle = await runMachine({
+  handle = await runTestDaemon({
     config,
     paths,
     logger,

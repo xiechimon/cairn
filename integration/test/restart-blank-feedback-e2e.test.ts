@@ -10,7 +10,7 @@ import { asc, eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { loadDaemonConfig } from '../../apps/daemon/src/config.js';
 import { createDaemonLogger } from '../../apps/daemon/src/log.js';
-import { type MachineHandle, runMachine } from '../../apps/daemon/src/machine-loop.js';
+import type { MachineHandle } from '../../apps/daemon/src/machine-loop.js';
 import { type StatePaths, statePaths } from '../../apps/daemon/src/state.js';
 import {
   message as messageTable,
@@ -18,7 +18,14 @@ import {
   todo as todoTable,
 } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, type RealServer, seedWorld, waitFor } from './helpers.js';
+import {
+  api,
+  bootRealServer,
+  type RealServer,
+  runTestDaemon,
+  seedWorld,
+  waitFor,
+} from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const TASK_TITLE = '空白反馈探针';
@@ -61,7 +68,7 @@ beforeAll(async () => {
     },
     {},
   );
-  handle = await runMachine({
+  handle = await runTestDaemon({
     config,
     paths,
     logger,

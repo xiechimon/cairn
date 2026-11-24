@@ -10,7 +10,13 @@ import { type Page, expect as pexpect } from '@playwright/test';
 import { and, eq, isNull } from 'drizzle-orm';
 import { afterAll, onTestFinished } from 'vitest';
 import { z } from 'zod';
+import {
+  type MachineHandle,
+  type MachineLoopOpts,
+  runMachine,
+} from '../../apps/daemon/src/machine-loop.js';
 import { SCRAPLING_VERSION, webToolsBin } from '../../apps/daemon/src/web-tools.js';
+import { offlineDaemonRuntimeOpts } from '../../apps/daemon/test/runtime-stubs.js';
 import { createApp } from '../../apps/server/src/app.js';
 import { openDbWithHandle, openMemoryDb } from '../../apps/server/src/db/client.js';
 import {
@@ -36,6 +42,10 @@ import { stampPersonSendBody } from '../../apps/server/test/helpers.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../scripts/test-tmpdir.mjs';
 
 export const AGENT_ID = 'agent-it-1';
+
+export function runTestDaemon(opts: MachineLoopOpts): Promise<MachineHandle> {
+  return runMachine({ ...offlineDaemonRuntimeOpts(), ...opts });
+}
 
 export function makeDaemonHome(prefix: string): string {
   const home = join(makeTestTempDir(prefix), 'state');

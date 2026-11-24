@@ -7,7 +7,7 @@ export default defineConfig({
   test: {
     fsModuleCache: true,
     maxWorkers: workers,
-    setupFiles: ['./test/tmpdir-cleanup-setup.ts', './test/antigravity-offline-setup.ts'],
+    setupFiles: ['./test/tmpdir-cleanup-setup.ts'],
     testTimeout: 180_000,
     hookTimeout: 120_000,
     fileParallelism: false,

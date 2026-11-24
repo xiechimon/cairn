@@ -13,7 +13,13 @@ import {
   createDevinManaged,
   createGeminiManaged,
 } from '../src/backend/runtime-channels.js';
-import { boot, CLAIMED, FakeMachineApi, waitFor } from './machine-loop-harness.js';
+import {
+  boot,
+  CLAIMED,
+  FakeMachineApi,
+  stubManagedRuntime,
+  waitFor,
+} from './machine-loop-harness.js';
 
 const tempDirs: string[] = [];
 
@@ -457,6 +463,7 @@ describe('shared managed runtime update path', () => {
       home: dir,
       api,
       presenceIntervalMs: 40,
+      claudeManaged: stubManagedRuntime(),
       devinManaged,
       updateChecksEnabled: () => true,
     });
