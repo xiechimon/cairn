@@ -32,7 +32,10 @@ const BODY_LABELS = ['正文', '内容'];
 const SENDER_KEY = 'from';
 const LABELLED_LINE = /^([^>：\n]{1,60})：(.*)$/;
 const SHELL_SENTENCE = /^Coordinator 想在 (.+?) 上以你的身份运行这条命令：([\s\S]+)$/;
-const UNSANDBOXED_SHELL_SENTENCE = /^Coordinator 想在 (.+?) 上不经沙箱运行这条命令：([\s\S]+)$/;
+const UNSANDBOXED_SHELL_WITH_CWD_SENTENCE =
+  /^Coordinator 想在 ([^\n：]+) 上不经沙箱运行这条命令\n目录：([^\n]+)\n命令：([\s\S]+)$/;
+const UNSANDBOXED_SHELL_SENTENCE =
+  /^Coordinator 想在 ([^\n：]+) 上不经沙箱运行这条命令：([\s\S]+)$/;
 const APP_SENTENCE = /^Coordinator 想在 (.+?) 上读取和操作 ([\s\S]+?)。$/;
 const LEAD_CLAUSE = /^([^：。\n]{1,40})：([\s\S]+)$/;
 const CONTEXT_JOIN = ' · ';
@@ -120,6 +123,17 @@ function outboundCard(text: string, t: Translate): ApprovalCardModel {
 export function approvalCardOf(question: ApprovalQuestion, t: Translate): ApprovalCardModel {
   const text = question.question;
   if (text.startsWith(OUTBOUND_OPEN) && text.includes('\n')) return outboundCard(text, t);
+  const unsandboxedWithCwd = UNSANDBOXED_SHELL_WITH_CWD_SENTENCE.exec(text);
+  if (unsandboxedWithCwd !== null)
+    return {
+      kind: 'shell',
+      title: t('在 {computer} 上不经沙箱运行一条命令', { computer: unsandboxedWithCwd[1] ?? '' }),
+      context: t('目录：{cwd}', { cwd: unsandboxedWithCwd[2] ?? '' }),
+      preview: (unsandboxedWithCwd[3] ?? '').trim(),
+      mono: true,
+      note: t('不经沙箱运行，仅对这一条命令生效'),
+      details: [],
+    };
   const unsandboxedShell = UNSANDBOXED_SHELL_SENTENCE.exec(text);
   if (unsandboxedShell !== null)
     return {

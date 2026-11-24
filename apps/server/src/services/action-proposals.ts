@@ -610,14 +610,9 @@ export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly Acti
         binding = parseHostShellEscalationInput(JSON.parse(proposal.inputJson));
       } catch {}
       if (approved) {
-        const poll = pollOrStartApprovedHostShellEscalation(
-          deps,
-          proposal,
-          subscriber.wakeStepId,
-          () => {
-            dispatchActionWakes(deps);
-          },
-        );
+        const poll = pollOrStartApprovedHostShellEscalation(deps, proposal, () => {
+          dispatchActionWakes(deps);
+        });
         if (poll.state === 'pending') continue;
         prompt = hostShellEscalationWakePrompt('executed', binding, poll.resultText);
       } else {

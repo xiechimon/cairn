@@ -1807,6 +1807,7 @@ export function askQuestionOfContent(content: unknown): {
     multiSelect?: boolean;
   }[];
   answers: { header: string; choices?: string[]; text?: string }[] | null;
+  cancelReason?: string;
   todoId?: string;
 } | null {
   let parsed: unknown = content;
@@ -1831,6 +1832,7 @@ export function askQuestionOfContent(content: unknown): {
     status: row.data.status,
     questions: row.data.questions,
     answers: row.data.answers,
+    ...(row.data.cancelReason !== undefined ? { cancelReason: row.data.cancelReason } : {}),
     ...(row.data.provenance?.startsWith(WATCH_PROVENANCE_PREFIX)
       ? { todoId: row.data.provenance.slice(WATCH_PROVENANCE_PREFIX.length) }
       : {}),
@@ -2216,6 +2218,7 @@ function collectChiefStream(
         status: ask.status,
         questions: ask.questions,
         answers: ask.answers,
+        ...(ask.cancelReason !== undefined ? { cancelReason: ask.cancelReason } : {}),
         ...(ask.todoId !== undefined ? { todoId: ask.todoId } : {}),
       });
       continue;

@@ -48,7 +48,7 @@ export function ApprovalAnswered({ item }: { item: ChiefQuestionItem }) {
   const question = item.questions[0];
   if (question === undefined) return null;
   if (item.status === 'cancelled') {
-    const expired = item.cancelReason?.includes('过期') === true;
+    const expired = item.cancelReason?.includes('已过期') === true;
     return (
       <ApprovalHistoryLine
         card={approvalCardOf(question, t)}

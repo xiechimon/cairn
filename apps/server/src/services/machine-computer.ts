@@ -1435,7 +1435,7 @@ export async function forwardComputerCall(
         const proposal = proposeAction(db, {
           teamId: thread.teamId,
           actionId: HOST_SHELL_ESCALATION_ACTION,
-          targetId: hostShellEscalationTargetId(binding),
+          targetId: hostShellEscalationTargetId(thread.id, binding),
           input: binding,
           threadId: thread.id,
           scopeProjectId: stepRow.scopeProjectId,
@@ -1444,6 +1444,7 @@ export async function forwardComputerCall(
             binding.command,
             APPROVE_CHOICE,
             REFUSE_CHOICE,
+            binding.cwd,
           ),
         });
         if (proposal.created)
@@ -1623,6 +1624,10 @@ export async function forwardComputerCall(
     acquirePhoneLease(db, phoneTarget.phoneId, stepId, deadlineAt);
   }
 
+  const sanitizedParams =
+    tool === 'user_computer_shell'
+      ? (({ escalate: _escalate, sandboxDeniedReason: _denied, ...rest }) => rest)(body.params)
+      : body.params;
   const fresh = {
     machineId: target.machineId,
     computerId: target.computerId,
@@ -1630,7 +1635,7 @@ export async function forwardComputerCall(
     tool,
     replaySafe: safe,
     params: {
-      ...storedParams(body.params),
+      ...storedParams(sanitizedParams),
       ...(browserRows.length > 0
         ? {
             browserPolicies: browserRows.map((row) => ({
@@ -1683,15 +1688,11 @@ export async function forwardComputerCall(
     })
     .run();
 
-  const forwardedParams =
-    tool === 'user_computer_shell'
-      ? (({ escalate: _escalate, ...rest }) => rest)(body.params)
-      : body.params;
   const call: ComputerCall = {
     callId: dispatchId,
     stepId,
     tool,
-    params: forwardedParams,
+    params: sanitizedParams,
     deadlineAt,
     ...('scopeKey' in target && target.scopeKey !== undefined ? { scopeKey: target.scopeKey } : {}),
     ...(browserTool

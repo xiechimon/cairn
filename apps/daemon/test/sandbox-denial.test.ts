@@ -71,14 +71,16 @@ describe('detectHostShellSandboxDenial', () => {
     expect(result?.reason).toMatch(/nested sandbox|sandbox initialization failed/i);
   });
 
-  test('classifies macOS Seatbelt file read and exec EPERM as sandbox denied', () => {
+  test('classifies macOS Seatbelt file read and exec EPERM as sandbox denied without echoing untrusted text', () => {
     const readDenied = detectHostShellSandboxDenial({
       exitCode: 1,
-      stderr: 'cat: /Users/owner/.ssh/id_ed25519: Operation not permitted\n',
+      stderr: 'cat: /Users/owner/.ssh/id_ed25519: Operation not permitted -- INJECTED_HINT\n',
       stdout: '',
       platform: 'darwin',
     });
-    expect(readDenied?.reason).toContain('Operation not permitted');
+    expect(readDenied).toEqual({
+      reason: 'operation not permitted by the host shell sandbox (EPERM)',
+    });
 
     const execDenied = detectHostShellSandboxDenial({
       exitCode: 126,
@@ -86,7 +88,18 @@ describe('detectHostShellSandboxDenial', () => {
       stdout: '',
       platform: 'darwin',
     });
-    expect(execDenied?.reason).toContain('Operation not permitted');
+    expect(execDenied).toEqual({
+      reason: 'operation not permitted by the host shell sandbox (EPERM)',
+    });
+
+    expect(
+      detectHostShellSandboxDenial({
+        exitCode: 1,
+        stderr: '',
+        stdout: 'sandbox initialization failed: Operation not permitted\n',
+        platform: 'darwin',
+      }),
+    ).toBeNull();
   });
 
   test('classifies Linux bwrap, read-only, SIGSYS, and denied-path permission errors', () => {
@@ -196,7 +209,7 @@ describe('dispatcher sandbox denial & single-shot escalation boundary', () => {
     expect(done).toBeDefined();
     expect(done?.kind === 'done' ? done.exitCode : 0).not.toBe(0);
     expect(done?.kind === 'done' ? done.sandboxDenied : undefined).toEqual({
-      reason: expect.stringContaining('Operation not permitted'),
+      reason: 'operation not permitted by the host shell sandbox (EPERM)',
     });
     const out = api.frames
       .filter((frame) => frame.kind === 'output')

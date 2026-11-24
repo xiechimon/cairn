@@ -135,7 +135,10 @@ export function resultOfComputerCallRow(row: ComputerCallRow): ComputerRelayResu
       const exit =
         row.exitCode !== null && row.exitCode !== 0 ? `\n[exit code ${row.exitCode}]` : '';
       const sandboxDeniedReason =
-        row.tool === 'user_computer_shell' && typeof row.params.sandboxDeniedReason === 'string'
+        row.tool === 'user_computer_shell' &&
+        row.exitCode !== null &&
+        row.exitCode !== 0 &&
+        typeof row.params.sandboxDeniedReason === 'string'
           ? row.params.sandboxDeniedReason.trim()
           : '';
       if (sandboxDeniedReason !== '') {

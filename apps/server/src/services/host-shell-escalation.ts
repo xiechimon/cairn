@@ -31,27 +31,21 @@ export const HOST_SHELL_ESCALATION_TOOL_CALL_ID = 'host-shell-escalate';
 
 const ESCALATION_COMMAND_MAX_CHARS = 4000;
 const ESCALATION_CWD_MAX_CHARS = 4096;
+const ESCALATION_DISPATCH_WINDOW_MS = 5 * 60_000;
+const DISALLOWED_COMMAND_CHARS = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
 
-function isDisallowedDisplayCode(code: number): boolean {
-  if (code === 0x09 || code === 0x0a) return false;
-  if (code < 0x20 || code === 0x7f) return true;
-  if (code === 0x200e || code === 0x200f) return true;
-  if (code >= 0x202a && code <= 0x202e) return true;
-  return code >= 0x2066 && code <= 0x2069;
-}
-
-function hasDisallowedDisplayChars(text: string): boolean {
-  for (let i = 0; i < text.length; i += 1) {
-    if (isDisallowedDisplayCode(text.charCodeAt(i))) return true;
+function hasDisallowedDisplayChars(text: string, allowNewline: boolean): boolean {
+  for (const ch of text) {
+    if (allowNewline && ch === '\n') continue;
+    if (DISALLOWED_COMMAND_CHARS.test(ch)) return true;
   }
   return false;
 }
 
 function stripDisallowedDisplayChars(text: string): string {
   let out = '';
-  for (let i = 0; i < text.length; i += 1) {
-    const code = text.charCodeAt(i);
-    if (!isDisallowedDisplayCode(code)) out += text[i];
+  for (const ch of text) {
+    if (!DISALLOWED_COMMAND_CHARS.test(ch)) out += ch;
   }
   return out;
 }
@@ -81,10 +75,10 @@ export function validateHostShellEscalationParams(
       `command is too long (${command.length} chars) for the owner to review safely on one approval card (max ${ESCALATION_COMMAND_MAX_CHARS} chars)`,
     );
   }
-  if (hasDisallowedDisplayChars(command)) {
+  if (hasDisallowedDisplayChars(command, true)) {
     throw new HttpError(
       400,
-      'command contains control or directional characters that cannot be reviewed safely on an approval card',
+      'command contains control or invisible characters that cannot be reviewed safely on an approval card',
     );
   }
   const hardline = ownComputerHardlineRefusal(command);
@@ -94,8 +88,9 @@ export function validateHostShellEscalationParams(
   if (params.cwd !== undefined) {
     if (
       typeof params.cwd !== 'string' ||
+      params.cwd.trim() === '' ||
       params.cwd.length > ESCALATION_CWD_MAX_CHARS ||
-      hasDisallowedDisplayChars(params.cwd)
+      hasDisallowedDisplayChars(params.cwd, false)
     ) {
       throw new HttpError(400, 'invalid cwd for escalated command');
     }
@@ -123,10 +118,14 @@ export function validateHostShellEscalationParams(
   };
 }
 
-export function hostShellEscalationTargetId(binding: HostShellEscalationBinding): string {
+export function hostShellEscalationTargetId(
+  threadId: string,
+  binding: HostShellEscalationBinding,
+): string {
   return createHash('sha256')
     .update(
       JSON.stringify({
+        threadId,
         machineId: binding.machineId,
         command: binding.command,
         cwd: binding.cwd ?? null,
@@ -148,11 +147,17 @@ export function hostShellEscalationCard(
   command: string,
   approveLabel: string,
   refuseLabel: string,
+  cwd?: string,
 ): AskUserQuestion[] {
+  const host = safeComputerLabel(computerName);
+  const question =
+    cwd !== undefined
+      ? `Coordinator 想在 ${host} 上不经沙箱运行这条命令\n目录：${cwd}\n命令：${command}`
+      : `Coordinator 想在 ${host} 上不经沙箱运行这条命令：${command}`;
   return [
     {
       header: '审批',
-      question: `Coordinator 想在 ${safeComputerLabel(computerName)} 上不经沙箱运行这条命令：${command}`,
+      question,
       options: [{ label: approveLabel }, { label: refuseLabel }],
     },
   ];
@@ -166,6 +171,12 @@ export function parseHostShellEscalationInput(raw: unknown): HostShellEscalation
   const parsed = hostShellEscalationBindingSchema.safeParse(rest);
   if (!parsed.success) {
     throw new HttpError(400, 'invalid host shell escalation binding');
+  }
+  if (hasDisallowedDisplayChars(parsed.data.command, true)) {
+    throw new HttpError(400, 'invalid host shell escalation command characters');
+  }
+  if (parsed.data.cwd !== undefined && hasDisallowedDisplayChars(parsed.data.cwd, false)) {
+    throw new HttpError(400, 'invalid host shell escalation cwd characters');
   }
   return parsed.data;
 }
@@ -207,6 +218,7 @@ export function hostShellEscalationWakePrompt(
     return [
       'The owner approved running this exact command once without the sandbox, and it has now finished.',
       `Command: ${command}`,
+      ...(binding?.cwd !== undefined ? [`Directory: ${binding.cwd}`] : []),
       'Output:',
       callResultText ?? '(no output)',
       'Continue the conversation using this result. Do not re-run the escalated command.',
@@ -224,10 +236,11 @@ export type ApprovedEscalationPoll = { state: 'ready'; resultText: string } | { 
 export function pollOrStartApprovedHostShellEscalation(
   deps: { db: Db; hub: PendingComputerDeps['hub']; machineHub?: PendingComputerDeps['machineHub'] },
   proposal: ProposalRow,
-  wakeStepId: string,
   onSettled: () => void,
+  now = nowMs(),
 ): ApprovedEscalationPoll {
-  const callId = computerCallId(wakeStepId, HOST_SHELL_ESCALATION_TOOL_CALL_ID);
+  const escalationStepId = `escalation:${proposal.id}`;
+  const callId = computerCallId(escalationStepId, HOST_SHELL_ESCALATION_TOOL_CALL_ID);
   const existing = deps.db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
   if (existing !== undefined) {
     if (isFinalComputerCallState(existing.state)) {
@@ -242,7 +255,7 @@ export function pollOrStartApprovedHostShellEscalation(
         state: 'interrupted',
         errorMessage: 'the server restarted before this escalated command finished',
         errorDelivery: 'unknown',
-        finishedAt: nowMs(),
+        finishedAt: now,
       })
       .where(eq(computerCall.id, callId))
       .run();
@@ -259,6 +272,12 @@ export function pollOrStartApprovedHostShellEscalation(
   ) {
     return { state: 'ready', resultText: 'escalation was not approved by the owner' };
   }
+  if (proposal.decidedAt === null || now - proposal.decidedAt > ESCALATION_DISPATCH_WINDOW_MS) {
+    return {
+      state: 'ready',
+      resultText: 'approval dispatch window elapsed before execution; nothing ran',
+    };
+  }
 
   let binding: HostShellEscalationBinding;
   try {
@@ -274,7 +293,6 @@ export function pollOrStartApprovedHostShellEscalation(
     };
   }
 
-  const now = nowMs();
   const callParams: Record<string, unknown> = {
     command: binding.command,
     ...(binding.cwd !== undefined ? { cwd: binding.cwd } : {}),
@@ -287,7 +305,7 @@ export function pollOrStartApprovedHostShellEscalation(
     .values({
       id: callId,
       teamId: proposal.teamId,
-      stepId: wakeStepId,
+      stepId: escalationStepId,
       toolCallId: HOST_SHELL_ESCALATION_TOOL_CALL_ID,
       machineId: binding.machineId,
       computerId: null,
@@ -312,7 +330,7 @@ export function pollOrStartApprovedHostShellEscalation(
 
   const call: ComputerCall = {
     callId,
-    stepId: wakeStepId,
+    stepId: escalationStepId,
     tool: 'user_computer_shell',
     params: callParams,
     deadlineAt,
@@ -326,7 +344,7 @@ export function pollOrStartApprovedHostShellEscalation(
         state: 'error',
         errorMessage: COMPUTER_NOT_CONNECTED,
         errorDelivery: 'not_delivered',
-        finishedAt: nowMs(),
+        finishedAt: now,
       })
       .where(eq(computerCall.id, callId))
       .run();

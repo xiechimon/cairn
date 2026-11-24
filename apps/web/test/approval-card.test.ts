@@ -162,6 +162,29 @@ describe('an unsandboxed host shell escalation approval card', () => {
     expect(texts(doc, 'chief-question-option-0-1')).toEqual(['不执行']);
   });
 
+  test('renders cwd prominently and never folds multiline shell commands', () => {
+    const multiline = Array.from({ length: 8 }, (_, i) => `echo line-${i + 1}`).join('\n');
+    const item: ChiefQuestionItem = {
+      kind: 'question',
+      id: 'approval-s2',
+      requestId: 'approval-s2',
+      status: 'pending',
+      questions: [
+        {
+          header: '审批',
+          question: `Coordinator 想在 Owner Mac 上不经沙箱运行这条命令\n目录：~/.ssh\n命令：${multiline}`,
+          options: [{ label: '批准执行' }, { label: '不执行' }],
+        },
+      ],
+      answers: null,
+    };
+    const doc = render(item);
+    expect(texts(doc, 'approval-card-context')).toEqual(['目录：~/.ssh']);
+    expect(texts(doc, 'approval-field-more')).toEqual([]);
+    expect(doc).not.toContain('line-clamp-5');
+    expect(elements(doc, 'approval-card-quote')[0]?.text).toContain('echo line-8');
+  });
+
   test('renders expired cancelled approval card as expired', () => {
     const doc = inI18n(
       createElement(ApprovalAnswered, {

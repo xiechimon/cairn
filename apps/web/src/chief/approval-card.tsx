@@ -44,16 +44,27 @@ function variantAt(index: number, count: number): 'default' | 'outline' | 'ghost
   return index === count - 1 ? 'ghost' : 'outline';
 }
 
-function Preview({ value, mono }: { value: string; mono: boolean }) {
+function Preview({
+  value,
+  mono,
+  allowFold = true,
+}: {
+  value: string;
+  mono: boolean;
+  allowFold?: boolean;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const lines = value.split('\n').length;
-  const foldable = lines > FOLD_LINES || value.length > FOLD_CHARS;
+  const foldable = allowFold && (lines > FOLD_LINES || value.length > FOLD_CHARS);
   return (
     <>
       <blockquote
         data-testid="approval-card-quote"
-        className="m-0 mt-2 border-s-2 border-border ps-3.5 text-ui text-foreground"
+        className={cn(
+          'm-0 mt-2 border-s-2 border-border ps-3.5 text-ui text-foreground',
+          !allowFold && 'max-h-60 overflow-y-auto',
+        )}
       >
         <span
           data-testid="approval-field-value"
@@ -180,7 +191,9 @@ export function ApprovalCard({
               .reverse()
       }
     >
-      {card.preview !== null && <Preview value={card.preview} mono={card.mono} />}
+      {card.preview !== null && (
+        <Preview value={card.preview} mono={card.mono} allowFold={card.kind !== 'shell'} />
+      )}
       {children}
       {raw && <RawArguments fields={card.details} />}
       {problem !== null && (

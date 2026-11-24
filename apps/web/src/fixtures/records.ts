@@ -650,6 +650,7 @@ export type ChiefStreamItem =
         multiSelect?: boolean;
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
+      cancelReason?: string;
       todoId?: string;
     }
   | {
