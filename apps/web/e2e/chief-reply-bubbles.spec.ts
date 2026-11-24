@@ -9,7 +9,7 @@ const reply = (page: Page) =>
     .getByTestId('chief-msg')
     .filter({ hasText: '这是一段测试用的 Markdown' });
 
-test('one reply is one grey bubble with loose paragraph spacing inside; tables and code are bordered surfaces', async ({
+test('one reply is one text block with loose paragraph spacing inside; tables and code are bordered surfaces', async ({
   page,
 }) => {
   await page.goto(ROUTE);
@@ -18,9 +18,7 @@ test('one reply is one grey bubble with loose paragraph spacing inside; tables a
   await expect(blocks).toHaveCount(5);
   await expect(message.getByTestId('chief-reply-bubble')).toHaveCount(3);
   const bubble = message.getByTestId('chief-reply-bubble').first();
-  await expect(bubble).toHaveCSS('border-top-left-radius', '16px');
-  await expect(bubble).toHaveCSS('padding-left', '14px');
-  await expect(bubble).toHaveCSS('padding-top', '7px');
+  await expect(bubble).toHaveCSS('padding-left', '0px');
   const inner = await bubble
     .locator('.chat-md-block')
     .evaluateAll((els) => els.map((el) => el.getBoundingClientRect()));
@@ -29,17 +27,17 @@ test('one reply is one grey bubble with loose paragraph spacing inside; tables a
     const prev = inner[i - 1];
     const next = inner[i];
     if (prev === undefined || next === undefined) continue;
-    expect(Math.round(next.top - prev.bottom), `loose gap before inner block ${i}`).toBe(10);
+    expect(Math.round(next.top - prev.bottom), `loose gap before inner block ${i}`).toBe(12);
   }
   const boxes = await blocks.evaluateAll((els) => els.map((el) => el.getBoundingClientRect()));
   for (let i = 1; i < boxes.length; i++) {
     const prev = boxes[i - 1];
     const next = boxes[i];
     if (prev === undefined || next === undefined) continue;
-    expect(Math.round(next.top - prev.bottom), `gap before block ${i}`).toBe(4);
+    expect(Math.round(next.top - prev.bottom), `gap before block ${i}`).toBe(12);
   }
   const widest = Math.max(...boxes.map((box) => box.width));
-  expect(widest).toBeLessThanOrEqual(512);
+  expect(widest).toBeLessThanOrEqual(576);
   const table = message.getByTestId('md-table');
   await expect(table).toHaveCSS('border-top-width', '1px');
   await expect(table.locator('xpath=ancestor::*[@data-slot="reply-bubble"]')).toHaveCount(0);
@@ -115,6 +113,10 @@ test('C31: a Coordinator reply sits on the page in the reply serif; the owner ke
       ...document.querySelectorAll('[data-testid="chief-stream"] [data-slot="user-bubble"]'),
     ].map(style);
     const table = style(document.querySelector('[data-testid="chief-stream"] [data-testid="md-table"]'));
+    const para = document.querySelector('[data-testid="chief-stream"] [data-testid="chief-reply-bubble"] .chat-para');
+    const item = document.querySelector('[data-testid="chief-stream"] [data-testid="chief-reply-bubble"] li');
+    const metrics = (el: Element | null) =>
+      el === null ? null : { size: getComputedStyle(el).fontSize, line: getComputedStyle(el).lineHeight };
     return {
       serif: resolve('fontFamily', 'var(--font-songti-serif)'),
       sans: resolve('fontFamily', 'var(--font-sans)'),
@@ -122,6 +124,8 @@ test('C31: a Coordinator reply sits on the page in the reply serif; the owner ke
       coordinator,
       owner,
       table,
+      para: metrics(para),
+      item: metrics(item),
     };
   });
   expect(look.coordinator.length).toBeGreaterThanOrEqual(3);
@@ -136,6 +140,8 @@ test('C31: a Coordinator reply sits on the page in the reply serif; the owner ke
     expect(own?.font, 'C31: the owner bubble stays in the sans').toBe(look.sans);
   }
   expect(look.table?.font, 'C31: a table stays in the sans').toBe(look.sans);
+  expect(look.para, 'C31: reply prose is 15/28').toEqual({ size: '15px', line: '28px' });
+  expect(look.item, 'C31: a list inside a reply keeps a 24px line').toEqual({ size: '15px', line: '24px' });
   await expect(stream.getByTestId('md-code-block')).toHaveCount(1);
   await expect(stream.getByTestId('chief-turn-error')).toHaveCount(1);
 });

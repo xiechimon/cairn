@@ -25,7 +25,7 @@ export function ProductChiefSection() {
         title="Question chips"
         note={
           last ??
-          'QuestionChips: a chip answers, digits pick, the composer types a free answer; answered, the questions stay as reply bubbles above one owner bubble'
+          'QuestionChips: a chip answers, digits pick, the composer types a free answer; answered, the questions stay as Coordinator replies above one owner bubble'
         }
         stage="canvas"
         className="flex-col"

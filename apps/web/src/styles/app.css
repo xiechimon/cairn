@@ -16,6 +16,7 @@
   --font-prose-mono: var(--font-system-mono);
   --font-heading: var(--font-display);
   --font-serif: var(--font-source-serif);
+  --font-reply: var(--font-songti-serif);
   --text-page: var(--type-page);
   --text-page--line-height: calc(32 / 24);
   --text-brand: var(--type-brand);
@@ -31,8 +32,11 @@
   --container-chat: 47.25rem;
   --container-chat-gutter: 49.25rem;
   --container-reply-bubble: 32rem;
+  --container-reply: 36rem;
   --text-card-title: var(--type-card-title);
   --text-card-title--line-height: calc(21 / 15);
+  --text-reply: var(--type-card-title);
+  --text-reply--line-height: calc(28 / 15);
   --text-ui: var(--type-ui);
   --text-ui--line-height: calc(20 / 14);
   --text-meta: var(--type-meta);

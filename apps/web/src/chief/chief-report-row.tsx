@@ -128,7 +128,7 @@ export function ChiefReportMessage({ report }: { report: ChiefReportContent }) {
       </p>
       <ResearchReportCard
         inline
-        className="mt-1"
+        className="mt-1 font-sans"
         report={{
           title: report.day,
           content: chiefReportMarkdown(report, t),

@@ -53,7 +53,7 @@ function HeadingTag({ level, segments }: { level: number; segments: DocSegment[]
   const Tag = `h${clamped}` as 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6';
   return (
     <Tag
-      className={`chat-md-head chat-md-head--${clamped} m-0 font-semibold text-(--foreground) ${HEAD_SIZE[clamped] ?? 'text-ui'}`}
+      className={`chat-md-head chat-md-head--${clamped} m-0 font-semibold text-(--foreground) ${HEAD_SIZE[clamped] ?? ''}`}
     >
       <Segments segments={segments} codeClassName="chat-code" />
     </Tag>
@@ -317,7 +317,7 @@ const FLOW_GAP: Record<Flow, string> = {
   list: 'mt-0.5',
 };
 
-const BUBBLE_SPACED_GAP = 'mt-2.5';
+const BUBBLE_SPACED_GAP = 'mt-3';
 
 const StreamingContext = createContext(false);
 
@@ -492,10 +492,10 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
   );
 }
 
-export const REPLY_BUBBLE_CLS =
-  'w-fit max-w-[min(100%,var(--container-reply-bubble))] rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-1.75';
+export const REPLY_TEXT_CLS =
+  'w-fit max-w-[min(100%,var(--container-reply))] rounded-sm font-reply text-reply font-normal text-pretty [&_ol]:leading-6 [&_ul]:leading-6 [overflow-wrap:anywhere] data-reply-highlight:bg-(--reply-bubble-highlight) data-reply-highlight:outline-8 data-reply-highlight:outline-solid data-reply-highlight:outline-(--reply-bubble-highlight)';
 export const REPLY_BLOCK_CLS =
-  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply-bubble))]';
+  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply))]';
 
 function ReplyGroup({
   group,
@@ -516,7 +516,7 @@ function ReplyGroup({
     >
       {group.bubble ? (
         <div
-          className={cn(REPLY_BUBBLE_CLS, 'data-reply-highlight:bg-(--reply-bubble-highlight)')}
+          className={REPLY_TEXT_CLS}
           data-slot="reply-bubble"
           data-testid="chief-reply-bubble"
           {...(highlighted ? { 'data-reply-highlight': '' } : {})}
@@ -555,7 +555,7 @@ export function ChatMarkdown({
   const files = useMemo(() => fileSetOf(text), [text]);
   const body =
     groups !== null ? (
-      <div className="flex flex-col items-start gap-1" data-slot="reply-blocks">
+      <div className="flex flex-col items-start gap-3" data-slot="reply-blocks">
         {groups.map((group, i) => (
           <ReplyGroup
             key={i}

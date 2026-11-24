@@ -14,11 +14,11 @@ colors-dark:
   pebble-working: '#82b46f'; pebble-idle: '#8c8b88'; pebble-resolved: '#434443'; tint-working: '#223a5e'; tint-working-soft: '#1d2d49'; tint-working-ink: '#9cbcf2'
   tint-wait: '#3d3014'; tint-wait-soft: '#2e2510'; tint-wait-ink: '#f2cf86'; tint-quiet: '#2a2b2a'; tint-quiet-soft: '#222322'; tint-quiet-ink: '#bbbab7'; tint-fail: '#4a2a24'; tint-fail-soft: '#3a2420'; tint-fail-ink: '#f09a88'
 typography:
-  greeting: { fontFamily: serif, fontSize: 32px, fontWeight: '360' }; page-title: { fontFamily: serif, fontSize: 24px, fontWeight: '500' }; brand: { fontFamily: serif, fontSize: 18px, fontWeight: '500' }; response: { fontFamily: serif, fontSize: 15px, fontWeight: '400', lineHeight: '21px' }
+  greeting: { fontFamily: serif, fontSize: 32px, fontWeight: '360' }; page-title: { fontFamily: serif, fontSize: 24px, fontWeight: '500' }; brand: { fontFamily: serif, fontSize: 18px, fontWeight: '500' }; response: { fontFamily: serif, fontSize: 15px, fontWeight: '400', lineHeight: '21px' }; reply: { fontFamily: reply, fontSize: 15px, fontWeight: '400', lineHeight: '28px' }
   heading: { fontFamily: display, fontSize: 15px, fontWeight: '500' }; card-title: { fontFamily: sans, fontSize: 15px, fontWeight: '600', lineHeight: '21px' }; ui: { fontFamily: sans, fontSize: 14px, fontWeight: '400' }
   meta: { fontFamily: sans, fontSize: 13px, fontWeight: '400' }; caption: { fontFamily: sans, fontSize: 12px, fontWeight: '500' }; code: { fontFamily: mono, fontSize: 13px, fontWeight: '400' }
 fonts:
-  serif: var(--font-source-serif); display: var(--font-display); sans: var(--font-sans); mono: var(--font-mono)
+  serif: var(--font-source-serif); display: var(--font-display); sans: var(--font-sans); mono: var(--font-mono); reply: var(--font-songti-serif)
 rounded:
   field: 8px; control: 8px; menu-item: 8px; card: 12px; sheet: 12px; menu: 14px; bubble: 18px; composer: 14px; full: 9999px
 spacing:

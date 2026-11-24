@@ -72,8 +72,8 @@ describe('parseFrontmatter', () => {
     expect(Object.keys(doc['colors-dark'] ?? {}).length).toBe(44);
     expect(Object.keys(doc.rounded ?? {}).length).toBe(9);
     expect(Object.keys(doc.spacing ?? {}).length).toBe(11);
-    expect(Object.keys(doc.typography ?? {}).length).toBe(10);
-    expect(Object.keys(doc.fonts ?? {}).length).toBe(4);
+    expect(Object.keys(doc.typography ?? {}).length).toBe(11);
+    expect(Object.keys(doc.fonts ?? {}).length).toBe(5);
   });
 });
 

@@ -1,5 +1,4 @@
 import { COMPUTER_HANDOFF_TIMEOUT_MS } from '@cairn/shared';
-import { cn } from 'cn';
 import { useEffect, useState } from 'react';
 import { useApiMutations, useComputers, usePhoneHandoffs } from '../api/hooks.js';
 import { clockTime } from '../api/mappers.js';
@@ -9,7 +8,6 @@ import { ComputerScreenDialog } from '../board/computer-screen-dialog.js';
 import { useScreenHoverControl } from '../board/screen-hover-control.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
-import { REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import {
@@ -139,7 +137,7 @@ export function TakeoverCard({ item }: { item: TakeoverItem }) {
         data-outcome={item.outcome}
         data-held={held ? 'true' : 'false'}
         aria-label={t('需要你登录')}
-        className={cn(REPLY_BUBBLE_CLS, 'flex flex-col gap-1 py-3')}
+        className="flex w-fit max-w-[min(100%,var(--container-reply-bubble))] flex-col gap-1 rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-3"
       >
         <p className="m-0 flex items-center gap-2 text-ui font-title text-foreground">
           {waiting && !held && (

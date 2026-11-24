@@ -49,6 +49,7 @@
     "sourceSerif4", Georgia, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     "Noto Sans CJK SC", serif;
   --font-jetbrains-mono: "jetbrainsMono", "jetbrainsMono Fallback";
+  --font-songti-serif: "sourceSerif4", "Songti SC", "STSong", Georgia, serif;
   --font-system-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
