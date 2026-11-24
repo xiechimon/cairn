@@ -320,8 +320,11 @@ export function requireDesignVersion(db: Db, teamId: string, versionId: string):
 export function readDesignVersionHtml(
   db: Db,
   attachmentsDir: string,
-  version: Pick<VersionRow, 'attachmentId' | 'teamId'>,
+  version: Pick<VersionRow, 'attachmentId' | 'teamId' | 'fileName'>,
 ): Buffer {
+  if (artifactKindOf(version.fileName) !== 'page') {
+    throw new HttpError(404, `design page ${version.fileName}`);
+  }
   const file = db
     .select({ storageKey: attachment.storageKey, status: attachment.status })
     .from(attachment)
@@ -388,7 +391,10 @@ export function createDesignShare(
   const origin = relayOrigin();
   if (origin === null) throw new HttpError(409, 'a share link needs a relay', 'relay-missing');
   requireTeamTodo(db, input.todoId, input.teamId);
-  if (currentVersion(db, input.todoId, input.fileName) === undefined) {
+  if (
+    artifactKindOf(input.fileName) !== 'page' ||
+    currentVersion(db, input.todoId, input.fileName) === undefined
+  ) {
     throw new HttpError(404, `design page ${input.fileName}`);
   }
   const row = db.transaction(() => {
