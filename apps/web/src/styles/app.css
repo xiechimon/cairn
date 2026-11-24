@@ -995,6 +995,23 @@ html:has([data-slot="demo-banner"]) .app-drawer {
     padding-bottom: env(safe-area-inset-bottom);
   }
 
+  html[data-narrow-chrome] [data-testid="artifact-panel"] {
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-narrow-chrome) + 1);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  html[data-narrow-chrome] [data-testid="artifact-chat-bar"] {
+    margin-top: var(--narrow-top);
+    justify-content: center;
+  }
+
+  html[data-narrow-chrome] :has(> [data-testid="artifact-chat-bar"]) [data-testid="chief-stream"] {
+    padding-top: 0;
+  }
+
   html[data-narrow-chrome] .board-sheet .side-panel-scrim {
     display: none;
   }
@@ -1403,10 +1420,6 @@ body:has([data-testid="chief-body"]),
 
 :root[data-shell="mac-desktop"] .sidebar-peek-trigger {
   left: 90px;
-}
-
-:root[data-shell="mac-desktop"] .file-lightbox-head {
-  padding-left: 82px;
 }
 
 .desktop-drag-strip {

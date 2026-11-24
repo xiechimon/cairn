@@ -173,7 +173,7 @@ test('a page with no captured image falls back to the report lines on its card',
   await expect(made.locator('iframe')).toHaveCount(0);
 });
 
-test('the dialog lists each file with open and download above the report, explains skipped files, and opens a page in the design view', async ({
+test('the dialog lists each file with open and download above the report, explains skipped files, and opens a page in the artifact panel', async ({
   page,
 }) => {
   const { made, tracker } = await openMade(page);
@@ -193,12 +193,12 @@ test('the dialog lists each file with open and download above the report, explai
   expect(filesBox!.y + filesBox!.height).toBeLessThan(docBox!.y);
   await files.getByRole('button', { name: '打开 benchmark.html' }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page).toHaveURL(/view=design/);
-  await expect(page).toHaveURL(/thread=page/);
-  await expect(page).toHaveURL(/page=benchmark\.html/);
-  await expect(page.getByTestId('design-pane')).toBeVisible();
+  await expect(page).toHaveURL(/artifact=att-page\.html/);
+  await expect(page).toHaveURL(/artifactName=benchmark\.html/);
+  await expect(page.getByTestId('artifact-panel')).toBeVisible();
+  await expect(page.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('benchmark.html');
   await page.goBack();
-  await expect(page.getByTestId('design-pane')).toHaveCount(0);
+  await expect(page.getByTestId('artifact-panel')).toHaveCount(0);
 
   await page.getByRole('complementary', { name: '成果' }).getByRole('button', { name: 'Export review deck' }).click();
   const deckDialog = page.getByRole('dialog', { name: 'Export review deck' });

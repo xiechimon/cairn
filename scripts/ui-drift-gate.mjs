@@ -231,12 +231,7 @@ for (const owner of SEGMENTED_ALLOWLIST.keys()) {
     failures.push(`G7 STALE allowlist entry ${owner}: file is gone — drop or re-point it.`);
 }
 
-const STATE_SHADOW_ALLOWLIST = new Map([
-  [
-    'board/file-lightbox.tsx hover:shadow-(--e2)',
-    'V21 lightbox exception: the adjacent-file peek lifts on hover to say it pages',
-  ],
-]);
+const STATE_SHADOW_ALLOWLIST = new Map();
 const stateShadowAllowed = new Set();
 for (const file of [...cssFiles, ...tsxFiles, ...walk(WEB_SRC, '.ts')]) {
   for (const finding of shadowFindings(readFileSync(file, 'utf8'))) {

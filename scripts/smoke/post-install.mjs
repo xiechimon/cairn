@@ -646,10 +646,10 @@ async function rightClick(page, locator) {
   await locator.scrollIntoViewIfNeeded();
   await locator.click({ button: 'right', timeout: UI_WAIT_MS });
   await page.keyboard.press('Escape');
-  const lightbox = page.getByTestId('file-lightbox');
-  if (await lightbox.isVisible().catch(() => false)) {
-    await page.keyboard.press('Escape');
-    await lightbox.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
+  const panel = page.getByTestId('artifact-panel');
+  if (await panel.isVisible().catch(() => false)) {
+    await panel.getByTestId('artifact-close').click();
+    await panel.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {});
   }
   await delay(400);
 }
@@ -728,28 +728,21 @@ async function checkAttachment(page, ctx) {
     'text file tile does not show a type icon',
   );
   await page.getByRole('button', { name: IMAGE_NAMES[0], exact: true }).first().click();
-  const lightbox = page.getByTestId('file-lightbox');
-  await lightbox.waitFor({ timeout: UI_WAIT_MS });
-  const position = await lightbox.getByTestId('file-lightbox-position').textContent();
-  assert.equal(
-    position.trim(),
-    `1 / ${IMAGE_NAMES.length}`,
-    `lightbox pager position unexpected: ${position}`,
-  );
-  await lightbox.getByTestId('file-lightbox-next').click();
-  await lightbox
-    .getByTestId('file-preview-name')
-    .filter({ hasText: IMAGE_NAMES[1] })
-    .waitFor({ timeout: UI_WAIT_MS });
-  await page.keyboard.press('Escape');
-  await lightbox.waitFor({ state: 'detached', timeout: UI_WAIT_MS });
+  const panel = page.getByTestId('artifact-panel');
+  const selected = panel.getByRole('tab', { selected: true });
+  await selected.filter({ hasText: IMAGE_NAMES[0] }).waitFor({ timeout: UI_WAIT_MS });
+  await page.getByRole('button', { name: IMAGE_NAMES[1], exact: true }).first().click();
+  await selected.filter({ hasText: IMAGE_NAMES[1] }).waitFor({ timeout: UI_WAIT_MS });
   await page.getByRole('button', { name: 'notes.txt', exact: true }).first().click();
-  const panel = page.getByTestId('file-panel');
   await panel
-    .getByTestId('file-preview-body')
+    .getByTestId('artifact-body')
     .filter({ hasText: TXT_BODY.split('\n')[0] })
     .waitFor({ timeout: UI_WAIT_MS });
-  return `lightbox paged ${position.trim()} to ${IMAGE_NAMES[1]}, notes.txt opened in the side panel`;
+  const tabs = await panel.getByTestId('artifact-tab').count();
+  assert.equal(tabs, 3, `expected three artifact tabs, saw ${tabs}`);
+  await panel.getByTestId('artifact-close').click();
+  await panel.waitFor({ state: 'detached', timeout: UI_WAIT_MS });
+  return `${IMAGE_NAMES[0]}, ${IMAGE_NAMES[1]} and notes.txt opened as artifact panel tabs`;
 }
 
 async function checkRemote(page, ctx) {

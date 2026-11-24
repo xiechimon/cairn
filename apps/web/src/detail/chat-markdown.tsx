@@ -9,13 +9,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  attachmentOpener,
-  FileSetContext,
-  fileSetOf,
-  OpenDesignPageContext,
-  OpenFileContext,
-} from '../board/file-pane.js';
 import { CopyIconButton } from '../components/copy-icon-button.js';
 import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -36,7 +29,8 @@ import {
   type TaskItem,
   type TaskState,
 } from '../lib/markdown.js';
-import { AttachmentChip, attachmentIdFromKey, COMPOSER_CHIP_LABEL } from './attachment-chip.js';
+import { ArtifactAttachment } from './artifact-attachment.js';
+import { attachmentIdFromKey, COMPOSER_CHIP_LABEL } from './attachment-chip.js';
 import { type CodeToken, useCodeTokens } from './code-highlight.js';
 import { MermaidBlock } from './mermaid-block.js';
 import { Segments } from './segments.js';
@@ -294,18 +288,9 @@ function MarkdownListItem({
 }
 
 function AttachmentBlock({ name, attachmentKey }: { name: string; attachmentKey: string }) {
-  const openers = {
-    file: useContext(OpenFileContext),
-    designPage: useContext(OpenDesignPageContext),
-  };
-  const set = useContext(FileSetContext);
   return (
     <div className="chat-md-attachment">
-      <AttachmentChip
-        name={name}
-        attachmentKey={attachmentKey}
-        {...attachmentOpener(openers, set, name, attachmentKey)}
-      />
+      <ArtifactAttachment name={name} attachmentKey={attachmentKey} />
     </div>
   );
 }
@@ -553,7 +538,6 @@ export function ChatMarkdown({
 }) {
   const groups = useMemo(() => (bubbles ? chatBubbleGroups(text) : null), [bubbles, text]);
   const blocks = useMemo(() => (bubbles ? null : parseChatMarkdown(text)), [bubbles, text]);
-  const files = useMemo(() => fileSetOf(text), [text]);
   const body =
     groups !== null ? (
       <div className="flex flex-col items-start gap-3" data-slot="reply-blocks">
@@ -570,9 +554,5 @@ export function ChatMarkdown({
     ) : (
       <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />
     );
-  return (
-    <FileSetContext.Provider value={files}>
-      <StreamingContext.Provider value={streaming}>{body}</StreamingContext.Provider>
-    </FileSetContext.Provider>
-  );
+  return <StreamingContext.Provider value={streaming}>{body}</StreamingContext.Provider>;
 }

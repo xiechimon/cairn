@@ -313,7 +313,7 @@ test('detail face: paste paints a placeholder, landing swaps it for a chip at th
   await expect(chip).toHaveCount(0);
 });
 
-test('detail face: clicking the settled chip opens the image in the lightbox; closing keeps the draft', async ({
+test('detail face: clicking the settled chip opens the image in the artifact panel; closing keeps the draft', async ({
   page,
 }) => {
   const deferred = await deferUploads(page);
@@ -331,15 +331,15 @@ test('detail face: clicking the settled chip opens the image in the lightbox; cl
 
   const chip = page.getByTestId('composer-attachments').getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await chip.click();
-  const panel = page.getByTestId('file-lightbox');
-  await expect(panel.getByTestId('file-preview-name')).toHaveText('pasted-image-1.png');
+  const panel = page.getByTestId('artifact-panel');
+  await expect(panel.getByRole('tab', { selected: true })).toHaveText('pasted-image-1.png');
   const view = panel.getByRole('img', { name: 'pasted-image-1.png' });
   await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
     CARD_W,
   );
   await evidenceShot(page, 'strip-detail-preview.png');
 
-  await panel.getByTestId('file-lightbox-close').click();
+  await panel.getByTestId('artifact-close').click();
   await expect(panel).toHaveCount(0);
   await expect(page.locator(COMPOSER)).toBeVisible();
   await expect(input).toHaveValue('');
@@ -458,7 +458,7 @@ async function openChief(page: Page, art: TestArt) {
   return { coordinator, input };
 }
 
-test('chief face: placeholder → settled chip → lightbox preview', async ({ page }) => {
+test('chief face: placeholder → settled chip → artifact panel preview', async ({ page }) => {
   const deferred = await deferUploads(page);
   const art: TestArt = { b64: PNG_1PX };
   const { coordinator, input } = await openChief(page, art);
@@ -481,13 +481,13 @@ test('chief face: placeholder → settled chip → lightbox preview', async ({ p
   const chip = strip.getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await expect(chip).toBeVisible();
   await chip.click();
-  const panel = page.getByTestId('file-lightbox');
-  await expect(panel.getByTestId('file-preview-name')).toHaveText('pasted-image-1.png');
+  const panel = page.getByTestId('artifact-panel');
+  await expect(panel.getByRole('tab', { selected: true })).toHaveText('pasted-image-1.png');
   const view = panel.getByRole('img', { name: 'pasted-image-1.png' });
   await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
     CARD_W,
   );
   await evidenceShot(page, 'strip-chief-preview.png');
-  await panel.getByTestId('file-lightbox-close').click();
+  await panel.getByTestId('artifact-close').click();
   await expect(panel).toHaveCount(0);
 });

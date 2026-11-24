@@ -12,7 +12,6 @@ export function SentAttachments({ files }: { files: AttachmentToken[] }) {
           key={`${file.key}#${index}`}
           testId="chief-sent-attachment"
           file={file}
-          set={files}
         />
       ))}
     </div>

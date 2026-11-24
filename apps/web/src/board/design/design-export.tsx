@@ -5,6 +5,8 @@ import { Button } from '../../components/ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../../components/ui/dropdown-menu.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
+import { ChevronDown, Download } from '../../icons/index.js';
+import { TOOL_BUTTON } from '../artifact/artifact-toolbar.js';
 import {
   buildDesignHandoffContent,
   buildDesignManifestContent,
@@ -89,11 +91,13 @@ export function ExportMenu({
             size="sm"
             data-testid="design-export"
             disabled={html === undefined}
-            className="flex-none text-content-secondary hover:text-foreground"
+            className={TOOL_BUTTON}
           />
         }
       >
-        {t('导出')}
+        <Download aria-hidden className="size-4" />
+        <span className="max-[640px]:sr-only">{t('导出')}</span>
+        <ChevronDown aria-hidden className="size-4 text-content-tertiary" />
       </DropdownMenuTrigger>
       <KeyedMenuContent align="end" className="w-56">
         <KeyedMenuItem

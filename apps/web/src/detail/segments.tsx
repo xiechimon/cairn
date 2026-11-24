@@ -2,12 +2,7 @@ import { cn } from 'cn';
 import { Eye } from 'lucide-react';
 import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
 import { Link } from 'react-router';
-import {
-  attachmentOpener,
-  FileSetContext,
-  OpenDesignPageContext,
-  OpenFileContext,
-} from '../board/file-pane.js';
+import { OpenFileContext } from '../board/file-pane.js';
 import { useThreadHref } from '../board/thread-link.js';
 import { echoTaskRef, hoverTaskRef, useTaskRefSignal } from '../chief/task-ref-signal.js';
 import { MachineName } from '../components/machine-label.js';
@@ -267,11 +262,7 @@ function decorate(seg: DocSegment, key: number, node: ReactNode): ReactNode {
 }
 
 export function Segments({ segments, codeClassName }: SegmentsProps) {
-  const openers = {
-    file: useContext(OpenFileContext),
-    designPage: useContext(OpenDesignPageContext),
-  };
-  const fileSet = useContext(FileSetContext);
+  const openFile = useContext(OpenFileContext);
   const glances = useContext(TodoGlanceContext);
   return (
     <>
@@ -288,7 +279,11 @@ export function Segments({ segments, codeClassName }: SegmentsProps) {
               key={j}
               name={seg.text}
               attachmentKey={seg.attachmentKey}
-              {...attachmentOpener(openers, fileSet, seg.text, seg.attachmentKey)}
+              onOpen={
+                openFile === undefined
+                  ? undefined
+                  : () => openFile({ name: seg.text, key: seg.attachmentKey ?? '' })
+              }
             />
           ) : seg.style === 'anchor' ? (
             seg.internal === true ? (

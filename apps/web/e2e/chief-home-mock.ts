@@ -216,6 +216,7 @@ export async function mockLive(
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     const handled = extra?.(p, route, json);
     if (handled !== undefined) return handled;
+    if (/^\/api\/attachments\/[^/]+\/artifact$/.test(p)) return json({ error: 'not found' }, 404);
     if (p === '/api/teams') return json([TEAM]);
     if (p === '/api/user/me') return json(USER);
     if (p === '/api/teams/t1/notifications') return json({ unreadThreadIds: [] });

@@ -217,7 +217,7 @@ export function CommentList({
     <section
       data-testid="design-comment-list"
       aria-label={t('评论')}
-      className="absolute inset-y-0 right-0 z-20 flex w-80 max-w-full flex-col border-l border-border bg-background shadow-(--shadow-popover)"
+      className="flex w-80 max-w-full flex-none flex-col border-l border-border bg-background max-[760px]:absolute max-[760px]:inset-y-0 max-[760px]:right-0 max-[760px]:z-20 max-[760px]:shadow-(--shadow-popover)"
     >
       <div className="flex h-10 flex-none items-center justify-between border-b border-border pr-1 pl-3">
         <h3 className="m-0 text-ui font-medium text-foreground">{t('评论')}</h3>

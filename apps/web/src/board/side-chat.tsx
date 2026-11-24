@@ -35,10 +35,8 @@ import { useI18n } from '../i18n/provider.js';
 import { baseName, dirName } from '../lib/path-name.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { MACHINES_HREF } from '../resources/hrefs.js';
-import { useOpenDesignAttachment } from './design/design-route.js';
 import { type EngineRunView, engineTranscript, engineUsageSummary } from './engine-run.js';
 import { EngineQuestion, EngineRawView } from './engine-run-view.js';
-import { OpenDesignPageContext } from './file-pane.js';
 import { useOpenCoordinatorThread } from './open-composer.js';
 import { joinMeta, relativeTime } from './rel-time.js';
 import { isWaitingToRetry, todoRetryPhrase } from './retry-copy.js';
@@ -585,7 +583,6 @@ export function SideChat({
   const { t } = useI18n();
   const chat = useThreadChat(todoId, listed);
   const todo = chat.todo;
-  const openDesignAttachment = useOpenDesignAttachment(todoId);
   const [searchParams, setSearchParams] = useSearchParams();
   const closeAll = () =>
     setSearchParams(
@@ -658,41 +655,39 @@ export function SideChat({
   }, [onClose, showsSubView]);
 
   return (
-    <OpenDesignPageContext.Provider value={openDesignAttachment}>
-      <SidePanel
-        ref={panelRef}
-        label={todo?.title ?? t('任务')}
-        onDismiss={onClose}
-        docked={docked}
-        testId="side-chat-panel"
-      >
-        {todo != null && chat.load === 'ready' ? (
-          Stage !== undefined ? (
-            <Stage>{thread}</Stage>
-          ) : (
-            thread(
-              chat.engineRun === undefined
-                ? undefined
-                : {
-                    run: chat.engineRun,
-                    ...(live ? { eventsInTranscript: true } : {}),
-                  },
-            )
-          )
+    <SidePanel
+      ref={panelRef}
+      label={todo?.title ?? t('任务')}
+      onDismiss={onClose}
+      docked={docked}
+      testId="side-chat-panel"
+    >
+      {todo != null && chat.load === 'ready' ? (
+        Stage !== undefined ? (
+          <Stage>{thread}</Stage>
         ) : (
-          <>
-            <Head
-              todoId={todoId}
-              todo={null}
-              onBack={onClose}
-              onClose={closeAll}
-              {...(docked ? { onCollapse: onClose } : {})}
-            />
-            <Unavailable chat={chat} />
-          </>
-        )}
-      </SidePanel>
-    </OpenDesignPageContext.Provider>
+          thread(
+            chat.engineRun === undefined
+              ? undefined
+              : {
+                  run: chat.engineRun,
+                  ...(live ? { eventsInTranscript: true } : {}),
+                },
+          )
+        )
+      ) : (
+        <>
+          <Head
+            todoId={todoId}
+            todo={null}
+            onBack={onClose}
+            onClose={closeAll}
+            {...(docked ? { onCollapse: onClose } : {})}
+          />
+          <Unavailable chat={chat} />
+        </>
+      )}
+    </SidePanel>
   );
 }
 

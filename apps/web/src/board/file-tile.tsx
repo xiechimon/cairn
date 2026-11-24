@@ -5,12 +5,10 @@ import { type FileTarget, OpenFileContext } from './file-pane.js';
 
 export function FileTile({
   file,
-  set,
   testId,
   onRemove,
 }: {
   file: FileTarget;
-  set: readonly FileTarget[];
   testId?: string;
   onRemove?: () => void;
 }) {
@@ -28,7 +26,7 @@ export function FileTile({
       previewLines={previewLines}
       previewProse={kind === 'document' && !file.key.endsWith('.xlsx')}
       {...(onRemove !== undefined ? { onRemove } : {})}
-      {...(openFile !== undefined ? { onPreview: () => openFile(file, set) } : { href: src })}
+      {...(openFile !== undefined ? { onPreview: () => openFile(file) } : { href: src })}
     />
   );
 }

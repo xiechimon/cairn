@@ -178,27 +178,39 @@ async function openDesign(page: Page, seeded: Comment[] = [], shareOrigin: strin
       state.restored.push(restore);
       return json(next, 201);
     }
+    if (path === '/api/attachments/att-2/artifact') {
+      return json({
+        todoId: PAGE_TASK.id,
+        fileName: 'pricing.html',
+        kind: 'page',
+        versionId: 'ver-2',
+        versionSeq: 2,
+        versionCount: 2,
+        openComments: 0,
+      });
+    }
     const pageId = /^\/api\/design\/versions\/([^/]+)\/page$/.exec(path)?.[1];
     if (pageId !== undefined) {
       return route.fulfill({ status: 200, contentType: 'text/html', body: HTML[pageId] ?? '' });
     }
     return undefined;
   });
-  await page.goto(`/app?view=design&thread=${PAGE_TASK.id}&page=pricing.html`);
+  await page.goto('/app?artifact=att-2.html&artifactName=pricing.html');
   return state;
 }
 
-test('the design view runs the page in a sandboxed frame beside the Coordinator, fits each viewport, and switches and restores versions', async ({
+test('the artifact panel runs a page in a sandboxed frame beside the Coordinator, fits each viewport, and switches and restores versions', async ({
   page,
 }) => {
   const state = await openDesign(page);
-  const pane = page.getByTestId('design-pane');
+  const pane = page.getByTestId('artifact-panel');
   await expect(pane).toBeVisible();
   await expect(page.getByTestId('home-c')).toBeVisible();
   const frame = pane.getByTestId('design-frame');
   await expect(frame).toHaveAttribute('sandbox', 'allow-scripts allow-forms allow-downloads');
   await expect(frame.contentFrame().getByRole('heading', { name: '随你一起长大的定价' })).toBeVisible();
-  await expect(pane.getByTestId('design-version-meta')).toHaveText('v2 · 当前');
+  await expect(page.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('pricing.html');
+  await expect(frame).toHaveAttribute('title', 'pricing.html · 第 2 版');
   expect(await frame.getAttribute('srcdoc')).toContain('data-od-sandbox-shim');
 
   await pane.getByTestId('design-viewport-mobile').click();
@@ -215,30 +227,33 @@ test('the design view runs the page in a sandboxed frame beside the Coordinator,
   expect(Math.abs((tablet?.width ?? 0) / (tablet?.height ?? 1) - 820 / 1180)).toBeLessThan(0.01);
   await pane.getByTestId('design-viewport-desktop').click();
 
-  await pane.getByTestId('design-versions').click();
-  await page.getByTestId('design-version-item').filter({ hasText: 'v1' }).click();
-  await expect(pane.getByTestId('design-version-banner')).toContainText('正在看 v1');
+  await pane.getByTestId('artifact-history-toggle').click();
+  const history = pane.getByTestId('artifact-history');
+  await expect(history.locator('[data-seq="2"]')).toHaveAttribute('aria-current', 'true');
+  await expect(history.locator('[data-seq="2"]')).toContainText('当前');
+  await history.locator('[data-seq="1"]').click();
+  await expect(pane.getByTestId('artifact-version-banner')).toContainText('正在看第 1 版，当前是第 2 版');
   await expect(frame.contentFrame().getByRole('heading', { name: 'Simple pricing' })).toBeVisible();
-  await pane.getByTestId('design-version-current').click();
-  await expect(pane.getByTestId('design-version-banner')).toHaveCount(0);
+  await pane.getByTestId('artifact-version-current').click();
+  await expect(pane.getByTestId('artifact-version-banner')).toHaveCount(0);
   await expect(frame.contentFrame().getByRole('heading', { name: '随你一起长大的定价' })).toBeVisible();
 
-  await pane.getByTestId('design-versions').click();
-  await page.getByTestId('design-version-item').filter({ hasText: 'v1' }).click();
-  await pane.getByTestId('design-version-restore').click();
-  await expect(pane.getByTestId('design-version-banner')).toHaveCount(0);
-  await expect(pane.getByTestId('design-version-meta')).toHaveText('v3 · 当前');
+  await history.locator('[data-seq="1"]').click();
+  await pane.getByTestId('artifact-version-restore').click();
+  await expect(pane.getByTestId('artifact-version-banner')).toHaveCount(0);
+  await expect(frame).toHaveAttribute('title', 'pricing.html · 从第 1 版恢复');
   expect(state.restored).toEqual(['ver-1']);
   await expect(frame.contentFrame().getByRole('heading', { name: 'Simple pricing' })).toBeVisible();
-  await pane.getByTestId('design-versions').click();
-  await expect(page.getByTestId('design-version-item').first()).toContainText('从 v1 恢复 · 当前');
-  await page.keyboard.press('Escape');
+  await expect(history.getByTestId('artifact-version').first()).toContainText('当前');
+  await expect(history.getByTestId('artifact-version').first()).toContainText('从第 1 版恢复');
+  await pane.getByTestId('artifact-history-close').click();
+  await expect(history).toHaveCount(0);
 
   await pane.getByTestId('design-source-toggle').click();
   await expect(pane.getByTestId('design-source')).toContainText('Simple pricing');
   await pane.getByTestId('design-source-toggle').click();
 
-  await pane.getByTestId('design-more').click();
+  await pane.getByTestId('artifact-name').click();
   await expect(page.getByTestId('design-open-browser')).toHaveAttribute(
     'href',
     '/api/design/versions/ver-3/page',
@@ -246,21 +261,21 @@ test('the design view runs the page in a sandboxed frame beside the Coordinator,
   await expect(page.getByTestId('design-open-browser')).toHaveAttribute('target', '_blank');
   await page.keyboard.press('Escape');
 
-  await pane.getByTestId('design-close').click();
+  await pane.getByTestId('artifact-close').click();
   await expect(pane).toHaveCount(0);
-  await expect(page).not.toHaveURL(/view=design/);
+  await expect(page).not.toHaveURL(/artifact=/);
 });
 
-test('below 1100px the design view is one pane with a chat and design switch', async ({ page }) => {
+test('below 1100px the artifact panel is one pane with a chat and file switch', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 800 });
   await openDesign(page);
-  const pane = page.getByTestId('design-pane');
+  const pane = page.getByTestId('artifact-panel');
   await expect(pane).toBeVisible();
   await expect(page.getByTestId('home-c')).toBeHidden();
-  await pane.getByTestId('design-focus-chat').click();
+  await pane.getByTestId('artifact-focus-chat').click();
   await expect(pane).toBeHidden();
   await expect(page.getByTestId('home-c')).toBeVisible();
-  await page.getByTestId('design-chat-bar').getByTestId('design-focus-design').click();
+  await page.getByTestId('artifact-chat-bar').getByTestId('artifact-focus-artifact').click();
   await expect(pane).toBeVisible();
   await expect(pane.getByTestId('design-frame').contentFrame().getByRole('heading')).toHaveText(
     '随你一起长大的定价',
@@ -271,12 +286,13 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   page,
 }) => {
   const state = await openDesign(page, [lostComment()]);
-  const pane = page.getByTestId('design-pane');
+  const pane = page.getByTestId('artifact-panel');
   const frame = pane.getByTestId('design-frame').contentFrame();
   await expect(frame.getByRole('heading', { name: '随你一起长大的定价' })).toBeVisible();
 
-  await pane.getByTestId('design-comment-mode').click();
-  await expect(pane.getByTestId('design-comment-mode')).toHaveAttribute('aria-pressed', 'true');
+  await pane.getByTestId('artifact-comment-toggle').click();
+  await expect(pane.getByTestId('artifact-comment-toggle')).toHaveAttribute('aria-pressed', 'true');
+  await expect(pane.getByTestId('artifact-comment-strip')).toBeVisible();
   await frame.getByRole('button', { name: '升级到 Pro' }).hover();
   await expect(pane.getByTestId('design-hover-outline')).toBeVisible();
   await frame.getByRole('button', { name: '升级到 Pro' }).click();
@@ -297,7 +313,6 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   const created = state.comments.find((c) => c.id === 'cmt-2');
   expect(created).toMatchObject({ versionId: 'ver-2', viewport: 'desktop', label: 'button', text: '升级到 Pro' });
 
-  await pane.getByTestId('design-comments-toggle').click();
   const rows = pane.getByTestId('design-comment-row');
   await expect(rows).toHaveCount(3);
   const lost = rows.filter({ has: page.getByTestId('design-comment-lost') });
@@ -340,17 +355,17 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   expect(state.sends[1]).toMatchObject({ content: '按下面的设计评论改。', designCommentIds: ['cmt-3'] });
 
   await page.keyboard.press('Escape');
-  await expect(pane.getByTestId('design-comment-mode')).toHaveAttribute('aria-pressed', 'false');
+  await expect(pane.getByTestId('artifact-comment-strip')).toHaveCount(0);
 });
 
 test('comments: a forged style from the frame cannot make the board fetch a url', async ({
   page,
 }) => {
   await openDesign(page);
-  const pane = page.getByTestId('design-pane');
+  const pane = page.getByTestId('artifact-panel');
   const frame = pane.getByTestId('design-frame').contentFrame();
   await expect(frame.getByRole('heading')).toBeVisible();
-  await pane.getByTestId('design-comment-mode').click();
+  await pane.getByTestId('artifact-comment-toggle').click();
 
   const fetched: string[] = [];
   page.on('request', (request) => {
@@ -402,8 +417,9 @@ test('mark-up: draw a box, a stroke and text, undo and redo, then save a PNG mar
 }) => {
   const state = await openDesign(page);
   await expect(page.frameLocator('[data-testid="design-frame"]').getByRole('heading')).toBeVisible();
+  await page.getByTestId('artifact-comment-toggle').click();
   await page.getByTestId('design-mark-mode').click();
-  await expect(page.getByTestId('design-mark-mode')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('design-mark-mode')).toHaveText('点选元素');
   const bar = page.getByTestId('design-mark-bar');
   await expect(bar).toBeVisible();
   const layer = page.getByTestId('design-draw-layer');
@@ -438,7 +454,7 @@ test('mark-up: draw a box, a stroke and text, undo and redo, then save a PNG mar
   await page.getByTestId('design-mark-save').click();
 
   await expect(bar).toBeHidden();
-  await expect(page.getByTestId('design-mark-mode')).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByTestId('artifact-comment-strip')).toHaveCount(0);
   expect(state.marks).toHaveLength(1);
   expect(state.marks[0]?.subarray(0, 8).toString('hex')).toBe('89504e470d0a1a0a');
   expect(state.writes).toEqual(['create cmt-1']);
@@ -451,12 +467,14 @@ test('mark-up: draw a box, a stroke and text, undo and redo, then save a PNG mar
   });
   await expect(page.locator('[data-testid="design-pin"][data-pin="1"]')).toBeVisible();
   await expect(page.getByTestId('design-comment-chip')).toHaveCount(1);
-  await page.getByTestId('design-comments-toggle').click();
   const mark = page.getByTestId('design-comment-mark').locator('img');
   await expect(mark).toBeVisible();
   await expect.poll(() => mark.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
 
+  await page.getByTestId('artifact-comment-toggle').click();
+  await page.getByTestId('artifact-comment-toggle').click();
   await page.getByTestId('design-mark-mode').click();
+  await expect(page.getByTestId('design-mark-bar')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('design-mark-bar')).toBeHidden();
 });

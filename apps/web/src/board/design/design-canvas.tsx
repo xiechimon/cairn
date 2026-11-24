@@ -121,92 +121,99 @@ export function DesignCanvas({
           onSend={mark.send === undefined ? undefined : submitMark(mark.send)}
         />
       )}
-      <DesignFrame
-        frameRef={frameRef}
-        srcdoc={srcdoc}
-        title={title}
-        viewport={viewport}
-        overlay={(transform) => (
-          <div
-            data-testid="design-overlay"
-            data-commenting={commenting || undefined}
-            className="pointer-events-none absolute inset-0 overflow-hidden"
-          >
-            {bridge.hover !== null && picked === null && (
+      <div className="relative flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <DesignFrame
+            frameRef={frameRef}
+            srcdoc={srcdoc}
+            title={title}
+            viewport={viewport}
+            overlay={(transform) => (
               <div
-                data-testid="design-hover-outline"
-                className="absolute rounded-xs border border-(--background) outline-2 outline-(--focus-ring)"
-                style={{
-                  left: bridge.hover.position.x * transform.scale,
-                  top: bridge.hover.position.y * transform.scale,
-                  width: bridge.hover.position.width * transform.scale,
-                  height: bridge.hover.position.height * transform.scale,
-                }}
-              />
-            )}
-            {picked !== null && (
-              <div
-                className="absolute rounded-xs border border-(--background) outline-2 outline-(--focus-ring)"
-                style={{
-                  left: picked.position.x * transform.scale,
-                  top: picked.position.y * transform.scale,
-                  width: picked.position.width * transform.scale,
-                  height: picked.position.height * transform.scale,
-                }}
-              />
-            )}
-            {marking && (
-              <DrawLayer
-                drawing={drawing}
-                color={MARK_COLOR}
-                label={t('标注画布')}
-                textLabel={t('标注文字')}
-              />
-            )}
-            {pins.map(({ comment, position }) => (
-              <div
-                key={comment.id}
-                className="absolute"
-                style={{ left: position.x * transform.scale, top: position.y * transform.scale }}
+                data-testid="design-overlay"
+                data-commenting={commenting || undefined}
+                className="pointer-events-none absolute inset-0 overflow-hidden"
               >
-                <CommentPin
-                  pin={comment.pin}
-                  status={comment.status}
-                  onClick={() => {
-                    setFocusedId(comment.id);
-                    onListOpen(true);
-                  }}
-                />
+                {bridge.hover !== null && picked === null && (
+                  <div
+                    data-testid="design-hover-outline"
+                    className="absolute rounded-xs border border-(--background) outline-2 outline-(--focus-ring)"
+                    style={{
+                      left: bridge.hover.position.x * transform.scale,
+                      top: bridge.hover.position.y * transform.scale,
+                      width: bridge.hover.position.width * transform.scale,
+                      height: bridge.hover.position.height * transform.scale,
+                    }}
+                  />
+                )}
+                {picked !== null && (
+                  <div
+                    className="absolute rounded-xs border border-(--background) outline-2 outline-(--focus-ring)"
+                    style={{
+                      left: picked.position.x * transform.scale,
+                      top: picked.position.y * transform.scale,
+                      width: picked.position.width * transform.scale,
+                      height: picked.position.height * transform.scale,
+                    }}
+                  />
+                )}
+                {marking && (
+                  <DrawLayer
+                    drawing={drawing}
+                    color={MARK_COLOR}
+                    label={t('标注画布')}
+                    textLabel={t('标注文字')}
+                  />
+                )}
+                {pins.map(({ comment, position }) => (
+                  <div
+                    key={comment.id}
+                    className="absolute"
+                    style={{
+                      left: position.x * transform.scale,
+                      top: position.y * transform.scale,
+                    }}
+                  >
+                    <CommentPin
+                      pin={comment.pin}
+                      status={comment.status}
+                      onClick={() => {
+                        setFocusedId(comment.id);
+                        onListOpen(true);
+                      }}
+                    />
+                  </div>
+                ))}
+                {picked !== null && commenting && (
+                  <CommentPopover
+                    key={`${picked.selector}:${picked.position.x}:${picked.position.y}`}
+                    target={picked}
+                    transform={transform}
+                    busy={draft.busy}
+                    onCancel={clearPicked}
+                    onSave={(note) => draft.save(picked, note, clearPicked)}
+                    onSend={
+                      draft.send === undefined
+                        ? undefined
+                        : (note) => draft.send?.(picked, note, clearPicked)
+                    }
+                  />
+                )}
               </div>
-            ))}
-            {picked !== null && commenting && (
-              <CommentPopover
-                key={`${picked.selector}:${picked.position.x}:${picked.position.y}`}
-                target={picked}
-                transform={transform}
-                busy={draft.busy}
-                onCancel={clearPicked}
-                onSave={(note) => draft.save(picked, note, clearPicked)}
-                onSend={
-                  draft.send === undefined
-                    ? undefined
-                    : (note) => draft.send?.(picked, note, clearPicked)
-                }
-              />
             )}
-          </div>
+          />
+        </div>
+        {listOpen && (
+          <CommentList
+            comments={comments}
+            located={bridge.located}
+            readOnly={readOnly}
+            focusedId={focusedId}
+            actions={actions}
+            onClose={() => onListOpen(false)}
+          />
         )}
-      />
-      {listOpen && (
-        <CommentList
-          comments={comments}
-          located={bridge.located}
-          readOnly={readOnly}
-          focusedId={focusedId}
-          actions={actions}
-          onClose={() => onListOpen(false)}
-        />
-      )}
+      </div>
     </div>
   );
 }

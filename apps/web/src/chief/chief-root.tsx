@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { type RouteObject, useLocation, useNavigate, useRoutes } from 'react-router';
 import { useLiveData } from '../api/provider.js';
-import { FileViewerHost } from '../board/file-lightbox.js';
+import { ArtifactHost } from '../board/artifact/artifact-host.js';
 import { coordinatorSearch, useOpenComposer, useOpenNewTask } from '../board/open-composer.js';
 import { useDesktopMenu } from '../desktop-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -149,7 +149,7 @@ export function ChiefRoot({
   );
   return (
     <ChiefRootContext.Provider value={api}>
-      <FileViewerHost>
+      <ArtifactHost>
         <div className="contents" inert={settings.open}>
           <Suspense fallback={null}>{page}</Suspense>
         </div>
@@ -162,7 +162,7 @@ export function ChiefRoot({
             <Suspense fallback={null}>{dialog}</Suspense>
           </RouteDialogCloseProvider>
         )}
-      </FileViewerHost>
+      </ArtifactHost>
     </ChiefRootContext.Provider>
   );
 }

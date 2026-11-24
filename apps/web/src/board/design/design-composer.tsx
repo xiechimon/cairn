@@ -1,13 +1,13 @@
 import type { DesignCommentRecord } from '@cairn/shared';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useDesignComments, useDesignMutations, useDesignPages } from '../../api/hooks.js';
+import { useDesignComments, useDesignMutations } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
 import { IconTooltip } from '../../components/icon-tooltip.js';
 import { Button } from '../../components/ui/button.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
-import { type DesignTarget, pickPage } from './design-route.js';
+import type { ArtifactRef } from '../artifact/artifact-panel.js';
 
 export interface PendingComments {
   count: number;
@@ -19,21 +19,17 @@ export function commentSubject(comment: Pick<DesignCommentRecord, 'text' | 'labe
   return comment.text !== '' ? comment.text : comment.label;
 }
 
-export function useDesignPageName(target: DesignTarget | null): string | null {
-  const { live } = useLiveData();
-  const pagesQ = useDesignPages(target?.todoId ?? '', live && target !== null);
-  if (target === null) return null;
-  return pickPage(pagesQ.data?.pages ?? [], target.fileName)?.fileName ?? null;
-}
-
 export function useDesignComposer(
-  target: DesignTarget | null,
+  target: ArtifactRef | null,
 ): (PendingComments & { ids: readonly string[] }) | null {
   const { t } = useI18n();
   const { live } = useLiveData();
-  const fileName = useDesignPageName(target);
-  const commentsQ = useDesignComments(target?.todoId ?? '', fileName, live && target !== null);
-  const { deleteComment } = useDesignMutations(target?.todoId ?? '', fileName ?? '');
+  const commentsQ = useDesignComments(
+    target?.todoId ?? '',
+    target?.fileName ?? null,
+    live && target !== null,
+  );
+  const { deleteComment } = useDesignMutations(target?.todoId ?? '', target?.fileName ?? '');
   if (target === null) return null;
   const open = (commentsQ.data ?? []).filter((comment) => comment.status === 'open');
   if (open.length === 0) return null;

@@ -27,6 +27,7 @@ import type {
   DesignCommentCreate,
   DesignCommentPatch,
   DesignCommentRecord,
+  ArtifactOfAttachment,
   DesignPageRecord,
   DesignShareRecord,
   DesignVersionRecord,
@@ -1857,6 +1858,24 @@ export const designVersionsQuery = (todoId: string, fileName: string | null) => 
       `${designPath(todoId)}/${encodeURIComponent(fileName ?? '')}/versions`,
     ),
 });
+
+export const artifactOfQuery = (attachmentId: string) => ({
+  queryKey: ['artifact-of', attachmentId] as const,
+  queryFn: async (): Promise<ArtifactOfAttachment | null> => {
+    try {
+      return await api.get<ArtifactOfAttachment>(
+        `/api/attachments/${encodeURIComponent(attachmentId)}/artifact`,
+      );
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  },
+  staleTime: 30_000,
+});
+
+export const useArtifactOf = (attachmentId: string, enabled: boolean) =>
+  useQuery({ ...artifactOfQuery(attachmentId), enabled });
 
 export const useDesignPages = (todoId: string, enabled: boolean) =>
   useQuery({ ...designPagesQuery(todoId), enabled });

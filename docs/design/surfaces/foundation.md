@@ -47,7 +47,7 @@ Shared visual, copy and accessibility rows; they load for every path under `apps
 | V18 | Like rows fold: three or more sibling rows with the same status sit under one section heading. | M |
 | V19 | A placeholder is not content: no text node consists only of `—`, `·` or `-`. | M; G `e2e/design-rules-measure.spec.ts` |
 | V20 | An object list is rows in one card, not a grid of identical cards; the results panel's preview row is the exception. | M; G `e2e/design-rules-measure.spec.ts`: no grid or stack of three or more outlined 12px-corner cards outside the results panel |
-| V21 | No hover shadows or elevation; a hover background covers the whole row or control. Exception: the file lightbox's adjacent-file peeks lift on hover to say they page (owner decision, 2026-11-21; allowlisted in G8). | G `ui-drift-gate` G8 |
+| V21 | No hover shadows or elevation; a hover background covers the whole row or control. | G `ui-drift-gate` G8 |
 | V22 | Sentence case and normal tracking: no uppercase labels; `letter-spacing` normal on every text node. | M; G `test/unslop-signs.test.ts` |
 | V23 | No weight of 800 or more and no italic in chrome; emphasis is weight or ink step. | M; G `test/unslop-signs.test.ts` |
 | V25 | Text keeps the platform's default font smoothing: no `-webkit-font-smoothing` or `antialiased` utilities. | G `test/font-smoothing.test.ts` |

@@ -290,43 +290,6 @@ test.describe('a touch screen', () => {
     expect(await page.evaluate(() => localStorage.getItem('cairn.side-panel-width'))).toBeNull();
   });
 
-  test('closing another panel under a moving finger keeps the mouse drag on this panel', async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 1440, height: 800 });
-    await page.goto(
-      '/app?scenario=chief-files-long&pane=made&file=team-files/att-verify-log.log&fileName=verify-3877.log',
-    );
-    const filePanel = page.getByTestId('file-panel');
-    const fileHandle = filePanel.getByTestId('side-panel-resize');
-    const madeHandle = page.locator(
-      'aside:not([data-testid="file-panel"]) [data-testid="side-panel-resize"]',
-    );
-    await expect(fileHandle).toBeVisible();
-    await expect(madeHandle).toBeVisible();
-    await expect(madeHandle).toHaveAttribute('aria-valuenow', '420');
-    const finger = await touchScreen(page);
-    const made = await madeHandle.boundingBox();
-    if (made === null) throw new Error('Made handle has no box');
-    const x = made.x + made.width / 2;
-    const y = made.y + made.height / 2;
-    await page.mouse.move(x, y);
-    await page.mouse.down();
-    await page.mouse.move(x - 100, y);
-    await expect(madeHandle).toHaveAttribute('aria-valuenow', '520');
-    const file = await fileHandle.boundingBox();
-    if (file === null) throw new Error('file handle has no box');
-    await finger.press(file.x + file.width / 2, file.y + file.height / 2);
-    await finger.move(file.x + file.width / 2 - 30, file.y + file.height / 2);
-    await page.keyboard.press('Escape');
-    await expect(filePanel).toHaveCount(0);
-    await expect(madeHandle).toHaveAttribute('aria-valuenow', '520');
-    await finger.lift();
-    await page.mouse.up();
-    await expect(madeHandle).toHaveAttribute('aria-valuenow', '520');
-    expect(await page.evaluate(() => localStorage.getItem('cairn.side-panel-width'))).toBe('520');
-  });
-
   test('a double-click reset ends a finger drag, so the finger cannot overwrite it', async ({
     page,
   }) => {

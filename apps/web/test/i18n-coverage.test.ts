@@ -43,6 +43,8 @@ const ALLOWLIST: Record<string, string> = {
 const LATIN_ALLOWLIST: Record<string, string> = {
   'board/first-run-setup.tsx::Cairn': 'product name',
   'chief/memory-edit-composer.tsx::MEMORY.md': 'memory file name fallback',
+  'board/artifact/comment-strip.tsx::Esc': 'keycap label inside <Kbd>',
+  'chief/queue-tabs.tsx::Esc': 'keycap label inside <Kbd>',
   'components/thread/pr-card.tsx::PR #': 'PR is a kept term; the issue number follows',
   'components/thread/pr-link.tsx::PR #': 'PR is a kept term; the issue number follows',
   'pages/dir-browser.tsx::git': 'tool name badge',

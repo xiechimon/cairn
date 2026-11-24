@@ -8,7 +8,7 @@ Owner decisions (ian, 2026-11-20) that override the first draft:
 2. Take Open Design's code, not a rewrite. Borrowed code lives in its own directories with `LICENSE`, `NOTICE.md` and one SPDX line per file, restyled with Cairn tokens and components.
 3. The left side is the Coordinator conversation. The owner talks to the Coordinator; comments on a page are forwarded to the task whose agent built it.
 4. Preview network: pages have network access (fonts, images, APIs), as in Open Design (see Security).
-5. Finished files (images, video, docx, pdf, pptx, xlsx and every other non-HTML type) open in a floating lightbox over the app with a pager across the message's files, through the borrowed viewers; the side panel is only for the design view while a page is being iterated (ian, 2026-11-20, superseding the side-panel file view). Tiles show a type glyph with the conventional office accent and the first lines when they are cheap to read.
+5. Every file, a page included, opens as a tab in the artifact panel beside the Coordinator chat, through the borrowed viewers (ian, 2026-11-24, superseding the 2026-11-20 lightbox; `docs/design/artifact-panel.md`). Tiles show a type glyph with the conventional office accent and the first lines when they are cheap to read.
 6. Previews are served by Cairn itself, so a page keeps opening after the task that made it stops; no preview depends on a task's own dev server.
 
 Tags: **verified** = read in source at the named commit or run live; **derived** = follows from verified facts; **guess** = the rest.
@@ -44,16 +44,16 @@ Pick the surface by what the user does next:
 
 | Type | Inline | Click opens | Viewer (borrowed) |
 |---|---|---|---|
-| html (deliverable or attached by a task) | card: thumbnail, name, `vN`, open-comment count | design view | `HtmlPreview` with the comment, mark-up and snapshot bridges |
-| md | chat markdown or card | lightbox | `MarkdownViewer` (rendered, source toggle) |
-| image (png, jpg, gif, webp, avif) | thumbnail chip | lightbox | `ImageViewer` |
-| svg | thumbnail chip | lightbox | `SvgViewer` (preview, source) |
-| video (mp4, webm, mov) | chip | lightbox | `VideoViewer` |
-| audio (mp3, wav, m4a) | chip | lightbox | `AudioViewer` |
-| pdf | chip | lightbox | browser PDF frame (see Borrowed code, deviations) |
-| docx, pptx, xlsx | chip with type and size | lightbox | `DocumentPreviewViewer` over the server text extraction |
-| text, code, json, log, diff | chip; tool output stays collapsed in the transcript | lightbox | `TextViewer` with line numbers; diffs and code highlighted |
-| other (zip, binary) | chip | lightbox with download | `BinaryViewer` |
+| html (deliverable or attached by a task) | card: name, type, version | artifact panel, page view | `HtmlPreview` with the comment, mark-up and snapshot bridges |
+| md | chat markdown or card | artifact panel | `MarkdownViewer` (rendered, source toggle) |
+| image (png, jpg, gif, webp, avif) | thumbnail chip | artifact panel | `ImageViewer` |
+| svg | thumbnail chip | artifact panel | `SvgViewer` (preview, source) |
+| video (mp4, webm, mov) | chip | artifact panel | `VideoViewer` |
+| audio (mp3, wav, m4a) | chip | artifact panel | `AudioViewer` |
+| pdf | chip | artifact panel | browser PDF frame (see Borrowed code, deviations) |
+| docx, pptx, xlsx | chip with type and size | artifact panel | `DocumentPreviewViewer` over the server text extraction |
+| text, code, json, log, diff | chip; tool output stays collapsed in the transcript | artifact panel | `TextViewer` with line numbers; diffs and code highlighted |
+| other (zip, binary) | chip | artifact panel with download | `BinaryViewer` |
 
 ## Scope
 
@@ -83,10 +83,10 @@ Each phase lands on `main` on its own and ends in a check run on a `verify-cairn
 
 ## Layout
 
-- Route: `/app?view=design&thread=<todoId>&page=<name>` (`page`, not the file lightbox's `file`) (`THREAD_PARAM`, `VIEW_PARAM` in `apps/web/src/board/thread-copy.ts`). Back returns to the previous view.
+- Route: `/app?artifact=<attachment key>&artifactName=<name>` (`ARTIFACT_PARAM` in `apps/web/src/board/file-pane.ts`); the page is the artifact the attachment is a version of (`GET /api/attachments/:id/artifact`). Back returns to the previous view.
 - Left: the Coordinator conversation and composer as on the home page, at the docked width bounds. Pending comment chips sit above the composer.
 - Right: a toolbar laid out like Open Design's (left: file picker when the task made several pages, reload, preview/source toggle, viewport menu; right: comment, mark-up, comment count, versions, export, share, `⋯` with open in browser and download), then the canvas.
-- Below 1100px the halves become one pane with a `对话` / `设计` switch in the head; at 390px the toolbar keeps viewport, comment and versions and moves the rest into `⋯`.
+- Below 1100px the halves become one pane with a `对话` / `文件` switch in the head; at 390px the toolbar keeps viewport, comment and versions and moves the rest into `⋯`.
 
 ## Scenarios
 

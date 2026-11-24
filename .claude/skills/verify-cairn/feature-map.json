@@ -2002,7 +2002,7 @@
       "id": "attachments",
       "name": "Attachments",
       "summary": "Files dropped, pasted or picked into a composer and files agents attach to threads, uploaded by grant and reclaimed later; a sent attachment is a card above the user's message, with its type glyph and first lines, that opens by kind: images and video in a full-window lightbox with a zoned top bar, a filmstrip of the message's media and peeks of the adjacent files; documents (Markdown with a preview/source switch, code with muted highlighting, text, PDF, office) in a right side panel inside the Coordinator layout, one at a time.",
-      "states": "Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; lightbox for an image, a video, the filmstrip and a hovered peek; document side panel for text and code with line numbers, Markdown preview and source, PDF, an office document, an unsupported type, loading and a load error; agent attachments in the thread transcript.",
+      "states": "Composer tile uploading (grey pulse), ready, failed (removable) and the drop-target outline; sent attachment card with type glyph, first-line preview or video frame; inline chat image, inline video and file card; artifact panel with several tabs, full screen, the phone chat/file switch, version history and an old version banner, for an image, a video, text and code with line numbers, Markdown preview and source, an office document, an unsupported type, loading and a load error; agent attachments in the thread transcript.",
       "centrality": 3,
       "status": "shipped",
       "code": {
@@ -2011,8 +2011,12 @@
           "apps/web/src/components/composer-attachment-tile.tsx",
           "apps/web/src/overlay/file-drop.ts",
           "apps/web/src/chief/sent-attachments.tsx",
-          "apps/web/src/board/file-lightbox.tsx",
-          "apps/web/src/board/file-doc-panel.tsx",
+          "apps/web/src/board/artifact/artifact-host.tsx",
+          "apps/web/src/board/artifact/artifact-panel.tsx",
+          "apps/web/src/board/artifact/artifact-route.ts",
+          "apps/web/src/board/artifact/artifact-toolbar.tsx",
+          "apps/web/src/board/artifact/file-artifact.tsx",
+          "apps/web/src/detail/artifact-attachment.tsx",
           "apps/web/src/board/file-tile.tsx",
           "apps/web/src/board/file-data.ts",
           "apps/web/src/board/file-pane.ts"
@@ -2069,11 +2073,10 @@
       "status": "partial",
       "code": {
         "web": [
-          "apps/web/src/board/design/design-pane.tsx",
+          "apps/web/src/board/artifact/page-artifact.tsx",
+          "apps/web/src/board/artifact/use-artifact-versions.ts",
+          "apps/web/src/board/artifact/comment-strip.tsx",
           "apps/web/src/board/design/design-frame.tsx",
-          "apps/web/src/board/design/design-route.ts",
-          "apps/web/src/board/design/design-split.tsx",
-          "apps/web/src/board/design/design-versions.tsx",
           "apps/web/src/board/design/design-bridge.ts",
           "apps/web/src/board/design/design-canvas.tsx",
           "apps/web/src/board/design/design-comment-list.tsx",
@@ -2114,7 +2117,7 @@
         "click label:成果",
         "click testid:made-card",
         "click testid:made-file-open",
-        "click testid:design-versions"
+        "click testid:artifact-history-toggle"
       ],
       "verify": [
         ".claude/skills/verify-cairn/features/design-surface.md"

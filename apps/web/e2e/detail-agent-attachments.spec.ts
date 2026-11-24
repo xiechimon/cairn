@@ -1,7 +1,7 @@
 import { chiefGetResponseSchema, encodeReplyQuote, renderTaskText, type TaskRequest } from '@cairn/shared';
 import { expect, test } from '@playwright/test';
 
-test('a final assistant reply renders two loaded screenshots and opens each in the lightbox', async ({
+test('a final assistant reply renders two loaded screenshots and opens each in the artifact panel', async ({
   page,
 }) => {
   const pageErrors: string[] = [];
@@ -162,9 +162,9 @@ test('a final assistant reply renders two loaded screenshots and opens each in t
   const original = context.getByRole('img', { name: 'Original screenshot', exact: true });
   await expect.poll(() => original.evaluate((image) => (image as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await original.click();
-  const panel = page.getByTestId('file-lightbox');
-  await expect(panel.getByTestId('file-preview-name')).toHaveText('Original screenshot');
-  await panel.getByTestId('file-lightbox-close').click();
+  const panel = page.getByTestId('artifact-panel');
+  await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('Original screenshot');
+  await panel.getByTestId('artifact-close').click();
   await expect(panel).toHaveCount(0);
   await context.getByTestId('reply-quote').getByRole('link').click();
   await expect(page.locator('[id="request-context-source-thread:ack"]')).toBeInViewport();
@@ -180,8 +180,8 @@ test('a final assistant reply renders two loaded screenshots and opens each in t
       .poll(() => image.evaluate((element) => (element as HTMLImageElement).naturalWidth))
       .toBeGreaterThan(0);
     await image.click();
-    const viewer = page.getByTestId('file-lightbox');
-    await expect(viewer.getByTestId('file-preview-name')).toHaveText(name);
+    const viewer = page.getByTestId('artifact-panel');
+    await expect(viewer.locator('[data-testid="artifact-tab"][data-active]')).toHaveText(name);
     await expect
       .poll(() =>
         viewer
@@ -189,7 +189,7 @@ test('a final assistant reply renders two loaded screenshots and opens each in t
           .evaluate((element) => (element as HTMLImageElement).naturalWidth),
       )
       .toBeGreaterThan(0);
-    await viewer.getByTestId('file-lightbox-close').click();
+    await viewer.getByTestId('artifact-close').click();
     await expect(viewer).toHaveCount(0);
   }
   expect(pageErrors).toEqual([]);

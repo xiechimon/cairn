@@ -29,10 +29,9 @@ import {
   ArchivedProjectBar,
   type ArchivedProjectState,
 } from './archived-project-bar.js';
+import { useActiveArtifact, useArtifactSplit } from './artifact/artifact-panel.js';
 import { useDesignComposer } from './design/design-composer.js';
-import type { DesignTarget } from './design/design-route.js';
-import { useDesignSplit } from './design/design-split.js';
-import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
+import { ARTIFACT_NAME_PARAM, ARTIFACT_PARAM } from './file-pane.js';
 import { HomeSpiral, type SpiralProject } from './home-spiral.js';
 import { LoadingComposer } from './loading-composer.js';
 import { MachineChip, MachinesPanel } from './machines-panel.js';
@@ -101,7 +100,6 @@ interface HomeCProps {
   archived?: ArchivedProjectState | null;
   fixtureProjects?: readonly SpiralProject[];
   thread?: ReactNode;
-  design?: DesignTarget | null;
 }
 
 export function conversationBoundaryKey(input: {
@@ -173,7 +171,6 @@ export function HomeC({
   archived = null,
   fixtureProjects,
   thread,
-  design = null,
 }: HomeCProps) {
   const { t } = useI18n();
   const { user, live, teamId, teamsQuery } = useLiveData();
@@ -198,8 +195,8 @@ export function HomeC({
       ? (ids: readonly string[]) =>
           Promise.resolve(surface.onSend?.(t('按下面的设计评论改。'), projectId, ids))
       : undefined;
-  const designSplit = useDesignSplit(design, sendDesignComments);
-  const designComposer = useDesignComposer(design);
+  const designSplit = useArtifactSplit(sendDesignComments);
+  const designComposer = useDesignComposer(useActiveArtifact());
   const paneShown = threadId === null || docked;
   const narrow = useNarrow();
   const { createTodo } = useApiMutations(teamId);
@@ -217,8 +214,8 @@ export function HomeC({
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
     params.delete(TASKS_TAB_PARAM);
-    params.delete(FILE_PARAM);
-    params.delete(FILE_NAME_PARAM);
+    params.delete(ARTIFACT_PARAM);
+    params.delete(ARTIFACT_NAME_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
     setSearchParams(params, { replace: true, state });

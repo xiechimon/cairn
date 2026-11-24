@@ -1,6 +1,6 @@
 import { isInfoOutput } from '@cairn/shared';
 import { PackageCheck, Search, SearchX } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router';
 import { useArchivedTodos, useProjects } from '../api/hooks.js';
 import { toDisplayTodo } from '../api/mappers.js';
@@ -15,9 +15,10 @@ import { Button } from '../components/ui/button.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { useOpenDesign } from './design/design-route.js';
+import { artifactKey } from './artifact/artifact-route.js';
+import { OpenFileContext } from './file-pane.js';
 import { MadeCard, MadeCarousel, MadeSkeleton } from './made-carousel.js';
-import { MadeFiles, primaryPage, sizeLabel } from './made-files.js';
+import { type Deliverable, MadeFiles, primaryPage, sizeLabel } from './made-files.js';
 import { groupMade, MADE_GROUP_LABEL, madeGroupOf, matchesMadeQuery } from './made-groups.js';
 import { MadeSearch } from './made-search.js';
 import { joinMeta, relativeTime } from './rel-time.js';
@@ -67,7 +68,7 @@ function MadeReport({
     [todo.latestBuildId, todo.title, todo.phase],
   );
   const { t } = useI18n();
-  const openDesign = useOpenDesign();
+  const openFile = useContext(OpenFileContext);
   const { report, settled } = useBuildReport(thread);
   useEffect(() => {
     if (settled && report === null) {
@@ -92,10 +93,14 @@ function MadeReport({
     >
       <MadeFiles
         deliverables={todo.deliverables}
-        onOpenPage={(name) => {
-          onClose();
-          openDesign(todo.id, name);
-        }}
+        {...(openFile === undefined
+          ? {}
+          : {
+              onOpen: (item: Deliverable) => {
+                onClose();
+                openFile({ name: item.name, key: artifactKey(item.attachmentId, item.name) });
+              },
+            })}
       />
     </ResearchReportDialog>
   );
@@ -121,11 +126,12 @@ export function WorkPanel({
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
   const [reportTodo, setReportTodo] = useState<TodoRecord | null>(null);
-  const openDesign = useOpenDesign();
+  const openFile = useContext(OpenFileContext);
   const openMade = (todo: TodoRecord) => {
     const page = todo.madeKind === 'page' ? primaryPage(todo.deliverables) : undefined;
     if (isInfoOutput(todo.output) && todo.latestBuildId !== null) setReportTodo(todo);
-    else if (page !== undefined) openDesign(todo.id, page.name);
+    else if (page !== undefined && openFile !== undefined)
+      openFile({ name: page.name, key: artifactKey(page.attachmentId, page.name) });
     else onOpenThread(todo.id);
   };
   const archivedQ = useArchivedTodos(teamId, connected && tab === 'archived');

@@ -1,88 +1,28 @@
-import { ATTACHMENT_KEY_SOURCE, isDesignPageName } from '@cairn/shared';
 import { createContext } from 'react';
 import { attachmentIdFromKey } from '../detail/attachment-chip.js';
-import { type FileViewerKind, kindFor } from '../vendor-open-design/viewers/file-kind.js';
 
-export const FILE_PARAM = 'file';
-export const FILE_NAME_PARAM = 'fileName';
+export const ARTIFACT_PARAM = 'artifact';
+export const ARTIFACT_NAME_PARAM = 'artifactName';
 
 export interface FileTarget {
   name: string;
   key: string;
 }
 
-export type OpenFile = (target: FileTarget, set?: readonly FileTarget[]) => void;
+export type OpenFile = (target: FileTarget) => void;
 
 export const OpenFileContext = createContext<OpenFile | undefined>(undefined);
-
-export const FileSetContext = createContext<readonly FileTarget[]>([]);
-
-export interface OpenDocument {
-  target: FileTarget;
-  close: () => void;
-}
-
-export const OpenDocumentContext = createContext<OpenDocument | null>(null);
-
-const LIGHTBOX_KINDS: ReadonlySet<FileViewerKind> = new Set(['image', 'svg', 'video']);
-
-export function opensInLightbox(target: FileTarget): boolean {
-  return LIGHTBOX_KINDS.has(kindFor(target.key));
-}
-
-const ATTACHMENT_REF = new RegExp(
-  `!?\\[([^\\]]*)\\]\\(attachment:(${ATTACHMENT_KEY_SOURCE})\\)`,
-  'g',
-);
-
-export function fileSetOf(text: string): FileTarget[] {
-  const seen = new Set<string>();
-  const out: FileTarget[] = [];
-  for (const match of text.matchAll(ATTACHMENT_REF)) {
-    const key = match[2] ?? '';
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ key, name: match[1] || key.slice(key.lastIndexOf('/') + 1) });
-  }
-  return out;
-}
-
-export interface DesignPageTarget {
-  name: string;
-  attachmentId: string;
-}
-
-export const OpenDesignPageContext = createContext<
-  ((target: DesignPageTarget) => void) | undefined
->(undefined);
 
 export function attachmentUrl(key: string): string {
   return `/api/attachments/${encodeURIComponent(attachmentIdFromKey(key))}`;
 }
 
-export function fileTargetOf(params: URLSearchParams): FileTarget | null {
-  const key = params.get(FILE_PARAM);
-  if (key === null || key === '') return null;
-  return { key, name: params.get(FILE_NAME_PARAM) ?? attachmentIdFromKey(key) };
-}
-
-export function withoutFileTarget(params: URLSearchParams): URLSearchParams {
-  params.delete(FILE_PARAM);
-  params.delete(FILE_NAME_PARAM);
-  return params;
-}
-
-export function attachmentOpener(
-  openers: {
-    file: OpenFile | undefined;
-    designPage: ((target: DesignPageTarget) => void) | undefined;
-  },
-  set: readonly FileTarget[],
-  name: string,
-  key: string,
-): { onOpen?: () => void } {
-  const { file, designPage } = openers;
-  if (designPage !== undefined && (isDesignPageName(name) || isDesignPageName(key)))
-    return { onOpen: () => designPage({ name, attachmentId: attachmentIdFromKey(key) }) };
-  return file === undefined ? {} : { onOpen: () => file({ name, key }, set) };
+export function downloadFile(href: string, name: string): void {
+  const anchor = document.createElement('a');
+  anchor.href = href;
+  anchor.download = name;
+  anchor.rel = 'noopener';
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
 }

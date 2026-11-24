@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { matchPath, useLocation, useNavigate } from 'react-router';
-import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
+import { ARTIFACT_NAME_PARAM, ARTIFACT_PARAM } from './file-pane.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { PANE_PARAM, TASKS_TAB_PARAM } from './work-panel.js';
 
@@ -89,7 +89,7 @@ export function useOpenNewTask(): () => void {
       pathname === '/app'
         ? new URLSearchParams(search)
         : new URLSearchParams(coordinatorSearch(search));
-    for (const key of [THREAD_PARAM, VIEW_PARAM, TASKS_TAB_PARAM, FILE_PARAM, FILE_NAME_PARAM])
+    for (const key of [THREAD_PARAM, VIEW_PARAM, TASKS_TAB_PARAM, ARTIFACT_PARAM, ARTIFACT_NAME_PARAM])
       params.delete(key);
     params.set(PANE_PARAM, 'tasks');
     const state: NewTaskState = { newTask: Date.now() };

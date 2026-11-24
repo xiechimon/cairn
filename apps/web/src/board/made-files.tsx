@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { useI18n } from '../i18n/provider.js';
 
-type Deliverable = TodoDeliverables['items'][number];
+export type Deliverable = TodoDeliverables['items'][number];
 
 const THUMB_SKELETON_DELAY_MS = 200;
 
@@ -163,10 +163,10 @@ function FileRow({
 
 export function MadeFiles({
   deliverables,
-  onOpenPage,
+  onOpen,
 }: {
   deliverables: TodoDeliverables | undefined;
-  onOpenPage?: (name: string) => void;
+  onOpen?: (item: Deliverable) => void;
 }) {
   const { t } = useI18n();
   if (deliverables === undefined) return null;
@@ -183,8 +183,8 @@ export function MadeFiles({
               <FileRow
                 item={item}
                 {...(item.kind === 'slides' ? { note: t('下载后打开') } : {})}
-                {...(item.kind === 'page' && onOpenPage !== undefined
-                  ? { onOpen: () => onOpenPage(item.name) }
+                {...(onOpen !== undefined && item.kind !== 'slides'
+                  ? { onOpen: () => onOpen(item) }
                   : {})}
               />
             </div>

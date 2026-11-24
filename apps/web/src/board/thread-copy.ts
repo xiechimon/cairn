@@ -1,6 +1,6 @@
 import { isInfoOutput } from '@cairn/shared';
 import type { TodoRecord } from '../fixtures/records.js';
-import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
+import { ARTIFACT_NAME_PARAM, ARTIFACT_PARAM } from './file-pane.js';
 import { STATUS_WORDS } from './status-words.js';
 
 export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
@@ -44,8 +44,8 @@ export function withThread(search: string | URLSearchParams, id: string): URLSea
   const params = new URLSearchParams(search);
   params.set(THREAD_PARAM, id);
   params.delete(VIEW_PARAM);
-  params.delete(FILE_PARAM);
-  params.delete(FILE_NAME_PARAM);
+  params.delete(ARTIFACT_PARAM);
+  params.delete(ARTIFACT_NAME_PARAM);
   return params;
 }
 

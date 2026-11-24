@@ -64,7 +64,6 @@ export function ComposerAttachments({
         <FileTile
           key={`${token.key}#${index}`}
           file={token}
-          set={settled}
           onRemove={thenFocusInput(() => onRemove(index))}
         />
       ))}

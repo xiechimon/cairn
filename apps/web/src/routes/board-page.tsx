@@ -19,11 +19,10 @@ import {
 } from '../board/antigravity-login-banner.js';
 import { AppSidebar } from '../board/app-sidebar.js';
 import type { ArchivedProjectState } from '../board/archived-project-bar.js';
+import { artifactTargetOf } from '../board/artifact/artifact-route.js';
 import { BackupBanner } from '../board/backup-banner.js';
 import { ClaudeLoginBanner, useClaudeLoginWarnings } from '../board/claude-login-banner.js';
-import { designTargetOf } from '../board/design/design-route.js';
 import { DevinLoginBanner, useDevinLoginWarnings } from '../board/devin-login-banner.js';
-import { FileDocPanel } from '../board/file-doc-panel.js';
 import { setupShown } from '../board/first-run-checklist-model.js';
 import {
   FirstRunFrame,
@@ -227,10 +226,10 @@ export function BoardPage() {
     projectLookup !== 'loading' &&
     projectLookup !== 'failed' &&
     !(projectLookup === 'unknown' && homeProjectId !== null);
-  const design = homeShown ? designTargetOf(searchParams) : null;
+  const artifactOpen = homeShown && artifactTargetOf(searchParams) !== null;
   const dockThread =
     homeShown &&
-    design === null &&
+    !artifactOpen &&
     threadId !== null &&
     panelDocked &&
     paneOf(searchParams.get(PANE_PARAM)) === 'tasks';
@@ -316,13 +315,11 @@ export function BoardPage() {
               tasksQuery={live ? tasksQ : undefined}
               archived={archivedState}
               fixtureProjects={live ? undefined : fixtureActive}
-              design={design}
               {...(dockThread ? { thread: sideChat(true) } : {})}
             />
           )}
         </div>
-        {threadId !== null && design === null && !dockThread && sideChat(false)}
-        {threadId === null && design === null && <FileDocPanel />}
+        {threadId !== null && !artifactOpen && !dockThread && sideChat(false)}
       </div>
       <SearchPanel
         open={search.open}
