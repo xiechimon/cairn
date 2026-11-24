@@ -1,8 +1,11 @@
 name: promote
 
-# Auto-promotes the queue/main head once its ci run is green. The workflow_run
-# trigger only fires for workflow files on the default branch, so this file is
-# trusted code; the queue ruleset still decides what may land on main.
+# Auto-promotes the queue/main head once its ci run (or an existing preflight/*
+# ci run on the same SHA) is green. Preflight-green fast-forward SHAs land
+# directly through push-queue.mjs without pushing queue/main; this workflow
+# handles candidates that do enter queue/main. The workflow_run trigger only fires
+# for workflow files on the default branch, so this file is trusted code; the
+# green-main ruleset still decides what may land on main.
 on:
   workflow_run:
     workflows: [ci]

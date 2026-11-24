@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename, join } from 'node:path';
 import { busyMessage, RELEASE_MARKER } from './guard-queue.mjs';
-import { ownerOf } from './promote-queue.mjs';
+import { closeIssuesAfterLanding, landingState, ownerOf, pushToMain } from './promote-queue.mjs';
 
 export function planPush({ live, queueHead }) {
   if (!live) return { action: 'push' };
@@ -59,6 +59,7 @@ export function failedGreenContexts(checkRuns) {
 export function nextWaitAction({
   live,
   headOnLive,
+  headOnMain,
   deadBase,
   headTree,
   armedTree,
@@ -71,13 +72,19 @@ export function nextWaitAction({
     if (failed.length > 0) return { action: 'fail', contexts: failed };
     return { action: 'poll' };
   }
-  if (deadBase) return { action: 'rebase', onto: 'origin/main' };
+  if (deadBase || headOnMain === false) return { action: 'rebase', onto: 'origin/main' };
   if (failed.length > 0) return { action: 'fail', contexts: failed };
   if (!evidence.ok) {
     if (headTree !== armedTree) return { action: 'preflight' };
     return { action: 'poll' };
   }
   return { action: 'push' };
+}
+
+export function landingTarget({ pushedSha, evidenceSha, containsMain }) {
+  if (!containsMain) return { action: 'reject-stale' };
+  if (evidenceSha === pushedSha) return { action: 'fast-forward-main', sha: pushedSha };
+  return { action: 'queue', sha: pushedSha };
 }
 
 export function unownedCommits(commits) {
@@ -170,6 +177,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       const head = git(['rev-parse', 'HEAD']);
       const headTree = treeOf(head);
       const headOnLive = current !== null && ancestor(current, 'HEAD');
+      const headOnMain = ancestor('origin/main', head);
       const deadBase = current === null && lastBase !== null && !ancestor(lastBase, 'origin/main');
       let runs;
       try {
@@ -190,6 +198,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
       const step = nextWaitAction({
         live: current,
         headOnLive,
+        headOnMain,
         deadBase,
         headTree,
         armedTree,
@@ -295,6 +304,47 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         'A green run on a commit with the same tree also counts; local pnpm prepush stays optional.',
     );
     process.exit(1);
+  }
+  const target = landingTarget({
+    pushedSha,
+    evidenceSha: evidence.sha,
+    containsMain: ancestor('origin/main', pushedSha),
+  });
+  if (target.action === 'reject-stale') {
+    console.error(
+      `[push-queue] not pushed: ${pushedSha.slice(0, 9)} does not contain origin/main; rebase onto origin/main and run again.`,
+    );
+    process.exit(1);
+  }
+  if (target.action === 'fast-forward-main') {
+    const before = git(['rev-parse', 'origin/main']);
+    try {
+      pushToMain({
+        sha: target.sha,
+        mainTip: before,
+        expectedQueueHead: null,
+        push: () => {
+          const result = spawnSync('git', ['push', 'origin', `${target.sha}:refs/heads/main`], {
+            encoding: 'utf8',
+          });
+          process.stdout.write(result.stdout ?? '');
+          process.stderr.write(result.stderr ?? '');
+          return result;
+        },
+        recheck: () => landingState(repo, target.sha),
+        sleep,
+      });
+    } catch (error) {
+      console.error(
+        `[push-queue] not landed (${error.message}); fetch and rebase onto origin/main, then run again.`,
+      );
+      process.exit(error.status ?? 1);
+    }
+    console.log(
+      `[push-queue] fast-forwarded main to ${target.sha.slice(0, 9)} (already green on preflight; skipped queue/main rerun)`,
+    );
+    closeIssuesAfterLanding({ repo, before, after: target.sha, logPrefix: '[push-queue]' });
+    process.exit(0);
   }
   const push = spawnSync('git', ['push', 'origin', 'HEAD:refs/heads/queue/main'], {
     stdio: 'inherit',

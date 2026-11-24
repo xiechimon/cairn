@@ -260,6 +260,10 @@ test('gates runs only when gates-needed is not false and not cancelled', () => {
         }
 });
 
+test('eval waits for check-core so a red typecheck or lint stops before the 30-minute eval', () => {
+  assert.match(job('eval'), /^ {4}needs: \[changes, check-core\]$/m);
+});
+
 test('every classify step output is re-exported as a changes job output', () => {
   const block = job('changes');
   const exposed = new Set(

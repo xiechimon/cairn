@@ -4,6 +4,7 @@ import { preflightRef, preflightRun, watchVerdict } from './preflight.mjs';
 import {
   failedGreenContexts,
   fetchCheckRuns,
+  landingTarget,
   laneName,
   missingGreenContexts,
   nextWaitAction,
@@ -253,5 +254,38 @@ test('fetchCheckRuns returns null when the commit is unknown to GitHub', () => {
       },
     }),
     null,
+  );
+});
+
+test('landingTarget fast-forwards main when exact SHA is preflight-green and contains origin/main', () => {
+  assert.deepEqual(landingTarget({ pushedSha: X, evidenceSha: X, containsMain: true }), {
+    action: 'fast-forward-main',
+    sha: X,
+  });
+  assert.deepEqual(
+    landingTarget({ pushedSha: X, evidenceSha: 'b'.repeat(40), containsMain: true }),
+    {
+      action: 'queue',
+      sha: X,
+    },
+  );
+  assert.deepEqual(landingTarget({ pushedSha: X, evidenceSha: X, containsMain: false }), {
+    action: 'reject-stale',
+  });
+});
+
+test('--wait rebases onto origin/main when main moved ahead of HEAD while queue/main is free', () => {
+  assert.deepEqual(
+    nextWaitAction({
+      live: null,
+      headOnLive: false,
+      headOnMain: false,
+      deadBase: false,
+      headTree: 'T1',
+      armedTree: 'T1',
+      evidence: { ok: true, sha: X },
+      failed: [],
+    }),
+    { action: 'rebase', onto: 'origin/main' },
   );
 });

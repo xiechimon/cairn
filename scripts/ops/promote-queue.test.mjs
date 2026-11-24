@@ -113,11 +113,35 @@ test('a check skipped by classification counts the same as the ruleset does', ()
   });
 });
 
-test('a successful run for a different sha or branch does not promote', () => {
+test('a successful run for a different sha or non-candidate branch does not promote', () => {
   const other = run({ head_sha: 'c'.repeat(40) });
   assert.equal(evaluate({ ...base, ciRuns: [other] }).action, 'wait');
   const wrongBranch = run({ head_branch: 'main' });
   assert.equal(evaluate({ ...base, ciRuns: [wrongBranch] }).action, 'wait');
+});
+
+test('preflight-green ff SHA promotes without a queue rerun; non-ff or red SHA does not', () => {
+  const preflightGreen = run({ head_branch: 'preflight/mac/lane-1' });
+  assert.deepEqual(evaluate({ ...base, ciRuns: [preflightGreen] }), {
+    action: 'promote',
+    sha: SHA,
+  });
+  const queuePending = run({ head_branch: 'queue/main', status: 'in_progress', conclusion: null });
+  assert.deepEqual(evaluate({ ...base, ciRuns: [queuePending, preflightGreen] }), {
+    action: 'promote',
+    sha: SHA,
+  });
+  assert.equal(
+    evaluate({ ...base, ciRuns: [preflightGreen], candidateContainsMain: false }).action,
+    'drop',
+  );
+  const preflightRed = run({
+    head_branch: 'preflight/mac/lane-1',
+    conclusion: 'failure',
+    run_attempt: 1,
+    id: 11,
+  });
+  assert.equal(evaluate({ ...base, ciRuns: [preflightRed], jobs: failedJobs }).action, 'retry');
 });
 
 const failedJobs = [
@@ -528,6 +552,21 @@ test('main already containing the candidate during the backoff counts as landed'
     recheck: () => ({ queueHead: SHA, mainTip: 'd'.repeat(40), landed: true }),
   });
   assert.equal(pushes, 1);
+});
+
+test('direct fast-forward backoff allows an empty queue/main when expectedQueueHead is null', () => {
+  let pushes = 0;
+  landing({
+    expectedQueueHead: null,
+    push: () => {
+      pushes += 1;
+      return pushes === 1
+        ? { status: 1, stderr: rulesetRefusal('Required status check "check" is expected.') }
+        : { status: 0, stdout: '', stderr: '' };
+    },
+    recheck: () => ({ queueHead: null, mainTip: MAIN_TIP, landed: false }),
+  });
+  assert.equal(pushes, 2);
 });
 
 test('ghPages asks gh to paginate and flattens every page', () => {

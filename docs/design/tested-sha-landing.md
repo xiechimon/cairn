@@ -23,8 +23,8 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
 
 `scripts/ops/promote-queue.mjs` promotes `queue/main` head SHA `S` when all hold:
 
-- a `ci` workflow run for `S` exists with conclusion `success` (in-progress,
-  queued and cancelled runs are not evidence);
+- a `ci` workflow run for `S` on `queue/*` or `preflight/*` exists with conclusion
+  `success` (in-progress, queued and cancelled runs are not evidence);
 - inside that run, jobs `check`, `pack-smoke` and `e2e-gate` all succeeded —
   the same three names the `green-main` ruleset requires on the pushed commit
   and `desktop-release` re-verifies before publishing. `desktop-release` is
@@ -222,6 +222,13 @@ the `queue-guard` run for the head SHA and waited on `check` forever.
 - A deletion that nobody follows with a push is undone as well, so a lane
   cannot clear a red candidate it dislikes; the `promote` workflow reruns and
   drops it.
+- `push-queue.mjs` fast-forwards `main` directly (one full CI run per SHA)
+  whenever `queue/main` is free, `HEAD` already has green `check` +
+  `pack-smoke` + `e2e-gate` on its exact SHA from `preflight/*`, and `HEAD`
+  contains `origin/main`; if another lane fast-forwards `main` first, the
+  non-fast-forward push fails and the loser rebases onto `origin/main`.
+  `queue/main` is only pushed when `Lane:` trailer stamping produced a new
+  untested SHA with the same tree.
 - `push-queue.mjs --wait` automates the competitive entry path: while a
   candidate is live it rebases the lane's commits onto that candidate (the
   landed candidate becomes `main`, so a head that contains it fast-forwards
@@ -229,10 +236,11 @@ the `queue-guard` run for the head SHA and waited on `check` forever.
   `preflight/<lane>` ref so the evidence gate is already green, and polls
   until the candidate resolves. A landing means the lane's stack is exactly
   its own commits again; a drop moves the lane's commits back onto
-  `origin/main` instead of resurrecting the dropped commits. A red preflight
-  run stops the wait and names the failed contexts. `PUSH_QUEUE_WAIT_MINUTES`
-  (default 120) bounds the wait; `PUSH_QUEUE_POLL_SECONDS` (default 15) the
-  poll cadence.
+  `origin/main` instead of resurrecting the dropped commits; if `origin/main`
+  moved ahead while `queue/main` is free, `--wait` rebases onto `origin/main`
+  and re-preflights. A red preflight run stops the wait and names the failed
+  contexts. `PUSH_QUEUE_WAIT_MINUTES` (default 120) bounds the wait;
+  `PUSH_QUEUE_POLL_SECONDS` (default 60) the poll cadence.
 - `promote-queue.mjs --enforce` (used by `promote.yml`): the head's `ci` run
   (matched by workflow name, never another run on the same SHA) that ended
   `failure` with a failed or timed out job gets those jobs rerun once

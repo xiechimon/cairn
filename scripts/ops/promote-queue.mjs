@@ -33,6 +33,9 @@ export function planDrop(chain) {
   };
 }
 
+const isCandidateBranch = (branch) =>
+  typeof branch === 'string' && (branch.startsWith('queue/') || branch.startsWith('preflight/'));
+
 export function evaluate({
   queueHead,
   ciRuns,
@@ -50,9 +53,12 @@ export function evaluate({
       dropReason: 'it does not contain main, which moved past it',
     };
   }
-  const run = ciRuns.find(
-    (r) => r.name === 'ci' && r.head_sha === queueHead && r.head_branch.startsWith('queue/'),
+  const matchingRuns = ciRuns.filter(
+    (r) => r.name === 'ci' && r.head_sha === queueHead && isCandidateBranch(r.head_branch),
   );
+  const run =
+    matchingRuns.find((r) => r.status === 'completed' && r.conclusion === 'success') ??
+    matchingRuns[0];
   if (run?.status !== 'completed')
     return { action: 'wait', reason: run ? `run ${run.status}` : 'no ci run yet' };
   if (run.conclusion !== 'success') {
@@ -285,6 +291,7 @@ export function isCheckLagRefusal(output) {
 export function pushToMain({
   sha,
   mainTip,
+  expectedQueueHead = sha,
   push,
   recheck,
   sleep,
@@ -317,7 +324,7 @@ export function pushToMain({
       log('[promote-queue] main already contains the candidate; landed while backing off');
       return;
     }
-    if (state.queueHead !== sha || state.mainTip !== mainTip) {
+    if (state.queueHead !== expectedQueueHead || state.mainTip !== mainTip) {
       const error = new Error(
         `queue head ${state.queueHead ?? 'deleted'} or main moved during the GH013 backoff; not retrying`,
       );
@@ -327,7 +334,7 @@ export function pushToMain({
   }
 }
 
-function landingState(repo, sha) {
+export function landingState(repo, sha) {
   spawnSync('git', ['fetch', '--quiet', 'origin', 'main', 'queue/main'], { stdio: 'inherit' });
   let queueHead = null;
   try {
@@ -340,6 +347,38 @@ function landingState(repo, sha) {
     mainTip: git(['rev-parse', 'origin/main']),
     landed: spawnSync('git', ['merge-base', '--is-ancestor', sha, 'origin/main']).status === 0,
   };
+}
+
+export function closeIssuesAfterLanding({ repo, before, after, logPrefix = '[promote-queue]' }) {
+  try {
+    const ghWrite = (args) => {
+      const tokens = new Set([process.env.QUEUE_WRITE_TOKEN, process.env.GH_TOKEN, undefined]);
+      let last;
+      for (const token of tokens) {
+        try {
+          return gh(args, token ? { env: { ...process.env, GH_TOKEN: token } } : undefined);
+        } catch (error) {
+          last = error;
+        }
+      }
+      throw last;
+    };
+    const closed = closeLandedIssues({
+      commits: landedCommits(before, after),
+      getIssue: (n) => ghWrite([`repos/${repo}/issues/${n}`]),
+      postComment: (n, body) =>
+        ghWrite(['--method', 'POST', `repos/${repo}/issues/${n}/comments`, '-f', `body=${body}`]),
+      closeIssue: (n) =>
+        ghWrite(['--method', 'PATCH', `repos/${repo}/issues/${n}`, '-f', 'state=closed']),
+      warn: (message) => console.log(`::warning::${message}`),
+    });
+    if (closed.length > 0)
+      console.log(`${logPrefix} closed ${closed.map((n) => `#${n}`).join(', ')}`);
+  } catch (error) {
+    console.log(
+      `::warning::issue closing after landing failed: ${String(error.message ?? error).split('\n')[0]}`,
+    );
+  }
 }
 
 if (process.argv[1] && import.meta.filename === process.argv[1]) {
@@ -379,41 +418,7 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         process.exit(error.status ?? 1);
       }
       console.log(`[promote-queue] promoted ${verdict.sha} to main`);
-      try {
-        const ghWrite = (args) => {
-          const tokens = new Set([process.env.QUEUE_WRITE_TOKEN, process.env.GH_TOKEN, undefined]);
-          let last;
-          for (const token of tokens) {
-            try {
-              return gh(args, token ? { env: { ...process.env, GH_TOKEN: token } } : undefined);
-            } catch (error) {
-              last = error;
-            }
-          }
-          throw last;
-        };
-        const closed = closeLandedIssues({
-          commits: landedCommits(before, verdict.sha),
-          getIssue: (n) => ghWrite([`repos/${repo}/issues/${n}`]),
-          postComment: (n, body) =>
-            ghWrite([
-              '--method',
-              'POST',
-              `repos/${repo}/issues/${n}/comments`,
-              '-f',
-              `body=${body}`,
-            ]),
-          closeIssue: (n) =>
-            ghWrite(['--method', 'PATCH', `repos/${repo}/issues/${n}`, '-f', 'state=closed']),
-          warn: (message) => console.log(`::warning::${message}`),
-        });
-        if (closed.length > 0)
-          console.log(`[promote-queue] closed ${closed.map((n) => `#${n}`).join(', ')}`);
-      } catch (error) {
-        console.log(
-          `::warning::issue closing after landing failed: ${String(error.message ?? error).split('\n')[0]}`,
-        );
-      }
+      closeIssuesAfterLanding({ repo, before, after: verdict.sha });
       process.exit(0);
     }
     if (enforce && verdict.action === 'drop') {

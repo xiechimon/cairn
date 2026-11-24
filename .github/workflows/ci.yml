@@ -597,7 +597,7 @@ jobs:
         run: node --test scripts/ops/deploy-self.test.mjs scripts/ops/control-plane-units.test.mjs
 
   eval:
-    needs: changes
+    needs: [changes, check-core]
     if: >-
       needs.changes.outputs.eval-needed == 'true' &&
       vars.EVAL_ENABLED == 'true' &&
