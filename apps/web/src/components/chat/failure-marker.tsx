@@ -1,6 +1,7 @@
 import { ChevronDown, ChevronUp, CircleAlert, Clock, Copy } from 'lucide-react';
 import { useId, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
+import { copyTextWithFeedback } from '../../lib/clipboard.js';
 import { Button } from '../ui/button.js';
 import { DialogShell } from '../ui/dialog-shell.js';
 import { Marker, MarkerContent, MarkerIcon } from '../ui/marker.js';
@@ -69,9 +70,7 @@ export function RawError({
         className="absolute top-1 right-1 text-content-tertiary pointer-coarse:size-11"
         aria-label={t('复制原始错误')}
         title={t('复制原始错误')}
-        onClick={() =>
-          void navigator.clipboard?.writeText(text).then(() => toastSuccess(t('已复制')))
-        }
+        onClick={() => copyTextWithFeedback(text, () => toastSuccess(t('已复制')))}
       >
         <Copy className="size-4" />
       </Button>
@@ -153,9 +152,7 @@ export function RawTextDialog({
           aria-label={t('复制')}
           title={t('复制')}
           className="text-content-tertiary pointer-coarse:size-11"
-          onClick={() =>
-            void navigator.clipboard?.writeText(text).then(() => toastSuccess(t('已复制')))
-          }
+          onClick={() => copyTextWithFeedback(text, () => toastSuccess(t('已复制')))}
         >
           <Copy />
         </Button>
