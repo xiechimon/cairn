@@ -116,6 +116,7 @@ export function MemoryPanel({
   const listRef = useRef<HTMLDivElement>(null);
   const autoHeadingRef = useRef<HTMLHeadingElement>(null);
   const detailBodyRef = useRef<HTMLDListElement>(null);
+  const openedRowRef = useRef<HTMLElement | null>(null);
   const editContentRef = useRef<HTMLTextAreaElement>(null);
   const memories = memoriesQ.data ?? [];
   const { injected, lookup } = memoriesByLayer(memories, project?.id ?? null);
@@ -136,6 +137,11 @@ export function MemoryPanel({
   const startDelete = () => {
     deleting.reset();
     setConfirming(true);
+  };
+  const exitDelete = () => {
+    if (deleting.isPending) return;
+    setConfirming(false);
+    setOpenId(null);
   };
   const confirmDelete = () => {
     if (open === null || deleting.isPending) return;
@@ -197,7 +203,10 @@ export function MemoryPanel({
                 data-slot="memory-row"
                 aria-label={t('打开记忆：{title}', { title: memory.title })}
                 className="h-auto min-h-11 w-full justify-start rounded-none border-0 px-3 py-3 text-left text-ui font-normal whitespace-normal"
-                onClick={() => setOpenId(memory.id)}
+                onClick={(event) => {
+                  openedRowRef.current = event.currentTarget;
+                  setOpenId(memory.id);
+                }}
               >
                 <span className={ROW_GRID_CLS}>
                   <span
@@ -299,7 +308,10 @@ export function MemoryPanel({
                       data-slot="memory-row"
                       aria-label={t('打开记忆：{title}', { title: memory.title })}
                       className="h-auto min-h-11 w-full justify-start rounded-none border-0 px-3 py-3 text-left text-ui font-normal whitespace-normal"
-                      onClick={() => setOpenId(memory.id)}
+                      onClick={(event) => {
+                        openedRowRef.current = event.currentTarget;
+                        setOpenId(memory.id);
+                      }}
                     >
                       <span className={ROW_GRID_CLS}>
                         <span
@@ -392,7 +404,7 @@ export function MemoryPanel({
         subtitle={open === null ? undefined : `${scopeLabel} · ${layerLabel(open)}`}
         initialFocus={editing === null ? detailBodyRef : editContentRef}
         onClose={() => {
-          if (updating.isPending) return;
+          if (confirming || updating.isPending) return;
           setEditing(null);
           setOpenId(null);
         }}
@@ -499,23 +511,20 @@ export function MemoryPanel({
         title={t('删除这条记忆？')}
         ariaLabel={t('删除这条记忆')}
         finalFocus={() => {
-          if (open !== null) return true;
+          const openedRow = openedRowRef.current;
+          if (openedRow?.isConnected === true) return openedRow;
           return (
             listRef.current?.querySelector<HTMLElement>('[data-slot="memory-row"]') ??
             autoHeadingRef.current
           );
         }}
-        onClose={() => {
-          if (!deleting.isPending) setConfirming(false);
-        }}
+        onClose={exitDelete}
         footer={
           <AlertDialogActions
             cancelLabel={t('取消')}
             confirmLabel={deleting.isPending ? t('正在删除…') : t('删除记忆')}
             confirmDisabled={deleting.isPending}
-            onCancel={() => {
-              if (!deleting.isPending) setConfirming(false);
-            }}
+            onCancel={exitDelete}
             onConfirm={confirmDelete}
           />
         }

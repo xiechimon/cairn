@@ -34,7 +34,7 @@ export function dialogWidth(size: DialogSize): string {
   return `min(100% - 2rem, var(--dialog-w-${size}))`;
 }
 
-export const DIALOG_PANEL_CLS = `grid max-h-[calc(100vh-64px)] max-w-none gap-0 overflow-hidden p-0 text-ui text-popover-foreground sm:max-w-none ${DIALOG_FACE}`;
+export const DIALOG_PANEL_CLS = `grid max-h-[calc(100vh-64px)] max-w-none gap-0 overflow-hidden p-0 text-ui text-popover-foreground sm:max-w-none data-[ending-style]:pointer-events-none ${DIALOG_FACE}`;
 
 export const DIALOG_HEAD_CLS = 'flex items-start gap-3 pt-4 pr-13 pb-1 pl-4';
 

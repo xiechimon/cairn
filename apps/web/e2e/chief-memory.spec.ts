@@ -388,6 +388,7 @@ test('delete confirms first, then removes the row and closes both dialogs', asyn
   await page.getByRole('dialog', { name: '评审交接' }).getByRole('button', { name: '删除…' }).click();
   const confirm = page.getByRole('alertdialog', { name: '删除这条记忆' });
   await expect(confirm).toBeVisible();
+  await expect(page.getByRole('dialog', { name: '评审交接' })).toHaveCount(0);
   await expect(confirm).toContainText('只删除这条记忆，不影响保存它的对话。');
   await settled(page);
   await evidenceShot(page, 'memory-delete-confirm.png');
@@ -396,19 +397,24 @@ test('delete confirms first, then removes the row and closes both dialogs', asyn
   await expect(page.getByRole('dialog', { name: '评审交接' })).toHaveCount(0);
   expect(deleted).toEqual(['m-review']);
   await expect(memoryRow(page, '评审交接')).toHaveCount(0);
+  await expect(memoryRow(page, '验证命令')).toBeFocused();
 });
 
 test('a failed delete keeps the row and says so in the confirmation', async ({ page }) => {
   await openMemory(page, { deleteFails: true });
   await memoryRow(page, '代码风格').click();
-  await page.getByRole('dialog', { name: '代码风格' }).getByRole('button', { name: '删除…' }).click();
-  const confirm = page.getByRole('alertdialog', { name: '删除这条记忆' });
+  const dialog = page.getByRole('dialog', { name: '代码风格' });
+  await dialog.getByRole('button', { name: '删除…' }).click();
+  const confirm = page.getByRole('alertdialog', { name: '删除这条记忆', includeHidden: true });
+  await expect(confirm).toBeVisible();
+  await expect(dialog).toHaveCount(0);
   await confirm.getByRole('button', { name: '删除记忆' }).click();
   await expect(confirm.getByRole('alert')).toHaveText('没有删除成功，记忆保持原样，请重试。');
   await confirm.getByRole('button', { name: '取消' }).click();
-  await expect(page.getByRole('dialog', { name: '代码风格' })).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(memoryRow(page, '代码风格')).toBeVisible();
+  await expect(confirm).toHaveCount(0);
+  await expect(dialog).toHaveCount(0);
+  await expect(memoryRow(page, '代码风格')).toBeFocused();
+  await expect(page.getByRole('dialog', { name: '记忆', exact: true })).toBeVisible();
 });
 
 test('edit a core memory inline: save PATCHes the changed text and follows the successor', async ({

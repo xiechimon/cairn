@@ -50,6 +50,7 @@
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "catalog:",
     "autoprefixer": "catalog:",
+    "happy-dom": "^21.0.4",
     "postcss": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",

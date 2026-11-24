@@ -1,7 +1,7 @@
 {
   "frozenFrom": {
-    "sha": "8380b3a47ea829a1f1da7f009ec266451986116a",
-    "date": "2026-11-22"
+    "sha": "09142f9da5716d2dfcf7d15c51d07c83943e36e7",
+    "date": "2026-11-24"
   },
   "scope": "apps/web/src/components/ui (#989, map #980). kind registry = shadcn base-nova registry item (upstreamItem names it; status pristine = hash must equal the vendored snapshot in scripts/ui-upstream-snapshots.json, deviated = registered divergence with reason). kind adapter = local composition over registry items or a repo-specific primitive (reason required). hash = sha256 over the comment-stripped, line-normalized file content (scripts/ui-normalize.mjs); comment-only edits do not move it, code edits always do. Scope is exactly this directory — domain-directory skins are ui-debt-gate/ui-drift-gate territory.",
   "files": {
@@ -75,8 +75,8 @@
     },
     "dialog-shell.tsx": {
       "kind": "adapter",
-      "reason": "Paper dialog adapter (docs/design/surfaces/chrome.md dialogs) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces. info puts an InfoTip beside the title for a background sentence that is not visible copy. stacked forces the registry overlay for a regular face opened over another dialog, as AlertDialogShell does, so the dialog underneath is dimmed.",
-      "hash": "d93a9363413dd40d6005e64e7cffc6a1ee692dec351ce65d54b6bb6ad12e75fa"
+      "reason": "Paper dialog adapter (docs/design/surfaces/chrome.md dialogs) over the registry dialog item: regular faces compose DialogContent/DialogTitle/DialogDescription/DialogClose and own the Paper skin here so dialog.tsx stays pristine (sheet surface, 16px corners, --dialog-shadow, S/M/L widths via --dialog-w-*, 16px title + 12px sub-line + 28px ghost close, body as the only scroll box, split footer with a left hint). Repo behavior contracts kept as semantic mapping (#193 three-segment cap + dialog-head/body/foot testids, #389 finalFocus, #73 retained-mount open flag, #318 layered dismiss, #68 family close law). viewportRoot and bare modes keep the legacy direct-primitive mechanism (search-panel / new-task-dialog / overlay/route-dialog own their geometry); zIndex/onBackdropClick/backdropClassName serve only those two modes, and bare forwards initialFocus. Exports the shared Paper pieces (DIALOG_* classes, DialogFootRow, dialogWidth) for AlertDialogShell and direct registry Dialog consumers. headerAction puts one quiet header action (memory Delete) left of the close button in regular faces. info puts an InfoTip beside the title for a background sentence that is not visible copy. stacked forces the registry overlay for a regular face opened over another dialog, as AlertDialogShell does, so the dialog underneath is dimmed. Panels carry data-[ending-style]:pointer-events-none so a popup in its closing transition cannot be clicked.",
+      "hash": "d82d929d7db6d69be44bf64f2fd75f3224aff5c51ac016e2d3d6c730a0aa2489"
     },
     "dialog.tsx": {
       "kind": "registry",
