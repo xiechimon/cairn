@@ -24,7 +24,7 @@ import {
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { blockedNow } from '../services/blockers.js';
-import { parseChiefTrigger } from '../services/chief.js';
+import { greetingReadmeSection, parseChiefTrigger } from '../services/chief.js';
 import { hasEarlierLiveChiefStep, STEER_HOLDS } from '../services/chief-turns.js';
 import { connectorToolDefsForTeam } from '../services/connector-broker.js';
 import { lastTurnUsageForColdResume } from '../services/coordinator-context.js';
@@ -414,13 +414,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
     return claimed;
   };
 
-  const claimedPayload = (
+  const claimedPayload = async (
     row: StepRow,
     providers: CoordinatorProviders,
-  ): {
+  ): Promise<{
     claimed: ClaimedStep;
     volatileText: string | null;
-  } | null => {
+  } | null> => {
     const threadRow = db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
     if (threadRow === undefined) return null;
     const chiefRow = db.select().from(chief).where(eq(chief.id, threadRow.chiefId)).get();
@@ -438,7 +438,9 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         origin: 'task-prompt',
       });
     }
-    const volatileParts = context.sections;
+    const readmeSection = await greetingReadmeSection(machine, row, threadRow);
+    const volatileParts =
+      readmeSection === null ? context.sections : [...context.sections, readmeSection];
     const lastUsage = lastTurnUsageForColdResume(db, row.buildId);
     const routerModel = `${providers.router.provider}/${providers.router.modelId}`;
     const retentionMs = cacheTtlMsFor(resolveCacheRetentionTier(), lastUsage?.model ?? routerModel);
@@ -625,7 +627,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         boundMs: CONNECTOR_TOOL_HYDRATE_BOUND_MS,
       });
       if (closing) return;
-      const payload = claimedPayload(row, providers);
+      const payload = await claimedPayload(row, providers);
+      if (closing) return;
       if (payload === null) throw new Error('Coordinator step has no chief thread');
       await runtime.runTurn({
         claimed: payload.claimed,

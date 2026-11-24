@@ -47,6 +47,7 @@ import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js
 import { blockerHandoffForClaim } from './blocker-handoff.js';
 import { holdBlockedBuild } from './blockers.js';
 import { failStepWithEvents, mergedPrElsewhere } from './builds.js';
+import { greetingReadmeSection } from './chief.js';
 import { chiefHistoryFor } from './chief-claim-history.js';
 import { hasEarlierLiveChiefStep } from './chief-turns.js';
 import { accountHeld, chiefLastRanOnOtherAccount } from './claude-account-hold.js';
@@ -280,14 +281,14 @@ function claimLocalTools(agentTools: readonly string[]): string[] {
   return tools;
 }
 
-function buildChiefClaim(
+async function buildChiefClaim(
   deps: MachineDeps,
   machineId: string,
   stepRow: typeof step.$inferSelect,
   threadRow: typeof chiefThread.$inferSelect,
   agentRow: RouteProfile,
   machineRow?: typeof machine.$inferSelect,
-): ClaimedStep | null {
+): Promise<ClaimedStep | null> {
   if (!agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (
@@ -323,14 +324,14 @@ const DAEMON_QUICK_REPLIES_GUIDANCE = [
   '</quick_replies>',
 ].join('\n');
 
-function chiefClaimPayload(
+async function chiefClaimPayload(
   deps: MachineDeps,
   machineId: string,
   stepRow: typeof step.$inferSelect,
   threadRow: typeof chiefThread.$inferSelect,
   agentRow: RouteProfile,
   machineRow?: typeof machine.$inferSelect,
-): ClaimedStep {
+): Promise<ClaimedStep> {
   const model = effectiveModel(agentRow, stepRow);
   const { trigger, systemPrompt, memories, instruction, memoryTrace } = chiefTurnContext(
     deps,
@@ -338,6 +339,11 @@ function chiefClaimPayload(
     threadRow,
     coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
+  const readmeSection = await greetingReadmeSection(deps, stepRow, threadRow);
+  const fullInstruction =
+    instruction !== null && readmeSection !== null
+      ? `${instruction}\n\n${readmeSection}`
+      : (instruction ?? readmeSection);
   deps.db.update(step).set({ memoryTrace }).where(eq(step.id, stepRow.id)).run();
   const runtime = stepRuntimeFor(model.provider);
   const boundSubscriptionId =
@@ -393,9 +399,9 @@ function chiefClaimPayload(
       action: continuesSession ? 'continue' : 'new',
       sessionId: continuesSession ? threadRow.sessionId : null,
     },
-    ...(instruction !== null
+    ...(fullInstruction !== null
       ? {
-          instruction,
+          instruction: fullInstruction,
         }
       : {}),
     agent: {
@@ -497,7 +503,7 @@ async function claimChiefTurn(
     }
     const chiefMachine = chiefMachineId(db, teamId, cand.agentRow.machineId);
     if (chiefMachine !== machineId) continue;
-    const claimed = buildChiefClaim(
+    const claimed = await buildChiefClaim(
       deps,
       machineId,
       cand.stepRow,

@@ -684,6 +684,67 @@ export async function readFile(
   return readCommittedFile(dir, commit, path, ref, options);
 }
 
+const README_CANDIDATES = [
+  'README.md',
+  'README.zh.md',
+  'readme.md',
+  'README.mdx',
+  'README.rst',
+  'README.txt',
+  'README',
+] as const;
+
+const README_READ_MAX_BYTES = 256 * 1024;
+const README_EXCERPT_MAX_CHARS = 6_000;
+
+export type ProjectReadmeResult =
+  | { status: 'ok'; repo: string; path: string; content: string; truncated: boolean }
+  | { status: 'missing'; repo: string }
+  | { status: 'unreadable'; repo: string; reason: string };
+
+function readmeRepoLabel(row: ProjectRow): string {
+  if (row.repoKind === 'github' && row.githubRepo !== null) return row.githubRepo;
+  if (row.repoKind === 'hosted' && row.repoName !== null) return row.repoName;
+  return row.name;
+}
+
+export async function readProjectReadme(
+  ctx: RepoReadCtx,
+  projectId: string,
+): Promise<ProjectReadmeResult | null> {
+  const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
+  if (row === undefined || row.repoKind === null) return null;
+  const repo = readmeRepoLabel(row);
+  const ref = row.baseBranch ?? undefined;
+  for (const candidate of README_CANDIDATES) {
+    try {
+      const file = await readFile(ctx, projectId, candidate, ref, {
+        maxBytes: README_READ_MAX_BYTES,
+      });
+      if (file.encoding !== 'utf-8') continue;
+      const truncated = file.content.length > README_EXCERPT_MAX_CHARS;
+      const content = truncated
+        ? `${file.content.slice(0, README_EXCERPT_MAX_CHARS)}\n…`
+        : file.content;
+      return { status: 'ok', repo, path: candidate, content, truncated };
+    } catch (error) {
+      if (
+        error instanceof HttpError &&
+        error.status === 404 &&
+        error.message.includes(`file ${candidate}`)
+      ) {
+        continue;
+      }
+      return {
+        status: 'unreadable',
+        repo,
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+  return { status: 'missing', repo };
+}
+
 export async function readBranches(
   ctx: RepoReadCtx,
   projectId: string,
