@@ -10,11 +10,17 @@ export function fetchMainTip({ repo, gh }) {
   return branch?.commit?.sha ?? null;
 }
 
-export function tipDecision({ tip, sha }) {
-  if (tip === sha) return { isTip: true };
+export function mainDecision({ repo, sha, gh }) {
+  const tip = fetchMainTip({ repo, gh });
+  if (tip === null) throw new Error('the branches/main read returned no commit sha');
+  if (tip === sha) return { onMain: true };
+  const comparison = JSON.parse(gh(['api', `repos/${repo}/compare/${sha}...${tip}`]));
+  if (comparison.status === 'ahead' && comparison.merge_base_commit?.sha === sha) {
+    return { onMain: true };
+  }
   return {
-    isTip: false,
-    reason: `main moved past ${sha.slice(0, 9)}; the tip is now ${String(tip).slice(0, 9)} and a later run evaluates whatever tip is current then`,
+    onMain: false,
+    reason: `${sha.slice(0, 9)} is not an ancestor of main ${tip.slice(0, 9)}`,
   };
 }
 
@@ -27,18 +33,13 @@ if (process.argv[1] && import.meta.filename === realpathSync(process.argv[1])) {
   try {
     const gh = (args) =>
       execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
-    const tip = fetchMainTip({ repo, gh });
-    if (tip === null) {
-      console.error('[release-tip] the branches/main read returned no commit sha');
-      process.exit(2);
-    }
-    const decision = tipDecision({ tip, sha });
-    if (decision.isTip) {
-      console.error(`[release-tip] ${sha.slice(0, 9)} is still the main tip`);
-      console.log('tip=true');
+    const decision = mainDecision({ repo, sha, gh });
+    if (decision.onMain) {
+      console.error(`[release-tip] ${sha.slice(0, 9)} is still on main`);
+      console.log('on_main=true');
     } else {
       console.error(`[release-tip] ${decision.reason}; skipping`);
-      console.log('tip=false');
+      console.log('on_main=false');
     }
     process.exit(0);
   } catch (error) {

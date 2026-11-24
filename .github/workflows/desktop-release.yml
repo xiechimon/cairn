@@ -29,10 +29,10 @@ jobs:
       actions: read
     outputs:
       release: ${{ steps.decision.outputs.release }}
-      sha: ${{ steps.sha.outputs.sha }}
+      sha: ${{ steps.decision.outputs.sha }}
       version: ${{ steps.decision.outputs.version }}
     steps:
-      - name: Resolve the main tip this run releases
+      - name: Resolve main history for candidate selection
         id: sha
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
           ref: ${{ steps.sha.outputs.sha }}
 
-      - name: Release the tip only when it is green, changed and untagged
+      - name: Select the newest green changed unreleased commit on main
         id: decision
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -351,7 +351,7 @@ jobs:
 
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ needs.decide.outputs.sha }}
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
@@ -385,7 +385,7 @@ jobs:
           GATE_REPO: ${{ github.repository }}
         run: node scripts/ops/release-gate.mjs "$RELEASE_SHA"
 
-      - name: Publish only while the candidate is still the main tip
+      - name: Publish only while the candidate is still on main
         id: tip
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -394,7 +394,7 @@ jobs:
         run: node scripts/ops/release-tip.mjs "$RELEASE_SHA" >> "$GITHUB_OUTPUT"
 
       - name: Publish the release
-        if: steps.tip.outputs.tip == 'true'
+        if: steps.tip.outputs.on_main == 'true'
         working-directory: apps/desktop/release
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -437,8 +437,8 @@ jobs:
               --input "$asset" --silent || bail "the asset $asset could not be uploaded"
           done
           tip=$(node "$GITHUB_WORKSPACE/scripts/ops/release-tip.mjs" "$RELEASE_SHA") || \
-            bail "the main tip could not be re-read"
-          [ "$tip" = "tip=true" ] || bail "main moved past $RELEASE_SHA"
+            bail "main ancestry could not be re-read"
+          [ "$tip" = "on_main=true" ] || bail "$RELEASE_SHA is no longer on main"
           plan=$(node "$GITHUB_WORKSPACE/scripts/ops/release-plan.mjs" "$RELEASE_SHA") || \
             bail "the desktop-v* releases and tags could not be re-read"
           if [ "$(printf '%s\n' "$plan" | sed -n 's/^released=//p')" = "true" ]; then

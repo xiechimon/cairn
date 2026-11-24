@@ -655,6 +655,7 @@ const publishFixture = (t) => {
       '        printf \'%s\\n\' "$RUN_READ"',
       '      fi',
       '      exit 0 ;;',
+      '    *compare/*) printf \'%s\\n\' "$COMPARE_READ"; exit 0 ;;',
       '    *branches/main*)',
       '      [ -z "$RERUN_ARMED" ] || : > "$RERUN_ARMED"',
       '      printf \'%s\\n\' "$BRANCH_READ"',
@@ -710,6 +711,10 @@ const publishFixture = (t) => {
         JOBS_PAGE: JSON.stringify({ jobs: greenJobs() }),
         EMPTY_PAGE: JSON.stringify({ jobs: [], workflow_runs: [] }),
         BRANCH_READ: JSON.stringify({ commit: { sha: built } }),
+        COMPARE_READ: JSON.stringify({
+          status: 'ahead',
+          merge_base_commit: { sha: git('merge-base', built, tip) },
+        }),
         RELEASES_PAGE: '[]',
         TAGS_READ: '[]',
         ...over,
@@ -873,6 +878,19 @@ test('run 45401517056: main advancing during packaging still publishes its green
     built,
   );
   assert.equal(callIndex(run.calls, /-X DELETE/), -1);
+});
+
+test('a packaged commit outside main never publishes even with green ci', (t) => {
+  const { git, publish, tip } = publishFixture(t);
+  const run = publish({
+    BRANCH_READ: JSON.stringify({ commit: { sha: tip } }),
+    COMPARE_READ: JSON.stringify({ status: 'diverged', merge_base_commit: { sha: tip } }),
+  });
+  assert.notEqual(run.result.status, 0);
+  assert.match(run.result.stderr, /no longer on main/);
+  assert.equal(run.state, 'draft');
+  assert.equal(callIndex(run.calls, /^api -X PATCH /), -1);
+  assert.equal(git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2'), '');
 });
 
 test('a ci attempt that turned during the upload leaves the staged draft behind', (t) => {

@@ -33,27 +33,25 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
   `schedule` backstop — GitHub's schedule trigger is best-effort and can
   delay or drop ticks for hours — and by `workflow_dispatch` to `main`
   only, so trusted `main` code still runs it. The wake is still
-  level-triggered: the run resolves the `main` tip fresh rather than
+  level-triggered: the run scans current `main` history rather than
   trusting the event's SHA. Runs serialize on one workflow-level concurrency
   group that never cancels the running release (`desktop-release`,
   `cancel-in-progress: false`); GitHub keeps only the newest pending run,
   so a later wake or dispatch replaces an earlier pending one and a run
   that finds the slot busy waits. Nothing retries a failed or replaced run
-  as such: a later wake evaluates the `main` tip current at that time,
-  and no re-dispatch job exists. Each run resolves the current
-  `main` tip through the branches API and checks it out, then
-  `scripts/ops/release-decide.mjs` judges it once: it plans the release
-  from the `desktop-v*` tags and releases
-  (`scripts/ops/release-plan.mjs`), reads the tip's push-to-`main` `ci`
-  run (`scripts/ops/release-gate.mjs`) and diffs the shipped app sources
-  against the highest-version published stable `desktop-v*` release.
-  The run releases only when all three hold — the ci run's latest attempt
-  ended `success` with green `check`/`pack-smoke`/`e2e-gate` jobs, shipped
-  sources moved, and no published stable `desktop-v*` release's tag
-  points at the tip — and exits successfully doing nothing otherwise:
-  pending ci, red ci, unchanged sources and an already released tip are
-  all skips, and a manual dispatch runs the identical check with no
-  source-diff bypass. Nothing is staged or resumed: a releasing run
+  as such: a later wake scans current `main` again, and no re-dispatch job
+  exists. Each run resolves main through the branches API and checks out its
+  full history. `scripts/ops/release-decide.mjs` scans newest first, excluding
+  ancestors of the highest-version published stable `desktop-v*` release.
+  It selects the newest unreleased commit whose own push-to-main CI's latest
+  attempt completed `success` with green `check`/`pack-smoke`/`e2e-gate`
+  (`scripts/ops/release-gate.mjs`) and whose shipped app sources moved since
+  that stable release. Pending or red CI on the tip does not block an older
+  eligible commit. No eligible candidate means a successful skip; manual
+  dispatch follows the identical rule without a source-diff bypass.
+  Both builds and live verification pin the selected SHA, while publish
+  control scripts come from the trusted workflow revision so selecting an
+  older candidate cannot restore an obsolete release gate. Nothing is staged or resumed: a releasing run
   always allocates a fresh version once, at decide time — the first
   `desktop-v*` name held by no tag and no release, published,
   prerelease or draft. Drafts reach the deciding token because the
@@ -94,9 +92,8 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
   carries the version yet — and the response's numeric `id` is the
   only handle used from there on. Every asset is uploaded to
   `releases/{id}/assets`. With the upload done the evidence is re-read
-  one last time — the `main` tip (`scripts/ops/release-tip.mjs`),
-  stopping when `main` moved past the resolved tip so an out-of-order
-  `ci` completion can never ship older code as the latest update,
+  one last time — the candidate must remain an ancestor of current `main`
+  (`scripts/ops/release-tip.mjs`); main advancing during packaging is allowed,
   whether a published stable `desktop-v*` release's tag
   already covers the SHA (`scripts/ops/release-plan.mjs`), and the
   version still above the highest published stable release
@@ -110,7 +107,7 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
   retargeted during the upload is abandoned, never renamed back, and
   GitHub creates the tag at the `target_commitish` the draft still holds. Any of those re-checks
   failing aborts the step and leaves the staged draft — no tag exists
-  to clean: a `main` that moved, ci that turned, a stable release that
+  to clean: a candidate outside `main`, ci that turned, a stable release that
   appeared over the same commit, a higher version that landed during
   the upload or a tag that appeared in it each refuse the publish. A
   publish-only rerun of an old run can therefore never release the same
@@ -125,8 +122,8 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
   publish the checked state, and the next release then publishes the
   newer tip and moves `latest` to it. Closing the window entirely would
   need the release write coordinated with main promotion and ci reruns
-  rather than separate API reads. A red tip therefore delays releases until
-  `main` is green again; that stall is intended, not a bug. `publish`
+  rather than separate API reads. A red or pending tip does not delay an
+  older eligible green ancestor. `publish`
   also waits on the `live-verify` job, which drives the new-task journey
   on an isolated stack and archives the evidence as an artifact.
 - `S` still equals `queue/main` head (a lane may have stacked a newer candidate;
@@ -316,8 +313,9 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
 - `release-gate.test.mjs`: the release gate waits on a missing or running
   `ci` run, re-reads the run around the pinned jobs so a superseded attempt
   cannot publish, blocks a red or cancelled latest attempt, and releases
-  only while the candidate is still the `main` tip (`release-tip.mjs`);
-  `decideRelease` releases a green, changed, unreleased tip and skips a
+  only while the candidate is still on `main` (`release-tip.mjs`);
+  the decide CLI scans past pending tip CI to select an older green ancestor;
+  `decideRelease` releases a green, changed, unreleased candidate and skips a
   pending, red, unchanged or already released one, holding a manual
   dispatch to the same rule; `planRelease` picks the first `desktop-v*`
   version held by no tag and no release — a published stable release on

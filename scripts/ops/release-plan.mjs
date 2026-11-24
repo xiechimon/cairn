@@ -56,7 +56,7 @@ export function planRelease({ sha, targets, releases }) {
     return {
       released: true,
       version: desktopTagVersion(covered.tag).join('.'),
-      reason: `${covered.tag} points at ${sha.slice(0, 9)} and its release is published; the tip is already released`,
+      reason: `${covered.tag} points at ${sha.slice(0, 9)} and its release is published; the candidate is already released`,
     };
   }
   return {

@@ -61,8 +61,8 @@ export function fetchGateEvidence({ repo, sha, gh }) {
       conclusion: after.conclusion,
       head_sha: after.head_sha,
       repository: repo,
-      event: before.event ?? picked.event,
-      head_branch: before.head_branch ?? picked.head_branch,
+      event: after.event,
+      head_branch: after.head_branch,
     },
     jobs,
   };

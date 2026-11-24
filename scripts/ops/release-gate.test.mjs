@@ -437,17 +437,24 @@ test('release-tip resolves the current main tip through the gh api', async () =>
   assert.deepEqual(calls, ['repos/o/r/branches/main']);
 });
 
-test('release-tip decides publish only when the candidate is the main tip', async () => {
-  const { tipDecision } = await import('./release-tip.mjs');
-  assert.deepEqual(tipDecision({ tip: SHA, sha: SHA }), { isTip: true });
-  const moved = tipDecision({ tip: OTHER_SHA, sha: SHA });
-  assert.equal(moved.isTip, false);
-  assert.match(moved.reason, /moved past|tip is now/);
-  assert.match(
-    moved.reason,
-    /a later run evaluates whatever tip is current then/,
-    'a queued or later run resolves the tip fresh; no push owns a release run',
-  );
+test('release-tip permits main ancestors and refuses missing, diverged or ahead candidates', async () => {
+  const { mainDecision } = await import('./release-tip.mjs');
+  for (const status of ['ahead', 'behind', 'diverged', 'identical', undefined]) {
+    for (const base of [SHA, OTHER_SHA]) {
+      const decision = mainDecision({
+        repo: 'o/r',
+        sha: SHA,
+        gh: ([, url]) =>
+          JSON.stringify(
+            url.includes('/branches/')
+              ? { commit: { sha: OTHER_SHA } }
+              : { status, merge_base_commit: { sha: base } },
+          ),
+      });
+      assert.equal(decision.onMain, status === 'ahead' && base === SHA);
+    }
+  }
+  assert.throws(() => mainDecision({ repo: 'o/r', sha: SHA, gh: () => '{}' }), /no commit sha/);
 });
 
 const workflow = readFileSync(
@@ -626,7 +633,7 @@ test('the publish job rechecks the evidence and releases only while the commit i
   const publish = jobBlock('publish');
   assert.match(publish, /actions: read/);
   const gateThenTipThenPublish =
-    /release-gate\.mjs "\$RELEASE_SHA"[\s\S]*?id: tip[\s\S]*?release-tip\.mjs "\$RELEASE_SHA" >> "\$GITHUB_OUTPUT"[\s\S]*?- name: Publish the release\s*\n\s*if: steps\.tip\.outputs\.tip == 'true'/.exec(
+    /release-gate\.mjs "\$RELEASE_SHA"[\s\S]*?id: tip[\s\S]*?release-tip\.mjs "\$RELEASE_SHA" >> "\$GITHUB_OUTPUT"[\s\S]*?- name: Publish the release\s*\n\s*if: steps\.tip\.outputs\.on_main == 'true'/.exec(
       publish,
     );
   assert.ok(
@@ -653,7 +660,7 @@ test('the whole run serializes on one workflow-level group so every tick judges 
 });
 
 test('every job builds, verifies and publishes the resolved release commit', () => {
-  assert.equal(parsed.jobs.decide.outputs.sha, `\${{ steps.sha.outputs.sha }}`);
+  assert.equal(parsed.jobs.decide.outputs.sha, `\${{ steps.decision.outputs.sha }}`);
   const pinned = `\${{ needs.decide.outputs.sha }}`;
   for (const name of ['live-verify', 'package', 'publish']) {
     const checkouts = (parsed.jobs[name].steps ?? []).filter(
@@ -661,7 +668,11 @@ test('every job builds, verifies and publishes the resolved release commit', () 
     );
     assert.ok(checkouts.length > 0, `${name} checks out`);
     for (const checkout of checkouts) {
-      assert.equal(checkout.with?.ref, pinned, `${name} pins the release sha`);
+      assert.equal(
+        checkout.with?.ref,
+        name === 'publish' ? `\${{ github.sha }}` : pinned,
+        `${name} pins application sources or trusted release control`,
+      );
     }
   }
   assert.ok(parsed.jobs.publish.needs.includes('decide'));
@@ -775,6 +786,7 @@ test('the publish tip step exits without releasing when the packaged sha is not 
       '#!/bin/sh',
       'case "$2" in',
       '  *branches/main*) printf \'%s\\n\' "$BRANCH_READ"; exit 0 ;;',
+      '  *compare/*) printf \'%s\\n\' \'{"status":"diverged"}\'; exit 0 ;;',
       'esac',
       'printf \'stub gh: unexpected %s\\n\' "$*" >&2',
       'exit 1',
@@ -803,12 +815,12 @@ test('the publish tip step exits without releasing when the packaged sha is not 
   assert.equal(moved.status, 0, moved.stderr);
   assert.equal(
     readFileSync(output, 'utf8'),
-    'tip=false\n',
+    'on_main=false\n',
     'a stale packaged sha leaves the step green and skips the publish step',
   );
   const current = runStep(SHA);
   assert.equal(current.status, 0, current.stderr);
-  assert.equal(readFileSync(output, 'utf8'), 'tip=true\n');
+  assert.equal(readFileSync(output, 'utf8'), 'on_main=true\n');
 });
 
 const freshTip = { released: false, version: '0.1.9' };

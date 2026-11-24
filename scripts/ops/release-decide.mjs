@@ -52,7 +52,7 @@ export function decideRelease({ plan, verdict, changed }) {
   if (verdict?.action !== 'release') {
     return {
       release: false,
-      reason: `the tip's required ci is not green: ${verdict?.reason ?? 'no ci verdict'}`,
+      reason: `the candidate's required ci is not green: ${verdict?.reason ?? 'no ci verdict'}`,
     };
   }
   if (changed !== true) {
@@ -64,7 +64,7 @@ export function decideRelease({ plan, verdict, changed }) {
   return {
     release: true,
     reason:
-      'the tip is green, its shipped sources moved and no published desktop-v* release covers it',
+      'the candidate is green, its shipped sources moved and no published desktop-v* release covers it',
   };
 }
 
@@ -81,31 +81,36 @@ if (process.argv[1] && import.meta.filename === realpathSync(process.argv[1])) {
     const gh = (args) =>
       execFileSync('gh', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
     const releases = fetchDesktopReleases({ repo, gh });
-    const plan = planRelease({
-      sha,
-      targets: fetchDesktopTagTargets({ repo, gh }),
-      releases,
-    });
-    if (plan.reason !== null) console.error(`[release-decide] ${plan.reason}`);
-    let verdict = null;
-    let changed = null;
-    if (plan.released !== true) {
-      const evidence = fetchGateEvidence({ repo, sha, gh });
-      verdict = evaluate({ run: evidence.run, jobs: evidence.jobs, sha, repo });
-      if (verdict.action === 'release') {
-        const sources = shippedSourcesChanged({
-          lastTag: highestBaselineRelease(releases),
-          sha,
-          git,
-        });
-        changed = sources.changed;
-        console.error(`[release-decide] ${sources.reason}`);
+    const targets = fetchDesktopTagTargets({ repo, gh });
+    const lastTag = highestBaselineRelease(releases);
+    const candidates = function* () {
+      yield sha;
+      const args = ['rev-list', '--topo-order', '--skip=1', sha];
+      if (lastTag !== null) args.push('--not', lastTag);
+      yield* git(args).trim().split('\n').filter(Boolean);
+    };
+    let version = null;
+    let selected = null;
+    for (const candidate of candidates()) {
+      const plan = planRelease({ sha: candidate, targets, releases });
+      version = plan.version;
+      if (plan.released) break;
+      const evidence = fetchGateEvidence({ repo, sha: candidate, gh });
+      const verdict = evaluate({ ...evidence, sha: candidate, repo });
+      const sources =
+        verdict.action === 'release'
+          ? shippedSourcesChanged({ lastTag, sha: candidate, git })
+          : null;
+      const decision = decideRelease({ plan, verdict, changed: sources?.changed });
+      console.error(`[release-decide] ${candidate.slice(0, 9)}: ${decision.reason}`);
+      if (decision.release) {
+        selected = candidate;
+        break;
       }
     }
-    const decision = decideRelease({ plan, verdict, changed });
-    console.error(`[release-decide] ${decision.reason}`);
-    console.log(`release=${decision.release}`);
-    console.log(`version=${plan.version}`);
+    console.log(`release=${selected !== null}`);
+    console.log(`sha=${selected ?? ''}`);
+    console.log(`version=${version ?? ''}`);
     process.exit(0);
   } catch (error) {
     console.error(
