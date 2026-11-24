@@ -685,7 +685,9 @@ export function openAntigravitySubscription(
   provider: string | null | undefined,
   boundSubscriptionId: string | null | undefined,
 ): string | undefined {
-  if (provider !== 'antigravity' || !boundSubscriptionId) return undefined;
+  if (provider !== 'antigravity') return undefined;
+  if (!boundSubscriptionId)
+    throw new HttpError(409, 'The step has no bound Antigravity connection.');
   const row = subscriptionRow(deps.db, teamId, boundSubscriptionId);
   if (row === undefined) throw new HttpError(409, 'The bound Antigravity connection is missing.');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
@@ -707,8 +709,9 @@ export function openAntigravitySubscription(
 export function enabledAntigravitySubscriptionId(
   deps: { db: Pick<Db, 'select'> },
   teamId: string,
+  at?: number,
 ): string | null {
-  return activeSubscriptionRow(deps, teamId)?.id ?? null;
+  return activeSubscriptionRow(deps, teamId, at)?.id ?? null;
 }
 
 export function enabledAntigravitySubscriptionModels(
@@ -747,7 +750,11 @@ export function hasActiveAntigravitySubscription(
   return activeSubscriptionRow(deps, teamId) !== undefined;
 }
 
-function activeSubscriptionRow(deps: { db: Pick<Db, 'select'> }, teamId: string): Row | undefined {
+function activeSubscriptionRow(
+  deps: { db: Pick<Db, 'select'> },
+  teamId: string,
+  at = nowMs(),
+): Row | undefined {
   return deps.db
     .select()
     .from(antigravitySubscription)
@@ -755,10 +762,7 @@ function activeSubscriptionRow(deps: { db: Pick<Db, 'select'> }, teamId: string)
       and(
         eq(antigravitySubscription.teamId, teamId),
         isNotNull(antigravitySubscription.enabledAt),
-        or(
-          isNull(antigravitySubscription.expiresAt),
-          gt(antigravitySubscription.expiresAt, nowMs()),
-        ),
+        or(isNull(antigravitySubscription.expiresAt), gt(antigravitySubscription.expiresAt, at)),
       ),
     )
     .get();

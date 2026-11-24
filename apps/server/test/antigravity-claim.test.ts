@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import {
   antigravitySubscription as antigravitySubscriptionTable,
   build as buildTable,
@@ -8,7 +8,9 @@ import {
   step as stepTable,
 } from '../src/db/schema.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
+import { claimPendingChiefStep } from '../src/services/coordinator-steps.js';
 import { antigravityUsable } from '../src/services/dispatch-eligibility.js';
+import * as machineRouting from '../src/services/machine-routing.js';
 import { claimStep, stepToken } from '../src/services/machines.js';
 import {
   bootServer,
@@ -24,6 +26,7 @@ const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const d of disposables.splice(0)) d();
   setCoordinatorInServer(false);
+  vi.restoreAllMocks();
 });
 
 function claim(s: TestServer, machineId: string) {
@@ -141,6 +144,31 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       modelId: 'gemini-4-carbon',
       machineId: authMachine,
     });
+    const expiry = Date.now() + 60_000;
+    s.db
+      .update(antigravitySubscriptionTable)
+      .set({ expiresAt: expiry })
+      .where(eq(antigravitySubscriptionTable.id, subId))
+      .run();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(expiry - 1);
+    const eligibility = machineRouting.workerIneligibility;
+    const beforeExpiry = vi
+      .spyOn(machineRouting, 'workerIneligibility')
+      .mockImplementationOnce((...args) => {
+        const result = eligibility(...args);
+        expect(result).toBeNull();
+        clock.mockReturnValue(expiry);
+        return result;
+      });
+    await expect(claim(s, authMachine)).resolves.toBeNull();
+    expect(beforeExpiry).toHaveBeenCalled();
+    expect(s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get()).toMatchObject({
+      status: 'pending',
+      antigravitySubscriptionId: null,
+    });
+    clock.mockRestore();
+    beforeExpiry.mockRestore();
+
     const claimed = await claim(s, authMachine);
     expect(claimed?.agent).toMatchObject({
       provider: 'antigravity',
@@ -200,6 +228,32 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
     s.db
       .insert(stepTable)
       .values({ id: 'cs1', buildId: 'chief-ag-1', kind: 'chief', status: 'pending', createdAt: 3 })
+      .run();
+
+    const pending = s.db.select().from(stepTable).where(eq(stepTable.id, 'cs1')).get();
+    if (pending === undefined) throw new Error('Missing pending Coordinator step');
+    const now = Date.now();
+    s.db
+      .update(antigravitySubscriptionTable)
+      .set({ expiresAt: now })
+      .where(eq(antigravitySubscriptionTable.id, subA))
+      .run();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now);
+    expect(
+      claimPendingChiefStep(s.db, pending, {
+        machineId,
+        bind: { runtime: 'antigravity', teamId: s.team.id },
+        model: { provider: 'antigravity', modelId: 'gemini-4-carbon', thinkingLevel: null },
+      }),
+    ).toBeNull();
+    expect(s.db.select().from(stepTable).where(eq(stepTable.id, 'cs1')).get()?.status).toBe(
+      'pending',
+    );
+    clock.mockRestore();
+    s.db
+      .update(antigravitySubscriptionTable)
+      .set({ expiresAt: null })
+      .where(eq(antigravitySubscriptionTable.id, subA))
       .run();
 
     const firstClaim = await claim(s, machineId);

@@ -37,6 +37,7 @@ Spawns the real CLI twice under a scratch `$HOME` (mkdtemp, removed in `finally`
 - ACP probe fails: the whole harvest fails with the probe's reason — the ACP advertised set is the authoritative contract; a `models list`-only fallback would offer values the session cannot actually select.
 - Expired subscription: short-circuits to `{status:'failed',failure:'auth',httpStatus:null}` without spawning.
 - A successful harvest stays fresh for one minute. The next request then starts one background refresh and returns the previous catalog while it runs. Concurrent cold requests share one harvest. Temporary failures preserve a previous catalog for up to five minutes from its successful fetch; auth failures discard it. Cold retries after a failed harvest are limited to one per ten seconds. Cache entries cannot be reused after subscription expiry, credential replacement or deletion.
+- Echo defense: while parsing the raw ACP options and the models list, an option whose `value` or `name` contains the token, or whose `value`/`name` exceeds 256 characters (the shared schema bound), is dropped on its own; catalog `family_label`, `cost_tier`, `cost_summary` and `model_uid` containing the token are ignored field by field. Other models and safe metadata stay.
 - Token hygiene: the token only ever enters the scratch `credentials.toml` and the child env; the scratch HOME is removed in `finally`, and errors map through `errorReason` so stderr text never becomes a response body.
 
 ## Readers — `listDevinSources` three-layer merge

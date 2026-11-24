@@ -14,6 +14,8 @@ import {
 const MAX_MODEL_UPDATE_WAIT_MS = 2_000;
 const MAX_CATALOG_GRACE_MS = 2_000;
 const MAX_MODELS = 2000;
+const MAX_MODEL_ID_LENGTH = 256;
+const MAX_MODEL_NAME_LENGTH = 256;
 const MODELS_LIST_ARGS = ['models', 'list', '--format', 'json', '--process-model', 'in-process'];
 const SUPPORTS_IMAGES_META = 'cognition.ai/supportsImages';
 
@@ -46,11 +48,16 @@ function acpFailure(error: { code?: number; message?: string }): Failure {
   return error.code === -32000 ? { ok: false, reason: 'auth' } : failure(error.message ?? '');
 }
 
-function stringOf(value: unknown, max: number): string | undefined {
-  return typeof value === 'string' && value.length > 0 && value.length <= max ? value : undefined;
+function stringOf(value: unknown, max: number, token: string): string | undefined {
+  return typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= max &&
+    !value.includes(token)
+    ? value
+    : undefined;
 }
 
-function parseCatalog(stdout: string): Map<string, CatalogVariant> {
+function parseCatalog(stdout: string, token: string): Map<string, CatalogVariant> {
   const meta = new Map<string, CatalogVariant>();
   let parsed: unknown;
   try {
@@ -65,19 +72,19 @@ function parseCatalog(stdout: string): Map<string, CatalogVariant> {
   if (!Array.isArray(families)) return meta;
   for (const family of families) {
     if (typeof family !== 'object' || family === null) continue;
-    const familyLabel = stringOf((family as { family_label?: unknown }).family_label, 256);
+    const familyLabel = stringOf((family as { family_label?: unknown }).family_label, 256, token);
     const variants = (family as { variants?: unknown }).variants;
     if (!Array.isArray(variants)) continue;
     for (const variant of variants) {
       if (typeof variant !== 'object' || variant === null) continue;
       const record = variant as Record<string, unknown>;
-      const uid = stringOf(record.model_uid, 256);
+      const uid = stringOf(record.model_uid, MAX_MODEL_ID_LENGTH, token);
       if (uid === undefined || meta.has(uid)) continue;
       const variantMeta: CatalogVariant = {};
       if (familyLabel !== undefined) variantMeta.family = familyLabel;
-      const costTier = stringOf(record.cost_tier, 256);
+      const costTier = stringOf(record.cost_tier, 256, token);
       if (costTier !== undefined) variantMeta.costTier = costTier;
-      const costSummary = stringOf(record.cost_summary, 512);
+      const costSummary = stringOf(record.cost_summary, 512, token);
       if (costSummary !== undefined) variantMeta.costSummary = costSummary;
       if (
         typeof record.max_context_tokens === 'number' &&
@@ -126,11 +133,11 @@ function listCatalog(
     child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
       stdout += chunk;
     });
-    child.on('close', (code) => finish(code === 0 ? parseCatalog(stdout) : new Map()));
+    child.on('close', (code) => finish(code === 0 ? parseCatalog(stdout, token) : new Map()));
   });
 }
 
-function modelOptionsOf(configOptions: unknown): AcpModelOption[] {
+function modelOptionsOf(configOptions: unknown, token: string): AcpModelOption[] {
   if (!Array.isArray(configOptions)) return [];
   const options: AcpModelOption[] = [];
   for (const option of configOptions) {
@@ -151,14 +158,17 @@ function modelOptionsOf(configOptions: unknown): AcpModelOption[] {
           name?: unknown;
           _meta?: unknown;
         };
-        if (typeof value !== 'string' || value === '') continue;
+        const id = stringOf(value, MAX_MODEL_ID_LENGTH, token);
+        if (id === undefined) continue;
+        const label = typeof name === 'string' && name !== '' ? name : id;
+        if (stringOf(label, MAX_MODEL_NAME_LENGTH, token) === undefined) continue;
         const supportsImages =
           typeof _meta === 'object' && _meta !== null
             ? (_meta as Record<string, unknown>)[SUPPORTS_IMAGES_META]
             : undefined;
         options.push({
-          value,
-          name: typeof name === 'string' && name !== '' ? name : value,
+          value: id,
+          name: label,
           ...(typeof supportsImages === 'boolean' ? { supportsImages } : {}),
         });
       }
@@ -238,7 +248,7 @@ function acpModelOptions(
         if (update?.sessionUpdate !== 'config_option_update' || typeof updateSession !== 'string') {
           return;
         }
-        const options = modelOptionsOf(update.configOptions);
+        const options = modelOptionsOf(update.configOptions, token);
         if (options.length === 0) return;
         if (sessionId === undefined) {
           if (bufferedUpdates.has(updateSession) || bufferedUpdates.size < 16) {
@@ -287,7 +297,7 @@ function acpModelOptions(
           return;
         }
         sessionId = openedSessionId;
-        merge(modelOptionsOf(message.result?.configOptions));
+        merge(modelOptionsOf(message.result?.configOptions, token));
         const earlier = bufferedUpdates.get(sessionId);
         if (earlier !== undefined) merge(earlier);
         updateDeadline = setTimeout(finishOptions, updateWaitMs);

@@ -98,7 +98,7 @@ describe('antigravity subscriptions REST & model sources', () => {
     expect(badRename.status).toBe(400);
   });
 
-  test('a bound step cannot fall back to host login if its subscription is missing or expired', async () => {
+  test('a step cannot fall back to host login if its subscription binding is absent, missing or expired', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());
     const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
@@ -110,10 +110,10 @@ describe('antigravity subscriptions REST & model sources', () => {
       expiresAt: Date.now() - 1000,
     });
     const { id: expiredId } = (await expired.json()) as { id: string };
-    const open = (id: string) =>
+    const open = (id?: string | null) =>
       openAntigravitySubscription({ db: s.db, box: s.secretBox }, s.team.id, 'antigravity', id);
     expect(open(hostId)).toBeUndefined();
-    for (const id of ['missing-bound-account', expiredId]) {
+    for (const id of [undefined, null, 'missing-bound-account', expiredId]) {
       expect(() => open(id)).toThrow(expect.objectContaining({ status: 409 }));
     }
   });

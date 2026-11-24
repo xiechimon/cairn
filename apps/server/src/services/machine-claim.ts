@@ -554,6 +554,7 @@ async function tryClaim(
     const enabledId = enabledSubscriptionId({ db }, teamId);
     const enabledDevinId = enabledDevinSubscriptionId({ db }, teamId);
     const enabledAntigravityId = enabledAntigravitySubscriptionId({ db }, teamId);
+    if (claimRuntimeIsAntigravity && enabledAntigravityId === null) continue;
     const prior = priorSessionOf(
       db,
       cand.stepRow,
@@ -613,7 +614,11 @@ async function tryClaim(
         if (projectFull(tx)) return false;
         const boundId = enabledSubscriptionId({ db: tx }, teamId);
         const boundDevinId = enabledDevinSubscriptionId({ db: tx }, teamId);
-        const boundAntigravityId = enabledAntigravitySubscriptionId({ db: tx }, teamId);
+        const boundAntigravityId = enabledAntigravitySubscriptionId(
+          { db: tx },
+          teamId,
+          Math.max(claimedAt, nowMs()),
+        );
         if (claimRuntimeIsClaudeCode) {
           if (boundId !== enabledId) return false;
           const fresh = priorSessionOf(
@@ -630,7 +635,11 @@ async function tryClaim(
           if (accountHeld(cand.stepRow, fresh, boundId)) return false;
         }
         if (claimRuntimeIsDevin && boundDevinId !== enabledDevinId) return false;
-        if (claimRuntimeIsAntigravity && boundAntigravityId !== enabledAntigravityId) return false;
+        if (
+          claimRuntimeIsAntigravity &&
+          (boundAntigravityId === null || boundAntigravityId !== enabledAntigravityId)
+        )
+          return false;
         const latestTodo = db.select().from(todo).where(eq(todo.id, cand.todoRow.id)).get();
         if (latestTodo === undefined) return false;
         if (

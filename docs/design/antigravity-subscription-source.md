@@ -80,7 +80,7 @@ The create and initial-attach APIs resolve the Google subject and remaining bear
 - Verification click (`POST /verify`) with `tokenCipher = null`: checks connected online Runners reporting `capabilities.antigravity.installed`; succeeds only if an online Runner reports `authenticated === true`, else returns `ok: false, reason: 'missing_local_login'`.
 - Switching enabled subscription (`enabledAt` changes): automatic continuation holds (`accountHeld` / `chiefLastRanOnOtherAccount`) force a fresh ACP session instead of resuming under the wrong account.
 - Disabling, deleting, replacing or attaching a credential to a subscription with a claimed step requires that step to finish first. A new connection can still be saved inactive while the enabled one is expired but referenced by a claimed step.
-- Step credential delivery refuses a missing or expired bound connection; only a valid host-login connection can deliberately supply no token.
+- A worker or Coordinator claim without a valid Antigravity subscription at claim time leaves the step pending, even if the connection was valid when Runner eligibility was first checked. Step credential delivery refuses an absent, missing or expired binding; only a valid host-login connection can deliberately supply no token.
 
 ## Test Matrix (One Test per Path)
 

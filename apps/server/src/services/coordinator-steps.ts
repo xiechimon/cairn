@@ -11,7 +11,6 @@ import {
 import { and, asc, desc, eq, inArray, isNotNull, notInArray, notLike, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
-  antigravitySubscription,
   chiefMessage,
   chiefThread,
   chiefTurnUsage,
@@ -26,6 +25,7 @@ import {
 } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { emitRuntimeStepSpan } from '../runtime-otel.js';
+import { enabledAntigravitySubscriptionId } from './antigravity-subscriptions.js';
 import {
   chiefClaimContext,
   coordinatorTurnState,
@@ -81,8 +81,14 @@ export function claimPendingChiefStep(
     typeof options.bind === 'string'
       ? { runtime: 'claude-code' as const, teamId: options.bind }
       : (options.bind ?? null);
+  if (options.model?.provider === 'antigravity' && bind?.runtime !== 'antigravity') return null;
   const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
   const claimed = db.transaction(() => {
+    const antigravitySubscriptionId =
+      bind?.runtime === 'antigravity'
+        ? enabledAntigravitySubscriptionId({ db }, bind.teamId, Math.max(claimedAt, nowMs()))
+        : null;
+    if (bind?.runtime === 'antigravity' && antigravitySubscriptionId === null) return null;
     const res = db
       .update(step)
       .set({
@@ -100,12 +106,7 @@ export function claimPendingChiefStep(
                 string | null
               >`(select ${devinSubscription.id} from ${devinSubscription} where ${devinSubscription.teamId} = ${bind.teamId} and ${devinSubscription.enabledAt} is not null and (${devinSubscription.expiresAt} is null or ${devinSubscription.expiresAt} > ${claimedAt}))`
             : null,
-        antigravitySubscriptionId:
-          bind?.runtime === 'antigravity'
-            ? sql<
-                string | null
-              >`(select ${antigravitySubscription.id} from ${antigravitySubscription} where ${antigravitySubscription.teamId} = ${bind.teamId} and ${antigravitySubscription.enabledAt} is not null and (${antigravitySubscription.expiresAt} is null or ${antigravitySubscription.expiresAt} > ${claimedAt}))`
-            : null,
+        antigravitySubscriptionId,
         claimedAt,
         lastHeartbeatAt: claimedAt,
         holdReason: null,

@@ -130,6 +130,8 @@ type FakeOpts = {
   extraModels?: number;
   partialUpdateDelaySeconds?: number;
   authErrorAt?: 'initialize' | 'authenticate' | 'session/new';
+  catalogData?: unknown;
+  configOptions?: unknown;
 };
 
 function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
@@ -142,7 +144,7 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
   const authenticate = opts.authenticate ?? 'ok';
   const catalogBody =
     catalog === 'ok'
-      ? `printf '%s' '${JSON.stringify(CATALOG)}'`
+      ? `printf '%s' '${JSON.stringify(opts.catalogData ?? CATALOG)}'`
       : catalog === 'garbage'
         ? "printf 'not json'"
         : catalog === 'hang'
@@ -167,7 +169,7 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
       ? structuredAuthError(3)
       : acp === 'session-error'
         ? '{"jsonrpc":"2.0","id":3,"error":{"code":-32603,"message":"session blew up"}}'
-        : `{"jsonrpc":"2.0","id":3,"result":{"sessionId":"s1","configOptions":${JSON.stringify(acp === 'update-only' || acp === 'early-update' ? [] : acp === 'partial-then-update' ? PARTIAL_OPTIONS : CONFIG_OPTIONS)}}}`;
+        : `{"jsonrpc":"2.0","id":3,"result":{"sessionId":"s1","configOptions":${JSON.stringify(acp === 'update-only' || acp === 'early-update' ? [] : acp === 'partial-then-update' ? PARTIAL_OPTIONS : (opts.configOptions ?? CONFIG_OPTIONS))}}}`;
   const modelUpdate = (configOptions: unknown) =>
     JSON.stringify({
       jsonrpc: '2.0',
@@ -398,6 +400,117 @@ describe('fetchDevinSubscriptionModels', () => {
     const result = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 150 });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.models).toHaveLength(3);
+  });
+});
+
+describe('fetchDevinSubscriptionModels credential echo defense', () => {
+  const modelSelect = (options: unknown[]) => [
+    { id: 'model', name: 'Model', category: 'model', type: 'select', options },
+  ];
+
+  test('drops ACP models whose id or name echo the token or exceed the schema length', async () => {
+    fakeDevinModels({
+      acp: 'no-update',
+      catalog: 'fail',
+      configOptions: modelSelect([
+        { value: 'safe-a', name: 'Safe A' },
+        { value: `leak-${TOKEN}`, name: 'Leaky id' },
+        { value: 'leak-name', name: `Name ${TOKEN} echoed` },
+        { value: 'x'.repeat(257), name: 'Long id' },
+        { value: 'long-name', name: 'n'.repeat(257) },
+        { group: 'g', name: 'G', options: [{ value: `grp-${TOKEN}`, name: 'Grouped leak' }] },
+        { value: 'safe-b', name: '' },
+        { value: 'edge-256', name: 'e'.repeat(256) },
+      ]),
+    });
+    const result = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 150 });
+    expect(result).toEqual({
+      ok: true,
+      models: [
+        { id: 'safe-a', name: 'Safe A' },
+        { id: 'safe-b', name: 'safe-b' },
+        { id: 'edge-256', name: 'e'.repeat(256) },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain(TOKEN);
+  });
+
+  test('drops only the catalog metadata fields that echo the token and keeps safe metadata', async () => {
+    fakeDevinModels({
+      acp: 'no-update',
+      configOptions: modelSelect([
+        { value: 'tainted', name: 'Tainted' },
+        { value: 'clean', name: 'Clean' },
+      ]),
+      catalogData: {
+        families: [
+          {
+            family_label: `Family ${TOKEN}`,
+            variants: [
+              {
+                model_uid: 'tainted',
+                cost_tier: `Tier ${TOKEN}`,
+                cost_summary: `$1 ${TOKEN}`,
+                max_context_tokens: 1000,
+                is_new: true,
+              },
+              { model_uid: `uid-${TOKEN}`, cost_tier: 'Free' },
+            ],
+          },
+          {
+            family_label: 'Clean family',
+            variants: [
+              {
+                model_uid: 'clean',
+                cost_tier: 'Free',
+                cost_summary: '$1 / 1M Input',
+                is_beta: true,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const result = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 150 });
+    expect(result).toEqual({
+      ok: true,
+      models: [
+        { id: 'tainted', name: 'Tainted', contextTokens: 1000, isNew: true },
+        {
+          id: 'clean',
+          name: 'Clean',
+          family: 'Clean family',
+          costTier: 'Free',
+          costSummary: '$1 / 1M Input',
+          isBeta: true,
+        },
+      ],
+    });
+    expect(JSON.stringify(result)).not.toContain(TOKEN);
+  });
+
+  test('a token echoed through the upstream-models endpoint never reaches the response or cache', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/devin-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Personal', token: TOKEN });
+    const { id } = (await created.json()) as { id: string };
+    fakeDevinModels({
+      acp: 'no-update',
+      configOptions: modelSelect([
+        { value: `leak-${TOKEN}`, name: 'Leaky' },
+        { value: 'safe', name: 'Safe' },
+      ]),
+    });
+    const url = `${path}/${id}/upstream-models`;
+    const first = await (await req(s.app, 'POST', url)).text();
+    const second = await (await req(s.app, 'POST', url)).text();
+    expect(first).not.toContain(TOKEN);
+    expect(second).not.toContain(TOKEN);
+    expect(JSON.parse(first)).toMatchObject({
+      status: 'ok',
+      models: [{ id: 'safe', name: 'Safe' }],
+    });
+    s.dispose();
   });
 });
 
