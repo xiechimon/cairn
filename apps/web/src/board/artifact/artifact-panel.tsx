@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useArtifactOf, useTodo } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
@@ -10,7 +10,6 @@ import { Button } from '../../components/ui/button.js';
 import { Skeleton } from '../../components/ui/skeleton.js';
 import { attachmentIdFromKey } from '../../detail/attachment-chip.js';
 import { useI18n } from '../../i18n/provider.js';
-import { X } from '../../icons/index.js';
 import type { FileTarget } from '../file-pane.js';
 import { usePanelDocked } from '../use-narrow.js';
 import { type ArtifactPanelState, useArtifactPanel } from './artifact-route.js';

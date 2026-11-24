@@ -61,7 +61,6 @@ import { triggerChiefWakes } from './chief.js';
 import { enabledSubscriptionId } from './claude-subscriptions.js';
 import { contextWindowOf } from './coordinator-context.js';
 import { assertCorrectionDone } from './correction.js';
-import { DELIVERABLES_MESSAGE_PREFIX } from './deliverables-message.js';
 import { enabledDevinSubscriptionId } from './devin-subscriptions.js';
 import { capabilityGatePasses, runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';

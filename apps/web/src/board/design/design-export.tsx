@@ -1,11 +1,10 @@
-import { FileArchive, FileCode, FileImage, Printer } from 'lucide-react';
+import { ChevronDown, Download, FileArchive, FileCode, FileImage, Printer } from 'lucide-react';
 import type { RefObject } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../../components/menu-keys.js';
 import { Button } from '../../components/ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../../components/ui/dropdown-menu.js';
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
-import { ChevronDown, Download } from '../../icons/index.js';
 import {
   buildDesignHandoffContent,
   buildDesignManifestContent,

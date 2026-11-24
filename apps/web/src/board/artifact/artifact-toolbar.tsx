@@ -1,6 +1,6 @@
 import { attachmentExtOf, type DesignVersionRecord } from '@cairn/shared';
 import { cn } from 'cn';
-import { History, MessageSquare } from 'lucide-react';
+import { ChevronDown, History, MessageSquare, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { IconTooltip } from '../../components/icon-tooltip.js';
 import { KeyedMenuContent } from '../../components/menu-keys.js';
@@ -8,7 +8,6 @@ import { Button } from '../../components/ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../../components/ui/dropdown-menu.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { TFunc } from '../../i18n/translate.js';
-import { ChevronDown, X } from '../../icons/index.js';
 import { relativeTime } from '../rel-time.js';
 
 export const TOOL_BUTTON =

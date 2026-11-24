@@ -1,9 +1,9 @@
 import { type ArtifactOfAttachment, artifactKindOf, type DesignCommentRecord } from '@cairn/shared';
-import { Check, Copy, Download, Globe, Pencil } from 'lucide-react';
+import { Check, ChevronDown, Copy, Download, Globe, Pencil } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useDesignMutations } from '../../api/hooks.js';
 import { useLiveData } from '../../api/provider.js';
-import { IconTooltip } from '../../components/icon-tooltip.js';
+import { CopyIconButton } from '../../components/copy-icon-button.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../../components/menu-keys.js';
 import { QueryBoundary } from '../../components/query-state.js';
 import { SegmentedTabs } from '../../components/segmented.js';
@@ -12,7 +12,6 @@ import { DropdownMenu, DropdownMenuTrigger } from '../../components/ui/dropdown-
 import { toastError } from '../../components/ui/toaster.js';
 import { DiagramView } from '../../detail/mermaid-block.js';
 import { useI18n } from '../../i18n/provider.js';
-import { ChevronDown } from '../../icons/index.js';
 import { AudioViewer } from '../../vendor-open-design/viewers/audio-viewer.js';
 import { BinaryViewer } from '../../vendor-open-design/viewers/binary-viewer.js';
 import { DocumentPreviewViewer } from '../../vendor-open-design/viewers/document-preview-viewer.js';
@@ -42,7 +41,6 @@ import { WhiteboardViewer } from './viewers/whiteboard-viewer.js';
 import { type Zoom, ZoomControl } from './viewers/zoom.js';
 import { ZoomImage } from './viewers/zoom-image.js';
 
-const COPIED_MS = 1500;
 const INLINE_KINDS = new Set(['image', 'svg', 'video', 'audio', 'pdf']);
 const SOURCE_KINDS = new Set(['sheet', 'diagram', 'whiteboard']);
 const REGION_WRAPPED = new Set(['design', 'diagram', 'whiteboard']);
@@ -210,22 +208,9 @@ function FileView({
   const keepReader = useCallback((read: SceneReader | null) => {
     sceneReader.current = read;
   }, []);
-  const [copied, setCopied] = useState(false);
   const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
   useEffect(() => onBody?.(bodyEl), [onBody, bodyEl]);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
   const text = readsText ? textQ.data : undefined;
-  const copy = () => {
-    if (text === undefined) return;
-    navigator.clipboard.writeText(text).then(
-      () => setCopied(true),
-      (error: unknown) => toastError(t('未能复制，请重试'), error),
-    );
-  };
   const withText = (render: (value: string) => ReactNode) => (
     <QueryBoundary
       query={textQ}
@@ -372,26 +357,21 @@ function FileView({
         />
       )}
       {readsText && (
-        <IconTooltip
-          label={copied ? t('已复制') : t('复制')}
+        <CopyIconButton
+          text={text ?? ''}
+          label={t('复制')}
+          copiedLabel={t('已复制')}
           side="bottom"
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              data-testid="artifact-copy"
-              disabled={text === undefined}
-              onClick={copy}
-              className={`${TOOL_BUTTON} w-7 px-0`}
-            />
-          }
-        >
-          {copied ? (
-            <Check aria-hidden className="size-4" />
-          ) : (
-            <Copy aria-hidden className="size-4" />
-          )}
-        </IconTooltip>
+          size="icon-sm"
+          testId="artifact-copy"
+          disabled={text === undefined}
+          replaceClassName
+          className={`${TOOL_BUTTON} w-7 px-0`}
+          icons={{
+            copy: <Copy aria-hidden className="size-4" />,
+            copied: <Check aria-hidden className="size-4" />,
+          }}
+        />
       )}
     </>
   );
