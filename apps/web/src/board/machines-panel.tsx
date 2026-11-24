@@ -1,6 +1,6 @@
-import type { ComputerRecord, ComputerStep, VmDownload } from '@cairn/shared';
+import type { ComputerRecord, ComputerStep } from '@cairn/shared';
 import { cn } from 'cn';
-import { Laptop, Monitor, Plus } from 'lucide-react';
+import { Laptop, Plus } from 'lucide-react';
 import {
   type FormEvent,
   type ReactElement,
@@ -31,11 +31,7 @@ import { toastError } from '../components/ui/toaster.js';
 import type { MachineRow } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { settingsHref } from '../settings/settings-href.js';
-import {
-  computerActionNoteText,
-  MachineMenu,
-  useComputerActions,
-} from './computer-actions-menu.js';
+import { MachineMenu } from './computer-actions-menu.js';
 import { ComputerScreenDialog } from './computer-screen-dialog.js';
 import { fleetStatus, fleetStatusLine } from './fleet-status.js';
 import { desktopControlOnline } from './machine-capabilities.js';
@@ -169,73 +165,6 @@ function LineRow({
   );
 }
 
-export function formatDownloadBytes(bytes: number): string {
-  const gb = bytes / 1e9;
-  return gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(bytes / 1e6)} MB`;
-}
-
-function VmDownloadRow({
-  download,
-  starting,
-  onDownload,
-}: {
-  download: VmDownload;
-  starting: boolean;
-  onDownload: () => void;
-}) {
-  const { t } = useI18n();
-  const state = starting && download.state !== 'downloading' ? 'downloading' : download.state;
-  const total = formatDownloadBytes(download.totalBytes);
-  const percent = Math.round((download.doneBytes / download.totalBytes) * 100);
-  return (
-    <div
-      data-testid="vm-download"
-      data-state={state}
-      className="relative flex min-h-14 items-center gap-3 py-2 pr-3 pl-4"
-    >
-      <Monitor aria-hidden="true" className="size-5.5 flex-none text-content-secondary" />
-      <span className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate text-ui text-foreground">{t('Linux 虚拟机')}</span>
-        <span
-          className={cn(
-            'truncate text-meta tabular-nums',
-            state === 'failed' ? 'text-destructive' : 'text-content-tertiary',
-          )}
-        >
-          {state === 'downloading'
-            ? `${formatDownloadBytes(download.doneBytes)} / ${total}`
-            : state === 'failed'
-              ? t('下载未完成')
-              : t('{size}，Coordinator 用它上网和操作软件', { size: total })}
-        </span>
-      </span>
-      {state !== 'downloading' && (
-        <Button
-          size="sm"
-          variant={state === 'failed' ? 'outline' : 'default'}
-          data-testid="vm-download-start"
-          className="flex-none px-3 pointer-coarse:h-11 pointer-coarse:px-6"
-          onClick={onDownload}
-        >
-          {state === 'failed' ? t('重试') : t('下载')}
-        </Button>
-      )}
-      {state === 'downloading' && (
-        <div
-          role="progressbar"
-          aria-label={t('Linux 虚拟机')}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className="absolute inset-x-0 bottom-0 h-0.5 bg-border"
-        >
-          <div className="h-full bg-content-tertiary" style={{ width: `${percent}%` }} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 const RENAME_FORM = 'machine-rename-form';
 
 function RenameMachineDialog({
@@ -303,12 +232,10 @@ function useCardLine({
   machine,
   computer,
   controlFailed,
-  note,
 }: {
   machine: MachineRow;
   computer: ComputerRecord | null;
   controlFailed: boolean;
-  note: ReturnType<typeof useComputerActions>['note'];
 }): CardLine | null {
   const { t } = useI18n();
   if (machine.online !== true) {
@@ -319,16 +246,6 @@ function useCardLine({
       title: t('在这台执行机上打开 Cairn，它就会上线'),
     };
   }
-  if (note !== null)
-    return {
-      kind: note.kind === 'failed' ? 'fail' : 'quiet',
-      node: (
-        <span role="status" data-testid="computer-action-note" data-note={note.kind}>
-          {computerActionNoteText(note, t)}
-        </span>
-      ),
-      ...(note.kind === 'failed' ? { title: note.detail } : {}),
-    };
   if (controlFailed) return { kind: 'fail', node: t('未能接管，电脑没有响应') };
   if (computer?.state === 'failed') return { kind: 'fail', node: t('电脑无响应，文件均保留') };
   if (computer?.handoffReason != null)
@@ -388,15 +305,8 @@ function MachineCard({
   const [screenRequested, setScreenRequested] = useState(openScreen);
   const control = useComputerControl({ teamId, computer });
   const screen = useScreenControl(control);
-  const actions = useComputerActions(teamId, computer);
-  const download = computer?.download?.state === 'ready' ? null : (computer?.download ?? null);
   const screenLive =
-    computer !== null &&
-    download === null &&
-    teamId !== undefined &&
-    desktopControlOnline(machine, computer);
-  const installing = actions.note?.kind === 'running' && actions.note.action === 'install';
-  const vm = computer?.kind === 'vm' && download === null;
+    computer !== null && teamId !== undefined && desktopControlOnline(machine, computer);
   const name = machineDisplayName(machine);
   const machineSettings =
     machine.id === undefined
@@ -406,8 +316,6 @@ function MachineCard({
     machine,
     computer,
     controlFailed: control.failed,
-    note:
-      download !== null && actions.note !== null && 'action' in actions.note ? null : actions.note,
   });
   const watch = screenLive ? () => setFullscreen(true) : null;
   const takeOver = () => {
@@ -455,39 +363,13 @@ function MachineCard({
             {t('接管')}
           </Button>
         )}
-        {vm && computer?.state === 'failed' && machine.online === true && (
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="computer-recover"
-            disabled={actions.pending}
-            className="flex-none px-3 pointer-coarse:h-11"
-            onClick={() => actions.run('recover')}
-          >
-            {t('恢复')}
-          </Button>
-        )}
         <MachineMenu
           machineName={name}
           settingsHref={machineSettings}
           onRename={machine.id === undefined ? null : () => setRenaming(true)}
           onWatch={watch}
-          vm={
-            vm
-              ? { disabled: actions.pending || machine.online !== true, onAction: actions.run }
-              : null
-          }
         />
       </div>
-      {download !== null && machine.online === true && (
-        <div className="border-t border-border">
-          <VmDownloadRow
-            download={download}
-            starting={installing}
-            onDownload={() => actions.run('install')}
-          />
-        </div>
-      )}
       {step !== null && machine.online === true && (
         <MachineStepPanel
           key={step.machineId}

@@ -173,7 +173,6 @@
   "@cairn/web:test/chief-orchestrate-echo.test.ts": 17,
   "@cairn/web:test/chief-orchestration-failure.test.ts": 5,
   "@cairn/web:test/chief-outbox.test.ts": 243,
-  "@cairn/web:test/chief-package-install-card.test.ts": 7,
   "@cairn/web:test/chief-prompt-origin.test.ts": 9,
   "@cairn/web:test/chief-queued-row-stamp.test.ts": 15,
   "@cairn/web:test/chief-report-line.test.ts": 9,

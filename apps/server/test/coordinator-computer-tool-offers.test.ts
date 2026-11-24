@@ -40,11 +40,11 @@ describe('Coordinator computer tool offers', () => {
     const defs = coordinatorToolDefs({ ownComputer: true, desktopTools: true });
     for (const name of mac)
       expect(defs.find((def) => def.name === name)?.description).toMatch(
-        /^The user's own Mac, not your VM computer/,
+        /^The user's own Mac, not the Coordinator computer desktop/,
       );
     for (const name of ['computer_observe', 'computer_act'])
       expect(defs.find((def) => def.name === name)?.description).toMatch(
-        /^Your VM computer, not the user's Mac/,
+        /^The Coordinator computer desktop, not the user's own screen/,
       );
   });
 

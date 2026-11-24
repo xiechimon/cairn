@@ -23,16 +23,6 @@ export const WEB_REST_ENDPOINTS: readonly RestEndpoint[] = [
   },
   {
     method: 'POST',
-    path: '/api/computers/package-install',
-    note: 'owner approves or declines a Coordinator install_packages request',
-  },
-  {
-    method: 'POST',
-    path: '/api/computers/{id}/actions',
-    note: 'owner stops, updates, recovers or resets a VM computer',
-  },
-  {
-    method: 'POST',
     path: '/api/teams/{teamId}/computers/{computerId}/screen',
     note: 'D75: mint one sealed viewer capability for a screen or controlled terminal',
   },

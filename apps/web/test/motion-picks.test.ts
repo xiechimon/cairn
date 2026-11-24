@@ -40,7 +40,6 @@ describe('pick 2: RingSpinner is the loading.dev Ring', () => {
       'board/local-provider-import.tsx',
       'board/thread-actions.tsx',
       'chief/approval-card.tsx',
-      'chief/package-install-card.tsx',
       'components/ui/toaster.tsx',
       'overlay/token-gate.tsx',
       'pages/project-settings-page.tsx',

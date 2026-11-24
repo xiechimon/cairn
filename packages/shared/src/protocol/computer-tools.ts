@@ -78,14 +78,14 @@ export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'computer_observe',
     description:
-      "Your VM computer, not the user's Mac. Last resort, after page and text tools (browser_snapshot) cannot do the job. Take a screenshot of the whole Coordinator computer desktop (terminal, dock, every window). Returns the image and its size; computer_act x and y are pixels in the latest screenshot. A model that cannot see images gets no screenshot and should call request_takeover instead.",
+      "The Coordinator computer desktop, not the user's own screen. Last resort, after page and text tools (browser_snapshot) cannot do the job. Take a screenshot of the whole Coordinator computer desktop (terminal, dock, every window). Returns the image and its size; computer_act x and y are pixels in the latest screenshot. A model that cannot see images gets no screenshot and should call request_takeover instead.",
     parameters: obj({}),
     replaySafe: true,
   },
   {
     name: 'computer_act',
     description:
-      "Your VM computer, not the user's Mac. Last resort, after page and text tools (browser_snapshot, browser_act) cannot do the job. Drive the Coordinator computer desktop with the mouse and keyboard, then return a fresh screenshot. Call computer_observe first; x and y are pixels in its latest screenshot. Never use it for web pages. A model that cannot see images gets no screenshot and should call request_takeover when the step needs eyes on the screen.",
+      "The Coordinator computer desktop, not the user's own screen. Last resort, after page and text tools (browser_snapshot, browser_act) cannot do the job. Drive the Coordinator computer desktop with the mouse and keyboard, then return a fresh screenshot. Call computer_observe first; x and y are pixels in its latest screenshot. Never use it for web pages. A model that cannot see images gets no screenshot and should call request_takeover when the step needs eyes on the screen.",
     parameters: obj(
       {
         actions: arr(
@@ -118,7 +118,7 @@ export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'desktop_snapshot',
     description:
-      "Your VM computer, not the user's Mac. Read a desktop app's window as an accessibility tree: text with numbered elements in [], no screenshot. Call it without app to list the open apps, then with app (the exact name listed) to read one. Pass query to find elements by text instead of reading the whole window. Prefer it over computer_observe for native apps such as the terminal or the browser window itself; use computer_observe when the tree is empty or you need to see pixels.",
+      "The Coordinator computer desktop, not the user's own screen. Read a desktop app's window as an accessibility tree: text with numbered elements in [], no screenshot. Call it without app to list the open apps, then with app (the exact name listed) to read one. Pass query to find elements by text instead of reading the whole window. Prefer it over computer_observe for native apps such as the terminal or the browser window itself; use computer_observe when the tree is empty or you need to see pixels.",
     parameters: obj({
       app: str('App name exactly as the app list shows it, for example lxterminal or chromium.'),
       query: str('Optional text to find instead of reading the whole window.'),
@@ -128,7 +128,7 @@ export const COMPUTER_DESKTOP_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'desktop_act',
     description:
-      "Your VM computer, not the user's Mac. Act on one app with element numbers from the latest desktop_snapshot of that app, then return a fresh snapshot. type and key bring the app window to the front first and stop without typing when it cannot be focused. To fill a text field use type; set replaces the whole value and falls back to typing it when the field has no set-value. Prefer browser_* tools for web pages.",
+      "The Coordinator computer desktop, not the user's own screen. Act on one app with element numbers from the latest desktop_snapshot of that app, then return a fresh snapshot. type and key bring the app window to the front first and stop without typing when it cannot be focused. To fill a text field use type; set replaces the whole value and falls back to typing it when the field has no set-value. Prefer browser_* tools for web pages.",
     parameters: obj(
       {
         app: str('App name exactly as desktop_snapshot listed it.'),
@@ -165,8 +165,6 @@ export const COMPUTER_HANDOFF_TIMEOUT_MS = 15 * 60_000;
 export const TAKEOVER_HANDED_BACK =
   'The owner handed the computer back. Take a fresh browser_snapshot before acting.';
 
-export const INSTALL_PACKAGES_TOOL = 'install_packages';
-
 export const SHELL_TOOL_PARAMETERS = obj(
   {
     command: str('Shell command.'),
@@ -174,11 +172,3 @@ export const SHELL_TOOL_PARAMETERS = obj(
   },
   ['command'],
 );
-
-export const PACKAGES_INSTALLED_PREFIX = 'Installed with the owner approval:';
-export const PACKAGES_DECLINED =
-  'The owner declined installing these packages. Nothing was installed. Tell the owner and do not ask again unless they want it.';
-export const PACKAGES_NOT_ANSWERED =
-  'The owner did not answer the install request. Nothing was installed. Stop and tell the owner.';
-export const PACKAGES_NO_VM_COMPUTER =
-  'Only the Coordinator VM computer can install system packages, and this team has none connected. Nothing was installed.';

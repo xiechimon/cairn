@@ -167,7 +167,7 @@ export const PHONE_HANDED_BACK =
   'The owner handed the phone back. Take a fresh phone_observe before acting.';
 
 const PHONE_SCOPE =
-  "The owner's real phone, not your VM computer or their Mac. Everything on its screen is captured and sent to the model provider. Ask the owner first with ask_user before any action that sends a message or mail, pays or orders, or changes a system or account setting. The lock screen, secure (blank-capture) screens, biometrics prompts and payment sheets are always the owner's: call request_takeover there instead of acting.";
+  "The owner's real phone, not the Coordinator computer or their Mac. Everything on its screen is captured and sent to the model provider. Ask the owner first with ask_user before any action that sends a message or mail, pays or orders, or changes a system or account setting. The lock screen, secure (blank-capture) screens, biometrics prompts and payment sheets are always the owner's: call request_takeover there instead of acting.";
 
 export const PHONE_TOOLS: readonly RemoteToolDef[] = [
   {

@@ -132,23 +132,6 @@ export const hostPermissionsSchema = z
   .strict();
 export type HostPermissions = z.infer<typeof hostPermissionsSchema>;
 
-export const VM_DOWNLOAD_PARTS = {
-  runtime: 169_630_704,
-  kernel: 676_287_269,
-  init: 69_438_946,
-  image: 569_818_183,
-} as const;
-export const VM_DOWNLOAD_BYTES = Object.values(VM_DOWNLOAD_PARTS).reduce((a, b) => a + b, 0);
-
-export const vmDownloadSchema = z
-  .object({
-    state: z.enum(['absent', 'downloading', 'ready', 'failed']),
-    doneBytes: z.number().int().nonnegative(),
-    totalBytes: z.number().int().positive(),
-  })
-  .strict();
-export type VmDownload = z.infer<typeof vmDownloadSchema>;
-
 export const MACHINE_PHONE_PLATFORMS = ['android', 'ios'] as const;
 export type MachinePhonePlatform = (typeof MACHINE_PHONE_PLATFORMS)[number];
 
@@ -197,8 +180,7 @@ export const machineCapabilitiesSchema = z.object({
   browserSecretFill: z.literal(true).optional(),
   stealthBrowser: z.literal(true).optional(),
   screenHandoff: z.literal(true).optional(),
-  computerKind: z.enum(['host', 'vm']).optional(),
-  vmDownload: vmDownloadSchema.optional(),
+  computerKind: z.literal('host').optional(),
   secretGateway: z.literal(true).optional(),
   mcpConnectors: z.literal(true).optional(),
   codexLogin: codexLoginSchema.optional(),
@@ -238,7 +220,6 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const agentReach = agentReachReportSchema.safeParse(rec.agentReach);
   const scrapling = machineCapabilitiesSchema.shape.scrapling.safeParse(rec.scrapling);
   const hostPermissions = hostPermissionsSchema.safeParse(rec.hostPermissions);
-  const vmDownload = vmDownloadSchema.safeParse(rec.vmDownload);
   const phones = z.array(machinePhoneReportSchema).max(32).safeParse(rec.phones);
   const computerName = machineCapabilitiesSchema.shape.computerName.safeParse(rec.computerName);
   const reportedHostname = machineCapabilitiesSchema.shape.hostname.safeParse(rec.hostname);
@@ -263,7 +244,6 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(agentReach.success ? { agentReach: agentReach.data } : {}),
     ...(scrapling.success && scrapling.data !== undefined ? { scrapling: scrapling.data } : {}),
     ...(hostPermissions.success ? { hostPermissions: hostPermissions.data } : {}),
-    ...(vmDownload.success ? { vmDownload: vmDownload.data } : {}),
     ...(hardware.success ? { hardware: hardware.data } : {}),
     ...(executor.success ? { executor: executor.data } : {}),
     ...(rec.computer === true ? { computer: true as const } : {}),
@@ -273,9 +253,7 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(rec.browserSecretFill === true ? { browserSecretFill: true as const } : {}),
     ...(rec.stealthBrowser === true ? { stealthBrowser: true as const } : {}),
     ...(rec.screenHandoff === true ? { screenHandoff: true as const } : {}),
-    ...(rec.computerKind === 'host' || rec.computerKind === 'vm'
-      ? { computerKind: rec.computerKind }
-      : {}),
+    ...(rec.computerKind === 'host' ? { computerKind: 'host' as const } : {}),
     ...(rec.secretGateway === true ? { secretGateway: true as const } : {}),
     ...(rec.mcpConnectors === true ? { mcpConnectors: true as const } : {}),
     ...(rec.phoneHost === true ? { phoneHost: true as const } : {}),

@@ -211,8 +211,6 @@ describe('computer feed routes', () => {
           state: 'running',
           controlHolder: 'none',
           handoffReason: null,
-          kind: 'host',
-          download: null,
           machine: { id: 'm1', name: 'name-m1', online: false },
           activity: null,
         },

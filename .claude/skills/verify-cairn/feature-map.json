@@ -1004,7 +1004,6 @@
           "apps/web/src/board/machine-step-panel.tsx",
           "apps/web/src/board/screen-control.ts",
           "apps/web/src/chief/takeover-card.tsx",
-          "apps/web/src/chief/package-install-card.tsx",
           "apps/web/src/board/computer-actions-menu.tsx",
           "apps/web/src/board/machine-capabilities.ts",
           "apps/web/src/resources/own-computer-panel.tsx"

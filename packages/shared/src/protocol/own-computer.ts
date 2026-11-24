@@ -194,7 +194,7 @@ export const HOST_SHELL_SANDBOX_BLOCKED_PREFIX = 'blocked by sandbox:';
 export const HOST_SHELL_ESCALATION_DENIED = 'denied by owner';
 
 const OWN_MAC_SCOPE =
-  "The user's own Mac, not your VM computer. Use it when the work lives on their Mac (their apps, files, projects or signed-in sessions); use the VM computer for websites the VM browser can open. Every call is logged and shown to the user in the conversation.";
+  "The user's own Mac, not the Coordinator computer desktop. Use it when the work lives on their Mac (their apps, files, projects or signed-in sessions). Every call is logged and shown to the user in the conversation.";
 
 export const OWN_COMPUTER_TOOLS: readonly RemoteToolDef[] = [
   {

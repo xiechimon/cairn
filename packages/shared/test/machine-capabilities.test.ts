@@ -12,7 +12,6 @@ import {
   parseReportedCapabilities,
   requiredCapabilitiesSchema,
   stepJournalRowSchema,
-  VM_DOWNLOAD_BYTES,
 } from '../src/index.js';
 
 describe('machineCapabilitiesSchema (daemon-reported machine capability list)', () => {
@@ -441,25 +440,6 @@ it('keeps HTTP-ready Scrapling metadata without leaking extra fields, and accept
       .omit({ scrapling: true })
       .parse({ ...base, scrapling: { version: '0.5.1' } }),
   ).toEqual(base);
-});
-
-it('keeps a valid Linux VM download report and drops a malformed one without losing the rest', () => {
-  const base = { mcpServers: ['docs'], skills: [], computerKind: 'vm' as const };
-  const vmDownload = {
-    state: 'downloading',
-    doneBytes: 580_000_000,
-    totalBytes: VM_DOWNLOAD_BYTES,
-  };
-  expect(parseReportedCapabilities({ ...base, vmDownload })).toEqual({ ...base, vmDownload });
-  for (const bad of [
-    { ...vmDownload, state: 'paused' },
-    { ...vmDownload, doneBytes: -1 },
-    { ...vmDownload, totalBytes: 0 },
-    { ...vmDownload, url: 'https://example.com' },
-    'ready',
-  ]) {
-    expect(parseReportedCapabilities({ ...base, vmDownload: bad })).toEqual(base);
-  }
 });
 
 it('keeps a devin report with an advertised model catalog and drops a malformed one without losing the rest', () => {

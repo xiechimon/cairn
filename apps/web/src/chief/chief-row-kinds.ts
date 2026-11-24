@@ -15,7 +15,6 @@ export const CHIEF_ROW_CLASS: Readonly<Record<ChiefRowKind, ChiefRowClass | 'hid
   question: 'card',
   takeover: 'card',
   'secret-request': 'card',
-  'package-install': 'card',
   'task-card': 'card',
   error: 'exception-alert',
   'runner-offline': 'exception-alert',

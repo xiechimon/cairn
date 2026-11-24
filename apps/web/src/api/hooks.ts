@@ -16,8 +16,6 @@ import type {
   ComposioConfigured,
   ComposioConnectBody,
   ComposioKeyBody,
-  ComputerManageAction,
-  ComputerManageResult,
   ComputerRecord,
   ComputerStep,
   ConversationMessagesResponse,
@@ -67,7 +65,6 @@ import type {
   NotificationRecord,
   NotificationsResponse,
   OAuthAuthorizeResponse,
-  PackageInstallDecisionBody,
   PairedDevice,
   PairingCodeResponse,
   PairingRequestView,
@@ -1793,17 +1790,6 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (body: SecretRequestAnswer) =>
         api.post<SecretRequestAnswered>(`/api/teams/${teamId}/secret-requests`, body),
       onSuccess: invalidateAll,
-    }),
-    decidePackageInstall: useMutation({
-      mutationFn: (body: PackageInstallDecisionBody) =>
-        api.post<{ ok: true }>('/api/computers/package-install', body),
-    }),
-    manageComputer: useMutation({
-      mutationFn: (input: { computerId: string; action: ComputerManageAction }) =>
-        api.post<ComputerManageResult>(`/api/computers/${input.computerId}/actions`, {
-          action: input.action,
-        }),
-      onSettled: invalidateAll,
     }),
     createApiKey: useMutation({
       mutationFn: (body: {

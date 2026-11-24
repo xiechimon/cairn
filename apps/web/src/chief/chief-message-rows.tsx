@@ -32,7 +32,6 @@ import { ChiefReportMessage } from './chief-report-row.js';
 import { chiefRowRenders } from './chief-row-kinds.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
-import { PackageInstallCard } from './package-install-card.js';
 import { ApprovalAnswered, QuestionReceipt } from './question-answered-line.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
@@ -303,7 +302,6 @@ export function chiefStreamRowKey(
     case 'handoff':
     case 'takeover':
     case 'secret-request':
-    case 'package-install':
     case 'task-card':
     case 'runner-offline':
     case 'stopped':
@@ -561,7 +559,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'secret-request') return <SecretRequestCard item={item} />;
-  if (item.kind === 'package-install') return <PackageInstallCard item={item} />;
   if (item.kind === 'task-card') return <TaskStartedRow todoId={item.todoId} title={item.title} />;
   if (item.kind === 'daily-report')
     return (

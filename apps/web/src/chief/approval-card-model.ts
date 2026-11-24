@@ -3,7 +3,7 @@ export interface ApprovalField {
   value: string;
 }
 
-export type ApprovalKind = 'mail' | 'send' | 'install' | 'shell' | 'app' | 'secret' | 'other';
+export type ApprovalKind = 'mail' | 'send' | 'shell' | 'app' | 'secret' | 'other';
 
 export interface ApprovalCardModel {
   kind: ApprovalKind;
@@ -189,22 +189,6 @@ export function approvalCardOf(question: ApprovalQuestion, t: Translate): Approv
     preview: null,
     mono: false,
     note: null,
-    details: [],
-  };
-}
-
-export function installCardOf(
-  packages: readonly string[],
-  t: Translate,
-  list: (items: readonly string[]) => string,
-): ApprovalCardModel {
-  return {
-    kind: 'install',
-    title: t('在 Coordinator 的电脑上安装 {packages}', { packages: list(packages) }),
-    context: t('批准后以 root 装进它的电脑，电脑更新或恢复后会自动重装。'),
-    preview: packages.join('\n'),
-    mono: true,
-    note: t('以 root 安装'),
     details: [],
   };
 }

@@ -1110,8 +1110,6 @@ export async function forwardComputerCall(
   }
 
   const tool = body.name;
-  if (tool === 'computer_manage' || tool === 'install_packages')
-    throw new HttpError(400, `${tool} is no longer supported`);
   if (tool === 'phone_manage') throw new HttpError(400, PHONE_MANAGE_PANEL_ONLY);
   if (tool === 'browser_close_tab')
     throw new HttpError(400, 'browser_close_tab is sent by the server when a step ends');

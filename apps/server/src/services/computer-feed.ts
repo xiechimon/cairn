@@ -53,8 +53,6 @@ export function listComputers(db: Db, teamId: string, userId: string): ComputerR
       state: row.state,
       controlHolder: row.controlHolder,
       handoffReason: row.handoffReason ?? null,
-      kind: 'host' as const,
-      download: null,
       machine: { id: row.machineId, name: machineName, online: machineOnline },
       activity: computerActivity(db, userId, row),
     }));

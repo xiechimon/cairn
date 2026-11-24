@@ -3376,11 +3376,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
         "call": {
           "additionalProperties": false,
           "properties": {
-            "browserLicense": {
-              "maxLength": 4096,
-              "minLength": 1,
-              "type": "string",
-            },
             "browserScope": {
               "maxLength": 200,
               "minLength": 1,
@@ -3491,8 +3486,6 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
                 "browser_act",
                 "browser_close_tab",
                 "request_takeover",
-                "install_packages",
-                "computer_manage",
                 "user_computer_shell",
                 "user_computer_observe",
                 "user_computer_act",
@@ -11537,16 +11530,6 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > web REST endpoint
   },
   {
     "method": "POST",
-    "note": "owner approves or declines a Coordinator install_packages request",
-    "path": "/api/computers/package-install",
-  },
-  {
-    "method": "POST",
-    "note": "owner stops, updates, recovers or resets a VM computer",
-    "path": "/api/computers/{id}/actions",
-  },
-  {
-    "method": "POST",
     "note": "D75: mint one sealed viewer capability for a screen or controlled terminal",
     "path": "/api/teams/{teamId}/computers/{computerId}/screen",
   },
@@ -13056,10 +13039,7 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
               "type": "boolean",
             },
             "computerKind": {
-              "enum": [
-                "host",
-                "vm",
-              ],
+              "const": "host",
               "type": "string",
             },
             "computerName": {
@@ -13581,36 +13561,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
             "stealthBrowser": {
               "const": true,
               "type": "boolean",
-            },
-            "vmDownload": {
-              "additionalProperties": false,
-              "properties": {
-                "doneBytes": {
-                  "maximum": 9007199254740991,
-                  "minimum": 0,
-                  "type": "integer",
-                },
-                "state": {
-                  "enum": [
-                    "absent",
-                    "downloading",
-                    "ready",
-                    "failed",
-                  ],
-                  "type": "string",
-                },
-                "totalBytes": {
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991,
-                  "type": "integer",
-                },
-              },
-              "required": [
-                "state",
-                "doneBytes",
-                "totalBytes",
-              ],
-              "type": "object",
             },
           },
           "required": [

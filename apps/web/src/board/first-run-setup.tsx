@@ -5,7 +5,6 @@ import { type CSSProperties, type ReactNode, useEffect, useState } from 'react';
 import {
   useApiMutations,
   useChief,
-  useComputers,
   useMachines,
   useModelSources,
   useProjects,
@@ -19,7 +18,6 @@ import { BrandGlyph } from '../components/brand-glyph.js';
 import { InkSpiral, type SpiralHang } from '../components/ink-spiral.js';
 import { SegmentedRadio } from '../components/segmented.js';
 import { SettingsCard } from '../components/settings-list.js';
-import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { toastError } from '../components/ui/toaster.js';
@@ -40,7 +38,6 @@ import {
 } from './first-run-checklist-model.js';
 import { failureCopy, ProviderCheckList } from './first-run-provider-check.js';
 import { LocalProviderImportCard } from './local-provider-import.js';
-import { formatDownloadBytes } from './machines-panel.js';
 import {
   checkKey,
   hiddenFromPicker,
@@ -300,7 +297,6 @@ function recordFor(setup: Setup, pick: Pick): ProviderRecord | undefined {
 function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
   const { t } = useI18n();
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
-  const { manageComputer } = useApiMutations(setup.teamId);
   const [checking, setChecking] = useState(false);
   const rejected = rejectedProviders(checks.checks);
   const options = setup.options.filter(
@@ -308,12 +304,6 @@ function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
       option.runtime !== 'pi' ||
       !hiddenFromPicker(checks.checks, rejected, option.provider, option.modelId),
   );
-  const computersQ = useComputers(setup.teamId, setup.live);
-  const vm =
-    computersQ.data?.find(
-      (computer) => computer.kind === 'vm' && computer.download?.state === 'absent',
-    ) ?? null;
-  const [downloadVm, setDownloadVm] = useState(false);
   const [changed, setChanged] = useState<ModelOption | null>(null);
   const suggested = coordinatorPickOf(setup);
   const pick: Pick | null =
@@ -355,8 +345,6 @@ function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
         });
       }
       setChanged(null);
-      if (downloadVm && vm !== null)
-        manageComputer.mutate({ computerId: vm.id, action: 'install' });
     } catch (error) {
       toastError(t('保存失败，请重试。'), error);
     }
@@ -403,34 +391,6 @@ function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
           '任务默认用 Coordinator 的模型。以后可以在设置里添加常用模型，让 Coordinator 按任务挑。',
         )}
       </p>
-      {vm?.download != null && (
-        <>
-          <h3 className="mx-0 mt-6 mb-1.5 text-meta font-normal text-content-tertiary">
-            {t('电脑')}
-          </h3>
-          <ul className="m-0 list-none border-y border-border p-0">
-            <li data-testid="first-run-vm" className="flex min-h-13 items-start gap-x-4 py-2">
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="font-title text-foreground">
-                  {t('Linux 虚拟机')}
-                  <span className="ml-2 font-normal text-meta text-content-tertiary tabular-nums">
-                    {formatDownloadBytes(vm.download.totalBytes)}
-                  </span>
-                </span>
-                <span className="text-pretty text-meta text-content-tertiary">
-                  {t('不占用你的鼠标键盘，和你的文件、账号隔开，可以放心装软件')}
-                </span>
-              </span>
-              <ToggleSwitch
-                className="mt-0.5 flex-none"
-                aria-label={t('Linux 虚拟机')}
-                checked={downloadVm}
-                onCheckedChange={setDownloadVm}
-              />
-            </li>
-          </ul>
-        </>
-      )}
       <div className="mt-6">
         <Button
           data-testid="first-run-confirm"

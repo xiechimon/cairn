@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { Box, CircleAlert, KeyRound, Mail, Monitor, Send, Terminal } from 'lucide-react';
+import { CircleAlert, KeyRound, Mail, Monitor, Send, Terminal } from 'lucide-react';
 import { type ComponentType, Fragment, type ReactNode, type SVGProps, useState } from 'react';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
@@ -27,7 +27,6 @@ export interface ApprovalCardProps {
 const KIND_ICON: Record<ApprovalKind, ComponentType<SVGProps<SVGSVGElement>>> = {
   mail: Mail,
   send: Send,
-  install: Box,
   shell: Terminal,
   app: Monitor,
   secret: KeyRound,
