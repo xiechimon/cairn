@@ -692,6 +692,7 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   let documentState: 'loading' | 'usable' | 'failed' = 'failed';
   let navigation = 0;
   let waitingForCommit = false;
+  let pendingLoadStart = false;
   const state = (): DesktopTrayState => ({
     runner: controls.runner(),
     keepAwake: keepAwake.isOn(),
@@ -747,6 +748,7 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
       if (
         attempt === navigation &&
         documentState === 'loading' &&
+        !pendingLoadStart &&
         !contents.isDestroyed() &&
         !contents.isLoading()
       ) {
@@ -757,10 +759,14 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   const loadTray = (): void => {
     navigation++;
     waitingForCommit = true;
+    pendingLoadStart = true;
     documentState = 'loading';
     const load = popover.loadURL(trayUrl);
     const attempt = navigation;
-    void load.catch(() => reconcileStoppedLoad(attempt));
+    void load.catch(() => {
+      if (attempt === navigation) pendingLoadStart = false;
+      reconcileStoppedLoad(attempt);
+    });
   };
   const toggle = (): void => {
     if (popover.isVisible() || Date.now() - hiddenAt < TRAY_REOPEN_GUARD_MS) {
@@ -772,12 +778,18 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
       return;
     }
     const now = performance.now();
-    trayOpenUntil = now < trayOpenUntil ? 0 : now + TRAY_QUEUED_OPEN_MS;
+    trayOpenUntil =
+      now < trayOpenUntil
+        ? 0
+        : documentState === 'failed'
+          ? Number.POSITIVE_INFINITY
+          : now + TRAY_QUEUED_OPEN_MS;
     if (documentState === 'failed') loadTray();
   };
   contents.on('did-start-navigation', ({ isMainFrame, isSameDocument }) => {
     if (!isMainFrame || isSameDocument) return;
     navigation++;
+    pendingLoadStart = false;
     if (documentState === 'failed') {
       waitingForCommit = true;
       documentState = 'loading';
@@ -785,6 +797,7 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   });
   contents.on('did-navigate', () => {
     waitingForCommit = false;
+    pendingLoadStart = false;
     documentState = 'loading';
     if (popover.isVisible()) hide();
   });
@@ -799,7 +812,7 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
     if (isMainFrame) reconcileStoppedLoad();
   });
   contents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
-    if (!isMainFrame) return;
+    if (!isMainFrame || pendingLoadStart) return;
     if (code === ERR_ABORTED) reconcileStoppedLoad();
     else failDocument();
   });

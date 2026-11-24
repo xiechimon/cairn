@@ -274,6 +274,7 @@ try {
         clickTimes: globalThis.__cairnColdTray.clickTimes,
         shows: globalThis.__cairnColdTray.shows,
         recoveryHeld: globalThis.__cairnSmokeRecovery?.release != null,
+        watch: globalThis.__cairnSmokeWatch ?? null,
       };
     });
   const trayWindows = () =>
@@ -301,8 +302,8 @@ try {
     };
   }
 
-  async function waitForScreen(onScreen) {
-    const deadline = Date.now() + OPEN_TIMEOUT_MS;
+  async function waitForScreen(onScreen, timeout = OPEN_TIMEOUT_MS) {
+    const deadline = Date.now() + timeout;
     for (;;) {
       const seen = await popoverOnScreen();
       if (seen.onScreen === onScreen || Date.now() > deadline) return seen;
@@ -1239,6 +1240,63 @@ try {
   console.log(`tray ${abortedRecovery.result}: ${abortedRecovery.name}: ${abortedRecovery.detail}`);
   await restoreTray();
 
+  await popoverWindow(({ BrowserWindow }, width) => {
+    const contents = BrowserWindow.getAllWindows().find(
+      (candidate) => candidate.getBounds().width === width,
+    ).webContents;
+    globalThis.__cairnSmokeWatch = { started: null, committed: null, finished: null, failed: null };
+    contents.on('did-start-navigation', (event) => {
+      if (event.isMainFrame && !event.isSameDocument)
+        globalThis.__cairnSmokeWatch.started ??= event.url;
+    });
+    contents.on('did-navigate', (_event, url) => {
+      globalThis.__cairnSmokeWatch.committed ??= url;
+    });
+    contents.on('did-finish-load', () => {
+      globalThis.__cairnSmokeWatch.finished ??= contents.getURL();
+    });
+    contents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
+      if (isMainFrame) globalThis.__cairnSmokeWatch.failed ??= { code, description, url };
+    });
+  });
+
+  const armRecoveryWatch = () =>
+    popoverWindow(() => {
+      globalThis.__cairnSmokeWatch = {
+        started: null,
+        committed: null,
+        finished: null,
+        failed: null,
+      };
+    });
+
+  async function assertClickRecovered(before) {
+    const delivered = await waitForPopover(({ clicks }) => clicks > before.clicks);
+    assert.ok(delivered !== null, 'the status item click never reached the tray');
+    const navigated = await waitForPopover(({ watch }) => watch !== null && watch.started !== null);
+    assert.ok(navigated !== null, 'the click never started the recovery navigation');
+    const settled = await waitForPopover(
+      ({ watch }) => watch !== null && (watch.finished !== null || watch.failed !== null),
+    );
+    assert.ok(settled !== null, 'the recovery navigation never settled');
+    assert.equal(
+      settled.watch.failed,
+      null,
+      `the recovery load failed: ${JSON.stringify(settled.watch.failed)}`,
+    );
+    assert.equal(
+      settled.watch.committed === trayUrl && settled.watch.finished === trayUrl,
+      true,
+      `the click recovered ${JSON.stringify(settled.watch)} instead of the tray`,
+    );
+    assert.equal(
+      settled.shows,
+      before.shows + 1,
+      'the recovery click did not show the popover exactly once',
+    );
+    await assertTrayRecovered();
+  }
+
   const states = [
     {
       name: 'app in the background',
@@ -1421,7 +1479,9 @@ try {
         assert.equal(state.loading, false, 'the popover page was still loading at the click');
         assert.equal(state.crashed, false, 'the popover renderer was crashed at the click');
       },
-      afterOpen: assertTrayRecovered,
+      arm: armRecoveryWatch,
+      openTimeout: GAP_TIMEOUT_MS,
+      afterOpen: assertClickRecovered,
     },
     {
       name: 'popover renderer crashed',
@@ -1429,7 +1489,9 @@ try {
       atClick(state) {
         assert.equal(state.crashed, true, 'the popover renderer was not crashed at the click');
       },
-      afterOpen: assertTrayRecovered,
+      arm: armRecoveryWatch,
+      openTimeout: GAP_TIMEOUT_MS,
+      afterOpen: assertClickRecovered,
     },
     {
       name: 'click recovers a renderer that crashed before its document finished',
@@ -1450,7 +1512,9 @@ try {
           'the fresh document renderer was not crashed at the click',
         );
       },
-      afterOpen: assertTrayRecovered,
+      arm: armRecoveryWatch,
+      openTimeout: GAP_TIMEOUT_MS,
+      afterOpen: assertClickRecovered,
     },
     {
       name: 'another app full screen',
@@ -1489,14 +1553,19 @@ try {
       const before = await popoverState();
       outcome.loading = before.loading;
       if (state.atClick !== undefined) state.atClick(before);
+      if (state.arm !== undefined) await state.arm();
       await clickStatusItem(state.button ?? 'left');
-      const seen = await waitForScreen(true);
+      const seen = await waitForScreen(true, state.openTimeout);
       if (seen.onScreen) {
-        if (state.afterOpen !== undefined) await state.afterOpen();
+        if (state.afterOpen !== undefined) await state.afterOpen(before);
         outcome.result = 'green';
         outcome.detail = JSON.stringify(seen.entry);
       } else {
         outcome.detail = seen.reason;
+        if (state.arm !== undefined) {
+          const { watch } = await popoverState();
+          if (watch !== null) outcome.detail += ` recovery=${JSON.stringify(watch)}`;
+        }
       }
     } catch (error) {
       if (error instanceof TrayDriverStopped) throw error;
