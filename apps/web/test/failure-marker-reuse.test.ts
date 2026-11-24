@@ -27,9 +27,9 @@ function offenders(): string[] {
   });
 }
 
-test('C31: a failure row in a conversation is drawn only by FailureMarker', () => {
+test('C32: a failure row in a conversation is drawn only by FailureMarker', () => {
   expect(
     offenders(),
-    `C31: these files draw their own failure row; render FailureMarker from src/${SHARED} instead`,
+    `C32: these files draw their own failure row; render FailureMarker from src/${SHARED} instead`,
   ).toEqual([]);
 });
