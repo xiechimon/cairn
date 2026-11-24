@@ -156,7 +156,8 @@ function recordingBackend(
   const backend: AgentBackend = {
     capabilities: PI_CAPABILITIES,
     async createSession(opts) {
-      sessions.push(opts);
+      const liveSecrets = opts.secrets?.();
+      sessions.push(liveSecrets === undefined ? opts : { ...opts, secrets: () => liveSecrets });
       return {
         sessionId: 'stub-sess-1',
         ...(sessionFile !== undefined ? { sessionFile } : {}),

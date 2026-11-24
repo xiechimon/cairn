@@ -109,6 +109,10 @@ async function enrollLocalMachine(
   }
 }
 
+export function readRunnerRegistration(home: string): MachineJson | undefined {
+  return readStoredMachine(home);
+}
+
 const MAX_MACHINE_JSON_BYTES = 16_384;
 
 function readStoredMachine(home: string, rejectSymlinkDir = false): MachineJson | undefined {
