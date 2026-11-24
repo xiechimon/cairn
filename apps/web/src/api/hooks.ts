@@ -32,6 +32,7 @@ import type {
   DesignVersionRecord,
   DiffFileContent,
   DocumentDiffFile,
+  FeedbackSubmitResponse,
   FsListResult,
   FsPickResult,
   GithubConnectionDevicePoll,
@@ -83,6 +84,7 @@ import type {
   ProviderPreset,
   ProviderRecord,
   PrPanelRow,
+  RelayDirectoryResponse,
   RemoteRoutesResponse,
   RouteOverride,
   ScheduleRecord,
@@ -691,10 +693,60 @@ export function useSetTunnelAccess() {
       api.post<TunnelAccess>('/api/remote/tunnel', input),
     onSuccess: (tunnel) => {
       void queryClient.invalidateQueries({ queryKey: ['remoteRoutes'] });
+      void queryClient.invalidateQueries({ queryKey: ['remoteDirectory'] });
       queryClient.setQueryData<RemoteRoutesResponse>(['remoteRoutes'], (old) =>
         old === undefined ? old : { ...old, tunnel },
       );
     },
+  });
+}
+
+export const useRemoteDirectory = (enabled: boolean) =>
+  useQuery({
+    queryKey: ['remoteDirectory'],
+    queryFn: () => api.get<RelayDirectoryResponse>('/api/remote/directory'),
+    enabled,
+    refetchInterval: REMOTE_POLL_MS,
+  });
+
+export function useSignInRelayAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { email: string; displayName?: string; relayUrl?: string }) =>
+      api.post<TunnelAccess>('/api/remote/account/signin', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['remoteRoutes'] });
+      void queryClient.invalidateQueries({ queryKey: ['remoteDirectory'] });
+    },
+  });
+}
+
+export function useSignOutRelayAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post<TunnelAccess>('/api/remote/account/signout', {}),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['remoteRoutes'] });
+      void queryClient.invalidateQueries({ queryKey: ['remoteDirectory'] });
+    },
+  });
+}
+
+export function useShareRelayDevice() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { targetEmail: string; role?: 'owner' | 'collaborator' }) =>
+      api.post<{ ok: boolean }>('/api/remote/shares', input),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['remoteDirectory'] });
+    },
+  });
+}
+
+export function useSubmitFeedback() {
+  return useMutation({
+    mutationFn: (input: { message: string; route?: string; errorSummary?: string }) =>
+      api.post<FeedbackSubmitResponse>('/api/feedback', input),
   });
 }
 

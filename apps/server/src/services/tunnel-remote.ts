@@ -1,7 +1,15 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
-import type { TunnelAccess, TunnelErrorKind } from '@cairn/shared';
+import { appendFileSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { hostname } from 'node:os';
+import { dirname, join } from 'node:path';
+import type {
+  FeedbackSubmitResponse,
+  RelayAccount,
+  RelayDirectoryDevice,
+  RelayDirectoryResponse,
+  TunnelAccess,
+  TunnelErrorKind,
+} from '@cairn/shared';
 import type { Hono } from 'hono';
 import WebSocket from 'ws';
 import { TUNNEL_ORIGIN_ENV_KEY } from '../lib/request-origin.js';
@@ -14,6 +22,7 @@ interface TunnelRecord {
   enabled: boolean;
   relayUrl: string | null;
   secret: string;
+  account: RelayAccount | null;
 }
 
 interface RelayRequestFrame {
@@ -30,6 +39,16 @@ export interface TunnelRemote {
   status(): TunnelAccess;
   resume(): Promise<TunnelAccess>;
   setEnabled(enabled: boolean, relayUrl?: string): Promise<TunnelAccess>;
+  signIn(input: { email: string; displayName?: string; relayUrl?: string }): Promise<TunnelAccess>;
+  signOut(): Promise<TunnelAccess>;
+  directory(): Promise<RelayDirectoryResponse>;
+  shareDevice(targetEmail: string, role?: 'owner' | 'collaborator'): Promise<void>;
+  revokeShare(targetEmail: string): Promise<void>;
+  submitFeedback(input: {
+    message: string;
+    route?: string;
+    errorSummary?: string;
+  }): Promise<FeedbackSubmitResponse>;
   stop(): Promise<void>;
 }
 
@@ -70,6 +89,14 @@ function readRecord(path: string): TunnelRecord | null {
   try {
     const raw = JSON.parse(readFileSync(path, 'utf8')) as Partial<TunnelRecord>;
     if (typeof raw.enabled !== 'boolean') return null;
+    const rawAccount = raw.account;
+    const account =
+      rawAccount !== null &&
+      rawAccount !== undefined &&
+      typeof rawAccount.email === 'string' &&
+      typeof rawAccount.displayName === 'string'
+        ? { email: rawAccount.email, displayName: rawAccount.displayName }
+        : null;
     return {
       enabled: raw.enabled,
       relayUrl: normalizeRelayUrl(raw.relayUrl),
@@ -77,6 +104,7 @@ function readRecord(path: string): TunnelRecord | null {
         typeof raw.secret === 'string' && raw.secret.length >= 16
           ? raw.secret
           : randomBytes(24).toString('hex'),
+      account,
     };
   } catch {
     return null;
@@ -95,6 +123,7 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
   const subdomain = deriveSubdomain(input.environmentId);
   let enabled = saved?.enabled ?? false;
   let relayUrl = saved?.relayUrl ?? normalizeRelayUrl(input.defaultRelayUrl);
+  let account: RelayAccount | null = saved?.account ?? null;
   const secret = saved?.secret ?? randomBytes(24).toString('hex');
   let state: TunnelAccess['state'] = 'off';
   let publicUrl: string | null = null;
@@ -112,7 +141,12 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
     url: enabled && state === 'ready' ? publicUrl : null,
     relayUrl,
     error: enabled && state === 'failed' ? error : null,
+    account,
   });
+
+  const persist = (): void => {
+    writeRecord(input.recordPath, { enabled, relayUrl, secret, account });
+  };
 
   const clearReconnect = (): void => {
     if (reconnectTimer !== null) {
@@ -263,7 +297,16 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
 
       socket.on('open', () => {
         if (ws !== socket) return;
-        socket.send(JSON.stringify({ type: 'hello', subdomain, secret }));
+        socket.send(
+          JSON.stringify({
+            type: 'hello',
+            subdomain,
+            secret,
+            accountEmail: account?.email ?? null,
+            deviceName: hostname(),
+            os: process.platform,
+          }),
+        );
       });
 
       socket.on('message', (raw) => {
@@ -357,7 +400,7 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
           relayUrl = parsed;
         }
         enabled = nextEnabled;
-        writeRecord(input.recordPath, { enabled, relayUrl, secret });
+        persist();
         if (!enabled) {
           reconnectAttempt = 0;
           closeSocket();
@@ -369,6 +412,110 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
         reconnectAttempt = 0;
         return connectOnce();
       }),
+    signIn: (creds) =>
+      enqueue(async () => {
+        const email = creds.email.trim().toLowerCase();
+        const displayName = creds.displayName?.trim() || email.split('@', 1)[0] || email;
+        if (creds.relayUrl !== undefined) {
+          const parsed = normalizeRelayUrl(creds.relayUrl);
+          if (parsed !== null) relayUrl = parsed;
+        }
+        account = { email, displayName };
+        enabled = relayUrl !== null && input.authToken !== null;
+        persist();
+        if (!enabled) return snapshot();
+        reconnectAttempt = 0;
+        return connectOnce();
+      }),
+    signOut: () =>
+      enqueue(async () => {
+        account = null;
+        enabled = false;
+        reconnectAttempt = 0;
+        closeSocket();
+        state = 'off';
+        publicUrl = null;
+        error = null;
+        persist();
+        return snapshot();
+      }),
+    directory: async (): Promise<RelayDirectoryResponse> => {
+      if (account === null || relayUrl === null) {
+        return { account, selfSubdomain: subdomain, ownDevices: [], sharedDevices: [] };
+      }
+      try {
+        const res = await fetch(
+          `${relayUrl}/_directory/devices?email=${encodeURIComponent(account.email)}`,
+        );
+        if (!res.ok) {
+          return { account, selfSubdomain: subdomain, ownDevices: [], sharedDevices: [] };
+        }
+        const body = (await res.json()) as {
+          ownDevices?: RelayDirectoryDevice[];
+          sharedDevices?: RelayDirectoryDevice[];
+        };
+        return {
+          account,
+          selfSubdomain: subdomain,
+          ownDevices: Array.isArray(body.ownDevices) ? body.ownDevices : [],
+          sharedDevices: Array.isArray(body.sharedDevices) ? body.sharedDevices : [],
+        };
+      } catch {
+        return { account, selfSubdomain: subdomain, ownDevices: [], sharedDevices: [] };
+      }
+    },
+    shareDevice: async (targetEmail: string, role: 'owner' | 'collaborator' = 'collaborator') => {
+      if (relayUrl === null) throw new Error('relay url is not configured');
+      const res = await fetch(`${relayUrl}/_directory/shares`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subdomain, secret, targetEmail, role }),
+      });
+      if (!res.ok) throw new Error('failed to share device');
+    },
+    revokeShare: async (targetEmail: string) => {
+      if (relayUrl === null) throw new Error('relay url is not configured');
+      const res = await fetch(`${relayUrl}/_directory/shares`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ subdomain, secret, targetEmail }),
+      });
+      if (!res.ok) throw new Error('failed to revoke share');
+    },
+    submitFeedback: async (fb): Promise<FeedbackSubmitResponse> => {
+      const localId = `fb_${randomBytes(6).toString('hex')}`;
+      const payload = {
+        id: localId,
+        createdAt: new Date().toISOString(),
+        email: account?.email ?? null,
+        message: fb.message,
+        context: {
+          platform: process.platform,
+          arch: process.arch,
+          node: process.version,
+          route: fb.route ?? null,
+          errorSummary: fb.errorSummary ?? null,
+          tunnelState: state,
+        },
+      };
+      const localPath = join(dirname(input.recordPath), 'feedback.jsonl');
+      mkdirSync(dirname(localPath), { recursive: true, mode: 0o700 });
+      appendFileSync(localPath, `${JSON.stringify(payload)}\n`, { mode: 0o600 });
+      if (relayUrl !== null) {
+        try {
+          const res = await fetch(`${relayUrl}/_feedback`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (res.ok) {
+            const remote = (await res.json()) as { id?: string };
+            if (typeof remote.id === 'string') return { ok: true, id: remote.id };
+          }
+        } catch {}
+      }
+      return { ok: true, id: localId };
+    },
     stop: () =>
       enqueue(async () => {
         stopped = true;

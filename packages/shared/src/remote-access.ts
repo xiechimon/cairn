@@ -89,12 +89,19 @@ export const tunnelErrorKindSchema = z.enum([
 ]);
 export type TunnelErrorKind = z.infer<typeof tunnelErrorKindSchema>;
 
+export const relayAccountSchema = z.object({
+  email: z.string().email(),
+  displayName: z.string().min(1).max(80),
+});
+export type RelayAccount = z.infer<typeof relayAccountSchema>;
+
 export const tunnelAccessSchema = z.object({
   enabled: z.boolean(),
   state: z.enum(['off', 'connecting', 'ready', 'reconnecting', 'failed', 'stopped']),
   url: z.string().nullable(),
   relayUrl: z.string().nullable(),
   error: tunnelErrorKindSchema.nullable(),
+  account: relayAccountSchema.nullable().optional(),
 });
 export type TunnelAccess = z.infer<typeof tunnelAccessSchema>;
 
@@ -105,6 +112,58 @@ export const tunnelSetBodySchema = z
   })
   .strict();
 export type TunnelSetBody = z.infer<typeof tunnelSetBodySchema>;
+
+export const relayAccountSignInBodySchema = z
+  .object({
+    email: z.string().trim().email().max(120),
+    displayName: z.string().trim().min(1).max(80).optional(),
+    relayUrl: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
+export type RelayAccountSignInBody = z.infer<typeof relayAccountSignInBodySchema>;
+
+export const relayDirectoryDeviceSchema = z.object({
+  subdomain: z.string().min(1),
+  name: z.string().min(1),
+  os: z.string().min(1),
+  ownerEmail: z.string().email(),
+  online: z.boolean(),
+  url: z.string().url(),
+  lastSeenAt: epochMs,
+  role: z.enum(['owner', 'collaborator']),
+});
+export type RelayDirectoryDevice = z.infer<typeof relayDirectoryDeviceSchema>;
+
+export const relayDirectoryResponseSchema = z.object({
+  account: relayAccountSchema.nullable(),
+  selfSubdomain: z.string().nullable(),
+  ownDevices: z.array(relayDirectoryDeviceSchema),
+  sharedDevices: z.array(relayDirectoryDeviceSchema),
+});
+export type RelayDirectoryResponse = z.infer<typeof relayDirectoryResponseSchema>;
+
+export const relayShareBodySchema = z
+  .object({
+    targetEmail: z.string().trim().email().max(120),
+    role: z.enum(['owner', 'collaborator']).optional(),
+  })
+  .strict();
+export type RelayShareBody = z.infer<typeof relayShareBodySchema>;
+
+export const feedbackSubmitBodySchema = z
+  .object({
+    message: z.string().trim().min(1).max(4000),
+    route: z.string().trim().max(200).optional(),
+    errorSummary: z.string().trim().max(400).optional(),
+  })
+  .strict();
+export type FeedbackSubmitBody = z.infer<typeof feedbackSubmitBodySchema>;
+
+export const feedbackSubmitResponseSchema = z.object({
+  ok: z.literal(true),
+  id: z.string().min(1),
+});
+export type FeedbackSubmitResponse = z.infer<typeof feedbackSubmitResponseSchema>;
 
 export const remoteRoutesResponseSchema = z.object({
   environmentId: z.string().min(1),

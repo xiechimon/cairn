@@ -6,6 +6,7 @@ import {
   ChartNoAxesColumn,
   ChevronLeft,
   Clock,
+  Flag,
   PanelLeft,
   Plus,
   Search,
@@ -23,9 +24,12 @@ import {
   useState,
 } from 'react';
 import { Link, type NavigateFunction, type To, useLocation, useNavigate } from 'react-router';
+import { useRemoteRoutes } from '../api/hooks.js';
+import { useLiveData } from '../api/provider.js';
 import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
+import { FeedbackDialog } from '../components/feedback-dialog.js';
 import { createdHere, useArrivals } from '../components/growth.js';
 import { InfoTip } from '../components/info-tip.js';
 import { SidebarNavRow } from '../components/shell/sidebar-nav-row.js';
@@ -368,6 +372,10 @@ export function BoardSidebar({
   const activeLayout = useMemo(() => sidebarProjects(allProjects), [allProjects]);
   const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const { live } = useLiveData();
+  const routesQ = useRemoteRoutes(live);
+  const relayAccount = routesQ.data?.tunnel?.account ?? null;
   const archivedPage = filter === 'archived';
   const archivedRows = useMemo(
     () => (archivedPage ? [...layout.ungrouped, ...layout.groups.flatMap((g) => g.projects)] : []),
@@ -646,16 +654,40 @@ export function BoardSidebar({
         className="flex h-14 flex-none items-center gap-1 border-t border-border pr-2 pl-1"
       >
         <div className="flex min-w-0 flex-1 items-center">
-          <span
-            data-testid="sidebar-footer-brand"
-            className="sidebar-footer-brand hidden min-w-0 items-center gap-2 pl-2 text-foreground"
-          >
-            <BrandGlyph className={ICON} />
-            <span className="truncate voice-title text-brand">{BRAND.manifestName}</span>
-          </span>
+          {relayAccount !== null ? (
+            <Link
+              to={{ pathname: `${SETTINGS_HREF}/remote-access`, search: plain }}
+              data-testid="sidebar-footer-account"
+              className="flex min-w-0 items-center gap-2 rounded-md py-1 pr-2 pl-2 text-foreground no-underline hover:bg-sidebar-hover"
+            >
+              <span className="flex size-5.5 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background uppercase">
+                {relayAccount.displayName.slice(0, 1)}
+              </span>
+              <span className="truncate text-ui font-medium">{relayAccount.displayName}</span>
+            </Link>
+          ) : (
+            <span
+              data-testid="sidebar-footer-brand"
+              className="sidebar-footer-brand hidden min-w-0 items-center gap-2 pl-2 text-foreground"
+            >
+              <BrandGlyph className={ICON} />
+              <span className="truncate voice-title text-brand">{BRAND.manifestName}</span>
+            </span>
+          )}
         </div>
         <div className="flex flex-none items-center gap-0.5">
           <DesktopUpdateButton iconClassName={ICON} idleClassName={ICON_BTN} />
+          <SidebarTip label={t('反馈')} side="top">
+            <Button
+              variant="ghost"
+              className={ICON_BTN}
+              aria-label={t('反馈')}
+              data-testid="sidebar-feedback"
+              onClick={() => setFeedbackOpen(true)}
+            >
+              <Flag className={ICON} strokeWidth={STROKE} />
+            </Button>
+          </SidebarTip>
           <FooterIcon label={t('用量')} testId="sidebar-usage" to={usageTarget}>
             <ChartNoAxesColumn className={ICON} strokeWidth={STROKE} />
           </FooterIcon>
@@ -665,6 +697,7 @@ export function BoardSidebar({
         </div>
       </div>
       <ChiefMemoryDialog open={memoryOpen} onClose={() => setMemoryOpen(false)} />
+      <FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} route={pathname} />
     </aside>
   );
 }

@@ -1,10 +1,13 @@
 import { networkInterfaces } from 'node:os';
 import {
+  feedbackSubmitBodySchema,
   pairBodySchema,
   pairClaimBodySchema,
   pairRequestBodySchema,
   REMOTE_DESCRIPTOR_VERSION,
   type RemoteDescriptor,
+  relayAccountSignInBodySchema,
+  relayShareBodySchema,
   tailnetSetBodySchema,
   tunnelSetBodySchema,
 } from '@cairn/shared';
@@ -124,6 +127,52 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
     const body = parseWith(tunnelSetBodySchema, await jsonBody(c), 'body');
     return c.json(await remote.tunnel.setEnabled(body.enabled, body.relayUrl));
+  });
+
+  app.post('/api/remote/account/signin', async (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
+    const body = parseWith(relayAccountSignInBodySchema, await jsonBody(c), 'body');
+    return c.json(await remote.tunnel.signIn(body));
+  });
+
+  app.post('/api/remote/account/signout', async (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
+    return c.json(await remote.tunnel.signOut());
+  });
+
+  app.get('/api/remote/directory', async (c) => {
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
+    return c.json(await remote.tunnel.directory());
+  });
+
+  app.post('/api/remote/shares', async (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
+    const body = parseWith(relayShareBodySchema, await jsonBody(c), 'body');
+    await remote.tunnel.shareDevice(body.targetEmail, body.role);
+    return c.json({ ok: true }, 201);
+  });
+
+  app.delete('/api/remote/shares', async (c) => {
+    requireOwner(c);
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
+    const body = parseWith(relayShareBodySchema, await jsonBody(c), 'body');
+    await remote.tunnel.revokeShare(body.targetEmail);
+    return c.body(null, 204);
+  });
+
+  app.post('/api/feedback', async (c) => {
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'feedback unavailable');
+    const body = parseWith(feedbackSubmitBodySchema, await jsonBody(c), 'body');
+    return c.json(await remote.tunnel.submitFeedback(body), 201);
   });
 
   const requireTokenAuth = (): void => {

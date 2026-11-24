@@ -76,6 +76,7 @@ export function buildRemoteRoutes(
             url: tunnelStatus.state === 'ready' ? tunnelStatus.url : null,
             relayUrl: tunnelStatus.relayUrl,
             error: tunnelStatus.state === 'failed' ? tunnelStatus.error : null,
+            account: tunnelStatus.account ?? null,
           },
         }
       : {}),

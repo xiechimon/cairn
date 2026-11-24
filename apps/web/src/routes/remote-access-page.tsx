@@ -7,14 +7,19 @@ import {
   usePairingGrants,
   usePairingRequests,
   useRemoteDevices,
+  useRemoteDirectory,
   useRemoteMutations,
   useRemoteRoutes,
   useSetTailnetAccess,
   useSetTunnelAccess,
+  useShareRelayDevice,
+  useSignInRelayAccount,
+  useSignOutRelayAccount,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { joinMeta, relativeTime } from '../board/rel-time.js';
 import { EmptyState } from '../components/empty-state.js';
+import { FeedbackDialog } from '../components/feedback-dialog.js';
 import { QrCode } from '../components/qr-code.js';
 import { SettingsCard, SettingsRow } from '../components/settings-list.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
@@ -29,7 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { copyTextWithFeedback, writeClipboard } from '../lib/clipboard.js';
@@ -141,10 +146,17 @@ export function RemoteAccessPage() {
   const mutations = useRemoteMutations();
   const setTailnet = useSetTailnetAccess();
   const setTunnel = useSetTunnelAccess();
+  const signInAccount = useSignInRelayAccount();
+  const signOutAccount = useSignOutRelayAccount();
+  const shareDevice = useShareRelayDevice();
   const [pairing, setPairing] = useState<PairingCodeResponse | null>(null);
   const [toggleFailed, setToggleFailed] = useState(false);
   const [tunnelToggleFailed, setTunnelToggleFailed] = useState(false);
   const [relayDraft, setRelayDraft] = useState<string | null>(null);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareEmail, setShareEmail] = useState('');
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [tunnelCopied, setTunnelCopied] = useState(false);
   const [loginCopied, setLoginCopied] = useState(false);
   const routes = routesQ.data?.routes ?? [];
@@ -153,6 +165,11 @@ export function RemoteAccessPage() {
   const pairingBlocked = live && routesQ.data !== undefined && candidates.length === 0;
   const tailnet = routesQ.data?.tailnet;
   const tunnel = routesQ.data?.tunnel;
+  const relayAccount = tunnel?.account ?? null;
+  const directoryQ = useRemoteDirectory(live && relayAccount !== null);
+  const ownDevices = directoryQ.data?.ownDevices ?? [];
+  const sharedDevices = directoryQ.data?.sharedDevices ?? [];
+  const selfSubdomain = directoryQ.data?.selfSubdomain ?? null;
   const tunnelOn = tunnel?.enabled === true;
   const tunnelState = tunnelOn ? tunnel.state : 'off';
   const tunnelFailed = tunnelOn && (tunnelState === 'failed' || tunnelToggleFailed);
@@ -283,6 +300,163 @@ export function RemoteAccessPage() {
           </p>
         </Card>
       ))}
+      {(live || routesQ.data !== undefined) && tunnel !== undefined && (
+        <div className="mt-3 flex flex-col gap-3" data-testid="remote-account-connect">
+          {tunnelFailed && (
+            <Card className="gap-2 p-4" data-testid="remote-tunnel-error-banner">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="m-0 text-ui font-medium text-destructive">{t('公网隧道连接异常')}</p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setTunnel.mutate({ enabled: true })}
+                  >
+                    {t('重试')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    className={DIALOG_PRIMARY_BUTTON}
+                    onClick={() => setFeedbackOpen(true)}
+                    data-testid="remote-error-feedback"
+                  >
+                    {t('一键反馈此问题')}
+                  </Button>
+                </div>
+              </div>
+              <p className="m-0 text-meta text-content-tertiary">{tunnelHint}</p>
+            </Card>
+          )}
+          {relayAccount === null ? (
+            <Card className="gap-3 p-4" data-testid="remote-account-signin-card">
+              <div>
+                <p className="m-0 text-ui font-medium">{t('登录账号，多台电脑一键直连')}</p>
+                <p className="m-0 mt-1 text-meta text-content-tertiary">
+                  {t('在两台 Windows 或 Mac 上登录同一账号，自动发现彼此并直连，无需每次扫码。')}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  value={emailDraft}
+                  onChange={(event) => setEmailDraft(event.target.value)}
+                  placeholder="you@example.com"
+                  aria-label={t('账号邮箱')}
+                  data-testid="remote-account-email-input"
+                  className="max-w-60 text-meta"
+                />
+                <Input
+                  value={relayInputValue}
+                  onChange={(event) => setRelayDraft(event.target.value)}
+                  placeholder="https://relay.example.com"
+                  aria-label={t('中继地址')}
+                  data-testid="remote-tunnel-relay-input"
+                  className="max-w-60 font-mono text-meta"
+                />
+                <Button
+                  size="sm"
+                  className={DIALOG_PRIMARY_BUTTON}
+                  disabled={signInAccount.isPending || !emailDraft.includes('@')}
+                  data-testid="remote-account-signin-btn"
+                  onClick={() => {
+                    const trimmedRelay = relayInputValue.trim();
+                    signInAccount.mutate(
+                      {
+                        email: emailDraft.trim(),
+                        ...(trimmedRelay !== '' ? { relayUrl: trimmedRelay } : {}),
+                      },
+                      {
+                        onSuccess: () => toastSuccess(t('账号已登录，正在自动互联设备')),
+                        onError: (err) => toastError(t('登录失败，请检查邮箱或中继地址'), err),
+                      },
+                    );
+                  }}
+                >
+                  {t('登录并自动互联')}
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <>
+              <SettingsCard>
+                <SettingsRow label={relayAccount.displayName} hint={relayAccount.email}>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      data-testid="remote-share-open"
+                      onClick={() => setShareOpen(true)}
+                    >
+                      {t('授权给其他账号')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={signOutAccount.isPending}
+                      onClick={() => signOutAccount.mutate()}
+                    >
+                      {t('退出')}
+                    </Button>
+                  </div>
+                </SettingsRow>
+                {ownDevices.map((dev) => (
+                  <SettingsRow
+                    key={dev.subdomain}
+                    label={dev.name}
+                    hint={`${dev.os} · ${dev.online ? t('在线') : t('离线')}`}
+                  >
+                    {dev.subdomain === selfSubdomain ? (
+                      <span className="text-meta text-content-tertiary">{t('本机已在线')}</span>
+                    ) : dev.online ? (
+                      <Button
+                        size="sm"
+                        className={DIALOG_PRIMARY_BUTTON}
+                        render={<a href={`${dev.url}/app`} target="_blank" rel="noreferrer" />}
+                      >
+                        {t('点击连接')}
+                      </Button>
+                    ) : (
+                      <span className="text-meta text-content-tertiary">{t('未开机')}</span>
+                    )}
+                  </SettingsRow>
+                ))}
+              </SettingsCard>
+              {sharedDevices.length > 0 && (
+                <SettingsCard>
+                  {sharedDevices.map((dev) => (
+                    <SettingsRow
+                      key={dev.subdomain}
+                      label={dev.name}
+                      hint={`${dev.ownerEmail} · ${dev.online ? t('在线') : t('离线')}`}
+                    >
+                      {dev.online ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          render={<a href={`${dev.url}/app`} target="_blank" rel="noreferrer" />}
+                        >
+                          {t('点击连接')}
+                        </Button>
+                      ) : (
+                        <span className="text-meta text-content-tertiary">{t('未开机')}</span>
+                      )}
+                    </SettingsRow>
+                  ))}
+                </SettingsCard>
+              )}
+              <div className="flex items-center justify-end">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setFeedbackOpen(true)}
+                  data-testid="remote-footer-feedback"
+                >
+                  {t('遇到连接问题？反馈 Bug')}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {(live || routesQ.data !== undefined) && (
         <SettingsCard className="mt-3">
           <SettingsRow
@@ -479,6 +653,52 @@ export function RemoteAccessPage() {
           onClose={() => setPairing(null)}
         />
       )}
+      {shareOpen && (
+        <DialogShell
+          title={t('授权给其他账号')}
+          subtitle={t('对方使用自己的账号登录后，即可在远程访问列表里直接点击连接这台电脑。')}
+          onClose={() => setShareOpen(false)}
+          footer={
+            <>
+              <Button variant="ghost" onClick={() => setShareOpen(false)}>
+                {t('取消')}
+              </Button>
+              <Button
+                className={DIALOG_PRIMARY_BUTTON}
+                disabled={shareDevice.isPending || !shareEmail.includes('@')}
+                onClick={() => {
+                  shareDevice.mutate(
+                    { targetEmail: shareEmail.trim(), role: 'collaborator' },
+                    {
+                      onSuccess: () => {
+                        toastSuccess(t('已授权给 {email}', { email: shareEmail.trim() }));
+                        setShareEmail('');
+                        setShareOpen(false);
+                      },
+                      onError: (err) => toastError(t('授权失败，请确认本机隧道已在线'), err),
+                    },
+                  );
+                }}
+              >
+                {t('发送授权')}
+              </Button>
+            </>
+          }
+        >
+          <Input
+            value={shareEmail}
+            onChange={(event) => setShareEmail(event.target.value)}
+            placeholder="friend@example.com"
+            aria-label={t('对方邮箱')}
+          />
+        </DialogShell>
+      )}
+      <FeedbackDialog
+        open={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+        route="/app/settings/remote-access"
+        errorSummary={tunnelFailed ? `tunnel:${tunnel?.error ?? 'failed'}` : undefined}
+      />
     </PageShell>
   );
 }
