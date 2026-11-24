@@ -1,7 +1,12 @@
 import { createHash } from 'node:crypto';
 import { rmSync } from 'node:fs';
 import { join } from 'node:path';
-import { ATTACHMENT_MAX_BYTES, formatAttachmentToken, isImageAttachmentExt } from '@cairn/shared';
+import {
+  ATTACHMENT_MAX_BYTES,
+  formatAttachmentToken,
+  inlineImageMimeOfBytes,
+  isImageAttachmentExt,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { attachment, message, type step, type todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -15,20 +20,9 @@ export function attachmentMime(fileName: string, bytes: Buffer): string {
   if (isImageAttachmentExt(ext) && !['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(ext)) {
     throw new HttpError(400, 'attach_file image type is not allowed; use PNG, JPEG, GIF, or WebP');
   }
-  const starts = (hex: string) => bytes.subarray(0, hex.length / 2).equals(Buffer.from(hex, 'hex'));
-  const detected = starts('89504e470d0a1a0a')
-    ? 'image/png'
-    : starts('ffd8ff')
-      ? 'image/jpeg'
-      : bytes.subarray(0, 6).toString('latin1') === 'GIF87a' ||
-          bytes.subarray(0, 6).toString('latin1') === 'GIF89a'
-        ? 'image/gif'
-        : bytes.subarray(0, 4).toString('latin1') === 'RIFF' &&
-            bytes.subarray(8, 12).toString('latin1') === 'WEBP'
-          ? 'image/webp'
-          : bytes.subarray(0, 5).toString('latin1') === '%PDF-'
-            ? 'application/pdf'
-            : null;
+  const detected =
+    inlineImageMimeOfBytes(bytes) ??
+    (bytes.subarray(0, 5).toString('latin1') === '%PDF-' ? 'application/pdf' : null);
   const expected: Record<string, string> = {
     png: 'image/png',
     jpg: 'image/jpeg',

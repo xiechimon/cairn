@@ -223,20 +223,50 @@ export function coordinatorTool(
           return { output: [{ type: 'text', text: result.text }, ...images] };
         }
         const text = await channel.relayTool(stepId, def.name, params, callId, context.abortSignal);
-        if (def.name === 'attachment') {
-          const attachment = JSON.parse(text) as {
-            fileName?: string;
-            mimeType: string;
-            sizeBytes?: number;
-            encoding: string;
-            content: string;
-          };
-          if (attachment.mimeType.startsWith('image/') && attachment.encoding === 'base64') {
+        if (def.name === 'attachment' || def.name === 'read_file') {
+          let attachment:
+            | {
+                id?: string;
+                fileName?: string;
+                mimeType?: unknown;
+                sizeBytes?: number;
+                encoding?: unknown;
+                content?: unknown;
+                attachmentToken?: string;
+              }
+            | undefined;
+          try {
+            attachment = JSON.parse(text) as typeof attachment;
+          } catch {
+            attachment = undefined;
+          }
+          if (
+            attachment !== undefined &&
+            typeof attachment.mimeType === 'string' &&
+            attachment.mimeType.startsWith('image/') &&
+            attachment.encoding === 'base64' &&
+            typeof attachment.content === 'string'
+          ) {
             const model = await drivingModel();
             if (model?.input.includes('image') === true) {
-              return {
-                output: [await prepareCoordinatorImage(attachment.content, attachment.mimeType)],
-              };
+              const imageBlock = await prepareCoordinatorImage(
+                attachment.content,
+                attachment.mimeType,
+              );
+              const meta =
+                attachment.attachmentToken === undefined
+                  ? []
+                  : [
+                      {
+                        type: 'text' as const,
+                        text: JSON.stringify({
+                          id: attachment.id,
+                          fileName: attachment.fileName,
+                          attachmentToken: attachment.attachmentToken,
+                        }),
+                      },
+                    ];
+              return { output: [imageBlock, ...meta] };
             }
             const read = await attachmentImageText({
               models: api.models,
@@ -264,7 +294,11 @@ export function coordinatorTool(
                 createdAt: Date.now(),
               })
               .catch(() => undefined);
-            return { output: [{ type: 'text', text: read.text }] };
+            const textOut =
+              attachment.attachmentToken === undefined
+                ? read.text
+                : `${read.text}\nattachmentToken=${attachment.attachmentToken}`;
+            return { output: [{ type: 'text', text: textOut }] };
           }
         }
         return { output: [{ type: 'text', text }] };

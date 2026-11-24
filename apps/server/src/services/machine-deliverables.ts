@@ -6,6 +6,10 @@ import {
   DELIVERABLE_LIMITS,
   type DeliverableKind,
   type DeliverablesMessage,
+  formatAttachmentToken,
+  INLINE_IMAGE_EXTS,
+  INLINE_IMAGE_MIME_BY_EXT,
+  inlineImageMimeOfBytes,
   resolveAttachmentMime,
 } from '@cairn/shared';
 import { and, eq, inArray, sql } from 'drizzle-orm';
@@ -21,6 +25,12 @@ import type { MachineDeps } from './machine-deps.js';
 const KIND_EXTS: Record<DeliverableKind, readonly string[]> = {
   page: ['html'],
   slides: ['pptx', 'pdf'],
+  image: INLINE_IMAGE_EXTS,
+};
+const MAX_BYTES_BY_KIND: Record<DeliverableKind, number> = {
+  page: DELIVERABLE_LIMITS.maxPageBytes,
+  slides: DELIVERABLE_LIMITS.maxSlidesBytes,
+  image: DELIVERABLE_LIMITS.maxImageBytes,
 };
 const UNSAFE_NAME = /[\p{Cc}\p{Cf}\p{Cs}/\\]/u;
 const PDF_MAGIC = Buffer.from('%PDF-', 'latin1');
@@ -63,11 +73,14 @@ function failRows(db: Db, rows: { id: string; status: string }[]): void {
 }
 
 export function deliverableKindOf(fileName: string): DeliverableKind {
-  return KIND_EXTS.page.includes(attachmentExtOf(fileName)) ? 'page' : 'slides';
+  const ext = attachmentExtOf(fileName);
+  if (KIND_EXTS.page.includes(ext)) return 'page';
+  if (KIND_EXTS.image.includes(ext)) return 'image';
+  return 'slides';
 }
 
 function maxBytesOf(kind: DeliverableKind): number {
-  return kind === 'page' ? DELIVERABLE_LIMITS.maxPageBytes : DELIVERABLE_LIMITS.maxSlidesBytes;
+  return MAX_BYTES_BY_KIND[kind];
 }
 
 function checkedExt(kind: DeliverableKind, name: string): string {
@@ -104,6 +117,22 @@ function contentCheckOf(ext: string): ContentCheck {
       }
     };
     return { push: (chunk) => decode(chunk), end: () => decode() };
+  }
+  const expectedImageMime = INLINE_IMAGE_MIME_BY_EXT[ext];
+  if (expectedImageMime !== undefined) {
+    let head = Buffer.alloc(0);
+    return {
+      push(chunk) {
+        if (head.length < 12) {
+          head = Buffer.concat([head, Buffer.from(chunk.subarray(0, 12 - head.length))]);
+        }
+      },
+      end() {
+        if (inlineImageMimeOfBytes(head) !== expectedImageMime) {
+          throw new HttpError(422, `file is not a valid .${ext}`);
+        }
+      },
+    };
   }
   const magic = ext === 'pdf' ? PDF_MAGIC : ZIP_MAGIC;
   let head = Buffer.alloc(0);
@@ -178,7 +207,7 @@ export function publishDeliverables(
       kind: deliverableKindOf(r.fileName),
       name: r.fileName,
       sizeBytes: r.sizeBytes,
-      attachmentToken: `![${r.id}](attachment:${r.storageKey})`,
+      attachmentToken: formatAttachmentToken(r.fileName.replace(/[[\]\n\r]/g, '_'), r.storageKey),
     })),
     skipped: input.manifest.skipped,
   };

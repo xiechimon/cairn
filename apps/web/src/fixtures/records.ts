@@ -61,7 +61,7 @@ export interface BuildRef {
   createdAt: number;
 }
 
-export type MadeKind = 'document' | 'design' | 'page' | 'slides' | 'code';
+export type MadeKind = 'document' | 'design' | 'page' | 'slides' | 'image' | 'code';
 
 export interface TodoRecord {
   id: string;

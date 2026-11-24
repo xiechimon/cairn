@@ -24,6 +24,7 @@ import {
   chiefMemoryThreadId,
   chiefTurnErrorContentSchema,
   conversationBranch,
+  deliverablesMessageSchema,
   fencedTitle,
   isChiefMemoryThreadId,
   isChiefSideThreadId,
@@ -108,6 +109,7 @@ import {
 import { runtimeGatePasses } from './dispatch-eligibility.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
+import { DELIVERABLES_MESSAGE_PREFIX } from './machine-deliverables.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { injectMemoryDocuments } from './memory.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
@@ -1661,6 +1663,30 @@ export function enqueueOwnershipWake(
   });
 }
 
+function gateDeliverableLines(db: Db, buildId: string | null): string | null {
+  if (buildId === null) return null;
+  const row = db
+    .select({ content: message.content })
+    .from(message)
+    .where(eq(message.id, `${DELIVERABLES_MESSAGE_PREFIX}${buildId}`))
+    .get();
+  if (row === undefined) return null;
+  try {
+    const raw = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+    const parsed = deliverablesMessageSchema.safeParse(raw);
+    if (!parsed.success || parsed.data.items.length === 0) return null;
+    return [
+      'Deliverables:',
+      ...parsed.data.items.map(
+        (item) =>
+          `Deliverable attachmentId=${encodeURIComponent(item.attachmentId)} kind=${item.kind} name=${encodeURIComponent(item.name)} token=${item.attachmentToken}`,
+      ),
+    ].join('\n');
+  } catch {
+    return null;
+  }
+}
+
 function enqueueGateWake(
   deps: ChiefDeps,
   threadId: string,
@@ -1670,11 +1696,14 @@ function enqueueGateWake(
   report: ReportRef | null,
 ): string {
   const facts = wakeFacts(report === null ? 'gate' : 'report', record, null);
+  const deliverables = gateDeliverableLines(deps.db, record.latestBuildId);
   const metadata = `Gate todo=${encodeURIComponent(record.id)} build=${encodeURIComponent(record.latestBuildId ?? '')} phase=${record.phase} attempt=${retry ? 1 : 0}`;
+  const body = [facts, deliverables, report === null ? null : reportLine(report), metadata]
+    .filter((part) => part !== null)
+    .join('\n');
   enqueueChiefStep(deps, threadId, {
     id,
-    prompt:
-      report === null ? `${facts}\n${metadata}` : `${facts}\n${reportLine(report)}\n${metadata}`,
+    prompt: body,
     trigger: 'gate',
     provenance: report === null ? watchProvenance(record.id) : reportProvenance(record.id),
     ownerMessageIds: [],
@@ -1762,7 +1791,7 @@ function wakeFactText(
       return `任务 ${ref} 停驻在 ${todo.phase} 关口，等人处理。不要自己放行：需要用户知道或决定时，用 notify_user 或 ask_user 说明，否则直接结束本轮。`;
     }
     case 'report':
-      return `任务 ${ref} 已交付研究报告，验收归你。先用 attachment 读下面 Report 行里 attachment= 的报告，再四选一：有用户该知道的结论，就用 notify_user 发 2–5 行，第一行是结论（报告卡片会自动附在通知下面，不用再写任务链接或标题），然后 complete_todos 收下；报告没有新信息、Report 行是 origin=none，就用 complete_todos 带 silent: true 静默收下，不发通知；需要补充或返工，用 message_thread 让它继续；不再需要，用 archive_todos 归档。这一轮只能读资料和处理这一个任务，别的工具会被拒绝；用户在这一轮发来的新消息不受这个限制，照常处理。`;
+      return `任务 ${ref} 已交付研究报告，验收归你。先用 attachment 读下面 Report 行里 attachment= 的报告；若下方 Deliverables 列出了图片交付物（kind=image），验收前也用 attachment 读取它的 attachmentId 亲自看图确认质量。再四选一：有用户该知道的结论或交付物，就用 notify_user 发 2–5 行，第一行是结论（报告卡片会自动附在通知下面，不用再写任务链接或标题；要把图片直接发到对话里时，把对应 Deliverable 行的 token 独立占一行写进 notify_user 的 message），然后 complete_todos 收下；报告没有新信息、没有交付物且 Report 行是 origin=none，就用 complete_todos 带 silent: true 静默收下，不发通知；需要补充或返工，用 message_thread 让它继续；不再需要，用 archive_todos 归档。这一轮只能读资料和处理这一个任务，别的工具会被拒绝；用户在这一轮发来的新消息不受这个限制，照常处理。`;
     case 'settle':
       return `任务 ${ref} 已完成（done）。请用 notify_user（provenance 填首行的 provenance= 值）用 2–4 行告诉用户任务已完成并总结结果：第一句点明 ${ref} 已完成，接着概括它完成了什么或验证结论，以及交付状态（done 本身不代表分支或 PR 已合并，按下方交付事实如实说明；需要更多细节可调 conversation 查）。只有同一完成结论在本对话里已经通知过用户时，才不重发、直接结束本轮。该任务的关注已自动解除。`;
     case 'failed':
@@ -1914,7 +1943,7 @@ Ask only when the need itself is ambiguous, or when the user has to choose a dir
 </asking>
 
 <talking>
-Reply in the language of the user's latest message, which the turn notes record as Reply language — never the language of notes, tool results, task text or your earlier replies. Use plain short sentences, and say nothing when there is nothing new. Each paragraph shows as its own bubble, so keep one matter in one paragraph. Mention a task with the link its tool result gives, not by number. When several consecutive user messages arrive before your reply, read them together as one turn: if a later message corrects or replaces an earlier one, answer only the updated request without answering the withdrawn one; if they ask separate things, address each in one reply.
+Reply in the language of the user's latest message, which the turn notes record as Reply language — never the language of notes, tool results, task text or your earlier replies. Use plain short sentences, and say nothing when there is nothing new. Each paragraph shows as its own bubble, so keep one matter in one paragraph. Mention a task with the link its tool result gives, not by number. When several consecutive user messages arrive before your reply, read them together as one turn: if a later message corrects or replaces an earlier one, answer only the updated request without answering the withdrawn one; if they ask separate things, address each in one reply. To show an image or attachment inline in chat or notify_user, put its ![name](attachment:...) token on its own separate line (attachment returns that attachmentToken); when the user asks for an image from a repository or task, export or read the deliverable instead of saying chat cannot show images.
 </talking>
 
 <events>

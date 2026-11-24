@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const deliverableKindSchema = z.enum(['page', 'slides', 'image']);
+export type DeliverableKind = z.infer<typeof deliverableKindSchema>;
+
 export const REPORT_FILE_NAME = 'report.md';
 export const INFO_REPORT_MAX_BYTES = 512 * 1024;
 export const infoReportMessageSchema = z.object({
@@ -16,7 +19,7 @@ export const deliverablesMessageSchema = z.object({
   items: z.array(
     z.object({
       attachmentId: z.string(),
-      kind: z.enum(['page', 'slides']),
+      kind: deliverableKindSchema,
       name: z.string(),
       sizeBytes: z.number().int().min(0),
       attachmentToken: z.string(),

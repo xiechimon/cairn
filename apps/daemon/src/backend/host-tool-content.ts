@@ -1,18 +1,14 @@
-import { COMPUTER_IMAGE_MAX_BASE64_CHARS } from '@cairn/shared';
+import {
+  COMPUTER_IMAGE_MAX_BASE64_CHARS,
+  INLINE_IMAGE_MIME_BY_EXT,
+  inlineImageMimeOfBytes,
+} from '@cairn/shared';
 
-const IMAGE_SIGNATURES: Record<string, (bytes: Buffer) => boolean> = {
-  'image/png': (b) =>
-    b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])),
-  'image/jpeg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
-  'image/gif': (b) => b.subarray(0, 4).toString('latin1') === 'GIF8',
-  'image/webp': (b) =>
-    b.subarray(0, 4).toString('latin1') === 'RIFF' &&
-    b.subarray(8, 12).toString('latin1') === 'WEBP',
-};
+const ALLOWED_IMAGE_MIMES: readonly string[] = Object.values(INLINE_IMAGE_MIME_BY_EXT);
 
 export function hostToolContent(name: string, text: string) {
   const asText = [{ type: 'text' as const, text }];
-  if (name !== 'attachment') return asText;
+  if (name !== 'attachment' && name !== 'read_file') return asText;
   let file: { mimeType?: unknown; encoding?: unknown; content?: unknown };
   try {
     file = JSON.parse(text);
@@ -21,7 +17,7 @@ export function hostToolContent(name: string, text: string) {
   }
   if (
     typeof file.mimeType !== 'string' ||
-    IMAGE_SIGNATURES[file.mimeType] === undefined ||
+    !ALLOWED_IMAGE_MIMES.includes(file.mimeType) ||
     file.encoding !== 'base64' ||
     typeof file.content !== 'string'
   ) {
@@ -36,7 +32,7 @@ export function hostToolContent(name: string, text: string) {
     ];
   }
   const bytes = Buffer.from(file.content, 'base64');
-  if (bytes.length === 0 || !IMAGE_SIGNATURES[file.mimeType]?.(bytes)) {
+  if (bytes.length === 0 || inlineImageMimeOfBytes(bytes) !== file.mimeType) {
     return [{ type: 'text' as const, text: 'This attachment is not a readable image.' }];
   }
   return [

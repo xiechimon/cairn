@@ -133,3 +133,26 @@ test('only calls interrupted by a stopped step are labelled cancelled after cont
   });
   expect(items[0]).toMatchObject({ steps: [{ cancelled: true, running: false }, { cancelled: false }, { cancelled: false, running: true }] });
 });
+
+test('info-card computer tools (shell, read_file, write_file, list_files, submit_report) map cleanly with task dir stripped', () => {
+  const dir = '/home/agent/tasks/01a20cbc-b485-7ab6-922c-f66596bf2c99';
+  const items = render([
+    call('c1', 'mcp__cairn__shell', { command: 'pdftoppm -png resume.pdf page' }, 1000),
+    call('c2', 'shell', { command: 'rg foo bar' }, 2000),
+    call('c3', 'mcp__cairn__read_file', { path: `${dir}/deliverables/images/resume_p1.png` }, 3000),
+    call('c4', 'mcp__cairn__write_file', { path: `${dir}/report.md`, content: '# Export\nok' }, 4000),
+    call('c5', 'list_files', { path: `${dir}/deliverables` }, 5000),
+    call('c6', 'mcp__cairn__submit_report', { path: `${dir}/report.md` }, 6000),
+  ]);
+  expect(items[0]).toMatchObject({
+    kind: 'work',
+    steps: [
+      { kind: 'call', action: 'run', command: 'pdftoppm -png resume.pdf page', description: 'pdftoppm -png resume.pdf page' },
+      { kind: 'call', action: 'search', command: 'rg foo bar' },
+      { kind: 'call', action: 'read', target: 'deliverables/images/resume_p1.png' },
+      { kind: 'call', action: 'edit', target: 'report.md', diff: { added: 2, removed: 0 } },
+      { kind: 'call', action: 'search', description: 'list_files deliverables' },
+      { kind: 'call', action: 'tool', target: 'submit_report · report.md' },
+    ],
+  });
+});

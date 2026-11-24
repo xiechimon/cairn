@@ -66,6 +66,7 @@ import { compactionCeilingFetch } from './compaction-ceiling.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { EventQueue } from './event-queue.js';
+import { hostToolContent } from './host-tool-content.js';
 import { probeModelImageSupport, rememberNoVision } from './image-support.js';
 import { describeImageWithModels } from './image-text.js';
 import { connectFailedLine } from './mcp-config.js';
@@ -1230,7 +1231,7 @@ export class PiBackend implements AgentBackend {
               execute: async (_id: string, params: Record<string, unknown>) => {
                 try {
                   const text = await relay(def.name, params ?? {});
-                  return { content: [{ type: 'text' as const, text }], details: {} };
+                  return { content: hostToolContent(def.name, text), details: {} };
                 } catch (err) {
                   const msg = err instanceof Error ? err.message : String(err);
                   return {

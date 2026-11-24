@@ -1,6 +1,6 @@
 import type { TodoDeliverables } from '@cairn/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Globe, Presentation } from 'lucide-react';
+import { Download, Globe, Image, Presentation } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { fetchWithSession } from '../api/auth.js';
 import { Button } from '../components/ui/button.js';
@@ -122,8 +122,9 @@ function FileRow({
   onOpen?: () => void;
 }) {
   const { t } = useI18n();
-  const Icon = item.kind === 'page' ? Globe : Presentation;
-  const meta = [item.kind === 'page' ? t('网页') : t('PPT'), sizeLabel(item.sizeBytes), note]
+  const Icon = item.kind === 'page' ? Globe : item.kind === 'image' ? Image : Presentation;
+  const kindLabel = item.kind === 'page' ? t('网页') : item.kind === 'image' ? t('图片') : t('PPT');
+  const meta = [kindLabel, sizeLabel(item.sizeBytes), note]
     .filter((part) => part !== undefined)
     .join(' · ');
   return (

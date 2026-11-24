@@ -41,6 +41,18 @@ describe('threadUpdates', () => {
     ]);
     expect(result).toEqual({ lines: ['Summary'], at: 420 });
   });
+
+  test('returns null for a review info task owned by Coordinator', () => {
+    expect(
+      threadUpdates(
+        { phase: 'review', phaseAt: 100, output: 'info', owner: 'coordinator', section: 'working' },
+        [
+          { kind: 'report', id: 'r1', attachmentId: 'a1', markdown: '# Exported\nOK', createdAt: 200 },
+          { kind: 'robot', markdown: 'Done.', createdAt: 300 },
+        ],
+      ),
+    ).toBeNull();
+  });
 });
 
 describe('threadOrigin', () => {

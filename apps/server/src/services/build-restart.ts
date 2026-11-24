@@ -5,6 +5,7 @@ import {
   buildReworkNewBranchNote,
   buildReworkReuseNote,
   conversationBranch,
+  isInfoOutput,
   SESSION_BRIEF,
   withRetryLessons,
 } from '@cairn/shared';
@@ -269,16 +270,13 @@ export async function restartFailedBuild(
     }
     const restartPrompt = feedbackText !== null ? buildRestartPrompt(feedbackText) : undefined;
     recordRestartConversation(newId);
-    enqueueStep(
-      deps,
-      newId,
-      'session',
-      todoRecord.teamId,
-      [SESSION_BRIEF, restartPrompt, priorLessons].filter((part) => part != null).join('\n\n'),
-      false,
-      origin === 'person',
-      { kind: 'first-task' },
-    );
+    const stepPrompt =
+      [isInfoOutput(todoRecord.output) ? null : SESSION_BRIEF, restartPrompt, priorLessons]
+        .filter((part) => part != null && part !== '')
+        .join('\n\n') || undefined;
+    enqueueStep(deps, newId, 'session', todoRecord.teamId, stepPrompt, false, origin === 'person', {
+      kind: 'first-task',
+    });
     setTodoPhase(deps, todoRecord.id, 'queued', {
       latestBuildId: newId,
       lastRunAt: createdAt,

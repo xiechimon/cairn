@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { isInlineAttachment, servedAttachmentMime } from '@cairn/shared';
+import { isInlineAttachment, isInlineImageAttachment, servedAttachmentMime } from '@cairn/shared';
 import type { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
@@ -87,10 +87,11 @@ export function registerUploadRoutes(app: Hono, ctx: AppContext): void {
       id,
     );
     const bytes = readFileSync(absPath);
-    const inlineDisposition =
-      row.scope !== 'deliverable' && isInlineAttachment(row.storageKey, row.mimeType)
-        ? 'inline'
-        : 'attachment';
+    const inlineAllowed =
+      row.scope === 'deliverable'
+        ? isInlineImageAttachment(row.storageKey, row.mimeType)
+        : isInlineAttachment(row.storageKey, row.mimeType);
+    const inlineDisposition = inlineAllowed ? 'inline' : 'attachment';
     return new Response(bytes, {
       status: 200,
       headers: {

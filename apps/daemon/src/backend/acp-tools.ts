@@ -10,6 +10,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { DAEMON_VERSION } from '../version.js';
+import { hostToolContent } from './host-tool-content.js';
 
 const AUTH_TIMEOUT_MS = 5_000;
 const MAX_AUTH_HEADER_BYTES = 256;
@@ -192,7 +193,7 @@ export async function openAcpTools(opts: SessionOpts): Promise<AcpStdioBridge | 
         const text = localTool
           ? await localTool.execute(params.arguments ?? {})
           : await opts.executeRemoteTool?.(params.name, params.arguments ?? {});
-        return { content: [{ type: 'text', text: text ?? '' }] };
+        return { content: hostToolContent(params.name, text ?? '') };
       } catch (error) {
         return {
           content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],

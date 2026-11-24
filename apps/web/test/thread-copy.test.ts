@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { threadCopy } from '../src/board/thread-copy.js';
+import { threadCopy, threadStatus } from '../src/board/thread-copy.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
 
 function todo(over: Partial<TodoRecord>): TodoRecord {
@@ -48,5 +48,32 @@ describe('threadCopy', () => {
       state: '已归档',
       reason: '任务已归档。',
     });
+  });
+
+  it('a finished info task in review owned by Coordinator does not mark needs-you', () => {
+    const coordReview = todo({
+      phase: 'review',
+      output: 'info',
+      owner: 'coordinator',
+      section: 'working',
+    });
+    expect(threadStatus(coordReview)).toBe('running');
+    expect(threadCopy(coordReview)).toEqual({
+      state: '审阅中',
+      reason: 'Coordinator 在跟进。',
+    });
+
+    const implicitInfoReview = todo({ phase: 'review', output: 'info' });
+    expect(threadStatus(implicitInfoReview)).toBe('running');
+
+    const handedOff = todo({
+      phase: 'review',
+      output: 'info',
+      owner: 'owner',
+      section: 'ready_for_review',
+    });
+    expect(threadStatus(handedOff)).toBe('needs-you');
+    expect(threadCopy(handedOff).state).toBe('待你决定');
+    expect(threadStatus(todo({ phase: 'review' }))).toBe('needs-you');
   });
 });

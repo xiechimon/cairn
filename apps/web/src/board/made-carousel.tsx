@@ -86,6 +86,12 @@ export function MadeCard({
     page !== undefined && pageHtml?.scripted === false && !thumbFailed
       ? pageThumbnailHref(page.attachmentId)
       : undefined;
+  const image =
+    todo.madeKind === 'image'
+      ? todo.deliverables?.items.find((item) => item.kind === 'image')
+      : undefined;
+  const previewSrc =
+    todo.previewUrl ?? (image === undefined ? undefined : `/api/attachments/${image.attachmentId}`);
   const slides =
     todo.madeKind === 'slides'
       ? todo.deliverables?.items.find((item) => item.kind === 'slides')
@@ -110,9 +116,9 @@ export function MadeCard({
         >
           {thumbSrc !== undefined ? (
             <PageThumb src={thumbSrc} onFail={() => setThumbFailed(true)} />
-          ) : todo.previewUrl !== undefined ? (
+          ) : previewSrc !== undefined ? (
             <img
-              src={todo.previewUrl}
+              src={previewSrc}
               alt=""
               loading="lazy"
               className="size-full rounded-(--radius-tile) border border-border object-cover object-top"

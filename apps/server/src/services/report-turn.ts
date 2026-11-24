@@ -4,6 +4,7 @@ import {
   COMPUTER_DIRECT_TOOLS,
   COMPUTER_OBSERVE_TOOLS,
   CONNECTOR_TOOL_PREFIX,
+  deliverablesMessageSchema,
   INSTALL_PACKAGES_TOOL,
   MEMORY_TOOLS,
   REPORT_ACK_KIND,
@@ -11,10 +12,12 @@ import {
 } from '@cairn/shared';
 import { eq, inArray } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { actionProposal, build, chiefMessage, chiefThread, todo } from '../db/schema.js';
+import { actionProposal, build, chiefMessage, chiefThread, message, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
+import { resolveToolAttachmentId } from './attachments.js';
 import { insertChiefMessageOnce } from './chief.js';
+import { DELIVERABLES_MESSAGE_PREFIX } from './machine-deliverables.js';
 import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { REPORT_PROVENANCE_PREFIX, reportProvenance, turnProvenance } from './turn-provenance.js';
 
@@ -103,9 +106,48 @@ export function reportRefOfPrompt(prompt: string | null): ReportRef | null {
   return turnProvenance(prompt) === reportProvenance(ref.todoId) ? ref : null;
 }
 
-function reportTurnAllows(ref: ReportRef, name: string, params: Record<string, unknown>): boolean {
+function deliverableAttachmentIds(db: Db, buildId: string): Set<string> {
+  const msg = db
+    .select({ content: message.content })
+    .from(message)
+    .where(eq(message.id, `${DELIVERABLES_MESSAGE_PREFIX}${buildId}`))
+    .get();
+  if (msg === undefined) return new Set();
+  try {
+    const raw = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+    const parsed = deliverablesMessageSchema.safeParse(raw);
+    return parsed.success ? new Set(parsed.data.items.map((i) => i.attachmentId)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function reportTurnAllows(
+  db: Db,
+  ref: ReportRef,
+  name: string,
+  params: Record<string, unknown>,
+): boolean {
   if (REPORT_OPEN_TOOLS.has(name)) return true;
-  if (name === 'attachment') return params.attachmentId === ref.attachmentId;
+  if (name === 'attachment') {
+    if (params.attachmentId === ref.attachmentId) return true;
+    const rawId = typeof params.attachmentId === 'string' ? params.attachmentId : null;
+    if (rawId === null) return false;
+    const teamId = db
+      .select({ teamId: todo.teamId })
+      .from(todo)
+      .where(eq(todo.id, ref.todoId))
+      .get()?.teamId;
+    if (teamId === undefined) return false;
+    try {
+      const resolved = resolveToolAttachmentId(db, teamId, rawId);
+      return (
+        resolved === ref.attachmentId || deliverableAttachmentIds(db, ref.buildId).has(resolved)
+      );
+    } catch {
+      return deliverableAttachmentIds(db, ref.buildId).has(rawId);
+    }
+  }
   if (name === 'message_thread') return params.todoId === ref.todoId;
   if (name === 'complete_todos' || name === 'archive_todos') {
     const ids = params.todoIds;
@@ -115,6 +157,7 @@ function reportTurnAllows(ref: ReportRef, name: string, params: Record<string, u
 }
 
 export function reportRefOfCall(
+  db: Db,
   prompt: string | null,
   ownerMessageIds: readonly string[],
   name: string,
@@ -122,7 +165,7 @@ export function reportRefOfCall(
 ): ReportRef | null {
   const ref = reportRefOfPrompt(prompt);
   if (ref === null) return null;
-  return ownerMessageIds.length === 0 || reportTurnAllows(ref, name, params) ? ref : null;
+  return ownerMessageIds.length === 0 || reportTurnAllows(db, ref, name, params) ? ref : null;
 }
 
 export function refuseRestrictedTurnTool(
@@ -142,7 +185,7 @@ export function refuseRestrictedTurnTool(
   }
   if (!isReportTurn(prompt) || ownerMessageIds.length > 0) return;
   const ref = reportRefOfPrompt(prompt);
-  if (ref !== null && reportTurnAllows(ref, name, params)) return;
+  if (ref !== null && reportTurnAllows(db, ref, name, params)) return;
   throw new HttpError(403, `report turn cannot call ${name}`);
 }
 
@@ -187,7 +230,7 @@ export function requireCurrentReportTurn(
   params: Record<string, unknown>,
 ): void {
   if (!REPORT_REF_TOOLS.has(name)) return;
-  const ref = reportRefOfCall(prompt, ownerMessageIds, name, params);
+  const ref = reportRefOfCall(db, prompt, ownerMessageIds, name, params);
   if (ref === null) return;
   if (!reportRefCurrent(db, ref)) {
     throw new HttpError(

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { posix } from 'node:path';
 import {
+  attachmentExtOf,
+  COMPUTER_IMAGE_MAX_BASE64_CHARS,
   type ComputerRelayResult,
   computerToolSchema,
   DELIVERABLE_LIMITS,
@@ -8,7 +10,10 @@ import {
   INFO_REPO_DIR,
   INFO_REPORT_MAX_BYTES,
   INFO_SUBMIT_REPORT_TOOL,
+  INLINE_IMAGE_EXTS,
+  INLINE_IMAGE_MIME_BY_EXT,
   infoTaskDir,
+  inlineImageMimeOfBytes,
   isComputerBrowserTool,
   isInfoCardComputerTool,
 } from '@cairn/shared';
@@ -286,7 +291,14 @@ async function submitInfoReport(
 const DELIVERABLE_FOLDERS: { folder: string; kind: DeliverableKind }[] = [
   { folder: 'pages', kind: 'page' },
   { folder: 'slides', kind: 'slides' },
+  { folder: 'images', kind: 'image' },
 ];
+const DELIVERABLE_MAX_BYTES: Record<DeliverableKind, number> = {
+  page: DELIVERABLE_LIMITS.maxPageBytes,
+  slides: DELIVERABLE_LIMITS.maxSlidesBytes,
+  image: DELIVERABLE_LIMITS.maxImageBytes,
+};
+const COMPUTER_IMAGE_MAX_BYTES = Math.floor((COMPUTER_IMAGE_MAX_BASE64_CHARS * 3) / 4);
 
 async function collectDeliverables(
   deps: MachineDeps,
@@ -302,15 +314,22 @@ async function collectDeliverables(
     row,
     'shell',
     {
-      command: `cd ${shellQuote(dir)} 2>/dev/null && for f in pages/* slides/*; do [ -f "$f" ] && printf '%s\\t%s\\n' "$f" "$(wc -c < "$f")"; done; true`,
+      command: `cd ${shellQuote(dir)} 2>/dev/null && for f in pages/* slides/* images/* *.png *.PNG *.jpg *.JPG *.jpeg *.JPEG *.gif *.GIF *.webp *.WEBP; do [ -f "$f" ] && printf '%s\\t%s\\n' "$f" "$(wc -c < "$f")"; done; true`,
     },
     randomUUID(),
     signal,
   );
   const entries = listed.text.split('\n').flatMap((line) => {
     const [path, size] = line.split('\t');
-    const folder = DELIVERABLE_FOLDERS.find((f) => path?.startsWith(`${f.folder}/`));
-    const name = path?.slice((folder?.folder.length ?? 0) + 1);
+    if (!path) return [];
+    if (!path.includes('/')) {
+      const ext = attachmentExtOf(path);
+      return (INLINE_IMAGE_EXTS as readonly string[]).includes(ext)
+        ? [{ path, name: path, kind: 'image' as const, size: Number(size) }]
+        : [];
+    }
+    const folder = DELIVERABLE_FOLDERS.find((f) => path.startsWith(`${f.folder}/`));
+    const name = folder === undefined ? undefined : path.slice(folder.folder.length + 1);
     return folder === undefined || name === undefined || name === '' || name.includes('/')
       ? []
       : [{ path, name, kind: folder.kind, size: Number(size) }];
@@ -322,8 +341,7 @@ async function collectDeliverables(
   const files: VmDeliverableFile[] = [];
   const skipped: { name: string; reason: string }[] = [];
   for (const entry of entries) {
-    const limit =
-      entry.kind === 'page' ? DELIVERABLE_LIMITS.maxPageBytes : DELIVERABLE_LIMITS.maxSlidesBytes;
+    const limit = DELIVERABLE_MAX_BYTES[entry.kind];
     if (!Number.isInteger(entry.size) || entry.size > limit) {
       skipped.push({ name: entry.name, reason: 'too-large' });
       continue;
@@ -406,6 +424,31 @@ export async function executeInfoCardTool(
   await ensureTaskDir(deps, machineId, row, signal);
   if (name === 'write_file' && params.append === true) {
     return appendFile(deps, machineId, row, params, toolCallId ?? randomUUID(), signal);
+  }
+  if (name === 'read_file' && typeof params.path === 'string' && params.path.trim() !== '') {
+    const ext = attachmentExtOf(params.path.trim());
+    const expectedMime = INLINE_IMAGE_MIME_BY_EXT[ext];
+    if (expectedMime !== undefined) {
+      const path = posix.resolve(infoTaskDir(row.buildId), params.path.trim());
+      const bytes = await readComputerFile(
+        deps,
+        machineId,
+        row,
+        path,
+        signal,
+        COMPUTER_IMAGE_MAX_BYTES,
+      );
+      if (inlineImageMimeOfBytes(bytes) !== expectedMime) {
+        throw new HttpError(400, `${path} does not match a valid .${ext} image`);
+      }
+      return JSON.stringify({
+        fileName: posix.basename(path),
+        mimeType: expectedMime,
+        sizeBytes: bytes.length,
+        encoding: 'base64',
+        content: bytes.toString('base64'),
+      });
+    }
   }
   const withCwd =
     name === 'shell' && typeof params.cwd !== 'string'

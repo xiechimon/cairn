@@ -1,8 +1,18 @@
+import { isInfoOutput } from '@cairn/shared';
 import type { TodoRecord } from '../fixtures/records.js';
 import { FILE_NAME_PARAM, FILE_PARAM } from './file-pane.js';
 import { STATUS_WORDS } from './status-words.js';
 
 export type ThreadStatus = 'running' | 'needs-you' | 'failed' | 'done' | 'idle';
+
+export function reviewOwnedByCoordinator(
+  todo: Pick<TodoRecord, 'phase' | 'owner' | 'section' | 'output'>,
+): boolean {
+  if (todo.phase !== 'review') return false;
+  if (todo.owner === 'coordinator') return true;
+  if (todo.owner === 'owner' || todo.section === 'ready_for_review') return false;
+  return isInfoOutput(todo.output);
+}
 
 export function threadStatus(todo: TodoRecord): ThreadStatus {
   switch (todo.phase) {
@@ -12,8 +22,9 @@ export function threadStatus(todo: TodoRecord): ThreadStatus {
       return 'running';
     case 'confirm':
     case 'needs_input':
-    case 'review':
       return 'needs-you';
+    case 'review':
+      return reviewOwnedByCoordinator(todo) ? 'running' : 'needs-you';
     case 'failed':
       return 'failed';
     case 'done':
@@ -73,7 +84,9 @@ export function threadCopy(todo: TodoRecord): ThreadCopy {
         primary: '看计划',
       };
     case 'review':
-      return { state: STATUS_WORDS.needsYou, reason: '已就绪，等你审阅。', primary: '审阅' };
+      return reviewOwnedByCoordinator(todo)
+        ? { state: STATUS_WORDS.inReview, reason: 'Coordinator 在跟进。' }
+        : { state: STATUS_WORDS.needsYou, reason: '已就绪，等你审阅。', primary: '审阅' };
     case 'failed':
       return { state: STATUS_WORDS.failed, reason: '失败了，打开它重试。' };
     case 'queued':

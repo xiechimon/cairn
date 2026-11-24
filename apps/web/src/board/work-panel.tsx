@@ -77,7 +77,13 @@ function MadeReport({
   }, [settled, report, onClose, onOpenThread, todo.id]);
   if (report === null) return null;
   const kind =
-    todo.madeKind === 'slides' ? t('PPT') : todo.madeKind === 'page' ? t('网页') : undefined;
+    todo.madeKind === 'slides'
+      ? t('PPT')
+      : todo.madeKind === 'page'
+        ? t('网页')
+        : todo.madeKind === 'image'
+          ? t('图片')
+          : undefined;
   return (
     <ResearchReportDialog
       report={kind === undefined ? report : { ...report, label: kind }}

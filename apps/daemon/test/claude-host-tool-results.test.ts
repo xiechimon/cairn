@@ -13,6 +13,9 @@ describe('hostToolContent', () => {
     expect(hostToolContent('attachment', attachment('image/png', png))).toEqual([
       { type: 'image', data: png, mimeType: 'image/png' },
     ]);
+    expect(hostToolContent('read_file', attachment('image/png', png))).toEqual([
+      { type: 'image', data: png, mimeType: 'image/png' },
+    ]);
   });
 
   test('an image the provider would reject is described in text instead of sent', () => {

@@ -167,7 +167,7 @@ function groupBy<T, K>(items: readonly T[], keyOf: (item: T) => K): Map<K, T[]> 
   return groups;
 }
 
-const DELIVERABLE_KIND_ORDER = { slides: 0, page: 1 } as const;
+const DELIVERABLE_KIND_ORDER = { slides: 0, page: 1, image: 2 } as const;
 
 function todoDeliverablesOf(content: unknown): TodoDeliverables | null {
   let raw = content;

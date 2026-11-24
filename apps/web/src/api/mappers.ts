@@ -1324,11 +1324,13 @@ function workCall(
   cancelled: boolean,
 ): WorkStep {
   const args = (call.arguments ?? {}) as Record<string, unknown>;
-  const name = call.name.toLowerCase();
-  const path = String(args.file_path ?? args.path ?? '').replace(
-    /^\/(?:home|Users)\/[^/]+\/\.(?:pacman-chief|cairn)\/(?:workspaces|plans)\/[^/]+\//,
-    '',
-  );
+  const name = call.name.toLowerCase().replace(/^mcp__cairn__/, '');
+  const path = String(args.file_path ?? args.path ?? '')
+    .replace(
+      /^\/(?:home|Users)\/[^/]+\/\.(?:pacman-chief|cairn)\/(?:workspaces|plans)\/[^/]+\//,
+      '',
+    )
+    .replace(/^\/home\/agent\/tasks\/[^/]+\//, '');
   const output = toolResultText(call.result);
   const seconds =
     call.startedAt !== undefined && call.endedAt !== undefined
@@ -1347,7 +1349,7 @@ function workCall(
     cancelled: call.result === undefined && cancelled,
     seconds,
   };
-  if (name === 'read') {
+  if (name === 'read' || name === 'read_file') {
     const offset = typeof args.offset === 'number' ? args.offset : null;
     const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : null;
     const range =
@@ -1358,7 +1360,7 @@ function workCall(
           : ` L${offset ?? 1}–${(offset ?? 1) + limit - 1}`;
     return { ...base, action: 'read', target: path + range };
   }
-  if (name === 'edit' || name === 'write' || name === 'multiedit') {
+  if (name === 'edit' || name === 'write' || name === 'write_file' || name === 'multiedit') {
     const edits = name === 'multiedit' && Array.isArray(args.edits) ? args.edits : [args];
     const removed: string[] = [];
     const added: string[] = [];
@@ -1378,15 +1380,21 @@ function workCall(
       changes: { removed, added },
     };
   }
-  if (name === 'grep' || name === 'find' || name === 'ls' || name === 'glob') {
+  if (
+    name === 'grep' ||
+    name === 'find' ||
+    name === 'ls' ||
+    name === 'list_files' ||
+    name === 'glob'
+  ) {
     const pattern = typeof args.pattern === 'string' ? args.pattern : '';
     return {
       ...base,
       action: 'search',
-      description: [call.name, pattern, path].filter((part) => part !== '').join(' '),
+      description: [name, pattern, path].filter((part) => part !== '').join(' '),
     };
   }
-  if (name === 'bash') {
+  if (name === 'bash' || name === 'shell') {
     const command = typeof args.command === 'string' ? args.command : '';
     const description =
       typeof args.description === 'string'
@@ -1398,6 +1406,9 @@ function workCall(
       description,
       command,
     };
+  }
+  if (name === 'submit_report') {
+    return { ...base, action: 'tool', target: path !== '' ? `submit_report · ${path}` : name };
   }
   return { ...base, action: 'tool', target: call.name.replace(/^mcp__/, '').replace(/__/g, ' · ') };
 }

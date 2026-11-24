@@ -356,7 +356,9 @@ async function runClaimedStep(
       ? claimed.chief.systemPrompt
       : composeWorkerSystemPrompt(agent.description, agent.memories, {
           ...taskMetaOpts(claimed),
-          attachments: true,
+          attachments:
+            claimed.remoteTools === undefined ||
+            claimed.remoteTools.some((tool) => tool.name === 'attach_file'),
           ...(claimed.project !== undefined ? { project: claimed.project } : {}),
         });
   const remoteTools = claimed.remoteTools;

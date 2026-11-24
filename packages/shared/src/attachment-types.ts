@@ -1,3 +1,5 @@
+import { INLINE_IMAGE_MIME_BY_EXT } from './attachment-token.js';
+
 export type AttachmentKind = 'image' | 'pdf' | 'text' | 'download';
 
 interface AttachmentTypeEntry {
@@ -178,6 +180,45 @@ export function servedAttachmentMime(storageKeyOrName: string): string {
 export function isInlineAttachment(storageKeyOrName: string, storedMime: string): boolean {
   const entry = ATTACHMENT_TYPES[attachmentExtOf(storageKeyOrName)];
   return entry?.inline === true && entry.mime === storedMime;
+}
+
+export function isInlineImageAttachment(storageKeyOrName: string, storedMime: string): boolean {
+  const expected = INLINE_IMAGE_MIME_BY_EXT[attachmentExtOf(storageKeyOrName)];
+  return expected !== undefined && expected === storedMime;
+}
+
+function bytesMatchAscii(bytes: Uint8Array, offset: number, ascii: string): boolean {
+  if (bytes.length < offset + ascii.length) return false;
+  for (let i = 0; i < ascii.length; i += 1) {
+    if (bytes[offset + i] !== ascii.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+export function inlineImageMimeOfBytes(bytes: Uint8Array): string | null {
+  if (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 &&
+    bytes[1] === 0x50 &&
+    bytes[2] === 0x4e &&
+    bytes[3] === 0x47 &&
+    bytes[4] === 0x0d &&
+    bytes[5] === 0x0a &&
+    bytes[6] === 0x1a &&
+    bytes[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+    return 'image/jpeg';
+  }
+  if (bytesMatchAscii(bytes, 0, 'GIF87a') || bytesMatchAscii(bytes, 0, 'GIF89a')) {
+    return 'image/gif';
+  }
+  if (bytesMatchAscii(bytes, 0, 'RIFF') && bytesMatchAscii(bytes, 8, 'WEBP')) {
+    return 'image/webp';
+  }
+  return null;
 }
 
 export const ATTACHMENT_ACCEPT = Object.keys(ATTACHMENT_TYPES)

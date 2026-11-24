@@ -13,6 +13,7 @@ import {
   createSkillBodySchema,
   DONE_ANNOUNCEMENT,
   fenceReportText,
+  formatAttachmentToken,
   IN_PROGRESS_PHASES,
   isChiefConversationId,
   isComposioSecretName,
@@ -28,6 +29,7 @@ import {
 import { and, eq, inArray, isNotNull, or, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
+  attachment,
   build,
   chief,
   chiefMessage,
@@ -745,6 +747,18 @@ export async function executeChiefTool(
     case 'attachment': {
       const attachmentId = resolveToolAttachmentId(db, ctx.teamId, str(params, 'attachmentId'));
       const meta = readAttachmentMeta(deps, ctx.teamId, attachmentId);
+      const attachmentRow = db
+        .select({ storageKey: attachment.storageKey, fileName: attachment.fileName })
+        .from(attachment)
+        .where(and(eq(attachment.id, attachmentId), eq(attachment.teamId, ctx.teamId)))
+        .get();
+      const token =
+        attachmentRow === undefined
+          ? undefined
+          : formatAttachmentToken(
+              attachmentRow.fileName.replace(/[[\]\n\r]/g, '_'),
+              attachmentRow.storageKey,
+            );
       const reportOf = db
         .select({ seqNum: todo.seqNum })
         .from(build)
@@ -753,9 +767,10 @@ export async function executeChiefTool(
         .get();
       return json(
         reportOf === undefined || meta.encoding !== 'utf8'
-          ? meta
+          ? { ...meta, ...(token === undefined ? {} : { attachmentToken: token }) }
           : {
               ...meta,
+              ...(token === undefined ? {} : { attachmentToken: token }),
               trust: 'untrusted-report',
               content: fenceReportText(`#${reportOf.seqNum}`, meta.content),
             },
@@ -941,7 +956,7 @@ export async function executeChiefTool(
         transitionTodos(deps, ctx.teamId, strArr(params, 'todoIds'), 'done', chiefActor, {
           silentSettleThreadId: ctx.threadId,
         });
-      const report = reportRefOfCall(turnPrompt, turnMessageIds, name, params);
+      const report = reportRefOfCall(db, turnPrompt, turnMessageIds, name, params);
       if (report === null) return json(complete());
       const { result, ack } = acceptReport(
         db,

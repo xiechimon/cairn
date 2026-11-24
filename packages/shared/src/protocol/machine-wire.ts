@@ -212,18 +212,18 @@ export type MachineLocalMergeRecheckResponse = z.infer<
 
 const MIB = 1024 * 1024;
 
+export { type DeliverableKind, deliverableKindSchema } from '../records/report.js';
+
 export const DELIVERABLE_LIMITS = {
   maxFiles: 5,
   maxTotalBytes: 50 * MIB,
   maxPageBytes: 2 * MIB,
   maxSlidesBytes: 20 * MIB,
+  maxImageBytes: 10 * MIB,
   maxRowsPerClaim: 10,
   maxNameChars: 120,
   maxSkipped: 20,
 } as const;
-
-export const deliverableKindSchema = z.enum(['page', 'slides']);
-export type DeliverableKind = z.infer<typeof deliverableKindSchema>;
 
 export const claimedStepSchema = z.object({
   localMerge: localMergeCommandSchema.optional(),

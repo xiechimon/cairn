@@ -1,5 +1,10 @@
 import type { BuildRecord, TriggerSource } from '@cairn/shared';
-import { isRegisteredMachine, type RouteOverride, SESSION_BRIEF } from '@cairn/shared';
+import {
+  isInfoOutput,
+  isRegisteredMachine,
+  type RouteOverride,
+  SESSION_BRIEF,
+} from '@cairn/shared';
 import { and, eq, isNull } from 'drizzle-orm';
 import { build, machine, project, schedule, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -177,12 +182,16 @@ export function startBuilds(
         todoRecord.phase === 'failed' && todoRecord.latestBuildId !== null
           ? retryLessonsOf(deps.db, todoRecord.latestBuildId)
           : null;
+      const stepPrompt =
+        [isInfoOutput(todoRecord.output) ? null : SESSION_BRIEF, input.prompt, lessons]
+          .filter((part) => part != null && part !== '')
+          .join('\n\n') || undefined;
       const scheduledStep = enqueueStep(
         deps,
         id,
         'session',
         todoRecord.teamId,
-        [SESSION_BRIEF, input.prompt, lessons].filter((part) => part != null).join('\n\n'),
+        stepPrompt,
         undefined,
         undefined,
         { kind: 'first-task' },

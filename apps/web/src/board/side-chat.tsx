@@ -47,7 +47,13 @@ import { isWaiting, SECTION_LABEL } from './tasks-sections.js';
 import { type ThreadActions, useThreadActions } from './thread-actions.js';
 import { ThreadAutomations } from './thread-automations.js';
 import type { ThreadChanges } from './thread-changes.js';
-import { THREAD_PARAM, threadCopy, threadStatus, VIEW_PARAM } from './thread-copy.js';
+import {
+  reviewOwnedByCoordinator,
+  THREAD_PARAM,
+  threadCopy,
+  threadStatus,
+  VIEW_PARAM,
+} from './thread-copy.js';
 import { ThreadLead } from './thread-lead.js';
 import {
   type ThreadChatStream,
@@ -120,7 +126,7 @@ function StatusLine({
             ? 'text-tint-wait-ink'
             : quotaHeld || scheduledRetry
               ? 'text-content-secondary'
-              : taskStatusInk(todo.phase),
+              : taskStatusInk(reviewOwnedByCoordinator(todo) ? 'building' : todo.phase),
         )}
       >
         {platformWait !== null

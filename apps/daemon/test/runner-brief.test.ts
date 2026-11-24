@@ -499,3 +499,16 @@ test.each(
     expect(readFileSync(join(cwd, file), 'utf8')).toBe(legacy);
   },
 );
+
+test('worker brief omits attach_file guidance when claimed remoteTools withhold attach_file', async () => {
+  let brief = '';
+  const { backend } = stubBackend({
+    onSessionStart: (_cwd, session) => {
+      brief = session.systemPrompt ?? '';
+    },
+  });
+  const claimed = claimedStep({ repoBound: false });
+  claimed.remoteTools = [{ name: 'shell', description: 'Run a shell command' }];
+  await run({ claimed, backend });
+  expect(brief).not.toContain('attach_file');
+});

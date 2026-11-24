@@ -1,6 +1,7 @@
 import type { TaskRequest } from '@cairn/shared';
 import type { ChiefStreamItem, TodoRecord, TranscriptItem } from '../fixtures/records.js';
 import { formatClockTime } from '../lib/date-format.js';
+import { reviewOwnedByCoordinator } from './thread-copy.js';
 
 export const MAX_UPDATE_LINES = 3;
 
@@ -41,10 +42,10 @@ function robotText(item: Extract<TranscriptItem, { kind: 'robot' }>): string {
 }
 
 export function threadUpdates(
-  todo: Pick<TodoRecord, 'phase' | 'phaseAt'>,
+  todo: Pick<TodoRecord, 'phase' | 'phaseAt' | 'owner' | 'section' | 'output'>,
   transcript: readonly TranscriptItem[],
 ): ThreadUpdates | null {
-  if (!UPDATE_PHASES.has(todo.phase)) return null;
+  if (!UPDATE_PHASES.has(todo.phase) || reviewOwnedByCoordinator(todo)) return null;
   const lines: string[] = [];
   let latestAt: number | null = null;
   const note = (text: string, createdAt: number | undefined) => {
