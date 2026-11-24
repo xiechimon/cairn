@@ -4,7 +4,8 @@ import type { Db } from '../db/client.js';
 import { provider } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
-import { newRecordId, nowMs } from '../lib/ids.js';
+import { newRecordId } from '../lib/ids.js';
+import { nextProviderVersion, replaceProviderCredential } from './provider-configuration.js';
 import { createProvider } from './providers.js';
 
 export const XAI_DEVICE_CODE_URL = 'https://auth.x.ai/oauth2/device/code';
@@ -278,9 +279,9 @@ function saveSubscription(
       baseUrl: XAI_PROVIDER_BASE_URL,
       api: 'openai-responses',
       authHeader: false,
-      apiKeyCipher: deps.box.seal(input.sealed),
+      ...replaceProviderCredential(existing.compat, deps.box.seal(input.sealed)),
       ...(existing.models.length === 0 ? { models: XAI_SUBSCRIPTION_MODELS } : {}),
-      updatedAt: nowMs(),
+      updatedAt: nextProviderVersion(),
     })
     .where(and(eq(provider.id, existing.id), eq(provider.apiKeyCipher, input.baselineCipher)))
     .run();
@@ -374,7 +375,7 @@ async function refreshAccess(
   }
   const written = deps.db
     .update(provider)
-    .set({ apiKeyCipher: deps.box.seal(sealed), updatedAt: nowMs() })
+    .set({ apiKeyCipher: deps.box.seal(sealed), updatedAt: nextProviderVersion() })
     .where(and(eq(provider.id, row.id), eq(provider.apiKeyCipher, row.apiKeyCipher)))
     .run();
   if (written.changes === 0) {

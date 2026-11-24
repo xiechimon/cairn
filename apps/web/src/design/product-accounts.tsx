@@ -17,8 +17,9 @@ import { useI18n } from '../i18n/provider.js';
 import { OnlineStatus } from '../resources/parts.js';
 import { TeamProviderEditor } from '../resources/provider-editors.js';
 import {
+  providerRowStatus,
+  QuotaMark,
   SubscriptionDetail,
-  subscriptionRowTone,
   subscriptionStatusView,
   subscriptionSummary,
 } from '../resources/subscription-detail.js';
@@ -99,19 +100,25 @@ function SubscriptionPanelSpecimen() {
     view: subscriptionStatusView(account, NOW, t, clock),
   }));
   const items: ProviderItem[] = [
-    ...views.map(({ account, view }) => ({
-      id: account.id,
-      name: account.label,
-      Mark: ClaudeMark,
-      status: subscriptionSummary(account, view, SPECIMEN_SUBSCRIPTION_MODELS, NOW, t),
-      tone: subscriptionRowTone(view, SPECIMEN_SUBSCRIPTION_MODELS),
-    })),
+    ...views.map(({ account, view }) => {
+      const status = providerRowStatus(view, SPECIMEN_SUBSCRIPTION_MODELS, t);
+      return {
+        id: account.id,
+        name: account.label,
+        Mark: ClaudeMark,
+        status: subscriptionSummary(SPECIMEN_SUBSCRIPTION_MODELS.length, t),
+        ...status,
+        aside: <QuotaMark windows={account.windows} />,
+      };
+    }),
     {
       id: 'anthropic',
       name: 'Anthropic',
       Mark: ClaudeMark,
       status: 'API key · 3 models',
+      statusLabel: t('可用'),
       tone: 'ok',
+      statusGlyph: 'ok',
     },
   ];
   const current = views.find(({ account }) => account.id === selected) ?? views[0];
@@ -172,6 +179,7 @@ const SPECIMEN_PROVIDER: ProviderRecord = {
   api: 'openai-completions',
   authHeader: true,
   compat: {},
+  configurationFingerprint: '0'.repeat(32),
   models: [
     { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5' },
     { id: 'claude-opus-4-5', name: 'Claude Opus 4.5' },
@@ -182,6 +190,7 @@ const SPECIMEN_PROVIDER: ProviderRecord = {
 };
 
 function ProviderPanelSpecimen() {
+  const { t } = useI18n();
   const [selected, setSelected] = useState('anthropic');
   const items: ProviderItem[] = [
     {
@@ -189,14 +198,18 @@ function ProviderPanelSpecimen() {
       name: 'Anthropic',
       Mark: ClaudeMark,
       status: 'API key · 1 model',
-      tone: 'ok',
+      statusLabel: t('未检查'),
+      tone: 'off',
+      statusGlyph: 'off',
     },
     {
       id: 'relay',
       name: 'Gateway',
       Mark: Server,
       status: 'Custom endpoint · 1 retired',
+      statusLabel: t('已下架'),
       tone: 'warn',
+      statusGlyph: 'warn',
     },
     {
       id: 'claude-code',
@@ -204,7 +217,9 @@ function ProviderPanelSpecimen() {
       Mark: ClaudeMark,
       version: '2.1.316',
       status: 'Not signed in',
+      statusLabel: t('未登录'),
       tone: 'warn',
+      statusGlyph: 'warn',
     },
   ];
   return (
@@ -276,12 +291,12 @@ export function AccountsSection() {
     <Section
       id="accounts"
       title="Accounts"
-      lede="Subscriptions live in the Providers list next to API keys, the way T3 Code's Providers page lists Codex and Claude: one row per account with kind and one status, the account's quota and usage in its detail. The routing page keeps only the graph."
+      lede="Subscriptions sit next to API keys in the Providers list. The row shows the kind, model count and tightest quota window. The detail shows each quota window, usage and account status."
     >
       <Specimen
         id="subscription-provider-list"
         title="Subscriptions in the provider list"
-        note="a subscription is one provider row beside API keys: kind, plan, one status, last use. States: available, verifying, failed with its reason, cooling, expired, never used. The detail shows status with Retry, quota, last use, 24 hour steps and Remove"
+        note="One row per account: kind, model count, status glyph and quota when reported. Select a row for account status, last use and quota resets."
         stage="sheet"
         code={`<ProviderPanel items={subscriptionItems} selectedId={id} onSelect={select}><SubscriptionDetail account={account} view={view} /></ProviderPanel>`}
       >
@@ -303,7 +318,7 @@ export function AccountsSection() {
       <Specimen
         id="provider-panel"
         title="Provider panel"
-        note="Providers page: list of instances (status dot ok, warn, off; optional runtime switch) beside the selected one's editor; model rows show name, id, retired, remove"
+        note="Providers page: list of instances with a distinct glyph for each status beside the selected one's editor; model rows show name, id, retired, remove"
         stage="sheet"
         code={`<ProviderPanel items={items} selectedId={id} onSelect={select} header={title}>{editor}</ProviderPanel>`}
       >

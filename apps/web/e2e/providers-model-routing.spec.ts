@@ -12,10 +12,10 @@ test('fixture: the routing page holds the provider list above the rule graph', a
   await expect(page.getByRole('tab')).toHaveCount(0);
   const rows = page.getByTestId('provider-instance');
   await expect(rows.filter({ hasText: '订阅' })).toHaveCount(4);
-  const work = page.locator('[data-instance-id^="subscription:"]', { hasText: '冷却至' });
-  await expect(work).toHaveCount(1);
+  const work = page.locator('[data-instance-id="subscription:sub-work"]');
   await work.click();
   await expect(page.getByTestId('subscription-detail')).toHaveAttribute('data-account-id', 'sub-work');
+  await expect(page.getByTestId('subscription-status')).toContainText('冷却至');
   await page.locator('[data-instance-id^="subscription:"]', { hasText: 'Personal' }).first().click();
   const detail = page.getByTestId('subscription-detail');
   await expect(detail).toContainText('最近使用');

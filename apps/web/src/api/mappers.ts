@@ -1536,14 +1536,21 @@ function thinkingOf(
 }
 
 export function toModelOptions(sources: ModelSource[]): ModelOption[] {
-  const livenessByModelId = new Map<string, 'alive' | 'dead' | 'unknown'>();
+  const keyOf = (source: ModelSource, id: string) => {
+    const provider = source.provider ?? source.runtime;
+    return source.runtime === 'claude-code' && source.machineId !== undefined
+      ? `${provider}/${source.machineId}/${id}`
+      : `${provider}/${id}`;
+  };
+  const livenessByKey = new Map<string, 'alive' | 'dead' | 'unknown'>();
   for (const source of sources) {
     for (const m of source.models) {
       if (m.id === '') continue;
       const lv = m.liveness ?? 'unknown';
-      const prev = livenessByModelId.get(m.id);
+      const key = keyOf(source, m.id);
+      const prev = livenessByKey.get(key);
       if (prev === undefined || (lv === 'dead' && prev !== 'dead')) {
-        livenessByModelId.set(m.id, lv);
+        livenessByKey.set(key, lv);
       }
     }
   }
@@ -1555,11 +1562,10 @@ export function toModelOptions(sources: ModelSource[]): ModelOption[] {
       source.providerLabel || (RUNTIME_LABELS[source.runtime] ?? source.runtime);
     for (const m of source.models) {
       if (m.id === '') continue;
-      const ccDim = source.runtime === 'claude-code' && source.machineId !== undefined;
-      const key = ccDim ? `${provider}/${source.machineId}/${m.id}` : `${provider}/${m.id}`;
+      const key = keyOf(source, m.id);
       if (seen.has(key)) continue;
       seen.add(key);
-      const lv = livenessByModelId.get(m.id);
+      const lv = livenessByKey.get(key);
       options.push({
         runtime: source.runtime,
         provider,

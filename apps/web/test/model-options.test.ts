@@ -105,16 +105,20 @@ describe('toModelOptions (#358 data-source projection, #770 providers section re
     expect(rows.map((r) => r.modelId)).toEqual(['m1']);
   });
 
-  it('F9: strict liveness — same model id marked dead by any source marks the row dead', () => {
+  it('F9: liveness is scoped to the provider: dead on one source does not retire the same id elsewhere', () => {
     const rows = toModelOptions([
-      piSource([{ id: 'm-dead', name: 'm-dead', liveness: 'alive' }]),
-      ccSource([{ id: 'm-dead', name: 'm-dead', liveness: 'dead' }]),
-      ccSource([{ id: 'm-alive', name: 'm-alive', liveness: 'alive' }]),
+      { ...piSource([{ id: 'm-dead', name: 'm-dead', liveness: 'alive' }]), provider: 'vani' },
+      { ...piSource([{ id: 'm-dead', name: 'm-dead', liveness: 'dead' }]), provider: 'local-llm' },
+      ccSource([{ id: 'm-dead', name: 'm-dead' }]),
+      piSource([{ id: 'm-alive', name: 'm-alive', liveness: 'alive' }]),
       piSource([{ id: 'm-unknown', name: 'm-unknown' }]),
     ]);
-    const byId = new Map(rows.map((r) => [r.modelId, r]));
-    expect(byId.get('m-dead')?.liveness).toBe('dead');
-    expect(byId.get('m-alive')?.liveness).toBe('alive');
-    expect(byId.get('m-unknown')?.liveness).toBeUndefined();
+    expect(rows.map((r) => [r.provider, r.modelId, r.liveness])).toEqual([
+      ['vani', 'm-dead', 'alive'],
+      ['local-llm', 'm-dead', 'dead'],
+      ['claude-code', 'm-dead', undefined],
+      ['pi', 'm-alive', 'alive'],
+      ['pi', 'm-unknown', undefined],
+    ]);
   });
 });

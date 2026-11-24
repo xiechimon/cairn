@@ -81,6 +81,7 @@ async function result(s: TestServer, path: string, body: object = {}) {
     httpStatus: number | null;
     detail: string | null;
     latencyMs: number | null;
+    configurationFingerprint: string;
   };
 }
 
@@ -90,6 +91,44 @@ afterEach(() => {
 });
 
 describe('provider connection check', () => {
+  test.each([200, 401])(
+    'returns the loaded configuration fingerprint even if the endpoint changes during an HTTP %i probe',
+    async (status) => {
+      const s = bootServer();
+      const path = await addProvider(s);
+      const recordPath = path.replace(/\/test$/, '');
+      const savedResponse = await req(s.app, 'PATCH', recordPath, {
+        baseUrl: 'https://new-provider.example/v1',
+      });
+      expect(savedResponse.status).toBe(200);
+      const saved = (await savedResponse.json()) as {
+        id: string;
+        updatedAt: number;
+        configurationFingerprint: string;
+      };
+      const calls = transport(() => {
+        s.db.run(
+          sql`UPDATE provider SET updatedAt = ${saved.updatedAt + 1}, baseUrl = 'https://later-provider.example/v1' WHERE id = ${saved.id}`,
+        );
+        return { status, body: status === 200 ? completion() : { error: { message: 'denied' } } };
+      });
+      const data = await result(s, path);
+      expect(calls[0]?.url).toBe('https://new-provider.example/v1/chat/completions');
+      expect(data.configurationFingerprint).toMatch(/^[a-f0-9]{32}$/);
+      expect(data.configurationFingerprint).toBe(saved.configurationFingerprint);
+      expect(data.status).toBe(status === 200 ? 'ok' : 'failed');
+      const envelope = (await (
+        await req(s.app, 'GET', `/api/teams/${s.team.id}/providers`)
+      ).json()) as {
+        providers: { id: string; updatedAt: number; configurationFingerprint: string }[];
+      };
+      const current = envelope.providers.find((record) => record.id === saved.id);
+      expect(current?.updatedAt).toBe(saved.updatedAt + 1);
+      expect(current?.configurationFingerprint).toMatch(/^[a-f0-9]{32}$/);
+      expect(current?.configurationFingerprint).not.toBe(data.configurationFingerprint);
+    },
+  );
+
   test('uses native Bearer auth for OpenAI-compatible api-key credentials', async () => {
     const calls = transport((call) => ({
       status:
@@ -215,6 +254,7 @@ describe('provider connection check', () => {
       httpStatus: null,
       detail: null,
       latencyMs: expect.any(Number),
+      configurationFingerprint: expect.stringMatching(/^[a-f0-9]{32}$/),
     });
   });
 
@@ -303,6 +343,7 @@ describe('provider connection check', () => {
       transport({ status: 401, body: { error: { message: `denied ${apiKey}` } } });
       const data = await result(s, path);
       expect(Object.keys(data).sort()).toEqual([
+        'configurationFingerprint',
         'detail',
         'failure',
         'httpStatus',

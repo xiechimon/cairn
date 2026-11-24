@@ -1,9 +1,13 @@
-import type { ProviderFailure, ProviderTestResult } from '@cairn/shared';
 import {
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSource,
   type ModelSourceModel,
   type ModelSourceRuntime,
+  PROVIDER_OAUTH_PRESET_IDS,
+  type ProviderFailure,
+  type ProviderRecord,
+  type ProviderTestResult,
+  type RoutingConnection,
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Download, Play } from 'lucide-react';
@@ -19,7 +23,9 @@ import { relativeTime } from '../board/rel-time.js';
 import { useClock, VENDORS } from '../components/accounts/account-parts.js';
 import { withCodeSpans } from '../components/notice-banner.js';
 import {
+  PROVIDER_STATUS,
   ProviderEditorHead,
+  type ProviderItem,
   type ProviderTone,
   TONE_DOT,
 } from '../components/providers/provider-panel.js';
@@ -29,7 +35,7 @@ import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { ACCENT_INK } from '../phase.js';
+import { selectRowChecks, type TeamProviderChecks } from './provider-check-state.js';
 import {
   type CheckFact,
   CheckResultPopover,
@@ -41,13 +47,11 @@ import {
 } from './provider-editors.js';
 import { COST_TIER_LABEL } from './upstream-model-picker.js';
 
-const WINDOW_LABELS: Record<string, string> = {
-  five_hour: '5 小时',
-  seven_day: '每周',
-  billing_period: '计费周期',
-};
-
-const WINDOW_ORDER = ['five_hour', 'seven_day', 'billing_period'];
+const WINDOW_LABELS = new Map([
+  ['five_hour', '5 小时'],
+  ['seven_day', '每周'],
+  ['billing_period', '计费周期'],
+]);
 
 const AUTH_RENEWAL: Record<AccountVendor, string> = {
   claude:
@@ -135,6 +139,39 @@ export interface SubscriptionStatusView {
   tone: ProviderTone;
   label: string | null;
   reason: string | null;
+  statusGlyph?: ProviderItem['statusGlyph'];
+}
+
+export function teamProviderStatusView(
+  record: ProviderRecord,
+  connections: readonly RoutingConnection[],
+  checks: TeamProviderChecks | undefined,
+  t: TFunc,
+): SubscriptionStatusView {
+  const matching = selectRowChecks(checks, record.configurationFingerprint);
+  const results = record.models.flatMap((model) => matching?.[model.id] ?? []);
+  const result = results.find((result) => result.status === 'failed');
+  const oauth = (PROVIDER_OAUTH_PRESET_IDS as readonly string[]).includes(record.providerId);
+  if (result?.status === 'failed') {
+    return {
+      tone: 'fail',
+      label:
+        result.failure === 'auth' && oauth
+          ? t('未登录')
+          : result.failure === null
+            ? t('无法连接服务商')
+            : t(FAILURE_SHORT[result.failure]),
+      reason: null,
+    };
+  }
+  if (results.some((result) => result.status === 'ok')) {
+    return { tone: 'ok', label: null, reason: null };
+  }
+  const owned = connections.filter((connection) => connection.id === record.id);
+  if (record.authHeader && owned.length > 0 && owned.every((connection) => !connection.available)) {
+    return { tone: 'warn', label: oauth ? t('未登录') : t('填写 API key'), reason: null };
+  }
+  return { tone: 'off', label: t('未检查'), reason: null };
 }
 
 const DAY = 86_400_000;
@@ -155,10 +192,13 @@ export function subscriptionStatusView(
 ): SubscriptionStatusView {
   switch (account.state) {
     case 'ok':
-      return { tone: 'ok', label: null, reason: null };
+      return account.hasToken === false
+        ? { tone: 'warn', label: t('未登录'), reason: null }
+        : { tone: 'ok', label: null, reason: null };
     case 'cooling':
       return {
         tone: 'off',
+        statusGlyph: 'cooling',
         label:
           account.cooldownUntil === null
             ? t('冷却中')
@@ -168,6 +208,7 @@ export function subscriptionStatusView(
     case 'exhausted':
       return {
         tone: 'off',
+        statusGlyph: 'exhausted',
         label: t('额度用尽'),
         reason:
           account.cooldownUntil !== null && account.cooldownUntil > now
@@ -177,14 +218,12 @@ export function subscriptionStatusView(
     case 'expired':
       return {
         tone: 'warn',
+        statusGlyph: 'expired',
         label: t('已过期'),
         reason: t(EXPIRED_RENEWAL[account.vendor]),
       };
   }
 }
-
-const leftPercent = (window: QuotaWindow) =>
-  Math.max(0, Math.round((1 - window.utilization) * 100));
 
 const SUBSCRIPTION_RUNTIME: Partial<Record<AccountVendor, ModelSourceRuntime>> = {
   claude: 'claude-code',
@@ -212,79 +251,85 @@ export function subscriptionModels(
   return [...byId.values()];
 }
 
-export function subscriptionRowTone(
+export function providerRowStatus(
   view: SubscriptionStatusView,
   models: readonly ModelSourceModel[],
-): ProviderTone {
-  if (view.tone === 'fail') return 'fail';
-  if (
-    models.length === 0 ||
-    models.some((model) => model.liveness === 'dead' || model.updateRequired !== undefined)
-  )
-    return 'warn';
-  return view.tone;
-}
-
-export function subscriptionSummary(
-  account: SubscriptionAccount,
-  view: SubscriptionStatusView,
-  models: readonly ModelSourceModel[],
-  now: number,
   t: TFunc,
-): string {
+): Pick<ProviderItem, 'tone' | 'statusLabel' | 'statusGlyph'> {
   const retired = models.filter((model) => model.liveness === 'dead').length;
   const outdated = models.filter((model) => model.updateRequired !== undefined).length;
-  return [
-    t('订阅'),
-    ...(account.plan === null ? [] : [account.plan]),
-    t('{n} 个模型', { n: models.length }),
-    ...(retired === 0 ? [] : [t('{n} 个已下架', { n: retired })]),
-    ...(outdated === 0 ? [] : [t('{n} 个需要更新 Cairn', { n: outdated })]),
-    ...(view.label === null ? [] : [view.label]),
-    ...(account.lastUsedAt === null || view.label !== null
-      ? []
-      : [t('最近使用 {ago}', { ago: relativeTime(account.lastUsedAt, now, t) })]),
-  ].join(' · ');
+  const modelLabels = [
+    ...(retired === 0 ? [] : [`${t('已下架')} · ${t('{n} 个模型', { n: retired })}`]),
+    ...(outdated === 0 ? [] : [t('{n} 个模型需要新版 Cairn', { n: outdated })]),
+  ];
+  const statusGlyph =
+    view.statusGlyph ??
+    (view.tone === 'fail'
+      ? 'fail'
+      : models.length === 0 || modelLabels.length > 0
+        ? 'warn'
+        : view.tone);
+  const emptyWarning =
+    models.length === 0 && statusGlyph === 'warn' ? t(PROVIDER_STATUS.warn.label) : null;
+  const labels = new Set([view.label, emptyWarning, ...modelLabels].filter(Boolean));
+  return {
+    tone: PROVIDER_STATUS[statusGlyph].tone,
+    statusLabel: [...labels].join(' · ') || t(PROVIDER_STATUS[statusGlyph].label),
+    statusGlyph,
+  };
+}
+
+export function subscriptionSummary(modelCount: number, t: TFunc): string {
+  return [t('订阅'), t('{n} 个模型', { n: modelCount })].join(' · ');
 }
 
 function quotaWindows(windows: readonly QuotaWindow[]): QuotaWindow[] {
-  return WINDOW_ORDER.flatMap((name) => windows.filter((w) => w.name === name));
+  return [
+    ...Array.from(WINDOW_LABELS.keys()).flatMap((name) => windows.filter((w) => w.name === name)),
+    ...windows.filter((w) => !WINDOW_LABELS.has(w.name)),
+  ];
 }
 
-const QUOTA_MARKS: { name: string; label: string }[] = [
-  { name: 'five_hour', label: '5h {left}%' },
-  { name: 'seven_day', label: '周 {left}%' },
-];
+function quotaReading(window: QuotaWindow, t: TFunc) {
+  const knownLabel = WINDOW_LABELS.get(window.name);
+  const name = window.name
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .replace(/[_-]+/g, ' ')
+    .trim()
+    .toLowerCase();
+  const label =
+    knownLabel === undefined ? name.charAt(0).toUpperCase() + name.slice(1) : t(knownLabel);
+  const left = Math.min(100, Math.max(0, Math.round((1 - window.utilization) * 100)));
+  const remaining = t('{window} 剩 {left}%', { window: label, left });
+  return {
+    label,
+    left,
+    remaining,
+    value: t('剩 {left}%', { left }),
+  };
+}
 
-export function QuotaMarks({ windows }: { windows: readonly QuotaWindow[] }) {
+export function QuotaMark({ windows }: { windows: readonly QuotaWindow[] }) {
   const { t } = useI18n();
-  const marks = QUOTA_MARKS.flatMap(({ name, label }) => {
-    const window = windows.find((w) => w.name === name);
-    return window === undefined ? [] : [{ name, label, left: leftPercent(window) }];
-  });
-  if (marks.length === 0) return null;
-  const summary = marks
-    .map(({ name, left }) =>
-      t('{window} 剩 {left}%', { window: t(WINDOW_LABELS[name] ?? name), left }),
-    )
-    .join(' · ');
+  let tightest: QuotaWindow | undefined;
+  for (const window of quotaWindows(windows)) {
+    if (tightest === undefined || window.utilization > tightest.utilization) tightest = window;
+  }
+  if (tightest === undefined) return null;
+  const { left, remaining, value } = quotaReading(tightest, t);
   return (
     <span
       data-testid="subscription-quota-mini"
+      data-window={tightest.name}
       role="img"
-      aria-label={summary}
-      title={summary}
-      className="flex flex-none flex-col items-end gap-0.5 pt-0.5 text-caption text-content-tertiary tabular-nums"
+      aria-label={remaining}
+      title={remaining}
+      className={cn(
+        'flex-none whitespace-nowrap pt-1 text-caption text-content-secondary tabular-nums',
+        isLowQuota(left) && 'text-tint-wait-ink',
+      )}
     >
-      {marks.map(({ name, label, left }) => (
-        <span
-          key={name}
-          data-window={name}
-          className={cn('whitespace-nowrap', isLowQuota(left) && ACCENT_INK)}
-        >
-          {t(label, { left })}
-        </span>
-      ))}
+      {value}
     </span>
   );
 }
@@ -305,22 +350,20 @@ export function resetsIn(
   return t('{time} 重置', { time: clock(ts, now) });
 }
 
-const QUOTA_ROW_CLS = 'settings-row grid min-h-11 items-center gap-x-3 py-2 text-meta tabular-nums';
-
 function QuotaSection({ account, now }: { account: SubscriptionAccount; now: number }) {
   const { t } = useI18n();
   const clock = useClock();
   const ordered = quotaWindows(account.windows);
-  if (ordered.length === 0) {
-    return (
+  return (
+    <>
       <SettingsSection title={t('用量')} testId="subscription-usage">
         <SettingsCard>
-          <div className={cn(QUOTA_ROW_CLS, 'grid-cols-[minmax(0,1fr)_auto]')}>
+          <div className="settings-row grid min-h-11 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 text-meta tabular-nums">
             <span className="text-content-secondary">{t('近 24 小时')}</span>
             <span className="text-foreground">
               {t('{n} 次运行', { n: account.stepsLast24h ?? 0 })}
             </span>
-            {account.vendor !== 'claude' && (
+            {ordered.length === 0 && account.vendor !== 'claude' && (
               <span
                 data-testid="subscription-usage-note"
                 className="col-span-2 text-caption text-content-tertiary"
@@ -331,53 +374,70 @@ function QuotaSection({ account, now }: { account: SubscriptionAccount; now: num
           </div>
         </SettingsCard>
       </SettingsSection>
-    );
-  }
-  return (
-    <SettingsSection title={t('额度')} testId="subscription-quota">
-      <SettingsCard>
-        {ordered.map((window) => {
-          const left = leftPercent(window);
-          const label = t(WINDOW_LABELS[window.name] ?? window.name);
-          return (
-            <div
-              key={window.name}
-              className={cn(
-                QUOTA_ROW_CLS,
-                'grid-cols-[4.5rem_minmax(3rem,1fr)_4rem_minmax(0,8rem)] max-sm:grid-cols-[4rem_minmax(2rem,1fr)_3.5rem_minmax(0,6.5rem)]',
-              )}
-            >
-              <span className="truncate text-content-secondary">{label}</span>
-              <span
-                role="progressbar"
-                aria-label={t('{window} 剩余', { window: label })}
-                aria-valuenow={left}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                className="block h-1 overflow-hidden rounded-full bg-secondary"
-              >
-                <i
-                  className={cn(
-                    'block h-full rounded-full',
-                    isLowQuota(left) ? 'bg-(--card-button)' : 'bg-content-secondary',
+      {ordered.length > 0 && (
+        <SettingsSection title={t('额度')} testId="subscription-quota">
+          <SettingsCard className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_max-content_max-content] gap-x-2">
+            {ordered.map((window) => {
+              const { label, left, remaining, value } = quotaReading(window, t);
+              const reset =
+                window.resetsAt === null ? null : resetsIn(window.resetsAt, now, t, clock);
+              const low = isLowQuota(left);
+              return (
+                <div
+                  key={window.name}
+                  data-testid="subscription-quota-window"
+                  className="settings-row col-span-full grid min-h-11 min-w-0 grid-cols-subgrid items-center gap-x-2 py-2 text-meta tabular-nums"
+                >
+                  <span
+                    data-testid="subscription-quota-name"
+                    title={label}
+                    className="min-w-0 truncate text-content-secondary"
+                  >
+                    {label}
+                  </span>
+                  <span
+                    role="progressbar"
+                    aria-label={t('{window} 剩余', { window: label })}
+                    aria-valuenow={left}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    className="h-1 min-w-0 overflow-hidden rounded-full bg-secondary"
+                  >
+                    <span
+                      className={cn(
+                        'block h-full rounded-full',
+                        low ? 'bg-(--card-button)' : 'bg-content-secondary',
+                      )}
+                      style={{ width: `${left}%` }}
+                    />
+                  </span>
+                  <span
+                    data-testid="subscription-quota-remaining"
+                    role="img"
+                    aria-label={remaining}
+                    className={cn(
+                      'flex-none whitespace-nowrap text-foreground',
+                      low && 'text-tint-wait-ink',
+                    )}
+                  >
+                    {value}
+                  </span>
+                  {reset !== null && (
+                    <span
+                      data-testid="subscription-quota-reset"
+                      title={reset}
+                      className="flex-none whitespace-nowrap text-caption text-content-tertiary"
+                    >
+                      {`· ${reset}`}
+                    </span>
                   )}
-                  style={{ width: `${left}%` }}
-                />
-              </span>
-              <span className={cn('text-right text-foreground', isLowQuota(left) && ACCENT_INK)}>
-                {t('剩 {left}%', { left })}
-              </span>
-              <span
-                data-testid="subscription-quota-reset"
-                className="truncate text-right text-caption text-content-tertiary"
-              >
-                {window.resetsAt === null ? null : resetsIn(window.resetsAt, now, t, clock)}
-              </span>
-            </div>
-          );
-        })}
-      </SettingsCard>
-    </SettingsSection>
+                </div>
+              );
+            })}
+          </SettingsCard>
+        </SettingsSection>
+      )}
+    </>
   );
 }
 
@@ -506,7 +566,7 @@ export function SubscriptionDetail({
   relogin,
 }: {
   account: SubscriptionAccount;
-  models: readonly SubscriptionModel[];
+  models: readonly (SubscriptionModel & Pick<ModelSourceModel, 'updateRequired'>)[];
   now: number;
   view: SubscriptionStatusView;
   verification: Verification | undefined;
@@ -525,8 +585,13 @@ export function SubscriptionDetail({
     tests.reset();
   }
   const ids = models.map((model) => model.id);
+  const updateModels = models.filter((model) => model.updateRequired !== undefined);
   const running = ids.filter((id) => checks[id]?.phase === 'running').length;
-  const summary = t('{n} 个', { n: ids.length });
+  const retired = models.filter((model) => model.liveness === 'dead').length;
+  const summary = [
+    t('{n} 个', { n: ids.length }),
+    ...(retired === 0 ? [] : [`${t('已下架')} · ${t('{n} 个模型', { n: retired })}`]),
+  ].join(' · ');
   const runtime = SUBSCRIPTION_RUNTIME[account.vendor];
   const runtimeLabel =
     runtime === undefined ? VENDORS[account.vendor].label : MODEL_SOURCE_RUNTIME_LABELS[runtime];
@@ -632,6 +697,13 @@ export function SubscriptionDetail({
             )}
           </span>
         </div>
+        {updateModels.length > 0 && (
+          <p className="m-0 wrap-anywhere text-meta text-content-tertiary tabular-nums">
+            {t('{n} 个模型需要新版 Cairn', { n: updateModels.length })}
+            {' · '}
+            {updateModels.map((model) => model.id).join(', ')}
+          </p>
+        )}
         {models.length === 0 ? (
           <p className="m-0 py-1 text-ui text-content-secondary">
             {actions.onPickUpstream === undefined
@@ -646,7 +718,6 @@ export function SubscriptionDetail({
                 id={model.id}
                 testId="subscription-model"
                 dead={model.liveness === 'dead'}
-                needsUpdate={'updateRequired' in model && model.updateRequired !== undefined}
                 check={checks[model.id]}
                 busy={actions.modelsBusy ?? false}
                 meta={tierMeta(model, t)}

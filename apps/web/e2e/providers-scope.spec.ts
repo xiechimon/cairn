@@ -95,6 +95,7 @@ test('live: provider edits send the agreed requests and touch no Runner', async 
   const calls: string[] = [];
   let provider = {
     kind: 'custom',
+    configurationFingerprint: '0'.repeat(32),
     id: 'p1',
     providerId: 'anthropic',
     label: 'Anthropic',
@@ -127,7 +128,10 @@ test('live: provider edits send the agreed requests and touch no Runner', async 
     if (path === '/api/teams/t1/providers/p1' && method === 'PATCH') {
       const body = route.request().postDataJSON();
       calls.push(`PATCH p1 ${JSON.stringify(body)}`);
-      provider = { ...provider, ...body };
+      const configurationFingerprint = Object.keys(body).every((key) => key === 'label')
+        ? provider.configurationFingerprint
+        : calls.length.toString(16).padStart(32, '0');
+      provider = { ...provider, ...body, configurationFingerprint };
       return json(provider);
     }
     if (path === '/api/teams/t1/providers/p1/upstream-models') {
@@ -141,7 +145,10 @@ test('live: provider edits send the agreed requests and touch no Runner', async 
     }
     if (path === '/api/teams/t1/providers/p1/test') {
       calls.push(`TEST p1 ${route.request().postDataJSON().model}`);
-      return json({ status: 'ok', reason: null, failure: null, httpStatus: null, latencyMs: 412 });
+      return json({
+        status: 'ok', reason: null, failure: null, httpStatus: null, detail: null, latencyMs: 412,
+        configurationFingerprint: provider.configurationFingerprint,
+      });
     }
     if (path === '/api/teams/t1/providers/p1' && method === 'DELETE') {
       calls.push('DELETE p1');
