@@ -9,7 +9,7 @@ import {
 } from '@cairn/shared';
 import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 import type { Api, Model, Provider, ProviderResponse } from '@earendil-works/pi-ai';
-import type { Harness } from '@earendil-works/pi-durable';
+import { createRegistry, type Harness } from '@earendil-works/pi-durable';
 import {
   coordinatorCompactionExtension,
   coordinatorCompactionSettings,
@@ -87,6 +87,7 @@ interface ThreadState {
   gate: ConversationGate;
   volatile: VolatileContext;
   summary: { ref: ModelRef | null };
+  syncConnectorTools: () => void;
 }
 
 export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi) {
@@ -127,13 +128,15 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           );
     const volatile = createVolatileContext();
     const summary: ThreadState['summary'] = { ref: null };
-    const extensions = [
+    const registry = createRegistry();
+    const memoryThread = isChiefMemoryThreadId(threadId);
+    const buildToolsExtension = (connectorTools: RemoteToolDef[]) =>
       coordinatorToolsExtension(api, gate, {
         routerTools: config.routerTools,
         desktopTools: config.desktopTools?.(threadId) === true,
         vmComputer: config.vmComputer?.(threadId) === true,
-        connectorTools: config.connectorTools?.(threadId) ?? [],
-        ...(isChiefMemoryThreadId(threadId)
+        connectorTools,
+        ...(memoryThread
           ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS }
           : { loaded: CORE_COORDINATOR_TOOLS }),
         ownComputer: config.ownComputer?.(threadId) === true,
@@ -153,7 +156,25 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
                 }
               },
             }),
-      }),
+      });
+    const initialConnectorTools = memoryThread ? [] : (config.connectorTools?.(threadId) ?? []);
+    let connectorDefs = new Map(
+      initialConnectorTools.map((def) => [def.name, JSON.stringify(def)]),
+    );
+    const syncConnectorTools = () => {
+      if (memoryThread) return;
+      const next = config.connectorTools?.(threadId) ?? [];
+      const nextDefs = new Map(next.map((def) => [def.name, JSON.stringify(def)]));
+      if (
+        nextDefs.size === connectorDefs.size &&
+        [...nextDefs].every(([name, raw]) => connectorDefs.get(name) === raw)
+      )
+        return;
+      registry.install(buildToolsExtension(next));
+      connectorDefs = nextDefs;
+    };
+    const extensions = [
+      buildToolsExtension(initialConnectorTools),
       volatileContextExtension(volatile),
       coordinatorCompactionExtension(
         () => summary.ref,
@@ -171,12 +192,13 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         },
       ),
     ];
+    for (const extension of extensions) registry.install(extension);
     const harness = openReconciledHarness(
       threadStorePath(config.storageDir, threadId),
       models.models,
       context,
       {
-        extensions,
+        registry,
         settings: settings(models),
         storeIdentity: (harness) => coordinatorStoreId(harness, context),
         refreshFacts: () => config.factsFor(threadId),
@@ -194,7 +216,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       config.onReconciled?.(threadId, result.outcome, result.stale);
       return result.harness;
     });
-    const state = { harness, models, gate, volatile, summary, inputs };
+    const state = { harness, models, gate, volatile, summary, inputs, syncConnectorTools };
     open.set(threadId, state);
     harness.catch(() => open.delete(threadId));
     return state;
@@ -269,6 +291,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         return target;
       };
       const state = prepare(stateOf(threadId));
+      state.syncConnectorTools();
       busy.set(threadId, (busy.get(threadId) ?? 0) + 1);
       const suggestionYield = new AbortController();
       suggestionYields.set(threadId, suggestionYield);

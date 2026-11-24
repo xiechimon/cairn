@@ -88,7 +88,13 @@ export const FAKE_MCP_TOOLS: McpConnectorTool[] = [
 
 export function insertConnector(
   s: TestServer,
-  opts: { slug?: string; status?: McpConnectorStatus; toolsJson?: McpConnectorTool[] } = {},
+  opts: {
+    slug?: string;
+    status?: McpConnectorStatus;
+    toolsJson?: McpConnectorTool[] | null;
+    toolCount?: number | null;
+    checkedAt?: number | null;
+  } = {},
 ): string {
   const id = `conn-${Math.random().toString(36).slice(2, 10)}`;
   s.db
@@ -102,7 +108,9 @@ export function insertConnector(
       headerNames: [],
       authKind: 'composio',
       status: opts.status ?? 'connected',
-      toolsJson: opts.toolsJson ?? FAKE_MCP_TOOLS,
+      toolCount: opts.toolCount === undefined ? null : opts.toolCount,
+      toolsJson: opts.toolsJson === undefined ? FAKE_MCP_TOOLS : opts.toolsJson,
+      checkedAt: opts.checkedAt === undefined ? null : opts.checkedAt,
       createdAt: 1,
       updatedAt: 1,
     })

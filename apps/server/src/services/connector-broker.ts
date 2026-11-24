@@ -35,8 +35,10 @@ import {
 } from './external-effects.js';
 import { type SendMail, sendSmtpMail } from './mail-smtp.js';
 import {
+  CONNECTOR_TOOL_HYDRATE_BOUND_MS,
   callConnectorTool,
   connectorEndpointBySlug,
+  hydrateMissingConnectorTools,
   type McpConnectorDeps,
 } from './mcp-servers.js';
 import type { VapidKeys } from './push.js';
@@ -59,6 +61,7 @@ export interface ConnectorCallContext {
   scopeProjectId: string | null;
   untrustedTurn?: boolean;
   mcpGrant: readonly string[] | null;
+  assertTurnClaim?: () => void;
 }
 
 type ConnectorRow = typeof mcpConnector.$inferSelect;
@@ -122,14 +125,25 @@ export function connectorToolDefsForTeam(db: Db, teamId: string): RemoteToolDef[
   const rows = db
     .select()
     .from(mcpConnector)
-    .where(and(eq(mcpConnector.teamId, teamId), eq(mcpConnector.status, 'connected')))
+    .where(
+      and(
+        eq(mcpConnector.teamId, teamId),
+        eq(mcpConnector.transport, 'http'),
+        eq(mcpConnector.status, 'connected'),
+      ),
+    )
     .orderBy(asc(mcpConnector.slug))
     .all();
   const defs: RemoteToolDef[] = [];
+  const seen = new Set<string>();
+  const mailActive = liveMailAccounts(db, teamId).length > 0;
+  if (mailActive) seen.add(MAIL_SEND_DEF.name);
   for (const row of rows) {
+    if (row.slug === MAIL_CONNECTOR_SLUG) continue;
     for (const tool of cachedTools(row)) {
       const name = connectorToolName(row.slug, tool.name);
-      if (name.length > CONNECTOR_TOOL_NAME_MAX) continue;
+      if (name.length > CONNECTOR_TOOL_NAME_MAX || seen.has(name)) continue;
+      seen.add(name);
       const parameters = sanitizeToolParameters(tool.inputSchema);
       defs.push({
         name,
@@ -139,7 +153,7 @@ export function connectorToolDefsForTeam(db: Db, teamId: string): RemoteToolDef[
       });
     }
   }
-  if (liveMailAccounts(db, teamId).length > 0) defs.push(MAIL_SEND_DEF);
+  if (mailActive) defs.push(MAIL_SEND_DEF);
   return defs;
 }
 
@@ -485,7 +499,7 @@ export async function executeConnectorToolCall(
     journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
     throw new HttpError(403, `connector ${parsed.slug} is outside the step's grant`);
   }
-  const row = deps.db
+  let row = deps.db
     .select()
     .from(mcpConnector)
     .where(and(eq(mcpConnector.teamId, ctx.teamId), eq(mcpConnector.slug, parsed.slug)))
@@ -498,6 +512,27 @@ export async function executeConnectorToolCall(
     journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
     throw new HttpError(409, `connector ${parsed.slug} is ${row.status}`);
   }
+  if (row.toolsJson === null && row.transport === 'http' && row.url !== null) {
+    await hydrateMissingConnectorTools(deps.mcp, {
+      teamId: ctx.teamId,
+      connectorId: row.id,
+      boundMs: CONNECTOR_TOOL_HYDRATE_BOUND_MS,
+    });
+    ctx.assertTurnClaim?.();
+    row = deps.db
+      .select()
+      .from(mcpConnector)
+      .where(and(eq(mcpConnector.teamId, ctx.teamId), eq(mcpConnector.slug, parsed.slug)))
+      .get();
+    if (row === undefined) {
+      journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
+      throw new HttpError(400, `unknown connector ${parsed.slug}`);
+    }
+    if (row.status !== 'connected') {
+      journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
+      throw new HttpError(409, `connector ${parsed.slug} is ${row.status}`);
+    }
+  }
   const tool = cachedTools(row).find((item) => item.name === parsed.tool);
   if (tool === undefined) {
     journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
@@ -508,16 +543,17 @@ export async function executeConnectorToolCall(
     journalRow(deps, ctx, actionId, parsed.slug, params, 'error');
     throw new HttpError(400, `invalid args for ${parsed.tool}: ${failure}`);
   }
-  const dispatch = async (): Promise<string> => {
-    const endpoint = await connectorEndpointBySlug(deps.mcp, ctx.teamId, parsed.slug);
-    if (endpoint === null) throw new HttpError(409, `connector ${parsed.slug} is not deliverable`);
-    return callConnectorTool(deps.mcp, endpoint, tool.name, params, signal);
-  };
   const entry = connectorActionEntry(parsed.slug, tool.name, tool.annotations);
   if (entry.class === 'free') {
+    const endpoint = await connectorEndpointBySlug(deps.mcp, ctx.teamId, parsed.slug);
+    ctx.assertTurnClaim?.();
+    if (endpoint === null) {
+      journalRow(deps, ctx, entry.id, parsed.slug, params, 'error');
+      throw new HttpError(409, `connector ${parsed.slug} is not deliverable`);
+    }
     journalRow(deps, ctx, entry.id, parsed.slug, params, 'run');
     try {
-      return await dispatch();
+      return await callConnectorTool(deps.mcp, endpoint, tool.name, params, signal);
     } catch (err) {
       journalRow(deps, ctx, entry.id, parsed.slug, params, 'error');
       throw err;
@@ -525,8 +561,14 @@ export async function executeConnectorToolCall(
   }
   const parked = gateOutboundAction(deps, ctx, entry, params);
   if (parked !== null) return parked;
+  const endpoint = await connectorEndpointBySlug(deps.mcp, ctx.teamId, parsed.slug);
+  ctx.assertTurnClaim?.();
+  if (endpoint === null) {
+    journalRow(deps, ctx, entry.id, parsed.slug, params, 'error');
+    throw new HttpError(409, `connector ${parsed.slug} is not deliverable`);
+  }
   try {
-    return await dispatch();
+    return await callConnectorTool(deps.mcp, endpoint, tool.name, params, signal);
   } catch (err) {
     journalRow(deps, ctx, entry.id, parsed.slug, params, 'error');
     throw err;

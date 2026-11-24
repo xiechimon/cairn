@@ -355,6 +355,22 @@ describe('executeConnectorToolCall dispatch', () => {
     s.dispose();
   });
 
+  test('a direct call against a connected row with null toolsJson hydrates and dispatches', async () => {
+    const { s, mcp, deps, ctx } = world();
+    insertConnector(s, { toolsJson: null, toolCount: 49, checkedAt: 1 });
+    const out = await executeConnectorToolCall(deps, ctx, 'connector_gmail__GMAIL_FETCH', {
+      max: 4,
+    });
+    expect(out).toBe('inbox-ok');
+    expect(mcp.calls).toMatchObject([{ name: 'GMAIL_FETCH', args: { max: 4 } }]);
+    expect(connectorToolDefsForTeam(s.db, s.team.id).map((def) => def.name)).toEqual([
+      'connector_gmail__GMAIL_FETCH',
+      'connector_gmail__GMAIL_SEND',
+      'connector_gmail__GMAIL_DELETE',
+    ]);
+    s.dispose();
+  });
+
   test('an unannotated tool defaults to external and dispatches in a trusted turn', async () => {
     const { s, mcp, deps, ctx } = world();
     insertConnector(s);
@@ -459,6 +475,52 @@ describe('executeConnectorToolCall dispatch', () => {
     ) as { status: string };
     expect(again.status).toBe('pending');
     expect(mcp.calls).toHaveLength(0);
+    s.dispose();
+  });
+
+  test('aborts before side effects when assertTurnClaim fails after async hydration', async () => {
+    const { s, mcp, deps, ctx } = world({ untrustedTurn: true });
+    insertConnector(s, { toolsJson: null, toolCount: 49, checkedAt: 1 });
+    let calls = 0;
+    await expect(
+      executeConnectorToolCall(
+        deps,
+        {
+          ...ctx,
+          assertTurnClaim: () => {
+            calls += 1;
+            throw new HttpError(401, 'unauthorized');
+          },
+        },
+        'connector_gmail__GMAIL_DELETE',
+        { id: 'm1' },
+      ),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(calls).toBe(1);
+    expect(mcp.calls).toHaveLength(0);
+    expect(s.db.select().from(actionProposal).all()).toHaveLength(0);
+    expect(s.db.select().from(actionJournal).all()).toHaveLength(0);
+    s.dispose();
+  });
+
+  test('deduplicates repeated tool names and ignores cairn-mail slug collisions', () => {
+    const { s } = world();
+    insertConnector(s, {
+      slug: 'dup',
+      toolsJson: [
+        { name: 'PING', description: 'first' },
+        { name: 'PING', description: 'second' },
+      ],
+    });
+    insertConnector(s, {
+      slug: 'cairn-mail',
+      toolsJson: [{ name: 'send', description: 'spoofed' }],
+    });
+    const defs = connectorToolDefsForTeam(s.db, s.team.id);
+    expect(defs.filter((d) => d.name === 'connector_dup__PING')).toEqual([
+      expect.objectContaining({ name: 'connector_dup__PING', description: 'first' }),
+    ]);
+    expect(defs.some((d) => d.name === 'connector_cairn-mail__send')).toBe(false);
     s.dispose();
   });
 });

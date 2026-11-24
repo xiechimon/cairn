@@ -54,7 +54,11 @@ import { MachineWakeHub } from './services/machine-wake-hub.js';
 import { seedLocalMachine } from './services/machines.js';
 import { createMailConnector } from './services/mail-connector.js';
 import { adoptGithubConnectorGrants } from './services/mcp-github-connector.js';
-import { newMcpOAuthState } from './services/mcp-servers.js';
+import {
+  hydrateMissingConnectorTools,
+  newMcpOAuthState,
+  publicOAuthFetch,
+} from './services/mcp-servers.js';
 import { seedOwnerCheckpoints } from './services/owner.js';
 import { capturePageOver, createPageThumbnails, parentPortOf } from './services/page-thumbnails.js';
 import { loadOrCreateVapidKeys } from './services/push.js';
@@ -224,6 +228,7 @@ const pageThumbnails = createPageThumbnails({
   attachmentsDir,
   capture: desktopPort === undefined ? undefined : capturePageOver(desktopPort),
 });
+const mcpOAuthState = newMcpOAuthState();
 const app = createApp(
   {
     remote: {
@@ -254,7 +259,7 @@ const app = createApp(
     xaiDeviceStates: new Map(),
     codexDeviceStates: new Map(),
     githubConnectionDeviceStates: new Map(),
-    mcpOAuthState: newMcpOAuthState(),
+    mcpOAuthState,
     oauthClient: config.githubOauth,
     githubAppTokenSocket: config.githubAppTokenSocket,
     githubAppIdentity: config.githubAppIdentity,
@@ -284,6 +289,21 @@ const app = createApp(
 );
 
 adoptGithubConnectorGrants({ db, box: secretBox });
+void hydrateMissingConnectorTools({
+  db,
+  box: secretBox,
+  mcpConfigPath: config.mcpConfigPath,
+  fetch: globalThis.fetch,
+  oauthFetch: publicOAuthFetch,
+  oauthState: mcpOAuthState,
+  githubFetch,
+  oauthClient: config.githubOauth,
+}).catch((err) => {
+  logger.warn(
+    { error: err instanceof Error ? err.message : String(err) },
+    'startup connector tool hydration failed',
+  );
+});
 
 warnInsecureBind(logger, config);
 warnIgnoredTailscaleUsers(logger);
@@ -331,6 +351,7 @@ const coordinator = config.coordinatorInServer
         attachmentsDir,
         skillsDir: config.skillsDir,
         mcpConfigPath: config.mcpConfigPath,
+        mcpOAuthState,
         convHub,
         githubFetch,
         githubBaseFetch: globalThis.fetch,

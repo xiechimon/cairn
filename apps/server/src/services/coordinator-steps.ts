@@ -8,7 +8,20 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   TURN_STATE_OPEN,
 } from '@cairn/shared';
-import { and, asc, desc, eq, inArray, isNotNull, notInArray, notLike, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lte,
+  notInArray,
+  notLike,
+  or,
+  sql,
+} from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   chiefMessage,
@@ -118,6 +131,7 @@ export function claimPendingChiefStep(
         and(
           eq(step.id, stepRow.id),
           eq(step.status, 'pending'),
+          or(isNull(step.holdUntil), lte(step.holdUntil, claimedAt)),
           notInArray(
             step.id,
             db

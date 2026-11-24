@@ -1,4 +1,8 @@
-import { type ClaudeCodeReport, machineTokenResponseSchema } from '@cairn/shared';
+import {
+  type ClaudeCodeReport,
+  type McpConnectorTool,
+  machineTokenResponseSchema,
+} from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, onTestFinished, test } from 'vitest';
 import {
@@ -13,6 +17,7 @@ import { newRecordId } from '../src/lib/ids.js';
 import { setCoordinatorInServer } from '../src/services/coordinator-context.js';
 import { executeRelayToolCall } from '../src/services/machine-relay.js';
 import { claimStep, stepToken } from '../src/services/machines.js';
+import { fakeMcp } from './fake-mcp-connector.js';
 import {
   bootServer,
   enrollConnectorRunner,
@@ -37,7 +42,11 @@ async function world() {
 function connector(
   s: TestServer,
   slug: string,
-  opts: { headers?: Record<string, string>; status?: 'connected' | 'needs_auth' } = {},
+  opts: {
+    headers?: Record<string, string>;
+    status?: 'connected' | 'needs_auth';
+    toolsJson?: McpConnectorTool[] | null;
+  } = {},
 ) {
   const headers = opts.headers ?? {};
   s.db
@@ -58,6 +67,7 @@ function connector(
       status: opts.status ?? 'connected',
       statusReason: null,
       toolCount: 1,
+      toolsJson: opts.toolsJson === undefined ? [] : opts.toolsJson,
       checkedAt: 1,
       authRevision: 1,
       tokenGeneration: 0,
@@ -271,5 +281,89 @@ describe('MCP connectors for the Coordinator on a Runner', () => {
     await expect(
       executeRelayToolCall(deps, machineId, 's1', 'connector_notion__PING', {}),
     ).rejects.toThrow(/grant/);
+  });
+
+  test('a Runner chief claim hydrates a connected connector with null toolsJson into remoteTools', async () => {
+    const { machineId, deps, s } = coordinatorWorld(true);
+    s.db.update(mcpConnector).set({ toolsJson: null }).run();
+    const mcp = fakeMcp();
+    const claimed = await claimStep(
+      { ...deps, mcpFetch: mcp.fetch },
+      machineId,
+      s.team.id,
+      10,
+      'http://localhost',
+    );
+    expect(claimed?.remoteTools?.map((tool) => tool.name)).toEqual(
+      expect.arrayContaining([
+        'connector_linear__GMAIL_FETCH',
+        'connector_linear__GMAIL_SEND',
+        'connector_linear__GMAIL_DELETE',
+      ]),
+    );
+  });
+
+  test('re-reads machine capabilities after hydration before granting mcpServers', async () => {
+    const { machineId, deps, s } = coordinatorWorld(true);
+    s.db.update(mcpConnector).set({ toolsJson: null }).run();
+    const mcp = fakeMcp();
+    let downgraded = false;
+    const racingFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+      if (!downgraded) {
+        downgraded = true;
+        const currentCaps = s.db
+          .select()
+          .from(machineTable)
+          .where(eq(machineTable.id, machineId))
+          .get()?.capabilities;
+        if (currentCaps) {
+          const { mcpConnectors: _dropped, ...rest } = currentCaps;
+          s.db
+            .update(machineTable)
+            .set({ capabilities: rest })
+            .where(eq(machineTable.id, machineId))
+            .run();
+        }
+      }
+      return mcp.fetch(input, init);
+    }) as typeof globalThis.fetch;
+
+    const claimed = await claimStep(
+      { ...deps, mcpFetch: racingFetch },
+      machineId,
+      s.team.id,
+      10,
+      'http://localhost',
+    );
+    expect(claimed?.mcpServers).toEqual(['files']);
+    expect(s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get()?.mcpGrant).toEqual([
+      'files',
+    ]);
+    expect((await stepToken(deps, machineId, 's1')).mcpConnectors).toBeUndefined();
+  });
+
+  test('skips connector hydration for locked mail-provenance chief turns', async () => {
+    const { machineId, deps, s } = coordinatorWorld(true);
+    s.db.update(mcpConnector).set({ toolsJson: null }).run();
+    s.db
+      .update(stepTable)
+      .set({ prompt: '[wake:wake] provenance=mail:evt-1\ncheck mail' })
+      .where(eq(stepTable.id, 's1'))
+      .run();
+    let fetchCalls = 0;
+    const spyFetch = (async () => {
+      fetchCalls += 1;
+      throw new Error('hydration must not run for locked chief turns');
+    }) as unknown as typeof globalThis.fetch;
+
+    const claimed = await claimStep(
+      { ...deps, mcpFetch: spyFetch },
+      machineId,
+      s.team.id,
+      10,
+      'http://localhost',
+    );
+    expect(claimed?.step.id).toBe('s1');
+    expect(fetchCalls).toBe(0);
   });
 });

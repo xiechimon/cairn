@@ -7,6 +7,7 @@ import {
   BRAND,
   CLAUDE_CONFIG_FILE_NAME,
   type CreateMcpConnectorBody,
+  cachedConnectorToolsSchema,
   isLocalCatalogEntry,
   type MachineTokenResponse,
   type McpCatalogEntry,
@@ -57,7 +58,7 @@ import {
   ListToolsResultSchema,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import { Agent, EnvHttpProxyAgent, fetch as undiciFetch } from 'undici';
 import type { Db } from '../db/client.js';
 import { machine, mcpConnector } from '../db/schema.js';
@@ -360,6 +361,7 @@ export const UNCHECKED = {
   status: 'unchecked',
   statusReason: null,
   toolCount: null,
+  toolsJson: null,
   checkedAt: null,
 } as const;
 
@@ -572,6 +574,7 @@ async function probeMcpServer(
   try {
     await client.connect(transport, { timeout });
     const tools: McpConnectorTool[] = [];
+    const seenNames = new Set<string>();
     let cursor: string | undefined;
     for (let page = 0; page < MAX_TOOL_PAGES; page += 1) {
       const result = await client.request(
@@ -579,7 +582,11 @@ async function probeMcpServer(
         ListToolsResultSchema,
         { timeout },
       );
-      for (const tool of result.tools) tools.push(tool as McpConnectorTool);
+      for (const tool of result.tools) {
+        if (seenNames.has(tool.name)) continue;
+        seenNames.add(tool.name);
+        tools.push(tool as McpConnectorTool);
+      }
       cursor = result.nextCursor;
       if (cursor === undefined) break;
     }
@@ -1272,6 +1279,169 @@ export async function callConnectorTool(
   }
 }
 
+export interface McpConnectorHostDeps {
+  db: Db;
+  box: SecretBox;
+  mcpConfigPath?: string;
+  mcpFetch?: typeof fetch;
+  mcpOAuthState?: McpOAuthState;
+  githubFetch?: FetchLike | undefined;
+  oauthClient?: OAuthClientConfig | null | undefined;
+}
+
+export function mcpConnectorDepsOf(deps: McpConnectorHostDeps): McpConnectorDeps {
+  return {
+    db: deps.db,
+    box: deps.box,
+    mcpConfigPath: deps.mcpConfigPath ?? defaultMcpConfigPath(),
+    fetch: deps.mcpFetch ?? globalThis.fetch,
+    oauthFetch: deps.mcpFetch ?? publicOAuthFetch,
+    oauthState: deps.mcpOAuthState ?? newMcpOAuthState(),
+    ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
+    ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
+  };
+}
+
+export const CONNECTOR_TOOL_HYDRATE_BOUND_MS = 5_000;
+const CONNECTOR_TOOL_HYDRATE_CONCURRENCY = 4;
+const CONNECTOR_TOOL_HYDRATE_ERROR_COOLDOWN_MS = 60_000;
+
+interface HydrateState {
+  inFlight: Map<string, Promise<void>>;
+  failedAt: Map<string, number>;
+  active: number;
+  waiters: (() => void)[];
+}
+
+const hydrateStateByDb = new WeakMap<Db, HydrateState>();
+
+function hydrateStateOf(db: Db): HydrateState {
+  let state = hydrateStateByDb.get(db);
+  if (state === undefined) {
+    state = { inFlight: new Map(), failedAt: new Map(), active: 0, waiters: [] };
+    hydrateStateByDb.set(db, state);
+  }
+  return state;
+}
+
+async function acquireHydrateSlot(state: HydrateState): Promise<void> {
+  if (state.active < CONNECTOR_TOOL_HYDRATE_CONCURRENCY) {
+    state.active += 1;
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    state.waiters.push(resolve);
+  });
+}
+
+function releaseHydrateSlot(state: HydrateState): void {
+  const next = state.waiters.shift();
+  if (next !== undefined) {
+    next();
+    return;
+  }
+  state.active = Math.max(0, state.active - 1);
+}
+
+export interface HydrateMissingConnectorToolsOptions {
+  teamId?: string;
+  connectorId?: string;
+  boundMs?: number;
+}
+
+export async function hydrateMissingConnectorTools(
+  deps: McpConnectorDeps,
+  options: HydrateMissingConnectorToolsOptions = {},
+): Promise<void> {
+  const rows = deps.db
+    .select({
+      id: mcpConnector.id,
+      teamId: mcpConnector.teamId,
+      updatedAt: mcpConnector.updatedAt,
+      authRevision: mcpConnector.authRevision,
+      tokenGeneration: mcpConnector.tokenGeneration,
+    })
+    .from(mcpConnector)
+    .where(
+      and(
+        eq(mcpConnector.transport, 'http'),
+        isNotNull(mcpConnector.url),
+        eq(mcpConnector.status, 'connected'),
+        isNull(mcpConnector.toolsJson),
+        ...(options.teamId === undefined ? [] : [eq(mcpConnector.teamId, options.teamId)]),
+        ...(options.connectorId === undefined ? [] : [eq(mcpConnector.id, options.connectorId)]),
+      ),
+    )
+    .orderBy(asc(mcpConnector.slug))
+    .all();
+  if (rows.length === 0) return;
+
+  const state = hydrateStateOf(deps.db);
+  const now = nowMs();
+  const tasks: Promise<void>[] = [];
+  for (const row of rows) {
+    const existing = state.inFlight.get(row.id);
+    if (existing !== undefined) {
+      tasks.push(existing);
+      continue;
+    }
+    const lastFailure = state.failedAt.get(row.id);
+    if (lastFailure !== undefined && now - lastFailure < CONNECTOR_TOOL_HYDRATE_ERROR_COOLDOWN_MS) {
+      continue;
+    }
+    const run = (async () => {
+      await acquireHydrateSlot(state);
+      try {
+        await checkMcpConnector(deps, row.teamId, row.id);
+        const after = deps.db
+          .select({
+            status: mcpConnector.status,
+            toolsJson: mcpConnector.toolsJson,
+            updatedAt: mcpConnector.updatedAt,
+            authRevision: mcpConnector.authRevision,
+            tokenGeneration: mcpConnector.tokenGeneration,
+          })
+          .from(mcpConnector)
+          .where(eq(mcpConnector.id, row.id))
+          .get();
+        const unchangedWithoutTools =
+          after !== undefined &&
+          after.status === 'connected' &&
+          after.toolsJson === null &&
+          after.updatedAt === row.updatedAt &&
+          after.authRevision === row.authRevision &&
+          after.tokenGeneration === row.tokenGeneration;
+        if (unchangedWithoutTools) state.failedAt.set(row.id, nowMs());
+        else state.failedAt.delete(row.id);
+      } catch {
+        state.failedAt.set(row.id, nowMs());
+      } finally {
+        releaseHydrateSlot(state);
+        state.inFlight.delete(row.id);
+      }
+    })();
+    state.inFlight.set(row.id, run);
+    tasks.push(run);
+  }
+  if (tasks.length === 0) return;
+
+  const all = Promise.all(tasks).then(() => undefined);
+  if (options.boundMs === undefined) {
+    await all;
+    return;
+  }
+  let timer: NodeJS.Timeout | undefined;
+  const bound = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, options.boundMs);
+    timer.unref?.();
+  });
+  try {
+    await Promise.race([all, bound]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function refreshMcpConnectorToken(
   deps: McpConnectorDeps,
   teamId: string,
@@ -1333,13 +1503,26 @@ async function runRefresh(deps: McpConnectorDeps, teamId: string, id: string): P
       .run();
     return;
   }
-  deps.db
-    .update(mcpConnector)
-    .set({
-      oauthCipher: sealOAuth(deps, secrets.client, tokens, secrets.refreshToken),
-      tokenGeneration: row.tokenGeneration + 1,
-      ...(row.statusReason === 'refresh_failed' ? { status: 'connected', statusReason: null } : {}),
-    })
-    .where(unchanged)
-    .run();
+  const sealed = sealOAuth(deps, secrets.client, tokens, secrets.refreshToken);
+  deps.db.transaction((tx) => {
+    const current = tx.select().from(mcpConnector).where(unchanged).get();
+    if (current === undefined) return;
+    const recoverRefreshFailure =
+      current.status === 'error' && current.statusReason === 'refresh_failed';
+    const cachedTools =
+      !recoverRefreshFailure || current.toolsJson === null
+        ? null
+        : cachedConnectorToolsSchema.safeParse(current.toolsJson);
+    const restoredToolCount = cachedTools?.success ? cachedTools.data.length : null;
+    tx.update(mcpConnector)
+      .set({
+        oauthCipher: sealed,
+        tokenGeneration: row.tokenGeneration + 1,
+        ...(recoverRefreshFailure
+          ? { status: 'connected', statusReason: null, toolCount: restoredToolCount }
+          : {}),
+      })
+      .where(unchanged)
+      .run();
+  });
 }
