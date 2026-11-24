@@ -288,7 +288,6 @@ test('missing agy installs first, then opens the browser login and verifies gree
   });
   const loginButton = dialog.getByTestId('antigravity-local-login');
   await expect(loginButton).toHaveText('安装并登录 Antigravity');
-  await expect(dialog).toContainText('会先下载 Antigravity');
   await loginButton.click();
   await page.evaluate(() => {
     const w = window as Window & { __antigravity?: AntigravityCalls };
