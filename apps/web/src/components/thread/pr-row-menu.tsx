@@ -1,5 +1,6 @@
 import { Ellipsis } from 'lucide-react';
 import { useI18n } from '../../i18n/provider.js';
+import { writeClipboard } from '../../lib/clipboard.js';
 import { IconTooltip } from '../icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../menu-keys.js';
 import { Button } from '../ui/button.js';
@@ -38,7 +39,7 @@ export function PrRowMenu({ number, url, onViewChanges, onResolve }: PrRowMenuPr
         <KeyedMenuItem
           shortcut="L"
           onClick={() => {
-            void navigator.clipboard?.writeText(url);
+            void writeClipboard(url);
             toastSuccess(t('已复制链接'));
           }}
         >

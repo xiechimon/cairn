@@ -13,6 +13,7 @@ import {
 import { toastSuccess } from '../components/ui/toaster.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
 import { ConnectorStatus, DIALOG_FORM_CLS, PALE_DISABLED } from './mcp-connector-dialog.js';
 
 type Step =
@@ -324,7 +325,6 @@ export function DeviceCode({
   expired?: boolean;
 }) {
   const { t } = useI18n();
-  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
   if (cells) {
     return (
       <div
@@ -365,17 +365,12 @@ export function DeviceCode({
       >
         {code}
       </code>
-      {clipboard && (
+      {hasClipboard() && (
         <Button
           variant="outline"
           size="xs"
           className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
-          onClick={() =>
-            void clipboard.writeText(code).then(
-              () => toastSuccess(t('已复制')),
-              () => {},
-            )
-          }
+          onClick={() => copyTextWithFeedback(code, () => toastSuccess(t('已复制')))}
         >
           {t('复制')}
         </Button>

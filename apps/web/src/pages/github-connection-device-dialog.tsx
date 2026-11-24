@@ -9,6 +9,7 @@ import {
   DialogShell,
 } from '../components/ui/dialog-shell.js';
 import { useI18n } from '../i18n/provider.js';
+import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
 import { DeviceCode } from '../resources/mcp-github-device-dialog.js';
 
 type Translate = (text: string, vars?: Record<string, string | number>) => string;
@@ -73,7 +74,7 @@ export function GithubConnectionDeviceDialog({
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
+  const canCopy = hasClipboard();
 
   useEffect(() => () => clearTimeout(copyTimer.current), []);
   useEffect(() => {
@@ -130,8 +131,8 @@ export function GithubConnectionDeviceDialog({
   };
   const openGithub = (url: string) => window.open(url, '_blank', 'noopener,noreferrer');
   const copyCode = () => {
-    if (step.kind !== 'code' || clipboard === undefined) return;
-    void clipboard.writeText(step.userCode).then(() => {
+    if (step.kind !== 'code') return;
+    copyTextWithFeedback(step.userCode, () => {
       setCopied(true);
       clearTimeout(copyTimer.current);
       copyTimer.current = setTimeout(() => setCopied(false), 1600);
@@ -169,8 +170,7 @@ export function GithubConnectionDeviceDialog({
         </p>
       </>
     );
-    if (clipboard !== undefined)
-      secondary = { label: copied ? t('已复制') : t('复制验证码'), onClick: copyCode };
+    if (canCopy) secondary = { label: copied ? t('已复制') : t('复制验证码'), onClick: copyCode };
     primary = { label: t('打开 GitHub'), onClick: () => openGithub(step.verificationUri) };
   } else if (step.kind === 'ended') {
     title = step.title;

@@ -46,6 +46,7 @@ import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown } from '../icons/index.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
@@ -294,14 +295,7 @@ export function ChiefConversation({
     null,
   );
   const copyText = useCallback(
-    (text: string) => {
-      const clip = navigator.clipboard;
-      if (!clip) return;
-      void clip.writeText(text).then(
-        () => toastSuccess(t('已复制')),
-        () => {},
-      );
-    },
+    (text: string) => copyTextWithFeedback(text, () => toastSuccess(t('已复制'))),
     [t],
   );
   const requestRewind = useCallback(

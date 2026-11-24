@@ -1,7 +1,8 @@
 import { cn } from 'cn';
-import { useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy } from '../icons/index.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';
 import { toastError } from './ui/toaster.js';
@@ -14,13 +15,25 @@ const COPY_ICON_BUTTON_CLS =
 export function CopyIconButton({
   text,
   label,
+  copiedLabel,
   testId,
   className,
+  replaceClassName = false,
+  size = 'icon',
+  side,
+  disabled = false,
+  icons,
 }: {
   text: string;
   label?: string;
+  copiedLabel?: string;
   testId: string;
   className?: string;
+  replaceClassName?: boolean;
+  size?: 'icon' | 'icon-sm';
+  side?: 'top' | 'bottom';
+  disabled?: boolean;
+  icons?: { copy: ReactNode; copied: ReactNode };
 }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -30,29 +43,31 @@ export function CopyIconButton({
     return () => window.clearTimeout(timer);
   }, [copied]);
   const copy = () => {
-    const failed = (error: unknown) => toastError(t('未能复制，请重试'), error);
-    const clip = navigator.clipboard;
-    if (clip === undefined) {
-      failed(null);
-      return;
-    }
-    void clip.writeText(text).then(() => setCopied(true), failed);
+    copyTextWithFeedback(
+      text,
+      () => setCopied(true),
+      (error) => toastError(t('未能复制，请重试'), error),
+    );
   };
   return (
     <IconTooltip
-      label={label ?? t('复制')}
+      label={copied && copiedLabel !== undefined ? copiedLabel : (label ?? t('复制'))}
+      side={side}
       trigger={
         <Button
           variant="ghost"
-          size="icon"
-          className={cn(COPY_ICON_BUTTON_CLS, className)}
+          size={size}
+          className={replaceClassName ? className : cn(COPY_ICON_BUTTON_CLS, className)}
           data-testid={testId}
           data-copied={copied ? '' : undefined}
+          disabled={disabled}
           onClick={copy}
         />
       }
     >
-      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+      {copied
+        ? (icons?.copied ?? <Check className="size-4" />)
+        : (icons?.copy ?? <Copy className="size-4" />)}
     </IconTooltip>
   );
 }

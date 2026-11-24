@@ -5,6 +5,7 @@ import { BrandGlyph } from '../components/brand-glyph.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
 import { PrGlyph } from '../components/thread/task-pr-line.js';
 import { Button } from '../components/ui/button.js';
+import { writeClipboard } from '../lib/clipboard.js';
 import { docChecks, type GalleryTheme, parseFrontmatter } from './design-doc.js';
 import {
   computedColor,
@@ -321,10 +322,7 @@ function Swatch({ name, cssVar }: { name: string; cssVar: string }) {
       variant="ghost"
       className="h-auto flex-col items-stretch gap-0 overflow-hidden border-border bg-card p-0 text-left font-normal hover:bg-card dark:hover:bg-card"
       onClick={() => {
-        navigator.clipboard
-          ?.writeText(`var(${cssVar})`)
-          .then(() => setCopied(true))
-          .catch(() => setCopied(false));
+        void writeClipboard(`var(${cssVar})`).then((ok) => setCopied(ok));
       }}
     >
       <span

@@ -30,6 +30,7 @@ import {
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { copyTextWithFeedback, writeClipboard } from '../lib/clipboard.js';
 import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
 import { PageShell } from '../pages/shell.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
@@ -95,7 +96,7 @@ function PairingDialog({
         <Button
           variant="outline"
           className={DIALOG_PRIMARY_BUTTON}
-          onClick={() => void navigator.clipboard?.writeText(link)}
+          onClick={() => void writeClipboard(link)}
         >
           {t('复制链接')}
         </Button>
@@ -281,7 +282,7 @@ export function RemoteAccessPage() {
                   variant="outline"
                   className={DIALOG_PRIMARY_BUTTON}
                   onClick={() => {
-                    void navigator.clipboard?.writeText(loginUrl).then(() => {
+                    copyTextWithFeedback(loginUrl, () => {
                       setLoginCopied(true);
                       setTimeout(() => setLoginCopied(false), 2_000);
                     });

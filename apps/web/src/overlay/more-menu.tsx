@@ -4,6 +4,7 @@ import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, Copy, MessageSquare, Trash2 } from '../icons/index.js';
+import { writeClipboard } from '../lib/clipboard.js';
 
 interface MoreMenuProps {
   open: boolean;
@@ -44,7 +45,7 @@ export function MoreMenu({
 }: MoreMenuProps) {
   const { t } = useI18n();
   const copyLink = () => {
-    void navigator.clipboard?.writeText(window.location.href);
+    void writeClipboard(window.location.href);
     onOpenChange(false);
   };
   const rows = [

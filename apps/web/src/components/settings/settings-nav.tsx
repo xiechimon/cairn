@@ -13,6 +13,7 @@ import { Link, type To } from 'react-router';
 import { useI18n } from '../../i18n/provider.js';
 import { IconTooltip } from '../icon-tooltip.js';
 import { Button } from '../ui/button.js';
+import { Separator } from '../ui/separator.js';
 
 export interface SettingsNavItem {
   id: string;
@@ -44,9 +45,7 @@ export function SettingsNav({
       <div className="flex min-h-0 flex-auto flex-col overflow-y-auto">
         {groups.map((group, index) => (
           <Fragment key={group.heading ?? group.items[0]?.id}>
-            {index > 0 && (
-              <hr aria-hidden className="mx-3 my-3.5 flex-none border-0 border-t border-border" />
-            )}
+            {index > 0 && <Separator aria-hidden className="mx-3 my-3.5 data-horizontal:w-auto" />}
             <div className="flex flex-col gap-0.5">
               {group.heading !== null && <span className="sr-only">{group.heading}</span>}
               {group.items.map((item) => (

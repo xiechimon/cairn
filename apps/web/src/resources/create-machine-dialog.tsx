@@ -13,6 +13,7 @@ import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shel
 import { Input } from '../components/ui/input.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { copyTextWithFeedback, hasClipboard } from '../lib/clipboard.js';
 
 const CMD_CLS =
   'flex items-center justify-between gap-2 rounded-md border border-border bg-card px-3 py-2 dark:bg-input/30';
@@ -37,21 +38,15 @@ export function startCommand(serverOrigin: string): string {
 
 export function CopyCommand({ command }: { command: string }) {
   const { t } = useI18n();
-  const clipboard = typeof navigator === 'undefined' ? undefined : navigator.clipboard;
   return (
     <div className={CMD_CLS}>
       <code className={CMD_CODE_CLS}>{command}</code>
-      {clipboard && (
+      {hasClipboard() && (
         <Button
           variant="outline"
           size="xs"
           className="shrink-0 px-2.5 pointer-coarse:h-11 pointer-coarse:px-3.5"
-          onClick={() =>
-            void clipboard.writeText(command).then(
-              () => toastSuccess(t('已复制')),
-              () => {},
-            )
-          }
+          onClick={() => copyTextWithFeedback(command, () => toastSuccess(t('已复制')))}
         >
           {t('复制')}
         </Button>
