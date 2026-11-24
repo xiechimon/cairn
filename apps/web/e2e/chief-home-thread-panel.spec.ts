@@ -146,17 +146,6 @@ test('a plan waiting for approval shows its chips like the suggested replies, 24
     leftOfComposer: 0,
     aboveComposer: 24,
   });
-  const main = await page.getByTestId('home-c').evaluate((el) => {
-    const chips = [...el.querySelectorAll('[data-testid="chief-question-chips"] button')]
-      .map((node) => node.getBoundingClientRect())
-      .filter((box) => box.height === 28);
-    const card = el.querySelector('.chief-composer')!.getBoundingClientRect();
-    return {
-      between: Math.round((chips[1]?.left ?? 0) - (chips[0]?.right ?? 0)),
-      aboveComposer: Math.round(card.top - (chips[0]?.bottom ?? 0)),
-    };
-  });
-  expect(main).toEqual({ between: face.between, aboveComposer: face.aboveComposer });
 });
 
 test('the thread composer is the main composer: the field, then a tool row with plus under it', async ({

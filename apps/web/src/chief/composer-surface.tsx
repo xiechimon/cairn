@@ -86,6 +86,7 @@ export interface ComposerSurfaceProps {
   placeholder: string;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   tab?: ReactNode;
+  beside?: ReactNode;
   above: ReactNode;
   context?: ChiefContextUsage | null | undefined;
   running?: boolean | undefined;
@@ -115,6 +116,7 @@ export function ComposerSurface({
   placeholder,
   composerRef,
   tab,
+  beside,
   above,
   context = null,
   running = false,
@@ -380,6 +382,7 @@ export function ComposerSurface({
               listboxId={inlineListboxId}
             />
           </div>
+          {beside}
           <IconTooltip
             label={send?.label ?? t('发送')}
             trigger={

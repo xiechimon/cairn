@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
-import { QuestionAnsweredLine, QuestionAsked } from '../chief/question-answered-line.js';
-import { QuestionChips } from '../chief/question-chips.js';
-import { answerLines } from '../chief/question-lifecycle.js';
-import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { QuestionReceipt } from '../chief/question-answered-line.js';
+import { QuestionCard } from '../chief/question-card.js';
+import { useI18n } from '../i18n/provider.js';
 import {
   NOW,
   QUESTION_ANSWERED,
   QUESTION_CANCELLED,
+  QUESTION_PARKED,
   QUESTION_PENDING,
+  QUESTION_WITHDRAWN,
 } from './product-fixtures.js';
 import { Labeled, Section, Specimen } from './specimen.js';
 
 export function ProductChiefSection() {
+  const { t } = useI18n();
   const [last, setLast] = useState<string | null>(null);
   return (
     <Section
@@ -21,18 +23,18 @@ export function ProductChiefSection() {
       lede="The Coordinator's parts: questions it asks you, the home summary line, and outage banners."
     >
       <Specimen
-        id="question-chips"
-        title="Question chips"
+        id="question-card"
+        title="Question card"
         note={
           last ??
-          'QuestionChips: a chip answers, digits pick, the composer types a free answer; answered, the questions stay as reply bubbles above one owner bubble'
+          'QuestionCard: docked above the composer; a row click answers a single choice, checkboxes and the arrow answer a multi choice, digits only move focus; answered or skipped, a receipt stays in the transcript'
         }
         stage="canvas"
         className="flex-col"
       >
         <Labeled label="Pending, two steps, the second is multi-select">
-          <div className="w-160">
-            <QuestionChips
+          <div className="flex max-h-120 w-160 flex-col rounded-(--radius-composer) bg-(--composer-fill) shadow-(--shadow-composer)">
+            <QuestionCard
               item={QUESTION_PENDING}
               onAnswer={({ answers }) =>
                 setLast(
@@ -44,18 +46,30 @@ export function ProductChiefSection() {
           </div>
         </Labeled>
         <Labeled label="Answered">
-          <div className="flex w-160 flex-col gap-6">
-            <QuestionAsked item={QUESTION_ANSWERED} />
-            <div className="flex justify-end">
-              <UserMessageBubble className="w-fit max-w-full whitespace-pre-line">
-                {answerLines(QUESTION_ANSWERED).join('\n')}
-              </UserMessageBubble>
+          <div className="w-160">
+            <QuestionReceipt item={QUESTION_ANSWERED} />
+          </div>
+        </Labeled>
+        <Labeled label="Skipped">
+          <div className="w-160">
+            <QuestionReceipt item={QUESTION_CANCELLED} />
+          </div>
+        </Labeled>
+        <Labeled label="Parked — still answerable, Coordinator continued">
+          <div className="w-160">
+            <div className="flex max-w-full min-w-0 flex-col items-start gap-1.5">
+              <div className="w-full max-w-full rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5">
+                <QuestionCard item={QUESTION_PARKED} />
+              </div>
+              <p className="m-0 pl-1.5 text-meta text-content-tertiary">
+                {t('Coordinator 没有等回答，已继续')}
+              </p>
             </div>
           </div>
         </Labeled>
-        <Labeled label="Cancelled">
+        <Labeled label="Withdrawn — receipt carries the reason">
           <div className="w-160">
-            <QuestionAnsweredLine item={QUESTION_CANCELLED} />
+            <QuestionReceipt item={QUESTION_WITHDRAWN} />
           </div>
         </Labeled>
       </Specimen>

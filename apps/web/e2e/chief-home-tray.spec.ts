@@ -94,31 +94,28 @@ test('a running turn with no question keeps its typing dots', async ({ page }) =
   await expect(page.getByTestId('chief-stream').getByTestId('typing-dots')).toBeVisible();
 });
 
-test('option descriptions live only in the chip tooltip and its accessible description (owner, 2026-11-11)', async ({ page }) => {
+test('each option shows its description under the label, and only the recommended one says so', async ({ page }) => {
   await openWithQuestion(page);
   const option = page.getByTestId('chief-question-option-0-0');
-  await expect(page.getByTestId('chief-question-descriptions')).toHaveCount(0);
-  await expect(option).not.toContainText('About 6 minutes');
-  await expect(option).toHaveAccessibleDescription('Recommended · About 6 minutes');
-  await expect(page.getByTestId('chief-question-option-0-1')).toHaveAccessibleDescription('Docs only, low risk');
-  await option.hover();
-  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('Recommended · About 6 minutes');
+  await expect(option).toContainText('About 6 minutes');
+  await expect(option).toContainText('Recommended');
+  await expect(page.getByTestId('chief-question-option-0-1')).toContainText('Docs only, low risk');
+  await expect(page.getByTestId('chief-question-option-0-1')).not.toContainText('Recommended');
   expect(await option.getAttribute('title')).toBeNull();
 });
 
-test('on a phone the question, its chips and dismiss sit in the conversation with no more menu', async ({ page }) => {
+test('on a phone the docked card keeps the question, its rows and skip on screen with no more menu', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await openWithQuestion(page);
-  const block = page.getByTestId('chief-question-chips');
+  const block = page.getByTestId('chief-composer-block').getByTestId('chief-question-chips');
   await expect(block.getByTestId('chief-question-text')).toBeVisible();
-  await expect(block.getByTestId('chief-question-option-0-0')).toBeVisible();
+  await expect(block.getByTestId('chief-question-option-0-0')).toBeInViewport({ ratio: 1 });
   await expect(block.getByTestId('chief-question-more')).toHaveCount(0);
   await expect(block.getByTestId('chief-question-position')).toHaveCount(0);
-  await block.getByTestId('chief-question-text').hover();
-  await block.getByTestId('chief-question-tools').getByTestId('chief-msg-more').click();
-  await page.getByTestId('chief-question-dismiss').click();
+  await expect(block.getByTestId('chief-question-skip')).toBeInViewport({ ratio: 1 });
+  await block.getByTestId('chief-question-skip').click();
   await expect(page.getByTestId('chief-question')).toHaveCount(0);
-  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Question dismissed' })).toBeVisible();
+  await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Skipped' })).toBeVisible();
 });
 
 test('a single question has no progress bar', async ({ page }) => {
@@ -127,19 +124,17 @@ test('a single question has no progress bar', async ({ page }) => {
   await expect(page.getByTestId('chief-question-prev')).toHaveCount(0);
 });
 
-test('a chip answer keeps the question as a reply bubble and puts the answer under it as one owner bubble', async ({ page }) => {
+test('an answer leaves a receipt with the question and the answer in the transcript, and no owner bubble', async ({ page }) => {
   const { answered } = await openWithQuestion(page);
   await page.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(1);
   await expect(page.getByTestId('chief-question')).toHaveCount(0);
   const stream = page.getByTestId('chief-stream');
-  await expect(stream.locator('[data-slot="user-bubble"][data-question-answer]')).toHaveText('Wait for CI');
-  const asked = stream.locator('[data-testid="chief-question-asked"][data-request-id="ask-1"]');
-  await expect(asked.getByTestId('chief-reply-bubble')).toHaveText(JSON.parse(QUESTION.content).questions[0].question);
-  const order = await stream
-    .locator('[data-testid="chief-question-asked"], [data-question-answer]')
-    .evaluateAll((nodes) => nodes.map((node) => node.hasAttribute('data-question-answer')));
-  expect(order).toEqual([false, true]);
-  await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
+  await expect(stream.locator('[data-question-answer]')).toHaveCount(0);
+  const receipt = stream.locator('[data-testid="chief-question-receipt"][data-request-id="ask-1"]');
+  await expect(receipt.getByTestId('chief-question-receipt-question')).toHaveText(
+    JSON.parse(QUESTION.content).questions[0].question,
+  );
+  await expect(receipt.getByTestId('chief-question-receipt-answer')).toHaveText('Wait for CI');
   await expect(page).toHaveTitle('Cairn');
 });

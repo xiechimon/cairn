@@ -644,6 +644,9 @@ export type ChiefStreamItem =
       }[];
       answers: { header: string; choices?: string[]; text?: string }[] | null;
       todoId?: string;
+      parkedAt?: number;
+      cancelReason?: string;
+      cancelledBy?: 'person' | 'coordinator';
     }
   | {
       kind: 'user';

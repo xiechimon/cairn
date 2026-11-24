@@ -21,6 +21,8 @@ import {
   ensureChief,
   recoverGateWake,
 } from '../src/services/chief.js';
+import { readQuestion } from '../src/services/chief-question-store.js';
+import { createOrGetQuestion } from '../src/services/chief-questions.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
 import { addTurnOwnerMessage } from '../src/services/chief-turns.js';
 import { storeInfoReport } from '../src/services/info-handoff.js';
@@ -123,6 +125,7 @@ function openWorld(opts: { origin?: 'none' | 'live' | 'archived' } = {}) {
   const toolDeps = {
     db: s.db,
     hub: s.svc.hub,
+    convHub: s.convHub,
     machineHub: s.machineHub,
     box: s.secretBox,
     user: s.user,
@@ -328,6 +331,117 @@ describe('a delivered research report reaches the conversation once', () => {
     recoverGateWake(w.deps, { ...retry!, prompt: turn.prompt, status: 'failed' });
     expect(w.reportWakes()).toHaveLength(2);
   });
+});
+
+describe('a delivered report withdraws only its own question', () => {
+  function question(
+    w: ReturnType<typeof openWorld>,
+    requestId: string,
+    threadId: string,
+    provenance?: string,
+  ) {
+    createOrGetQuestion(w.deps, {
+      threadId,
+      requestId,
+      questions: [
+        {
+          header: 'Scope',
+          question: 'Which source should we use?',
+          options: [{ label: 'Published results' }],
+        },
+      ],
+      ...(provenance === undefined ? {} : { provenance }),
+      askedFor: [],
+    });
+  }
+
+  test.each([null, 'report-runner'])(
+    'the real report wake withdraws the resolved card through relay %s',
+    async (machineId) => {
+      const w = openWorld({ origin: 'live' });
+      question(w, 'resolved-question', w.channelId, `watch:${w.task.todoId}`);
+      const turn = w.deliver()!;
+      expect(turn.prompt).toContain(`provenance=report:${w.task.todoId}`);
+      expect(turn.ownerMessageIds).toEqual([]);
+      const published = vi.spyOn(w.s.convHub, 'publishMessage');
+      w.s.db
+        .update(stepTable)
+        .set({ status: 'claimed', machineId })
+        .where(eq(stepTable.id, turn.id))
+        .run();
+      const result = await executeRelayToolCall(
+        w.toolDeps,
+        machineId,
+        turn.id,
+        'withdraw_question',
+        {
+          requestId: 'resolved-question',
+          reason: 'The delivered report settles the source.',
+          provenance: `report:${w.task.todoId}`,
+        },
+      );
+      expect(JSON.parse(result)).toEqual({ status: 'cancelled', requestId: 'resolved-question' });
+      expect(readQuestion(w.s.db, w.channelId, 'resolved-question')).toMatchObject({
+        status: 'cancelled',
+        cancelledBy: 'coordinator',
+        cancelReason: 'The delivered report settles the source.',
+      });
+      expect(published).toHaveBeenCalledWith(
+        w.channelId,
+        expect.objectContaining({ id: 'resolved-question' }),
+      );
+    },
+  );
+
+  test.each(['other-task', 'other-thread', 'unlinked', 'wrong-provenance', 'stale', 'approval'])(
+    'a report refuses %s without changing the card',
+    async (boundary) => {
+      const w = openWorld({ origin: 'live' });
+      const threadId = boundary === 'other-thread' ? w.main.id : w.channelId;
+      const provenance =
+        boundary === 'unlinked'
+          ? undefined
+          : `watch:${boundary === 'other-task' ? w.other.todoId : w.task.todoId}`;
+      question(w, 'protected-question', threadId, provenance);
+      if (boundary === 'approval') {
+        const row = readQuestion(w.s.db, threadId, 'protected-question')!;
+        w.s.db
+          .update(chiefMessage)
+          .set({ content: JSON.stringify({ ...row, askedFor: ['action-proposal:protected'] }) })
+          .where(eq(chiefMessage.id, 'protected-question'))
+          .run();
+      }
+      const before = readQuestion(w.s.db, threadId, 'protected-question');
+      const turn = w.deliver()!;
+      if (boundary === 'stale')
+        w.s.db
+          .update(todoTable)
+          .set({ phase: 'done' })
+          .where(eq(todoTable.id, w.task.todoId))
+          .run();
+      const published = vi.spyOn(w.s.convHub, 'publishMessage');
+      const error = {
+        'other-task': /question does not belong to this report task/,
+        'other-thread': /question protected-question/,
+        unlinked: /question does not belong to this report task/,
+        'wrong-provenance': /provenance/,
+        stale: /report-stale/,
+        approval: /approval card/,
+      }[boundary];
+      await expect(
+        w.call(turn, 'withdraw_question', {
+          requestId: 'protected-question',
+          reason: 'The result is available.',
+          provenance:
+            boundary === 'wrong-provenance'
+              ? `report:${w.other.todoId}`
+              : `report:${w.task.todoId}`,
+        }),
+      ).rejects.toThrow(error);
+      expect(readQuestion(w.s.db, threadId, 'protected-question')).toEqual(before);
+      expect(published).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('an owner message steered into a stale report turn', () => {

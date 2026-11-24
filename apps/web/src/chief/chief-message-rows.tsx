@@ -1,4 +1,5 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
+import { cn } from 'cn';
 import {
   type ComponentProps,
   type CSSProperties,
@@ -36,14 +37,20 @@ import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import { ChiefReportMessage } from './chief-report-row.js';
+import { useOptionalChiefRoot } from './chief-root.js';
 import { chiefRowRenders } from './chief-row-kinds.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import type { TaskRef } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { PackageInstallCard } from './package-install-card.js';
-import { ApprovalAnswered, QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
-import { answerLines } from './question-lifecycle.js';
+import {
+  ApprovalAnswered,
+  QuestionAnsweredLine,
+  QuestionReceipt,
+} from './question-answered-line.js';
+import { type ChiefQuestionItem, QuestionCard } from './question-card.js';
+import { questionDraftKey } from './question-drafts.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
   REPLY_HIGHLIGHT_ATTR,
@@ -427,6 +434,35 @@ function HandoffRow({ todoId }: { todoId: string }) {
   );
 }
 
+function ParkedQuestion({ item }: { item: ChiefQuestionItem }) {
+  const { t } = useI18n();
+  const root = useOptionalChiefRoot();
+  const { teamId } = useLiveData();
+  const conversationId = root?.surface.chiefData.threadId ?? 'chief';
+  const draftKey = questionDraftKey({
+    teamId: teamId ?? 'local',
+    conversationId,
+    requestId: item.requestId,
+  });
+  return (
+    <div className="flex w-full max-w-full min-w-0 flex-col items-start gap-1.5">
+      <div className={cn(REPLY_BUBBLE_CLS, 'w-full max-w-full py-0')}>
+        <QuestionCard
+          item={item}
+          draftKey={draftKey}
+          onAnswer={(input) =>
+            root?.surface.onAnswerQuestion?.({ ...input, threadId: conversationId })
+          }
+          onCancel={(requestId) => root?.surface.onCancelQuestion?.(requestId, conversationId)}
+        />
+      </div>
+      <p data-testid="chief-question-parked" className="m-0 pl-1.5 text-meta text-content-tertiary">
+        {t('Coordinator 没有等回答，已继续')}
+      </p>
+    </div>
+  );
+}
+
 const LIVE_TURN_KEY = 'live-turn';
 
 export function chiefStreamRowKeys(
@@ -794,66 +830,33 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         </Message>
       </MessageScrollerItem>
     );
-  if (item.kind === 'question' && item.status === 'pending') return null;
   if (item.kind === 'question') {
-    if (item.status === 'cancelled')
+    const approval = isApprovalRequest(item.requestId);
+    if (item.status === 'pending') {
+      if (item.parkedAt === undefined || approval) return null;
       return (
         <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
           <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
             <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-              <QuestionAnsweredLine item={item} />
+              <ParkedQuestion item={item} />
             </MessageContent>
           </Message>
         </MessageScrollerItem>
       );
-    if (isApprovalRequest(item.requestId))
-      return (
-        <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-          <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
-            <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-              <ApprovalAnswered item={item} />
-            </MessageContent>
-          </Message>
-        </MessageScrollerItem>
-      );
-    const answers = answerLines(item);
+    }
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message
-          className={joinsPrev ? RUN_ROW_CLS : REPLY_ROW_CLS}
-          data-testid="chief-msg"
-          data-run={joinsPrev ? 'last' : undefined}
-        >
+        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <QuestionAsked item={item} onCopy={onCopy} />
-            {answers.length === 0 && (
-              <div className="mt-2">
-                <QuestionAnsweredLine item={item} />
-              </div>
+            {!approval ? (
+              <QuestionReceipt item={item} />
+            ) : item.status === 'cancelled' ? (
+              <QuestionAnsweredLine item={item} />
+            ) : (
+              <ApprovalAnswered item={item} />
             )}
           </MessageContent>
         </Message>
-        {answers.length > 0 && (
-          <Message
-            className={`${USER_ROW_CLS} justify-end`}
-            data-testid="chief-msg"
-            data-run={joinsNext ? 'first' : undefined}
-          >
-            <MessageContent
-              className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
-              data-testid="chief-msg-col"
-            >
-              <UserMessageBubble
-                data-testid="chief-bubble"
-                data-question-answer={item.requestId}
-                tail={!joinsNext}
-                className="w-fit max-w-full [overflow-wrap:anywhere] whitespace-pre-line"
-              >
-                {answers.join('\n')}
-              </UserMessageBubble>
-            </MessageContent>
-          </Message>
-        )}
       </MessageScrollerItem>
     );
   }

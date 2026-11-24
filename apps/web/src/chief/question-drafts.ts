@@ -1,5 +1,11 @@
 export type QuestionDraft =
-  | { kind: 'choices'; picked: string[]; other: boolean; otherText: string }
+  | {
+      kind: 'choices';
+      picked: string[];
+      other: boolean;
+      otherText: string;
+      optionAttachments?: string[];
+    }
   | { kind: 'text'; value: string };
 
 export type QuestionDraftRecord = {

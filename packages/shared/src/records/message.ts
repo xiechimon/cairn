@@ -352,6 +352,7 @@ export const askUserQuestionContentSchema = z.object({
   questions: z.array(askUserQuestionSchema).min(1).max(4),
   answers: z.array(askUserAnswerSchema).nullable(),
   cancelReason: z.string().optional(),
+  cancelledBy: z.enum(['person', 'coordinator']).optional(),
   parkedAt: z.number().int().optional(),
   provenance: provenanceSchema.optional(),
   answeredAt: z.number().int().optional(),

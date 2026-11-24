@@ -19,7 +19,17 @@ import {
   machineToolRelayResponseSchema,
   newChiefThreadId,
   remoteToolDefSchema,
+  WORKER_ASK_USER_TOOL,
 } from '../src/index.js';
+
+it('only the Coordinator ask tool directs the agent to withdraw a question', () => {
+  const coordinatorAsk = CHIEF_REMOTE_TOOLS.find(({ name }) => name === 'ask_user');
+  expect(CHIEF_REMOTE_TOOLS.map(({ name }) => name)).toContain('withdraw_question');
+  expect(coordinatorAsk?.description).toContain('withdraw_question');
+  expect(WORKER_ASK_USER_TOOL.name).toBe('ask_user');
+  expect(WORKER_ASK_USER_TOOL.parameters).toEqual(coordinatorAsk?.parameters);
+  expect(WORKER_ASK_USER_TOOL.description).not.toContain('withdraw_question');
+});
 
 const RAW_TOOL_DEF_HASH_KEYS = [
   'agents',
@@ -73,7 +83,7 @@ const RAW_TOOL_DEF_HASH_KEYS = [
   'workflow_runs',
 ];
 
-describe('47-item vocabulary', () => {
+describe('48-item vocabulary', () => {
   const rawKeys: string[] = RAW_TOOL_DEF_HASH_KEYS;
   const removed: readonly string[] = CHIEF_TOOLS_REMOVED;
   const added: readonly string[] = CHIEF_TOOLS_ADDED;
@@ -85,9 +95,9 @@ describe('47-item vocabulary', () => {
     ...added,
   ].sort();
 
-  it('raw key set is exactly 49; live vocabulary = raw - removals - D60 removals + additions = 47', () => {
+  it('raw key set is exactly 49; live vocabulary = raw - removals - D60 removals + additions = 48', () => {
     expect(rawKeys).toHaveLength(49);
-    expect(CHIEF_TOOL_COUNT).toBe(47);
+    expect(CHIEF_TOOL_COUNT).toBe(48);
     expect(CHIEF_TOOL_COUNT).toBe(
       rawKeys.filter((name) => !removedUnderD60.includes(name)).length -
         removed.length +
@@ -100,7 +110,7 @@ describe('47-item vocabulary', () => {
     expect(CHIEF_REMOTE_TOOLS.map((t) => t.name).sort()).toEqual(expected);
   });
 
-  it('removal registry = delete_skills + set_remote_shell + close_todos + reopen_todos; addition registry = create_skill + update_skill + models + update_memory + search_history + read_history + channel_messages + archive_todos + unarchive_todos + inspect_run', () => {
+  it('removal registry = delete_skills + set_remote_shell + close_todos + reopen_todos; addition registry = create_skill + update_skill + models + update_memory + search_history + read_history + channel_messages + archive_todos + unarchive_todos + inspect_run + withdraw_question', () => {
     expect(removed).toEqual(['delete_skills', 'set_remote_shell', 'close_todos', 'reopen_todos']);
     expect(added).toEqual([
       'create_skill',
@@ -113,6 +123,7 @@ describe('47-item vocabulary', () => {
       'archive_todos',
       'unarchive_todos',
       'inspect_run',
+      'withdraw_question',
     ]);
     for (const name of removed) {
       expect(CHIEF_TOOL_NAMES).not.toContain(name);
@@ -124,11 +135,11 @@ describe('47-item vocabulary', () => {
     }
   });
 
-  it('groups = 19 read + 15 organize + 2 execute + 11 private', () => {
+  it('groups = 19 read + 15 organize + 2 execute + 12 private', () => {
     expect(CHIEF_TOOL_CATEGORIES.read).toHaveLength(19);
     expect(CHIEF_TOOL_CATEGORIES.organize).toHaveLength(15);
     expect(CHIEF_TOOL_CATEGORIES.execute).toHaveLength(2);
-    expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(11);
+    expect(CHIEF_TOOL_CATEGORIES.private).toHaveLength(12);
   });
 
   it('read side all replaySafe (bundle extraction: read tools carry a retry budget, r5 §3.1); write side not marked', () => {
@@ -186,7 +197,7 @@ describe('Coordinator task text contract', () => {
 });
 
 describe('D60 router tools', () => {
-  it('are six tools outside the 47-item base vocabulary, so the base count stays 47', () => {
+  it('are six tools outside the 48-item base vocabulary, so the base count stays 48', () => {
     expect(CHIEF_ROUTER_TOOL_NAMES).toEqual([
       'open_thread',
       'message_thread',
@@ -196,7 +207,7 @@ describe('D60 router tools', () => {
       'needs_you',
     ]);
     expect(CHIEF_ROUTER_TOOLS.map((t) => t.name)).toEqual([...CHIEF_ROUTER_TOOL_NAMES]);
-    expect(CHIEF_TOOL_COUNT).toBe(47);
+    expect(CHIEF_TOOL_COUNT).toBe(48);
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(CHIEF_TOOL_NAMES).not.toContain(name);
   });
 

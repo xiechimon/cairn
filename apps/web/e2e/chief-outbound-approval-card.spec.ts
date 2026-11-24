@@ -25,6 +25,7 @@ const CARD = {
     kind: 'ask_user_question',
     requestId: 'approval-p1',
     status: 'pending',
+    parkedAt: 20,
     questions: [
       { header: '审批', question: QUESTION, options: [{ label: '发送' }, { label: '不发' }] },
     ],

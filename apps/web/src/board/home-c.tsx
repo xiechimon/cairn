@@ -212,8 +212,7 @@ export function HomeC({
   const activeProjects = splitProjectsByArchive(projectsQuery.data ?? []).active;
   const saveProjectId =
     projectId ?? (activeProjects.length === 1 ? (activeProjects[0]?.id ?? null) : null);
-  const showPane = (next: WorkPane | null, state: unknown = location.state) => {
-    const params = new URLSearchParams(searchParams);
+  const showPane = (next: WorkPane | null, params = new URLSearchParams(searchParams)) => {
     params.delete(THREAD_PARAM);
     params.delete(VIEW_PARAM);
     params.delete(TASKS_TAB_PARAM);
@@ -221,7 +220,7 @@ export function HomeC({
     params.delete(FILE_NAME_PARAM);
     if (next === null) params.delete(PANE_PARAM);
     else params.set(PANE_PARAM, next);
-    setSearchParams(params, { replace: true, state });
+    setSearchParams(params, { replace: true, state: location.state });
   };
   const togglePane = (next: WorkPane) => {
     showPane(pane === next && paneShown ? null : next);
@@ -282,7 +281,10 @@ export function HomeC({
   const setupEmpty = modelsMissing && fallbackOnly;
   const conversation = setupEmpty
     ? []
-    : stream.filter((item) => !(item.kind === 'question' && item.status === 'pending'));
+    : stream.filter(
+        (item) =>
+          !(item.kind === 'question' && item.status === 'pending' && item.parkedAt === undefined),
+      );
   const questionScope = useMemo(
     () =>
       projectId === null
@@ -332,10 +334,12 @@ export function HomeC({
   };
   const openQuestion = (target: QuestionTarget) => {
     const step = questionOpenStep(target, questionView);
-    if (step.kind === 'open-thread') {
+    const closeTasks = narrow && pane === 'tasks';
+    if (step.kind === 'open-thread' || closeTasks) {
       const params = new URLSearchParams(searchParams);
-      params.set(CHIEF_PARAM, step.threadId);
-      setSearchParams(params, { replace: true, state: location.state });
+      if (step.kind === 'open-thread') params.set(CHIEF_PARAM, step.threadId);
+      if (closeTasks) showPane(null, params);
+      else setSearchParams(params, { replace: true, state: location.state });
     }
     setQuestionTarget(target);
   };
@@ -343,19 +347,27 @@ export function HomeC({
     questionTarget === null || !loaded ? null : questionOpenStep(questionTarget, questionView);
   const stepKind = questionStep?.kind ?? null;
   const focusAt = questionStep?.kind === 'focus' ? questionStep.at : -1;
+  const scrollTo = questionStep?.kind === 'scroll' ? questionStep.requestId : null;
   const loadEarlier = surface.earlier?.onLoad;
+  const tasksObscureConversation = narrow && pane === 'tasks';
   useEffect(() => {
-    if (questionTarget === null) return;
+    if (questionTarget === null || tasksObscureConversation) return;
     if (stepKind === 'focus') {
       questionDockState.setFocus(focusAt);
-      questionDockState.reveal();
+      questionDockState.expand(questionTarget.requestId, { focusRow: false });
+      setQuestionTarget(null);
+    } else if (stepKind === 'approval') {
+      questionDockState.revealApproval(questionTarget.requestId);
+      setQuestionTarget(null);
+    } else if (stepKind === 'scroll' && scrollTo !== null) {
+      questionDockState.requestScrollTo(scrollTo);
       setQuestionTarget(null);
     } else if (stepKind === 'load-earlier') {
       loadEarlier?.();
     } else if (stepKind === 'missing') {
       setQuestionTarget(null);
     }
-  }, [questionTarget, stepKind, focusAt, loadEarlier]);
+  }, [questionTarget, tasksObscureConversation, stepKind, focusAt, scrollTo, loadEarlier]);
   const [section, setSection] = useState<HTMLElement | null>(null);
   useTouchMessageTools(section);
 

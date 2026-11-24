@@ -1,9 +1,24 @@
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
+import { ChiefQuestion, useDockedQuestion, useQuestionPending } from '../src/chief/chief-question.js';
+import type { OriginChiefQuestion } from '../src/chief/question-origin.js';
 import { ApprovalAnswered } from '../src/chief/question-answered-line.js';
-import { type ChiefQuestionItem, QuestionChips } from '../src/chief/question-chips.js';
+import { type ChiefQuestionItem, QuestionCard } from '../src/chief/question-card.js';
 import { I18nProvider } from '../src/i18n/provider.js';
+
+const root = vi.hoisted(() => ({ pendingQuestions: [] as OriginChiefQuestion[] }));
+
+vi.mock('../src/chief/chief-root.js', () => ({
+  useOptionalChiefRoot: () => ({ ...root, surface: { load: 'ready' } }),
+}));
+vi.mock('../src/components/ui/message-scroller.js', () => ({
+  MessageScrollerItem: ({ children }: { children: ReactNode }) => children,
+}));
+
+afterEach(() => {
+  root.pendingQuestions = [];
+});
 
 const MAIL_CARD = [
   '对外发送：cairn-mail send',
@@ -46,7 +61,7 @@ function inI18n(child: ReturnType<typeof createElement>): string {
 }
 
 const render = (item: ChiefQuestionItem) =>
-  inI18n(createElement(QuestionChips, { item, onAnswer: () => {}, onCancel: () => {} }));
+  inI18n(createElement(QuestionCard, { item, onAnswer: () => {}, onCancel: () => {} }));
 
 const textOf = (html: string) =>
   html
@@ -66,6 +81,24 @@ function elements(html: string, testId: string): { tag: string; text: string }[]
 const texts = (html: string, testId: string) => elements(html, testId).map((node) => node.text);
 
 describe('an outbound approval card', () => {
+  test('a server-created parked approval keeps its existing actionable surface', () => {
+    root.pendingQuestions = [{
+      teamId: 'team',
+      conversationId: 'conversation',
+      origin: 'Coordinator',
+      item: { ...mailItem(), parkedAt: 1000 },
+    }];
+    const doc = inI18n(createElement(ChiefQuestion));
+    expect(texts(doc, 'approval-card-title')).toEqual(['发送邮件给 lena.hoffmann@example.com']);
+    expect(elements(doc, 'chief-question-option-0-0')[0]?.tag).not.toContain('disabled=""');
+    expect(elements(doc, 'chief-question-option-0-1')).toHaveLength(1);
+    const Probe = () => {
+      expect(useQuestionPending()).toBe(true);
+      expect(useDockedQuestion()).toBeNull();
+      return null;
+    };
+    inI18n(createElement(Probe));
+  });
   test('says the action in one sentence with the account and subject under it', () => {
     const doc = render(mailItem());
     expect(texts(doc, 'approval-card-title')).toEqual(['发送邮件给 lena.hoffmann@example.com']);

@@ -1,8 +1,9 @@
 import type { PrPanelRow, TasksQuery, TodoSection } from '@cairn/shared';
 import { toDisplayTodo } from '../api/mappers.js';
+import { isApprovalRequest } from '../chief/approval-card-model.js';
 import type { GlyphKind } from '../components/status-glyph.js';
 import type { ChiefStreamItem, TodoRecord } from '../fixtures/records.js';
-import { pendingQuestions } from './needs-you.js';
+import { dockedQuestions, pendingQuestions } from './needs-you.js';
 import { threadCopy } from './thread-copy.js';
 
 export type TaskSection = TodoSection;
@@ -252,6 +253,8 @@ export interface QuestionThreadView {
 export type QuestionOpenStep =
   | { kind: 'open-thread'; threadId: string }
   | { kind: 'focus'; at: number }
+  | { kind: 'approval' }
+  | { kind: 'scroll'; requestId: string }
   | { kind: 'load-earlier' }
   | { kind: 'wait' }
   | { kind: 'missing' };
@@ -262,10 +265,19 @@ export function questionOpenStep(
 ): QuestionOpenStep {
   if (target.threadId !== null && target.threadId !== view.threadId)
     return { kind: 'open-thread', threadId: target.threadId };
-  const pending = pendingQuestions(view.stream);
-  if (pending.some((question) => question.requestId === target.requestId)) {
-    if (view.dismissing(target.requestId)) return { kind: 'missing' };
-    const at = pending
+  const asked = pendingQuestions(view.stream).find(
+    (question) => question.requestId === target.requestId,
+  );
+  if (asked !== undefined) {
+    if (
+      view.dismissing(asked.requestId) ||
+      (view.shown != null && !view.shown.has(asked.requestId))
+    )
+      return { kind: 'missing' };
+    if (isApprovalRequest(asked.requestId)) return { kind: 'approval' };
+    const surfaced = dockedQuestions(view.stream);
+    if (!surfaced.includes(asked)) return { kind: 'scroll', requestId: asked.requestId };
+    const at = surfaced
       .filter(
         (question) =>
           !view.dismissing(question.requestId) &&

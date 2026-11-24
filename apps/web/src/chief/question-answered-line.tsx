@@ -1,12 +1,11 @@
 import { cn } from 'cn';
 import { Ban, CircleCheck } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalHistoryLine } from './approval-card.js';
 import { approvalCardOf } from './approval-card-model.js';
-import { MessageToolbar } from './message-toolbar.js';
-import type { ChiefQuestionItem } from './question-chips.js';
+import type { ChiefQuestionItem } from './question-card.js';
+import { answerOf } from './question-lifecycle.js';
 
 export function QuestionAnsweredLine({ item }: { item: ChiefQuestionItem }) {
   const { t } = useI18n();
@@ -26,61 +25,73 @@ export function QuestionAnsweredLine({ item }: { item: ChiefQuestionItem }) {
   );
 }
 
-export function QuestionAsked({
-  item,
-  onCopy,
-}: {
-  item: ChiefQuestionItem;
-  onCopy?: ((text: string) => void) | undefined;
-}) {
+function ReceiptQuestionText({ text }: { text: string }) {
   return (
     <div
-      data-testid="chief-question-asked"
+      data-testid="chief-question-receipt-question"
+      className="line-clamp-2 text-meta leading-[18px] text-pretty text-(--text-tertiary) [overflow-wrap:anywhere] [&_p]:m-0 [&_p]:inline"
+    >
+      <ChatMarkdown text={text} />
+    </div>
+  );
+}
+
+export function QuestionReceipt({ item }: { item: ChiefQuestionItem }) {
+  const { t } = useI18n();
+  const cancelled = item.status === 'cancelled';
+  if (cancelled && item.cancelledBy === 'coordinator') {
+    return (
+      <div
+        data-testid="chief-question-receipt"
+        data-request-id={item.requestId}
+        data-status={item.status}
+        data-withdrawn=""
+        className="flex w-full max-w-full min-w-0 flex-col gap-1.5"
+      >
+        {item.questions.map((question, n) => (
+          <ReceiptQuestionText key={n} text={question.question} />
+        ))}
+        <p
+          data-testid="chief-question-receipt-answer"
+          className="m-0 text-ui leading-5 [overflow-wrap:anywhere] whitespace-pre-line text-(--text-tertiary)"
+        >
+          {t('不再需要回答')}
+          {item.cancelReason !== undefined && item.cancelReason !== ''
+            ? `：${item.cancelReason}`
+            : ''}
+        </p>
+      </div>
+    );
+  }
+  const status = !cancelled
+    ? t('已回答')
+    : item.cancelledBy === 'person'
+      ? t('已跳过')
+      : t('已取消提问');
+  return (
+    <div
+      data-testid="chief-question-receipt"
       data-request-id={item.requestId}
-      data-slot="reply-blocks"
-      className="flex w-full max-w-full min-w-0 flex-col items-start gap-1"
+      data-status={item.status}
+      className="flex w-full max-w-full min-w-0 flex-col gap-3"
     >
       {item.questions.map((question, n) => {
-        const bubble = (
-          <div
-            data-slot="reply-bubble"
-            data-testid="chief-reply-bubble"
-            className={cn(REPLY_BUBBLE_CLS, 'text-ui leading-5 break-words')}
-          >
-            <ChatMarkdown text={question.question} />
-          </div>
-        );
+        const answer = answerOf(item, n);
         return (
-          <div key={n} className={REPLY_BLOCK_CLS} data-slot="reply-block">
-            {question.header === '' ? (
-              bubble
-            ) : (
-              <Tooltip>
-                <TooltipTrigger render={bubble} />
-                <TooltipContent side="top" sideOffset={6} className="max-w-72">
-                  {question.header}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {onCopy !== undefined && (
-              <MessageToolbar
-                placement="right"
-                testId={n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools'}
-                stamp={null}
-                onCopy={() => onCopy(question.question)}
-              />
-            )}
+          <div key={n} className="flex min-w-0 flex-col gap-0.5">
+            <ReceiptQuestionText text={question.question} />
+            <p
+              data-testid="chief-question-receipt-answer"
+              className={cn(
+                'm-0 text-ui leading-5 [overflow-wrap:anywhere] whitespace-pre-line',
+                answer === null ? 'text-(--text-tertiary)' : 'text-foreground',
+              )}
+            >
+              {answer ?? status}
+            </p>
           </div>
         );
       })}
-      {onCopy !== undefined && (
-        <MessageToolbar
-          placement="below-start"
-          testId="chief-msg-tools-touch"
-          stamp={null}
-          onCopy={() => onCopy(item.questions.map((question) => question.question).join('\n'))}
-        />
-      )}
     </div>
   );
 }

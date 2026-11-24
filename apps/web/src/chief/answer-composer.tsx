@@ -20,6 +20,8 @@ export interface AnswerComposerProps {
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   handleRef?: Ref<ComposerSurfaceHandle>;
   tab?: ReactNode;
+  beside?: ReactNode;
+  placeholder: string;
   above: ReactNode;
   context?: ChiefContextUsage | undefined;
   running?: boolean | undefined;
@@ -36,6 +38,8 @@ export function AnswerComposer({
   composerRef,
   handleRef,
   tab,
+  beside,
+  placeholder,
   above,
   context,
   running,
@@ -57,17 +61,18 @@ export function AnswerComposer({
     onAttachment === undefined
       ? undefined
       : async (files: File[]) => {
-          questionDockState.beginUpload();
+          const draftKey = draftKeyOfAnswer(answerKey);
+          questionDockState.beginUpload(draftKey);
           try {
             const tokens = await onAttachment(files);
             if (aliveRef.current) return tokens;
-            if (tokens.length > 0 && !questionDockState.isClosed(draftKeyOfAnswer(answerKey))) {
+            if (tokens.length > 0 && !questionDockState.isClosed(draftKey)) {
               const current = splitDraft(answerStore.get(answerKey));
               answerStore.set(answerKey, joinDraft([...current.tokens, ...tokens], current.text));
             }
             return [];
           } finally {
-            questionDockState.endUpload();
+            questionDockState.endUpload(draftKey);
           }
         };
   const primary = active ? questionDockState.primary() : null;
@@ -89,9 +94,10 @@ export function AnswerComposer({
       active={active}
       onFocusEnter={onFocusEnter}
       onFocusLeave={onFocusLeave}
-      placeholder={t('输入你自己的回答…')}
+      placeholder={placeholder}
       composerRef={composerRef}
       tab={tab}
+      beside={beside}
       above={above}
       context={context}
       running={running}

@@ -13,6 +13,7 @@ const JUMP_BTN_CLS =
 export function JumpToLatestButton({
   label,
   threshold = JUMP_THRESHOLD,
+  followAfterClick = true,
   className,
   children,
   variant = 'secondary',
@@ -20,6 +21,7 @@ export function JumpToLatestButton({
   ...props
 }: {
   threshold?: number;
+  followAfterClick?: boolean;
   className?: string;
   children?: React.ReactNode;
   variant?: React.ComponentProps<typeof Button>['variant'];
@@ -88,7 +90,7 @@ export function JumpToLatestButton({
             props.onClick?.(e);
             if (e.defaultPrevented) return;
             e.currentTarget.blur();
-            followingRef.current = true;
+            followingRef.current = followAfterClick;
             scrollToEnd({ behavior: 'instant' });
           }}
         />

@@ -10,7 +10,7 @@ export type UseScrollFadeOptions = {
 
 type FadeSide = 'top' | 'bottom' | 'left' | 'right';
 
-function readFadeSize(el: HTMLElement, side: FadeSide, override?: number): number {
+export function readScrollFadeSize(el: HTMLElement, side: FadeSide, override?: number): number {
   if (override != null) return override;
   const style = getComputedStyle(el);
   for (const name of [`--scroll-fade-size-${side}`, '--scroll-fade-size']) {
@@ -44,7 +44,7 @@ export function useScrollFade(
   const sync = useCallback(() => {
     const el = ref.current;
     if (!el) return;
-    const size = (side: FadeSide) => readFadeSize(el, side, fadeSize);
+    const size = (side: FadeSide) => readScrollFadeSize(el, side, fadeSize);
 
     if (orientation === 'vertical' || orientation === 'both') {
       const { scrollTop, scrollHeight, clientHeight } = el;

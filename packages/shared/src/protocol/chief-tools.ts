@@ -35,6 +35,7 @@ export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'needs_you',
   'notify_user',
   'ask_user',
+  'withdraw_question',
   'request_secret',
   'memories',
   'attachment',
@@ -74,6 +75,7 @@ export const CHIEF_TOOLS_ADDED = [
   'archive_todos',
   'unarchive_todos',
   'inspect_run',
+  'withdraw_question',
 ] as const;
 
 export const CHIEF_TOOL_CATEGORIES = {
@@ -118,6 +120,7 @@ export const CHIEF_TOOL_CATEGORIES = {
   execute: ['cancel_builds', 'merge_builds'],
   private: [
     'ask_user',
+    'withdraw_question',
     'notify_user',
     'save_memory',
     'update_memory',
@@ -335,6 +338,48 @@ export const COORDINATOR_MEMORY_REMOTE_TOOLS: readonly RemoteToolDef[] =
       ? { ...tool, description: COORDINATOR_UPDATE_MEMORY_DESCRIPTION }
       : tool,
   );
+
+export const WORKER_ASK_USER_TOOL: RemoteToolDef = {
+  name: 'ask_user',
+  description:
+    'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). The user states needs and makes architecture decisions; research and decide everything else yourself. Do not ask for facts you can find in the code, the docs or by research, or for implementation details. Ask only for real decisions: an ambiguous need, architecture or product direction, reversing a recorded decision, payments, credentials, irreversible or external actions, or what a team, project or repository rule routes to a person. Batch them into one call instead of asking one at a time; give each the evidence in its description and mark the option you recommend. Every card already offers a free-text answer, so list only real choices.',
+  parameters: obj(
+    {
+      questions: arr(
+        obj(
+          {
+            header: str('Short label of the question block (<= 24 chars).'),
+            question: str('The question text.'),
+            options: arr(
+              obj(
+                {
+                  label: str('Choice label shown as a button.'),
+                  description: str('Optional one-line hint under the label.'),
+                  recommended: {
+                    type: 'boolean',
+                    description:
+                      'Mark the one option you recommend; the card shows it first, labelled Recommended.',
+                  },
+                },
+                ['label'],
+              ),
+              'Answer choices; empty array = free-text answer.',
+            ),
+            multiSelect: {
+              type: 'boolean',
+              description:
+                'Allow multiple choices (default single). Ignored for free-text questions.',
+            },
+          },
+          ['header', 'question', 'options'],
+        ),
+        'Questions to ask in this call (1-4); each renders one block on the card.',
+      ),
+      provenance: str(PROVENANCE_PARAM),
+    },
+    ['questions'],
+  ),
+};
 
 export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   {
@@ -769,44 +814,21 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
     parameters: obj({ buildIds: idArr('Build ids to merge.') }, ['buildIds']),
   },
   {
-    name: 'ask_user',
+    ...WORKER_ASK_USER_TOOL,
+    description: `${WORKER_ASK_USER_TOOL.description} If a later turn settles a question you already asked — research answered it, or a delivered result removed the need — withdraw it with withdraw_question and a one-line reason so it stops waiting on the user.`,
+  },
+  {
+    name: 'withdraw_question',
+    replaySafe: true,
     description:
-      'Ask the user structured questions and block this turn until they answer a question card (same turn continues with their choices as the tool result). The user states needs and makes architecture decisions; research and decide everything else yourself. Do not ask for facts you can find in the code, the docs or by research, or for implementation details. Ask only for real decisions: an ambiguous need, architecture or product direction, reversing a recorded decision, payments, credentials, irreversible or external actions, or what a team, project or repository rule routes to a person. Batch them into one call instead of asking one at a time; give each the evidence in its description and mark the option you recommend. Every card already offers a free-text answer, so list only real choices.',
+      'Withdraw a question card you asked earlier with ask_user when it is no longer needed — research settled it, or a delivered result removed the choice. The card turns into a receipt showing your reason and can no longer be answered. Pass the requestId that ask_user returned. In event turns ([wake:…]) pass the provenance from the prompt, same as ask_user.',
     parameters: obj(
       {
-        questions: arr(
-          obj(
-            {
-              header: str('Short label of the question block (<= 24 chars).'),
-              question: str('The question text.'),
-              options: arr(
-                obj(
-                  {
-                    label: str('Choice label shown as a button.'),
-                    description: str('Optional one-line hint under the label.'),
-                    recommended: {
-                      type: 'boolean',
-                      description:
-                        'Mark the one option you recommend; the card shows it first, labelled Recommended.',
-                    },
-                  },
-                  ['label'],
-                ),
-                'Answer choices; empty array = free-text answer.',
-              ),
-              multiSelect: {
-                type: 'boolean',
-                description:
-                  'Allow multiple choices (default single). Ignored for free-text questions.',
-              },
-            },
-            ['header', 'question', 'options'],
-          ),
-          'Questions to ask in this call (1-4); each renders one block on the card.',
-        ),
+        requestId: str('The requestId ask_user returned for the card to withdraw.'),
+        reason: str('One short line for the receipt, saying why the answer is no longer needed.'),
         provenance: str(PROVENANCE_PARAM),
       },
-      ['questions'],
+      ['requestId', 'reason'],
     ),
   },
   {
@@ -856,7 +878,7 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
 ];
 
-export const CHIEF_TOOL_COUNT = 47;
+export const CHIEF_TOOL_COUNT = 48;
 
 export const CHIEF_ROUTER_TOOL_NAMES = [
   'open_thread',
@@ -1107,10 +1129,6 @@ const WORKER_SCHEDULE_TOOLS: readonly RemoteToolDef[] = [
     ),
   },
 ];
-
-export const WORKER_ASK_USER_TOOL: RemoteToolDef = CHIEF_REMOTE_TOOLS.find(
-  (t) => t.name === 'ask_user',
-) as RemoteToolDef;
 
 export const WORKER_THREAD_REPORT_TOOL: RemoteToolDef = {
   name: 'thread_report',

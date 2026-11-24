@@ -263,7 +263,12 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       answerCard(teamId, threadId, requestId, proposalId, 'refuse', c);
       return c.json({ ok: true as const });
     }
-    cancelQuestion(svc, { threadId, requestId, reason: '用户取消了本次提问' });
+    cancelQuestion(svc, {
+      threadId,
+      requestId,
+      reason: '用户取消了本次提问',
+      cancelledBy: 'person',
+    });
     return c.json({ ok: true as const });
   });
 

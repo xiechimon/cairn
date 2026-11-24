@@ -159,37 +159,11 @@ test('clicking a chip sends exactly its text as an owner message and the chips g
   await expect(page.getByTestId('home-c').getByTestId('chief-composer-input')).toHaveValue('');
 });
 
-test('a pending question hides the suggested replies: the question chips win', async ({ page }) => {
+test('a pending question hides the suggested replies: the question card wins', async ({ page }) => {
   await mockLive(page, state({ messages: [...TURN, pendingQuestion] }));
   await page.goto('/app');
-  await expect(page.getByTestId('chief-stream').getByTestId('chief-question-chips')).toBeVisible();
+  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question-chips')).toBeVisible();
   await expect(page.getByTestId('chief-quick-replies')).toHaveCount(0);
-});
-
-test('question chips and suggested-reply chips share one look', async ({ page }) => {
-  const look = (locator: ReturnType<Page['locator']>) =>
-    locator.evaluate((el) => {
-      const style = getComputedStyle(el);
-      return [
-        style.height,
-        style.borderTopWidth,
-        style.borderTopColor,
-        style.borderTopLeftRadius,
-        style.backgroundColor,
-        style.fontSize,
-        style.fontWeight,
-        style.color,
-        style.paddingLeft,
-      ].join(' ');
-    });
-  await mockLive(page, state());
-  await page.goto('/app');
-  const reply = await look(chips(page).first());
-  await mockLive(page, state({ messages: [...TURN, pendingQuestion] }));
-  await page.goto('/app');
-  const option = page.getByTestId('chief-question-option-0-0');
-  await expect(option).toBeVisible();
-  expect(await look(option)).toBe(reply);
 });
 
 const STREAM = `/api/conversations/${THREAD.id}/stream`;

@@ -36,10 +36,12 @@ const REPORT_OPEN_TOOLS = new Set([
   'projects',
   'docs',
   'notify_user',
+  'withdraw_question',
 ]);
 const REPORT_REF_TOOLS = new Set([
   'attachment',
   'notify_user',
+  'withdraw_question',
   'complete_todos',
   'archive_todos',
   'message_thread',

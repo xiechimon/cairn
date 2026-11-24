@@ -1,5 +1,6 @@
 import {
   defaultRangeExtractor,
+  measureElement,
   type Range,
   type Rect,
   useVirtualizer,
@@ -18,6 +19,7 @@ import {
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
+import { readScrollFadeSize } from '../hooks/use-scroll-fade.js';
 import { safeSessionStorage } from '../safe-storage.js';
 import { useReaderLeft } from './reader-follow.js';
 
@@ -63,20 +65,30 @@ function saveSnapshot(cacheKey: string, snapshot: StreamSnapshot): void {
   } catch {}
 }
 
+export interface VirtualStreamScrollTarget {
+  index: number;
+  onMounted: (node: HTMLElement) => void;
+}
+
 export function VirtualStream({
   cacheKey,
   keys,
   renderRow,
   viewportRef,
+  scrollTarget,
 }: {
   cacheKey: string;
   keys: readonly (string | number)[];
   renderRow: (index: number) => ReactNode;
   viewportRef: RefObject<HTMLDivElement | null>;
+  scrollTarget?: VirtualStreamScrollTarget;
 }) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const [restored] = useState(() => readSnapshot(cacheKey));
   const [scrollMargin, setScrollMargin] = useState(restored?.scrollMargin ?? 0);
+  const scrollPaddingStart = useRef(0);
+  const [observedSizes] = useState(() => new WeakMap<Element, number>());
+  const scheduleReadBack = useRef<(() => void) | null>(null);
   const { end } = useMessageScrollerScrollable();
   const { scrollToEnd } = useMessageScroller();
   const readerLeft = useReaderLeft();
@@ -84,15 +96,24 @@ export function VirtualStream({
     count: keys.length,
     getScrollElement: () => viewportRef.current,
     estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    measureElement: (node, entry, instance) => {
+      const size = measureElement(node, entry, instance);
+      if (entry !== undefined) {
+        observedSizes.set(node, size);
+        scheduleReadBack.current?.();
+      }
+      return size;
+    },
     getItemKey: (index) => keys[index] ?? index,
     overscan: OVERSCAN,
     rangeExtractor: keepNewestRowMounted,
     anchorTo: 'end',
-    initialOffset: Number.MAX_SAFE_INTEGER,
+    initialOffset: readerLeft ? 0 : Number.MAX_SAFE_INTEGER,
     initialMeasurementsCache: restored?.items ?? [],
     ...(restored?.rect != null ? { initialRect: restored.rect } : {}),
     scrollEndThreshold: readerLeft ? -1 : FOLLOW_THRESHOLD,
     scrollMargin,
+    scrollPaddingStart: scrollPaddingStart.current,
   });
   const measureNewestRow = useCallback(
     (node: HTMLDivElement | null) => {
@@ -114,12 +135,6 @@ export function VirtualStream({
     );
     if (top !== scrollMargin) setScrollMargin(top);
   });
-  useLayoutEffect(() => {
-    const viewport = listRef.current?.closest<HTMLElement>(
-      '[data-slot="message-scroller-viewport"]',
-    );
-    if (viewport != null) viewport.scrollTop = viewport.scrollHeight;
-  }, []);
   useLayoutEffect(
     () => () => {
       saveSnapshot(cacheKey, {
@@ -130,11 +145,75 @@ export function VirtualStream({
     },
     [cacheKey, virtualizer],
   );
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (viewport === null || scrollTarget === undefined) return;
+    scrollPaddingStart.current = readScrollFadeSize(viewport, 'top');
+    virtualizer.setOptions({
+      ...virtualizer.options,
+      scrollPaddingStart: scrollPaddingStart.current,
+    });
+    const { index, onMounted } = scrollTarget;
+    let frame: number | null = null;
+    let previous: { node: HTMLElement; geometry: number[] } | null = null;
+    const schedule = () => {
+      frame ??= requestAnimationFrame(readBack);
+    };
+    const stop = () => {
+      scheduleReadBack.current = null;
+      viewport.removeEventListener('scroll', schedule);
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
+    const readBack = () => {
+      frame = null;
+      const items = virtualizer.getVirtualItems();
+      const target = items.find((item) => item.index === index);
+      const node = listRef.current?.querySelector<HTMLElement>(`[data-index="${index}"]`);
+      const [offset] = virtualizer.getOffsetForIndex(index, 'start') ?? [];
+      const { scrollTop } = viewport;
+      const { scrollOffset } = virtualizer;
+      const measured = items.every((item) => {
+        if (item.index > index) return true;
+        const element = virtualizer.elementsCache.get(item.key);
+        return element !== undefined && observedSizes.get(element) === item.size;
+      });
+      if (
+        target !== undefined &&
+        node != null &&
+        node === virtualizer.elementsCache.get(target.key) &&
+        measured &&
+        offset !== undefined &&
+        scrollOffset !== null &&
+        Math.abs(scrollTop - offset) <= 1 &&
+        Math.abs(scrollOffset - offset) <= 1
+      ) {
+        const geometry = [offset, scrollTop, scrollOffset, target.start, target.size];
+        if (
+          previous?.node === node &&
+          previous.geometry.every((value, i) => value === geometry[i])
+        ) {
+          stop();
+          onMounted(node);
+          return;
+        }
+        previous = { node, geometry };
+        schedule();
+      } else previous = null;
+    };
+    scheduleReadBack.current = schedule;
+    viewport.addEventListener('scroll', schedule, { passive: true });
+    virtualizer.scrollToIndex(index, { align: 'start' });
+    schedule();
+    return stop;
+  }, [observedSizes, scrollPaddingStart, scrollTarget, viewportRef, virtualizer]);
+  useLayoutEffect(() => {
+    scheduleReadBack.current?.();
+  });
   return (
     <div
       ref={listRef}
       data-testid="chief-virtual-rows"
-      className="relative w-full shrink-0"
+      className="relative w-full shrink-0 [overflow-anchor:none]"
       style={{ height: virtualizer.getTotalSize() }}
     >
       {virtualizer.getVirtualItems().map((item) => (

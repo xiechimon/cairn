@@ -339,12 +339,12 @@
       "id": "questions",
       "name": "Question cards",
       "summary": "Questions from the Coordinator or a thread appear as answerable cards above the composer, stay parked quietly, and keep per-question drafts.",
-      "states": "A question card sits above the composer with numbered options and a recommended one; it can be collapsed, answered later, or cancelled, and shows a line once answered.",
+      "states": "A question card sits above the composer with numbered options and the recommended one first; it pages between pending questions, collapses into the composer, answers or skips, and leaves a receipt in the transcript once answered.",
       "centrality": 1,
       "status": "shipped",
       "code": {
         "web": [
-          "apps/web/src/chief/question-chips.tsx",
+          "apps/web/src/chief/question-card.tsx",
           "apps/web/src/chief/chief-question.tsx",
           "apps/web/src/chief/question-lifecycle.ts"
         ],

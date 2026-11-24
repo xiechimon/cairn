@@ -1738,6 +1738,9 @@ export function askQuestionOfContent(content: unknown): {
   }[];
   answers: { header: string; choices?: string[]; text?: string }[] | null;
   todoId?: string;
+  parkedAt?: number;
+  cancelReason?: string;
+  cancelledBy?: 'person' | 'coordinator';
 } | null {
   let parsed: unknown = content;
   if (typeof content === 'string') {
@@ -1761,6 +1764,9 @@ export function askQuestionOfContent(content: unknown): {
     status: row.data.status,
     questions: row.data.questions,
     answers: row.data.answers,
+    ...(row.data.parkedAt !== undefined ? { parkedAt: row.data.parkedAt } : {}),
+    ...(row.data.cancelReason !== undefined ? { cancelReason: row.data.cancelReason } : {}),
+    ...(row.data.cancelledBy !== undefined ? { cancelledBy: row.data.cancelledBy } : {}),
     ...(row.data.provenance?.startsWith(WATCH_PROVENANCE_PREFIX)
       ? { todoId: row.data.provenance.slice(WATCH_PROVENANCE_PREFIX.length) }
       : {}),
@@ -2147,6 +2153,9 @@ function collectChiefStream(
         questions: ask.questions,
         answers: ask.answers,
         ...(ask.todoId !== undefined ? { todoId: ask.todoId } : {}),
+        ...(ask.parkedAt !== undefined ? { parkedAt: ask.parkedAt } : {}),
+        ...(ask.cancelReason !== undefined ? { cancelReason: ask.cancelReason } : {}),
+        ...(ask.cancelledBy !== undefined ? { cancelledBy: ask.cancelledBy } : {}),
       });
       continue;
     }

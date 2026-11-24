@@ -16,10 +16,13 @@ const listeners = new Set<Listener>();
 let version = 0;
 let primary: QuestionPrimary | null = null;
 let focusIndex = 0;
-let uploads = 0;
-let reveals = 0;
+const uploads = new Map<string, number>();
+let approvalReveal: { requestId: string } | null = null;
 const answers = new Map<string, string>();
 const closed = new Set<string>();
+const collapsed = new Set<string>();
+let focusRowRequest: string | null = null;
+let scrollToRequest: string | null = null;
 
 export function answerKeyOf(draftKey: string, step: number): string {
   return `${draftKey}#${step}`;
@@ -44,23 +47,28 @@ export const questionDockState = {
   snapshot(): number {
     return version;
   },
-  uploading(): boolean {
-    return uploads > 0;
+  uploading(draftKey?: string): boolean {
+    return draftKey === undefined ? uploads.size > 0 : uploads.has(draftKey);
   },
-  beginUpload(): void {
-    uploads += 1;
-    if (uploads === 1) emit();
+  beginUpload(draftKey: string): void {
+    const count = uploads.get(draftKey) ?? 0;
+    uploads.set(draftKey, count + 1);
+    if (count === 0) emit();
   },
-  endUpload(): void {
-    if (uploads === 0) return;
-    uploads -= 1;
-    if (uploads === 0) emit();
+  endUpload(draftKey: string): void {
+    const count = uploads.get(draftKey) ?? 0;
+    if (count === 0) return;
+    if (count > 1) uploads.set(draftKey, count - 1);
+    else {
+      uploads.delete(draftKey);
+      emit();
+    }
   },
   focus(): number {
     return focusIndex;
   },
   setFocus(next: number): void {
-    if (next === focusIndex || uploads > 0) return;
+    if (next === focusIndex || uploads.size > 0) return;
     focusIndex = next;
     emit();
   },
@@ -73,13 +81,40 @@ export const questionDockState = {
     else answers.set(key, text);
     emit();
   },
+  isCollapsed(requestId: string): boolean {
+    return collapsed.has(requestId);
+  },
+  collapse(requestId: string): void {
+    if (collapsed.has(requestId)) return;
+    collapsed.add(requestId);
+    emit();
+  },
+  expand(requestId: string, options: { focusRow: boolean }): void {
+    if (options.focusRow) focusRowRequest = requestId;
+    if (!collapsed.delete(requestId) && !options.focusRow) return;
+    emit();
+  },
+  takeFocusRow(requestId: string): boolean {
+    if (focusRowRequest !== requestId) return false;
+    focusRowRequest = null;
+    return true;
+  },
+  requestScrollTo(requestId: string): void {
+    scrollToRequest = requestId;
+    emit();
+  },
+  takeScrollTo(): string | null {
+    const request = scrollToRequest;
+    scrollToRequest = null;
+    return request;
+  },
   isClosed(draftKey: string): boolean {
     return closed.has(draftKey);
   },
   clearAnswers(draftKey: string): void {
     closed.add(draftKey);
     let changed = false;
-    for (const key of [...answers.keys()]) {
+    for (const key of answers.keys()) {
       if (!key.startsWith(`${draftKey}#`)) continue;
       answers.delete(key);
       changed = true;
@@ -102,11 +137,11 @@ export const questionDockState = {
     primary = null;
     emit();
   },
-  reveals(): number {
-    return reveals;
+  approvalReveal(): { requestId: string } | null {
+    return approvalReveal;
   },
-  reveal(): void {
-    reveals += 1;
+  revealApproval(requestId: string): void {
+    approvalReveal = { requestId };
     emit();
   },
   isDismissing(requestId: string): boolean {

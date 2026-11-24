@@ -1020,7 +1020,7 @@ export function wakeProvenance(wakeId: string): string {
 export function requireTurnProvenance(
   turnPrompt: string | null,
   given: unknown,
-  tool: 'notify_user' | 'ask_user',
+  tool: 'notify_user' | 'ask_user' | 'withdraw_question',
 ): string {
   if (parseChiefTrigger(turnPrompt) === 'user') return 'user';
   const expected = turnProvenance(turnPrompt);

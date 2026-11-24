@@ -65,7 +65,7 @@ import {
   taskLink,
 } from './chief.js';
 import { channelMessages, readHistory, searchHistory } from './chief-history.js';
-import { APPROVAL_CARD_ID_PREFIX } from './chief-question-store.js';
+import { APPROVAL_CARD_ID_PREFIX, cancelQuestion, readQuestion } from './chief-question-store.js';
 import {
   announceQuestion,
   askUserQuestionsOfParams,
@@ -1137,6 +1137,33 @@ export async function executeChiefTool(
         requestId,
         note: 'question card delivered; the blocking answer channel is POST /api/machine/ask (newer daemon builds relay it automatically)',
       });
+    }
+    case 'withdraw_question': {
+      requireTurnProvenance(ctx.turnPrompt ?? null, params.provenance, 'withdraw_question');
+      const requestId = str(params, 'requestId');
+      const reason = str(params, 'reason');
+      const existing = readQuestion(db, ctx.threadId, requestId);
+      if (existing === null) throw new HttpError(404, `question ${requestId}`);
+      const report = reportRefOfCall(turnPrompt, turnMessageIds, name, params);
+      if (
+        report !== null &&
+        (ctx.threadId !== report.threadId ||
+          (existing.provenance !== `watch:${report.todoId}` &&
+            existing.provenance !== `report:${report.todoId}`))
+      )
+        throw new HttpError(403, 'question does not belong to this report task');
+      if (existing.status !== 'pending') {
+        return json({
+          status: existing.status,
+          requestId,
+          note: 'the question was already settled; nothing was changed',
+        });
+      }
+      cancelQuestion(
+        { db, ...(deps.convHub !== undefined ? { convHub: deps.convHub } : {}) },
+        { threadId: ctx.threadId, requestId, reason, cancelledBy: 'coordinator' },
+      );
+      return json({ status: 'cancelled', requestId });
     }
     case 'notify_user': {
       const provenance = requireTurnProvenance(

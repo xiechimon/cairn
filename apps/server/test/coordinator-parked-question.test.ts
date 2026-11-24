@@ -1,14 +1,18 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
 import { chiefMessage, chiefThread, step as stepTable } from '../src/db/schema.js';
-import { ASK_PARKED_REASON, cancelPendingQuestions } from '../src/services/chief-question-store.js';
+import {
+  ACTION_PROPOSAL_CARD_MARKER,
+  ASK_PARKED_REASON,
+  cancelPendingQuestions,
+} from '../src/services/chief-question-store.js';
 import {
   ASK_PARK_MS,
   createOrGetQuestion,
   holdForQuestion,
 } from '../src/services/chief-questions.js';
 import { hasEarlierLiveChiefStep } from '../src/services/chief-turns.js';
-import { H, registerChiefHarness } from './chief-harness.js';
+import { H, registerChiefHarness, relay } from './chief-harness.js';
 import { postProject, req } from './helpers.js';
 
 registerChiefHarness();
@@ -54,14 +58,15 @@ function finishTurn(stepId: string) {
   H.s.db.update(chiefThread).set({ activeRun: null }).where(eq(chiefThread.id, H.threadId)).run();
 }
 
-function questionRow() {
-  const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, 'ask-q')).get();
+function questionRow(requestId = 'ask-q') {
+  const row = H.s.db.select().from(chiefMessage).where(eq(chiefMessage.id, requestId)).get();
   return {
     projectId: row?.projectId ?? null,
     content: JSON.parse(row?.content as string) as {
       status: string;
       parkedAt?: number;
       cancelReason?: string;
+      cancelledBy?: string;
     },
   };
 }
@@ -195,5 +200,80 @@ describe('ask_user parks instead of holding the one Coordinator thread', () => {
     expect(rewind.status).toBe(409);
     expect(((await rewind.json()) as { error: string }).error).toContain('waiting for an answer');
     expect(questionRow().content.status).toBe('pending');
+  });
+});
+
+describe('withdraw_question settles a question the Coordinator no longer needs', () => {
+  test('a still-pending question is cancelled with the reason and refuses a later answer', async () => {
+    await askFromProjectTurn(H.projectId, 0);
+    const out = (await relay('withdraw_question', {
+      requestId: 'ask-q',
+      reason: '调研已经回答了这个问题',
+    })) as { status: string; requestId: string };
+    expect(out).toEqual({ status: 'cancelled', requestId: 'ask-q' });
+    const stored = questionRow();
+    expect(stored.content.status).toBe('cancelled');
+    expect(stored.content.cancelReason).toBe('调研已经回答了这个问题');
+    expect(stored.content.cancelledBy).toBe('coordinator');
+    expect((await answer()).status).toBe(409);
+  });
+
+  test('a parked question withdraws the same way', async () => {
+    await askFromProjectTurn(H.projectId, ASK_PARK_MS + 1);
+    await holdForQuestion({ db: H.s.db }, { threadId: H.threadId, requestId: 'ask-q', holdMs: 0 });
+    expect(questionRow().content.parkedAt).toBeDefined();
+    const out = (await relay('withdraw_question', {
+      requestId: 'ask-q',
+      reason: '不需要了',
+    })) as { status: string };
+    expect(out.status).toBe('cancelled');
+    expect(questionRow().content).toMatchObject({
+      status: 'cancelled',
+      cancelReason: '不需要了',
+      cancelledBy: 'coordinator',
+    });
+    expect((await answer()).status).toBe(409);
+  });
+
+  test('unknown requestId, an approval card and an already settled question each fail their own way', async () => {
+    await askFromProjectTurn(H.projectId, 0);
+    createOrGetQuestion(
+      { db: H.s.db },
+      {
+        threadId: H.threadId,
+        requestId: 'approval-card-1',
+        questions: QUESTIONS,
+        askedFor: [`${ACTION_PROPOSAL_CARD_MARKER}proposal-1`],
+      },
+    );
+    await expect(
+      relay('withdraw_question', { requestId: 'ask-missing', reason: 'x' }),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      relay('withdraw_question', { requestId: 'approval-card-1', reason: 'x' }),
+    ).rejects.toMatchObject({ status: 403 });
+    expect(questionRow('approval-card-1').content.status).toBe('pending');
+    expect((await answer()).status).toBe(200);
+    const settled = (await relay('withdraw_question', {
+      requestId: 'ask-q',
+      reason: 'x',
+    })) as { status: string };
+    expect(settled.status).toBe('answered');
+    expect(questionRow().content.status).toBe('answered');
+  });
+
+  test('an event turn withdraws only with the provenance of the event that started it', async () => {
+    await askFromProjectTurn(H.projectId, 0);
+    const turnPrompt = '[wake:settle] provenance=watch:todo-1\n调研回来了';
+    await expect(
+      relay('withdraw_question', { requestId: 'ask-q', reason: '已查明' }, { turnPrompt }),
+    ).rejects.toMatchObject({ status: 400 });
+    const out = (await relay(
+      'withdraw_question',
+      { requestId: 'ask-q', reason: '已查明', provenance: 'watch:todo-1' },
+      { turnPrompt },
+    )) as { status: string };
+    expect(out.status).toBe('cancelled');
+    expect(questionRow().content.cancelledBy).toBe('coordinator');
   });
 });

@@ -64,10 +64,11 @@ test('two pending decisions are answered one at a time above the composer; the r
   await expect(panel).toHaveAccessibleName('待回答的提问');
   await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Claude subscription');
   await expect(card.getByTestId('chief-question-option-0-0')).toHaveAttribute('data-recommended', '');
-  await expect(card.getByTestId('chief-question-option-0-0')).toHaveAccessibleDescription('推荐 · Verified');
+  await expect(card.getByTestId('chief-question-option-0-0')).toContainText('推荐');
+  await expect(card.getByTestId('chief-question-option-0-0')).toContainText('Verified');
   await expect(card.getByTestId('chief-question-option-0-1')).toContainText('wokey');
   await expect(card.getByTestId('chief-question-other-0')).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '输入你自己的回答…');
+  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
   await card.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(1);
   expect(answered[0]).toEqual({

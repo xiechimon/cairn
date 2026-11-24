@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import type { ChiefStreamItem } from '../src/fixtures/records.js';
-import { answerLines, awaitingStream } from '../src/chief/question-lifecycle.js';
+import { answerOf, awaitingStream } from '../src/chief/question-lifecycle.js';
 
 type Question = Extract<ChiefStreamItem, { kind: 'question' }>;
 
@@ -40,12 +40,12 @@ describe('a pending question stops the conversation saying it is working', () =>
   });
 });
 
-describe('the answered question becomes the lines of one owner bubble', () => {
-  test('a chosen option is the one line', () => {
-    expect(answerLines(question())).toEqual(['After CI is green']);
+describe('the receipt shows each answer under its question', () => {
+  test('a chosen option is the answer', () => {
+    expect(answerOf(question(), 0)).toBe('After CI is green');
   });
 
-  test('several questions give one line each, free text counts', () => {
+  test('several questions give one answer each, choices joined, free text counts', () => {
     const item = question({
       questions: [
         { header: 'A', question: 'a?', options: [{ label: 'x' }] },
@@ -56,16 +56,16 @@ describe('the answered question becomes the lines of one owner bubble', () => {
         { header: 'B', text: 'later' },
       ],
     });
-    expect(answerLines(item)).toEqual(['x、y', 'later']);
+    expect([answerOf(item, 0), answerOf(item, 1)]).toEqual(['x、y', 'later']);
   });
 
-  test('missing or empty answers give no lines', () => {
-    expect(answerLines(question({ answers: null }))).toEqual([]);
-    expect(answerLines(question({ answers: [{ header: 'Merge' }] }))).toEqual([]);
+  test('missing or empty answers give none', () => {
+    expect(answerOf(question({ answers: null }), 0)).toBeNull();
+    expect(answerOf(question({ answers: [{ header: 'Merge' }] }), 0)).toBeNull();
   });
 
-  test('a pending or cancelled question gives no lines, whatever it holds', () => {
-    expect(answerLines(question({ status: 'pending' }))).toEqual([]);
-    expect(answerLines(question({ status: 'cancelled' }))).toEqual([]);
+  test('a pending or cancelled question gives none, whatever it holds', () => {
+    expect(answerOf(question({ status: 'pending' }), 0)).toBeNull();
+    expect(answerOf(question({ status: 'cancelled' }), 0)).toBeNull();
   });
 });

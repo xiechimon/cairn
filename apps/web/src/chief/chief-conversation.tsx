@@ -50,6 +50,7 @@ import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
+import { readScrollFadeSize } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { ArrowDown, Check } from '../icons/index.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
@@ -57,6 +58,7 @@ import { useFileDrop } from '../overlay/file-drop.js';
 import type { MentionGroups } from '../overlay/mention-token.js';
 import { useServerDraft } from '../overlay/use-server-draft.js';
 import { AnswerComposer } from './answer-composer.js';
+import { isApprovalRequest } from './approval-card-model.js';
 import { type BubbleRun, bubbleRuns } from './bubble-runs.js';
 import { ChiefStreamRow, chiefStreamRowKey, chiefStreamRowKeys } from './chief-message-rows.js';
 import {
@@ -65,7 +67,14 @@ import {
   ChiefFallbackBanner,
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
-import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
+import {
+  ChiefQuestion,
+  ChiefQuestionDock,
+  QuestionRestoreButton,
+  useAnswerKey,
+  useDockedQuestion,
+  useQuestionPending,
+} from './chief-question.js';
 import {
   foldTaskCards,
   placeReportCards,
@@ -89,7 +98,7 @@ import { sideChatSeed } from './selection-reply-model.js';
 import { type GroupedRow, groupThreadEvents, type StreamRow } from './thread-activity.js';
 import { needsTimeDivider, timeDividerLabel } from './time-dividers.js';
 import { CardFailureContext, QueueWaitCard, TurnFailureCard } from './turn-failure.js';
-import { VirtualStream } from './virtual-stream.js';
+import { VirtualStream, type VirtualStreamScrollTarget } from './virtual-stream.js';
 
 const SCROLLER_ROOT_CLS = 'h-auto min-h-0 min-w-0 flex-1 overscroll-none';
 const SCROLLER_CONTENT_CLS =
@@ -115,7 +124,11 @@ function layoutStream(
   seen: Set<string>,
   reportSeen: Set<string>,
 ): StreamLayout {
-  const { rows: grouped, startedBy } = foldTaskCards(groupThreadEvents(list), glances);
+  const transcript = list.filter(
+    ({ item }) =>
+      !(item.kind === 'question' && item.status === 'pending' && isApprovalRequest(item.requestId)),
+  );
+  const { rows: grouped, startedBy } = foldTaskCards(groupThreadEvents(transcript), glances);
   let lastAt = previousAt;
   const dividers = grouped.map(({ item }) => {
     const at = 'createdAt' in item && typeof item.createdAt === 'number' ? item.createdAt : null;
@@ -156,7 +169,16 @@ export function ChiefFollowArmed({ onAtBottom }: { onAtBottom: (atBottom: boolea
 export function ChiefScrollProvider({ children }: { children: React.ReactNode }) {
   const [atBottom, setAtBottom] = useState(true);
   const [readerLeft, setReaderLeft] = useState(false);
-  const readerFollow = useMemo(() => ({ readerLeft, setReaderLeft }), [readerLeft]);
+  const readerFollow = useMemo(
+    () => ({
+      readerLeft,
+      setReaderLeft: (left: boolean) => {
+        if (!left) setAtBottom(true);
+        setReaderLeft(left);
+      },
+    }),
+    [readerLeft],
+  );
   return (
     <MessageScrollerProvider
       autoScroll={atBottom && !readerLeft}
@@ -286,8 +308,13 @@ export function ChiefConversation({
                   : CHIEF_INPUT_PLACEHOLDER_STEERING,
               )
             : (placeholder ?? t(CHIEF_INPUT_PLACEHOLDER)));
-  useSyncExternalStore(questionDockState.subscribe, questionDockState.snapshot, () => 0);
+  const dockTick = useSyncExternalStore(
+    questionDockState.subscribe,
+    questionDockState.snapshot,
+    () => 0,
+  );
   const answerKey = useAnswerKey();
+  const docked = useDockedQuestion();
   const [threadOverride, setThreadOverride] = useState(false);
   const mode = composerMode({
     questionPending: answerKey !== null,
@@ -299,9 +326,23 @@ export function ChiefConversation({
   const todosQ = useTodos(teamId, live);
   const onAttachment =
     onSend != null ? (files: File[]) => uploadMessageAttachments(files, t) : undefined;
-  const { scrollToEnd } = useMessageScroller();
+  const { scrollToEnd, scrollToMessage } = useMessageScroller();
   const reader = useReaderFollow();
   const followSentRef = useRef(false);
+  const [questionScroll, setQuestionScroll] = useState<{
+    requestId: string;
+    threadId: string | undefined;
+  } | null>(null);
+  useEffect(() => {
+    const requestId = questionDockState.takeScrollTo();
+    if (requestId === null) {
+      setQuestionScroll((current) => (current?.threadId === chief.threadId ? current : null));
+      return;
+    }
+    followSentRef.current = false;
+    reader.pause();
+    setQuestionScroll({ requestId, threadId: chief.threadId });
+  }, [dockTick, chief.threadId, reader]);
   const [enteringKey, setEnteringKey] = useState<string | number | null>(null);
   const latestUserKeyRef = useRef<string | number | null>(null);
   const userKeyAtSendRef = useRef<string | number | null>(null);
@@ -642,6 +683,54 @@ export function ChiefConversation({
       layoutStream(rows.slice(dayEarlier), glances, before.lastAt, seen, reportSeen),
     ] as const;
   }, [rows, glances, dayEarlier]);
+  const questionJump = useMemo(() => {
+    if (questionScroll === null || questionScroll.threadId !== chief.threadId) return null;
+    const grouped =
+      day == null ? streamLayout.grouped : [...earlierLayout.grouped, ...streamLayout.grouped];
+    const index = grouped.findIndex(
+      ({ item }) =>
+        item.kind === 'question' &&
+        item.status === 'pending' &&
+        item.requestId === questionScroll.requestId,
+    );
+    const item = grouped[index]?.item;
+    return item?.kind === 'question' && item.id !== undefined
+      ? { index, messageId: item.id }
+      : null;
+  }, [questionScroll, chief.threadId, day, earlierLayout, streamLayout]);
+  const focusQuestion = useCallback(
+    (node: HTMLElement) => {
+      const option = node.querySelector<HTMLElement>('[data-question-row]');
+      if (option === null) return;
+      option.focus({ preventScroll: true });
+      const viewport = viewportRef.current;
+      if (
+        viewport !== null &&
+        viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 1
+      )
+        reader.follow();
+      setQuestionScroll((current) => (current === questionScroll ? null : current));
+    },
+    [questionScroll, reader],
+  );
+  const questionIndex = questionJump?.index;
+  const questionScrollTarget = useMemo<VirtualStreamScrollTarget | undefined>(
+    () =>
+      questionIndex === undefined ? undefined : { index: questionIndex, onMounted: focusQuestion },
+    [questionIndex, focusQuestion],
+  );
+  useLayoutEffect(() => {
+    const viewport = viewportRef.current;
+    if (day == null || questionJump === null || questionScroll === null || viewport === null)
+      return;
+    const node = [...viewport.querySelectorAll<HTMLElement>('[data-request-id]')].find(
+      (candidate) => candidate.dataset.requestId === questionScroll.requestId,
+    );
+    if (node === undefined) return;
+    const scrollMargin = readScrollFadeSize(viewport, 'top');
+    if (scrollToMessage(questionJump.messageId, { align: 'start', scrollMargin }))
+      focusQuestion(node);
+  }, [day, questionJump, questionScroll, scrollToMessage, focusQuestion]);
   const sideChatFor = useCallback(
     (sourceMessageId: string) => {
       if (openThreadId !== null) return openThreadId;
@@ -792,6 +881,7 @@ export function ChiefConversation({
                           keys={streamLayout.keys}
                           renderRow={(n) => streamEntry(streamLayout, n)}
                           viewportRef={viewportRef}
+                          scrollTarget={questionScrollTarget}
                         />
                       ) : (
                         <>
@@ -808,7 +898,11 @@ export function ChiefConversation({
                 </TodoGlanceContext.Provider>
               </MessageScrollerContent>
             </FadeScrollerViewport>
-            <JumpToLatestButton label={t('滚动到最新')} onClick={reader.follow}>
+            <JumpToLatestButton
+              label={t('滚动到最新')}
+              followAfterClick={false}
+              onClick={reader.follow}
+            >
               <ArrowDown width={20} height={20} />
             </JumpToLatestButton>
             {earlier != null && (
@@ -860,6 +954,9 @@ export function ChiefConversation({
         data-testid="chief-composer-block"
         className="group/composer flex max-h-[65%] min-h-0 flex-none flex-col"
       >
+        {composerReplacement == null && (
+          <ChiefQuestionDock onCollapsed={() => answerSurfaceRef.current?.focus()} />
+        )}
         {composerReplacement ?? (
           <>
             <ComposerSurface
@@ -938,6 +1035,14 @@ export function ChiefConversation({
                 composerRef={answerActive ? composerRef : undefined}
                 tab={answerActive ? queueTab : null}
                 above={answerActive ? capsules : null}
+                beside={docked?.collapsed === true ? <QuestionRestoreButton /> : null}
+                placeholder={
+                  docked === null
+                    ? t('输入你自己的回答…')
+                    : docked.collapsed
+                      ? docked.question
+                      : t('或者直接回复…')
+                }
                 context={chief.context}
                 running={chief.running}
                 threadId={chief.threadId ?? null}

@@ -4,7 +4,7 @@ import type {
   ProjectRecord,
   TodoRecord as SharedTodoRecord,
 } from '@cairn/shared';
-import type { ChiefQuestionItem } from '../chief/question-chips.js';
+import type { ChiefQuestionItem } from '../chief/question-card.js';
 import type {
   ChangesContent,
   DocBlock,
@@ -394,6 +394,20 @@ export const QUESTION_CANCELLED: ChiefQuestionItem = {
   ...QUESTION_PENDING,
   requestId: 'req-3',
   status: 'cancelled',
+};
+
+export const QUESTION_PARKED: ChiefQuestionItem = {
+  ...QUESTION_PENDING,
+  requestId: 'req-4',
+  parkedAt: 1_700_000_000_000,
+};
+
+export const QUESTION_WITHDRAWN: ChiefQuestionItem = {
+  ...QUESTION_PENDING,
+  requestId: 'req-5',
+  status: 'cancelled',
+  cancelledBy: 'coordinator',
+  cancelReason: 'Research already settled this',
 };
 
 export const ISSUE_ECHO: GithubIssueEcho = {

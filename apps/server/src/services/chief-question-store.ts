@@ -135,7 +135,12 @@ export function publishQuestion(deps: StoreDeps, threadId: string, requestId: st
 
 export function cancelQuestion(
   deps: StoreDeps,
-  input: { threadId: string; requestId: string; reason: string },
+  input: {
+    threadId: string;
+    requestId: string;
+    reason: string;
+    cancelledBy?: 'person' | 'coordinator';
+  },
 ): void {
   const content = readQuestion(deps.db, input.threadId, input.requestId);
   if (content !== null && proposalIdOfCard(content) !== null) {
@@ -146,6 +151,7 @@ export function cancelQuestion(
     ...content,
     status: 'cancelled',
     cancelReason: input.reason,
+    ...(input.cancelledBy !== undefined ? { cancelledBy: input.cancelledBy } : {}),
   };
   writeQuestion(deps.db, input.threadId, input.requestId, next, nowMs());
   publishQuestion(deps, input.threadId, input.requestId);
