@@ -1,6 +1,6 @@
 {
   "format": 3,
-  "sourceBaseline": "9db46b2647420c105aae55c94af1f535beb6924a",
+  "sourceBaseline": "c03e2b2c2520b4bbade9d38cfaf313a0a97a52b9",
   "foreignKeys": {
     "composer_draft": [[["teamId"],"team",["id"]],[["userId"],"user",["id"]]],
     "computer": [[["teamId"],"team",["id"]],[["machineId"],"machine",["id"]]],
@@ -155,6 +155,7 @@
     {"table":"api_key","symbol":"apiKey"},
     {"table":"paired_device","symbol":"pairedDevice"},
     {"table":"pairing_grant","symbol":"pairingGrant"},
+    {"table":"pairing_request","symbol":"pairingRequest"},
     {"table":"browser_session","symbol":"browserSession"},
     {"table":"machine","symbol":"machine"},
     {"table":"thread_pr","symbol":"threadPr"},
@@ -233,6 +234,7 @@
   "admission": [
     {"id":"owner-listener","paths":["apps/server/src/lib/token-auth.ts","apps/server/src/lib/owner-channel.ts","apps/server/src/routes-core.ts"],"issuer":"Provisioned installation owner and team","root":"owner-listener","operation":"owner-listener","handle":"not-issued-by-a-team-scope-on-baseline","postAwaitCheck":"Owner and existing local-mode surfaces only; identity cookie has no authority","effect":"Owner and existing local-mode surfaces only; identity cookie has no authority","acceptance":["authorized-and-compatible","wrong-installation-or-team","wrong-purpose-or-resource","expired-or-revoked","no-effects-on-rejection"],"behaviorEvidence":"not-run"},
     {"id":"pairing-grant","paths":["apps/server/src/routes-remote.ts","apps/server/src/services/paired-devices.ts"],"issuer":"Grant issuer and installation","root":"pairing-grant","operation":"pairing-grant","handle":"not-issued-by-a-team-scope-on-baseline","postAwaitCheck":"Match before capacity checks; consume and create device and session atomically","effect":"Match before capacity checks; consume and create device and session atomically","acceptance":["authorized-and-compatible","wrong-installation-or-team","wrong-purpose-or-resource","expired-or-revoked","no-effects-on-rejection"],"behaviorEvidence":"not-run"},
+    {"id":"pairing-request","paths":["apps/server/src/routes-remote.ts","apps/server/src/services/pairing-requests.ts"],"issuer":"Requesting peer, installation and approving owner","root":"pairing-request","operation":"pairing-request","handle":"not-issued-by-a-team-scope-on-baseline","postAwaitCheck":"Match installation, secret and pending/approved state before capacity checks; consume and create device and session atomically","effect":"Match installation, secret and pending/approved state before capacity checks; consume and create device and session atomically","acceptance":["authorized-and-compatible","wrong-installation-or-team","wrong-purpose-or-resource","expired-or-revoked","no-effects-on-rejection"],"behaviorEvidence":"not-run"},
     {"id":"paired-device","paths":["apps/server/src/app.ts","apps/server/src/services/paired-devices.ts"],"issuer":"Live device and listener","root":"paired-device","operation":"paired-device","handle":"not-issued-by-a-team-scope-on-baseline","postAwaitCheck":"Update presence only after admission; retire streams and exact push targets","effect":"Update presence only after admission; retire streams and exact push targets","acceptance":["authorized-and-compatible","wrong-installation-or-team","wrong-purpose-or-resource","expired-or-revoked","no-effects-on-rejection"],"behaviorEvidence":"not-run"},
     {"id":"browser-session","paths":["apps/server/src/routes-core.ts","apps/server/src/services/browser-session.ts","apps/server/src/lib/cloudflare-access.ts"],"issuer":"Local owner or verified external exchange","root":"browser-session","operation":"browser-session","handle":"not-issued-by-a-team-scope-on-baseline","postAwaitCheck":"Match full session binding and expiry; preserve same-origin","effect":"Match full session binding and expiry; preserve same-origin","acceptance":["authorized-and-compatible","wrong-installation-or-team","wrong-purpose-or-resource","expired-or-revoked","no-effects-on-rejection"],"behaviorEvidence":"not-run"},
     {"id":"stream-ticket","paths":["apps/server/src/routes-core.ts","apps/server/src/services/browser-session.ts"],"issuer":"Admitted principal and current credential epoch","root":"stream-ticket","operation":"stream-ticket","handle":"not-issued-by-a-team-scope-on-baseline","postAwaitCheck":"Single-use stream-only lease; recheck subscription changes","effect":"Single-use stream-only lease; recheck subscription changes","acceptance":["authorized-and-compatible","wrong-installation-or-team","wrong-purpose-or-resource","expired-or-revoked","no-effects-on-rejection"],"behaviorEvidence":"not-run"},

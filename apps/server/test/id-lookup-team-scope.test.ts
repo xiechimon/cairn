@@ -1,3 +1,4 @@
+import { BROWSER_AUTH_HEADER } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -6,6 +7,7 @@ import {
   machine,
   pairedDevice,
   pairingGrant,
+  pairingRequest,
   phone,
   plan,
   schedule,
@@ -629,6 +631,88 @@ describe('listener credential admission', () => {
     const rows = (await list.json()) as { id: string }[];
     expect(rows.map(({ id }) => id)).toContain(own);
     expect(rows.map(({ id }) => id)).not.toContain(foreign);
+  });
+
+  it('creates, lists, approves and claims a pairing request on its issuing listener', async () => {
+    const { b, db } = world;
+    const created = await fixtureRequest(b.server, 'POST', '/api/remote/pair/request', {
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      body: { name: 'authorized fixture' },
+    });
+    expect(created.status).toBe(201);
+    const { id, secret } = (await created.json()) as { id: string; secret: string };
+    const listed = await asOwner(b, 'GET', '/api/remote/pairing-requests');
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toContainEqual(expect.objectContaining({ id }));
+
+    const approved = await asOwner(b, 'POST', `/api/remote/pairing-requests/${id}/approve`);
+    expect(approved.status).toBe(200);
+    const claimed = await fixtureRequest(b.server, 'POST', '/api/remote/pair/claim', {
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      body: { id, secret },
+    });
+    expect(claimed.status).toBe(200);
+    const { status, deviceId } = (await claimed.json()) as { status: string; deviceId: string };
+    expect(status).toBe('approved');
+    expect(db.select().from(pairedDevice).where(eq(pairedDevice.id, deviceId)).get()?.teamId).toBe(
+      b.teamId,
+    );
+    const replay = await fixtureRequest(b.server, 'POST', '/api/remote/pair/claim', {
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      body: { id, secret },
+    });
+    expect(replay.status).toBe(404);
+  });
+
+  it.fails('pairing request list leaks foreign requests', async () => {
+    const { a, b } = world;
+    const createdA = await fixtureRequest(a.server, 'POST', '/api/remote/pair/request', {
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      body: { name: 'device-a' },
+    });
+    const createdB = await fixtureRequest(b.server, 'POST', '/api/remote/pair/request', {
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      body: { name: 'device-b' },
+    });
+    const { id: own } = (await createdA.json()) as { id: string };
+    const { id: foreign } = (await createdB.json()) as { id: string };
+    const list = await asOwner(a, 'GET', '/api/remote/pairing-requests');
+    expect(list.status).toBe(200);
+    const rows = (await list.json()) as { id: string }[];
+    expect(rows.map(({ id }) => id)).toContain(own);
+    expect(rows.map(({ id }) => id)).not.toContain(foreign);
+  });
+
+  it.fails('foreign pairing request is decided and claimed on the wrong listener', async () => {
+    const { a, b, db } = world;
+    const created = await fixtureRequest(b.server, 'POST', '/api/remote/pair/request', {
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      body: { name: 'authorized fixture' },
+    });
+    expect(created.status).toBe(201);
+    const { id, secret } = (await created.json()) as { id: string; secret: string };
+    const current = () => db.select().from(pairingRequest).where(eq(pairingRequest.id, id)).get();
+    const before = current();
+    const devices = db.select().from(pairedDevice).all();
+    const sessions = db.select().from(browserSession).all();
+    const foreignApprove = await asOwner(a, 'POST', `/api/remote/pairing-requests/${id}/approve`);
+    const foreignClaim = await fixtureRequest(a.server, 'POST', '/api/remote/pair/claim', {
+      headers: { [BROWSER_AUTH_HEADER]: '1' },
+      body: { id, secret },
+    });
+    expect({
+      approve: foreignApprove.status,
+      claim: foreignClaim.status,
+      request: current(),
+      devices: db.select().from(pairedDevice).all(),
+      sessions: db.select().from(browserSession).all(),
+    }).toEqual({
+      approve: 404,
+      claim: 404,
+      request: before,
+      devices,
+      sessions,
+    });
   });
 
   it('keeps a stream ticket stream-only and single-use', async () => {
