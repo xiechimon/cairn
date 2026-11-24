@@ -421,7 +421,7 @@ function demoFixtureOf(): FixtureSet {
       },
       {
         kind: 'fail',
-        title: '执行失败',
+        label: '执行失败',
         body: 'dry-run 发现 2019 年前的订单缺 currency 字段，回填默认值与账务对不上，已停止迁移。',
         raw: 'pnpm migrate:dry\norders before 2019: 1284 rows missing currency, aborting\nexit code 1',
       },

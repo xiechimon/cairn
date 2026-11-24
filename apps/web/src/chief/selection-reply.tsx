@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { PanelRight, TextQuote } from 'lucide-react';
+import { TextQuote } from 'lucide-react';
 import {
   type KeyboardEvent as ReactKeyboardEvent,
   type RefObject,
@@ -58,17 +58,13 @@ function isEditable(node: EventTarget | null): boolean {
 export function SelectionReply({
   containerRef,
   enabled,
-  sideChatFor,
   onAddQuote,
   onSendQuote,
-  onAskSideChat,
 }: {
   containerRef: RefObject<HTMLElement | null>;
   enabled: boolean;
-  sideChatFor: (sourceMessageId: string) => string | null;
   onAddQuote: (draft: ReplyQuoteDraft, text: string) => void;
   onSendQuote: (draft: ReplyQuoteDraft, text: string) => void;
-  onAskSideChat: (todoId: string, quote: string) => void;
 }) {
   const { t } = useI18n();
   const [target, setTarget] = useState<Target | null>(null);
@@ -77,7 +73,6 @@ export function SelectionReply({
   const floatRef = useRef<HTMLDivElement | null>(null);
   const touchRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-  const sideChatTodo = target === null ? null : sideChatFor(target.sourceMessageId);
 
   const dismiss = useCallback(() => {
     containerRef.current?.ownerDocument.getSelection()?.removeAllRanges();
@@ -273,24 +268,6 @@ export function SelectionReply({
         data-source={target.sourceMessageId}
         className={PILL_CLS}
       >
-        {sideChatTodo !== null && (
-          <>
-            <Button
-              variant="ghost"
-              data-testid="selection-ask-side-chat"
-              className={PILL_BUTTON_CLS}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => {
-                onAskSideChat(sideChatTodo, target.text);
-                dismiss();
-              }}
-            >
-              <PanelRight aria-hidden strokeWidth={1.75} className="size-4" />
-              {t('问侧聊')}
-            </Button>
-            <span aria-hidden className="h-4 w-px bg-border" />
-          </>
-        )}
         <Button
           variant="ghost"
           data-testid="selection-quote"

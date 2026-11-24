@@ -262,13 +262,17 @@ test('hook output and the credential line stay folded inside the work group', as
 test('the failure reason shows once, behind the raw-error control', async ({ page }) => {
   await stubWorld(page);
   const col = page.getByTestId('transcript-col');
-  await expect(col).toContainText('本步异常结束：git commit failed (exit 1)');
+  await expect(col.getByTestId('transcript-fail')).toHaveText('本步异常结束详情');
+  await expect(col).not.toContainText('git commit failed');
   expect((await col.innerText()).split(DIVERGED).length - 1).toBe(0);
   await expect(page.getByTestId('transcript-note').filter({ hasText: '返工回到本分支继续' })).toHaveText(
     '返工回到本分支继续。',
   );
-  await page.getByRole('button', { name: '查看原始错误' }).click();
-  await expect(page.getByTestId('fail-raw-error')).toContainText(DIVERGED);
+  const toggle = page.getByTestId('failure-marker-detail');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(col.getByTestId('fail-raw-error')).toContainText(DIVERGED);
 });
 
 test('a finished turn whose only work is hook and credential rows stays folded', async ({ page }) => {
@@ -293,14 +297,15 @@ for (const theme of ['light', 'dark'] as const) {
       for (const el of root.querySelectorAll('*')) if (el.scrollHeight > el.clientHeight + 1) el.scrollTop = 0;
     });
     await col.screenshot({ path: `${dir}/${SHOT_LABEL}-${theme}.png` });
-    const rawButton = page.getByRole('button', { name: '查看原始错误' });
+    const rawButton = page.getByTestId('failure-marker-detail');
     await rawButton.hover();
     expect(await rawButton.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
     await col.screenshot({ path: `${dir}/${SHOT_LABEL}-${theme}-hover-failure.png` });
     await rawButton.click();
     await expect(page.getByTestId('fail-raw-error')).toBeVisible();
     await page.screenshot({ path: `${dir}/${SHOT_LABEL}-${theme}-raw-error.png` });
-    await page.keyboard.press('Escape');
+    await rawButton.click();
+    await expect(page.getByTestId('fail-raw-error')).toHaveCount(0);
     for (const summary of await page.getByTestId('work-summary').all()) {
       if ((await summary.getAttribute('aria-expanded')) !== 'true') await summary.click();
     }

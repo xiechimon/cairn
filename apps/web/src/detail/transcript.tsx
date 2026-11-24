@@ -1,10 +1,10 @@
 import type { StepPromptOrigin } from '@cairn/shared';
-import { CircleAlert } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
+import { FailureMarker, RawTextDialog } from '../components/chat/failure-marker.js';
 import { liveTokensLabel, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
@@ -14,8 +14,6 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '../components/ui/collapsible.js';
-import { DialogShell } from '../components/ui/dialog-shell.js';
-import { Marker, MarkerContent, MarkerIcon } from '../components/ui/marker.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -23,7 +21,7 @@ import type { TFunc } from '../i18n/translate.js';
 import { Clock } from '../icons/index.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { BackgroundTasks } from './background-tasks.js';
-import { ChatMarkdown, REPLY_BLOCK_CLS, TaskCard } from './chat-markdown.js';
+import { ChatMarkdown, TaskCard } from './chat-markdown.js';
 import { failFactsText } from './fail-facts.js';
 import { Segments } from './segments.js';
 import { WorkTrace } from './work-trace.js';
@@ -51,7 +49,6 @@ function rowMargin(item: TranscriptItem, prev: TranscriptItem | undefined): stri
   if (prev?.kind === 'note') return 'mt-1.5';
   switch (item.kind) {
     case 'robot':
-    case 'fail':
     case 'streaming':
     case 'review':
     case 'verify':
@@ -330,7 +327,7 @@ function Row({
     case 'bg-tasks':
       return <BackgroundTasks item={item} t={t} />;
     case 'fail':
-      return <FailRow item={item} margin={margin} t={t} />;
+      return <FailRow item={item} t={t} />;
     case 'streaming':
       return (
         <div className={`${AGENT_ROW} ${margin} [&>*]:max-w-full`} data-row="agent">
@@ -485,95 +482,18 @@ function Row({
   }
 }
 
-function FailRow({
-  item,
-  margin,
-  t,
-}: {
-  item: Extract<TranscriptItem, { kind: 'fail' }>;
-  margin: string;
-  t: TFunc;
-}) {
-  const [rawOpen, setRawOpen] = useState(false);
-  const title =
-    item.plain !== undefined
-      ? t(item.plain.key, item.plain.vars)
-      : item.facts === undefined
-        ? item.title
-        : t('本步异常结束：{reason}', { reason: item.title });
-  const facts = failFactsText(item.facts, t);
-  const copy = [title, item.body === '' ? '' : t(item.body), facts]
-    .filter((part) => part !== '')
-    .join('\n');
+function FailRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'fail' }>; t: TFunc }) {
+  const lines = [item.body === '' ? '' : t(item.body), failFactsText(item.facts, t)].filter(
+    (line) => line !== '',
+  );
   return (
-    <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-      <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
-        <span
-          className="chat-text -mt-px agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
-          data-testid="agent-text"
-        >
-          <Marker
-            role="alert"
-            className="items-start gap-2 text-ui leading-5.5 text-(--foreground)"
-          >
-            <MarkerIcon className="flex h-lh items-center text-(--fail-fg)">
-              <CircleAlert />
-            </MarkerIcon>
-            <span className="flex min-w-0 flex-1 flex-col gap-1">
-              <MarkerContent className="chat-para--fail text-(--fail-fg)">{title}</MarkerContent>
-              {item.body !== '' && <span className="text-foreground">{t(item.body)}</span>}
-              {item.title !== '' && (
-                <span className="flex flex-wrap items-center gap-x-3 text-meta text-content-secondary">
-                  {facts !== '' && <span>{facts}</span>}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 px-0 text-meta font-normal text-content-secondary pointer-coarse:h-11"
-                    onClick={() => setRawOpen(true)}
-                  >
-                    {t('查看原始错误')}
-                  </Button>
-                </span>
-              )}
-            </span>
-          </Marker>
-        </span>
-        <RowTools placement="right" copy={copy} />
-      </div>
-      <RowTools placement="below-start" copy={copy} />
-      <RawTextDialog
-        title={t('原始错误')}
-        text={item.raw ?? item.title}
-        open={rawOpen}
-        onClose={() => setRawOpen(false)}
-        testId="fail-raw-error"
+    <div className="my-3" data-row="fail">
+      <FailureMarker
+        label={t(item.label, item.labelVars)}
+        testId="transcript-fail"
+        detail={{ lines, raw: item.raw }}
       />
     </div>
-  );
-}
-
-function RawTextDialog({
-  title,
-  text,
-  open,
-  onClose,
-  testId,
-}: {
-  title: string;
-  text: string;
-  open: boolean;
-  onClose: () => void;
-  testId: string;
-}) {
-  return (
-    <DialogShell title={title} open={open} onClose={onClose} size="l">
-      <pre
-        className="m-0 rounded-(--cds-radius-sm) border border-(--border) bg-(--muted) px-2.5 py-2 text-left font-mono text-code break-words whitespace-pre-wrap text-(--foreground) [word-break:break-word]"
-        data-testid={testId}
-      >
-        {text}
-      </pre>
-    </DialogShell>
   );
 }
 

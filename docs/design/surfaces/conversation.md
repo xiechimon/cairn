@@ -19,6 +19,7 @@ Scope: `apps/web/src/chief/` `apps/web/src/detail/` `apps/web/src/components/cha
 | C17 | Historical daily reports render read-only; no buttons and no new reports are generated. | G `e2e/chief-daily-report.spec.ts` |
 | C31 | A Coordinator reply has no background and is set in the reply serif (`--font-songti-serif`, 15/28, 400; lists 24px); the owner's message keeps the sand bubble in the sans; tables, code blocks, chips and cards inside a reply keep their own faces. | M `e2e/chief-reply-bubbles.spec.ts` (C31 test) |
 | C18 | After sending, the user's message and the reply's start are in the viewport; a jump-to-latest control appears after scrolling away. | M latest reply top is inside the viewport after send |
+| C31 | A failed step or turn in any conversation (Coordinator chat, task transcript) is one `FailureMarker` separator line from `components/chat/failure-marker.tsx`: icon, a short plain reason, and `详情` opening the guidance and raw error; no file draws its own failure row. | G `test/failure-marker-reuse.test.ts` |
 
 ## Shell and top bar
 

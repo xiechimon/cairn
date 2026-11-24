@@ -31,7 +31,7 @@ test('selecting a reply shows the pill; R opens the quote box and Enter stages t
   const pill = page.getByTestId('selection-reply-bar');
   await expect(pill).toBeVisible();
   await expect(pill).toHaveAttribute('data-source', 'm6');
-  await expect(pill.getByTestId('selection-ask-side-chat')).toHaveText('问侧聊');
+  await expect(pill.getByTestId('selection-ask-side-chat')).toHaveCount(0);
   await expect(pill.getByTestId('selection-quote')).toContainText('引用');
 
   await page.keyboard.press('r');
@@ -74,15 +74,4 @@ test('Cmd+Enter in the quote box sends the quote and the text at once; Escape cl
     .poll(() => sent.at(-1))
     .toBe(`<!-- reply source=m6 -->\n> ${LAST_REPLY}\n\n那就合并吧`);
   await expect(page.getByTestId('composer-reply-quote')).toHaveCount(0);
-});
-
-test('Ask in side chat opens the task thread with the selection quoted in its composer', async ({
-  page,
-}) => {
-  await openChat(page);
-  await dragSelect(page, 'm6');
-  await page.getByTestId('selection-ask-side-chat').click();
-  await expect(page).toHaveURL(/thread=todo-1/);
-  const panel = page.getByTestId('side-chat-panel');
-  await expect(panel.locator('textarea')).toHaveValue(`> ${LAST_REPLY}\n\n`);
 });

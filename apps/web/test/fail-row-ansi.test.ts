@@ -41,7 +41,7 @@ const FAILED_WIRE_CARD: WireTodo = {
 };
 
 describe('mapTranscript failure row (#1262 fallback)', () => {
-  test('R1: polluted errorMessage → fail item title plain text', () => {
+  test('R1: polluted errorMessage → fail item raw plain text', () => {
     const items = mapTranscript({
       messages: [],
       steps: [],
@@ -52,7 +52,7 @@ describe('mapTranscript failure row (#1262 fallback)', () => {
       liveText: '',
     });
     const fail = items.find((i): i is Extract<typeof i, { kind: 'fail' }> => i.kind === 'fail');
-    expect(fail?.title).toBe(CLEAN);
+    expect(fail?.raw).toBe(CLEAN);
   });
 
   test('R3: clean errorMessage verbatim unchanged (zero regression)', () => {
@@ -66,7 +66,7 @@ describe('mapTranscript failure row (#1262 fallback)', () => {
       liveText: '',
     });
     const fail = items.find((i): i is Extract<typeof i, { kind: 'fail' }> => i.kind === 'fail');
-    expect(fail?.title).toBe(CLEAN);
+    expect(fail?.raw).toBe(CLEAN);
   });
 });
 

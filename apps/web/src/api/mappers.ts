@@ -59,6 +59,7 @@ import {
   PLAN_SECTIONS,
   parseAgentTodoText,
   REQUEST_SECRET_TOOL,
+  RETRY_PARKED_MARK,
   REVIEW_VERDICT_KIND,
   RUNNER_OS_LABELS,
   replyQuoteText,
@@ -812,6 +813,13 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         entries.push({ at: m.createdAt, item: systemRowItem(row, m.id, m.createdAt) });
         continue;
       }
+      if (m.id.startsWith(RETRY_PARKED_ID_PREFIX) || text.startsWith(RETRY_PARKED_MARK)) {
+        entries.push({
+          at: m.createdAt,
+          item: { ...failItem(text), id: m.id, createdAt: m.createdAt },
+        });
+        continue;
+      }
       if (text.startsWith(REWORK_REUSE_HEAD)) {
         entries.push({
           at: m.createdAt,
@@ -1109,18 +1117,11 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
     !items.some(
       (item) =>
         item.kind === 'fail' &&
-        item.raw !== undefined &&
-        failureReasonKey(item.raw) === failureReasonKey(build.errorMessage ?? ''),
+        (item.id?.startsWith(RETRY_PARKED_ID_PREFIX) === true ||
+          failureReasonKey(item.raw) === failureReasonKey(build.errorMessage ?? '')),
     )
   ) {
-    const plain = runtimeUpdatePlain(build.errorMessage);
-    items.push({
-      kind: 'fail',
-      title: stripAnsiEscapes(build.errorMessage),
-      createdAt: todo.phaseAt,
-      body: failGuidanceBody(classifyStepFailure(build.errorMessage)),
-      ...(plain !== null ? { plain } : {}),
-    });
+    items.push({ ...failItem(build.errorMessage), createdAt: todo.phaseAt });
   }
   if (
     !running &&
@@ -1211,26 +1212,48 @@ function systemRowItem(row: SystemRow, id: string, createdAt: number): Transcrip
           seconds: null,
         },
       };
-    case BUILD_FAILURE_ROW_KIND: {
-      const headline =
-        /^(.+?\(exit -?\d+\))/.exec(row.reason)?.[1] ?? row.reason.split('\n')[0] ?? '';
-      const plain = runtimeUpdatePlain(row.reason);
+    case BUILD_FAILURE_ROW_KIND:
       return {
-        kind: 'fail',
+        ...failItem(row.reason),
         id,
         createdAt,
-        title: stripAnsiEscapes(headline),
-        body: failGuidanceBody(classifyStepFailure(row.reason)),
-        ...(plain !== null ? { plain } : {}),
         facts: {
           files: row.fileCount,
           commits: row.commits.map((commit) => commit.slice(0, 9)),
           pr: row.pr?.number ?? null,
         },
-        raw: stripAnsiEscapes(row.reason),
       };
-    }
   }
+}
+
+const RETRY_PARKED_ID_PREFIX = 'retry-parked-';
+
+const FAIL_KIND_LABELS: Partial<Record<ReturnType<typeof classifyStepFailure>, string>> = {
+  quota: '模型额度已用尽',
+  capacity: '请求被限流',
+  network: '连接服务商时中断',
+  model_unavailable: '模型不可用',
+};
+
+function failLabel(raw: string): { label: string; labelVars?: Record<string, string> } {
+  const plain = runtimeUpdatePlain(raw);
+  if (plain !== null) return { label: plain.key, labelVars: plain.vars };
+  if (raw.startsWith(RETRY_PARKED_MARK)) {
+    const retries = /automatic retries exhausted \((\d+)\)/.exec(raw)?.[1];
+    if (retries !== undefined)
+      return { label: '自动重试 {n} 次后仍失败，已暂停', labelVars: { n: retries } };
+    const hourly = /(\d+) failed builds in one hour/.exec(raw)?.[1];
+    if (hourly !== undefined)
+      return { label: '一小时内失败 {n} 次，已暂停', labelVars: { n: hourly } };
+    if (/model unavailable/i.test(raw)) return { label: '模型不可用，已暂停' };
+    return { label: '已暂停自动重试' };
+  }
+  return { label: FAIL_KIND_LABELS[classifyStepFailure(raw)] ?? '本步异常结束' };
+}
+
+function failItem(reason: string): Extract<TranscriptItem, { kind: 'fail' }> {
+  const raw = stripAnsiEscapes(reason);
+  return { kind: 'fail', ...failLabel(raw), body: failGuidanceBody(classifyStepFailure(raw)), raw };
 }
 
 export function runtimeUpdatePlain(

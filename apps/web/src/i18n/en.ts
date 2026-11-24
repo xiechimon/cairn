@@ -205,7 +205,16 @@ export const EN: Record<string, string> = {
   正在准备: 'Preparing',
   '还有 {n} 行': '{n## more line|# more lines}',
   无输出: 'No output',
-  '本步异常结束：{reason}': 'This step ended abnormally: {reason}',
+  本步异常结束: 'This step ended abnormally',
+  模型额度已用尽: 'Model quota used up',
+  请求被限流: 'Requests were rate limited',
+  连接服务商时中断: 'The connection to the provider dropped',
+  模型不可用: 'Model unavailable',
+  '自动重试 {n} 次后仍失败，已暂停':
+    'Paused after {n#1 automatic retry|# automatic retries} failed',
+  '一小时内失败 {n} 次，已暂停': 'Paused after {n#1 failure|# failures} in one hour',
+  '模型不可用，已暂停': 'Paused: model unavailable',
+  已暂停自动重试: 'Automatic retries paused',
   '改动 {n} 个文件': 'Changed {n#1 file|# files}',
   '改动 {name}': 'Changed {name}',
   改动未能加载: 'The changes did not load',
@@ -757,7 +766,6 @@ export const EN: Record<string, string> = {
   '回复：{quote}': 'Replying to: {quote}',
   回复这条消息: 'Reply to this message',
   选中文字的操作: 'Selection actions',
-  问侧聊: 'Ask in side chat',
   引用: 'Quote',
   引用这段话: 'Quote this passage',
   针对这段话说点什么: 'Say something about this passage',
@@ -1226,9 +1234,6 @@ export const EN: Record<string, string> = {
   // —— #75 deep dynamic states: reject loop / failed / reuse plan ——
   '由 Coordinator 发起': 'Started by Coordinator',
   '运行在 {m} 上': 'Running on {m}',
-  // #1258 失败行原始错误弹窗面
-  查看原始错误: 'View raw error',
-  原始错误: 'Raw error',
   'CI 修复第 {round}/{max} 轮：推送前检查未通过':
     'CI fix round {round}/{max}: pre-push checks failed',
   'CI 修复第 {round}/{max} 轮：CI 检查未通过': 'CI fix round {round}/{max}: CI checks failed',

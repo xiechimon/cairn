@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
+import { FailureMarker } from '../components/chat/failure-marker.js';
 import { StatusLine } from '../components/chat/status-line.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
 import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
@@ -28,7 +29,6 @@ import {
 } from '../components/ui/attachment.js';
 import { Bubble, BubbleContent } from '../components/ui/bubble.js';
 import { Button } from '../components/ui/button.js';
-import { Marker, MarkerContent } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Select, SelectContent, SelectItem, SelectValue } from '../components/ui/select.js';
@@ -280,7 +280,7 @@ export function ConversationSection() {
       <Specimen
         id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles bubbleTools={…} /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles bubbleTools={…} /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>\n<FailureMarker label="This step ended abnormally" detail={{ lines, raw }} />`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -334,14 +334,14 @@ export function ConversationSection() {
             </MessageContent>
           </Message>
           <StatusLine>Plan approved · 3 steps</StatusLine>
-          <Marker
-            className="rounded-(--radius-card) bg-danger-soft px-3 py-2.5 text-meta text-destructive"
-            role="alert"
-          >
-            <MarkerContent>
-              The machine went offline. The task will resume when it is back.
-            </MarkerContent>
-          </Marker>
+          <FailureMarker
+            label="This step ended abnormally"
+            testId="turn-failure"
+            detail={{
+              lines: ['Re-run the task once the Runner is back online.'],
+              raw: 'machine offline: dev-mac stopped heartbeating',
+            }}
+          />
         </div>
       </Specimen>
       <Specimen id="attachments" title="Attachments" note="done, uploading and error states">

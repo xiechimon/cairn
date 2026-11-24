@@ -472,10 +472,10 @@ export type TranscriptItem =
   | { kind: 'step-prompt'; id: string; origin: StepPromptOrigin; raw: string }
   | {
       kind: 'fail';
-      title: string;
+      label: string;
+      labelVars?: Record<string, string>;
       body: string;
-      plain?: { key: string; vars: Record<string, string> };
-      raw?: string;
+      raw: string;
       facts?: FailFacts;
       id?: string;
       createdAt?: number;

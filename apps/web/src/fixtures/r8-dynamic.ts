@@ -158,8 +158,9 @@ function transcript12(stamp: string): TranscriptItem[] {
     { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
     {
       kind: 'fail',
-      title: '运行该任务的执行机已离线',
+      label: '运行该任务的执行机已离线',
       body: '请将这台执行机重新上线。这一步不会改派到其他执行机。',
+      raw: 'machine offline: dev-mac stopped heartbeating',
     },
   ];
 }
@@ -376,8 +377,9 @@ const RUN1_FAILED: TranscriptItem[] = [
   { kind: 'note', text: '{name} 发起了合并', vars: { name: 'Xmon Dai' } },
   {
     kind: 'fail',
-    title: '运行该任务的执行机已离线',
+    label: '运行该任务的执行机已离线',
     body: '请将这台执行机重新上线。这一步不会改派到其他执行机。',
+    raw: 'machine offline: dev-mac stopped heartbeating',
   },
 ];
 
