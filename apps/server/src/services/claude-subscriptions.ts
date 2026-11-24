@@ -35,6 +35,11 @@ import {
   verifyClaudeSubscription,
 } from './claude-subscription-verification.js';
 import { timedCheck } from './subscription-check.js';
+import {
+  assertLabelHidesToken,
+  claimRateWindow,
+  refuseWhileRunning,
+} from './subscription-helpers.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 import { fetchAnthropicOAuthModels } from './upstream-models.js';
 
@@ -51,28 +56,6 @@ type Row = typeof claudeSubscription.$inferSelect;
 
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
 const modelTestWindows = new WeakMap<Db, Map<string, number>>();
-
-function claimRateWindow(
-  store: WeakMap<Db, Map<string, number>>,
-  db: Db,
-  key: string,
-  action: string,
-  windowMs = 10_000,
-): void {
-  const now = nowMs();
-  const windows = store.get(db) ?? new Map<string, number>();
-  for (const [id, retryAt] of windows) {
-    if (retryAt <= now) windows.delete(id);
-  }
-  if (windows.has(key)) {
-    throw new HttpError(
-      429,
-      `Please wait ${windowMs / 1000} seconds between ${action} for this connection.`,
-    );
-  }
-  windows.set(key, now + windowMs);
-  store.set(db, windows);
-}
 
 function toRecord(row: Row): ClaudeSubscription {
   return {
@@ -113,19 +96,6 @@ function runningStepCount(db: Pick<Db, 'select'>, subscriptionId: string): numbe
   );
 }
 
-function refuseWhileRunning(db: Pick<Db, 'select'>, row: Row, action: string): void {
-  if (row.enabledAt === null) return;
-  const running = runningStepCount(db, row.id);
-  if (running > 0) {
-    throw new HttpError(
-      409,
-      `Cannot ${action} this account while ${running} task(s) are running on it; finish or stop them first.`,
-      undefined,
-      { code: 'running-tasks', running },
-    );
-  }
-}
-
 export function updateClaudeSubscription(
   deps: Deps,
   teamId: string,
@@ -135,9 +105,7 @@ export function updateClaudeSubscription(
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Claude subscription connection');
   const token = deps.box.open(row.tokenCipher);
-  if (patch.label?.includes(token)) {
-    throw new HttpError(400, 'Connection label must not contain the token');
-  }
+  assertLabelHidesToken(patch.label, token);
   if (patch.models?.some((model) => model.id.includes(token) || model.name.includes(token))) {
     throw new HttpError(400, 'Model names must not contain the token');
   }
@@ -235,7 +203,9 @@ export async function enableClaudeSubscription(
         );
       }
       if (current) {
-        refuseWhileRunning(tx, current, 'switch away from');
+        if (current.enabledAt !== null) {
+          refuseWhileRunning(() => runningStepCount(tx, current.id), 'switch away from');
+        }
         tx.update(claudeSubscription)
           .set({ enabledAt: null })
           .where(eq(claudeSubscription.id, current.id))
@@ -267,7 +237,7 @@ export function disableClaudeSubscription(
     const row = subscriptionRow(tx, teamId, id);
     if (!row) throw notFound('Claude subscription connection');
     if (row.enabledAt === null) return toRecord(row);
-    refuseWhileRunning(tx, row, 'disable');
+    refuseWhileRunning(() => runningStepCount(tx, row.id), 'disable');
     tx.update(claudeSubscription)
       .set({ enabledAt: null })
       .where(eq(claudeSubscription.id, id))
@@ -474,8 +444,7 @@ export function createClaudeSubscription(
   teamId: string,
   body: CreateClaudeSubscription,
 ): ClaudeSubscription {
-  if (body.label.includes(body.token))
-    throw new HttpError(400, 'Connection label must not contain the token');
+  assertLabelHidesToken(body.label, body.token);
   const now = nowMs();
   const row = {
     id: newRecordId(),
@@ -658,7 +627,7 @@ export function deleteClaudeSubscription(deps: { db: Db }, teamId: string, id: s
   return deps.db.transaction((tx) => {
     const row = subscriptionRow(tx, teamId, id);
     if (!row) return false;
-    refuseWhileRunning(tx, row, 'delete');
+    if (row.enabledAt !== null) refuseWhileRunning(() => runningStepCount(tx, row.id), 'delete');
     return (
       tx
         .delete(claudeSubscription)

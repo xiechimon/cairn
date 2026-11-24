@@ -116,6 +116,14 @@ import { listBuildStepRoutes } from './step-route.js';
 import { assertGroundedClaims, TerminalClaimError } from './terminal-claims.js';
 import { startThreadBuild } from './thread-message.js';
 import { getTodo, listTodos, setTodoArchived, setTodoPhase } from './todos.js';
+import {
+  json,
+  optStr,
+  requireProjectRow,
+  requireTeamBuild,
+  requireTeamTodo,
+  str,
+} from './tool-guards.js';
 import { readTopModels } from './top-models.js';
 import { insertGateAnnouncement } from './transcript.js';
 
@@ -166,18 +174,6 @@ function skillAuditActor(ctx: ChiefToolCtx): { type: 'member' | 'agent'; id: str
 
 type Params = Record<string, unknown>;
 
-function str(params: Params, key: string): string {
-  const v = params[key];
-  if (typeof v !== 'string' || v === '')
-    throw new HttpError(400, `invalid params.${key}: expected non-empty string`);
-  return v;
-}
-function optStr(params: Params, key: string): string | undefined {
-  const v = params[key];
-  if (v === undefined || v === null) return undefined;
-  if (typeof v !== 'string') throw new HttpError(400, `invalid params.${key}: expected string`);
-  return v;
-}
 function strArr(params: Params, key: string): string[] {
   const v = params[key];
   if (!Array.isArray(v) || v.some((x) => typeof x !== 'string')) {
@@ -192,28 +188,6 @@ function num(params: Params, key: string): number | undefined {
     throw new HttpError(400, `invalid params.${key}: expected number`);
   }
   return v;
-}
-function json(result: unknown): string {
-  return JSON.stringify(result ?? null);
-}
-
-function requireProjectRow(db: Db, projectId: string, teamId: string) {
-  const row = db
-    .select()
-    .from(project)
-    .where(and(eq(project.id, projectId), listedProjects(teamId)))
-    .get();
-  if (!row) throw new HttpError(404, `project ${projectId}`);
-  return row;
-}
-function requireTeamTodo(db: Db, todoId: string, teamId: string) {
-  const row = db
-    .select()
-    .from(todo)
-    .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
-    .get();
-  if (!row) throw new HttpError(404, `todo ${todoId}`);
-  return row;
 }
 const PROJECT_WRITE_TOOLS = new Set([
   'create_todo',
@@ -301,17 +275,6 @@ const SEARCH_QUERY_MAX_CHARS = 200;
 const SEARCH_QUERY_MAX_TERMS = 8;
 export const CHIEF_TASK_LIST_SUMMARY_MAX_CHARS = 240;
 
-function requireTeamBuild(db: Db, buildId: string, teamId: string) {
-  const row = db.select({ todoId: build.todoId }).from(build).where(eq(build.id, buildId)).get();
-  if (!row) throw new HttpError(404, `build ${buildId}`);
-  const owned = db
-    .select({ id: todo.id })
-    .from(todo)
-    .where(and(eq(todo.id, row.todoId), eq(todo.teamId, teamId)))
-    .get();
-  if (!owned) throw new HttpError(404, `build ${buildId}`);
-  return row;
-}
 function requireTeamConversation(db: Db, conversationId: string, teamId: string): void {
   if (!isChiefConversationId(conversationId)) {
     requireTeamBuild(db, conversationId, teamId);

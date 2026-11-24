@@ -7,32 +7,17 @@ import {
   verifiedManagedBin,
   verifiedManagedBins,
 } from '@cairn/shared/managed-bin';
+import { acpProbeEnv, collectLines } from './acp-probe.js';
+
+export { collectLines };
 
 export const DEFAULT_DEVIN_TIMEOUT_MS = 30_000;
 
 const MANAGED_INSTALL_ROOT = join(homedir(), '.cairn', 'tools', 'devin');
-const FORWARDED_ENV = [
-  'HTTPS_PROXY',
-  'HTTP_PROXY',
-  'ALL_PROXY',
-  'NO_PROXY',
-  'https_proxy',
-  'http_proxy',
-  'all_proxy',
-  'no_proxy',
-  'LANG',
-  'TZ',
-];
 const AUTH_FAILURE = /authentication|401|invalid|expired|login|unauthorized|forbidden|auth method/i;
 
 export function childEnv(home: string, token: string): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { HOME: home, WINDSURF_API_KEY: token };
-  if (process.env.PATH !== undefined) env.PATH = process.env.PATH;
-  for (const name of FORWARDED_ENV) {
-    const value = process.env[name];
-    if (value !== undefined) env[name] = value;
-  }
-  return env;
+  return acpProbeEnv({ HOME: home, WINDSURF_API_KEY: token });
 }
 
 function managedVersions(): string[] {
@@ -81,18 +66,6 @@ export function devinBin(args: string[]): { command: string; args: string[] } {
     args:
       args[0] === 'acp' && acpAt >= 0 ? [...managed.args, ...args.slice(1)] : [...prefix, ...args],
   };
-}
-
-export function collectLines(buffer: string): { lines: string[]; rest: string } {
-  const lines: string[] = [];
-  let rest = buffer;
-  let index = rest.indexOf('\n');
-  while (index >= 0) {
-    lines.push(rest.slice(0, index));
-    rest = rest.slice(index + 1);
-    index = rest.indexOf('\n');
-  }
-  return { lines, rest };
 }
 
 export function errorReason(text: string): DevinSubscriptionVerifyResult {

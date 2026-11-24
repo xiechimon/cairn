@@ -10,9 +10,10 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
-import { attachment, designComment, designShare, designVersion, todo } from '../db/schema.js';
+import { attachment, designComment, designShare, designVersion } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { requireTeamTodo } from './tool-guards.js';
 
 type VersionRow = typeof designVersion.$inferSelect;
 
@@ -58,16 +59,6 @@ export function recordDesignVersion(db: Db, input: DesignVersionInput): VersionR
   return row;
 }
 
-function requireTodo(db: Db, teamId: string, todoId: string): typeof todo.$inferSelect {
-  const row = db
-    .select()
-    .from(todo)
-    .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
-    .get();
-  if (!row) throw new HttpError(404, `todo ${todoId}`);
-  return row;
-}
-
 function versionRecord(db: Db, row: VersionRow): DesignVersionRecord {
   const size = db
     .select({ sizeBytes: attachment.sizeBytes })
@@ -96,7 +87,7 @@ function versionRecord(db: Db, row: VersionRow): DesignVersionRecord {
 }
 
 export function listDesignPages(db: Db, teamId: string, todoId: string): DesignPageRecord[] {
-  requireTodo(db, teamId, todoId);
+  requireTeamTodo(db, todoId, teamId);
   const rows = db
     .select()
     .from(designVersion)
@@ -150,7 +141,7 @@ export function listDesignVersions(
   todoId: string,
   fileName: string,
 ): DesignVersionRecord[] {
-  requireTodo(db, teamId, todoId);
+  requireTeamTodo(db, todoId, teamId);
   return db
     .select()
     .from(designVersion)
@@ -170,7 +161,7 @@ export function restoreDesignVersion(
   db: Db,
   input: { teamId: string; todoId: string; versionId: string; userId: string },
 ): DesignVersionRecord {
-  const todoRow = requireTodo(db, input.teamId, input.todoId);
+  const todoRow = requireTeamTodo(db, input.todoId, input.teamId);
   if (todoRow.archivedAt !== null) throw new HttpError(409, 'Unarchive to continue');
   const from = db
     .select()
@@ -285,7 +276,7 @@ export function createDesignShare(
 ): DesignShareRecord {
   const origin = relayOrigin();
   if (origin === null) throw new HttpError(409, 'a share link needs a relay', 'relay-missing');
-  requireTodo(db, input.teamId, input.todoId);
+  requireTeamTodo(db, input.todoId, input.teamId);
   if (currentVersion(db, input.todoId, input.fileName) === undefined) {
     throw new HttpError(404, `design page ${input.fileName}`);
   }
@@ -316,7 +307,7 @@ export function revokeDesignShare(
   db: Db,
   input: { teamId: string; todoId: string; fileName: string },
 ): void {
-  requireTodo(db, input.teamId, input.todoId);
+  requireTeamTodo(db, input.todoId, input.teamId);
   db.update(designShare)
     .set({ revokedAt: nowMs() })
     .where(
