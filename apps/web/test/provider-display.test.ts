@@ -393,6 +393,15 @@ it.each([
   expect(subtitle).not.toMatch(/需要新版 Cairn|最近使用/);
 });
 
+function pickedModels(
+  vendor: SubscriptionAccount['vendor'],
+  models: readonly ModelSourceModel[],
+): Pick<SubscriptionAccount, 'models'> {
+  return vendor === 'antigravity'
+    ? { models: models.map(({ id, name }) => ({ id, name })) }
+    : {};
+}
+
 it.each((['claude', 'antigravity', 'devin'] as const).flatMap((vendor) => [
   { vendor, state: 'cooling', cooldownUntil: null, status: '冷却中' },
   { vendor, state: 'cooling', cooldownUntil: NOW + HOUR, status: '冷却至' },
@@ -402,7 +411,10 @@ it.each((['claude', 'antigravity', 'devin'] as const).flatMap((vendor) => [
 ] as const))(
   'keeps $vendor $state in the row button name without changing its subtitle',
   ({ vendor, state, cooldownUntil, status }) => {
-    const { row, detail } = renderAccount({ ...CLAUDE, vendor, state, cooldownUntil }, CLAUDE_MODELS);
+    const { row, detail } = renderAccount(
+      { ...CLAUDE, vendor, state, cooldownUntil, ...pickedModels(vendor, CLAUDE_MODELS) },
+      CLAUDE_MODELS,
+    );
     const detailStatus = detail.match(
       /data-testid="subscription-status"[^>]*><span[^>]*><\/span>([^<]+)<\/span>/,
     )?.[1];
@@ -423,7 +435,10 @@ it.each((['claude', 'antigravity', 'devin'] as const).flatMap((vendor) => [
   { vendor, state: 'expired', icon: 'circle-x' },
 ] as const))('distinguishes $vendor $state without color or visible status words', ({ vendor, state, icon }) => {
   for (const models of [[], CLAUDE_MODELS]) {
-    const { row } = renderAccount({ ...CLAUDE, vendor, state }, models);
+    const { row } = renderAccount(
+      { ...CLAUDE, vendor, state, ...pickedModels(vendor, models) },
+      models,
+    );
     expect(row).toMatch(new RegExp(`<svg(?=[^>]*aria-hidden="true")[^>]*class="[^"]*lucide-${icon}[^"]*"`));
     expect(row.replace(/<[^>]*>/g, '')).toBe(`${CLAUDE.label}订阅 · ${models.length} 个模型`);
   }
@@ -486,7 +501,7 @@ it.each(['claude', 'antigravity', 'devin'] as const)(
       { models: [{ ...CLAUDE_MODELS[0]!, liveness: 'dead' }], labels: ['已下架', '1 个模型', '1 个模型需要新版 Cairn'], tone: 'warn' },
     ];
     for (const { models, labels, tone } of cases) {
-      const { row } = renderAccount({ ...CLAUDE, vendor }, models);
+      const { row } = renderAccount({ ...CLAUDE, vendor, ...pickedModels(vendor, models) }, models);
       expect(row).toContain(`data-tone="${tone}"`);
       const label = row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1];
       expect(label).toBeDefined();
@@ -560,13 +575,27 @@ it.each(['claude', 'antigravity', 'devin'] as const)(
 it.each(['claude', 'antigravity', 'devin'] as const)(
   'C1: the %s model update warning uses the same wording in the glyph and button',
   (vendor) => {
-    const { row } = renderAccount({ ...CLAUDE, vendor }, CLAUDE_MODELS);
+    const { row } = renderAccount(
+      { ...CLAUDE, vendor, ...pickedModels(vendor, CLAUDE_MODELS) },
+      CLAUDE_MODELS,
+    );
     const name = row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1];
     const status = row.match(/data-testid="provider-status-mark"[^>]*aria-label="([^"]*)"/)?.[1];
     expect(status).toBe('3 个模型需要新版 Cairn');
     expect(name).toContain(status);
   },
 );
+
+it('does not inherit Runner models for an Antigravity subscription with no picked models', () => {
+  const { row, detail } = renderAccount({ ...CLAUDE, vendor: 'antigravity' }, CLAUDE_MODELS);
+  const subtitle = row.match(/data-testid="provider-subtitle"[^>]*>([^<]*)<\/span>/)?.[1];
+  expect(subtitle).toBe('订阅 · 0 个模型');
+  expect(row).toContain('data-tone="warn"');
+  expect(row.match(/data-testid="provider-status-mark"[^>]*aria-label="([^"]*)"/)?.[1]).toBe(
+    '需要处理',
+  );
+  expect(detail).not.toContain('claude-opus-5-5');
+});
 
 function renderRow(props: ComponentProps<typeof ProviderInstanceRow>) {
   return renderToStaticMarkup(createElement(I18nProvider, {
@@ -682,7 +711,11 @@ it.each([
 );
 
 it('does not announce availability for a subscription without a token', () => {
-  const { row, detail } = renderAccount({ ...CLAUDE, vendor: 'antigravity', hasToken: false }, [{ id: 'current', name: 'Current' }]);
+  const models = [{ id: 'current', name: 'Current' }];
+  const { row, detail } = renderAccount(
+    { ...CLAUDE, vendor: 'antigravity', hasToken: false, models },
+    models,
+  );
   expect(row).toContain('data-tone="warn"');
   expect(row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).toContain('未登录');
   expect(row.match(/<button\b[^>]*aria-label="([^"]*)"/)?.[1]).not.toContain('可用');
