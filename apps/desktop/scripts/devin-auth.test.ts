@@ -9,7 +9,7 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { devinLogin } from '../src/devin-auth.js';
 
 vi.mock('@cairn/shared/managed-bin', () => ({
-  verifiedManagedBins: () => [{ command: process.execPath }],
+  activeManagedBin: () => ({ command: process.execPath }),
 }));
 vi.mock('node:child_process', async (original) => ({
   ...(await original<typeof import('node:child_process')>()),
