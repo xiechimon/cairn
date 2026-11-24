@@ -732,11 +732,7 @@ async function checkAttachment(page, ctx) {
   const openTile = async (name) => {
     const chatFocus = page.getByTestId('artifact-focus-chat');
     if (await chatFocus.isVisible().catch(() => false)) await chatFocus.click();
-    await attachments
-      .filter({ hasText: name })
-      .getByRole('button', { name, exact: true })
-      .first()
-      .click();
+    await attachments.getByRole('button', { name, exact: true }).first().click();
   };
   await openTile(IMAGE_NAMES[0]);
   await selected.filter({ hasText: IMAGE_NAMES[0] }).waitFor({ timeout: UI_WAIT_MS });
