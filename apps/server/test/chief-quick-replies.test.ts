@@ -45,7 +45,14 @@ interface World {
   s: TestServer;
   threadId: string;
   claim(): Promise<ClaimedStep>;
-  done(stepId: string, text: string, prompt?: string): Promise<void>;
+  done(
+    stepId: string,
+    text: string,
+    prompt?: string,
+    extra?: {
+      skillInjectionFacts?: { injected: string[]; omitted: string[]; unrendered: string[] };
+    },
+  ): Promise<void>;
   tool(stepId: string, params: Record<string, unknown>, name?: string): Promise<Response>;
   userTurn(prompt: string): void;
   wake(): void;
@@ -91,7 +98,7 @@ async function setup(): Promise<World> {
       if (!body.step) throw new Error('no chief step claimed');
       return claimedStepSchema.parse(body.step);
     },
-    async done(stepId, text, prompt) {
+    async done(stepId, text, prompt, extra) {
       const urlsRes = await call(s.app, 'POST', `/api/machine/upload-urls/${stepId}`, {
         cred: token,
         body: { files: [{ name: 'transcript.json' }] },
@@ -122,7 +129,13 @@ async function setup(): Promise<World> {
       });
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
-        body: { status: 'success', sessionId: `sess-${stepId}` },
+        body: {
+          status: 'success',
+          sessionId: `sess-${stepId}`,
+          ...(extra?.skillInjectionFacts !== undefined
+            ? { skillInjectionFacts: extra.skillInjectionFacts }
+            : {}),
+        },
       });
       expect(doneRes.status).toBe(200);
     },
@@ -225,12 +238,26 @@ describe('suggest_replies (Coordinator quick replies)', () => {
     expect(quickRows(w)).toEqual([]);
   });
 
-  test('is offered to the Coordinator', async () => {
+  test('is offered to the Coordinator as a non-deferred tool with daemon prompt guidance', async () => {
     const w = await setup();
     expect(chiefRemoteTools().map((t) => t.name)).toContain(SUGGEST_REPLIES_TOOL_NAME);
     w.userTurn('再看一下');
     const turn = await w.claim();
-    expect(JSON.stringify(turn)).toContain(SUGGEST_REPLIES_TOOL_NAME);
+    const def = turn.remoteTools?.find((t) => t.name === SUGGEST_REPLIES_TOOL_NAME);
+    expect(def).toBeDefined();
+    expect(def?.deferred).not.toBe(true);
+    expect(turn.chief?.systemPrompt).toContain(SUGGEST_REPLIES_TOOL_NAME);
+  });
+
+  test('daemon turn finishing with skillInjectionFacts keeps suggested replies visible', async () => {
+    const w = await setup();
+    w.userTurn('帮我看一遍这个仓库');
+    const turn = await w.claim();
+    expect((await w.tool(turn.step.id, { replies: ['先看 README', '建个计划'] })).status).toBe(200);
+    await w.done(turn.step.id, '看完了，你想先从哪开始？', undefined, {
+      skillInjectionFacts: { injected: [], omitted: [], unrendered: [] },
+    });
+    expect(await visible(w)).toEqual(['先看 README', '建个计划']);
   });
 
   test('stores the sanitised set on one row for the turn, streams it and delivers it in the page', async () => {

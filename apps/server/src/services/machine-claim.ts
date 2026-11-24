@@ -20,6 +20,7 @@ import {
   type RemoteToolDef,
   type SkillInjectionRecord,
   type StepKind,
+  SUGGEST_REPLIES_TOOL_NAME,
   selectSkillsForTask,
   WORKER_ASK_USER_TOOL,
   WORKER_CLOSE_AS_DUPLICATE_TOOL,
@@ -316,6 +317,12 @@ function buildChiefClaim(
   return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
 }
 
+const DAEMON_QUICK_REPLIES_GUIDANCE = [
+  '<quick_replies>',
+  `On user turns (never on [wake:…] event turns), before writing your final reply call ${SUGGEST_REPLIES_TOOL_NAME} once with 1 to 3 brief follow-ups the owner might send next, in the conversation's language (skip if you already called ask_user or if no natural follow-up fits; never suggest destructive or irreversible actions).`,
+  '</quick_replies>',
+].join('\n');
+
 function chiefClaimPayload(
   deps: MachineDeps,
   machineId: string,
@@ -402,7 +409,10 @@ function chiefClaimPayload(
     },
     chief: {
       threadId: threadRow.id,
-      systemPrompt,
+      systemPrompt:
+        mailTurn || memoryEditTurn
+          ? systemPrompt
+          : `${systemPrompt}\n\n${DAEMON_QUICK_REPLIES_GUIDANCE}`,
       trigger,
       ...(history !== null ? { history } : {}),
     },
@@ -421,7 +431,9 @@ function chiefClaimPayload(
               }),
               ...connectorToolDefsForTeam(deps.db, threadRow.teamId),
             ].map((def) =>
-              CORE_COORDINATOR_TOOLS.has(def.name) ? def : { ...def, deferred: true },
+              CORE_COORDINATOR_TOOLS.has(def.name) || def.name === SUGGEST_REPLIES_TOOL_NAME
+                ? def
+                : { ...def, deferred: true },
             )),
     ],
     ...(chiefMcp !== undefined ? { mcpServers: chiefMcp } : {}),

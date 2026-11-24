@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   ASK_USER_QUESTION_KIND,
+  CHIEF_DIGEST_KIND,
+  CHIEF_MODEL_FALLBACK_KIND,
   CHIEF_NOTICE_KIND,
   CHIEF_REPLY_TOOLS,
   CHIEF_TOOL_NAMES,
@@ -9,7 +11,9 @@ import {
   type QuickRepliesRow,
   quickRepliesContentSchema,
   quickRepliesRowId,
+  REPORT_ACK_KIND,
   remoteToolDefSchema,
+  SKILL_INJECTION_CHECK_KIND,
   SUGGEST_REPLIES_TOOL_NAME,
   sanitizeQuickReplies,
 } from '../src/index.js';
@@ -185,6 +189,73 @@ describe('liveQuickReplies lifecycle', () => {
       content: JSON.stringify({ kind: CHIEF_NOTICE_KIND, message: 'x', provenance: 'user' }),
     };
     expect(liveQuickReplies([...TURN, notice], idle)).toEqual([]);
+    const announcedFallback: QuickRepliesRow = {
+      id: 'fb-announced',
+      role: 'system',
+      content: JSON.stringify({
+        kind: CHIEF_MODEL_FALLBACK_KIND,
+        from: 'a/b',
+        to: 'c/d',
+        stepId: 's1',
+        announced: true,
+      }),
+    };
+    expect(liveQuickReplies([...TURN, announcedFallback], idle)).toEqual([]);
+  });
+
+  it('row 5b: silent internal system rows after the reply do not hide the chips', () => {
+    const skillCheck: QuickRepliesRow = {
+      id: 'skill-injection-s1',
+      role: 'system',
+      content: JSON.stringify({
+        kind: SKILL_INJECTION_CHECK_KIND,
+        level: 'ok',
+        reds: [],
+        yellows: [],
+        injected: [],
+        omitted: [],
+        unrendered: [],
+      }),
+    };
+    const digest: QuickRepliesRow = {
+      id: 'chief-digest-1',
+      role: 'system',
+      content: JSON.stringify({
+        kind: CHIEF_DIGEST_KIND,
+        reason: 'daily',
+        coversUntil: 100,
+        madeAt: 101,
+        items: [],
+      }),
+    };
+    const ack: QuickRepliesRow = {
+      id: 'report-ack-1',
+      role: 'system',
+      content: JSON.stringify({
+        kind: REPORT_ACK_KIND,
+        mode: 'silent',
+        todoId: 'todo-1',
+        buildId: 'build-1',
+      }),
+    };
+    const unannouncedFallback: QuickRepliesRow = {
+      id: 'fb-silent',
+      role: 'system',
+      content: JSON.stringify({
+        kind: CHIEF_MODEL_FALLBACK_KIND,
+        from: 'a/b',
+        to: 'c/d',
+        stepId: 's1',
+      }),
+    };
+    expect(liveQuickReplies([...TURN, skillCheck], idle)).toEqual([
+      '好，等你汇报',
+      '先只看 README',
+    ]);
+    expect(liveQuickReplies([...TURN, digest, ack, unannouncedFallback], idle)).toEqual([
+      '好，等你汇报',
+      '先只看 README',
+    ]);
   });
 
   it('row 6: hidden when the turn wrote no reply text', () => {

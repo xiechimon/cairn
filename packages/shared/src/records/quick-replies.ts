@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { ASK_USER_QUESTION_KIND } from './message.js';
+import { SKILL_INJECTION_CHECK_KIND } from '../skill-injection-check.js';
+import {
+  ASK_USER_QUESTION_KIND,
+  CHIEF_DIGEST_KIND,
+  CHIEF_MODEL_FALLBACK_KIND,
+  REPORT_ACK_KIND,
+} from './message.js';
 
 export const QUICK_REPLIES_KIND = 'quick_replies';
 export const QUICK_REPLIES_ROW_ID_PREFIX = 'quick-replies-';
@@ -111,6 +117,23 @@ function hasReplyText(content: unknown): boolean {
   );
 }
 
+const SILENT_SYSTEM_KINDS = new Set<unknown>([
+  SKILL_INJECTION_CHECK_KIND,
+  CHIEF_DIGEST_KIND,
+  REPORT_ACK_KIND,
+]);
+
+function isSilentSystemRow(row: QuickRepliesRow): boolean {
+  if (row.role !== 'system') return false;
+  const parsed = parsedContent(row.content);
+  const kind = kindOf(parsed);
+  if (SILENT_SYSTEM_KINDS.has(kind)) return true;
+  if (kind === CHIEF_MODEL_FALLBACK_KIND) {
+    return (parsed as { announced?: unknown }).announced !== true;
+  }
+  return false;
+}
+
 export function liveQuickReplies(
   rows: readonly QuickRepliesRow[],
   state: { running: boolean; runningStepId?: string | null },
@@ -122,7 +145,7 @@ export function liveQuickReplies(
   if (!content.success) return [];
   if (state.running && state.runningStepId !== content.data.stepId) return [];
   const after = rows.slice(at + 1);
-  if (after.some((row) => row.role !== 'assistant')) return [];
+  if (after.some((row) => row.role !== 'assistant' && !isSilentSystemRow(row))) return [];
   const turnStart = rows.slice(0, at).findLastIndex((row) => row.role === 'user');
   const turnRows = rows.slice(turnStart + 1);
   const answered = turnRows.some((row) => row.role === 'assistant' && hasReplyText(row.content));

@@ -273,7 +273,21 @@ test('suggestions belong to the channel that made them: another project channel 
 
 test("in the owning project's channel the suggestions show and send with that project", async ({ page }) => {
   const bodies: { content?: string; projectId?: string }[] = [];
-  await mockLive(page, projectState(), (path, route) => {
+  const skillCheck: Row = {
+    id: 'skill-injection-s1',
+    role: 'system',
+    content: JSON.stringify({
+      kind: 'skill_injection_check',
+      level: 'ok',
+      reds: [],
+      yellows: [],
+      injected: [],
+      omitted: [],
+      unrendered: [],
+    }),
+    createdAt: 14,
+  };
+  await mockLive(page, projectState([...TURN, skillCheck]), (path, route) => {
     if (route.request().method() === 'POST' && /\/messages$|\/chief\/threads$/.test(path))
       bodies.push(route.request().postDataJSON() as { content?: string; projectId?: string });
     return undefined;
