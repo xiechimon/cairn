@@ -3054,4 +3054,18 @@ export const EN: Record<string, string> = {
   已停止自动重试: 'Automatic retries stopped',
   '请查看原始错误后点击立即重试，或在下方回复说明修改方式。':
     'Inspect the raw error and click Retry now, or reply below with instructions.',
+  '还有 {n} 个文件': '{n## more file|# more files}',
+  正在生成改动: 'Preparing the change',
+  图片没能加载出来: 'The image did not load',
+  '{name} 正在加载': '{name} is loading',
+  '查看大图：{name}': 'View full size: {name}',
+  '图表没能画出来，下面是同一份数据。': 'The chart could not be drawn. Here is the same data.',
+  '{name}（{unit}）': '{name} ({unit})',
+  '降了 {n}%': 'Down {n}%',
+  '升了 {n}%': 'Up {n}%',
+  显示哪些数据: 'Series to show',
+  收起表格: 'Hide table',
+  查看表格: 'Show table',
+  '复制 CSV': 'Copy CSV',
+  正在生成图表: 'Preparing the chart',
 };

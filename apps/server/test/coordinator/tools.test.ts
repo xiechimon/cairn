@@ -140,6 +140,8 @@ describe('deferred coordinator tools', () => {
       expect(names).toContain('create_todo');
       expect(names).toContain('tool_search');
       expect(names).toContain('call_tool');
+      expect(names).toContain('show_diff');
+      expect(names).toContain('show_chart');
       expect(names).not.toContain('merge_builds');
     }
     expect(seenResults[0]).toContain('merge_builds');

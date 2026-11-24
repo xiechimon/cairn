@@ -30,6 +30,7 @@ import {
   backgroundTaskSchema,
   CHIEF_TURN_ERROR_KIND,
   CONFIRM_ANNOUNCEMENT,
+  chatBlockSchema,
   chiefDigestContentSchema,
   chiefModelFallbackContentSchema,
   chiefModelRestoredContentSchema,
@@ -71,6 +72,8 @@ import {
   runtimeUpdateRequired,
   SECRET_REQUEST_CANCELLED,
   SECRET_REQUEST_SAVED_PREFIX,
+  SHOW_CHART_TOOL,
+  SHOW_DIFF_TOOL,
   SUGGEST_REPLIES_TOOL_NAME,
   type SystemRow,
   stripAnsiEscapes,
@@ -1918,6 +1921,31 @@ function packageInstallItemOf(call: ToolCallRecord, id: string): ChiefStreamItem
   };
 }
 
+function chatBlockItemOf(call: ToolCallRecord, id: string): ChiefStreamItem {
+  const tool = call.name === SHOW_DIFF_TOOL ? 'diff' : 'chart';
+  const finished = call.result !== undefined || call.endedAt !== undefined || call.isError === true;
+  if (!finished) {
+    const focus = (call.arguments as { focus?: { path?: unknown }[] } | null)?.focus?.[0]?.path;
+    return {
+      kind: 'chat-block',
+      id,
+      tool,
+      state: 'pending',
+      ...(typeof focus === 'string' && focus !== '' ? { path: focus } : {}),
+    };
+  }
+  let parsed: unknown = null;
+  try {
+    parsed = call.isError === true ? null : JSON.parse(toolResultText(call.result) ?? '');
+  } catch {
+    parsed = null;
+  }
+  const block = chatBlockSchema.safeParse(parsed);
+  return block.success
+    ? { kind: 'chat-block', id, tool, state: 'ready', block: block.data }
+    : { kind: 'chat-block', id, tool, state: 'failed' };
+}
+
 function handoffTodoOf(call: ToolCallRecord): string | null {
   if (call.name !== 'message_todo' || call.result === undefined || call.isError === true)
     return null;
@@ -2165,6 +2193,10 @@ function collectChiefStream(
     }
     const call = toolCallOfContent(m.content);
     if (call?.name === SUGGEST_REPLIES_TOOL_NAME) continue;
+    if (call?.name === SHOW_DIFF_TOOL || call?.name === SHOW_CHART_TOOL) {
+      if (!eventTurn) items.push(chatBlockItemOf(call, m.id));
+      continue;
+    }
     if (call?.name === 'request_takeover') {
       items.push(takeoverItemOf(call, m.id));
       continue;

@@ -16,6 +16,8 @@ import {
   OpenDesignPageContext,
   OpenFileContext,
 } from '../board/file-pane.js';
+import { DiffFence } from '../components/chat/diff-glance.js';
+import { InlineImage, InlineImagePair } from '../components/chat/inline-image.js';
 import { CopyIconButton } from '../components/copy-icon-button.js';
 import { useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -35,7 +37,12 @@ import {
   type TaskItem,
   type TaskState,
 } from '../lib/markdown.js';
-import { AttachmentChip, attachmentIdFromKey, COMPOSER_CHIP_LABEL } from './attachment-chip.js';
+import {
+  AttachmentChip,
+  attachmentIdFromKey,
+  COMPOSER_CHIP_LABEL,
+  isImageAttachmentKey,
+} from './attachment-chip.js';
 import { type CodeToken, useCodeTokens } from './code-highlight.js';
 import { MermaidBlock } from './mermaid-block.js';
 import { Segments } from './segments.js';
@@ -292,12 +299,30 @@ function MarkdownListItem({
   );
 }
 
-function AttachmentBlock({ name, attachmentKey }: { name: string; attachmentKey: string }) {
+function AttachmentBlock({
+  name,
+  attachmentKey,
+  paired = false,
+}: {
+  name: string;
+  attachmentKey: string;
+  paired?: boolean;
+}) {
   const openers = {
     file: useContext(OpenFileContext),
     designPage: useContext(OpenDesignPageContext),
   };
   const set = useContext(FileSetContext);
+  const reply = useContext(ReplyContext);
+  if (reply && isImageAttachmentKey(attachmentKey))
+    return (
+      <InlineImage
+        name={name}
+        attachmentKey={attachmentKey}
+        paired={paired}
+        {...attachmentOpener(openers, set, name, attachmentKey)}
+      />
+    );
   return (
     <div className="chat-md-attachment">
       <AttachmentChip
@@ -320,9 +345,11 @@ const FLOW_GAP: Record<Flow, string> = {
 const BUBBLE_SPACED_GAP = 'mt-3';
 
 const StreamingContext = createContext(false);
+const ReplyContext = createContext(false);
 
 function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
   const streaming = useContext(StreamingContext);
+  const reply = useContext(ReplyContext);
   switch (block.kind) {
     case 'head':
       return <HeadingTag level={block.level} segments={block.segments} />;
@@ -332,6 +359,10 @@ function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
       const code = (
         <CodeBlock {...(block.lang !== undefined ? { lang: block.lang } : {})} text={block.text} />
       );
+      if (reply && (block.lang === 'diff' || block.lang === 'patch'))
+        return (
+          <DiffFence text={block.text} open={streaming && block.open === true} fallback={code} />
+        );
       return block.lang === 'mermaid' ? (
         <MermaidBlock text={block.text} source={code} final={!streaming || block.open !== true} />
       ) : (
@@ -375,18 +406,46 @@ function MarkdownBlocks({
   flow: Flow;
   spaced?: boolean[];
 }) {
-  return blocks.map((block, i) => (
+  const reply = useContext(ReplyContext);
+  const runs = reply ? imageRuns(blocks) : blocks.map((block, start) => ({ start, run: [block] }));
+  return runs.map(({ start, run }) => (
     <div
-      key={i}
+      key={start}
       className={cn(
         'chat-md-block',
-        i > 0 && (spaced?.[i] === true ? BUBBLE_SPACED_GAP : FLOW_GAP[flow]),
+        start > 0 && (spaced?.[start] === true ? BUBBLE_SPACED_GAP : FLOW_GAP[flow]),
       )}
-      data-kind={block.kind}
+      data-kind={run[0]?.kind}
     >
-      <MarkdownBlock block={block} depth={depth} />
+      {run.length > 1 ? (
+        <InlineImagePair>
+          {run.map((block, j) =>
+            block.kind === 'attachment' ? (
+              <AttachmentBlock key={j} name={block.name} attachmentKey={block.key} paired />
+            ) : null,
+          )}
+        </InlineImagePair>
+      ) : (
+        run[0] !== undefined && <MarkdownBlock block={run[0]} depth={depth} />
+      )}
     </div>
   ));
+}
+
+const isImageBlock = (block: ChatBlock | undefined) =>
+  block?.kind === 'attachment' && isImageAttachmentKey(block.key);
+
+function imageRuns(blocks: ChatBlock[]): { start: number; run: ChatBlock[] }[] {
+  const runs: { start: number; run: ChatBlock[] }[] = [];
+  blocks.forEach((block, i) => {
+    const open = runs.at(-1);
+    if (open !== undefined && isImageBlock(block) && open.run.every(isImageBlock)) {
+      open.run.push(block);
+      return;
+    }
+    runs.push({ start: i, run: [block] });
+  });
+  return runs;
 }
 
 function capitalize(lang: string): string {
@@ -497,6 +556,11 @@ export const REPLY_TEXT_CLS =
 export const REPLY_BLOCK_CLS =
   'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply))]';
 
+const isDiffFence = (group: ChatBubbleGroup) =>
+  group.blocks.length === 1 &&
+  group.blocks[0]?.kind === 'code' &&
+  (group.blocks[0].lang === 'diff' || group.blocks[0].lang === 'patch');
+
 function ReplyGroup({
   group,
   tools,
@@ -510,7 +574,11 @@ function ReplyGroup({
 }) {
   return (
     <div
-      className={group.bubble ? REPLY_BLOCK_CLS : 'group/reply-block relative w-fit max-w-full'}
+      className={
+        group.bubble
+          ? REPLY_BLOCK_CLS
+          : cn('group/reply-block relative max-w-full', isDiffFence(group) ? 'w-full' : 'w-fit')
+      }
       data-slot="reply-block"
       data-bubble={group.bubble ? 'true' : 'false'}
     >
@@ -571,7 +639,9 @@ export function ChatMarkdown({
     );
   return (
     <FileSetContext.Provider value={files}>
-      <StreamingContext.Provider value={streaming}>{body}</StreamingContext.Provider>
+      <StreamingContext.Provider value={streaming}>
+        <ReplyContext.Provider value={bubbles}>{body}</ReplyContext.Provider>
+      </StreamingContext.Provider>
     </FileSetContext.Provider>
   );
 }

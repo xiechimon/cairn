@@ -119,7 +119,11 @@ describe('quickRepliesContentSchema', () => {
 
 describe('suggest_replies tool definition', () => {
   it('stays outside the pinned 47-tool vocabulary and passes the tool shape', () => {
-    expect(CHIEF_REPLY_TOOLS.map((t) => t.name)).toEqual([SUGGEST_REPLIES_TOOL_NAME]);
+    expect(CHIEF_REPLY_TOOLS.map((t) => t.name)).toEqual([
+      SUGGEST_REPLIES_TOOL_NAME,
+      'show_diff',
+      'show_chart',
+    ]);
     expect(CHIEF_TOOL_NAMES).not.toContain(SUGGEST_REPLIES_TOOL_NAME);
     for (const def of CHIEF_REPLY_TOOLS)
       expect(remoteToolDefSchema.safeParse(def).success).toBe(true);

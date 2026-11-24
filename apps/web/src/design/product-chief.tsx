@@ -2,11 +2,16 @@ import { useState } from 'react';
 import { ChiefFallbackBanner, ChiefOutageBanner } from '../chief/chief-outage-banner.js';
 import { DecisionDock } from '../chief/decision-dock.js';
 import { QuestionReceipt } from '../chief/question-answered-line.js';
+import { ChatChartBlock, ChatChartSkeleton } from '../components/chat/chat-chart.js';
+import { DiffGlanceBlock, DiffGlanceSkeleton } from '../components/chat/diff-glance.js';
+import { InlineImage } from '../components/chat/inline-image.js';
 import {
   NOW,
   QUESTION_ANSWERED,
   QUESTION_CANCELLED,
   QUESTION_PENDING,
+  REPLY_CHART,
+  REPLY_GLANCE,
 } from './product-fixtures.js';
 import { Labeled, Section, Specimen } from './specimen.js';
 
@@ -51,6 +56,39 @@ export function ProductChiefSection() {
         <Labeled label="Skipped">
           <div className="w-160">
             <QuestionReceipt item={QUESTION_CANCELLED} />
+          </div>
+        </Labeled>
+      </Specimen>
+      <Specimen
+        id="reply-blocks"
+        title="Reply blocks"
+        note="DiffGlanceBlock, ChatChartBlock, InlineImage: parts of a Coordinator reply at prose width, each with the skeleton of its final shape"
+        stage="canvas"
+        className="flex-col"
+      >
+        <Labeled label="Code change glance">
+          <div className="w-160">
+            <DiffGlanceBlock glance={REPLY_GLANCE} />
+          </div>
+        </Labeled>
+        <Labeled label="Code change, still running">
+          <div className="w-160">
+            <DiffGlanceSkeleton head={null} rows={6} />
+          </div>
+        </Labeled>
+        <Labeled label="Before and after chart">
+          <div className="w-144">
+            <ChatChartBlock chart={REPLY_CHART} />
+          </div>
+        </Labeled>
+        <Labeled label="Chart, still running">
+          <div className="w-144">
+            <ChatChartSkeleton />
+          </div>
+        </Labeled>
+        <Labeled label="Image whose file is missing">
+          <div className="w-144">
+            <InlineImage name="resume.png" attachmentKey="team-1/missing.png" />
           </div>
         </Labeled>
       </Specimen>

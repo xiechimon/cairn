@@ -1,4 +1,4 @@
-import type { AgentTodoItem } from '@cairn/shared';
+import { type AgentTodoItem, INLINE_IMAGE_EXTS } from '@cairn/shared';
 import { Lexer, Marked, type Token, type Tokens } from 'marked';
 import markedCjkFriendly from 'marked-cjk-friendly';
 import type { DocSegment } from '../fixtures/records.js';
@@ -421,12 +421,21 @@ export function parseChatMarkdown(text: string): ChatBlock[] {
 
 const UNBUBBLED = new Set<ChatBlock['kind']>(['code', 'table', 'attachment', 'tasks', 'rule']);
 
+const isImageBlock = (block: ChatBlock) =>
+  block.kind === 'attachment' &&
+  (INLINE_IMAGE_EXTS as readonly string[]).includes(
+    block.key.slice(block.key.lastIndexOf('.') + 1).toLowerCase(),
+  );
+
 export function chatBubbleGroups(text: string): ChatBubbleGroup[] {
   const groups: ChatBubbleGroup[] = [];
   for (const { block, spaced, source } of topBlocks(text)) {
     const bubble = !UNBUBBLED.has(block.kind);
     const open = groups.at(-1);
-    if (open !== undefined && bubble && open.bubble) {
+    if (
+      open !== undefined &&
+      ((bubble && open.bubble) || (isImageBlock(block) && open.blocks.every(isImageBlock)))
+    ) {
       open.blocks.push(block);
       open.spaced.push(spaced);
       open.source = `${open.source}\n${source}`;

@@ -9,6 +9,7 @@ export const CHIEF_ROW_CLASS: Readonly<Record<ChiefRowKind, ChiefRowClass | 'hid
   user: 'message',
   robot: 'message',
   'daily-report': 'message',
+  'chat-block': 'message',
   'channel-mirror': 'message',
   handoff: 'message',
   stopped: 'message',

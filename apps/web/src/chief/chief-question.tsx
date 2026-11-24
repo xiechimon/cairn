@@ -130,7 +130,10 @@ export function ChiefQuestion() {
   if (shown === undefined || questionDockState.minimized()) return null;
   const key = draftKeyOf(shown);
   return (
-    <div data-testid="chief-question-dock" className="mx-auto mb-2 flex min-h-0 w-[calc(100%-2rem)] max-w-chat flex-col">
+    <div
+      data-testid="chief-question-dock"
+      className="mx-auto mb-2 flex min-h-0 w-[calc(100%-2rem)] max-w-chat flex-col"
+    >
       <DecisionDock
         key={shown.item.requestId}
         item={shown.item}

@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { SHOW_CHART_TOOL, SHOW_DIFF_TOOL } from '../records/chat-block.js';
+import { CHART_MAX_CATEGORIES, CHART_MAX_SERIES } from '../records/chat-chart.js';
+import { GLANCE_MAX_LINES } from '../records/diff-glance.js';
 import { RUNNER_OS, runnerOsSchema } from '../records/machine-capabilities.js';
 import { memoryToolParamsSchemas, TEAM_MEMORY_MAX_CHARS } from '../records/memory.js';
 import { THREAD_REPORT_LINE_MAX } from '../records/message.js';
@@ -38,6 +41,8 @@ export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'request_secret',
   'memories',
   'attachment',
+  SHOW_DIFF_TOOL,
+  SHOW_CHART_TOOL,
 ]);
 
 export const machineToolRelayBodySchema = z.object({
@@ -944,6 +949,52 @@ export const CHIEF_REPLY_TOOLS: readonly RemoteToolDef[] = [
         ),
       },
       ['replies'],
+    ),
+  },
+  {
+    name: SHOW_DIFF_TOOL,
+    description: `Show the user a glance of a task's code change inside your reply: the key lines of the most important file (at most ${GLANCE_MAX_LINES}) and one line per other file. Call it where the change belongs in your reply, then keep writing. Name the key lines with focus when you know which part explains the change; without focus the changed lines and one line around them are picked. Do not paste the same diff as text.`,
+    parameters: obj(
+      {
+        todoId: str('Todo id whose latest build diff to show.'),
+        focus: arr(
+          obj(
+            {
+              path: str('Repository-relative path of the key file.'),
+              start: num('First new-side line number of the key lines.'),
+              end: num('Last new-side line number of the key lines.'),
+            },
+            ['path'],
+          ),
+          'Optional key file and line ranges; the first entry whose path is in the diff leads, and every entry with that path adds a range (two short ranges read better than one long one).',
+        ),
+      },
+      ['todoId'],
+    ),
+  },
+  {
+    name: SHOW_CHART_TOOL,
+    description: `Draw a bar or line chart inside your reply when numbers compare across categories or over time and a chart reads faster than a table. Bar for categories, line for a time series. Mark a before/after comparison with role on the two series. At most ${CHART_MAX_SERIES} series and ${CHART_MAX_CATEGORIES} categories; every series has one value per category. Use real numbers you read, never estimates.`,
+    parameters: obj(
+      {
+        type: str('bar or line.'),
+        title: str("Chart title, in the user's language."),
+        unit: str('Optional unit shown next to the title, such as ms.'),
+        categories: arr({ type: 'string' }, 'Category labels or time points, in order.'),
+        series: arr(
+          obj(
+            {
+              name: str('Series label shown in the legend.'),
+              values: arr({ type: 'number' }, 'One value per category.'),
+              role: str('Optional: before or after in a before/after comparison.'),
+            },
+            ['name', 'values'],
+          ),
+          'Data series.',
+        ),
+        summary: str('One sentence under the chart saying what it shows.'),
+      },
+      ['type', 'title', 'categories', 'series'],
     ),
   },
 ];

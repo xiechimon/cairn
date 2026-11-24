@@ -129,11 +129,13 @@ export function DiffFileBody({
   buildId,
   showFull,
   wrap = false,
+  glance = false,
 }: {
   file: DiffFile;
   buildId: string | null;
   showFull: boolean;
   wrap?: boolean;
+  glance?: boolean;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -144,9 +146,11 @@ export function DiffFileBody({
     () => file.hunks.map((hunk) => computeHunkWordDiff(hunk.lines)),
     [file.hunks],
   );
-  const lineText = wrap
-    ? 'min-w-0 pl-2 whitespace-pre-wrap [overflow-wrap:anywhere]'
-    : 'pl-2 whitespace-pre';
+  const lineText = glance
+    ? 'min-w-0 flex-1 overflow-hidden pr-3 pl-2 whitespace-pre mask-r-from-[calc(100%-3rem)]'
+    : wrap
+      ? 'min-w-0 pl-2 whitespace-pre-wrap [overflow-wrap:anywhere]'
+      : 'pl-2 whitespace-pre';
   const lineRow = wrap ? `${DIFF_LINE} items-start` : DIFF_LINE;
   return (
     <>
@@ -155,22 +159,36 @@ export function DiffFileBody({
           const wordDiff = wordDiffs[hi];
           return (
             <div key={hunk.header}>
-              {unmodifiedBefore(file.hunks, hi) > 0 && (
+              {glance
+                ? hi > 0 && (
+                    <div
+                      className="flex h-5 items-center pl-6 font-mono text-code text-(--text-tertiary) select-none"
+                      data-testid="diff-fold"
+                    >
+                      <span aria-hidden>⋯</span>
+                      <span className="sr-only">
+                        {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
+                      </span>
+                    </div>
+                  )
+                : unmodifiedBefore(file.hunks, hi) > 0 && (
+                    <div
+                      className="flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
+                      data-testid="diff-fold"
+                    >
+                      {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
+                    </div>
+                  )}
+              {!glance && (
                 <div
-                  className="flex h-7 items-center pl-3 text-meta text-(--text-tertiary)"
-                  data-testid="diff-fold"
+                  className={cn(
+                    'bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]',
+                    wrap && 'truncate pr-3',
+                  )}
                 >
-                  {t('{n} 行未改动', { n: unmodifiedBefore(file.hunks, hi) })}
+                  {hunk.header}
                 </div>
               )}
-              <div
-                className={cn(
-                  'bg-(--secondary) pl-18 font-mono text-code leading-6 text-(--text-tertiary) [font-variant-ligatures:none]',
-                  wrap && 'truncate pr-3',
-                )}
-              >
-                {hunk.header}
-              </div>
               {hunk.lines.map((line, i) => {
                 const segs = wordDiff?.segments.get(i);
                 const isCapped = wordDiff?.capped.has(i) === true;

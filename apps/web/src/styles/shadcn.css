@@ -239,6 +239,11 @@
   --diff-del-bg: #2f1f1b;
   --diff-add-word-bg: #2b3f29;
   --diff-del-word-bg: #48291f;
+  --chart-1: var(--card-button);
+  --chart-2: #676867;
+  --chart-3: #7fa3cc;
+  --chart-4: var(--running);
+  --chart-5: var(--destructive);
   --text-on-accent: #1a1404;
   --count-badge: #376dd6;
   --count-badge-ink: var(--text-on-veil);
@@ -397,6 +402,11 @@
   --diff-del-bg: #f9e8e3;
   --diff-add-word-bg: #d2e4c7;
   --diff-del-word-bg: #f1d2c9;
+  --chart-1: var(--card-button);
+  --chart-2: #9c9c98;
+  --chart-3: #2f55a8;
+  --chart-4: var(--running);
+  --chart-5: var(--destructive);
   --text-on-accent: #ffffff;
   --count-badge: #376dd6;
   --count-badge-ink: var(--text-on-veil);

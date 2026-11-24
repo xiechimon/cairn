@@ -28,6 +28,7 @@ import { parseAttachmentTokens, splitDraft } from '../overlay/attachment-paste.j
 import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
+import { ChatBlockRow } from './chat-block-row.js';
 import { ChiefReportMessage } from './chief-report-row.js';
 import { chiefRowRenders } from './chief-row-kinds.js';
 import { isLiveNotice } from './live-notice.js';
@@ -294,6 +295,7 @@ export function chiefStreamRowKey(
     case 'robot':
       return item.id ?? (item.typing === true ? LIVE_TURN_KEY : index);
     case 'thinking':
+    case 'chat-block':
     case 'question':
     case 'handoff':
     case 'takeover':
@@ -512,6 +514,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         <FailureMarker label={t('未完成')} testId="chief-turn-error" />
       </MessageScrollerItem>
     );
+  if (item.kind === 'chat-block')
+    return <ChatBlockRow item={item} joinsPrev={joinsPrev} joinsNext={joinsNext} />;
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'secret-request') return <SecretRequestCard item={item} />;

@@ -22,6 +22,8 @@ import {
   MODEL_SOURCE_RUNTIME_LABELS,
   SECRET_NAME_PATTERN,
   SECRET_NAME_RULE,
+  SHOW_CHART_TOOL,
+  SHOW_DIFF_TOOL,
   SUGGEST_REPLIES_TOOL_NAME,
   updateSkillToolParamsSchema,
 } from '@cairn/shared';
@@ -74,6 +76,7 @@ import {
 } from './chief-questions.js';
 import { suggestQuickReplies } from './chief-quick-replies.js';
 import { assertToolNotRemoved, executeRouterTool, isRouterTool } from './chief-router-tools.js';
+import { showChart, showDiff } from './chief-show.js';
 import { readConversationPage } from './conversation-page.js';
 import {
   createRequestTodo,
@@ -353,6 +356,8 @@ export async function executeChiefTool(
   requireUnarchivedTargets(db, ctx.teamId, name, params);
   if (isRouterTool(name)) return executeRouterTool(deps, ctx, name, params);
   if (name === SUGGEST_REPLIES_TOOL_NAME) return suggestQuickReplies(deps, ctx, params);
+  if (name === SHOW_DIFF_TOOL) return showDiff(deps, ctx.teamId, params);
+  if (name === SHOW_CHART_TOOL) return showChart(params);
   const action = actionByToolName(name);
   if (action?.surfaces.includes('coordinator') === true) {
     const result = executeAction(

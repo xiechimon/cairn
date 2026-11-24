@@ -1,6 +1,7 @@
 import {
   type AgentTodoItem,
   type BackgroundTask,
+  type ChatBlockResult,
   type ChiefReportContent,
   type ChiefTurnErrorContent,
   type ClaudeLogin,
@@ -693,6 +694,14 @@ export type ChiefStreamItem =
       kind: 'daily-report';
       id: string;
       report: ChiefReportContent;
+    }
+  | {
+      kind: 'chat-block';
+      id: string;
+      tool: 'diff' | 'chart';
+      state: 'pending' | 'ready' | 'failed';
+      block?: ChatBlockResult;
+      path?: string;
     }
   | {
       kind: 'runner-offline';
