@@ -44,6 +44,7 @@ async function world() {
       kind: 'build',
       status: 'claimed',
       machineId: 'm1',
+      claimedAt: 1,
       createdAt: 1,
     })
     .run();
@@ -56,6 +57,7 @@ async function world() {
       headers: { 'content-type': 'application/json', authorization: 'Bearer rt' },
       body: JSON.stringify({
         name: 'attach_file',
+        generation: 1,
         params: prepareFileAttachment(cwd, { path: name }),
       }),
     });
