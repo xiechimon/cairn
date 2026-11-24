@@ -105,11 +105,16 @@ test('promote listens for completed ci runs on queue refs and serializes promoti
   assert.equal(cancel, 'false');
 });
 
-test('desktop-release serializes every tick on one group and never cancels the running release, whatever the trigger', () => {
+test('desktop-release serializes every wake on one group and never cancels the running release, whatever the trigger', () => {
+  const text = readFileSync(join(WORKFLOWS, 'desktop-release.yml'), 'utf8');
+  assert.match(
+    text,
+    /workflow_run:\s*\n\s*workflows: \[ci\]\s*\n\s*types: \[completed\]\s*\n\s*branches: \[main\]/,
+  );
   const { group, cancel } = concurrencyOf('desktop-release');
   assert.equal(group, 'desktop-release');
   assert.equal(cancel, 'false');
-  for (const event_name of ['schedule', 'workflow_dispatch']) {
+  for (const event_name of ['schedule', 'workflow_dispatch', 'workflow_run']) {
     const run = decision('desktop-release', {
       event_name,
       ref: 'refs/heads/main',

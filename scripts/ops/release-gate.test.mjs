@@ -464,13 +464,17 @@ const jobBlock = (name) => {
   return match[1];
 };
 
-test('desktop-release polls on a fifteen-minute schedule and manual dispatch; no event can reach it', () => {
+test('desktop-release wakes on every completed main ci run, a fifteen-minute schedule and manual dispatch; no push can reach it', () => {
   assert.equal(parsed.on.push, undefined);
-  assert.equal(parsed.on.workflow_run, undefined);
   assert.deepEqual(parsed.on.schedule, [{ cron: '*/15 * * * *' }]);
   assert.ok('workflow_dispatch' in parsed.on);
+  assert.deepEqual(parsed.on.workflow_run, {
+    workflows: ['ci'],
+    types: ['completed'],
+    branches: ['main'],
+  });
   assert.equal(parsed.jobs.redispatch, undefined, 'the re-dispatch job is gone');
-  assert.doesNotMatch(workflow, /workflow_run|release-redispatch|GITHUB_EVENT_NAME/);
+  assert.doesNotMatch(workflow, /release-redispatch|GITHUB_EVENT_NAME/);
 });
 
 test('a manual dispatch runs the decide job only when it names the main ref', () => {

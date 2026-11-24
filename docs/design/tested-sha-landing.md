@@ -28,14 +28,18 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
 - inside that run, jobs `check`, `pack-smoke` and `e2e-gate` all succeeded —
   the same three names the `green-main` ruleset requires on the pushed commit
   and `desktop-release` re-verifies before publishing. `desktop-release` is
-  a level-triggered poller, not a push reaction: it runs on a 15-minute
-  `schedule` and on `workflow_dispatch` to `main` only, so trusted `main`
-  code still runs it. Runs serialize on one workflow-level concurrency
+  a level-triggered poller, not a push reaction: it is woken by a
+  `workflow_run` on every `ci` run completed on `main`, by a 15-minute
+  `schedule` backstop — GitHub's schedule trigger is best-effort and can
+  delay or drop ticks for hours — and by `workflow_dispatch` to `main`
+  only, so trusted `main` code still runs it. The wake is still
+  level-triggered: the run resolves the `main` tip fresh rather than
+  trusting the event's SHA. Runs serialize on one workflow-level concurrency
   group that never cancels the running release (`desktop-release`,
   `cancel-in-progress: false`); GitHub keeps only the newest pending run,
-  so a later tick or dispatch replaces an earlier pending one and a run
+  so a later wake or dispatch replaces an earlier pending one and a run
   that finds the slot busy waits. Nothing retries a failed or replaced run
-  as such: a later tick evaluates the `main` tip current at that time,
+  as such: a later wake evaluates the `main` tip current at that time,
   and no re-dispatch job exists. Each run resolves the current
   `main` tip through the branches API and checks it out, then
   `scripts/ops/release-decide.mjs` judges it once: it plans the release
@@ -70,9 +74,10 @@ head). Rejected candidates never move `main`; the lane rebases and re-queues.
   older release cannot lower them. `decide` picks the version once
   and passes it to both architectures and to `publish`; nothing renames
   or bumps it afterwards — the packaged app, the assets, the manifest
-  and the tag all carry the decided version. Fifteen minutes is the polling cadence, not
+  and the tag all carry the decided version. The ci-completion wake and the
+  fifteen-minute backstop are polling cadence, not
   a bound on release latency — the price of removing the edge-triggered
-  races: a tick that finds the slot busy queues behind the active build,
+  races: a wake that finds the slot busy queues behind the active build,
   and the tip can be superseded while it packages. `publish`
   re-reads the evidence: the run's latest attempt must have ended
   `success` with green jobs inside `runs/{id}/attempts/{attempt}/jobs`,
@@ -276,7 +281,7 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
 4. Rollout day for the poller: cancel every `desktop-release` run started
    on the pre-poller workflow and never rerun one — GitHub reruns a
    workflow at its original revision, so a rerun of a pre-change run
-   publishes without the gate. The schedule retries an eligible tip on
+   publishes without the gate. The next wake retries an eligible tip on
    its own; a tag or release left behind by a failed publish is skipped
    past by version — the next run allocates above it.
 
@@ -320,7 +325,7 @@ which keeps lanes honest via AGENTS.md but is toothless by itself.
   a release or a tag, and a
   rerun that finds the SHA
   already covered or the version occupied refuses; the workflow
-  shape is `schedule` plus
+  shape is a `ci`-on-`main` `workflow_run` wake plus `schedule` and
   `main`-only dispatch on one concurrency group that never cancels the running release, with
   no re-dispatch path.
 - Self-test: push the change itself as `queue/main`, watch its run, promote it
