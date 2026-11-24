@@ -1,4 +1,3 @@
-import { timingSafeEqual } from 'node:crypto';
 import {
   apiKeyRecordSchema,
   BRAND,
@@ -15,11 +14,11 @@ import { eq } from 'drizzle-orm';
 import type { Context } from 'hono';
 import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { type agentMemory, apiKey, project } from './db/schema.js';
+import { type agentMemory, project } from './db/schema.js';
 import { sha256Hex } from './lib/crypto.js';
 import { notFound } from './lib/errors.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
-import { gitKeyUsable } from './services/credentials.js';
+import { type ResolvedGitAuth, resolveGitAuth } from './services/credentials.js';
 import type { GithubIssueFaceDeps } from './services/github-issues.js';
 import { assertDeviceActive } from './services/paired-devices.js';
 import { isPersonalSpace } from './services/personal-space.js';
@@ -99,20 +98,16 @@ export function requestOrigin(c: Context): string {
   return tailnetOriginOf(c) ?? new URL(c.req.url).origin;
 }
 
-export function verifyGitBasicAuth(ctx: AppContext, header: string): string | undefined {
+export function verifyGitBasicAuth(ctx: AppContext, header: string): ResolvedGitAuth | null {
   const match = /^Basic\s+(.+)$/i.exec(header);
-  if (!match) return undefined;
+  if (!match) return null;
   const decoded = Buffer.from(match[1] ?? '', 'base64').toString('utf8');
   const sep = decoded.indexOf(':');
-  if (sep < 0) return undefined;
+  if (sep < 0) return null;
   const secret = decoded.slice(sep + 1);
-  if (secret === '') return undefined;
+  if (secret === '') return null;
   const hash = Buffer.from(sha256Hex(secret));
-  const rows = ctx.db.select().from(apiKey).where(eq(apiKey.gitAccess, true)).all();
-  const row = rows.find(
-    (r) => r.keyHash.length === hash.byteLength && timingSafeEqual(Buffer.from(r.keyHash), hash),
-  );
-  return row && gitKeyUsable(ctx.db, row.name) ? row.id : undefined;
+  return resolveGitAuth(ctx.db, hash);
 }
 
 export function githubAppOf(ctx: AppContext) {

@@ -14,7 +14,14 @@ import {
 import { enqueueChiefStep } from '../src/services/chief.js';
 import { notifyChiefMessage } from '../src/services/notifications.js';
 import { createScheduler } from '../src/services/scheduler.js';
-import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  machineIdByName,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 
 const IDLE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -109,7 +116,11 @@ async function setupTurn(content: string): Promise<TurnWorld> {
       expect(putRes.status).toBe(200);
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
-        body: { status: 'success', sessionId: `sess-${stepId}` },
+        body: {
+          status: 'success',
+          sessionId: `sess-${stepId}`,
+          generation: claimedGeneration(s.db, stepId),
+        },
       });
       expect(doneRes.status).toBe(200);
     },

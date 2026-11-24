@@ -16,6 +16,7 @@ import {
 import { providerHealth } from '../src/services/provider-health.js';
 import {
   bootServer,
+  claimedGeneration,
   insertClaudeSubscription,
   issueApiKey,
   postProject,
@@ -136,11 +137,26 @@ async function chiefWorld(
       return body.step ? claimedStepSchema.parse(body.step) : null;
     },
     async done(stepId: string, body: Record<string, unknown>): Promise<Response> {
-      const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+      const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+        cred: token,
+        body: { generation: claimedGeneration(s.db, stepId), ...body },
+      });
       return res;
     },
     async token(stepId: string) {
-      const res = await call(s.app, 'GET', `/api/machine/token/${stepId}`, { cred: token });
+      const generation = s.db
+        .select({ claimedAt: stepTable.claimedAt })
+        .from(stepTable)
+        .where(eq(stepTable.id, stepId))
+        .get()?.claimedAt;
+      const res = await call(
+        s.app,
+        'GET',
+        `/api/machine/token/${stepId}?generation=${generation}`,
+        {
+          cred: token,
+        },
+      );
       expect(res.status).toBe(200);
       return (await res.json()) as { provider: { providerId: string } | null };
     },
@@ -205,7 +221,10 @@ async function gateWorld(fallbackModels: { provider: string; modelId: string }[]
       return body.step ? claimedStepSchema.parse(body.step) : null;
     },
     async done(stepId: string, body: Record<string, unknown>) {
-      return call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+      return call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+        cred: token,
+        body: { generation: claimedGeneration(s.db, stepId), ...body },
+      });
     },
   };
 }

@@ -1,6 +1,6 @@
 import { rmSync } from 'node:fs';
 import { dirname, isAbsolute, join } from 'node:path';
-import type { BoundGitCredentials } from '@cairn/shared';
+import { type BoundGitCredentials, GITHUB_REPOSITORY_RENAMED } from '@cairn/shared';
 import { gitCredentialEnv } from './git.js';
 import { ensurePrivateDir, writePrivateFile } from './private-fs.js';
 
@@ -12,6 +12,25 @@ export function stepCredentialStateDirs(env: NodeJS.ProcessEnv | undefined): str
     env?.GH_CONFIG_DIR !== undefined && isAbsolute(env.GH_CONFIG_DIR) ? [env.GH_CONFIG_DIR] : [],
   ].flat();
   return [...new Set(dirs)];
+}
+
+export class GitHubAppTokenUnavailableError extends Error {
+  constructor(body: string) {
+    let reason: unknown;
+    try {
+      const response: unknown = JSON.parse(body);
+      if (typeof response === 'object' && response !== null && 'reason' in response)
+        reason = response.reason;
+    } catch {
+      reason = undefined;
+    }
+    super(
+      reason === GITHUB_REPOSITORY_RENAMED.reason
+        ? GITHUB_REPOSITORY_RENAMED.message
+        : 'GitHub App token service unavailable',
+    );
+    this.name = 'GitHubAppTokenUnavailableError';
+  }
 }
 
 export class StepAppCredential {
@@ -26,7 +45,7 @@ export class StepAppCredential {
     private readonly dir: string,
     credential: BoundGitCredentials,
     private readonly fetchCredential: () => Promise<BoundGitCredentials>,
-    private readonly remember: (value: string) => void,
+    private readonly remember: (value: string, expiresAt: number) => void,
     private readonly now: () => number = Date.now,
     private readonly onError: () => void = () => undefined,
   ) {
@@ -88,7 +107,7 @@ export class StepAppCredential {
   }
 
   private replace(credential: BoundGitCredentials): void {
-    this.remember(credential.password);
+    this.remember(credential.password, credential.expiresAt ?? this.now() + 60 * 60_000);
     if (credential.kind !== 'app' || /[\r\n\0]/.test(credential.password))
       throw new Error('App credential refresh unavailable');
     writePrivateFile(this.tokenFile, credential.password);

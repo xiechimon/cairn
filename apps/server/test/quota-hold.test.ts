@@ -14,7 +14,13 @@ import {
 } from '../src/db/schema.js';
 import { QUOTA_HOLD_BACKOFF_MS, quotaHoldBackoffMs } from '../src/services/dispatch-timeouts.js';
 import { toTodoRecord } from '../src/services/todos.js';
-import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  postProject,
+  seedSessionRoute,
+} from './helpers.js';
 
 const QUOTA_ERROR = '402: {"message":"insufficient quota: usage limit reached","type":..}';
 const NETWORK_ERROR = 'upstream stream disconnected: connection reset by peer';
@@ -97,7 +103,10 @@ async function setupWorld() {
     return claimedStepSchema.parse(body.step);
   }
   async function done(stepId: string, body: Record<string, unknown>): Promise<void> {
-    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: token,
+      body: { generation: claimedGeneration(s.db, stepId), ...body },
+    });
     if (res.status !== 200) throw new Error(`done returned ${res.status}`);
   }
   const todoRow = () => s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;

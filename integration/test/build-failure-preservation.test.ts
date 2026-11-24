@@ -117,7 +117,7 @@ async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') 
   };
   const claimed = {
     ...CLAIMED,
-    step: { ...CLAIMED.step, buildId: 'b1', kind: 'build' as const },
+    step: { ...CLAIMED.step, buildId: 'b1', kind: 'build' as const, generation: 1 },
     conversationId: 'b1',
     project: {
       id: project.id,
@@ -143,6 +143,7 @@ async function failedBuild(failure: 'duration' | 'idle' | 'crash' = 'duration') 
     },
   );
   const body = machineDoneBodySchema.parse(client.doneBodies[0]!.body);
+  expect(body.generation).toBe(claimed.step.generation);
   const deps = {
     ...s.svc,
     box: s.secretBox,

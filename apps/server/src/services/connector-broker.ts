@@ -44,6 +44,7 @@ import { openMailPassword } from './secrets.js';
 
 export interface ConnectorBrokerDeps {
   db: Db;
+  assertClaim?: () => void;
   mcp: McpConnectorDeps;
   hub?: TeamStreamHub;
   convHub?: ConversationStreamHub;
@@ -410,6 +411,7 @@ function mailSendPayloadOf(row: EffectRow): MailSendPayload | null {
 }
 
 async function sendMailEffect(deps: ConnectorBrokerDeps, effectRow: EffectRow): Promise<unknown> {
+  deps.assertClaim?.();
   const p = mailSendPayloadOf(effectRow);
   if (p === null) throw failEffect('mail-send payload is malformed');
   const account = deps.db
@@ -510,6 +512,7 @@ export async function executeConnectorToolCall(
   }
   const dispatch = async (): Promise<string> => {
     const endpoint = await connectorEndpointBySlug(deps.mcp, ctx.teamId, parsed.slug);
+    deps.assertClaim?.();
     if (endpoint === null) throw new HttpError(409, `connector ${parsed.slug} is not deliverable`);
     return callConnectorTool(deps.mcp, endpoint, tool.name, params, signal);
   };

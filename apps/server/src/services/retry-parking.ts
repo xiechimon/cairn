@@ -5,6 +5,7 @@ import {
   RETRY_PARKED_MARK,
   runtimeUpdateRequired,
   UNSTARTED_STEP_STATUSES,
+  WORKFLOW_PUSH_REFUSAL,
 } from '@cairn/shared';
 import { and, eq, gt, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -52,6 +53,21 @@ export function retryIsParked(error: string): boolean {
   return kind === 'model_unavailable' || kind === 'runtime_outdated';
 }
 
+function workflowPushRefused(error: string): boolean {
+  return (
+    error === WORKFLOW_PUSH_REFUSAL ||
+    (error.startsWith(RETRY_PARKED_MARK) && error.endsWith(`Last error: ${WORKFLOW_PUSH_REFUSAL}`))
+  );
+}
+
+export function automaticRestartBlocked(error: string): boolean {
+  return workflowPushRefused(error) || retryIsParked(error);
+}
+
+export function assertPermanentRefusalCleared(error: string | null): void {
+  if (error !== null && workflowPushRefused(error)) throw new HttpError(409, WORKFLOW_PUSH_REFUSAL);
+}
+
 function runtimeUpdateReason(
   update: NonNullable<ReturnType<typeof runtimeUpdateRequired>>,
 ): string {
@@ -63,7 +79,7 @@ function runtimeUpdateReason(
 }
 
 export function failureNeedsHuman(errorMessage: string): boolean {
-  if (retryIsParked(errorMessage)) return true;
+  if (automaticRestartBlocked(errorMessage)) return true;
   if (errorMessage.startsWith('PR Auto-fix needs you:')) return true;
   if (isProviderAuthFailure(errorMessage)) return true;
   if (GATE_REJECTION.some((mark) => errorMessage.includes(mark))) return true;
@@ -110,6 +126,7 @@ export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): vo
   if (!row?.latestBuildId) return;
   if (row.phase === 'failed') parkFailedBuild(deps, row.latestBuildId);
   const latest = deps.db.select().from(build).where(eq(build.id, row.latestBuildId)).get();
+  assertPermanentRefusalCleared(latest?.errorMessage ?? null);
   if (latest && retryIsParked(latest.errorMessage ?? '')) {
     const update = runtimeUpdateRequired(latest.errorMessage ?? '');
     throw new HttpError(
@@ -125,7 +142,7 @@ export function assertAutomaticRetryAllowed(deps: BuildDeps, todoId: string): vo
 
 export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs()): boolean {
   const row = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  if (!row) return false;
+  if (!row || workflowPushRefused(row.errorMessage ?? '')) return false;
   const owner = deps.db.select().from(todo).where(eq(todo.id, row.todoId)).get();
   if (!owner || owner.latestBuildId !== buildId || owner.archivedAt !== null) return false;
   const failures = deps.db

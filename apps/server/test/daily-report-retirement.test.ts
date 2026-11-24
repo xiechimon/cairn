@@ -10,10 +10,11 @@ import type { Db } from '../src/db/client.js';
 import * as schema from '../src/db/schema.js';
 import { agentMemory, chief, chiefMessage, chiefThread, step, todo } from '../src/db/schema.js';
 import { composeChiefSystemPrompt } from '../src/services/chief.js';
-import { finishStep } from '../src/services/machines.js';
+
 import { createScheduler } from '../src/services/scheduler.js';
 import {
   bootServer,
+  finishStepForClaim,
   insertMachineIntoOldSchema,
   insertStepIntoOldSchema,
   postProject,
@@ -260,7 +261,7 @@ test.each(['report', 'daily'] as const)(
     const messages = s.db.select().from(chiefMessage).all();
     const memories = s.db.select().from(agentMemory).all();
     const chiefs = s.db.select().from(chief).all();
-    await finishStep(
+    await finishStepForClaim(
       { ...s.svc, box: s.secretBox, reposDir: s.reposDir, attachmentsDir: s.attachmentsDir },
       machineId,
       'report-claimed',

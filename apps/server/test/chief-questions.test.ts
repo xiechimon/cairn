@@ -19,7 +19,14 @@ import {
   holdForQuestion,
 } from '../src/services/chief-questions.js';
 import { stepSessionPath } from '../src/services/machine-uploads.js';
-import { bootServer, issueApiKey, machineIdByName, seedRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  machineIdByName,
+  seedRoute,
+  type TestServer,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -165,7 +172,7 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
     'session-upload',
     'transcript-upload',
   ] as const) {
-    test.each(['valid', 'revoke', 'rotate'] as const)(
+    test.each(['valid', 'revoke', 'rotate', 'reclaim'] as const)(
       `a delayed ${path} body revalidates a %s credential before any mutation`,
       async (change) => {
         const w = await makeWorld();
@@ -231,7 +238,9 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
           body,
           duplex: 'half',
         };
-        const waiting = w.s.app.request(new Request(new URL(url, 'http://localhost'), init));
+        const requestUrl = new URL(url, 'http://localhost');
+        requestUrl.searchParams.set('generation', String(claimedGeneration(w.s.db, w.stepId)));
+        const waiting = w.s.app.request(new Request(requestUrl, init));
         try {
           await vi.waitFor(() => expect(reading).toBe(true));
           if (change === 'revoke') {
@@ -245,9 +254,17 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
               .where(eq(machineTable.id, w.machineId))
               .run();
           }
+          if (change === 'reclaim') {
+            w.s.db
+              .update(stepTable)
+              .set({ claimedAt: claimedGeneration(w.s.db, w.stepId) + 1 })
+              .where(eq(stepTable.id, w.stepId))
+              .run();
+          }
           finishBody();
           const response = await waiting;
-          expect(response.status).toBe(change === 'valid' ? 200 : 401);
+          const permitted = change === 'valid' || (change === 'reclaim' && path === 'presence');
+          expect(response.status).toBe(permitted ? 200 : change === 'reclaim' ? 409 : 401);
           const machine = w.s.db
             .select()
             .from(machineTable)
@@ -266,7 +283,7 @@ describe('#1049 question line lifecycle (createOrGet / answer / cancel / wrap-up
             'transcript-upload': transcript !== undefined,
             'session-upload': existsSync(stepSessionPath(w.s.attachmentsDir, w.stepId)),
           }[path];
-          expect(written).toBe(change === 'valid');
+          expect(written).toBe(permitted);
         } finally {
           finishBody();
           await waiting;

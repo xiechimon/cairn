@@ -6,7 +6,7 @@ import {
   type MachineDoneBody,
   workspaceHookRowContent,
 } from '@cairn/shared';
-import { MachineApiError } from '../machine-client.js';
+import { bindMachineClaim, MachineApiError } from '../machine-client.js';
 import { writePrivateFile } from '../private-fs.js';
 import { type RunStepDeps, type RunStepOptions, runStep } from '../runner.js';
 import { resumePendingUpload } from '../step-final-upload.js';
@@ -40,6 +40,7 @@ export async function runOrbStep(
     return;
   }
   const stepId = claimed.step.id;
+  deps = { ...deps, client: bindMachineClaim(deps.client, stepId, claimed.step.generation) };
   if (!isOrbPathId(stepId)) throw new Error('Invalid orb step id');
   deps.journal.claim({
     stepId,
@@ -57,7 +58,10 @@ export async function runOrbStep(
   if (options.stopRequest) stop.accept(options.stopRequest);
   const heartbeat = setInterval(() => {
     void deps.client.heartbeat(stepId).catch((error: unknown) => {
-      if (error instanceof MachineApiError && (error.status === 410 || error.status === 404))
+      if (
+        error instanceof MachineApiError &&
+        (error.status === 410 || error.status === 404 || error.status === 409)
+      )
         void stop.deliver({ discard: false });
     });
   }, deps.heartbeatIntervalMs ?? 30_000);
@@ -227,6 +231,7 @@ export async function runOrbStep(
             socketPath,
             stepId,
             release,
+            generation: claimed.step.generation,
             ...(remoteSandbox ? { authTimeoutMs: ORB_STREAM_AUTH_TIMEOUT_MS } : {}),
             onStaleRelease: (loaded) => {
               staleRelease = loaded;
@@ -382,5 +387,9 @@ export async function relayOrbStopped(deps: RunStepDeps, handle: OrbHandle): Pro
     content: workspaceHookRowContent(note),
     createdAt: Date.now(),
   };
-  await deps.client.transcriptRow?.(handle.lastStepId, row);
+  const generation = deps.journal.get(handle.lastStepId)?.claimed?.step.generation;
+  await bindMachineClaim(deps.client, handle.lastStepId, generation).transcriptRow?.(
+    handle.lastStepId,
+    row,
+  );
 }

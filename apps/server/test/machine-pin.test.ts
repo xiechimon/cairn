@@ -15,6 +15,7 @@ import {
 } from '../src/db/schema.js';
 import {
   bootServer,
+  claimedGeneration,
   insertClaudeSubscription,
   issueApiKey,
   postProject,
@@ -158,7 +159,12 @@ describe('#1312 other-machine mark on a resumed session', () => {
     expect(machineOkResponseSchema.parse(await planPut.json())).toEqual({ ok: true });
     const doneRes = await call(w.s.app, 'POST', `/api/machine/done/${stepId}`, {
       cred: w.tokenA,
-      body: { status: 'success', sessionId, hasChanges: false },
+      body: {
+        status: 'success',
+        sessionId,
+        hasChanges: false,
+        generation: claimedGeneration(w.s.db, stepId),
+      },
     });
     expect(doneRes.status).toBe(200);
   }

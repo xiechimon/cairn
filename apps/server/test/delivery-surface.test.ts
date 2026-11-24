@@ -12,7 +12,13 @@ import {
   todo as todoTable,
 } from '../src/db/schema.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { bootServer, issueApiKey, seedSessionRoute, type TestServer } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  seedSessionRoute,
+  type TestServer,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -107,7 +113,7 @@ async function setupWorld(): Promise<World> {
     async done(stepId, body) {
       return call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: machineJson.token,
-        body,
+        body: { generation: claimedGeneration(s.db, stepId), ...body },
       });
     },
   };

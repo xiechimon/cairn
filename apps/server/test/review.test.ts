@@ -26,6 +26,7 @@ import { sweepAbandonedBuildSteps } from '../src/services/build-abandoned-sweep.
 import type { TestServer } from './helpers.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   postProject,
   seedRoute,
@@ -164,7 +165,7 @@ async function setupWorld(opts: { hosted?: boolean } = {}): Promise<World> {
   async function done(stepId: string, body: Record<string, unknown>): Promise<void> {
     const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
       cred: machineToken,
-      body,
+      body: { generation: claimedGeneration(s.db, stepId), ...body },
     });
     expect(res.status).toBe(200);
   }

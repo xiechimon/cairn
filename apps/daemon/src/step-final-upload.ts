@@ -6,7 +6,12 @@ import {
 } from '@cairn/shared';
 import { type StepJournalEntry, TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
-import { isTransientUploadError, type MachineApi, MachineApiError } from './machine-client.js';
+import {
+  bindMachineClaim,
+  isTransientUploadError,
+  type MachineApi,
+  MachineApiError,
+} from './machine-client.js';
 import type { RunStepDeps } from './runner.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
 
@@ -81,8 +86,9 @@ export async function resumePendingUpload(
   entry: StepJournalEntry,
   opts: { running?: number; failOnRejectedDone?: boolean } = {},
 ): Promise<void> {
-  const { client, journal, logger } = deps;
+  const { journal, logger } = deps;
   const stepId = entry.stepId;
+  const client = bindMachineClaim(deps.client, stepId, entry.claimed?.step.generation);
   const doneBody = entry.doneBody;
   if (doneBody == null) return;
   const running = opts.running ?? 1;

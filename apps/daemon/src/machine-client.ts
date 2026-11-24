@@ -97,6 +97,7 @@ export interface MachineClientOpts {
   serverUrl: string;
   getToken?: () => string;
   fetchImpl?: typeof fetch;
+  claim?: Readonly<{ stepId: string; generation: number | undefined }>;
 }
 
 export interface MachineApi {
@@ -140,7 +141,11 @@ export interface MachineApi {
     body: MachineAskBody,
     opts?: { signal?: AbortSignal },
   ): Promise<MachineAskResponse>;
-  token(stepId: string): Promise<MachineTokenResponse>;
+  token(
+    stepId: string,
+    generation?: number,
+    opts?: { refresh?: boolean },
+  ): Promise<MachineTokenResponse>;
   skillsManifest(stepId: string): Promise<MachineSkillsManifestResponse>;
   skillFile(stepId: string, dirName: string, path: string): Promise<Buffer>;
   attachment(
@@ -185,8 +190,30 @@ export class MachineClient implements MachineApi {
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
 
+  forClaim(stepId: string, generation: number | undefined): MachineClient {
+    if (
+      this.opts.claim !== undefined &&
+      (this.opts.claim.stepId !== stepId || this.opts.claim.generation !== generation)
+    )
+      throw new Error('Machine client is already bound to another claim');
+    return new MachineClient({ ...this.opts, claim: { stepId, generation } });
+  }
+
   private url(path: string): string {
-    return `${this.opts.serverUrl}${path}`;
+    const url = new URL(path, this.opts.serverUrl);
+    const claim = this.opts.claim;
+    if (claim !== undefined) {
+      const stepId =
+        /^\/api\/machine\/(?:heartbeat|tool|ask|token|skills|attachment|upload-urls|session|local-merge-recheck|done)\/([^/]+)/.exec(
+          url.pathname,
+        )?.[1] ?? url.searchParams.get('stepId');
+      if (stepId !== null && stepId !== undefined && decodeURIComponent(stepId) !== claim.stepId)
+        throw new Error('Machine request does not match its claim');
+      url.searchParams.delete('generation');
+      if (claim.generation !== undefined)
+        url.searchParams.set('generation', String(claim.generation));
+    }
+    return url.toString();
   }
 
   private async request<T>(
@@ -454,8 +481,18 @@ export class MachineClient implements MachineApi {
     throw lastErr instanceof Error ? lastErr : new Error(`${name} relay failed`);
   }
 
-  async token(stepId: string): Promise<MachineTokenResponse> {
-    return this.request('GET', `/api/machine/token/${stepId}`, {
+  async token(
+    stepId: string,
+    generation?: number,
+    opts: { refresh?: boolean } = {},
+  ): Promise<MachineTokenResponse> {
+    const query = [
+      generation == null ? '' : `generation=${generation}`,
+      opts.refresh === true ? 'refresh=1' : '',
+    ]
+      .filter((part) => part !== '')
+      .join('&');
+    return this.request('GET', `/api/machine/token/${stepId}${query === '' ? '' : `?${query}`}`, {
       parse: (raw) => machineTokenResponseSchema.parse(raw),
     });
   }
@@ -593,7 +630,8 @@ export class MachineClient implements MachineApi {
 
   async done(stepId: string, body: MachineDoneBody): Promise<void> {
     await this.request('POST', `/api/machine/done/${stepId}`, {
-      body,
+      body:
+        this.opts.claim === undefined ? body : { ...body, generation: this.opts.claim.generation },
       parse: (raw) => machineOkResponseSchema.parse(raw),
     });
   }
@@ -689,6 +727,14 @@ export class MachineClient implements MachineApi {
       void reader.cancel().catch(() => {});
     }
   }
+}
+
+export function bindMachineClaim(
+  client: MachineApi,
+  stepId: string,
+  generation: number | undefined,
+): MachineApi {
+  return client instanceof MachineClient ? client.forClaim(stepId, generation) : client;
 }
 
 export type { StepRecord };

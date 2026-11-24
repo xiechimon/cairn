@@ -3,12 +3,12 @@ import { eq } from 'drizzle-orm';
 import { expect, test } from 'vitest';
 import { build, chiefMessage, message, plan, project, step, todo } from '../src/db/schema.js';
 import { addChiefWatch } from '../src/services/chief.js';
-import { finishStep } from '../src/services/machines.js';
+
 import { executeMcpTool } from '../src/services/mcp-face.js';
 import { reconcileOwners } from '../src/services/owner.js';
 import { getTodo } from '../src/services/todos.js';
 import { H, registerChiefHarness, relay, toolDeps } from './chief-harness.js';
-import { insertMachine } from './helpers.js';
+import { finishStepForClaim, insertMachine } from './helpers.js';
 
 registerChiefHarness();
 
@@ -207,7 +207,7 @@ test('failed gate turn retries once with a fresh session then posts a visible sy
   };
   async function fail(id: string) {
     H.s.db.update(step).set({ status: 'claimed', machineId }).where(eq(step.id, id)).run();
-    await finishStep(finishDeps, machineId, id, {
+    await finishStepForClaim(finishDeps, machineId, id, {
       status: 'failed',
       errorMessage: 'context_length_exceeded',
     });

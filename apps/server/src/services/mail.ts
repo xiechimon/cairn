@@ -2,6 +2,7 @@ import type { MailAccountStatus, MailEventStatus, MailRank, UserRecord } from '@
 import { fenceMailText } from '@cairn/shared';
 import { and, asc, eq, isNotNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import type { CommitEffects } from '../db/commit-effects.js';
 import { mailAccount, mailEvent, mailRule, pushDelivery, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
@@ -29,7 +30,7 @@ const EVENT_NEXT: Record<MailEventStatus, readonly MailEventStatus[]> = {
 const ACTIVE_ACCOUNT = new Set<MailAccountStatus>(['watching', 'degraded']);
 const MAIL_EXCERPT_CHARS = 2000;
 
-export interface MailDeps {
+export interface MailDeps extends CommitEffects {
   db: Db;
   hub: TeamStreamHub;
   user: UserRecord;
@@ -206,6 +207,7 @@ export function deliverMailEvent(
       pending.push.teamId,
       pending.push.msg,
       pending.push.msg.tag,
+      deps,
     );
     deps.db
       .update(pushDelivery)

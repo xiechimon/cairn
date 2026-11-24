@@ -31,10 +31,10 @@ import {
   sweepZombieQueuedTodos,
 } from '../src/services/builds.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
-import { claimStep, fetchStop, finishStep } from '../src/services/machines.js';
+import { claimStep, fetchStop } from '../src/services/machines.js';
 import { deleteProject } from '../src/services/projects.js';
 import { deleteTodo, getTodo } from '../src/services/todos.js';
-import { bootServer, insertMachine, req, seedSessionRoute } from './helpers.js';
+import { bootServer, finishStepForClaim, insertMachine, req, seedSessionRoute } from './helpers.js';
 
 const files: DocumentDiffFile[] = [{ path: 'retained.ts', additions: 1, deletions: 0, hunks: [] }];
 
@@ -159,7 +159,7 @@ describe('archive is independent of task phase', () => {
           .get(),
       ).toEqual({ archiveStop: 'requested' });
       expect(fetchStop(deps, { id: machineId }, 'step-archive')).toEqual({ discard: false });
-      await finishStep(deps, machineId, 'step-archive', {
+      await finishStepForClaim(deps, machineId, 'step-archive', {
         status,
         hasChanges: true,
         errorMessage: status === 'failed' ? 'Late failure' : undefined,
@@ -203,7 +203,7 @@ describe('archive is independent of task phase', () => {
         .run();
       await action(s, 'archive');
       if (undoFirst) await action(s, 'unarchive');
-      await finishStep(deps, machineId, 'step-archive', { status: 'stopped' });
+      await finishStepForClaim(deps, machineId, 'step-archive', { status: 'stopped' });
       const restored = undoFirst
         ? await (await req(s.app, 'GET', '/api/todos/todo-archive')).json()
         : await action(s, 'unarchive');
@@ -287,9 +287,9 @@ test('parallel claimed steps retain their archive stops after Undo before pollin
       .get(),
   ).toEqual({ n: 2 });
   expect(fetchStop(deps, { id: machineId }, 'step-archive')).toEqual({ discard: false });
-  await finishStep(deps, machineId, 'step-archive', { status: 'stopped' });
+  await finishStepForClaim(deps, machineId, 'step-archive', { status: 'stopped' });
   expect(fetchStop(deps, { id: machineId }, 'parallel-step')).toEqual({ discard: false });
-  await finishStep(deps, machineId, 'parallel-step', { status: 'stopped' });
+  await finishStepForClaim(deps, machineId, 'parallel-step', { status: 'stopped' });
   expect(
     s.db
       .select()
@@ -377,7 +377,7 @@ test('archive completion keeps session, checkpoint, usage and clears unconsumed 
     })
     .run();
   await action(s, 'archive');
-  await finishStep(deps, machineId, 'step-archive', {
+  await finishStepForClaim(deps, machineId, 'step-archive', {
     status: 'stopped',
     sessionId: 'retained-session',
     commit: 'a'.repeat(40),
@@ -578,7 +578,7 @@ test.each(['stopped', 'success', 'failed'] as const)(
       prepareStopForDone(deps, 'todo-archive', { actor: 'person', reason: 'test stop' }),
     ).toEqual({ state: 'stopping' });
     await action(s, 'archive');
-    await finishStep(deps, machineId, 'step-archive', { status, hasChanges: true });
+    await finishStepForClaim(deps, machineId, 'step-archive', { status, hasChanges: true });
     expect(await action(s, 'unarchive')).toMatchObject({ phase: 'done', archivedAt: null });
   },
 );

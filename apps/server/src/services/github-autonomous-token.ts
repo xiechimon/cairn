@@ -4,12 +4,12 @@ import { unattributed } from '../lib/github-token.js';
 import { appTokenOrNull } from './github-app-token.js';
 import { type GithubTokenDeps, userTokenOrNull } from './github-connection.js';
 
-export async function autonomousToken(
+async function writeToken(
   deps: GithubTokenDeps,
   teamId: string,
   repo: { owner: string; repo: string },
-  force = false,
-  minimumValidityMs = 300_000,
+  force: boolean,
+  minimumValidityMs: number,
 ): Promise<AutonomousToken | null> {
   let reason: AppTokenReason = 'app-token-unavailable';
   const app = await appTokenOrNull(
@@ -26,6 +26,7 @@ export async function autonomousToken(
     repo,
     force,
     minimumValidityMs,
+    'server-write',
   );
   if (app !== null) return app;
   const user = await userTokenOrNull(deps, teamId);
@@ -37,10 +38,21 @@ export async function autonomousToken(
       });
 }
 
+export function autonomousToken(
+  deps: GithubTokenDeps,
+  teamId: string,
+  repo: { owner: string; repo: string },
+  force = false,
+  minimumValidityMs = 300_000,
+): Promise<AutonomousToken | null> {
+  return writeToken(deps, teamId, repo, force, minimumValidityMs);
+}
+
 export async function githubReadToken(
   deps: GithubTokenDeps,
   teamId: string,
   repo: { owner: string; repo: string },
+  onAppReason?: (reason: AppTokenReason) => void,
 ): Promise<AppToken | UserToken | null> {
   return (
     (await appTokenOrNull(
@@ -50,8 +62,12 @@ export async function githubReadToken(
             deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket,
         },
         ...(deps.githubFetch ? { fetchImpl: deps.githubFetch } : {}),
+        onReason: ({ reason }) => onAppReason?.(reason),
       },
       repo,
+      false,
+      300_000,
+      'server-read',
     )) ?? (await userTokenOrNull(deps, teamId))
   );
 }

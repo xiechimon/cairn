@@ -178,9 +178,12 @@ describe('#1497 claim: another team project stays out of the payload, no credent
     });
     const { step } = (await claimRes.json()) as { step: ClaimedStep | null };
     if (!step) throw new Error('no step claimed');
-    const tokenRes = await call(s.app, 'GET', `/api/machine/token/${step.step.id}`, {
-      cred: token,
-    });
+    const tokenRes = await call(
+      s.app,
+      'GET',
+      `/api/machine/token/${step.step.id}?generation=${step.step.generation}`,
+      { cred: token },
+    );
     const creds = (await tokenRes.json()) as { git: unknown };
     return { step, creds };
   }

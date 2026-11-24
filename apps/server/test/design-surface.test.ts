@@ -52,6 +52,7 @@ async function world() {
       kind: 'build',
       status: 'claimed',
       machineId: 'm1',
+      claimedAt: 1,
       createdAt: 1,
     })
     .run();

@@ -195,8 +195,8 @@ describe('the local merge landing re-check', () => {
     const w = await world();
     w.s.db.update(step).set({ status: 'done' }).where(eq(step.id, 'merge')).run();
     const res = await w.recheck();
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ authorized: false, reason: 'step-released' });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('not claimed') });
   });
 
   test('a command that differs from the claimed instruction refuses', async () => {

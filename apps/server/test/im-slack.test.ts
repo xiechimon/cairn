@@ -614,6 +614,7 @@ describe('Slack question size guard', () => {
       const stepId = turn().id;
       claim(stepId);
       const client = new MachineClient({
+        claim: { stepId, generation: turn().claimedAt! },
         serverUrl: 'http://fixture.invalid',
         getToken: () => token,
         fetchImpl: async (input, init) => {

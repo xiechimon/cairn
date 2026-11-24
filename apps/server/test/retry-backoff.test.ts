@@ -1,3 +1,4 @@
+import { WORKFLOW_PUSH_REFUSAL } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import {
@@ -168,6 +169,55 @@ describe('automatic retry backoff and cap', () => {
         .all()
         .some((m) => String(m.content).includes(`Automatic retry 1/${RETRY_LIMIT}`)),
     ).toBe(true);
+  });
+
+  test('a workflow permission refusal stays failed until a person restarts it', async () => {
+    const w = openWorld();
+    const reason = WORKFLOW_PUSH_REFUSAL;
+    failStep(w, w.stepId, reason);
+    agePhase(w, nowMs() - RETRY_BASE_MS - 1);
+    await sweepFailedRetries(w.deps);
+    expect(phaseOf(w)).toBe('failed');
+    expect(buildCount(w)).toBe(1);
+    expect(latestBuild(w)?.errorMessage).toBe(reason);
+    for (const origin of ['retry', 'coordinator', 'runtime'] as const) {
+      await expect(
+        applyBuildStepAction(
+          w.deps,
+          w.buildId,
+          { action: 'restart', feedback: '', clientMessageId: `workflow-${origin}` },
+          'cairn',
+          origin,
+        ),
+      ).rejects.toMatchObject({ status: 409, message: reason });
+    }
+
+    await applyBuildStepAction(
+      w.deps,
+      w.buildId,
+      {
+        action: 'restart',
+        feedback: 'Workflow changes handled separately',
+        clientMessageId: 'workflow-retry',
+      },
+      'Owner',
+      'person',
+    );
+    expect(phaseOf(w)).toBe('queued');
+    expect(buildCount(w)).toBe(2);
+    expect(latestBuild(w)?.retryAttempt).toBe(0);
+  });
+
+  test('retry exhaustion preserves the workflow refusal', async () => {
+    const w = openWorld();
+    w.s.db
+      .update(buildTable)
+      .set({ retryAttempt: RETRY_LIMIT })
+      .where(eq(buildTable.id, w.buildId))
+      .run();
+    failStep(w, w.stepId, WORKFLOW_PUSH_REFUSAL);
+    expect(phaseOf(w)).toBe('failed');
+    expect(latestBuild(w)?.errorMessage).toBe(WORKFLOW_PUSH_REFUSAL);
   });
 
   test('the backoff doubles between automatic retries', async () => {

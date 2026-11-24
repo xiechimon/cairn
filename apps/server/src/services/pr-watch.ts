@@ -7,12 +7,12 @@ import {
   githubCommitCheckRuns,
   githubPullPanel,
 } from '../lib/github.js';
-import type { AutonomousToken } from '../lib/github-token.js';
+import type { AppToken, AutonomousToken, UserToken } from '../lib/github-token.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { BuildDeps } from './builds.js';
 import { CI_CLOSED_CONFIRM_MS } from './ci-loop.js';
 import { githubRepoOfProject } from './git.js';
-import { autonomousToken } from './github-autonomous-token.js';
+import { autonomousToken, githubReadToken } from './github-autonomous-token.js';
 import { ensurePullClosesTaskIssue } from './pr-closing-line.js';
 import { createPrWakes, settlePrWakeNotices } from './pr-wakes.js';
 import { type CheckTally, checkTallyOf, FINISHED_PR_STATES, mergeStateOf } from './thread-pr.js';
@@ -199,7 +199,7 @@ export function createPrWatch(
 
   async function readChecks(
     fetchImpl: FetchLike,
-    token: AutonomousToken,
+    token: AppToken | UserToken,
     target: Target,
     key: string,
     head: string,
@@ -221,11 +221,20 @@ export function createPrWatch(
 
   async function watchOne(
     fetchImpl: FetchLike,
-    token: AutonomousToken,
+    token: AppToken | UserToken,
     target: Target,
     now: number,
     tally: PrWatchTally,
   ): Promise<void> {
+    let writeToken: Promise<AutonomousToken | null> | null = null;
+    const resolveToken = () => {
+      writeToken ??= autonomousToken(
+        { ...deps, githubFetch: run.githubFetch },
+        target.teamId,
+        target,
+      );
+      return writeToken;
+    };
     const key = `${target.teamId}:${target.fullName}#${target.prNumber}`;
     const existing = deps.db
       .select()
@@ -290,7 +299,7 @@ export function createPrWatch(
       try {
         const body = await ensurePullClosesTaskIssue(
           fetchImpl,
-          token,
+          resolveToken,
           target,
           target.prNumber,
           task,
@@ -400,6 +409,7 @@ export function createPrWatch(
         runs: counted === null ? null : (checks.get(key)?.runs ?? null),
         fetch: fetchImpl,
         token,
+        resolveToken,
         owner: target.owner,
         repo: target.repo,
         now,
@@ -453,7 +463,7 @@ export function createPrWatch(
             }
             for (const target of targets) {
               try {
-                const token = await autonomousToken(
+                const token = await githubReadToken(
                   { ...deps, githubFetch: run.githubFetch },
                   teamId,
                   target,

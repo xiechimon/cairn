@@ -7,8 +7,14 @@ import type { FetchLike } from '../src/lib/github.js';
 import { requestMerge } from '../src/services/build-merge-request.js';
 import { createCiPoller } from '../src/services/ci-loop.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
-import { finishStep } from '../src/services/machine-finish-step.js';
-import { bootServer, insertMachine, issueApiKey, req, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  finishStepForClaim,
+  insertMachine,
+  issueApiKey,
+  req,
+  seedSessionRoute,
+} from './helpers.js';
 
 test('base branch survives PATCH, GET, unrelated edits and reset to the repo default', async () => {
   const s = bootServer();
@@ -344,7 +350,7 @@ test('build completion looks up PRs only against the configured base', async () 
       text: async () => JSON.stringify(body),
     };
   };
-  await finishStep(
+  await finishStepForClaim(
     {
       ...s.svc,
       box: s.secretBox,

@@ -1,4 +1,9 @@
-import type { AgentSessionHandle, CommitIdentity, ProviderConfig } from '@cairn/shared';
+import {
+  type AgentSessionHandle,
+  type CommitIdentity,
+  type ProviderConfig,
+  WORKFLOW_PUSH_REFUSAL,
+} from '@cairn/shared';
 import type { AskChannel } from './ask-channel.js';
 import { deliverStepOutcome, type StepDeliveryInput } from './step-deliver.js';
 import type { StepGitRunner } from './step-git-tools.js';
@@ -132,7 +137,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     stopped,
     isReview,
     attachmentVerify,
-    quotaBlock,
+    quotaBlock: lastError === WORKFLOW_PUSH_REFUSAL ? null : quotaBlock,
     skillInjectionFacts: input.skillInjectionFacts,
     uploadedEvidence: input.uploadedEvidence,
     git,

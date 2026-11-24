@@ -29,6 +29,8 @@ import {
 
 const HEAD_B = 'b'.repeat(40);
 
+const CLAIM_PIN_PROBE = 'https://api.github.com/repos/octo/alpha';
+
 const disposables: (() => void)[] = [];
 afterAll(() => {
   for (const dispose of disposables) dispose();
@@ -267,7 +269,7 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
     expect(got.todo?.blockerHandoff).toBeUndefined();
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, got.step.id)).get();
     expect(row?.blockerHandoff).toBeNull();
-    expect(w.mock.requests).toEqual([]);
+    expect(w.mock.requests).toEqual([CLAIM_PIN_PROBE]);
   });
 
   test('S3 step rows match the payload shape, exposed through steps REST', async () => {
@@ -439,7 +441,7 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
       .run();
     const got = await claim(w);
     expect(got.todo?.blockerHandoff).toEqual(snapshot);
-    expect(w.mock.requests).toEqual([]);
+    expect(w.mock.requests).toEqual([CLAIM_PIN_PROBE]);
   });
 
   test('S12 swapping blockedBy through update_todo rebuilds the handoff for the new blocker', async () => {
@@ -579,7 +581,7 @@ describe('#1624 child-card claim carries blocker-card deliveries', () => {
     updateAutonomousTodo(w.s.svc, childId, { blockedBy: [a] });
     const got = await claim(w);
     expect(got.todo?.blockerHandoff).toEqual(snapshot);
-    expect(w.mock.requests).toEqual([]);
+    expect(w.mock.requests).toEqual([CLAIM_PIN_PROBE]);
   });
 
   test('S11 an explicit merge of delivered work does not carry it', async () => {

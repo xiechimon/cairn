@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   BROWSER_AUTH_HEADER,
+  type MachineDoneBody,
   type ModelRef,
   type PolicyUse,
   type ProjectRepoKind,
@@ -41,7 +42,9 @@ import { createClaudeSubscription } from '../src/services/claude-subscriptions.j
 import { createDevinSubscription } from '../src/services/devin-subscriptions.js';
 import { ConversationStreamHub, TeamStreamHub } from '../src/services/events.js';
 import { teamAutonomyPaused } from '../src/services/github-autonomy-brake.js';
+import type { MachineDeps } from '../src/services/machine-deps.js';
 import { MachineWakeHub } from '../src/services/machine-wake-hub.js';
+import { finishStep } from '../src/services/machines.js';
 import { createMailConnector } from '../src/services/mail-connector.js';
 import type { OpenMailbox } from '../src/services/mail-imap.js';
 import type { SendMail } from '../src/services/mail-smtp.js';
@@ -245,7 +248,11 @@ export function bootServer(
       init?: RequestInit,
       ...rest: unknown[]
     ) => {
-      const forward = (next: RequestInit | undefined) => rawRequest(input, next, ...(rest as []));
+      const target =
+        new Headers(init?.headers).get('x-cairn-raw-send') === '1' || typeof input !== 'string'
+          ? input
+          : stampMachineClaimPath(db, input);
+      const forward = (next: RequestInit | undefined) => rawRequest(target, next, ...(rest as []));
       if (init?.method !== 'POST' || typeof init.body !== 'string' || typeof input !== 'string') {
         return forward(init);
       }
@@ -530,6 +537,55 @@ export function deliverCodeStep(
     .run();
   completeStep(deps, stepId, { hasChanges: opts.hasChanges ?? true });
   return { buildId, stepId };
+}
+
+export function stampMachineClaimPath(db: Db, path: string): string {
+  const url = new URL(path, 'http://localhost');
+  if (url.searchParams.has('generation')) return path;
+  const stepId =
+    /^\/api\/machine\/(?:heartbeat|tool|ask|skills|attachment|upload-urls|session|local-merge-recheck)\/([^/]+)/.exec(
+      url.pathname,
+    )?.[1] ??
+    (/^\/api\/machine\/(?:steer(?:\/ack)?|stop)$/.test(url.pathname)
+      ? url.searchParams.get('stepId')
+      : null);
+  if (stepId == null) return path;
+  const row = db
+    .select({ claimedAt: stepTable.claimedAt })
+    .from(stepTable)
+    .where(eq(stepTable.id, decodeURIComponent(stepId)))
+    .get();
+  if (row?.claimedAt == null) return path;
+  url.searchParams.set('generation', String(row.claimedAt));
+  return /^https?:/.test(path) ? url.toString() : `${url.pathname}${url.search}`;
+}
+
+export function claimedGeneration(db: Db, stepId: string): number {
+  return (
+    db
+      .select({ claimedAt: stepTable.claimedAt })
+      .from(stepTable)
+      .where(eq(stepTable.id, stepId))
+      .get()?.claimedAt ?? 0
+  );
+}
+
+export async function finishStepForClaim(
+  deps: MachineDeps,
+  machineId: string,
+  stepId: string,
+  body: MachineDoneBody,
+): Promise<void> {
+  let claimedAt = claimedGeneration(deps.db, stepId);
+  if (claimedAt === 0) {
+    deps.db
+      .update(stepTable)
+      .set({ claimedAt: nowMs() })
+      .where(and(eq(stepTable.id, stepId), eq(stepTable.status, 'claimed')))
+      .run();
+    claimedAt = claimedGeneration(deps.db, stepId);
+  }
+  return finishStep(deps, machineId, stepId, { generation: claimedAt, ...body });
 }
 
 export function insertMachine(

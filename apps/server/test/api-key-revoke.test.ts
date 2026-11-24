@@ -105,6 +105,14 @@ describe('deleting an API key revokes it on every path that accepts API keys', (
         `/api/teams/${s.team.id}/api-keys/${stepKey.id}`,
       );
       expect(stepDelete.status).toBe(404);
+      const stepNamed = await req(s.app, 'POST', `/api/teams/${s.team.id}/api-keys`, {
+        name: 'git-step-forged-step',
+        gitAccess: true,
+        mcpAccess: false,
+        machineAccess: false,
+        toolGrants: { read: [], write: [] },
+      });
+      expect(stepNamed.status).toBe(400);
     } finally {
       s.dispose();
     }

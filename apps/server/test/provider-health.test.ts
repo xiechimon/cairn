@@ -60,6 +60,16 @@ describe('the provider circuit breaker (#1493)', () => {
     expect(t.tryAcquire('relay-a')).toBe(true);
   });
 
+  test('checking half-open eligibility does not reserve the probe', () => {
+    const { t, clock } = tracker();
+    fail(t, 'relay-a', 5);
+    clock.now += HALF_OPEN_AFTER_MS;
+    expect(t.canAcquire('relay-a')).toBe(true);
+    expect(t.canAcquire('relay-a')).toBe(true);
+    expect(t.tryAcquire('relay-a')).toBe(true);
+    expect(t.canAcquire('relay-a')).toBe(false);
+  });
+
   test('H3: while the half_open probe slot is taken, no more passes', () => {
     const { t, clock } = tracker();
     fail(t, 'relay-a', 5);

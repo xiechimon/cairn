@@ -13,6 +13,7 @@ import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { plan as planTable, provider as providerTable } from '../src/db/schema.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   openConvStream,
   postProject,
@@ -259,7 +260,11 @@ describe('conversation stream (02 section 1.2 conversation stream, M5 live strea
 
       const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
         cred: token,
-        body: { status: 'success', hasChanges: false },
+        body: {
+          status: 'success',
+          hasChanges: false,
+          generation: claimedGeneration(s.db, stepId),
+        },
       });
       expect(doneRes.status).toBe(200);
       const doneEv = await stream.next(
@@ -292,7 +297,7 @@ describe('conversation stream (02 section 1.2 conversation stream, M5 live strea
     });
     await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
       cred: token,
-      body: { status: 'success' },
+      body: { status: 'success', generation: claimedGeneration(s.db, stepId) },
     });
     const stream = await openConvStream(s.app, buildId);
     try {
@@ -405,6 +410,7 @@ describe('[inferred] build detail read surface (M5 overlay data source, register
           usage: [
             { model: 'stub-gw/stub-model', input: 12, output: 980, cacheRead: 100, cacheWrite: 0 },
           ],
+          generation: claimedGeneration(s.db, stepId),
         },
       });
       const usage = (await (

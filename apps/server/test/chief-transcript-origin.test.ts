@@ -6,7 +6,7 @@ import { enqueueChiefStep, sendChiefMessage } from '../src/services/chief.js';
 import { receiveUpload } from '../src/services/machine-uploads.js';
 import { reportTranscriptRow } from '../src/services/machines.js';
 import { H, registerChiefHarness, toolDeps } from './chief-harness.js';
-import { insertMachine } from './helpers.js';
+import { claimedGeneration, insertMachine } from './helpers.js';
 
 registerChiefHarness();
 
@@ -19,7 +19,11 @@ function claimedChiefStep(prompt: string, machineId: string): string {
     trigger: 'user',
     ownerMessageIds: [],
   });
-  H.s.db.update(step).set({ machineId, status: 'claimed' }).where(eq(step.id, stepId)).run();
+  H.s.db
+    .update(step)
+    .set({ machineId, status: 'claimed', claimedAt: 1 })
+    .where(eq(step.id, stepId))
+    .run();
   return stepId;
 }
 
@@ -32,7 +36,7 @@ test('a daemon transcript upload stamps the chief step prompt echo task-prompt',
   const stepId = claimedChiefStep(GREETING, machineId);
   receiveUpload(
     toolDeps(),
-    { stepId, name: 'transcript', machineId },
+    { stepId, name: 'transcript', machineId, generation: claimedGeneration(H.s.db, stepId) },
     {
       stepId,
       messages: [

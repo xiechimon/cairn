@@ -442,17 +442,19 @@ describe('subscription login takes precedence over expired machine login', () =>
         .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
         .where(eq(machineTable.id, machineId))
         .run();
-      const credentialResponse = await s.app.request(`/api/machine/token/${stepId}`, {
-        headers: { authorization: `Bearer ${machineToken}` },
-      });
+      const credentialResponse = await s.app.request(
+        `/api/machine/token/${stepId}?generation=${claimed?.step.generation}`,
+        { headers: { authorization: `Bearer ${machineToken}` } },
+      );
       expect(credentialResponse.status).toBe(200);
       expect(await credentialResponse.json()).toMatchObject({ claudeSubscriptionToken: token });
       for (const status of ['done', 'failed', 'stopped', 'waiting_quota', 'pending'] as const) {
         s.db.update(stepTable).set({ status }).where(eq(stepTable.id, stepId)).run();
-        const finished = await s.app.request(`/api/machine/token/${stepId}`, {
-          headers: { authorization: `Bearer ${machineToken}` },
-        });
-        expect(finished.status).toBe(200);
+        const finished = await s.app.request(
+          `/api/machine/token/${stepId}?generation=${claimed?.step.generation}`,
+          { headers: { authorization: `Bearer ${machineToken}` } },
+        );
+        expect(finished.status).toBe(409);
         const body = await finished.text();
         expect(body).not.toContain(token);
         expect(JSON.parse(body)).not.toHaveProperty('claudeSubscriptionToken');
@@ -481,9 +483,10 @@ describe('subscription login takes precedence over expired machine login', () =>
         })
         .where(eq(stepTable.id, stepId))
         .run();
-      const piCredentials = await s.app.request(`/api/machine/token/${stepId}`, {
-        headers: { authorization: `Bearer ${machineToken}` },
-      });
+      const piCredentials = await s.app.request(
+        `/api/machine/token/${stepId}?generation=${claimed?.step.generation}`,
+        { headers: { authorization: `Bearer ${machineToken}` } },
+      );
       expect(piCredentials.status).toBe(200);
       expect(await piCredentials.text()).not.toContain(token);
     },
@@ -527,8 +530,17 @@ test('team-scoped revocation removes future credentials and stops claude-code cl
     .where(eq(machineTable.id, machineId))
     .run();
   const headers = { authorization: `Bearer ${machineToken}` };
+  const firstGeneration = s.db
+    .select({ claimedAt: stepTable.claimedAt })
+    .from(stepTable)
+    .where(eq(stepTable.id, firstStep))
+    .get()?.claimedAt;
   expect(
-    await (await s.app.request(`/api/machine/token/${firstStep}`, { headers })).json(),
+    await (
+      await s.app.request(`/api/machine/token/${firstStep}?generation=${firstGeneration}`, {
+        headers,
+      })
+    ).json(),
   ).toMatchObject({ claudeSubscriptionToken: token });
   expect((await req(s.app, 'DELETE', `/api/teams/other/claude-subscriptions/${id}`)).status).toBe(
     404,
@@ -543,10 +555,12 @@ test('team-scoped revocation removes future credentials and stops claude-code cl
   expect(await claimAs(s, machineId)).toBeNull();
   s.db
     .update(stepTable)
-    .set({ machineId, status: 'claimed' })
+    .set({ machineId, status: 'claimed', claimedAt: 33 })
     .where(eq(stepTable.id, nextStep))
     .run();
-  const nextCredentials = await s.app.request(`/api/machine/token/${nextStep}`, { headers });
+  const nextCredentials = await s.app.request(`/api/machine/token/${nextStep}?generation=33`, {
+    headers,
+  });
   expect(nextCredentials.status).toBe(200);
   expect(await nextCredentials.text()).not.toContain(token);
 });
@@ -579,7 +593,8 @@ describe('several stored subscriptions, one enabled', () => {
       .set({ tokenHash: createHash('sha256').update(machineToken).digest('hex') })
       .where(eq(machineTable.id, machineId))
       .run();
-    return s.app.request(`/api/machine/token/${stepId}`, {
+    const generation = stepRow(s, stepId)?.claimedAt;
+    return s.app.request(`/api/machine/token/${stepId}?generation=${generation}`, {
       headers: { authorization: `Bearer ${machineToken}` },
     });
   }

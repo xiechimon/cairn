@@ -39,6 +39,7 @@ import {
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import { runAfterCommit } from '../db/commit-effects.js';
 import {
   chiefThread,
   computer,
@@ -536,8 +537,11 @@ export function settleComputerCall(db: Db, callId: string, hub?: TeamStreamHub):
     live.dispose();
   }
   const publishHub = live?.hub ?? hub;
-  if (publishHub) publishComputerChanged(db, publishHub, row);
-  live?.resolve(resultOfRow(row));
+  try {
+    if (publishHub) publishComputerChanged(db, publishHub, row);
+  } finally {
+    live?.resolve(resultOfRow(row));
+  }
 }
 
 function expireComputerCall(db: Db, callId: string): void {
@@ -557,7 +561,7 @@ function expireComputerCall(db: Db, callId: string): void {
   settleComputerCall(db, callId);
 }
 
-type PendingDeps = Pick<MachineDeps, 'db' | 'hub' | 'machineHub'>;
+type PendingDeps = Pick<MachineDeps, 'commitEffects' | 'db' | 'hub' | 'machineHub'>;
 
 function openPending(
   deps: PendingDeps,
@@ -607,7 +611,7 @@ function releaseExecutionLease(db: Db, stepId: string): void {
 }
 
 export function stopStepComputer(
-  deps: Pick<MachineDeps, 'db'> & { machineHub?: MachineWakeHub },
+  deps: Pick<MachineDeps, 'commitEffects' | 'db'> & { machineHub?: MachineWakeHub },
   stepId: string,
 ): void {
   const { db } = deps;
@@ -630,8 +634,10 @@ export function stopStepComputer(
       )
       .run();
   }
-  for (const { id } of open) settleComputerCall(db, id);
   releaseExecutionLease(db, stepId);
+  for (const { id } of open) {
+    runAfterCommit(deps, 'settleComputerCall', () => settleComputerCall(db, id));
+  }
 }
 
 function machineAcceptsTool(row: typeof machine.$inferSelect, tool: ComputerTool): boolean {
@@ -1435,11 +1441,15 @@ export function closeInfoCardTab(
     tabScope: browserTabScope(stepRow),
     browserScope: browserScopeFor(thread),
   };
-  if (!deps.machineHub.pushComputer(owned.machineId, call)) {
-    db.delete(computerCall).where(eq(computerCall.id, callId)).run();
-    return;
-  }
-  void openPending(deps, call).result;
+  const hubs = deps.commitEffects?.hubs;
+  const machineHub = hubs?.machineHub ?? deps.machineHub;
+  runAfterCommit(deps, 'browser_close_tab', () => {
+    if (!machineHub.pushComputer(owned.machineId, call)) {
+      db.delete(computerCall).where(eq(computerCall.id, callId)).run();
+      return;
+    }
+    void openPending({ db, hub: hubs?.hub ?? deps.hub, machineHub }, call).result;
+  });
 }
 
 export async function forwardComputerCall(

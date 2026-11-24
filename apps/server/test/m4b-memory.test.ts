@@ -5,7 +5,13 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { agentMemory, build as buildTable } from '../src/db/schema.js';
 import { workerRemoteTools } from '../src/services/machine-claim.js';
 import { listMemoryEntries } from '../src/services/memory.js';
-import { bootServer, issueApiKey, postProject, seedSessionRoute } from './helpers.js';
+import {
+  bootServer,
+  claimedGeneration,
+  issueApiKey,
+  postProject,
+  seedSessionRoute,
+} from './helpers.js';
 
 async function call(
   app: Hono,
@@ -164,7 +170,12 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     const { s, token, step } = await world();
     const done = await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
-      body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
+      body: {
+        status: 'success',
+        sessionId: 'sess-1',
+        hasChanges: true,
+        generation: claimedGeneration(s.db, step.step.id),
+      },
     });
     expect(done.status).toBe(200);
     expect(listMemoryEntries(s.db, { agentId: OWNER_ID, teamId: s.team.id })).toHaveLength(0);
@@ -181,7 +192,12 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     });
     await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
-      body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
+      body: {
+        status: 'success',
+        sessionId: 'sess-1',
+        hasChanges: true,
+        generation: claimedGeneration(s.db, step.step.id),
+      },
     });
     const step2 = await claimNextTask(s, token, projectId);
     expect(step2.todo?.id).not.toBe(todoId);
@@ -197,7 +213,12 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     await editIndex(s.app, token, step.step.id, projectId, { title: '项目一', content: 'p1' });
     await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
-      body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
+      body: {
+        status: 'success',
+        sessionId: 'sess-1',
+        hasChanges: true,
+        generation: claimedGeneration(s.db, step.step.id),
+      },
     });
     const now = Date.now();
     s.db
@@ -228,7 +249,12 @@ describe('worker step memory relay (r5 section 6 write path = agent tool -> serv
     await editIndex(s.app, token, step.step.id, projectId, { title: '项目一', content: 'p1' });
     await call(s.app, 'POST', `/api/machine/done/${step.step.id}`, {
       cred: token,
-      body: { status: 'success', sessionId: 'sess-1', hasChanges: true },
+      body: {
+        status: 'success',
+        sessionId: 'sess-1',
+        hasChanges: true,
+        generation: claimedGeneration(s.db, step.step.id),
+      },
     });
     const now = Date.now();
     const base = { agentId: OWNER_ID, teamId: s.team.id, createdAt: now, updatedAt: now };

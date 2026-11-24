@@ -21,6 +21,7 @@ import { seedLocalMachine } from '../src/services/machines.js';
 import { stepQueueProjector } from '../src/services/step-queue.js';
 import {
   bootServer,
+  claimedGeneration,
   insertClaudeSubscription,
   issueApiKey,
   postProject,
@@ -125,7 +126,12 @@ async function finishPlan(s: TestServer, token: string, stepId: string, sessionI
   expect(machineOkResponseSchema.parse(await planPut.json())).toEqual({ ok: true });
   const doneRes = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
     cred: token,
-    body: { status: 'success', sessionId, hasChanges: false },
+    body: {
+      status: 'success',
+      sessionId,
+      hasChanges: false,
+      generation: claimedGeneration(s.db, stepId),
+    },
   });
   expect(doneRes.status).toBe(200);
 }

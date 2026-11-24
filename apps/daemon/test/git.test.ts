@@ -542,6 +542,21 @@ describe('isGitTransientNetFailure — permanent failures short-circuit (#1786)'
       ),
     ).toBe(false);
   });
+
+  test('a remote-side policy rejection is not transient', () => {
+    const workflowsRejection = [
+      'git push failed (exit 1): remote: error: refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission',
+      'To https://github.com/o/r.git',
+      ' ! [remote rejected] cairn/b1 -> cairn/b1 (refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml` without `workflows` permission)',
+      "error: failed to push some refs to 'https://github.com/o/r.git'",
+    ].join('\n');
+    expect(isGitTransientNetFailure(workflowsRejection)).toBe(false);
+    expect(
+      isGitTransientNetFailure(
+        'git push failed (exit 1): ! [remote rejected] main -> main (pre-receive hook declined)',
+      ),
+    ).toBe(false);
+  });
 });
 
 describe('isGitTransientNetFailure — retry only connection loss and timeouts (#1786)', () => {

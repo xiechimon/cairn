@@ -11,6 +11,7 @@ import type {
 import { ACTIVE_STEP_STATUSES, isBuildStepKind } from '@cairn/shared';
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import type { CommitEffects } from '../db/commit-effects.js';
 import { build, steerPending, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { systemGitOps } from '../lib/git.js';
@@ -31,7 +32,7 @@ import type { OAuthClientConfig } from './oauth.js';
 import { planAutoApproveAt, planAwaitsAutoConfirm } from './plan-auto-confirm.js';
 import type { VapidKeys } from './push.js';
 import { toQuotaWait } from './quota-wait.js';
-import { retryIsParked } from './retry-parking.js';
+import { automaticRestartBlocked } from './retry-parking.js';
 import { profileForStep } from './routing-rules.js';
 import { stepQueueProjector } from './step-queue.js';
 import { type BuildStepRoute, listBuildStepRoutes } from './step-route.js';
@@ -68,7 +69,7 @@ export type MergeRequestOutcome =
   | { state: 'requested'; stepId: string | null }
   | { state: 'unconfirmed'; prNumber: number };
 
-export interface BuildDeps {
+export interface BuildDeps extends CommitEffects {
   githubAppTokenSocket?: string | null | undefined;
   githubAppIdentity?: GitIdentity | null | undefined;
   steerOptions?: Pick<BuildSteerOptions, 'human'>;
@@ -244,7 +245,7 @@ export function enqueueStep(
   promptOrigin?: StepPromptOrigin,
 ): StepRecord {
   const current = deps.db.select().from(build).where(eq(build.id, buildId)).get();
-  if (byPerson !== true && current && retryIsParked(current.errorMessage ?? ''))
+  if (byPerson !== true && current && automaticRestartBlocked(current.errorMessage ?? ''))
     throw new HttpError(409, current.errorMessage ?? 'Task parked');
   const id = newRecordId();
   const createdAt = nowMs();

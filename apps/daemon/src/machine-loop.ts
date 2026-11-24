@@ -69,7 +69,12 @@ import { createImsgBridge } from './imsg-bridge.js';
 import { StepJournal, type TranscriptBuffer } from './journal.js';
 import type { DaemonLogger } from './log.js';
 import { createMachineCapabilitiesProbe } from './machine-capabilities.js';
-import { type MachineApi, MachineApiError, MachineClient } from './machine-client.js';
+import {
+  bindMachineClaim,
+  type MachineApi,
+  MachineApiError,
+  MachineClient,
+} from './machine-client.js';
 import { enrollThroughBrowser } from './machine-enroll.js';
 import { OrbLifecycle, resolveOrbCap } from './orb/lifecycle.js';
 import type { OrbProvider } from './orb/provider.js';
@@ -1023,6 +1028,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   const streamCtrl = new AbortController();
   const deliverSteer = async (stepId: string): Promise<void> => {
+    const client = bindMachineClaim(
+      stepDeps().client,
+      stepId,
+      journal.get(stepId)?.claimed?.step.generation,
+    );
     if (stepSteeringSupport.get(stepId) === false) {
       logger.step(`steer left queued (backend does not support steering) step=${stepId}`);
       return;
@@ -1117,6 +1127,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   };
   const deliveredStops = new Set<string>();
   const deliverStop = async (stepId: string): Promise<void> => {
+    const client = bindMachineClaim(
+      stepDeps().client,
+      stepId,
+      journal.get(stepId)?.claimed?.step.generation,
+    );
     try {
       const discard = await client.stop(stepId);
       if (discard === null || deliveredStops.has(stepId)) return;

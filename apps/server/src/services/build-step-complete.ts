@@ -11,6 +11,7 @@ import {
   type VerifyVerdict,
 } from '@cairn/shared';
 import { and, eq, ne } from 'drizzle-orm';
+import { runAfterCommit, withCommitEffects } from '../db/commit-effects.js';
 import { build, plan as planTable, step, stopPending, todo } from '../db/schema.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { receivesAnswers, undeliveredAnswers } from './answer-delivery.js';
@@ -111,13 +112,12 @@ function stepArtifactGate(
 }
 
 function confirmDeliveredPlan(deps: BuildDeps, buildId: string): void {
-  try {
-    deps.db.transaction(() => {
-      if (planAutoConfirmation(deps, buildId).eligible) confirmPlanAutomatically(deps, buildId);
-    });
-  } catch {
-    return;
-  }
+  const { commitEffects, ...settled } = deps;
+  const committedDeps = { ...settled, ...commitEffects?.hubs };
+  runAfterCommit(deps, 'confirmDeliveredPlan', () => {
+    if (planAutoConfirmation(committedDeps, buildId).eligible)
+      confirmPlanAutomatically(committedDeps, buildId);
+  });
 }
 
 export interface CompleteStepOutcome {
@@ -137,7 +137,7 @@ export function completeStep(
   stepId: string,
   outcome: CompleteStepOutcome = {},
 ): void {
-  deps.db.transaction(() => completeStepSettled(deps, stepId, outcome));
+  withCommitEffects(deps, (settled) => completeStepSettled(settled, stepId, outcome));
 }
 
 function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteStepOutcome): void {
@@ -295,7 +295,7 @@ function completeStepSettled(deps: BuildDeps, stepId: string, outcome: CompleteS
   const keepInfoReport = () => {
     if (outcome.report === undefined || deps.attachmentsDir === undefined) return;
     storeInfoReport(
-      { db: deps.db, attachmentsDir: deps.attachmentsDir },
+      { ...deps, attachmentsDir: deps.attachmentsDir },
       {
         buildId: stepRow.buildId,
         teamId: todoRow.teamId,

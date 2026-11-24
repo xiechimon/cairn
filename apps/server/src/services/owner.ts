@@ -20,6 +20,7 @@ import {
   TransactionRollbackError,
 } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
+import type { CommitEffects } from '../db/commit-effects.js';
 import { build, dueEvent, message, step, todo } from '../db/schema.js';
 import { nowMs } from '../lib/ids.js';
 import { BLOCKED_BY_HOLD, deadEndBlocker } from './blockers.js';
@@ -58,7 +59,7 @@ export function ownershipHandoffEventId(stepId: string): string {
 
 const ENDED_STEP = new Set(['done', 'failed', 'stopped']);
 
-export interface OwnerDeps extends ChiefDeps {
+export interface OwnerDeps extends ChiefDeps, CommitEffects {
   vapidKeys?: VapidKeys | null;
 }
 
@@ -240,12 +241,20 @@ const PUSH_TITLE: Record<NeedsYouReason, string> = {
 
 function notifyOwner(deps: OwnerDeps, row: TodoRow, reason: NeedsYouReason): void {
   notifyOwnership(deps, row, reason);
-  pushToUserSafely(deps.db, deps.vapidKeys ?? null, deps.user.id, row.teamId, {
-    title: PUSH_TITLE[reason],
-    body: `#${row.seqNum} ${row.title}`,
-    href: `/app/todo/${row.id}`,
-    tag: `${deps.user.id}:${row.id}`,
-  });
+  pushToUserSafely(
+    deps.db,
+    deps.vapidKeys ?? null,
+    deps.user.id,
+    row.teamId,
+    {
+      title: PUSH_TITLE[reason],
+      body: `#${row.seqNum} ${row.title}`,
+      href: `/app/todo/${row.id}`,
+      tag: `${deps.user.id}:${row.id}`,
+    },
+    undefined,
+    deps,
+  );
 }
 
 function claimCheckpoint(db: Db, row: TodoRow, owner: string, workKey: string): boolean {

@@ -20,6 +20,7 @@ import {
 } from '../src/db/schema.js';
 import {
   bootServer,
+  claimedGeneration,
   issueApiKey,
   pinSessionRoute,
   postProject,
@@ -101,7 +102,10 @@ async function setupWorld() {
     return claimedStepSchema.parse(body.step);
   }
   async function done(stepId: string, body: Record<string, unknown>): Promise<void> {
-    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, { cred: token, body });
+    const res = await call(s.app, 'POST', `/api/machine/done/${stepId}`, {
+      cred: token,
+      body: { generation: claimedGeneration(s.db, stepId), ...body },
+    });
     expect(res.status).toBe(200);
   }
   async function uploadPlan(stepId: string, content: string): Promise<void> {
@@ -262,7 +266,7 @@ describe('the stop server write surface (M7 #308)', () => {
     const other = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
       cred: w.otherToken,
     });
-    expect(await other.json()).toEqual({ discard: null });
+    expect(other.status).toBe(404);
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(1);
     const first = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
       cred: w.token,
@@ -276,7 +280,7 @@ describe('the stop server write surface (M7 #308)', () => {
     const third = await call(w.s.app, 'GET', `/api/machine/stop?stepId=${stepId}`, {
       cred: w.token,
     });
-    expect(await third.json()).toEqual({ discard: null });
+    expect(third.status).toBe(409);
     expect(w.s.db.select().from(stopPendingTable).all()).toHaveLength(0);
   });
 
@@ -368,7 +372,7 @@ describe('the stop server write surface (M7 #308)', () => {
     expect(again.status).toBe(409);
   });
 
-  test('failure mode 9: after stop is booked, the steer fetch -> null (the step is not claimed)', async () => {
+  test('failure mode 9: after stop is booked, the steer fetch is fenced (the step is not claimed)', async () => {
     const buildId = await w.startBuild();
     const claimed = await w.claim();
     await call(w.s.app, 'POST', `/api/conversations/${buildId}/messages`, {
@@ -379,7 +383,7 @@ describe('the stop server write surface (M7 #308)', () => {
     const steerFetch = await call(w.s.app, 'GET', `/api/machine/steer?stepId=${claimed.step.id}`, {
       cred: w.token,
     });
-    expect(await steerFetch.json()).toEqual({ content: null });
+    expect(steerFetch.status).toBe(409);
   });
 
   test('chief conversations are outside the stop surface: a chief- prefixed id -> 404 (stop gates on the build table)', async () => {
