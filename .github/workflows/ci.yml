@@ -171,6 +171,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Team-scope source inventory
+        env:
+          NODE_OPTIONS: --max-old-space-size=2048
+        run: perl -e 'alarm 300; exec @ARGV' node --test scripts/team-scope-inventory.test.mjs
+
       - name: Prepush checks (#1533)
         env:
           PREPUSH_BASE_SHA: ${{ needs.changes.outputs.base-sha || github.event.pull_request.base.sha || github.event.before }}
