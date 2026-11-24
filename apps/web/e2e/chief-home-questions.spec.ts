@@ -452,17 +452,12 @@ test('a multi-question request sends nothing and starts no turn until its last q
   const asked = stream.locator('[data-testid="chief-question-asked"][data-request-id="ask-0000000a"]');
   await expect(asked).toHaveCount(1);
   const kept = await asked.evaluate((block) => {
-    const probe = document.createElement('div');
-    probe.style.backgroundColor = 'var(--reply-bubble-fill)';
-    document.body.append(probe);
-    const fill = getComputedStyle(probe).backgroundColor;
-    probe.remove();
     const bubbles = [...block.querySelectorAll<HTMLElement>('[data-testid="chief-reply-bubble"]')];
     const boxes = bubbles.map((bubble) => bubble.getBoundingClientRect());
     const answer = document.querySelector('[data-question-answer="ask-0000000a"]')!.getBoundingClientRect();
     const column = block.closest('[data-testid="chief-msg"]')!.getBoundingClientRect();
     return {
-      fills: bubbles.map((bubble) => getComputedStyle(bubble).backgroundColor === fill),
+      fills: bubbles.map((bubble) => getComputedStyle(bubble).backgroundColor === 'rgba(0, 0, 0, 0)'),
       heights: boxes.map((box) => Math.round(box.height)),
       left: boxes.map((box) => Math.round(box.left - column.left)),
       between: Math.round(boxes[1]!.top - boxes[0]!.bottom),
@@ -470,7 +465,7 @@ test('a multi-question request sends nothing and starts no turn until its last q
       chips: block.querySelectorAll('button[data-testid^="chief-question-option"]').length,
     };
   });
-  expect(kept).toEqual({ fills: [true, true], heights: [34, 34], left: [0, 0], between: 4, toAnswer: 24, chips: 0 });
+  expect(kept).toEqual({ fills: [true, true], heights: [28, 28], left: [0, 0], between: 4, toAnswer: 24, chips: 0 });
   await page.screenshot({ path: test.info().outputPath('answered-request.png') });
 });
 

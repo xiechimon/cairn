@@ -17,7 +17,7 @@ import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
-import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_TEXT_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalCard } from './approval-card.js';
@@ -339,10 +339,7 @@ export function QuestionChips({
       >
         <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
           <ChipTip tip={question.header === '' ? null : question.header}>
-            <div
-              data-testid="chief-question-text"
-              className={cn(REPLY_BUBBLE_CLS, 'text-ui leading-5 break-words')}
-            >
+            <div data-testid="chief-question-text" className={REPLY_TEXT_CLS}>
               <ChatMarkdown text={question.question} />
             </div>
           </ChipTip>

@@ -11,6 +11,7 @@ export const cn = createCn({
             'brand',
             'heading',
             'card-title',
+            'reply',
             'ui',
             'meta',
             'code',

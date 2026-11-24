@@ -25,7 +25,7 @@ import { Marker } from '../components/ui/marker.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
-import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_BUBBLE_CLS } from '../detail/chat-markdown.js';
+import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_TEXT_CLS } from '../detail/chat-markdown.js';
 import { Segments as DocSegments, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefSegment, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
@@ -111,7 +111,7 @@ const MSG_COL_MID_CLS = `${MSG_COL_CLS} gap-0`;
 const MSG_COL_LIVE_CLS = 'min-w-0 flex-1 gap-0';
 
 const BUBBLE_WRAP_CLS = `w-full max-w-full font-sans ${CHAT_BODY_CLS}`;
-const SAID_CLS = `${REPLY_BUBBLE_CLS} min-w-0 font-sans ${CHAT_BODY_CLS} text-(--foreground) [overflow-wrap:anywhere]`;
+const SAID_CLS = `${REPLY_TEXT_CLS} min-w-0 text-(--foreground)`;
 
 function CoordinatorSaid({ testId, children }: { testId: string; children: ReactNode }) {
   return (
@@ -184,7 +184,7 @@ function BubbleReports({ todoIds }: { todoIds: readonly string[] }) {
   const arrived = useArrivals(todoIds);
   if (todoIds.length === 0) return null;
   return (
-    <div data-slot="bubble-reports" className="mt-1 flex flex-col">
+    <div data-slot="bubble-reports" className="mt-1 flex flex-col font-sans">
       {todoIds.map((todoId) => (
         <ResearchReportLine key={todoId} todoId={todoId} grow={arrived.has(todoId)} />
       ))}
@@ -634,7 +634,7 @@ function RunnerOfflineRow({ notice }: { notice: RunnerOfflineContent }) {
         <Button
           variant="outline"
           size="sm"
-          className="mt-3"
+          className="mt-3 font-sans"
           disabled={moving}
           onClick={() => void move()}
         >
@@ -938,18 +938,18 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             ) : (
               <div className={REPLY_BLOCK_CLS} data-slot="reply-block">
                 <div
-                  className={REPLY_BUBBLE_CLS}
+                  className={REPLY_TEXT_CLS}
                   data-slot="reply-bubble"
                   data-testid="chief-reply-bubble"
                   {...(sourceHighlighted ? { [REPLY_HIGHLIGHT_ATTR]: '' } : {})}
                 >
                   {(item.paragraphs ?? []).map((p, j) => (
-                    <p key={j} className={j > 0 ? `mt-1 ${CHAT_BODY_CLS}` : CHAT_BODY_CLS}>
+                    <p key={j} className={j > 0 ? 'mt-3' : undefined}>
                       <Segments segments={p} />
                     </p>
                   ))}
                   {item.bullets != null && item.bullets.length > 0 && (
-                    <ul className={`mt-1 list-disc ps-9 ${CHAT_BODY_CLS}`}>
+                    <ul className="mt-1 list-disc ps-9">
                       {item.bullets.map((b, j) => (
                         <li key={`b${j}`}>
                           <Segments segments={b} />
