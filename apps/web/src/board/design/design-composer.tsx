@@ -36,7 +36,7 @@ export function useDesignComposer(
   return {
     ids: open.map((comment) => comment.id),
     count: open.length,
-    emptyDraftText: t('按下面的设计评论改。'),
+    emptyDraftText: t('按下面的批注改。'),
     chips: (
       <div data-testid="design-comment-chips" className="mb-2 flex flex-wrap gap-1.5">
         {open.map((comment) => (

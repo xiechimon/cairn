@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Skeleton } from '../../../components/ui/skeleton.js';
+import { RegionSurface } from '../file-comments.js';
 import { useFileBytes } from './use-file-bytes.js';
 
 export function DocxViewer({ src, fallback }: { src: string; fallback: ReactNode }) {
@@ -40,7 +41,10 @@ export function DocxViewer({ src, fallback }: { src: string; fallback: ReactNode
       {state === 'rendering' && (
         <Skeleton className="absolute inset-x-4 top-4 aspect-[1/1.414] max-w-2xl rounded-none" />
       )}
-      <div ref={host} className="artifact-docx" />
+      <div className="relative">
+        <div ref={host} className="artifact-docx" />
+        {state === 'drawn' && <RegionSurface />}
+      </div>
     </div>
   );
 }

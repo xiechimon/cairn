@@ -89,7 +89,13 @@ export function useOpenNewTask(): () => void {
       pathname === '/app'
         ? new URLSearchParams(search)
         : new URLSearchParams(coordinatorSearch(search));
-    for (const key of [THREAD_PARAM, VIEW_PARAM, TASKS_TAB_PARAM, ARTIFACT_PARAM, ARTIFACT_NAME_PARAM])
+    for (const key of [
+      THREAD_PARAM,
+      VIEW_PARAM,
+      TASKS_TAB_PARAM,
+      ARTIFACT_PARAM,
+      ARTIFACT_NAME_PARAM,
+    ])
       params.delete(key);
     params.set(PANE_PARAM, 'tasks');
     const state: NewTaskState = { newTask: Date.now() };

@@ -1,7 +1,8 @@
-import type {
-  DesignCommentRecord,
-  DesignViewport,
-  DesignTarget as ElementTarget,
+import {
+  artifactCommentState,
+  type DesignCommentRecord,
+  type DesignViewport,
+  type DesignTarget as ElementTarget,
 } from '@cairn/shared';
 import { type RefObject, useEffect, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
@@ -12,7 +13,12 @@ import {
   useDrawing,
 } from '../../vendor-open-design/draw-overlay.js';
 import { useCommentBridge } from './design-bridge.js';
-import { type CommentActions, CommentList, CommentPin } from './design-comment-list.js';
+import {
+  type CommentActions,
+  CommentList,
+  CommentPin,
+  type CommentSend,
+} from './design-comment-list.js';
 import { CommentPopover } from './design-comment-popover.js';
 import { DesignFrame } from './design-frame.js';
 import { MarkBar } from './design-markup.js';
@@ -51,6 +57,8 @@ export function DesignCanvas({
   readOnly,
   actions,
   draft,
+  send,
+  retarget,
 }: {
   frameRef: RefObject<HTMLIFrameElement | null>;
   srcdoc: string;
@@ -67,6 +75,8 @@ export function DesignCanvas({
   readOnly: boolean;
   actions: CommentActions;
   draft: CommentDraftHandlers;
+  send?: CommentSend | undefined;
+  retarget?: ((target: ElementTarget) => void) | undefined;
 }) {
   const { t } = useI18n();
   const bridge = useCommentBridge({ frameRef, commenting, comments });
@@ -85,6 +95,11 @@ export function DesignCanvas({
   useEffect(() => {
     if (!commenting) clearPicked();
   }, [commenting, clearPicked]);
+  useEffect(() => {
+    if (picked === null || retarget === undefined) return;
+    retarget(picked);
+    clearPicked();
+  }, [picked, retarget, clearPicked]);
   useEffect(() => {
     if (!commenting || picked !== null) return;
     const onKey = (event: KeyboardEvent) => {
@@ -184,7 +199,7 @@ export function DesignCanvas({
                     />
                   </div>
                 ))}
-                {picked !== null && commenting && (
+                {picked !== null && commenting && retarget === undefined && (
                   <CommentPopover
                     key={`${picked.selector}:${picked.position.x}:${picked.position.y}`}
                     target={picked}
@@ -206,6 +221,14 @@ export function DesignCanvas({
         {listOpen && (
           <CommentList
             comments={comments}
+            stateOf={(comment) =>
+              artifactCommentState({
+                status: comment.status,
+                handledSeq: comment.handledSeq,
+                anchorResolves: bridge.located.get(comment.id)?.state !== 'lost',
+              })
+            }
+            send={send}
             located={bridge.located}
             readOnly={readOnly}
             focusedId={focusedId}

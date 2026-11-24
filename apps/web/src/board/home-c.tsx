@@ -193,7 +193,7 @@ export function HomeC({
   const sendDesignComments =
     archived === null && surface.onSend != null
       ? (ids: readonly string[]) =>
-          Promise.resolve(surface.onSend?.(t('按下面的设计评论改。'), projectId, ids))
+          Promise.resolve(surface.onSend?.(t('按下面的批注改。'), projectId, ids))
       : undefined;
   const designSplit = useArtifactSplit(sendDesignComments);
   const designComposer = useDesignComposer(useActiveArtifact());

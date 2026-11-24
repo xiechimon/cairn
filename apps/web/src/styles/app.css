@@ -1522,3 +1522,13 @@ body:has([data-testid="chief-body"]),
   margin-bottom: 1rem;
   box-shadow: var(--e1);
 }
+
+.artifact-markdown[data-commenting] [data-slot="reply-blocks"] > * {
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.artifact-markdown[data-commenting] [data-slot="reply-blocks"] > *:hover {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}

@@ -1,4 +1,4 @@
-import { type ArtifactOfAttachment, artifactKindOf } from '@cairn/shared';
+import { type ArtifactOfAttachment, artifactKindOf, type DesignCommentRecord } from '@cairn/shared';
 import { Check, Copy, Download, Globe, Pencil } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useDesignMutations } from '../../api/hooks.js';
@@ -24,8 +24,17 @@ import { DocumentPreviewUnavailable, useAttachmentFiles } from '../file-data.js'
 import { downloadFile, type FileTarget } from '../file-pane.js';
 import { artifactKey } from './artifact-route.js';
 import { ArtifactToolbar, OldVersionBar, TOOL_BUTTON, VersionHistory } from './artifact-toolbar.js';
+import {
+  COMMENT_KINDS,
+  CommentLayerProvider,
+  RegionSurface,
+  useFileComments,
+} from './file-comments.js';
+import type { SendDesignComments } from './page-artifact.js';
 import { useArtifactVersions } from './use-artifact-versions.js';
+import { CodeComments } from './viewers/code-comments.js';
 import { DocxViewer } from './viewers/docx-viewer.js';
+import { MarkdownComments } from './viewers/markdown-comments.js';
 import { PdfViewer } from './viewers/pdf-viewer.js';
 import { SheetViewer } from './viewers/sheet-viewer.js';
 import type { SceneReader } from './viewers/whiteboard-canvas.js';
@@ -36,6 +45,21 @@ import { ZoomImage } from './viewers/zoom-image.js';
 const COPIED_MS = 1500;
 const INLINE_KINDS = new Set(['image', 'svg', 'video', 'audio', 'pdf']);
 const SOURCE_KINDS = new Set(['sheet', 'diagram', 'whiteboard']);
+const REGION_WRAPPED = new Set(['design', 'diagram', 'whiteboard']);
+
+const COMMENT_HINT: Record<string, string> = {
+  code: '选中几行，或点一个行号',
+  sheet: '点一个单元格，或拖选一片',
+  document: '点一段文字加批注',
+  video: '停在要改的那一刻，点右边的按钮',
+};
+
+function formatTime(seconds: number): string {
+  const s = Math.floor(seconds);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+type FileComments = ReturnType<typeof useFileComments>;
 
 type Mode = 'preview' | 'source';
 
@@ -43,23 +67,48 @@ export function FileArtifact({
   target,
   artifact,
   readOnly,
+  sendComments,
 }: {
   target: FileTarget;
   artifact: ArtifactOfAttachment | null;
   readOnly: boolean;
+  sendComments: SendDesignComments | undefined;
 }) {
   if (artifact === null) return <FileView fileKey={target.key} name={target.name} />;
-  return <VersionedFile target={target} artifact={artifact} readOnly={readOnly} />;
+  return (
+    <VersionedFile
+      target={target}
+      artifact={artifact}
+      readOnly={readOnly}
+      sendComments={sendComments}
+    />
+  );
+}
+
+function locate(body: HTMLElement | null, comment: DesignCommentRecord) {
+  if (body === null || comment.anchor === null) return;
+  if (comment.anchor.type === 'time') {
+    const video = body.querySelector('video');
+    if (video !== null) video.currentTime = comment.anchor.seconds;
+    return;
+  }
+  const page = comment.anchor.type === 'region' ? comment.anchor.page : undefined;
+  if (page !== undefined)
+    body.querySelector(`[data-testid="artifact-pdf-page"][data-page="${page}"]`)?.scrollIntoView({
+      block: 'start',
+    });
 }
 
 function VersionedFile({
   target,
   artifact,
   readOnly,
+  sendComments,
 }: {
   target: FileTarget;
   artifact: ArtifactOfAttachment;
   readOnly: boolean;
+  sendComments: SendDesignComments | undefined;
 }) {
   const { t } = useI18n();
   const { live } = useLiveData();
@@ -70,11 +119,23 @@ function VersionedFile({
   const editable = live && !readOnly && !versions.viewingOld;
   const fileKey =
     shown === undefined ? target.key : artifactKey(shown.attachmentId, artifact.fileName);
+  const [body, setBody] = useState<HTMLElement | null>(null);
+  const comments = useFileComments({
+    todoId: artifact.todoId,
+    fileName: artifact.fileName,
+    versionId: shown?.id,
+    enabled: live && COMMENT_KINDS.has(artifact.kind),
+    readOnly: readOnly || versions.viewingOld,
+    sendComments,
+    onLocate: (comment) => locate(body, comment),
+  });
   return (
     <FileView
       key={fileKey}
       fileKey={fileKey}
       name={artifact.fileName}
+      comments={comments}
+      onBody={setBody}
       history={{ open: historyOpen, toggle: () => setHistoryOpen((open) => !open) }}
       save={
         editable
@@ -122,6 +183,8 @@ function FileView({
   save = null,
   banner = null,
   aside = null,
+  comments = null,
+  onBody,
 }: {
   fileKey: string;
   name: string;
@@ -129,6 +192,8 @@ function FileView({
   save?: { busy: boolean; run: (content: string, done: () => void) => void } | null;
   banner?: ReactNode;
   aside?: ReactNode;
+  comments?: FileComments | null;
+  onBody?: (body: HTMLElement | null) => void;
 }) {
   const { t } = useI18n();
   const files = useAttachmentFiles(fileKey, { size: true });
@@ -146,6 +211,8 @@ function FileView({
     sceneReader.current = read;
   }, []);
   const [copied, setCopied] = useState(false);
+  const [bodyEl, setBodyEl] = useState<HTMLDivElement | null>(null);
+  useEffect(() => onBody?.(bodyEl), [onBody, bodyEl]);
   useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
@@ -206,6 +273,10 @@ function FileView({
       ))
     ) : artifactKind === 'whiteboard' ? (
       withText((value) => <WhiteboardViewer text={value} editing={editing} onReader={keepReader} />)
+    ) : artifactKind === 'code' && kind === 'text' ? (
+      withText((value) => <CodeComments name={fileKey} text={value} />)
+    ) : kind === 'markdown' && mode === 'preview' ? (
+      withText((value) => <MarkdownComments text={value} />)
     ) : kind === 'pdf' ? (
       <PdfViewer src={src} zoom={zoom} onFitScale={setFitScale} />
     ) : artifactKind === 'docx' ? (
@@ -233,6 +304,38 @@ function FileView({
     ) : (
       binary
     );
+  const commentsOn = comments?.layer.commenting ?? false;
+  const wrappedBody =
+    REGION_WRAPPED.has(artifactKind) && mode === 'preview' && !editing ? (
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {body}
+        <RegionSurface />
+      </div>
+    ) : (
+      body
+    );
+  const timeTool =
+    kind === 'video' && comments !== null
+      ? {
+          label: t('在这一刻加批注'),
+          testId: 'artifact-comment-at-time',
+          onClick: () => {
+            const video = bodyEl?.querySelector('video');
+            if (video == null || bodyEl === null) return;
+            video.pause();
+            const box = bodyEl.getBoundingClientRect();
+            comments.layer.pick({
+              anchor: { type: 'time', seconds: video.currentTime },
+              element: {
+                selector: '',
+                label: formatTime(video.currentTime),
+                text: '',
+              },
+              point: { x: box.left + box.width / 2 - 150, y: box.top + 16 },
+            });
+          },
+        }
+      : undefined;
   const controls = (
     <>
       {(kind === 'image' || kind === 'pdf') && (
@@ -319,7 +422,14 @@ function FileView({
           </>
         }
         controls={controls}
-        comments={null}
+        comments={
+          comments?.toolbar == null
+            ? null
+            : {
+                ...comments.toolbar,
+                disabled: mode === 'source' && artifactKind !== 'code',
+              }
+        }
         history={history}
         exportMenu={
           <DropdownMenu>
@@ -347,14 +457,22 @@ function FileView({
         }
       />
       {banner}
+      {comments?.strip?.({
+        hint: t(COMMENT_HINT[artifactKind] ?? '点击一处，或按住拖出一块区域'),
+        ...(timeTool !== undefined ? { tool: timeTool } : {}),
+      })}
       <div className="relative flex min-h-0 flex-1">
         <div
+          ref={setBodyEl}
           data-testid="artifact-body"
           data-kind={kind}
-          className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+          data-commenting={commentsOn || undefined}
+          className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
         >
-          {body}
+          <CommentLayerProvider layer={comments?.layer ?? null}>{wrappedBody}</CommentLayerProvider>
+          {comments?.composer?.(bodyEl)}
         </div>
+        {comments?.list}
         {aside}
       </div>
     </>

@@ -263,5 +263,12 @@ function ArtifactTab({
       />
     );
   }
-  return <FileArtifact target={target} artifact={artifact} readOnly={readOnly} />;
+  return (
+    <FileArtifact
+      target={target}
+      artifact={artifact}
+      readOnly={readOnly}
+      sendComments={sendComments}
+    />
+  );
 }

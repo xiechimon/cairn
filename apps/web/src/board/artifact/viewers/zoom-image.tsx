@@ -1,8 +1,35 @@
 import { ImageOff } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { EmptyState } from '../../../components/empty-state.js';
 import { useI18n } from '../../../i18n/provider.js';
+import { RegionSurface } from '../file-comments.js';
 import type { Zoom } from './zoom.js';
+
+interface Box {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+function useImageBox(image: HTMLImageElement | null): Box | null {
+  const [box, setBox] = useState<Box | null>(null);
+  useEffect(() => {
+    if (image === null) return;
+    const measure = () =>
+      setBox({
+        left: image.offsetLeft,
+        top: image.offsetTop,
+        width: image.offsetWidth,
+        height: image.offsetHeight,
+      });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(image);
+    return () => observer.disconnect();
+  }, [image]);
+  return box;
+}
 
 export function ZoomImage({
   name,
@@ -20,6 +47,8 @@ export function ZoomImage({
   const { t } = useI18n();
   const [broken, setBroken] = useState(false);
   const [natural, setNatural] = useState<number | null>(null);
+  const [image, setImage] = useState<HTMLImageElement | null>(null);
+  const box = useImageBox(image);
   if (broken)
     return (
       <EmptyState
@@ -34,9 +63,10 @@ export function ZoomImage({
   return (
     <div
       data-testid="artifact-image-stage"
-      className="flex min-h-0 flex-1 overflow-auto overscroll-contain p-2"
+      className="relative flex min-h-0 flex-1 overflow-auto overscroll-contain p-2"
     >
       <img
+        ref={setImage}
         data-testid="file-preview-image"
         src={src}
         alt={name}
@@ -61,6 +91,11 @@ export function ZoomImage({
             : 'm-auto flex-none rounded-(--radius-tile)'
         }
       />
+      {box !== null && box.width > 0 && (
+        <div className="pointer-events-none absolute" style={box}>
+          <RegionSurface />
+        </div>
+      )}
     </div>
   );
 }

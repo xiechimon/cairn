@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { CodeWithLines } from './code-with-lines.js';
 import { fileExtOf } from './file-kind.js';
 
@@ -32,9 +32,24 @@ export function isDiffFile(name: string): boolean {
   return ext === 'diff' || ext === 'patch';
 }
 
-export function TextViewer({ name, text }: { name: string; text: string }) {
+export function TextViewer({
+  name,
+  text,
+  lineMark,
+}: {
+  name: string;
+  text: string;
+  lineMark?: ((line: number) => ReactNode) | undefined;
+}) {
   const displayText = useMemo(() => formatJsonFileTextForDisplay(name, text), [name, text]);
-  return <CodeWithLines text={displayText} lang={codeLangFor(name)} diff={isDiffFile(name)} />;
+  return (
+    <CodeWithLines
+      text={displayText}
+      lang={codeLangFor(name)}
+      diff={isDiffFile(name)}
+      lineMark={lineMark}
+    />
+  );
 }
 
 export function formatJsonFileTextForDisplay(name: string, text: string): string {

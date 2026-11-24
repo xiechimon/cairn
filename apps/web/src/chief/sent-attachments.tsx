@@ -8,11 +8,7 @@ export function SentAttachments({ files }: { files: AttachmentToken[] }) {
       className="flex max-w-full flex-wrap justify-end gap-2"
     >
       {files.map((file, index) => (
-        <FileTile
-          key={`${file.key}#${index}`}
-          testId="chief-sent-attachment"
-          file={file}
-        />
+        <FileTile key={`${file.key}#${index}`} testId="chief-sent-attachment" file={file} />
       ))}
     </div>
   );

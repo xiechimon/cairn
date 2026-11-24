@@ -1,17 +1,41 @@
-import { DESIGN_LIMITS, type DesignCommentRecord, type DesignCommentStatus } from '@cairn/shared';
+import {
+  type ArtifactCommentState,
+  DESIGN_LIMITS,
+  type DesignCommentRecord,
+  type DesignCommentStatus,
+  describeAnchor,
+} from '@cairn/shared';
 import { X } from 'lucide-react';
 import { useState } from 'react';
 import { IconTooltip } from '../../components/icon-tooltip.js';
+import { SegmentedTabs } from '../../components/segmented.js';
 import { Button } from '../../components/ui/button.js';
+import { StatusChip, type StatusTone } from '../../components/ui/status-chip.js';
 import { Textarea } from '../../components/ui/textarea.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { Located } from './design-bridge.js';
 
-const STATUS_LABEL: Record<DesignCommentStatus, string> = {
-  open: '未发送',
-  sent: '已发给 agent',
-  resolved: '已解决',
+const STATE_LABEL: Record<ArtifactCommentState, string> = {
+  pending: '待处理',
+  working: '处理中',
+  done: '已改',
+  stale: '已失效',
 };
+
+const STATE_TONE: Record<ArtifactCommentState, StatusTone> = {
+  pending: 'confirm',
+  working: 'idle',
+  done: 'done',
+  stale: 'failed',
+};
+
+type Filter = 'all' | 'open' | 'done';
+
+export function commentWhere(comment: DesignCommentRecord): string {
+  if (comment.anchor !== null && comment.anchor.type !== 'slide')
+    return describeAnchor(comment.anchor);
+  return comment.text !== '' ? `${comment.label}「${comment.text}」` : comment.label;
+}
 
 function markHref(attachmentId: string): string {
   return `/api/attachments/${encodeURIComponent(attachmentId)}`;
@@ -22,6 +46,7 @@ export interface CommentActions {
   remove: (id: string) => void;
   resolve: (id: string) => void;
   reopen: (id: string) => void;
+  retarget?: (id: string) => void;
 }
 
 export function CommentPin({
@@ -52,16 +77,20 @@ export function CommentPin({
 
 function CommentRow({
   comment,
+  state,
   located,
   readOnly,
   focused,
   actions,
+  onPick,
 }: {
   comment: DesignCommentRecord;
+  state: ArtifactCommentState;
   located: Located | undefined;
   readOnly: boolean;
   focused: boolean;
   actions: CommentActions;
+  onPick: ((comment: DesignCommentRecord) => void) | undefined;
 }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
@@ -71,6 +100,7 @@ function CommentRow({
       data-testid="design-comment-row"
       data-pin={comment.pin}
       data-status={comment.status}
+      data-state={state}
       data-anchor={located?.state}
       data-focused={focused || undefined}
       className="flex gap-2.5 border-b border-border px-3 py-3 data-focused:bg-(--surface-1)"
@@ -129,12 +159,30 @@ function CommentRow({
           </a>
         )}
         <p className="m-0 truncate text-meta text-content-tertiary">
-          {[
-            comment.text !== '' ? `${comment.label}「${comment.text}」` : comment.label,
-            `v${comment.versionSeq}`,
-            t(STATUS_LABEL[comment.status]),
-          ].join(' · ')}
+          {onPick === undefined ? (
+            `${commentWhere(comment)} · v${comment.versionSeq}`
+          ) : (
+            <Button
+              variant="link"
+              size="xs"
+              data-testid="design-comment-where"
+              onClick={() => onPick(comment)}
+              className="h-auto max-w-full truncate p-0 text-meta font-normal text-content-tertiary"
+            >
+              {`${commentWhere(comment)} · v${comment.versionSeq}`}
+            </Button>
+          )}
         </p>
+        <div className="flex">
+          <StatusChip tone={STATE_TONE[state]} className="text-meta">
+            <span data-testid="design-comment-state">{t(STATE_LABEL[state])}</span>
+          </StatusChip>
+        </div>
+        {state === 'stale' && located?.state !== 'lost' && (
+          <p data-testid="design-comment-stale" className="m-0 text-meta text-content-secondary">
+            {t('原来的位置在新版里找不到了')}
+          </p>
+        )}
         {located?.state === 'lost' && (
           <p data-testid="design-comment-lost" className="m-0 text-meta text-content-secondary">
             {t('在 v{n} 上提出，这一版中未找到', { n: comment.versionSeq })}
@@ -147,6 +195,17 @@ function CommentRow({
         )}
         {!readOnly && draft === null && (
           <div className="-ml-2 flex flex-wrap gap-0.5">
+            {state === 'stale' && actions.retarget !== undefined && (
+              <Button
+                variant="ghost"
+                size="xs"
+                data-testid="design-comment-retarget"
+                className="text-content-secondary"
+                onClick={() => actions.retarget?.(comment.id)}
+              >
+                {t('重新指位置')}
+              </Button>
+            )}
             {comment.status === 'open' && (
               <>
                 <Button
@@ -197,22 +256,41 @@ function CommentRow({
   );
 }
 
+export interface CommentSend {
+  busy: boolean;
+  run: (ids: readonly string[]) => void;
+}
+
 export function CommentList({
   comments,
-  located,
+  stateOf,
+  located = new Map(),
   readOnly,
   focusedId,
   actions,
+  send,
+  onPick,
   onClose,
 }: {
   comments: readonly DesignCommentRecord[];
-  located: ReadonlyMap<string, Located>;
+  stateOf: (comment: DesignCommentRecord) => ArtifactCommentState;
+  located?: ReadonlyMap<string, Located>;
   readOnly: boolean;
   focusedId: string | null;
   actions: CommentActions;
+  send?: CommentSend | undefined;
+  onPick?: (comment: DesignCommentRecord) => void;
   onClose: () => void;
 }) {
   const { t } = useI18n();
+  const [filter, setFilter] = useState<Filter>('all');
+  const rows = comments.map((comment) => ({ comment, state: stateOf(comment) }));
+  const shown = rows.filter(({ state }) =>
+    filter === 'all' ? true : filter === 'done' ? state === 'done' : state !== 'done',
+  );
+  const pendingIds = rows
+    .filter(({ state }) => state === 'pending')
+    .map(({ comment }) => comment.id);
   return (
     <section
       data-testid="design-comment-list"
@@ -220,7 +298,7 @@ export function CommentList({
       className="flex w-80 max-w-full flex-none flex-col border-l border-border bg-background max-[760px]:absolute max-[760px]:inset-y-0 max-[760px]:right-0 max-[760px]:z-20 max-[760px]:shadow-(--shadow-popover)"
     >
       <div className="flex h-10 flex-none items-center justify-between border-b border-border pr-1 pl-3">
-        <h3 className="m-0 text-ui font-medium text-foreground">{t('评论')}</h3>
+        <h3 className="m-0 text-ui font-medium text-foreground">{t('批注')}</h3>
         <IconTooltip
           label={t('关闭评论列表')}
           side="bottom"
@@ -237,6 +315,20 @@ export function CommentList({
           <X aria-hidden className="size-4" />
         </IconTooltip>
       </div>
+      {comments.length > 0 && (
+        <div className="flex-none px-3 pt-2.5 pb-1">
+          <SegmentedTabs
+            value={filter}
+            label={t('筛选批注')}
+            onChange={setFilter}
+            options={[
+              { value: 'all', label: t('全部'), testId: 'design-comment-filter-all' },
+              { value: 'open', label: t('未改'), testId: 'design-comment-filter-open' },
+              { value: 'done', label: t('已改'), testId: 'design-comment-filter-done' },
+            ]}
+          />
+        </div>
+      )}
       {comments.length === 0 ? (
         <p
           data-testid="design-comments-empty"
@@ -246,10 +338,12 @@ export function CommentList({
         </p>
       ) : (
         <ul className="m-0 min-h-0 flex-1 list-none overflow-y-auto p-0">
-          {comments.map((comment) => (
+          {shown.map(({ comment, state }) => (
             <CommentRow
               key={comment.id}
               comment={comment}
+              state={state}
+              onPick={onPick}
               located={located.get(comment.id)}
               readOnly={readOnly}
               focused={comment.id === focusedId}
@@ -257,6 +351,18 @@ export function CommentList({
             />
           ))}
         </ul>
+      )}
+      {send !== undefined && !readOnly && pendingIds.length > 0 && (
+        <div className="mt-auto flex-none border-t border-border p-3">
+          <Button
+            data-testid="design-comment-send-all"
+            className="w-full"
+            disabled={send.busy}
+            onClick={() => send.run(pendingIds)}
+          >
+            {t('发给 Coordinator ({n})', { n: pendingIds.length })}
+          </Button>
+        </div>
       )}
     </section>
   );

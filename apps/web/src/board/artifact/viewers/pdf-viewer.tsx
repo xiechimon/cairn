@@ -6,6 +6,7 @@ import { IconTooltip } from '../../../components/icon-tooltip.js';
 import { Button } from '../../../components/ui/button.js';
 import { Skeleton } from '../../../components/ui/skeleton.js';
 import { useI18n } from '../../../i18n/provider.js';
+import { RegionSurface, useCommentLayer } from '../file-comments.js';
 import { useFileBytes } from './use-file-bytes.js';
 import type { Zoom } from './zoom.js';
 
@@ -152,9 +153,12 @@ export function PdfViewer({
   const deck = opened !== null && isDeck(opened.sizes);
   const fit = opened === null || width === 0 || deck ? 1 : pdfFitScale(opened.sizes, width);
   useEffect(() => onFitScale(fit), [fit, onFitScale]);
+  const report = useCommentLayer()?.report;
   useEffect(() => {
-    if (opened !== null) onPages?.(opened.doc.numPages);
-  }, [opened, onPages]);
+    if (opened === null) return;
+    onPages?.(opened.doc.numPages);
+    report?.({ pages: opened.doc.numPages });
+  }, [opened, onPages, report]);
   const scale = zoom === 'fit' ? fit : zoom;
   if (bytesQ.isError || failed)
     return (
@@ -275,6 +279,7 @@ function PdfPage({
       <canvas ref={canvasRef} className="absolute inset-0 size-full" />
       <div ref={textRef} className="textLayer" />
       {!drawn && <Skeleton className="absolute inset-0 rounded-none" />}
+      {textLayer && drawn && <RegionSurface page={number} />}
     </div>
   );
 }

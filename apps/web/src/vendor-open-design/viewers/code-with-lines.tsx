@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx
 import { cn } from 'cn';
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { type CodeToken, useCodeTokens } from '../../detail/code-highlight.js';
 import { useI18n } from '../../i18n/provider.js';
 
@@ -45,10 +45,12 @@ export function CodeWithLines({
   text,
   lang,
   diff = false,
+  lineMark,
 }: {
   text: string;
   lang?: string | undefined;
   diff?: boolean;
+  lineMark?: ((line: number) => ReactNode) | undefined;
 }) {
   const { t } = useI18n();
   const lines = useMemo(() => codeLines(text), [text]);
@@ -73,17 +75,19 @@ export function CodeWithLines({
             <div
               key={index}
               data-slot="file-line"
+              data-line={index + 1}
               {...(kind !== null ? { 'data-diff': kind } : {})}
               className="contents"
             >
               <span
                 aria-hidden
                 className={cn(
-                  'min-w-10 border-r border-(--border) pr-2 pl-3 text-right text-content-tertiary tabular-nums select-none',
+                  'relative min-w-10 border-r border-(--border) pr-2 pl-3 text-right text-content-tertiary tabular-nums select-none',
                   row,
                 )}
               >
                 {index + 1}
+                {lineMark?.(index + 1)}
               </span>
               <span
                 className={cn('min-w-0 px-3 whitespace-pre-wrap [overflow-wrap:anywhere]', row)}

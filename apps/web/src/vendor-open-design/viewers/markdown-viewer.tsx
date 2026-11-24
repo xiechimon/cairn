@@ -1,12 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0. Modified by Cairn from nexu-io/open-design@07258801 apps/web/src/components/FileViewer.tsx
-import { useMemo } from 'react';
+import { type ReactNode, type Ref, useMemo } from 'react';
 import { ChatMarkdown } from '../../detail/chat-markdown.js';
 import { useI18n } from '../../i18n/provider.js';
 import { CODE_VIEWER_MAX_LINES, CodeWithLines, codeLines } from './code-with-lines.js';
 
 export type MarkdownViewerMode = 'preview' | 'source';
 
-export function MarkdownViewer({ text, mode }: { text: string; mode: MarkdownViewerMode }) {
+export function MarkdownViewer({
+  text,
+  mode,
+  articleRef,
+  children,
+}: {
+  text: string;
+  mode: MarkdownViewerMode;
+  articleRef?: Ref<HTMLElement>;
+  children?: ReactNode;
+}) {
   const { t } = useI18n();
   const lines = useMemo(() => codeLines(text), [text]);
   if (mode === 'source') return <CodeWithLines text={text} lang="markdown" />;
@@ -14,10 +24,12 @@ export function MarkdownViewer({ text, mode }: { text: string; mode: MarkdownVie
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pt-2 pb-4">
       <article
+        ref={articleRef}
         data-testid="file-preview-markdown"
-        className="mx-auto w-full max-w-chat min-w-0 px-3 py-2 text-ui leading-5 text-foreground [overflow-wrap:anywhere]"
+        className="relative mx-auto w-full max-w-chat min-w-0 px-3 py-2 text-ui leading-5 text-foreground [overflow-wrap:anywhere]"
       >
         <ChatMarkdown text={shown.join('\n')} />
+        {children}
       </article>
       {lines.length > shown.length && (
         <p

@@ -6,7 +6,6 @@ import { DropdownMenu, DropdownMenuTrigger } from '../../components/ui/dropdown-
 import { toastError } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
 import { ChevronDown, Download } from '../../icons/index.js';
-import { TOOL_BUTTON } from '../artifact/artifact-toolbar.js';
 import {
   buildDesignHandoffContent,
   buildDesignManifestContent,
@@ -16,6 +15,7 @@ import {
 } from '../../vendor-open-design/design-handoff.js';
 import { requestPreviewSnapshot } from '../../vendor-open-design/snapshot-request.js';
 import { buildZip } from '../../vendor-open-design/zip.js';
+import { TOOL_BUTTON } from '../artifact/artifact-toolbar.js';
 
 function downloadHref(href: string, filename: string) {
   const anchor = document.createElement('a');

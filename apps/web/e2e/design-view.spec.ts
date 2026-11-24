@@ -52,6 +52,9 @@ function lostComment(): Comment {
     markAttachmentId: null,
     status: 'sent',
     messageId: 'm-old',
+    anchor: null,
+    sentAt: 1,
+    handledSeq: null,
     createdAt: 1,
     updatedAt: 1,
     elementId: 'promo',
@@ -91,8 +94,11 @@ async function openDesign(page: Page, seeded: Comment[] = [], shareOrigin: strin
         versionSeq: version?.seq ?? 0,
         pin: Math.max(0, ...state.comments.map((c) => c.pin)) + 1,
         markAttachmentId: body.markAttachmentId ?? null,
+        anchor: body.anchor ?? null,
         status: 'open',
         messageId: null,
+        sentAt: null,
+        handledSeq: null,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -141,7 +147,7 @@ async function openDesign(page: Page, seeded: Comment[] = [], shareOrigin: strin
       };
       state.sends.push(body);
       const ids = new Set(body.designCommentIds ?? []);
-      state.comments = state.comments.map((c) => (ids.has(c.id) ? { ...c, status: 'sent' } : c));
+      state.comments = state.comments.map((c) => (ids.has(c.id) ? { ...c, status: 'sent', sentAt: Date.now() } : c));
       mock.messages = [
         ...mock.messages,
         { id: `n${mock.messages.length + 1}`, role: 'user', content: body.content, createdAt: Date.now() },
@@ -320,7 +326,7 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await expect(lost).toContainText('在 v1 上提出，这一版中未找到');
   await expect(pane.locator('[data-testid="design-pin"][data-pin="1"]')).toHaveCount(0);
   const second = pane.locator('[data-testid="design-comment-row"][data-pin="2"]');
-  await expect(second).toContainText('未发送');
+  await expect(second.getByTestId('design-comment-state')).toHaveText('待处理');
   await second.getByTestId('design-comment-edit').click();
   await second.getByTestId('design-comment-edit-note').fill('只让 Pro 的按钮是实心，另外两个描边');
   await second.getByTestId('design-comment-edit-save').click();
@@ -340,7 +346,7 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await expect.poll(() => state.sends.length).toBe(1);
   expect(state.sends[0]).toMatchObject({ content: '按评论改', designCommentIds: ['cmt-2'] });
   await expect(page.getByTestId('design-comment-chip')).toHaveCount(0);
-  await expect(second).toContainText('已发给 agent');
+  await expect(second.getByTestId('design-comment-state')).toHaveText('处理中');
   await expect(second.getByTestId('design-comment-delete')).toHaveCount(0);
   await second.getByTestId('design-comment-resolve').click();
   await expect(second).toHaveAttribute('data-status', 'resolved');
@@ -352,7 +358,7 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await page.getByTestId('design-comment-note').fill('这句去掉');
   await page.getByTestId('design-comment-send').click();
   await expect.poll(() => state.sends.length).toBe(2);
-  expect(state.sends[1]).toMatchObject({ content: '按下面的设计评论改。', designCommentIds: ['cmt-3'] });
+  expect(state.sends[1]).toMatchObject({ content: '按下面的批注改。', designCommentIds: ['cmt-3'] });
 
   await page.keyboard.press('Escape');
   await expect(pane.getByTestId('artifact-comment-strip')).toHaveCount(0);

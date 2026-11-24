@@ -74,6 +74,8 @@ export function PageArtifact({
   const { createComment, patchComment, deleteComment, saveMark, createShare, stopShare } =
     useDesignMutations(todoId, fileName);
   const [commenting, setCommenting] = useState(false);
+  const [retargetId, setRetargetId] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
   const [listOpen, setListOpen] = useState(false);
   const stopCommenting = useCallback(() => setCommenting(false), []);
   const [marking, setMarking] = useState(false);
@@ -98,7 +100,22 @@ export function PageArtifact({
         { id, patch: { status: 'open' } },
         { onError: commentFailed('评论未能修改') },
       ),
+    retarget: (id) => {
+      setRetargetId(id);
+      setMarking(false);
+      setCommenting(true);
+    },
   };
+  const send =
+    sendComments === undefined
+      ? undefined
+      : {
+          busy: sending,
+          run: (ids: readonly string[]) => {
+            setSending(true);
+            void sendComments(ids).finally(() => setSending(false));
+          },
+        };
   if (page === undefined || shown === undefined) {
     return versions.pagesFailed ? (
       <EmptyState
@@ -125,6 +142,20 @@ export function PageArtifact({
       { ...target, versionId: shown.id, viewport, note },
       { onSuccess: (row) => then(row.id), onError: commentFailed('评论未能保存') },
     );
+  const retarget =
+    retargetId === null
+      ? undefined
+      : (target: Parameters<CommentDraftHandlers['save']>[0]) => {
+          setRetargetId(null);
+          setCommenting(false);
+          patchComment.mutate(
+            {
+              id: retargetId,
+              patch: { retarget: { ...target, versionId: shown.id, viewport, anchor: null } },
+            },
+            { onError: commentFailed('评论未能修改') },
+          );
+        };
   const draft: CommentDraftHandlers = {
     busy: createComment.isPending,
     save: (target, note, done) => createFrom(target, note, () => done()),
@@ -291,7 +322,13 @@ export function PageArtifact({
       )}
       {commentOn && (
         <CommentStrip
-          hint={marking ? t('在页面上画出要改的地方，写一句说明') : t('点一个元素加批注')}
+          hint={
+            retargetId !== null
+              ? t('点一个元素，把这条批注指到新位置')
+              : marking
+                ? t('在页面上画出要改的地方，写一句说明')
+                : t('点一个元素加批注')
+          }
           tool={{
             label: marking ? t('点选元素') : t('画标注'),
             testId: 'design-mark-mode',
@@ -301,6 +338,7 @@ export function PageArtifact({
             },
           }}
           onExit={() => {
+            setRetargetId(null);
             setCommenting(false);
             setMarking(false);
           }}
@@ -351,6 +389,8 @@ export function PageArtifact({
               readOnly={readOnly}
               actions={actions}
               draft={draft}
+              send={send}
+              retarget={retarget}
             />
           )}
         </div>
