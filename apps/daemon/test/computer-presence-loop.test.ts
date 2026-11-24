@@ -3,7 +3,7 @@ import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
 import type { ComputerPresence, MachinePresenceBody } from '@cairn/shared';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, onTestFinished, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { computerMachineName, HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import { ComputerPresenceReporter } from '../src/computer/presence.js';
@@ -12,12 +12,21 @@ import type { DaemonLogger } from '../src/log.js';
 import { MachineClient } from '../src/machine-client.js';
 import { runMachine } from '../src/machine-loop.js';
 import { statePaths } from '../src/state.js';
-import { FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
+import {
+  FakeMachineApi,
+  fakeBackend,
+  stubManagedRuntime,
+  waitFor,
+} from './machine-loop-harness.js';
 
 vi.mock('../src/claude-code-bin.js', () => ({ probeClaudeBin: async () => null }));
 
 describe('computer presence machine wiring', () => {
   test('startup, immediate changes and periodic observations reach machine presence and stop cleanly', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('unexpected network fetch'));
+    onTestFinished(() => fetchSpy.mockRestore());
     const home = makeTestTempDir('computer-presence-loop-');
     const api = new FakeMachineApi();
     const listeners = new Set<() => void>();
@@ -68,6 +77,14 @@ describe('computer presence machine wiring', () => {
       idleSleepPrevention: false,
       proxyEnv: {},
       capEnv: {},
+      devinManaged: stubManagedRuntime(),
+      geminiManaged: stubManagedRuntime(),
+      updateChecksEnabled: () => false,
+      antigravityManaged: {
+        current: () => null,
+        ensure: async () => null,
+        probe: async () => null,
+      },
       otel: null,
     });
     try {
@@ -91,9 +108,14 @@ describe('computer presence machine wiring', () => {
       expect(listeners.size).toBe(0);
       expect(releaseTestTempDir(home)).toBe(true);
     }
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   test('a Linux daemon reports its running host desktops under the server computer name', async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockRejectedValue(new Error('unexpected network fetch'));
+    onTestFinished(() => fetchSpy.mockRestore());
     const home = makeTestTempDir('computer-presence-desktop-');
     const bin = join(home, 'bin');
     mkdirSync(bin);
@@ -145,6 +167,14 @@ describe('computer presence machine wiring', () => {
       proxyEnv: {},
       capEnv: { PATH: bin },
       platform: 'linux',
+      devinManaged: stubManagedRuntime(),
+      geminiManaged: stubManagedRuntime(),
+      updateChecksEnabled: () => false,
+      antigravityManaged: {
+        current: () => null,
+        ensure: async () => null,
+        probe: async () => null,
+      },
       otel: null,
     });
     try {
@@ -161,6 +191,7 @@ describe('computer presence machine wiring', () => {
       vi.unstubAllEnvs();
       expect(releaseTestTempDir(home)).toBe(true);
     }
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   test('deadline closes a real stalled HTTP presence request and keeps its bearer on the machine route', async () => {
