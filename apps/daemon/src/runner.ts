@@ -195,7 +195,9 @@ async function runClaimedStep(
   const treeEnv: Record<string, string> = { ...opts.env, [STEP_TREE_ENV]: treeMarker };
   const reaper = new StepReaper({ env: STEP_TREE_ENV, value: treeMarker }, STEP_REAP_GRACE_MS);
   deps.stepTreeMarkers?.set(stepId, treeMarker);
+  let reaped = false;
   const reapTree = async () => {
+    reaped = true;
     try {
       await reaper.reap();
     } catch (error) {
@@ -204,7 +206,9 @@ async function runClaimedStep(
       );
     }
   };
-  stepCleanups.push(reapTree);
+  stepCleanups.push(async () => {
+    if (!reaped) await reapTree();
+  });
   stepCleanups.push(() => {
     deps.stepTreeMarkers?.delete(stepId);
   });
