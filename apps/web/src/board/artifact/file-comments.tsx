@@ -391,12 +391,15 @@ function AnchorComposer({
   const top = y + GAP + COMPOSER_H <= height ? y + GAP : Math.max(GAP, y - COMPOSER_H - GAP);
   const trimmed = note.trim();
   return (
-    <div
-      role="dialog"
+    <form
       aria-label={t('写批注')}
       data-testid="artifact-comment-composer"
       className="absolute z-(--z-floating) flex flex-col gap-2.5 rounded-(--radius-popover) border border-border bg-popover p-3 text-popover-foreground shadow-(--shadow-popover)"
       style={{ left, top, width: Math.min(COMPOSER_W, width - GAP * 2) }}
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (trimmed !== '' && !busy) onSave(trimmed);
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.stopPropagation();
@@ -427,15 +430,15 @@ function AnchorComposer({
           {t('取消')}
         </Button>
         <Button
+          type="submit"
           size="sm"
           data-testid="artifact-comment-save"
           disabled={trimmed === '' || busy}
-          onClick={() => onSave(trimmed)}
         >
           {t('保存')}
         </Button>
       </div>
-    </div>
+    </form>
   );
 }
 
