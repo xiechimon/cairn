@@ -332,7 +332,7 @@ test('detail face: clicking the settled chip opens the image in the artifact pan
   const chip = page.getByTestId('composer-attachments').getByRole('button', { name: 'pasted-image-1.png', exact: true });
   await chip.click();
   const panel = page.getByTestId('artifact-panel');
-  await expect(panel.getByRole('tab', { selected: true })).toHaveText('pasted-image-1.png');
+  await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('pasted-image-1.png');
   const view = panel.getByRole('img', { name: 'pasted-image-1.png' });
   await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
     CARD_W,
@@ -482,7 +482,7 @@ test('chief face: placeholder → settled chip → artifact panel preview', asyn
   await expect(chip).toBeVisible();
   await chip.click();
   const panel = page.getByTestId('artifact-panel');
-  await expect(panel.getByRole('tab', { selected: true })).toHaveText('pasted-image-1.png');
+  await expect(panel.locator('[data-testid="artifact-tab"][data-active]')).toHaveText('pasted-image-1.png');
   const view = panel.getByRole('img', { name: 'pasted-image-1.png' });
   await expect.poll(() => view.evaluate((el) => (el as HTMLImageElement).naturalWidth)).toBe(
     CARD_W,
