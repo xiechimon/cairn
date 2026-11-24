@@ -161,6 +161,16 @@ export class WorkspaceManager implements WorktreeOps {
 
       const credFallback = !this.seedRoot && input.machineCredentialFallback === true;
       let credentialSource: GitCredentialSource = 'integration';
+      let activeCredentials = input.credentials;
+      const baseRefresh = input.refresh;
+      const refreshCredentials =
+        baseRefresh === undefined
+          ? undefined
+          : async () => {
+              const fresh = await baseRefresh();
+              activeCredentials = fresh;
+              return fresh;
+            };
       const runNet = async (
         what: string,
         op: (cred: BoundGitCredentials | null) => Promise<void>,
@@ -179,10 +189,11 @@ export class WorkspaceManager implements WorktreeOps {
               return op(cred);
             });
           },
-          input.credentials,
+          activeCredentials,
           {
             what,
             allowMachineFallback: credFallback,
+            ...(refreshCredentials !== undefined ? { refresh: refreshCredentials } : {}),
             onFallback: (reason) => {
               onFallback?.(reason);
               this.logger.workspace(
@@ -210,7 +221,10 @@ export class WorkspaceManager implements WorktreeOps {
           this.logger.workspace(`Cloning ${label} (branch: ${defaultBranchGuess})`);
           await runNet(
             'clone',
-            (cred) => gitPrim.clone(cloneUrl, baseRepoDir, cred),
+            (cred) => {
+              if (existsSync(baseRepoDir)) rmSync(baseRepoDir, { recursive: true, force: true });
+              return gitPrim.clone(cloneUrl, baseRepoDir, cred);
+            },
             () => rmSync(baseRepoDir, { recursive: true, force: true }),
           );
           await runNet('fetch', (cred) => gitPrim.fetch(baseRepoDir, cred));

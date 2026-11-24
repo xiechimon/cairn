@@ -230,10 +230,16 @@ function usableRotation(
   return rotation.token;
 }
 
+export interface ConnectionTokenOptions {
+  minimumValidityMs?: number | undefined;
+  forceRefresh?: boolean | undefined;
+}
+
 export async function connectionToken(
   deps: GithubTokenDeps,
   teamId: string,
   pin?: GithubConnectionPin,
+  options?: ConnectionTokenOptions,
 ): Promise<GithubTokenAccess> {
   const box = deps.box;
   if (box === undefined) return { reason: 'no-secret-box' };
@@ -250,10 +256,11 @@ export async function connectionToken(
     return { reason: 'token-unreadable' };
   }
   if (row.disconnectedReason !== null) return { reason: 'github-disconnected' };
+  const skewMs = Math.max(REFRESH_SKEW_MS, options?.minimumValidityMs ?? REFRESH_SKEW_MS);
   const expired =
     row.refreshTokenCipher !== null &&
-    row.accessTokenExpiresAt !== null &&
-    Date.now() >= row.accessTokenExpiresAt - REFRESH_SKEW_MS;
+    (options?.forceRefresh === true ||
+      (row.accessTokenExpiresAt !== null && Date.now() >= row.accessTokenExpiresAt - skewMs));
   if (!expired) return { token, box, pin: connectionPin(row) };
   const access = await refreshConnectionToken(deps, connectionDeps, row, token);
   if (pin !== undefined && 'token' in access && !matchesConnection(access.pin, pin)) {
@@ -528,16 +535,18 @@ export function readGithubConnectionStatus(
 export async function teamUserToken(
   deps: GithubTokenDeps,
   teamId: string,
+  options?: ConnectionTokenOptions,
 ): Promise<{ token: UserToken; box: SecretBox } | { reason: GithubTokenReason }> {
-  const access = await connectionToken(deps, teamId);
+  const access = await connectionToken(deps, teamId, undefined, options);
   return 'token' in access ? { token: access.token as UserToken, box: access.box } : access;
 }
 
 export async function userTokenOrNull(
   deps: GithubTokenDeps,
   teamId: string,
+  options?: ConnectionTokenOptions,
 ): Promise<UserToken | null> {
-  const access = await teamUserToken(deps, teamId);
+  const access = await teamUserToken(deps, teamId, options);
   return 'token' in access ? access.token : null;
 }
 

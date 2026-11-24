@@ -292,6 +292,7 @@ export async function executeRelayToolCall(
         ...(deps.githubFetch !== undefined ? { githubFetch: deps.githubFetch } : {}),
         ...(deps.githubBaseFetch !== undefined ? { githubBaseFetch: deps.githubBaseFetch } : {}),
         ...(deps.oauthClient !== undefined ? { oauthClient: deps.oauthClient } : {}),
+        ...(deps.githubApp !== undefined ? { githubApp: deps.githubApp } : {}),
       },
       {
         teamId: threadRow.teamId,

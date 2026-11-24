@@ -247,24 +247,42 @@ export async function withGitCredentialFallback(
     await op(null);
     return 'machine';
   }
+  const previousPassword = cred.password;
   try {
     await op(cred);
     return 'integration';
   } catch (err) {
-    const first = err instanceof Error ? err.message : String(err);
-    if (cred.kind === 'app' && opts.refresh && isGitAuthFailure(first)) {
-      const fresh = await opts.refresh();
-      if (fresh.kind !== 'app') throw new Error('App credential refresh unavailable');
-      await op(fresh);
-      return 'integration';
+    let first = err instanceof Error ? err.message : String(err);
+    let activeErr: unknown = err;
+    let activeKind = cred.kind;
+    if (opts.refresh && isGitAuthFailure(first)) {
+      if (cred.kind === 'app') {
+        const fresh = await opts.refresh();
+        if (fresh.kind !== 'app') throw new Error('App credential refresh unavailable');
+        await op(fresh);
+        return 'integration';
+      }
+      const fresh = await opts.refresh().catch(() => null);
+      if (fresh !== null && fresh.kind === 'app') {
+        activeKind = 'app';
+      } else if (fresh !== null && fresh.password !== previousPassword) {
+        try {
+          await op(fresh);
+          return 'integration';
+        } catch (retryErr) {
+          activeErr = retryErr;
+          first = retryErr instanceof Error ? retryErr.message : String(retryErr);
+        }
+      }
     }
     if (
       cred.kind === 'app' ||
-      err instanceof GitPushHookError ||
+      activeKind === 'app' ||
+      activeErr instanceof GitPushHookError ||
       !opts.allowMachineFallback ||
       !isGitAuthFailure(first)
     )
-      throw err;
+      throw activeErr;
     opts.onFallback?.(first);
     try {
       await op(null);

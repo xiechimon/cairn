@@ -242,6 +242,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     (!isAbsolute(options.workspacesDir) || resolve(options.workspacesDir) !== options.workspacesDir)
   )
     throw new Error(`Unsafe confinement workspaces root: ${options.workspacesDir}`);
+  const daemonHomeInput = resolve(options.daemonHome);
   const daemonHomeLexical = existsSync(options.daemonHome)
     ? realpathSync(options.daemonHome)
     : canonicalDeny(options.daemonHome);
@@ -311,7 +312,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const pathPair = (lexical: string) => ({ lexical, real: canonicalDeny(lexical) });
     const userConfig = pathPair(join(home, '.config'));
     const deniedPairs = [
-      { lexical: resolve(options.daemonHome), real: daemonHome },
+      { lexical: daemonHomeInput, real: daemonHome },
       userConfig,
       ...[join(home, '.cairn'), ...extraDeniedRoots].map(pathPair),
     ];
@@ -368,9 +369,15 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
     const temp = grantPath(tempInput);
     writableRoots.add(temp);
     writableRoots.add(dirname(temp));
+    const insideDaemonInput = (path: string): boolean => {
+      const lexical = resolve(path);
+      return (
+        (contains(daemonHome, lexical) && lexical !== daemonHome) ||
+        (contains(daemonHomeInput, lexical) && lexical !== daemonHomeInput)
+      );
+    };
     const daemonChild = (path: string): string => {
-      if (!contains(daemonHome, path) || path === daemonHome)
-        throw new Error(`Unsafe confinement state path: ${path}`);
+      if (!insideDaemonInput(path)) throw new Error(`Unsafe confinement state path: ${path}`);
       const resolved = grantPath(path);
       if (!contains(daemonHome, resolved) || resolved === daemonHome)
         throw new Error(`Unsafe confinement state path: ${path}`);

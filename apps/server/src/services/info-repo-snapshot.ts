@@ -1,13 +1,93 @@
 import type { step, todo } from '../db/schema.js';
 import { runGit } from '../lib/git.js';
+import type { FetchLike } from '../lib/github.js';
+import { githubAccessHint, githubNoTokenHint } from '../lib/github-access-hint.js';
+import { githubApiBaseUrl } from '../lib/github-api-base.js';
+import { githubTokenFetch } from '../lib/github-token.js';
 import { githubRepoOfProject, projectOfTodo, repoDirFor } from './git.js';
-import { githubReadToken } from './github-autonomous-token.js';
+import { githubAppRegistration } from './github-app-registration.js';
+import { githubReadTokenAccess } from './github-autonomous-token.js';
+import { refreshingGithubFetch } from './github-connection.js';
+import { githubConnectionInstallUrl } from './github-connection-device.js';
 import type { MachineDeps } from './machine-deps.js';
 import { requestRepoArchive } from './machine-repo-archive.js';
 import { profileForStep } from './routing-rules.js';
 
 export const INFO_SNAPSHOT_MAX_BYTES = 6 * 1024 * 1024;
 const SNAPSHOT_TIMEOUT_MS = 60_000;
+
+function isAllowedSnapshotRedirect(location: string, requestUrl: string): string | null {
+  let target: URL;
+  let apiBase: URL;
+  try {
+    target = new URL(location, requestUrl);
+    apiBase = new URL(`${githubApiBaseUrl()}/`);
+  } catch {
+    return null;
+  }
+  if (target.username !== '' || target.password !== '') return null;
+  if (target.origin === apiBase.origin && target.pathname.startsWith(apiBase.pathname)) {
+    return target.href;
+  }
+  if (target.protocol !== 'https:') return null;
+  const host = target.hostname.toLowerCase();
+  if (
+    host === 'codeload.github.com' ||
+    host === 'api.github.com' ||
+    host === 'github.com' ||
+    host.endsWith('.githubusercontent.com')
+  ) {
+    return target.href;
+  }
+  return null;
+}
+
+async function cancelBody(response: Awaited<ReturnType<FetchLike>>): Promise<void> {
+  const body = (response as { body?: { cancel?: () => Promise<unknown> } | null }).body;
+  if (body && typeof body.cancel === 'function') {
+    await body.cancel().catch(() => {});
+  }
+}
+
+async function readBoundedTarball(
+  response: Awaited<ReturnType<FetchLike>>,
+  maxBytes: number,
+): Promise<Buffer | null> {
+  const rawLength = response.headers.get('content-length');
+  const declaredLength =
+    rawLength !== null && rawLength.trim() !== '' ? Number(rawLength) : Number.NaN;
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await cancelBody(response);
+    return null;
+  }
+  const body = (response as { body?: ReadableStream<Uint8Array> | null }).body;
+  if (body && typeof body.getReader === 'function') {
+    const reader = body.getReader();
+    const chunks: Buffer[] = [];
+    let total = 0;
+    try {
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > maxBytes) {
+          await reader.cancel().catch(() => {});
+          return null;
+        }
+        chunks.push(Buffer.from(value));
+      }
+      return Buffer.concat(chunks, total);
+    } finally {
+      reader.releaseLock();
+    }
+  }
+  const arrayBufferFn = (response as { arrayBuffer?: () => Promise<ArrayBuffer> }).arrayBuffer;
+  const bytes =
+    typeof arrayBufferFn === 'function'
+      ? Buffer.from(await arrayBufferFn.call(response))
+      : Buffer.from(await response.text(), 'binary');
+  return bytes.length > maxBytes ? null : bytes;
+}
 
 type TodoRow = typeof todo.$inferSelect;
 type StepRow = typeof step.$inferSelect;
@@ -74,15 +154,62 @@ export async function infoRepoSnapshot(
   }
   const github = githubRepoOfProject(project);
   if (github === null) return null;
-  const token = await githubReadToken(deps, project.teamId, github);
-  if (token === null) return { reason: 'no GitHub read access for this repository' };
-  const response = await fetch(
-    `https://api.github.com/repos/${github.owner}/${github.repo}/tarball/${encodeURIComponent(project.baseBranch ?? 'HEAD')}`,
-    { headers: { authorization: `Bearer ${token}`, accept: 'application/vnd.github+json' } },
+  const access = await githubReadTokenAccess(deps, project.teamId, github);
+  if (access.token === null) return { reason: githubNoTokenHint(access.reason) };
+  const baseFetch = deps.githubBaseFetch ?? deps.githubFetch ?? fetch;
+  const fetchImpl = githubTokenFetch(
+    refreshingGithubFetch(deps, baseFetch, project.teamId),
+    access.token,
+    github,
   );
-  if (!response.ok) return { reason: `GitHub answered ${response.status}` };
-  const bytes = Buffer.from(await response.arrayBuffer());
-  return bytes.length > INFO_SNAPSHOT_MAX_BYTES
+  const timeout = AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS);
+  const requestSignal = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  const url = `${githubApiBaseUrl()}/repos/${encodeURIComponent(github.owner)}/${encodeURIComponent(github.repo)}/tarball/${encodeURIComponent(project.baseBranch ?? 'HEAD')}`;
+  let response = await fetchImpl(url, {
+    headers: {
+      authorization: `Bearer ${access.token}`,
+      accept: 'application/vnd.github+json',
+      'x-github-api-version': '2022-11-28',
+      'user-agent': 'cairn-server',
+    },
+    redirect: 'manual',
+    signal: requestSignal,
+  });
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location');
+    await cancelBody(response);
+    const redirectUrl = location !== null ? isAllowedSnapshotRedirect(location, url) : null;
+    if (redirectUrl === null) {
+      return { reason: 'GitHub returned an untrusted snapshot redirect' };
+    }
+    response = await baseFetch(redirectUrl, {
+      headers: { 'user-agent': 'cairn-server' },
+      redirect: 'error',
+      signal: requestSignal,
+    });
+  }
+  if (!response.ok) {
+    await cancelBody(response);
+    if (response.status === 401 || response.status === 403 || response.status === 404) {
+      const installUrl = githubConnectionInstallUrl(
+        deps.githubApp === undefined ? githubAppRegistration : deps.githubApp,
+      );
+      return {
+        reason: `GitHub answered ${response.status}: ${githubAccessHint(
+          {
+            owner: github.owner,
+            repo: github.repo,
+            token: access.token,
+            installUrl,
+          },
+          response.status,
+        )}`,
+      };
+    }
+    return { reason: `GitHub answered ${response.status}` };
+  }
+  const bytes = await readBoundedTarball(response, INFO_SNAPSHOT_MAX_BYTES);
+  return bytes === null
     ? { reason: `the snapshot is larger than ${INFO_SNAPSHOT_MAX_BYTES} bytes` }
     : { tarGz: bytes };
 }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { HttpError, notFound } from './errors.js';
 import { looksBinary } from './git.js';
 import type { FetchLike } from './github.js';
+import { type GithubAccessTokenReason, githubAccessHint } from './github-access-hint.js';
 import { githubApiBaseUrl } from './github-api-base.js';
 import { githubTokenFetch } from './github-token.js';
 
@@ -36,59 +37,114 @@ const treeSchema = z.object({
 export interface GithubRepoRead {
   fetchImpl: FetchLike;
   token: string | null;
+  tokenReason?: GithubAccessTokenReason | null | undefined;
+  installUrl?: string | null | undefined;
   repository: GithubRepoRef;
 }
 
-function repositoryUrl(reader: GithubRepoRead, suffix: string): string {
+function repositoryBaseUrl(reader: GithubRepoRead): string {
   const { owner, repo } = reader.repository;
-  return `${githubApiBaseUrl()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${suffix}`;
+  return `${githubApiBaseUrl()}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+}
+
+function repositoryUrl(reader: GithubRepoRead, suffix: string): string {
+  return `${repositoryBaseUrl(reader)}/${suffix}`;
 }
 
 function encodedPath(path: string): string {
   return path.split('/').map(encodeURIComponent).join('/');
 }
 
-function readFailure(reader: GithubRepoRead, status: number, what: string): HttpError {
+function accessHintFor(reader: GithubRepoRead, status: number): string {
+  return githubAccessHint(
+    {
+      owner: reader.repository.owner,
+      repo: reader.repository.repo,
+      token: reader.token,
+      tokenReason: reader.tokenReason,
+      installUrl: reader.installUrl,
+    },
+    status,
+  );
+}
+
+function readFailure(
+  reader: GithubRepoRead,
+  status: number,
+  what: string,
+  repoLevel = false,
+): HttpError {
   const { owner, repo } = reader.repository;
-  if (status === 404) return notFound(`${what} of ${owner}/${repo}`);
+  if (status === 404) {
+    if (!repoLevel) return notFound(`${what} of ${owner}/${repo}`);
+    return new HttpError(
+      404,
+      `${what} of ${owner}/${repo} not found; ${accessHintFor(reader, status)}`,
+    );
+  }
   if (status === 401 || status === 403) {
     return new HttpError(
       status,
-      `GitHub refused to read ${what} of ${owner}/${repo} (status ${status}); connect the project to a GitHub account or app that can read it`,
+      `GitHub refused to read ${what} of ${owner}/${repo} (status ${status}); ${accessHintFor(reader, status)}`,
     );
   }
   return new HttpError(502, `GitHub read of ${what} of ${owner}/${repo} failed (status ${status})`);
+}
+
+function githubHeaders(token: string | null): Record<string, string> {
+  return {
+    accept: 'application/vnd.github+json',
+    'x-github-api-version': '2022-11-28',
+    'user-agent': 'cairn-server',
+    ...(token !== null ? { authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 async function readJson(
   reader: GithubRepoRead,
   url: string,
   what: string,
-  signal?: AbortSignal,
+  options: { repoLevel?: boolean; signal?: AbortSignal | undefined } = {},
 ): Promise<unknown> {
-  const headers: Record<string, string> = {
-    accept: 'application/vnd.github+json',
-    'x-github-api-version': '2022-11-28',
-    'user-agent': 'cairn-server',
-    ...(reader.token !== null ? { authorization: `Bearer ${reader.token}` } : {}),
-  };
   let response: Awaited<ReturnType<FetchLike>>;
   const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
-  const combined = signal !== undefined ? AbortSignal.any([signal, timeout]) : timeout;
+  const combined =
+    options.signal !== undefined ? AbortSignal.any([options.signal, timeout]) : timeout;
   try {
     response = await githubTokenFetch(reader.fetchImpl, reader.token)(url, {
-      headers,
+      headers: githubHeaders(reader.token),
       signal: combined,
     });
   } catch (error) {
-    if (signal?.aborted) throw error;
+    if (options.signal?.aborted) throw error;
     throw new HttpError(502, `GitHub read failed: ${url}`);
   }
-  if (!response.ok) throw readFailure(reader, response.status, what);
+  if (!response.ok) throw readFailure(reader, response.status, what, options.repoLevel ?? false);
   try {
     return await response.json();
   } catch {
     throw new HttpError(502, `GitHub returned an unreadable response: ${url}`);
+  }
+}
+
+async function probeRepositoryStatus(
+  reader: GithubRepoRead,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  const combined = signal !== undefined ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const response = await githubTokenFetch(reader.fetchImpl, reader.token)(
+      repositoryBaseUrl(reader),
+      {
+        headers: githubHeaders(reader.token),
+        signal: combined,
+      },
+    );
+    return response.status;
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    return null;
   }
 }
 
@@ -109,7 +165,25 @@ async function resolveCommit(
   const url = noRef
     ? repositoryUrl(reader, 'commits?per_page=1')
     : repositoryUrl(reader, `commits/${encodeURIComponent(shortRef(ref))}`);
-  const body = await readJson(reader, url, what, signal);
+  let body: unknown;
+  try {
+    body = await readJson(reader, url, what, { repoLevel: noRef, signal });
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    if (error instanceof HttpError && error.status === 404 && !noRef) {
+      const repoStatus = await probeRepositoryStatus(reader, signal);
+      if (repoStatus !== null && repoStatus >= 200 && repoStatus < 300) {
+        throw error;
+      }
+      throw readFailure(
+        reader,
+        repoStatus === 401 || repoStatus === 403 ? repoStatus : 404,
+        what,
+        true,
+      );
+    }
+    throw error;
+  }
   if (noRef) {
     const list = commitListSchema.safeParse(body);
     const sha = list.success ? list.data[0]?.sha : undefined;
@@ -156,7 +230,7 @@ async function readGithubProjectFileAtCommit(
       reader,
       repositoryUrl(reader, `contents/${encodedPath(path)}?ref=${encodeURIComponent(commit)}`),
       `file ${path} at ref ${ref}`,
-      options.signal,
+      { signal: options.signal },
     ),
   );
   if (!contents.success || contents.data.type !== 'file') {
@@ -180,7 +254,7 @@ async function readGithubProjectFileAtCommit(
       reader,
       repositoryUrl(reader, `git/blobs/${encodeURIComponent(sha)}`),
       `file ${path} at ref ${ref}`,
-      options.signal,
+      { signal: options.signal },
     ),
   );
   if (!blob.success || blob.data.encoding !== 'base64') throw missing;

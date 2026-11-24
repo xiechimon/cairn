@@ -85,6 +85,7 @@ export interface WorktreePrepareInput {
   workspacesRoot: string;
   credentials: BoundGitCredentials | null;
   hookCredentials?: BoundGitCredentials | null;
+  refresh?: (() => Promise<BoundGitCredentials>) | undefined;
   baseBranch?: string | null;
   machineCredentialFallback?: boolean;
   readonly?: boolean;

@@ -38,6 +38,7 @@ export interface MachineDeps {
   githubBaseFetch?: FetchLike;
   oauthFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
+  githubApp?: Readonly<{ clientId: string; slug: string }> | null | undefined;
   mcpFetch?: typeof fetch;
   mailSend?: SendMail;
   mcpOAuthState?: McpOAuthState;

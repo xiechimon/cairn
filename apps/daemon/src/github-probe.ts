@@ -103,8 +103,10 @@ async function probeViaApi(opts: ProbeOpts, fetchImpl: ProbeFetch): Promise<Gith
         },
         signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
       });
-      if (res.status === 401 && attempt === 0 && opts.tokenKind === 'app' && opts.refreshToken) {
-        token = await opts.refreshToken();
+      if (res.status === 401 && attempt === 0 && opts.refreshToken) {
+        const refreshed = await opts.refreshToken().catch(() => null);
+        if (!refreshed || refreshed === token) return null;
+        token = refreshed;
         continue;
       }
       if (!res.ok) return null;
@@ -141,9 +143,14 @@ function pickPr(
 }
 
 export async function probeGithubPr(opts: ProbeOpts): Promise<GithubPrProbe | null> {
-  if (opts.tokenKind === 'app') return probeViaApi(opts, opts.fetchImpl ?? fetch).catch(() => null);
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  if (opts.tokenKind === 'app') return probeViaApi(opts, fetchImpl).catch(() => null);
+  if (opts.token) {
+    const viaApi = await probeViaApi(opts, fetchImpl).catch(() => null);
+    if (viaApi !== null) return viaApi;
+  }
   const gh = opts.ghPath ?? 'gh';
   const viaGh = await probeViaGh(opts, gh).catch(() => null);
   if (viaGh !== null) return viaGh;
-  return probeViaApi(opts, opts.fetchImpl ?? fetch).catch(() => null);
+  return opts.token ? null : probeViaApi(opts, fetchImpl).catch(() => null);
 }

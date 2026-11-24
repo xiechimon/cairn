@@ -14,9 +14,12 @@ import {
   githubListPulls,
   githubListWorkflowRuns,
 } from '../lib/github.js';
+import { githubAppGrantHint, isGithubAppScopedToken } from '../lib/github-access-hint.js';
 import { githubRepoOfProject } from './git.js';
+import { githubAppRegistration } from './github-app-registration.js';
 import { githubReadToken } from './github-autonomous-token.js';
-import { teamUserToken } from './github-connection.js';
+import { refreshingGithubFetch, teamUserToken } from './github-connection.js';
+import { githubConnectionInstallUrl } from './github-connection-device.js';
 import type { GithubIssueFaceDeps } from './github-issues.js';
 import { listedProjects } from './personal-space.js';
 
@@ -83,7 +86,12 @@ async function openTarget(
   return { owner, repo, slug, token: access.token };
 }
 
-function readFailure(failure: GithubListFailure, slug: string): HttpError {
+function readFailure(
+  failure: GithubListFailure,
+  target: GithubTarget,
+  installUrl: string | null,
+): HttpError {
+  const { owner, repo, slug, token } = target;
   switch (failure.kind) {
     case 'timeout':
       return new HttpError(
@@ -108,16 +116,16 @@ function readFailure(failure: GithubListFailure, slug: string): HttpError {
         );
       }
       if (status === 403) {
-        return new HttpError(
-          424,
-          `github: access forbidden (HTTP 403); the team token may lack access to ${slug}`,
-        );
+        const suffix = isGithubAppScopedToken(token)
+          ? `; ${githubAppGrantHint(owner, repo, installUrl)}`
+          : `; the team token may lack access to ${slug}`;
+        return new HttpError(424, `github: access forbidden (HTTP 403)${suffix}`);
       }
       if (status === 404) {
-        return new HttpError(
-          404,
-          `github: ${slug} not found, or the team token cannot see it (HTTP 404)`,
-        );
+        const suffix = isGithubAppScopedToken(token)
+          ? `; ${githubAppGrantHint(owner, repo, installUrl)}`
+          : `, or the team token cannot see it (HTTP 404)`;
+        return new HttpError(404, `github: ${slug} not found${suffix}`);
       }
       if (status >= 500) {
         return new HttpError(502, `github: upstream error (HTTP ${status}); try again later`);
@@ -127,8 +135,12 @@ function readFailure(failure: GithubListFailure, slug: string): HttpError {
   }
 }
 
-function unwrap<T>(result: GithubListResult<T>, slug: string): { items: T[]; hasMore: boolean } {
-  if (!result.ok) throw readFailure(result.failure, slug);
+function unwrap<T>(
+  result: GithubListResult<T>,
+  target: GithubTarget,
+  installUrl: string | null,
+): { items: T[]; hasMore: boolean } {
+  if (!result.ok) throw readFailure(result.failure, target, installUrl);
   return result;
 }
 
@@ -158,7 +170,11 @@ export async function executeGithubReadTool(
   name: GithubReadToolName,
   params: Record<string, unknown>,
 ): Promise<unknown> {
-  const fetchImpl = deps.githubFetch ?? fetch;
+  const baseFetch = deps.githubBaseFetch ?? deps.githubFetch ?? fetch;
+  const fetchImpl = refreshingGithubFetch(deps, baseFetch, teamId);
+  const installUrl = githubConnectionInstallUrl(
+    deps.githubApp === undefined ? githubAppRegistration : deps.githubApp,
+  );
   const timeoutMs = GITHUB_READ_TIMEOUT_MS;
   switch (name) {
     case 'issues': {
@@ -172,7 +188,8 @@ export async function executeGithubReadTool(
           ...paging,
           timeoutMs,
         }),
-        t.slug,
+        t,
+        installUrl,
       );
       const refOf = (n: number) => githubIssueSourceRef(t.owner, t.repo, n).toLowerCase();
       const taskIds = taskIdsBySourceRef(
@@ -211,7 +228,8 @@ export async function executeGithubReadTool(
           ...paging,
           timeoutMs,
         }),
-        t.slug,
+        t,
+        installUrl,
       );
       return {
         projectId: p.projectId,
@@ -243,7 +261,8 @@ export async function executeGithubReadTool(
           ...paging,
           timeoutMs,
         }),
-        t.slug,
+        t,
+        installUrl,
       );
       return {
         projectId: p.projectId,

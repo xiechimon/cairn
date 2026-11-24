@@ -28,6 +28,7 @@ import {
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike, GithubRepoProbe } from '../lib/github.js';
 import { githubRepoReachable } from '../lib/github.js';
+import { githubAppGrantHint, isGithubAppScopedToken } from '../lib/github-access-hint.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import type { CairnSourceRoots } from '../lib/local-source.js';
 import type { ConversationStreamHub } from './events.js';
@@ -39,6 +40,7 @@ import {
   uniqueRepoName,
   validateLocalRepoPath,
 } from './git.js';
+import { githubAppRegistration } from './github-app-registration.js';
 import {
   assertGithubConnectionCurrent,
   connectionToken,
@@ -47,6 +49,7 @@ import {
   githubConnectionPin,
   refreshingGithubFetch,
 } from './github-connection.js';
+import { githubConnectionInstallUrl } from './github-connection-device.js';
 import { dispatchHostedCleanup, enqueueHostedCleanup } from './hosted-cleanup.js';
 import { retireTodoDeliverables } from './machine-deliverables.js';
 import { moveProjectMemoriesToTeam } from './memory.js';
@@ -156,9 +159,12 @@ async function requireGithubRepoReachable(
 ): Promise<GithubRepoProbe> {
   const probe = await githubRepoReachable(deps.githubFetch ?? fetch, token, owner, repo);
   if (!probe.reachable) {
+    const suffix = isGithubAppScopedToken(token)
+      ? `; ${githubAppGrantHint(owner, repo, githubConnectionInstallUrl(githubAppRegistration))}`
+      : '';
     throw new HttpError(
       400,
-      `invalid body at githubRepo: repository not reachable: ${owner}/${repo}`,
+      `invalid body at githubRepo: repository not reachable: ${owner}/${repo}${suffix}`,
     );
   }
   return probe;

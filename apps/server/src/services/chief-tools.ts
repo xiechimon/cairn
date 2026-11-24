@@ -82,7 +82,7 @@ import {
 } from './coordinator-request.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { effectDedupeKey } from './external-effects.js';
-import { isGithubRepoRef, readFile } from './git.js';
+import { isGithubRepoRef, PROJECT_FILES_MAX_LIMIT, readFile, readFiles } from './git.js';
 import { assertGithubConnectionCurrent } from './github-connection.js';
 import { executeGithubReadTool } from './github-reads.js';
 import { inspectRun } from './inspect-run.js';
@@ -137,6 +137,7 @@ export interface ChiefToolDeps {
   githubFetch?: FetchLike;
   githubBaseFetch?: FetchLike;
   oauthClient?: OAuthClientConfig | null;
+  githubApp?: Readonly<{ clientId: string; slug: string }> | null | undefined;
 }
 
 const PROJECT_CREATED_NEXT =
@@ -291,6 +292,8 @@ const DOCS_MAX_FILE_BYTES = 64 * 1024;
 const DOCS_MAX_RESPONSE_BYTES = 128 * 1024;
 const DOCS_MAX_JSON_EXPANSION = 6;
 const DOCS_FILE_METADATA_RESERVE_BYTES = 2048;
+const DOCS_TREE_DEFAULT_LIMIT = 200;
+const DOCS_TREE_MAX_LIMIT = 2000;
 
 export const CHIEF_TASK_LIST_MAX_OUTPUT_BYTES = 32 * 1024;
 export const CHIEF_TASK_LIST_TITLE_MAX_CHARS = 160;
@@ -542,12 +545,108 @@ export async function executeChiefTool(
     case 'docs': {
       const projectId = str(params, 'projectId');
       const row = requireProjectRow(db, projectId, ctx.teamId);
-      const paths = strArr(params, 'paths');
-      if (paths.length === 0) {
+      const hasPaths = params.paths !== undefined;
+      const paths = hasPaths ? strArr(params, 'paths') : [];
+      const treeFlag = params.tree;
+      if (treeFlag !== undefined && typeof treeFlag !== 'boolean') {
+        throw new HttpError(400, 'invalid params.tree: expected boolean');
+      }
+      const prefix = optStr(params, 'prefix');
+      const limitParam = num(params, 'limit');
+      const wantTree = treeFlag === true || !hasPaths || prefix !== undefined;
+      if (!wantTree && paths.length === 0) {
         return json({ projectId, name: row.name, repoKind: row.repoKind, files: [] });
       }
-      const capped = paths.slice(0, DOCS_MAX_PATHS);
       const ref = optStr(params, 'ref');
+      const repoReadCtx = {
+        db,
+        reposDir: deps.reposDir,
+        workspacesDir: deps.workspacesDir,
+        box: deps.box,
+        githubFetch: deps.githubFetch,
+        githubBaseFetch: deps.githubBaseFetch,
+        oauthClient: deps.oauthClient,
+        githubAppTokenSocket: deps.githubAppTokenSocket,
+        githubApp: deps.githubApp,
+        discloseLocalPath: false,
+      };
+      let treeResult:
+        | {
+            ref: string;
+            commit: string;
+            truncated: boolean;
+            entries: { path: string; type: 'blob' | 'tree'; size: number | null }[];
+          }
+        | undefined;
+      if (wantTree) {
+        const treeLimit =
+          limitParam === undefined
+            ? DOCS_TREE_DEFAULT_LIMIT
+            : Math.min(Math.max(Math.floor(limitParam), 1), DOCS_TREE_MAX_LIMIT);
+        const normalizedPrefix = prefix?.replace(/^\.\//, '').replace(/^\/+/, '');
+        const fetchLimit =
+          normalizedPrefix !== undefined && normalizedPrefix !== ''
+            ? PROJECT_FILES_MAX_LIMIT
+            : treeLimit;
+        const listed = await readFiles(
+          repoReadCtx,
+          projectId,
+          ref ?? row.baseBranch ?? undefined,
+          String(fetchLimit),
+        );
+        const matched =
+          normalizedPrefix !== undefined && normalizedPrefix !== ''
+            ? (() => {
+                const dirPrefix = normalizedPrefix.endsWith('/')
+                  ? normalizedPrefix
+                  : `${normalizedPrefix}/`;
+                return listed.files.filter(
+                  (entry) => entry.path === normalizedPrefix || entry.path.startsWith(dirPrefix),
+                );
+              })()
+            : listed.files;
+        const candidates = matched.slice(0, treeLimit);
+        let truncated = listed.truncated || matched.length > candidates.length;
+        const entries: typeof candidates = [];
+        const envelopeBytes = Buffer.byteLength(
+          json({
+            projectId,
+            name: row.name,
+            repoKind: row.repoKind,
+            ...(row.githubRepo !== null ? { githubRepo: row.githubRepo } : {}),
+            ref: listed.ref,
+            commit: listed.commit,
+            truncated: true,
+            entries: [],
+          }),
+        );
+        let usedBytes = envelopeBytes;
+        for (const entry of candidates) {
+          const entryBytes = Buffer.byteLength(json(entry)) + 1;
+          if (usedBytes + entryBytes > DOCS_MAX_RESPONSE_BYTES) {
+            truncated = true;
+            break;
+          }
+          entries.push(entry);
+          usedBytes += entryBytes;
+        }
+        treeResult = {
+          ref: listed.ref,
+          commit: listed.commit,
+          truncated,
+          entries,
+        };
+        if (paths.length === 0) {
+          return json({
+            projectId,
+            name: row.name,
+            repoKind: row.repoKind,
+            ...(row.githubRepo !== null ? { githubRepo: row.githubRepo } : {}),
+            ...treeResult,
+          });
+        }
+      }
+      const capped = paths.slice(0, DOCS_MAX_PATHS);
       const files: Record<string, unknown>[] = [];
       for (const p of capped) {
         try {
@@ -562,37 +661,29 @@ export async function executeChiefTool(
           ) {
             throw new HttpError(403, 'credential file access denied');
           }
-          const f = await readFile(
-            {
-              db,
-              reposDir: deps.reposDir,
-              workspacesDir: deps.workspacesDir,
-              box: deps.box,
-              githubFetch: deps.githubFetch,
-              githubAppTokenSocket: deps.githubAppTokenSocket,
-              discloseLocalPath: false,
-            },
-            projectId,
-            p,
-            ref,
-            {
-              defaultBranch: true,
-              maxBytes: Math.max(
-                0,
-                Math.min(
-                  DOCS_MAX_FILE_BYTES,
-                  Math.floor(
-                    (DOCS_MAX_RESPONSE_BYTES -
-                      Buffer.byteLength(
-                        json({ projectId, name: row.name, files, omitted: paths.length }),
-                      ) -
-                      DOCS_FILE_METADATA_RESERVE_BYTES) /
-                      DOCS_MAX_JSON_EXPANSION,
-                  ),
+          const f = await readFile(repoReadCtx, projectId, p, ref, {
+            defaultBranch: true,
+            maxBytes: Math.max(
+              0,
+              Math.min(
+                DOCS_MAX_FILE_BYTES,
+                Math.floor(
+                  (DOCS_MAX_RESPONSE_BYTES -
+                    Buffer.byteLength(
+                      json({
+                        projectId,
+                        name: row.name,
+                        ...(treeResult !== undefined ? { tree: treeResult } : {}),
+                        files,
+                        omitted: paths.length,
+                      }),
+                    ) -
+                    DOCS_FILE_METADATA_RESERVE_BYTES) /
+                    DOCS_MAX_JSON_EXPANSION,
                 ),
               ),
-            },
-          );
+            ),
+          });
           files.push({
             path: f.path,
             ref: f.ref,
@@ -607,8 +698,15 @@ export async function executeChiefTool(
           });
         }
         if (
-          Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
-          DOCS_MAX_RESPONSE_BYTES
+          Buffer.byteLength(
+            json({
+              projectId,
+              name: row.name,
+              ...(treeResult !== undefined ? { tree: treeResult } : {}),
+              files,
+              omitted: paths.length,
+            }),
+          ) > DOCS_MAX_RESPONSE_BYTES
         ) {
           files.pop();
           files.push({
@@ -616,8 +714,15 @@ export async function executeChiefTool(
             error: 'repository document response limit exceeded',
           });
           if (
-            Buffer.byteLength(json({ projectId, name: row.name, files, omitted: paths.length })) >
-            DOCS_MAX_RESPONSE_BYTES
+            Buffer.byteLength(
+              json({
+                projectId,
+                name: row.name,
+                ...(treeResult !== undefined ? { tree: treeResult } : {}),
+                files,
+                omitted: paths.length,
+              }),
+            ) > DOCS_MAX_RESPONSE_BYTES
           ) {
             files.pop();
             break;
@@ -627,6 +732,7 @@ export async function executeChiefTool(
       return json({
         projectId,
         name: row.name,
+        ...(treeResult !== undefined ? { tree: treeResult } : {}),
         files,
         ...(paths.length > files.length ? { omitted: paths.length - files.length } : {}),
       });

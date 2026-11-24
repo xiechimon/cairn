@@ -76,7 +76,12 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
       candidates: await listMemoryImportCandidates(
         ctx.db,
         teamId,
-        repoReaderOf({ ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) }),
+        repoReaderOf({
+          ...ctx,
+          box: ctx.secretBox,
+          githubApp: ctx.mcpGithubApp,
+          discloseLocalPath: isOwnerSession(c),
+        }),
       ),
     });
   });
@@ -91,7 +96,12 @@ export function registerMemoryRoutes(app: Hono, ctx: AppContext): void {
           ctx.db,
           teamId,
           body,
-          repoReaderOf({ ...ctx, box: ctx.secretBox, discloseLocalPath: isOwnerSession(c) }),
+          repoReaderOf({
+            ...ctx,
+            box: ctx.secretBox,
+            githubApp: ctx.mcpGithubApp,
+            discloseLocalPath: isOwnerSession(c),
+          }),
         ),
       },
       201,

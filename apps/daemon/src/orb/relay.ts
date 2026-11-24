@@ -363,6 +363,12 @@ export class RelayMachineServer {
         const index = method === 'relayTool' ? 3 : 2;
         args[index] = { ...(args[index] as object), signal: controller.signal };
       }
+      if (method === 'token' && args.length > 1) {
+        const opts = z.object({ refresh: z.boolean().optional() }).strict().safeParse(args[1]);
+        if (!opts.success || args.length > 2)
+          throw new RelayMachineError('Invalid relay token args');
+        args[1] = opts.data;
+      }
       if (method === 'done') {
         if (this.reporting) throw new RelayMachineError('Relay completion is already in flight');
         const body = machineDoneBodySchema.safeParse(args[1]);

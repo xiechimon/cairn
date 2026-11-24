@@ -143,7 +143,7 @@ export interface MachineApi {
     body: MachineAskBody,
     opts?: { signal?: AbortSignal },
   ): Promise<MachineAskResponse>;
-  token(stepId: string): Promise<MachineTokenResponse>;
+  token(stepId: string, opts?: { refresh?: boolean }): Promise<MachineTokenResponse>;
   skillsManifest(stepId: string): Promise<MachineSkillsManifestResponse>;
   skillFile(stepId: string, dirName: string, path: string): Promise<Buffer>;
   attachment(
@@ -503,8 +503,9 @@ export class MachineClient implements MachineApi {
     throw lastErr instanceof Error ? lastErr : new Error(`${name} relay failed`);
   }
 
-  async token(stepId: string): Promise<MachineTokenResponse> {
-    return this.request('GET', `/api/machine/token/${stepId}`, {
+  async token(stepId: string, opts?: { refresh?: boolean }): Promise<MachineTokenResponse> {
+    const query = opts?.refresh === true ? '?refresh=1' : '';
+    return this.request('GET', `/api/machine/token/${stepId}${query}`, {
       parse: (raw) => machineTokenResponseSchema.parse(raw),
     });
   }

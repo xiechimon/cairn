@@ -41,7 +41,11 @@ import {
   type CairnSourceRoots,
   requireRealpath,
 } from '../lib/local-source.js';
-import { githubReadToken } from './github-autonomous-token.js';
+import type { OAuthClientConfig } from '../lib/oauth-client.js';
+import { githubAppRegistration } from './github-app-registration.js';
+import { githubReadTokenAccess } from './github-autonomous-token.js';
+import { refreshingGithubFetch } from './github-connection.js';
+import { githubConnectionInstallUrl } from './github-connection-device.js';
 
 export type ProjectRow = typeof project.$inferSelect;
 
@@ -54,7 +58,10 @@ export interface RepoCtx {
 export interface RepoReadCtx extends RepoCtx {
   box?: SecretBox | undefined;
   githubFetch?: FetchLike | undefined;
+  githubBaseFetch?: FetchLike | undefined;
+  oauthClient?: OAuthClientConfig | null | undefined;
   githubAppTokenSocket?: string | null | undefined;
+  githubApp?: Readonly<{ clientId: string; slug: string }> | null | undefined;
   discloseLocalPath: boolean;
 }
 
@@ -360,20 +367,41 @@ async function githubRepoCacheDir(ctx: RepoCtx, row: ProjectRow): Promise<string
   return cache;
 }
 
+function repoGithubTokenDeps(ctx: RepoReadCtx) {
+  return {
+    db: ctx.db,
+    box: ctx.box,
+    githubFetch: ctx.githubFetch,
+    githubBaseFetch: ctx.githubBaseFetch,
+    oauthClient: ctx.oauthClient,
+    githubAppTokenSocket: ctx.githubAppTokenSocket,
+  };
+}
+
+function repoGithubFetch(ctx: RepoReadCtx, teamId: string): FetchLike {
+  const base = ctx.githubBaseFetch ?? ctx.githubFetch ?? fetch;
+  return ctx.box === undefined
+    ? base
+    : refreshingGithubFetch(repoGithubTokenDeps(ctx), base, teamId);
+}
+
+function repoGithubInstallUrl(ctx: Pick<RepoReadCtx, 'githubApp'>): string | null {
+  return githubConnectionInstallUrl(
+    ctx.githubApp === undefined ? githubAppRegistration : ctx.githubApp,
+  );
+}
+
 async function githubRepoReader(ctx: RepoReadCtx, row: ProjectRow): Promise<GithubRepoRead> {
   const repository = githubRepoOfProject(row);
   if (repository === null) throw new HttpError(409, 'invalid GitHub repository binding');
-  const token = await githubReadToken(
-    {
-      db: ctx.db,
-      box: ctx.box,
-      githubFetch: ctx.githubFetch,
-      githubAppTokenSocket: ctx.githubAppTokenSocket,
-    },
-    row.teamId,
+  const access = await githubReadTokenAccess(repoGithubTokenDeps(ctx), row.teamId, repository);
+  return {
+    fetchImpl: repoGithubFetch(ctx, row.teamId),
+    token: access.token,
+    tokenReason: access.reason,
+    installUrl: repoGithubInstallUrl(ctx),
     repository,
-  );
-  return { fetchImpl: ctx.githubFetch ?? fetch, token, repository };
+  };
 }
 
 export async function requireRepoReadDir(ctx: RepoReadCtx, projectId: string): Promise<string> {
@@ -824,8 +852,11 @@ export async function readBranches(
   const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
   const ref = githubRepoOfProject(row);
   if (row && ref) {
-    const token = await githubReadToken(ctx, row.teamId, ref);
-    return githubBranches(ctx.githubFetch ?? fetch, token, ref);
+    const access = await githubReadTokenAccess(repoGithubTokenDeps(ctx), row.teamId, ref);
+    return githubBranches(repoGithubFetch(ctx, row.teamId), access.token, ref, {
+      tokenReason: access.reason,
+      installUrl: repoGithubInstallUrl(ctx),
+    });
   }
   const dir = await requireRepoReadDir(ctx, projectId);
   return systemGitOps.listBranches(dir);

@@ -2,6 +2,7 @@ import type { GithubRepoRef, ProjectBranchesResponse } from '@cairn/shared';
 import { z } from 'zod';
 import { HttpError } from './errors.js';
 import type { FetchLike } from './github.js';
+import { type GithubAccessTokenReason, githubAccessHint } from './github-access-hint.js';
 import { githubApiBaseUrl } from './github-api-base.js';
 import { githubTokenFetch } from './github-token.js';
 
@@ -9,10 +10,16 @@ const repositorySchema = z.object({ default_branch: z.string().min(1).nullable()
 const branchesSchema = z.array(z.object({ name: z.string().min(1) }));
 const BRANCHES_PER_PAGE = 100;
 
+export interface GithubBranchesAccess {
+  tokenReason?: GithubAccessTokenReason | null | undefined;
+  installUrl?: string | null | undefined;
+}
+
 export async function githubBranches(
   fetchImpl: FetchLike,
   token: string | null,
   ref: GithubRepoRef,
+  access?: GithubBranchesAccess,
 ): Promise<ProjectBranchesResponse> {
   const base = `${githubApiBaseUrl()}/repos/${encodeURIComponent(ref.owner)}/${encodeURIComponent(ref.repo)}`;
   const read = async (url: string): Promise<unknown> => {
@@ -27,7 +34,23 @@ export async function githubBranches(
         signal: AbortSignal.timeout(15_000),
       });
       if (!response.ok) {
-        throw new HttpError(response.status === 404 ? 404 : 502, 'Unable to read GitHub branches');
+        if (response.status === 401 || response.status === 403 || response.status === 404) {
+          const hint = githubAccessHint(
+            {
+              owner: ref.owner,
+              repo: ref.repo,
+              token,
+              tokenReason: access?.tokenReason,
+              installUrl: access?.installUrl,
+            },
+            response.status,
+          );
+          throw new HttpError(
+            response.status === 404 ? 404 : response.status,
+            `Unable to read GitHub branches for ${ref.owner}/${ref.repo}; ${hint}`,
+          );
+        }
+        throw new HttpError(502, 'Unable to read GitHub branches');
       }
       return await response.json();
     } catch (error) {

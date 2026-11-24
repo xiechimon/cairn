@@ -26,7 +26,7 @@ describe('parametersToShape (failure modes 2/3)', () => {
     const json = roundTrip(byName('docs').parameters);
     const props = json.properties as Record<string, Record<string, unknown>>;
     expect(json.type).toBe('object');
-    expect(json.required).toEqual(['projectId', 'paths']);
+    expect(json.required).toEqual(['projectId']);
     expect(props.projectId).toMatchObject({ type: 'string', description: 'Project id.' });
     const paths = must(props.paths, 'paths');
     expect(paths).toMatchObject({
@@ -34,6 +34,9 @@ describe('parametersToShape (failure modes 2/3)', () => {
       description: expect.stringContaining('batch'),
     });
     expect((paths.items as Record<string, unknown>).type).toBe('string');
+    expect(props.tree).toMatchObject({ type: 'boolean' });
+    expect(props.prefix).toMatchObject({ type: 'string' });
+    expect(props.limit).toMatchObject({ type: 'number' });
     expect(props.ref).toMatchObject({
       type: 'string',
       description: 'Optional git ref; defaults to the default branch.',
