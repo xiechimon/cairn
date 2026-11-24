@@ -13,6 +13,7 @@ import {
 } from 'react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalCard } from './approval-card.js';
@@ -60,6 +61,12 @@ const ICON_BTN_CLS =
 
 const ROW_CLS =
   "relative grid min-h-10 w-full grid-cols-[24px_minmax(0,1fr)] items-center gap-x-3 rounded-lg p-2 text-left [&+&]:before:absolute [&+&]:before:inset-x-2 [&+&]:before:top-0 [&+&]:before:h-px [&+&]:before:bg-border [&+&]:before:content-[''] hover:before:opacity-0 [&:hover+&]:before:opacity-0 focus-within:before:opacity-0 [&:focus-within+&]:before:opacity-0 pointer-coarse:min-h-11";
+
+const ROW_BUTTON_CLS =
+  'h-auto cursor-pointer justify-items-stretch border-0 font-normal whitespace-normal select-auto hover:bg-(--menu-hover) disabled:cursor-default disabled:opacity-100 dark:hover:bg-(--menu-hover)';
+
+const OTHER_INPUT_CLS =
+  'h-6 border-0 bg-transparent p-0 text-ui text-foreground shadow-none placeholder:text-content-tertiary focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 md:text-ui dark:bg-transparent dark:disabled:bg-transparent';
 
 const KEY_CLS =
   'grid size-6 place-items-center rounded-md bg-secondary text-meta text-content-tertiary tabular-nums';
@@ -506,41 +513,37 @@ export function DecisionDock({
           );
           const on = picked.includes(option.label);
           return multi ? (
-            <button
+            <Button
               key={oi}
               type="button"
               aria-pressed={on}
               data-dock-row=""
               data-testid={`chief-question-option-${step}-${oi}`}
               disabled={disabled}
-              className={cn(
-                ROW_CLS,
-                'cursor-pointer hover:bg-(--menu-hover) disabled:cursor-default',
-              )}
+              variant="ghost"
+              className={cn(ROW_CLS, ROW_BUTTON_CLS)}
               onClick={() => choose(oi)}
             >
               <CheckBox on={on} />
               {label}
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               key={oi}
               type="button"
               data-dock-row=""
               data-testid={`chief-question-option-${step}-${oi}`}
               aria-pressed={on}
               disabled={disabled}
-              className={cn(
-                ROW_CLS,
-                'cursor-pointer hover:bg-(--menu-hover) disabled:cursor-default',
-              )}
+              variant="ghost"
+              className={cn(ROW_CLS, ROW_BUTTON_CLS)}
               onClick={() => choose(oi)}
             >
               <span aria-hidden className={KEY_CLS}>
                 {oi + 1}
               </span>
               {label}
-            </button>
+            </Button>
           );
         })}
         <div
@@ -556,7 +559,7 @@ export function DecisionDock({
               <Pencil className="size-4" strokeWidth={1.75} />
             </span>
           )}
-          <input
+          <Input
             data-dock-row=""
             data-testid={`chief-question-other-${step}`}
             type="text"
@@ -565,7 +568,7 @@ export function DecisionDock({
             disabled={disabled}
             placeholder={freeText ? t('输入你的回答') : t('输入你自己的回答…')}
             aria-label={freeText ? t('输入你的回答') : t('输入你自己的回答…')}
-            className="h-6 w-full min-w-0 border-0 bg-transparent p-0 text-ui text-foreground outline-none placeholder:text-content-tertiary"
+            className={OTHER_INPUT_CLS}
             onChange={(event) => setOther(event.target.value)}
             onKeyDown={(event) => {
               if (event.key !== 'Enter' || event.nativeEvent.isComposing) return;
