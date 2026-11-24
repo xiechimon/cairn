@@ -376,7 +376,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const home = page.getByTestId('home-c');
     const row = home.getByTestId('chief-msg').filter({ hasText: '再顺便看下空列提示' });
     await row.getByTestId('chief-bubble').hover();
-    await row.locator('[data-placement="left"] [data-testid="chief-steer-withdraw"]').click();
+    await row.locator('[data-placement="below-end"] [data-testid="chief-steer-withdraw"]').click();
     await expect.poll(() => calls).toContain('DELETE /messages/m4');
     await expect(home.getByTestId('chief-composer-input')).toHaveValue('再顺便看下空列提示');
   });

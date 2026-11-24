@@ -379,7 +379,7 @@ function MarkdownBlocks({
     <div
       key={i}
       className={cn(
-        'chat-md-block',
+        'chat-md-block max-w-full min-w-0',
         i > 0 && (spaced?.[i] === true ? BUBBLE_SPACED_GAP : FLOW_GAP[flow]),
       )}
       data-kind={block.kind}
@@ -495,7 +495,7 @@ function CodeBlock({ lang, text }: { lang?: string; text: string }) {
 export const REPLY_BUBBLE_CLS =
   'w-fit max-w-[min(100%,var(--container-reply-bubble))] rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5 py-1.75';
 export const REPLY_BLOCK_CLS =
-  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply-bubble))]';
+  'group/reply-block relative w-fit max-w-[min(100%,var(--container-reply-bubble))] hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-start';
 
 function ReplyGroup({
   group,
@@ -510,7 +510,11 @@ function ReplyGroup({
 }) {
   return (
     <div
-      className={group.bubble ? REPLY_BLOCK_CLS : 'group/reply-block relative w-fit max-w-full'}
+      className={
+        group.bubble
+          ? REPLY_BLOCK_CLS
+          : 'group/reply-block relative w-fit max-w-full hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-start'
+      }
       data-slot="reply-block"
       data-bubble={group.bubble ? 'true' : 'false'}
     >
@@ -539,6 +543,7 @@ export function ChatMarkdown({
   text,
   bubbles = false,
   bubbleTools,
+  multiBlockTools,
   bubbleFooter,
   highlight,
   streaming = false,
@@ -546,7 +551,8 @@ export function ChatMarkdown({
   text: string;
   streaming?: boolean;
   bubbles?: boolean;
-  bubbleTools?: (group: ChatBubbleGroup, index: number) => ReactNode;
+  bubbleTools?: (group: ChatBubbleGroup, index: number, count: number) => ReactNode;
+  multiBlockTools?: ReactNode;
   bubbleFooter?: ReactNode;
   highlight?: (group: ChatBubbleGroup) => boolean;
 }) {
@@ -560,11 +566,12 @@ export function ChatMarkdown({
           <ReplyGroup
             key={i}
             group={group}
-            tools={bubbleTools?.(group, i)}
+            tools={bubbleTools?.(group, i, groups.length)}
             highlighted={highlight?.(group) === true}
             footer={i === groups.length - 1 ? bubbleFooter : null}
           />
         ))}
+        {groups.length > 1 && multiBlockTools}
       </div>
     ) : (
       <MarkdownBlocks blocks={blocks ?? []} depth={0} flow="prose" />

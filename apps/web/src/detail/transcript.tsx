@@ -2,7 +2,7 @@ import type { StepPromptOrigin } from '@cairn/shared';
 import { CircleAlert } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
-import { MessageToolbar } from '../chief/message-toolbar.js';
+import { MessageToolbar, type ToolbarPlacement } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
 import { liveTokensLabel, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
@@ -34,8 +34,10 @@ interface TranscriptProps {
 }
 
 const ROW_BASE = 'flex items-start';
-const AGENT_ROW = 'chat-row--agent group/message flex flex-col items-start';
-const USER_ROW = 'chat-row--user group/message flex flex-col items-end';
+const AGENT_ROW =
+  'chat-row--agent group/message relative flex flex-col items-start hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10';
+const USER_ROW =
+  'chat-row--user group/message relative flex flex-col items-end hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10';
 const TOOLS_ROW =
   '-ml-4 -mr-[calc(1rem-var(--scrollbar-gutter,0px))] overflow-x-clip pl-4 pr-[calc(1rem-var(--scrollbar-gutter,0px))]';
 
@@ -79,14 +81,14 @@ function RowTools({
   copy,
   stamp,
 }: {
-  placement: 'right' | 'left' | 'below-start' | 'below-end';
+  placement: ToolbarPlacement;
   copy: string;
   stamp?: string | undefined;
 }) {
   return (
     <MessageToolbar
       placement={placement}
-      testId={placement === 'right' || placement === 'left' ? 'msg-tools' : 'msg-tools-touch'}
+      testId="msg-tools"
       stamp={
         stamp == null ? null : (
           <span className="text-caption whitespace-nowrap tabular-nums" data-testid="msg-stamp">
@@ -254,7 +256,7 @@ function Row({
           data-tools-root=""
         >
           <div
-            className="group/reply-block relative max-w-[min(85%,42rem)]"
+            className="group/reply-block relative max-w-[min(85%,42rem)] hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-end"
             data-slot="reply-block"
           >
             <UserMessageBubble
@@ -268,9 +270,8 @@ function Row({
             >
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
             </UserMessageBubble>
-            <RowTools placement="left" copy={copy} stamp={item.at} />
+            <RowTools placement="below-end" copy={copy} stamp={item.at} />
           </div>
-          <RowTools placement="below-end" copy={copy} stamp={item.at} />
         </div>
       );
     }
@@ -278,7 +279,10 @@ function Row({
       const copy = robotCopyText(item);
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
+          <div
+            className="group/reply-block relative w-fit max-w-full hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-start"
+            data-slot="reply-block"
+          >
             <div
               className="chat-text agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
@@ -291,9 +295,8 @@ function Row({
                 ))
               )}
             </div>
-            <RowTools placement="right" copy={copy} />
+            <RowTools placement="below-start" copy={copy} />
           </div>
-          <RowTools placement="below-start" copy={copy} />
         </div>
       );
     }
@@ -366,7 +369,10 @@ function Row({
     case 'review':
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
+          <div
+            className="group/reply-block relative w-fit max-w-full hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-start"
+            data-slot="reply-block"
+          >
             <div
               className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
@@ -428,15 +434,17 @@ function Row({
                 </div>
               ))}
             </div>
-            <RowTools placement="right" copy={reviewCopyText(item)} />
+            <RowTools placement="below-start" copy={reviewCopyText(item)} />
           </div>
-          <RowTools placement="below-start" copy={reviewCopyText(item)} />
         </div>
       );
     case 'verify':
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
-          <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
+          <div
+            className="group/reply-block relative w-fit max-w-full hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-start"
+            data-slot="reply-block"
+          >
             <div
               className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
@@ -477,9 +485,8 @@ function Row({
                 </p>
               ))}
             </div>
-            <RowTools placement="right" copy={verifyCopyText(item)} />
+            <RowTools placement="below-start" copy={verifyCopyText(item)} />
           </div>
-          <RowTools placement="below-start" copy={verifyCopyText(item)} />
         </div>
       );
   }
@@ -538,9 +545,8 @@ function FailRow({
             </span>
           </Marker>
         </span>
-        <RowTools placement="right" copy={copy} />
+        <RowTools placement="below-start" copy={copy} />
       </div>
-      <RowTools placement="below-start" copy={copy} />
       <RawTextDialog
         title={t('原始错误')}
         text={item.raw ?? item.title}

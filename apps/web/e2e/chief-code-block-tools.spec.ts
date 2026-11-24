@@ -31,12 +31,12 @@ for (const scheme of ['light', 'dark'] as const) {
         await code.scrollIntoViewIfNeeded();
         const block = code.locator('xpath=ancestor::*[@data-slot="reply-block"][1]');
         await code.getByTestId('md-code').hover();
-        const tools = block.locator('[data-placement="right"]');
+        const tools = block.locator('[data-placement="below-start"]');
         await expect(tools).toHaveCSS('opacity', '1');
         await evidencePanelShot(page, `code-block-tools-${name}-${scheme}-${width}.png`, block, 48);
         const ownButtons = [code.getByTestId('md-code-expand'), code.getByTestId('md-code-copy')];
         const toolButtons = tools.getByRole('button');
-        await expect(toolButtons).toHaveCount(1);
+        await expect(toolButtons).toHaveCount(2);
         for (const own of ownButtons) {
           const ownBox = await own.boundingBox();
           expect(ownBox).not.toBeNull();

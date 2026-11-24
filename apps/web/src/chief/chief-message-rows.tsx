@@ -40,7 +40,7 @@ import { chiefRowRenders } from './chief-row-kinds.js';
 import { TaskRefRow } from './chief-task-ref-row.js';
 import type { TaskRef } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
-import { MessageToolbar } from './message-toolbar.js';
+import { MessageToolbar, type ToolbarMode } from './message-toolbar.js';
 import { PackageInstallCard } from './package-install-card.js';
 import { ApprovalAnswered, QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
 import { answerLines } from './question-lifecycle.js';
@@ -715,10 +715,10 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     const sending = item.delivery === 'sending';
     const steering = item.pending === 'steering';
     const fade = sending ? 'opacity-55' : '';
-    const userTools = (placement: 'left' | 'below-end', testId: string) => (
+    const userTools = (
       <MessageToolbar
-        placement={placement}
-        testId={testId}
+        placement="below-end"
+        testId="chief-msg-tools"
         stamp={<MessageStamp createdAt={item.createdAt} fallback={item.at} />}
         onReply={
           onReply !== undefined && item.id != null
@@ -747,15 +747,18 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
           >
             {sentFiles.length > 0 && (
               <div
-                className={`group/reply-block relative max-w-full ${fade}`}
+                className={`group/reply-block relative max-w-full hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-end ${fade}`}
                 data-slot="reply-block"
               >
                 <SentAttachments files={sentFiles} />
-                {!showBubble && !sending && userTools('left', 'chief-msg-tools')}
+                {!showBubble && !sending && userTools}
               </div>
             )}
             {showBubble && (
-              <div className="group/reply-block relative max-w-full" data-slot="reply-block">
+              <div
+                className="group/reply-block relative max-w-full hover:z-10 has-focus-visible:z-10 has-[[aria-expanded=true]]:z-10 pointer-coarse:flex pointer-coarse:flex-col pointer-coarse:items-end"
+                data-slot="reply-block"
+              >
                 <UserMessageBubble
                   data-testid="chief-bubble"
                   tail={!joinsNext}
@@ -769,15 +772,13 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
                 </UserMessageBubble>
-                {!sending && userTools('left', 'chief-msg-tools')}
+                {!sending && userTools}
               </div>
             )}
-            {sending ? (
+            {sending && (
               <span role="status" className="sr-only" data-testid="chief-msg-sending">
                 {t('发送中')}
               </span>
-            ) : (
-              userTools('below-end', 'chief-msg-tools-touch')
             )}
           </MessageContent>
         </Message>
@@ -885,17 +886,23 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </span>
     ) : undefined;
   const robotTools = (
-    placement: 'right' | 'below-start',
     quote: string,
     testId: string,
+    mode: ToolbarMode = 'both',
     withNote = true,
   ): ReactNode =>
     settled ? (
       <MessageToolbar
-        placement={placement}
+        placement="below-start"
+        mode={mode}
         testId={testId}
         stamp={<MessageStamp createdAt={item.createdAt} />}
         note={withNote ? fallbackNote : undefined}
+        onReply={
+          onReply !== undefined && item.id != null
+            ? () => onReply({ sourceMessageId: item.id ?? '', quote })
+            : undefined
+        }
         onCopy={() => onCopy(quote)}
       />
     ) : null;
@@ -923,13 +930,14 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 streaming={!settled}
                 bubbles
                 bubbleFooter={<BubbleReports todoIds={reports} />}
-                bubbleTools={(group, n) =>
+                bubbleTools={(group, n, count) =>
                   robotTools(
-                    'right',
                     group.source,
                     n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools',
+                    count === 1 ? 'both' : 'hover',
                   )
                 }
+                multiBlockTools={robotTools(whole, 'chief-msg-tools-touch', 'touch', false)}
                 highlight={(group) =>
                   sourceHighlighted &&
                   (group.source.includes(quoted) || quoted.includes(group.source))
@@ -959,12 +967,11 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                   )}
                   <BubbleReports todoIds={reports} />
                 </div>
-                {robotTools('right', whole, 'chief-msg-foot')}
+                {robotTools(whole, 'chief-msg-foot')}
               </div>
             )}
           </div>
           {item.typing === true && <TypingDots className="mt-1" />}
-          {robotTools('below-start', whole, 'chief-msg-tools-touch', false)}
         </MessageContent>
       </Message>
     </MessageScrollerItem>

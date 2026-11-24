@@ -307,20 +307,13 @@ export function QuestionChips({
               }))}
             />
             <MessageToolbar
-              placement="right"
+              placement="below-start"
               testId="chief-question-tools"
               stamp={null}
               onCopy={() => copyText(question.question)}
               onDismiss={pending && onCancel !== undefined ? dismiss : undefined}
             />
           </div>
-          <MessageToolbar
-            placement="below-start"
-            testId="chief-question-tools-touch"
-            stamp={null}
-            onCopy={() => copyText(question.question)}
-            onDismiss={pending && onCancel !== undefined ? dismiss : undefined}
-          />
         </div>
       </div>
     );
@@ -347,24 +340,17 @@ export function QuestionChips({
             </div>
           </ChipTip>
           <MessageToolbar
-            placement="right"
+            placement="below-start"
             testId="chief-question-tools"
             stamp={null}
             onCopy={() => copyText(question.question)}
             onDismiss={pending && onCancel !== undefined ? dismiss : undefined}
           />
         </div>
-        <MessageToolbar
-          placement="below-start"
-          testId="chief-question-tools-touch"
-          stamp={null}
-          onCopy={() => copyText(question.question)}
-          onDismiss={pending && onCancel !== undefined ? dismiss : undefined}
-        />
       </div>
       <fieldset
         aria-label={t('回答选项')}
-        className="m-0 mt-3 flex max-w-full min-w-0 flex-wrap items-center gap-3 border-0 p-0"
+        className="m-0 mt-5 flex max-w-full min-w-0 flex-wrap items-center gap-3 border-0 p-0"
       >
         {question.options.map((option, oi) => {
           const selected = draft?.kind === 'choices' && draft.picked.includes(option.label);

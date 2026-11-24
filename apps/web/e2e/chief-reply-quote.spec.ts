@@ -17,21 +17,29 @@ async function openChat(page: Page) {
 }
 
 async function replyTo(page: Page, sourceId: string) {
-  const bubble = page.locator(`[data-reply-source="${sourceId}"]`);
-  await bubble.hover();
-  await bubble
-    .locator('xpath=..')
-    .locator('[data-placement="left"] [data-testid="chief-msg-reply"]')
-    .click();
+  const source = page.locator(`[data-reply-source="${sourceId}"]`);
+  const bubble = source.locator('[data-slot="reply-bubble"]').first();
+  if ((await bubble.count()) > 0) {
+    await bubble.hover();
+    await source.locator('[data-placement="below-start"] [data-testid="chief-msg-reply"]').first().click();
+  } else {
+    await source.hover();
+    await source
+      .locator('xpath=..')
+      .locator('[data-placement="below-end"] [data-testid="chief-msg-reply"]')
+      .click();
+  }
 }
 
-test('a Coordinator message offers copy but no reply arrow and no more menu', async ({ page }) => {
+test('a Coordinator message offers copy and reply below the bubble, with no more menu', async ({
+  page,
+}) => {
   await openChat(page);
   const source = page.locator('[data-reply-source="m6"]');
   await source.locator('[data-slot="reply-bubble"]').first().hover();
-  const tools = source.locator('[data-placement="right"]').first();
+  const tools = source.locator('[data-placement="below-start"]').first();
   await expect(tools.getByTestId('chief-msg-copy')).toBeVisible();
-  await expect(tools.getByTestId('chief-msg-reply')).toHaveCount(0);
+  await expect(tools.getByTestId('chief-msg-reply')).toBeVisible();
   await expect(tools.getByTestId('chief-msg-more')).toHaveCount(0);
 });
 

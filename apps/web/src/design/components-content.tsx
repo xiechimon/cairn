@@ -303,7 +303,7 @@ export function ConversationSection() {
                   }
                   bubbleTools={() => (
                     <MessageToolbar
-                      placement="right"
+                      placement="below-start"
                       testId="turn-reply-tools"
                       stamp="10:43"
                       onCopy={() => {}}

@@ -64,7 +64,8 @@ export function QuestionAsked({
             )}
             {onCopy !== undefined && (
               <MessageToolbar
-                placement="right"
+                placement="below-start"
+                mode={item.questions.length === 1 ? 'both' : 'hover'}
                 testId={n === 0 ? 'chief-msg-foot' : 'chief-msg-block-tools'}
                 stamp={null}
                 onCopy={() => onCopy(question.question)}
@@ -73,9 +74,10 @@ export function QuestionAsked({
           </div>
         );
       })}
-      {onCopy !== undefined && (
+      {onCopy !== undefined && item.questions.length > 1 && (
         <MessageToolbar
           placement="below-start"
+          mode="touch"
           testId="chief-msg-tools-touch"
           stamp={null}
           onCopy={() => onCopy(item.questions.map((question) => question.question).join('\n'))}
