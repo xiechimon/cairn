@@ -11,6 +11,7 @@ import type {
 import { ENV_VARS } from '@cairn/shared';
 import { childEnv } from '../child-env.js';
 import { stepCredentialRedactor } from '../credential-output.js';
+import { ProcessTree, STEP_TREE_ENV } from '../process-tree.js';
 import { stepCredentialStateDirs } from '../step-app-credential.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
 import { EventQueue } from './event-queue.js';
@@ -37,6 +38,7 @@ export function piHostEnv(parent: NodeJS.ProcessEnv = process.env): Record<strin
 
 const START_TIMEOUT_MS = 60_000;
 const STOP_TIMEOUT_MS = 10_000;
+const KILL_TREE_GRACE_MS = 3_000;
 const STDERR_TAIL_BYTES = 4096;
 
 export interface PiHostOpen {
@@ -50,13 +52,6 @@ export interface PiHostOpen {
 interface PendingSteer {
   resolve: () => void;
   reject: (error: Error) => void;
-}
-
-function killGroup(pid: number | undefined): void {
-  if (pid === undefined) return;
-  try {
-    process.kill(-pid, 'SIGKILL');
-  } catch {}
 }
 
 function removeIfEmpty(directory: string): void {
@@ -80,7 +75,6 @@ class PiHostSession implements AgentSessionHandle {
   private nextSteer = 0;
   private closed = false;
   private stopping = false;
-  private exited = false;
   private readyResolve!: () => void;
   private readyReject!: (error: Error) => void;
   readonly ready: Promise<void>;
@@ -88,6 +82,8 @@ class PiHostSession implements AgentSessionHandle {
   private readonly closedPromise: Promise<void>;
   private readonly writer: FrameWriter;
   private readonly child: ReturnType<typeof spawn>;
+  private readonly tree: ProcessTree | null;
+  private killingTree: Promise<void> | undefined;
 
   constructor(
     private readonly args: PiHostOpen,
@@ -107,17 +103,28 @@ class PiHostSession implements AgentSessionHandle {
     this.closedPromise = new Promise<void>((resolve) => {
       this.closedResolve = resolve;
     });
+    const treeMarker = opts.env?.[STEP_TREE_ENV];
     this.child = spawn(launch.command, launch.args, {
       cwd: opts.cwd,
-      env: piHostEnv(),
+      env: {
+        ...piHostEnv(),
+        ...(treeMarker !== undefined ? { [STEP_TREE_ENV]: treeMarker } : {}),
+      },
       detached: true,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     });
+    this.tree =
+      this.child.pid !== undefined && treeMarker !== undefined
+        ? new ProcessTree(
+            this.child.pid,
+            { env: STEP_TREE_ENV, value: treeMarker },
+            KILL_TREE_GRACE_MS,
+          )
+        : null;
     this.child.on('error', (error) => this.fail(`Pi host failed to start: ${error.message}`));
     this.child.on('exit', (code, signal) => {
-      this.exited = true;
-      killGroup(this.child.pid);
+      void this.killTree();
       if (!this.closed) {
         this.fail(
           `Pi host exited unexpectedly (${signal ?? `code ${code ?? 'unknown'}`})${this.stderrSuffix()}`,
@@ -128,7 +135,7 @@ class PiHostSession implements AgentSessionHandle {
     const { stdin, stdout, stderr } = this.child;
     if (stdin === null || stdout === null || stderr === null) {
       void this.ready.catch(() => {});
-      killGroup(this.child.pid);
+      void this.killTree();
       throw new Error('Pi host has no stdio pipes');
     }
     this.writer = new FrameWriter(
@@ -290,9 +297,14 @@ class PiHostSession implements AgentSessionHandle {
       pending.reject(reason ?? new Error('Pi session closed before steer was consumed'));
     this.steers.clear();
     this.queue.end();
-    killGroup(this.exited ? undefined : this.child.pid);
+    void this.killTree();
     removeIfEmpty(this.privateDirectory);
     this.closedResolve();
+  }
+
+  private killTree(): Promise<void> {
+    this.killingTree ??= this.tree === null ? Promise.resolve() : this.tree.kill().catch(() => {});
+    return this.killingTree;
   }
 
   async steer(text: string, images?: readonly DeliveredImage[]): Promise<void> {
@@ -322,6 +334,7 @@ class PiHostSession implements AgentSessionHandle {
     timer.unref();
     try {
       await this.closedPromise;
+      await this.killTree();
     } finally {
       clearTimeout(timer);
     }

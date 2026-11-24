@@ -13,6 +13,7 @@ import { createServer, Socket } from 'node:net';
 import { homedir } from 'node:os';
 import { isAbsolute, join } from 'node:path';
 import { childEnv } from '../child-env.js';
+import { processStartTime } from '../process-tree.js';
 import type { OrbEnsureDeps, OrbEnsureService } from './services-ensure.js';
 import { ensureOrbServices } from './services-ensure.js';
 import { loadEnsureServicesFile } from './services-yaml.js';
@@ -178,34 +179,7 @@ function readPidText(path: string): string {
   return readFileSync(path, 'utf8').trim();
 }
 
-export function processStartTime(pid: number): string | null {
-  if (process.platform === 'darwin') return darwinProcessStart(pid);
-  return linuxProcessStart(pid);
-}
-
-function linuxProcessStart(pid: number): string | null {
-  try {
-    const status = readFileSync(`/proc/${pid}/stat`, 'utf8');
-    const close = status.lastIndexOf(')');
-    if (close < 0) return null;
-    const start = Number(status.slice(close + 2).split(' ')[19]);
-    return Number.isInteger(start) ? String(start) : null;
-  } catch {
-    return null;
-  }
-}
-
-function darwinProcessStart(pid: number): string | null {
-  try {
-    const out = execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], {
-      encoding: 'utf8',
-      timeout: 2000,
-    }).trim();
-    return out.length > 0 ? out : null;
-  } catch {
-    return null;
-  }
-}
+export { processStartTime };
 
 export function readLiveServicePid(path: string): number | null {
   const text = readPidText(path);

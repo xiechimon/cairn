@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { phoneControlRefusal } from '../backend/command-gate.js';
 import type { DaemonLogger } from '../log.js';
 import type { MachineApi } from '../machine-client.js';
+import { STEP_TREE_ENV } from '../process-tree.js';
 import {
   AUTO_STEALTH_NOTE,
   type BrowserToolName,
@@ -129,6 +130,7 @@ export interface ComputerDispatcherOptions {
   retryMaxMs?: number;
   cairnOrigins: readonly string[];
   phones?: Phones;
+  stepTreeMarkers?: ReadonlyMap<string, string>;
 }
 
 export interface ComputerDispatcher {
@@ -282,9 +284,11 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     setupTimer.unref();
     try {
       try {
+        const treeMarker = options.stepTreeMarkers?.get(call.stepId);
         events = await host.execute({
           argv: ['bash', '-lc', params.command],
           ...(params.cwd !== undefined ? { cwd: params.cwd } : {}),
+          ...(treeMarker !== undefined ? { env: { [STEP_TREE_ENV]: treeMarker } } : {}),
           timeoutMs,
           signal: controller.signal,
         });

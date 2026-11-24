@@ -76,6 +76,7 @@ import type { OrbProvider } from './orb/provider.js';
 import { createOrbProvider } from './orb/select.js';
 import { relayOrbStopped, runOrbStep } from './orb/step.js';
 import { ensurePrivateDir } from './private-fs.js';
+import { STEP_TREE_ENV, StepReaper } from './process-tree.js';
 import { setupProxy } from './proxy.js';
 import { performRepoArchive } from './repo-archive.js';
 import type { RunStepOptions } from './runner.js';
@@ -160,6 +161,7 @@ const STRANDED_UPLOAD_REPLAY_MS = 30_000;
 const STRANDED_UPLOAD_MIN_AGE_MS = 30_000;
 const STRANDED_UPLOAD_MAX_ATTEMPTS = 40;
 const CONFINEMENT_STOP_WAIT_MS = 15_000;
+const STEP_REAP_GRACE_MS = 3_000;
 
 export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): number {
   return Math.min(current * 2, cap);
@@ -815,6 +817,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const stepImageSupport = new Map<string, boolean | null>();
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
+  const stepTreeMarkers = new Map<string, string>();
   const stops = new StepStops();
   const workerSlots = new Map<string, number>();
   const assignWorkerSlot = (stepId: string): number => {
@@ -856,6 +859,23 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   sweepOrphans();
   const orphanTimer = setInterval(sweepOrphans, 24 * 60 * 60 * 1000);
   orphanTimer.unref?.();
+
+  await Promise.all(
+    journal.treeMarkers().map(async (value) => {
+      try {
+        const reaped = await new StepReaper(
+          { env: STEP_TREE_ENV, value },
+          STEP_REAP_GRACE_MS,
+        ).reap();
+        if (reaped > 0)
+          logger.recover(`reaped ${reaped} leftover processes for step tree marker=${value}`);
+      } catch (error) {
+        logger.recover(
+          `leftover step tree reap failed marker=${value}: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+    }),
+  );
 
   const sweepStepScratch = () => {
     try {
@@ -1118,6 +1138,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     ...(orbComputer ? { orb: orbComputer } : {}),
     phones,
     cairnOrigins,
+    stepTreeMarkers,
   });
   const imsgBridge = createImsgBridge({ api: client, logger, home: config.home });
   void (async () => {
@@ -1269,6 +1290,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       stepImageSupport,
       stepSteeringSupport,
       stepTranscripts,
+      stepTreeMarkers,
       stops,
       machineName: config.name,
       ...(daemonOtel !== null ? { otel: daemonOtel } : {}),

@@ -1,4 +1,5 @@
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
@@ -14,6 +15,7 @@ interface ProcessRow {
 
 export const COMPUTER_MARKER_ENV = 'CAIRN_COMPUTER_CALL';
 export const SESSION_TREE_ENV = 'CAIRN_SESSION_TREE';
+export const STEP_TREE_ENV = 'CAIRN_STEP_TREE';
 
 export interface TreeMarker {
   env: string;
@@ -180,4 +182,87 @@ export class ProcessTree {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function processStartTime(pid: number): string | null {
+  if (process.platform === 'linux') {
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+      const close = stat.lastIndexOf(')');
+      if (close < 0) return null;
+      const start = Number(stat.slice(close + 2).split(' ')[19]);
+      return Number.isInteger(start) ? String(start) : null;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const out = execFileSync('ps', ['-o', 'lstart=', '-p', String(pid)], {
+      encoding: 'utf8',
+      timeout: 2000,
+    }).trim();
+    return out.length > 0 ? out : null;
+  } catch {
+    return null;
+  }
+}
+
+export class StepReaper {
+  private readonly starts = new Map<number, string | null>();
+
+  constructor(
+    private readonly marker: TreeMarker,
+    private readonly graceMs: number,
+  ) {}
+
+  private async members(): Promise<Map<number, ProcessRow>> {
+    const linux = process.platform === 'linux';
+    const rows = linux ? await readLinuxProcesses() : await readPortableProcesses();
+    const byId = new Map(rows.map((row) => [row.pid, row]));
+    let holders: number[] = [];
+    if (linux) holders = await markerHolders(rows, this.marker);
+    else if (process.platform === 'darwin')
+      holders = await darwinMarkerHolders(rows, this.marker, new Set());
+    const members = new Map<number, ProcessRow>();
+    for (const pid of holders) {
+      if (pid === process.pid || pid === process.ppid) continue;
+      const row = byId.get(pid);
+      if (row !== undefined) members.set(pid, row);
+    }
+    for (const pid of [...this.starts.keys()]) if (!members.has(pid)) this.starts.delete(pid);
+    for (const pid of members.keys()) this.starts.set(pid, processStartTime(pid));
+    return members;
+  }
+
+  private signal(members: ReadonlyMap<number, ProcessRow>, signal: NodeJS.Signals): void {
+    for (const pid of members.keys()) {
+      if (pid <= 1) continue;
+      const recorded = this.starts.get(pid);
+      const current = processStartTime(pid);
+      if (recorded != null && current !== null && recorded !== current) continue;
+      try {
+        process.kill(pid, signal);
+      } catch {}
+    }
+  }
+
+  async reap(): Promise<number> {
+    let live = await this.members();
+    const seen = live.size;
+    if (live.size === 0) return seen;
+    this.signal(live, 'SIGTERM');
+    const graceEnds = Date.now() + this.graceMs;
+    while (Date.now() < graceEnds) {
+      await sleep(POLL_MS);
+      live = await this.members();
+      if (![...live.values()].some((row) => !row.zombie)) return seen;
+    }
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      this.signal(live, 'SIGKILL');
+      await sleep(POLL_MS);
+      live = await this.members();
+      if (![...live.values()].some((row) => !row.zombie)) return seen;
+    }
+    return seen;
+  }
 }
