@@ -209,7 +209,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(fence).toContainText('curl -s localhost:8787/healthz');
   });
 
-  test('F-R13: a todo mention renders as the title chip, points at task detail and a click opens it; literal #seq/pseudo schemes render no link (#675)', async ({
+  test('F-R13: a todo mention renders as the task word, points at task detail and a click opens it; literal #seq/pseudo schemes render no link (#675)', async ({
     page,
   }) => {
     const stream = page.getByTestId('chief-stream');
@@ -220,8 +220,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(mention).toHaveAttribute('href', /^\/app\?(.*&)?thread=r3-legacy-1$/);
 
     await expect(stream).toContainText('prose #12 与 [伪链](todos:t2) 保持字面');
-    await expect(stream.locator('.mention-chip')).toHaveCount(1);
-    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
+    await expect(stream.locator('.mention-chip')).toHaveCount(0);
 
     await mention.click();
     await expect(page).toHaveURL(/[?&]thread=r3-legacy-1/);
@@ -273,8 +272,7 @@ test.describe('Coordinator markdown face (fixture, #650)', () => {
     await expect(stream.locator('a[data-slot="task-mention"]')).toHaveText(
       '编写 CONTRIBUTING.md 贡献指南',
     );
-    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
-    await expect(stream.locator('a[data-slot="task-mention"]')).toHaveClass(/mention-chip--todo/);
+    await expect(stream.getByTestId('chief-task-started-said')).toHaveCount(0);
     await expect(stream).not.toContainText('r5-scribe');
 
     const tools = stream.getByTestId('chief-msg-tools');
@@ -334,13 +332,13 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
 
     await expect(bubble.locator('strong')).toHaveText('优先');
 
-    const chip = bubble.locator('.mention-chip--todo');
+    const chip = bubble.locator('a[data-slot="task-mention"]');
     await expect(chip).toHaveCount(1);
     await expect(chip).toHaveText('任务');
     await expect(chip).toHaveAttribute('href', /^\/app\?(.*&)?thread=t16$/);
 
     await expect(bubble).toContainText('prose #12 与 [伪链](todos:t2) [空](todo:) 保持字面');
-    await expect(bubble.locator('.mention-chip')).toHaveCount(1);
+    await expect(bubble.locator('a[data-slot="task-mention"]')).toHaveCount(1);
 
     await chip.click();
     await expect(page).toHaveURL(/[?&]thread=t16/);

@@ -46,7 +46,7 @@ for (const [label, phase, verified] of [
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
     await expect(stream.getByTestId('chief-sub-thread')).toHaveCount(0);
-    await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
+    await expect(stream.getByTestId('chief-task-started-said')).toHaveCount(0);
     await expect(stream.getByTestId('chief-bubble')).toHaveCount(1);
     await expect(stream).not.toContainText('[wake:');
     await expect(stream).not.toContainText('Internal worker reporting instructions');
@@ -260,7 +260,7 @@ test('reports and relayed messages add no bare sub-thread row to the conversatio
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream.getByTestId('chief-sub-thread')).toHaveCount(0);
-  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-task-started-said')).toHaveCount(0);
   await expect(stream).not.toContainText('Which export format?');
   await expect(stream).not.toContainText('Use CSV instead');
   await expect(stream).not.toContainText('JSON please');
@@ -269,7 +269,7 @@ test('reports and relayed messages add no bare sub-thread row to the conversatio
   await expect(stream.getByTestId('chief-bubble')).toHaveText('Add an export');
 });
 
-test('a thread already shown under the reply that started it adds no row for its later reports', async ({
+test('a task the reply names in its sentence adds no line, then or for its later reports', async ({
   page,
 }) => {
   await mockLive(page, {
@@ -295,13 +295,14 @@ test('a thread already shown under the reply that started it adds no row for its
   });
   await page.goto('/app');
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-  await expect(stream.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(stream.getByTestId('chief-task-started-said')).toHaveCount(0);
   await expect(stream.getByTestId('chief-sub-thread')).toHaveCount(0);
   const first = stream.getByTestId('chief-msg').filter({ hasText: 'Started' });
-  await expect(first.getByTestId('chief-task-ref')).toHaveCount(1);
+  await expect(first.locator('a[data-slot="task-mention"]')).toHaveText(TASK.title);
+  await expect(stream.locator('a[data-slot="task-mention"]')).toHaveCount(2);
 });
 
-test('a split request shows research and code as flat sibling rows; the code row says what it waits for', async ({
+test('a split request the reply does not name gets one 已建任务 line with both task words; the code word says what it waits for', async ({
   page,
 }) => {
   const research = {
@@ -328,17 +329,13 @@ test('a split request shows research and code as flat sibling rows; the code row
     todos: [research, { ...TASK, phase: 'queued', blockedBy: [research.id] }],
   });
   await page.goto('/app');
-  const refs = page.getByTestId('home-c').getByTestId('chief-task-refs');
-  const rows = refs.getByTestId('chief-task-ref');
-  await expect(rows).toHaveText([/^Research export formats/, new RegExp(`^${TASK.title}`)]);
-  const lefts = await rows.evaluateAll((all) => all.map((row) => row.getBoundingClientRect().left));
-  expect(lefts[1]).toBe(lefts[0]);
-  await expect(refs.locator('[data-slot="task-ref-waits"]')).toHaveText(['等「Research export formats」']);
+  const said = page.getByTestId('home-c').getByTestId('chief-task-started-said');
+  await expect(said).toHaveCount(1);
+  const words = said.locator('a[data-slot="task-mention"]');
+  await expect(words).toHaveText(['Research export formats', TASK.title]);
   await expect(page.locator('[data-grow]')).toHaveCount(0);
-  await rows.nth(1).hover();
-  await expect(
-    page.getByTestId('chief-task-ref-hover').locator('[data-slot="task-ref-starts-after"]'),
-  ).toContainText('Research export formats');
+  await words.nth(1).hover();
+  await expect(page.getByTestId('task-mention-tip')).toContainText('等「Research export formats」');
 });
 
 test('a research report is one card under its research row; hover shows a summary and a click opens the document', async ({
@@ -387,7 +384,6 @@ test('a research report is one card under its research row; hover shows a summar
   await page.goto('/app');
   const reply = page.getByTestId('home-c').getByTestId('chief-msg').filter({ hasText: 'Started' });
   const card = reply.getByTestId('chief-reply-bubble').getByTestId('research-report-card');
-  await expect(reply.getByTestId('chief-task-refs').getByTestId('research-report-card')).toHaveCount(0);
   await expect(card).toHaveCount(1);
   await expect(card).toHaveText('Research export formats');
   await expect(card).toHaveAttribute('data-stage', 'draft');
@@ -461,9 +457,7 @@ test('a research card in Made opens its report as a document; one with no report
   await expect(page.getByTestId('research-report-doc')).toHaveCount(0);
 });
 
-test('a task created with no reply after it hangs on an elbow over a short reply bubble', async ({
-  page,
-}) => {
+test('a task created with no reply after it stands as one 已建任务 line with its word', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -474,16 +468,11 @@ test('a task created with no reply after it hangs on an elbow over a short reply
   });
   await page.goto('/app');
   const started = page.getByTestId('home-c').getByTestId('chief-task-started');
-  await expect(started.getByTestId('chief-task-ref')).toHaveText(/^Create HELLO\.md/);
-  await expect(started.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
-  await expect(started.getByTestId('chief-task-started-said')).toHaveText('已建任务');
-  const row = await started.getByTestId('chief-task-ref').boundingBox();
-  const said = await started.getByTestId('chief-task-started-said').boundingBox();
-  expect((row?.y ?? 0) + (row?.height ?? 0)).toBeLessThanOrEqual(said?.y ?? 0);
-  expect(row?.x ?? 0).toBeGreaterThan(said?.x ?? 0);
+  await expect(started.getByTestId('chief-task-started-said')).toHaveText(/^已建任务\s*Create HELLO\.md$/);
+  await expect(started.locator('a[data-slot="task-mention"]')).toHaveAttribute('data-phase', 'building');
 });
 
-test('an archived task keeps its elbow row instead of falling back to a title chip', async ({ page }) => {
+test('an archived task keeps its word in the 已建任务 line', async ({ page }) => {
   await mockLive(page, {
     threads: [THREAD],
     messages: [
@@ -495,12 +484,11 @@ test('an archived task keeps its elbow row instead of falling back to a title ch
   });
   await page.goto('/app');
   const started = page.getByTestId('home-c').getByTestId('chief-task-started');
-  await expect(started.getByTestId('chief-task-ref')).toHaveText(/^Create HELLO\.md/);
-  await expect(started.locator('[data-slot="task-ref-elbow"]')).toHaveCount(1);
+  await expect(started.locator('a[data-slot="task-mention"]')).toHaveText('Create HELLO.md');
   await expect(page.getByTestId('chief-task-created')).toHaveCount(0);
 });
 
-test('a task archived in the same turn leaves no card and the next task folds into the reply', async ({
+test('a task archived in the same turn leaves no card and the next task gets the line under the reply', async ({
   page,
 }) => {
   const dropped = { ...TASK, id: 'todo-old', seqNum: 9, title: 'Draft the old brief' };
@@ -541,12 +529,12 @@ test('a task archived in the same turn leaves no card and the next task folds in
   const stream = page.getByTestId('home-c').getByTestId('chief-stream');
   await expect(stream.getByTestId('chief-task-started')).toHaveCount(0);
   await expect(stream.getByTestId('chief-task-created')).toHaveCount(0);
-  const refs = stream.getByTestId('chief-task-refs');
-  await expect(refs.getByTestId('chief-task-ref')).toHaveCount(1);
-  await expect(refs.getByTestId('chief-task-ref')).toHaveText(/^Draft the new brief/);
-  const ref = await refs.getByTestId('chief-task-ref').boundingBox();
+  const said = stream.getByTestId('chief-task-started-said');
+  await expect(said).toHaveCount(1);
+  await expect(said.locator('a[data-slot="task-mention"]')).toHaveText(['Draft the new brief']);
+  const line = await said.boundingBox();
   const bubble = await stream.getByTestId('chief-reply-bubble').first().boundingBox();
-  expect((ref?.y ?? 0) + (ref?.height ?? 0)).toBeLessThanOrEqual(bubble?.y ?? 0);
+  expect(line?.y ?? 0).toBeGreaterThanOrEqual((bubble?.y ?? 0) + (bubble?.height ?? 0));
 });
 
 test('C27: a research report copies as its Markdown source from an icon button beside close', async ({ page }) => {

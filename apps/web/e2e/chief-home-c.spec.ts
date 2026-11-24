@@ -16,14 +16,13 @@ test('the home is one Coordinator conversation: no greeting once it has messages
   await expect(page.getByTestId('home-c').locator('.voice-greeting')).toHaveCount(0);
   await expect(page.getByTestId('tasks-badge')).toHaveText('3');
   await expect(page.getByTestId('needs-you')).toHaveCount(0);
-  await expect(page.getByTestId('chief-stream').getByTestId('chief-task-ref')).toHaveText([
-    /^Orb canary round 7/,
-    /^Fold finished turns into purpose and duration/,
-  ]);
+  const words = page.getByTestId('chief-stream').locator('a[data-slot="task-mention"]');
+  await expect(words.filter({ hasText: 'Orb canary round 7' })).not.toHaveCount(0);
+  await expect(words.filter({ hasText: 'Fold finished turns into purpose and duration' })).not.toHaveCount(0);
   await expect(page.getByTestId('chief-stream').locator('[data-slot="task-card"]')).toHaveCount(0);
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
-  await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toBeVisible();
-  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
+  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toBeVisible();
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toHaveCount(0);
   await expect(page.getByTestId('chief-stream')).toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('in-progress-pill')).toHaveCount(0);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('Coordinator');
@@ -66,12 +65,12 @@ test('the sidebar lists project names only, and the project chat filters the tas
   await rows.filter({ hasText: 'cairn' }).click();
   await expect(page).toHaveURL(new RegExp(`project=${PROJECT_ID}&chat=1`));
   await expect(page.getByTestId('tasks-badge')).toHaveText('2');
-  const refs = page.getByTestId('chief-stream').getByTestId('chief-task-ref');
-  await expect(refs).toHaveCount(1);
-  await expect(refs).toContainText('Fold finished turns into purpose and duration');
+  const words = page.getByTestId('chief-stream').locator('a[data-slot="task-mention"]');
+  await expect(words.filter({ hasText: 'Fold finished turns into purpose and duration' })).not.toHaveCount(0);
+  await expect(words.filter({ hasText: 'Orb canary round 7' })).toHaveCount(0);
   await expect(page.getByTestId('chief-stream')).not.toContainText('Run the orb canary until it passes');
   await expect(page.getByTestId('chief-stream')).toContainText('Fold finished turns before review');
-  await expect(composer(page)).toHaveAttribute('placeholder', /in cairn|Type your own answer/);
+  await expect(composer(page)).toHaveAttribute('placeholder', /in cairn|Or reply directly/);
   await expect(page.getByTestId('home-c').getByRole('heading', { level: 1 })).toHaveText('cairn');
 });
 

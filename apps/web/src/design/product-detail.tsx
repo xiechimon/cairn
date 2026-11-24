@@ -1,11 +1,10 @@
 import { PHASE_VALUES } from '@cairn/shared';
 import { useState } from 'react';
-import { TaskRefRow } from '../chief/chief-task-ref-row.js';
 import { ComposerAttachmentTile } from '../components/composer-attachment-tile.js';
 import { Button } from '../components/ui/button.js';
 import { Composer } from '../detail/composer.js';
 import { DocPane } from '../detail/docpane.js';
-import { Segments, TodoGlanceContext, TodoStatus } from '../detail/segments.js';
+import { Segments, TaskGlyph, TodoGlanceContext } from '../detail/segments.js';
 import { SourceIssueLine } from '../detail/source-issue.js';
 import { SpecBlock } from '../detail/spec-block.js';
 import { StopConfirmDialog } from '../detail/stop-confirm-dialog.js';
@@ -305,11 +304,11 @@ export function ProductDetailSection() {
       <Specimen
         id="status-and-inline-segments"
         title="Status and inline segments"
-        note="TodoStatus for every phase, Segments with code, links and mentions"
+        note="TaskGlyph for every phase, Segments with code, links and mentions"
       >
         {PHASE_VALUES.map((phase) => (
           <Cell key={phase} label={phase}>
-            <TodoStatus phase={phase} />
+            <TaskGlyph phase={phase} />
           </Cell>
         ))}
         <Cell label="Segments">
@@ -338,7 +337,7 @@ export function ProductDetailSection() {
       <Specimen
         id="task-references"
         title="Task references"
-        note="Reference row above a Coordinator reply, per task state: a tinted tile and the title. In the sentence the task is a chip with the same state"
+        note="A task is a word in the Coordinator sentence: its state glyph and title, unframed, with a tooltip and a link to the task"
         className="flex-col items-start"
       >
         {TASK_REF_PHASES.map((phase) => (
@@ -347,14 +346,6 @@ export function ProductDetailSection() {
               value={new Map([[`gallery-ref-${phase}`, { phase, seq: 12, title: TASK_REF_TITLE }]])}
             >
               <div className="flex w-110 flex-col gap-1">
-                <TaskRefRow
-                  taskRef={{
-                    todoId: `gallery-ref-${phase}`,
-                    seq: 12,
-                    title: TASK_REF_TITLE,
-                    phase,
-                  }}
-                />
                 <p className="m-0 text-ui leading-[22px]">
                   <Segments
                     codeClassName="chat-code"

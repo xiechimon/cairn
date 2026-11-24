@@ -1,5 +1,5 @@
+import type { AskUserAnswer } from '@cairn/shared';
 import type { ChiefStreamItem } from '../fixtures/records.js';
-import type { ChiefQuestionItem } from './question-chips.js';
 
 export function awaitingStream(
   stream: readonly ChiefStreamItem[],
@@ -9,9 +9,7 @@ export function awaitingStream(
   return stream.filter((item) => item.kind !== 'streaming');
 }
 
-export function answerLines(item: Pick<ChiefQuestionItem, 'status' | 'answers'>): string[] {
-  if (item.status !== 'answered') return [];
-  return (item.answers ?? [])
-    .map((answer) => (answer.choices ?? []).join('、') || (answer.text ?? '').trim())
-    .filter((part) => part !== '');
+export function answerLineOf(answer: AskUserAnswer | undefined): string {
+  if (answer === undefined) return '';
+  return (answer.choices ?? []).join('、') || (answer.text ?? '').trim();
 }

@@ -21,21 +21,23 @@ test('C23: a whole Coordinator turn never rebuilds or moves what it already show
   const home = page.getByTestId('home-c');
   await expect(home.getByTestId('typing-dots')).toBeVisible();
   await page.waitForFunction((u) => window.__es.some((es) => es.url.includes(u)), streamUrl);
-  await watchRemounts(page, ['chief-task-ref', 'chief-bubble', 'research-report-card', 'md-task']);
+  await watchRemounts(page, ['chief-bubble', 'research-report-card', 'md-task']);
 
   for (const [n, task] of [TASK, SECOND].entries()) {
     const message = createTodoRow(`create-${n}`, task, 20 + n);
     messages.push(message);
     await emit(page, { type: 'message', message });
   }
-  const refs = home.getByTestId('chief-task-ref');
-  await expect(refs).toHaveCount(2);
   const user = home.getByTestId('chief-bubble').first();
-  const before = await offsetFrom(user, refs.first());
+  await expect(home.getByTestId('chief-task-started')).toHaveCount(0);
+  await expect(home.getByTestId('chief-task-started-said')).toHaveCount(0);
 
   await emit(page, { type: 'text_delta', text: REPLY });
   await expect(home.getByTestId('chief-reply')).toContainText('我开了两个任务');
-  expect(await offsetFrom(user, refs.first())).toBe(before);
+  const words = home.locator('a[data-slot="task-mention"]');
+  await expect(words).toHaveCount(2);
+  const reply = home.getByTestId('chief-reply').first();
+  const settledAt = await offsetFrom(user, reply);
 
   const answer: Row = { id: 'answer', role: 'assistant', content: REPLY, createdAt: 40 };
   messages.push(answer);
@@ -43,7 +45,8 @@ test('C23: a whole Coordinator turn never rebuilds or moves what it already show
   await emit(page, { type: 'message', message: answer });
   await emit(page, { type: 'step', step: { id: 'ask', status: 'done' } });
   await expect(home.getByTestId('typing-dots')).toHaveCount(0);
-  await expect(refs).toHaveCount(2);
-  expect(await offsetFrom(user, refs.first())).toBe(before);
+  await expect(words).toHaveCount(2);
+  await expect(home.getByTestId('chief-task-started-said')).toHaveCount(0);
+  expect(await offsetFrom(user, reply)).toBe(settledAt);
   expect(await remounts(page)).toEqual([]);
 });

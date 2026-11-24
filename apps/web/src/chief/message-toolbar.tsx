@@ -1,5 +1,5 @@
 import { cn } from 'cn';
-import { Ellipsis, Reply, Undo, X } from 'lucide-react';
+import { Ellipsis, Reply, Undo } from 'lucide-react';
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -153,7 +153,6 @@ export function MessageToolbar({
   onReply,
   onCopy,
   onRewind,
-  onDismiss,
   onWithdraw,
   testId,
 }: {
@@ -163,7 +162,6 @@ export function MessageToolbar({
   onReply?: (() => void) | undefined;
   onCopy: () => void;
   onRewind?: (() => void) | undefined;
-  onDismiss?: (() => void) | undefined;
   onWithdraw?: (() => void) | undefined;
   testId: string;
 }) {
@@ -188,7 +186,7 @@ export function MessageToolbar({
       <Undo width={20} height={20} />
     </IconTooltip>
   );
-  const hasMenu = onRewind !== undefined || onDismiss !== undefined;
+  const hasMenu = onRewind !== undefined;
   const pill = !armed ? (
     <div className={TOOLS_CLS} data-slot="message-toolbar-tools" data-unarmed>
       {withdraw}
@@ -294,17 +292,6 @@ export function MessageToolbar({
               <KeyedMenuItem shortcut="R" data-action="rewind" onClick={onRewind}>
                 <Restore width={20} height={20} />
                 {t('恢复到此处')}
-              </KeyedMenuItem>
-            )}
-            {onDismiss !== undefined && (
-              <KeyedMenuItem
-                shortcut="D"
-                variant="destructive"
-                data-testid="chief-question-dismiss"
-                onClick={onDismiss}
-              >
-                <X width={20} height={20} />
-                {t('取消提问')}
               </KeyedMenuItem>
             )}
           </KeyedMenuContent>

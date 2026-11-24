@@ -1,17 +1,8 @@
 import { isInfoOutput, RESEARCH_STUCK_SOURCE_KIND } from '@cairn/shared';
-import type { TodoGlance } from '../detail/segments.js';
+import { linkTaskNumbers, type TodoGlance } from '../detail/segments.js';
 import type { ChiefSegment } from '../fixtures/records.js';
 import { parseMentionSegments } from '../overlay/mention-token.js';
 import type { GroupedRow } from './thread-activity.js';
-
-export interface TaskRef {
-  todoId: string;
-  seq: number | null;
-  title: string | null;
-  phase: TodoGlance['phase'];
-}
-
-export const MAX_TASK_REFS = 3;
 
 interface GlanceSource {
   phase: string;
@@ -38,31 +29,23 @@ export function todoGlanceOf(todo: GlanceSource): TodoGlance {
   };
 }
 
-interface RefSource {
+interface MentionSource {
   markdown?: string | undefined;
   paragraphs?: ChiefSegment[][] | undefined;
   bullets?: ChiefSegment[][] | undefined;
 }
 
-export function taskRefsOf(
-  source: RefSource,
+export function mentionedTaskIds(
+  source: MentionSource,
   glances: ReadonlyMap<string, TodoGlance>,
-  started: readonly string[] = [],
-): TaskRef[] {
-  const found = new Map<string, TaskRef>();
-  const add = (todoId: string) => {
-    const glance = glances.get(todoId);
-    if (glance === undefined || found.has(todoId)) return;
-    found.set(todoId, {
-      todoId,
-      seq: glance.seq ?? null,
-      title: glance.title ?? null,
-      phase: glance.phase,
-    });
-  };
+): ReadonlySet<string> {
+  const ids = new Set<string>();
   if (source.markdown !== undefined) {
     for (const part of parseMentionSegments(source.markdown)) {
-      if (part.kind === 'mention' && part.token.kind === 'todo') add(part.token.id);
+      if (part.kind === 'mention' && part.token.kind === 'todo') ids.add(part.token.id);
+    }
+    for (const segment of linkTaskNumbers(source.markdown, glances) ?? []) {
+      if (segment.mentionId !== undefined) ids.add(segment.mentionId);
     }
   }
   const seqs = new Set(
@@ -71,13 +54,9 @@ export function taskRefsOf(
       .flatMap((segment) => (segment.todo === undefined ? [] : [segment.todo])),
   );
   for (const [todoId, glance] of glances) {
-    if (glance.seq !== undefined && seqs.has(glance.seq)) add(todoId);
+    if (glance.seq !== undefined && seqs.has(glance.seq)) ids.add(todoId);
   }
-  const mentioned = [...found.values()].slice(0, MAX_TASK_REFS);
-  const shown = new Set(mentioned.map((ref) => ref.todoId));
-  found.clear();
-  for (const todoId of started) if (!shown.has(todoId)) add(todoId);
-  return [...mentioned, ...found.values()];
+  return ids;
 }
 
 export interface FoldedTaskCards {
@@ -137,31 +116,28 @@ export function foldTaskCards(
   };
 }
 
-const placedLists = new WeakMap<object, { key: string; refs: readonly TaskRef[] }>();
+const placedLists = new WeakMap<object, readonly string[]>();
 
-function stableRefs(owner: object, refs: TaskRef[]): readonly TaskRef[] {
-  const key = refs.map((ref) => `${ref.todoId}|${ref.phase}|${ref.title ?? ''}`).join('\n');
-  const previous = placedLists.get(owner);
-  if (previous !== undefined && previous.key === key) return previous.refs;
-  placedLists.set(owner, { key, refs });
-  return refs;
-}
-
-export function placeTaskRefs(
+export function placeUnmentionedTasks(
   rows: readonly GroupedRow[],
   startedBy: ReadonlyMap<GroupedRow['item'], readonly string[]>,
   glances: ReadonlyMap<string, TodoGlance>,
-  seen: Set<string>,
-): ReadonlyMap<GroupedRow['item'], readonly TaskRef[]> {
-  const placed = new Map<GroupedRow['item'], readonly TaskRef[]>();
+): ReadonlyMap<GroupedRow['item'], readonly string[]> {
+  const placed = new Map<GroupedRow['item'], readonly string[]>();
   for (const { item } of rows) {
-    if (item.kind === 'task-card') seen.add(item.todoId);
-    if (item.kind !== 'robot' && item.kind !== 'streaming') continue;
-    const refs = taskRefsOf({}, glances, startedBy.get(item) ?? []).filter(
-      (ref) => !seen.has(ref.todoId) && glances.get(ref.todoId)?.internal !== true,
+    if (item.kind !== 'robot' || isLiveRow(item)) continue;
+    const started = startedBy.get(item) ?? [];
+    if (started.length === 0) continue;
+    const mentioned = mentionedTaskIds(item, glances);
+    const ids = [...new Set(started)].filter(
+      (id) => !mentioned.has(id) && glances.get(id)?.internal !== true,
     );
-    for (const ref of refs) seen.add(ref.todoId);
-    if (refs.length > 0) placed.set(item, stableRefs(item, refs));
+    if (ids.length === 0) continue;
+    const previous = placedLists.get(item);
+    const stable =
+      previous !== undefined && previous.join('\n') === ids.join('\n') ? previous : ids;
+    placedLists.set(item, stable);
+    placed.set(item, stable);
   }
   return placed;
 }

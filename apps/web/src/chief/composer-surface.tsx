@@ -94,6 +94,7 @@ export interface ComposerSurfaceProps {
   dropActive?: boolean;
   seededFiles?: ComposerFileSeed[] | undefined;
   inputTestId?: string;
+  trailing?: ReactNode;
 }
 
 export function ComposerSurface({
@@ -123,6 +124,7 @@ export function ComposerSurface({
   dropActive = false,
   seededFiles,
   inputTestId,
+  trailing,
 }: ComposerSurfaceProps) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -387,6 +389,7 @@ export function ComposerSurface({
               listboxId={inlineListboxId}
             />
           </div>
+          {trailing}
           <IconTooltip
             label={send?.label ?? t('发送')}
             trigger={

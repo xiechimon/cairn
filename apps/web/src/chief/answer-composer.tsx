@@ -1,7 +1,11 @@
+import { ChevronUp } from 'lucide-react';
 import { type ReactNode, type Ref, useEffect, useRef, useSyncExternalStore } from 'react';
+import { IconTooltip } from '../components/icon-tooltip.js';
+import { Button } from '../components/ui/button.js';
 import type { ChiefContextUsage } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { joinDraft, splitDraft } from '../overlay/attachment-paste.js';
+import { useMinimizedQuestion } from './chief-question.js';
 import { keyedBinding } from './composer-binding.js';
 import { ComposerSurface, type ComposerSurfaceHandle } from './composer-surface.js';
 import { draftKeyOfAnswer, questionDockState } from './question-dock-state.js';
@@ -10,6 +14,14 @@ const answerStore = {
   get: (key: string) => questionDockState.answerText(key),
   set: (key: string, value: string) => questionDockState.setAnswerText(key, value),
 };
+
+function plainLine(markdown: string): string {
+  return markdown
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/[`*_#>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 const NO_MENTIONS = { todo: [], agent: [], project: [], skill: [], machine: [] };
 
@@ -70,6 +82,7 @@ export function AnswerComposer({
             questionDockState.endUpload();
           }
         };
+  const minimized = useMinimizedQuestion();
   const primary = active ? questionDockState.primary() : null;
   const advance = () => questionDockState.primary()?.advance();
   return (
@@ -89,7 +102,25 @@ export function AnswerComposer({
       active={active}
       onFocusEnter={onFocusEnter}
       onFocusLeave={onFocusLeave}
-      placeholder={t('输入你自己的回答…')}
+      placeholder={minimized === null ? t('或者直接回复…') : plainLine(minimized)}
+      trailing={
+        minimized === null ? undefined : (
+          <IconTooltip
+            label={t('展开提问')}
+            trigger={
+              <Button
+                variant="ghost"
+                data-testid="chief-question-restore"
+                aria-label={t('展开提问')}
+                className="size-8 flex-none rounded-full p-0 text-content-tertiary hover:bg-(--menu-hover) hover:text-foreground pointer-coarse:size-11"
+                onClick={() => questionDockState.reveal()}
+              />
+            }
+          >
+            <ChevronUp className="size-4" />
+          </IconTooltip>
+        )
+      }
       composerRef={composerRef}
       tab={tab}
       above={above}
