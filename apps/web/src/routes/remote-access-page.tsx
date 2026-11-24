@@ -469,7 +469,11 @@ export function RemoteAccessPage() {
           )}
         </div>
       )}
-      <details className="mt-4" data-testid="remote-advanced-details">
+      <details
+        className="mt-4"
+        open={pairingBlocked || awaitingTailnetLogin || undefined}
+        data-testid="remote-advanced-details"
+      >
         <summary className="cursor-pointer select-none text-meta text-content-tertiary hover:text-foreground">
           {t('高级：本地 Tailscale 与手动配对')}
         </summary>

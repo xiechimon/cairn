@@ -1,1 +1,52 @@
-[]
+[
+  {
+    "path": "apps/daemon/src/backend/command-gate.ts",
+    "name": "splitBashSegments",
+    "reason": "Security surface deferred for dedicated security-review pass."
+  },
+  {
+    "path": "apps/server/src/db/schema.ts",
+    "name": "memoryCandidate",
+    "reason": "Drizzle schema table retained to avoid schema migration drift."
+  },
+  {
+    "path": "apps/server/src/db/schema.ts",
+    "name": "buildOutcomeBackfill",
+    "reason": "Drizzle schema table retained to avoid schema migration drift."
+  },
+  {
+    "path": "apps/server/src/lib/keys.ts",
+    "name": "newDeviceId",
+    "reason": "Security surface deferred for dedicated security-review pass."
+  },
+  {
+    "path": "apps/server/src/services/mcp-face.ts",
+    "name": "grantedToolNames",
+    "reason": "Security surface deferred for dedicated security-review pass."
+  },
+  {
+    "path": "apps/web/src/api/antigravity-subscriptions.ts",
+    "name": "hasUsableAntigravitySubscription",
+    "reason": "Owned by an active parallel lane."
+  },
+  {
+    "path": "apps/web/src/components/model-select-core.tsx",
+    "name": "modelEchoLabel",
+    "reason": "Owned by an active parallel lane."
+  },
+  {
+    "path": "apps/web/src/components/model-select-core.tsx",
+    "name": "providerEchoLabel",
+    "reason": "Owned by an active parallel lane."
+  },
+  {
+    "path": "packages/shared/src/experience-candidate.ts",
+    "name": "PROMOTION_MIN_BUILDS",
+    "reason": "Retained pending owner decision on retiring experience-candidate module."
+  },
+  {
+    "path": "packages/shared/src/experience-candidate.ts",
+    "name": "experienceProposalSchema",
+    "reason": "Retained pending owner decision on retiring experience-candidate module."
+  }
+]

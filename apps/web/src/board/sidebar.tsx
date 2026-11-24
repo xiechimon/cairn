@@ -25,7 +25,6 @@ import {
 } from 'react';
 import { Link, type NavigateFunction, type To, useLocation, useNavigate } from 'react-router';
 import { useRemoteRoutes } from '../api/hooks.js';
-import { useLiveData } from '../api/provider.js';
 import { CoordinatorGlyph } from '../chief/chief-status-mark.js';
 import { ChiefMemoryDialog } from '../chief/memory-dialog.js';
 import { BrandGlyph } from '../components/brand-glyph.js';
@@ -373,8 +372,7 @@ export function BoardSidebar({
   const groupNames = useMemo(() => activeLayout.groups.map((group) => group.name), [activeLayout]);
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
-  const { live } = useLiveData();
-  const routesQ = useRemoteRoutes(live);
+  const routesQ = useRemoteRoutes(false);
   const relayAccount = routesQ.data?.tunnel?.account ?? null;
   const archivedPage = filter === 'archived';
   const archivedRows = useMemo(
