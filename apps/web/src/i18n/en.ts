@@ -2925,4 +2925,6 @@ export const EN: Record<string, string> = {
   已停止自动重试: 'Automatic retries stopped',
   '请查看原始错误后点击立即重试，或在下方回复说明修改方式。':
     'Inspect the raw error and click Retry now, or reply below with instructions.',
+  '暂时无法加载 GitHub 仓库列表，请稍后重试。':
+    'Could not load your GitHub repositories. Try again later.',
 };

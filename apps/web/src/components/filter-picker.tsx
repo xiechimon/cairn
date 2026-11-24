@@ -88,6 +88,15 @@ export function FilterPicker({
   label,
   placeholder,
   noun,
+  open,
+  onOpenChange,
+  alwaysFilter = false,
+  filterLabel,
+  emptyText,
+  loading = false,
+  header,
+  footer,
+  popupTestId,
   trigger,
   triggerClassName,
   triggerContent,
@@ -104,6 +113,15 @@ export function FilterPicker({
   label: string;
   placeholder: string;
   noun: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  alwaysFilter?: boolean;
+  filterLabel?: string;
+  emptyText?: string;
+  loading?: boolean;
+  header?: ReactNode;
+  footer?: ReactNode;
+  popupTestId?: string;
   trigger?: ReactElement;
   triggerClassName?: string;
   triggerContent?: ReactNode;
@@ -116,12 +134,15 @@ export function FilterPicker({
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState('');
-  const filterable = options.length > FILTER_THRESHOLD;
+  const filterable = alwaysFilter || options.length > FILTER_THRESHOLD;
   const typed = query.trim();
   const groups = grouped(options);
   const shown = typed === '' ? groups : grouped(options.filter((o) => matchesQuery(o, typed)));
   const count = shown.reduce((sum, group) => sum + group.items.length, 0);
   const picked = options.find((option) => option.value === value) ?? null;
+  const hasEmptyCopy =
+    !loading && (typed !== '' || (options.length === 0 && emptyText !== undefined));
+  const hasBody = count > 0 || hasEmptyCopy;
   return (
     <Combobox.Root<PickOption>
       items={groups}
@@ -130,17 +151,19 @@ export function FilterPicker({
       value={picked}
       disabled={disabled}
       autoHighlight
+      {...(open === undefined ? {} : { open })}
       itemToStringLabel={(option) => option.label}
       isItemEqualToValue={(a, b) => a.value === b.value}
       inputValue={query}
       onInputValueChange={(next) => setQuery(filterable ? next : '')}
-      onOpenChange={(open, details) => {
-        if (!open && details.reason === 'escape-key' && query !== '') {
+      onOpenChange={(nextOpen, details) => {
+        if (!nextOpen && details.reason === 'escape-key' && query !== '') {
           details.cancel();
           setQuery('');
           return;
         }
-        if (!open) setQuery('');
+        if (!nextOpen) setQuery('');
+        onOpenChange?.(nextOpen);
       }}
       onValueChange={(next) => {
         if (next !== null && next.value !== value) onPick(next.value);
@@ -194,41 +217,48 @@ export function FilterPicker({
         >
           <Combobox.Popup
             data-slot="select-content"
+            data-testid={popupTestId}
             aria-label={label}
             className={cn(
               'flex max-h-(--available-height) w-80 min-w-(--anchor-width) flex-col max-sm:w-89 bg-popover text-popover-foreground outline-none',
               popupClassName,
             )}
           >
+            {header !== undefined && (
+              <div className="-mx-1 -mt-1 flex flex-none items-center justify-between gap-2 border-b border-border px-3 py-2 text-caption text-content-tertiary">
+                {header}
+              </div>
+            )}
             <div
               data-slot="picker-filter"
               className={
-                filterable && typed !== ''
-                  ? FIELD_SHOWN
+                alwaysFilter || (filterable && typed !== '')
+                  ? cn(FIELD_SHOWN, header !== undefined && 'mt-0', !hasBody && 'mb-0')
                   : cn(
                       'sr-only',
                       filterable && 'pointer-coarse:not-sr-only',
                       filterable && COARSE_SHOWN,
+                      header !== undefined && 'pointer-coarse:mt-0',
                     )
               }
             >
               <SearchIcon aria-hidden className="size-4 flex-none" />
               <Combobox.Input
                 placeholder={placeholder}
-                aria-label={t('筛选{noun}', { noun })}
+                aria-label={filterLabel ?? t('筛选{noun}', { noun })}
                 readOnly={!filterable}
                 className="h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-ui text-foreground outline-hidden placeholder:text-content-tertiary"
               />
-              {filterable && (
+              {filterable && !loading && (
                 <span className="flex-none text-caption text-content-tertiary">
                   {t('{count} 个{noun}', { count: typed === '' ? options.length : count, noun })}
                 </span>
               )}
             </div>
             <Combobox.Empty>
-              {typed !== '' && (
+              {hasEmptyCopy && (
                 <p className="m-0 px-3 py-5 text-center text-meta text-content-tertiary">
-                  {t('没有匹配「{query}」的{noun}', { query: typed, noun })}
+                  {emptyText ?? t('没有匹配「{query}」的{noun}', { query: typed, noun })}
                 </p>
               )}
             </Combobox.Empty>
@@ -277,27 +307,39 @@ export function FilterPicker({
                 </Combobox.Group>
               )}
             </Combobox.List>
-            {filterable && (
-              <div className="-mx-1 -mb-1 mt-1 flex h-9 flex-none items-center justify-between gap-2 border-t border-border px-3 text-caption text-content-tertiary pointer-coarse:hidden">
-                {typed === '' ? (
-                  <>
-                    <span>{t('输入可筛选')}</span>
-                    <span>{t('{count} 个{noun}', { count: options.length, noun })}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex items-center gap-2">
-                      {count > 0 && (
-                        <>
-                          <span>{t('↑↓ 选择')}</span>
-                          <span>{t('↵ 确认')}</span>
-                        </>
-                      )}
-                    </span>
-                    <span>{t('Esc 清空')}</span>
-                  </>
+            {footer !== undefined ? (
+              <div
+                className={cn(
+                  '-mx-1 -mb-1 flex flex-none flex-col gap-1 px-3 py-2 text-caption text-content-tertiary',
+                  hasBody && 'mt-1 border-t border-border',
                 )}
+              >
+                {footer}
               </div>
+            ) : (
+              filterable &&
+              (!alwaysFilter || typed !== '') && (
+                <div className="-mx-1 -mb-1 mt-1 flex h-9 flex-none items-center justify-between gap-2 border-t border-border px-3 text-caption text-content-tertiary pointer-coarse:hidden">
+                  {typed === '' ? (
+                    <>
+                      <span>{t('输入可筛选')}</span>
+                      <span>{t('{count} 个{noun}', { count: options.length, noun })}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-2">
+                        {count > 0 && (
+                          <>
+                            <span>{t('↑↓ 选择')}</span>
+                            <span>{t('↵ 确认')}</span>
+                          </>
+                        )}
+                      </span>
+                      <span>{t('Esc 清空')}</span>
+                    </>
+                  )}
+                </div>
+              )
             )}
           </Combobox.Popup>
         </Combobox.Positioner>
