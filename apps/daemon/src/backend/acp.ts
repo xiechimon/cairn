@@ -43,7 +43,6 @@ import {
   CLAUDE_TODO_STATUS_STATES,
 } from '@cairn/shared';
 import { writeJsonObject } from '../agent-config.js';
-import { stepCredentialStateDirs } from '../step-app-credential.js';
 import { DAEMON_VERSION } from '../version.js';
 import {
   type AcpToolCall,
@@ -707,9 +706,7 @@ class AcpBackend implements AgentBackend {
               : [...(this.options.executableArgs ?? ['--acp'])],
       };
       const confined =
-        this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch, {
-          readable: stepCredentialStateDirs(opts.env),
-        }) ?? launch;
+        this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch) ?? launch;
       const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
       const geminiHome = sessionEnv.GEMINI_CLI_HOME;
       if (!adapter && opts.compactAt !== undefined && geminiHome !== undefined) {

@@ -16,19 +16,25 @@ import { assembleStepEnv, type StepEnvInput } from '../src/step-env.js';
 import { runWorkspaceHook } from '../src/workspace-hooks.js';
 import { testTempDir } from './test-temp-dir.js';
 
-const DAEMON_CREDENTIALS = {
+const CAIRN_INTERNAL_ENV = {
+  CAIRN_TOKEN: 'daemon-token',
+  CAIRN_API_KEY: 'daemon-api-key',
+  CAIRN_MACHINE_TOKEN: 'host-machine-token',
+  CAIRN_GIT_CRED_PASSWORD: 'host-git-password',
+  CAIRN_OTEL_ENDPOINT: 'http://collector',
+  OTEL_EXPORTER_OTLP_HEADERS: 'auth=x',
+};
+
+const HOST_USER_ENV = {
   GH_TOKEN: 'host-gh-token',
   GITHUB_TOKEN: 'host-github-token',
+  GH_CONFIG_DIR: '/Users/dev/.config/gh',
   ANTHROPIC_API_KEY: 'host-anthropic-key',
-  ANTHROPIC_AUTH_TOKEN: 'host-anthropic-bearer',
-  CAIRN_GIT_CRED_PASSWORD: 'host-git-password',
   AWS_SECRET_ACCESS_KEY: 'host-aws-secret',
   OPENAI_API_KEY: 'host-openai-key',
-  CAIRN_MACHINE_TOKEN: 'host-machine-token',
   GIT_CONFIG_COUNT: '1',
   GIT_CONFIG_KEY_0: 'credential.helper',
-  GIT_CONFIG_VALUE_0: 'host-helper',
-  NODE_OPTIONS: '--require /host/inject.js',
+  GIT_CONFIG_VALUE_0: 'osxkeychain',
 };
 
 const PARENT = {
@@ -39,8 +45,10 @@ const PARENT = {
   TMPDIR: '/tmp/daemon',
   LC_ALL: 'en_US.UTF-8',
   SSH_AUTH_SOCK: '/tmp/ssh.sock',
+  SSH_AGENT_PID: '1234',
   HTTP_PROXY: 'http://proxy:3128',
-  ...DAEMON_CREDENTIALS,
+  ...CAIRN_INTERNAL_ENV,
+  ...HOST_USER_ENV,
 };
 
 afterEach(() => vi.unstubAllEnvs());
@@ -60,19 +68,21 @@ function envOutput(env: Record<string, string>): Record<string, string> {
 }
 
 describe('childEnv', () => {
-  test('keeps only allowlisted parent keys plus explicit extras', () => {
+  test('inherits host env including git/gh credentials while stripping Cairn internal keys', () => {
     const env = childEnv({ STEP_VALUE: 'step', PATH: '/step/bin' }, PARENT);
-    for (const key of Object.keys(DAEMON_CREDENTIALS)) expect(env[key]).toBeUndefined();
+    for (const key of Object.keys(CAIRN_INTERNAL_ENV)) expect(env[key]).toBeUndefined();
+    for (const [key, value] of Object.entries(HOST_USER_ENV)) expect(env[key]).toBe(value);
     expect(env.STEP_VALUE).toBe('step');
     expect(env.PATH).toBe('/step/bin');
     expect(env.HOME).toBe('/home/daemon');
     expect(env.LANG).toBe('en_US.UTF-8');
     expect(env.LC_ALL).toBe('en_US.UTF-8');
     expect(env.SSH_AUTH_SOCK).toBe('/tmp/ssh.sock');
+    expect(env.SSH_AGENT_PID).toBe('1234');
     expect(env.HTTP_PROXY).toBe('http://proxy:3128');
   });
 
-  test('an undefined extra removes an allowlisted key', () => {
+  test('an undefined extra removes an inherited key', () => {
     expect(childEnv({ HOME: undefined }, PARENT).HOME).toBeUndefined();
   });
 
@@ -119,15 +129,20 @@ describe('childEnv', () => {
 });
 
 describe('runtimeChildEnv', () => {
-  test('task children see no daemon credentials but the session env and runtime basics', () => {
+  test('task children inherit host git/gh/ssh env while Cairn internal and OTel keys stay stripped', () => {
     const env = runtimeChildEnv(
       { TMPDIR: '/step/tmp', FOO: 'step', CLAUDE_CONFIG_DIR: '/cairn/home' },
       PARENT,
     );
-    for (const key of Object.keys(DAEMON_CREDENTIALS)) expect(env[key]).toBeUndefined();
+    for (const key of Object.keys(CAIRN_INTERNAL_ENV)) expect(env[key]).toBeUndefined();
     expect(env).toMatchObject({
       PATH: PARENT.PATH,
       HOME: PARENT.HOME,
+      GH_TOKEN: PARENT.GH_TOKEN,
+      GITHUB_TOKEN: PARENT.GITHUB_TOKEN,
+      GH_CONFIG_DIR: PARENT.GH_CONFIG_DIR,
+      SSH_AUTH_SOCK: PARENT.SSH_AUTH_SOCK,
+      SSH_AGENT_PID: PARENT.SSH_AGENT_PID,
       TMPDIR: '/step/tmp',
       FOO: 'step',
       CLAUDE_CONFIG_DIR: '/cairn/home',
@@ -135,11 +150,13 @@ describe('runtimeChildEnv', () => {
     });
   });
 
-  test('an env spawned through runtimeChildEnv contains no daemon credential', () => {
+  test('an env spawned through runtimeChildEnv preserves host GH_TOKEN and drops Cairn internal tokens', () => {
     const seen = envOutput(
-      runtimeChildEnv({ TMPDIR: '/step/tmp' }, { ...PARENT, GH_TOKEN: 'daemon-token' }),
+      runtimeChildEnv({ TMPDIR: '/step/tmp' }, { ...PARENT, GH_TOKEN: 'host-gh-token' }),
     );
-    for (const key of Object.keys(DAEMON_CREDENTIALS)) expect(seen[key]).toBeUndefined();
+    for (const key of Object.keys(CAIRN_INTERNAL_ENV)) expect(seen[key]).toBeUndefined();
+    expect(seen.GH_TOKEN).toBe('host-gh-token');
+    expect(seen.SSH_AUTH_SOCK).toBe(PARENT.SSH_AUTH_SOCK);
     expect(seen.PATH).toBe(PARENT.PATH);
     expect(seen.HOME).toBe(PARENT.HOME);
   });
@@ -153,32 +170,16 @@ describe('runtimeChildEnv', () => {
     expect(env.CAIRN_OTEL_ENDPOINT).toBeUndefined();
     expect(env.OTEL_SDK_DISABLED).toBe('true');
   });
-
-  test('session children never inherit the owner SSH agent pointer', () => {
-    const env = runtimeChildEnv({ TMPDIR: '/step/tmp' }, PARENT);
-    expect(env.SSH_AUTH_SOCK).toBe('');
-    expect(env.SSH_AGENT_PID).toBe('');
-  });
-
-  test('an App credential file still hides token variables inside the session env', () => {
-    const env = runtimeChildEnv(
-      { CAIRN_GIT_CRED_FILE: '/private/token', GH_TOKEN: 'inherited', GITHUB_TOKEN: 'x' },
-      PARENT,
-    );
-    expect(env.CAIRN_GIT_CRED_FILE).toBe('/private/token');
-    expect(env.GH_TOKEN).toBeUndefined();
-    expect(env.GITHUB_TOKEN).toBeUndefined();
-  });
 });
 
 describe('pi task shell', () => {
-  test('bash children keep session metadata and the step env but no daemon credentials', () => {
+  test('bash children keep session metadata and host git/gh env while dropping Cairn internal keys', () => {
     const env = piBashEnv(
       { ...PARENT, PI_SESSION_ID: 'sess-1', PI_MODEL: 'synthetic', PI_TELEMETRY: '0' },
       { TMPDIR: '/step/tmp', CLAUDE_CONFIG_DIR: '/cairn/home' },
       '/cairn/agent',
     );
-    for (const key of Object.keys(DAEMON_CREDENTIALS)) expect(env[key]).toBeUndefined();
+    for (const key of Object.keys(CAIRN_INTERNAL_ENV)) expect(env[key]).toBeUndefined();
     expect(env.PI_SESSION_ID).toBe('sess-1');
     expect(env.PI_MODEL).toBe('synthetic');
     expect(env.PI_TELEMETRY).toBeUndefined();
@@ -192,25 +193,32 @@ describe('step env per step kind', () => {
   const git: BoundGitCredentials = {
     username: 'x-access-token',
     password: 'step-password',
-    url: 'https://github.com/acme/widgets.git',
+    url: 'http://127.0.0.1:3000/git/acme/widgets.git',
   };
   const base: StepEnvInput = {
     inherited: { KEEP: '1' },
     temporary: { TMPDIR: '/step/tmp' },
     git,
-    appCredential: null,
     readonlyGit: false,
     runtimeId: null,
     agentConfig: { cairnHome: '/cairn-home' },
     claudeSubscriptionToken: undefined,
   };
 
-  test('a build step keeps the push credential it needs', () => {
+  test('a hosted repo build step injects git credentials without overriding GH_TOKEN', () => {
     const { env } = assembleStepEnv({ ...base, readonlyGit: false });
-    expect(env.GH_TOKEN).toBe('step-password');
-    expect(env.GITHUB_TOKEN).toBe('step-password');
+    expect(env.GH_TOKEN).toBeUndefined();
+    expect(env.GITHUB_TOKEN).toBeUndefined();
     expect(env.CAIRN_GIT_CRED_PASSWORD).toBe('step-password');
     expect(Number(env.GIT_CONFIG_COUNT)).toBeGreaterThan(0);
+  });
+
+  test('an external repo build step injects no git or gh credential override', () => {
+    const { env } = assembleStepEnv({ ...base, git: null, readonlyGit: false });
+    expect(env.GH_TOKEN).toBeUndefined();
+    expect(env.GITHUB_TOKEN).toBeUndefined();
+    expect(env.CAIRN_GIT_CRED_PASSWORD).toBeUndefined();
+    expect(env.GIT_CONFIG_COUNT).toBeUndefined();
   });
 
   test('a verify step gets no push credential, only the push denial', () => {
@@ -224,25 +232,12 @@ describe('step env per step kind', () => {
     expect(env.GIT_CONFIG_KEY_0).toBe('url.cairn-readonly-workspace-denied://.pushInsteadOf');
     expect(env.GIT_CONFIG_VALUE_0).toBe('');
   });
-
-  test('an App credential verify step gets no credential helper either', () => {
-    const { env } = assembleStepEnv({
-      ...base,
-      readonlyGit: true,
-      appCredential: {
-        env: () => ({ GH_CONFIG_DIR: '/step/gh', CAIRN_GIT_CRED_FILE: '/step/token' }),
-      },
-    });
-    expect(env.GH_CONFIG_DIR).toBeUndefined();
-    expect(env.CAIRN_GIT_CRED_FILE).toBeUndefined();
-    expect(env.GH_TOKEN).toBeUndefined();
-  });
 });
 
 describe('MCP subprocesses', () => {
-  test('a stdio MCP server gets the allowlist env and cannot inherit daemon credentials', () => {
-    vi.stubEnv('GH_TOKEN', 'daemon-token');
-    vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-key');
+  test('a stdio MCP server inherits host env minus Cairn internal keys', () => {
+    vi.stubEnv('GH_TOKEN', 'host-gh-token');
+    vi.stubEnv('CAIRN_TOKEN', 'daemon-secret');
     const transport = redactingMcpTransports((value) => value)(
       {
         name: 'probe',
@@ -260,17 +255,17 @@ describe('MCP subprocesses', () => {
     if (!(transport instanceof StdioTransport)) throw new Error('expected a stdio transport');
     expect(transport.options.inheritEnv).toBe(false);
     expect(transport.options.env?.MCP_SERVER_KEY).toBe('declared');
-    expect(transport.options.env?.GH_TOKEN).toBeUndefined();
-    expect(transport.options.env?.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(transport.options.env?.GH_TOKEN).toBe('host-gh-token');
+    expect(transport.options.env?.CAIRN_TOKEN).toBeUndefined();
     expect(transport.options.env?.PATH).toBe(process.env.PATH);
     expect(transport.options.env?.HOME).toBe(process.env.HOME);
   });
 });
 
 describe('spawn sites', () => {
-  test('a workspace hook receives the allowlist env plus explicit git credentials', async () => {
-    vi.stubEnv('GH_TOKEN', 'daemon-token');
-    vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-key');
+  test('a workspace hook inherits host git/gh credentials and explicit hosted credentials', async () => {
+    vi.stubEnv('GH_TOKEN', 'host-gh-token');
+    vi.stubEnv('CAIRN_TOKEN', 'daemon-secret');
     const root = testTempDir('cairn-hook-env-');
     const script = join(root, '.agents');
     mkdirSync(script, { recursive: true });
@@ -282,22 +277,23 @@ describe('spawn sites', () => {
       credentials: {
         username: 'x-access-token',
         password: 'step-password',
-        url: 'https://github.com/acme/widgets.git',
+        url: 'http://127.0.0.1:3000/git/acme/widgets.git',
       },
       timeoutMs: 15_000,
       log: () => {},
     });
     const seen = envOutputFromText(note?.output ?? '');
-    expect(seen.GH_TOKEN).toBeUndefined();
-    expect(seen.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(seen.GH_TOKEN).toBe('host-gh-token');
+    expect(seen.CAIRN_TOKEN).toBeUndefined();
     expect(seen.CAIRN_GIT_CRED_PASSWORD).toBe('step-password');
     expect(seen.GIT_CONFIG_COUNT).toBe('2');
     expect(seen.PATH).toBe(process.env.PATH);
     expect(seen.HOME).toBe(process.env.HOME);
   });
 
-  test('a host orb exec child receives the allowlist env and explicit options only', async () => {
-    vi.stubEnv('GH_TOKEN', 'daemon-token');
+  test('a host orb exec child inherits host env minus Cairn internal tokens', async () => {
+    vi.stubEnv('GH_TOKEN', 'host-gh-token');
+    vi.stubEnv('CAIRN_TOKEN', 'daemon-secret');
     const captured: NodeJS.ProcessEnv[] = [];
     const host = new HostOrbProvider(async (_argv, options) => {
       captured.push(options?.env ?? {});
@@ -305,14 +301,15 @@ describe('spawn sites', () => {
     });
     const handle = await host.ensure({ conversationId: 'C', projectId: 'P' });
     await host.exec(handle, ['env'], { env: { STEP_ONLY: '1' } });
-    expect(captured[0]?.GH_TOKEN).toBeUndefined();
+    expect(captured[0]?.GH_TOKEN).toBe('host-gh-token');
+    expect(captured[0]?.CAIRN_TOKEN).toBeUndefined();
     expect(captured[0]?.STEP_ONLY).toBe('1');
     expect(captured[0]?.PATH).toBe(process.env.PATH);
   });
 
-  test('an ACP child receives the session env and allowlist basics, not daemon credentials', async () => {
-    vi.stubEnv('GH_TOKEN', 'daemon-token');
-    vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-key');
+  test('an ACP child inherits host git/gh env while dropping Cairn internal tokens', async () => {
+    vi.stubEnv('GH_TOKEN', 'host-gh-token');
+    vi.stubEnv('CAIRN_TOKEN', 'daemon-secret');
     let captured: NodeJS.ProcessEnv | undefined;
     const agent = createGeminiBackend({
       executablePath: 'gemini',
@@ -330,17 +327,16 @@ describe('spawn sites', () => {
         env: { GEMINI_API_KEY: 'step-key' },
       }),
     ).rejects.toThrow('captured environment');
-    expect(captured?.GH_TOKEN).toBeUndefined();
-    expect(captured?.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(captured?.GH_TOKEN).toBe('host-gh-token');
+    expect(captured?.CAIRN_TOKEN).toBeUndefined();
     expect(captured?.GEMINI_API_KEY).toBe('step-key');
     expect(captured?.OTEL_SDK_DISABLED).toBe('true');
     expect(captured?.PATH).toBe(process.env.PATH);
   });
 
-  test('the Claude SDK env carries the session env and allowlist basics, not daemon credentials', () => {
-    vi.stubEnv('GH_TOKEN', 'daemon-token');
-    vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-key');
-    vi.stubEnv('ANTHROPIC_AUTH_TOKEN', 'daemon-bearer');
+  test('the Claude SDK env inherits host git/gh env while dropping Cairn internal tokens', () => {
+    vi.stubEnv('GH_TOKEN', 'host-gh-token');
+    vi.stubEnv('CAIRN_TOKEN', 'daemon-secret');
     const options = buildClaudeSdkOptions({
       cwd: '/tmp/ws',
       modelId: 'sonnet',
@@ -353,9 +349,8 @@ describe('spawn sites', () => {
       abortController: new AbortController(),
       env: { CLAUDE_CONFIG_DIR: '/cairn/home', FOO: 'step' },
     });
-    expect(options.env?.GH_TOKEN).toBeUndefined();
-    expect(options.env?.ANTHROPIC_API_KEY).toBeUndefined();
-    expect(options.env?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
+    expect(options.env?.GH_TOKEN).toBe('host-gh-token');
+    expect(options.env?.CAIRN_TOKEN).toBeUndefined();
     expect(options.env?.FOO).toBe('step');
     expect(options.env?.CLAUDE_CONFIG_DIR).toBe('/cairn/home');
     expect(options.env?.PATH).toBe(process.env.PATH);

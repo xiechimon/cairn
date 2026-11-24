@@ -30,8 +30,7 @@ export interface StepToolingInput {
   isReview: boolean;
   metered: boolean;
   creds: StepCredentials;
-  appCredential: { needsRefresh(): boolean } | null;
-  refreshGit: () => Promise<BoundGitCredentials>;
+  gitCredential: BoundGitCredentials | null;
   commitIdentity: CommitIdentity | null;
   repo: StepRepo | null;
   ws: PreparedWorkspace | null;
@@ -74,9 +73,7 @@ export async function prepareStepTooling(
   const stepIdentity =
     input.commitIdentity ?? localCommitIdentity(agent.displayName ?? 'cairn-agent');
   const withStepGit = stepGitRunner({
-    credential: creds.git,
-    appCredential: input.appCredential,
-    refresh: input.refreshGit,
+    credential: input.gitCredential,
     allowMachineFallback: input.repo?.kind === 'github',
     log: (line) => logger.step(line),
   });
@@ -96,7 +93,7 @@ export async function prepareStepTooling(
     createTag: {
       localTools: claimed.localTools,
       repoDir: input.ws?.cwd ?? null,
-      credential: creds.git,
+      credential: input.gitCredential,
       identity: stepIdentity,
       runGit: withStepGit,
       redact: input.redact,

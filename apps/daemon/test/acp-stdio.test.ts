@@ -286,7 +286,7 @@ describe('Gemini stdio execution', () => {
   });
 });
 
-test('ACP children remove inherited token variables when the step uses an App file', async () => {
+test('ACP children keep host git and GitHub token variables', async () => {
   let inherited: NodeJS.ProcessEnv | undefined;
   const agent = createGeminiBackend({
     executablePath: 'gemini',
@@ -299,14 +299,13 @@ test('ACP children remove inherited token variables when the step uses an App fi
     agent.createSession({
       ...opts,
       env: {
-        CAIRN_GIT_CRED_FILE: '/private/token',
         GH_TOKEN: 'inherited',
         GITHUB_TOKEN: 'inherited',
       },
     }),
   ).rejects.toThrow('captured environment');
-  expect(inherited?.GH_TOKEN).toBeUndefined();
-  expect(inherited?.GITHUB_TOKEN).toBeUndefined();
+  expect(inherited?.GH_TOKEN).toBe('inherited');
+  expect(inherited?.GITHUB_TOKEN).toBe('inherited');
 });
 
 test.each(['new', 'load', 'resume'])(

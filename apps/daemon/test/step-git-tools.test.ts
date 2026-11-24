@@ -9,31 +9,11 @@ describe('stepGitRunner', () => {
     const seen: Array<BoundGitCredentials | null> = [];
     const run = stepGitRunner({
       credential: null,
-      appCredential: null,
-      refresh: async () => {
-        throw new Error('no refresh');
-      },
       allowMachineFallback: true,
       log: () => {},
     });
     expect(await run(async (credential) => void seen.push(credential))).toBe('machine');
     expect(seen).toEqual([null]);
-  });
-
-  it('refreshes an app credential that is due before running', async () => {
-    let refreshes = 0;
-    const run = stepGitRunner({
-      credential: null,
-      appCredential: { needsRefresh: () => true },
-      refresh: async () => {
-        refreshes += 1;
-        return { kind: 'app', username: 'x', password: 'p', url: 'https://example.invalid/r' };
-      },
-      allowMachineFallback: false,
-      log: () => {},
-    });
-    await run(async () => {});
-    expect(refreshes).toBe(1);
   });
 });
 

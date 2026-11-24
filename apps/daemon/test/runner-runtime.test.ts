@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -224,6 +224,42 @@ async function setup(
     opts.sessionFile,
   );
   const resolved: (string | null | undefined)[] = [];
+  const repoCwd = join(home, 'workspaces', claimed.conversationId);
+  const stubWorkspace =
+    claimed.project?.repo != null
+      ? {
+          async prepare() {
+            mkdirSync(repoCwd, { recursive: true });
+            return {
+              cwd: repoCwd,
+              baseRepoDir: repoCwd,
+              branch: `cairn/conv-${claimed.conversationId}`,
+              defaultBranch: 'main',
+              reused: false,
+            };
+          },
+          async commitAll() {
+            return { committed: false, head: 'abc', setupDrift: [] };
+          },
+          async push() {},
+          async mergeDefaultBranch() {
+            return { output: '' };
+          },
+          async headCommit() {
+            return 'abc';
+          },
+          async countAhead() {
+            return 0;
+          },
+          async commitsAhead() {
+            return [];
+          },
+          async cleanupOrphans() {
+            return [];
+          },
+          async restoreCheckpoint() {},
+        }
+      : undefined;
   const deps = {
     client,
     journal,
@@ -233,6 +269,7 @@ async function setup(
     },
     logger,
     paths,
+    ...(stubWorkspace !== undefined ? { workspace: stubWorkspace } : {}),
     workspacesDir: join(home, 'workspaces'),
     mcpConfigPath: join(home, 'claude.json'),
     heartbeatIntervalMs: 60_000,
@@ -252,12 +289,23 @@ describe('runner runtime identity branch (spec 17 A3/A4)', () => {
       expected: 'Connected owner <owner@example.com>',
     },
   ])(
-    'a $provider session can commit with an empty HOME using $expected without writing global config',
+    'a hosted-repo $provider session can commit with an empty HOME using $expected without writing global config',
     async ({ provider, identity, expected }) => {
-      const { sessions } = await setup(claimedStep({ provider, modelId: 'stub-model' }), {
-        commitIdentity: identity,
-        runEnv: { GIT_AUTHOR_NAME: 'Inherited', GIT_AUTHOR_EMAIL: 'wrong@example.com' },
-      });
+      const baseStep = claimedStep({ provider, modelId: 'stub-model' });
+      const { sessions } = await setup(
+        {
+          ...baseStep,
+          project: {
+            id: 'p1',
+            name: 'demo',
+            repo: { kind: 'hosted', cloneUrl: 'http://server/git/t/r', baseBranch: 'main' },
+          },
+        },
+        {
+          commitIdentity: identity,
+          runEnv: { GIT_AUTHOR_NAME: 'Inherited', GIT_AUTHOR_EMAIL: 'wrong@example.com' },
+        },
+      );
       const dir = testTempDir('runner-commit-');
       const env = {
         PATH: process.env.PATH,
@@ -285,6 +333,15 @@ describe('runner runtime identity branch (spec 17 A3/A4)', () => {
       ).not.toMatch(/^user\./m);
     },
   );
+
+  test('an external-repo session preserves host git identity instead of injecting commitEnv', async () => {
+    const { sessions } = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {
+      commitIdentity: { name: 'Connected owner', email: 'owner@example.com' },
+      runEnv: { GIT_AUTHOR_NAME: 'Host User', GIT_AUTHOR_EMAIL: 'host@example.com' },
+    });
+    expect(sessions[0]?.env?.GIT_AUTHOR_NAME).toBe('Host User');
+    expect(sessions[0]?.env?.GIT_AUTHOR_EMAIL).toBe('host@example.com');
+  });
 
   test('failure mode 1: runtime step + token provider null → executed by the claude backend + inert provider + canon line', async () => {
     const { client, lines, sessions, resolved } = await setup(
@@ -534,7 +591,7 @@ describe('subscription credential isolation', () => {
       subscriptionToken: token,
     });
     expect(claude.sessions[0]?.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
-    expect(claude.sessions[0]?.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
+    expect(claude.sessions[0]?.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBeUndefined();
     const pi = await setup(claimedStep({ provider: 'stub-gw', modelId: 'stub-model' }), {
       subscriptionToken: token,
     });

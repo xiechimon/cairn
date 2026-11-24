@@ -344,7 +344,6 @@ describe('antigravity ACP runtime and credentials', () => {
       {
         inherited: { GEMINI_API_KEY: 'stale-key' },
         git: null,
-        appCredential: null,
         readonlyGit: false,
         runtimeId: 'antigravity',
         agentConfig: { cairnHome, realHome: cairnHome },
@@ -367,7 +366,6 @@ describe('antigravity ACP runtime and credentials', () => {
       {
         inherited: { GEMINI_API_KEY: 'stale-key' },
         git: null,
-        appCredential: null,
         readonlyGit: false,
         runtimeId: 'antigravity',
         agentConfig: { cairnHome, realHome: cairnHome },

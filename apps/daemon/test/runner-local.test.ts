@@ -370,7 +370,7 @@ describe('runner repo shape wiring (spec 12 G2-T2)', () => {
     expect(client.doneBodies[0]!.body.status).toBe('success');
   }, 30_000);
 
-  test('failure mode 3: github merge step → worktree (https clone) + push consumes per-step credentials', {
+  test('failure mode 3: github merge step → worktree (https clone) uses host git credentials instead of per-step App token', {
     timeout: 20_000,
   }, async () => {
     const { client, calls, pushes } = await setup(
@@ -378,7 +378,7 @@ describe('runner repo shape wiring (spec 12 G2-T2)', () => {
       { git: GITHUB_TOKEN },
     );
     expect(calls).toContain('prepare:https://github.com/o/r.git');
-    expect(pushes[0]!.cred).toEqual({ ...GITHUB_TOKEN, url: 'https://github.com/o/r.git' });
+    expect(pushes[0]!.cred).toBeNull();
     expect(probeMock).toHaveBeenCalledWith(
       expect.objectContaining({
         owner: 'o',
@@ -387,6 +387,18 @@ describe('runner repo shape wiring (spec 12 G2-T2)', () => {
         token: GITHUB_TOKEN.password,
       }),
     );
+    expect(client.doneBodies[0]!.body.status).toBe('success');
+  });
+
+  test('failure mode 3b: hosted repo merge step still consumes per-step push credentials', {
+    timeout: 20_000,
+  }, async () => {
+    const { client, calls, pushes } = await setup(
+      claimedStep('merge', { kind: 'hosted', cloneUrl: 'http://server/git/t/r.git' }),
+      { git: GITHUB_TOKEN },
+    );
+    expect(calls).toContain('prepare:http://server/git/t/r.git');
+    expect(pushes[0]!.cred).toEqual({ ...GITHUB_TOKEN, url: 'http://server/git/t/r.git' });
     expect(client.doneBodies[0]!.body.status).toBe('success');
   });
 

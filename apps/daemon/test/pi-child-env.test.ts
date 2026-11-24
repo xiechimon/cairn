@@ -84,15 +84,14 @@ test.each([undefined, { ...exporterEnv, FOO: 'step-value' }])(
       for (const key of Object.keys(exporterEnv)) {
         if (key !== 'OTEL_SDK_DISABLED') expect(child).not.toHaveProperty(key);
       }
-      for (const key of ['GH_TOKEN', 'GITHUB_TOKEN', 'ANTHROPIC_API_KEY']) {
-        expect(child).not.toHaveProperty(key);
-      }
+      expect(child.GH_TOKEN).toBe('daemon-gh-token');
+      expect(child.GITHUB_TOKEN).toBe('daemon-github-token');
       expect(child.OTEL_SDK_DISABLED).toBe('true');
       expect(child).toMatchObject({
         PATH: `${join(directory, 'agent', 'bin')}${delimiter}${path}`,
         HOME: directory,
       });
-      expect(child.FOO).toBe(env?.FOO);
+      expect(child.FOO).toBe(env?.FOO ?? 'daemon-value');
       for (const key of Object.keys(exporterEnv)) expect(process.env[key]).toBe(before[key]);
       expect(daemonOtelFromEnv(process.env)?.contextFor('build', 'step').environment).toBe(
         'production',
@@ -103,20 +102,19 @@ test.each([undefined, { ...exporterEnv, FOO: 'step-value' }])(
   },
 );
 
-test('the pi host child keeps operator pins but no daemon credentials', () => {
+test('the pi host child keeps operator pins and host git/ssh env while dropping Cairn tokens', () => {
   vi.stubEnv('CAIRN_PI_CACHE_RETENTION', 'long');
   vi.stubEnv('CAIRN_CUSTOM_MODEL_REASONING', '1');
   vi.stubEnv('GH_TOKEN', 'daemon-gh-token');
-  vi.stubEnv('ANTHROPIC_API_KEY', 'daemon-anthropic-key');
+  vi.stubEnv('CAIRN_TOKEN', 'cairn-secret');
   vi.stubEnv('SSH_AUTH_SOCK', '/tmp/owner-agent.sock');
   const env = piHostEnv();
   expect(env.CAIRN_PI_CACHE_RETENTION).toBe('long');
   expect(env.CAIRN_CUSTOM_MODEL_REASONING).toBe('1');
   expect(resolvePiCacheRetention(env)).toBe('long');
-  expect(env).not.toHaveProperty('GH_TOKEN');
-  expect(env).not.toHaveProperty('ANTHROPIC_API_KEY');
-  expect(env.SSH_AUTH_SOCK).toBe('');
-  expect(env.SSH_AGENT_PID).toBe('');
+  expect(env.GH_TOKEN).toBe('daemon-gh-token');
+  expect(env).not.toHaveProperty('CAIRN_TOKEN');
+  expect(env.SSH_AUTH_SOCK).toBe('/tmp/owner-agent.sock');
 });
 
 test('the embedded pi keeps its agent dir and pins out of task commands', async () => {

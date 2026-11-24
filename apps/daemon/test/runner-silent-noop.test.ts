@@ -20,7 +20,6 @@ import type { DaemonLogger } from '../src/log.js';
 import type { MachineApi } from '../src/machine-client.js';
 import { runStep } from '../src/runner.js';
 import { statePaths } from '../src/state.js';
-import { StepAppCredential } from '../src/step-app-credential.js';
 import { StepStops } from '../src/step-stops.js';
 import { testTempDir } from './test-temp-dir.js';
 
@@ -308,11 +307,8 @@ test('cleanup failures do not skip credentials, heartbeat, maps or stop settleme
   const stepSteeringSupport = new Map<string, boolean>();
   const stepTranscripts = new Map<string, TranscriptBuffer>();
   const temporaryFailure = new Error('temporary cleanup EACCES');
-  const credentialFailure = new Error('credential cleanup EACCES');
   const mapFailure = new Error('session cleanup failure');
   const createTemporary = tempEnvironment.createTempEnvironment;
-  const pushCredential = credentials.pushCredential;
-  const dispose = StepAppCredential.prototype.dispose;
   vi.spyOn(tempEnvironment, 'createTempEnvironment').mockImplementation((env) => {
     const temporary = createTemporary(env);
     return {
@@ -327,22 +323,7 @@ test('cleanup failures do not skip credentials, heartbeat, maps or stop settleme
       },
     };
   });
-  vi.spyOn(credentials, 'pushCredential').mockImplementation((...args) => ({
-    ...pushCredential(...args),
-    git: {
-      kind: 'app',
-      username: 'test',
-      password: 'synthetic',
-      url: 'https://example.invalid/repo',
-    },
-  }));
   const clear = vi.spyOn(credentials, 'clearCredentials');
-  const disposal = vi.spyOn(StepAppCredential.prototype, 'dispose').mockImplementation(function (
-    this: StepAppCredential,
-  ) {
-    dispose.call(this);
-    throw credentialFailure;
-  });
   const intervals = vi.spyOn(globalThis, 'setInterval');
   const clearTimer = vi.spyOn(globalThis, 'clearInterval');
   try {
@@ -365,23 +346,15 @@ test('cleanup failures do not skip credentials, heartbeat, maps or stop settleme
       claimedStep(),
       { env: { CAIRN_TEST_TEMP_ROOT: home } },
     ).catch((error: unknown) => error);
-    expect(disposal).toHaveBeenCalledOnce();
-    expect(clear.mock.invocationCallOrder.at(-1)).toBeGreaterThan(
-      disposal.mock.invocationCallOrder[0]!,
-    );
+    expect(clear).toHaveBeenCalled();
     expect(clearTimer).toHaveBeenCalledWith(intervals.mock.results[0]!.value);
     for (const map of [sessionHandles, stepImageSupport, stepSteeringSupport, stepTranscripts])
       expect(map.has('step-noop1')).toBe(false);
     expect(stops.get('step-noop1')).toBeUndefined();
     expect(result).toBeInstanceOf(AggregateError);
-    for (const error of [temporaryFailure, credentialFailure, mapFailure])
+    for (const error of [temporaryFailure, mapFailure])
       expect((result as AggregateError).message).toContain(error.message);
-    expect((result as AggregateError).errors).toEqual([
-      temporaryFailure,
-      credentialFailure,
-      mapFailure,
-    ]);
-    expect(existsSync(join(paths.agentRuntimeDir, 'step-step-noop1-github'))).toBe(false);
+    expect((result as AggregateError).errors).toEqual([temporaryFailure, mapFailure]);
   } finally {
     vi.restoreAllMocks();
   }

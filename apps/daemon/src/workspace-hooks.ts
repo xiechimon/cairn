@@ -5,7 +5,6 @@ import { type BoundGitCredentials, missingSetupCommand } from '@cairn/shared';
 import type { Launch, SessionConfiner } from './backend/confine-session.js';
 import { childEnv } from './child-env.js';
 import { gitCredentialEnv } from './git.js';
-import { stepCredentialStateDirs } from './step-app-credential.js';
 
 export const HOOK_OUTPUT_CHAR_LIMIT = 100_000;
 
@@ -60,8 +59,6 @@ export async function runWorkspaceHook(
   const env: NodeJS.ProcessEnv = childEnv({
     ...(credentials !== null ? gitCredentialEnv(credentials) : {}),
     ...input.env,
-    SSH_AUTH_SOCK: '',
-    SSH_AGENT_PID: '',
   });
   const launch: Launch = input.confine?.(
     {
@@ -72,7 +69,6 @@ export async function runWorkspaceHook(
     },
     'hook',
     { command: path, args: [] },
-    { readable: stepCredentialStateDirs(env) },
   ) ?? { command: path, args: [] };
   const startedAt = Date.now();
   let kept = '';

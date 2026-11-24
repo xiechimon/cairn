@@ -45,7 +45,6 @@ export interface StepEnvInput {
   inherited: Record<string, string> | undefined;
   temporary: Record<string, string>;
   git: BoundGitCredentials | null;
-  appCredential: { env(): Record<string, string> } | null;
   readonlyGit: boolean;
   runtimeId: string | null;
   agentConfig: { cairnHome: string; realHome?: string };
@@ -66,31 +65,21 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
   const gitEnv: Record<string, string> =
     input.git === null || input.readonlyGit
       ? {}
-      : (input.appCredential?.env() ?? {
-          ...Object.fromEntries(
-            Object.entries(gitCredentialEnv(input.git)).filter(
-              (entry): entry is [string, string] => entry[1] !== undefined,
-            ),
+      : Object.fromEntries(
+          Object.entries(gitCredentialEnv(input.git)).filter(
+            (entry): entry is [string, string] => entry[1] !== undefined,
           ),
-          GH_TOKEN: input.git.password,
-          GITHUB_TOKEN: input.git.password,
-        });
+        );
   const env: Record<string, string> = {
     ...input.inherited,
     ...input.temporary,
     ...gitEnv,
     ...(input.readonlyGit ? READONLY_GIT_ENV : {}),
   };
-  if (input.appCredential !== null) {
-    delete env.GH_TOKEN;
-    delete env.GITHUB_TOKEN;
-    delete env.CAIRN_GIT_CRED_PASSWORD;
-  }
   delete env.CLAUDE_CODE_OAUTH_TOKEN;
   if (input.claudeCodeCoordinator === true) env.CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS = '100000';
   if (input.claudeSubscriptionToken !== undefined) {
     env.CLAUDE_CODE_OAUTH_TOKEN = input.claudeSubscriptionToken;
-    if (input.inherited?.CAIRN_ORB !== '1') env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB = '1';
   }
   delete env.WINDSURF_API_KEY;
   if (input.devinToken !== undefined) env.WINDSURF_API_KEY = input.devinToken;

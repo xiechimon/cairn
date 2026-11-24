@@ -14,29 +14,13 @@ export type StepGitRunner = (operation: GitOperation) => Promise<GitCredentialSo
 
 export function stepGitRunner(input: {
   credential: BoundGitCredentials | null;
-  appCredential: { needsRefresh(): boolean } | null;
-  refresh: () => Promise<BoundGitCredentials>;
   allowMachineFallback: boolean;
   log: (line: string) => void;
 }): StepGitRunner {
   return async (operation) => {
-    let refreshed = false;
-    const refresh = async () => {
-      if (refreshed) {
-        throw new Error(
-          input.credential?.kind === 'app'
-            ? 'App credential authentication failed after refresh'
-            : 'GitHub credential authentication failed after refresh',
-        );
-      }
-      refreshed = true;
-      return input.refresh();
-    };
-    if (input.appCredential?.needsRefresh()) await input.refresh();
     return withGitCredentialFallback(operation, input.credential, {
       what: 'push',
       allowMachineFallback: input.allowMachineFallback,
-      refresh,
       onFallback: (reason) =>
         input.log(
           `git push auth failed (per-step token), retrying with machine credentials: ${reason}`,

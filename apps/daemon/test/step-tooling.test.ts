@@ -43,10 +43,7 @@ function input(overrides: Partial<StepToolingInput> = {}) {
     isReview: false,
     metered: true,
     creds: { provider: null, secrets: EMPTY_SECRET_VAULT, git: null },
-    appCredential: null,
-    refreshGit: async () => {
-      throw new Error('no refresh');
-    },
+    gitCredential: null,
     commitIdentity: null,
     repo: null,
     ws: null,

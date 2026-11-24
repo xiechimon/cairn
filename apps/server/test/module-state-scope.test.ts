@@ -32,7 +32,7 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/backend/web-search.ts:spendQueues':
     'write serialization keyed on spend-file path; coordinates a filesystem resource',
   'apps/daemon/src/brief-file.ts:CONTEXT_FILENAMES': 'constant lookup table',
-  'apps/daemon/src/child-env.ts:CHILD_ENV_BASE': 'constant lookup table',
+  'apps/daemon/src/child-env.ts:STRIPPED_ENV_KEYS': 'constant lookup table',
   'apps/daemon/src/computer/browser.ts:SECRET_AUTOCOMPLETE': 'constant lookup table',
   'apps/daemon/src/computer/browser.ts:scopeTabUse':
     'tab accounting for the daemon-owned browser runtime; one browser per daemon process',

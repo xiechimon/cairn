@@ -29,7 +29,7 @@ import type { DaemonLogger } from './log.js';
 import { bindMachineClaim, type MachineApi, MachineApiError } from './machine-client.js';
 import { STEP_TREE_ENV, StepReaper } from './process-tree.js';
 import type { StatePaths } from './state.js';
-import { GitHubAppTokenUnavailableError, StepAppCredential } from './step-app-credential.js';
+import { GitHubAppTokenUnavailableError } from './step-app-credential.js';
 import { prepareStepEnv, READONLY_GIT_ENV } from './step-env.js';
 import { reportStepProvenance, stepSkillsCatalog } from './step-executor-record.js';
 import { finishStepRun } from './step-finish.js';
@@ -286,36 +286,6 @@ async function runClaimedStep(
     creds.git?.expiresAt ?? (creds.git?.kind === 'app' ? now() + 60 * 60_000 : Infinity),
   );
   const redact = <T>(value: T): T => credentials.redact(value);
-  const appCredential =
-    creds.git?.kind === 'app' && !attachmentVerify
-      ? new StepAppCredential(
-          join(deps.paths.credsDir, `step-${stepId}-github`),
-          creds.git,
-          async () => {
-            const fresh = (await fetchStepToken(true)).git;
-            if (fresh?.kind !== 'app' || creds.git === null)
-              throw new Error('App credential refresh unavailable');
-            return { ...fresh, url: creds.git.url };
-          },
-          (value, expiresAt) => credentials.remember(value, expiresAt),
-          now,
-          () => logger.step('App credential timer refresh failed; retrying next minute'),
-        )
-      : null;
-  if (appCredential !== null) stepCleanups.push(() => appCredential.dispose());
-  const refreshGit = async () => {
-    if (appCredential !== null) return appCredential.refresh();
-    if (creds.git === null) throw new Error('GitHub credential refresh unavailable');
-    const fresh = (await fetchStepToken(true)).git;
-    if (fresh?.password) {
-      credentials.remember(fresh.password, fresh.expiresAt);
-    }
-    if (fresh === null || fresh.kind === 'app' || creds.git === null) {
-      throw new Error('GitHub credential refresh unavailable');
-    }
-    Object.assign(creds.git, { ...fresh, url: creds.git.url });
-    return creds.git;
-  };
   client = guardCredentialOutputs(client, redact);
   journal = guardCredentialOutputs(journal, redact);
   logger = guardCredentialOutputs(logger, redact);
@@ -373,14 +343,17 @@ async function runClaimedStep(
   logger.workspace('准备工作区...');
   const checkout = isReview && reviewGate === 'review';
   const repo = isChief || (isReview && !checkout) ? null : (claimed.project?.repo ?? null);
+  const hostedGitCred = repo?.kind === 'hosted' ? creds.git : null;
   const setup = await setUpStepWorkspace({
     workspace: deps.workspace,
     claimed,
     repo,
     workspacesRoot: deps.workspacesDir,
-    credentials: creds.git,
-    hookCredentials: attachmentVerify ? null : creds.git,
-    refresh: refreshGit,
+    credentials: hostedGitCred,
+    hookCredentials: attachmentVerify ? null : hostedGitCred,
+    refresh: async () => {
+      throw new Error('App credential refresh unavailable');
+    },
     machineName: deps.machineName ?? hostname(),
     attachmentVerify,
     evidenceDirectory: verifyEvidenceDirectory,
@@ -435,8 +408,7 @@ async function runClaimedStep(
     isReview,
     metered: treeEnv.CAIRN_ORB !== '1',
     creds,
-    appCredential,
-    refreshGit,
+    gitCredential: hostedGitCred,
     commitIdentity: appIdentity,
     repo,
     ws,
@@ -465,9 +437,8 @@ async function runClaimedStep(
   const skillInjection: { facts: SkillInjectionFacts | null } = { facts: null };
   const stepEnv = prepareStepEnv(
     {
-      inherited: { ...treeEnv, ...commitEnv(stepIdentity) },
-      git: attachmentVerify ? null : repo?.kind === 'github' ? creds.git : null,
-      appCredential,
+      inherited: repo?.kind === 'hosted' ? { ...treeEnv, ...commitEnv(stepIdentity) } : treeEnv,
+      git: attachmentVerify ? null : hostedGitCred,
       readonlyGit: attachmentVerify,
       runtimeId,
       agentConfig: { cairnHome: deps.paths.home },
@@ -687,10 +658,7 @@ async function runClaimedStep(
     repo,
     creds,
     credentialValues: credentials.values(),
-    refreshGitToken:
-      appCredential !== null && !attachmentVerify
-        ? async () => (await refreshGit()).password
-        : null,
+    refreshGitToken: null,
     transcript,
     isReview,
     attachmentVerify,

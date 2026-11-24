@@ -36,20 +36,20 @@ export function desktopOtelEnv(path: string, log: (line: string) => void): OtelE
 }
 
 const OTEL_ENV_FILE = 'CAIRN_OTEL_ENV_FILE';
-const SECRET_SHAPED_ENV = /(?:_TOKEN|_SECRET|_PASSWORD|_KEY|_CREDENTIALS?)$/;
-const SCRUB_EXEMPT = new Set(['CAIRN_REQUIRE_TOKEN']);
+const CAIRN_INTERNAL_ENV = new Set([
+  'CAIRN_TOKEN',
+  'CAIRN_AUTH',
+  'CAIRN_API_KEY',
+  'CAIRN_GIT_CRED_PASSWORD',
+  'CAIRN_GITHUB_OAUTH_CLIENT_SECRET',
+  'CAIRN_GITHUB_OAUTH_CLIENT_ID',
+  'CAIRN_ALERT_SMTP_URL',
+]);
 
 export function scrubSpawnEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next: NodeJS.ProcessEnv = { ...env };
   for (const key of Object.keys(next)) {
-    if (SCRUB_EXEMPT.has(key)) continue;
-    if (
-      SECRET_SHAPED_ENV.test(key) ||
-      key.startsWith('CAIRN_OTEL_') ||
-      key.startsWith('OTEL_') ||
-      key === 'CAIRN_GITHUB_OAUTH_CLIENT_ID' ||
-      key === 'CAIRN_ALERT_SMTP_URL'
-    )
+    if (CAIRN_INTERNAL_ENV.has(key) || key.startsWith('CAIRN_OTEL_') || key.startsWith('OTEL_'))
       delete next[key];
   }
   return next;

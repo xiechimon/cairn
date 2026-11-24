@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
   AgentBackend,
@@ -34,7 +34,6 @@ vi.mock('../src/github-probe.js', async (importOriginal) => {
 });
 
 const GITHUB_TOKEN: GitCredentials = { username: 'x-access-token', password: 'ghp_steptoken' };
-const GITHUB_STEP_CRED = { ...GITHUB_TOKEN, url: 'https://github.com/o/r.git' };
 const MEA_AUTH_FAILURE =
   'remote: Invalid username or token. Password authentication is not supported.\n' +
   "fatal: Authentication failed for 'https://github.com/xiechimon/cairn.git/'";
@@ -316,28 +315,18 @@ function transcriptRows(client: FakeClient): TranscriptUpload['messages'] {
   return client.transcripts.at(-1)?.messages ?? [];
 }
 
-describe('runner push credential fallback + provenance line (#1225)', () => {
-  test('failure mode 1: github token auth failure → machine second attempt succeeds, provenance line machine (no token value), done success', async () => {
-    const workspace = fakeWorkspace({
-      pushWithToken: () => {
-        throw new Error(MEA_AUTH_FAILURE);
-      },
-    });
-    const { client, lines } = await setup(
+describe('runner push credentials: hosted keeps daemon credentials, external uses host git/gh', () => {
+  test('github repo uses machine credentials directly without per-step token override', async () => {
+    const workspace = fakeWorkspace({});
+    const { client } = await setup(
       claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
       { git: GITHUB_TOKEN, workspace },
     );
-    expect(workspace.pushes).toEqual([
-      { branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED },
-      { branch: 'cairn/conv-conv-1', cred: null },
-    ]);
+    expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: null }]);
     expect(client.doneBodies[0]!.body.status).toBe('success');
     const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
     expect(row?.role).toBe('system');
     expect(systemRowOf(row?.content)).toEqual({ kind: GIT_CREDENTIAL_ROW_KIND, source: 'machine' });
-    const allText = `${JSON.stringify(transcriptRows(client))}\n${lines.join('\n')}`;
-    expect(allText).not.toContain(GITHUB_TOKEN.password);
-    expect(lines.some((l) => l.includes('machine credentials'))).toBe(true);
   }, 20_000);
 
   test('a push that fails twice with connection reset and then succeeds does not fail the build', async () => {
@@ -369,52 +358,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     }
   }, 20_000);
 
-  test('failure mode 2: github token valid → single push (cred = token), provenance line integration', async () => {
-    const workspace = fakeWorkspace({});
-    const { client } = await setup(
-      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      { git: GITHUB_TOKEN, workspace },
-    );
-    expect(workspace.pushes).toEqual([{ branch: 'cairn/conv-conv-1', cred: GITHUB_STEP_CRED }]);
-    const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(systemRowOf(row?.content)).toEqual({
-      kind: GIT_CREDENTIAL_ROW_KIND,
-      source: 'integration',
-    });
-    expect(client.doneBodies[0]!.body.status).toBe('success');
-  }, 20_000);
-
-  test('failure mode 3: github auth fails on both paths → done failed, errorMessage names both paths', async () => {
-    const workspace = fakeWorkspace({
-      pushWithToken: () => {
-        throw new Error(MEA_AUTH_FAILURE);
-      },
-      pushWithMachine: () => {
-        throw new Error("fatal: could not read Username for 'https://github.com'");
-      },
-    });
-    const { client } = await setup(
-      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      { git: GITHUB_TOKEN, workspace },
-    );
-    expect(workspace.pushes).toHaveLength(2);
-    expect(client.doneBodies[0]!.body.status).toBe('failed');
-    const msg = String(client.doneBodies[0]!.body.errorMessage);
-    expect(msg).toContain('per-step token');
-    expect(msg).toContain('Invalid username or token');
-    expect(msg).toContain('machine credentials');
-    expect(msg).toContain('could not read Username');
-    const row = transcriptRows(client).find((r) => r.id === 'git-credential-s1');
-    expect(systemRowOf(row?.content)).toEqual({
-      kind: GIT_CREDENTIAL_ROW_KIND,
-      source: 'integration',
-    });
-    expect(`${msg}\n${JSON.stringify(transcriptRows(client))}`).not.toContain(
-      GITHUB_TOKEN.password,
-    );
-  }, 20_000);
-
-  test('failure mode 4: hosted auth failure → single push, no fallback, no provenance line (server per-step key untouched)', async () => {
+  test('hosted auth failure fails in a single push with no machine fallback and no provenance line', async () => {
     const workspace = fakeWorkspace({
       pushWithToken: () => {
         throw new Error(MEA_AUTH_FAILURE);
@@ -430,7 +374,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
   }, 20_000);
 
-  test('failure mode 5: local push failure → single attempt, no fallback, no provenance line', async () => {
+  test('local push failure fails in a single attempt with no fallback and no provenance line', async () => {
     const workspace = fakeWorkspace({
       pushWithMachine: () => {
         throw new Error('push failed (128): bad object');
@@ -457,29 +401,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
     expect(transcriptRows(client).some((r) => r.id === 'git-credential-s1')).toBe(false);
   }, 20_000);
 
-  test('a push that falls back to machine credentials keeps the credential row before the agent output', async () => {
-    const workspace = fakeWorkspace({
-      pushWithToken: () => {
-        throw new Error(MEA_AUTH_FAILURE);
-      },
-    });
-    let clock = 1_000;
-    const { client } = await setup(
-      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      { git: GITHUB_TOKEN, workspace, now: () => (clock += 10) },
-    );
-    const rows = transcriptRows(client);
-    const credential = rows.find((r) => r.id === 'git-credential-s1');
-    const firstAssistant = rows.find((r) => r.role === 'assistant');
-    expect(systemRowOf(credential?.content)).toEqual({
-      kind: GIT_CREDENTIAL_ROW_KIND,
-      source: 'machine',
-    });
-    expect(firstAssistant).toBeDefined();
-    expect(credential!.createdAt).toBeLessThan(firstAssistant!.createdAt);
-  }, 20_000);
-
-  test('failure mode 6: prepare already fell back (provenance machine) → provenance line surfaces with prepare (visible even on rounds where push never fired)', async () => {
+  test('prepare provenance machine surfaces even on rounds where push never fired', async () => {
     const workspace = fakeWorkspace({
       credentialSource: 'machine',
     });
@@ -499,7 +421,7 @@ describe('runner push credential fallback + provenance line (#1225)', () => {
 });
 
 test.each(['github', 'hosted'] as const)(
-  'step shell GitHub credentials are scoped and erased for %s',
+  'hosted repo injects scoped git credentials while external github leaves host git/gh untouched: %s',
   async (kind) => {
     let held: SessionOpts['env'];
     let applied = false;
@@ -516,16 +438,17 @@ test.each(['github', 'hosted'] as const)(
         onSession: (opts) => {
           held = opts.env;
           applied =
-            kind === 'github'
-              ? opts.env?.GH_TOKEN === GITHUB_TOKEN.password &&
-                opts.env.GITHUB_TOKEN === GITHUB_TOKEN.password &&
-                opts.env.CAIRN_GIT_CRED_PASSWORD === GITHUB_TOKEN.password
-              : opts.env?.GH_TOKEN === undefined && opts.env?.CAIRN_GIT_CRED_PASSWORD === undefined;
+            kind === 'hosted'
+              ? opts.env?.GH_TOKEN === undefined &&
+                opts.env?.CAIRN_GIT_CRED_PASSWORD === GITHUB_TOKEN.password
+              : opts.env?.GH_TOKEN === undefined &&
+                opts.env?.GITHUB_TOKEN === undefined &&
+                opts.env?.CAIRN_GIT_CRED_PASSWORD === undefined &&
+                opts.env?.GH_CONFIG_DIR === undefined;
         },
       },
     );
     expect(applied).toBe(true);
-    expect(held?.GH_TOKEN === undefined).toBe(true);
     expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
     expect(process.env.GH_TOKEN === previous).toBe(true);
     expect(JSON.stringify(transcriptRows(client)).includes(GITHUB_TOKEN.password)).toBe(false);
@@ -538,225 +461,21 @@ test.each(['github', 'hosted'] as const)(
   },
 );
 
-test('App git authentication failure never retries with machine user credentials', async () => {
-  const workspace = fakeWorkspace({
-    pushWithToken: async () => {
-      throw new Error(MEA_AUTH_FAILURE);
-    },
-  });
+test('hosted step shell credentials are erased when backend session creation fails', async () => {
+  let held: SessionOpts['env'];
   const { client } = await setup(
-    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-    { git: { ...GITHUB_TOKEN, kind: 'app' }, workspace },
-  );
-  expect(workspace.pushes).toHaveLength(2);
-  expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
-  expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
-  expect(client.doneBodies[0]?.body.status).toBe('failed');
-});
-
-test.each([undefined, 'app'] as const)(
-  'step shell credentials are erased when backend session creation fails: %s',
-  async (kind) => {
-    let held: SessionOpts['env'];
-    let file: string | undefined;
-    const { client } = await setup(
-      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      {
-        git: { ...GITHUB_TOKEN, kind },
-        workspace: fakeWorkspace({}),
-        onSession: (opts) => {
-          held = opts.env;
-          file = opts.env?.CAIRN_GIT_CRED_FILE;
-          throw new Error('backend unavailable');
-        },
-      },
-    );
-    expect(client.doneBodies[0]?.body.status).toBe('failed');
-    expect(held?.GH_TOKEN === undefined).toBe(true);
-    expect(held?.GITHUB_TOKEN === undefined).toBe(true);
-    expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
-    if (kind === 'app') expect(file !== undefined && !existsSync(file)).toBe(true);
-  },
-);
-
-test.each(['auth', 'age', 'twice'] as const)(
-  'refreshes a long-step App credential once: %s',
-  async (scenario) => {
-    let clock = 1000;
-    let attempts = 0;
-    const replacement = {
-      ...GITHUB_TOKEN,
-      kind: 'app' as const,
-      password: 'refreshed-fixture-value',
-    };
-    const workspace = fakeWorkspace({
-      pushWithToken: async () => {
-        attempts++;
-        if (scenario === 'twice' || (scenario === 'auth' && attempts === 1))
-          throw new Error(`Authentication failed ${replacement.password}`);
-      },
-    });
-    const { client, lines, paths } = await setup(
-      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      {
-        git: { ...GITHUB_TOKEN, kind: 'app' },
-        replacement,
-        sessionText: `${JSON.stringify({ text: `${GITHUB_TOKEN.password} ${replacement.password}` })}\n`,
-        workspace,
-        now: () => clock,
-        onSession: () => {
-          if (scenario === 'age') clock += 51 * 60000;
-        },
-      },
-    );
-    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
-    for (const file of readdirSync(paths.outboxDir)) {
-      const content = readFileSync(join(paths.outboxDir, file), 'utf8');
-      expect(
-        content.includes(GITHUB_TOKEN.password) || content.includes(replacement.password),
-      ).toBe(false);
-    }
-    expect(client.sessionUploads.length).toBeGreaterThan(0);
-    expect(client.sessionUploads.join('').includes(GITHUB_TOKEN.password)).toBe(false);
-    expect(workspace.pushes).toHaveLength(scenario === 'age' ? 1 : 2);
-    expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
-    expect(client.doneBodies[0]?.body.status).toBe(scenario === 'twice' ? 'failed' : 'success');
-    expect(
-      JSON.stringify([
-        client.doneBodies,
-        client.transcripts,
-        client.sessionUploads,
-        lines,
-      ]).includes(replacement.password),
-    ).toBe(false);
-  },
-);
-
-test.each(['auth', 'age'] as const)(
-  'reports a required App credential refresh 503 without retrying settlement: %s',
-  async (scenario) => {
-    let clock = 1000;
-    const workspace = fakeWorkspace({
-      currentBranch: 'cairn/conv-conv-1',
-      pushWithToken: async () => {
-        throw new Error(MEA_AUTH_FAILURE);
-      },
-    });
-    const { client } = await setup(
-      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      {
-        git: { ...GITHUB_TOKEN, kind: 'app' },
-        workspace,
-        refreshError: new MachineApiError(503, '{"error":"fixture mint unavailable"}'),
-        now: () => clock,
-        onSession: () => {
-          if (scenario === 'age') clock += 51 * 60000;
-        },
-      },
-    );
-    expect(client.doneBodies).toHaveLength(1);
-    expect(client.doneBodies[0]?.body).toMatchObject({
-      status: 'failed',
-      errorMessage: 'GitHub App token service unavailable',
-    });
-    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
-    expect(workspace.pushes).toHaveLength(scenario === 'auth' ? 1 : 0);
-    expect(workspace.pushes.every((push) => push.cred?.kind === 'app')).toBe(true);
-  },
-);
-
-test('a background credential refresh 503 leaves the running step and its current token intact', async () => {
-  vi.useFakeTimers();
-  try {
-    const workspace = fakeWorkspace({});
-    const { client, lines } = await setup(
-      claimedStep(
-        'build',
-        { kind: 'github', cloneUrl: 'https://github.com/o/r.git' },
-        { tools: [] },
-      ),
-      {
-        git: { ...GITHUB_TOKEN, kind: 'app', expiresAt: Date.now() + 16 * 60000 },
-        workspace,
-        refreshError: new MachineApiError(503, '{"error":"fixture mint unavailable"}'),
-        onSession: async (opts) => {
-          await vi.advanceTimersByTimeAsync(2 * 60000);
-          expect(readFileSync(opts.env?.CAIRN_GIT_CRED_FILE ?? '', 'utf8')).toBe(
-            GITHUB_TOKEN.password,
-          );
-        },
-      },
-    );
-    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
-    expect(client.doneBodies[0]?.body.status).toBe('success');
-    expect(lines.some((line) => line.includes('timer refresh failed'))).toBe(true);
-    expect(workspace.pushes).toHaveLength(0);
-  } finally {
-    vi.useRealTimers();
-  }
-});
-
-test('App agent environment uses the step private credential files and cleanup erases them', async () => {
-  let files: string[] = [];
-  let privateEnv = false;
-  const { client } = await setup(
-    claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
+    claimedStep('build', { kind: 'hosted', cloneUrl: 'http://server/git/t/r' }),
     {
-      git: { ...GITHUB_TOKEN, kind: 'app', expiresAt: Date.now() + 3600000 },
+      git: GITHUB_TOKEN,
       workspace: fakeWorkspace({}),
       onSession: (opts) => {
-        files = [
-          opts.env?.CAIRN_GIT_CRED_FILE ?? '',
-          join(opts.env?.GH_CONFIG_DIR ?? '', 'hosts.yml'),
-        ];
-        privateEnv =
-          opts.env?.GH_TOKEN === undefined &&
-          opts.env?.GITHUB_TOKEN === undefined &&
-          opts.env?.CAIRN_GIT_CRED_PASSWORD === undefined &&
-          files.every((file) => existsSync(file));
+        held = opts.env;
+        throw new Error('backend unavailable');
       },
     },
   );
-  expect(privateEnv).toBe(true);
-  expect(files.every((file) => !existsSync(file))).toBe(true);
-  expect(client.doneBodies[0]?.body.status).toBe('success');
-});
-
-test('running App step refreshes the shell files and redacts both generations', async () => {
-  vi.useFakeTimers();
-  try {
-    const replacement = {
-      ...GITHUB_TOKEN,
-      kind: 'app' as const,
-      password: 'fixture-rotated-app',
-      expiresAt: Date.now() + 120 * 60000,
-    };
-    let replaced = false;
-    const { client, lines } = await setup(
-      claimedStep('build', { kind: 'github', cloneUrl: 'https://github.com/o/r.git' }),
-      {
-        git: { ...GITHUB_TOKEN, kind: 'app', expiresAt: Date.now() + 3600000 },
-        replacement,
-        workspace: fakeWorkspace({}),
-        echo: `${GITHUB_TOKEN.password} ${replacement.password}`,
-        onSession: async (opts) => {
-          const file = opts.env?.CAIRN_GIT_CRED_FILE ?? '';
-          await vi.advanceTimersByTimeAsync(46 * 60000);
-          replaced = existsSync(file) && readFileSync(file, 'utf8') === replacement.password;
-        },
-      },
-    );
-    expect(replaced).toBe(true);
-    expect(client.calls.filter((call) => call === 'token')).toHaveLength(2);
-    expect(client.doneBodies[0]?.body.status).toBe('success');
-    const output = JSON.stringify([client.transcripts, client.doneBodies, lines]);
-    expect(output.includes(GITHUB_TOKEN.password) || output.includes(replacement.password)).toBe(
-      false,
-    );
-    expect(vi.getTimerCount()).toBe(0);
-  } finally {
-    vi.useRealTimers();
-  }
+  expect(client.doneBodies[0]?.body.status).toBe('failed');
+  expect(held?.CAIRN_GIT_CRED_PASSWORD === undefined).toBe(true);
 });
 
 test.each(

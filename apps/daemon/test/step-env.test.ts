@@ -26,7 +26,6 @@ function input(patch: Partial<StepEnvInput> = {}): StepEnvInput {
     inherited: undefined,
     temporary: {},
     git: null,
-    appCredential: null,
     readonlyGit: false,
     runtimeId: null,
     agentConfig: { cairnHome: '/cairn-home' },
@@ -47,29 +46,14 @@ describe('assembleStepEnv', () => {
     expect(env).toEqual({ TMPDIR: '/step', KEEP: '1' });
   });
 
-  test('a token credential reaches git and gh, and is dropped on cleanup', () => {
+  test('a hosted git credential reaches git without overriding GH_TOKEN and is dropped on cleanup', () => {
     const step = assembleStepEnv(input({ inherited: { KEEP: '1' }, git }));
-    expect(step.env.GH_TOKEN).toBe('step-password');
-    expect(step.env.GITHUB_TOKEN).toBe('step-password');
+    expect(step.env.GH_TOKEN).toBeUndefined();
+    expect(step.env.GITHUB_TOKEN).toBeUndefined();
     expect(step.env.CAIRN_GIT_CRED_PASSWORD).toBe('step-password');
     expect(Number(step.env.GIT_CONFIG_COUNT)).toBeGreaterThan(0);
     step.dropGitCredentials();
     expect(step.env).toEqual({ KEEP: '1' });
-  });
-
-  test('an App credential supplies its own env and never exposes a token variable', () => {
-    const step = assembleStepEnv(
-      input({
-        inherited: { GH_TOKEN: 'host', GITHUB_TOKEN: 'host', CAIRN_GIT_CRED_PASSWORD: 'host' },
-        git,
-        appCredential: {
-          env: () => ({ GH_CONFIG_DIR: '/step/gh', CAIRN_GIT_CRED_PASSWORD: 'app' }),
-        },
-      }),
-    );
-    expect(step.env).toEqual({ GH_CONFIG_DIR: '/step/gh' });
-    step.dropGitCredentials();
-    expect(step.env).toEqual({});
   });
 
   test('a read-only workspace overrides the git config with the push denial', () => {
@@ -99,13 +83,12 @@ describe('assembleStepEnv', () => {
     expect(env).toEqual({});
   });
 
-  test('the step subscription token replaces it and scrubs subprocesses on the host', () => {
+  test('the step subscription token replaces it without setting subprocess env scrub', () => {
     const { env } = assembleStepEnv(
       input({ inherited: { CLAUDE_CODE_OAUTH_TOKEN: 'host' }, claudeSubscriptionToken: 'step' }),
     );
     expect(env).toEqual({
       CLAUDE_CODE_OAUTH_TOKEN: 'step',
-      CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1',
     });
   });
 
@@ -430,16 +413,16 @@ describe('agent config isolation', () => {
 });
 
 describe('prepareStepEnv', () => {
-  test('creates a step temp directory, passes git through and registers both cleanups', async () => {
+  test('creates a step temp directory, passes hosted git through and registers both cleanups', async () => {
     const cleanups: (() => void | Promise<void>)[] = [];
     const { temporary: _, ...rest } = input({ inherited: { KEEP: '1' }, git });
     const prepared = prepareStepEnv(rest, cleanups);
     if ('error' in prepared) throw new Error(prepared.error);
     expect(prepared.env.KEEP).toBe('1');
-    expect(prepared.env.GH_TOKEN).toBe('step-password');
+    expect(prepared.env.CAIRN_GIT_CRED_PASSWORD).toBe('step-password');
     expect(prepared.env.TMPDIR).toBeTruthy();
     expect(cleanups).toHaveLength(2);
     for (const cleanup of [...cleanups].reverse()) await cleanup();
-    expect(prepared.env.GH_TOKEN).toBeUndefined();
+    expect(prepared.env.CAIRN_GIT_CRED_PASSWORD).toBeUndefined();
   });
 });

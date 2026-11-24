@@ -4,7 +4,6 @@ import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
-  type CanUseTool,
   createSdkMcpServer,
   type EffortLevel,
   type McpServerConfig,
@@ -47,7 +46,6 @@ import { z } from 'zod';
 import { claudeCodeTeamSubscriptionAuthFailureMessage } from '../claude-code-auth.js';
 import { stepCredentialRedactor } from '../credential-output.js';
 import { ProcessTree, SESSION_TREE_ENV } from '../process-tree.js';
-import { stepCredentialStateDirs } from '../step-app-credential.js';
 import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { BackgroundTaskRows } from './claude-background-tasks.js';
@@ -1443,13 +1441,6 @@ const METERED_CLAUDE_AUTH_BLANK = {
   CLAUDE_CODE_USE_FOUNDRY: '',
 };
 
-function approveUnlessDisallowed(disallowedTools: readonly string[]): CanUseTool {
-  return async (toolName, input) =>
-    disallowedTools.includes(toolName)
-      ? { behavior: 'deny', message: `${toolName} is not available in this step` }
-      : { behavior: 'allow', updatedInput: input };
-}
-
 const OAUTH_TOKEN_FD = 3;
 
 function spawnClaudeProcess(
@@ -1498,7 +1489,6 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
           CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: String(OAUTH_TOKEN_FD),
         }
       : inheritedEnv;
-  const scrubbed = env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB === '1';
   const hostMcp = Object.fromEntries(
     Object.entries(parts.mcpServers).filter(([slug]) => slug === HOST_MCP_SERVER_NAME),
   );
@@ -1520,14 +1510,9 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
             ...(parts.deferredTools === true ? [TOOL_SEARCH_BUILTIN] : []),
           ],
         }
-      : scrubbed
-        ? {
-            permissionMode: 'default' as const,
-            canUseTool: approveUnlessDisallowed(parts.disallowedTools),
-          }
-        : parts.inOrb
-          ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
-          : { permissionMode: 'bypassPermissions' as const }),
+      : parts.inOrb
+        ? { permissionMode: 'bypassPermissions' as const, allowDangerouslySkipPermissions: true }
+        : { permissionMode: 'bypassPermissions' as const }),
     disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
     ...(locked
       ? {
@@ -1719,9 +1704,7 @@ export class ClaudeCodeBackend implements AgentBackend {
         ...(this.opts.confine !== undefined
           ? {
               confine: (launch: Launch) =>
-                (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch, {
-                  readable: stepCredentialStateDirs(opts.env),
-                }),
+                (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch),
             }
           : {}),
         abortController: abort,

@@ -94,7 +94,7 @@ export async function finishStepRun(input: StepFinishInput): Promise<void> {
     stepId,
     appIdentity: input.appIdentity,
     identity: input.identity,
-    mergeCredential: input.creds.git,
+    mergeCredential: input.repo?.kind === 'hosted' ? input.creds.git : null,
     headAtStart: input.headAtStart,
     stepStartMs: input.stepStartMs,
     runGit: input.runGit,

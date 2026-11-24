@@ -86,18 +86,11 @@ export function runtimeChildEnv(
   const filtered: NodeJS.ProcessEnv = {};
   for (const [key, value] of Object.entries(extra)) {
     if (CLI_EXPORT_KEY.test(key)) continue;
-    if (
-      extra.CAIRN_GIT_CRED_FILE &&
-      ['GH_TOKEN', 'GITHUB_TOKEN', 'CAIRN_GIT_CRED_PASSWORD'].includes(key)
-    )
-      continue;
     filtered[key] = value;
   }
   return childEnv(
     {
       ...filtered,
-      SSH_AUTH_SOCK: '',
-      SSH_AGENT_PID: '',
       OTEL_SDK_DISABLED: 'true',
     },
     parent,

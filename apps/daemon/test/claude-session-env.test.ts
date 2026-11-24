@@ -135,7 +135,7 @@ test('subscription authentication reaches the CLI on fd 3 and never through its 
   expect(seen.child).not.toContain(token);
 });
 
-test('a host step keeps the subscription token in env, where it outranks a local Claude login', () => {
+test('a host step keeps the subscription token in env and bypasses permission prompts', () => {
   const token = `sk-ant-oat01-${'h'.repeat(64)}`;
   const options = buildClaudeSdkOptions({
     cwd: '/tmp/ws',
@@ -147,11 +147,12 @@ test('a host step keeps the subscription token in env, where it outranks a local
     inOrb: false,
     lockedDown: false,
     abortController: new AbortController(),
-    env: { CLAUDE_CODE_OAUTH_TOKEN: token, CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1' },
+    env: { CLAUDE_CODE_OAUTH_TOKEN: token },
   });
   expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN).toBe(token);
-  expect(options.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBe('1');
+  expect(options.env?.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB).toBeUndefined();
   expect(options.env?.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR).toBeUndefined();
+  expect(options.permissionMode).toBe('bypassPermissions');
   expect(options.spawnClaudeCodeProcess).toBeUndefined();
 });
 
@@ -189,9 +190,7 @@ test('a team subscription token blanks inherited metered Claude auth so the CLI 
     expect(team.env?.[key]).toBe('');
   }
   const local = buildClaudeSdkOptions({ ...base, env: { FOO: '1' } });
-  expect(local.env?.ANTHROPIC_API_KEY).toBeUndefined();
-  expect(local.env?.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
-  expect(local.env?.CLAUDE_CODE_USE_BEDROCK).toBeUndefined();
+  expect(local.env?.ANTHROPIC_API_KEY).toBe('sk-ant-api03-inherited');
   expect(local.env?.FOO).toBe('1');
   expect(local.env?.PATH).toBe(process.env.PATH);
 });

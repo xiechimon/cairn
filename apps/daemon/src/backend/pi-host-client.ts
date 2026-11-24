@@ -12,7 +12,6 @@ import { ENV_VARS } from '@cairn/shared';
 import { childEnv } from '../child-env.js';
 import { stepCredentialRedactor } from '../credential-output.js';
 import { ProcessTree, STEP_TREE_ENV } from '../process-tree.js';
-import { stepCredentialStateDirs } from '../step-app-credential.js';
 import type { Launch, SessionConfiner } from './confine-session.js';
 import { EventQueue } from './event-queue.js';
 import type { PiBackendOpts } from './pi.js';
@@ -32,8 +31,6 @@ export function piHostEnv(parent: NodeJS.ProcessEnv = process.env): Record<strin
     {
       [ENV_VARS.piCacheRetention]: parent[ENV_VARS.piCacheRetention],
       [ENV_VARS.customModelReasoning]: parent[ENV_VARS.customModelReasoning],
-      SSH_AUTH_SOCK: '',
-      SSH_AGENT_PID: '',
     },
     parent,
   );
@@ -398,7 +395,6 @@ export async function openPiHostSession(args: PiHostOpen): Promise<AgentSessionH
         : [];
     confined = args.confine({ cwd: args.opts.cwd, env: args.opts.env ?? {} }, 'pi', args.launch, {
       state: [args.backend.agentDir, privateDirectory, ...allowedFiles],
-      readable: stepCredentialStateDirs(args.opts.env),
     });
   } catch (error) {
     removeIfEmpty(privateDirectory);

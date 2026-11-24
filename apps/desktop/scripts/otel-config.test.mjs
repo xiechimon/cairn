@@ -91,7 +91,7 @@ test('child processes receive only the env-file flag, never the otel values', ()
   });
 });
 
-test('spawn env audit drops credential-shaped and otel keys but keeps system keys', () => {
+test('spawn env keeps host git/gh credentials while dropping cairn internal and otel keys', () => {
   const env = scrubSpawnEnv({
     PATH: '/usr/bin',
     HOME: '/Users/x',
@@ -121,19 +121,24 @@ test('spawn env audit drops credential-shaped and otel keys but keeps system key
     ANTHROPIC_API_KEY: 'sk-ant',
     NPM_CONFIG_USERCONFIG: '/x/.npmrc',
   });
-  for (const key of Object.keys(env)) {
-    if (key === 'CAIRN_REQUIRE_TOKEN') continue;
-    assert.doesNotMatch(key, /_TOKEN$|_SECRET$|_PASSWORD$|_KEY$|^CAIRN_OTEL_|^OTEL_/, key);
+  assert.equal(env.GH_TOKEN, 'gho_x');
+  assert.equal(env.GITHUB_TOKEN, 'ghp_x');
+  assert.equal(env.SSH_AUTH_SOCK, '/tmp/agent.sock');
+  assert.equal(env.OPENAI_API_KEY, 'sk-runtime');
+  assert.equal(env.ANTHROPIC_API_KEY, 'sk-ant');
+  for (const dropped of [
+    'CAIRN_TOKEN',
+    'CAIRN_API_KEY',
+    'CAIRN_GIT_CRED_PASSWORD',
+    'CAIRN_GITHUB_OAUTH_CLIENT_SECRET',
+    'CAIRN_GITHUB_OAUTH_CLIENT_ID',
+    'CAIRN_ALERT_SMTP_URL',
+    'CAIRN_OTEL_ENDPOINT',
+    'CAIRN_OTEL_HEADERS',
+    'CAIRN_OTEL_ENVIRONMENT',
+    'CAIRN_OTEL_ENV_FILE',
+    'OTEL_EXPORTER_OTLP_HEADERS',
+  ]) {
+    assert.equal(env[dropped], undefined, dropped);
   }
-  assert.deepEqual(Object.keys(env).sort(), [
-    'CAIRN_CONFINE_DENIED_ROOTS',
-    'CAIRN_HOME',
-    'CAIRN_OWNER_CHANNEL',
-    'CAIRN_REQUIRE_TOKEN',
-    'CAIRN_SERVER',
-    'HOME',
-    'NPM_CONFIG_USERCONFIG',
-    'PATH',
-    'SSH_AUTH_SOCK',
-  ]);
 });

@@ -268,7 +268,6 @@ describe('devin credential delivery', () => {
       {
         inherited: { WINDSURF_API_KEY: 'stale' },
         git: null,
-        appCredential: null,
         readonlyGit: false,
         runtimeId: 'devin',
         agentConfig: { cairnHome: '/cairn-home' },

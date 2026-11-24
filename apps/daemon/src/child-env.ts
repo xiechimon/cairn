@@ -1,105 +1,21 @@
-const CHILD_ENV_BASE = new Set(
-  [
-    'PATH',
-    'HOME',
-    'USER',
-    'LOGNAME',
-    'SHELL',
-    'LANG',
-    'LANGUAGE',
-    'TERM',
-    'COLORTERM',
-    'TZ',
-    'TMPDIR',
-    'TMP',
-    'TEMP',
-    'DISPLAY',
-    'WAYLAND_DISPLAY',
-    'XAUTHORITY',
-    'XDG_RUNTIME_DIR',
-    'XDG_CONFIG_HOME',
-    'XDG_DATA_HOME',
-    'XDG_CACHE_HOME',
-    'XDG_STATE_HOME',
-    'DBUS_SESSION_BUS_ADDRESS',
-    'SSH_AUTH_SOCK',
-    'SSH_AGENT_PID',
-    'HTTP_PROXY',
-    'HTTPS_PROXY',
-    'ALL_PROXY',
-    'NO_PROXY',
-    'SSL_CERT_FILE',
-    'SSL_CERT_DIR',
-    'NODE_EXTRA_CA_CERTS',
-    'REQUESTS_CA_BUNDLE',
-    'CURL_CA_BUNDLE',
-    'GIT_SSL_CAINFO',
-    'FNM_DIR',
-    'FNM_MULTISHELL_PATH',
-    'FNM_ARCH',
-    'FNM_NODE_DIST_MIRROR',
-    'FNM_VERSION_FILE_STRATEGY',
-    'NVM_DIR',
-    'NVM_BIN',
-    'NVM_INC',
-    'VOLTA_HOME',
-    'PNPM_HOME',
-    'COREPACK_HOME',
-    'ASDF_DIR',
-    'ASDF_DATA_DIR',
-    'ASDF_CONFIG_FILE',
-    '__MISE_DIFF',
-    'MISE_DATA_DIR',
-    'MISE_CONFIG_DIR',
-    'MISE_CACHE_DIR',
-    'HOMEBREW_PREFIX',
-    'HOMEBREW_CELLAR',
-    'HOMEBREW_REPOSITORY',
-    'GOPATH',
-    'GOBIN',
-    'GOROOT',
-    'GOMODCACHE',
-    'CARGO_HOME',
-    'RUSTUP_HOME',
-    'PYENV_ROOT',
-    'VIRTUAL_ENV',
-    'UV_CACHE_DIR',
-    'UV_PYTHON_INSTALL_DIR',
-    'RBENV_ROOT',
-    'JAVA_HOME',
-    'SDKMAN_DIR',
-    'SDKMAN_CANDIDATES_DIR',
-    'ANDROID_HOME',
-    'ANDROID_SDK_ROOT',
-    'SDKROOT',
-    'DEVELOPER_DIR',
-    'SYSTEMROOT',
-    'WINDIR',
-    'SYSTEMDRIVE',
-    'COMSPEC',
-    'PATHEXT',
-    'PSMODULEPATH',
-    'USERPROFILE',
-    'HOMEDRIVE',
-    'HOMEPATH',
-    'USERNAME',
-    'APPDATA',
-    'LOCALAPPDATA',
-    'PROGRAMDATA',
-    'PROGRAMFILES',
-    'PROGRAMFILES(X86)',
-    'PROGRAMW6432',
-    'COMMONPROGRAMFILES',
-    'COMMONPROGRAMFILES(X86)',
-    'PROCESSOR_ARCHITECTURE',
-    'NUMBER_OF_PROCESSORS',
-    'OS',
-  ].map((name) => name.toUpperCase()),
+const STRIPPED_ENV_KEYS = new Set(
+  ['PI_CODING_AGENT_DIR', 'PI_OFFLINE', 'PI_TELEMETRY', 'PI_SKIP_VERSION_CHECK'].map((name) =>
+    name.toUpperCase(),
+  ),
 );
 
-function inherited(name: string): boolean {
+const STRIPPED_ENV_PREFIXES = [
+  'CAIRN_',
+  'OTEL_',
+  'ANT_OTEL_',
+  'BETA_TRACING_',
+  'ENABLE_BETA_TRACING_',
+] as const;
+
+function stripped(name: string): boolean {
   const key = name.toUpperCase();
-  return CHILD_ENV_BASE.has(key) || key.startsWith('LC_');
+  if (STRIPPED_ENV_KEYS.has(key)) return true;
+  return STRIPPED_ENV_PREFIXES.some((prefix) => key.startsWith(prefix));
 }
 
 export function childEnv(
@@ -108,7 +24,7 @@ export function childEnv(
 ): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [name, value] of Object.entries(parent)) {
-    if (value !== undefined && inherited(name)) env[name] = value;
+    if (value !== undefined && !stripped(name)) env[name] = value;
   }
   for (const [name, value] of Object.entries(extra)) {
     if (value === undefined) delete env[name];
