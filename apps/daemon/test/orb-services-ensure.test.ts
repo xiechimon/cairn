@@ -1,6 +1,7 @@
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { processStartTime } from '@cairn/shared/parent-watch';
 import { describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
@@ -358,6 +359,15 @@ services:
       PORT: "3000"
 `),
     ).toThrow('env is invalid');
+  });
+
+  it('reuses the yaml library instead of hand-rolling a YAML parser', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '../src/orb/services-yaml.ts'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/function\s+parse(?:Yaml|Block|Map|List|Scalar)\w*\b/);
+    expect(source).toContain('@cairn/shared/yaml');
   });
 });
 
