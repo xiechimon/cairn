@@ -1,12 +1,3 @@
-// i18n provider (issue #74): the one React seam of the mechanism — locale
-// state + t() bound to the en dict, switchable at runtime from the account
-// 语言 row. zh-CN is authoritative and the default; a switch persists to
-// both observed storage keys (r2 §1.5) and flips <html lang> (r1 §1.1).
-// No framework: issue #74 scopes the workspace layer to 仅中英 and rules
-// the multilingual framework out, overriding the react-i18next pin in
-// 01 §4.1 (that pin serves the four-language landing, a separate surface).
-// useState + context is the whole machinery here.
-
 import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { safeLocalStorage } from '../safe-storage.js';

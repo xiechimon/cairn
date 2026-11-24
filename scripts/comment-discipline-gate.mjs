@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { assertExactRevertTree, git as gitIn, revertedShas } from './exact-revert.mjs';
@@ -56,6 +56,21 @@ try {
         .split('\0')
         .filter((path) => /\.(ts|tsx|mjs|css)$/.test(path));
   let violations = 0;
+  let stale = 0;
+  const allowlistFileCache = new Map();
+  for (const entry of allowlist) {
+    let lines = allowlistFileCache.get(entry.path);
+    if (lines === undefined) {
+      lines = existsSync(entry.path) ? new Set(readFileSync(entry.path, 'utf8').split('\n')) : null;
+      allowlistFileCache.set(entry.path, lines);
+    }
+    if (lines === null || !lines.has(entry.line)) {
+      console.error(
+        `scripts/comment-discipline-allowlist.json: stale entry for ${entry.path} (${JSON.stringify(entry.line)})`,
+      );
+      stale++;
+    }
+  }
   for (const path of files) {
     const added = new Set();
     let line = 0;
@@ -92,9 +107,9 @@ try {
     }
   }
   console.log(
-    `comment-discipline-gate: ${violations} new comment line(s)${exactRevert ? ' (exact revert of main commits)' : ''}`,
+    `comment-discipline-gate: ${violations} new comment line(s), ${stale} stale allowlist entry(ies)${exactRevert ? ' (exact revert of main commits)' : ''}`,
   );
-  process.exitCode = violations ? 1 : 0;
+  process.exitCode = violations || stale ? 1 : 0;
 } catch (error) {
   console.error(`comment-discipline-gate: ${error.message}`);
   process.exitCode = 2;

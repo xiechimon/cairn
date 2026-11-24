@@ -10,7 +10,6 @@ export const RUNTIME_BLOCK_BEGIN = '<!-- BEGIN CAIRN-RUNTIME (auto-managed; do n
 export const RUNTIME_BLOCK_END = '<!-- END CAIRN-RUNTIME -->';
 const EXEMPT = [
   /^README\.zh\.md$/,
-  /^apps\/web\/src\/i18n\//,
   /^site\/src\/content\/docs\/zh-cn\//,
   /(^|\/)zh(-CN)?\.(md|ya?ml)$/,
 ];

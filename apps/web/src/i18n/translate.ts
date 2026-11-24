@@ -2,8 +2,6 @@ import type { Locale } from './locale.js';
 
 export type TVars = Record<string, string | number>;
 
-/** Call-site signature the components consume (bound to locale + dict by
- *  the provider). */
 export type TFunc = (source: string, vars?: TVars) => string;
 
 const englishCardinals = new Intl.PluralRules('en');
