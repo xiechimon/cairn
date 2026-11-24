@@ -146,24 +146,24 @@ interface PdfWord {
 const MATCH_CHARS = 40;
 
 async function pdfWords(doc: PDFDocumentProxy): Promise<PdfWord[]> {
+  const { Util } = await loadPdfJs();
   const words: PdfWord[] = [];
   for (let number = 1; number <= Math.min(doc.numPages, MAX_PAGES); number++) {
     const page = await doc.getPage(number);
-    const [x0 = 0, y0 = 0, x1 = 0, y1 = 0] = page.view;
-    const width = x1 - x0;
-    const height = y1 - y0;
+    const viewport = page.getViewport({ scale: 1 });
     const content = await page.getTextContent();
     for (const item of content.items) {
       if (!('str' in item) || item.str.trim() === '') continue;
-      const [, , , , e = 0, f = 0] = item.transform as number[];
+      const [, , c = 0, d = 0, e = 0, f = 0] = Util.transform(viewport.transform, item.transform);
+      const height = Math.hypot(c, d);
       words.push({
         page: number,
         text: item.str.replace(/\s+/g, ''),
         rect: {
-          x: (e - x0) / width,
-          y: 1 - (f - y0 + item.height) / height,
-          width: item.width / width,
-          height: item.height / height,
+          x: e / viewport.width,
+          y: (f - height) / viewport.height,
+          width: item.width / viewport.width,
+          height: height / viewport.height,
         },
       });
     }
