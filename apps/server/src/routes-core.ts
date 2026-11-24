@@ -20,7 +20,12 @@ import { toTeamRecord } from './db/seed.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { openSseStream } from './lib/sse-headers.js';
-import { isOpenRemotePath, pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
+import {
+  isOpenRemotePath,
+  matchesAuthToken,
+  pairedDeviceIdOf,
+  sameOriginPageWrite,
+} from './lib/token-auth.js';
 import { githubAppOf, jsonBody, requireTeam, SESSION_COOKIE } from './routes-helpers.js';
 import { readBackupHealth } from './services/backup-status.js';
 import { issueBrowserSession, requestIsSecure, setAuthCookie } from './services/browser-session.js';
@@ -61,6 +66,19 @@ const ACCESS_REFUSALS = {
 export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
   const streamSessions = new StreamSessionRegistry();
   app.get('/api/auth/session', (c) => c.body(null, 204));
+
+  app.post('/api/auth/session', (c) => {
+    c.header('cache-control', 'no-store');
+    if (ctx.authToken === null) return c.body(null, 204);
+    const match = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
+    const provided = match?.[1] ?? null;
+    if (provided === null || !matchesAuthToken(ctx.authToken, provided)) {
+      return c.json({ error: 'owner token required' }, 403);
+    }
+    const session = issueBrowserSession(ctx.db, 'owner', null);
+    setAuthCookie(c, session.token, requestIsSecure(c), session.expiresAt);
+    return c.body(null, 204);
+  });
 
   app.use('/api/*', async (c, next) => {
     if (!getCookie(c, SESSION_COOKIE) && !isOpenRemotePath(c.req.path)) {

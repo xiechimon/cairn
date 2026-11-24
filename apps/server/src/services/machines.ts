@@ -253,6 +253,8 @@ export function toMachineRecord(row: typeof machine.$inferSelect, runningSteps?:
     ...(runningSteps !== undefined ? { runningSteps } : {}),
     capabilities: row.capabilities,
     ...(login.success ? { claudeLogin: login.data } : {}),
+    maxConcurrency: row.maxConcurrency ?? null,
+    autoDispatch: row.autoDispatch ?? true,
   });
 }
 

@@ -185,6 +185,17 @@ export const chiefThreadSchema = z.object({
         })
         .nullable(),
       blocked: stepQueueBlockedSchema.optional(),
+      alternateMachines: z
+        .array(
+          z.object({
+            machineId: recordId,
+            name: z.string(),
+          }),
+        )
+        .optional(),
+      lockReason: z
+        .enum(['active-session', 'local-project', 'explicit-pin', 'host-subscription'])
+        .optional(),
     })
     .nullable()
     .optional(),

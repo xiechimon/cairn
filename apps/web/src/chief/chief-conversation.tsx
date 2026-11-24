@@ -20,7 +20,14 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useConnected } from '../api/connection-state.js';
-import { useArchivedTodos, useMachines, useProjects, useSkills, useTodos } from '../api/hooks.js';
+import {
+  useApiMutations,
+  useArchivedTodos,
+  useMachines,
+  useProjects,
+  useSkills,
+  useTodos,
+} from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import type { PendingComments } from '../board/design/design-composer.js';
 import { useUnreadThreadIds } from '../board/use-thread-unread.js';
@@ -42,7 +49,7 @@ import {
   useMessageScroller,
   useMessageScrollerScrollable,
 } from '../components/ui/message-scroller.js';
-import { toastSuccess } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { ThreadUnreadContext, type TodoGlance, TodoGlanceContext } from '../detail/segments.js';
 import type { ChiefContent, ChiefStreamItem } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
@@ -537,6 +544,16 @@ export function ChiefConversation({
     };
   }, [latestError, latestUser, dismissedFailure, onRetryGreeting, retryLastUser]);
   const [dismissedWait, setDismissedWait] = useState<string | null>(null);
+  const { switchChiefStepMachine } = useApiMutations(teamId);
+  const handleSwitchMachine = useCallback(
+    (stepId: string, machineId: string) => {
+      switchChiefStepMachine.mutate(
+        { stepId, machineId },
+        { onError: (error) => toastError(t('切换执行机失败，请重试。'), error) },
+      );
+    },
+    [switchChiefStepMachine, t],
+  );
   const liveWait = rows.findLast(({ item }) => item.kind === 'streaming')?.item;
   const waitNow = liveWait?.kind === 'streaming' ? (liveWait.queueWait ?? null) : null;
   useEffect(() => {
@@ -731,6 +748,8 @@ export function ChiefConversation({
           wait={queueWait}
           className={BANNER_CLS}
           onDismiss={() => setDismissedWait(queueWait.kind)}
+          onSwitchMachine={handleSwitchMachine}
+          switching={switchChiefStepMachine.isPending}
         />
       ) : failure !== null ? (
         <TurnFailureCard

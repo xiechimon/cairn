@@ -1357,6 +1357,14 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['model-routing', teamId] });
       },
     }),
+    switchChiefStepMachine: useMutation({
+      mutationFn: (input: { stepId: string; machineId: string }) =>
+        api.post<{ ok: true; machineId: string; name: string }>(
+          `/api/chief/steps/${encodeURIComponent(input.stepId)}/switch-machine`,
+          { machineId: input.machineId },
+        ),
+      onSuccess: invalidateAll,
+    }),
     pairPhone: useMutation({
       mutationFn: (input: {
         machineId: string;

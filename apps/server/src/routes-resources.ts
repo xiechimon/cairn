@@ -339,9 +339,15 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     if (!row) throw notFound(`machine ${id}`);
     requireTeam(ctx, row.teamId);
     const body = parseWith(patchMachineBodySchema, await jsonBody(c), 'body');
-    if (body.isDefault === true) {
+    if (
+      body.isDefault === true ||
+      body.maxConcurrency !== undefined ||
+      body.autoDispatch !== undefined
+    ) {
       if (!isOwnerSession(c)) throw new HttpError(403, 'owner session required');
-      if (row.tokenHash === null) throw new HttpError(409, 'machine is not enrolled');
+    }
+    if (body.isDefault === true && row.tokenHash === null) {
+      throw new HttpError(409, 'machine is not enrolled');
     }
     if (body.enabledRuntimes !== undefined) {
       throw new HttpError(
@@ -349,11 +355,21 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
         'runtimes follow what the Runner detects; there is no runtime switch to change',
       );
     }
-    if (body.name !== undefined) {
-      ctx.db.update(machine).set({ name: body.name }).where(eq(machine.id, id)).run();
+    const patch: Partial<typeof machine.$inferInsert> = {};
+    if (body.name !== undefined) patch.name = body.name;
+    if (body.maxConcurrency !== undefined) patch.maxConcurrency = body.maxConcurrency;
+    if (body.autoDispatch !== undefined) patch.autoDispatch = body.autoDispatch;
+    if (Object.keys(patch).length > 0) {
+      ctx.db.update(machine).set(patch).where(eq(machine.id, id)).run();
     }
     if (body.isDefault === true) {
       ctx.db.update(team).set({ defaultMachineId: id }).where(eq(team.id, row.teamId)).run();
+    }
+    if (
+      body.isDefault === true ||
+      body.maxConcurrency !== undefined ||
+      body.autoDispatch !== undefined
+    ) {
       ctx.machineHub.wake(row.teamId);
     }
     const updated = ctx.db.select().from(machine).where(eq(machine.id, id)).get();

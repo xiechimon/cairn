@@ -1,14 +1,17 @@
 import { cn } from 'cn';
-import { useEffect } from 'react';
+import { type FormEvent, useEffect, useState } from 'react';
 import {
   consumePairFragment,
   ensurePairRequest,
   requestNewPairAttempt,
+  signInWithOwnerToken,
   useAuth,
 } from '../api/auth.js';
 import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
+import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
+import { Separator } from '../components/ui/separator.js';
 import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -21,7 +24,25 @@ const stayOpen = () => undefined;
 export function TokenGate() {
   const { t } = useI18n();
   const auth = useAuth();
+  const [tokenMode, setTokenMode] = useState(false);
+  const [tokenInput, setTokenInput] = useState('');
+  const [tokenSubmitting, setTokenSubmitting] = useState(false);
+  const [tokenError, setTokenError] = useState<'invalid' | 'unavailable' | null>(null);
   const pending = auth.pair?.phase === 'pending';
+
+  const submitOwnerToken = async (event: FormEvent) => {
+    event.preventDefault();
+    if (tokenSubmitting) return;
+    setTokenSubmitting(true);
+    setTokenError(null);
+    const outcome = await signInWithOwnerToken(tokenInput);
+    setTokenSubmitting(false);
+    if (outcome === 'ok') {
+      setTokenInput('');
+      return;
+    }
+    setTokenError(outcome);
+  };
   const now = useIntervalNow(pending);
 
   useEffect(() => {
@@ -117,6 +138,66 @@ export function TokenGate() {
           <p className="m-0 text-xs text-destructive" role="alert">
             {t('配对链接无效或已过期。')}
           </p>
+        )}
+        <Separator />
+        {tokenMode ? (
+          <form onSubmit={(e) => void submitOwnerToken(e)} className="flex flex-col gap-2">
+            <Input
+              type="password"
+              autoComplete="current-password"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              placeholder={t('粘贴服务器访问令牌')}
+              aria-label={t('服务器访问令牌')}
+              data-testid="owner-token-input"
+              disabled={tokenSubmitting}
+            />
+            {tokenError !== null && (
+              <p
+                className="m-0 text-xs text-destructive"
+                role="alert"
+                data-testid="owner-token-error"
+              >
+                {tokenError === 'invalid'
+                  ? t('访问令牌无效，请检查后重试。')
+                  : t('连接失败，请重试。')}
+              </p>
+            )}
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="pointer-coarse:h-11"
+                onClick={() => {
+                  setTokenMode(false);
+                  setTokenError(null);
+                }}
+              >
+                {t('返回配对码')}
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                className="pointer-coarse:h-11"
+                data-testid="owner-token-submit"
+                disabled={tokenSubmitting || tokenInput.trim() === ''}
+              >
+                {tokenSubmitting ? t('正在登录…') : t('登录')}
+              </Button>
+            </div>
+          </form>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="w-full text-meta font-normal text-content-secondary pointer-coarse:h-11"
+            data-testid="owner-token-toggle"
+            onClick={() => setTokenMode(true)}
+          >
+            {t('用访问令牌登录')}
+          </Button>
         )}
         <p className="m-0 text-center text-caption leading-normal text-content-tertiary">
           <span className="block" role="status">

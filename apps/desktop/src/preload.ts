@@ -78,6 +78,16 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   localRunner: {
     reconnect: (): Promise<void> => ipcRenderer.invoke('local-runner:reconnect'),
   },
+  host: {
+    status: (): Promise<unknown> => ipcRenderer.invoke('desktop-host:status'),
+    addRemote: (input: { name: string; url: string }): Promise<unknown> =>
+      ipcRenderer.invoke('desktop-host:add-remote', input),
+    removeRemote: (id: string): Promise<unknown> =>
+      ipcRenderer.invoke('desktop-host:remove-remote', id),
+    switch: (id: string): Promise<unknown> => ipcRenderer.invoke('desktop-host:switch', id),
+    setResident: (enabled: boolean): Promise<unknown> =>
+      ipcRenderer.invoke('desktop-host:set-resident', enabled),
+  },
   devin: {
     status: (): Promise<DevinLocalStatus> => ipcRenderer.invoke('devin:status'),
     import: (input: DesktopSubscriptionInput): Promise<DevinLoginOutcome> =>

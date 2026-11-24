@@ -1324,7 +1324,8 @@
           "/api/teams/:id/machines",
           "/api/machines/:id",
           "/api/machines/:id/revoke",
-          "/api/todos/:id/runner"
+          "/api/todos/:id/runner",
+          "/api/chief/steps/:stepId/switch-machine"
         ]
       },
       "reach": [

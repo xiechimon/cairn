@@ -111,6 +111,24 @@ export const stepJournalRowSchema = stepRecordSchema.extend({
         })
         .optional(),
       blocked: stepQueueBlockedSchema.optional(),
+      alternateMachines: z
+        .array(
+          z.object({
+            machineId: recordId,
+            name: z.string(),
+          }),
+        )
+        .optional(),
+      lockReason: z
+        .enum(['active-session', 'local-project', 'explicit-pin', 'host-subscription'])
+        .optional(),
+    })
+    .optional(),
+  routedFrom: z
+    .object({
+      machineId: recordId,
+      name: z.string(),
+      reason: z.enum(['offline', 'busy', 'manual-switch']),
     })
     .optional(),
   skillInjection: skillInjectionSchema.nullable(),

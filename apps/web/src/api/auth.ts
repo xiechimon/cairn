@@ -101,6 +101,34 @@ function publish(confirmedReplacement = false): void {
   for (const listener of listeners) listener();
 }
 
+export async function signInWithOwnerToken(
+  rawToken: string,
+): Promise<'ok' | 'invalid' | 'unavailable'> {
+  const token = rawToken.trim();
+  if (token === '') return 'invalid';
+  try {
+    const response = await fetch(BROWSER_SESSION_PATH, {
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      mode: 'same-origin',
+      redirect: 'error',
+      headers: {
+        [BROWSER_AUTH_HEADER]: '1',
+        authorization: `Bearer ${token}`,
+      },
+    });
+    if (response.status === 204) {
+      applyVerdict('authenticated', 'waiting', true);
+      return 'ok';
+    }
+    if (response.status === 401 || response.status === 403) return 'invalid';
+    return 'unavailable';
+  } catch {
+    return 'unavailable';
+  }
+}
+
 export function subscribeAuth(listener: () => void): () => void {
   listeners.add(listener);
   return () => {

@@ -1557,6 +1557,8 @@ export function mapMachines(
     ...(m.capabilities !== undefined ? { capabilities: m.capabilities } : {}),
     ...(m.claudeLogin !== undefined ? { claudeLogin: m.claudeLogin } : {}),
     ...(m.providers !== undefined ? { providers: m.providers } : {}),
+    ...(m.maxConcurrency !== undefined ? { maxConcurrency: m.maxConcurrency } : {}),
+    ...(m.autoDispatch !== undefined ? { autoDispatch: m.autoDispatch } : {}),
   }));
 }
 
@@ -2368,6 +2370,12 @@ export function mapChief(
             queueWait: {
               kind: waitKind,
               ...(turnQueue.waitingFor != null ? { machine: turnQueue.waitingFor.name } : {}),
+              stepId: turnQueue.stepId,
+              ...(turnQueue.alternateMachines !== undefined &&
+              turnQueue.alternateMachines.length > 0
+                ? { alternateMachines: turnQueue.alternateMachines }
+                : {}),
+              ...(turnQueue.lockReason !== undefined ? { lockReason: turnQueue.lockReason } : {}),
             },
           });
         } else {

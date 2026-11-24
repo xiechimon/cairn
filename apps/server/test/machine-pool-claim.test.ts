@@ -257,14 +257,15 @@ function occupy(w: World, machineId: string, n: number): void {
 }
 
 describe('a worker step runs only on its named machine', () => {
-  test('preferred machine offline: another eligible machine does not take the step', async () => {
+  test('preferred machine offline past grace: another eligible auto-dispatch machine takes the step', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac');
     routeOf(w, omarchy);
-    const stepId = pendingStep(w);
-    expect(await claimOn(w, mac)).toBeNull();
-    expect(statusOf(w, stepId)).toBe('pending');
+    const stepId = pendingStep(w, { ageMs: 20_000 });
+    const claimed = await claimOn(w, mac);
+    expect(claimed?.step.id).toBe(stepId);
+    expect(statusOf(w, stepId)).toBe('claimed');
   });
 
   test('preferred machine online and free: another machine leaves the step to it', async () => {
@@ -316,14 +317,15 @@ describe('a worker step runs only on its named machine', () => {
     expect(statusOf(w, stepId)).toBe('pending');
   });
 
-  test('an Orb-required route does not move to another Orb executor when its preferred one is offline', async () => {
+  test('an Orb-required route moves to another eligible Orb executor when its preferred one is offline past grace', async () => {
     const w = await world();
     const orb = await machineOf(w, 'omarchy-orb', { online: false, executor: 'orb' });
     const macOrb = await machineOf(w, 'mac-orb', { executor: 'orb' });
     routeOf(w, orb, { executor: 'orb' });
-    const stepId = pendingStep(w);
-    expect(await claimOn(w, macOrb)).toBeNull();
-    expect(statusOf(w, stepId)).toBe('pending');
+    const stepId = pendingStep(w, { ageMs: 20_000 });
+    const claimed = await claimOn(w, macOrb);
+    expect(claimed?.step.id).toBe(stepId);
+    expect(statusOf(w, stepId)).toBe('claimed');
   });
 
   test('a local-path project never leaves its preferred machine', async () => {
@@ -422,10 +424,11 @@ describe('a worker step runs only on its named machine', () => {
     expect(queue?.blocked).toBeUndefined();
   });
 
-  test('the queue keeps waiting for the named machine when it is offline', async () => {
+  test('the queue keeps waiting for the named machine when it is offline and no auto-dispatch backup exists', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac');
+    w.s.db.update(machineTable).set({ autoDispatch: false }).where(eq(machineTable.id, mac)).run();
     routeOf(w, omarchy);
     occupy(w, mac, 1);
     const stepId = pendingStep(w);
@@ -523,10 +526,11 @@ describe('the default Runner', () => {
     expect((await claimOn(w, linux))?.step.id).toBe(stepId);
   });
 
-  test('an offline default Runner keeps the step waiting; no other machine takes it', async () => {
+  test('an offline default Runner fails over to an online auto-dispatch backup past grace, and waits when backups disable autoDispatch', async () => {
     const w = await world();
     const linux = await machineOf(w, 'linux', { online: false });
     const mac = await machineOf(w, 'mac');
+    w.s.db.update(machineTable).set({ autoDispatch: false }).where(eq(machineTable.id, mac)).run();
     routeOf(w, null);
     const stepId = pendingStep(w, { ageMs: 60 * 60_000 });
     expect(await claimOn(w, mac)).toBeNull();

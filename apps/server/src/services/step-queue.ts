@@ -27,14 +27,12 @@ import { projectOfTodo } from './git.js';
 import { infoCardPlan } from './info-card.js';
 import {
   chiefIneligibility,
-  chiefMachineId,
   machineCanReturn,
-  platformFallbackMachineId,
   priorSessionOf,
+  type RouteLockReason,
   type RouteVerdict,
-  routeTargets,
-  routeVerdict,
-  runtimeFallbackMachineId,
+  resolveChiefCandidates,
+  resolveWorkerCandidates,
   targetUnavailable,
   teamDefaultMachineId,
   type WorkerStepFacts,
@@ -132,6 +130,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
       teamId: chiefThread.teamId,
       holdReason: step.holdReason,
       holdUntil: step.holdUntil,
+      targetMachineId: step.targetMachineId,
       chiefId: chiefThread.chiefId,
       projectId: chiefThread.projectId,
     })
@@ -169,7 +168,10 @@ export function stepQueueProjector(db: Db, teamId: string) {
 
   interface WorkerRouting {
     verdict: RouteVerdict;
+    waitingForId: string | null;
     blocked: StepQueueBlocked | undefined;
+    alternateMachines: Array<{ machineId: string; name: string }>;
+    lockReason?: RouteLockReason;
   }
 
   function workerRouting(
@@ -199,30 +201,44 @@ export function stepQueueProjector(db: Db, teamId: string) {
       facts.model.provider,
     );
     const need = agentRow.requiredCapabilities?.os;
-    const sole = runtimeFallbackMachineId(db, teamId, facts.model.provider, () =>
-      platformFallbackMachineId(db, teamMachines, defaultMachineId, need),
-    );
     const homeRetired =
       target.homeMachineId !== null && !machineCanReturn(db, target.homeMachineId);
     const homePin = homeRetired && !facts.localProject ? null : target.homeMachineId;
-    const verdict = routeVerdict({
-      machineId: null,
-      targets: routeTargets(
+    const explicitOverrideMachineId = row.todoRow.routeOverride?.machineId ?? null;
+    const resolution = resolveWorkerCandidates({
+      db,
+      teamId,
+      teamMachines,
+      facts,
+      catalog,
+      sessionMachineId:
         !prior.freshSession && prior.priorSessionId !== null ? prior.priorMachineLiveId : null,
-        homePin,
-        sole,
-      ),
+      explicitOverrideMachineId,
+      ruleMachineId: explicitOverrideMachineId === null ? homePin : null,
+      defaultMachineId,
+      stepCreatedAt: row.createdAt,
+      now,
     });
+    const verdict: RouteVerdict =
+      resolution.claimableIds.length > 0
+        ? { claim: true }
+        : { claim: false, waitingFor: resolution.waitingForId };
+    const waitingForId = resolution.claimableIds[0] ?? resolution.waitingForId;
+    const extra = {
+      waitingForId,
+      alternateMachines: resolution.alternateMachines,
+      ...(resolution.lockReason !== undefined ? { lockReason: resolution.lockReason } : {}),
+    };
     if (
       stepRuntimeFor(facts.model.provider) === 'claude-code' &&
       accountHeld(row, prior, enabledId)
     ) {
-      return { verdict, blocked: { kind: 'account-switched', missing: [] } };
+      return { verdict, blocked: { kind: 'account-switched', missing: [] }, ...extra };
     }
-    if (verdict.claim) return { verdict, blocked: undefined };
+    if (verdict.claim) return { verdict, blocked: undefined, ...extra };
     const named = verdict.waitingFor;
     if (homeRetired && facts.localProject && named === target.homeMachineId) {
-      return { verdict, blocked: { kind: 'machine-retired', missing: [] } };
+      return { verdict, blocked: { kind: 'machine-retired', missing: [] }, ...extra };
     }
     const platform = need === undefined ? {} : { platform: need };
     if (named === null) {
@@ -232,12 +248,17 @@ export function stepQueueProjector(db: Db, teamId: string) {
           need === undefined
             ? { kind: 'machine-offline', missing: [] }
             : { kind: 'capability-missing', missing: [RUNNER_OS_LABELS[need]], ...platform },
+        ...extra,
       };
     }
-    if (!unavailable(named)) return { verdict, blocked: undefined };
+    if (!unavailable(named)) return { verdict, blocked: undefined, ...extra };
     const home = machineRowOf(named);
     if (home === undefined || !home.online) {
-      return { verdict, blocked: { kind: 'machine-offline', missing: [], ...platform } };
+      return {
+        verdict,
+        blocked: { kind: 'machine-offline', missing: [], ...platform },
+        ...extra,
+      };
     }
     const gap = workerIneligibility(db, home, facts, catalog, now);
     return {
@@ -249,6 +270,7 @@ export function stepQueueProjector(db: Db, teamId: string) {
               gap,
               MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(facts.model.provider)],
             ),
+      ...extra,
     };
   }
 
@@ -259,36 +281,71 @@ export function stepQueueProjector(db: Db, teamId: string) {
     }
     return serverRoutes.get(projectId) ?? null;
   };
-  function blockedFor(
+  function chiefQueueOutcome(
     target: QueueTargetStep,
     row: (typeof queue)[number],
-  ): StepQueueBlocked | undefined {
+  ): {
+    blocked: StepQueueBlocked | undefined;
+    waitingOn: string | null;
+    alternateMachines: Array<{ machineId: string; name: string }>;
+    lockReason?: RouteLockReason;
+  } {
     if (!('todoRow' in row) && coordinatorInServerEnabled() && !isChiefSideThreadId(row.threadId)) {
       const serverRoute = serverRouteOf(row.projectId);
       if (serverRoute !== null) {
-        if (!('refusal' in serverRoute)) return undefined;
+        if (!('refusal' in serverRoute)) {
+          return { blocked: undefined, waitingOn: null, alternateMachines: [] };
+        }
         if (target.homeMachineId === null) {
-          return coordinatorRefusalBlocked(serverRoute.refusal, serverRoute.rule);
+          return {
+            blocked: coordinatorRefusalBlocked(serverRoute.refusal, serverRoute.rule),
+            waitingOn: null,
+            alternateMachines: [],
+          };
         }
       }
     }
     const agentRow = agentForRow(row);
     const provider =
       ('fallback' in row ? row.fallback?.model?.provider : undefined) ?? agentRow?.provider;
-    const homeMachineId = chiefMachineId(db, teamId, target.homeMachineId, provider);
-    const home = teamMachines.find((m) => m.id === homeMachineId);
+    const now = nowMs();
+    const resolution = resolveChiefCandidates({
+      db,
+      teamId,
+      teamMachines,
+      pinnedMachineId: target.homeMachineId,
+      targetMachineId: 'targetMachineId' in row ? (row.targetMachineId ?? null) : null,
+      agentRow: agentRow ?? { requiredCapabilities: null },
+      provider,
+      stepCreatedAt: row.createdAt,
+      now,
+    });
+    const extra = {
+      alternateMachines: resolution.alternateMachines,
+      ...(resolution.lockReason !== undefined ? { lockReason: resolution.lockReason } : {}),
+    };
+    if (resolution.claimableIds.length > 0) {
+      return { blocked: undefined, waitingOn: resolution.claimableIds[0] ?? null, ...extra };
+    }
+    const waitingOn = resolution.waitingForId;
+    const home = waitingOn === null ? undefined : teamMachines.find((m) => m.id === waitingOn);
     if (home === undefined || !home.online) {
-      return { kind: 'machine-offline', missing: [] };
+      return { blocked: { kind: 'machine-offline', missing: [] }, waitingOn, ...extra };
     }
     if (agentRow?.modelId != null) {
-      const gap = chiefIneligibility(db, home, agentRow, provider, nowMs());
-      if (gap !== null)
-        return ineligibleBlocked(gap, MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)]);
+      const gap = chiefIneligibility(db, home, agentRow, provider, now);
+      if (gap !== null) {
+        return {
+          blocked: ineligibleBlocked(gap, MODEL_SOURCE_RUNTIME_LABELS[stepRuntimeFor(provider)]),
+          waitingOn,
+          ...extra,
+        };
+      }
     }
     if (!confinementDispatchReady(home.capabilities)) {
-      return { kind: 'sandbox-unavailable', missing: [] };
+      return { blocked: { kind: 'sandbox-unavailable', missing: [] }, waitingOn, ...extra };
     }
-    return undefined;
+    return { blocked: undefined, waitingOn, ...extra };
   }
 
   function project(target: QueueTargetStep): StepQueueInfo | null {
@@ -324,12 +381,9 @@ export function stepQueueProjector(db: Db, teamId: string) {
       'todoRow' in queueRow && routeForStep(db, queueRow.todoRow, queueRow.kind) !== null
         ? workerRouting(target, queueRow)
         : null;
+    const chiefOutcome = routing === null ? chiefQueueOutcome(target, queueRow) : null;
     const waitingOn =
-      routing === null
-        ? target.homeMachineId
-        : routing.verdict.claim
-          ? null
-          : routing.verdict.waitingFor;
+      routing !== null ? routing.waitingForId : (chiefOutcome?.waitingOn ?? target.homeMachineId);
     let waitingFor: StepQueueInfo['waitingFor'] = null;
     if (waitingOn !== null) {
       const row = machineRowOf(waitingOn);
@@ -344,12 +398,17 @@ export function stepQueueProjector(db: Db, teamId: string) {
       target.holdReason === 'quota' && target.holdUntil != null
         ? { reason: 'quota', retryAt: target.holdUntil }
         : undefined;
-    const blocked = routing !== null ? routing.blocked : blockedFor(target, queueRow);
+    const blocked = routing !== null ? routing.blocked : chiefOutcome?.blocked;
+    const alternateMachines =
+      routing !== null ? routing.alternateMachines : (chiefOutcome?.alternateMachines ?? []);
+    const lockReason = routing !== null ? routing.lockReason : chiefOutcome?.lockReason;
     return {
       position,
       waitingFor,
       ...(hold !== undefined ? { hold } : {}),
       ...(blocked !== undefined ? { blocked } : {}),
+      ...(alternateMachines.length > 0 ? { alternateMachines } : {}),
+      ...(lockReason !== undefined ? { lockReason } : {}),
     };
   }
 

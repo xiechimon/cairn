@@ -177,13 +177,20 @@ export function QueueWaitCard({
   wait,
   className,
   onDismiss,
+  onSwitchMachine,
+  switching,
 }: {
   wait: QueueWait;
   className: string;
   onDismiss: () => void;
+  onSwitchMachine?: (stepId: string, machineId: string) => void;
+  switching?: boolean;
 }) {
   const { t } = useI18n();
   const computer = wait.kind === 'no-computer';
+  const alternates = computer ? [] : (wait.alternateMachines ?? []);
+  const primaryAlt = wait.stepId !== undefined ? alternates[0] : undefined;
+  const canSwitch = primaryAlt !== undefined && onSwitchMachine !== undefined;
   const title = computer
     ? t('Coordinator 的电脑尚未就绪')
     : wait.machine !== undefined
@@ -191,9 +198,13 @@ export function QueueWaitCard({
       : t('执行机离线');
   const why = computer
     ? t('这一步需要电脑，但暂无可用的电脑。打开执行机面板启动它，就绪后本轮会自动继续。')
-    : t(
-        '这一步要在执行机上运行，但它当前离线。确认电脑已开机、Cairn 正在运行，执行机上线后本轮会自动继续。',
-      );
+    : wait.lockReason === 'local-project'
+      ? t('此项目文件夹仅在该执行机本地。确认电脑已开机、Cairn 正在运行，上线后本轮会自动继续。')
+      : canSwitch
+        ? t('这一步正在等该执行机恢复，也可以直接切换到另一台在线执行机继续。')
+        : t(
+            '这一步要在执行机上运行，但它当前离线。确认电脑已开机、Cairn 正在运行，执行机上线后本轮会自动继续。',
+          );
   return (
     <NoticeCard
       testId="chief-queue-wait-card"
@@ -205,8 +216,22 @@ export function QueueWaitCard({
       onDismiss={onDismiss}
     >
       <span className="mt-2 flex flex-wrap items-center gap-2">
+        {canSwitch && wait.stepId !== undefined && (
+          <Button
+            size="sm"
+            disabled={switching}
+            className="pointer-coarse:h-11"
+            data-testid="chief-queue-switch-machine"
+            onClick={() => {
+              if (wait.stepId !== undefined) onSwitchMachine(wait.stepId, primaryAlt.machineId);
+            }}
+          >
+            {t('改在 {machine} 继续', { machine: primaryAlt.name })}
+          </Button>
+        )}
         <Button
           size="sm"
+          variant={canSwitch ? 'outline' : 'default'}
           className="pointer-coarse:h-11"
           render={<Link to={computer ? `/app?${PANE_PARAM}=machines` : settingsHref('machines')} />}
         >

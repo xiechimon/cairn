@@ -344,6 +344,9 @@ export const step = sqliteTable(
     mcpGrant: json<string[]>('mcpGrant'),
     claimedRepo: text('claimedRepo'),
     claimedRepoId: integer('claimedRepoId'),
+    targetMachineId: text('targetMachineId'),
+    routedFromMachineId: text('routedFromMachineId'),
+    routedReason: text('routedReason').$type<'offline' | 'busy' | 'manual-switch' | null>(),
     memoryTrace: json<ChiefMemoryTrace>('memoryTrace'),
     createdAt: epochMs('createdAt').notNull(),
   },
@@ -1022,6 +1025,8 @@ export const machine = sqliteTable(
     capabilities: json<MachineCapabilities | null>('capabilities'),
     hostKey: text('hostKey'),
     retiredAt: epochMs('retiredAt'),
+    maxConcurrency: integer('maxConcurrency'),
+    autoDispatch: bool('autoDispatch').notNull().default(true),
   },
   (t) => [
     index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt),

@@ -337,6 +337,8 @@ export interface MachineRow {
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
   phonesFixture?: PhonesFixture;
+  maxConcurrency?: number | null;
+  autoDispatch?: boolean;
 }
 
 export interface PhonesFixture {
@@ -591,6 +593,9 @@ export interface ChiefSegment {
 export interface QueueWait {
   kind: 'no-computer' | 'machine-offline';
   machine?: string;
+  stepId?: string;
+  alternateMachines?: Array<{ machineId: string; name: string }>;
+  lockReason?: 'active-session' | 'local-project' | 'explicit-pin' | 'host-subscription';
 }
 
 export type ChiefStreamItem =

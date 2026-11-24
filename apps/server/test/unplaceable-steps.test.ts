@@ -518,6 +518,7 @@ describe('an offline Runner with waiting tasks keeps one Coordinator status row 
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac');
+    w.s.db.update(machineTable).set({ autoDispatch: false }).where(eq(machineTable.id, mac)).run();
     routeOf(w, omarchy);
     const stepId = pendingStep(w);
     const now = Date.now();

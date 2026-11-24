@@ -6,10 +6,12 @@ import {
 } from '@cairn/shared';
 import { and, eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
+import { z } from 'zod';
 import type { AppContext } from './context.js';
-import { chiefMessage } from './db/schema.js';
+import { chiefMessage, chiefThread, machine, step } from './db/schema.js';
 import { conditionalGet } from './lib/conditional-get.js';
-import { notFound, parseWith } from './lib/errors.js';
+import { HttpError, notFound, parseWith } from './lib/errors.js';
+import { nowMs } from './lib/ids.js';
 import { pairedDeviceIdOf, sameOriginPageWrite } from './lib/token-auth.js';
 import { jsonBody, requireTeam, svcOf } from './routes-helpers.js';
 import {
@@ -42,7 +44,11 @@ import { parseAnswerBody } from './services/chief-questions.js';
 import { steerChiefMessage, stopChiefTurn, withdrawChiefMessage } from './services/chief-turns.js';
 import { latestChiefMemoryUsage } from './services/coordinator-steps.js';
 import { sendDesignComments } from './services/design-comments.js';
+import { isOwner } from './services/instance-owner.js';
+import { chiefIneligibility } from './services/machine-routing.js';
 import { isChiefConversation } from './services/machines.js';
+import { effectiveModel } from './services/model-fallback.js';
+import { coordinatorProfile } from './services/routing-rules.js';
 import {
   cancelQueuedMessage,
   deliverQueuedMessage,
@@ -307,5 +313,64 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         body.clientMessageId,
       );
     return c.json(result, 201);
+  });
+
+  const switchChiefMachineBodySchema = z.object({
+    machineId: z.string().min(1),
+  });
+
+  app.post('/api/chief/steps/:stepId/switch-machine', async (c) => {
+    const isOwnerSession =
+      pairedDeviceIdOf(c) === null &&
+      (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
+      isOwner(ctx.db, ctx.user.id);
+    if (!isOwnerSession) {
+      throw new HttpError(403, 'owner session required');
+    }
+    const stepId = c.req.param('stepId');
+    const stepRow = ctx.db.select().from(step).where(eq(step.id, stepId)).get();
+    if (stepRow?.kind !== 'chief') {
+      throw notFound(`chief step ${stepId}`);
+    }
+    const threadRow = ctx.db
+      .select()
+      .from(chiefThread)
+      .where(eq(chiefThread.id, stepRow.buildId))
+      .get();
+    if (!threadRow) throw notFound(`chief thread ${stepRow.buildId}`);
+    requireTeam(ctx, threadRow.teamId);
+    if (stepRow.status !== 'pending') {
+      throw new HttpError(409, 'step is no longer pending');
+    }
+    const body = parseWith(switchChiefMachineBodySchema, await jsonBody(c), 'body');
+    const target = ctx.db
+      .select()
+      .from(machine)
+      .where(and(eq(machine.id, body.machineId), eq(machine.teamId, threadRow.teamId)))
+      .get();
+    if (!target || target.retiredAt !== null) {
+      throw notFound(`machine ${body.machineId}`);
+    }
+    if (!target.online) {
+      throw new HttpError(409, 'target machine is offline');
+    }
+    const agentRow = coordinatorProfile(ctx.db, threadRow.teamId, threadRow.projectId);
+    if (agentRow !== null && agentRow.modelId != null) {
+      const model = effectiveModel(agentRow, stepRow);
+      if (chiefIneligibility(ctx.db, target, agentRow, model.provider, nowMs()) !== null) {
+        throw new HttpError(409, 'target machine cannot run this step');
+      }
+    }
+    ctx.db
+      .update(step)
+      .set({
+        targetMachineId: target.id,
+        routedFromMachineId: stepRow.targetMachineId ?? agentRow?.machineId ?? null,
+        routedReason: 'manual-switch',
+      })
+      .where(and(eq(step.id, stepId), eq(step.status, 'pending')))
+      .run();
+    ctx.machineHub.wake(threadRow.teamId);
+    return c.json({ ok: true as const, machineId: target.id, name: target.name });
   });
 }

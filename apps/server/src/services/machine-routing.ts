@@ -94,46 +94,6 @@ export function chiefIneligibility(
   return null;
 }
 
-export function runtimeFallbackMachineId(
-  db: Pick<Db, 'select' | 'update'>,
-  teamId: string,
-  provider: string | null | undefined,
-  fallback: () => string | null,
-): string | null {
-  if (stepRuntimeFor(provider) === 'antigravity') {
-    const source = activeAntigravitySource(db, teamId);
-    if (source.kind === 'host') return source.login.runnerId;
-  }
-  return fallback();
-}
-
-export function chiefMachineId(
-  db: Pick<Db, 'select' | 'update'>,
-  teamId: string,
-  pinnedMachineId: string | null,
-  provider: string | null | undefined,
-): string | null {
-  return (
-    liveMachineId(db, pinnedMachineId) ??
-    runtimeFallbackMachineId(db, teamId, provider, () =>
-      fallbackMachineId(
-        db
-          .select({
-            id: machine.id,
-            online: machine.online,
-            kind: machine.kind,
-            lastSeenAt: machine.lastSeenAt,
-            retiredAt: machine.retiredAt,
-          })
-          .from(machine)
-          .where(eq(machine.teamId, teamId))
-          .all(),
-        teamDefaultMachineId(db, teamId),
-      ),
-    )
-  );
-}
-
 export function targetUnavailable(
   db: Db,
   target: MachineRow | undefined,
@@ -306,16 +266,341 @@ export function platformFallbackMachineId(
   return online[0]?.id ?? matching[0]?.id ?? null;
 }
 
+export const OFFLINE_FAILOVER_GRACE_MS = 15_000;
+
+export function effectiveMaxConcurrency(row: { maxConcurrency?: number | null }): number {
+  return row.maxConcurrency ?? Number.POSITIVE_INFINITY;
+}
+
+export type RouteLockReason =
+  | 'active-session'
+  | 'local-project'
+  | 'explicit-pin'
+  | 'host-subscription';
+
+export interface CandidateResolution {
+  claimableIds: string[];
+  waitingForId: string | null;
+  alternateMachines: Array<{ machineId: string; name: string }>;
+  failover?: { fromMachineId: string; reason: 'offline' | 'busy' };
+  lockReason?: RouteLockReason;
+}
+
+function isMachineAvailableForPool(
+  db: Db,
+  row: MachineRow,
+): { online: boolean; hasSlot: boolean; running: number } {
+  const running = machineRunningCount(db, row.id);
+  const max = effectiveMaxConcurrency(row);
+  return {
+    online: row.online && row.retiredAt === null,
+    hasSlot: running < max,
+    running,
+  };
+}
+
+function inOfflineGrace(
+  preferred: MachineRow | undefined,
+  stepCreatedAt: number,
+  now: number,
+): boolean {
+  if (preferred === undefined || preferred.online) return false;
+  if (now - stepCreatedAt >= OFFLINE_FAILOVER_GRACE_MS) return false;
+  if (preferred.lastSeenAt == null) return true;
+  return now - preferred.lastSeenAt < OFFLINE_FAILOVER_GRACE_MS;
+}
+
+export function resolveChiefCandidates(input: {
+  db: Db;
+  teamId: string;
+  teamMachines: readonly MachineRow[];
+  pinnedMachineId: string | null;
+  targetMachineId: string | null;
+  agentRow: Pick<RouteProfile, 'requiredCapabilities'>;
+  provider: string | null | undefined;
+  stepCreatedAt: number;
+  now: number;
+  claimingMachineId?: string;
+}): CandidateResolution {
+  const { db, teamId, teamMachines, agentRow, provider, stepCreatedAt, now } = input;
+  const isOnline = (m: MachineRow) => m.online || m.id === input.claimingMachineId;
+  const activeMachines = teamMachines.filter((m) => m.retiredAt === null && isRegisteredMachine(m));
+  const eligibleOnline = activeMachines.filter(
+    (m) => isOnline(m) && chiefIneligibility(db, m, agentRow, provider, now) === null,
+  );
+  const toAlternates = (excludeId: string | null) =>
+    eligibleOnline
+      .filter((m) => m.id !== excludeId)
+      .map((m) => ({ machineId: m.id, name: m.name }));
+
+  if (input.targetMachineId !== null && machineCanReturn(db, input.targetMachineId)) {
+    const target = activeMachines.find((m) => m.id === input.targetMachineId);
+    const eligible = target !== undefined && eligibleOnline.some((m) => m.id === target.id);
+    const hasSlot =
+      eligible && machineRunningCount(db, target.id) < effectiveMaxConcurrency(target);
+    return {
+      claimableIds: hasSlot ? [target.id] : [],
+      waitingForId: hasSlot ? null : input.targetMachineId,
+      alternateMachines: toAlternates(input.targetMachineId),
+      lockReason: 'explicit-pin',
+    };
+  }
+
+  if (stepRuntimeFor(provider) === 'antigravity') {
+    const source = activeAntigravitySource(db, teamId);
+    if (source.kind === 'host') {
+      const hostId = source.login.runnerId;
+      const host = activeMachines.find((m) => m.id === hostId);
+      const eligible = host !== undefined && eligibleOnline.some((m) => m.id === host.id);
+      const hasSlot = eligible && machineRunningCount(db, host.id) < effectiveMaxConcurrency(host);
+      return {
+        claimableIds: hasSlot ? [host.id] : [],
+        waitingForId: hasSlot ? null : hostId,
+        alternateMachines: toAlternates(hostId),
+        lockReason: 'host-subscription',
+      };
+    }
+  }
+
+  const preferredId =
+    liveMachineId(db, input.pinnedMachineId) ??
+    fallbackMachineId(activeMachines, teamDefaultMachineId(db, teamId));
+
+  if (preferredId === null) {
+    return {
+      claimableIds: [],
+      waitingForId: null,
+      alternateMachines: toAlternates(null),
+    };
+  }
+  const preferred = activeMachines.find((m) => m.id === preferredId);
+  const preferredEligible =
+    preferred !== undefined && eligibleOnline.some((m) => m.id === preferred.id);
+
+  const backups = eligibleOnline
+    .filter((m) => m.id !== preferredId && m.autoDispatch !== false)
+    .map((m) => ({ row: m, ...isMachineAvailableForPool(db, m) }))
+    .filter((entry) => (entry.online || entry.row.id === input.claimingMachineId) && entry.hasSlot)
+    .sort((a, b) => a.running - b.running || (a.row.id < b.row.id ? -1 : 1));
+
+  if (preferredEligible && preferred !== undefined) {
+    const running = machineRunningCount(db, preferred.id);
+    if (running < effectiveMaxConcurrency(preferred)) {
+      return {
+        claimableIds: [preferred.id],
+        waitingForId: null,
+        alternateMachines: toAlternates(preferred.id),
+      };
+    }
+    if (backups.length > 0) {
+      return {
+        claimableIds: backups.map((b) => b.row.id),
+        waitingForId: null,
+        alternateMachines: toAlternates(preferred.id),
+        failover: { fromMachineId: preferred.id, reason: 'busy' },
+      };
+    }
+    return {
+      claimableIds: [],
+      waitingForId: preferred.id,
+      alternateMachines: toAlternates(preferred.id),
+    };
+  }
+
+  if (preferred !== undefined && inOfflineGrace(preferred, stepCreatedAt, now)) {
+    return {
+      claimableIds: [],
+      waitingForId: preferred.id,
+      alternateMachines: toAlternates(preferred.id),
+    };
+  }
+
+  if (backups.length > 0) {
+    return {
+      claimableIds: backups.map((b) => b.row.id),
+      waitingForId: null,
+      alternateMachines: toAlternates(preferredId),
+      ...(preferredId !== null
+        ? { failover: { fromMachineId: preferredId, reason: 'offline' as const } }
+        : {}),
+    };
+  }
+
+  return {
+    claimableIds: [],
+    waitingForId: preferredId,
+    alternateMachines: toAlternates(preferredId),
+  };
+}
+
+export function resolveWorkerCandidates(input: {
+  db: Db;
+  teamId: string;
+  teamMachines: readonly MachineRow[];
+  facts: WorkerStepFacts;
+  catalog: ReadonlyArray<{ id: string; liveness?: 'alive' | 'dead' | 'unknown' }>;
+  sessionMachineId: string | null;
+  explicitOverrideMachineId: string | null;
+  ruleMachineId: string | null;
+  defaultMachineId: string | null;
+  stepCreatedAt: number;
+  now: number;
+  claimingMachineId?: string;
+}): CandidateResolution {
+  const { db, teamId, teamMachines, facts, catalog, stepCreatedAt, now } = input;
+  const isOnline = (m: MachineRow) => m.online || m.id === input.claimingMachineId;
+  const activeMachines = teamMachines.filter((m) => m.retiredAt === null && isRegisteredMachine(m));
+  const eligibleOnline = activeMachines.filter(
+    (m) => isOnline(m) && workerIneligibility(db, m, facts, catalog, now) === null,
+  );
+  const toAlternates = (excludeId: string | null) =>
+    eligibleOnline
+      .filter((m) => m.id !== excludeId)
+      .map((m) => ({ machineId: m.id, name: m.name }));
+
+  if (facts.localProject || facts.localMerge) {
+    const pinnedId =
+      input.sessionMachineId ??
+      input.explicitOverrideMachineId ??
+      input.ruleMachineId ??
+      input.defaultMachineId;
+    const pinned = pinnedId === null ? undefined : activeMachines.find((m) => m.id === pinnedId);
+    const eligible = pinned !== undefined && eligibleOnline.some((m) => m.id === pinned.id);
+    const hasSlot =
+      eligible && machineRunningCount(db, pinned.id) < effectiveMaxConcurrency(pinned);
+    return {
+      claimableIds: hasSlot ? [pinned.id] : [],
+      waitingForId: hasSlot ? null : pinnedId,
+      alternateMachines: [],
+      lockReason: 'local-project',
+    };
+  }
+
+  if (input.sessionMachineId !== null) {
+    const pinned = activeMachines.find((m) => m.id === input.sessionMachineId);
+    const eligible = pinned !== undefined && eligibleOnline.some((m) => m.id === pinned.id);
+    const hasSlot =
+      eligible && machineRunningCount(db, pinned.id) < effectiveMaxConcurrency(pinned);
+    return {
+      claimableIds: hasSlot ? [pinned.id] : [],
+      waitingForId: hasSlot ? null : input.sessionMachineId,
+      alternateMachines: toAlternates(input.sessionMachineId),
+      lockReason: 'active-session',
+    };
+  }
+
+  if (input.explicitOverrideMachineId !== null) {
+    const pinned = activeMachines.find((m) => m.id === input.explicitOverrideMachineId);
+    const eligible = pinned !== undefined && eligibleOnline.some((m) => m.id === pinned.id);
+    const hasSlot =
+      eligible && machineRunningCount(db, pinned.id) < effectiveMaxConcurrency(pinned);
+    return {
+      claimableIds: hasSlot ? [pinned.id] : [],
+      waitingForId: hasSlot ? null : input.explicitOverrideMachineId,
+      alternateMachines: toAlternates(input.explicitOverrideMachineId),
+      lockReason: 'explicit-pin',
+    };
+  }
+
+  if (stepRuntimeFor(facts.model.provider) === 'antigravity') {
+    const source = activeAntigravitySource(db, teamId);
+    if (source.kind === 'host') {
+      const hostId = source.login.runnerId;
+      const host = activeMachines.find((m) => m.id === hostId);
+      const eligible = host !== undefined && eligibleOnline.some((m) => m.id === host.id);
+      const hasSlot = eligible && machineRunningCount(db, host.id) < effectiveMaxConcurrency(host);
+      return {
+        claimableIds: hasSlot ? [host.id] : [],
+        waitingForId: hasSlot ? null : hostId,
+        alternateMachines: toAlternates(hostId),
+        lockReason: 'host-subscription',
+      };
+    }
+  }
+
+  const needOs = facts.agentRow.requiredCapabilities?.os;
+  const preferredId =
+    liveMachineId(db, input.ruleMachineId) ??
+    platformFallbackMachineId(db, activeMachines, input.defaultMachineId, needOs);
+  if (preferredId === null) {
+    return {
+      claimableIds: [],
+      waitingForId: null,
+      alternateMachines: toAlternates(null),
+    };
+  }
+
+  const preferred = activeMachines.find((m) => m.id === preferredId);
+  const preferredEligible =
+    preferred !== undefined && eligibleOnline.some((m) => m.id === preferred.id);
+
+  const backups = eligibleOnline
+    .filter((m) => m.id !== preferredId && m.autoDispatch !== false)
+    .map((m) => ({ row: m, ...isMachineAvailableForPool(db, m) }))
+    .filter((entry) => (entry.online || entry.row.id === input.claimingMachineId) && entry.hasSlot)
+    .sort((a, b) => a.running - b.running || (a.row.id < b.row.id ? -1 : 1));
+
+  if (preferredEligible && preferred !== undefined) {
+    const running = machineRunningCount(db, preferred.id);
+    if (running < effectiveMaxConcurrency(preferred)) {
+      return {
+        claimableIds: [preferred.id],
+        waitingForId: null,
+        alternateMachines: toAlternates(preferred.id),
+      };
+    }
+    if (backups.length > 0) {
+      return {
+        claimableIds: backups.map((b) => b.row.id),
+        waitingForId: null,
+        alternateMachines: toAlternates(preferred.id),
+        failover: { fromMachineId: preferred.id, reason: 'busy' },
+      };
+    }
+    return {
+      claimableIds: [],
+      waitingForId: preferred.id,
+      alternateMachines: toAlternates(preferred.id),
+    };
+  }
+
+  if (preferred !== undefined && inOfflineGrace(preferred, stepCreatedAt, now)) {
+    return {
+      claimableIds: [],
+      waitingForId: preferred.id,
+      alternateMachines: toAlternates(preferred.id),
+    };
+  }
+
+  if (backups.length > 0) {
+    return {
+      claimableIds: backups.map((b) => b.row.id),
+      waitingForId: null,
+      alternateMachines: toAlternates(preferredId),
+      ...(preferredId !== null
+        ? { failover: { fromMachineId: preferredId, reason: 'offline' as const } }
+        : {}),
+    };
+  }
+
+  return {
+    claimableIds: [],
+    waitingForId: preferredId,
+    alternateMachines: toAlternates(preferredId),
+  };
+}
+
 export type RouteVerdict = { claim: true } | { claim: false; waitingFor: string | null };
 
 export function routeVerdict(input: {
   machineId: string | null;
   targets: readonly RouteTarget[];
 }): RouteVerdict {
-  const target = input.targets[0];
-  if (target === undefined) return { claim: false, waitingFor: null };
-  if (target.machineId === input.machineId) return { claim: true };
-  return { claim: false, waitingFor: target.machineId };
+  if (input.targets.length === 0) return { claim: false, waitingFor: null };
+  if (input.machineId !== null && input.targets.some((t) => t.machineId === input.machineId)) {
+    return { claim: true };
+  }
+  return { claim: false, waitingFor: input.targets[0]?.machineId ?? null };
 }
 
 export function waitingSince(stepRow: { createdAt: number; holdUntil: number | null }): number {

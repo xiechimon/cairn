@@ -62,6 +62,15 @@ import {
   stopAntigravityLogin,
 } from './antigravity-auth.js';
 import { appMenuTemplate } from './app-menu.js';
+import {
+  activeConnectionOf,
+  addRemoteConnection,
+  LOCAL_CONNECTION_ID,
+  readConnectionCatalog,
+  removeRemoteConnection,
+  runnerHomeForConnection,
+  setActiveConnection,
+} from './connections.js';
 import { installContextMenu } from './context-menu.js';
 import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
 import { createKeepAwake } from './keep-awake.js';
@@ -79,6 +88,14 @@ import { desktopOtelEnv, withOtelFileEnv } from './otel-config.js';
 import { openPermissionGuide, readPermissions, registerOwnComputerIpc } from './own-computer.js';
 import { type CapturePage, createPageCapture } from './page-capture.js';
 import { offscreenCaptureSurfaces, pageCaptureRequestOf } from './page-capture-window.js';
+import {
+  clearServerOwner,
+  installResidentHost,
+  isResidentInstalled,
+  probeResidentServer,
+  uninstallResidentHost,
+  writeServerOwner,
+} from './resident-host.js';
 import { createRestartBudget } from './restart-budget.js';
 import { type LocalRunner, readRunnerRegistration, startLocalRunner } from './runner.js';
 import { migrateRunnerHome, runnerHomeFor } from './runner-home.js';
@@ -958,7 +975,12 @@ function serveNotifications(origin: string): void {
   });
 }
 
-function serveUpdates(origin: string, notice: UpdateNotice | null, ownerToken: string): void {
+function serveUpdates(
+  origin: string,
+  notice: UpdateNotice | null,
+  ownerToken: string,
+  allowLocalCredentials = true,
+): void {
   const showMenu = (state: DesktopUpdateState): void =>
     Menu.setApplicationMenu(
       Menu.buildFromTemplate(
@@ -1065,42 +1087,54 @@ function serveUpdates(origin: string, notice: UpdateNotice | null, ownerToken: s
     app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'dist'),
     'antigravity-login-worker.mjs',
   );
-  const credentials = desktopCredentialActions(
-    origin,
-    ownerToken,
-    ownerChannelKey,
-    app.getPath('userData'),
-    workerPath,
-  );
+  const credentials = allowLocalCredentials
+    ? desktopCredentialActions(
+        origin,
+        ownerToken,
+        ownerChannelKey,
+        app.getPath('userData'),
+        workerPath,
+      )
+    : null;
+  const fromLocalMainPage = (event: IpcMainInvokeEvent): boolean =>
+    allowLocalCredentials && fromMainPage(event);
   ipcMain.handle('local-providers:scan', (event) =>
-    fromMainPage(event) ? scanLocalProviders() : [],
+    fromLocalMainPage(event) ? scanLocalProviders() : [],
   );
   ipcMain.handle('local-providers:import', (event, input: unknown) =>
-    fromMainPage(event) ? credentials.importProviders(input) : [],
+    fromLocalMainPage(event) && credentials !== null ? credentials.importProviders(input) : [],
   );
   ipcMain.handle('devin:status', (event) =>
-    fromMainPage(event) ? devinLocalStatus() : { loggedIn: false, canLogin: false },
+    fromLocalMainPage(event) ? devinLocalStatus() : { loggedIn: false, canLogin: false },
   );
   ipcMain.handle('devin:import', (event, input: unknown) =>
-    fromMainPage(event) ? credentials.importDevin(input) : { ok: false, reason: 'cancelled' },
+    fromLocalMainPage(event) && credentials !== null
+      ? credentials.importDevin(input)
+      : { ok: false, reason: 'cancelled' },
   );
   ipcMain.handle('devin:login', (event, input: unknown) =>
-    fromMainPage(event) ? credentials.loginDevin(input) : { ok: false, reason: 'cancelled' },
+    fromLocalMainPage(event) && credentials !== null
+      ? credentials.loginDevin(input)
+      : { ok: false, reason: 'cancelled' },
   );
   ipcMain.handle('devin:cancel-login', (event) => {
-    if (fromMainPage(event)) devinCancelLogin();
+    if (fromLocalMainPage(event)) devinCancelLogin();
   });
   ipcMain.handle('antigravity:status', async (event) => {
-    if (!fromMainPage(event)) return { installed: false, loggedIn: false, canLogin: false };
+    if (!fromLocalMainPage(event)) return { installed: false, loggedIn: false, canLogin: false };
     const status = await antigravityLocalStatus();
     const runnerId = readRunnerRegistration(runnerHome())?.machineId;
     return runnerId === undefined ? status : { ...status, runnerId };
   });
   ipcMain.handle('antigravity:import', (event, input: unknown) =>
-    fromMainPage(event) ? credentials.importAntigravity(input) : { ok: false, reason: 'cancelled' },
+    fromLocalMainPage(event) && credentials !== null
+      ? credentials.importAntigravity(input)
+      : { ok: false, reason: 'cancelled' },
   );
   ipcMain.handle('antigravity:login', async (event, input: unknown, subscriptionId?: unknown) => {
-    if (!fromMainPage(event)) return { ok: false, reason: 'cancelled' };
+    if (!fromLocalMainPage(event) || credentials === null) {
+      return { ok: false, reason: 'cancelled' };
+    }
     const controller = new AbortController();
     const cancel = () => controller.abort();
     event.sender.once('render-process-gone', cancel);
@@ -1313,12 +1347,41 @@ async function boot(): Promise<void> {
     const otelFile = otelEnv.CAIRN_OTEL_ENDPOINT === undefined ? null : otelEnvPath;
     serverOtelFile = otelFile;
     otelHeaderLogSecrets.push(...otelHeaderSecrets(otelEnv.CAIRN_OTEL_HEADERS));
-    server = startServer(await serverPort(), otelFile, serverExited, desktopShellEnv);
-    await waitUntilServing(server);
-    startHealthWatch(server, guard);
-    const ownerToken = readOwnerToken();
-    signOwnPagesIn(server.origin, ownerToken);
-    const origin = server.origin;
+
+    const catalog = readConnectionCatalog(userData);
+    const activeConn = activeConnectionOf(catalog);
+    let origin: string;
+    let ownerToken = '';
+    let attachedToResident = false;
+
+    if (activeConn.kind === 'remote') {
+      origin = activeConn.url;
+    } else {
+      const resident = await probeResidentServer(cairnHome());
+      if (resident !== null) {
+        origin = resident.origin;
+        attachedToResident = true;
+        ownerToken = readOwnerToken();
+        if (ownerToken !== '') signOwnPagesIn(origin, ownerToken);
+      } else {
+        const port = await serverPort();
+        server = startServer(port, otelFile, serverExited, desktopShellEnv);
+        await waitUntilServing(server);
+        writeServerOwner(cairnHome(), {
+          pid: process.pid,
+          port,
+          origin: server.origin,
+          managedBy: 'desktop',
+          startedAt: Date.now(),
+        });
+        startHealthWatch(server, guard);
+        ownerToken = readOwnerToken();
+        signOwnPagesIn(server.origin, ownerToken);
+        origin = server.origin;
+      }
+    }
+
+    const activeRunnerHome = runnerHomeForConnection(runnerHome(), userData, activeConn.id);
     let runnerWanted = true;
     const bringRunnerUp = (): Promise<void> => {
       if (runner !== null) {
@@ -1326,15 +1389,20 @@ async function boot(): Promise<void> {
         return Promise.resolve();
       }
       const legacyRunnerDir = join(app.getPath('userData'), 'runner');
-      migrateRunnerHome(legacyRunnerDir, runnerHome());
+      if (activeConn.id === LOCAL_CONNECTION_ID) {
+        migrateRunnerHome(legacyRunnerDir, activeRunnerHome);
+      }
       runnerStarting ??= startLocalRunner({
         root: bundledRoot('runner'),
-        home: runnerHome(),
-        legacyHomes: [legacyRunnerDir, join(app.getPath('userData'), 'runner-home')],
+        home: activeRunnerHome,
+        legacyHomes:
+          activeConn.id === LOCAL_CONNECTION_ID
+            ? [legacyRunnerDir, join(app.getPath('userData'), 'runner-home')]
+            : [],
         serverHome: cairnHome(),
         origin,
         ownerToken,
-        ownerChannelKey,
+        ownerChannelKey: activeConn.kind === 'local' ? ownerChannelKey : '',
         otelFile,
         agentDesktop: agentDesktopBinary(),
         shellEnv: () => desktopShellEnv,
@@ -1373,12 +1441,85 @@ async function boot(): Promise<void> {
       runnerWanted = true;
       return bringRunnerUp();
     });
+    const fromHostMainPage = (event: IpcMainInvokeEvent): boolean =>
+      !quitting &&
+      mainWindow?.webContents === event.sender &&
+      event.senderFrame === event.sender.mainFrame &&
+      event.senderFrame?.origin === origin;
+    const hostStatus = () => {
+      const current = readConnectionCatalog(userData);
+      return {
+        activeId: current.activeId,
+        connections: [
+          { id: LOCAL_CONNECTION_ID, kind: 'local' as const, name: 'This computer', url: null },
+          ...current.items.map((item) => ({
+            id: item.id,
+            kind: 'remote' as const,
+            name: item.name,
+            url: item.url,
+          })),
+        ],
+        residentSupported: IS_MAC && activeConn.kind === 'local',
+        residentInstalled: isResidentInstalled(homedir()),
+        attachedToResident,
+      };
+    };
+    ipcMain.handle('desktop-host:status', (event) => {
+      if (!fromHostMainPage(event)) return null;
+      return hostStatus();
+    });
+    ipcMain.handle('desktop-host:add-remote', (event, input: unknown) => {
+      if (!fromHostMainPage(event)) return null;
+      if (
+        typeof input !== 'object' ||
+        input === null ||
+        typeof (input as { name?: unknown }).name !== 'string' ||
+        typeof (input as { url?: unknown }).url !== 'string'
+      ) {
+        throw new Error('Invalid remote connection input');
+      }
+      addRemoteConnection(userData, {
+        name: (input as { name: string }).name,
+        url: (input as { url: string }).url,
+      });
+      return hostStatus();
+    });
+    ipcMain.handle('desktop-host:remove-remote', (event, id: unknown) => {
+      if (!fromHostMainPage(event)) return null;
+      if (typeof id !== 'string' || id === '') throw new Error('Invalid connection id');
+      removeRemoteConnection(userData, id);
+      return hostStatus();
+    });
+    ipcMain.handle('desktop-host:switch', (event, id: unknown) => {
+      if (!fromHostMainPage(event)) return null;
+      if (typeof id !== 'string' || id === '') throw new Error('Invalid connection id');
+      setActiveConnection(userData, id);
+      app.relaunch({ args: relaunchArgs(false) });
+      app.exit(0);
+      return hostStatus();
+    });
+    ipcMain.handle('desktop-host:set-resident', async (event, enabled: unknown) => {
+      if (!fromHostMainPage(event) || activeConn.kind !== 'local') return null;
+      if (typeof enabled !== 'boolean') throw new Error('enabled must be boolean');
+      if (enabled) {
+        await installResidentHost({
+          homeDir: homedir(),
+          executablePath: process.execPath,
+          serverEntry: join(bundledRoot('server'), 'dist', 'index.mjs'),
+          cairnHome: cairnHome(),
+          logDir: join(userData, 'logs'),
+        });
+      } else {
+        await uninstallResidentHost({ homeDir: homedir() });
+      }
+      return hostStatus();
+    });
     void removeLeftoverUpdates();
-    serveUpdates(server.origin, notice, ownerToken);
-    serveNotifications(server.origin);
-    serveOwnComputer(server.origin, agentDesktopBinary());
+    serveUpdates(origin, notice, ownerToken, activeConn.kind === 'local');
+    serveNotifications(origin);
+    serveOwnComputer(origin, agentDesktopBinary());
     watchIdleUpdate();
-    if (!BACKGROUND_LAUNCH) openWindow(server.origin);
+    if (!BACKGROUND_LAUNCH) openWindow(origin);
   } catch (error) {
     const reason = messageOf(error);
     if (guard !== null) {
@@ -1425,6 +1566,7 @@ if (!app.requestSingleInstanceLock()) {
     const running = server;
     void Promise.all([stopAntigravityLogin(), stopDevinLogin(), runner?.stop()])
       .then(() => stopServer(running))
+      .then(() => clearServerOwner(cairnHome(), process.pid))
       .then(() => (activeGuard?.rollingBack() === true ? undefined : updater?.apply('none')))
       .catch((error: unknown) =>
         console.error('finishing the pending update on quit failed:', messageOf(error)),

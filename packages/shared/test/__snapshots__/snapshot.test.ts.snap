@@ -6123,6 +6123,25 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
             "queue": {
               "additionalProperties": false,
               "properties": {
+                "alternateMachines": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "machineId": {
+                        "type": "string",
+                      },
+                      "name": {
+                        "type": "string",
+                      },
+                    },
+                    "required": [
+                      "machineId",
+                      "name",
+                    ],
+                    "type": "object",
+                  },
+                  "type": "array",
+                },
                 "blocked": {
                   "additionalProperties": false,
                   "properties": {
@@ -6186,6 +6205,15 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                     "retryAt",
                   ],
                   "type": "object",
+                },
+                "lockReason": {
+                  "enum": [
+                    "active-session",
+                    "local-project",
+                    "explicit-pin",
+                    "host-subscription",
+                  ],
+                  "type": "string",
                 },
                 "position": {
                   "maximum": 9007199254740991,
@@ -6306,6 +6334,31 @@ exports[`body/envelope schema snapshots > conversationStreamEvent > conversation
                   "type": "null",
                 },
               ],
+            },
+            "routedFrom": {
+              "additionalProperties": false,
+              "properties": {
+                "machineId": {
+                  "type": "string",
+                },
+                "name": {
+                  "type": "string",
+                },
+                "reason": {
+                  "enum": [
+                    "offline",
+                    "busy",
+                    "manual-switch",
+                  ],
+                  "type": "string",
+                },
+              },
+              "required": [
+                "machineId",
+                "name",
+                "reason",
+              ],
+              "type": "object",
             },
             "skillInjection": {
               "anyOf": [
@@ -7856,6 +7909,25 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
     "queue": {
       "additionalProperties": false,
       "properties": {
+        "alternateMachines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "machineId": {
+                "type": "string",
+              },
+              "name": {
+                "type": "string",
+              },
+            },
+            "required": [
+              "machineId",
+              "name",
+            ],
+            "type": "object",
+          },
+          "type": "array",
+        },
         "blocked": {
           "additionalProperties": false,
           "properties": {
@@ -7919,6 +7991,15 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
             "retryAt",
           ],
           "type": "object",
+        },
+        "lockReason": {
+          "enum": [
+            "active-session",
+            "local-project",
+            "explicit-pin",
+            "host-subscription",
+          ],
+          "type": "string",
         },
         "position": {
           "maximum": 9007199254740991,
@@ -8039,6 +8120,31 @@ exports[`body/envelope schema snapshots > stepJournalRow > stepJournalRow.json 1
           "type": "null",
         },
       ],
+    },
+    "routedFrom": {
+      "additionalProperties": false,
+      "properties": {
+        "machineId": {
+          "type": "string",
+        },
+        "name": {
+          "type": "string",
+        },
+        "reason": {
+          "enum": [
+            "offline",
+            "busy",
+            "manual-switch",
+          ],
+          "type": "string",
+        },
+      },
+      "required": [
+        "machineId",
+        "name",
+        "reason",
+      ],
+      "type": "object",
     },
     "skillInjection": {
       "anyOf": [
@@ -10147,6 +10253,25 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                         "queue": {
                           "additionalProperties": false,
                           "properties": {
+                            "alternateMachines": {
+                              "items": {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "machineId": {
+                                    "type": "string",
+                                  },
+                                  "name": {
+                                    "type": "string",
+                                  },
+                                },
+                                "required": [
+                                  "machineId",
+                                  "name",
+                                ],
+                                "type": "object",
+                              },
+                              "type": "array",
+                            },
                             "blocked": {
                               "additionalProperties": false,
                               "properties": {
@@ -10210,6 +10335,15 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                                 "retryAt",
                               ],
                               "type": "object",
+                            },
+                            "lockReason": {
+                              "enum": [
+                                "active-session",
+                                "local-project",
+                                "explicit-pin",
+                                "host-subscription",
+                              ],
+                              "type": "string",
                             },
                             "position": {
                               "maximum": 9007199254740991,
@@ -10330,6 +10464,31 @@ exports[`body/envelope schema snapshots > teamStreamEvent > teamStreamEvent.json
                               "type": "null",
                             },
                           ],
+                        },
+                        "routedFrom": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "machineId": {
+                              "type": "string",
+                            },
+                            "name": {
+                              "type": "string",
+                            },
+                            "reason": {
+                              "enum": [
+                                "offline",
+                                "busy",
+                                "manual-switch",
+                              ],
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "machineId",
+                            "name",
+                            "reason",
+                          ],
+                          "type": "object",
                         },
                         "skillInjection": {
                           "anyOf": [
@@ -12538,6 +12697,25 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
         {
           "additionalProperties": false,
           "properties": {
+            "alternateMachines": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "machineId": {
+                    "type": "string",
+                  },
+                  "name": {
+                    "type": "string",
+                  },
+                },
+                "required": [
+                  "machineId",
+                  "name",
+                ],
+                "type": "object",
+              },
+              "type": "array",
+            },
             "blocked": {
               "additionalProperties": false,
               "properties": {
@@ -12582,6 +12760,15 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > chi
                 "missing",
               ],
               "type": "object",
+            },
+            "lockReason": {
+              "enum": [
+                "active-session",
+                "local-project",
+                "explicit-pin",
+                "host-subscription",
+              ],
+              "type": "string",
             },
             "position": {
               "maximum": 9007199254740991,
@@ -12699,6 +12886,9 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "autoDispatch": {
+      "type": "boolean",
+    },
     "capabilities": {
       "anyOf": [
         {
@@ -13492,6 +13682,18 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "type": [
         "string",
         "null",
+      ],
+    },
+    "maxConcurrency": {
+      "anyOf": [
+        {
+          "maximum": 32,
+          "minimum": 1,
+          "type": "integer",
+        },
+        {
+          "type": "null",
+        },
       ],
     },
     "name": {

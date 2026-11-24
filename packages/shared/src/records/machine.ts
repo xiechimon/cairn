@@ -44,6 +44,8 @@ export const machineRecordSchema = z.object({
   strain: z.array(machineStrainReasonSchema).optional(),
   capabilities: machineCapabilitiesSchema.nullish(),
   claudeLogin: claudeLoginSchema.optional(),
+  maxConcurrency: z.number().int().min(1).max(32).nullable().optional(),
+  autoDispatch: z.boolean().optional(),
 });
 export type MachineRecord = z.infer<typeof machineRecordSchema>;
 
@@ -65,5 +67,7 @@ export const patchMachineBodySchema = z.object({
     .optional(),
   enabledRuntimes: z.array(z.enum(MACHINE_RUNTIMES)).optional(),
   isDefault: z.literal(true).optional(),
+  maxConcurrency: z.number().int().min(1).max(32).nullable().optional(),
+  autoDispatch: z.boolean().optional(),
 });
 export type PatchMachineBody = z.infer<typeof patchMachineBodySchema>;

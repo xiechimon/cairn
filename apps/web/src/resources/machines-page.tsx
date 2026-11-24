@@ -13,6 +13,7 @@ import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 import { PageShell } from '../pages/shell.js';
 import { CreateMachineDialog } from './create-machine-dialog.js';
+import { DesktopHostPanel } from './desktop-host-panel.js';
 import { MACHINES_HREF } from './hrefs.js';
 import { orderMachines } from './machine-order.js';
 import { MachineRowView } from './machine-row.js';
@@ -105,6 +106,7 @@ export function MachinesPage() {
             </div>
           </SettingsPanel>
         </QueryBoundary>
+        <DesktopHostPanel />
       </div>
       <CreateMachineDialog
         open={addOpen}

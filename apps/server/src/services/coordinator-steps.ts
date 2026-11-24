@@ -99,6 +99,8 @@ export function claimPendingChiefStep(
     bind?: ChiefSubscriptionBind | string | null;
     model?: StepRanModel | null;
     mcpGrant?: string[] | null;
+    routedFromMachineId?: string | null;
+    routedReason?: 'offline' | 'busy' | 'manual-switch' | null;
     stillAuthorized?: () => boolean;
   },
 ): StepRow | null {
@@ -146,6 +148,10 @@ export function claimPendingChiefStep(
         holdUntil: null,
         ranModel: options.model ?? null,
         mcpGrant: options.mcpGrant ?? null,
+        ...(options.routedFromMachineId !== undefined
+          ? { routedFromMachineId: options.routedFromMachineId }
+          : {}),
+        ...(options.routedReason !== undefined ? { routedReason: options.routedReason } : {}),
       })
       .where(
         and(

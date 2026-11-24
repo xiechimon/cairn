@@ -97,6 +97,36 @@ export function desktopTray(): DesktopTrayBridge | null {
   );
 }
 
+export interface DesktopHostConnection {
+  id: string;
+  kind: 'local' | 'remote';
+  name: string;
+  url: string | null;
+}
+
+export interface DesktopHostStatus {
+  activeId: string;
+  connections: DesktopHostConnection[];
+  residentSupported: boolean;
+  residentInstalled: boolean;
+  attachedToResident: boolean;
+}
+
+export interface DesktopHostBridge {
+  status: () => Promise<DesktopHostStatus | null>;
+  addRemote: (input: { name: string; url: string }) => Promise<DesktopHostStatus | null>;
+  removeRemote: (id: string) => Promise<DesktopHostStatus | null>;
+  switch: (id: string) => Promise<DesktopHostStatus | null>;
+  setResident: (enabled: boolean) => Promise<DesktopHostStatus | null>;
+}
+
+export function desktopHost(): DesktopHostBridge | null {
+  if (typeof window === 'undefined') return null;
+  return (
+    (window as Window & { cairnDesktop?: { host?: DesktopHostBridge } }).cairnDesktop?.host ?? null
+  );
+}
+
 export interface DesktopUpdateBridge {
   state: () => Promise<DesktopUpdateState | null>;
   check: () => Promise<void>;

@@ -90,13 +90,9 @@ import {
 } from './machine-deps.js';
 import {
   chiefIneligibility,
-  chiefMachineId,
-  liveMachineId,
-  platformFallbackMachineId,
   priorSessionOf,
-  routeTargets,
-  routeVerdict,
-  runtimeFallbackMachineId,
+  resolveChiefCandidates,
+  resolveWorkerCandidates,
   teamDefaultMachineId,
   type WorkerStepFacts,
   workerIneligibility,
@@ -293,6 +289,7 @@ async function buildChiefClaim(
   stillAuthorized: () => boolean,
   signal: AbortSignal | undefined,
   machineRow?: typeof machine.$inferSelect,
+  failover?: { fromMachineId: string; reason: 'offline' | 'busy' },
 ): Promise<ClaimedStep | null> {
   if (!stillAuthorized() || !agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
@@ -326,6 +323,9 @@ async function buildChiefClaim(
             thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
           },
     mcpGrant: stepMcpGrant(deps.db, freshMachine, chiefTurnLocked(stepRow)) ?? null,
+    ...(failover !== undefined
+      ? { routedFromMachineId: failover.fromMachineId, routedReason: failover.reason }
+      : {}),
     stillAuthorized,
   });
   if (claimed === null) return null;
@@ -470,10 +470,15 @@ function chiefClaimPayload(
 
 function runnerFull(
   db: MachineDeps['db'],
-  machineId: string,
+  machineRow: Pick<typeof machine.$inferSelect, 'id' | 'maxConcurrency'>,
   maxWorkers: number | undefined,
 ): boolean {
-  return maxWorkers !== undefined && machineRunningCount(db, machineId) >= maxWorkers;
+  const configured = machineRow.maxConcurrency;
+  const cap =
+    maxWorkers !== undefined && configured != null
+      ? Math.min(maxWorkers, configured)
+      : (maxWorkers ?? (configured != null ? configured : undefined));
+  return cap !== undefined && machineRunningCount(db, machineRow.id) >= cap;
 }
 
 async function claimChiefTurn(
@@ -490,17 +495,29 @@ async function claimChiefTurn(
   const initialMachine = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!initialMachine) return null;
   let machineRow = initialMachine;
-  if (runnerFull(db, machineId, maxWorkers)) return null;
+  if (runnerFull(db, machineRow, maxWorkers)) return null;
   let cands = claimChiefCandidates(deps, machineId, teamId).filter(
     (cand) => cand.stepRow.createdAt <= createdUpTo,
   );
+  const teamMachinesNow = () => db.select().from(machine).where(eq(machine.teamId, teamId)).all();
+  const initialTeamMachines = teamMachinesNow();
   const needsConnectorTools = cands.some((cand) => {
     if (chiefTurnLocked(cand.stepRow) || !cand.agentRow.modelId) return false;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) return false;
     const model = effectiveModel(cand.agentRow, cand.stepRow);
-    if (chiefMachineId(db, teamId, cand.agentRow.machineId, model.provider) !== machineId) {
-      return false;
-    }
+    const resolution = resolveChiefCandidates({
+      db,
+      teamId,
+      teamMachines: initialTeamMachines,
+      pinnedMachineId: cand.agentRow.machineId,
+      targetMachineId: cand.stepRow.targetMachineId ?? null,
+      agentRow: cand.agentRow,
+      provider: model.provider,
+      stepCreatedAt: cand.stepRow.createdAt,
+      now: nowMs(),
+      claimingMachineId: machineId,
+    });
+    if (!resolution.claimableIds.includes(machineId)) return false;
     return chiefIneligibility(db, initialMachine, cand.agentRow, model.provider, nowMs()) === null;
   });
   if (needsConnectorTools) {
@@ -512,11 +529,12 @@ async function claimChiefTurn(
     const freshMachine = db.select().from(machine).where(eq(machine.id, machineId)).get();
     if (!freshMachine) return null;
     machineRow = freshMachine;
-    if (runnerFull(db, machineId, maxWorkers)) return null;
+    if (runnerFull(db, machineRow, maxWorkers)) return null;
     cands = claimChiefCandidates(deps, machineId, teamId).filter(
       (cand) => cand.stepRow.createdAt <= createdUpTo,
     );
   }
+  const currentTeamMachines = teamMachinesNow();
   for (const cand of cands) {
     if (!stillAuthorized()) return null;
     if (hasEarlierLiveChiefStep(db, cand.stepRow)) continue;
@@ -526,13 +544,19 @@ async function claimChiefTurn(
     ) {
       continue;
     }
-    const chiefMachine = chiefMachineId(
+    const resolution = resolveChiefCandidates({
       db,
       teamId,
-      cand.agentRow.machineId,
-      effectiveModel(cand.agentRow, cand.stepRow).provider,
-    );
-    if (chiefMachine !== machineId) continue;
+      teamMachines: currentTeamMachines,
+      pinnedMachineId: cand.agentRow.machineId,
+      targetMachineId: cand.stepRow.targetMachineId ?? null,
+      agentRow: cand.agentRow,
+      provider: effectiveModel(cand.agentRow, cand.stepRow).provider,
+      stepCreatedAt: cand.stepRow.createdAt,
+      now: nowMs(),
+      claimingMachineId: machineId,
+    });
+    if (!resolution.claimableIds.includes(machineId)) continue;
     const claimed = await buildChiefClaim(
       deps,
       machineId,
@@ -542,6 +566,7 @@ async function claimChiefTurn(
       stillAuthorized,
       signal,
       machineRow,
+      resolution.failover,
     );
     if (claimed) {
       if (cand.stepRow.prompt !== null) {
@@ -602,7 +627,7 @@ async function tryClaim(
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
   const catalog = mergedCatalogModels(teamId);
-  const queued = runnerFull(db, machineId, maxWorkers)
+  const queued = runnerFull(db, machineRow, maxWorkers)
     ? []
     : claimCandidates(deps, machineId, teamId);
   const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
@@ -622,7 +647,7 @@ async function tryClaim(
   if (chiefAhead) return chiefAhead;
   if (!stillAuthorized()) return null;
   machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
-  if (!machineRow || runnerFull(db, machineId, maxWorkers)) return null;
+  if (!machineRow || runnerFull(db, machineRow, maxWorkers)) return null;
 
   for (const cand of workerCands) {
     if (
@@ -701,35 +726,23 @@ async function tryClaim(
     if (claimRuntimeIsClaudeCode && accountHeld(cand.stepRow, prior, enabledId)) continue;
     const sessionOnOtherMachine =
       priorSessionId !== null && priorMachineId !== null && priorMachineId !== machineId;
-    const sole = runtimeFallbackMachineId(db, teamId, model.provider, () =>
-      platformFallbackMachineId(
-        db,
-        db
-          .select({
-            id: machine.id,
-            online: machine.online,
-            kind: machine.kind,
-            lastSeenAt: machine.lastSeenAt,
-            tokenHash: machine.tokenHash,
-            capabilities: machine.capabilities,
-            retiredAt: machine.retiredAt,
-          })
-          .from(machine)
-          .where(eq(machine.teamId, teamId))
-          .all(),
-        teamDefaultMachineId(db, teamId),
-        agentRow.requiredCapabilities?.os,
-      ),
-    );
-    const allowed = routeVerdict({
-      machineId,
-      targets: routeTargets(
-        !freshSession && priorSessionId !== null ? priorMachineLiveId : null,
-        facts.localProject ? agentRow.machineId : liveMachineId(db, agentRow.machineId),
-        sole,
-      ),
-    }).claim;
-    if (!allowed) continue;
+    const teamMachines = db.select().from(machine).where(eq(machine.teamId, teamId)).all();
+    const explicitOverrideMachineId = cand.todoRow.routeOverride?.machineId ?? null;
+    const resolution = resolveWorkerCandidates({
+      db,
+      teamId,
+      teamMachines,
+      facts,
+      catalog,
+      sessionMachineId: !freshSession && priorSessionId !== null ? priorMachineLiveId : null,
+      explicitOverrideMachineId,
+      ruleMachineId: explicitOverrideMachineId === null ? agentRow.machineId : null,
+      defaultMachineId: teamDefaultMachineId(db, teamId),
+      stepCreatedAt: cand.stepRow.createdAt,
+      now,
+      claimingMachineId: machineId,
+    });
+    if (!resolution.claimableIds.includes(machineId)) continue;
     const skillInjection = workerSkillInjection(deps, agentRow, cand.todoRow);
     const guardPr =
       cand.stepRow.kind === 'plan' || isBuildStepKind(cand.stepRow.kind)
@@ -832,6 +845,12 @@ async function tryClaim(
             holdUntil: null,
             ranModel: pinnedModel,
             mcpGrant: workerMcp ?? null,
+            ...(resolution.failover !== undefined
+              ? {
+                  routedFromMachineId: resolution.failover.fromMachineId,
+                  routedReason: resolution.failover.reason,
+                }
+              : {}),
           })
           .where(pendingClaim(cand.stepRow, claimedAt))
           .run();
