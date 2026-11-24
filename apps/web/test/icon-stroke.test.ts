@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import * as Lucide from 'lucide-react';
 import { describe, expect, test } from 'vitest';
 
 const SRC = new URL('../src/', import.meta.url).pathname;
@@ -26,6 +27,11 @@ describe('icon stroke', () => {
     );
     const expected = HEAVY_GLYPHS.has(file) ? '3' : '1.75';
     for (const stroke of strokes) expect(stroke).toBe(expected);
+  });
+
+  test('src/icons holds only custom glyphs, never duplicates of lucide-react', () => {
+    const duplicates = files.filter((file) => Object.hasOwn(Lucide, file.slice(0, -4)));
+    expect(duplicates).toEqual([]);
   });
 
   test('V14: no component passes a numeric strokeWidth other than 1.75', () => {

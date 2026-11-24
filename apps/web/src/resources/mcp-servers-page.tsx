@@ -6,7 +6,7 @@ import {
   type StartMcpConnectorOAuthBody,
   startMcpConnectorOAuthBodySchema,
 } from '@cairn/shared';
-import { Mail } from 'lucide-react';
+import { Ban, Mail, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
@@ -27,7 +27,6 @@ import { Button } from '../components/ui/button.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { Ban, Plus } from '../icons/index.js';
 import { PageShell } from '../pages/shell.js';
 import { useComposioRows } from './composio-section.js';
 import { MCP_HREF } from './hrefs.js';

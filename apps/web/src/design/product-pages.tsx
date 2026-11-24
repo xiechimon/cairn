@@ -1,7 +1,7 @@
+import { Folder } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverTrigger } from '../components/ui/popover.js';
-import { Folder } from '../icons/index.js';
 import { DirBrowser } from '../pages/dir-browser.js';
 import { ProjectBaseBranchSelect } from '../pages/project-base-branch-select.js';
 import type { GalleryTheme } from './design-doc.js';

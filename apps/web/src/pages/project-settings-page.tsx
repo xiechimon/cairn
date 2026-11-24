@@ -5,7 +5,14 @@ import {
   type TeamRoutingSettings,
 } from '@cairn/shared';
 import { cn } from 'cn';
-import { Archive, ArchiveRestore, BookText, FolderSearch, Settings2 } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  BookText,
+  ChevronDown,
+  FolderSearch,
+  Settings2,
+} from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { type To, useParams, useSearchParams } from 'react-router';
 import { useApiMutations, useModelSources, useProjects } from '../api/hooks.js';
@@ -43,7 +50,6 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ModelOption, ProjectContent } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown } from '../icons/index.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { RuleRow } from '../resources/routing-settings-page.js';
 import { ProjectBaseBranchSelect } from './project-base-branch-select.js';
@@ -361,7 +367,7 @@ export function ProjectSettingsPage() {
                     className={`prj-set-branch inline-flex w-32 items-center justify-between border px-2.5 font-mono ${SETTINGS_SELECT_TRIGGER_CLS}`}
                   >
                     {project?.defaultBranch ?? 'main'}
-                    <ChevronDown width={16} height={16} className="text-content-tertiary" />
+                    <ChevronDown className="size-4 text-content-tertiary" />
                   </span>
                 )}
               </SettingsRow>

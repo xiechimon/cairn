@@ -1,4 +1,5 @@
 import { FS_LIST_MAX_ENTRIES } from '@cairn/shared';
+import { ChevronLeft, ChevronRight, Folder, GitCommit, Search } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api/client.js';
 import { useFsList, useProjects } from '../api/hooks.js';
@@ -8,7 +9,6 @@ import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { PopoverContent } from '../components/ui/popover.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft, ChevronRight, Folder, GitCommit, Search } from '../icons/index.js';
 import { baseName } from '../lib/path-name.js';
 
 const LAST_DIR_KEY = 'cairn.dirBrowser.lastDir';
@@ -123,7 +123,7 @@ function FolderList({
   return (
     <>
       <div className="-mx-2.5 -mt-2.5 mb-1 flex h-10 items-center gap-2 border-b border-border px-3 text-content-tertiary">
-        <Search width={18} height={18} />
+        <Search className="size-4 flex-none" />
         <Input
           autoFocus
           aria-label={t('查找文件夹或粘贴路径')}
@@ -288,7 +288,7 @@ function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack
             />
           }
         >
-          <ChevronLeft width={16} height={16} />
+          <ChevronLeft className="size-4" />
         </IconTooltip>
         <nav className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5 border-b border-border pb-1.5">
           {crumbs.map((seg, i) => (

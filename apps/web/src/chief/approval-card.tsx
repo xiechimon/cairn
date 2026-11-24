@@ -1,11 +1,10 @@
 import { cn } from 'cn';
-import { Box, CircleAlert, KeyRound, Mail, Send } from 'lucide-react';
+import { Box, CircleAlert, KeyRound, Mail, Monitor, Send, Terminal } from 'lucide-react';
 import { type ComponentType, Fragment, type ReactNode, type SVGProps, useState } from 'react';
 import { NoticeBanner } from '../components/notice-banner.js';
 import { Button } from '../components/ui/button.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { useI18n } from '../i18n/provider.js';
-import { Monitor, Terminal } from '../icons/index.js';
 import type { ApprovalCardModel, ApprovalField, ApprovalKind } from './approval-card-model.js';
 
 export interface ApprovalAction {

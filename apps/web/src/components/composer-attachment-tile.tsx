@@ -1,8 +1,7 @@
 import { cn } from 'cn';
-import { Play } from 'lucide-react';
+import { Play, X } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
 import { useI18n } from '../i18n/provider.js';
-import { X } from '../icons/index.js';
 import { FileGlyph } from './file-glyph.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { AttachmentTrigger } from './ui/attachment.js';

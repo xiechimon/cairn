@@ -1,7 +1,7 @@
 import { cn } from 'cn';
+import { Check, Copy } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Copy } from '../icons/index.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';

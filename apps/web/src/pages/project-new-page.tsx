@@ -10,6 +10,7 @@ import {
   projectIconOrAuto,
 } from '@cairn/shared';
 import { cn } from 'cn';
+import { ArrowUpDown, Check, ChevronDown } from 'lucide-react';
 import { type KeyboardEvent, type Ref, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../api/client.js';
@@ -41,7 +42,6 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
-import { ArrowUpDown, Check, ChevronDown } from '../icons/index.js';
 import { RouteDialog } from '../overlay/route-dialog.js';
 import { DirBrowser } from './dir-browser.js';
 import { GithubConnectionDeviceDialog } from './github-connection-device-dialog.js';
@@ -89,7 +89,7 @@ function RepoSwapButton({
         />
       }
     >
-      <ArrowUpDown width={16} height={16} />
+      <ArrowUpDown className="size-4" />
     </IconTooltip>
   );
 }
@@ -511,7 +511,7 @@ export function ProjectNewPage() {
                         ) : (
                           <span>{githubRepo}</span>
                         )}
-                        <ChevronDown width={16} height={16} />
+                        <ChevronDown className="size-4" />
                       </PopoverTrigger>
                       <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
                     </>
@@ -576,7 +576,7 @@ export function ProjectNewPage() {
                     }
                   >
                     <span className="text-content-tertiary">{t('选择仓库')}</span>
-                    <ChevronDown width={16} height={16} />
+                    <ChevronDown className="size-4" />
                   </DropdownMenuTrigger>
                 )}
                 <KeyedMenuContent
@@ -667,7 +667,7 @@ export function ProjectNewPage() {
                           {repo.full_name}
                           {githubRepo === repo.full_name && (
                             <span className="ml-auto flex text-primary">
-                              <Check width={16} height={16} />
+                              <Check className="size-4" />
                             </span>
                           )}
                         </Button>

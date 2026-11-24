@@ -1,6 +1,6 @@
 import type { MachinePhoneReport, PhoneActivity, PhoneRow } from '@cairn/shared';
 import { cn } from 'cn';
-import { Smartphone } from 'lucide-react';
+import { ChevronDown, Smartphone } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useApiMutations, usePhoneActivity, usePhones } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -22,7 +22,6 @@ import type { MachineRow } from '../fixtures/records.js';
 import { useMinuteClock } from '../hooks/use-minute-clock.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { ChevronDown } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 
 export function shouldShowPhones(machine: MachineRow): boolean {
@@ -318,7 +317,7 @@ export function usePhonesRow(machine: MachineRow): {
         <ChevronDown
           aria-hidden
           className={cn(
-            'size-3 flex-none transition-transform duration-(--dur-fast)',
+            'size-4 flex-none transition-transform duration-(--dur-fast)',
             expanded && 'rotate-180',
           )}
         />

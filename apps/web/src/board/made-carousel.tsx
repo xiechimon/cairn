@@ -1,5 +1,5 @@
 import { isInfoOutput } from '@cairn/shared';
-import { Lock, Presentation } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Lock, Presentation } from 'lucide-react';
 import {
   type FocusEvent,
   type ReactNode,
@@ -16,7 +16,6 @@ import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronLeft, ChevronRight } from '../icons/index.js';
 import {
   PageThumb,
   pageThumbnailHref,

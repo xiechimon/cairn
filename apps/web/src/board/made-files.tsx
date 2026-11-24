@@ -1,12 +1,11 @@
 import type { TodoDeliverables } from '@cairn/shared';
 import { useQuery } from '@tanstack/react-query';
-import { Globe, Presentation } from 'lucide-react';
+import { Download, Globe, Presentation } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { fetchWithSession } from '../api/auth.js';
 import { Button } from '../components/ui/button.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { useI18n } from '../i18n/provider.js';
-import { Download } from '../icons/index.js';
 
 type Deliverable = TodoDeliverables['items'][number];
 

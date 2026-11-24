@@ -1,6 +1,6 @@
 import { cn } from 'cn';
+import { ChevronDown } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { ChevronDown } from '../icons/index.js';
 import { DropdownMenuTrigger } from './ui/dropdown-menu.js';
 
 const SIZE_CLS = {

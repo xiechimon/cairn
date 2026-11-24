@@ -1,4 +1,5 @@
 import { PUBLISHED_PACKAGES } from '@cairn/shared';
+import { Key, Monitor } from 'lucide-react';
 import { Fragment, type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { useChief, useMachines, useProviders } from '../api/hooks.js';
@@ -8,7 +9,6 @@ import { BANNER_CLS } from '../chief/chief-outage-banner.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
-import { Key, Monitor } from '../icons/index.js';
 import { settingsHref } from '../settings/settings-href.js';
 import {
   coordinatorCanAnswer,
@@ -137,7 +137,7 @@ function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean })
           className="h-11 gap-2 rounded-md px-5 text-heading"
           render={<Link to={href} />}
         >
-          <Key width={20} height={20} />
+          <Key className="size-5" />
           {t('接入模型来源')}
         </Button>
         <p className="m-0 text-ui text-balance text-content-secondary">{hint}</p>
@@ -152,7 +152,7 @@ function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean })
       data-variant="line"
       className={`${BANNER_CLS} items-center shadow-(--e1)`}
     >
-      <Key aria-hidden="true" width={20} height={20} className="flex-none text-(--waiting-ink)" />
+      <Key aria-hidden="true" className="size-5 flex-none text-(--waiting-ink)" />
       <span className="min-w-0 flex-1">{t('Coordinator 现在没有模型可用')}</span>
       <Button
         variant="outline"
@@ -187,7 +187,7 @@ function MachinePrompt() {
       data-variant="line"
       className={`${BANNER_CLS} items-center shadow-(--e1)`}
     >
-      <Monitor aria-hidden="true" width={20} height={20} className="flex-none text-icon" />
+      <Monitor aria-hidden="true" className="size-5 flex-none text-icon" />
       <span className="flex min-w-0 flex-1 flex-col">
         <span data-testid="setup-prompt-label" className="text-foreground">
           {label}

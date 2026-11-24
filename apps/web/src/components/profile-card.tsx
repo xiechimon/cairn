@@ -1,7 +1,7 @@
 import { cn } from 'cn';
+import { SquarePen } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useI18n } from '../i18n/provider.js';
-import { SquarePen } from '../icons/index.js';
 import { SettingsHeader } from './settings-list.js';
 import { Button } from './ui/button.js';
 import { DIALOG_PRIMARY_BUTTON, DIALOG_TEXT_BUTTON } from './ui/dialog-shell.js';

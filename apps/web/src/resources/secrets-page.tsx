@@ -1,6 +1,6 @@
 import type { SecretListEntry } from '@cairn/shared';
 import { cn } from 'cn';
-import { Ellipsis, Lock, ShieldEllipsis } from 'lucide-react';
+import { Ellipsis, Lock, Search, ShieldEllipsis } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, useSecrets } from '../api/hooks.js';
@@ -21,7 +21,6 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '../components/ui/i
 import { toastError } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { Search } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { BulkSecretDialog } from './bulk-secret-dialog.js';

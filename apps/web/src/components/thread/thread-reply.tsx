@@ -1,7 +1,7 @@
 import { cn } from 'cn';
+import { ArrowUp } from 'lucide-react';
 import { type KeyboardEvent, useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { ArrowUp } from '../../icons/index.js';
 import { IconTooltip } from '../icon-tooltip.js';
 import {
   InputGroup,

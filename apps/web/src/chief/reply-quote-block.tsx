@@ -1,8 +1,7 @@
-import { Reply } from 'lucide-react';
+import { Reply, X } from 'lucide-react';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
-import { X } from '../icons/index.js';
 
 const QUOTE_CLS =
   'm-0 flex min-w-0 flex-1 border-l-2 border-border pl-3 text-meta leading-5 whitespace-pre-wrap text-content-secondary line-clamp-3';
@@ -81,7 +80,7 @@ export function ReplyingToBar({
           />
         }
       >
-        <X width={22} height={22} />
+        <X className="size-5.5" />
       </IconTooltip>
     </fieldset>
   );

@@ -1,4 +1,5 @@
 import { pairingLink } from '@cairn/shared';
+import { ArrowDown, Copy, Download, Settings, Trash2 } from 'lucide-react';
 import { useId, useState } from 'react';
 import { StatusMarkFloat } from '../chief/chief-status-mark.js';
 import { STATUS_MARK_IDS, STATUS_MARK_LABELS } from '../chief/status-mark.js';
@@ -31,7 +32,6 @@ import {
 } from '../components/ui/message-scroller.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { Separator } from '../components/ui/separator.js';
-import { ArrowDown, Copy, Download, Settings, Trash2 } from '../icons/index.js';
 import { SEED_TRANSCRIPT } from './agent-transcript.js';
 import { Cell, Section, Specimen } from './specimen.js';
 
@@ -296,7 +296,7 @@ export function StreamSection() {
                 </MessageScrollerContent>
               </FadeScrollerViewport>
               <JumpToLatestButton label="Jump to latest">
-                <ArrowDown width={20} height={20} />
+                <ArrowDown className="size-5" />
               </JumpToLatestButton>
             </MessageScroller>
           </MessageScrollerProvider>

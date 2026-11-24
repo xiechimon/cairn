@@ -1,10 +1,10 @@
 import { cn } from 'cn';
+import { FileCheck, FileText, Layers, Puzzle } from 'lucide-react';
 import { type Ref, useEffect } from 'react';
 import { MachineIcon } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import { SeededAvatar } from '../components/ui/seeded-avatar.js';
 import { useI18n } from '../i18n/provider.js';
-import { FileCheck, FileText, Layers, Puzzle } from '../icons/index.js';
 import type { InlineCompletionRow } from './mention-token.js';
 
 export interface MentionInlineProps {
@@ -22,15 +22,15 @@ export interface MentionInlineProps {
 function InlineKindIcon({ row }: { row: InlineCompletionRow }) {
   switch (row.kind) {
     case 'todo':
-      return <FileCheck width={16} height={16} />;
+      return <FileCheck className="size-4" />;
     case 'skill':
-      return <Puzzle width={16} height={16} />;
+      return <Puzzle className="size-4" />;
     case 'project':
-      return <Layers width={16} height={16} />;
+      return <Layers className="size-4" />;
     case 'machine':
       return <MachineIcon machine={row} className="size-4" />;
     case 'file':
-      return <FileText width={16} height={16} />;
+      return <FileText className="size-4" />;
     case 'agent':
       return null;
   }

@@ -1,4 +1,5 @@
 import { cn } from 'cn';
+import { Check } from 'lucide-react';
 import {
   createContext,
   Fragment,
@@ -24,7 +25,7 @@ import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shel
 import { Separator } from '../components/ui/separator.js';
 import type { DocSegment } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, ChiefExpand } from '../icons/index.js';
+import { ChiefExpand } from '../icons/index.js';
 import {
   type ChatBlock,
   type ChatBubbleGroup,

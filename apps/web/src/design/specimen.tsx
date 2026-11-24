@@ -1,7 +1,7 @@
 import { cn } from 'cn';
+import { ChevronRight } from 'lucide-react';
 import { type CSSProperties, createContext, type ReactNode, useContext } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronRight } from '../icons/index.js';
 
 export const DISPLAY_STYLE: CSSProperties = {
   fontFamily: 'var(--font-display)',

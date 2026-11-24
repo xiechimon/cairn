@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   Collapsible,
@@ -5,7 +6,6 @@ import {
   CollapsibleTrigger,
 } from '../components/ui/collapsible.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronRight } from '../icons/index.js';
 
 export function ProviderConnectionDisclosure({
   summary,

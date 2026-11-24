@@ -1,9 +1,20 @@
-import { Archive, CircleStop, ClipboardList, Pencil, Route, ScrollText, Undo2 } from 'lucide-react';
+import {
+  Archive,
+  Check,
+  CircleStop,
+  ClipboardList,
+  Copy,
+  MessageSquare,
+  Pencil,
+  Route,
+  ScrollText,
+  Trash2,
+  Undo2,
+} from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
 import { useI18n } from '../i18n/provider.js';
-import { Check, Copy, MessageSquare, Trash2 } from '../icons/index.js';
 import { writeClipboard } from '../lib/clipboard.js';
 
 interface MoreMenuProps {

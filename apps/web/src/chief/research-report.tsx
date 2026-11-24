@@ -1,5 +1,6 @@
 import { infoReportMessageSchema } from '@cairn/shared';
 import { cn } from 'cn';
+import { FileText } from 'lucide-react';
 import {
   type CSSProperties,
   createContext,
@@ -20,7 +21,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { TodoGlanceContext } from '../detail/segments.js';
 import { useI18n } from '../i18n/provider.js';
-import { FileText } from '../icons/index.js';
 import { messageStampLabel } from './time-dividers.js';
 
 export interface ResearchReport {

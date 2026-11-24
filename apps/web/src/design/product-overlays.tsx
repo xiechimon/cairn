@@ -1,9 +1,8 @@
-import { Play } from 'lucide-react';
+import { EllipsisVertical, Play, Search, Settings } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { Button } from '../components/ui/button.js';
 import { DropdownMenuTrigger } from '../components/ui/dropdown-menu.js';
 import { Kbd } from '../components/ui/kbd.js';
-import { EllipsisVertical, Search, Settings } from '../icons/index.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MentionInline } from '../overlay/mention-inline.js';
 import { MoreMenu } from '../overlay/more-menu.js';
