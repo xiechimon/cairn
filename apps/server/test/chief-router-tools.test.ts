@@ -770,6 +770,27 @@ describe('router tools', () => {
       expect(state).toContain('Waiting on someone: none');
     });
 
+    test('failed tasks are listed under Failed tasks rather than Running tasks', async () => {
+      const opened = await openThread({ seqNum: 4 });
+      H.s.db.update(todo).set({ phase: 'failed' }).where(eq(todo.id, opened.todoId)).run();
+      const state = coordinatorTurnState(toolDeps(), H.teamId);
+      expect(state).toContain('Running tasks: none');
+      expect(state).toContain('Failed tasks: #4 failed');
+      expect(state).not.toContain('Running tasks: #4');
+    });
+
+    test('prompt and tool descriptions tell the Coordinator that queued tasks have not started running', () => {
+      const prompt = buildChiefSystemPrompt(toolDeps(), H.teamId, H.threadId).text;
+      expect(prompt).toContain('queued, not started or running');
+      expect(prompt).toContain('workspace setup');
+      const createTodo = CHIEF_REMOTE_TOOLS.find((tool) => tool.name === 'create_todo')!;
+      expect(createTodo.description).toContain('queued to run');
+      expect(createTodo.description).toContain('workspace setup');
+      const openThreadTool = CHIEF_ROUTER_TOOLS.find((tool) => tool.name === 'open_thread')!;
+      expect(openThreadTool.description).toContain('only queues the thread');
+      expect(openThreadTool.description).toContain('workspace setup');
+    });
+
     test('a gate wake no longer tells the Coordinator to confirm or review', async () => {
       const { wakeFacts } = await import('../src/services/chief.js');
       const record = {

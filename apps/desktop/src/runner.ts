@@ -12,6 +12,11 @@ import {
   OWNER_CHANNEL_HEADER,
 } from '@cairn/shared';
 import { probeHostKey } from '@cairn/shared/host-identity';
+import {
+  applyShellEnvironment,
+  SHELL_ENV_RESOLVED_VAR,
+  type ShellEnvironmentPatch,
+} from '@cairn/shared/shell-env';
 import { withOtelFileEnv } from './otel-config.js';
 import { createRestartBudget } from './restart-budget.js';
 
@@ -31,6 +36,7 @@ export interface RunnerOptions {
   ownerChannelKey: string;
   otelFile: string | null;
   agentDesktop: string | null;
+  shellEnv?: () => ShellEnvironmentPatch;
   isQuitting: () => boolean;
 }
 
@@ -122,6 +128,9 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
     },
     options.otelFile,
   );
+  const discovered = options.shellEnv?.();
+  if (discovered !== undefined) applyShellEnvironment(env, discovered, process.platform);
+  env[SHELL_ENV_RESOLVED_VAR] = '1';
   delete env[ENV_VARS.token];
   delete env[ENV_VARS.auth];
   delete env[ENV_VARS.apiKey];
@@ -173,13 +182,17 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
             '--property=KillMode=control-group',
             '--property=TimeoutStopSec=5s',
             ...Object.keys(env)
-              .filter(
-                (name) =>
+              .filter((name) => {
+                const value = env[name];
+                return (
+                  typeof value === 'string' &&
+                  !/[\r\n\0]/.test(value) &&
                   /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) &&
                   !/^(INVOCATION_ID|JOURNAL_STREAM|SYSTEMD_EXEC_PID|MANAGERPID|NOTIFY_SOCKET|LISTEN_PID|LISTEN_FDS|LISTEN_FDNAMES|WATCHDOG_PID|WATCHDOG_USEC)$/.test(
                     name,
-                  ),
-              )
+                  )
+                );
+              })
               .map((name) => `--setenv=${name}`),
             '--',
             ...command,

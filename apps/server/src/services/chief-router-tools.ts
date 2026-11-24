@@ -94,7 +94,22 @@ function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): str
   }
   try {
     const buildId = startThreadBuild(deps, row, { origin: 'coordinator', actor: 'Coordinator' });
-    return json({ todoId: row.id, seqNum: row.seqNum, buildId });
+    const opened = deps.db
+      .select({ phase: todo.phase })
+      .from(todo)
+      .where(eq(todo.id, row.id))
+      .get();
+    const phase = opened?.phase ?? 'queued';
+    return json({
+      todoId: row.id,
+      seqNum: row.seqNum,
+      buildId,
+      phase,
+      note:
+        phase === 'failed'
+          ? 'Task already failed before starting; report the failure instead of saying it started.'
+          : 'Queued for a runner to pick up (phase: queued). Workspace setup has not finished and may still fail; tell the owner it is queued, not that it has started running.',
+    });
   } catch (error) {
     if (error instanceof PhaseTransitionError) throw new HttpError(409, error.message);
     throw error;

@@ -27,12 +27,15 @@ import {
 } from './pi-host-protocol.js';
 
 export function piHostEnv(parent: NodeJS.ProcessEnv = process.env): Record<string, string> {
-  return childEnv({
-    [ENV_VARS.piCacheRetention]: parent[ENV_VARS.piCacheRetention],
-    [ENV_VARS.customModelReasoning]: parent[ENV_VARS.customModelReasoning],
-    SSH_AUTH_SOCK: '',
-    SSH_AGENT_PID: '',
-  });
+  return childEnv(
+    {
+      [ENV_VARS.piCacheRetention]: parent[ENV_VARS.piCacheRetention],
+      [ENV_VARS.customModelReasoning]: parent[ENV_VARS.customModelReasoning],
+      SSH_AUTH_SOCK: '',
+      SSH_AGENT_PID: '',
+    },
+    parent,
+  );
 }
 
 const START_TIMEOUT_MS = 60_000;

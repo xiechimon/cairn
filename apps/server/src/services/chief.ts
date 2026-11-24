@@ -1798,6 +1798,15 @@ function fireChiefWake(
 
 const TURN_STATE_THREADS_MAX = 20;
 
+function formatTaskStateGroup(
+  label: string,
+  rows: readonly { seqNum: number; phase: string }[],
+): string {
+  const shown = rows.slice(0, TURN_STATE_THREADS_MAX).map((row) => `#${row.seqNum} ${row.phase}`);
+  const hidden = rows.length - shown.length;
+  return `${label}: ${shown.join(', ')}${hidden > 0 ? `, and ${hidden} more` : ''}`;
+}
+
 function taskStateLines(db: Db, teamId: string): string[] {
   const rows = db
     .select()
@@ -1812,8 +1821,9 @@ function taskStateLines(db: Db, teamId: string): string[] {
     )
     .orderBy(asc(todo.seqNum))
     .all();
-  const shown = rows.slice(0, TURN_STATE_THREADS_MAX).map((row) => `#${row.seqNum} ${row.phase}`);
-  const hidden = rows.length - shown.length;
+  const running = rows.filter((row) => row.phase !== 'failed' && row.phase !== 'stopped');
+  const failed = rows.filter((row) => row.phase === 'failed');
+  const stopped = rows.filter((row) => row.phase === 'stopped');
   const attention = rows
     .flatMap((row) => {
       const ownership = ownershipOf(db, row);
@@ -1821,9 +1831,9 @@ function taskStateLines(db: Db, teamId: string): string[] {
     })
     .slice(0, TURN_STATE_THREADS_MAX);
   return [
-    rows.length > 0
-      ? `Running tasks: ${shown.join(', ')}${hidden > 0 ? `, and ${hidden} more` : ''}`
-      : 'Running tasks: none',
+    running.length > 0 ? formatTaskStateGroup('Running tasks', running) : 'Running tasks: none',
+    ...(failed.length > 0 ? [formatTaskStateGroup('Failed tasks', failed)] : []),
+    ...(stopped.length > 0 ? [formatTaskStateGroup('Stopped tasks', stopped)] : []),
     attention.length > 0
       ? `Waiting on someone: ${attention.join(', ')}`
       : 'Waiting on someone: none',
@@ -1874,7 +1884,7 @@ A turn whose prompt starts with [wake:…] was started by an event, not by the u
 </events>
 
 <delivery>
-A terminal state is true only where the record says so: a change is merged when its merge step reports done or GitHub answers merged, pushed when a step reports the commit, released when a release is recorded, and done when the task's phase says done. A merge you requested is under way, not merged. The server refuses or rewrites prose that asserts a merged, landed, pushed, released or passing-tests outcome without that record, or without saying which task report it came from, so state the recorded fact instead ("the merge is under way; it will report when it finishes"); the merge itself announces its outcome when it lands.
+A terminal state is true only where the record says so: a change is merged when its merge step reports done or GitHub answers merged, pushed when a step reports the commit, released when a release is recorded, and done when the task's phase says done. A merge you requested is under way, not merged. A task you just created or opened is queued, not started or running: a runner still has to pick it up and run workspace setup, which can fail before the agent starts — say it is queued, and never claim a queued or failed task has started or is running. The server refuses or rewrites prose that asserts a merged, landed, pushed, released or passing-tests outcome without that record, or without saying which task report it came from, so state the recorded fact instead ("the merge is under way; it will report when it finishes"); the merge itself announces its outcome when it lands.
 </delivery>
 
 <untrusted>

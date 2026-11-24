@@ -21,12 +21,29 @@ import {
   githubIssueSourceRef,
   IN_PROGRESS_PHASES,
   isBackendRuntimeId,
+  missingSetupCommand,
   orchestrationSourceRef,
   PLACEHOLDER_TITLE_FALLBACK,
   parseGithubIssueSourceRef,
   renderTaskText,
+  systemRowOf,
+  WORKSPACE_HOOK_ROW_KIND,
 } from '@cairn/shared';
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, max, min, or, sql } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  like,
+  max,
+  min,
+  or,
+  sql,
+} from 'drizzle-orm';
 import { cacheTtlMsFor, resolveCacheRetentionTier } from '../coordinator/runtime/cold-slim.js';
 import { compactionWindow } from '../coordinator/runtime/compaction.js';
 import type { Db } from '../db/client.js';
@@ -206,15 +223,53 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
       .all(),
     (r) => r.todoId,
   );
-  const history = groupBy(
-    db
-      .select({ todoId: build.todoId, buildId: build.id, createdAt: build.createdAt })
-      .from(build)
-      .where(inArray(build.todoId, ids))
-      .orderBy(asc(build.createdAt))
-      .all(),
-    (r) => r.todoId,
+  const buildRows = db
+    .select({
+      todoId: build.todoId,
+      buildId: build.id,
+      createdAt: build.createdAt,
+      errorMessage: build.errorMessage,
+    })
+    .from(build)
+    .where(inArray(build.todoId, ids))
+    .orderBy(asc(build.createdAt))
+    .all();
+  const history = groupBy(buildRows, (r) => r.todoId);
+  const missingCommands = new Map<string, string>();
+  const latestBuildSet = new Set(latestBuildIds);
+  for (const b of buildRows) {
+    if (!latestBuildSet.has(b.buildId) || b.errorMessage === null) continue;
+    const cmd = missingSetupCommand(b.errorMessage);
+    if (cmd !== null) missingCommands.set(b.buildId, cmd);
+  }
+  const failedBuildIds = rows.flatMap((row) =>
+    row.phase === 'failed' && row.latestBuildId !== null && !missingCommands.has(row.latestBuildId)
+      ? [row.latestBuildId]
+      : [],
   );
+  if (failedBuildIds.length > 0) {
+    const setupRows = db
+      .select({ conversationId: message.conversationId, content: message.content })
+      .from(message)
+      .where(
+        and(
+          inArray(message.conversationId, failedBuildIds),
+          eq(message.role, 'system'),
+          like(message.id, 'hook-setup-%'),
+        ),
+      )
+      .orderBy(desc(message.createdAt))
+      .all();
+    for (const setupRow of setupRows) {
+      if (missingCommands.has(setupRow.conversationId)) continue;
+      const parsed = systemRowOf(setupRow.content);
+      if (parsed === null || parsed.kind !== WORKSPACE_HOOK_ROW_KIND || parsed.status === 'ok') {
+        continue;
+      }
+      const cmd = missingSetupCommand(parsed.output);
+      if (cmd !== null) missingCommands.set(setupRow.conversationId, cmd);
+    }
+  }
   const quotaWaits = new Map<string, QuotaWait>();
   const waitingSteps =
     latestBuildIds.length === 0
@@ -324,6 +379,7 @@ function todoRelations(db: Db, rows: readonly TodoRow[]) {
     githubLabelIds: (labels.get(row.id) ?? []).map((r) => r.labelId),
     history: (history.get(row.id) ?? []).map(({ buildId, createdAt }) => ({ buildId, createdAt })),
     quotaWait: row.latestBuildId === null ? null : (quotaWaits.get(row.latestBuildId) ?? null),
+    missingCommand: row.latestBuildId === null ? undefined : missingCommands.get(row.latestBuildId),
     usage: usage.get(row.id),
     context: contextByTodo.get(row.id),
   });
@@ -355,6 +411,7 @@ function todoRecordOf(
     githubLabelIds,
     history,
     quotaWait,
+    missingCommand,
     usage,
     context,
   }: ReturnType<ReturnType<typeof todoRelations>>,
@@ -394,6 +451,7 @@ function todoRecordOf(
     section: sectionOf(row, ownership, now, heldByBlockers(deps.db, row)),
     ...(waitingOn !== undefined ? { waitingOn } : {}),
     quotaWait,
+    ...(row.phase === 'failed' && missingCommand !== undefined ? { missingCommand } : {}),
     ...(lastProgressAt !== undefined ? { lastProgressAt } : {}),
     ...(usage !== undefined && usage.rows > 0
       ? {

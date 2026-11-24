@@ -84,7 +84,9 @@ export function workPurposes(steps: readonly WorkStep[], running: boolean, t: TF
     }
     if (step.command === undefined || step.description === undefined) return [];
     if (running && !step.running) return [];
-    const purpose = (step.localized === true ? t(step.description) : step.description).trim();
+    const purpose = (
+      step.localized === true ? t(step.description, step.localizedVars) : step.description
+    ).trim();
     return purpose === '' || purpose === (step.command.split('\n')[0] ?? '').trim()
       ? []
       : [purpose];
@@ -156,7 +158,8 @@ function currentAction(steps: readonly Exclude<WorkStep, { kind: 'say' }>[], t: 
     (step): step is Extract<WorkStep, { kind: 'call' }> => step.kind === 'call',
   );
   if (call === undefined) return t('正在思考');
-  const target = call.localized === true ? t(stepTarget(call)) : stepTarget(call);
+  const target =
+    call.localized === true ? t(stepTarget(call), call.localizedVars) : stepTarget(call);
   return `${t(RUNNING_VERBS[call.action])} ${target}`;
 }
 
@@ -244,7 +247,7 @@ function WorkStepRow({
   const lines = call
     ? (call.output === null
         ? t('无输出')
-        : call.localized === true
+        : call.localized === true && call.localizedVars === undefined
           ? t(call.output)
           : call.output
       ).split('\n')
@@ -295,7 +298,7 @@ function WorkStepRow({
               {preview}
             </span>
           ) : call.localized === true ? (
-            t(stepTarget(call))
+            t(stepTarget(call), call.localizedVars)
           ) : (
             stepTarget(call)
           )

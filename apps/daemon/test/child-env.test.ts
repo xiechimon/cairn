@@ -9,6 +9,7 @@ import { buildClaudeSdkOptions } from '../src/backend/claude-code.js';
 import { redactingMcpTransports } from '../src/backend/mcp-log-redaction.js';
 import { runtimeChildEnv } from '../src/backend/otel.js';
 import { piBashEnv } from '../src/backend/pi.js';
+import { piHostEnv } from '../src/backend/pi-host-client.js';
 import { childEnv } from '../src/child-env.js';
 import { HostOrbProvider } from '../src/orb/provider.js';
 import { assembleStepEnv, type StepEnvInput } from '../src/step-env.js';
@@ -73,6 +74,47 @@ describe('childEnv', () => {
 
   test('an undefined extra removes an allowlisted key', () => {
     expect(childEnv({ HOME: undefined }, PARENT).HOME).toBeUndefined();
+  });
+
+  test('preserves login-shell toolchain variables without leaking daemon credentials', () => {
+    const toolchainParent = {
+      ...PARENT,
+      FNM_DIR: '/home/daemon/.local/share/fnm',
+      FNM_MULTISHELL_PATH: '/home/daemon/.local/state/fnm_multishells/1',
+      NVM_DIR: '/home/daemon/.nvm',
+      VOLTA_HOME: '/home/daemon/.volta',
+      PNPM_HOME: '/home/daemon/.local/share/pnpm',
+      HOMEBREW_PREFIX: '/opt/homebrew',
+      MISE_DATA_DIR: '/home/daemon/.local/share/mise',
+      GOPATH: '/home/daemon/go',
+      CARGO_HOME: '/home/daemon/.cargo',
+      PYENV_ROOT: '/home/daemon/.pyenv',
+    };
+    const env = childEnv({}, toolchainParent);
+    expect(env.FNM_DIR).toBe('/home/daemon/.local/share/fnm');
+    expect(env.FNM_MULTISHELL_PATH).toBe('/home/daemon/.local/state/fnm_multishells/1');
+    expect(env.NVM_DIR).toBe('/home/daemon/.nvm');
+    expect(env.VOLTA_HOME).toBe('/home/daemon/.volta');
+    expect(env.PNPM_HOME).toBe('/home/daemon/.local/share/pnpm');
+    expect(env.HOMEBREW_PREFIX).toBe('/opt/homebrew');
+    expect(env.MISE_DATA_DIR).toBe('/home/daemon/.local/share/mise');
+    expect(env.GOPATH).toBe('/home/daemon/go');
+    expect(env.CARGO_HOME).toBe('/home/daemon/.cargo');
+    expect(env.PYENV_ROOT).toBe('/home/daemon/.pyenv');
+    for (const key of Object.keys(DAEMON_CREDENTIALS)) expect(env[key]).toBeUndefined();
+  });
+
+  test('piHostEnv forwards the provided parent environment', () => {
+    const customParent = {
+      ...PARENT,
+      PATH: '/fnm/bin:/opt/homebrew/bin:/usr/bin:/bin',
+      FNM_DIR: '/home/daemon/.local/share/fnm',
+    };
+    const env = piHostEnv(customParent);
+    expect(env.PATH).toBe('/fnm/bin:/opt/homebrew/bin:/usr/bin:/bin');
+    expect(env.FNM_DIR).toBe('/home/daemon/.local/share/fnm');
+    expect(env.GH_TOKEN).toBeUndefined();
+    expect(env.SSH_AUTH_SOCK).toBe('');
   });
 });
 

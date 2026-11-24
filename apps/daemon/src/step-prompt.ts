@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { ClaimedStep } from '@cairn/shared';
+import type { ClaimedStep, WorkspaceHookNoteData } from '@cairn/shared';
 import {
   appendAnswers,
   appendBlockerHandoff,
@@ -15,6 +15,7 @@ import {
   conversationBranch,
   isBuildStepKind,
   isIssueSourcedTask,
+  missingSetupCommand,
   PLAN_FILE_NAME,
   parseReviewPromptMeta,
   parseVerifyPromptMeta,
@@ -157,6 +158,40 @@ export function composeWorkerSystemPrompt(
     parts.push(composeTaskMetaInstruction(opts.taskMeta.currentTitle, opts.taskMeta.meta));
   }
   return parts.length > 0 ? parts.join('\n\n') : undefined;
+}
+
+const FAILED_SETUP_OUTPUT_MAX_CHARS = 4_000;
+
+export function prependFailedSetupHookContext(
+  prompt: string,
+  hooks: readonly WorkspaceHookNoteData[],
+  redact: (text: string) => string = (text) => text,
+): string {
+  const failed = hooks.filter((hook) => hook.name === 'setup' && hook.status !== 'ok');
+  if (failed.length === 0) return prompt;
+  const sections = failed.map((hook) => {
+    const missing = missingSetupCommand(hook.output);
+    const cleaned = redact(hook.output).trim();
+    const excerpt =
+      cleaned.length > FAILED_SETUP_OUTPUT_MAX_CHARS
+        ? `…\n${cleaned.slice(-FAILED_SETUP_OUTPUT_MAX_CHARS)}`
+        : cleaned;
+    const header =
+      missing !== null
+        ? `.agents/setup exited ${hook.exitCode ?? 'unknown'} because command "${missing}" was not found on PATH.`
+        : `.agents/setup exited ${hook.exitCode ?? 'unknown'} before the session started.`;
+    const guidance =
+      missing !== null
+        ? `First check whether you can install or enable "${missing}" (for example via corepack enable, npm i -g ${missing}, or a local package manager) and re-run .agents/setup. If it cannot be installed in this environment, explain clearly to the user that "${missing}" is missing and how to install it.`
+        : 'First inspect the .agents/setup failure output above, try to install the missing tool and re-run .agents/setup if possible, or explain clearly to the user what is missing.';
+    return [
+      '[Workspace setup hook failed before the session started]',
+      header,
+      ...(excerpt !== '' ? ['Output:', excerpt] : []),
+      guidance,
+    ].join('\n');
+  });
+  return `${sections.join('\n\n')}\n\n---\n\n${prompt}`;
 }
 
 export interface StepPromptPlan {

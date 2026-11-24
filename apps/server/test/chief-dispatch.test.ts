@@ -33,7 +33,12 @@ describe('open_thread dispatch', () => {
     const out = (await relay('create_todo', ownerTodo('写文档'))) as {
       id: string;
       buildId: string;
+      phase: string;
+      note: string;
     };
+    expect(out.phase).toBe('queued');
+    expect(out.note).toContain('queued');
+    expect(out.note).toContain('Workspace setup');
     const todoRec = { id: out.id };
     const row = H.s.db.select().from(todoTable).where(eq(todoTable.id, todoRec.id)).get()!;
     expect(row.phase).toBe('queued');
@@ -58,7 +63,14 @@ describe('create_todo parking', () => {
     expect(H.s.db.select().from(buildTable).where(eq(buildTable.todoId, created.id)).all()).toEqual(
       [],
     );
-    const opened = (await relay('open_thread', { todoId: created.id })) as { buildId: string };
+    const opened = (await relay('open_thread', { todoId: created.id })) as {
+      buildId: string;
+      phase: string;
+      note: string;
+    };
+    expect(opened.phase).toBe('queued');
+    expect(opened.note).toContain('queued');
+    expect(opened.note).toContain('Workspace setup');
     const started = H.s.db.select().from(todoTable).where(eq(todoTable.id, created.id)).get()!;
     expect(started.phase).toBe('queued');
     expect(started.latestBuildId).toBe(opened.buildId);
@@ -167,3 +179,26 @@ test.each(['Please implement this', '[wake:gate] provenance=test\nReview task'])
     expect(created.createdBy).toBe(turnPrompt.startsWith('[wake:') ? AGENT_ID : H.userId);
   },
 );
+
+test('a failed todo exposes missingCommand from its build error for task cards', async () => {
+  const out = (await relay('create_todo', ownerTodo('安装依赖并跑测试'))) as {
+    id: string;
+    buildId: string;
+  };
+  H.s.db
+    .update(buildTable)
+    .set({
+      errorMessage:
+        'workspace hook .agents/setup exited 127 — .agents/setup: line 6: pnpm: command not found',
+    })
+    .where(eq(buildTable.id, out.buildId))
+    .run();
+  H.s.db.update(todoTable).set({ phase: 'failed' }).where(eq(todoTable.id, out.id)).run();
+  const res = await req(H.s.app, 'GET', `/api/tasks?teamId=${H.teamId}`);
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    entries: { kind: string; id?: string; missingCommand?: string | null }[];
+  };
+  const card = body.entries.find((entry) => entry.kind === 'todo' && entry.id === out.id);
+  expect(card?.missingCommand).toBe('pnpm');
+});
