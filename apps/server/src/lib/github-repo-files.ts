@@ -60,7 +60,12 @@ function readFailure(reader: GithubRepoRead, status: number, what: string): Http
   return new HttpError(502, `GitHub read of ${what} of ${owner}/${repo} failed (status ${status})`);
 }
 
-async function readJson(reader: GithubRepoRead, url: string, what: string): Promise<unknown> {
+async function readJson(
+  reader: GithubRepoRead,
+  url: string,
+  what: string,
+  signal?: AbortSignal,
+): Promise<unknown> {
   const headers: Record<string, string> = {
     accept: 'application/vnd.github+json',
     'x-github-api-version': '2022-11-28',
@@ -68,12 +73,15 @@ async function readJson(reader: GithubRepoRead, url: string, what: string): Prom
     ...(reader.token !== null ? { authorization: `Bearer ${reader.token}` } : {}),
   };
   let response: Awaited<ReturnType<FetchLike>>;
+  const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
+  const combined = signal !== undefined ? AbortSignal.any([signal, timeout]) : timeout;
   try {
     response = await githubTokenFetch(reader.fetchImpl, reader.token)(url, {
       headers,
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      signal: combined,
     });
-  } catch {
+  } catch (error) {
+    if (signal?.aborted) throw error;
     throw new HttpError(502, `GitHub read failed: ${url}`);
   }
   if (!response.ok) throw readFailure(reader, response.status, what);
@@ -91,13 +99,17 @@ function shortRef(ref: string): string {
     .replace(/^refs\/tags\//, '');
 }
 
-async function resolveCommit(reader: GithubRepoRead, ref: string | undefined): Promise<string> {
+async function resolveCommit(
+  reader: GithubRepoRead,
+  ref: string | undefined,
+  signal?: AbortSignal,
+): Promise<string> {
   const noRef = ref === undefined || ref === 'HEAD';
   const what = noRef ? 'the default branch' : `ref ${ref}`;
   const url = noRef
     ? repositoryUrl(reader, 'commits?per_page=1')
     : repositoryUrl(reader, `commits/${encodeURIComponent(shortRef(ref))}`);
-  const body = await readJson(reader, url, what);
+  const body = await readJson(reader, url, what, signal);
   if (noRef) {
     const list = commitListSchema.safeParse(body);
     const sha = list.success ? list.data[0]?.sha : undefined;
@@ -132,19 +144,19 @@ function toFileResponse(
   };
 }
 
-export async function readGithubProjectFile(
+async function readGithubProjectFileAtCommit(
   reader: GithubRepoRead,
+  commit: string,
   path: string,
-  refParam: string | undefined,
-  options: { maxBytes?: number } = {},
+  ref: string,
+  options: { maxBytes?: number; signal?: AbortSignal } = {},
 ): Promise<ProjectFileResponse> {
-  const ref = refParam ?? 'HEAD';
-  const commit = await resolveCommit(reader, refParam);
   const contents = contentsSchema.safeParse(
     await readJson(
       reader,
       repositoryUrl(reader, `contents/${encodedPath(path)}?ref=${encodeURIComponent(commit)}`),
       `file ${path} at ref ${ref}`,
+      options.signal,
     ),
   );
   if (!contents.success || contents.data.type !== 'file') {
@@ -168,10 +180,49 @@ export async function readGithubProjectFile(
       reader,
       repositoryUrl(reader, `git/blobs/${encodeURIComponent(sha)}`),
       `file ${path} at ref ${ref}`,
+      options.signal,
     ),
   );
   if (!blob.success || blob.data.encoding !== 'base64') throw missing;
   return toFileResponse(path, ref, commit, Buffer.from(blob.data.content, 'base64'));
+}
+
+export async function readGithubProjectFile(
+  reader: GithubRepoRead,
+  path: string,
+  refParam: string | undefined,
+  options: { maxBytes?: number; signal?: AbortSignal } = {},
+): Promise<ProjectFileResponse> {
+  const ref = refParam ?? 'HEAD';
+  const commit = await resolveCommit(reader, refParam, options.signal);
+  return readGithubProjectFileAtCommit(reader, commit, path, ref, options);
+}
+
+export async function readGithubProjectFileCandidates(
+  reader: GithubRepoRead,
+  paths: readonly string[],
+  refParam: string | undefined,
+  options: { maxBytes?: number; signal?: AbortSignal } = {},
+): Promise<ProjectFileResponse | null> {
+  const ref = refParam ?? 'HEAD';
+  const commit = await resolveCommit(reader, refParam, options.signal);
+  for (const path of paths) {
+    if (options.signal?.aborted) throw options.signal.reason;
+    try {
+      const file = await readGithubProjectFileAtCommit(reader, commit, path, ref, options);
+      if (file.encoding === 'utf-8') return file;
+    } catch (error) {
+      if (
+        error instanceof HttpError &&
+        error.status === 404 &&
+        error.message.includes(`file ${path}`)
+      ) {
+        continue;
+      }
+      throw error;
+    }
+  }
+  return null;
 }
 
 export async function listGithubProjectFiles(

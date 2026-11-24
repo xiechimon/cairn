@@ -18,7 +18,7 @@ import {
 } from '@cairn/shared';
 import { repositoryCacheRefPrefix } from '@cairn/shared/repo-cache';
 import { parsePatch } from 'diff';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, isNull, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   build as buildTable,
@@ -34,6 +34,7 @@ import {
   type GithubRepoRead,
   listGithubProjectFiles,
   readGithubProjectFile,
+  readGithubProjectFileCandidates,
 } from '../lib/github-repo-files.js';
 import {
   assertSourceOutsideCairnDirs,
@@ -696,6 +697,7 @@ const README_CANDIDATES = [
 
 const README_READ_MAX_BYTES = 256 * 1024;
 const README_EXCERPT_MAX_CHARS = 6_000;
+const README_TIMEOUT_MS = 5_000;
 
 export type ProjectReadmeResult =
   | { status: 'ok'; repo: string; path: string; content: string; truncated: boolean }
@@ -708,25 +710,27 @@ function readmeRepoLabel(row: ProjectRow): string {
   return row.name;
 }
 
-export async function readProjectReadme(
-  ctx: RepoReadCtx,
-  projectId: string,
-): Promise<ProjectReadmeResult | null> {
-  const row = ctx.db.select().from(project).where(eq(project.id, projectId)).get();
-  if (row === undefined || row.repoKind === null) return null;
-  const repo = readmeRepoLabel(row);
-  const ref = row.baseBranch ?? undefined;
+function toReadmeOk(repo: string, file: ProjectFileResponse): ProjectReadmeResult {
+  const truncated = file.content.length > README_EXCERPT_MAX_CHARS;
+  const excerpt = truncated
+    ? `${file.content.slice(0, README_EXCERPT_MAX_CHARS).replace(/[\uD800-\uDBFF]$/, '')}\n…`
+    : file.content;
+  return { status: 'ok', repo, path: file.path, content: excerpt, truncated };
+}
+
+async function readCommittedReadmeCandidate(
+  dir: string,
+  commit: string,
+  ref: string,
+  signal: AbortSignal,
+): Promise<ProjectFileResponse | null> {
   for (const candidate of README_CANDIDATES) {
+    if (signal.aborted) throw signal.reason;
     try {
-      const file = await readFile(ctx, projectId, candidate, ref, {
+      const file = await readCommittedFile(dir, commit, candidate, ref, {
         maxBytes: README_READ_MAX_BYTES,
       });
-      if (file.encoding !== 'utf-8') continue;
-      const truncated = file.content.length > README_EXCERPT_MAX_CHARS;
-      const content = truncated
-        ? `${file.content.slice(0, README_EXCERPT_MAX_CHARS)}\n…`
-        : file.content;
-      return { status: 'ok', repo, path: candidate, content, truncated };
+      if (file.encoding === 'utf-8') return file;
     } catch (error) {
       if (
         error instanceof HttpError &&
@@ -735,14 +739,82 @@ export async function readProjectReadme(
       ) {
         continue;
       }
-      return {
-        status: 'unreadable',
-        repo,
-        reason: error instanceof Error ? error.message : String(error),
-      };
+      throw error;
     }
   }
-  return { status: 'missing', repo };
+  return null;
+}
+
+export async function readProjectReadme(
+  ctx: RepoReadCtx,
+  teamId: string,
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectReadmeResult | null> {
+  const row = ctx.db
+    .select()
+    .from(project)
+    .where(
+      and(eq(project.id, projectId), eq(project.teamId, teamId), isNull(project.personalOwnerId)),
+    )
+    .get();
+  if (row === undefined || row.repoKind === null) return null;
+  const repo = readmeRepoLabel(row);
+  const timeout = AbortSignal.timeout(README_TIMEOUT_MS);
+  const budget = signal !== undefined ? AbortSignal.any([signal, timeout]) : timeout;
+  const refParam = row.baseBranch ?? undefined;
+  try {
+    let found: ProjectFileResponse | null = null;
+    if (row.repoKind === 'github') {
+      let readFromLocal = false;
+      for await (const source of githubReadDirs(ctx, row)) {
+        if (budget.aborted) throw budget.reason;
+        let ref = refParam ?? 'HEAD';
+        if (refParam === undefined) {
+          if (row.baseBranch != null) {
+            ref = `refs/remotes/origin/${row.baseBranch}`;
+          } else if (source.kind === 'cache') {
+            ref = await remoteDefaultRef(
+              source.dir,
+              'project repository cache default branch is missing; re-prepare the project to refresh it or configure baseBranch',
+            );
+          }
+        }
+        const commit = await resolveReadCommit(ctx, projectId, source, ref);
+        if (commit === null) {
+          if (source.kind === 'checkout') continue;
+          throw notFound(`ref ${ref}`);
+        }
+        found = await readCommittedReadmeCandidate(source.dir, commit, ref, budget);
+        readFromLocal = true;
+        break;
+      }
+      if (!readFromLocal) {
+        const reader = await githubRepoReader(ctx, row);
+        found = await readGithubProjectFileCandidates(reader, README_CANDIDATES, refParam, {
+          maxBytes: README_READ_MAX_BYTES,
+          signal: budget,
+        });
+      }
+    } else {
+      const dir = await requireRepoReadDir(ctx, projectId);
+      const ref = refParam ?? 'HEAD';
+      const commit = await resolveCommitOr404(ctx, projectId, { dir, kind: 'dir' }, ref);
+      found = await readCommittedReadmeCandidate(dir, commit, ref, budget);
+    }
+    return found === null ? { status: 'missing', repo } : toReadmeOk(repo, found);
+  } catch (error) {
+    if (error instanceof HttpError) {
+      return { status: 'unreadable', repo, reason: error.message };
+    }
+    return {
+      status: 'unreadable',
+      repo,
+      reason: budget.aborted
+        ? 'timed out reading repository README'
+        : 'repository could not be read due to an internal error',
+    };
+  }
 }
 
 export async function readBranches(

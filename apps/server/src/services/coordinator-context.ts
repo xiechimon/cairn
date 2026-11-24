@@ -285,7 +285,13 @@ export function channelUsageSummary(
     const owned = db
       .select({ id: chiefThread.id })
       .from(chiefThread)
-      .where(and(eq(chiefThread.chiefId, chiefRow.id), eq(chiefThread.id, threadId)))
+      .where(
+        and(
+          eq(chiefThread.chiefId, chiefRow.id),
+          eq(chiefThread.teamId, chiefRow.teamId),
+          eq(chiefThread.id, threadId),
+        ),
+      )
       .get();
     if (owned === undefined) return null;
     threadIds = [owned.id];
@@ -293,7 +299,7 @@ export function channelUsageSummary(
     threadIds = db
       .select({ id: chiefThread.id })
       .from(chiefThread)
-      .where(eq(chiefThread.chiefId, chiefRow.id))
+      .where(and(eq(chiefThread.chiefId, chiefRow.id), eq(chiefThread.teamId, chiefRow.teamId)))
       .all()
       .map((row) => row.id);
   }
@@ -314,7 +320,7 @@ export function channelUsageSummary(
       machineName: machine.name,
     })
     .from(step)
-    .leftJoin(machine, eq(machine.id, step.machineId))
+    .leftJoin(machine, and(eq(machine.id, step.machineId), eq(machine.teamId, chiefRow.teamId)))
     .where(and(inArray(step.buildId, threadIds), eq(step.kind, 'chief')))
     .all();
   const started = steps.filter((row) => row.claimedAt !== null);

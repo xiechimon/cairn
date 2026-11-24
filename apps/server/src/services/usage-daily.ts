@@ -5,7 +5,7 @@ import {
   MODEL_SOURCE_RUNTIME_LABELS,
   type ModelSourceRuntime,
 } from '@cairn/shared';
-import { eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { project, provider } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
@@ -70,8 +70,8 @@ function usageSlots(db: Db, teamId: string, from: number, to: number): SlotRow[]
       ${sums((type) => `su.${type}`)}
     FROM step_usage su
     LEFT JOIN build b ON b.id = su.buildId AND su.kind != 'chief'
-    LEFT JOIN todo td ON td.id = b.todoId
-    LEFT JOIN chief_thread ct ON ct.id = su.buildId AND su.kind = 'chief'
+    LEFT JOIN todo td ON td.id = b.todoId AND td.teamId = ${teamId}
+    LEFT JOIN chief_thread ct ON ct.id = su.buildId AND su.kind = 'chief' AND ct.teamId = ${teamId}
     WHERE su.teamId = ${teamId} AND su.createdAt >= ${from} AND su.createdAt <= ${to}
     GROUP BY 1, 2, 3, 4, 5
     UNION ALL
@@ -215,7 +215,7 @@ export function dailyUsage(
         : db
             .select({ id: project.id, name: project.name })
             .from(project)
-            .where(inArray(project.id, projectIds))
+            .where(and(eq(project.teamId, teamId), inArray(project.id, projectIds)))
             .all(),
   };
 }

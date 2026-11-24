@@ -88,6 +88,7 @@ export function claimPendingChiefStep(
     bind?: ChiefSubscriptionBind | string | null;
     model?: StepRanModel | null;
     mcpGrant?: string[] | null;
+    stillAuthorized?: () => boolean;
   },
 ): StepRow | null {
   const bind =
@@ -97,6 +98,7 @@ export function claimPendingChiefStep(
   if (options.model?.provider === 'antigravity' && bind?.runtime !== 'antigravity') return null;
   const claimedAt = Math.max(nowMs(), (stepRow.claimedAt ?? 0) + 1);
   const claimed = db.transaction(() => {
+    if (options.stillAuthorized !== undefined && !options.stillAuthorized()) return null;
     const antigravitySubscriptionId =
       bind?.runtime === 'antigravity'
         ? enabledAntigravitySubscriptionId({ db }, bind.teamId, Math.max(claimedAt, nowMs()))

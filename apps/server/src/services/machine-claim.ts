@@ -287,13 +287,23 @@ async function buildChiefClaim(
   stepRow: typeof step.$inferSelect,
   threadRow: typeof chiefThread.$inferSelect,
   agentRow: RouteProfile,
+  stillAuthorized: () => boolean,
+  signal: AbortSignal | undefined,
   machineRow?: typeof machine.$inferSelect,
 ): Promise<ClaimedStep | null> {
-  if (!agentRow.modelId) return null;
+  if (!stillAuthorized() || !agentRow.modelId) return null;
   const model = effectiveModel(agentRow, stepRow);
   if (
     !machineRow ||
     chiefIneligibility(deps.db, machineRow, agentRow, model.provider, nowMs()) !== null
+  )
+    return null;
+  const readmeSection = await greetingReadmeSection(deps, stepRow, threadRow, signal);
+  if (!stillAuthorized()) return null;
+  const freshMachine = deps.db.select().from(machine).where(eq(machine.id, machineId)).get();
+  if (
+    !freshMachine ||
+    chiefIneligibility(deps.db, freshMachine, agentRow, model.provider, nowMs()) !== null
   )
     return null;
   const runtime = stepRuntimeFor(model.provider);
@@ -312,10 +322,19 @@ async function buildChiefClaim(
             modelId: model.modelId,
             thinkingLevel: stepRow.fallback?.model ? null : agentRow.thinkingLevel,
           },
-    mcpGrant: stepMcpGrant(deps.db, machineRow, chiefTurnLocked(stepRow)) ?? null,
+    mcpGrant: stepMcpGrant(deps.db, freshMachine, chiefTurnLocked(stepRow)) ?? null,
+    stillAuthorized,
   });
   if (claimed === null) return null;
-  return chiefClaimPayload(deps, machineId, claimed, threadRow, agentRow, machineRow);
+  return chiefClaimPayload(
+    deps,
+    machineId,
+    claimed,
+    threadRow,
+    agentRow,
+    readmeSection,
+    freshMachine,
+  );
 }
 
 const DAEMON_QUICK_REPLIES_GUIDANCE = [
@@ -324,14 +343,15 @@ const DAEMON_QUICK_REPLIES_GUIDANCE = [
   '</quick_replies>',
 ].join('\n');
 
-async function chiefClaimPayload(
+function chiefClaimPayload(
   deps: MachineDeps,
   machineId: string,
   stepRow: typeof step.$inferSelect,
   threadRow: typeof chiefThread.$inferSelect,
   agentRow: RouteProfile,
+  readmeSection: string | null,
   machineRow?: typeof machine.$inferSelect,
-): Promise<ClaimedStep> {
+): ClaimedStep {
   const model = effectiveModel(agentRow, stepRow);
   const { trigger, systemPrompt, memories, instruction, memoryTrace } = chiefTurnContext(
     deps,
@@ -339,7 +359,6 @@ async function chiefClaimPayload(
     threadRow,
     coordinatorMemoryOwner(deps.db, threadRow.teamId) ?? null,
   );
-  const readmeSection = await greetingReadmeSection(deps, stepRow, threadRow);
   const fullInstruction =
     instruction !== null && readmeSection !== null
       ? `${instruction}\n\n${readmeSection}`
@@ -462,7 +481,9 @@ async function claimChiefTurn(
   maxWorkers: number | undefined,
   createdUpTo: number,
   stillAuthorized: () => boolean,
+  signal: AbortSignal | undefined,
 ): Promise<ClaimedStep | null> {
+  if (!stillAuthorized()) return null;
   const { db } = deps;
   const initialMachine = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!initialMachine) return null;
@@ -509,6 +530,8 @@ async function claimChiefTurn(
       cand.stepRow,
       cand.threadRow,
       cand.agentRow,
+      stillAuthorized,
+      signal,
       machineRow,
     );
     if (claimed) {
@@ -527,6 +550,7 @@ async function tryClaim(
   maxWorkers: number | undefined,
   supportsAttachmentVerify: boolean,
   stillAuthorized: () => boolean,
+  signal: AbortSignal | undefined,
 ): Promise<ClaimedStep | null> {
   if (!stillAuthorized()) return null;
   const { db } = deps;
@@ -549,6 +573,7 @@ async function tryClaim(
     maxWorkers,
     earliestWorker,
     stillAuthorized,
+    signal,
   );
   if (chiefAhead) return chiefAhead;
   if (!stillAuthorized()) return null;
@@ -905,6 +930,7 @@ async function tryClaim(
       ...(workerMcp !== undefined ? { mcpServers: workerMcp } : {}),
     };
   }
+  if (!stillAuthorized()) return null;
   return claimChiefTurn(
     deps,
     machineId,
@@ -912,6 +938,7 @@ async function tryClaim(
     maxWorkers,
     Number.POSITIVE_INFINITY,
     stillAuthorized,
+    signal,
   );
 }
 
@@ -971,6 +998,7 @@ export async function claimStep(
     body?.maxWorkers,
     body?.verifyAttachments === true,
     stillAuthorized,
+    signal,
   );
   if (first) return first;
   await deps.machineHub.waitWake(teamId, holdMs, signal, sinceWake);
@@ -983,5 +1011,6 @@ export async function claimStep(
     body?.maxWorkers,
     body?.verifyAttachments === true,
     stillAuthorized,
+    signal,
   );
 }

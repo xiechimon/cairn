@@ -139,7 +139,12 @@ export function liveQuickReplies(
   state: { running: boolean; runningStepId?: string | null },
 ): string[] {
   if (rows.some(isPendingQuestion)) return [];
-  const at = rows.findLastIndex((row) => kindOf(row.content) === QUICK_REPLIES_KIND);
+  const at = rows.findLastIndex(
+    (row) =>
+      row.role === 'system' &&
+      row.id.startsWith(QUICK_REPLIES_ROW_ID_PREFIX) &&
+      kindOf(row.content) === QUICK_REPLIES_KIND,
+  );
   if (at < 0) return [];
   const content = quickRepliesContentSchema.safeParse(parsedContent(rows[at]?.content));
   if (!content.success) return [];
