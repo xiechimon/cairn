@@ -620,7 +620,29 @@ export async function antigravitySubscriptionUpstreamModels(
   if (!deps.ownerInitiated) return fallback('auth');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) return fallback('auth');
   claimRateWindow(upstreamModelsWindows, deps.db, row.id, 'model list attempts');
-  if (row.tokenCipher === null) return fallback('auth');
+  if (row.tokenCipher === null) {
+    const runners = deps.db
+      .select({ capabilities: machine.capabilities })
+      .from(machine)
+      .where(and(eq(machine.teamId, teamId), eq(machine.online, true), isNull(machine.retiredAt)))
+      .orderBy(machine.id)
+      .all()
+      .flatMap((m) =>
+        m.capabilities?.antigravity?.installed === true ? [m.capabilities.antigravity] : [],
+      );
+    const seen = new Set<string>();
+    const models = runners
+      .filter((runner) => runner.authenticated === true)
+      .flatMap((runner) => runner.models ?? [])
+      .filter((model) => {
+        if (model.id === '' || seen.has(model.id)) return false;
+        seen.add(model.id);
+        return true;
+      })
+      .map(({ id, name }) => ({ id, name }));
+    if (models.length > 0) return { status: 'ok', models };
+    return fallback(runners.length > 0 ? 'auth' : 'not-found');
+  }
 
   let token: string;
   try {

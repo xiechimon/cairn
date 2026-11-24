@@ -1034,6 +1034,66 @@ describe('antigravity upstream models', () => {
     expect(await signedOut.json()).toMatchObject({ status: 'fallback', failure: 'auth' });
   });
 
+  test('lists the full CLI model catalog reported by an authenticated Runner for a host-login subscription while ignoring retired Runners', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const fullCliModels = [
+      { id: 'gemini-4-neon', name: 'Gemini 4 Neon' },
+      { id: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+      { id: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+      { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
+      { id: 'gemini-pro-orchestrator-neon', name: 'Orchestrator (Neon)' },
+      { id: 'gemini-pro-orchestrator', name: 'Orchestrator (Carbon)' },
+      { id: 'gemini-pro-orchestrator-argon', name: 'Orchestrator (Argon)' },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+      { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+      { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+      { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+    ];
+    const retiredId = insertMachine(s, {
+      name: 'agy-retired',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          authenticated: true,
+          models: [{ id: 'retired-only-model', name: 'Retired Only' }],
+        },
+      },
+    });
+    s.db.update(machineTable).set({ retiredAt: 1 }).where(eq(machineTable.id, retiredId)).run();
+    insertMachine(s, {
+      name: 'agy-full-cli',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          version: '1.5.16',
+          authenticated: true,
+          models: fullCliModels,
+        },
+      },
+    });
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const createdHost = await req(s.app, 'POST', path, { label: 'Host login' });
+    expect(createdHost.status).toBe(201);
+    const host = (await createdHost.json()) as { id: string };
+    const upstream = await req(s.app, 'POST', `${path}/${host.id}/upstream-models`);
+    expect(upstream.status).toBe(200);
+    expect(await upstream.json()).toEqual({ status: 'ok', models: fullCliModels });
+
+    const createdKey = await req(s.app, 'POST', path, {
+      label: 'Separate key',
+      token: `AIzaSyA${'m'.repeat(28)}`,
+    });
+    const keyed = (await createdKey.json()) as { id: string };
+    const keyedUpstream = await req(s.app, 'POST', `${path}/${keyed.id}/upstream-models`);
+    expect(keyedUpstream.status).toBe(200);
+    expect(await keyedUpstream.json()).toMatchObject({ status: 'fallback', failure: 'not-found' });
+  });
+
   test('stores a curated model subset and offers it in model sources', async () => {
     const s = bootServer({ githubFetch: async () => new Response('[]') });
     disposables.push(() => s.dispose());

@@ -18,7 +18,7 @@ type PendingProbe = {
 type ProbeQueue = { pending: Map<string, PendingProbe>; scheduled: boolean };
 
 const queues = new WeakMap<MachineWakeHub, ProbeQueue>();
-const PROBE_TIMEOUT_MS = 15_000;
+const PROBE_TIMEOUT_MS = 35_000;
 
 function scheduleProbeDispatch(hub: MachineWakeHub, queue: ProbeQueue): void {
   if (queue.scheduled || queue.pending.size === 0) return;

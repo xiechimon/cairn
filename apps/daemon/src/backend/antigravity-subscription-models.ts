@@ -20,7 +20,7 @@ import { antigravityFileStorageEnv, writeAntigravityAuthSettings } from '../agen
 import { DAEMON_VERSION } from '../version.js';
 import { type AntigravityInstall, antigravityProbeEnv } from './antigravity-managed.js';
 
-const PROBE_TIMEOUT_MS = 10_000;
+const PROBE_TIMEOUT_MS = 30_000;
 const UPDATE_IDLE_MS = 200;
 const MAX_MODELS = 2000;
 

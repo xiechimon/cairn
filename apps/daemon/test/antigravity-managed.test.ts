@@ -386,4 +386,59 @@ describe('antigravity managed binary resolution', () => {
     });
     expect(await managed.ensure()).toBeNull();
   });
+
+  test('adopts late config_option_update with the full CLI model catalog instead of freezing on a single initial model', async () => {
+    const dir = tempDir('ag-late-models-');
+    const root = join(dir, 'managed');
+    const fullCliModels = [
+      { value: 'gemini-4-neon', name: 'Gemini 4 Neon' },
+      { value: 'gemini-4-carbon', name: 'Gemini 4 Carbon' },
+      { value: 'gemini-4-argon', name: 'Gemini 4 Argon' },
+      { value: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
+      { value: 'gemini-pro-orchestrator-neon', name: 'Orchestrator (Neon)' },
+      { value: 'gemini-pro-orchestrator', name: 'Orchestrator (Carbon)' },
+      { value: 'gemini-pro-orchestrator-argon', name: 'Orchestrator (Argon)' },
+      { value: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+      { value: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+      { value: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+      { value: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+    ];
+    const body = [
+      "import { createInterface } from 'node:readline';",
+      'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+      'for await (const line of createInterface({ input: process.stdin })) {',
+      '  const msg = JSON.parse(line);',
+      '  if (msg.method === "initialize") {',
+      '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentInfo: { name: "Antigravity ACP Server", version: "1.5.16" }, agentCapabilities: { loadSession: true } } });',
+      '  } else if (msg.method === "session/new") {',
+      '    send({ id: msg.id, result: { sessionId: "probe-1", configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-3.8-flash", options: [{ value: "gemini-3.8-flash", name: "Gemini 3.8 Flash" }] }] } });',
+      '    setTimeout(() => {',
+      '      send({ method: "session/update", params: { sessionId: "foreign-session", update: { sessionUpdate: "config_option_update", configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "foreign-only", options: [{ value: "foreign-only", name: "Foreign" }] }] } } });',
+      `      send({ method: "session/update", params: { sessionId: "probe-1", update: { sessionUpdate: "config_option_update", configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-neon", options: ${JSON.stringify(fullCliModels)} }] } } });`,
+      '    }, 25);',
+      '  } else if (msg.method === "session/set_config_option") {',
+      '    const thought = msg.params.value === "gemini-4-neon" ? [{ id: "thought_level", name: "Thinking", category: "thought_level", type: "select", currentValue: "high", options: [{ value: "low", name: "Low" }, { value: "medium", name: "Medium" }, { value: "high", name: "High" }, { value: "xhigh", name: "XHigh" }] }] : [];',
+      '    send({ id: msg.id, result: { configOptions: thought } });',
+      '  }',
+      '}',
+    ].join('\n');
+    const source = `#!/bin/sh\nexec ${shQuote(process.execPath)} --input-type=module -e ${shQuote(body)} -- "$0" "$@"\n`;
+    writeManagedCliInstall(root, '1.5.16', source);
+
+    const managed = createAntigravityManaged({
+      root,
+      platform: 'darwin',
+      arch: 'arm64',
+      fetchImpl: async () => new Response('{}', { status: 500 }),
+    });
+    const install = await managed.probe();
+    expect(install?.authenticated).toBe(true);
+    expect(install?.models.map((m) => m.id)).toEqual(fullCliModels.map((m) => m.value));
+    expect(install?.models.find((m) => m.id === 'gemini-4-neon')).toMatchObject({
+      id: 'gemini-4-neon',
+      name: 'Gemini 4 Neon',
+      thinkingLevels: ['low', 'medium', 'high', 'xhigh'],
+      thinkingDefault: 'high',
+    });
+  });
 });

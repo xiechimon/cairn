@@ -5,7 +5,6 @@ import {
   isBackendRuntimeId,
   MACHINE_RUNTIMES,
   type MachineCapabilities,
-  type MachineHardware,
   type MachineRuntime,
   MODEL_SOURCE_RUNTIME_LABELS,
   type RequiredCapabilities,

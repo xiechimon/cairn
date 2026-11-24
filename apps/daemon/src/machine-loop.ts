@@ -1169,9 +1169,20 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       const result =
         install === null
           ? ({ status: 'failed', failure: 'not-found' } as const)
-          : await probeAntigravitySubscriptionModels(install, token, paths.home, signal).catch(
-              () => ({ status: 'failed', failure: 'upstream' }) as const,
-            );
+          : await (() => {
+              const version = install.version;
+              activeAntigravityVersions.set(
+                version,
+                (activeAntigravityVersions.get(version) ?? 0) + 1,
+              );
+              return probeAntigravitySubscriptionModels(install, token, paths.home, signal)
+                .catch(() => ({ status: 'failed', failure: 'upstream' }) as const)
+                .finally(() => {
+                  const next = (activeAntigravityVersions.get(version) ?? 1) - 1;
+                  if (next > 0) activeAntigravityVersions.set(version, next);
+                  else activeAntigravityVersions.delete(version);
+                });
+            })();
       await client.finishAntigravityModelProbe(
         requestId,
         connectionId,

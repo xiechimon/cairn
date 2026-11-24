@@ -469,3 +469,69 @@ test('binds OAuth execution with an explicit expiration to a compatible runner',
     openAntigravitySubscription({ db: s.db, box: s.secretBox }, s.team.id, 'antigravity', id),
   ).toBe(JSON.stringify({ kind: 'oauth-personal', token: ACCESS_TOKEN, expiresAt }));
 });
+
+test('personal OAuth returns the full CLI-equivalent catalog even when an online Runner reports only gemini-3.8-flash', async () => {
+  const s = bootServer({ githubFetch: async () => new Response('[]') });
+  try {
+    insertMachine(s, {
+      name: 'legacy-1-5-2-runner',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravity: {
+          installed: true,
+          version: '1.5.2',
+          authenticated: true,
+          models: [{ id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }],
+        },
+      },
+    });
+    const fullCliEntries = [
+      ['gemini-4-neon', 'Gemini 4 Neon', 'MODEL_PROVIDER_GOOGLE'],
+      ['gemini-4-carbon', 'Gemini 4 Carbon', 'MODEL_PROVIDER_GOOGLE'],
+      ['gemini-4-argon', 'Gemini 4 Argon', 'MODEL_PROVIDER_GOOGLE'],
+      ['gemini-4-hydrogen', 'Gemini 4 Hydrogen', 'MODEL_PROVIDER_GOOGLE'],
+      ['gemini-pro-orchestrator-neon', 'Orchestrator (Neon)', 'MODEL_PROVIDER_GOOGLE'],
+      ['gemini-pro-orchestrator', 'Orchestrator (Carbon)', 'MODEL_PROVIDER_GOOGLE'],
+      ['gemini-pro-orchestrator-argon', 'Orchestrator (Argon)', 'MODEL_PROVIDER_GOOGLE'],
+      ['gemini-3.8-flash', 'Gemini 3.8 Flash', 'MODEL_PROVIDER_GOOGLE'],
+      ['claude-opus-5-5', 'Claude Opus 5.5', 'MODEL_PROVIDER_ANTHROPIC'],
+      ['claude-sonnet-5-5', 'Claude Sonnet 5.5', 'MODEL_PROVIDER_ANTHROPIC'],
+      ['gpt-oss-120b-medium', 'GPT-OSS 120B (Medium)', 'MODEL_PROVIDER_OPENAI'],
+    ] as const;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+          return Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT });
+        }
+        if (url.endsWith(':fetchAvailableModels')) {
+          return Response.json({
+            models: Object.fromEntries(
+              fullCliEntries.map(([id, displayName, modelProvider]) => [
+                id,
+                { displayName, modelProvider },
+              ]),
+            ),
+          });
+        }
+        return Response.json({ groups: [] });
+      }),
+    );
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const created = await req(s.app, 'POST', path, {
+      label: 'Personal full catalog',
+      token: ACCESS_TOKEN,
+      expiresAt: Date.now() + 600_000,
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    const response = await req(s.app, 'POST', `${path}/${id}/upstream-models`);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { status: string; models: { id: string }[] };
+    expect(body.status).toBe('ok');
+    expect(body.models.map((m) => m.id)).toEqual(fullCliEntries.map(([modelId]) => modelId));
+  } finally {
+    s.dispose();
+  }
+});

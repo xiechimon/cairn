@@ -32,6 +32,7 @@ import { DAEMON_VERSION } from '../version.js';
 
 const PROBE_INIT_TIMEOUT_MS = 30_000;
 const PROBE_SESSION_TIMEOUT_MS = 30_000;
+const PROBE_UPDATE_IDLE_MS = 200;
 
 export interface AntigravityModel {
   id: string;
@@ -144,10 +145,10 @@ function within<T>(request: Promise<T>, label: string): Promise<T> {
 
 async function withThinkingLevels(
   setModel: (configId: string, modelId: string) => Promise<SetSessionConfigOptionResponse>,
-  created: NewSessionResponse,
+  configOptions: readonly SessionConfigOption[] | null | undefined,
   models: AntigravityModel[],
 ): Promise<AntigravityModel[]> {
-  const modelOption = created.configOptions?.find((option) => option.category === 'model');
+  const modelOption = configOptions?.find((option) => option.category === 'model');
   if (modelOption?.type !== 'select') return models;
   const learned: AntigravityModel[] = [];
   for (const model of models) {
@@ -162,20 +163,38 @@ async function withThinkingLevels(
   return learned;
 }
 
-function extractModels(response: NewSessionResponse): AntigravityModel[] {
-  const modelOption = response.configOptions?.find((option) => option.category === 'model');
-  if (modelOption?.type !== 'select') {
-    return defaultModels();
-  }
-  const models: AntigravityModel[] = [];
-  for (const entry of modelOption.options) {
-    if ('options' in entry) {
-      for (const item of entry.options) models.push({ id: item.value, name: item.name });
-    } else {
-      models.push({ id: entry.value, name: entry.name });
+function extractModels(
+  configOptions: readonly SessionConfigOption[] | null | undefined,
+  response: NewSessionResponse,
+): AntigravityModel[] {
+  const modelOption = configOptions?.find((option) => option.category === 'model');
+  if (modelOption?.type === 'select') {
+    const seen = new Set<string>();
+    const models: AntigravityModel[] = [];
+    for (const entry of modelOption.options) {
+      const items = 'options' in entry ? entry.options : [entry];
+      for (const item of items) {
+        if (item.value === '' || seen.has(item.value)) continue;
+        seen.add(item.value);
+        models.push({ id: item.value, name: item.name || item.value });
+      }
     }
+    if (models.length > 0) return models;
   }
-  return models.length > 0 ? models : defaultModels();
+  const legacy = (response as { models?: { availableModels?: unknown } }).models?.availableModels;
+  if (Array.isArray(legacy)) {
+    const seen = new Set<string>();
+    const models: AntigravityModel[] = [];
+    for (const entry of legacy) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const { modelId, name } = entry as { modelId?: unknown; name?: unknown };
+      if (typeof modelId !== 'string' || modelId === '' || seen.has(modelId)) continue;
+      seen.add(modelId);
+      models.push({ id: modelId, name: typeof name === 'string' && name !== '' ? name : modelId });
+    }
+    if (models.length > 0) return models;
+  }
+  return defaultModels();
 }
 
 function reportedVersionMatches(reported: string | undefined, expected: string): boolean {
@@ -258,13 +277,46 @@ async function probeAntigravityBinary(
   child.stderr.on('data', (chunk: Buffer) => logStream.write(chunk));
   child.stderr.resume();
   const app = client({ name: 'cairn' });
+  const bufferedUpdates = new Map<string, readonly SessionConfigOption[]>();
+  let sessionId: string | undefined;
+  let latestConfigOptions: readonly SessionConfigOption[] | null | undefined;
+  let collectingUpdates = true;
+  let updateTimer: ReturnType<typeof setTimeout> | undefined;
+  let finishUpdates = () => {};
+  let childExited = false;
+  const extendUpdateWindow = () => {
+    clearTimeout(updateTimer);
+    updateTimer = setTimeout(finishUpdates, PROBE_UPDATE_IDLE_MS);
+  };
+  app.onNotification(methods.client.session.update, ({ params }) => {
+    if (!collectingUpdates || params.update.sessionUpdate !== 'config_option_update') return;
+    const options = params.update.configOptions;
+    if (!Array.isArray(options)) return;
+    if (sessionId === undefined) {
+      if (bufferedUpdates.has(params.sessionId) || bufferedUpdates.size < 16) {
+        bufferedUpdates.set(params.sessionId, options);
+      }
+      return;
+    }
+    if (params.sessionId !== sessionId) return;
+    latestConfigOptions = options;
+    extendUpdateWindow();
+  });
   const stream = ndJsonStream(
     Writable.toWeb(child.stdin),
     Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
   );
   const connection = app.connect(stream);
-  child.once('error', (error) => connection.close(error));
-  child.once('exit', (code) => connection.close(new Error(`antigravity probe exited (${code})`)));
+  child.once('error', (error) => {
+    childExited = true;
+    finishUpdates();
+    connection.close(error);
+  });
+  child.once('exit', (code) => {
+    childExited = true;
+    finishUpdates();
+    connection.close(new Error(`antigravity probe exited (${code})`));
+  });
 
   try {
     const initialized = await Promise.race([
@@ -288,6 +340,16 @@ async function probeAntigravityBinary(
           setTimeout(() => reject(new Error('probe session timeout')), PROBE_SESSION_TIMEOUT_MS),
         ),
       ]);
+      sessionId = created.sessionId;
+      latestConfigOptions = bufferedUpdates.get(created.sessionId) ?? created.configOptions;
+      if (!childExited) {
+        await new Promise<void>((resolve) => {
+          finishUpdates = resolve;
+          extendUpdateWindow();
+        });
+      }
+      collectingUpdates = false;
+      clearTimeout(updateTimer);
       const models = await withThinkingLevels(
         (configId, value) =>
           within(
@@ -297,8 +359,8 @@ async function probeAntigravityBinary(
             ),
             'probe model',
           ),
-        created,
-        extractModels(created),
+        latestConfigOptions,
+        extractModels(latestConfigOptions, created),
       );
       return { version, binPath, args, source, authenticated: true, models };
     } catch {
@@ -314,6 +376,8 @@ async function probeAntigravityBinary(
   } catch {
     return null;
   } finally {
+    collectingUpdates = false;
+    clearTimeout(updateTimer);
     connection.close();
     child.kill('SIGTERM');
     const killTimer = setTimeout(() => child.kill('SIGKILL'), 500);
