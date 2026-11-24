@@ -9,6 +9,8 @@ import { testTempDir } from './test-temp-dir.js';
 
 const repo = fileURLToPath(new URL('../../../', import.meta.url));
 const stepEnv = new URL('../src/step-env.ts', import.meta.url).href;
+const parentWatch = new URL('../../../packages/shared/src/node/parent-watch.ts', import.meta.url)
+  .href;
 const profiles = new URL('../../../packages/shared/src/node/credential-profile.ts', import.meta.url)
   .href;
 
@@ -32,6 +34,7 @@ test.each(['current', 'legacy'] as const)(
     import { writeFileSync } from 'node:fs';
     import { dirname, join } from 'node:path';
     import { prepareStepEnv } from ${JSON.stringify(stepEnv)};
+    import { processStartTime } from ${JSON.stringify(parentWatch)};
     const prepared = prepareStepEnv({
       git: null, appCredential: null, readonlyGit: false, runtimeId: 'antigravity',
       agentConfig: { cairnHome: process.argv[1] },
@@ -43,7 +46,7 @@ test.each(['current', 'legacy'] as const)(
         ? execFileSync('/bin/ps', ['-o', 'lstart=', '-p', String(process.pid)], {
             encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' },
           }).trim()
-        : '1';
+        : processStartTime(process.pid);
       writeFileSync(join(dirname(prepared.env.HOME), 'owner.json'), JSON.stringify({ pid: process.pid, startTime }));
     }
     console.log(prepared.env.HOME);

@@ -38,19 +38,7 @@ export function apiKeyProbeRunnerGrant(db: Db, teamId: string, machineId: string
   const pinned = rules.filter((rule) => rule.machineId === machineId && eligible(rule));
   if (pinned.length > 0) return JSON.stringify(['pinned', pinned]);
   const unpinned = rules.filter((rule) => rule.machineId === null && eligible(rule));
-  if (rules.length === 0) {
-    if (
-      !eligible({
-        machineId: null,
-        requiredCapabilities: null,
-        provider: 'antigravity',
-        modelId: null,
-      })
-    )
-      return null;
-  } else if (unpinned.length === 0) {
-    return null;
-  }
+  if (unpinned.length === 0) return null;
   const defaultMachineId = teamDefaultMachineId(db, teamId);
   const teamMachines = db
     .select({

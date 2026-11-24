@@ -11,7 +11,7 @@ afterEach(() => {
   for (const dir of fixtures.splice(0)) releaseTestTempDir(dir);
 });
 
-function fakeAgy(outcome: 'catalog' | 'empty' | 'auth') {
+function fakeAgy(outcome: 'catalog' | 'groups' | 'empty' | 'auth') {
   const dir = makeTestTempDir('agy-subscription-models-');
   fixtures.push(dir);
   const script = join(dir, 'agy.mjs');
@@ -30,9 +30,9 @@ function settings(component) {
 function modelSelect(options) {
   return { id: 'model', name: 'Model', type: 'select', category: 'model', currentValue: 'gemini-paid', options };
 }
-function update(sessionId, value) {
+function update(sessionId, value, options = [{ value, name: value }]) {
   send({ method: 'session/update', params: { sessionId, update: {
-    sessionUpdate: 'config_option_update', configOptions: [modelSelect([{ value, name: value }])],
+    sessionUpdate: 'config_option_update', configOptions: [modelSelect(options)],
   } } });
 }
 if (
@@ -68,6 +68,34 @@ for await (const line of createInterface({ input: process.stdin })) {
         update('foreign', 'foreign-model');
         setTimeout(() => update('live', 'gpt-from-update'), 25);
         break;
+      case 'groups':
+        reply(id, { sessionId: 'live', configOptions: [modelSelect([
+          { value: 'late-grouped', name: 'Late Grouped' },
+          { group: 'google', name: 'Gemini Models', options: [
+            { value: 'gemini-grouped', name: 'Gemini Grouped' },
+            { value: 'late-grouped', name: 'Ignored Duplicate' },
+          ] },
+          { group: 'external', name: 'Claude and GPT models', options: [
+            { value: 'claude-grouped', name: 'C'.repeat(300) },
+            { value: 'echoed-credential', name: 'C'.repeat(250) + ${JSON.stringify(TOKEN)} },
+          ] },
+          { group: 'leaky', name: 'Pool ' + ${JSON.stringify(TOKEN)}, options: [
+            { value: 'leaky-group-model', name: 'Leaky Group Model' },
+          ] },
+          { group: 'long', name: 'G'.repeat(65), options: [
+            { value: 'long-group-model', name: 'Long Group Model' },
+          ] },
+          { group: 'unnamed', name: '  ', options: [
+            { value: 'unnamed-group-model', name: 'Unnamed Group Model' },
+          ] },
+        ])] });
+        setTimeout(() => update('live', 'unused', [
+          { group: 'late', name: 'Late Pool', options: [
+            { value: 'late-update-model', name: 'Late Update Model' },
+            { value: 'late-grouped', name: 'Ignored Duplicate' },
+          ] },
+        ]), 25);
+        break;
       case 'empty':
         reply(id, { sessionId: 'live', configOptions: [] });
         break;
@@ -93,14 +121,31 @@ test('uses only the supplied key in a scratch home and combines all three ACP mo
     status: 'ok',
     models: [
       { id: 'gemini-paid', name: 'Gemini Paid' },
-      { id: 'claude-paid', name: 'Claude Paid' },
+      { id: 'claude-paid', name: 'Claude Paid', group: 'External' },
       { id: 'gpt-from-update', name: 'gpt-from-update' },
+      { id: 'gemini-paid-high', name: 'Gemini Paid High' },
       { id: 'independent-legacy-model', name: 'Independent Legacy Model' },
     ],
   });
   const profile = readFileSync(marker, 'utf8');
   expect(dirname(dirname(profile))).toBe(join(realpathSync(appData), 'credential-profiles'));
   expect(existsSync(profile)).toBe(false);
+});
+
+test("keeps each model's authoritative group, and the model itself when its group is unusable", async () => {
+  const { install, appData } = fakeAgy('groups');
+  expect(await probeAntigravitySubscriptionModels(install, TOKEN, appData)).toEqual({
+    status: 'ok',
+    models: [
+      { id: 'late-grouped', name: 'Late Grouped', group: 'Gemini Models' },
+      { id: 'gemini-grouped', name: 'Gemini Grouped', group: 'Gemini Models' },
+      { id: 'claude-grouped', name: 'C'.repeat(256), group: 'Claude and GPT models' },
+      { id: 'leaky-group-model', name: 'Leaky Group Model' },
+      { id: 'long-group-model', name: 'Long Group Model' },
+      { id: 'unnamed-group-model', name: 'Unnamed Group Model' },
+      { id: 'late-update-model', name: 'Late Update Model', group: 'Late Pool' },
+    ],
+  });
 });
 
 test.each([

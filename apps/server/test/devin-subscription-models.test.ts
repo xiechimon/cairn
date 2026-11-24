@@ -91,6 +91,17 @@ const CONFIG_OPTIONS = [
   { id: 'flag', name: 'Flag', category: 'model', type: 'boolean', currentValue: true },
 ];
 
+const PARTIAL_OPTIONS = [
+  {
+    id: 'model',
+    name: 'Model',
+    category: 'model',
+    type: 'select',
+    currentValue: 'swe-2-high',
+    options: [{ value: 'swe-2-high', name: 'SWE-2' }],
+  },
+];
+
 const UPDATE_OPTIONS = [
   {
     id: 'model',
@@ -107,9 +118,17 @@ const UPDATE_OPTIONS = [
 
 type FakeOpts = {
   catalog?: 'ok' | 'fail' | 'garbage' | 'hang' | 'hang-before-record';
-  acp?: 'ok' | 'auth-reject' | 'session-error' | 'no-update' | 'update-only' | 'early-update';
+  acp?:
+    | 'ok'
+    | 'auth-reject'
+    | 'session-error'
+    | 'no-update'
+    | 'update-only'
+    | 'early-update'
+    | 'partial-then-update';
   authenticate?: 'ok' | 'absent';
   extraModels?: number;
+  partialUpdateDelaySeconds?: number;
   authErrorAt?: 'initialize' | 'authenticate' | 'session/new';
 };
 
@@ -148,7 +167,7 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
       ? structuredAuthError(3)
       : acp === 'session-error'
         ? '{"jsonrpc":"2.0","id":3,"error":{"code":-32603,"message":"session blew up"}}'
-        : `{"jsonrpc":"2.0","id":3,"result":{"sessionId":"s1","configOptions":${JSON.stringify(acp === 'update-only' || acp === 'early-update' ? [] : CONFIG_OPTIONS)}}}`;
+        : `{"jsonrpc":"2.0","id":3,"result":{"sessionId":"s1","configOptions":${JSON.stringify(acp === 'update-only' || acp === 'early-update' ? [] : acp === 'partial-then-update' ? PARTIAL_OPTIONS : CONFIG_OPTIONS)}}}`;
   const modelUpdate = (configOptions: unknown) =>
     JSON.stringify({
       jsonrpc: '2.0',
@@ -176,6 +195,9 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
   if (acp === 'ok') sessionWrite += '; exit 0';
   if (acp === 'update-only') {
     sessionWrite += `; sleep 0.1; printf '%s\\n' '${modelUpdate(UPDATE_OPTIONS)}'`;
+  }
+  if (acp === 'partial-then-update') {
+    sessionWrite += `; sleep ${opts.partialUpdateDelaySeconds ?? 0.1}; printf '%s\\n' '${modelUpdate(UPDATE_OPTIONS)}'`;
   }
   if (acp === 'early-update') {
     sessionWrite = `printf '%s\\n' '${modelUpdate(UPDATE_OPTIONS)}' '${sessionReply}'`;
@@ -236,17 +258,46 @@ describe('fetchDevinSubscriptionModels', () => {
     ['update-only', ['swe-2-high', 'gpt-5.5']],
     ['early-update', ['swe-2-high', 'gpt-5.5']],
   ] as const)(
-    'returns the %s catalog promptly while the ACP session stays open',
+    'collects the %s catalog within the configured bound even while the ACP session stays open',
     async (acp, ids) => {
       fakeDevinModels({ acp });
-      const start = performance.now();
-      const result = await fetchDevinSubscriptionModels(TOKEN);
-      const elapsed = performance.now() - start;
+      const result = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 350 });
       expect(result.ok && result.models.map((model) => model.id)).toEqual(ids);
-      expect(elapsed, `Live fake ACP cold fetch: ${elapsed.toFixed(1)} ms`).toBeLessThan(1_500);
-      console.info(`Live fake ACP ${acp} cold fetch: ${elapsed.toFixed(1)} ms`);
     },
   );
+
+  test.each([0.1, 0.65])(
+    'keeps collecting when a matching update completes a partial catalog %ss later',
+    async (partialUpdateDelaySeconds) => {
+      fakeDevinModels({ acp: 'partial-then-update', partialUpdateDelaySeconds });
+      const result = await fetchDevinSubscriptionModels(TOKEN);
+      expect(result.ok && result.models.map((model) => model.id)).toEqual([
+        'swe-2-high',
+        'gpt-5.5',
+      ]);
+    },
+  );
+
+  test('stops waiting for the optional models list shortly after ACP succeeds', async () => {
+    const { dir } = fakeDevinModels({ catalog: 'hang' });
+    const start = performance.now();
+    const result = await fetchDevinSubscriptionModels(TOKEN, {
+      timeoutMs: 5_000,
+      catalogGraceMs: 200,
+    });
+    const elapsed = performance.now() - start;
+    expect(result.ok && result.models.map((model) => model.id)).toEqual([
+      'swe-2-high',
+      'swe-2-flash-medium',
+      'claude-x',
+      'gpt-5.5',
+    ]);
+    if (result.ok)
+      expect(result.models[0]).toEqual({ id: 'swe-2-high', name: 'SWE-2', supportsImages: true });
+    expect(elapsed, `waited ${elapsed.toFixed(0)} ms`).toBeLessThan(1_500);
+    const pid = Number(readFileSync(join(dir, 'metadata.pid'), 'utf8'));
+    await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
+  });
 
   test('joins the ACP select set with the catalog metadata, merging session/update options', async () => {
     const { runs } = fakeDevinModels();

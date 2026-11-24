@@ -1,10 +1,20 @@
+import { eq } from 'drizzle-orm';
 import { afterEach, expect, test, vi } from 'vitest';
+import { antigravitySubscription } from '../src/db/schema.js';
 import { openAntigravitySubscription } from '../src/services/antigravity-subscriptions.js';
 import { antigravityUsable } from '../src/services/dispatch-eligibility.js';
 import { bootServer, insertMachine, req } from './helpers.js';
 
 const ACCESS_TOKEN = 'ya29.fake-personal-subscription-token';
 const SECOND_TOKEN = 'ya29.fake-second-subscription-token';
+const GOOGLE_SUBJECT = '102900000000000000001';
+const OTHER_GOOGLE_SUBJECT = '102900000000000000002';
+const PAID_VARIANTS = ['neon', 'carbon', 'argon'].flatMap((family) =>
+  ['low', 'medium', 'high', 'xhigh'].map((effort) => ({
+    id: `gemini-4-${family}-${effort}`,
+    displayName: `Gemini 4 ${family} ${effort}`,
+  })),
+);
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -18,7 +28,7 @@ test.each([undefined, null])(
     const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
     const now = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(now);
-    const upstream = vi.fn(async () => Response.json({ expires_in: '3599' }));
+    const upstream = vi.fn(async () => Response.json({ expires_in: '3599', sub: GOOGLE_SUBJECT }));
     vi.stubGlobal('fetch', upstream);
     const response = await req(s.app, 'POST', path, {
       label: 'Personal',
@@ -55,9 +65,10 @@ test.each([undefined, null])(
 test.each([
   ['rejected', 400, { error: 'invalid_token' }, 400],
   ['missing expiry', 200, {}, 502],
-  ['expired', 200, { expires_in: '0' }, 400],
-  ['malformed expiry', 200, { expires_in: 'not-a-number' }, 502],
-  ['oversized expiry', 200, { expires_in: '9000000000000' }, 502],
+  ['expired', 200, { expires_in: '0', sub: GOOGLE_SUBJECT }, 400],
+  ['malformed expiry', 200, { expires_in: 'not-a-number', sub: GOOGLE_SUBJECT }, 502],
+  ['oversized expiry', 200, { expires_in: '9000000000000', sub: GOOGLE_SUBJECT }, 502],
+  ['missing subject', 200, { expires_in: '3600' }, 502],
   ['upstream failure', 503, {}, 502],
 ] as const)(
   'does not store OAuth credentials when tokeninfo reports %s',
@@ -120,6 +131,12 @@ test('discovers each account’s entitlement models without switching the active
     const bearer = headers.get('Authorization');
     const paid = bearer === `Bearer ${ACCESS_TOKEN}`;
     if (!paid && bearer !== `Bearer ${SECOND_TOKEN}`) return new Response('{}', { status: 401 });
+    if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+      return Response.json({
+        expires_in: '3600',
+        sub: paid ? GOOGLE_SUBJECT : OTHER_GOOGLE_SUBJECT,
+      });
+    }
     if (url.endsWith(':fetchAvailableModels')) {
       return Response.json({
         models: {
@@ -131,6 +148,12 @@ test('discovers each account’s entitlement models without switching the active
                   modelProvider: 'MODEL_PROVIDER_ANTHROPIC',
                 },
                 'gpt-paid': { label: 'GPT Paid' },
+                'gemini-echoed-credential': {
+                  displayName: `${'x'.repeat(256 - ACCESS_TOKEN.length)}${ACCESS_TOKEN}`,
+                },
+                ...Object.fromEntries(
+                  PAID_VARIANTS.map(({ id, displayName }) => [id, { displayName }]),
+                ),
               }
             : {}),
         },
@@ -156,6 +179,10 @@ test('discovers each account’s entitlement models without switching the active
         gemini,
         { id: 'claude-paid', name: 'Claude Paid · Claude and GPT models' },
         { id: 'gpt-paid', name: 'GPT Paid · Claude and GPT models' },
+        ...PAID_VARIANTS.map(({ id, displayName }) => ({
+          id,
+          name: `${displayName} · Gemini Models`,
+        })),
       ],
     ],
     [SECOND_TOKEN, [gemini]],
@@ -172,9 +199,11 @@ test('discovers each account’s entitlement models without switching the active
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'ok', models });
   }
-  expect(upstream).toHaveBeenCalledTimes(4);
+  expect(upstream).toHaveBeenCalledTimes(6);
   for (const [url, init] of upstream.mock.calls) {
-    expect(new URL(url).origin).toBe('https://cloudcode-pa.googleapis.com');
+    expect(['https://cloudcode-pa.googleapis.com', 'https://oauth2.googleapis.com']).toContain(
+      new URL(url).origin,
+    );
     expect(init).toMatchObject({ method: 'POST', redirect: 'error' });
   }
 });
@@ -198,6 +227,10 @@ test('attaches OAuth only to the selected credentialless subscription and never 
       })
     ).status,
   ).toBe(400);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT })),
+  );
   const attached = await req(s.app, 'POST', `${path}/${id}/attach-oauth`, credential);
   expect(attached.status).toBe(200);
   expect(await attached.json()).toMatchObject({
@@ -227,6 +260,9 @@ test('renews expired desktop OAuth in place before probing the same account cata
     const start = Date.now();
     const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
     const upstream = vi.fn(async (url: string, init: RequestInit) => {
+      if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+        return Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT });
+      }
       expect(new Headers(init.headers).get('authorization')).toBe(`Bearer ${SECOND_TOKEN}`);
       return url.endsWith(':fetchAvailableModels')
         ? Response.json({ models: { 'claude-renewed': { displayName: 'Claude Renewed' } } })
@@ -248,7 +284,7 @@ test('renews expired desktop OAuth in place before probing the same account cata
       status: 'fallback',
       failure: 'auth',
     });
-    expect(upstream).not.toHaveBeenCalled();
+    expect(upstream).toHaveBeenCalledTimes(1);
     const credential = { kind: 'oauth-personal', token: SECOND_TOKEN, expiresAt: start + 120_000 };
     const renewed = await req(s.app, 'POST', `${path}/${id}/attach-oauth`, credential);
     expect(renewed.status).toBe(200);
@@ -268,7 +304,95 @@ test('renews expired desktop OAuth in place before probing the same account cata
       status: 'ok',
       models,
     });
-    expect(upstream).toHaveBeenCalledTimes(2);
+    expect(upstream).toHaveBeenCalledTimes(4);
+  } finally {
+    s.dispose();
+  }
+});
+
+test.each([
+  ['a different account', OTHER_GOOGLE_SUBJECT, 409],
+  ['no verifiable account', undefined, 502],
+] as const)(
+  'refuses to renew expired OAuth with %s without changing the row',
+  async (_case, sub, status) => {
+    const s = bootServer();
+    try {
+      const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+      const start = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async (url: string, init: RequestInit) => {
+          expect(url).toBe('https://oauth2.googleapis.com/tokeninfo');
+          return Response.json({
+            expires_in: '3600',
+            sub:
+              new Headers(init.headers).get('authorization') === `Bearer ${ACCESS_TOKEN}`
+                ? GOOGLE_SUBJECT
+                : sub,
+          });
+        }),
+      );
+      const created = await req(s.app, 'POST', path, {
+        label: 'Desktop account',
+        token: ACCESS_TOKEN,
+        expiresAt: start + 60_000,
+      });
+      expect(created.status).toBe(201);
+      const { id } = (await created.json()) as { id: string };
+      const models = [{ id: 'gemini-account-a', name: 'Account A model' }];
+      expect((await req(s.app, 'PATCH', `${path}/${id}`, { models })).status).toBe(200);
+      const before = await (await req(s.app, 'GET', path)).json();
+      clock.mockReturnValue(start + 60_001);
+      const result = await req(s.app, 'POST', `${path}/${id}/attach-oauth`, {
+        kind: 'oauth-personal',
+        token: SECOND_TOKEN,
+        expiresAt: start + 120_000,
+      });
+      expect(result.status).toBe(status);
+      const error = await result.text();
+      for (const secret of [ACCESS_TOKEN, SECOND_TOKEN, GOOGLE_SUBJECT, OTHER_GOOGLE_SUBJECT]) {
+        expect(error).not.toContain(secret);
+      }
+      expect(await (await req(s.app, 'GET', path)).json()).toEqual(before);
+    } finally {
+      s.dispose();
+    }
+  },
+);
+
+test('allows reading old OAuth credentials but refuses to renew one without an account binding', async () => {
+  const s = bootServer();
+  try {
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const start = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(start);
+    const upstream = vi.fn(async () => Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT }));
+    vi.stubGlobal('fetch', upstream);
+    const created = await req(s.app, 'POST', path, { label: 'Legacy connection' });
+    const { id } = (await created.json()) as { id: string };
+    const expiresAt = start + 60_000;
+    const tokenCipher = `oauth-personal:${s.secretBox.seal(ACCESS_TOKEN)}`;
+    s.db
+      .update(antigravitySubscription)
+      .set({ tokenCipher, expiresAt })
+      .where(eq(antigravitySubscription.id, id))
+      .run();
+    expect(
+      openAntigravitySubscription({ db: s.db, box: s.secretBox }, s.team.id, 'antigravity', id),
+    ).toBe(JSON.stringify({ kind: 'oauth-personal', token: ACCESS_TOKEN, expiresAt }));
+    clock.mockReturnValue(expiresAt + 1);
+    const result = await req(s.app, 'POST', `${path}/${id}/attach-oauth`, {
+      kind: 'oauth-personal',
+      token: SECOND_TOKEN,
+      expiresAt: start + 120_000,
+    });
+    expect(result.status).toBe(409);
+    expect(upstream).not.toHaveBeenCalled();
+    expect(
+      s.db.select().from(antigravitySubscription).where(eq(antigravitySubscription.id, id)).get(),
+    ).toMatchObject({ tokenCipher, expiresAt });
   } finally {
     s.dispose();
   }
@@ -300,11 +424,14 @@ test('does not turn a quota response into an account catalog when discovery is d
   const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) =>
-      url.endsWith(':fetchAvailableModels')
+    vi.fn(async (url: string) => {
+      if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+        return Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT });
+      }
+      return url.endsWith(':fetchAvailableModels')
         ? new Response('{}', { status: 403 })
-        : Response.json({ groups: [{ displayName: 'Claude and GPT models' }] }),
-    ),
+        : Response.json({ groups: [{ displayName: 'Claude and GPT models' }] });
+    }),
   );
   const created = await req(s.app, 'POST', path, {
     label: 'Denied account',
@@ -320,6 +447,10 @@ test('does not turn a quota response into an account catalog when discovery is d
 test('binds OAuth execution with an explicit expiration to a compatible runner', async () => {
   const s = bootServer({ githubFetch: async () => new Response('[]') });
   const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT })),
+  );
   const body = { label: 'Google account', token: ACCESS_TOKEN };
   const expiresAt = Date.now() + 600_000;
   const created = await req(s.app, 'POST', path, { ...body, expiresAt });

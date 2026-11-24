@@ -7,6 +7,7 @@ import { OWNER_CHANNEL_HEADER } from '@cairn/shared';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { antigravitySubscription } from '../../server/src/db/schema.js';
+import { openAntigravitySubscription } from '../../server/src/services/antigravity-subscriptions.js';
 import { bootServer } from '../../server/test/helpers.js';
 import { desktopCredentialActions } from '../src/local-credential-actions.js';
 import { scanLocalProviders } from '../src/local-providers.js';
@@ -25,7 +26,15 @@ vi.mock('node:child_process', async (original) => ({
 
 function offlineServer() {
   const s = bootServer({ authToken: owner, ownerChannel: { key: channel } });
-  const toServer = vi.fn((url: string, init: RequestInit) => s.app.request(url, init));
+  const toServer = vi.fn((url: string, init: RequestInit) => {
+    if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+      const bearer = new Headers(init.headers).get('authorization');
+      expect(bearer).toMatch(/^Bearer ya29\.[a-z]+$/);
+      expect(init.redirect).toBe('error');
+      return Promise.resolve(Response.json({ expires_in: '7200', sub: `fixture-${bearer?.[12]}` }));
+    }
+    return s.app.request(url, init);
+  });
   vi.stubGlobal('fetch', toServer);
   return s;
 }
@@ -133,10 +142,10 @@ test('two default desktop sign-ins save distinct encrypted credentials and read 
       .find((entry) => entry.id === id);
     if (row?.tokenCipher == null) throw new Error('Missing encrypted subscription credential');
     expect(row.tokenCipher).not.toContain(tokenFor(account));
-    expect(row.tokenCipher.startsWith('oauth-personal:')).toBe(true);
-    expect(s.secretBox.open(row.tokenCipher.slice('oauth-personal:'.length))).toBe(
-      tokenFor(account),
-    );
+    expect(row.tokenCipher).not.toContain(`fixture-${account}`);
+    expect(
+      openAntigravitySubscription({ db: s.db, box: s.secretBox }, s.team.id, 'antigravity', row.id),
+    ).toBe(JSON.stringify({ kind: 'oauth-personal', token: tokenFor(account), expiresAt }));
     vi.stubGlobal(
       'fetch',
       vi.fn(async (_url: unknown, init: RequestInit) => {
@@ -196,8 +205,12 @@ test('local Antigravity, Devin and Pi imports return metadata only and use the b
     { providerId: 'relay', status: 'saved', id: expect.any(String) },
     { providerId: 'missing', status: 'missing' },
   ]);
-  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
-  for (const [url, init] of vi.mocked(fetch).mock.calls) {
+  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(4);
+  const desktopCalls = vi
+    .mocked(fetch)
+    .mock.calls.filter(([url]) => String(url).startsWith(origin));
+  expect(desktopCalls).toHaveLength(3);
+  for (const [url, init] of desktopCalls) {
     expect(String(url)).toMatch(/^http:\/\/localhost:3210\/api\/teams\//);
     expect(new Headers(init?.headers).get(OWNER_CHANNEL_HEADER)).toBe(channel);
     expect(new Headers(init?.headers).get('authorization')).toBe(`Bearer ${owner}`);

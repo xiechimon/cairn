@@ -10,6 +10,7 @@ import {
   step as stepTable,
   team,
 } from '../src/db/schema.js';
+import { openAntigravitySubscription } from '../src/services/antigravity-subscriptions.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
 import { getModelSources } from '../src/services/providers.js';
 import { bootServer, insertMachine, issueApiKey, postProject, req, seedRoute } from './helpers.js';
@@ -95,6 +96,26 @@ describe('antigravity subscriptions REST & model sources', () => {
       { label: `bad-${tokenSecret}` },
     );
     expect(badRename.status).toBe(400);
+  });
+
+  test('a bound step cannot fall back to host login if its subscription is missing or expired', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const host = await req(s.app, 'POST', path, { label: 'Intentional host login' });
+    const { id: hostId } = (await host.json()) as { id: string };
+    const expired = await req(s.app, 'POST', path, {
+      label: 'Expired key',
+      token: `AIzaSyA${'e'.repeat(28)}`,
+      expiresAt: Date.now() - 1000,
+    });
+    const { id: expiredId } = (await expired.json()) as { id: string };
+    const open = (id: string) =>
+      openAntigravitySubscription({ db: s.db, box: s.secretBox }, s.team.id, 'antigravity', id);
+    expect(open(hostId)).toBeUndefined();
+    for (const id of ['missing-bound-account', expiredId]) {
+      expect(() => open(id)).toThrow(expect.objectContaining({ status: 409 }));
+    }
   });
 
   test('verifies host-login connection from online Runner antigravity capabilities', async () => {
@@ -217,6 +238,26 @@ describe('antigravity subscriptions REST & model sources', () => {
       `/api/teams/${s.team.id}/antigravity-subscriptions/${sub.id}/disable`,
     );
     expect(conflictDisable.status).toBe(409);
+
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    s.db
+      .update(antigravitySubscription)
+      .set({ expiresAt: Date.now() - 1000 })
+      .where(eq(antigravitySubscription.id, sub.id))
+      .run();
+    const replacement = await req(s.app, 'POST', path, { label: 'Replacement' });
+    expect(replacement.status).toBe(201);
+    expect(await replacement.json()).toMatchObject({ enabled: false });
+    expect(await (await req(s.app, 'GET', path)).json()).toContainEqual(
+      expect.objectContaining({ id: sub.id, enabled: true }),
+    );
+
+    s.db
+      .update(antigravitySubscription)
+      .set({ enabledAt: null })
+      .where(eq(antigravitySubscription.id, sub.id))
+      .run();
+    expect((await req(s.app, 'DELETE', `${path}/${sub.id}`)).status).toBe(409);
 
     const stepsRes = await req(
       s.app,
@@ -394,6 +435,8 @@ describe('antigravity upstream models', () => {
   test.each([
     'expired',
     'ambiguous-default',
+    'team-default-without-provider-route',
+    'sole-runner-without-provider-route',
     'wrong-runner',
     'retired',
     'confinement',
@@ -415,6 +458,16 @@ describe('antigravity upstream models', () => {
         refusal === 'wrong-runner' ? await enrollProbeRunner(s, 'assigned-offline-stream') : runner;
       if (refusal === 'ambiguous-default') {
         await enrollProbeRunner(s, 'another-eligible-runner');
+        s.db.update(team).set({ defaultMachineId: null }).where(eq(team.id, s.team.id)).run();
+      } else if (refusal === 'team-default-without-provider-route') {
+        await enrollProbeRunner(s, 'another-eligible-runner');
+        s.db
+          .update(team)
+          .set({ defaultMachineId: runner.machineId })
+          .where(eq(team.id, s.team.id))
+          .run();
+        seedRoute(s, 'session', { provider: 'devin', machineId: runner.machineId });
+      } else if (refusal === 'sole-runner-without-provider-route') {
         s.db.update(team).set({ defaultMachineId: null }).where(eq(team.id, s.team.id)).run();
       } else {
         seedRoute(s, 'session', {
@@ -506,7 +559,7 @@ describe('antigravity upstream models', () => {
     }
   });
 
-  test.each(['pinned', 'no rule', 'unpinned'] as const)(
+  test.each(['pinned', 'unpinned'] as const)(
     'dispatches each account credential only to its assigned connection with %s routing',
     async (routing) => {
       const s = bootServer({ githubFetch: async () => new Response('[]') });
@@ -520,13 +573,11 @@ describe('antigravity upstream models', () => {
           .where(eq(team.id, s.team.id))
           .run();
       }
-      if (routing !== 'no rule') {
-        seedRoute(s, 'session', {
-          provider: 'antigravity',
-          modelId: 'gemini-4-carbon',
-          machineId: routing === 'pinned' ? runner.machineId : null,
-        });
-      }
+      seedRoute(s, 'session', {
+        provider: 'antigravity',
+        modelId: 'gemini-4-carbon',
+        machineId: routing === 'pinned' ? runner.machineId : null,
+      });
       let event: ReturnType<
         typeof deferred<Extract<MachineStreamEvent, { type: 'antigravity.models' }>>
       >;

@@ -1,4 +1,5 @@
 import {
+  type AntigravityProbedModel,
   type AntigravitySubscriptionModel,
   antigravitySubscriptionModelSchema,
   type ProviderFailure,
@@ -57,6 +58,19 @@ export function labelAntigravityModel(
   return `${displayName.slice(0, 256 - suffix.length)}${suffix}`;
 }
 
+export function antigravityProbedCatalog(
+  probed: readonly AntigravityProbedModel[],
+  token: string,
+): AntigravitySubscriptionModel[] {
+  const models = new Map<string, AntigravitySubscriptionModel>();
+  for (const { id, name, group } of probed) {
+    if (models.has(id) || id.includes(token) || name.includes(token)) continue;
+    const pool = group === undefined || group.includes(token) ? undefined : group;
+    models.set(id, { id, name: labelAntigravityModel(id, name, pool) });
+  }
+  return [...models.values()];
+}
+
 function accountRequest(url: string, accessToken: string, signal: AbortSignal) {
   return fetch(url, {
     method: 'POST',
@@ -88,7 +102,7 @@ async function accountPools(
     const parsed = quotaEnvelope.safeParse(await res.json());
     if (!parsed.success) return pools;
     for (const group of parsed.data.groups ?? []) {
-      if (group.displayName === undefined) continue;
+      if (group.displayName === undefined || group.displayName.includes(accessToken)) continue;
       for (const bucket of group.buckets ?? []) {
         if (!bucket.disabled && bucket.modelId && !pools.has(bucket.modelId)) {
           pools.set(bucket.modelId, group.displayName);
@@ -122,10 +136,11 @@ export async function fetchAntigravityEntitlements(
       const model = availableModel.safeParse(entry);
       if (!model.success || model.data.disabled) continue;
       const displayName = model.data.displayName ?? model.data.label ?? id;
+      if (id.includes(accessToken) || displayName.includes(accessToken)) continue;
       const pool = pools.get(id) ?? poolOfModel(id, model.data.modelProvider);
       const name = labelAntigravityModel(id, displayName, pool);
       const validated = antigravitySubscriptionModelSchema.safeParse({ id, name });
-      if (!validated.success || id.includes(accessToken) || name.includes(accessToken)) continue;
+      if (!validated.success) continue;
       models.push(validated.data);
       if (models.length >= MAX_MODELS) break;
     }

@@ -3,7 +3,7 @@ import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '..
 import { agentTodoReportSchema } from '../agent-todo.js';
 import {
   ANTIGRAVITY_TOKEN_REGEX,
-  antigravitySubscriptionModelSchema,
+  antigravityProbedModelSchema,
 } from '../antigravity-subscription.js';
 import { backgroundTaskSchema } from '../background-task.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
@@ -318,7 +318,7 @@ export type MachineRepoArchiveCommand = z.infer<typeof machineRepoArchiveCommand
 export const machineAntigravityModelProbeResultSchema = z.discriminatedUnion('status', [
   z.object({
     status: z.literal('ok'),
-    models: z.array(antigravitySubscriptionModelSchema).min(1).max(2000),
+    models: z.array(antigravityProbedModelSchema).min(1).max(2000),
   }),
   z.object({
     status: z.literal('failed'),

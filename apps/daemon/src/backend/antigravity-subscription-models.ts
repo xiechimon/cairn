@@ -9,7 +9,9 @@ import {
   type SessionConfigOption,
 } from '@agentclientprotocol/sdk';
 import {
-  type AntigravitySubscriptionModel,
+  ANTIGRAVITY_MODEL_NAME_MAX_LENGTH,
+  type AntigravityProbedModel,
+  antigravityProbedModelSchema,
   antigravitySubscriptionModelSchema,
   type MachineAntigravityModelProbeResult,
 } from '@cairn/shared';
@@ -22,10 +24,18 @@ const PROBE_TIMEOUT_MS = 10_000;
 const UPDATE_IDLE_MS = 200;
 const MAX_MODELS = 2000;
 
-function modelChoices(options: readonly SessionConfigOption[] | null | undefined) {
+type ModelChoice = { value: string; name: string; group?: string };
+
+function modelChoices(
+  options: readonly SessionConfigOption[] | null | undefined,
+): readonly ModelChoice[] {
   return (options ?? []).flatMap((option) =>
     option.type === 'select' && option.category === 'model'
-      ? option.options.flatMap((choice) => ('options' in choice ? choice.options : [choice]))
+      ? option.options.flatMap((choice) =>
+          'options' in choice
+            ? choice.options.map(({ value, name }) => ({ value, name, group: choice.name }))
+            : [{ value: choice.value, name: choice.name }],
+        )
       : [],
   );
 }
@@ -35,7 +45,7 @@ async function queryAntigravityModels(
   { home, env }: ReturnType<typeof createCredentialProfile>,
   token: string,
   signal: AbortSignal,
-): Promise<AntigravitySubscriptionModel[]> {
+): Promise<AntigravityProbedModel[]> {
   signal.throwIfAborted();
   const child = spawn(install.binPath, install.args, {
     cwd: home,
@@ -51,17 +61,41 @@ async function queryAntigravityModels(
     stdio: ['pipe', 'pipe', 'ignore'],
     windowsHide: true,
   });
-  const models = new Map<string, AntigravitySubscriptionModel>();
-  const updates = new Map<string, ReturnType<typeof modelChoices>>();
+  const models = new Map<string, AntigravityProbedModel>();
+  const updates = new Map<string, readonly ModelChoice[]>();
   let sessionId: string | undefined;
   let updateTimer: ReturnType<typeof setTimeout> | undefined;
   let finishUpdates = () => {};
   let childClosed = false;
-  const add = (id: unknown, name: unknown) => {
-    const parsed = antigravitySubscriptionModelSchema.safeParse({ id, name: name || id });
-    if (!parsed.success || models.size >= MAX_MODELS) return;
-    if (parsed.data.id.includes(token) || parsed.data.name.includes(token)) return;
-    if (!models.has(parsed.data.id)) models.set(parsed.data.id, parsed.data);
+  const add = (id: unknown, name: unknown, group?: unknown) => {
+    if (typeof name === 'string' && name.includes(token)) return;
+    const parsed = antigravitySubscriptionModelSchema.safeParse({
+      id,
+      name:
+        typeof name === 'string' && name !== ''
+          ? name.slice(0, ANTIGRAVITY_MODEL_NAME_MAX_LENGTH)
+          : id,
+    });
+    if (!parsed.success || parsed.data.id.includes(token)) return;
+    const label = antigravityProbedModelSchema.shape.group.safeParse(
+      typeof group === 'string' ? group.trim() : undefined,
+    );
+    const groupLabel =
+      label.success && label.data !== undefined && !label.data.includes(token)
+        ? label.data
+        : undefined;
+    const existing = models.get(parsed.data.id);
+    if (existing !== undefined) {
+      if (existing.group === undefined && groupLabel !== undefined) {
+        models.set(existing.id, { ...existing, group: groupLabel });
+      }
+      return;
+    }
+    if (models.size >= MAX_MODELS) return;
+    models.set(
+      parsed.data.id,
+      groupLabel === undefined ? parsed.data : { ...parsed.data, group: groupLabel },
+    );
   };
   const extendUpdateWindow = () => {
     clearTimeout(updateTimer);
@@ -82,7 +116,7 @@ async function queryAntigravityModels(
       return;
     }
     if (params.sessionId !== sessionId) return;
-    for (const choice of choices) add(choice.value, choice.name);
+    for (const choice of choices) add(choice.value, choice.name, choice.group);
     extendUpdateWindow();
   });
   const connection = app.connect(
@@ -119,8 +153,9 @@ async function queryAntigravityModels(
     });
     if (typeof created.sessionId !== 'string' || created.sessionId === '') return [];
     sessionId = created.sessionId;
-    for (const choice of modelChoices(created.configOptions)) add(choice.value, choice.name);
-    for (const choice of updates.get(sessionId) ?? []) add(choice.value, choice.name);
+    for (const choice of modelChoices(created.configOptions))
+      add(choice.value, choice.name, choice.group);
+    for (const choice of updates.get(sessionId) ?? []) add(choice.value, choice.name, choice.group);
     if (!childClosed && !signal.aborted) {
       await new Promise<void>((resolve) => {
         finishUpdates = resolve;
@@ -128,15 +163,13 @@ async function queryAntigravityModels(
       });
     }
     signal.throwIfAborted();
-    const configurable = new Set(models.keys());
     const legacy = (created as { models?: { availableModels?: unknown } }).models?.availableModels;
     if (Array.isArray(legacy)) {
       for (const entry of legacy) {
         if (typeof entry !== 'object' || entry === null) continue;
         const { modelId, name } = entry as { modelId?: unknown; name?: unknown };
         if (typeof modelId !== 'string') continue;
-        const base = modelId.replace(/-(low|medium|high)$/, '');
-        if (!configurable.has(base)) add(modelId, name);
+        add(modelId, name);
       }
     }
     return [...models.values()];

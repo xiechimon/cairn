@@ -15,12 +15,16 @@ import {
   DEFAULT_ANTIGRAVITY_MODELS,
   isAntigravityOAuthAccessToken,
 } from '@cairn/shared';
-import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { z } from 'zod';
 import type { Db } from '../db/client.js';
 import { antigravitySubscription, build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { fetchAntigravityEntitlements, labelAntigravityModel } from './antigravity-entitlements.js';
+import {
+  antigravityProbedCatalog,
+  fetchAntigravityEntitlements,
+} from './antigravity-entitlements.js';
 import { dispatchAntigravityModelProbe } from './antigravity-model-probes.js';
 import {
   verifyAntigravityHostLogin,
@@ -49,10 +53,36 @@ type Row = typeof antigravitySubscription.$inferSelect;
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
 const upstreamModelsWindows = new WeakMap<Db, Map<string, number>>();
 const OAUTH_CIPHER_PREFIX = 'oauth-personal:';
+const BOUND_OAUTH_CIPHER_PREFIX = `${OAUTH_CIPHER_PREFIX}v2:`;
+const googleSubjectSchema = z.string().regex(/^[a-zA-Z0-9_-]{1,255}$/);
+const boundOAuthSchema = z.object({
+  token: z.string().refine(isAntigravityOAuthAccessToken),
+  subject: googleSubjectSchema,
+});
+const googleTokenInfoSchema = z.object({
+  expires_in: z.union([z.number(), z.string().regex(/^-?\d+$/)]),
+  sub: googleSubjectSchema,
+});
 
 type SubscriptionMode = 'none' | 'host' | 'token' | 'oauth-personal';
+type ResolvedSubscription = CreateAntigravitySubscription & { googleSubject?: string };
+
+function openBoundOAuth(box: SecretBox, cipher: string): z.infer<typeof boundOAuthSchema> {
+  try {
+    return boundOAuthSchema.parse(
+      JSON.parse(box.open(cipher.slice(BOUND_OAUTH_CIPHER_PREFIX.length))),
+    );
+  } catch {
+    throw new Error('Unable to open the saved Antigravity OAuth credential.');
+  }
+}
+
+function sealBoundOAuth(box: SecretBox, token: string, subject: string): string {
+  return `${BOUND_OAUTH_CIPHER_PREFIX}${box.seal(JSON.stringify({ token, subject }))}`;
+}
 
 function openCredential(box: SecretBox, cipher: string): string {
+  if (cipher.startsWith(BOUND_OAUTH_CIPHER_PREFIX)) return openBoundOAuth(box, cipher).token;
   return box.open(
     cipher.startsWith(OAUTH_CIPHER_PREFIX) ? cipher.slice(OAUTH_CIPHER_PREFIX.length) : cipher,
   );
@@ -120,7 +150,6 @@ function runningStepCount(db: Pick<Db, 'select'>, subscriptionId: string): numbe
 }
 
 function refuseWhileRunning(db: Pick<Db, 'select'>, row: Row, action: string): void {
-  if (row.enabledAt === null) return;
   const running = runningStepCount(db, row.id);
   if (running > 0) {
     throw new HttpError(
@@ -366,18 +395,13 @@ export function listAntigravitySubscriptions(
   });
 }
 
-export async function resolveAntigravitySubscriptionExpiry(
-  body: CreateAntigravitySubscription,
-): Promise<CreateAntigravitySubscription> {
-  if (!body.token || !isAntigravityOAuthAccessToken(body.token) || body.expiresAt != null) {
-    return body;
-  }
+async function resolveGoogleOAuth(token: string, suppliedExpiry?: number | null) {
   const startedAt = nowMs();
   try {
     const response = await fetch('https://oauth2.googleapis.com/tokeninfo', {
       method: 'POST',
       headers: {
-        authorization: `Bearer ${body.token}`,
+        authorization: `Bearer ${token}`,
         'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
       },
       redirect: 'error',
@@ -386,66 +410,67 @@ export async function resolveAntigravitySubscriptionExpiry(
     if ([400, 401, 403].includes(response.status)) {
       throw new HttpError(400, 'Google OAuth access token is invalid or expired.');
     }
-    if (!response.ok) throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
-    const info: unknown = await response.json();
-    const remaining =
-      info !== null && typeof info === 'object' && 'expires_in' in info
-        ? info.expires_in
-        : undefined;
-    const seconds =
-      typeof remaining === 'number' || (typeof remaining === 'string' && /^-?\d+$/.test(remaining))
-        ? Number(remaining)
-        : Number.NaN;
-    if (!Number.isSafeInteger(seconds)) {
-      throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
+    if (!response.ok) throw new HttpError(502, 'Unable to verify the Google OAuth account.');
+    const info = googleTokenInfoSchema.parse(await response.json());
+    const seconds = Number(info.expires_in);
+    const googleExpiry = startedAt + seconds * 1000;
+    if (
+      !Number.isSafeInteger(seconds) ||
+      !antigravityOAuthStepCredentialSchema.safeParse({
+        kind: 'oauth-personal',
+        token,
+        expiresAt: googleExpiry,
+      }).success
+    ) {
+      if (Number.isSafeInteger(seconds) && seconds <= 0) {
+        throw new HttpError(400, 'Google OAuth access token is invalid or expired.');
+      }
+      throw new HttpError(502, 'Unable to verify the Google OAuth account.');
     }
-    const expiresAt = startedAt + seconds * 1000;
+    const expiresAt = Math.min(googleExpiry, suppliedExpiry ?? googleExpiry);
     if (expiresAt <= nowMs()) {
       throw new HttpError(400, 'Google OAuth access token is invalid or expired.');
     }
-    if (
-      !antigravityOAuthStepCredentialSchema.safeParse({
-        kind: 'oauth-personal',
-        token: body.token,
-        expiresAt,
-      }).success
-    ) {
-      throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
-    }
-    return { ...body, expiresAt };
+    return { expiresAt, googleSubject: info.sub };
   } catch (error) {
     if (error instanceof HttpError) throw error;
-    throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
+    throw new HttpError(502, 'Unable to verify the Google OAuth account.');
   }
+}
+
+export async function resolveAntigravitySubscription(
+  body: CreateAntigravitySubscription,
+): Promise<ResolvedSubscription> {
+  if (!body.token || !isAntigravityOAuthAccessToken(body.token)) return body;
+  return { ...body, ...(await resolveGoogleOAuth(body.token, body.expiresAt)) };
 }
 
 export function createAntigravitySubscription(
   deps: Deps,
   teamId: string,
-  body: CreateAntigravitySubscription,
+  body: ResolvedSubscription,
 ): AntigravitySubscription {
   const token = body.token ?? null;
-  const oauth = token !== null && isAntigravityOAuthAccessToken(token);
-  if (
-    oauth &&
-    !antigravityOAuthStepCredentialSchema.safeParse({
-      kind: 'oauth-personal',
-      token,
-      expiresAt: body.expiresAt,
-    }).success
-  ) {
-    throw new HttpError(400, 'A Google OAuth access token requires its expiration time.');
-  }
-  if (token !== null && body.label.includes(token)) {
-    throw new HttpError(400, 'Connection label must not contain the token');
-  }
   const now = nowMs();
+  let tokenCipher: string | null = null;
+  if (token !== null) {
+    if (body.label.includes(token)) {
+      throw new HttpError(400, 'Connection label must not contain the token');
+    }
+    if (isAntigravityOAuthAccessToken(token)) {
+      if (body.googleSubject === undefined || body.expiresAt == null || body.expiresAt <= now) {
+        throw new HttpError(400, 'A valid, verified Google OAuth access token is required.');
+      }
+      tokenCipher = sealBoundOAuth(deps.box, token, body.googleSubject);
+    } else {
+      tokenCipher = deps.box.seal(token);
+    }
+  }
   const row: Row = {
     id: newRecordId(),
     teamId,
     label: body.label,
-    tokenCipher:
-      token === null ? null : `${oauth ? OAUTH_CIPHER_PREFIX : ''}${deps.box.seal(token)}`,
+    tokenCipher,
     expiresAt: body.expiresAt ?? null,
     enabledAt: null,
     models: [],
@@ -453,31 +478,37 @@ export function createAntigravitySubscription(
     createdAt: now,
   };
   return deps.db.transaction((tx) => {
-    tx.update(antigravitySubscription)
-      .set({ enabledAt: null })
-      .where(
-        and(
-          eq(antigravitySubscription.teamId, teamId),
-          isNotNull(antigravitySubscription.enabledAt),
-          isNotNull(antigravitySubscription.expiresAt),
-          lte(antigravitySubscription.expiresAt, now),
-        ),
-      )
-      .run();
-    const shouldEnable =
-      enabledRow(tx, teamId) === undefined && (row.expiresAt === null || row.expiresAt > now);
+    const current = enabledRow(tx, teamId);
+    const canEnable = row.expiresAt === null || row.expiresAt > now;
+    const replaceExpired =
+      canEnable &&
+      current?.expiresAt != null &&
+      current.expiresAt <= now &&
+      runningStepCount(tx, current.id) === 0;
+    if (replaceExpired) {
+      tx.update(antigravitySubscription)
+        .set({ enabledAt: null })
+        .where(
+          and(
+            eq(antigravitySubscription.teamId, teamId),
+            eq(antigravitySubscription.id, current.id),
+          ),
+        )
+        .run();
+    }
+    const shouldEnable = canEnable && (current === undefined || replaceExpired);
     const stored = shouldEnable ? { ...row, enabledAt: now } : row;
     tx.insert(antigravitySubscription).values(stored).run();
     return toRecord(stored);
   });
 }
 
-export function attachAntigravityOAuthCredential(
+export async function attachAntigravityOAuthCredential(
   deps: Deps,
   teamId: string,
   id: string,
   credential: AntigravityOAuthStepCredential,
-): AntigravitySubscription {
+): Promise<AntigravitySubscription> {
   const row = subscriptionRow(deps.db, teamId, id);
   if (row === undefined) throw notFound('Antigravity subscription connection');
   refuseWhileRunning(deps.db, row, 'attach a credential to');
@@ -485,31 +516,51 @@ export function attachAntigravityOAuthCredential(
   if (credential.expiresAt <= now || row.label.includes(credential.token)) {
     throw new HttpError(400, 'Invalid Antigravity OAuth credential');
   }
-  if (row.tokenCipher !== null && !row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX)) {
-    throw new HttpError(409, 'This subscription already has a credential');
+  let subject: string | undefined;
+  if (row.tokenCipher !== null) {
+    if (
+      !row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX) ||
+      row.expiresAt === null ||
+      row.expiresAt > now
+    ) {
+      throw new HttpError(409, 'This subscription already has a credential');
+    }
+    if (!row.tokenCipher.startsWith(BOUND_OAUTH_CIPHER_PREFIX)) {
+      throw new HttpError(
+        409,
+        'This connection cannot be renewed safely. Add a new Google connection.',
+      );
+    }
+    subject = openBoundOAuth(deps.box, row.tokenCipher).subject;
   }
-  const saved = deps.db
-    .update(antigravitySubscription)
-    .set({
-      tokenCipher: `${OAUTH_CIPHER_PREFIX}${deps.box.seal(credential.token)}`,
-      expiresAt: credential.expiresAt,
+  const resolved = await resolveGoogleOAuth(credential.token, credential.expiresAt);
+  if (subject !== undefined && subject !== resolved.googleSubject) {
+    throw new HttpError(
+      409,
+      'Sign in with the Google account originally used for this connection.',
+    );
+  }
+  const saved = deps.db.transaction((tx) => {
+    const fresh = subscriptionRow(tx, teamId, id);
+    if (fresh === undefined) throw notFound('Antigravity subscription connection');
+    if (fresh.tokenCipher !== row.tokenCipher || fresh.expiresAt !== row.expiresAt) {
+      throw new HttpError(409, 'This subscription credential changed; try again.');
+    }
+    refuseWhileRunning(tx, fresh, 'attach a credential to');
+    if (resolved.expiresAt <= nowMs() || fresh.label.includes(credential.token)) {
+      throw new HttpError(400, 'Invalid Antigravity OAuth credential');
+    }
+    const updated = {
+      tokenCipher: sealBoundOAuth(deps.box, credential.token, resolved.googleSubject),
+      expiresAt: resolved.expiresAt,
       lastCheck: null,
-    })
-    .where(
-      and(
-        eq(antigravitySubscription.teamId, teamId),
-        eq(antigravitySubscription.id, id),
-        row.tokenCipher === null
-          ? isNull(antigravitySubscription.tokenCipher)
-          : and(
-              eq(antigravitySubscription.tokenCipher, row.tokenCipher),
-              lte(antigravitySubscription.expiresAt, now),
-            ),
-      ),
-    )
-    .returning()
-    .get();
-  if (saved === undefined) throw new HttpError(409, 'This subscription already has a credential');
+    };
+    tx.update(antigravitySubscription)
+      .set(updated)
+      .where(and(eq(antigravitySubscription.teamId, teamId), eq(antigravitySubscription.id, id)))
+      .run();
+    return { ...fresh, ...updated };
+  });
   verificationWindows.get(deps.db)?.delete(id);
   upstreamModelsWindows.get(deps.db)?.delete(id);
   return toRecord(saved);
@@ -624,13 +675,8 @@ export async function antigravitySubscriptionUpstreamModels(
   );
   if (probed.status === 'failed') return fallback(probed.failure);
   if (!isProbeAuthorized(probed.machineId)) return fallback('auth');
-  const models = new Map<string, { id: string; name: string }>();
-  for (const model of probed.models) {
-    if (!models.has(model.id) && !model.id.includes(token) && !model.name.includes(token)) {
-      models.set(model.id, { ...model, name: labelAntigravityModel(model.id, model.name) });
-    }
-  }
-  return models.size > 0 ? { status: 'ok', models: [...models.values()] } : fallback('upstream');
+  const models = antigravityProbedCatalog(probed.models, token);
+  return models.length > 0 ? { status: 'ok', models } : fallback('upstream');
 }
 
 export function openAntigravitySubscription(
@@ -641,12 +687,12 @@ export function openAntigravitySubscription(
 ): string | undefined {
   if (provider !== 'antigravity' || !boundSubscriptionId) return undefined;
   const row = subscriptionRow(deps.db, teamId, boundSubscriptionId);
-  if (row === undefined || row.tokenCipher === null) return undefined;
-  const oauth = row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX);
+  if (row === undefined) throw new HttpError(409, 'The bound Antigravity connection is missing.');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
-    if (oauth) throw new HttpError(409, 'Antigravity OAuth access token expired');
-    return undefined;
+    throw new HttpError(409, 'The bound Antigravity connection has expired.');
   }
+  if (row.tokenCipher === null) return undefined;
+  const oauth = row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX);
   const token = openCredential(deps.box, row.tokenCipher);
   if (!oauth) return token;
   if (row.expiresAt === null) throw new HttpError(409, 'Missing Antigravity OAuth expiration');

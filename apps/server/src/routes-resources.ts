@@ -71,7 +71,7 @@ import {
   listAntigravitySubscriptionSteps,
   listAntigravitySubscriptions,
   patchAntigravitySubscription,
-  resolveAntigravitySubscriptionExpiry,
+  resolveAntigravitySubscription,
   verifyAntigravitySubscriptionConnection,
 } from './services/antigravity-subscriptions.js';
 import { createApiKey, deleteApiKey, listApiKeys } from './services/api-keys.js';
@@ -687,11 +687,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireOwnerSession(c);
     const body = parseWith(createAntigravitySubscriptionSchema, await jsonBody(c), 'body');
     return c.json(
-      createAntigravitySubscription(
-        keysvc,
-        teamId,
-        await resolveAntigravitySubscriptionExpiry(body),
-      ),
+      createAntigravitySubscription(keysvc, teamId, await resolveAntigravitySubscription(body)),
       201,
     );
   });
@@ -719,7 +715,9 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const credential = parseWith(antigravityOAuthStepCredentialSchema, await jsonBody(c), 'body');
-    return c.json(attachAntigravityOAuthCredential(keysvc, teamId, c.req.param('cid'), credential));
+    return c.json(
+      await attachAntigravityOAuthCredential(keysvc, teamId, c.req.param('cid'), credential),
+    );
   });
 
   app.post('/api/teams/:id/antigravity-subscriptions/:cid/enable', async (c) => {

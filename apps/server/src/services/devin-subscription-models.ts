@@ -12,7 +12,7 @@ import {
 } from './devin-cli.js';
 
 const MAX_MODEL_UPDATE_WAIT_MS = 2_000;
-const MODEL_OUTPUT_DRAIN_MS = 50;
+const MAX_CATALOG_GRACE_MS = 2_000;
 const MAX_MODELS = 2000;
 const MODELS_LIST_ARGS = ['models', 'list', '--format', 'json', '--process-model', 'in-process'];
 const SUPPORTS_IMAGES_META = 'cognition.ai/supportsImages';
@@ -184,7 +184,6 @@ function acpModelOptions(
     let settled = false;
     let sessionId: string | undefined;
     let updateDeadline: ReturnType<typeof setTimeout> | undefined;
-    let drainDeadline: ReturnType<typeof setTimeout> | undefined;
     let output = '';
     let buffer = '';
     const byValue = new Map<string, AcpModelOption>();
@@ -200,7 +199,6 @@ function acpModelOptions(
       settled = true;
       clearTimeout(timer);
       clearTimeout(updateDeadline);
-      clearTimeout(drainDeadline);
       child.kill('SIGKILL');
       resolve(result);
     };
@@ -292,7 +290,7 @@ function acpModelOptions(
         merge(modelOptionsOf(message.result?.configOptions));
         const earlier = bufferedUpdates.get(sessionId);
         if (earlier !== undefined) merge(earlier);
-        if (byValue.size === 0) updateDeadline = setTimeout(finishOptions, updateWaitMs);
+        updateDeadline = setTimeout(finishOptions, updateWaitMs);
       }
     };
     child.on('error', (error: NodeJS.ErrnoException) => {
@@ -307,9 +305,6 @@ function acpModelOptions(
         if (settled) return;
         if (line.trim() !== '') onMessage(line);
       }
-      if (settled || byValue.size === 0) return;
-      clearTimeout(updateDeadline);
-      drainDeadline ??= setTimeout(finishOptions, MODEL_OUTPUT_DRAIN_MS);
     });
     child.stderr.on('data', (chunk: Buffer) => {
       output += chunk.toString('utf8');
@@ -330,7 +325,7 @@ function acpModelOptions(
 
 export async function fetchDevinSubscriptionModels(
   token: string,
-  options: { timeoutMs?: number; updateWaitMs?: number } = {},
+  options: { timeoutMs?: number; updateWaitMs?: number; catalogGraceMs?: number } = {},
 ): Promise<DevinSubscriptionModelsResult> {
   const home = await mkdtemp(join(tmpdir(), 'cairn-devin-models-'));
   const catalogController = new AbortController();
@@ -352,7 +347,16 @@ export async function fetchDevinSubscriptionModels(
       catalogController.abort();
       return acp;
     }
-    const catalog = await catalogPromise;
+    let graceTimer: ReturnType<typeof setTimeout> | undefined;
+    const catalog = await Promise.race([
+      catalogPromise,
+      new Promise<Map<string, CatalogVariant>>((resolve) => {
+        graceTimer = setTimeout(
+          () => resolve(new Map()),
+          options.catalogGraceMs ?? MAX_CATALOG_GRACE_MS,
+        );
+      }),
+    ]).finally(() => clearTimeout(graceTimer));
     const models = acp.options.map((option) => {
       const variant = catalog.get(option.value);
       return {
