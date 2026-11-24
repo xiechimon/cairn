@@ -47,13 +47,22 @@ export function ApprovalAnswered({ item }: { item: ChiefQuestionItem }) {
   const { t } = useI18n();
   const question = item.questions[0];
   if (question === undefined) return null;
+  if (item.status === 'cancelled') {
+    const expired = item.cancelReason?.includes('过期') === true;
+    return (
+      <ApprovalHistoryLine
+        card={approvalCardOf(question, t)}
+        status={expired ? t('已过期') : t('已取消')}
+        outcome={expired ? 'expired' : 'cancelled'}
+        icon={<Ban strokeWidth={1.75} className="size-4 text-content-tertiary" />}
+      />
+    );
+  }
   const choice = item.answers?.[0]?.choices?.[0] ?? null;
   const index = choice === null ? -1 : question.options.findIndex((o) => o.label === choice);
-  const skipped = item.status === 'cancelled';
-  const declined = skipped || (index > 0 && index === question.options.length - 1);
-  const status = skipped
-    ? t('已跳过')
-    : index === 0
+  const declined = index > 0 && index === question.options.length - 1;
+  const status =
+    index === 0
       ? t('已批准')
       : declined
         ? t('已拒绝')

@@ -146,6 +146,7 @@ export const computerCallSchema = z.object({
   browserLicense: z.string().min(1).max(4096).optional(),
   ownerChrome: z.literal('browsermcp').optional(),
   computerGrant: z.enum(['browser', 'desktop']).optional(),
+  hostShellEscalation: z.literal('approved').optional(),
   phone: z
     .strictObject({
       phoneId: recordId,
@@ -187,6 +188,11 @@ export const computerFrameSchema = z.discriminatedUnion('kind', [
     images: z.array(computerImageSchema).max(COMPUTER_IMAGES_MAX).optional(),
     exitCode: z.number().int().nullable().optional(),
     loginForm: loginFormSchema.optional(),
+    sandboxDenied: z
+      .strictObject({
+        reason: z.string().min(1).max(500),
+      })
+      .optional(),
   }),
   z.object({
     kind: z.literal('error'),

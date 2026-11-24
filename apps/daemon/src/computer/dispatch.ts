@@ -15,6 +15,7 @@ import {
 import { z } from 'zod';
 import { phoneControlRefusal } from '../backend/command-gate.js';
 import type { HostShellConfinement } from '../backend/host-shell-confinement.js';
+import { detectHostShellSandboxDenial } from '../backend/sandbox-denial.js';
 import type { DaemonLogger } from '../log.js';
 import { type MachineApi, MachineApiError } from '../machine-client.js';
 import { STEP_TREE_ENV } from '../process-tree.js';
@@ -68,6 +69,7 @@ export const COMPUTER_FRAME_ERROR_MAX_CHARS = 4096;
 
 export const COMPUTER_COMMAND_TIMEOUT_MS = 5 * 60_000;
 export const COMPUTER_OUTPUT_CAP_CHARS = 2 * 1024 * 1024;
+const SANDBOX_DENIAL_SCAN_CHARS = 8 * 1024;
 export const COMPUTER_FLUSH_MS = 250;
 export const COMPUTER_HEARTBEAT_MS = 10_000;
 const FINAL_FRAME_MARGIN_MS = 5_000;
@@ -291,6 +293,9 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     controller: AbortController,
   ): Promise<void> {
     const poster = posterFor(call, controller);
+    const unsandboxed =
+      call.tool === 'user_computer_shell' && call.hostShellEscalation === 'approved';
+    const checkSandboxDenial = call.tool === 'user_computer_shell' && !unsandboxed;
     let events: AsyncIterable<ComputerProcessEvent>;
     const setupTimer = setTimeout(
       () => controller.abort('timeout'),
@@ -306,6 +311,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
           ...(treeMarker !== undefined ? { env: { [STEP_TREE_ENV]: treeMarker } } : {}),
           timeoutMs,
           signal: controller.signal,
+          ...(unsandboxed ? { unsandboxed: true } : {}),
         });
       } finally {
         clearTimeout(setupTimer);
@@ -322,10 +328,21 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return;
     }
     let exit: Extract<ComputerProcessEvent, { kind: 'exit' }> | undefined;
+    let stdoutTail = '';
+    let stderrTail = '';
     try {
       for await (const event of events) {
         if (event.kind === 'exit') exit = event;
-        else poster.output(event.kind, event.text);
+        else {
+          poster.output(event.kind, event.text);
+          if (checkSandboxDenial) {
+            if (event.kind === 'stderr') {
+              stderrTail = (stderrTail + event.text).slice(-SANDBOX_DENIAL_SCAN_CHARS);
+            } else {
+              stdoutTail = (stdoutTail + event.text).slice(-SANDBOX_DENIAL_SCAN_CHARS);
+            }
+          }
+        }
       }
     } catch (error) {
       if (error instanceof ComputerRefusal) {
@@ -364,10 +381,20 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await poster.finish({ kind: 'error', message, delivery: 'unknown' });
     } else {
       const code = exit?.code ?? null;
+      const sandboxDenied = checkSandboxDenial
+        ? detectHostShellSandboxDenial({
+            exitCode: code,
+            stderr: stderrTail,
+            stdout: stdoutTail,
+            platform: process.platform,
+            isDeniedPath: (candidate) => options.hostConfinement?.denied(candidate) === true,
+          })
+        : null;
       await poster.finish({
         kind: 'done',
         text: `exit code: ${code ?? 'unknown'}`,
         exitCode: code,
+        ...(sandboxDenied !== null ? { sandboxDenied } : {}),
       });
     }
   }

@@ -335,6 +335,8 @@ export const EN: Record<string, string> = {
   '主题「{subject}」': 'Subject “{subject}”',
   '在 {computer} 上以你的身份运行一条命令': 'Run a command as you on {computer}',
   '以你的身份运行，能读写你的文件': 'Runs as you and can read and write your files',
+  '在 {computer} 上不经沙箱运行一条命令': 'Run a command without the sandbox on {computer}',
+  '不经沙箱运行，仅对这一条命令生效': 'Runs without the sandbox, for this command only',
   '在 {computer} 上读取和操作 {app}': 'Read and operate {app} on {computer}',
   以你的身份操作这个应用: 'Operates this app as you',
   '在 Coordinator 的电脑上安装 {packages}': 'Install {packages} on the Coordinator computer',

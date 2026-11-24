@@ -125,3 +125,51 @@ describe('an outbound approval card', () => {
     ]);
   });
 });
+
+describe('an unsandboxed host shell escalation approval card', () => {
+  const SHELL_CARD =
+    'Coordinator 想在 Owner Mac 上不经沙箱运行这条命令：qlmanage -t -s 800 -o /tmp/out /tmp/a.pdf';
+
+  function shellItem(
+    status: ChiefQuestionItem['status'] = 'pending',
+    answers: ChiefQuestionItem['answers'] = null,
+    cancelReason?: string,
+  ): ChiefQuestionItem {
+    return {
+      kind: 'question',
+      id: 'approval-s1',
+      requestId: 'approval-s1',
+      status,
+      questions: [
+        {
+          header: '审批',
+          question: SHELL_CARD,
+          options: [{ label: '批准执行' }, { label: '不执行' }],
+        },
+      ],
+      answers,
+      ...(cancelReason !== undefined ? { cancelReason } : {}),
+    };
+  }
+
+  test('renders exact monospace command, single-shot note, and Allow / Deny actions', () => {
+    const doc = render(shellItem());
+    expect(texts(doc, 'approval-card-title')).toEqual(['在 Owner Mac 上不经沙箱运行一条命令']);
+    expect(texts(doc, 'approval-card-note')).toEqual(['不经沙箱运行，仅对这一条命令生效']);
+    const [quote] = elements(doc, 'approval-card-quote');
+    expect(quote?.text).toBe('qlmanage -t -s 800 -o /tmp/out /tmp/a.pdf');
+    expect(texts(doc, 'chief-question-option-0-0')).toEqual(['批准执行']);
+    expect(texts(doc, 'chief-question-option-0-1')).toEqual(['不执行']);
+  });
+
+  test('renders expired cancelled approval card as expired', () => {
+    const doc = inI18n(
+      createElement(ApprovalAnswered, {
+        item: shellItem('cancelled', null, '审批已过期，没有执行。'),
+      }),
+    );
+    expect(texts(doc, 'approval-history-text')).toEqual([
+      '已过期 · 在 Owner Mac 上不经沙箱运行一条命令',
+    ]);
+  });
+});

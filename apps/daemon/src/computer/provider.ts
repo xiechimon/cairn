@@ -11,6 +11,7 @@ export interface ComputerExecuteRequest {
   stdin?: string;
   timeoutMs: number;
   signal: AbortSignal;
+  unsandboxed?: boolean;
 }
 
 export interface ComputerFileEntry {

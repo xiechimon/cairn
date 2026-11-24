@@ -157,6 +157,7 @@ export class HostComputerProvider implements ComputerProvider {
     requested: string | undefined,
     label: string,
     signal?: AbortSignal,
+    skipConfinement = false,
   ): Promise<string> {
     const text = (requested ?? '').trim();
     if (text.includes('\0')) throw new ComputerRefusal(`${label} contains a null byte`);
@@ -170,7 +171,7 @@ export class HostComputerProvider implements ComputerProvider {
         `${label} must be inside the home folder; cd elsewhere within the command`,
       );
     }
-    if (this.options.confinement?.denied(resolved) === true) {
+    if (!skipConfinement && this.options.confinement?.denied(resolved) === true) {
       throw new ComputerRefusal(`${label} is inside a protected directory`);
     }
     let existing = resolved;
@@ -193,7 +194,7 @@ export class HostComputerProvider implements ComputerProvider {
       throw new ComputerRefusal(`${label} resolves outside the home folder`);
     }
     const target = path.join(existing, ...missing);
-    if (this.options.confinement?.denied(target) === true) {
+    if (!skipConfinement && this.options.confinement?.denied(target) === true) {
       throw new ComputerRefusal(`${label} is inside a protected directory`);
     }
     return target;
@@ -234,7 +235,7 @@ export class HostComputerProvider implements ComputerProvider {
     let browserEnv: Record<string, string> = {};
     try {
       signal.throwIfAborted();
-      cwd = await this.resolveInHome(request.cwd, 'cwd', signal);
+      cwd = await this.resolveInHome(request.cwd, 'cwd', signal, request.unsandboxed === true);
       const info = await awaitWithSignal(
         stat(cwd).catch(() => undefined),
         signal,
@@ -264,7 +265,10 @@ export class HostComputerProvider implements ComputerProvider {
     };
     let child: ReturnType<typeof spawnContainedCommand>;
     try {
-      const launched = this.options.confinement?.wrap(command, args) ?? { command, args };
+      const launched =
+        request.unsandboxed === true
+          ? { command, args }
+          : (this.options.confinement?.wrap(command, args) ?? { command, args });
       child = spawnContainedCommand(launched.command, launched.args, {
         cwd,
         env,

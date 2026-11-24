@@ -35,6 +35,13 @@ import {
   proposalIdOfCard,
 } from './chief-question-store.js';
 import type { TeamStreamHub } from './events.js';
+import {
+  HOST_SHELL_ESCALATION_ACTION,
+  hostShellEscalationWakePrompt,
+  parseHostShellEscalationInput,
+  pollOrStartApprovedHostShellEscalation,
+  validateHostShellEscalationApproval,
+} from './host-shell-escalation.js';
 import { dispatchHostedCleanup } from './hosted-cleanup.js';
 import { isOwner } from './instance-owner.js';
 import { deleteProject, type ProjectTx } from './projects.js';
@@ -96,7 +103,11 @@ function sendsOutside(deps: AnswerDeps, actionId: string): boolean {
 }
 
 function approvedOnlyInteractively(deps: AnswerDeps, actionId: string): boolean {
-  return sendsOutside(deps, actionId) || actionId === BROWSER_PASSWORD_ACTION;
+  return (
+    sendsOutside(deps, actionId) ||
+    actionId === BROWSER_PASSWORD_ACTION ||
+    actionId === HOST_SHELL_ESCALATION_ACTION
+  );
 }
 
 export const proposalCardId = (proposalId: string) => `${APPROVAL_CARD_ID_PREFIX}${proposalId}`;
@@ -424,6 +435,11 @@ function runHandler(deps: AnswerDeps, tx: ProjectTx, row: ProposalRow, now: numb
     journal(tx, row, 'run', now);
     return;
   }
+  if (row.actionId === HOST_SHELL_ESCALATION_ACTION) {
+    validateHostShellEscalationApproval(tx, row.teamId, JSON.parse(row.inputJson));
+    journal(tx, row, 'run', now);
+    return;
+  }
   if (sendsOutside(deps, row.actionId)) return;
   if (row.actionId === 'todo.delete') {
     runTodoDelete(deps, tx, row, now);
@@ -462,6 +478,12 @@ export function answerProposal(deps: AnswerDeps, input: AnswerInput): { status: 
       }
       if (row.actionId === BROWSER_PASSWORD_ACTION && !isOwner(deps.db, input.decidedBy)) {
         throw new HttpError(403, 'only the owner can authorize a browser password website');
+      }
+      if (row.actionId === HOST_SHELL_ESCALATION_ACTION && !isOwner(deps.db, input.decidedBy)) {
+        throw new HttpError(
+          403,
+          'only the owner can approve running a command without the sandbox',
+        );
       }
       const digest = storedCardDigest(row);
       if (digest !== null && input.viaCard !== true) {
@@ -575,20 +597,44 @@ export function dispatchActionWakes(deps: ChiefDeps & { registry?: readonly Acti
       continue;
     }
     const approved = row.outcome === 'executed';
-    const proposal = approved
-      ? deps.db.select().from(actionProposal).where(eq(actionProposal.id, row.proposalId)).get()
-      : undefined;
+    const proposal = deps.db
+      .select()
+      .from(actionProposal)
+      .where(eq(actionProposal.id, row.proposalId))
+      .get();
     const actionId = proposal?.actionId;
-    const entry =
-      actionId === undefined
-        ? undefined
-        : ((deps.registry ?? SLICE1_ACTIONS).find((item) => item.id === actionId) ??
-          connectorActionForId(actionId));
-    const prompt = approved
-      ? entry !== undefined && isExternalActionClass(entry.class)
-        ? `审批 ${row.proposalId} 已由用户批准：以已批准的输入重新发起该动作即会执行。审批卡上的文字经过规整，不能照卡重写参数；必须逐字复制下面的参数，任何标点、空白的改动都会被当成新的动作重新审批。\n已批准的参数：${JSON.stringify(approvedArguments(proposal))}`
-        : `审批 ${row.proposalId} 已由用户批准，服务端已执行。`
-      : `审批 ${row.proposalId} 的结果是 ${row.outcome}：没有执行。除非用户重新要求，不要再次发起同一动作。`;
+    let prompt: string;
+    if (actionId === HOST_SHELL_ESCALATION_ACTION && proposal !== undefined) {
+      let binding = null;
+      try {
+        binding = parseHostShellEscalationInput(JSON.parse(proposal.inputJson));
+      } catch {}
+      if (approved) {
+        const poll = pollOrStartApprovedHostShellEscalation(
+          deps,
+          proposal,
+          subscriber.wakeStepId,
+          () => {
+            dispatchActionWakes(deps);
+          },
+        );
+        if (poll.state === 'pending') continue;
+        prompt = hostShellEscalationWakePrompt('executed', binding, poll.resultText);
+      } else {
+        prompt = hostShellEscalationWakePrompt(row.outcome, binding);
+      }
+    } else {
+      const entry =
+        actionId === undefined
+          ? undefined
+          : ((deps.registry ?? SLICE1_ACTIONS).find((item) => item.id === actionId) ??
+            connectorActionForId(actionId));
+      prompt = approved
+        ? entry !== undefined && isExternalActionClass(entry.class)
+          ? `审批 ${row.proposalId} 已由用户批准：以已批准的输入重新发起该动作即会执行。审批卡上的文字经过规整，不能照卡重写参数；必须逐字复制下面的参数，任何标点、空白的改动都会被当成新的动作重新审批。\n已批准的参数：${JSON.stringify(approvedArguments(proposal))}`
+          : `审批 ${row.proposalId} 已由用户批准，服务端已执行。`
+        : `审批 ${row.proposalId} 的结果是 ${row.outcome}：没有执行。除非用户重新要求，不要再次发起同一动作。`;
+    }
     try {
       enqueueChiefStep(deps, subscriber.threadId, {
         id: subscriber.wakeStepId,
