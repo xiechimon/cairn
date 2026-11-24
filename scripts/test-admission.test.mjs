@@ -262,6 +262,7 @@ for (const [dir, config] of [
   ['apps/server', 'vitest.config.ts'],
   ['apps/web', 'vitest.config.ts'],
   ['apps/daemon', 'vitest.config.ts'],
+  ['apps/desktop', 'vitest.config.ts'],
   ['integration', 'vitest.config.ts'],
 ]) {
   test(`direct configuration admission: ${dir}/${config}`, async (t) => {
