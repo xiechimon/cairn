@@ -1,5 +1,8 @@
+import { chmodSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { ClaimedStep, MachinePresenceResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
 
 describe('per-step backend resolution (spec 17 A3: backendFor is the only branch point)', () => {
@@ -195,6 +198,139 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     expect(attempts).toBe(2);
     await handle.stop();
     await handle.done;
+  });
+
+  test('checks the Antigravity release channel periodically even when already installed', async () => {
+    const api = new FakeMachineApi();
+    let version = '1.5.15';
+    let ensures = 0;
+    const { handle } = await boot({
+      api,
+      presenceIntervalMs: 20,
+      antigravityUpdateCheckMs: 60,
+      antigravityManaged: {
+        current: () => ({
+          version,
+          binPath: `/agy/${version}`,
+          args: ['acp', '--app-data-dir', 'antigravity-acp'],
+          source: 'managed' as const,
+          authenticated: true,
+          models: [],
+        }),
+        ensure: async () => {
+          ensures += 1;
+          if (ensures >= 2) version = '1.5.16';
+          return {
+            version,
+            binPath: `/agy/${version}`,
+            args: ['acp', '--app-data-dir', 'antigravity-acp'],
+            source: 'managed' as const,
+            authenticated: true,
+            models: [],
+          };
+        },
+        probe: async () => null,
+      },
+    });
+    await waitFor(() => ensures >= 2);
+    await waitFor(() =>
+      api.presenceBodies.some(
+        (body) =>
+          (body as { capabilities?: { antigravity?: { version?: string } } }).capabilities
+            ?.antigravity?.version === '1.5.16',
+      ),
+    );
+    await handle.stop();
+    await handle.done;
+  });
+
+  test('running Antigravity sessions finish on their old runtime while new sessions switch to the updated runtime', async () => {
+    const binDir = makeTestTempDir('agy-switch-');
+    try {
+      const gateFile = join(binDir, 'release-v1');
+      const shQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
+      const makeMock = (name: string, label: string, waitForFile?: string): string => {
+        const script = join(binDir, name);
+        const body = [
+          "import { existsSync } from 'node:fs';",
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          `    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentInfo: { name: "Antigravity ACP Server", version: ${JSON.stringify(label)} }, agentCapabilities: { loadSession: true } } });`,
+          '  } else if (msg.method === "session/new") {',
+          `    send({ id: msg.id, result: { sessionId: ${JSON.stringify(`sess-${label}`)}, configOptions: [{ id: "model", name: "Model", category: "model", type: "select", currentValue: "gemini-4-neon", options: [{ value: "gemini-4-neon", name: "Gemini 4 Neon" }] }] } });`,
+          '  } else if (msg.method === "session/set_config_option") {',
+          '    send({ id: msg.id, result: { configOptions: [] } });',
+          '  } else if (msg.method === "session/prompt") {',
+          ...(waitForFile !== undefined
+            ? [
+                `    while (!existsSync(${JSON.stringify(waitForFile)})) await new Promise((r) => setTimeout(r, 15));`,
+              ]
+            : []),
+          `    send({ method: "session/update", params: { sessionId: ${JSON.stringify(`sess-${label}`)}, update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: ${JSON.stringify(`ran-on-${label}`)} } } } });`,
+          '    send({ id: msg.id, result: { stopReason: "end_turn" } });',
+          '  }',
+          '}',
+        ].join('\n');
+        writeFileSync(
+          script,
+          `#!/bin/sh\nexec ${shQuote(process.execPath)} --input-type=module -e ${shQuote(body)} -- "$0" "$@"\n`,
+        );
+        chmodSync(script, 0o755);
+        return script;
+      };
+      const v1Bin = makeMock('agy-v1.sh', '1.5.15', gateFile);
+      const v2Bin = makeMock('agy-v2.sh', '1.5.16');
+      let current = {
+        version: '1.5.15',
+        binPath: v1Bin,
+        args: ['acp', '--app-data-dir', 'antigravity-acp'],
+        source: 'managed' as const,
+        authenticated: true,
+        models: [{ id: 'gemini-4-neon', name: 'Gemini 4 Neon' }],
+      };
+      const api = new FakeMachineApi();
+      const { handle } = await boot({
+        api,
+        confinementPlatform: 'win32',
+        antigravityManaged: {
+          current: () => current,
+          ensure: async () => current,
+          probe: async () => current,
+        },
+      });
+      const stepFor = (id: string): ClaimedStep => ({
+        ...CLAIMED,
+        step: { ...CLAIMED.step, id, kind: 'build' },
+        conversationId: `conv-${id}`,
+        instruction: 'Hello',
+        agent: { ...CLAIMED.agent!, provider: 'antigravity', modelId: 'gemini-4-neon' },
+      });
+      await waitFor(() => api.parked !== null);
+      api.parked?.(stepFor('s-old'));
+      await waitFor(() => api.calls.includes('token:s-old'));
+      await waitFor(() => api.parked !== null);
+      current = { ...current, version: '1.5.16', binPath: v2Bin };
+      api.parked?.(stepFor('s-new'));
+      await waitFor(() => api.doneBodies.some((entry) => entry.stepId === 's-new'), 10_000);
+      expect(api.doneBodies.find((entry) => entry.stepId === 's-new')?.body).toMatchObject({
+        status: 'success',
+        sessionId: 'sess-1.5.16',
+      });
+      expect(api.doneBodies.some((entry) => entry.stepId === 's-old')).toBe(false);
+      writeFileSync(gateFile, 'go');
+      await waitFor(() => api.doneBodies.some((entry) => entry.stepId === 's-old'), 10_000);
+      expect(api.doneBodies.find((entry) => entry.stepId === 's-old')?.body).toMatchObject({
+        status: 'success',
+        sessionId: 'sess-1.5.15',
+      });
+      await handle.stop();
+      await handle.done;
+    } finally {
+      releaseTestTempDir(binDir);
+    }
   });
 
   test('a failing Devin ensure is not retried on every presence send', async () => {

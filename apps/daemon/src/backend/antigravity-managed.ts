@@ -16,19 +16,22 @@ import {
   acpThoughtLevel,
   acpThoughtLevels,
   BRAND,
+  compareVersions,
   DEFAULT_ANTIGRAVITY_MODELS,
   type ThinkingLevel,
 } from '@cairn/shared';
 import {
-  ANTIGRAVITY_ARCHIVE_HOST,
-  ANTIGRAVITY_REGISTRY_URL,
+  ANTIGRAVITY_CLI_ARCHIVE_PREFIX,
+  ANTIGRAVITY_CLI_MANIFEST_BASE,
+  ANTIGRAVITY_CLI_MIN_VERSION,
+  type AntigravityManagedBin,
   currentAntigravityManagedInstall,
   ensureAntigravityManagedInstall,
 } from '@cairn/shared/antigravity-install';
 import { DAEMON_VERSION } from '../version.js';
 
-const PROBE_INIT_TIMEOUT_MS = 10_000;
-const PROBE_SESSION_TIMEOUT_MS = 20_000;
+const PROBE_INIT_TIMEOUT_MS = 30_000;
+const PROBE_SESSION_TIMEOUT_MS = 30_000;
 
 export interface AntigravityModel {
   id: string;
@@ -56,9 +59,13 @@ export interface AntigravityManagedOptions {
   root?: string;
   platform?: string;
   arch?: string;
+  musl?: boolean;
   fetchImpl?: typeof fetch;
-  registryUrl?: string;
-  archiveHost?: string;
+  manifestBaseUrl?: string;
+  archiveUrlPrefix?: string;
+  versionProbe?: boolean;
+  protectedVersions?: () => Iterable<string>;
+  validateBinary?: (bin: AntigravityManagedBin) => Promise<boolean>;
   env?: NodeJS.ProcessEnv;
   log?: (message: string) => void;
   probeBinary?: (
@@ -95,7 +102,7 @@ const PROBE_ENV_KEYS = [
 ];
 
 function probeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  const out: NodeJS.ProcessEnv = {};
+  const out: NodeJS.ProcessEnv = { AGY_CLI_DISABLE_AUTO_UPDATE: '1' };
   for (const key of PROBE_ENV_KEYS) {
     const value = env[key];
     if (value !== undefined) out[key] = value;
@@ -169,6 +176,68 @@ function extractModels(response: NewSessionResponse): AntigravityModel[] {
     }
   }
   return models.length > 0 ? models : defaultModels();
+}
+
+function reportedVersionMatches(reported: string | undefined, expected: string): boolean {
+  if (reported === undefined || reported === '') return false;
+  if (compareVersions(reported, ANTIGRAVITY_CLI_MIN_VERSION) < 0) return false;
+  return (
+    reported === expected ||
+    reported.startsWith(`${expected}-`) ||
+    reported.startsWith(`${expected}+`)
+  );
+}
+
+export async function validateAntigravityBinary(
+  candidate: AntigravityManagedBin,
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): Promise<boolean> {
+  const validationDir = mkdtempSync(join(tmpdir(), 'cairn-agy-validate-'));
+  const child = spawn(candidate.binPath, candidate.args, {
+    cwd: validationDir,
+    stdio: ['pipe', 'pipe', 'pipe'],
+    env: {
+      ...probeEnv(baseEnv),
+      HOME: validationDir,
+      TMPDIR: validationDir,
+    },
+  });
+  child.stderr.resume();
+  const app = client({ name: 'cairn' });
+  const stream = ndJsonStream(
+    Writable.toWeb(child.stdin),
+    Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
+  );
+  const connection = app.connect(stream);
+  child.once('error', (error) => connection.close(error));
+  child.once('exit', (code) =>
+    connection.close(new Error(`antigravity validate exited (${code})`)),
+  );
+
+  try {
+    const initialized = await Promise.race([
+      connection.agent.request(methods.agent.initialize, {
+        protocolVersion: PROTOCOL_VERSION,
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, session: {} },
+        clientInfo: { name: 'cairn', version: DAEMON_VERSION },
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('validate initialize timeout')), PROBE_INIT_TIMEOUT_MS),
+      ),
+    ]);
+    if (initialized.protocolVersion !== PROTOCOL_VERSION) return false;
+    if (!reportedVersionMatches(initialized.agentInfo?.version, candidate.version)) return false;
+    const caps = initialized.agentCapabilities;
+    return caps?.loadSession === true || caps?.sessionCapabilities?.resume !== undefined;
+  } catch {
+    return false;
+  } finally {
+    connection.close();
+    child.kill('SIGTERM');
+    const killTimer = setTimeout(() => child.kill('SIGKILL'), 500);
+    killTimer.unref();
+    rmSync(validationDir, { recursive: true, force: true });
+  }
 }
 
 async function probeAntigravityBinary(
@@ -260,19 +329,30 @@ export function createAntigravityManaged(
   const root = options.root ?? antigravityInstallRoot(join(homedir(), BRAND.homeDirName));
   const env = probeEnv(options.env ?? process.env);
   const log = options.log ?? (() => {});
-  const installOptions = {
-    root,
-    platform: options.platform,
-    arch: options.arch,
-    fetchImpl: options.fetchImpl,
-    registryUrl: options.registryUrl ?? ANTIGRAVITY_REGISTRY_URL,
-    archiveHost: options.archiveHost ?? ANTIGRAVITY_ARCHIVE_HOST,
-    log,
-  };
   const probeImpl =
     options.probeBinary ??
     ((binPath, args, source, knownVersion) =>
       probeAntigravityBinary(binPath, args, source, knownVersion, env));
+  const validate =
+    options.validateBinary ??
+    (options.probeBinary !== undefined
+      ? async (candidate: AntigravityManagedBin) =>
+          (await probeImpl(candidate.binPath, candidate.args, 'managed', candidate.version)) !==
+          null
+      : (candidate: AntigravityManagedBin) => validateAntigravityBinary(candidate, env));
+  const installOptions = {
+    root,
+    platform: options.platform,
+    arch: options.arch,
+    musl: options.musl,
+    fetchImpl: options.fetchImpl,
+    manifestBaseUrl: options.manifestBaseUrl ?? ANTIGRAVITY_CLI_MANIFEST_BASE,
+    archiveUrlPrefix: options.archiveUrlPrefix ?? ANTIGRAVITY_CLI_ARCHIVE_PREFIX,
+    versionProbe: options.versionProbe,
+    validate,
+    protectedVersions: options.protectedVersions,
+    log,
+  };
 
   let cached: AntigravityInstall | null = null;
   let pendingEnsure: Promise<AntigravityInstall | null> | null = null;

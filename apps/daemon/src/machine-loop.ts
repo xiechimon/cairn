@@ -125,6 +125,7 @@ export interface MachineLoopOpts {
   devinEnsureRetryMs?: number;
   antigravityEnsureRetryMs?: number;
   antigravityReprobeMs?: number;
+  antigravityUpdateCheckMs?: number;
   computerPresence?: ComputerPresenceSource;
   claimBackoffBaseMs?: number;
   proxyEnv?: NodeJS.ProcessEnv;
@@ -169,6 +170,7 @@ export const PRESENCE_TIMEOUT_MS = 20_000;
 export const GOODBYE_TIMEOUT_MS = 2_000;
 const MANAGED_ENSURE_RETRY_MS = 5 * 60_000;
 const ANTIGRAVITY_REPROBE_MS = 10 * 60_000;
+const ANTIGRAVITY_UPDATE_CHECK_MS = 60 * 60_000;
 export const DISPATCHER_RESET_FAILURE_THRESHOLD = 3;
 
 export const PORT_BASE_ENV = 'CAIRN_PORT_BASE';
@@ -370,10 +372,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let devinEnsured = false;
   let devinEnsureRetryAt = 0;
   let devinModels = loadDevinModels(paths);
+  const activeAntigravityVersions = new Map<string, number>();
   const antigravityManaged =
     opts.antigravityManaged ??
     createAntigravityManaged({
       root: toolInstallRoot(paths.home, 'antigravity'),
+      protectedVersions: () => activeAntigravityVersions.keys(),
       log: (line) => logger.machine(line),
       fetchImpl: installFetch,
     });
@@ -457,7 +461,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   let claudeBackend: AgentBackend | null = opts.claudeCodeBackend ?? null;
   let geminiBackend: AgentBackend | null = opts.geminiBackend ?? null;
   let devinBackend: AgentBackend | null = null;
-  let antigravityBackend: AgentBackend | null = null;
+  let antigravityBackend: { key: string; backend: AgentBackend } | null = null;
   let claudeAnnounced = false;
   let geminiAnnounced = false;
   const backendFor = (agentProviderId: string | null | undefined): AgentBackend => {
@@ -468,19 +472,37 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           'Antigravity runtime is not installed yet: install agy or wait for managed setup, then retry the step',
         );
       }
-      antigravityBackend ??= createAcpBackend({
-        harness: 'antigravity',
-        command: install.binPath,
-        args: install.args,
-        permissions: 'allow-once',
-        sessionResume: true,
-        allowHostMcp: true,
-        usageEvents: true,
-        skills: { skillsDir: config.skillsDir, cwd: config.home },
-        onSkillsLog: (msg) => logger.skills(msg),
-        ...(confine !== null && confine !== undefined ? { confine } : {}),
-      });
-      return antigravityBackend;
+      const runtimeKey = JSON.stringify([install.binPath, install.args]);
+      if (antigravityBackend === null || antigravityBackend.key !== runtimeKey) {
+        const runtimeVersion = install.version;
+        antigravityBackend = {
+          key: runtimeKey,
+          backend: createAcpBackend({
+            harness: 'antigravity',
+            command: install.binPath,
+            args: install.args,
+            permissions: 'allow-once',
+            sessionResume: true,
+            allowHostMcp: true,
+            usageEvents: true,
+            skills: { skillsDir: config.skillsDir, cwd: config.home },
+            onSkillsLog: (msg) => logger.skills(msg),
+            acquireRuntime: () => {
+              activeAntigravityVersions.set(
+                runtimeVersion,
+                (activeAntigravityVersions.get(runtimeVersion) ?? 0) + 1,
+              );
+              return () => {
+                const next = (activeAntigravityVersions.get(runtimeVersion) ?? 1) - 1;
+                if (next > 0) activeAntigravityVersions.set(runtimeVersion, next);
+                else activeAntigravityVersions.delete(runtimeVersion);
+              };
+            },
+            ...(confine !== null && confine !== undefined ? { confine } : {}),
+          }),
+        };
+      }
+      return antigravityBackend.backend;
     }
     if (agentProviderId === 'devin') {
       const install = devinManaged.current();
@@ -1184,17 +1206,20 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   let antigravityRetryAt = 0;
   let antigravityReprobeAt = Date.now() + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
+  let antigravityUpdateCheckAt =
+    Date.now() + (opts.antigravityUpdateCheckMs ?? ANTIGRAVITY_UPDATE_CHECK_MS);
   const presenceTimer = setInterval(() => {
     const currentAg = antigravityManaged.current();
+    const now = Date.now();
     if (currentAg === null) {
-      if (Date.now() >= antigravityRetryAt) {
-        antigravityRetryAt =
-          Date.now() + (opts.antigravityEnsureRetryMs ?? MANAGED_ENSURE_RETRY_MS);
-        void antigravityManaged
-          .ensure()
+      if (now >= antigravityRetryAt) {
+        antigravityRetryAt = now + (opts.antigravityEnsureRetryMs ?? MANAGED_ENSURE_RETRY_MS);
+        void trackInstall(antigravityManaged.ensure())
           .then((install) => {
             if (install === null) return;
             antigravityRetryAt = 0;
+            antigravityUpdateCheckAt =
+              Date.now() + (opts.antigravityUpdateCheckMs ?? ANTIGRAVITY_UPDATE_CHECK_MS);
             if (sendPresenceNow !== null) return sendPresenceNow();
           })
           .catch((error: unknown) => {
@@ -1203,10 +1228,24 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             );
           });
       }
+    } else if (now >= antigravityUpdateCheckAt) {
+      antigravityUpdateCheckAt =
+        now + (opts.antigravityUpdateCheckMs ?? ANTIGRAVITY_UPDATE_CHECK_MS);
+      antigravityReprobeAt = now + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
+      void trackInstall(antigravityManaged.ensure())
+        .then((install) => {
+          if (install !== null && install.version !== currentAg.version && sendPresenceNow !== null)
+            return sendPresenceNow();
+        })
+        .catch((error: unknown) => {
+          logger.machine(
+            `antigravity managed update check failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        });
     } else if (!currentAg.authenticated) {
       void antigravityManaged.probe().catch(() => {});
-    } else if (Date.now() >= antigravityReprobeAt) {
-      antigravityReprobeAt = Date.now() + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
+    } else if (now >= antigravityReprobeAt) {
+      antigravityReprobeAt = now + (opts.antigravityReprobeMs ?? ANTIGRAVITY_REPROBE_MS);
       void antigravityManaged.probe().catch(() => {});
     }
     void probeAuthAndRemember()

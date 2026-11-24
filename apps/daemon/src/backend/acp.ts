@@ -160,6 +160,31 @@ function selectOptionValues(option: SessionConfigOption): Set<string> {
   );
 }
 
+function acpErrorCode(error: unknown): number | undefined {
+  if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'number' ? code : undefined;
+}
+
+function isAntigravityAuthError(error: unknown, message: string): boolean {
+  return (
+    acpErrorCode(error) === -32000 ||
+    /authentication required|authenticate|not logged in|login|unauthorized|api key|auth method|no browser is available/i.test(
+      message,
+    )
+  );
+}
+
+function antigravityAcpErrorMessage(error: unknown, message: string): string {
+  if (/spawn .*ENOENT|\bagy\b.*not found/i.test(message)) {
+    return 'Antigravity executable not found: install Google Antigravity (agy) on the Runner or enable managed install.';
+  }
+  if (isAntigravityAuthError(error, message)) {
+    return `Antigravity login failed: sign in to Antigravity on the Runner or enable a subscription with a token. ${message}`;
+  }
+  return message;
+}
+
 export function acpErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   if (/spawn agy .*ENOENT|\bagy\b.*not found/i.test(message)) {
@@ -651,6 +676,7 @@ class AcpBackend implements AgentBackend {
         'Gemini managed install is missing: the managed runtime setup did not complete',
       );
     }
+    const releaseRuntime = adapter?.acquireRuntime?.();
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
       const launch = {
@@ -675,6 +701,9 @@ class AcpBackend implements AgentBackend {
           if (key.startsWith('CHISEL_') || key.startsWith('DEVIN_')) delete sessionEnv[key];
         }
       }
+      if (adapter?.harness === 'antigravity') {
+        sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
+      }
       child = spawnProcess(confined.command, confined.args, {
         cwd: opts.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -682,6 +711,7 @@ class AcpBackend implements AgentBackend {
         env: runtimeChildEnv(sessionEnv),
       });
     } catch (error) {
+      releaseRuntime?.();
       hostTools?.close();
       throw error;
     }
@@ -762,6 +792,7 @@ class AcpBackend implements AgentBackend {
     const cleanup = () => {
       if (cleanedUp) return;
       cleanedUp = true;
+      releaseRuntime?.();
       hostTools?.close();
       for (const bridge of mcpBridges) bridge.close();
       mcpBridges.length = 0;
@@ -847,22 +878,35 @@ class AcpBackend implements AgentBackend {
       };
       const response = resumeId
         ? await (async () => {
-            try {
-              if (caps?.sessionCapabilities?.resume)
+            if (caps?.sessionCapabilities?.resume) {
+              try {
                 return await connection.agent.request<ResumeSessionResponse>(
                   methods.agent.session.resume,
                   { ...request, sessionId: resumeId },
                 );
-              if (caps?.loadSession)
+              } catch (error) {
+                const detail = error instanceof Error ? error.message : String(error);
+                if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
+                  throw error;
+                }
+                if (!caps?.loadSession) {
+                  throw new SessionNotResumableError(resumeId, detail);
+                }
+              }
+            }
+            if (caps?.loadSession) {
+              try {
                 return await connection.agent.request<LoadSessionResponse>(
                   methods.agent.session.load,
                   { ...request, sessionId: resumeId },
                 );
-            } catch (error) {
-              throw new SessionNotResumableError(
-                resumeId,
-                error instanceof Error ? error.message : String(error),
-              );
+              } catch (error) {
+                const detail = error instanceof Error ? error.message : String(error);
+                if (adapter?.harness === 'antigravity' && isAntigravityAuthError(error, detail)) {
+                  throw error;
+                }
+                throw new SessionNotResumableError(resumeId, detail);
+              }
             }
             throw new SessionNotResumableError(resumeId);
           })()
@@ -962,8 +1006,13 @@ class AcpBackend implements AgentBackend {
       return session;
     } catch (error) {
       cleanup();
+      if (error instanceof SessionNotResumableError) throw error;
       const message = error instanceof Error ? error.message : String(error);
-      const mapped = adapter ? message : acpErrorMessage(error);
+      const mapped = adapter
+        ? adapter.harness === 'antigravity'
+          ? antigravityAcpErrorMessage(error, message)
+          : message
+        : acpErrorMessage(error);
       throw new Error(
         mapped !== message
           ? mapped
@@ -1003,6 +1052,7 @@ export interface AcpBackendOptions {
   createUpdateNormalizer?: () => (update: SessionUpdate) => AcpUpdateNormalization;
   initializeTimeoutMs?: number;
   cancelTimeoutMs?: number;
+  acquireRuntime?: () => () => void;
   spawnProcess?: GeminiBackendOptions['spawnProcess'];
 }
 

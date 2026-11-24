@@ -287,6 +287,7 @@ export interface BootOpts {
   devinEnsureRetryMs?: number;
   antigravityEnsureRetryMs?: number;
   antigravityReprobeMs?: number;
+  antigravityUpdateCheckMs?: number;
   capabilitiesProbe?: () => MachineCapabilities;
   withMachineJson?: boolean;
   preEnrolled?: { serverUrl: string };
@@ -376,6 +377,9 @@ export function startMachine(opts: BootOpts) {
         : {}),
       ...(opts.antigravityReprobeMs !== undefined
         ? { antigravityReprobeMs: opts.antigravityReprobeMs }
+        : {}),
+      ...(opts.antigravityUpdateCheckMs !== undefined
+        ? { antigravityUpdateCheckMs: opts.antigravityUpdateCheckMs }
         : {}),
       claimBackoffBaseMs: 10,
       proxyEnv: {},

@@ -1,14 +1,13 @@
 import { spawn } from 'node:child_process';
-import { accessSync, constants, readdirSync, readFileSync, statSync } from 'node:fs';
+import { accessSync, constants, statSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import type { AntigravitySubscriptionVerifyResult } from '@cairn/shared';
 import {
-  unsafeManagedVersion,
-  verifiedManagedBin,
-  verifiedManagedBins,
-} from '@cairn/shared/managed-bin';
+  ANTIGRAVITY_ACP_ARGS,
+  currentAntigravityManagedInstall,
+} from '@cairn/shared/antigravity-install';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MANAGED_ROOT = join(homedir(), '.cairn', 'tools', 'antigravity');
@@ -29,7 +28,7 @@ const AUTH_FAILURE =
   /authentication|401|invalid|expired|login|unauthorized|forbidden|auth method|api key/i;
 
 function childEnv(): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = { HOME: homedir() };
+  const env: NodeJS.ProcessEnv = { HOME: homedir(), AGY_CLI_DISABLE_AUTO_UPDATE: '1' };
   if (process.env.PATH !== undefined) env.PATH = process.env.PATH;
   for (const name of FORWARDED_ENV) {
     const value = process.env[name];
@@ -38,45 +37,25 @@ function childEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-function managedVersions(): string[] {
-  const versions: string[] = [];
+function isExecutableFile(path: string): boolean {
   try {
-    for (const entry of readdirSync(join(MANAGED_ROOT, 'versions'), { withFileTypes: true })) {
-      if (entry.isDirectory()) versions.push(entry.name);
-    }
-  } catch {}
-  return versions;
-}
-
-function managedMarkerCommand(): { command: string; args: string[] } | null {
-  let currentVersion: string | null = null;
-  try {
-    const current = JSON.parse(readFileSync(join(MANAGED_ROOT, 'current.json'), 'utf8')) as {
-      version?: unknown;
-    };
-    if (typeof current.version === 'string' && !unsafeManagedVersion(current.version)) {
-      currentVersion = current.version;
-    }
-  } catch {}
-  const candidates = [
-    ...(currentVersion === null
-      ? []
-      : [verifiedManagedBin(join(MANAGED_ROOT, 'versions', currentVersion))]),
-    ...verifiedManagedBins(join(MANAGED_ROOT, 'versions'), managedVersions()),
-  ];
-  const found = candidates.find((bin) => bin !== null);
-  if (found === undefined || found === null) return null;
-  return { command: found.command, args: found.args.length > 0 ? found.args : ['acp'] };
+    accessSync(path, constants.X_OK);
+    return statSync(path).isFile();
+  } catch {
+    return false;
+  }
 }
 
 function resolveAgyBinary(): { command: string; args: string[] } {
   const explicit = process.env.AGY_BIN ?? process.env.CAIRN_AGY_PATH;
-  const managed = managedMarkerCommand();
+  if (explicit !== undefined && explicit.trim() !== '' && isExecutableFile(explicit.trim())) {
+    return { command: explicit.trim(), args: [...ANTIGRAVITY_ACP_ARGS] };
+  }
+  const managed = currentAntigravityManagedInstall(MANAGED_ROOT);
+  if (managed !== null && isExecutableFile(managed.binPath)) {
+    return { command: managed.binPath, args: managed.args };
+  }
   const candidates = [
-    ...(explicit !== undefined && explicit.trim() !== '' ? [explicit.trim()] : []),
-    ...verifiedManagedBins(join(MANAGED_ROOT, 'versions'), managedVersions()).map(
-      (bin) => bin.command,
-    ),
     `${homedir()}/.local/bin/agy`,
     '/opt/homebrew/bin/agy',
     '/usr/local/bin/agy',
@@ -86,12 +65,9 @@ function resolveAgyBinary(): { command: string; args: string[] } {
       .map((dir) => join(dir, 'agy')),
   ];
   for (const candidate of candidates) {
-    try {
-      accessSync(candidate, constants.X_OK);
-      if (statSync(candidate).isFile()) return { command: candidate, args: ['acp'] };
-    } catch {}
+    if (isExecutableFile(candidate)) return { command: candidate, args: [...ANTIGRAVITY_ACP_ARGS] };
   }
-  return managed ?? { command: 'agy', args: ['acp'] };
+  return { command: 'agy', args: [...ANTIGRAVITY_ACP_ARGS] };
 }
 
 function collectLines(buffer: string): { lines: string[]; rest: string } {
@@ -115,9 +91,7 @@ function errorResult(text: string): AntigravitySubscriptionVerifyResult {
 function probe(home: string, timeoutMs: number): Promise<AntigravitySubscriptionVerifyResult> {
   return new Promise((resolve) => {
     const bin = resolveAgyBinary();
-    const args = basename(bin.command).startsWith('agy')
-      ? [...bin.args, '--log-file', join(home, 'probe.log')]
-      : bin.args;
+    const args = [...bin.args, '--log-file', join(home, 'probe.log')];
     const child = spawn(bin.command, args, {
       cwd: home,
       env: childEnv(),

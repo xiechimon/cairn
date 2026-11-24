@@ -1,40 +1,43 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import {
-  accessSync,
-  constants,
-  mkdtempSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-} from 'node:fs';
+import { accessSync, constants, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import {
   type AntigravityLocalStatus,
   type AntigravityLoginOutcome,
   type AntigravityLoginPhase,
   antigravityCliDir,
   antigravityKeyFromText,
+  compareVersions,
 } from '@cairn/shared';
 import {
+  ANTIGRAVITY_ACP_ARGS,
+  ANTIGRAVITY_CLI_MIN_VERSION,
+  type AntigravityManagedBin,
   antigravityInstallSupported,
+  currentAntigravityManagedInstall,
   ensureAntigravityManagedInstall,
 } from '@cairn/shared/antigravity-install';
-import { verifiedManagedBins } from '@cairn/shared/managed-bin';
 
 const STATUS_TIMEOUT_MS = 20_000;
+const VALIDATE_TIMEOUT_MS = 30_000;
 const LOGIN_TIMEOUT_MS = 600_000;
 
 interface ResolvedBinary {
   binPath: string;
+  args: string[];
   source: 'local' | 'managed';
 }
 
 interface JsonRpcMessage {
   id?: unknown;
   result?: {
+    protocolVersion?: unknown;
     agentInfo?: { version?: unknown };
+    agentCapabilities?: {
+      loadSession?: unknown;
+      sessionCapabilities?: { resume?: unknown };
+    };
     authMethods?: { id?: unknown }[];
   };
   error?: unknown;
@@ -42,22 +45,6 @@ interface JsonRpcMessage {
 
 function managedToolsRoot(): string {
   return `${homedir()}/.cairn/tools/antigravity`;
-}
-
-function managedVersionsRoot(): string {
-  return `${managedToolsRoot()}/versions`;
-}
-
-function managedVersions(): string[] {
-  try {
-    return readdirSync(managedVersionsRoot(), {
-      withFileTypes: true,
-    })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch {
-    return [];
-  }
 }
 
 function isExecutableFile(path: string): boolean {
@@ -71,20 +58,22 @@ function isExecutableFile(path: string): boolean {
 
 function resolveAntigravityBinary(): ResolvedBinary | null {
   const explicit = process.env.CAIRN_AGY_PATH?.trim();
-  const candidates = [
-    ...(explicit !== undefined && explicit !== '' ? [explicit] : []),
-    ...verifiedManagedBins(managedVersionsRoot(), managedVersions()).map((bin) => bin.command),
-  ];
-  for (const candidate of candidates) {
-    if (!isExecutableFile(candidate)) continue;
-    return { binPath: candidate, source: 'managed' };
+  if (explicit !== undefined && explicit !== '' && isExecutableFile(explicit)) {
+    return { binPath: explicit, args: [...ANTIGRAVITY_ACP_ARGS], source: 'managed' };
+  }
+  const managed = currentAntigravityManagedInstall(managedToolsRoot());
+  if (managed !== null && isExecutableFile(managed.binPath)) {
+    return { binPath: managed.binPath, args: managed.args, source: 'managed' };
   }
   return null;
 }
 
-function acpSpawnArgs(binPath: string, logFile: string): string[] {
-  if (basename(binPath).endsWith('.par')) return [];
-  return basename(binPath).startsWith('agy') ? ['acp', '--log-file', logFile] : ['acp'];
+function acpSpawnArgs(resolved: ResolvedBinary, logFile: string): string[] {
+  return [...resolved.args, '--log-file', logFile];
+}
+
+function acpSpawnEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return { ...process.env, ...extra, AGY_CLI_DISABLE_AUTO_UPDATE: '1' };
 }
 
 function sendJsonRpc(child: ChildProcess, message: Record<string, unknown>): void {
@@ -120,6 +109,70 @@ function pickAuthMethod(authMethods: { id?: unknown }[] | undefined): string {
   return typeof first === 'string' ? first : 'oauth-personal';
 }
 
+function validateCandidate(candidate: AntigravityManagedBin): Promise<boolean> {
+  const validationDir = mkdtempSync(join(tmpdir(), 'cairn-agy-validate-'));
+  let child: ChildProcess;
+  try {
+    child = spawn(candidate.binPath, candidate.args, {
+      cwd: validationDir,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: acpSpawnEnv({ HOME: validationDir, TMPDIR: validationDir }),
+    });
+  } catch {
+    rmSync(validationDir, { recursive: true, force: true });
+    return Promise.resolve(false);
+  }
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    let exited = false;
+    const finish = (ok: boolean): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (!exited) child.kill();
+      rmSync(validationDir, { recursive: true, force: true });
+      resolve(ok);
+    };
+    const timer = setTimeout(() => finish(false), VALIDATE_TIMEOUT_MS);
+    child.on('exit', () => {
+      exited = true;
+      finish(false);
+    });
+    child.on('error', () => {
+      exited = true;
+      finish(false);
+    });
+    child.stdin?.on('error', () => finish(false));
+    attachNdjsonReader(child, (message) => {
+      if (message.id !== 1) return;
+      if (message.error !== undefined || message.result?.protocolVersion !== 1) {
+        finish(false);
+        return;
+      }
+      const version = message.result.agentInfo?.version;
+      const versionOk =
+        typeof version === 'string' &&
+        compareVersions(version, ANTIGRAVITY_CLI_MIN_VERSION) >= 0 &&
+        (version === candidate.version ||
+          version.startsWith(`${candidate.version}-`) ||
+          version.startsWith(`${candidate.version}+`));
+      const caps = message.result.agentCapabilities;
+      const resumeOk =
+        caps?.loadSession === true || caps?.sessionCapabilities?.resume !== undefined;
+      finish(versionOk && resumeOk);
+    });
+    sendJsonRpc(child, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'initialize',
+      params: {
+        protocolVersion: 1,
+        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
+      },
+    });
+  });
+}
+
 export async function antigravityLocalStatus(): Promise<AntigravityLocalStatus> {
   const resolved = resolveAntigravityBinary();
   if (resolved === null) {
@@ -134,9 +187,10 @@ export async function antigravityLocalStatus(): Promise<AntigravityLocalStatus> 
   let exited = false;
 
   try {
-    child = spawn(resolved.binPath, acpSpawnArgs(resolved.binPath, join(probeDir, 'probe.log')), {
+    child = spawn(resolved.binPath, acpSpawnArgs(resolved, join(probeDir, 'probe.log')), {
       cwd: probeDir,
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: acpSpawnEnv(),
     });
     const activeChild = child;
     activeChild.on('exit', () => {
@@ -266,6 +320,7 @@ export function antigravityLogin(
       onPhase?.('installing');
       const installed = await ensureAntigravityManagedInstall({
         root: managedToolsRoot(),
+        validate: validateCandidate,
         log: (message) => console.error(`Antigravity install: ${message}`),
       });
       resolved = resolveAntigravityBinary();
@@ -276,9 +331,10 @@ export function antigravityLogin(
     const loginDir = mkdtempSync(join(tmpdir(), 'cairn-agy-login-'));
     let child: ChildProcess;
     try {
-      child = spawn(resolved.binPath, acpSpawnArgs(resolved.binPath, join(loginDir, 'login.log')), {
+      child = spawn(resolved.binPath, acpSpawnArgs(resolved, join(loginDir, 'login.log')), {
         cwd: loginDir,
         stdio: ['pipe', 'pipe', 'pipe'],
+        env: acpSpawnEnv(),
       });
     } catch (error) {
       console.error('Antigravity login failed to spawn:', error);
