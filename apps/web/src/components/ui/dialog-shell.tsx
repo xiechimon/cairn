@@ -177,7 +177,7 @@ export function DialogShell({
             data-slot="dialog-overlay"
             style={{ zIndex: backdropZ }}
             className={backdropClass}
-            onClick={onBackdropClick ?? (() => onClose())}
+            onClick={dismissible ? (onBackdropClick ?? (() => onClose())) : undefined}
           />
           <DialogPrimitive.Popup
             data-slot="dialog-content"
@@ -199,6 +199,7 @@ export function DialogShell({
                   }
             }
             role={viewportRoot ? 'presentation' : 'dialog'}
+            aria-modal={viewportRoot ? undefined : true}
             aria-label={viewportRoot ? undefined : title}
           >
             {children}

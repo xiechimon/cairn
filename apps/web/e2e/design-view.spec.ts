@@ -280,7 +280,7 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await frame.getByRole('button', { name: '升级到 Pro' }).hover();
   await expect(pane.getByTestId('design-hover-outline')).toBeVisible();
   await frame.getByRole('button', { name: '升级到 Pro' }).click();
-  const popover = pane.getByTestId('design-comment-popover');
+  const popover = page.getByTestId('design-comment-popover');
   await expect(popover.getByTestId('design-comment-target')).toHaveText('button · 「升级到 Pro」');
   await expect(popover.getByTestId('design-inspect')).toContainText('尺寸');
   await popover.getByTestId('design-comment-note').fill('只让 Pro 的按钮是实心');
@@ -289,8 +289,8 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await expect(pane.locator('[data-testid="design-pin"][data-pin="2"]')).toBeVisible();
 
   await frame.getByRole('heading').click();
-  await pane.getByTestId('design-comment-note').fill('标题短一点');
-  await pane.getByTestId('design-comment-save').click();
+  await page.getByTestId('design-comment-note').fill('标题短一点');
+  await page.getByTestId('design-comment-save').click();
   const chips = page.getByTestId('design-comment-chip');
   await expect(chips).toHaveText([/^2升级到 Pro · 只让 Pro 的按钮是实心$/, /^3随你一起长大的定价 · 标题短一点$/]);
   await expect(page.getByTestId('chief-send-comments')).toHaveText('发送（含 2 条评论）');
@@ -334,8 +334,8 @@ test('comments: pick an element, save, edit, delete, send with the next message,
   await expect(second).toHaveAttribute('data-status', 'open');
 
   await frame.getByText('一个工作区').click();
-  await pane.getByTestId('design-comment-note').fill('这句去掉');
-  await pane.getByTestId('design-comment-send').click();
+  await page.getByTestId('design-comment-note').fill('这句去掉');
+  await page.getByTestId('design-comment-send').click();
   await expect.poll(() => state.sends.length).toBe(2);
   expect(state.sends[1]).toMatchObject({ content: '按下面的设计评论改。', designCommentIds: ['cmt-3'] });
 
@@ -379,7 +379,7 @@ test('comments: a forged style from the frame cannot make the board fetch a url'
     color: 'url("/swatch-probe-text.png")',
     backgroundColor: 'url("/swatch-probe-background.png")',
   });
-  const popover = pane.getByTestId('design-comment-popover');
+  const popover = page.getByTestId('design-comment-popover');
   await expect(popover).toBeVisible();
   await page.waitForTimeout(800);
   expect(fetched).toEqual([]);
