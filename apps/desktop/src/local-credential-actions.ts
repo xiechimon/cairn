@@ -101,18 +101,30 @@ export function desktopCredentialActions(
         return { ok: false, reason: 'save' };
       }
       return antigravityLogin(
-        ({ token, expiresAt }, loginSignal) =>
+        ({ token, expiresAt, refreshToken, authMethod }, loginSignal) =>
           subscriptionId === undefined
             ? post(
                 target.teamId,
                 'antigravity-subscriptions',
-                { label: target.label, token, expiresAt },
+                {
+                  label: target.label,
+                  ...(token !== undefined ? { token } : {}),
+                  ...(expiresAt !== undefined ? { expiresAt } : {}),
+                  ...(refreshToken !== undefined ? { refreshToken } : {}),
+                  ...(authMethod !== undefined ? { authMethod } : {}),
+                },
                 loginSignal,
               )
             : post(
                 target.teamId,
                 `antigravity-subscriptions/${subscriptionId}/attach-oauth`,
-                { kind: 'oauth-personal', token, expiresAt },
+                {
+                  kind: 'oauth-personal',
+                  ...(token !== undefined ? { token } : {}),
+                  ...(expiresAt !== undefined ? { expiresAt } : {}),
+                  ...(refreshToken !== undefined ? { refreshToken } : {}),
+                  ...(authMethod !== undefined ? { authMethod } : {}),
+                },
                 loginSignal,
               ),
         appData,

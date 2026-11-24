@@ -54,7 +54,8 @@ import {
 } from './acp-permission-gate.js';
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
 import type { PermissionRule } from './command-gate.js';
-import type { SessionConfiner } from './confine-session.js';
+import { SANDBOX_EXEC } from './confine-seatbelt.js';
+import { type SessionConfiner, usesHostAntigravityAuth } from './confine-session.js';
 
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -704,11 +705,20 @@ class AcpBackend implements AgentBackend {
       if (adapter?.harness === 'antigravity') {
         sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
       }
+      const env = runtimeChildEnv(sessionEnv);
+      if (
+        adapter?.harness === 'antigravity' &&
+        confined.command === SANDBOX_EXEC &&
+        !usesHostAntigravityAuth('antigravity', sessionEnv) &&
+        (env.SSL_CERT_FILE === undefined || env.SSL_CERT_FILE === '')
+      ) {
+        env.SSL_CERT_FILE = '/etc/ssl/cert.pem';
+      }
       child = spawnProcess(confined.command, confined.args, {
         cwd: opts.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         ...(adapter && process.platform !== 'win32' ? { detached: true } : {}),
-        env: runtimeChildEnv(sessionEnv),
+        env,
       });
     } catch (error) {
       releaseRuntime?.();
@@ -718,9 +728,6 @@ class AcpBackend implements AgentBackend {
     const groupPid = adapter && process.platform !== 'win32' ? child.pid : undefined;
     if (groupPid !== undefined) adapterProcessGroups.add(groupPid);
     let stderr = '';
-    child.stderr.on('data', (chunk: Buffer) => {
-      stderr = (stderr + chunk.toString()).slice(-8192);
-    });
     const app = client({ name: 'cairn' });
     const gateOptions = this.options.gate;
     app.onRequest(methods.client.session.requestPermission, ({ params }) => {
@@ -767,6 +774,24 @@ class AcpBackend implements AgentBackend {
       Readable.toWeb(child.stdout) as ReadableStream<Uint8Array>,
     );
     const connection = app.connect(stream);
+    let interactiveAuthDetected = false;
+    child.stderr.on('data', (chunk: Buffer) => {
+      if (interactiveAuthDetected) return;
+      const text = chunk.toString();
+      if (
+        adapter?.harness === 'antigravity' &&
+        /Open the following link to authenticate/i.test(stderr + text)
+      ) {
+        interactiveAuthDetected = true;
+        connection.close(
+          new Error(
+            'Antigravity OAuth login expired or revoked; sign in again in Settings -> Model Routing',
+          ),
+        );
+        return;
+      }
+      stderr = (stderr + text).slice(-8192);
+    });
     child.once('error', (error) => connection.close(error));
     child.once('exit', (code) =>
       connection.close(

@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   DEFAULT_ANTIGRAVITY_MODELS,
   type MachineAntigravityVerifyBody,
@@ -5,6 +7,7 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   antigravitySubscription,
   build as buildTable,
@@ -26,6 +29,7 @@ import {
   insertMachine,
   issueApiKey,
   postProject,
+  redeemTestPairing,
   req,
   seedRoute,
   type TestServer,
@@ -70,6 +74,7 @@ function attachLiveVerifier(
 const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const d of disposables.splice(0)) d();
+  vi.unstubAllGlobals();
 });
 
 function deferred<T>() {
@@ -1874,5 +1879,214 @@ describe('antigravity upstream models', () => {
       machineId,
       models: [{ id: 'gemini-4-carbon', name: 'Gemini 4 Carbon', slot: 'builtin' }],
     });
+  });
+
+  test('stores durable refresh-token OAuth bound to refresh-derived subject, blocks account-swap and paired verify, and allows bound renewal after auth failure', async () => {
+    const ownerToken = 'durable-oauth-owner-token-0123456789abcdef';
+    const s = bootServer({ authToken: ownerToken, githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const ownerHeaders = { authorization: `Bearer ${ownerToken}` };
+    const call = (
+      method: string,
+      url: string,
+      headers: Record<string, string>,
+      body?: unknown,
+    ): Promise<Response> =>
+      Promise.resolve(
+        s.app.request(url, {
+          method,
+          headers: {
+            ...(body !== undefined ? { 'content-type': 'application/json' } : {}),
+            ...headers,
+          },
+          body: body !== undefined ? JSON.stringify(body) : undefined,
+        }),
+      );
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const refreshA = `1//0gDurableRefreshA_${'a'.repeat(32)}`;
+    const refreshB = `1//0gDurableRefreshB_${'b'.repeat(32)}`;
+    const refreshOther = `1//0gDurableRefreshOther_${'o'.repeat(32)}`;
+    const refreshRevoked = `1//0gDurableRefreshRevoked_${'r'.repeat(32)}`;
+    const accessA = `ya29.${'a'.repeat(64)}`;
+    const accessB = `ya29.${'b'.repeat(64)}`;
+    const accessOther = `ya29.${'o'.repeat(64)}`;
+    const expiresAt = Date.now() + 3_600_000;
+
+    const prevBin = process.env.AGY_BIN;
+    const binDir = makeTestTempDir('agy-verify-durable-');
+    const stateFile = join(binDir, 'revoked.flag');
+    disposables.push(() => {
+      if (prevBin === undefined) delete process.env.AGY_BIN;
+      else process.env.AGY_BIN = prevBin;
+      releaseTestTempDir(binDir);
+    });
+    const fakeBin = join(binDir, 'fake-agy.sh');
+    writeFileSync(
+      fakeBin,
+      [
+        '#!/bin/sh',
+        `exec "${process.execPath}" --input-type=module -e '`,
+        'import { existsSync, readFileSync, writeFileSync } from "node:fs";',
+        'import { createInterface } from "node:readline";',
+        'const send = (o) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...o }) + "\\n");',
+        'const force = process.env.AGY_CLI_FORCE_FILE_TOKEN_STORAGE;',
+        'const tokenPath = process.env.HOME + "/.gemini/antigravity-acp/antigravity-oauth-token";',
+        'const tok = JSON.parse(readFileSync(tokenPath, "utf8"));',
+        'const refresh = tok.token?.refresh_token;',
+        `const minted = refresh === "${refreshA}" && !existsSync(${JSON.stringify(stateFile)}) ? "${accessA}" : refresh === "${refreshB}" ? "${accessB}" : refresh === "${refreshOther}" ? "${accessOther}" : null;`,
+        'for await (const line of createInterface({ input: process.stdin })) {',
+        '  const m = JSON.parse(line);',
+        '  if (m.method === "initialize") send({ id: m.id, result: { protocolVersion: 1 } });',
+        '  if (m.method === "session/new") {',
+        '    if (force === "1" && minted !== null) {',
+        '      tok.token.access_token = minted;',
+        '      tok.token.expiry = new Date(Date.now() + 3600000).toISOString();',
+        '      writeFileSync(tokenPath, JSON.stringify(tok));',
+        '      send({ id: m.id, result: { sessionId: "ok" } });',
+        '    } else {',
+        '      send({ id: m.id, error: { code: -32000, message: "Authentication required" } });',
+        '    }',
+        '  }',
+        '}',
+        "'",
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    process.env.AGY_BIN = fakeBin;
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        expect(url).toBe('https://oauth2.googleapis.com/tokeninfo');
+        const bearer = new Headers(init?.headers).get('authorization');
+        if (bearer === `Bearer ${accessA}` || bearer === `Bearer ${accessB}`) {
+          return Response.json({ expires_in: '3600', sub: 'sub-same' });
+        }
+        if (bearer === `Bearer ${accessOther}`) {
+          return Response.json({ expires_in: '3600', sub: 'sub-other' });
+        }
+        return Response.json({ error: 'invalid_token' }, { status: 400 });
+      }),
+    );
+
+    const leaked = await call('POST', path, ownerHeaders, {
+      label: `Oops ${refreshA}`,
+      token: accessA,
+      expiresAt,
+      refreshToken: refreshA,
+    });
+    expect(leaked.status).toBe(400);
+
+    const unverified = await call('POST', path, ownerHeaders, {
+      label: 'Bad refresh',
+      refreshToken: refreshRevoked,
+      authMethod: 'consumer',
+    });
+    expect(unverified.status).toBe(400);
+
+    const mismatchedCreate = await call('POST', path, ownerHeaders, {
+      label: 'Cross account',
+      token: accessA,
+      expiresAt,
+      refreshToken: refreshOther,
+      authMethod: 'consumer',
+    });
+    expect(mismatchedCreate.status).toBe(400);
+
+    const created = await call('POST', path, ownerHeaders, {
+      label: 'Portable Google',
+      refreshToken: refreshA,
+      authMethod: 'consumer',
+    });
+    expect(created.status).toBe(201);
+    const body = (await created.json()) as {
+      id: string;
+      hasToken: boolean;
+      oauthPersonal?: boolean;
+      expiresAt: number | null;
+    };
+    expect(body).toMatchObject({
+      hasToken: true,
+      oauthPersonal: true,
+      expiresAt: null,
+    });
+    expect(JSON.stringify(body)).not.toContain(refreshA);
+
+    const patchLeak = await call('PATCH', `${path}/${body.id}`, ownerHeaders, {
+      label: `leak-${refreshA}`,
+    });
+    expect(patchLeak.status).toBe(400);
+
+    const healthyOverwrite = await call('POST', `${path}/${body.id}/attach-oauth`, ownerHeaders, {
+      kind: 'oauth-personal',
+      token: accessB,
+      expiresAt,
+      refreshToken: refreshB,
+    });
+    expect(healthyOverwrite.status).toBe(409);
+
+    const issued = await call('POST', '/api/remote/pairing', ownerHeaders);
+    expect(issued.status).toBe(201);
+    const { code } = (await issued.json()) as { code: string };
+    const paired = await redeemTestPairing(s.app, code, 'phone');
+    expect(paired.status).toBe(201);
+    const { token: deviceToken } = (await paired.json()) as { token: string };
+    const pairedVerify = await call('POST', `${path}/${body.id}/verify`, {
+      authorization: `Bearer ${deviceToken}`,
+    });
+    expect(pairedVerify.status).toBe(403);
+
+    writeFileSync(stateFile, 'revoked');
+    const failedVerify = await call('POST', `${path}/${body.id}/verify`, ownerHeaders);
+    expect(failedVerify.status).toBe(200);
+    expect(await failedVerify.json()).toMatchObject({ ok: false, reason: 'auth' });
+
+    const swappedRenew = await call('POST', `${path}/${body.id}/attach-oauth`, ownerHeaders, {
+      kind: 'oauth-personal',
+      token: accessB,
+      expiresAt,
+      refreshToken: refreshOther,
+      authMethod: 'consumer',
+    });
+    expect(swappedRenew.status).toBe(400);
+
+    const otherSubjectRenew = await call('POST', `${path}/${body.id}/attach-oauth`, ownerHeaders, {
+      kind: 'oauth-personal',
+      refreshToken: refreshOther,
+      authMethod: 'consumer',
+    });
+    expect(otherSubjectRenew.status).toBe(409);
+
+    const renewed = await call('POST', `${path}/${body.id}/attach-oauth`, ownerHeaders, {
+      kind: 'oauth-personal',
+      token: accessB,
+      expiresAt,
+      refreshToken: refreshB,
+      authMethod: 'consumer',
+    });
+    expect(renewed.status).toBe(200);
+    expect(await renewed.json()).toMatchObject({
+      id: body.id,
+      hasToken: true,
+      oauthPersonal: true,
+      expiresAt: null,
+    });
+
+    const okVerify = await call('POST', `${path}/${body.id}/verify`, ownerHeaders);
+    expect(okVerify.status).toBe(200);
+    expect(await okVerify.json()).toMatchObject({
+      ok: true,
+      check: { command: 'agy acp · Portable Google OAuth' },
+    });
+
+    const epipeBin = join(binDir, 'early-exit-agy.sh');
+    writeFileSync(epipeBin, '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+    process.env.AGY_BIN = epipeBin;
+    const earlyExit = await call('POST', path, ownerHeaders, {
+      label: 'Early exit probe',
+      refreshToken: refreshB,
+      authMethod: 'consumer',
+    });
+    expect(earlyExit.status).toBe(502);
   });
 });

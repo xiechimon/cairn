@@ -4,6 +4,7 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   renameSync,
   rmSync,
   symlinkSync,
@@ -12,6 +13,18 @@ import {
 import { dirname, join, sep } from 'node:path';
 import type { AntigravityOAuthStepCredential } from '@cairn/shared';
 import { claudeConfigHome, runtimeHome } from './runtime-homes.js';
+
+export const ANTIGRAVITY_OAUTH_SHARED_HOME = 'antigravity-oauth';
+export const ANTIGRAVITY_OAUTH_PERSISTENT_DIRS = ['conversations', 'brain'] as const;
+
+export function antigravityOAuthPersistentDirs(cairnHome: string): string[] {
+  const acpDir = join(
+    runtimeHome(cairnHome, ANTIGRAVITY_OAUTH_SHARED_HOME),
+    '.gemini',
+    'antigravity-acp',
+  );
+  return ANTIGRAVITY_OAUTH_PERSISTENT_DIRS.map((name) => join(acpDir, name));
+}
 
 export const ANTIGRAVITY_CREDENTIAL_FILES = [
   '.gemini/antigravity-cli/antigravity-oauth-token',
@@ -42,13 +55,31 @@ function lstatOrNull(path: string) {
 }
 
 function realDirectory(home: string, relative: string): string {
-  let current = home;
-  for (const part of relative.split(sep).filter((segment) => segment !== '.')) {
+  const realRoot = realpathSync(home);
+  let current = realRoot;
+  for (const part of relative
+    .split(/[\\/]/)
+    .filter((segment) => segment !== '' && segment !== '.')) {
+    if (part === '..') throw new Error(`Invalid relative directory segment: ${relative}`);
     current = join(current, part);
     const stat = lstatOrNull(current);
-    if (stat?.isDirectory()) continue;
-    if (stat !== null) rmSync(current, { recursive: true, force: true });
-    mkdirSync(current, { mode: 0o700 });
+    if (!stat?.isDirectory()) {
+      if (stat !== null) rmSync(current, { recursive: true, force: true });
+      try {
+        mkdirSync(current, { mode: 0o700 });
+      } catch (error) {
+        if (
+          (error as NodeJS.ErrnoException).code !== 'EEXIST' ||
+          !lstatOrNull(current)?.isDirectory()
+        ) {
+          throw error;
+        }
+      }
+    }
+    const resolved = realpathSync(current);
+    if (resolved !== realRoot && !resolved.startsWith(`${realRoot}${sep}`)) {
+      throw new Error(`Unsafe agent config directory escape: ${current}`);
+    }
   }
   return current;
 }
@@ -124,8 +155,41 @@ export function prepareAntigravityHome(input: {
 export function writeAntigravityOAuthCredential(
   home: string,
   credential: AntigravityOAuthStepCredential,
+  cairnHome?: string,
 ): void {
-  writeAntigravityAuthSettings(home, 'oauth-personal');
+  const authType = credential.authMethod === 'business' ? 'oauth-business' : 'oauth-personal';
+  writeAntigravityAuthSettings(home, authType);
+  if (cairnHome !== undefined) {
+    const sharedHome = realDirectory(cairnHome, join('homes', ANTIGRAVITY_OAUTH_SHARED_HOME));
+    const sharedAcpDir = realDirectory(sharedHome, join('.gemini', 'antigravity-acp'));
+    const profileAcpDir = realDirectory(home, join('.gemini', 'antigravity-acp'));
+    for (const name of ANTIGRAVITY_OAUTH_PERSISTENT_DIRS) {
+      const target = realDirectory(sharedAcpDir, name);
+      const link = join(profileAcpDir, name);
+      if (lstatOrNull(link) === null) symlinkSync(target, link);
+    }
+  }
+  const freshAccess =
+    credential.token !== undefined &&
+    credential.expiresAt !== undefined &&
+    credential.expiresAt > Date.now()
+      ? { token: credential.token, expiry: new Date(credential.expiresAt).toISOString() }
+      : null;
+  if (credential.refreshToken !== undefined) {
+    writeJsonObject(home, '.gemini/antigravity-acp/antigravity-oauth-token', {
+      token: {
+        access_token: freshAccess?.token ?? '',
+        token_type: 'Bearer',
+        refresh_token: credential.refreshToken,
+        expiry: freshAccess?.expiry ?? '2020-01-01T00:00:00Z',
+      },
+      auth_method: credential.authMethod ?? 'consumer',
+    });
+    return;
+  }
+  if (credential.token === undefined || credential.expiresAt === undefined) {
+    throw new Error('Antigravity OAuth credential is missing both refresh token and access token');
+  }
   writeJsonObject(home, '.gemini/antigravity-acp/antigravity-oauth-token', {
     token: {
       access_token: credential.token,
@@ -140,6 +204,7 @@ export function antigravityFileStorageEnv(home: string): Record<string, string> 
     GEMINI_HOME: join(home, '.gemini'),
     GEMINI_CLI_HOME: home,
     AGY_ACP_FORCE_FILE_STORAGE: '1',
+    AGY_CLI_FORCE_FILE_TOKEN_STORAGE: '1',
     AGY_CLI_DISABLE_AUTO_UPDATE: '1',
     SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0',
   };
@@ -147,7 +212,7 @@ export function antigravityFileStorageEnv(home: string): Record<string, string> 
 
 export function writeAntigravityAuthSettings(
   home: string,
-  auth: 'gemini-api-key' | 'oauth-personal' = 'gemini-api-key',
+  auth: 'gemini-api-key' | 'oauth-personal' | 'oauth-business' = 'gemini-api-key',
   oauthHome?: string,
 ): void {
   const settingsFile = '.gemini/antigravity-cli/settings.json';

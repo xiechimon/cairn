@@ -10,7 +10,11 @@ import {
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import type { SessionOpts } from '@cairn/shared';
-import { ANTIGRAVITY_CREDENTIAL_FILES, GEMINI_CREDENTIAL_FILES } from '../agent-config.js';
+import {
+  ANTIGRAVITY_CREDENTIAL_FILES,
+  antigravityOAuthPersistentDirs,
+  GEMINI_CREDENTIAL_FILES,
+} from '../agent-config.js';
 import {
   canonicalDeny,
   contains,
@@ -168,7 +172,16 @@ interface StateEntry {
   root?: string;
 }
 
-function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv): StateEntry[] {
+export function usesHostAntigravityAuth(harness: SessionHarness, env: NodeJS.ProcessEnv): boolean {
+  return harness === 'antigravity' && env.CAIRN_ANTIGRAVITY_AUTH_MODE === 'host';
+}
+
+function ownState(
+  harness: SessionHarness,
+  home: string,
+  env: NodeJS.ProcessEnv,
+  daemonHome?: string,
+): StateEntry[] {
   switch (harness) {
     case 'claude-code': {
       const explicit = env.CLAUDE_CONFIG_DIR;
@@ -182,10 +195,13 @@ function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv)
       return [];
     case 'antigravity': {
       const base = isolatedHome(env.HOME, home);
-      const hostLogin = env.CAIRN_ANTIGRAVITY_AUTH_MODE === 'host';
+      const hostLogin = usesHostAntigravityAuth(harness, env);
       if (base === null) return hostLogin ? [{ path: join(home, '.gemini'), root: home }] : [];
       return [
         { path: base },
+        ...(env.CAIRN_ANTIGRAVITY_AUTH_MODE === 'oauth-personal' && daemonHome !== undefined
+          ? antigravityOAuthPersistentDirs(daemonHome).map((path) => ({ path }))
+          : []),
         ...(hostLogin
           ? ANTIGRAVITY_CREDENTIAL_FILES.map((file) => ({
               path: join(home, file),
@@ -252,8 +268,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       HOME: opts.env?.HOME ?? environment.HOME,
       TMPDIR: opts.env?.TMPDIR ?? environment.TMPDIR,
     };
-    const antigravityHostLogin =
-      harness === 'antigravity' && env.CAIRN_ANTIGRAVITY_AUTH_MODE === 'host';
+    const antigravityHostLogin = usesHostAntigravityAuth(harness, env);
     const workspace = realpathSync(opts.cwd);
     const tempEnv = env.TMPDIR;
     const tempInput = resolve(
@@ -263,7 +278,7 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       options.systemTempDirectory === undefined || options.systemTempDirectory === null
         ? null
         : resolve(options.systemTempDirectory);
-    const stateEntries = ownState(harness, home, env).filter(
+    const stateEntries = ownState(harness, home, env, daemonHomeLexical).filter(
       (entry) => !isStateFile(home, entry.path) || existsSync(entry.path),
     );
     const claudeTemp = join(realpathSync('/tmp'), `claude-${userInfo().uid}`);

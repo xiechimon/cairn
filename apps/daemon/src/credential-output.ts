@@ -26,12 +26,76 @@ export function credentialSecretValues(value: string | undefined): (string | und
   }
 }
 
+const GOOGLE_OAUTH_TOKEN_PATTERN = /(?:ya29\.[A-Za-z0-9._~-]{12,}|1\/\/[A-Za-z0-9._~+/-]{16,})/g;
+
+function buildAsciiCharTable(extra: string): Uint8Array {
+  const table = new Uint8Array(128);
+  for (let c = 48; c <= 57; c += 1) table[c] = 1;
+  for (let c = 65; c <= 90; c += 1) table[c] = 1;
+  for (let c = 97; c <= 122; c += 1) table[c] = 1;
+  for (let i = 0; i < extra.length; i += 1) table[extra.charCodeAt(i)] = 1;
+  return table;
+}
+
+const GOOGLE_OAUTH_SPECS = [
+  { prefix: 'ya29.', minLen: 17, table: buildAsciiCharTable('._~-') },
+  { prefix: '1//', minLen: 19, table: buildAsciiCharTable('._~+/-') },
+] as const;
+const MAX_DYNAMIC_TOKEN_HOLD = 4_100;
+
+function isTableChar(text: string, index: number, table: Uint8Array): boolean {
+  const code = text.charCodeAt(index);
+  return code < 128 && table[code] === 1;
+}
+
+function holdGoogleOAuthBoundary(text: string, cut: number): number {
+  let base = cut;
+  for (const { prefix } of GOOGLE_OAUTH_SPECS) {
+    for (let len = Math.min(prefix.length - 1, text.length); len >= 1; len--) {
+      if (text.endsWith(prefix.slice(0, len))) {
+        base = Math.min(base, text.length - len);
+      }
+    }
+  }
+  let adjusted = base;
+  for (const { prefix, minLen, table } of GOOGLE_OAUTH_SPECS) {
+    const floor = Math.max(0, base - MAX_DYNAMIC_TOKEN_HOLD);
+    let runStart = base;
+    while (runStart > floor && isTableChar(text, runStart - 1, table)) {
+      runStart -= 1;
+    }
+    const runExceedsLimit =
+      runStart === floor && runStart > 0 && isTableChar(text, runStart - 1, table);
+    if (!runExceedsLimit) {
+      if (runStart < base) {
+        const idx = text.indexOf(prefix, runStart);
+        if (idx >= 0 && idx <= base) adjusted = Math.min(adjusted, idx);
+      }
+      continue;
+    }
+    const windowStart = floor + 1;
+    const prefixBefore = text.lastIndexOf(prefix, floor);
+    let inSameRun = prefixBefore >= 0 && prefixBefore + minLen > windowStart;
+    for (let i = prefixBefore; inSameRun && i < floor; i += 1) {
+      if (!isTableChar(text, i, table)) inSameRun = false;
+    }
+    const searchStart = inSameRun ? prefixBefore + minLen : windowStart;
+    const idx = text.indexOf(prefix, searchStart);
+    if (idx >= 0 && idx <= base) adjusted = Math.min(adjusted, idx);
+  }
+  return Math.max(0, adjusted);
+}
+
 export function credentialRedactor(...values: (string | undefined)[]): <T>(value: T) => T {
   const tokens = values.filter((value): value is string => Boolean(value));
   const visit = (value: unknown): unknown => {
-    if (tokens.length === 0) return value;
-    if (typeof value === 'string')
-      return tokens.reduce((text, token) => text.split(token).join('[REDACTED]'), value);
+    if (typeof value === 'string') {
+      const literalRedacted = tokens.reduce(
+        (text, token) => text.split(token).join('[REDACTED]'),
+        value,
+      );
+      return literalRedacted.replace(GOOGLE_OAUTH_TOKEN_PATTERN, '[REDACTED]');
+    }
     if (Array.isArray(value)) return value.map(visit);
     if (
       value !== null &&
@@ -85,10 +149,6 @@ export async function* credentialSafeEvents(
   try {
     for await (const event of events) {
       const tokens = values();
-      if (tokens.length === 0) {
-        yield event;
-        continue;
-      }
       if (event.type === 'text_delta' || event.type === 'thinking_delta') {
         if (type !== null && type !== event.type && pending !== '') {
           yield { type, text: redact(pending) };
@@ -96,13 +156,22 @@ export async function* credentialSafeEvents(
         }
         type = event.type;
         pending += event.text;
-        let cut = Math.max(
-          0,
-          pending.length - Math.max(...tokens.map((value) => value.length)) + 1,
-        );
-        for (const value of tokens) {
-          const start = pending.lastIndexOf(value, cut);
-          if (start >= 0 && start + value.length > cut) cut = start;
+        let cut =
+          tokens.length === 0
+            ? pending.length
+            : Math.max(0, pending.length - Math.max(...tokens.map((value) => value.length)) + 1);
+        for (;;) {
+          const next = holdGoogleOAuthBoundary(pending, cut);
+          let adjusted = next;
+          for (const value of tokens) {
+            const start = pending.lastIndexOf(value, adjusted);
+            if (start >= 0 && start + value.length > adjusted) adjusted = start;
+          }
+          if (adjusted === next) {
+            cut = next;
+            break;
+          }
+          cut = adjusted;
         }
         if (cut > 0) {
           yield { type, text: redact(pending.slice(0, cut)) };

@@ -1,5 +1,8 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   antigravitySubscription as antigravitySubscriptionTable,
   build as buildTable,
@@ -29,6 +32,7 @@ const disposables: (() => void)[] = [];
 afterEach(() => {
   for (const d of disposables.splice(0)) d();
   setCoordinatorInServer(false);
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -398,5 +402,181 @@ describe('Antigravity dispatch, worker claim, and Coordinator claim', () => {
       'cs2',
     );
     expect(secondToken.antigravityToken).toBe(tokenB);
+  });
+
+  test('unauthenticated Runner claims worker and chief steps with portable OAuth and receives antigravityToken only while claimed', async () => {
+    setCoordinatorInServer(true);
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+
+    const refreshToken = `1//0gPortableClaim_${'p'.repeat(36)}`;
+    const accessToken = `ya29.${'p'.repeat(64)}`;
+    const prevBin = process.env.AGY_BIN;
+    const binDir = makeTestTempDir('agy-claim-portable-');
+    disposables.push(() => {
+      if (prevBin === undefined) delete process.env.AGY_BIN;
+      else process.env.AGY_BIN = prevBin;
+      releaseTestTempDir(binDir);
+    });
+    const fakeBin = join(binDir, 'fake-agy.sh');
+    writeFileSync(
+      fakeBin,
+      [
+        '#!/bin/sh',
+        `exec "${process.execPath}" --input-type=module -e '`,
+        'import { readFileSync, writeFileSync } from "node:fs";',
+        'import { createInterface } from "node:readline";',
+        'const send = (o) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...o }) + "\\n");',
+        'const tokenPath = process.env.HOME + "/.gemini/antigravity-acp/antigravity-oauth-token";',
+        'const tok = JSON.parse(readFileSync(tokenPath, "utf8"));',
+        'for await (const line of createInterface({ input: process.stdin })) {',
+        '  const m = JSON.parse(line);',
+        '  if (m.method === "initialize") send({ id: m.id, result: { protocolVersion: 1 } });',
+        '  if (m.method === "session/new") {',
+        `    tok.token.access_token = "${accessToken}";`,
+        '    tok.token.expiry = new Date(Date.now() + 3600000).toISOString();',
+        '    writeFileSync(tokenPath, JSON.stringify(tok));',
+        '    send({ id: m.id, result: { sessionId: "ok" } });',
+        '  }',
+        '}',
+        "'",
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    process.env.AGY_BIN = fakeBin;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ expires_in: '3600', sub: 'sub-claim-portable' })),
+    );
+
+    const created = await req(s.app, 'POST', `/api/teams/${s.team.id}/antigravity-subscriptions`, {
+      label: 'Portable Google',
+      refreshToken,
+      authMethod: 'consumer',
+    });
+    expect(created.status).toBe(201);
+    const { id: subId } = (await created.json()) as { id: string };
+    const unauthMachine = insertMachine(s, {
+      name: 'mac-mini-no-login',
+      capabilities: {
+        mcpServers: [],
+        skills: [],
+        antigravityOAuthProfile: true,
+        antigravity: { installed: true, authenticated: false },
+      },
+    });
+    expect(antigravityUsable(s.db, s.team.id)).toBe(true);
+
+    const projectId = await postProject(s.app, 'ag-portable');
+    const todo = (await (
+      await req(s.app, 'POST', `/api/projects/${projectId}/todos`, {
+        title: 'Portable Task',
+        spec: 'Run on mini without host login',
+      })
+    ).json()) as { id: string };
+    s.db
+      .insert(buildTable)
+      .values({
+        id: 'b-port',
+        todoId: todo.id,
+        withPlan: false,
+        planDocId: null,
+        triggerSource: 'user',
+        createdAt: 1,
+      })
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({ id: 's-port', buildId: 'b-port', kind: 'build', status: 'pending', createdAt: 2 })
+      .run();
+
+    seedRoute(s, 'session', {
+      provider: 'antigravity',
+      modelId: 'gemini-4-carbon',
+      machineId: unauthMachine,
+    });
+    const workerClaim = await claim(s, unauthMachine);
+    expect(workerClaim?.agent).toMatchObject({
+      provider: 'antigravity',
+      modelId: 'gemini-4-carbon',
+    });
+    expect(
+      s.db.select().from(stepTable).where(eq(stepTable.id, 's-port')).get()
+        ?.antigravitySubscriptionId,
+    ).toBe(subId);
+
+    const workerToken = await stepToken(
+      { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
+      unauthMachine,
+      's-port',
+    );
+    expect(workerToken.antigravityToken).toBeDefined();
+    expect(JSON.parse(workerToken.antigravityToken ?? '')).toMatchObject({
+      kind: 'oauth-personal',
+      refreshToken,
+      authMethod: 'consumer',
+      token: accessToken,
+    });
+
+    s.db
+      .update(stepTable)
+      .set({ status: 'done', finishedAt: 5 })
+      .where(eq(stepTable.id, 's-port'))
+      .run();
+    const afterDoneToken = await stepToken(
+      { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
+      unauthMachine,
+      's-port',
+    );
+    expect(afterDoneToken.antigravityToken).toBeUndefined();
+
+    seedRoute(s, 'coordinator', {
+      provider: 'antigravity',
+      modelId: 'gemini-4-carbon',
+      machineId: unauthMachine,
+    });
+    s.db
+      .insert(chiefTable)
+      .values({ id: 'c-port', userId: s.svc.user.id, teamId: s.team.id, createdAt: 1 })
+      .run();
+    s.db
+      .insert(chiefThreadTable)
+      .values({
+        id: 'chief-port-1',
+        chiefId: 'c-port',
+        userId: s.svc.user.id,
+        teamId: s.team.id,
+        title: 'coord portable',
+        createdAt: 2,
+        updatedAt: 2,
+        sessionId: '',
+        sessionOpenedAt: 2,
+      })
+      .run();
+    s.db
+      .insert(stepTable)
+      .values({
+        id: 'cs-port',
+        buildId: 'chief-port-1',
+        kind: 'chief',
+        status: 'pending',
+        createdAt: 3,
+      })
+      .run();
+
+    const chiefClaim = await claim(s, unauthMachine);
+    expect(chiefClaim?.agent).toMatchObject({ provider: 'antigravity' });
+    const chiefToken = await stepToken(
+      { ...s.svc, box: s.secretBox, attachmentsDir: s.attachmentsDir, reposDir: s.reposDir },
+      unauthMachine,
+      'cs-port',
+    );
+    expect(chiefToken.antigravityToken).toBeDefined();
+    expect(JSON.parse(chiefToken.antigravityToken ?? '')).toMatchObject({
+      kind: 'oauth-personal',
+      refreshToken,
+      authMethod: 'consumer',
+      token: accessToken,
+    });
   });
 });

@@ -1,4 +1,12 @@
-import { chmodSync, existsSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import type { ClaimedStep, SessionOpts, StepEvent } from '@cairn/shared';
 import { ANTIGRAVITY_ACP_ARGS } from '@cairn/shared/antigravity-install';
@@ -419,5 +427,128 @@ describe('antigravity ACP runtime and credentials', () => {
         }),
       ).toBeNull();
     }
+  });
+
+  test('step-env materializes disposable 0600 refresh-token OAuth profile with persistent session symlinks and deletes token on cleanup', () => {
+    const cairnHome = tempDir('agy-oauth-cairn-');
+    const realHome = tempDir('agy-oauth-real-');
+    mkdirSync(join(realHome, '.gemini', 'antigravity-cli'), { recursive: true });
+    writeFileSync(
+      join(realHome, '.gemini', 'antigravity-cli', 'antigravity-oauth-token'),
+      'host-should-not-be-linked',
+    );
+    const refreshToken = `1//0gDaemonPortable_${'d'.repeat(32)}`;
+    const serialized = JSON.stringify({
+      kind: 'oauth-personal',
+      refreshToken,
+      authMethod: 'consumer',
+    });
+    const creds = pushCredential(
+      {
+        provider: null,
+        antigravityToken: serialized,
+        secrets: {},
+        git: null,
+      } as never,
+      null,
+    );
+    expect(creds.antigravityToken).toBe(serialized);
+
+    const cleanups: (() => void | Promise<void>)[] = [];
+    const prepared = prepareStepEnv(
+      {
+        inherited: { GEMINI_API_KEY: 'stale-key', AGY_CLI_FORCE_FILE_TOKEN_STORAGE: '0' },
+        git: null,
+        appCredential: null,
+        readonlyGit: false,
+        runtimeId: 'antigravity',
+        agentConfig: { cairnHome, realHome },
+        claudeSubscriptionToken: undefined,
+        antigravityToken: creds.antigravityToken,
+      },
+      cleanups,
+    );
+    expect('error' in prepared).toBe(false);
+    if ('error' in prepared) return;
+
+    const stepHome = prepared.env.HOME ?? '';
+    expect(prepared.env.GEMINI_API_KEY).toBeUndefined();
+    expect(prepared.env.AGY_CLI_FORCE_FILE_TOKEN_STORAGE).toBe('1');
+    expect(prepared.env.CAIRN_ANTIGRAVITY_AUTH_MODE).toBe('oauth-personal');
+    expect(stepHome.includes('credential-profiles')).toBe(true);
+
+    const tokenPath = join(stepHome, '.gemini', 'antigravity-acp', 'antigravity-oauth-token');
+    expect(statSync(tokenPath).mode & 0o777).toBe(0o600);
+    const tokenJson = JSON.parse(readFileSync(tokenPath, 'utf8')) as {
+      token: { refresh_token: string; access_token: string };
+      auth_method: string;
+      id_token_email?: unknown;
+    };
+    expect(tokenJson.token.refresh_token).toBe(refreshToken);
+    expect(tokenJson.token.access_token).toBe('');
+    expect(tokenJson.auth_method).toBe('consumer');
+    expect(tokenJson.id_token_email).toBeUndefined();
+
+    const convLink = join(stepHome, '.gemini', 'antigravity-acp', 'conversations');
+    expect(lstatSync(convLink).isSymbolicLink()).toBe(true);
+    const sharedConvDir = join(
+      cairnHome,
+      'homes',
+      'antigravity-oauth',
+      '.gemini',
+      'antigravity-acp',
+      'conversations',
+    );
+    writeFileSync(join(convLink, 'sess-1.pb'), 'trajectory');
+    expect(existsSync(join(sharedConvDir, 'sess-1.pb'))).toBe(true);
+    expect(existsSync(join(stepHome, 'Library', 'Keychains'))).toBe(false);
+
+    clearCredentials(creds);
+    expect(creds.antigravityToken).toBeUndefined();
+    for (const fn of [...cleanups].reverse()) void fn();
+    expect(existsSync(tokenPath)).toBe(false);
+    expect(existsSync(stepHome)).toBe(false);
+    expect(existsSync(join(sharedConvDir, 'sess-1.pb'))).toBe(true);
+  });
+
+  test('fails fast when Antigravity falls back to interactive browser auth on stderr without leaking the OAuth URL', async () => {
+    const dir = tempDir('ag-interactive-fallback-');
+    const agent = join(dir, 'agy-interactive.sh');
+    writeFileSync(
+      agent,
+      shellNodeScript(
+        [
+          "import { createInterface } from 'node:readline';",
+          'const send = (obj) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...obj }) + "\\n");',
+          'for await (const line of createInterface({ input: process.stdin })) {',
+          '  const msg = JSON.parse(line);',
+          '  if (msg.method === "initialize") {',
+          '    send({ id: msg.id, result: { protocolVersion: msg.params.protocolVersion, agentCapabilities: {} } });',
+          '  } else if (msg.method === "session/new") {',
+          '    process.stderr.write("Open the following link to authenticate the ACP server: https://accounts.google.com/o/oauth2/auth?state=secret-state\\n");',
+          '  }',
+          '}',
+        ].join('\n'),
+      ),
+    );
+    chmodSync(agent, 0o755);
+
+    const backend = createAcpBackend({
+      harness: 'antigravity',
+      command: agent,
+      permissions: 'allow-once',
+      allowHostMcp: true,
+    });
+    const err = await backend
+      .createSession({
+        cwd: dir,
+        provider: { kind: 'api_key', providerId: 'antigravity' },
+        modelId: 'gemini-4-carbon',
+        prompt: 'hi',
+      })
+      .catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toContain('Antigravity OAuth login expired or revoked');
+    expect((err as Error).message).not.toContain('secret-state');
   });
 });

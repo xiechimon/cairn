@@ -243,3 +243,142 @@ test.each(['missing', 'expired', 'malformed'] as const)(
     expect(fetch).not.toHaveBeenCalled();
   },
 );
+
+function mockServerRefreshProbe(mintedAccessToken: string) {
+  vi.mocked(spawn).mockImplementationOnce((_cmd, _args, options) => {
+    const cwd = String((options as { cwd?: string } | undefined)?.cwd ?? '');
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const stderr = new PassThrough();
+    const child = Object.assign(new EventEmitter(), {
+      stdin,
+      stdout,
+      stderr,
+      kill: vi.fn(() => {
+        queueMicrotask(() => child.emit('close', 0, null));
+        return true;
+      }),
+    });
+    let buf = '';
+    stdin.on('data', (chunk: Buffer) => {
+      buf += chunk.toString('utf8');
+      for (const line of buf.split('\n')) {
+        if (line.trim() === '') continue;
+        try {
+          const msg = JSON.parse(line) as { id?: number; method?: string };
+          if (msg.method === 'initialize') {
+            stdout.write(`${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: {} })}\n`);
+          } else if (msg.method === 'session/new') {
+            const tokenPath = join(cwd, '.gemini', 'antigravity-acp', 'antigravity-oauth-token');
+            const current = JSON.parse(readFileSync(tokenPath, 'utf8')) as {
+              token: Record<string, unknown>;
+              auth_method?: string;
+            };
+            current.token.access_token = mintedAccessToken;
+            current.token.expiry = new Date(Date.now() + 3_600_000).toISOString();
+            writeFileSync(tokenPath, JSON.stringify(current));
+            stdout.write(
+              `${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result: { sessionId: 'ok' } })}\n`,
+            );
+          }
+        } catch {}
+      }
+      buf = '';
+    });
+    return child as unknown as ReturnType<typeof spawn>;
+  });
+}
+
+test('desktop sign-in captures durable 1// refresh token with AGY_CLI_FORCE_FILE_TOKEN_STORAGE=1 and local import supports acp_token.json', async () => {
+  const s = offlineServer();
+  const refreshToken = `1//0gDesktopDurable_${'r'.repeat(32)}`;
+  const accessToken = tokenFor('d');
+  const expiresAt = Date.now() + 3_600_000;
+  const child = mockLogin();
+  mockServerRefreshProbe(accessToken);
+  const pending = actions.loginAntigravity(
+    { teamId: s.team.id, label: 'Durable Google' },
+    () => {},
+    new AbortController().signal,
+  );
+  const spawnCall = vi.mocked(spawn).mock.calls.at(-1);
+  const options = spawnCall?.[2] as { cwd: string; env?: Record<string, string> } | undefined;
+  if (options === undefined) throw new Error('Expected login spawn');
+  expect(options.env?.AGY_CLI_FORCE_FILE_TOKEN_STORAGE).toBe('1');
+  const dir = join(options.cwd, '.gemini', 'antigravity-acp');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'antigravity-oauth-token'),
+    JSON.stringify({
+      token: {
+        access_token: accessToken,
+        expiry: new Date(expiresAt).toISOString(),
+        refresh_token: refreshToken,
+      },
+      auth_method: 'consumer',
+    }),
+  );
+  child.stdout.write('{"id":1,"result":{"authMethods":[{"id":"oauth-personal"}]}}\n');
+  child.stdout.write('{"id":2,"result":{}}\n');
+  const outcome = await pending;
+  expect(outcome).toEqual({
+    ok: true,
+    subscription: { id: expect.any(String), label: 'Durable Google' },
+  });
+  if (!outcome.ok) return;
+  const row = s.db
+    .select()
+    .from(antigravitySubscription)
+    .all()
+    .find((entry) => entry.id === outcome.subscription.id);
+  expect(row?.expiresAt).toBeNull();
+  expect(row?.tokenCipher).not.toContain(refreshToken);
+  expect(
+    JSON.parse(
+      openAntigravitySubscription(
+        { db: s.db, box: s.secretBox },
+        s.team.id,
+        'antigravity',
+        outcome.subscription.id,
+      ) ?? '{}',
+    ),
+  ).toMatchObject({
+    kind: 'oauth-personal',
+    refreshToken,
+    authMethod: 'consumer',
+    token: accessToken,
+  });
+
+  const legacyRefresh = `1//0gLegacyAcpImport_${'l'.repeat(32)}`;
+  const legacyAccess = tokenFor('e');
+  mockServerRefreshProbe(legacyAccess);
+  mkdirSync(join(home, '.gemini', 'antigravity-acp'), { recursive: true });
+  writeFileSync(
+    join(home, '.gemini', 'antigravity-acp', 'acp_token.json'),
+    JSON.stringify({ refresh_token: legacyRefresh }),
+  );
+  const imported = await actions.importAntigravity({
+    teamId: s.team.id,
+    label: 'Legacy Imported',
+  });
+  expect(imported).toEqual({
+    ok: true,
+    subscription: { id: expect.any(String), label: 'Legacy Imported' },
+  });
+  if (!imported.ok) return;
+  expect(
+    JSON.parse(
+      openAntigravitySubscription(
+        { db: s.db, box: s.secretBox },
+        s.team.id,
+        'antigravity',
+        imported.subscription.id,
+      ) ?? '{}',
+    ),
+  ).toMatchObject({
+    kind: 'oauth-personal',
+    refreshToken: legacyRefresh,
+    authMethod: 'consumer',
+    token: legacyAccess,
+  });
+});

@@ -101,6 +101,8 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
   }
   delete env.GEMINI_API_KEY;
   delete env.CAIRN_ANTIGRAVITY_AUTH_MODE;
+  delete env.AGY_CLI_FORCE_FILE_TOKEN_STORAGE;
+  delete env.AGY_ACP_FORCE_FILE_STORAGE;
   let cleanupProfile: (() => void) | undefined;
   if (input.runtimeId === 'antigravity' && input.antigravityToken?.startsWith('{')) {
     let credential: ReturnType<typeof antigravityOAuthStepCredentialSchema.parse>;
@@ -112,11 +114,14 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
     for (const key of Object.keys(env)) {
       if (AMBIENT_GOOGLE_AUTH.has(key.toUpperCase())) delete env[key];
     }
-    if (credential.expiresAt <= Date.now())
+    if (
+      credential.refreshToken === undefined &&
+      (credential.expiresAt === undefined || credential.expiresAt <= Date.now())
+    )
       throw new Error('Antigravity OAuth access token expired');
     const profile = createCredentialProfile(input.agentConfig.cairnHome);
     try {
-      writeAntigravityOAuthCredential(profile.home, credential);
+      writeAntigravityOAuthCredential(profile.home, credential, input.agentConfig.cairnHome);
       Object.assign(env, profile.env, antigravityFileStorageEnv(profile.home));
       cleanupProfile = profile.cleanup;
     } catch (error) {

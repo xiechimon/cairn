@@ -1,6 +1,22 @@
 import semver from 'semver';
-import { ANTIGRAVITY_TOKEN_REGEX } from './antigravity-subscription.js';
+import { ANTIGRAVITY_TOKEN_REGEX, type AntigravityOAuth } from './antigravity-subscription.js';
 import type { DesktopSubscriptionMetadata } from './desktop-local-credentials.js';
+
+export function serializeAntigravityOAuthTokenFile(
+  oauth: AntigravityOAuth,
+  fresh?: { token: string; expiresAt: number },
+): string {
+  return `${JSON.stringify({
+    token: {
+      access_token: fresh?.token ?? '',
+      token_type: 'Bearer',
+      refresh_token: oauth.refreshToken,
+      expiry:
+        fresh !== undefined ? new Date(fresh.expiresAt).toISOString() : '2020-01-01T00:00:00Z',
+    },
+    auth_method: oauth.authMethod,
+  })}\n`;
+}
 
 export interface AntigravityLocalStatus {
   installed: boolean;

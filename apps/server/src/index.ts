@@ -3,6 +3,7 @@ import { hostname } from 'node:os';
 import { join, resolve } from 'node:path';
 import { setTimeout as waitTimeout } from 'node:timers/promises';
 import { ENV_VARS } from '@cairn/shared';
+import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
@@ -185,6 +186,11 @@ const githubFetch = refreshingGithubFetch(
   globalThis.fetch,
 );
 const environmentId = loadOrCreateEnvironmentId(environmentIdPathOf(config.dataDir));
+try {
+  reapCredentialProfiles(config.dataDir);
+} catch (error) {
+  logger.warn({ err: String(error) }, 'failed to reap leftover credential profiles');
+}
 const tailscale = createTailscaleServe({
   environmentId,
   listenPort: config.port,

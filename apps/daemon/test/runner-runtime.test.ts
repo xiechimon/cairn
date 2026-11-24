@@ -490,7 +490,7 @@ describe('subscription credential isolation', () => {
     'Antigravity ACP output redacts bare OAuth bearer and %s before upload',
     async (refreshField) => {
       const bearer = 'ya29.fake-step-bearer';
-      const refreshToken = 'fake-step-refresh-token';
+      const refreshToken = '1//fake-step-refresh-token';
       const credential = JSON.stringify({
         kind: 'oauth-personal',
         token: bearer,

@@ -518,6 +518,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   const keysvc = { db: ctx.db, box: ctx.secretBox };
   const antigravitySvc = {
     ...keysvc,
+    dataDir: ctx.dataDir,
     machineHub: ctx.machineHub,
     ...(ctx.antigravityVerifyTimeoutMs !== undefined
       ? { verifyTimeoutMs: ctx.antigravityVerifyTimeoutMs }
@@ -693,8 +694,16 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(createAntigravitySubscriptionSchema, await jsonBody(c), 'body');
+    const agySvc = { ...keysvc, dataDir: ctx.dataDir };
     return c.json(
-      createAntigravitySubscription(keysvc, teamId, await resolveAntigravitySubscription(body)),
+      createAntigravitySubscription(
+        agySvc,
+        teamId,
+        await resolveAntigravitySubscription(body, {
+          dataDir: ctx.dataDir,
+          signal: c.req.raw.signal,
+        }),
+      ),
       201,
     );
   });
@@ -723,7 +732,13 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireOwnerSession(c);
     const credential = parseWith(antigravityOAuthStepCredentialSchema, await jsonBody(c), 'body');
     return c.json(
-      await attachAntigravityOAuthCredential(keysvc, teamId, c.req.param('cid'), credential),
+      await attachAntigravityOAuthCredential(
+        { ...keysvc, dataDir: ctx.dataDir },
+        teamId,
+        c.req.param('cid'),
+        credential,
+        c.req.raw.signal,
+      ),
     );
   });
 
@@ -758,6 +773,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(
       await verifyAntigravitySubscriptionConnection(antigravitySvc, teamId, c.req.param('cid'), {
         signal: c.req.raw.signal,
+        ownerInitiated: isOwnerSession(c),
       }),
     );
   });
@@ -769,6 +785,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
       await antigravitySubscriptionUpstreamModels(
         {
           ...keysvc,
+          dataDir: ctx.dataDir,
           machineHub: ctx.machineHub,
           ownerInitiated: isOwnerSession(c),
           apiKeyProbeRunnerGrant: (machineId) => apiKeyProbeRunnerGrant(ctx.db, teamId, machineId),

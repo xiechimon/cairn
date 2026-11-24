@@ -3,15 +3,18 @@ import { accessSync, constants, mkdtempSync, readFileSync, rmSync, statSync } fr
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  ANTIGRAVITY_REFRESH_TOKEN_REGEX,
   type AntigravityLocalStatus,
   type AntigravityLoginOutcome,
   type AntigravityLoginPhase,
+  type AntigravityOAuthAuthMethod,
   type AntigravityOAuthStepCredential,
   antigravityCliDir,
   antigravityKeyFromText,
   antigravityOAuthStepCredentialSchema,
   compareVersions,
   type DesktopSubscriptionMetadata,
+  isAntigravityOAuthAccessToken,
 } from '@cairn/shared';
 import {
   ANTIGRAVITY_ACP_ARGS,
@@ -45,7 +48,12 @@ interface InitializeMessage {
   error?: unknown;
 }
 
-type AntigravityImportCredential = { token: string; expiresAt?: number };
+type AntigravityImportCredential = {
+  token?: string;
+  expiresAt?: number;
+  refreshToken?: string;
+  authMethod?: AntigravityOAuthAuthMethod;
+};
 
 function managedToolsRoot(): string {
   return `${homedir()}/.cairn/tools/antigravity`;
@@ -188,14 +196,32 @@ function oauthPath(home: string): string {
 function parseOAuthCredential(text: string | null): AntigravityOAuthStepCredential | null {
   if (text === null) return null;
   try {
-    const raw = JSON.parse(text) as { token?: { access_token?: unknown; expiry?: unknown } };
-    const expiresAt = typeof raw.token?.expiry === 'string' ? Date.parse(raw.token.expiry) : NaN;
+    const raw = JSON.parse(text) as {
+      token?: { access_token?: unknown; expiry?: unknown; refresh_token?: unknown };
+      refresh_token?: unknown;
+      auth_method?: unknown;
+    };
+    const accessToken =
+      typeof raw.token?.access_token === 'string' &&
+      isAntigravityOAuthAccessToken(raw.token.access_token.trim())
+        ? raw.token.access_token.trim()
+        : undefined;
+    const parsedExpiry = typeof raw.token?.expiry === 'string' ? Date.parse(raw.token.expiry) : NaN;
+    const hasFreshAccessToken =
+      accessToken !== undefined && Number.isFinite(parsedExpiry) && parsedExpiry > Date.now();
+    const rawRefresh = raw.token?.refresh_token ?? raw.refresh_token;
+    const refreshToken =
+      typeof rawRefresh === 'string' && ANTIGRAVITY_REFRESH_TOKEN_REGEX.test(rawRefresh.trim())
+        ? rawRefresh.trim()
+        : undefined;
+    const authMethod: AntigravityOAuthAuthMethod =
+      raw.auth_method === 'business' ? 'business' : 'consumer';
     const parsed = antigravityOAuthStepCredentialSchema.safeParse({
       kind: 'oauth-personal',
-      token: raw.token?.access_token,
-      expiresAt,
+      ...(hasFreshAccessToken ? { token: accessToken, expiresAt: parsedExpiry } : {}),
+      ...(refreshToken !== undefined ? { refreshToken, authMethod } : {}),
     });
-    return parsed.success && expiresAt > Date.now() ? parsed.data : null;
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
@@ -203,8 +229,21 @@ function parseOAuthCredential(text: string | null): AntigravityOAuthStepCredenti
 
 export function readLocalAntigravityCredential(): AntigravityImportCredential | null {
   const home = homedir();
-  const credential = parseOAuthCredential(readRegularCredentialFile(oauthPath(home)));
-  if (credential !== null) return { token: credential.token, expiresAt: credential.expiresAt };
+  for (const candidate of [
+    oauthPath(home),
+    join(antigravityCliDir(home), 'antigravity-oauth-token'),
+    join(home, '.gemini', 'antigravity-acp', 'acp_token.json'),
+  ]) {
+    const credential = parseOAuthCredential(readRegularCredentialFile(candidate));
+    if (credential !== null) {
+      return {
+        ...(credential.token !== undefined ? { token: credential.token } : {}),
+        ...(credential.expiresAt !== undefined ? { expiresAt: credential.expiresAt } : {}),
+        ...(credential.refreshToken !== undefined ? { refreshToken: credential.refreshToken } : {}),
+        ...(credential.authMethod !== undefined ? { authMethod: credential.authMethod } : {}),
+      };
+    }
+  }
   if (typeof process.env.GEMINI_API_KEY === 'string') {
     const token = antigravityKeyFromText(process.env.GEMINI_API_KEY);
     if (token !== null) return { token };
@@ -284,6 +323,7 @@ export function antigravityLogin(
         GOOGLE_API_KEY: undefined,
         GOOGLE_APPLICATION_CREDENTIALS: undefined,
         AGY_ACP_FORCE_FILE_STORAGE: '1',
+        AGY_CLI_FORCE_FILE_TOKEN_STORAGE: '1',
         AGY_CLI_DISABLE_AUTO_UPDATE: '1',
       }),
       credentialPath: oauthPath,

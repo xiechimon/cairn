@@ -853,6 +853,86 @@ describe('session confiner', () => {
     expect(launches[0]?.[1]).toBe('-p');
     expect(launches[0]?.at(-1)).toBe('/bin/true');
   });
+
+  test('supplies /etc/ssl/cert.pem via SSL_CERT_FILE and shared OAuth state for Seatbelt-confined non-host Antigravity sessions', async () => {
+    const { confine, worktree, runnerHome } = fixture();
+    const portableHome = join(runnerHome, 'credential-profiles', 'profile-1-abc123', 'home');
+    const sharedOAuthHome = join(runnerHome, 'homes', 'antigravity-oauth');
+    const sharedConversations = join(
+      sharedOAuthHome,
+      '.gemini',
+      'antigravity-acp',
+      'conversations',
+    );
+    const sharedBrain = join(sharedOAuthHome, '.gemini', 'antigravity-acp', 'brain');
+    const hostHome = join(runnerHome, 'homes', 'antigravity');
+    mkdirSync(portableHome, { recursive: true });
+    mkdirSync(sharedConversations, { recursive: true });
+    mkdirSync(sharedBrain, { recursive: true });
+    mkdirSync(hostHome, { recursive: true });
+
+    const prevCert = process.env.SSL_CERT_FILE;
+    delete process.env.SSL_CERT_FILE;
+    try {
+      const captureEnv = async (env: Record<string, string>) => {
+        let captured: NodeJS.ProcessEnv | undefined;
+        let profile = '';
+        const backend = createAcpBackend({
+          harness: 'antigravity',
+          command: '/bin/true',
+          confine,
+          spawnProcess: (_command, args, options) => {
+            profile = args[1] ?? '';
+            captured = options.env;
+            throw new Error('stop after recording');
+          },
+        });
+        await expect(
+          backend.createSession({
+            provider: { kind: 'api_key', providerId: 'antigravity' },
+            modelId: 'gemini-4-carbon',
+            cwd: worktree,
+            env,
+          }),
+        ).rejects.toThrow('stop after recording');
+        return { env: captured ?? {}, profile };
+      };
+
+      const portable = await captureEnv({
+        HOME: portableHome,
+        CAIRN_ANTIGRAVITY_AUTH_MODE: 'oauth-personal',
+        AGY_CLI_FORCE_FILE_TOKEN_STORAGE: '1',
+      });
+      expect(portable.env.SSL_CERT_FILE).toBe('/etc/ssl/cert.pem');
+      expect(portable.profile).toContain('global-name-prefix "com.apple.trustd"');
+      expect(portable.profile).toContain('global-name-prefix "com.apple.secd"');
+      expect(portable.profile).toContain(`(subpath "${realpathSync(sharedConversations)}")`);
+      expect(portable.profile).toContain(`(subpath "${realpathSync(sharedBrain)}")`);
+      expect(portable.profile).not.toContain(`(subpath "${realpathSync(sharedOAuthHome)}")`);
+
+      const keyed = await captureEnv({
+        HOME: hostHome,
+        CAIRN_ANTIGRAVITY_AUTH_MODE: 'gemini-api-key',
+        GEMINI_API_KEY: 'AIza-step',
+      });
+      expect(keyed.env.SSL_CERT_FILE).toBe('/etc/ssl/cert.pem');
+
+      const custom = await captureEnv({
+        HOME: portableHome,
+        CAIRN_ANTIGRAVITY_AUTH_MODE: 'oauth-personal',
+        SSL_CERT_FILE: '/custom/ca.pem',
+      });
+      expect(custom.env.SSL_CERT_FILE).toBe('/custom/ca.pem');
+
+      const host = await captureEnv({
+        HOME: hostHome,
+        CAIRN_ANTIGRAVITY_AUTH_MODE: 'host',
+      });
+      expect(host.env.SSL_CERT_FILE).toBeUndefined();
+    } finally {
+      if (prevCert !== undefined) process.env.SSL_CERT_FILE = prevCert;
+    }
+  });
 });
 
 describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () => {
@@ -1391,6 +1471,55 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     const keyed = profileFor('antigravity', { GEMINI_API_KEY: 'AIza-step' });
     expect(keyed).toContain('global-name-prefix "com.apple.secd"');
   });
+
+  test.runIf(process.platform === 'darwin')(
+    'confined portable Antigravity can read /etc/ssl/cert.pem and write pinned conversations/brain while Keychains, trustd, and parent OAuth dirs stay denied',
+    () => {
+      const { confine, worktree, runnerHome } = fixture();
+      const portableHome = join(runnerHome, 'credential-profiles', 'profile-2-def456', 'home');
+      const sharedAcpDir = join(
+        runnerHome,
+        'homes',
+        'antigravity-oauth',
+        '.gemini',
+        'antigravity-acp',
+      );
+      const sharedConversations = join(sharedAcpDir, 'conversations');
+      const sharedBrain = join(sharedAcpDir, 'brain');
+      mkdirSync(portableHome, { recursive: true });
+      mkdirSync(sharedConversations, { recursive: true });
+      mkdirSync(sharedBrain, { recursive: true });
+      const oauthEnv = {
+        HOME: portableHome,
+        CAIRN_ANTIGRAVITY_AUTH_MODE: 'oauth-personal',
+        AGY_CLI_FORCE_FILE_TOKEN_STORAGE: '1',
+      };
+      const launch = confine({ cwd: worktree, env: oauthEnv }, 'antigravity', {
+        command: '/bin/sh',
+        args: [
+          '-c',
+          `grep -m1 "BEGIN CERTIFICATE" /etc/ssl/cert.pem && echo ok > '${join(sharedConversations, 'sess.pb')}'`,
+        ],
+      });
+      expect(launch.args[1]).toContain('global-name-prefix "com.apple.trustd"');
+      expect(launch.args[1]).toContain('global-name-prefix "com.apple.secd"');
+      expect(execFileSync(launch.command, launch.args, { encoding: 'utf8' })).toContain(
+        'BEGIN CERTIFICATE',
+      );
+      const siblingDrop = confine({ cwd: worktree, env: oauthEnv }, 'antigravity', {
+        command: '/bin/sh',
+        args: ['-c', `echo rogue > '${join(sharedAcpDir, 'antigravity-oauth-token')}'`],
+      });
+      expect(() =>
+        execFileSync(siblingDrop.command, siblingDrop.args, { stdio: 'pipe' }),
+      ).toThrow();
+      const unlinkLeaf = confine({ cwd: worktree, env: oauthEnv }, 'antigravity', {
+        command: '/bin/sh',
+        args: ['-c', `mv '${sharedConversations}' '${join(sharedAcpDir, 'moved')}'`],
+      });
+      expect(() => execFileSync(unlinkLeaf.command, unlinkLeaf.args, { stdio: 'pipe' })).toThrow();
+    },
+  );
 
   test.runIf(process.platform === 'darwin')(
     'a confined session cannot submit launchd jobs or exec escape binaries',

@@ -16,6 +16,8 @@ test.each([
   `sk-${'a'.repeat(32)}`,
   `github_pat_${'a'.repeat(40)}`,
   `v1:${'a'.repeat(40)}`,
+  `ya29.${'a'.repeat(48)}`,
+  `1//0g${'a'.repeat(48)}`,
   'Bearer abc.def-ghi_123',
 ])('recognizes credential family %s', (token) => {
   expect(redactSecrets(`before ${token} after`)).toEqual({
@@ -102,6 +104,8 @@ test.each([
   ['sk-', 'sk-'],
   ['Bearer', 'Bearer '],
   ['v1:', 'v1:'],
+  ['ya29.', 'ya29.'],
+  ['1//', '1//'],
 ])('repeated %s prefixes redact in linear time', (_name, unit) => {
   const text = unit.repeat(16384);
   const started = performance.now();
