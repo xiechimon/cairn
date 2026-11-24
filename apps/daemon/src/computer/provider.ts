@@ -1,5 +1,3 @@
-import type { ComputerManageAction, ComputerManageOutcome } from '@cairn/shared';
-
 export type ComputerProcessEvent =
   | { kind: 'stdout' | 'stderr'; text: string }
   | { kind: 'exit'; code: number; reason?: 'timeout' | 'aborted'; delivery?: 'not_delivered' };
@@ -44,24 +42,8 @@ export interface ComputerProvider {
   killAll(): Promise<void>;
 }
 
-export interface ComputerScopeGrant {
-  browserLicense?: string;
-}
-
-export interface ComputerPackageInstallOptions {
-  timeoutMs: number;
-  signal: AbortSignal;
-  output: (stream: 'stdout' | 'stderr', text: string) => void;
-}
-
 export interface ScopedComputerProviders {
   readonly hostRoot?: string;
-  forScope(scopeKey: string, grant?: ComputerScopeGrant): ComputerProvider;
+  forScope(scopeKey: string): ComputerProvider;
   killAll(): Promise<void>;
-  installPackages?(
-    scopeKey: string,
-    packages: readonly string[],
-    options: ComputerPackageInstallOptions,
-  ): Promise<number>;
-  manage?(scopeKey: string, action: ComputerManageAction): Promise<ComputerManageOutcome>;
 }

@@ -1,7 +1,7 @@
 import type { ComputerPresenceSource } from './presence.js';
 import type { ScopedComputerProviders } from './provider.js';
 
-export type ComputerKind = 'host' | 'vm';
+export type ComputerKind = 'host';
 export type ComputerHoldUse = 'view' | 'control' | 'handoff';
 
 export interface ComputerDesktops extends ScopedComputerProviders, ComputerPresenceSource {

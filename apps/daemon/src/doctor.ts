@@ -139,19 +139,6 @@ function darwinChecks(env: DoctorEnv): Check[] {
     { id: 'macos', label: 'macOS host', status: 'pass' },
     nodeCheck(env),
     notRootCheck(env),
-    env.which('container')
-      ? {
-          id: 'vm-runtime',
-          label: 'Computer VM runtime (container)',
-          status: 'pass',
-          detail: 'Apple container CLI found',
-        }
-      : {
-          id: 'vm-runtime',
-          label: 'Computer VM runtime (container)',
-          status: 'info',
-          detail: 'not installed; optional — enables the Linux VM Computer feature',
-        },
     diskCheck(env),
     {
       id: 'versions',

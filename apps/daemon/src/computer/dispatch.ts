@@ -4,13 +4,9 @@ import {
   COMPUTER_REPLAY_SAFE_TOOLS,
   type ComputerCall,
   type ComputerTool,
-  computerManageParamsSchema,
-  INSTALL_PACKAGES_TIMEOUT_MS,
-  installPackagesParamsSchema,
   isPhoneTool,
   OWN_COMPUTER_TOOL_NAMES,
   ownComputerHardlineRefusal,
-  PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { z } from 'zod';
 import type { HostShellConfinement } from '../backend/host-shell-confinement.js';
@@ -51,12 +47,8 @@ export const NO_COMPUTER_PROVIDER_MESSAGE = 'This machine has no computer provid
 export const NO_COMPUTER_SCOPE_MESSAGE = 'The call names no computer';
 export const NO_COMPUTER_GRANT_MESSAGE =
   'The server did not stamp a computer grant on this call, so it was not run; update the Cairn server';
-export const NO_VM_COMPUTER_MESSAGE =
-  'Only the Coordinator VM computer can install system packages or be stopped, updated, recovered or reset';
 export const NO_PHONE_STAMP_MESSAGE =
   'The server did not stamp a consented phone on this call, so it was not run';
-const INSTALL_SUMMARY_LINES = 12;
-const INSTALL_TAIL_CHARS = 16 * 1024;
 export const FILE_TRUNCATED_MARKER = '\n[file truncated]';
 export const BROWSER_TRUNCATED_MARKER = '\n[browser output truncated]';
 export const COMPUTER_FRAME_ERROR_MAX_CHARS = 4096;
@@ -151,12 +143,8 @@ export interface ComputerDispatcher {
 
 function orbGrantNeeded(call: ComputerCall): 'browser' | 'desktop' | null {
   if (BROWSER_TOOLS.has(call.tool)) return 'browser';
-  if (call.tool === 'install_packages' || ORB_TOOLS.has(call.tool)) return 'desktop';
+  if (ORB_TOOLS.has(call.tool)) return 'desktop';
   return null;
-}
-
-function lastLines(text: string, count: number): string {
-  return text.trimEnd().split('\n').slice(-count).join('\n');
 }
 
 function listingText(entries: ComputerFileEntry[]): string {
@@ -241,10 +229,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return NO_COMPUTER_PROVIDER_MESSAGE;
     if (!call.scopeKey) return NO_COMPUTER_SCOPE_MESSAGE;
     return {
-      provider: options.orb.forScope(
-        call.scopeKey,
-        call.browserLicense === undefined ? {} : { browserLicense: call.browserLicense },
-      ),
+      provider: options.orb.forScope(call.scopeKey),
     };
   }
 
@@ -601,88 +586,6 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
   }
 
-  async function handleInstall(call: ComputerCall, controller: AbortController): Promise<void> {
-    const orb = options.orb;
-    if (!orb?.installPackages || !call.scopeKey) {
-      await refuse(call, NO_VM_COMPUTER_MESSAGE);
-      return;
-    }
-    const params = installPackagesParamsSchema.safeParse(call.params);
-    if (!params.success) {
-      await refuse(
-        call,
-        `install_packages refused: ${params.error.issues[0]?.message ?? 'invalid packages'}`,
-      );
-      return;
-    }
-    if (call.deadlineAt - now() <= FINAL_FRAME_MARGIN_MS) {
-      await refuse(call, 'Too little time was left before the call deadline, so nothing ran');
-      return;
-    }
-    const poster = posterFor(call, controller);
-    let tail = '';
-    let code: number;
-    try {
-      code = await orb.installPackages(call.scopeKey, params.data.packages, {
-        timeoutMs: Math.min(
-          INSTALL_PACKAGES_TIMEOUT_MS,
-          call.deadlineAt - now() - FINAL_FRAME_MARGIN_MS,
-        ),
-        signal: controller.signal,
-        output: (stream, text) => {
-          poster.output(stream, text);
-          tail = (tail + text).slice(-INSTALL_TAIL_CHARS);
-        },
-      });
-    } catch (error) {
-      await poster.finish(
-        error instanceof ComputerRefusal
-          ? { kind: 'error', message: error.message, delivery: error.delivery }
-          : { kind: 'error', message: 'The package install failed', delivery: 'unknown' },
-      );
-      return;
-    }
-    if (poster.abandoned) return;
-    const summary = lastLines(tail, INSTALL_SUMMARY_LINES);
-    await poster.finish(
-      code === 0
-        ? {
-            kind: 'done',
-            text: `${PACKAGES_INSTALLED_PREFIX} ${params.data.packages.join(' ')}.\n${summary}`,
-            exitCode: 0,
-          }
-        : {
-            kind: 'error',
-            message: boundBrowserError(`apt-get exited with ${code}:\n${summary}`),
-            delivery: 'unknown',
-          },
-    );
-  }
-
-  async function handleManage(call: ComputerCall, controller: AbortController): Promise<void> {
-    const orb = options.orb;
-    if (!orb?.manage || !call.scopeKey) {
-      await refuse(call, NO_VM_COMPUTER_MESSAGE);
-      return;
-    }
-    const params = computerManageParamsSchema.safeParse(call.params);
-    if (!params.success) {
-      await refuse(call, 'The computer action is not one of stop, update, recover or reset');
-      return;
-    }
-    const poster = posterFor(call, controller);
-    try {
-      const outcome = await orb.manage(call.scopeKey, params.data.action);
-      await poster.finish({ kind: 'done', text: outcome });
-    } catch (error) {
-      await poster.finish(
-        error instanceof ComputerRefusal
-          ? { kind: 'error', message: error.message, delivery: error.delivery }
-          : { kind: 'error', message: 'The computer action failed', delivery: 'unknown' },
-      );
-    }
-  }
-
   async function handlePhoneManage(call: ComputerCall, controller: AbortController): Promise<void> {
     const phones = options.phones;
     if (phones === undefined) {
@@ -856,14 +759,6 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
     if (isPhoneTool(call.tool)) {
       await refuse(call, 'The phone tool is not a known phone tool');
-      return;
-    }
-    if (call.tool === 'install_packages') {
-      await handleInstall(call, controller);
-      return;
-    }
-    if (call.tool === 'computer_manage') {
-      await handleManage(call, controller);
       return;
     }
     if (call.tool === 'user_computer_observe' || call.tool === 'user_computer_act') {

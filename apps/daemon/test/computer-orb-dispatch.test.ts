@@ -4,7 +4,6 @@ import {
   type ComputerTool,
   isComputerBrowserTool,
   type MachineComputerFramesBody,
-  PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { AUTO_STEALTH_NOTE } from '../src/computer/browser.js';
@@ -13,14 +12,14 @@ import {
   NO_COMPUTER_GRANT_MESSAGE,
   NO_COMPUTER_PROVIDER_MESSAGE,
   NO_COMPUTER_SCOPE_MESSAGE,
-  NO_VM_COMPUTER_MESSAGE,
 } from '../src/computer/dispatch.js';
 import {
   type ComputerProvider,
   ComputerRefusal,
   type ScopedComputerProviders,
 } from '../src/computer/provider.js';
-import { NO_CLOAK_LICENSE } from '../src/computer/vm-desktop.js';
+
+const NO_CLOAK_LICENSE = 'CloakBrowser license required';
 
 const FAST = { flushMs: 20, heartbeatMs: 5_000, retryBaseMs: 5, retryMaxMs: 20, cairnOrigins: [] };
 
@@ -125,7 +124,6 @@ describe('orb routing', () => {
     ['desktop_snapshot', {}, 'desktop'],
     ['browser_navigate', { url: 'https://example.com' }, 'browser'],
     ['browser_snapshot', {}, 'browser'],
-    ['install_packages', { packages: ['ffmpeg'] }, 'desktop'],
   ] as const)(
     'an unstamped %s call is refused and never reaches a provider',
     async (tool, params, grant) => {
@@ -133,13 +131,7 @@ describe('orb routing', () => {
       const fake = fakeClient();
       const dispatcher = createComputerDispatcher({
         client: fake.client,
-        orb: {
-          ...fakeOrb(log),
-          async installPackages() {
-            log.push('install:ran');
-            return 0;
-          },
-        },
+        orb: fakeOrb(log),
         ...FAST,
       });
       await dispatcher.dispatch(
@@ -161,24 +153,23 @@ describe('orb routing', () => {
     },
   );
 
-  test('computer_manage and browser_close_tab run without a grant stamp', async () => {
+  test('browser_close_tab runs without a grant stamp', async () => {
     const log: string[] = [];
     const fake = fakeClient();
     const dispatcher = createComputerDispatcher({
       client: fake.client,
-      orb: {
-        ...fakeOrb(log),
-        async manage(scopeKey, action) {
-          log.push(`manage[${scopeKey}]:${action}`);
-          return 'stopped' as const;
-        },
-      },
+      orb: fakeOrb(log),
       ...FAST,
     });
     await dispatcher.dispatch(
-      call('computer_manage', { action: 'stop' }, { scopeKey: 'chief:c1' }),
+      call(
+        'browser_close_tab',
+        {},
+        { scopeKey: 'chief:c1', tabScope: 'tab-1', computerGrant: undefined },
+      ),
     );
-    expect(log).toEqual(['manage[chief:c1]:stop']);
+    expect(errorOf(fake.frames)).toBeUndefined();
+    expect(fake.frames.some((frame) => frame.kind === 'done')).toBe(true);
   });
 
   test('an Orb tool without a scope is refused and never reaches a provider', async () => {
@@ -473,121 +464,5 @@ describe('call id replay', () => {
     });
     await dispatcher.close();
     expect(log).toContain('orb:killAll');
-  });
-
-  test('install_packages runs on the VM computer, streams apt output and names what it installed', async () => {
-    const log: string[] = [];
-    const fake = fakeClient();
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      orb: {
-        ...fakeOrb(log),
-        async installPackages(scopeKey, packages, options) {
-          log.push(`install[${scopeKey}]:${packages.join(',')}`);
-          options.output('stdout', 'Setting up ffmpeg (7:5.1.9) ...\n');
-          return 0;
-        },
-      },
-      ...FAST,
-    });
-    await dispatcher.dispatch(
-      call('install_packages', { packages: ['ffmpeg'] }, { scopeKey: 'chief:c1' }),
-    );
-    expect(log).toEqual(['install[chief:c1]:ffmpeg']);
-    expect(fake.frames.some((frame) => frame.kind === 'output')).toBe(true);
-    const done = fake.frames.find((frame) => frame.kind === 'done');
-    expect(done).toMatchObject({ exitCode: 0 });
-    expect(done && 'text' in done && done.text).toContain(`${PACKAGES_INSTALLED_PREFIX} ffmpeg`);
-    expect(done && 'text' in done && done.text).toContain('Setting up ffmpeg');
-  });
-
-  test('a failed apt run comes back as an error with its last lines', async () => {
-    const fake = fakeClient();
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      orb: {
-        ...fakeOrb([]),
-        async installPackages(_scopeKey, _packages, options) {
-          options.output('stderr', 'E: Unable to locate package nosuch\n');
-          return 100;
-        },
-      },
-      ...FAST,
-    });
-    await dispatcher.dispatch(
-      call('install_packages', { packages: ['nosuch'] }, { scopeKey: 'chief:c1' }),
-    );
-    expect(errorOf(fake.frames)?.message).toContain('apt-get exited with 100');
-    expect(errorOf(fake.frames)?.message).toContain('Unable to locate package nosuch');
-  });
-
-  test.each([
-    ['a path', { packages: ['/tmp/x.deb'] }],
-    ['an option', { packages: ['--allow-unauthenticated'] }],
-    ['no package', { packages: [] }],
-    ['an extra parameter', { packages: ['ffmpeg'], flags: '-y' }],
-  ])('install_packages with %s is refused and never reaches the computer', async (_l, params) => {
-    const log: string[] = [];
-    const fake = fakeClient();
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      orb: {
-        ...fakeOrb(log),
-        async installPackages() {
-          log.push('install');
-          return 0;
-        },
-      },
-      ...FAST,
-    });
-    await dispatcher.dispatch(call('install_packages', params, { scopeKey: 'chief:c1' }));
-    expect(errorOf(fake.frames)?.delivery).toBe('not_delivered');
-    expect(log).toEqual([]);
-  });
-
-  test('a computer that cannot install or manage refuses both', async () => {
-    const fake = fakeClient();
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      orb: fakeOrb([]),
-      ...FAST,
-    });
-    await dispatcher.dispatch(
-      call('install_packages', { packages: ['ffmpeg'] }, { scopeKey: 'chief:c1' }),
-    );
-    await dispatcher.dispatch(
-      call('computer_manage', { action: 'stop' }, { scopeKey: 'chief:c1' }),
-    );
-    const errors = fake.frames.filter((frame) => frame.kind === 'error');
-    expect(errors).toHaveLength(2);
-    expect(errors.map((frame) => 'message' in frame && frame.message)).toEqual([
-      NO_VM_COMPUTER_MESSAGE,
-      NO_VM_COMPUTER_MESSAGE,
-    ]);
-  });
-
-  test('computer_manage runs the owner action and returns its outcome', async () => {
-    const log: string[] = [];
-    const fake = fakeClient();
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      orb: {
-        ...fakeOrb(log),
-        async manage(scopeKey, action) {
-          log.push(`manage[${scopeKey}]:${action}`);
-          return 'current';
-        },
-      },
-      ...FAST,
-    });
-    await dispatcher.dispatch(
-      call('computer_manage', { action: 'update' }, { scopeKey: 'chief:c1' }),
-    );
-    await dispatcher.dispatch(
-      call('computer_manage', { action: 'wipe' }, { scopeKey: 'chief:c1' }),
-    );
-    expect(log).toEqual(['manage[chief:c1]:update']);
-    expect(fake.frames.find((frame) => frame.kind === 'done')).toMatchObject({ text: 'current' });
-    expect(errorOf(fake.frames)?.delivery).toBe('not_delivered');
   });
 });

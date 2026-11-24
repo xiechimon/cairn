@@ -51,26 +51,19 @@ function check(env: DoctorEnv, id: string) {
 }
 
 describe('runDoctor on macOS', () => {
-  it('reports runner readiness without requiring seatbelt', () => {
-    const result = runDoctor(fakeEnv({ platform: 'darwin', missing: ['sandbox-exec'] }));
+  it('reports runner readiness without requiring seatbelt or a VM runtime', () => {
+    const result = runDoctor(
+      fakeEnv({ platform: 'darwin', missing: ['sandbox-exec', 'container'] }),
+    );
     expect(result.ok).toBe(true);
     expect(check(fakeEnv({ platform: 'darwin' }), 'macos').status).toBe('pass');
     expect(result.checks.map((c) => c.id)).toEqual([
       'macos',
       'node',
       'not-root',
-      'vm-runtime',
       'disk',
       'versions',
     ]);
-  });
-
-  it('reports the VM runtime as optional info when container is absent', () => {
-    const absent = check(fakeEnv({ platform: 'darwin', missing: ['container'] }), 'vm-runtime');
-    expect(absent.status).toBe('info');
-    expect(absent.detail).toContain('optional');
-    expect(runDoctor(fakeEnv({ platform: 'darwin', missing: ['container'] })).ok).toBe(true);
-    expect(check(fakeEnv({ platform: 'darwin' }), 'vm-runtime').status).toBe('pass');
   });
 });
 

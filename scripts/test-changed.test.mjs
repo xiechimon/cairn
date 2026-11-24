@@ -8,7 +8,6 @@ import {
 } from './test-changed.mjs';
 
 const tests = [
-  'apps/daemon/test/computer-vm-desktop.test.ts',
   'apps/daemon/test/computer-host-desktop.test.ts',
   'apps/server/test/machine-computer.test.ts',
   'apps/server/test/coordinator-computer-tool-offers.test.ts',
@@ -26,8 +25,8 @@ test('a changed test file is selected', () => {
 });
 
 test('a changed source file selects same-package tests whose name contains its basename', () => {
-  assert.deepEqual(selectTests(['apps/daemon/src/computer/vm-desktop.ts'], tests), [
-    'apps/daemon/test/computer-vm-desktop.test.ts',
+  assert.deepEqual(selectTests(['apps/daemon/src/computer/host-desktop.ts'], tests), [
+    'apps/daemon/test/computer-host-desktop.test.ts',
   ]);
   assert.deepEqual(selectTests(['apps/server/src/services/machine-computer.ts'], tests), [
     'apps/server/test/machine-computer.test.ts',

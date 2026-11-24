@@ -74,8 +74,6 @@ import type { ComputerProvider, ScopedComputerProviders } from './computer/provi
 import { OutboundComputerScreens } from './computer/screen-channel.js';
 import { createComputerScreenProvider } from './computer/screen-provider.js';
 import { defaultStagingRoot, sweepStagedUploads } from './computer/staging.js';
-import { VmDesktops } from './computer/vm-desktop.js';
-import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
 import { createHostPermissionsProbe, type HostPermissionsProbe } from './host-permissions.js';
 import { importAgentConfig } from './import-agent-config.js';
@@ -384,7 +382,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const enrolledIdentity = { machineId: '' };
   const computerInputLocks = join(paths.home, 'computer-input');
   const inputFence = new ComputerInputFence(computerInputLocks, () => enrolledIdentity.machineId);
-  const vmRoot = join(paths.home, 'vm');
   const desktops: ComputerDesktops | undefined =
     opts.orbComputer !== undefined
       ? undefined
@@ -395,15 +392,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             env: capEnv,
             inputFence,
           })
-        : platform === 'darwin'
-          ? new VmDesktops({
-              root: vmRoot,
-              runtime: new VmRuntime({ root: vmRoot, env: capEnv }),
-              env: capEnv,
-              inputFence,
-              log: (message) => logger.machine(message),
-            })
-          : undefined;
+        : undefined;
   const hostDesktops = desktops?.missingPrograms().length === 0 ? desktops : undefined;
   if (hostDesktops) ensurePrivateDir(computerInputLocks);
   if (hostDesktops instanceof HostDesktops) {
@@ -493,7 +482,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const reach = agentReach.current();
     const scraper = scrapling.current();
     const hostPermissions = hostPermissionsProbe.current();
-    const vmDownload = hostDesktops instanceof VmDesktops ? hostDesktops.vmDownload() : undefined;
     return {
       ...capabilitiesProbe(),
       osPlatform: osPlatformOf(platform),
@@ -549,7 +537,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         : {}),
       ...(hostDesktops?.offersStealthBrowser() ? { stealthBrowser: true as const } : {}),
       ...(hostDesktops ? { computerKind: hostDesktops.kind, screenHandoff: true as const } : {}),
-      ...(vmDownload !== undefined ? { vmDownload } : {}),
       ...(hostComputer ? { ownComputerShell: true as const } : {}),
       ...(hostScreen ? { ownComputer: true as const } : {}),
       ...(phones.usable() ? { phoneHost: true as const } : {}),
@@ -817,9 +804,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             holdComputer: (scopeKey, use, browserScope) =>
               hostDesktops.hold(scopeKey, use, browserScope),
             socketPath: (scopeKey, kind) => hostDesktops.socketPath(scopeKey, kind),
-            ...(hostDesktops instanceof VmDesktops
-              ? { terminalCommand: (scopeKey: string) => hostDesktops.terminalCommand(scopeKey) }
-              : {}),
           }
         : {},
     ),

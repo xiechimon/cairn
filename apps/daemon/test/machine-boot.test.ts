@@ -3,7 +3,6 @@ import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { HOST_DESKTOP_PROGRAMS } from '../src/computer/host-desktop.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
-import { VmRuntime } from '../src/computer/vm-runtime.js';
 import { MachineApiError } from '../src/machine-client.js';
 import { boot, FakeMachineApi, waitFor } from './machine-loop-harness.js';
 import { FakeOrbProvider } from './orb-fake.js';
@@ -270,12 +269,10 @@ describe('D75 computer capability', () => {
     expect(caps?.browser).toBeUndefined();
   });
 
-  test('a Mac offers a VM computer exactly when its runtime is supported', async () => {
-    const supported =
-      new VmRuntime({ root: testTempDir('machine-boot-vm-') }).unsupported() === undefined;
+  test('a Mac offers no built-in VM computer', async () => {
     const caps = await report({ platform: 'darwin', capEnv: { PATH: desktopPrograms() } });
-    expect(caps?.computer).toBe(supported ? true : undefined);
-    expect(caps?.computerKind).toBe(supported ? 'vm' : undefined);
+    expect(caps?.computer).toBeUndefined();
+    expect(caps?.computerKind).toBeUndefined();
   });
 
   test('a Linux daemon missing them offers no computer', async () => {

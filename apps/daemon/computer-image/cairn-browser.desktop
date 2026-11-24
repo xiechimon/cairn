@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Stealth Browser
-Exec=/usr/local/bin/cairn-browser open
-Icon=web-browser
-Terminal=false
