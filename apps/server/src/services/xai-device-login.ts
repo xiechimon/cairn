@@ -5,6 +5,13 @@ import { provider } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import type { FetchLike } from '../lib/github.js';
 import { newRecordId } from '../lib/ids.js';
+import {
+  createRefreshInflightMap,
+  ownDeviceState,
+  postDeviceForm,
+  requiredDeviceString,
+  sweepExpiredStates,
+} from './device-login-helpers.js';
 import { nextProviderVersion, replaceProviderCredential } from './provider-configuration.js';
 import { createProvider } from './providers.js';
 
@@ -51,30 +58,10 @@ export interface XaiDeviceDeps {
   states: Map<string, XaiDeviceState>;
 }
 
-interface TokenResponse {
-  ok: boolean;
-  status: number;
-  body: Record<string, unknown>;
-}
-
-const refreshInflights = new WeakMap<Db, Map<string, Promise<string>>>();
-
-function refreshInflightOf(db: Db): Map<string, Promise<string>> {
-  let map = refreshInflights.get(db);
-  if (map === undefined) {
-    map = new Map<string, Promise<string>>();
-    refreshInflights.set(db, map);
-  }
-  return map;
-}
-
-function requiredString(body: Record<string, unknown>, field: string): string {
-  const value = body[field];
-  if (typeof value !== 'string' || value.length === 0) {
-    throw new HttpError(502, `xAI device login returned an invalid ${field}`);
-  }
-  return value;
-}
+const DEVICE_LABEL = 'xAI device login';
+const refreshInflightOf = createRefreshInflightMap<string>();
+const requiredString = (body: Record<string, unknown>, field: string) =>
+  requiredDeviceString(body, field, DEVICE_LABEL);
 
 function positiveNumber(body: Record<string, unknown>, field: string): number {
   const value = body[field];
@@ -97,35 +84,8 @@ function httpsUri(raw: string): string {
   return url.href;
 }
 
-async function postForm(
-  fetchImpl: FetchLike,
-  url: string,
-  fields: Record<string, string>,
-): Promise<TokenResponse> {
-  let response: Awaited<ReturnType<FetchLike>>;
-  try {
-    response = await fetchImpl(url, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams(fields).toString(),
-    });
-  } catch {
-    throw new HttpError(502, 'xAI device login request failed');
-  }
-  let body: Record<string, unknown> = {};
-  try {
-    const parsed = await response.json();
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      body = parsed as Record<string, unknown>;
-    }
-  } catch {
-    throw new HttpError(502, `xAI device login returned invalid JSON (HTTP ${response.status})`);
-  }
-  return { ok: response.ok, status: response.status, body };
-}
+const postForm = (fetchImpl: FetchLike, url: string, fields: Record<string, string>) =>
+  postDeviceForm(fetchImpl, url, fields, { label: DEVICE_LABEL, requireJsonOnError: true });
 
 function secretOf(raw: string): XaiOAuthSecret | null {
   if (!raw.startsWith('{')) return null;
@@ -178,13 +138,6 @@ function tokensFromBody(
   return { refresh, access, expiresInSeconds };
 }
 
-function sweep(states: Map<string, XaiDeviceState>): void {
-  const now = Date.now();
-  for (const [state, entry] of states) {
-    if (entry.expiresAt <= now) states.delete(state);
-  }
-}
-
 export async function startXaiDeviceLogin(
   deps: XaiDeviceDeps,
   input: { teamId: string; createdBy: string },
@@ -195,7 +148,7 @@ export async function startXaiDeviceLogin(
   intervalSeconds: number;
   expiresInSeconds: number;
 }> {
-  sweep(deps.states);
+  sweepExpiredStates(deps.states);
   const response = await postForm(deps.fetch, XAI_DEVICE_CODE_URL, {
     client_id: XAI_PI_PUBLIC_CLIENT_ID,
     scope: XAI_SCOPE,
@@ -236,12 +189,6 @@ export async function startXaiDeviceLogin(
     intervalSeconds,
     expiresInSeconds,
   };
-}
-
-function ownState(deps: XaiDeviceDeps, teamId: string, state: string): XaiDeviceState {
-  const entry = deps.states.get(state);
-  if (!entry || entry.teamId !== teamId) throw new HttpError(404, 'xAI device login not found');
-  return entry;
 }
 
 function saveSubscription(
@@ -298,7 +245,7 @@ export async function pollXaiDeviceLogin(
   | { status: 'denied' }
   | { status: 'expired' }
 > {
-  const entry = ownState(deps, input.teamId, input.state);
+  const entry = ownDeviceState(deps.states, input.teamId, input.state, DEVICE_LABEL);
   if (entry.expiresAt <= Date.now()) {
     deps.states.delete(input.state);
     return { status: 'expired' };

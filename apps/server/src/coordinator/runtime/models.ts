@@ -1,4 +1,9 @@
-import { createThinkingBindingGuard, type ProviderConfig } from '@cairn/shared';
+import {
+  createThinkingBindingGuard,
+  type ProviderConfig,
+  pipeStreamRetriedBeforeContent,
+  streamEventCarriesContent,
+} from '@cairn/shared';
 import {
   type Api,
   type AssistantMessage,
@@ -28,11 +33,6 @@ function hasImages(context: Context): boolean {
       typeof message.content !== 'string' &&
       message.content.some((block) => block.type === 'image'),
   );
-}
-
-function carriesContent(event: AssistantMessageEvent): boolean {
-  if (event.type === 'done' || event.type === 'toolcall_start') return true;
-  return 'delta' in event && event.delta.length > 0;
 }
 
 function withoutImages(context: Context): Context {
@@ -77,28 +77,12 @@ function retriedBeforeContent(
   retry: (error: AssistantMessage) => boolean,
 ): AssistantMessageEventStream {
   const out = createAssistantMessageEventStream();
-  const run = async () => {
-    const held: AssistantMessageEvent[] = [];
-    let streaming = false;
-    for await (const event of start()) {
-      if (event.type === 'error' && !streaming) {
-        if (retry(event.error)) {
-          for await (const next of start()) out.push(next);
-          return;
-        }
-        for (const earlier of held) out.push(earlier);
-        out.push(event);
-        return;
-      }
-      if (!streaming && carriesContent(event)) {
-        streaming = true;
-        for (const earlier of held.splice(0)) out.push(earlier);
-      }
-      if (streaming) out.push(event);
-      else held.push(event);
-    }
-  };
-  void run().catch((error) => out.end(failedStream(model, error)));
+  void pipeStreamRetriedBeforeContent(
+    start,
+    (event) => (event.type === 'error' ? event.error : undefined),
+    retry,
+    (event) => out.push(event),
+  ).catch((error) => out.end(failedStream(model, error)));
   return out;
 }
 
@@ -179,7 +163,7 @@ export function createCoordinatorModels(
           }
           return;
         }
-        if (!streaming && carriesContent(event)) {
+        if (!streaming && streamEventCarriesContent(event)) {
           streaming = true;
           for (const earlier of held.splice(0)) out.push(earlier);
         }

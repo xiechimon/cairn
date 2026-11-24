@@ -26,13 +26,13 @@ import {
   LANGFUSE_ATTR,
   observationAttributes,
   piCatalogProviderId,
+  pipeStreamRetriedBeforeContent,
   THINKING_LEVELS,
   contextTokensOf as usageContextTokens,
 } from '@cairn/shared';
 import {
   type Api,
   type AssistantMessage,
-  type AssistantMessageEvent,
   type AssistantMessageEventStream,
   createAssistantMessageEventStream,
   getSystemMessageText,
@@ -1347,39 +1347,18 @@ export class PiBackend implements AgentBackend {
   }
 }
 
-function carriesContent(event: AssistantMessageEvent): boolean {
-  if (event.type === 'done' || event.type === 'toolcall_start') return true;
-  return 'delta' in event && event.delta.length > 0;
-}
-
 function retriedBeforeContent(
   model: Model<Api>,
   start: () => AssistantMessageEventStream,
   retry: (error: AssistantMessage) => boolean,
 ): AssistantMessageEventStream {
   const out = createAssistantMessageEventStream();
-  const run = async () => {
-    const held: AssistantMessageEvent[] = [];
-    let streaming = false;
-    for await (const event of start()) {
-      if (event.type === 'error' && !streaming) {
-        if (retry(event.error)) {
-          for await (const next of start()) out.push(next);
-          return;
-        }
-        for (const earlier of held) out.push(earlier);
-        out.push(event);
-        return;
-      }
-      if (!streaming && carriesContent(event)) {
-        streaming = true;
-        for (const earlier of held.splice(0)) out.push(earlier);
-      }
-      if (streaming) out.push(event);
-      else held.push(event);
-    }
-  };
-  void run().catch((error) =>
+  void pipeStreamRetriedBeforeContent(
+    start,
+    (event) => (event.type === 'error' ? event.error : undefined),
+    retry,
+    (event) => out.push(event),
+  ).catch((error) =>
     out.end({
       role: 'assistant',
       content: [],
