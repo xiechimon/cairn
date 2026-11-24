@@ -133,11 +133,6 @@ export function machineSecondary(
   return `#${machine.id.replace(NON_ALPHANUMERIC, '').slice(-SUFFIX_LENGTH)}`;
 }
 
-export function machineLabel(machine: NamedMachine, all: readonly NamedMachine[]): string {
-  const secondary = machineSecondary(machine, all);
-  return secondary === null ? machine.name : `${machine.name} · ${secondary}`;
-}
-
 export function MachineName({
   machine,
   all = [],

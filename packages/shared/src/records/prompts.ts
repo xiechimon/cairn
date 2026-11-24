@@ -1,7 +1,6 @@
 import { CAIRN_REVIEW_HOLD_LABEL, type PrReviewFinding } from '../review-findings.js';
 import { chiefThreadTitle } from './chief.js';
 import { PLAN_FILE_NAME } from './plan.js';
-import { REPORT_FILE_NAME } from './report.js';
 import type { StepKind } from './step.js';
 import { renderTaskText, type TaskRequest, type TaskTitleAuthor } from './task-request.js';
 import type { TaskDecision } from './todo.js';
@@ -324,10 +323,6 @@ export function buildRetryLessonsSection(lessonsNewestFirst: readonly string[]):
   return `${RETRY_LESSONS_SHAPE.head}\n${items.join('\n')}\n${RETRY_LESSONS_SHAPE.tail}`;
 }
 
-export function isPlanFirstRoundWithLessons(prompt: string): boolean {
-  return prompt.startsWith(`${buildPlanFirstRoundInstruction()}\n\n${RETRY_LESSONS_HEAD}`);
-}
-
 export function withRetryLessons(
   instruction: string | undefined,
   kind: 'plan' | 'build',
@@ -514,24 +509,6 @@ export function buildConfirmedPlanNote(planFile: string): string {
 export function appendConfirmedPlanNote(prompt: string, planFile: string): string {
   if (prompt.includes(CONFIRMED_PLAN_NOTE_HEAD)) return prompt;
   const note = buildConfirmedPlanNote(planFile);
-  return prompt === '' ? note : `${prompt}\n${note}`;
-}
-
-const REPORT_NOTE_HEAD = `${REPORT_FILE_NAME} 交接位置：`;
-const REPORT_NOTE_TAIL = `。该位置在仓库检出之外——本步的交付物是这份报告：把完整报告写入此文件再结束本步；不要在仓库工作区里创建它，也不要把它 git add 或提交。`;
-
-export function appendReportLocationNote(prompt: string, reportFile: string): string {
-  if (prompt.includes(REPORT_NOTE_HEAD)) return prompt;
-  const note = `${REPORT_NOTE_HEAD}${reportFile}${REPORT_NOTE_TAIL}`;
-  return prompt === '' ? note : `${prompt}\n${note}`;
-}
-
-const DELIVERABLES_NOTE_HEAD = '成果文件交接位置：';
-const DELIVERABLES_NOTE_TAIL = `。可选：本步如果做出了网页或 PPT，把网页（.html）放进其中的 pages/，把 PPT（.pptx 或 .pdf）放进 slides/；文件直接放在这两个文件夹里，不要再分子文件夹，最多 5 个文件，网页每个不超过 2 MiB，PPT 每个不超过 20 MiB。报告仍写在 ${REPORT_FILE_NAME}。`;
-
-export function appendDeliverablesLocationNote(prompt: string, deliverablesDir: string): string {
-  if (prompt.includes(DELIVERABLES_NOTE_HEAD)) return prompt;
-  const note = `${DELIVERABLES_NOTE_HEAD}${deliverablesDir}${DELIVERABLES_NOTE_TAIL}`;
   return prompt === '' ? note : `${prompt}\n${note}`;
 }
 

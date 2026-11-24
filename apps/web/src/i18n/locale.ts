@@ -4,10 +4,6 @@ export const LOCALE_STORAGE_KEYS = ['cairn.locale', 'cairn-locale'] as const;
 
 const KNOWN: readonly string[] = ['zh', 'en'];
 
-export function isLocale(value: unknown): value is Locale {
-  return value === 'zh' || value === 'en';
-}
-
 export function readStoredLocale(
   storage: Pick<Storage, 'getItem'> | null,
   browserLanguage: string | undefined = globalThis.navigator?.language,

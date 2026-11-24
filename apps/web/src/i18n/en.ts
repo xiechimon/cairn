@@ -638,7 +638,6 @@ export const EN: Record<string, string> = {
   全部展开: 'Expand all',
   全部收起: 'Collapse all',
   显示完整文件: 'Show full file',
-  显示差异: 'Show diff',
   '行过长，已退回整行高亮': 'Line too long — whole-line highlight only',
   运行在: 'Running on',
   ' 上': '',
@@ -1147,8 +1146,6 @@ export const EN: Record<string, string> = {
   输入: 'Input',
   输出: 'Output',
   花费: 'Cost',
-  '无价格来源：模型未声明费率，或该运行未上报费用':
-    'No price source: the model declares no rates, or the run reported no cost',
   当前: 'Current',
   重新运行: 'Run again',
   '第 1 次运行': 'Run 1',

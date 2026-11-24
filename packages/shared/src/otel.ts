@@ -47,14 +47,6 @@ export function otlpStepSpanIdOfBuild(buildId: string, stepId: string): string {
   return deriveOtelId(8, 'span', buildId, 'step', stepId);
 }
 
-export function otlpChildSpanIdOfBuild(
-  buildId: string,
-  stepId: string,
-  ...path: (string | number)[]
-): string {
-  return deriveOtelId(8, 'span', buildId, 'step', stepId, ...path);
-}
-
 export function otlpTraceIdOfTurn(stepId: string): string {
   return deriveOtelId(16, 'trace', 'turn', stepId);
 }

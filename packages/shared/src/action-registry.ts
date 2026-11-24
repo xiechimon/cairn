@@ -119,10 +119,6 @@ export const SLICE1_ACTIONS = [
   todoDeleteAction,
 ] as const;
 
-export function actionById(id: string): (typeof SLICE1_ACTIONS)[number] | undefined {
-  return SLICE1_ACTIONS.find((entry) => entry.id === id);
-}
-
 export function actionByToolName(name: string): (typeof SLICE1_ACTIONS)[number] | undefined {
   return SLICE1_ACTIONS.find((entry) => entry.toolName === name);
 }

@@ -1,13 +1,10 @@
 import type { DiffFileContent } from '@cairn/shared';
 import { cn } from 'cn';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useBuildChangeFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { Button } from '../components/ui/button.js';
 import type { DiffFile, DocBlock } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
-import { ChevronDown, ChevronRight, UnfoldVertical } from '../icons/index.js';
-import { baseName, dirName } from '../lib/path-name.js';
 import { Segments } from './segments.js';
 import { computeHunkWordDiff } from './word-diff.js';
 
@@ -64,57 +61,6 @@ function deriveFullFileView(
   return file.data.encoding === 'base64'
     ? { kind: 'binary' }
     : { kind: 'text', content: file.data.content };
-}
-
-export function DiffFileBlock({
-  file,
-  expanded,
-  buildId,
-  allowFullFile = true,
-}: {
-  file: DiffFile;
-  expanded: boolean;
-  buildId: string | null;
-  allowFullFile?: boolean;
-}) {
-  const { t } = useI18n();
-  const [showFull, setShowFull] = useState(false);
-  return (
-    <div>
-      <div className="flex h-8.5 flex-none items-center gap-1.5 border-b border-(--border) pl-3 text-ui text-(--text-tertiary) [&_svg]:text-(--text-tertiary)">
-        {expanded ? (
-          <ChevronDown width={10} height={10} />
-        ) : (
-          <ChevronRight width={10} height={10} />
-        )}
-        <span className="min-w-0 truncate">
-          <span className="font-medium text-(--foreground)">{baseName(file.path)}</span>
-          {dirName(file.path) !== '' && <span className="ml-1.5">{dirName(file.path)}</span>}
-        </span>
-        <span className="ml-auto pr-4 font-mono text-meta text-(--diff-add-fg)">
-          +{file.added}
-          {file.removed != null && file.removed > 0 && (
-            <span className="text-(--destructive)"> −{file.removed}</span>
-          )}
-        </span>
-      </div>
-      {expanded && (
-        <div>
-          <DiffFileBody file={file} buildId={buildId} showFull={showFull} />
-          {allowFullFile && (
-            <Button
-              variant="ghost"
-              className="w-full justify-start"
-              onClick={() => setShowFull((v) => !v)}
-            >
-              <UnfoldVertical width={12} height={12} />
-              {showFull ? t('显示差异') : t('显示完整文件')}
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export function DiffFileBody({

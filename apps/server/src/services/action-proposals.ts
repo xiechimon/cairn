@@ -317,25 +317,6 @@ function closeProposal(
   writeWakes(tx, row.id, status);
 }
 
-export function endPendingProposal(
-  db: Pick<Db, 'transaction'>,
-  proposalId: string,
-  status: 'expired' | 'superseded',
-  now = nowMs(),
-): void {
-  db.transaction(
-    (tx) => {
-      const row = tx.select().from(actionProposal).where(eq(actionProposal.id, proposalId)).get();
-      if (row?.status === 'pending') closeProposal(tx, row, status, null, null, now);
-    },
-    { behavior: 'immediate' },
-  );
-}
-
-export function endPendingProposalIn(tx: ProjectTx, row: ProposalRow, status: 'superseded') {
-  if (row.status === 'pending') closeProposal(tx, row, status, null, null, nowMs());
-}
-
 export function settlePendingProposal(
   tx: ProjectTx,
   teamId: string,

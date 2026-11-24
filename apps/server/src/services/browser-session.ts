@@ -114,11 +114,3 @@ export function createStreamTicketBook(): StreamTicketBook {
     },
   };
 }
-
-export function sessionFromRequest(
-  db: Db,
-  cookie: string | undefined,
-): ResolvedBrowserSession | null {
-  if (cookie === undefined || cookie === '') return null;
-  return resolveBrowserSession(db, cookie);
-}

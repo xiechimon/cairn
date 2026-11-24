@@ -16,18 +16,3 @@ export function mentionChipClass(kind: string | null | undefined): string {
   if (kind == null || KIND_CHIP_CLS[kind] === undefined) return CHIP_BASE;
   return cn(CHIP_BASE, `mention-chip--${kind}`, KIND_CHIP_CLS[kind]);
 }
-
-const ICON_BASE =
-  'inline-flex size-7 shrink-0 items-center justify-center rounded-(--cds-radius-md) bg-(--surface-tertiary) text-(--foreground)';
-
-const KIND_ICON_CLS: Record<string, string> = {
-  todo: 'bg-(--spot-text-on-tint)/18 text-(--spot-text-on-tint)',
-  skill: 'text-content-secondary',
-  agent: 'text-content-secondary',
-  project: 'text-content-secondary',
-  machine: 'text-content-secondary',
-};
-
-export function mentionIconClass(kind: string): string {
-  return cn(ICON_BASE, `mention-icon--${kind}`, KIND_ICON_CLS[kind] ?? '');
-}

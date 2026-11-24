@@ -134,7 +134,3 @@ export function sweepAbandonedMemoryEditSteps(
     abandonMemoryEditStep(deps.db, row, 'executor lost');
   }
 }
-
-export function stepBelongsToMemoryEdit(row: StepRow): boolean {
-  return isMemoryEditStep(row);
-}

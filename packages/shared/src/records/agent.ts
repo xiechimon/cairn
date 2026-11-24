@@ -14,8 +14,6 @@ export const PERSONA_ROLES = [
 ] as const;
 export type PersonaRole = (typeof PERSONA_ROLES)[number];
 
-export const personaRoleSchema = z.enum(PERSONA_ROLES);
-
 export const agentStatusSchema = z.enum(['active']);
 
 export const AGENT_TOOL_SWITCHES = [

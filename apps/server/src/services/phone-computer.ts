@@ -93,20 +93,6 @@ function liveOffered(deps: Pick<MachineDeps, 'db' | 'machineHub'>, joined: Joine
   return link === 'ready' || link === 'locked' || pairingInFlight(deps.db, joined.row.id);
 }
 
-export function teamOffersPhones(
-  deps: Pick<MachineDeps, 'db' | 'machineHub'>,
-  teamId: string,
-): boolean {
-  return joinedPhones(deps.db, teamId).some((joined) => liveOffered(deps, joined));
-}
-
-export function phoneComputerOffered(
-  deps: Pick<MachineDeps, 'db' | 'machineHub'>,
-  threadId: string,
-): boolean {
-  return offeredPhoneNames(deps, threadId).length > 0;
-}
-
 export function offeredPhoneNames(
   deps: Pick<MachineDeps, 'db' | 'machineHub'>,
   threadId: string,
@@ -332,20 +318,6 @@ export function markPhoneHandoffIfNone(
     .set({ handoffReason: reason, handoffStepId: stepId, handoffRequestedAt: now, updatedAt: now })
     .where(eq(phone.id, phoneId))
     .run();
-}
-
-export function openPhoneCalls(db: Db, phoneId: string) {
-  return db
-    .select()
-    .from(computerCall)
-    .where(
-      and(
-        eq(computerCall.phoneId, phoneId),
-        inArray(computerCall.state, ['dispatched', 'running']),
-        isNull(computerCall.finishedAt),
-      ),
-    )
-    .all();
 }
 
 export function cancelPhoneCalls(db: Db, phoneId: string): void {

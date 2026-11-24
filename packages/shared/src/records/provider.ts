@@ -225,8 +225,6 @@ export const xaiDevicePollResponseSchema = z.discriminatedUnion('status', [
 ]);
 export type XaiDevicePollResponse = z.infer<typeof xaiDevicePollResponseSchema>;
 
-export const codexDeviceStartResponseSchema = xaiDeviceStartResponseSchema;
 export type CodexDeviceStartResponse = XaiDeviceStartResponse;
 
-export const codexDevicePollResponseSchema = xaiDevicePollResponseSchema;
 export type CodexDevicePollResponse = XaiDevicePollResponse;

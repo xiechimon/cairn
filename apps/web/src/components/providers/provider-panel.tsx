@@ -33,7 +33,7 @@ import {
 import type { ComponentType, CSSProperties, DOMAttributes, ReactNode, Ref, SVGProps } from 'react';
 import { useState } from 'react';
 import { useI18n } from '../../i18n/provider.js';
-import { SettingsPanel, SettingsSection } from '../settings-list.js';
+import { SettingsPanel } from '../settings-list.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js';
@@ -493,21 +493,5 @@ export function ProviderEditorHead({
       {version != null && <code className="text-meta text-content-tertiary">v{version}</code>}
       {aside}
     </div>
-  );
-}
-
-export function ProviderSection({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <SettingsSection title={title} description={hint}>
-      {children}
-    </SettingsSection>
   );
 }

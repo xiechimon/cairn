@@ -22,11 +22,12 @@ describe('web helper deduplication guards', () => {
   });
 
   test('baseName and dirName live only in lib/path-name.ts', () => {
-    for (const rel of ['board/side-chat.tsx', 'detail/docpane.tsx', 'pages/dir-browser.tsx']) {
+    for (const rel of ['board/side-chat.tsx', 'pages/dir-browser.tsx']) {
       const source = readWeb(rel);
       expect(source, rel).not.toMatch(/function\s+baseName\s*\(/);
       expect(source, rel).toContain("from '../lib/path-name.js'");
     }
+    expect(readWeb('detail/docpane.tsx')).not.toMatch(/function\s+baseName\s*\(/);
   });
 
   test('clockTime formatters delegate to formatClockTime in lib/date-format.ts', () => {

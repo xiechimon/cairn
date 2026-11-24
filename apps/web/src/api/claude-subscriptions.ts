@@ -30,17 +30,6 @@ export function useRefreshClaudeQuota(teamId: string | undefined) {
   });
 }
 
-export function hasUsableClaudeSubscription(
-  subscriptions: readonly Pick<ClaudeSubscription, 'enabled' | 'expiresAt'>[] | undefined,
-  now: number,
-): boolean {
-  return (subscriptions ?? []).some(
-    (subscription) =>
-      subscription.enabled !== false &&
-      (subscription.expiresAt === null || subscription.expiresAt > now),
-  );
-}
-
 export function useCreateClaudeSubscription(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({
