@@ -5,16 +5,14 @@ import { type ReactNode, useState } from 'react';
 import { useApiMutations, usePhoneActivity, usePhones } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { relativeTime } from '../board/rel-time.js';
+import { FORM_CONTROL_CLS, FormField, FormStack } from '../components/form-layout.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../components/ui/dialog.js';
+  DIALOG_PRIMARY_BUTTON,
+  DIALOG_TEXT_BUTTON,
+  DialogShell,
+} from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
@@ -165,56 +163,62 @@ export function PhonePairDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent data-testid="phone-pair-dialog">
-        <DialogHeader>
-          <DialogTitle>{t('配对手机')}</DialogTitle>
-          <DialogDescription>
-            {t(
-              '在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。{name} 会通过 adb 连接手机。',
-              {
-                name: machineName,
-              },
-            )}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex min-w-0 flex-col gap-3">
-          <label
-            htmlFor="phone-pair-name"
-            className="flex flex-col gap-1 text-meta text-content-secondary"
+    <DialogShell
+      open={open}
+      onClose={onClose}
+      stacked
+      size="m"
+      title={t('配对手机')}
+      subtitle={t(
+        '在手机上：开发者选项 → 无线调试 → 使用配对码配对设备，把显示的 IP:端口 和 6 位配对码填到这里。{name} 会通过 adb 连接手机。',
+        { name: machineName },
+      )}
+      footer={
+        <>
+          <Button variant="ghost" className={DIALOG_TEXT_BUTTON} onClick={onClose}>
+            {t('取消')}
+          </Button>
+          <Button
+            className={DIALOG_PRIMARY_BUTTON}
+            data-testid="phone-pair-submit"
+            disabled={!ready || pending}
+            aria-busy={pending}
+            onClick={submit}
           >
-            {t('手机名称（可选）')}
+            {t('配对')}
+          </Button>
+        </>
+      }
+    >
+      <div data-testid="phone-pair-dialog">
+        <FormStack className="max-w-none">
+          <FormField label={t('手机名称（可选）')} htmlFor="phone-pair-name">
             <Input
               id="phone-pair-name"
               data-testid="phone-pair-name"
+              className={FORM_CONTROL_CLS}
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder={t('例如 Pixel 8a')}
             />
-          </label>
-          <label
-            htmlFor="phone-pair-endpoint"
-            className="flex flex-col gap-1 text-meta text-content-secondary"
-          >
-            {t('IP:端口')}
+          </FormField>
+          <FormField label={t('IP:端口')} htmlFor="phone-pair-endpoint">
             <Input
               id="phone-pair-endpoint"
               data-testid="phone-pair-endpoint"
+              className={FORM_CONTROL_CLS}
               value={endpoint}
               onChange={(event) => setEndpoint(event.target.value)}
               placeholder="192.168.1.20:37123"
               inputMode="text"
               autoComplete="off"
             />
-          </label>
-          <label
-            htmlFor="phone-pair-code"
-            className="flex flex-col gap-1 text-meta text-content-secondary"
-          >
-            {t('6 位配对码')}
+          </FormField>
+          <FormField label={t('6 位配对码')} htmlFor="phone-pair-code">
             <Input
               id="phone-pair-code"
               data-testid="phone-pair-code"
+              className={FORM_CONTROL_CLS}
               value={code}
               onChange={(event) => setCode(event.target.value)}
               placeholder="123456"
@@ -222,7 +226,7 @@ export function PhonePairDialog({
               autoComplete="off"
               maxLength={6}
             />
-          </label>
+          </FormField>
           <label
             htmlFor="phone-pair-consent"
             className="flex items-start gap-2 text-meta text-content-secondary"
@@ -240,22 +244,9 @@ export function PhonePairDialog({
               )}
             </span>
           </label>
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>
-            {t('取消')}
-          </Button>
-          <Button
-            data-testid="phone-pair-submit"
-            disabled={!ready || pending}
-            aria-busy={pending}
-            onClick={submit}
-          >
-            {t('配对')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </FormStack>
+      </div>
+    </DialogShell>
   );
 }
 
@@ -378,7 +369,7 @@ export function usePhonesRow(machine: MachineRow): {
                       return;
                     }
                     const prefill = ENDPOINT_RE.test(view.deviceId)
-                      ? view.deviceId.slice(0, view.deviceId.lastIndexOf(':')) + ':'
+                      ? `${view.deviceId.slice(0, view.deviceId.lastIndexOf(':'))}:`
                       : '';
                     setPairOpen({ phoneId: null, endpoint: prefill });
                   }}
@@ -396,7 +387,8 @@ export function usePhonesRow(machine: MachineRow): {
                       blockDemoWrite();
                       return;
                     }
-                    setPairOpen({ phoneId: view.row!.id, endpoint: '' });
+                    const row = view.row;
+                    if (row !== null) setPairOpen({ phoneId: row.id, endpoint: '' });
                   }}
                 >
                   {t('重试')}

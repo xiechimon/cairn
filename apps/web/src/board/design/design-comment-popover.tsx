@@ -1,13 +1,10 @@
 import { DESIGN_LIMITS, type DesignTarget as ElementTarget } from '@cairn/shared';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '../../components/ui/button.js';
+import { Popover, PopoverContent } from '../../components/ui/popover.js';
 import { Textarea } from '../../components/ui/textarea.js';
 import { useI18n } from '../../i18n/provider.js';
 import type { FrameTransform } from './design-frame.js';
-
-const POPOVER_W = 300;
-const POPOVER_H = 280;
-const GAP = 8;
 
 function firstFamily(family: string | undefined): string | undefined {
   return family?.split(',')[0]?.replace(/["']/g, '').trim() || undefined;
@@ -90,77 +87,91 @@ export function CommentPopover({
 }) {
   const { t } = useI18n();
   const [note, setNote] = useState('');
-  const stageW = transform.width * transform.scale;
-  const stageH = transform.height * transform.scale;
-  const left = Math.max(
-    GAP,
-    Math.min(target.position.x * transform.scale, stageW - POPOVER_W - GAP),
-  );
-  const below = (target.position.y + target.position.height) * transform.scale + GAP;
-  const top =
-    below + POPOVER_H <= stageH
-      ? below
-      : Math.max(GAP, target.position.y * transform.scale - POPOVER_H - GAP);
+  const anchorRef = useRef<HTMLSpanElement>(null);
   const trimmed = note.trim();
   return (
-    <div
-      role="dialog"
-      aria-label={t('评论这个元素')}
-      data-testid="design-comment-popover"
-      className="pointer-events-auto absolute z-10 flex flex-col gap-2.5 rounded-(--radius-popover) border border-border bg-popover p-3 text-popover-foreground shadow-(--shadow-popover)"
-      style={{ left, top, width: Math.min(POPOVER_W, stageW - GAP * 2) }}
-      onKeyDown={(event) => {
-        if (event.key === 'Escape') {
-          event.stopPropagation();
-          onCancel();
-        }
-        if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && trimmed !== '') {
-          event.preventDefault();
-          onSave(trimmed);
-        }
-      }}
-    >
-      <p
-        data-testid="design-comment-target"
-        className="m-0 truncate text-meta text-content-secondary"
-      >
-        {targetCaption(target)}
-      </p>
-      <InspectRows target={target} />
-      <Textarea
-        data-testid="design-comment-note"
-        aria-label={t('评论内容')}
-        placeholder={t('对这个元素说点什么')}
-        maxLength={DESIGN_LIMITS.noteChars}
-        value={note}
-        autoFocus
-        onChange={(event) => setNote(event.target.value)}
-        className="min-h-16 resize-none text-ui"
+    <>
+      <span
+        ref={anchorRef}
+        aria-hidden
+        className="pointer-events-none absolute"
+        style={{
+          left: target.position.x * transform.scale,
+          top: target.position.y * transform.scale,
+          width: target.position.width * transform.scale,
+          height: target.position.height * transform.scale,
+        }}
       />
-      <div className="flex items-center justify-end gap-1.5">
-        <Button variant="ghost" size="sm" data-testid="design-comment-cancel" onClick={onCancel}>
-          {t('取消')}
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="design-comment-save"
-          disabled={trimmed === '' || busy}
-          onClick={() => onSave(trimmed)}
+      <Popover
+        open
+        onOpenChange={(next) => {
+          if (!next) onCancel();
+        }}
+      >
+        <PopoverContent
+          anchor={anchorRef}
+          side="bottom"
+          align="start"
+          sideOffset={8}
+          collisionPadding={8}
+          aria-label={t('评论这个元素')}
+          data-testid="design-comment-popover"
+          className="w-75 max-w-[calc(100vw-16px)] border border-border p-3"
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && (event.metaKey || event.ctrlKey) && trimmed !== '') {
+              event.preventDefault();
+              onSave(trimmed);
+            }
+          }}
         >
-          {t('保存')}
-        </Button>
-        {onSend !== undefined && (
-          <Button
-            size="sm"
-            data-testid="design-comment-send"
-            disabled={trimmed === '' || busy}
-            onClick={() => onSend(trimmed)}
+          <p
+            data-testid="design-comment-target"
+            className="m-0 truncate text-meta text-content-secondary"
           >
-            {t('发给 agent')}
-          </Button>
-        )}
-      </div>
-    </div>
+            {targetCaption(target)}
+          </p>
+          <InspectRows target={target} />
+          <Textarea
+            data-testid="design-comment-note"
+            aria-label={t('评论内容')}
+            placeholder={t('对这个元素说点什么')}
+            maxLength={DESIGN_LIMITS.noteChars}
+            value={note}
+            autoFocus
+            onChange={(event) => setNote(event.target.value)}
+            className="min-h-16 resize-none text-ui"
+          />
+          <div className="flex items-center justify-end gap-1.5">
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="design-comment-cancel"
+              onClick={onCancel}
+            >
+              {t('取消')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="design-comment-save"
+              disabled={trimmed === '' || busy}
+              onClick={() => onSave(trimmed)}
+            >
+              {t('保存')}
+            </Button>
+            {onSend !== undefined && (
+              <Button
+                size="sm"
+                data-testid="design-comment-send"
+                disabled={trimmed === '' || busy}
+                onClick={() => onSend(trimmed)}
+              >
+                {t('发给 agent')}
+              </Button>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+    </>
   );
 }

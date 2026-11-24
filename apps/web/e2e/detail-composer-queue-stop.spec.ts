@@ -403,9 +403,9 @@ test('discard is available during a running step only and requires confirmation'
   const task = await runningTask(page);
   await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await page.getByTestId('discard-changes').click();
-  await expect(page.getByRole('dialog')).toBeVisible();
+  await expect(page.getByRole('alertdialog')).toBeVisible();
   expect(task.stops).toEqual([]);
-  await page.getByRole('dialog').getByRole('button', { name: '丢弃修改', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '丢弃修改', exact: true }).click();
   await expect.poll(() => task.stops).toEqual([{ discard: true }]);
 });
 
@@ -417,7 +417,7 @@ test('kept changes after Stop do not expose discard', async ({ page }) => {
   await page.reload();
   await page.getByTestId('side-chat').getByRole('button', { name: '更多操作…' }).click();
   await expect(page.getByTestId('discard-changes')).toHaveCount(0);
-  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
 });
 
 test('a queued capsule sits in the composer above the input and shows the full text on hover', async ({ page }) => {

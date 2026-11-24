@@ -101,7 +101,7 @@ test('groups follow the design: models, execution, security', async ({ page }) =
   await expect(nav).toContainText('执行环境');
   await expect(nav).toContainText('安全');
   await expect(nav).toContainText('消息');
-  await expect(nav.locator('hr')).toHaveCount(4);
+  await expect(nav.locator('[data-slot="separator"]')).toHaveCount(4);
   const order = await nav.locator('[data-settings-section]').evaluateAll((els) =>
     els.map((el) => el.getAttribute('data-settings-section')),
   );

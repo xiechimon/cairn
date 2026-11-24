@@ -317,7 +317,6 @@ checkPatternGuard({
   skip: (relPath) => relPath.startsWith('design/') || relPath.startsWith(UI_PRIMITIVES_PREFIX),
   allowlist: new Map([
     ['board/local-provider-import.tsx', 'legacy ui/card visual site awaiting owner design pass'],
-    ['overlay/token-gate.tsx', 'legacy ui/card visual site awaiting owner design pass'],
     ['routes/machine-authorize-page.tsx', 'legacy ui/card visual site awaiting owner design pass'],
     ['routes/remote-access-page.tsx', 'legacy ui/card visual site awaiting owner design pass'],
   ]),
@@ -335,7 +334,6 @@ checkPatternGuard({
     ['board/file-lightbox.tsx', 'full-bleed media lightbox over Dialog primitive'],
     ['chief/research-report.tsx', 'DialogTitle helper beside DialogShell'],
     ['overlay/route-dialog.tsx', 'DialogClose/DialogTitle helpers beside DialogShell'],
-    ['resources/phones-panel.tsx', 'legacy direct ui/dialog site awaiting owner migration'],
   ]),
   message:
     'direct components/ui/dialog import — use DialogShell from components/ui/dialog-shell.tsx',
@@ -368,6 +366,22 @@ checkPatternGuard({
     ['pages/project-new-page.tsx', 'legacy repo listbox awaiting owner FilterPicker migration'],
   ]),
   message: 'hand-written role="listbox" — compose from components/filter-picker.tsx',
+});
+
+checkPatternGuard({
+  code: 'G15',
+  files: tsxFiles,
+  pattern: /(?<!\[)\brole=\{?\s*['"]dialog['"]/,
+  skip: (relPath) => relPath.startsWith(UI_PRIMITIVES_PREFIX) || relPath.startsWith('design/'),
+  allowlist: new Map([
+    [
+      'board/computer-screen-dialog.tsx',
+      'viewportRoot full-bleed VNC viewer dialog over DialogShell',
+    ],
+    ['chief/selection-reply.tsx', 'active-lane floating selection toolbar'],
+    ['overlay/search-panel.tsx', 'viewportRoot command palette over DialogShell'],
+  ]),
+  message: 'hand-written role="dialog" — use DialogShell, AlertDialogShell, or Popover',
 });
 
 if (failures.length === 0) {

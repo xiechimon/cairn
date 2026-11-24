@@ -12,16 +12,7 @@ import {
   Vault,
   X,
 } from 'lucide-react';
-import {
-  type KeyboardEvent as ReactKeyboardEvent,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { type To, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useMachines } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -35,9 +26,10 @@ import {
 import { SettingsSearch } from '../components/settings/settings-search.js';
 import { SettingsMatchProvider, SettingsRows } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { useTypeToFocus } from '../overlay/hotkeys.js';
+import { isEditableTarget, useTypeToFocus } from '../overlay/hotkeys.js';
 import { EmbeddedShell } from '../pages/shell.js';
 import { MachinesPage } from '../resources/machines-page.js';
 import { McpServersPage } from '../resources/mcp-servers-page.js';
@@ -211,16 +203,9 @@ const TABBABLE =
 const LAYER_ABOVE_SETTINGS =
   '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 
-function isEditable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.isContentEditable || target.closest('input, textarea, select') !== null)
-  );
-}
-
-function trapTab(event: ReactKeyboardEvent<HTMLElement>): void {
-  if (event.key !== 'Tab' || !event.currentTarget.contains(event.target as Node)) return;
-  const tabbable = [...event.currentTarget.querySelectorAll<HTMLElement>(TABBABLE)].filter(
+function trapTab(root: HTMLElement, event: KeyboardEvent): void {
+  if (event.key !== 'Tab' || !root.contains(event.target as Node)) return;
+  const tabbable = [...root.querySelectorAll<HTMLElement>(TABBABLE)].filter(
     (el) => el.offsetParent !== null && el.tabIndex >= 0,
   );
   const first = tabbable[0];
@@ -230,7 +215,7 @@ function trapTab(event: ReactKeyboardEvent<HTMLElement>): void {
     return;
   }
   const active = document.activeElement;
-  if (event.shiftKey && (active === first || active === event.currentTarget)) {
+  if (event.shiftKey && (active === first || active === root)) {
     event.preventDefault();
     last.focus();
   } else if (!event.shiftKey && active === last) {
@@ -253,7 +238,6 @@ export function SettingsDialog({
   const [matchLabel, setMatchLabel] = useState<string | null>(null);
   const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
   const machineNote = useMachineNote();
-  const titleId = useId();
   const [restoredSection] = useState(() => (sectionParam === '' ? storedSettingsSection() : null));
   const lastShown = useRef<SettingsSectionId | null>(null);
   const movedTo =
@@ -269,41 +253,34 @@ export function SettingsDialog({
   useEffect(() => {
     lastShown.current = shown?.id ?? null;
   }, [shown]);
-  const opener = useRef<HTMLElement | null>(
-    document.activeElement instanceof HTMLElement ? document.activeElement : null,
+  const [opener] = useState<HTMLElement | undefined>(() =>
+    document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+      ? document.activeElement
+      : undefined,
   );
-  const popupRef = useRef<HTMLDivElement>(null);
+  const focusRef = useRef<HTMLDivElement>(null);
+  const [focusNode, setFocusNode] = useState<HTMLDivElement | null>(null);
+  const setFocusRef = useCallback((node: HTMLDivElement | null) => {
+    focusRef.current = node;
+    setFocusNode(node);
+  }, []);
   const searchRef = useRef<HTMLInputElement>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
   useEffect(() => {
-    const returnTo = opener.current;
-    return () => {
-      if (returnTo?.isConnected) returnTo.focus();
-    };
-  }, []);
-  useLayoutEffect(() => {
-    popupRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (document.querySelector('[data-open]') !== null) return;
-      if (isEditable(event.target)) return;
-      closeRef.current();
-    };
-    document.addEventListener('keydown', onKey, true);
-    return () => document.removeEventListener('keydown', onKey, true);
-  }, []);
+    if (focusNode === null) return;
+    const onKeyDown = (event: KeyboardEvent) => trapTab(focusNode, event);
+    focusNode.addEventListener('keydown', onKeyDown);
+    return () => focusNode.removeEventListener('keydown', onKeyDown);
+  }, [focusNode]);
   const searchNow = useCallback(() => {
     const input = searchRef.current;
     return input === null || input.offsetParent === null ? null : input;
   }, []);
-  const layerAbove = useCallback(
-    () =>
-      [...document.querySelectorAll(LAYER_ABOVE_SETTINGS)].some(
-        (el) => el !== popupRef.current && el.checkVisibility(),
-      ),
-    [],
-  );
+  const layerAbove = useCallback(() => {
+    const selfDialog = focusRef.current?.closest('[role="dialog"]') ?? null;
+    return [...document.querySelectorAll(LAYER_ABOVE_SETTINGS)].some(
+      (el) => el !== selfDialog && el.checkVisibility(),
+    );
+  }, []);
   useTypeToFocus(searchNow, layerAbove);
   const hrefFor = (id: string): To => ({ pathname: `${SETTINGS_HREF}/${id}`, search });
   useEffect(() => {
@@ -342,29 +319,42 @@ export function SettingsDialog({
       shown.element()
     );
   return (
-    <>
-      <div
-        aria-hidden
-        data-testid="settings-backdrop"
-        className="fixed inset-0 z-(--z-backdrop-low) bg-(--overlay-scrim)"
-        onClick={onClose}
-      />
-      <div
-        ref={popupRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        onKeyDown={trapTab}
-        className="fixed inset-0 z-(--z-panel-low) flex flex-col overflow-hidden bg-dialog-surface pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-ui text-foreground outline-none md:inset-auto md:top-1/2 md:left-1/2 md:h-(--settings-h) md:w-(--settings-w) md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-(--radius-sheet) md:p-0 md:shadow-(--e3)"
-      >
+    <DialogShell
+      bare
+      open
+      title={t('设置')}
+      zIndex="var(--z-panel-low)"
+      initialFocus={focusRef}
+      returnFocusTo={opener}
+      width={tabs ? '100vw' : 'var(--settings-w)'}
+      height={tabs ? '100dvh' : 'var(--settings-h)'}
+      className={
+        tabs
+          ? 'inset-0! top-0! left-0! max-h-none! translate-x-0! translate-y-0! animate-none! rounded-none! pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-foreground shadow-none! duration-0!'
+          : 'rounded-(--radius-sheet)! text-foreground shadow-(--e3)!'
+      }
+      onBackdropClick={onClose}
+      onClose={(details) => {
+        if (details?.reason === 'outside-press') return;
+        if (details?.reason === 'escape-key') {
+          const selfDialog = focusRef.current?.closest('[role="dialog"]') ?? null;
+          const nestedOpen = [...document.querySelectorAll('[data-open]')].some(
+            (el) =>
+              el !== selfDialog &&
+              el.getAttribute('data-slot') !== 'dialog-overlay' &&
+              el.checkVisibility(),
+          );
+          if (nestedOpen || layerAbove() || isEditableTarget(details.event?.target ?? null)) return;
+        }
+        onClose();
+      }}
+    >
+      <div ref={setFocusRef} tabIndex={-1} className="flex min-h-0 flex-1 flex-col outline-none">
         <header
           data-testid="settings-title"
           className="flex h-11 flex-none items-center justify-between gap-2 border-b border-border pr-3 pl-4"
         >
-          <h1 id={titleId} className="m-0 text-card-title font-semibold text-foreground">
-            {t('设置')}
-          </h1>
+          <h1 className="m-0 text-card-title font-semibold text-foreground">{t('设置')}</h1>
           <IconTooltip
             label={t('关闭设置')}
             side="bottom"
@@ -433,6 +423,6 @@ export function SettingsDialog({
           </div>
         </div>
       </div>
-    </>
+    </DialogShell>
   );
 }
