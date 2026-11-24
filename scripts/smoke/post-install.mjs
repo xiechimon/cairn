@@ -727,13 +727,22 @@ async function checkAttachment(page, ctx) {
     (await textTile.locator('svg, [data-file-icon]').count()) > 0,
     'text file tile does not show a type icon',
   );
-  await page.getByRole('button', { name: IMAGE_NAMES[0], exact: true }).first().click();
   const panel = page.getByTestId('artifact-panel');
-  const selected = panel.getByRole('tab', { selected: true });
+  const selected = panel.locator('[data-testid="artifact-tab"][data-active]');
+  const openTile = async (name) => {
+    const chatFocus = page.getByTestId('artifact-focus-chat');
+    if (await chatFocus.isVisible().catch(() => false)) await chatFocus.click();
+    await attachments
+      .filter({ hasText: name })
+      .getByRole('button', { name, exact: true })
+      .first()
+      .click();
+  };
+  await openTile(IMAGE_NAMES[0]);
   await selected.filter({ hasText: IMAGE_NAMES[0] }).waitFor({ timeout: UI_WAIT_MS });
-  await page.getByRole('button', { name: IMAGE_NAMES[1], exact: true }).first().click();
+  await openTile(IMAGE_NAMES[1]);
   await selected.filter({ hasText: IMAGE_NAMES[1] }).waitFor({ timeout: UI_WAIT_MS });
-  await page.getByRole('button', { name: 'notes.txt', exact: true }).first().click();
+  await openTile('notes.txt');
   await panel
     .getByTestId('artifact-body')
     .filter({ hasText: TXT_BODY.split('\n')[0] })
