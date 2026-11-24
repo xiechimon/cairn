@@ -59,7 +59,7 @@ export function ProductChiefSection() {
           <div className="w-160">
             <div className="flex max-w-full min-w-0 flex-col items-start gap-1.5">
               <div className="w-full max-w-full rounded-(--radius-reply) bg-(--reply-bubble-fill) px-3.5">
-                <QuestionCard item={QUESTION_PARKED} />
+                <QuestionCard item={QUESTION_PARKED} multiline />
               </div>
               <p className="m-0 pl-1.5 text-meta text-content-tertiary">
                 {t('Coordinator 没有等回答，已继续')}

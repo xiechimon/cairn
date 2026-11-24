@@ -15,6 +15,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { Input } from '../components/ui/input.js';
+import { Textarea } from '../components/ui/textarea.js';
 import { toastSuccess } from '../components/ui/toaster.js';
 import { ChatMarkdown, REPLY_BLOCK_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
@@ -42,6 +43,7 @@ export interface QuestionCardProps {
   onCancel?: (requestId: string) => void;
   draftKey?: string;
   bound?: boolean;
+  multiline?: boolean;
   grow?: boolean;
   pager?: ReactNode;
   onCollapse?: () => void;
@@ -122,6 +124,7 @@ export function QuestionCard({
   onCancel,
   draftKey,
   bound = false,
+  multiline = false,
   grow = false,
   pager,
   onCollapse,
@@ -297,7 +300,7 @@ export function QuestionCard({
         return;
       }
       const target = event.target instanceof HTMLElement ? event.target : null;
-      const typing = target?.matches('input[type="text"], input:not([type])') === true;
+      const typing = target?.matches('input[type="text"], input:not([type]), textarea') === true;
       if (
         event.key === 'Enter' &&
         (event.ctrlKey || event.metaKey || (typing && !event.shiftKey))
@@ -316,6 +319,7 @@ export function QuestionCard({
         return;
       }
       if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+      if (target?.matches('textarea') === true) return;
       const at = rows.findIndex((row) => row === target || row.contains(target));
       if (at < 0) return;
       event.preventDefault();
@@ -424,7 +428,19 @@ export function QuestionCard({
         {t('跳过')}
       </Button>
     );
-  const otherInput = (
+  const otherInput = multiline ? (
+    <Textarea
+      data-testid="chief-question-other"
+      data-question-row=""
+      aria-label={t('输入你自己的回答…')}
+      placeholder={t('输入你自己的回答…')}
+      autoComplete="off"
+      value={otherText}
+      disabled={disabled}
+      onChange={(event) => setOtherAt(step, event.target.value)}
+      className="min-h-6 max-h-30 min-w-0 resize-none overflow-y-auto border-0 bg-transparent px-0 py-0 text-ui leading-5 text-foreground shadow-none placeholder:text-(--text-tertiary) focus-visible:border-transparent focus-visible:ring-0 md:text-ui dark:bg-transparent"
+    />
+  ) : (
     <Input
       data-testid="chief-question-other"
       data-question-row=""

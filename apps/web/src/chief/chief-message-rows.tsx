@@ -450,6 +450,7 @@ function ParkedQuestion({ item }: { item: ChiefQuestionItem }) {
         <QuestionCard
           item={item}
           draftKey={draftKey}
+          multiline
           onAnswer={(input) =>
             root?.surface.onAnswerQuestion?.({ ...input, threadId: conversationId })
           }

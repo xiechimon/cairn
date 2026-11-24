@@ -4,6 +4,8 @@ import { toast } from 'sonner';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { AnswerComposer } from '../src/chief/answer-composer.js';
 import { type ChiefQuestionItem, QuestionCard, type QuestionCardProps } from '../src/chief/question-card.js';
+import { Input } from '../src/components/ui/input.js';
+import { Textarea } from '../src/components/ui/textarea.js';
 import { answerKeyOf, questionDockState } from '../src/chief/question-dock-state.js';
 import { questionDraftStore, questionSubmitStore } from '../src/chief/question-drafts.js';
 
@@ -322,6 +324,16 @@ describe('one answer draft across card and composer', () => {
     } finally {
       questionDockState.endUpload('another-request');
     }
+  });
+});
+
+describe('the free-text answer field', () => {
+  test('a parked card edits line breaks in the multiline field the answer composer uses; the docked row stays single-line', () => {
+    const question = item([{ label: 'Dashboard' }]);
+    const parked = QuestionCard({ item: question, draftKey: 'parked-free-text', multiline: true });
+    const docked = QuestionCard({ item: question, draftKey: 'docked-free-text', bound: true });
+    expect(element(parked, 'chief-question-other').type).toBe(Textarea);
+    expect(element(docked, 'chief-question-other').type).toBe(Input);
   });
 });
 

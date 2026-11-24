@@ -63,18 +63,22 @@ async function open(page: Page, data: ReturnType<typeof state>) {
     const body = (route.request().postDataJSON() as Posted['body']) ?? null;
     posted.push({ path, body });
     const requestId = /\/questions\/([^/]+)\//.exec(path)?.[1] ?? '';
+    const cancelling = path.endsWith('/cancel');
     data.messages = data.messages.map((row) =>
       row.id === `row-${requestId}`
         ? {
             ...row,
             content: JSON.stringify({
               ...JSON.parse(row.content as string),
-              status: path.endsWith('/cancel') ? 'cancelled' : 'answered',
-              answers: body?.answers ?? null,
+              status: cancelling ? 'cancelled' : 'answered',
+              ...(cancelling
+                ? { cancelledBy: 'person', cancelReason: '用户取消了本次提问' }
+                : { answers: body?.answers ?? null }),
             }),
           }
         : row,
     );
+    if (cancelling) return json({ ok: true });
     const updated = data.messages.find((row) => row.id === `row-${requestId}`);
     return json(updated === undefined ? {} : JSON.parse(updated.content as string));
   });
