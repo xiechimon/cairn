@@ -84,3 +84,58 @@ test('headings, inline styles, quote and a task list with the dashed-circle and 
   await expect(message).not.toContainText('**');
   await expect(message).not.toContainText('~~');
 });
+
+test('C31: a Coordinator reply sits on the page in the reply serif; the owner keeps the sand bubble in the sans', async ({
+  page,
+}) => {
+  await page.goto('/app?scenario=chief-voice');
+  const stream = page.getByTestId('home-c').getByTestId('chief-stream');
+  const reply = stream.getByTestId('chief-msg').filter({ hasText: '压测结果整理好了' });
+  await expect(reply.getByTestId('chief-reply-bubble').first()).toBeVisible();
+  const look = await page.evaluate(() => {
+    const resolve = (prop: 'fontFamily' | 'backgroundColor', value: string) => {
+      const probe = document.createElement('div');
+      probe.style[prop] = value;
+      document.body.append(probe);
+      const out = getComputedStyle(probe)[prop];
+      probe.remove();
+      return out;
+    };
+    const style = (el: Element | null) => {
+      if (el === null) return null;
+      const css = getComputedStyle(el);
+      return { background: css.backgroundColor, font: css.fontFamily };
+    };
+    const coordinator = [
+      ...document.querySelectorAll(
+        '[data-testid="chief-stream"] [data-testid="chief-reply-bubble"], [data-testid="chief-stream"] [data-testid="chief-handoff"]',
+      ),
+    ].map(style);
+    const owner = [
+      ...document.querySelectorAll('[data-testid="chief-stream"] [data-slot="user-bubble"]'),
+    ].map(style);
+    const table = style(document.querySelector('[data-testid="chief-stream"] [data-testid="md-table"]'));
+    return {
+      serif: resolve('fontFamily', 'var(--font-songti-serif)'),
+      sans: resolve('fontFamily', 'var(--font-sans)'),
+      sand: resolve('backgroundColor', 'var(--bubble-fill)'),
+      coordinator,
+      owner,
+      table,
+    };
+  });
+  expect(look.coordinator.length).toBeGreaterThanOrEqual(3);
+  for (const said of look.coordinator) {
+    expect(said?.background, 'C31: a Coordinator reply has no background').toBe('rgba(0, 0, 0, 0)');
+    expect(said?.font, 'C31: a Coordinator reply is set in the reply serif').toBe(look.serif);
+  }
+  expect(look.serif, 'C31: the reply serif token resolves').toMatch(/^"?sourceSerif4"?, "Songti SC"/);
+  expect(look.owner.length).toBe(4);
+  for (const own of look.owner) {
+    expect(own?.background, 'C31: the owner keeps the sand bubble').toBe(look.sand);
+    expect(own?.font, 'C31: the owner bubble stays in the sans').toBe(look.sans);
+  }
+  expect(look.table?.font, 'C31: a table stays in the sans').toBe(look.sans);
+  await expect(stream.getByTestId('md-code-block')).toHaveCount(1);
+  await expect(stream.getByTestId('chief-turn-error')).toHaveCount(1);
+});

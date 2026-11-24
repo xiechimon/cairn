@@ -359,6 +359,102 @@ export const chiefMarkdownRef: FixtureSet = {
   },
 };
 
+const CHIEF_VOICE_REPLY = [
+  '压测结果整理好了，重试预算是主要瓶颈：',
+  '',
+  '- 预算从 3 秒放宽到 8 秒后，超时率降到 0.4%',
+  '- 失败集中在跨区链路，同区几乎没有',
+  '- 重试次数不用改，**预算**才是关键',
+  '',
+  '| 预算 | 请求数 | 超时率 |',
+  '| --- | ---: | ---: |',
+  '| 3 秒 | 12,480 | 6.1% |',
+  '| 8 秒 | 12,512 | 0.4% |',
+  '',
+  '配置改成这样：',
+  '',
+  '```yaml',
+  'relay:',
+  '  retry:',
+  '    attempts: 3',
+  '    budget: 8s',
+  '```',
+  '',
+  '改动已经交给任务处理，合并前我会再核对一遍。',
+].join('\n');
+
+export const chiefVoice: FixtureSet = {
+  todos: [legacyReview, legacyDone, contributingGuide],
+  now: r7(15, 12),
+  chief: {
+    bound: true,
+    modelSlot: 'claude-sonnet-5 · 默认',
+    threadTitle: '看下 relay 重试为什么老超时',
+    stream: [
+      {
+        kind: 'user',
+        id: 'voice-ask',
+        text: '看下 relay 重试为什么老超时',
+        createdAt: r7(15, 0),
+      },
+      {
+        kind: 'robot',
+        id: 'voice-short',
+        markdown: '查到了：重试预算只有 3 秒，跨区链路一抖就超时。我先跑一轮压测确认。',
+        seconds: '12s',
+        createdAt: r7(15, 0) + 20_000,
+      },
+      {
+        kind: 'task-card',
+        id: 'voice-task-card',
+        todoId: contributingGuide.id,
+        projectId: contributingGuide.projectId,
+        seq: contributingGuide.seqNum,
+        title: contributingGuide.title,
+      },
+      { kind: 'handoff', id: 'voice-handoff', todoId: legacyReview.id },
+      {
+        kind: 'user',
+        id: 'voice-data',
+        text: '把压测数据和改法整理一下',
+        createdAt: r7(15, 5),
+      },
+      {
+        kind: 'robot',
+        id: 'voice-long',
+        markdown: CHIEF_VOICE_REPLY,
+        seconds: '31s',
+        createdAt: r7(15, 5) + 40_000,
+      },
+      {
+        kind: 'user',
+        id: 'voice-again',
+        text: '再跑一遍跨区压测',
+        createdAt: r7(15, 9),
+      },
+      {
+        kind: 'error',
+        id: 'voice-failed',
+        text: '模型服务暂时不可用，这一轮没有完成。',
+        createdAt: r7(15, 9) + 10_000,
+      },
+      {
+        kind: 'user',
+        id: 'voice-later',
+        text: '好，服务恢复后再跑',
+        createdAt: r7(15, 10),
+      },
+      {
+        kind: 'robot',
+        id: 'voice-ack',
+        markdown: '好的，服务恢复后我再跑跨区压测，结果出来告诉你。',
+        seconds: '4s',
+        createdAt: r7(15, 10) + 8_000,
+      },
+    ],
+  },
+};
+
 const CHIEF_CODE_REPLY = [
   '读取记录的函数如下：',
   '',

@@ -39,6 +39,7 @@ export {
   chiefThread,
   chiefThreadsLong,
   chiefThreadsOpen,
+  chiefVoice,
   chiefWorking,
 } from './chief.js';
 export {
