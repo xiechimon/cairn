@@ -350,6 +350,32 @@ test('the artifact panel fills the phone screen and switches to the chat', async
   await expect(panel).toHaveCount(0);
 });
 
+test('on a phone, opening an attachment from the chat always shows the artifact panel', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const message = '![shot.png](attachment:team-files/att-shot.png)\n![clip.mp4](attachment:team-files/att-clip.mp4)\n看看';
+  await mockLive(
+    page,
+    { threads: [THREAD], messages: [...HISTORY, { id: 'm9', role: 'user', content: message, createdAt: 40 }] },
+    (path, route) => (path.startsWith('/api/attachments/') ? route.fulfill({ status: 404, body: '' }) : undefined),
+  );
+  await page.goto('/app');
+  const tiles = page.getByTestId('chief-sent-attachment');
+  const panel = page.getByTestId('artifact-panel');
+  const selected = panel.locator('[data-testid="artifact-tab"][data-active]');
+  const openFromChat = async (name: string) => {
+    await tiles.getByRole('button', { name, exact: true }).first().click();
+    await expect(panel).toBeVisible();
+    await expect(selected).toHaveText(name);
+    await page.getByTestId('artifact-focus-chat').click();
+    await expect(panel).toBeHidden();
+  };
+  await openFromChat('shot.png');
+  await openFromChat('clip.mp4');
+  await openFromChat('clip.mp4');
+});
+
 test('a live file downloads through the endpoint that names the file', async ({ page }) => {
   await mockLive(page, { threads: [], messages: HISTORY }, (path, route) =>
     path === '/api/attachments/att-notes'

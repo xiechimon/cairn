@@ -7,6 +7,12 @@ import { PANE_PARAM, TASKS_TAB_PARAM } from '../work-panel.js';
 
 const TABS_KEY = 'cairn.artifact-tabs';
 const MAX_TABS = 12;
+let openCount = 0;
+
+function openedOf(state: unknown): number {
+  if (typeof state !== 'object' || state === null || !('artifactOpened' in state)) return 0;
+  return typeof state.artifactOpened === 'number' ? state.artifactOpened : 0;
+}
 
 export function artifactKey(attachmentId: string, fileName: string): string {
   const ext = attachmentExtOf(fileName);
@@ -91,6 +97,7 @@ export function tabsWith(
 
 export interface ArtifactPanelState {
   target: FileTarget | null;
+  opened: number;
   tabs: readonly FileTarget[];
   open: (target: FileTarget, replaces?: string | null) => void;
   select: (target: FileTarget) => void;
@@ -109,11 +116,11 @@ export function useArtifactPanel(): ArtifactPanelState {
     [stored, target?.key, target?.name],
   );
   const go = useCallback(
-    (next: FileTarget | null, replace: boolean) => {
+    (next: FileTarget | null, replace: boolean, state?: { artifactOpened: number }) => {
       const search = withArtifact(new URLSearchParams(location.search), next).toString();
       navigate(
         { pathname: location.pathname, search: search === '' ? '' : `?${search}` },
-        { replace },
+        { replace, state },
       );
     },
     [navigate, location.pathname, location.search],
@@ -121,7 +128,8 @@ export function useArtifactPanel(): ArtifactPanelState {
   const open = useCallback(
     (next: FileTarget, replaces: string | null = null) => {
       writeTabs(tabsWith(readTabs(), next, replaces));
-      go(next, target !== null);
+      openCount += 1;
+      go(next, target !== null, { artifactOpened: openCount });
     },
     [go, target],
   );
@@ -139,5 +147,5 @@ export function useArtifactPanel(): ArtifactPanelState {
     },
     [go, target],
   );
-  return { target, tabs, open, select, closeTab, closePanel };
+  return { target, opened: openedOf(location.state), tabs, open, select, closeTab, closePanel };
 }

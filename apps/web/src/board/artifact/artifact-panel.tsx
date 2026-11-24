@@ -61,7 +61,12 @@ export function useArtifactSplit(
   const wide = usePanelDocked();
   const panel = useArtifactPanel();
   const [focus, setFocus] = useState<Focus>('artifact');
+  const [shownOpen, setShownOpen] = useState(panel.opened);
   const [full, setFull] = useState(false);
+  if (panel.opened !== shownOpen) {
+    setShownOpen(panel.opened);
+    setFocus('artifact');
+  }
   if (panel.target === null) return null;
   const switcher = wide ? null : <FocusSwitch value={focus} onChange={setFocus} />;
   return {
