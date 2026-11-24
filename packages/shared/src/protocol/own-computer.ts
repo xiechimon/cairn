@@ -236,3 +236,16 @@ export const OWN_COMPUTER_TOOLS: readonly RemoteToolDef[] = [
     ),
   },
 ];
+
+export const COORDINATOR_ATTACH_FILE_TOOL: RemoteToolDef = {
+  name: 'attach_file',
+  description:
+    "Attach a file from the user's own computer to your reply (up to 10 MiB; PNG, JPEG, GIF, WebP, PDF, or UTF-8 text/JSON/XML). Pass the file path on the user's computer (for example a PNG exported with user_computer_shell). Credential directories are refused. The attachment is added to your reply automatically; do not repeat the attachment markdown token in your text.",
+  parameters: obj(
+    {
+      path: str("Path to the file on the user's computer."),
+      caption: str('Optional caption or display name for the attachment.'),
+    },
+    ['path'],
+  ),
+};

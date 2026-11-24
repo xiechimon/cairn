@@ -6,6 +6,7 @@ import {
   INSTALL_PACKAGES_TOOL,
   isComputerBrowserTool,
   isInfoCardComputerTool,
+  isOwnComputerTool,
   REQUEST_SECRET_TOOL,
   type RemoteToolDef,
 } from '@cairn/shared';
@@ -53,7 +54,12 @@ export function stepRemoteToolExecutor(input: {
     const ownerWait = name === 'request_takeover' || name === REQUEST_SECRET_TOOL;
     const install = name === INSTALL_PACKAGES_TOOL;
     const computerCall =
-      isComputerBrowserTool(name) || isInfoCardComputerTool(name) || ownerWait || install;
+      isComputerBrowserTool(name) ||
+      isInfoCardComputerTool(name) ||
+      isOwnComputerTool(name) ||
+      name === 'attach_file' ||
+      ownerWait ||
+      install;
     return client.relayTool(stepId, name, params, {
       ...(def?.replaySafe ? { replaySafe: true } : {}),
       ...(computerCall

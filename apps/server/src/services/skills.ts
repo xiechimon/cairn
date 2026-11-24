@@ -208,6 +208,36 @@ export function readSkillFileBytes(skillDir: string, fileName: string): Buffer |
   return readFileSync(real);
 }
 
+export interface SkillDocument {
+  id: string;
+  name: string;
+  description: string | null;
+  path: string;
+  content: string;
+  files: string[];
+}
+
+export function readSkillDocument(
+  skillsDir: string,
+  skillId: string,
+  filePath?: string,
+): SkillDocument {
+  const found = resolveLocalSkill(skillsDir, skillId);
+  if (found === null) throw new NotFoundError(`skill ${skillId}`);
+  const target =
+    filePath !== undefined && filePath.trim() !== '' ? filePath.trim() : SKILL_ENTRY_FILE;
+  const content = readSkillFile(found.dir, target);
+  if (content === null) throw new NotFoundError(`skill file ${skillId}/${target}`);
+  return {
+    id: found.skill.id,
+    name: found.skill.name,
+    description: found.skill.description,
+    path: target,
+    content,
+    files: listSkillFiles(found.dir),
+  };
+}
+
 export function filterKnownSkillIds(skillsDir: string, ids: string[]): string[] {
   const known = new Set(scanLocalSkills(skillsDir).map((s) => s.id));
   return ids.filter((id) => known.has(id));

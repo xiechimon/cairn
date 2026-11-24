@@ -61,7 +61,12 @@ import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
 import { localMergeRecheckAuthorization } from './services/local-merge.js';
 import { receiveAntigravityVerify } from './services/machine-antigravity-verify.js';
 import { scopeMachineClaim } from './services/machine-claim-scope.js';
-import { forwardComputerCall, receiveComputerFrames } from './services/machine-computer.js';
+import {
+  computerCallDownloadAttachment,
+  computerCallUploadAttachment,
+  forwardComputerCall,
+  receiveComputerFrames,
+} from './services/machine-computer.js';
 import { withFencedTransaction } from './services/machine-deps.js';
 import { executeRelayToolCall, machineAsk } from './services/machine-relay.js';
 import { receiveRepoArchive, receiveRepoArchiveFailure } from './services/machine-repo-archive.js';
@@ -890,6 +895,47 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
           receiveComputerFrames(ctx.db, ctx.hub, row.id, callId, body.frames, ctx.secretBox),
         );
       },
+    );
+  });
+
+  app.get('/api/machine/computer/:callId/attachment', (c) => {
+    const callId = parseWith(computerCallIdSchema, c.req.param('callId'), 'callId');
+    const row = me(c);
+    const file = computerCallDownloadAttachment(deps, row.id, callId);
+    return new Response(new Uint8Array(file.bytes), {
+      status: 200,
+      headers: {
+        'content-type': 'application/octet-stream',
+        'content-length': String(file.bytes.length),
+        'cache-control': 'no-store',
+        'x-cairn-filename': encodeURIComponent(file.fileName),
+      },
+    });
+  });
+
+  app.post('/api/machine/computer/:callId/attachment', async (c) => {
+    const callId = parseWith(computerCallIdSchema, c.req.param('callId'), 'callId');
+    const rawFileName = c.req.header('x-cairn-filename');
+    if (rawFileName === undefined || rawFileName === '') {
+      throw new HttpError(400, 'missing x-cairn-filename header');
+    }
+    let fileName: string;
+    let caption: string | undefined;
+    try {
+      fileName = decodeURIComponent(rawFileName);
+      const rawCaption = c.req.header('x-cairn-caption');
+      if (rawCaption !== undefined) caption = decodeURIComponent(rawCaption);
+    } catch {
+      throw new HttpError(400, 'invalid attachment header encoding');
+    }
+    return executeMachineCommand(
+      c,
+      async () => Buffer.from(await c.req.arrayBuffer()),
+      (row, bytes) =>
+        c.json(
+          computerCallUploadAttachment(deps, row.id, callId, { fileName, caption, bytes }),
+          201,
+        ),
     );
   });
 

@@ -7,7 +7,6 @@ import {
   computerToolSchema,
   createSkillBodySchema,
   derivePlaceholderTitle,
-  INSTALL_PACKAGES_TOOL,
   isBuildStepKind,
   isComputerBrowserTool,
   isOwnComputerTool,
@@ -128,9 +127,8 @@ export function isCoordinatorComputerTool(name: string): boolean {
     isComputerBrowserTool(name) ||
     isOwnComputerTool(name) ||
     isPhoneTool(name) ||
+    name === 'attach_file' ||
     name === 'request_takeover' ||
-    name === INSTALL_PACKAGES_TOOL ||
-    name === 'shell' ||
     name === 'computer_observe' ||
     name === 'computer_act' ||
     name === 'desktop_snapshot' ||
@@ -186,7 +184,7 @@ export async function executeRelayToolCall(
   if (infoCardTodoOf(deps.db, row) !== null) {
     return executeInfoCardTool(deps, machineId, row, name, params, toolCallId, signal);
   }
-  if (isCoordinatorComputerTool(name)) {
+  if (isCoordinatorComputerTool(name) && (name !== 'attach_file' || row.kind === 'chief')) {
     return (await relayComputerTool(deps, machineId, stepId, name, params, toolCallId, signal))
       .text;
   }

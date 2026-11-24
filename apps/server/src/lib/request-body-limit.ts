@@ -47,6 +47,7 @@ function budgetOf(c: Context): number {
     case '/api/machine/computer/:callId':
     case '/api/machine/im/:connId/event':
       return 24 * MIB;
+    case '/api/machine/computer/:callId/attachment':
     case '/api/uploads/upload':
       return MULTIPART_BODY_BYTES;
     case '/api/todos/:id/design/marks':

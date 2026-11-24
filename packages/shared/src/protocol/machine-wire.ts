@@ -746,6 +746,18 @@ export const MACHINE_WIRE_EXTENSIONS = [
       '[design] #5210 landing round-trip: after the local checks and before the ref write the daemon re-asks the claim-time authorization; a refusal or no answer stops the landing (docs/design/local-merge-landing-recheck.md)',
   },
   {
+    method: 'GET',
+    path: '/api/machine/computer/{callId}/attachment',
+    reason:
+      '[design] Stage an uploaded chat attachment onto the owner computer for a live stage_attachment computer call (docs/design/coordinator-inline-files.md)',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/computer/{callId}/attachment',
+    reason:
+      '[design] Single-use binary upload of a host file produced for a live Coordinator attach_file computer call (docs/design/coordinator-inline-files.md)',
+  },
+  {
     method: 'POST',
     path: '/api/machine/im/{connId}/event',
     reason:

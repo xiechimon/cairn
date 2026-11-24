@@ -34,7 +34,7 @@ import { chiefTurnContext, claimPendingChiefStep } from '../services/coordinator
 import { coordinatorToolDefs } from '../services/coordinator-tool-defs.js';
 import { captureClaimInputs } from '../services/coordinator-turn-capture.js';
 import { serverTurnModel } from '../services/machine-claim.js';
-import { teamOffersDesktop } from '../services/machine-computer.js';
+import { stageTurnAttachments, teamOffersDesktop } from '../services/machine-computer.js';
 import { type MachineDeps, publishStepStatus, upsertChiefRow } from '../services/machine-deps.js';
 import {
   CONNECTOR_TOOL_HYDRATE_BOUND_MS,
@@ -49,7 +49,6 @@ import { listedProjects } from '../services/personal-space.js';
 import { offeredPhoneNames } from '../services/phone-computer.js';
 import { stepScopeProjectId } from '../services/picked-project.js';
 import { markProviderModelTextOnly } from '../services/providers.js';
-import { teamHasVmComputer } from '../services/vm-computer.js';
 import {
   type CoordinatorProviders,
   coordinatorProviders,
@@ -295,10 +294,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         const teamId = threadTeam(threadId);
         return teamId !== null && teamOffersDesktop(db, teamId);
       },
-      vmComputer: (threadId) => {
-        const teamId = threadTeam(threadId);
-        return teamId !== null && teamHasVmComputer(db, teamId);
-      },
       connectorTools: (threadId) => {
         const teamId = threadTeam(threadId);
         return teamId === null ? [] : connectorToolDefsForTeam(db, teamId);
@@ -419,6 +414,7 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
   const claimedPayload = async (
     row: StepRow,
     providers: CoordinatorProviders,
+    stagedUploads: string | null = null,
   ): Promise<{
     claimed: ClaimedStep;
     volatileText: string | null;
@@ -441,8 +437,11 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
       });
     }
     const readmeSection = await greetingReadmeSection(machine, row, threadRow);
-    const volatileParts =
-      readmeSection === null ? context.sections : [...context.sections, readmeSection];
+    const volatileParts = [
+      ...context.sections,
+      ...(readmeSection !== null ? [readmeSection] : []),
+      ...(stagedUploads !== null ? [stagedUploads] : []),
+    ];
     const lastUsage = lastTurnUsageForColdResume(db, row.buildId);
     const routerModel = `${providers.router.provider}/${providers.router.modelId}`;
     const retentionMs = cacheTtlMsFor(resolveCacheRetentionTier(), lastUsage?.model ?? routerModel);
@@ -594,7 +593,6 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
           ...coordinatorToolDefs({
             routerTools: options.routerTools ?? true,
             desktopTools: teamOffersDesktop(db, threadRow.teamId),
-            vmComputer: teamHasVmComputer(db, threadRow.teamId),
             ownComputer: ownComputerOffered(db, row.buildId),
             ownerChrome: localBrowserConnector(db, threadRow.teamId) !== null,
             phoneComputer: offeredPhoneNames({ db, machineHub: machine.machineHub }, row.buildId),
@@ -629,7 +627,13 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
         boundMs: CONNECTOR_TOOL_HYDRATE_BOUND_MS,
       });
       if (closing) return;
-      const payload = await claimedPayload(row, providers);
+      const threadRow = db.select().from(chiefThread).where(eq(chiefThread.id, row.buildId)).get();
+      const stagedUploads =
+        threadRow !== undefined && row.prompt !== null
+          ? await stageTurnAttachments(machine, row, threadRow, row.prompt).catch(() => null)
+          : null;
+      if (closing) return;
+      const payload = await claimedPayload(row, providers, stagedUploads);
       if (closing) return;
       if (payload === null) throw new Error('Coordinator step has no chief thread');
       await runtime.runTurn({

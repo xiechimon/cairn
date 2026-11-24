@@ -391,23 +391,8 @@ export class HostComputerProvider implements ComputerProvider {
     if (bytes.byteLength > this.maxFileBytes) {
       throw new ComputerRefusal(`content exceeds ${this.maxFileBytes} bytes`);
     }
-    const text = (requested ?? '').trim();
-    const expanded = path.resolve(
-      this.home,
-      text === '' || text === '~'
-        ? this.home
-        : text.startsWith('~/')
-          ? path.join(this.home, text.slice(2))
-          : text,
-    );
-    if (this.options.confinement?.writeDenied(expanded) === true) {
-      throw new ComputerRefusal('path is write-protected');
-    }
     const target = await this.resolveInHome(requested, 'path');
     if (target === (await this.realHome())) throw new ComputerRefusal('path is the home folder');
-    if (this.options.confinement?.writeDenied(target) === true) {
-      throw new ComputerRefusal('path is write-protected');
-    }
     const directory = path.dirname(target);
     await mkdir(directory, { recursive: true });
     const realDirectory = await realpath(directory);
@@ -415,11 +400,8 @@ export class HostComputerProvider implements ComputerProvider {
       throw new ComputerRefusal('path resolves outside the home folder');
     }
     const realTarget = path.join(realDirectory, path.basename(target));
-    if (
-      this.options.confinement?.denied(realTarget) === true ||
-      this.options.confinement?.writeDenied(realTarget) === true
-    ) {
-      throw new ComputerRefusal('path is write-protected');
+    if (this.options.confinement?.denied(realTarget) === true) {
+      throw new ComputerRefusal('path is inside a protected directory');
     }
     const existing = await lstat(realTarget).catch(() => undefined);
     if (existing && !existing.isFile()) throw new ComputerRefusal('path is not a regular file');

@@ -14,8 +14,9 @@ import {
 } from '@cairn/shared';
 import { z } from 'zod';
 import { phoneControlRefusal } from '../backend/command-gate.js';
+import type { HostShellConfinement } from '../backend/host-shell-confinement.js';
 import type { DaemonLogger } from '../log.js';
-import type { MachineApi } from '../machine-client.js';
+import { type MachineApi, MachineApiError } from '../machine-client.js';
 import { STEP_TREE_ENV } from '../process-tree.js';
 import {
   AUTO_STEALTH_NOTE,
@@ -47,6 +48,7 @@ import {
   ComputerRefusal,
   type ScopedComputerProviders,
 } from './provider.js';
+import { defaultStagingRoot, readHostFileForAttach, writeStagedUpload } from './staging.js';
 
 const OWN_MAC_TOOLS: ReadonlySet<string> = new Set(OWN_COMPUTER_TOOL_NAMES);
 
@@ -79,6 +81,15 @@ const shellParams = z.object({
 });
 
 const pathParams = z.object({ path: z.string().max(4096) });
+const attachFileParams = z.object({
+  path: z.string().min(1).max(4096),
+  caption: z.string().max(500).optional(),
+});
+const stageAttachmentParams = z.object({
+  threadId: z.string().min(1).max(256),
+  attachmentId: z.string().min(1).max(256),
+  fileName: z.string().min(1).max(512),
+});
 const listParams = z.object({ path: z.string().max(4096).optional() });
 const writeParams = z.object({ path: z.string().max(4096), content: z.string() });
 
@@ -103,7 +114,8 @@ interface Route {
   refusal: (command: string) => string | undefined;
 }
 
-type ComputerClient = Pick<MachineApi, 'computerFrames'>;
+type ComputerClient = Pick<MachineApi, 'computerFrames'> &
+  Partial<Pick<MachineApi, 'downloadComputerAttachment' | 'uploadComputerAttachment'>>;
 
 export async function rejectComputerCall(
   client: ComputerClient,
@@ -118,6 +130,9 @@ export async function rejectComputerCall(
 export interface ComputerDispatcherOptions {
   client: ComputerClient;
   host?: ComputerProvider;
+  hostConfinement?: Pick<HostShellConfinement, 'denied'>;
+  hostHome?: string;
+  stagingRoot?: string;
   screen?: HostScreen;
   orb?: ScopedComputerProviders;
   logger?: Pick<DaemonLogger, 'machine'>;
@@ -683,7 +698,119 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
     }
   }
 
+  function apiErrorMessage(error: unknown, fallback: string): string {
+    if (error instanceof MachineApiError) {
+      try {
+        const parsed = JSON.parse(error.body) as { error?: unknown };
+        if (typeof parsed.error === 'string' && parsed.error.trim() !== '') return parsed.error;
+      } catch {}
+      return error.body.trim() !== '' ? error.body.slice(0, 300) : fallback;
+    }
+    return error instanceof Error && error.message.trim() !== '' ? error.message : fallback;
+  }
+
+  async function handleStageAttachment(
+    call: ComputerCall,
+    controller: AbortController,
+  ): Promise<void> {
+    if (!options.host || !options.client.downloadComputerAttachment) {
+      await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
+      return;
+    }
+    const parsed = stageAttachmentParams.safeParse(call.params);
+    if (!parsed.success) {
+      await refuse(call, 'The stage_attachment call has invalid arguments, so nothing ran');
+      return;
+    }
+    if (call.deadlineAt - now() <= 0) {
+      await refuse(call, 'The call deadline had already passed, so nothing ran');
+      return;
+    }
+    const stagingRoot = options.stagingRoot ?? defaultStagingRoot();
+    if (options.hostConfinement?.denied(stagingRoot)) {
+      await refuse(call, 'The staging directory is inside a protected path');
+      return;
+    }
+    const poster = posterFor(call, controller);
+    try {
+      const bytes = await options.client.downloadComputerAttachment(call.callId, controller.signal);
+      const staged = writeStagedUpload(stagingRoot, {
+        threadId: parsed.data.threadId,
+        attachmentId: parsed.data.attachmentId,
+        fileName: parsed.data.fileName,
+        bytes,
+      });
+      await poster.finish({ kind: 'done', text: JSON.stringify(staged) });
+    } catch (error) {
+      await poster.finish(
+        error instanceof ComputerRefusal
+          ? { kind: 'error', message: error.message, delivery: 'not_delivered' }
+          : {
+              kind: 'error',
+              message: boundBrowserError(apiErrorMessage(error, 'Staging the attachment failed')),
+              delivery: 'unknown',
+            },
+      );
+    }
+  }
+
+  async function handleAttachFile(call: ComputerCall, controller: AbortController): Promise<void> {
+    if (!options.host || !options.hostConfinement || !options.client.uploadComputerAttachment) {
+      await refuse(call, NO_COMPUTER_PROVIDER_MESSAGE);
+      return;
+    }
+    const parsed = attachFileParams.safeParse(call.params);
+    if (!parsed.success) {
+      await refuse(call, 'attach_file requires a non-empty path string');
+      return;
+    }
+    if (call.deadlineAt - now() <= 0) {
+      await refuse(call, 'The call deadline had already passed, so nothing ran');
+      return;
+    }
+    let prepared: { fileName: string; bytes: Buffer };
+    try {
+      prepared = readHostFileForAttach(parsed.data.path, options.hostConfinement, {
+        ...(options.hostHome !== undefined ? { home: options.hostHome } : {}),
+      });
+    } catch (error) {
+      await refuse(
+        call,
+        error instanceof ComputerRefusal ? error.message : 'The file could not be read',
+      );
+      return;
+    }
+    const poster = posterFor(call, controller);
+    try {
+      const uploaded = await options.client.uploadComputerAttachment(
+        call.callId,
+        {
+          fileName: prepared.fileName,
+          ...(parsed.data.caption !== undefined ? { caption: parsed.data.caption } : {}),
+          bytes: prepared.bytes,
+        },
+        controller.signal,
+      );
+      await poster.finish({ kind: 'done', text: JSON.stringify(uploaded) });
+    } catch (error) {
+      await poster.finish({
+        kind: 'error',
+        message: boundBrowserError(apiErrorMessage(error, 'Uploading the attachment failed')),
+        delivery:
+          error instanceof MachineApiError && error.status < 500 ? 'not_delivered' : 'unknown',
+      });
+    }
+  }
+
   async function handle(call: ComputerCall, controller: AbortController): Promise<void> {
+    if (call.tool === 'stage_attachment') {
+      await handleStageAttachment(call, controller);
+      return;
+    }
+    if (call.tool === 'attach_file') {
+      await handleAttachFile(call, controller);
+      return;
+    }
     const grant = orbGrantNeeded(call);
     if (grant !== null && call.computerGrant !== grant) {
       await refuse(call, NO_COMPUTER_GRANT_MESSAGE);

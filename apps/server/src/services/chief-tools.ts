@@ -113,7 +113,12 @@ import {
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
 import { createSecret, deleteSecret, listSecrets, updateSecret } from './secrets.js';
-import { createLocalSkill, scanLocalSkills, updateLocalSkill } from './skills.js';
+import {
+  createLocalSkill,
+  readSkillDocument,
+  scanLocalSkills,
+  updateLocalSkill,
+} from './skills.js';
 import { listBuildStepRoutes } from './step-route.js';
 import { assertGroundedClaims, TerminalClaimError } from './terminal-claims.js';
 import { startThreadBuild } from './thread-message.js';
@@ -479,6 +484,13 @@ export async function executeChiefTool(
         .where(eq(machine.teamId, ctx.teamId))
         .all()
         .some((row) => row.capabilities?.agentReach !== undefined);
+      const skillId = optStr(params, 'skillId');
+      if (skillId !== undefined) {
+        if (skillId === 'agent-reach' && !reachEnabled) {
+          throw new HttpError(404, `skill ${skillId} not found`);
+        }
+        return json(readSkillDocument(deps.skillsDir, skillId, optStr(params, 'path')));
+      }
       const scanned = scanLocalSkills(deps.skillsDir).filter(
         (skill) => skill.id !== 'agent-reach' || reachEnabled,
       );

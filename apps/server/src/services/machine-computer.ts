@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import {
   browserSecretFillActionSchema,
   CLOAK_LICENSE_SECRET,
@@ -35,6 +37,7 @@ import {
   phoneManageResultSchema,
   redactSecrets,
   type SecretBox,
+  STAGE_ATTACHMENT_TIMEOUT_MS,
   TAKEOVER_HANDED_BACK,
 } from '@cairn/shared';
 import { and, desc, eq, inArray, isNull, ne } from 'drizzle-orm';
@@ -58,6 +61,8 @@ import {
   proposeAction,
   REFUSE_CHOICE,
 } from './action-proposals.js';
+import { attachCoordinatorFile } from './agent-attachments.js';
+import { requireAttachmentRow } from './attachments.js';
 import {
   BROWSER_PASSWORD_ACTION,
   browserPasswordIds,
@@ -65,6 +70,7 @@ import {
   requireBrowserPassword,
 } from './browser-passwords.js';
 import { NotFoundError } from './builds.js';
+import { parseChiefTrigger } from './chief.js';
 import { announceQuestion } from './chief-questions.js';
 import { computerCallOwnerUserId, ownedPrivateComputer } from './computer-access.js';
 import {
@@ -89,6 +95,7 @@ import { isOwner } from './instance-owner.js';
 import { type MachineDeps, ownedStepRow } from './machine-deps.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { localBrowserConnector } from './mcp-servers.js';
+import { memoryEditIdOfPrompt } from './memory-edit-turns.js';
 import { ownComputerTarget } from './own-computer.js';
 import {
   acquirePhoneLease,
@@ -100,7 +107,7 @@ import {
   sanitizePhoneName,
 } from './phone-computer.js';
 import { sendMustReachAlert } from './push-alerts.js';
-import { refuseRestrictedTurnTool } from './report-turn.js';
+import { refuseRestrictedTurnTool, turnForcesOutboundApproval } from './report-turn.js';
 
 export const COMPUTER_OUTPUT_HEAD_CHARS = 16 * 1024;
 export const COMPUTER_OUTPUT_TAIL_CHARS = 48 * 1024;
@@ -1477,18 +1484,57 @@ export async function forwardComputerCall(
   if (tool === 'phone_manage') throw new HttpError(400, PHONE_MANAGE_PANEL_ONLY);
   if (tool === 'browser_close_tab')
     throw new HttpError(400, 'browser_close_tab is sent by the server when a step ends');
+  if (tool === 'stage_attachment')
+    throw new HttpError(400, 'stage_attachment is sent by the server before a turn starts');
+  if (stepRow.kind === 'chief') {
+    refuseRestrictedTurnTool(db, stepRow.prompt, tool, body.params, stepRow.ownerMessageIds ?? []);
+    if (
+      tool === 'shell' ||
+      tool === 'list_files' ||
+      tool === 'read_file' ||
+      tool === 'write_file'
+    ) {
+      throw new HttpError(
+        400,
+        'the Coordinator VM command channel was removed; use user_computer_shell instead',
+      );
+    }
+  }
   let own: { machineId: string } | null = null;
   let phoneTarget: Extract<PhoneComputerTarget, { kind: 'ready' }> | null = null;
-  if (isOwnComputerTool(tool) || isPhoneTool(tool)) {
-    refuseRestrictedTurnTool(db, stepRow.prompt, tool, body.params, stepRow.ownerMessageIds ?? []);
+  if (isOwnComputerTool(tool) || tool === 'attach_file' || isPhoneTool(tool)) {
     const chiefRow =
       stepRow.kind === 'chief'
         ? db.select().from(chiefThread).where(eq(chiefThread.id, stepRow.buildId)).get()
         : undefined;
     if (chiefRow === undefined) throw new NotFoundError(`chief thread ${stepRow.buildId}`);
-    if (isOwnComputerTool(tool)) {
-      const target = ownComputerTarget(deps, chiefRow, tool);
+    if (isOwnComputerTool(tool) || tool === 'attach_file') {
+      const target = ownComputerTarget(
+        deps,
+        chiefRow,
+        tool === 'attach_file' ? 'user_computer_shell' : tool,
+      );
       if (target.kind === 'refused') return { text: target.text };
+      if (tool === 'attach_file') {
+        const filePath = body.params.path;
+        if (
+          typeof filePath !== 'string' ||
+          filePath.trim() === '' ||
+          filePath.includes('\0') ||
+          filePath.length > 4096
+        ) {
+          throw new HttpError(400, 'attach_file requires a non-empty path string');
+        }
+        if (
+          body.params.caption !== undefined &&
+          (typeof body.params.caption !== 'string' || body.params.caption.length > 500)
+        ) {
+          throw new HttpError(
+            400,
+            'attach_file caption must be a string of at most 500 characters',
+          );
+        }
+      }
       own = { machineId: target.machineId };
     } else {
       const target = phoneComputerTarget(deps, thread, stepId, tool, body.params);
@@ -1759,4 +1805,207 @@ export async function forwardComputerCall(
   const row = db.select().from(computerCall).where(eq(computerCall.id, dispatchId)).get();
   if (row) publishComputerChanged(db, deps.hub, row);
   return waitForCall(deps, pending, stepId, opts.signal);
+}
+
+const PROMPT_ATTACHMENT_REF =
+  /!?\[[^\]]*\]\(attachment:([A-Za-z0-9_-]+)\/([A-Za-z0-9_-]+)\.([a-z0-9]{1,8})\)/g;
+const MAX_STAGED_ATTACHMENTS_PER_TURN = 16;
+
+function sanitizePromptInline(text: string, maxChars: number): string {
+  return text.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, maxChars);
+}
+
+function activeMachineComputerCall(
+  db: Db,
+  machineId: string,
+  callId: string,
+  expectedTool: 'stage_attachment' | 'attach_file',
+): { callRow: CallRow; stepRow: typeof step.$inferSelect } {
+  const row = db.select().from(computerCall).where(eq(computerCall.id, callId)).get();
+  if (!row || row.machineId !== machineId || row.tool !== expectedTool) {
+    throw new HttpError(404, 'computer call not found');
+  }
+  if (row.state !== 'dispatched' && row.state !== 'running') {
+    throw new HttpError(409, `computer call already ${row.state}`);
+  }
+  if (row.deadlineAt <= nowMs()) {
+    throw new HttpError(409, 'computer call deadline expired');
+  }
+  const stepRow = db.select().from(step).where(eq(step.id, row.stepId)).get();
+  if (stepRow?.kind !== 'chief' || stepRow.status !== 'claimed') {
+    throw new HttpError(409, `${expectedTool} requires a claimed Coordinator turn`);
+  }
+  return { callRow: row, stepRow };
+}
+
+export function computerCallDownloadAttachment(
+  deps: Pick<MachineDeps, 'db' | 'attachmentsDir'>,
+  machineId: string,
+  callId: string,
+): { fileName: string; mimeType: string; bytes: Buffer } {
+  const { callRow } = activeMachineComputerCall(deps.db, machineId, callId, 'stage_attachment');
+  const attachmentId = callRow.params.attachmentId;
+  if (typeof attachmentId !== 'string' || attachmentId === '') {
+    throw new HttpError(400, 'stage_attachment call has no attachmentId');
+  }
+  const att = requireAttachmentRow(deps.db, callRow.teamId, attachmentId);
+  const bytes = readFileSync(join(deps.attachmentsDir, att.storageKey));
+  return { fileName: att.fileName, mimeType: att.mimeType, bytes };
+}
+
+export function computerCallUploadAttachment(
+  deps: MachineDeps,
+  machineId: string,
+  callId: string,
+  input: { fileName: string; caption?: string | undefined; bytes: Buffer },
+): { id: string; key: string; token: string; sha256: string } {
+  const { callRow, stepRow } = activeMachineComputerCall(deps.db, machineId, callId, 'attach_file');
+  const threadRow = deps.db
+    .select()
+    .from(chiefThread)
+    .where(eq(chiefThread.id, stepRow.buildId))
+    .get();
+  if (!threadRow || threadRow.teamId !== callRow.teamId) {
+    throw new NotFoundError(`chief thread ${stepRow.buildId}`);
+  }
+  const claimed = deps.db
+    .update(computerCall)
+    .set({ resultText: 'uploading' })
+    .where(
+      and(
+        eq(computerCall.id, callId),
+        inArray(computerCall.state, ['dispatched', 'running']),
+        isNull(computerCall.resultText),
+      ),
+    )
+    .run();
+  if (claimed.changes === 0) {
+    throw new HttpError(409, 'attach_file already uploaded for this call');
+  }
+  try {
+    return attachCoordinatorFile(deps, stepRow, threadRow, input);
+  } catch (error) {
+    deps.db
+      .update(computerCall)
+      .set({ resultText: null })
+      .where(and(eq(computerCall.id, callId), eq(computerCall.resultText, 'uploading')))
+      .run();
+    throw error;
+  }
+}
+
+export async function stageTurnAttachments(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  threadRow: typeof chiefThread.$inferSelect,
+  prompt: string,
+  signal?: AbortSignal,
+): Promise<string | null> {
+  if (!isOwner(deps.db, threadRow.userId)) return null;
+  if (parseChiefTrigger(prompt) !== 'user') return null;
+  if (turnForcesOutboundApproval(deps.db, prompt)) return null;
+  if (memoryEditIdOfPrompt(prompt) !== null) return null;
+  const seen = new Set<string>();
+  const refs: { teamId: string; attachmentId: string }[] = [];
+  for (const match of prompt.matchAll(PROMPT_ATTACHMENT_REF)) {
+    const teamId = match[1] ?? '';
+    const attachmentId = match[2] ?? '';
+    if (teamId !== threadRow.teamId || attachmentId === '' || seen.has(attachmentId)) continue;
+    seen.add(attachmentId);
+    refs.push({ teamId, attachmentId });
+    if (refs.length >= MAX_STAGED_ATTACHMENTS_PER_TURN) break;
+  }
+  if (refs.length === 0) return null;
+  const rows = refs.flatMap((ref) => {
+    try {
+      return [requireAttachmentRow(deps.db, threadRow.teamId, ref.attachmentId)];
+    } catch {
+      return [];
+    }
+  });
+  if (rows.length === 0) return null;
+  const target = ownComputerTarget(deps, threadRow, 'user_computer_shell');
+  if (target.kind === 'refused') {
+    const names = rows.map((row) => sanitizePromptInline(row.fileName, 120)).join(', ');
+    return [
+      '<staged_uploads>',
+      `Uploaded file(s) (${names}) could not be staged on the user's computer: ${target.text}`,
+      '</staged_uploads>',
+    ].join('\n');
+  }
+  const lines: string[] = [];
+  for (const row of rows) {
+    const safeName = sanitizePromptInline(row.fileName, 120);
+    const toolCallId = `stage-${row.id}`;
+    const latest = latestComputerAttempt(deps.db, stepRow.id, toolCallId);
+    const existing = latest?.row;
+    const now = nowMs();
+    const deadlineAt = now + STAGE_ATTACHMENT_TIMEOUT_MS;
+    const params = {
+      threadId: threadRow.id,
+      attachmentId: row.id,
+      fileName: row.fileName,
+    };
+    if (existing?.state === 'done' && existing.resultText !== null) {
+      try {
+        const parsed = JSON.parse(existing.resultText) as { path?: unknown };
+        if (typeof parsed.path === 'string' && parsed.path !== '') {
+          lines.push(
+            `- ${safeName} (${row.mimeType}, ${row.sizeBytes} bytes): ${sanitizePromptInline(parsed.path, 512)}`,
+          );
+          continue;
+        }
+      } catch {}
+    }
+    const attempt = (latest?.attempt ?? 0) + 1;
+    const dispatchId = computerCallId(stepRow.id, toolCallId, attempt);
+    deps.db
+      .insert(computerCall)
+      .values({
+        id: dispatchId,
+        teamId: threadRow.teamId,
+        stepId: stepRow.id,
+        toolCallId,
+        machineId: target.machineId,
+        computerId: null,
+        tool: 'stage_attachment',
+        replaySafe: true,
+        params,
+        state: 'dispatched',
+        deadlineAt,
+        createdAt: now,
+      })
+      .run();
+    const call: ComputerCall = {
+      callId: dispatchId,
+      stepId: stepRow.id,
+      tool: 'stage_attachment',
+      params,
+      deadlineAt,
+    };
+    if (!deps.machineHub.pushComputer(target.machineId, call)) {
+      deps.db.delete(computerCall).where(eq(computerCall.id, dispatchId)).run();
+      lines.push(`- ${safeName}: could not be staged (${COMPUTER_NOT_CONNECTED})`);
+      continue;
+    }
+    const settled = await waitForCall(deps, openPending(deps, call), stepRow.id, signal);
+    let stagedPath: string | null = null;
+    try {
+      const parsed = JSON.parse(settled.text) as { path?: unknown };
+      if (typeof parsed.path === 'string' && parsed.path !== '') stagedPath = parsed.path;
+    } catch {}
+    if (stagedPath !== null) {
+      lines.push(
+        `- ${safeName} (${row.mimeType}, ${row.sizeBytes} bytes): ${sanitizePromptInline(stagedPath, 512)}`,
+      );
+    } else {
+      lines.push(`- ${safeName}: could not be staged (${sanitizePromptInline(settled.text, 200)})`);
+    }
+  }
+  return [
+    '<staged_uploads>',
+    "Uploaded chat files staged on the user's computer (ready for user_computer_shell; return output files with attach_file):",
+    ...lines,
+    '</staged_uploads>',
+  ].join('\n');
 }

@@ -8,11 +8,10 @@ import { isCoordinatorComputerTool } from '../src/services/machine-relay.js';
 
 const computerNames = (
   desktopTools: boolean,
-  vmComputer = desktopTools,
   ownComputer = desktopTools,
   phoneComputer: readonly string[] = [],
 ) =>
-  coordinatorToolDefs({ desktopTools, vmComputer, ownComputer, phoneComputer })
+  coordinatorToolDefs({ desktopTools, ownComputer, phoneComputer })
     .map((def) => def.name)
     .filter((name) => (COMPUTER_TOOLS as readonly string[]).includes(name))
     .sort();
@@ -31,15 +30,13 @@ describe('Coordinator computer tool offers', () => {
     const offered = COMPUTER_TOOLS.filter(
       (name) => 'offered' in COORDINATOR_COMPUTER_TOOL_OFFERS[name],
     ).sort();
-    expect(computerNames(true, true, true, ['Pixel 8a'])).toEqual(offered);
+    expect(computerNames(true, true, ['Pixel 8a'])).toEqual(offered);
   });
 
   test("the user's Mac tools are offered only when the user's Mac is, and keep the Mac prefix", () => {
-    expect(computerNames(true, true, false)).not.toContain('user_computer_observe');
+    expect(computerNames(true, false)).not.toContain('user_computer_observe');
     const mac = ['user_computer_act', 'user_computer_observe', 'user_computer_shell'];
-    expect(computerNames(false, false, true).filter((name) => name.startsWith('user_'))).toEqual(
-      mac,
-    );
+    expect(computerNames(false, true).filter((name) => name.startsWith('user_'))).toEqual(mac);
     const defs = coordinatorToolDefs({ ownComputer: true, desktopTools: true });
     for (const name of mac)
       expect(defs.find((def) => def.name === name)?.description).toMatch(
@@ -51,22 +48,20 @@ describe('Coordinator computer tool offers', () => {
       );
   });
 
-  test('the Coordinator shell is offered with a VM computer, runs there, and is not the Mac shell', () => {
-    expect(computerNames(true, false)).not.toContain('shell');
-    expect(computerNames(true, true)).toContain('shell');
-    const defs = coordinatorToolDefs({ desktopTools: true, vmComputer: true, ownComputer: true });
-    expect(defs.find((def) => def.name === 'shell')?.description).toMatch(
-      /^Your VM computer, not the user's Mac/,
-    );
-    expect(defs.find((def) => def.name === 'user_computer_shell')?.description).toMatch(
-      /^The user's own Mac/,
-    );
-  });
-
-  test('install_packages is offered only with a VM computer', () => {
-    expect(computerNames(true, false)).not.toContain('install_packages');
-    expect(computerNames(true, true)).toContain('install_packages');
-    expect(computerNames(true, true)).not.toContain('computer_manage');
+  test('the Coordinator VM command channel (shell and install_packages) is withheld', () => {
+    expect('withheld' in COORDINATOR_COMPUTER_TOOL_OFFERS.shell).toBe(true);
+    expect('withheld' in COORDINATOR_COMPUTER_TOOL_OFFERS.install_packages).toBe(true);
+    expect('withheld' in COORDINATOR_COMPUTER_TOOL_OFFERS.stage_attachment).toBe(true);
+    expect(COORDINATOR_COMPUTER_TOOL_OFFERS.attach_file).toEqual({
+      offered: 'when_owner_thread_and_team_has_mac',
+    });
+    expect(isCoordinatorComputerTool('shell')).toBe(false);
+    expect(isCoordinatorComputerTool('install_packages')).toBe(false);
+    expect(isCoordinatorComputerTool('attach_file')).toBe(true);
+    expect(computerNames(true, true)).not.toContain('shell');
+    expect(computerNames(true, true)).not.toContain('install_packages');
+    expect(computerNames(false, true)).toContain('attach_file');
+    expect(computerNames(true, false)).not.toContain('attach_file');
   });
 
   test('every offered computer tool is routed to a machine computer', () => {

@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
 import {
-  COMPUTER_VM_TOOLS,
   type ComputerCall,
   type MachineStreamEvent,
   PACKAGES_DECLINED,
@@ -410,12 +409,10 @@ describe('after a server restart', () => {
 });
 
 describe('the Coordinator prompt', () => {
-  test('install_packages carries its own rules and the prompt never names it', () => {
+  test('the Coordinator prompt never names install_packages', () => {
     const vm = boot();
     expect(composeChiefSystemPrompt(vm.deps, vm.s.team.id, THREAD)).not.toContain(
       'install_packages',
     );
-    const install = COMPUTER_VM_TOOLS.find((def) => def.name === 'install_packages')!;
-    expect(install.description).toContain('pip install --user');
   });
 });

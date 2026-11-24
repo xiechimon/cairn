@@ -8,12 +8,20 @@ import {
   isImageAttachmentExt,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
-import { attachment, message, type step, type todo } from '../db/schema.js';
+import {
+  attachment,
+  chiefMessage,
+  type chiefThread,
+  message,
+  type step,
+  type todo,
+} from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
 import { extOf, validateAttachmentUpload, writeAttachmentFile } from './attachments.js';
 import { recordDesignVersion } from './design.js';
-import { type MachineDeps, upsertMessage } from './machine-deps.js';
+import { type MachineDeps, upsertChiefRow, upsertMessage } from './machine-deps.js';
+import { stepScopeProjectId } from './picked-project.js';
 
 const BINARY_MIME_BY_EXT: Readonly<Record<string, string>> = {
   png: 'image/png',
@@ -185,4 +193,77 @@ export function attachWorkerFile(
     throw error;
   }
   return JSON.stringify({ id, key, token, sha256 });
+}
+
+export function attachCoordinatorFile(
+  deps: MachineDeps,
+  stepRow: typeof step.$inferSelect,
+  threadRow: typeof chiefThread.$inferSelect,
+  input: { fileName: string; caption?: string | undefined; bytes: Buffer },
+): { id: string; key: string; token: string; sha256: string } {
+  if (stepRow.status !== 'claimed') throw new HttpError(409, 'attach_file requires a claimed turn');
+  if (input.caption !== undefined && input.caption.length > 2000) {
+    throw new HttpError(400, 'attach_file caption must be a string of at most 2000 characters');
+  }
+  if (input.bytes.length <= 0) {
+    throw new HttpError(400, 'attach_file requires a non-empty file');
+  }
+  if (input.bytes.length > ATTACHMENT_MAX_BYTES) {
+    throw new HttpError(400, 'attach_file exceeds the 10 MiB attachment cap');
+  }
+  const mimeType = attachmentMime(input.fileName, input.bytes);
+  validateAttachmentUpload(
+    { db: deps.db, teamId: threadRow.teamId },
+    {
+      fileName: input.fileName,
+      mimeType,
+      size: input.bytes.length,
+      scope: 'message',
+    },
+  );
+  const id = newRecordId();
+  const key = `${threadRow.teamId}/${id}.${extOf(input.fileName)}`;
+  const caption = (
+    input.caption !== undefined && input.caption.trim() !== '' ? input.caption : input.fileName
+  ).replace(/[[\]\r\n]/g, ' ');
+  const token = formatAttachmentToken(caption, key);
+  const sha256 = createHash('sha256').update(input.bytes).digest('hex');
+  const outputId = `attachment-output-${stepRow.id}`;
+  const prior = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, outputId)).get();
+  const now = nowMs();
+  writeAttachmentFile(deps.attachmentsDir, key, input.bytes);
+  try {
+    deps.db.transaction(() => {
+      deps.db
+        .insert(attachment)
+        .values({
+          id,
+          teamId: threadRow.teamId,
+          todoId: null,
+          sha256,
+          createdBy: `step:${stepRow.id}`,
+          fileName: input.fileName,
+          mimeType,
+          sizeBytes: input.bytes.length,
+          storageKey: key,
+          grantId: newRecordId(),
+          scope: 'message',
+          status: 'ready',
+          createdAt: now,
+        })
+        .run();
+      upsertChiefRow(deps, {
+        id: outputId,
+        threadId: threadRow.id,
+        projectId: stepScopeProjectId(stepRow),
+        role: 'assistant',
+        content: typeof prior?.content === 'string' ? `${prior.content}\n${token}` : token,
+        createdAt: prior?.createdAt ?? now,
+      });
+    });
+  } catch (error) {
+    rmSync(join(deps.attachmentsDir, key), { force: true });
+    throw error;
+  }
+  return { id, key, token, sha256 };
 }

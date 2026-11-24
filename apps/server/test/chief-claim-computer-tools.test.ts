@@ -109,11 +109,12 @@ function addVm(s: TestServer, opts: { kind?: 'vm' | 'host' } = {}) {
 }
 
 describe('a Runner-claimed chief turn offers the computer tools the machine reports', () => {
-  test('a capable VM machine puts the desktop and VM tools on the claim payload', async () => {
+  test('a capable VM machine puts desktop tools on the claim payload and omits the retired VM command channel', async () => {
     const s = boot();
     addVm(s);
     const names = await toolNames(s);
-    for (const name of [...DESKTOP_TOOLS, ...VM_TOOLS]) expect(names).toContain(name);
+    for (const name of DESKTOP_TOOLS) expect(names).toContain(name);
+    for (const name of VM_TOOLS) expect(names).not.toContain(name);
   });
 
   test('a host-kind computer offers the desktop tools but not the VM tools', async () => {

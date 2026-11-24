@@ -228,77 +228,54 @@ describe('createHostShellConfinement', () => {
     expect(profile).toContain('(deny mach-bootstrap)');
     expect(profile).toContain('(deny process-exec (literal "/bin/launchctl")');
     expect(profile).toContain('global-name-prefix "com.apple.secd"');
-    const writeDeny = profile
-      .split('\n')
-      .filter((line) => line.startsWith('(deny file-write*'))
-      .join('\n');
-    expect(writeDeny).toContain(`(subpath "${join(home, 'Library', 'LaunchAgents')}")`);
-    expect(writeDeny).toContain('(subpath "/Library/LaunchAgents")');
-    expect(writeDeny).toContain('(subpath "/Library/LaunchDaemons")');
-    expect(writeDeny).toContain(`(subpath "${join(home, '.config', 'git')}")`);
-    expect(writeDeny).toContain(`(literal "${join(home, '.gitconfig')}")`);
-    expect(writeDeny).toContain(`(literal "${join(home, '.zlogin')}")`);
-    const hookDeny = profile
-      .split('\n')
-      .filter(
-        (line) =>
-          line.startsWith('(deny file-write* (regex') && line.includes('[hH][oO][oO][kK][sS]'),
-      )
-      .join('\n');
-    expect(hookDeny).toContain('[pP][rR][eE]-[cC][oO][mM][mM][iI][tT]');
-    expect(hookDeny).toContain('[uU][pP][dD][aA][tT][eE]');
-    expect(hookDeny).toContain('[cC][oO][nN][fF][iI][gG]');
+    expect(profile).not.toContain('global-name-prefix "com.apple.trustd"');
+    expect(profile).toContain('(deny file-write-unlink');
+    expect(profile).not.toContain(`(subpath "${join(home, 'Library', 'LaunchAgents')}")`);
+    expect(profile).not.toContain('(subpath "/Library/LaunchAgents")');
+    expect(profile).not.toContain(`(subpath "${join(home, 'Library', 'Mail')}")`);
+    expect(profile).not.toContain(`(literal "${join(home, '.zshrc')}")`);
   });
 
-  test('writeDenied() covers deferred-persistence paths while denied() leaves them readable', () => {
+  test('on linux denied() covers only credential paths and leaves mail/rc/history/non-credential files allowed', () => {
     const { home, serverHome } = layout();
     const conf = createHostShellConfinement({
       home,
       deniedRoots: [serverHome],
-      platform: 'darwin',
+      platform: 'linux',
+      xdgRuntimeDir: '/run/user/501',
     });
-    expect(conf.writeDenied(join(home, 'Library', 'LaunchAgents', 'com.evil.plist'))).toBe(true);
-    expect(conf.writeDenied('/Library/LaunchDaemons/com.evil.plist')).toBe(true);
-    expect(conf.writeDenied(join(home, '.gitconfig'))).toBe(true);
-    expect(conf.writeDenied(join(home, '.config', 'git', 'config'))).toBe(true);
-    expect(conf.writeDenied(join(home, 'repo', '.git', 'hooks', 'pre-commit'))).toBe(true);
-    expect(conf.writeDenied(join(home, 'repo', '.git', 'config'))).toBe(true);
-    expect(conf.writeDenied(join(home, 'repo.git', 'objects', 'x'))).toBe(true);
-    expect(conf.writeDenied(join(home, 'repo', '.github', 'workflows', 'x'))).toBe(false);
-    expect(conf.writeDenied(join(home, 'work', 'out.txt'))).toBe(false);
-    expect(conf.writeDenied(join(home, 'repo', '.gitignore'))).toBe(false);
-    expect(conf.writeDenied(join(home, 'repo', '.gitkeep'))).toBe(false);
-    expect(conf.writeDenied(join(home, 'repo', 'x.git2', 'hooks', 'x'))).toBe(false);
-    expect(conf.writeDenied(join(home, 'notes.git'))).toBe(true);
-    expect(conf.denied(join(home, 'Library', 'LaunchAgents', 'com.evil.plist'))).toBe(false);
-    expect(conf.denied(join(home, '.gitconfig'))).toBe(false);
-  });
-
-  test('the write_file host verb refuses write-protected targets', async () => {
-    const { home, serverHome } = layout();
-    const host = provider(home, [serverHome]);
-    await expect(
-      host.writeFile(join(home, 'Library', 'LaunchAgents', 'com.evil.plist'), 'x'),
-    ).rejects.toBeInstanceOf(ComputerRefusal);
-    await expect(host.writeFile(join(home, '.gitconfig'), 'x')).rejects.toBeInstanceOf(
-      ComputerRefusal,
-    );
-    await expect(
-      host.writeFile(join(home, 'repo', '.git', 'hooks', 'pre-commit'), 'x'),
-    ).rejects.toBeInstanceOf(ComputerRefusal);
-    await expect(host.writeFile(join(home, 'repo', '.git', 'config'), 'x')).rejects.toBeInstanceOf(
-      ComputerRefusal,
-    );
-    const linkedRepo = join(home, 'linked');
-    const elsewhere = join(home, 'elsewhere');
-    mkdirSync(linkedRepo, { recursive: true });
-    mkdirSync(join(elsewhere, 'hooks'), { recursive: true });
-    symlinkSync(elsewhere, join(linkedRepo, '.git'));
-    await expect(
-      host.writeFile(join(linkedRepo, '.git', 'hooks', 'pre-commit'), 'x'),
-    ).rejects.toBeInstanceOf(ComputerRefusal);
-    await host.writeFile(join(home, 'work', 'ok.txt'), 'x');
-    await host.writeFile(join(home, 'work', '.gitkeep'), 'x');
+    for (const allowed of [
+      join(home, '.zshrc'),
+      join(home, '.bashrc'),
+      join(home, '.zsh_history'),
+      join(home, '.bash_history'),
+      join(home, '.gitconfig'),
+      join(home, '.config', 'autostart', 'a.desktop'),
+      join(home, '.local', 'share', 'fish', 'fish_history'),
+    ]) {
+      expect(conf.denied(allowed), allowed).toBe(false);
+    }
+    for (const blocked of [
+      join(home, '.ssh', 'id_ed25519'),
+      join(home, '.gnupg', 'secring.gpg'),
+      join(home, '.aws', 'credentials'),
+      join(home, '.azure', 'accessTokens.json'),
+      join(home, '.config', 'gcloud', 'credentials.db'),
+      join(home, '.config', 'gh', 'hosts.yml'),
+      join(home, '.npmrc'),
+      join(home, '.cargo', 'credentials.toml'),
+      join(home, '.cargo', 'credentials'),
+      join(home, '.pypirc'),
+      join(home, '.docker', 'config.json'),
+      join(home, '.netrc'),
+      join(home, '.git-credentials'),
+      join(home, '.local', 'share', 'keyrings', 'login.keyring'),
+      join(home, '.mozilla', 'firefox', 'profiles.ini'),
+      join(home, '.config', 'google-chrome', 'Default', 'Login Data'),
+      join(home, '.1password', 'agent.sock'),
+    ]) {
+      expect(conf.denied(blocked), blocked).toBe(true);
+    }
   });
 
   test('on linux the wrapped command is bubblewrap over the host tree', () => {
@@ -313,9 +290,6 @@ describe('createHostShellConfinement', () => {
       expect(() => conf.wrap('true', [])).toThrow(ComputerRefusal);
       return;
     }
-    const gitconfig = join(home, '.gitconfig');
-    writeFileSync(gitconfig, '[user]\n');
-    mkdirSync(join(home, '.config', 'git'), { recursive: true });
     const sockets = [
       '/private/var/run/docker.sock',
       '/var/run/docker.sock',
@@ -341,24 +315,13 @@ describe('createHostShellConfinement', () => {
           launch.args[index + 1] === source &&
           launch.args[index + 2] === target,
       );
-    expect(pairAt(gitconfig, gitconfig)).toBeGreaterThan(-1);
-    expect(pairAt(join(home, '.config', 'git'), join(home, '.config', 'git'))).toBeGreaterThan(-1);
-    const missingFile = join(home, '.yarnrc');
-    expect(pairAt('/dev/null', missingFile)).toBeGreaterThan(-1);
-    const bashLogin = join(home, '.bash_login');
-    expect(pairAt(bashLogin, bashLogin)).toBeGreaterThan(-1);
-    expect(readFileSync(bashLogin, 'utf8')).toContain('.profile');
+    const missingCredFile = join(home, '.yarnrc');
+    expect(pairAt('/dev/null', missingCredFile)).toBeGreaterThan(-1);
     const gnupg = join(home, '.gnupg');
     expect(
       launch.args.findIndex((arg, index) => arg === '--tmpfs' && launch.args[index + 1] === gnupg),
     ).toBeGreaterThan(-1);
     expect(lstatSync(gnupg).mode & 0o777).toBe(0o700);
-    const missingDir = join(home, '.config', 'autostart');
-    const tmpfsAt = launch.args.findIndex(
-      (arg, index) => arg === '--tmpfs' && launch.args[index + 1] === missingDir,
-    );
-    expect(tmpfsAt).toBeGreaterThan(-1);
-    expect(launch.args.slice(tmpfsAt + 2, tmpfsAt + 4)).toEqual(['--remount-ro', missingDir]);
     const missingDeniedDir = join(home, '.aws');
     expect(
       launch.args.findIndex(
@@ -454,37 +417,22 @@ describe('createHostShellConfinement', () => {
     symlinkSync(join(serverHome, 'missing-token'), escapeServer);
     expect(conf.denied(escapeServer)).toBe(true);
 
-    const escapeGitconfig = join(home, 'work', 'escape-gitconfig');
-    symlinkSync(join(home, '.gitconfig'), escapeGitconfig);
-    expect(conf.writeDenied(escapeGitconfig)).toBe(true);
-
-    const escapeHook = join(home, 'work', 'escape-hook');
-    symlinkSync(join(home, 'repo', '.git', 'hooks', 'pre-commit'), escapeHook);
-    expect(conf.writeDenied(escapeHook)).toBe(true);
-
     const loopA = join(home, 'work', 'loop-a');
     const loopB = join(home, 'work', 'loop-b');
     symlinkSync(loopB, loopA);
     symlinkSync(loopA, loopB);
     expect(conf.denied(loopA)).toBe(true);
-    expect(conf.writeDenied(loopA)).toBe(true);
     expect(conf.denied(`${join(home, 'work', 'ok')}\0`)).toBe(true);
 
     const dotfiles = join(home, 'dotfiles');
     mkdirSync(dotfiles, { recursive: true });
     writeFileSync(join(dotfiles, 'netrc'), 'secret-netrc');
-    writeFileSync(join(dotfiles, 'gitconfig'), '[user]\n');
     symlinkSync(join(dotfiles, 'netrc'), join(home, '.netrc'));
-    symlinkSync(join(dotfiles, 'gitconfig'), join(home, '.gitconfig'));
     expect(conf.denied(join(home, '.netrc'))).toBe(true);
-    expect(conf.writeDenied(join(home, '.gitconfig'))).toBe(true);
 
     const host = provider(home, [serverHome]);
     await expect(host.readFile(join(home, '.netrc'))).rejects.toBeInstanceOf(ComputerRefusal);
-    await expect(host.writeFile(join(home, '.gitconfig'), 'x')).rejects.toBeInstanceOf(
-      ComputerRefusal,
-    );
-    await expect(host.writeFile(escapeGitconfig, 'x')).rejects.toBeInstanceOf(ComputerRefusal);
+    await expect(host.writeFile(escapeSsh, 'x')).rejects.toBeInstanceOf(ComputerRefusal);
     await expect(host.writeFile(join(escapeSshSub, 'new'), 'x')).rejects.toBeInstanceOf(
       ComputerRefusal,
     );
@@ -577,46 +525,168 @@ describe.runIf(process.platform === 'darwin')('host shell seatbelt probe', () =>
     }
   }, 30000);
 
-  test('write-denied paths refuse writes but keep reads, and git hooks are protected', () => {
+  test('open-confine allows reading Mail/Messages/Safari history/rc/history and non-credential writes while denying credentials', () => {
     const { home, serverHome } = layout();
+    const allowedReads = [
+      join(home, 'Library', 'Mail', 'V10', 'envelope'),
+      join(home, 'Library', 'Messages', 'chat.db'),
+      join(home, 'Library', 'Safari', 'History.db'),
+      join(home, '.zshrc'),
+      join(home, '.bashrc'),
+      join(home, '.zsh_history'),
+      join(home, '.bash_history'),
+    ];
+    for (const file of allowedReads) {
+      mkdirSync(join(file, '..'), { recursive: true });
+      writeFileSync(file, 'ok-data');
+    }
+    const deniedCreds = [
+      join(home, '.ssh', 'id_ed25519'),
+      join(home, '.gnupg', 'secring.gpg'),
+      join(home, '.aws', 'credentials'),
+      join(home, '.azure', 'accessTokens.json'),
+      join(home, '.config', 'gcloud', 'credentials.db'),
+      join(home, '.config', 'gh', 'hosts.yml'),
+      join(home, '.npmrc'),
+      join(home, '.cargo', 'credentials.toml'),
+      join(home, '.cargo', 'credentials'),
+      join(home, '.pypirc'),
+      join(home, '.docker', 'config.json'),
+      join(home, '.netrc'),
+      join(home, '.git-credentials'),
+      join(home, 'Library', 'Keychains', 'login.keychain-db'),
+      join(home, 'Library', 'Cookies', 'Cookies.binarycookies'),
+      join(
+        home,
+        'Library',
+        'Containers',
+        'com.apple.Safari',
+        'Data',
+        'Library',
+        'Cookies',
+        'Cookies.binarycookies',
+      ),
+      join(home, 'Library', 'Application Support', 'Google', 'Chrome', 'Default', 'Login Data'),
+      join(serverHome, 'access-token'),
+    ];
+    for (const file of deniedCreds) {
+      mkdirSync(join(file, '..'), { recursive: true });
+      writeFileSync(file, 'secret-cred');
+    }
     mkdirSync(join(home, 'Library', 'LaunchAgents'), { recursive: true });
-    writeFileSync(join(home, 'Library', 'LaunchAgents', 'existing.plist'), 'plist');
-    writeFileSync(join(home, '.gitconfig'), '[user]\n');
-    mkdirSync(join(home, 'repo', '.git', 'hooks', 'pre-commit.d'), { recursive: true });
+    mkdirSync(join(home, 'repo', '.git', 'hooks'), { recursive: true });
     const conf = createHostShellConfinement({ home, deniedRoots: [serverHome] });
     if (!existsSync('/usr/bin/sandbox-exec')) return;
     const run = (script: string) => {
       const launch = conf.wrap('/bin/sh', ['-c', script]);
       return spawnSync(launch.command, launch.args, { cwd: home, encoding: 'utf8', timeout: 8000 });
     };
-    expect(run(`echo x > '${join(home, 'Library', 'LaunchAgents', 'new.plist')}'`).status).not.toBe(
-      0,
+    for (const file of allowedReads) {
+      expect(conf.denied(file), file).toBe(false);
+      const res = run(`/bin/cat '${file}'`);
+      expect(res.status, `read ${file}: ${res.stderr}`).toBe(0);
+      expect(res.stdout, file).toBe('ok-data');
+    }
+    for (const file of deniedCreds) {
+      expect(conf.denied(file), file).toBe(true);
+      const res = run(`/bin/cat '${file}'`);
+      expect(res.status, `denied read ${file}`).not.toBe(0);
+      expect(res.stdout, file).not.toContain('secret-cred');
+    }
+    expect(run(`echo x > '${join(home, 'Library', 'LaunchAgents', 'new.plist')}'`).status).toBe(0);
+    expect(run(`echo x > '${join(home, '.gitconfig')}'`).status).toBe(0);
+    expect(run(`echo x > '${join(home, 'repo', '.git', 'hooks', 'pre-commit')}'`).status).toBe(0);
+    const renameBypass = run(
+      `mv '${join(home, '.config')}' '${join(home, '.config.bak')}' && /bin/cat '${join(home, '.config.bak', 'gh', 'hosts.yml')}'`,
     );
-    expect(run(`echo x >> '${join(home, '.gitconfig')}'`).status).not.toBe(0);
-    expect(run(`echo x > '${join(home, 'repo', '.git', 'hooks', 'pre-commit')}'`).status).not.toBe(
-      0,
+    expect(renameBypass.status).not.toBe(0);
+    expect(renameBypass.stdout).not.toContain('secret-cred');
+  });
+
+  test.runIf(process.platform === 'darwin')(
+    'macOS host-shell confinement allows sips, textutil, swift PDFKit, mdls, and plutil while keeping credentials and escape binaries denied',
+    () => {
+      const { home, serverHome } = layout();
+      const conf = createHostShellConfinement({ home, deniedRoots: [serverHome] });
+      if (!existsSync('/usr/bin/sandbox-exec')) return;
+      const run = (script: string) => {
+        const launch = conf.wrap('/bin/sh', ['-c', script]);
+        return spawnSync(launch.command, launch.args, {
+          cwd: home,
+          encoding: 'utf8',
+          timeout: 15000,
+        });
+      };
+      const sampleTxt = join(home, 'work', 'note.txt');
+      const sampleHtml = join(home, 'work', 'note.html');
+      const samplePng = join(home, 'work', 'out.png');
+      const samplePdf = join(home, 'work', 'sample.pdf');
+      const tinyPng = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      );
+      writeFileSync(sampleTxt, 'hello cairn\n');
+      writeFileSync(samplePng, tinyPng);
+
+      const sipsRes = run(
+        `/usr/bin/sips -s format pdf '${samplePng}' --out '${samplePdf}' && /usr/bin/sips -s format png '${samplePdf}' --out '${join(home, 'work', 'from-pdf.png')}'`,
+      );
+      expect(sipsRes.status, sipsRes.stderr).toBe(0);
+      expect(existsSync(join(home, 'work', 'from-pdf.png'))).toBe(true);
+
+      const textutilRes = run(
+        `/usr/bin/textutil -convert html '${sampleTxt}' -output '${sampleHtml}'`,
+      );
+      expect(textutilRes.status, textutilRes.stderr).toBe(0);
+      expect(readFileSync(sampleHtml, 'utf8')).toContain('hello cairn');
+
+      const mdlsRes = run(`/usr/bin/mdls '${sampleTxt}'`);
+      expect(mdlsRes.status, mdlsRes.stderr).toBe(0);
+
+      const plutilRes = run(
+        '/usr/bin/plutil -lint /System/Library/CoreServices/SystemVersion.plist',
+      );
+      expect(plutilRes.status, plutilRes.stderr).toBe(0);
+
+      if (
+        existsSync('/usr/bin/swift') &&
+        spawnSync('/usr/bin/swift', ['-e', 'import PDFKit'], { timeout: 10000 }).status === 0
+      ) {
+        const swiftRes = run(
+          `/usr/bin/swift -e 'import PDFKit; let d = PDFDocument(url: URL(fileURLWithPath: "${samplePdf}"))!; print(d.pageCount)'`,
+        );
+        expect(swiftRes.status, swiftRes.stderr).toBe(0);
+        expect(swiftRes.stdout.trim()).toBe('1');
+      }
+
+      expect(run(`/bin/cat '${join(home, '.ssh', 'id_ed25519')}'`).status).not.toBe(0);
+      expect(run(`/usr/bin/osascript -e 'return 1'`).status).not.toBe(0);
+      expect(run('/usr/bin/open -h').status).not.toBe(0);
+    },
+  );
+
+  test('Linux bwrap pins existing ancestors of denied credentials before leaf masks to block rename bypass', () => {
+    const { root, home, serverHome } = layout();
+    const binDir = join(root, 'bin');
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(join(binDir, 'bwrap'), '#!/bin/sh\n', { mode: 0o755 });
+    mkdirSync(join(home, '.config', 'gh'), { recursive: true });
+    writeFileSync(join(home, '.config', 'gh', 'hosts.yml'), 'secret');
+
+    const conf = createHostShellConfinement({
+      home,
+      deniedRoots: [serverHome],
+      platform: 'linux',
+      path: binDir,
+    });
+    const { args } = conf.wrap('/bin/sh', ['-c', 'true']);
+    const configDir = join(home, '.config');
+    const ghDir = join(home, '.config', 'gh');
+    const bindIdx = args.findIndex(
+      (arg, i) => arg === '--bind' && args[i + 1] === configDir && args[i + 2] === configDir,
     );
-    expect(run(`echo x >> '${join(home, 'repo', '.git', 'config')}'`).status).not.toBe(0);
-    expect(run(`echo x > '${join(home, 'repo', '.git', 'commondir')}'`).status).not.toBe(0);
-    expect(run(`echo x > '${join(home, 'repo', '.GIT', 'hooks', 'Pre-Commit')}'`).status).not.toBe(
-      0,
-    );
-    expect(run(`echo x > '${join(home, 'repo', '.git')}/./hooks/update'`).status).not.toBe(0);
-    expect(
-      run(`echo x > '${join(home, 'repo', '.git', 'hooks', 'pre-commit.d', 'x')}'`).status,
-    ).not.toBe(0);
-    expect(run(`echo x > '${join(home, 'repo', '.git')}//hooks//pre-commit'`).status).not.toBe(0);
-    expect(
-      run(`mv '${join(home, 'repo', '.git', 'hooks')}' '${join(home, 'repo', '.git', 'h')}'`)
-        .status,
-    ).not.toBe(0);
-    expect(run(`mv '${join(home, 'repo', '.git')}' '${join(home, 'repo', 'g')}'`).status).not.toBe(
-      0,
-    );
-    expect(run(`rmdir '${join(home, 'repo', '.git', 'hooks')}'`).status).not.toBe(0);
-    expect(run(`mkdir -p '${join(home, 'fresh', '.git', 'hooks')}'`).status).toBe(0);
-    expect(run(`cat '${join(home, 'Library', 'LaunchAgents', 'existing.plist')}'`).status).toBe(0);
-    expect(run(`cat '${join(home, '.gitconfig')}'`).status).toBe(0);
-    expect(run(`echo x > '${join(home, 'work', 'ok')}'`).status).toBe(0);
+    const tmpfsIdx = args.findIndex((arg, i) => arg === '--tmpfs' && args[i + 1] === ghDir);
+    expect(bindIdx).toBeGreaterThan(-1);
+    expect(tmpfsIdx).toBeGreaterThan(bindIdx);
   });
 });

@@ -301,9 +301,9 @@ describe('request_secret holds the turn until the owner answers', () => {
   });
 
   test('every Coordinator is offered the tool, with or without a computer', () => {
-    for (const options of [{}, { vmComputer: true }, { routerTools: false }])
+    for (const options of [{}, { desktopTools: true }, { routerTools: false }])
       expect(coordinatorToolDefs(options).map((def) => def.name)).toContain(REQUEST_SECRET_TOOL);
-    expect(coordinatorToolDefs({ vmComputer: true }).map((def) => def.name)).not.toContain(
+    expect(coordinatorToolDefs({ desktopTools: true }).map((def) => def.name)).not.toContain(
       'request_cloak_license',
     );
   });

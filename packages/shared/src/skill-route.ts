@@ -97,7 +97,7 @@ export function formatSkillRouteSection(hint: SkillRouteHint): string {
   ];
   for (const s of hint.skills) {
     lines.push(
-      `- 技能 ${s.id}${s.description ? ` — ${s.description}` : ''}（用 skills 工具核对详情；切合才用，不切合直接忽略）`,
+      `- 技能 ${s.id}${s.description ? ` — ${s.description}` : ''}（用 skills(skillId: "${s.id}") 读取完整指令与参考文件；切合才用，不切合直接忽略）`,
     );
   }
   if (hint.toolHint !== null) {

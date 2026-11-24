@@ -48,7 +48,6 @@ export interface ServerRuntimeConfig {
   stopPollMs?: number;
   factsFor(threadId: string): ReconcileFacts;
   desktopTools?(threadId: string): boolean;
-  vmComputer?(threadId: string): boolean;
   connectorTools?(threadId: string): RemoteToolDef[];
   ownComputer?(threadId: string): boolean;
   phoneComputer?(threadId: string): readonly string[];
@@ -136,7 +135,6 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       coordinatorToolsExtension(api, gate, {
         routerTools: config.routerTools,
         desktopTools: config.desktopTools?.(threadId) === true,
-        vmComputer: config.vmComputer?.(threadId) === true,
         connectorTools,
         ...(memoryThread
           ? { remoteTools: WORKER_MEMORY_REMOTE_TOOLS }

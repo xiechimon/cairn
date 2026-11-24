@@ -31,7 +31,7 @@ import {
 import { listedProjects } from './personal-space.js';
 import { assertPlatformChangeAllowed, setTodoPlatform } from './routing-rules.js';
 import { createSchedule, deleteSchedule, listSchedules } from './schedules.js';
-import { scanLocalSkills } from './skills.js';
+import { readSkillDocument, scanLocalSkills } from './skills.js';
 import { createAutonomousTodo, getTodo, listTodos, updateAutonomousTodo } from './todos.js';
 
 export interface McpCallerCtx {
@@ -51,7 +51,7 @@ const TOOL_SCHEMAS: Record<string, z.ZodRawShape> = {
   conversation: { conversationId: s, before: s.optional() },
   schedules: {},
   attachment: { attachmentId: s },
-  skills: {},
+  skills: { skillId: s.optional(), path: s.optional() },
   machines: {},
   issues: githubReadToolParamsSchemas.issues.shape,
   pull_requests: githubReadToolParamsSchemas.pull_requests.shape,
@@ -215,6 +215,15 @@ export async function executeMcpTool(
       );
     }
     case 'skills': {
+      const skillId =
+        typeof args.skillId === 'string' && args.skillId.trim() !== ''
+          ? args.skillId.trim()
+          : undefined;
+      if (skillId !== undefined) {
+        const path =
+          typeof args.path === 'string' && args.path.trim() !== '' ? args.path.trim() : undefined;
+        return json(readSkillDocument(deps.skillsDir, skillId, path));
+      }
       const scanned = scanLocalSkills(deps.skillsDir);
       return json(scanned.map((k) => ({ id: k.id, name: k.name, description: k.description })));
     }

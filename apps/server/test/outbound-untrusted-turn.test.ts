@@ -3,7 +3,7 @@ import type { McpConnectorTool } from '@cairn/shared';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { and, eq } from 'drizzle-orm';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { z } from 'zod';
 import {
   actionProposal,
@@ -338,22 +338,18 @@ describe('outbound actions in turns that carry untrusted outside content', () =>
       .run();
     w.s.machineHub.subscribeMachine(w.s.team.id, 'mac', () => undefined);
     const abort = new AbortController();
-    const held = relayComputerTool(
-      w.deps,
-      null,
-      w.turn(MAIL_PROMPT),
-      'install_packages',
-      { packages: ['ffmpeg'] },
-      'install-1',
-      abort.signal,
-    );
-    await vi.waitFor(() => {
-      const rows = w.s.db.select().from(computerCall).all();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.params).toEqual({ packages: ['ffmpeg'], approval: 'pending' });
-    });
-    abort.abort();
-    await held;
+    await expect(
+      relayComputerTool(
+        w.deps,
+        null,
+        w.turn(MAIL_PROMPT),
+        'install_packages',
+        { packages: ['ffmpeg'] },
+        'install-1',
+        abort.signal,
+      ),
+    ).rejects.toThrow(/mail turn cannot call install_packages/);
+    expect(w.s.db.select().from(computerCall).all()).toEqual([]);
     expect(w.s.db.select().from(actionProposal).all()).toEqual([]);
     w.s.dispose();
   });
@@ -365,15 +361,21 @@ describe('outbound actions in turns that carry untrusted outside content', () =>
       'search_history',
       'create_todo',
       'browser_snapshot',
-      'shell',
       'browser_navigate',
       'browser_act',
       'computer_act',
       'desktop_act',
-      'install_packages',
     ])
       expect(() => refuseRestrictedTurnTool(w.s.db, MAIL_PROMPT, name)).not.toThrow();
-    for (const name of ['set_secret', 'schedule_todo', 'save_memory', 'user_computer_shell'])
+    for (const name of [
+      'set_secret',
+      'schedule_todo',
+      'save_memory',
+      'user_computer_shell',
+      'attach_file',
+      'shell',
+      'install_packages',
+    ])
       expect(() => refuseRestrictedTurnTool(w.s.db, MAIL_PROMPT, name)).toThrow(
         /mail turn cannot call/,
       );

@@ -538,7 +538,7 @@ describe('login handoff gate', () => {
     });
   });
 
-  test('a password form or a shell call does not force handoff', async () => {
+  test('a password form or a desktop_act call does not force handoff', async () => {
     const { s, deps, calls } = boot();
     const snapshot = forwardComputerCall(
       deps,
@@ -550,16 +550,16 @@ describe('login handoff gate', () => {
       done(1, { signals: ['password'] }),
     ]);
     await snapshot;
-    const shell = forwardComputerCall(deps, 'sidecar', 'step-a', {
+    const act = forwardComputerCall(deps, 'sidecar', 'step-a', {
       computer: true,
-      name: 'shell',
+      name: 'desktop_act',
       toolCallId: 'b',
-      params: { command: 'ls' },
+      params: { actions: [] },
     });
     receiveComputerFrames(s.db, s.hub, 'omarchy', calls[1]!.callId, [
       done(1, { signals: ['password'] }),
     ]);
-    await shell;
+    await act;
     expect(computerRow(s).handoffReason).toBeNull();
   });
 
@@ -606,22 +606,22 @@ describe('login handoff gate', () => {
     expect(s.db.select().from(computerCallTable).all()).toEqual([]);
   });
 
-  test('read-only tools other than snapshot and observe still pass while the owner holds control', async () => {
+  test('VM list_files is refused on Coordinator chief steps', async () => {
     const { s, deps, calls } = boot();
     setHandoff(s, {
       controlHolder: 'user',
       controlLeaseId: 'lease',
       controlLeaseExpiresAt: Date.now() + 60_000,
     });
-    const listing = forwardComputerCall(deps, 'sidecar', 'step-a', {
-      computer: true,
-      name: 'list_files',
-      toolCallId: 'l',
-      params: { path: '.' },
-    });
-    expect(calls).toHaveLength(1);
-    receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1)]);
-    await listing;
+    await expect(
+      forwardComputerCall(deps, 'sidecar', 'step-a', {
+        computer: true,
+        name: 'list_files',
+        toolCallId: 'l',
+        params: { path: '.' },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(calls).toHaveLength(0);
   });
 });
 
@@ -1012,9 +1012,9 @@ describe('CloakBrowser license for VM computers', () => {
       browser('browser_snapshot', 'plain'),
       {
         computer: true as const,
-        name: 'shell' as const,
-        toolCallId: 'sh',
-        params: { command: 'true', stealth: true },
+        name: 'computer_act' as const,
+        toolCallId: 'act',
+        params: { actions: [], stealth: true },
       },
     ]) {
       const pending = forwardComputerCall(deps, 'sidecar', 'step-a', body);
@@ -1054,11 +1054,11 @@ describe('CloakBrowser license for VM computers', () => {
     finish(s, calls.at(-1)!, `key is ${LICENSE}`);
     const result = await pending;
     expect(result.text).not.toContain(LICENSE);
-    const shell = forwardComputerCall(deps, 'sidecar', 'step-a', {
+    const act = forwardComputerCall(deps, 'sidecar', 'step-a', {
       computer: true as const,
-      name: 'shell' as const,
+      name: 'computer_act' as const,
       toolCallId: 'cat-key',
-      params: { command: 'cat /run/cairn/cloak.key' },
+      params: { actions: [] },
     });
     const call = calls.at(-1)!;
     receiveComputerFrames(
@@ -1072,7 +1072,7 @@ describe('CloakBrowser license for VM computers', () => {
       ],
       s.secretBox,
     );
-    expect(JSON.stringify(await shell)).not.toContain(LICENSE);
+    expect(JSON.stringify(await act)).not.toContain(LICENSE);
     expect(JSON.stringify(s.db.select().from(computerCallTable).all())).not.toContain(LICENSE);
   });
 });

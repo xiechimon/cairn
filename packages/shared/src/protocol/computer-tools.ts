@@ -175,29 +175,6 @@ export const SHELL_TOOL_PARAMETERS = obj(
   ['command'],
 );
 
-export const COMPUTER_VM_TOOLS: readonly RemoteToolDef[] = [
-  {
-    name: 'shell',
-    description:
-      "Your VM computer, not the user's Mac (user_computer_shell is the Mac). Run a shell command in the Coordinator computer: scripts, downloads, checking files, starting apps. Output is bounded: the first 16 KiB and last 48 KiB are kept. For apps with a window, desktop_snapshot reads them afterwards.",
-    parameters: SHELL_TOOL_PARAMETERS,
-  },
-  {
-    name: INSTALL_PACKAGES_TOOL,
-    description:
-      'Install Debian system packages (apt) on the Coordinator computer. Posts an approval card naming the packages and waits for the owner; only after approval they are installed as root and kept across computer updates and recovery. Use exact Debian package names, at most 20. For Python or Node packages use pip install --user or npm i -g in the computer terminal instead; they need no approval.',
-    parameters: obj(
-      {
-        packages: arr(
-          { type: 'string' },
-          'Debian package names, for example ["ffmpeg"] or ["libpq-dev", "build-essential"].',
-        ),
-      },
-      ['packages'],
-    ),
-  },
-];
-
 export const PACKAGES_INSTALLED_PREFIX = 'Installed with the owner approval:';
 export const PACKAGES_DECLINED =
   'The owner declined installing these packages. Nothing was installed. Tell the owner and do not ask again unless they want it.';

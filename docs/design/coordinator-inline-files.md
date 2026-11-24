@@ -1,15 +1,15 @@
 # Coordinator Inline File Staging & `attach_file`
 
 **Date**: 2026-11-24
-**Prior art**: [`docs/research/personal-agents-inline-actions-2026-11-24.md`](../research/personal-agents-inline-actions-2026-11-24.md) (on `agents-research` @ `727764467`), [`docs/research/per-command-confinement-2026-11-24.md`](../research/per-command-confinement-2026-11-24.md)
+**Prior art**: `docs/research/personal-agents-inline-actions-2026-11-24.md` (on branch `agents-research` @ `727764467`), [`docs/research/per-command-confinement-2026-11-24.md`](../research/per-command-confinement-2026-11-24.md)
 
 ## Newcomer View
 
-- **Where they meet it and why**: In the main Cairn Coordinator chat right after installing Cairn, the owner drops a file (such as a resume PDF) and asks *"导出成图片发给我"*. The Coordinator converts it directly on the owner's computer in the same turn and replies with inline PNG previews, instead of creating a tracked coding task and worktree.
+- **Where they meet it and why**: In the main Cairn Coordinator chat right after installing Cairn, the owner drops a file (such as a resume PDF) and asks *"export this as images and send them to me"*. The Coordinator converts it directly on the owner's computer in the same turn and replies with inline PNG previews, instead of creating a tracked coding task and worktree.
 - **What they must already know**: Nothing beyond dropping a file in chat and asking in plain language.
 - **Accounts, payments, and keys asked of them**: None beyond their already-configured model provider and the Cairn desktop/daemon already connected on their Mac.
 - **Where their files are stored**:
-  - Uploaded files live in Cairn's team attachment store (`<CAIRN_HOME>/attachments/<teamId>/<id>.<ext>`) and are staged on the owner's computer under the OS temp dir (`<os.tmpdir()>/cairn-uploads/<safeThreadId>/<attachmentId>-<safeFileName>`, mode `0700` dirs / `0600` files).
+  - Uploaded files live in Cairn's team attachment store (`<CAIRN_HOME>/attachments/<teamId>/<id>.<ext>`) and are staged on the owner's computer under the OS temp dir (`<os.tmpdir()>/cairn-uploads-<uid>/<safeThreadId>/<attachmentId>-<safeFileName>`, mode `0700` dirs / `0600` files).
   - Returned files from `attach_file` are saved in the same team attachment store and referenced in `chief_message` as `![caption](attachment:<teamId>/<id>.<ext>)`.
 - **Where they get stuck / what they see when it fails**: If their Mac is offline, a file is missing, or the output exceeds 10 MiB, the Coordinator gets a plain failure reason from the tool and explains it directly in chat (no silent hang, no partial attachment row).
 
@@ -21,7 +21,7 @@ Prior art across 10 open-source personal agents (`personal-agents-inline-actions
 
 | User Situation | What the User Sees | What Cairn Does | Wait & Cost |
 |---|---|---|---|
-| Drops `resume.pdf` in chat: *"把它导出成图片发给我"* (Mac online) | Existing tool-call rows + inline PNG image(s) in the Coordinator reply, clickable to open lightbox. | Stages `resume.pdf` to `<tmpdir>/cairn-uploads/<threadId>/<id>-resume.pdf`; Coordinator runs `user_computer_shell` to export PNGs and calls `attach_file` per PNG; server validates & writes attachment + appends `![name](attachment:<key>)` to the reply. | ~5–20 s; 1 turn, 0 runner/worktree startup. |
+| Drops `resume.pdf` in chat: *"export this as images and send them to me"* (Mac online) | Existing tool-call rows + inline PNG image(s) in the Coordinator reply, clickable to open lightbox. | Stages `resume.pdf` to `<tmpdir>/cairn-uploads-<uid>/<threadId>/<id>-resume.pdf`; Coordinator runs `user_computer_shell` to export PNGs and calls `attach_file` per PNG; server validates & writes attachment + appends `![name](attachment:<key>)` to the reply. | ~5–20 s; 1 turn, 0 runner/worktree startup. |
 | Drops a file while their Mac is offline | Plain-language reply saying the Mac is not connected, so conversion / file attachment cannot run now. | Staging notes Mac offline in turn context; `user_computer_shell` and `attach_file` return `OWN_COMPUTER_NO_MAC`. | ~2 s; 1 turn. |
 | Generated output file is missing or > 10 MiB | Plain-language failure explaining file not found or exceeds 10 MiB limit. | Daemon `handleAttachFile` checks existence, regular file, `0 < size <= 10 MiB`, refuses before upload; no orphan DB row. | Immediate tool error. |
 | Prompt injection tries `attach_file({ path: "~/.ssh/id_ed25519" })` | Refused (`path is inside a protected directory`); no bytes leave the Mac. | Daemon checks `confinement.denied()` on both requested and `realpathSync` target + `O_NOFOLLOW` + inode verification before reading. | Immediate refusal. |
@@ -33,7 +33,7 @@ Prior art across 10 open-source personal agents (`personal-agents-inline-actions
 
 ### 1. Inbound Upload Staging (`stage_attachment` internal computer call)
 
-- **Location on owner's computer**: `<stagingRoot>/<safeThreadId>/<safeAttachmentId>-<safeFileName>`, where `<stagingRoot> = join(realpathSync(os.tmpdir()), 'cairn-uploads')`.
+- **Location on owner's computer**: `<stagingRoot>/<safeThreadId>/<safeAttachmentId>-<safeFileName>`, where `<stagingRoot> = join(realpathSync(os.tmpdir()), 'cairn-uploads-<uid>')`.
   - `<safeThreadId>` and `<safeAttachmentId>`: validated against `/^[A-Za-z0-9_-]{1,128}$/` (hashed fallback if ever outside).
   - `<safeFileName>`: `basename` with path separators, NUL, and control/format chars stripped; defaults to `attachment.<ext>` if empty or `.`/`..`.
   - Directory mode `0o700`, file mode `0o600`, written atomically (`O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW` temp file + `rename`).
@@ -72,9 +72,9 @@ Prior art across 10 open-source personal agents (`personal-agents-inline-actions
 | Path | Reader / Writer | Persisted State Touched |
 |---|---|---|
 | `POST /api/uploads/grant` + `POST /api/uploads/upload` | Web composer -> Server | Writes `attachment` row + file in `attachmentsDir` |
-| `stageTurnAttachments()` (`coordinator/index.ts`, `machine-claim.ts`) | Server -> Mac daemon | Creates `computer_call` (`stage_attachment`); writes `<tmpdir>/cairn-uploads/<threadId>/<id>-<name>` |
+| `stageTurnAttachments()` (`coordinator/index.ts`, `machine-claim.ts`) | Server -> Mac daemon | Creates `computer_call` (`stage_attachment`); writes `<tmpdir>/cairn-uploads-<uid>/<threadId>/<id>-<name>` |
 | `GET /api/machine/computer/:callId/attachment` | Mac daemon <- Server | Reads `computer_call` + `attachment` + file from `attachmentsDir` |
-| `sweepStagedUploads()` (`apps/daemon/src/machine-loop.ts`) | Mac daemon | Deletes expired `<tmpdir>/cairn-uploads/<threadId>` dirs (> 72 h) |
+| `sweepStagedUploads()` (`apps/daemon/src/machine-loop.ts`) | Mac daemon | Deletes expired `<tmpdir>/cairn-uploads-<uid>/<threadId>` dirs (> 72 h) |
 | `attach_file` tool (`machine-relay.ts` -> `machine-computer.ts` -> `dispatch.ts`) | Coordinator -> Server -> Mac daemon | Creates `computer_call` (`attach_file`); reads file on Mac |
 | `POST /api/machine/computer/:callId/attachment` -> `attachCoordinatorFile()` | Mac daemon -> Server | Writes file in `attachmentsDir`, inserts `attachment` row, upserts `chief_message` (`attachment-output-<stepId>`) |
 | `GET /api/attachments/:id` | Web UI <- Server | Reads `attachment` row + file from `attachmentsDir` (`inline` for images/PDF) |
@@ -84,7 +84,7 @@ Prior art across 10 open-source personal agents (`personal-agents-inline-actions
 
 | # | Path / Failure Mode | Expected Behavior | Test |
 |---|---|---|---|
-| 1 | Happy path: stage uploaded PDF on Mac | Written to `<tmpdir>/cairn-uploads/<threadId>/<id>-<name>` (`0700`/`0600`), staged path injected in turn context | `coordinator-inline-files.test.ts` (staging happy path) |
+| 1 | Happy path: stage uploaded PDF on Mac | Written to `<tmpdir>/cairn-uploads-<uid>/<threadId>/<id>-<name>` (`0700`/`0600`), staged path injected in turn context | `coordinator-inline-files.test.ts` (staging happy path) |
 | 2 | Happy path: `attach_file` PNG on Mac -> chat reply | Attachment row created, file stored, `chief_message` updated with `![caption](attachment:<key>)`, returns `{ id, key, token, sha256 }` | `coordinator-inline-files.test.ts` (attach_file happy path) |
 | 3 | Multi-file `attach_file` in same turn | Both tokens appended on separate lines in `attachment-output-<stepId>` | `coordinator-inline-files.test.ts` (multi-file append) |
 | 4 | Machine offline during staging or `attach_file` | Staging adds offline note (turn continues); `attach_file` returns plain `OWN_COMPUTER_NO_MAC` refusal | `coordinator-inline-files.test.ts` (machine offline) |
@@ -95,5 +95,5 @@ Prior art across 10 open-source personal agents (`personal-agents-inline-actions
 | 9 | File empty or > 10 MiB (`ATTACHMENT_MAX_BYTES`) | Daemon refuses (`file is empty` / `file exceeds the 10 MiB attachment limit`) before upload | `computer-attach-file.test.ts` (size cap) |
 | 10 | Unsupported extension or magic-byte MIME mismatch | Server rejects with 400 (`attach_file content does not match...` / `file extension not allowed`); daemon surfaces error; no DB row or stray file | `coordinator-inline-files.test.ts` (MIME mismatch) |
 | 11 | Upload HTTP failure (5xx / network error / call expired) | Daemon finishes call with error frame (`delivery: 'unknown'`); server rolls back any partial file; Coordinator receives plain failure line | `computer-attach-file.test.ts` (upload fails) |
-| 12 | Staged upload cleanup (`sweepStagedUploads`) & filename sanitization | Strips traversal (`../../etc/passwd`) to safe filename; removes dirs older than TTL while keeping fresh ones | `computer-attach-file.test.ts` (staging sanitization + TTL sweep) |
+| 12 | Staged upload cleanup (`sweepStagedUploads`) & filename sanitization | Strips parent-traversal path segments to a safe filename; removes dirs older than TTL while keeping fresh ones | `computer-attach-file.test.ts` (staging sanitization + TTL sweep) |
 | 13 | Coordinator reading installed skills (`skills(skillId, path)`) | Always core-loaded; reads `SKILL.md` and sibling reference files from `skillsDir` via `resolveLocalSkill` + `readSkillFile`, rejecting missing skills and `..`/symlink traversal with 404 | `coordinator-inline-files.test.ts` (skills core-loaded + read + traversal) |

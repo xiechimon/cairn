@@ -75,6 +75,7 @@ import { ComputerPresenceReporter, type ComputerPresenceSource } from './compute
 import type { ComputerProvider, ScopedComputerProviders } from './computer/provider.js';
 import { OutboundComputerScreens } from './computer/screen-channel.js';
 import { createComputerScreenProvider } from './computer/screen-provider.js';
+import { defaultStagingRoot, sweepStagedUploads } from './computer/staging.js';
 import { VmDesktops } from './computer/vm-desktop.js';
 import { VmRuntime } from './computer/vm-runtime.js';
 import type { DaemonConfig } from './config.js';
@@ -378,16 +379,20 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       skillsDir: config.skillsDir,
     });
   const serverPort = serverPortOf(new URL(config.serverUrl));
+  const stagingRoot = defaultStagingRoot();
+  const hostConfinement =
+    capEnv.CAIRN_OWN_COMPUTER === '1'
+      ? createHostShellConfinement({
+          deniedRoots: [config.home, join(homedir(), '.cairn'), ...extraDeniedRoots],
+          ...(serverPort !== null ? { serverPort } : {}),
+          agentDesktop: capEnv.CAIRN_AGENT_DESKTOP ?? null,
+          stagingRoot,
+        })
+      : undefined;
   const hostComputer =
     opts.hostComputer ??
-    (capEnv.CAIRN_OWN_COMPUTER === '1'
-      ? new HostComputerProvider({
-          confinement: createHostShellConfinement({
-            deniedRoots: [config.home, join(homedir(), '.cairn'), ...extraDeniedRoots],
-            ...(serverPort !== null ? { serverPort } : {}),
-            agentDesktop: capEnv.CAIRN_AGENT_DESKTOP ?? null,
-          }),
-        })
+    (hostConfinement !== undefined
+      ? new HostComputerProvider({ confinement: hostConfinement })
       : undefined);
   const hostPermissionsProbe = opts.hostPermissionsProbe ?? createHostPermissionsProbe(capEnv);
   const cairnOrigins = [
@@ -1069,6 +1074,12 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       if (removed.length > 0) {
         logger.workspace(`step-attachments recycled: ${removed.length} (${removed.join(', ')})`);
       }
+      const stagedRemoved = sweepStagedUploads(stagingRoot, { now: Date.now() });
+      if (stagedRemoved.length > 0) {
+        logger.workspace(
+          `staged-uploads recycled: ${stagedRemoved.length} (${stagedRemoved.join(', ')})`,
+        );
+      }
     } catch (err: unknown) {
       logger.workspace(
         `step-attachments cleanup failed: ${err instanceof Error ? err.message : String(err)}`,
@@ -1330,6 +1341,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     client,
     logger,
     ...(hostComputer ? { host: hostComputer } : {}),
+    ...(hostConfinement ? { hostConfinement } : {}),
+    stagingRoot,
     ...(hostScreen ? { screen: hostScreen } : {}),
     ...(orbComputer ? { orb: orbComputer } : {}),
     phones,

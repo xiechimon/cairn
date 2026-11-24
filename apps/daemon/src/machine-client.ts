@@ -1,5 +1,6 @@
 import {
   type AgentTodoReport,
+  ATTACHMENT_MAX_BYTES,
   type BackgroundTask,
   type ClaimedStep,
   type ClaudeCodeReport,
@@ -191,6 +192,12 @@ export interface MachineApi {
     body: MachineComputerFramesBody,
     signal?: AbortSignal,
   ): Promise<MachineComputerFramesResponse>;
+  downloadComputerAttachment?(callId: string, signal?: AbortSignal): Promise<Buffer>;
+  uploadComputerAttachment?(
+    callId: string,
+    input: { fileName: string; caption?: string; bytes: Buffer },
+    signal?: AbortSignal,
+  ): Promise<{ id: string; key: string; token: string; sha256: string }>;
   imEvent?(connId: string, body: MachineImEventBody): Promise<void>;
   stream(
     signal: AbortSignal,
@@ -744,6 +751,49 @@ export class MachineClient implements MachineApi {
       signal,
       parse: (raw) => machineComputerFramesResponseSchema.parse(raw),
     });
+  }
+
+  async downloadComputerAttachment(callId: string, signal?: AbortSignal): Promise<Buffer> {
+    const token = this.opts.getToken?.();
+    const res = await this.fetchImpl(this.url(`/api/machine/computer/${callId}/attachment`), {
+      method: 'GET',
+      ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+      ...(signal ? { signal } : {}),
+    });
+    if (!res.ok) throw new MachineApiError(res.status, await res.text());
+    const declared = Number(res.headers.get('content-length') ?? '0');
+    if (Number.isFinite(declared) && declared > ATTACHMENT_MAX_BYTES) {
+      throw new MachineApiError(413, 'attachment exceeds the 10 MiB limit');
+    }
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.byteLength > ATTACHMENT_MAX_BYTES) {
+      throw new MachineApiError(413, 'attachment exceeds the 10 MiB limit');
+    }
+    return bytes;
+  }
+
+  async uploadComputerAttachment(
+    callId: string,
+    input: { fileName: string; caption?: string; bytes: Buffer },
+    signal?: AbortSignal,
+  ): Promise<{ id: string; key: string; token: string; sha256: string }> {
+    const token = this.opts.getToken?.();
+    const encodedCaption =
+      input.caption !== undefined ? encodeURIComponent(input.caption.slice(0, 500)) : undefined;
+    const headers: Record<string, string> = {
+      'content-type': 'application/octet-stream',
+      'x-cairn-filename': encodeURIComponent(input.fileName),
+      ...(encodedCaption !== undefined ? { 'x-cairn-caption': encodedCaption } : {}),
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    };
+    const res = await this.fetchImpl(this.url(`/api/machine/computer/${callId}/attachment`), {
+      method: 'POST',
+      headers,
+      body: new Uint8Array(input.bytes),
+      ...(signal ? { signal } : {}),
+    });
+    if (!res.ok) throw new MachineApiError(res.status, await res.text());
+    return (await res.json()) as { id: string; key: string; token: string; sha256: string };
   }
 
   async imEvent(connId: string, body: MachineImEventBody): Promise<void> {

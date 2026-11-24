@@ -44,7 +44,10 @@ export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
   'ask_user',
   'request_secret',
   'memories',
+  'skills',
   'attachment',
+  'user_computer_shell',
+  'attach_file',
 ]);
 
 export const machineToolRelayBodySchema = z.object({
@@ -379,8 +382,12 @@ export const CHIEF_REMOTE_TOOLS: readonly RemoteToolDef[] = [
   },
   {
     name: 'skills',
-    description: 'List team skills (folders with a SKILL.md) granted to agents.',
-    parameters: obj({}),
+    description:
+      'List installed team skills (omit skillId) or read a skill\'s SKILL.md and reference files (pass skillId, and optionally path such as "references/guide.md") so you can follow the skill directly.',
+    parameters: obj({
+      skillId: str('Optional skill id to read. Omit to list all installed team skills.'),
+      path: str('Optional relative file path inside the skill folder (defaults to "SKILL.md").'),
+    }),
     replaySafe: true,
   },
   {

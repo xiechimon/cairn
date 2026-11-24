@@ -4,7 +4,7 @@ import {
   CHIEF_ROUTER_TOOLS,
   COMPUTER_DESKTOP_TOOLS,
   COMPUTER_REMOTE_TOOLS,
-  COMPUTER_VM_TOOLS,
+  COORDINATOR_ATTACH_FILE_TOOL,
   type ComputerTool,
   OWN_COMPUTER_TOOLS,
   PHONE_TOOLS,
@@ -32,18 +32,22 @@ const OWNER_CHROME_NOTE =
 export type CoordinatorComputerToolOffer =
   | { offered: 'always' }
   | { offered: 'when_machine_reports_computer' }
-  | { offered: 'when_machine_reports_vm_computer' }
   | { offered: 'when_owner_thread_and_team_has_mac' }
   | { offered: 'when_owner_thread_and_consented_phone' }
   | { withheld: string };
 
 export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorComputerToolOffer> =
   {
-    shell: { offered: 'when_machine_reports_vm_computer' },
+    shell: {
+      withheld: "the Coordinator runs commands on the owner's computer through user_computer_shell",
+    },
     list_files: { withheld: 'the Coordinator delegates file work to threads' },
     read_file: { withheld: 'the Coordinator delegates file work to threads' },
     write_file: { withheld: 'the Coordinator delegates file work to threads' },
-    attach_file: { withheld: 'the Coordinator attaches files through attachment' },
+    attach_file: { offered: 'when_owner_thread_and_team_has_mac' },
+    stage_attachment: {
+      withheld: 'the server stages uploaded chat attachments internally before a turn starts',
+    },
     computer_observe: { offered: 'when_machine_reports_computer' },
     computer_act: { offered: 'when_machine_reports_computer' },
     desktop_snapshot: { offered: 'when_machine_reports_computer' },
@@ -55,7 +59,9 @@ export const COORDINATOR_COMPUTER_TOOL_OFFERS: Record<ComputerTool, CoordinatorC
     browser_act: { offered: 'always' },
     browser_close_tab: { withheld: 'the server closes a card tab when its step ends' },
     request_takeover: { offered: 'always' },
-    install_packages: { offered: 'when_machine_reports_vm_computer' },
+    install_packages: {
+      withheld: "the Coordinator VM command channel was removed; use the owner's computer directly",
+    },
     computer_manage: {
       withheld:
         'only the owner stops, updates, recovers or resets the computer from the Computers panel',
@@ -108,7 +114,6 @@ export function coordinatorToolDefs(
   options: {
     routerTools?: boolean;
     desktopTools?: boolean;
-    vmComputer?: boolean;
     ownComputer?: boolean;
     ownerChrome?: boolean;
     phoneComputer?: readonly string[];
@@ -129,8 +134,7 @@ export function coordinatorToolDefs(
     REQUEST_SECRET_TOOL_DEF,
     ...browserTools,
     ...(options.desktopTools === true ? COMPUTER_DESKTOP_TOOLS : []),
-    ...(options.vmComputer === true ? COMPUTER_VM_TOOLS : []),
-    ...(options.ownComputer === true ? OWN_COMPUTER_TOOLS : []),
+    ...(options.ownComputer === true ? [...OWN_COMPUTER_TOOLS, COORDINATOR_ATTACH_FILE_TOOL] : []),
     ...(options.phoneComputer !== undefined && options.phoneComputer.length > 0
       ? phoneToolDefs(options.phoneComputer)
       : []),

@@ -80,7 +80,7 @@ import { parseHostedMergeInstruction } from './hosted-merge-instruction.js';
 import { infoCardPlan, infoCardRemoteTools } from './info-card.js';
 import { infoRepoOffered } from './info-repo-snapshot.js';
 import { localMergeAuthorizationRefusal } from './local-merge.js';
-import { teamOffersDesktop } from './machine-computer.js';
+import { stageTurnAttachments, teamOffersDesktop } from './machine-computer.js';
 import { failEarlierClaimDeliverables } from './machine-deliverables.js';
 import {
   type MachineDeps,
@@ -128,7 +128,6 @@ import { stepNamesTask } from './task-naming.js';
 import { isThreadScheduleTool } from './thread-schedule-tools.js';
 import { setTodoPhase } from './todos.js';
 import { turnProvenance } from './turn-provenance.js';
-import { teamHasVmComputer } from './vm-computer.js';
 
 function workerSkillInjection(
   deps: MachineDeps,
@@ -458,7 +457,6 @@ function chiefClaimPayload(
           : [
               ...coordinatorToolDefs({
                 desktopTools: teamOffersDesktop(deps.db, threadRow.teamId),
-                vmComputer: teamHasVmComputer(deps.db, threadRow.teamId),
                 ownComputer: ownComputerOffered(deps.db, stepRow.buildId),
                 ownerChrome: localBrowserConnector(deps.db, threadRow.teamId) !== null,
                 phoneComputer: offeredPhoneNames(deps, stepRow.buildId),
@@ -551,6 +549,25 @@ async function claimChiefTurn(
       machineRow,
     );
     if (claimed) {
+      if (cand.stepRow.prompt !== null) {
+        const claimedRow = deps.db.select().from(step).where(eq(step.id, claimed.step.id)).get();
+        const stagedUploads =
+          claimedRow !== undefined
+            ? await stageTurnAttachments(
+                deps,
+                claimedRow,
+                cand.threadRow,
+                cand.stepRow.prompt,
+                signal,
+              ).catch(() => null)
+            : null;
+        if (stagedUploads !== null) {
+          claimed.instruction =
+            claimed.instruction !== undefined && claimed.instruction !== ''
+              ? `${claimed.instruction}\n\n${stagedUploads}`
+              : stagedUploads;
+        }
+      }
       publishStepStatus(deps, claimed.step.id);
       return claimed;
     }

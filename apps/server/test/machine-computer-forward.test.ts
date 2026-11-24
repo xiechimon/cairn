@@ -164,7 +164,12 @@ function boot(): { s: TestServer; deps: MachineDeps; chiefId: string } {
 }
 
 function shell(command: string, toolCallId = 'tc-1') {
-  return { computer: true as const, name: 'shell' as const, toolCallId, params: { command } };
+  return {
+    computer: true as const,
+    name: 'computer_act' as const,
+    toolCallId,
+    params: { command },
+  };
 }
 
 function callRow(s: TestServer, id: string) {
@@ -244,22 +249,31 @@ describe('Coordinator desktop tools', () => {
 });
 
 describe('Coordinator shell and desktop start-up', () => {
-  test('the Coordinator shell runs in its own computer through the relay and keeps the shell output bounds', async () => {
+  test('the Coordinator VM shell channel is refused while desktop tools run through the relay', async () => {
     const { s, deps, chiefId } = boot();
     addMachine(s, 'omarchy', { computer: true });
     const calls = connect(s, 'omarchy');
     s.db.update(stepTable).set({ machineId: null }).where(eq(stepTable.id, 'step-a')).run();
+    await expect(
+      forwardComputerCall(deps, null, 'step-a', {
+        computer: true,
+        name: 'shell',
+        toolCallId: 'tc-shell',
+        params: { command: 'echo hi' },
+      }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(calls).toHaveLength(0);
     const result = createCoordinatorServerApi(deps).relayTool(
       'step-a',
-      'shell',
-      { command: 'echo hi' },
-      'tc-shell',
+      'desktop_act',
+      { actions: [] },
+      'tc-desktop-act',
     );
     await vi.waitFor(() => expect(calls).toHaveLength(1));
     expect(calls[0]).toMatchObject({
-      tool: 'shell',
+      tool: 'desktop_act',
       scopeKey: `chief:${chiefId}`,
-      params: { command: 'echo hi' },
+      params: { actions: [] },
     });
     receiveComputerFrames(s.db, s.hub, 'omarchy', calls[0]!.callId, [done(1, '', 0)]);
     expect(await result).toBe('');
@@ -305,11 +319,25 @@ describe('Coordinator shell and desktop start-up', () => {
 });
 
 describe('forwardComputerCall target and presence', () => {
+  test.each(['shell', 'list_files', 'read_file', 'write_file'] as ComputerTool[])(
+    'Coordinator chief steps refuse removed VM command/file tool %s before dispatch',
+    async (name) => {
+      const { s, deps } = boot();
+      addMachine(s, 'omarchy', { computer: true, browser: true });
+      const calls = connect(s, 'omarchy');
+      await expect(
+        forwardComputerCall(deps, 'sidecar', 'step-a', {
+          computer: true,
+          name,
+          toolCallId: `refused-${name}`,
+          params: {},
+        }),
+      ).rejects.toMatchObject({ status: 400 });
+      expect(calls).toEqual([]);
+    },
+  );
+
   test.each([
-    'shell',
-    'list_files',
-    'read_file',
-    'write_file',
     'computer_observe',
     'computer_act',
     'desktop_snapshot',
@@ -361,10 +389,6 @@ describe('forwardComputerCall target and presence', () => {
   );
 
   test.each([
-    ['shell', 'desktop'],
-    ['list_files', 'desktop'],
-    ['read_file', 'desktop'],
-    ['write_file', 'desktop'],
     ['computer_observe', 'desktop'],
     ['computer_act', 'desktop'],
     ['desktop_snapshot', 'desktop'],
@@ -591,9 +615,9 @@ describe('forwardComputerCall replay', () => {
     await expect(
       forwardComputerCall(deps, 'sidecar', 'step-a', {
         computer: true,
-        name: 'read_file',
+        name: 'computer_observe',
         toolCallId: 'reuse',
-        params: { path: 'x' },
+        params: {},
       }),
     ).rejects.toMatchObject({ status: 409 });
     expect(calls).toHaveLength(1);
@@ -605,9 +629,9 @@ describe('forwardComputerCall replay', () => {
     const calls = connect(ctx.s, 'omarchy');
     const read = {
       computer: true as const,
-      name: 'read_file' as const,
+      name: 'computer_observe' as const,
       toolCallId: 'r1',
-      params: { path: 'a' },
+      params: {},
     };
     const first = forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
     const id = computerCallId('step-a', 'r1');
@@ -634,9 +658,9 @@ describe('forwardComputerCall replay', () => {
     const calls = connect(ctx.s, 'omarchy');
     const read = {
       computer: true as const,
-      name: 'read_file' as const,
+      name: 'computer_observe' as const,
       toolCallId: 'r1',
-      params: { path: 'a' },
+      params: {},
     };
     void forwardComputerCall(ctx.deps, 'sidecar', 'step-a', read);
     dropComputerWaiters();
@@ -701,9 +725,9 @@ describe('forwardComputerCall daemon errors and deadlines', () => {
     const { s, deps, result, id } = await started();
     const read = forwardComputerCall(deps, 'sidecar', 'step-a', {
       computer: true,
-      name: 'read_file',
+      name: 'computer_observe',
       toolCallId: 'r1',
-      params: { path: 'a' },
+      params: {},
     });
     await vi.advanceTimersByTimeAsync(11 * 60_000);
     expect((await result).text).toContain('interrupted, may have partially run');
@@ -898,9 +922,9 @@ describe('leases', () => {
       .run();
     void forwardComputerCall(deps, 'sidecar', 'step-a', {
       computer: true,
-      name: 'read_file',
+      name: 'computer_observe',
       toolCallId: 'obs',
-      params: { path: 'a' },
+      params: {},
     });
     const kept = s.db.select().from(computerTable).get()?.executionLeaseExpiresAt ?? 0;
     expect(kept).toBeGreaterThan(Date.now() + hour - 5_000);
@@ -926,7 +950,7 @@ describe('leases', () => {
     );
   });
 
-  test('while ian holds control every bot call is refused except read-only safe tools', async () => {
+  test('while ian holds control every bot action is refused and screen observation returns owner-control refusal', async () => {
     const { s, deps, calls } = await twoSteps();
     s.db
       .update(computerTable)
@@ -935,14 +959,14 @@ describe('leases', () => {
     await expect(
       forwardComputerCall(deps, 'sidecar', 'step-a', shell('rm x', 'tc-3')),
     ).rejects.toThrow(COMPUTER_USER_CONTROL);
-    void forwardComputerCall(deps, 'sidecar', 'step-a', {
+    const obs = await forwardComputerCall(deps, 'sidecar', 'step-a', {
       computer: true,
-      name: 'read_file',
+      name: 'computer_observe',
       toolCallId: 'r1',
-      params: { path: 'a' },
+      params: {},
     });
-    expect(calls).toHaveLength(2);
-    expect(calls[1]?.tool).toBe('read_file');
+    expect(obs.text).toContain('owner');
+    expect(calls).toHaveLength(1);
   });
 });
 

@@ -6,7 +6,6 @@ import {
   CONNECTOR_TOOL_PREFIX,
   DELIVERABLES_MESSAGE_PREFIX,
   deliverablesMessageSchema,
-  INSTALL_PACKAGES_TOOL,
   MEMORY_TOOLS,
   REPORT_ACK_KIND,
   type ReportAckContent,
@@ -52,8 +51,7 @@ const MAIL_TURN_OPEN_TOOLS: ReadonlySet<string> = new Set([
   ...CHIEF_TOOL_CATEGORIES.read.filter((name) => name !== 'secrets'),
   'create_todo',
   ...COMPUTER_OBSERVE_TOOLS,
-  ...COMPUTER_DIRECT_TOOLS,
-  INSTALL_PACKAGES_TOOL,
+  ...COMPUTER_DIRECT_TOOLS.filter((name) => name !== 'shell'),
 ]);
 const ACTION_WAKE_PROVENANCE_PREFIX = 'action-proposal:';
 

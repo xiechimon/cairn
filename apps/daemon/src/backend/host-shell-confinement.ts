@@ -15,22 +15,19 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { realpathOfNearest } from '@cairn/shared/realpath-nearest';
 import { executableOnPath } from '../computer/contained-spawn.js';
 import { ComputerRefusal } from '../computer/provider.js';
+import { isSafeStagingRoot } from '../computer/staging.js';
 import {
   CONTAINER_SOCKETS,
   canonicalDeny,
   contains,
-  DENIED_DIRECTORIES,
-  DENIED_FILES,
+  HOST_SHELL_CREDENTIAL_DIRECTORIES,
+  HOST_SHELL_CREDENTIAL_FILES,
 } from './confine.js';
 import {
-  HOST_SHELL_WRITE_DENY_DIRECTORIES,
-  HOST_SHELL_WRITE_DENY_FILES,
-  HOST_SHELL_WRITE_DENY_ROOTS,
   hostShellCommand,
-  LINUX_WRITE_DENY_MASKED_BINARIES,
   MAC_AGENT_SOCKETS,
-  MAC_DENIED_DIRECTORIES,
   MAC_DENIED_ROOTS,
+  MAC_HOST_SHELL_CREDENTIAL_DIRECTORIES,
   SANDBOX_EXEC,
 } from './confine-seatbelt.js';
 
@@ -42,30 +39,12 @@ export interface HostShellConfinementOptions {
   platform?: string;
   path?: string;
   xdgRuntimeDir?: string;
+  stagingRoot?: string;
 }
 
 const SYSTEM_BIN_PATH = '/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:/usr/sbin:/sbin:/snap/bin';
 
 const MATERIALIZE_MISSING_FILES: Record<string, { content: string; mode: number }> = {
-  '.bash_profile': {
-    mode: 0o644,
-    content:
-      'if [ -f ~/.bash_login ]; then . ~/.bash_login; elif [ -f ~/.profile ]; then . ~/.profile; fi\n',
-  },
-  '.bash_login': { mode: 0o644, content: 'if [ -f ~/.profile ]; then . ~/.profile; fi\n' },
-  '.xinitrc': {
-    mode: 0o755,
-    content:
-      '#!/bin/sh\nif [ -x /etc/X11/xinit/xinitrc ]; then exec /etc/X11/xinit/xinitrc; fi\nif [ -x /etc/X11/Xsession ]; then exec /etc/X11/Xsession; fi\n',
-  },
-  '.xsession': {
-    mode: 0o755,
-    content: '#!/bin/sh\nif [ -x /etc/X11/Xsession ]; then exec /etc/X11/Xsession; fi\n',
-  },
-  '.emacs': {
-    mode: 0o644,
-    content: '(when (file-readable-p "~/.emacs.d/init.el") (load-file "~/.emacs.d/init.el"))\n',
-  },
   '.claude.json': { mode: 0o600, content: '{}\n' },
 };
 
@@ -73,13 +52,29 @@ const MATERIALIZE_MISSING_DIRS: Record<string, number> = { '.gnupg': 0o700 };
 
 export interface HostShellConfinement {
   denied(target: string): boolean;
-  writeDenied(target: string): boolean;
   wrap(command: string, args: readonly string[]): { command: string; args: string[] };
 }
 
 function canonicalize(path: string): string {
   if (!isAbsolute(path)) return path;
   return resolve(path) === path ? canonicalDeny(path) : realpathOfNearest(path);
+}
+
+function existingAncestorsOf(paths: readonly string[]): string[] {
+  const seen = new Set<string>();
+  for (const raw of paths) {
+    let cursor = dirname(raw);
+    while (cursor !== '/' && cursor !== dirname(cursor)) {
+      if (cursor !== '/tmp' && cursor !== '/var/tmp') {
+        try {
+          const st = lstatSync(cursor);
+          if (!st.isSymbolicLink() && st.isDirectory()) seen.add(cursor);
+        } catch {}
+      }
+      cursor = dirname(cursor);
+    }
+  }
+  return [...seen].sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
 }
 
 function denyVariants(paths: readonly string[]): string[] {
@@ -135,25 +130,20 @@ export function createHostShellConfinement(
     ...(desktopDir !== undefined ? [desktopDir] : []),
     ...runtimeDirectories,
     ...(platform === 'darwin'
-      ? [...DENIED_DIRECTORIES, ...MAC_DENIED_DIRECTORIES].map((entry) => join(home, entry))
-      : DENIED_DIRECTORIES.map((entry) => join(home, entry))),
+      ? [...HOST_SHELL_CREDENTIAL_DIRECTORIES, ...MAC_HOST_SHELL_CREDENTIAL_DIRECTORIES].map(
+          (entry) => join(home, entry),
+        )
+      : HOST_SHELL_CREDENTIAL_DIRECTORIES.map((entry) => join(home, entry))),
     ...(platform === 'darwin' ? MAC_DENIED_ROOTS : []),
   ];
   const rawDeniedFiles = [
-    ...DENIED_FILES.map((entry) => join(home, entry)),
+    ...HOST_SHELL_CREDENTIAL_FILES.map((entry) => join(home, entry)),
     ...(platform === 'darwin' ? MAC_AGENT_SOCKETS.map((entry) => join(home, entry)) : []),
     ...(platform !== 'win32' ? CONTAINER_SOCKETS : []),
     ...runtimeFiles,
   ];
-  const rawDeniedWriteDirectories = [
-    ...(platform === 'darwin' ? HOST_SHELL_WRITE_DENY_ROOTS : []),
-    ...HOST_SHELL_WRITE_DENY_DIRECTORIES.map((entry) => join(home, entry)),
-  ];
-  const rawDeniedWriteFiles = HOST_SHELL_WRITE_DENY_FILES.map((entry) => join(home, entry));
   const deniedDirectories = denyVariants(rawDeniedDirectories);
   const deniedFiles = denyVariants(rawDeniedFiles);
-  const deniedWriteDirectories = denyVariants(rawDeniedWriteDirectories);
-  const deniedWriteFiles = denyVariants(rawDeniedWriteFiles);
   const protectedDirs = new Set(
     denyVariants([
       ...(options.deniedRoots ?? []),
@@ -164,8 +154,6 @@ export function createHostShellConfinement(
   const fold =
     platform === 'darwin' ? (path: string) => path.toLowerCase() : (path: string) => path;
   const foldedPaths = deniedPaths.map(fold);
-  const foldedWriteDirectories = deniedWriteDirectories.map(fold);
-  const foldedWriteFiles = new Set(deniedWriteFiles.map(fold));
   const denied = (target: string): boolean => {
     if (target.includes('\0')) return true;
     const lexical = fold(isAbsolute(target) ? resolve(target) : target);
@@ -178,30 +166,6 @@ export function createHostShellConfinement(
     }
     return foldedPaths.some((root) => contains(root, probe));
   };
-  const writeDenied = (target: string): boolean => {
-    if (target.includes('\0')) return true;
-    const gitSegment = (path: string) =>
-      path.split('/').some((segment) => segment === '.git' || segment.endsWith('.git'));
-    const lexical = fold(isAbsolute(target) ? resolve(target) : target);
-    if (
-      gitSegment(fold(target)) ||
-      gitSegment(lexical) ||
-      foldedWriteDirectories.some((root) => contains(root, lexical)) ||
-      foldedWriteFiles.has(lexical)
-    ) {
-      return true;
-    }
-    let probe: string;
-    try {
-      probe = fold(isAbsolute(target) ? realpathOfNearest(target, { onLoop: 'throw' }) : target);
-    } catch {
-      return true;
-    }
-    if (gitSegment(probe)) return true;
-    return (
-      foldedWriteDirectories.some((root) => contains(root, probe)) || foldedWriteFiles.has(probe)
-    );
-  };
 
   const wrap = (command: string, args: readonly string[]): { command: string; args: string[] } => {
     if (platform === 'darwin') {
@@ -212,8 +176,9 @@ export function createHostShellConfinement(
         {
           deniedDirectories,
           deniedFiles,
-          deniedWriteDirectories,
-          deniedWriteFiles,
+          ...(options.stagingRoot !== undefined
+            ? { stagingRoot: canonicalize(options.stagingRoot) }
+            : {}),
           ...(options.serverPort !== undefined ? { serverPort: options.serverPort } : {}),
           ...(desktopDir !== undefined ? { agentDesktopDir: desktopDir } : {}),
         },
@@ -243,6 +208,16 @@ export function createHostShellConfinement(
       const resolvedIsDirectory = (target: string): boolean => {
         try {
           return statSync(target).isDirectory();
+        } catch {
+          return false;
+        }
+      };
+      const writableParent = (target: string): boolean => {
+        const parent = dirname(target);
+        try {
+          if (!statSync(parent).isDirectory()) return false;
+          accessSync(parent, constants.W_OK);
+          return true;
         } catch {
           return false;
         }
@@ -329,35 +304,9 @@ export function createHostShellConfinement(
           continue;
         }
         if (stat === undefined) {
-          if (!contains(home, file) || !writableAncestor(file)) continue;
+          if (!contains(home, file) || !writableParent(file)) continue;
           stat = materialize(file);
         }
-        mounted.add(canon);
-        mounts.push('--ro-bind', '/dev/null', canon);
-      }
-      for (const path of [
-        ...rawDeniedWriteDirectories.map((entry) => ({ entry, directory: true })),
-        ...rawDeniedWriteFiles.map((entry) => ({ entry, directory: false })),
-      ]) {
-        if (covered(canonicalize(dirname(path.entry)))) continue;
-        let stat = probeTarget(path.entry);
-        const canon = canonicalize(path.entry);
-        if (covered(canon)) continue;
-        if (stat === undefined) {
-          if (!writableAncestor(path.entry)) continue;
-          stat = materialize(path.entry);
-        }
-        mounted.add(canon);
-        if (stat === undefined) {
-          if (path.directory) mounts.push('--tmpfs', canon, '--remount-ro', canon);
-          else mounts.push('--ro-bind', '/dev/null', canon);
-        } else {
-          mounts.push('--ro-bind', canon, canon);
-        }
-      }
-      for (const binary of LINUX_WRITE_DENY_MASKED_BINARIES) {
-        const canon = canonicalize(binary);
-        if (covered(canon) || !existsSync(binary)) continue;
         mounted.add(canon);
         mounts.push('--ro-bind', '/dev/null', canon);
       }
@@ -382,6 +331,17 @@ export function createHostShellConfinement(
           } catch {}
         }
       }
+      const ancestorPins = existingAncestorsOf([...mounted]).flatMap((dir) => ['--bind', dir, dir]);
+      const stagingBind: string[] = [];
+      if (options.stagingRoot !== undefined && isSafeStagingRoot(options.stagingRoot)) {
+        const stagingCanon = canonicalize(options.stagingRoot);
+        if (
+          (contains('/tmp', stagingCanon) || contains('/var/tmp', stagingCanon)) &&
+          !denied(stagingCanon)
+        ) {
+          stagingBind.push('--bind', stagingCanon, stagingCanon);
+        }
+      }
       return {
         command: bwrap,
         args: [
@@ -398,6 +358,8 @@ export function createHostShellConfinement(
           '/tmp',
           '--tmpfs',
           '/var/tmp',
+          ...stagingBind,
+          ...ancestorPins,
           ...mounts,
           '--',
           command,
@@ -408,5 +370,5 @@ export function createHostShellConfinement(
     throw new ComputerRefusal('host shell confinement is unsupported on this platform');
   };
 
-  return { denied, writeDenied, wrap };
+  return { denied, wrap };
 }

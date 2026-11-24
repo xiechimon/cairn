@@ -8,6 +8,7 @@ export const COMPUTER_TOOLS = [
   'read_file',
   'write_file',
   'attach_file',
+  'stage_attachment',
   'computer_observe',
   'computer_act',
   'desktop_snapshot',
@@ -34,12 +35,16 @@ export type ComputerTool = z.infer<typeof computerToolSchema>;
 export const COMPUTER_REPLAY_SAFE_TOOLS: ReadonlySet<ComputerTool> = new Set([
   'list_files',
   'read_file',
+  'stage_attachment',
   'computer_observe',
   'desktop_snapshot',
   'browser_snapshot',
   'user_computer_observe',
   'phone_observe',
 ]);
+
+export const STAGED_UPLOADS_DIR_NAME = 'cairn-uploads';
+export const STAGE_ATTACHMENT_TIMEOUT_MS = 30_000;
 
 export const DEBIAN_PACKAGE_NAME = /^[a-z0-9][a-z0-9+.-]+$/;
 export const INSTALL_PACKAGES_MAX = 20;

@@ -218,8 +218,8 @@ describe('private computer principal boundary with two server-bound AppContexts'
     for (const owner of [s.user, bob]) {
       const result = forwardComputerCall(deps, 'sidecar', `step-${owner.id}`, {
         computer: true,
-        name: 'shell',
-        toolCallId: 'private-shell',
+        name: 'computer_act',
+        toolCallId: 'private-act',
         params: { command: `echo private-${owner.id}`, cwd: `/private/${owner.id}` },
       });
       const call = calls.at(-1);

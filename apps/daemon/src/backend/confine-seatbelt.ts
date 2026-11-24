@@ -15,167 +15,32 @@ import {
 
 export const SANDBOX_EXEC = '/usr/bin/sandbox-exec';
 
-export const MAC_DENIED_DIRECTORIES = [
+export const MAC_HOST_SHELL_CREDENTIAL_DIRECTORIES = [
   'Library/Keychains',
+  'Library/Cookies',
+  'Library/Containers/com.apple.Safari/Data/Library/Cookies',
   'Library/Application Support/Google/Chrome',
   'Library/Application Support/Chromium',
+  'Library/Application Support/BraveSoftware',
+  'Library/Application Support/Microsoft Edge',
+  'Library/Application Support/Vivaldi',
+  'Library/Application Support/Arc',
   'Library/Application Support/Firefox',
+  'Library/Application Support/1Password',
+  'Library/Group Containers/2BUA8C4S2C.com.1password',
   'Library/Application Support/Claude',
   'Library/Application Support/Code',
   'Library/Application Support/@cairn',
+  'Library/pnpm/rc',
+];
+export const MAC_DENIED_DIRECTORIES = [
+  ...MAC_HOST_SHELL_CREDENTIAL_DIRECTORIES,
   'Library/Safari',
-  'Library/Cookies',
   'Library/Mail',
   'Library/Messages',
-  'Library/pnpm/rc',
 ];
 export const MAC_DENIED_ROOTS = ['/Library/Keychains'];
 export const MAC_AGENT_SOCKETS = ['Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock'];
-export const HOST_SHELL_WRITE_DENY_DIRECTORIES = [
-  'Library/LaunchAgents',
-  'Library/Input Methods',
-  'Library/QuickLook',
-  'Library/Audio/Plug-Ins',
-  'Library/ScriptingAdditions',
-  'Library/Python',
-  'Library/Application Support/iTerm2/DynamicProfiles',
-  '.vscode/extensions',
-  '.config/git',
-  '.config/fish',
-  '.config/nvim',
-  '.config/zsh',
-  '.config/tmux',
-  '.config/kitty',
-  '.config/wezterm',
-  '.config/alacritty',
-  '.config/ghostty',
-  '.config/direnv',
-  '.config/autostart',
-  '.config/systemd/user',
-  '.config/environment.d',
-  '.config/pip',
-  '.config/go',
-  '.config/zellij',
-  '.emacs.d',
-  '.local/bin',
-  '.local/share/applications',
-  '.local/share/nvim',
-  '.ipython',
-  '.jupyter',
-  '.vim',
-  '.bundle',
-  '.pip',
-  'bin',
-];
-export const HOST_SHELL_WRITE_DENY_FILES = [
-  '.gitconfig',
-  '.gitmodules',
-  '.lldbinit',
-  '.gdbinit',
-  '.vimrc',
-  '.gvimrc',
-  '.nvimrc',
-  '.emacs',
-  '.tmux.conf',
-  '.screenrc',
-  '.hgrc',
-  '.curlrc',
-  '.zlogin',
-  '.zlogout',
-  '.bash_login',
-  '.bash_logout',
-  '.yarnrc',
-  '.yarnrc.yml',
-  '.xprofile',
-  '.xinitrc',
-  '.xsession',
-  '.xsessionrc',
-  '.wgetrc',
-  '.bash_aliases',
-  '.pam_environment',
-  '.pythonrc',
-  '.condarc',
-  '.config/mimeapps.list',
-];
-export const HOST_SHELL_WRITE_DENY_ROOTS = ['/Library/LaunchAgents', '/Library/LaunchDaemons'];
-
-const GIT_HOOK_NAMES = [
-  'applypatch-msg',
-  'commit-msg',
-  'fsmonitor-watchman',
-  'post-applypatch',
-  'post-checkout',
-  'post-commit',
-  'post-index-change',
-  'post-merge',
-  'post-receive',
-  'post-rewrite',
-  'post-update',
-  'pre-applypatch',
-  'pre-auto-gc',
-  'pre-commit',
-  'pre-merge-commit',
-  'pre-push',
-  'pre-rebase',
-  'pre-receive',
-  'prepare-commit-msg',
-  'proc-receive',
-  'push-to-checkout',
-  'p4-changelist',
-  'p4-post-changelist',
-  'p4-prepare-changelist',
-  'p4-pre-submit',
-  'reference-transaction',
-  'sendemail-validate',
-  'update',
-];
-
-function folded(name: string): string {
-  return name.replace(/[a-z]/g, (char) => `[${char}${char.toUpperCase()}]`);
-}
-
-const GIT_DIR_SEGMENT = `\\.${folded('git')}(/.+)?/`;
-const GIT_METADATA_NAMES = `(${folded('config')}(\\..*)?|${folded('commondir')}|${folded('gitdir')}|${folded('info')}/${folded('attributes')})$`;
-const GIT_HOOKS_SEGMENT = `${GIT_DIR_SEGMENT}${folded('hooks')}`;
-
-const GIT_HOOK_NAME_CHUNKS: string[][] = [];
-for (let index = 0; index < GIT_HOOK_NAMES.length; index += 7)
-  GIT_HOOK_NAME_CHUNKS.push(GIT_HOOK_NAMES.slice(index, index + 7).map(folded));
-
-export const GIT_METADATA_WRITE_DENIES = [
-  `(deny file-write-unlink (regex #"\\.${folded('git')}$") (regex #"${GIT_HOOKS_SEGMENT}$"))`,
-  `(deny file-write* (regex #"${GIT_DIR_SEGMENT}${GIT_METADATA_NAMES}") (regex #"${GIT_HOOKS_SEGMENT}/[^/]+/"))`,
-  ...GIT_HOOK_NAME_CHUNKS.map(
-    (names) => `(deny file-write* (regex #"${GIT_HOOKS_SEGMENT}/(${names.join('|')})$"))`,
-  ),
-];
-
-export const LINUX_WRITE_DENY_MASKED_BINARIES = [
-  '/usr/bin/crontab',
-  '/usr/bin/at',
-  '/usr/bin/atq',
-  '/usr/bin/batch',
-  '/usr/sbin/at',
-  '/usr/sbin/crontab',
-  '/bin/crontab',
-  '/bin/at',
-  '/bin/atq',
-  '/bin/batch',
-  '/usr/bin/sudo',
-  '/bin/sudo',
-  '/usr/bin/su',
-  '/bin/su',
-  '/usr/bin/pkexec',
-  '/bin/pkexec',
-  '/usr/bin/doas',
-  '/bin/doas',
-  '/usr/bin/newgrp',
-  '/bin/newgrp',
-  '/usr/bin/sg',
-  '/bin/sg',
-  '/usr/bin/gpasswd',
-  '/bin/gpasswd',
-];
 const OWN_STATE_NAMES = [
   '.claude',
   '.pi',
@@ -193,6 +58,10 @@ const MACH_SERVICE_DENIALS = [
 
 const KEYCHAIN_MACH_DENIALS = [
   '(deny mach-lookup (global-name-prefix "com.apple.securityd") (global-name-prefix "com.apple.SecurityServer") (global-name-prefix "com.apple.secd") (global-name-prefix "com.apple.trustd"))',
+];
+
+const HOST_SHELL_KEYCHAIN_MACH_DENIALS = [
+  '(deny mach-lookup (global-name-prefix "com.apple.securityd") (global-name-prefix "com.apple.SecurityServer") (global-name-prefix "com.apple.secd"))',
 ];
 
 export const ESCAPE_BINARIES = [
@@ -496,31 +365,35 @@ export function seatbeltCommand(
 export interface HostShellPolicy {
   deniedDirectories: string[];
   deniedFiles: string[];
-  deniedWriteDirectories?: string[];
-  deniedWriteFiles?: string[];
+  stagingRoot?: string;
   serverPort?: number;
   agentDesktopDir?: string;
 }
 
 export function hostShellProfile(policy: HostShellPolicy): string {
+  const deniedAncestors = [
+    ...new Set([
+      ...[...policy.deniedDirectories, ...policy.deniedFiles].flatMap(ancestorsOf),
+      ...(policy.stagingRoot !== undefined ? [policy.stagingRoot] : []),
+    ]),
+  ];
   const lines = ['(version 1)', '(allow default)'];
   lines.push(
     ...ruleLines('deny file-read* file-write*', [
       ...policy.deniedDirectories.map((path) => `(subpath ${quoted(path)})`),
       ...policy.deniedFiles.map((path) => `(literal ${quoted(path)})`),
     ]),
-    ...ruleLines('deny file-write*', [
-      ...(policy.deniedWriteDirectories ?? []).map((path) => `(subpath ${quoted(path)})`),
-      ...(policy.deniedWriteFiles ?? []).map((path) => `(literal ${quoted(path)})`),
-    ]),
-    ...GIT_METADATA_WRITE_DENIES,
+    ...ruleLines(
+      'deny file-write-unlink',
+      deniedAncestors.map((path) => `(literal ${quoted(path)})`),
+    ),
   );
   if (policy.agentDesktopDir !== undefined) {
     lines.push(`(deny process-exec (subpath ${quoted(policy.agentDesktopDir)}))`);
   }
   lines.push(...unixSocketDenies(policy.deniedDirectories, policy.deniedFiles));
   lines.push(...ESCAPE_DENIALS);
-  lines.push(...MACH_SERVICE_DENIALS, ...KEYCHAIN_MACH_DENIALS);
+  lines.push(...MACH_SERVICE_DENIALS, ...HOST_SHELL_KEYCHAIN_MACH_DENIALS);
   if (policy.serverPort !== undefined) serverPortDenies(lines, policy.serverPort);
   return `${lines.join('\n')}\n`;
 }
