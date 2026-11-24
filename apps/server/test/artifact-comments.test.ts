@@ -245,3 +245,20 @@ test('existing non-page task files get their first version from the migration', 
       .all(),
   ).toEqual([{ fileName: 'resume.pdf', seq: 1 }]);
 });
+
+test('only an html page is served or shared as a page; other artifacts stay downloads', async () => {
+  const { s, task, attach, pages } = await world();
+  await attach('notes.md', '<script>alert(1)</script>');
+  const version = (await pages()).find((p) => p.fileName === 'notes.md')?.current.id;
+  expect(version).toBeDefined();
+  const page = await req(s.app, 'GET', `/api/design/versions/${version}/page`);
+  expect(page.status).toBe(404);
+  expect(page.headers.get('content-type') ?? '').not.toContain('text/html');
+  process.env.CAIRN_RELAY_ORIGIN = 'https://relay.example.test';
+  try {
+    const share = await req(s.app, 'POST', `/api/todos/${task.id}/design/notes.md/share`);
+    expect(share.status).toBe(404);
+  } finally {
+    delete process.env.CAIRN_RELAY_ORIGIN;
+  }
+});
