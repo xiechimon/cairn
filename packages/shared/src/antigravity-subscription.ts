@@ -41,6 +41,20 @@ export type AntigravityOAuthStepCredential = z.infer<typeof antigravityOAuthStep
 
 export const ANTIGRAVITY_MODEL_NAME_MAX_LENGTH = 256;
 
+const INTERNAL_ANTIGRAVITY_MODEL_ID_PATTERNS = [
+  /^chat_\d+$/i,
+  /^tab_/i,
+  /-image$/i,
+  /-tiered$/i,
+  /^models\//i,
+] as const;
+
+export function isInternalAntigravityModelId(id: string): boolean {
+  const trimmed = id.trim();
+  if (trimmed === '') return true;
+  return INTERNAL_ANTIGRAVITY_MODEL_ID_PATTERNS.some((pattern) => pattern.test(trimmed));
+}
+
 export const antigravitySubscriptionModelSchema = z.strictObject({
   id: z.string().min(1).max(256),
   name: z.string().min(1).max(ANTIGRAVITY_MODEL_NAME_MAX_LENGTH),

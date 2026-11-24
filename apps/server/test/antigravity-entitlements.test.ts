@@ -1,5 +1,8 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { eq } from 'drizzle-orm';
-import { afterEach, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
+import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { antigravitySubscription } from '../src/db/schema.js';
 import { openAntigravitySubscription } from '../src/services/antigravity-subscriptions.js';
 import { antigravityUsable } from '../src/services/dispatch-eligibility.js';
@@ -16,7 +19,16 @@ const PAID_VARIANTS = ['neon', 'carbon', 'argon'].flatMap((family) =>
   })),
 );
 
+let prevAgyBin: string | undefined;
+
+beforeEach(() => {
+  prevAgyBin = process.env.AGY_BIN;
+  process.env.AGY_BIN = '/nonexistent/agy';
+});
+
 afterEach(() => {
+  if (prevAgyBin === undefined) delete process.env.AGY_BIN;
+  else process.env.AGY_BIN = prevAgyBin;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -171,17 +183,17 @@ test('discovers each account’s entitlement models without switching the active
   });
   vi.stubGlobal('fetch', upstream);
 
-  const gemini = { id: 'gemini-flash', name: 'Gemini Flash · Gemini Models' };
+  const gemini = { id: 'gemini-flash', name: 'Gemini Flash' };
   for (const [token, models] of [
     [
       ACCESS_TOKEN,
       [
         gemini,
-        { id: 'claude-paid', name: 'Claude Paid · Claude and GPT models' },
-        { id: 'gpt-paid', name: 'GPT Paid · Claude and GPT models' },
+        { id: 'claude-paid', name: 'Claude Paid' },
+        { id: 'gpt-paid', name: 'GPT Paid' },
         ...PAID_VARIANTS.map(({ id, displayName }) => ({
           id,
-          name: `${displayName} · Gemini Models`,
+          name: displayName,
         })),
       ],
     ],
@@ -199,7 +211,7 @@ test('discovers each account’s entitlement models without switching the active
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: 'ok', models });
   }
-  expect(upstream).toHaveBeenCalledTimes(6);
+  expect(upstream).toHaveBeenCalledTimes(4);
   for (const [url, init] of upstream.mock.calls) {
     expect(['https://cloudcode-pa.googleapis.com', 'https://oauth2.googleapis.com']).toContain(
       new URL(url).origin,
@@ -276,7 +288,7 @@ test('renews expired desktop OAuth in place before probing the same account cata
     });
     expect(created.status).toBe(201);
     const { id, enabledAt } = (await created.json()) as { id: string; enabledAt: number };
-    const models = [{ id: 'claude-renewed', name: 'Claude Renewed · Claude and GPT models' }];
+    const models = [{ id: 'claude-renewed', name: 'Claude Renewed' }];
     expect((await req(s.app, 'PATCH', `${path}/${id}`, { models })).status).toBe(200);
 
     clock.mockReturnValue(start + 60_001);
@@ -304,7 +316,7 @@ test('renews expired desktop OAuth in place before probing the same account cata
       status: 'ok',
       models,
     });
-    expect(upstream).toHaveBeenCalledTimes(4);
+    expect(upstream).toHaveBeenCalledTimes(3);
   } finally {
     s.dispose();
   }
@@ -532,6 +544,279 @@ test('personal OAuth returns the full CLI-equivalent catalog even when an online
     expect(body.status).toBe('ok');
     expect(body.models.map((m) => m.id)).toEqual(fullCliEntries.map(([modelId]) => modelId));
   } finally {
+    s.dispose();
+  }
+});
+
+test('filters internal, non-chat, and unrunnable entries at source and returns clean human display names', async () => {
+  const s = bootServer({ githubFetch: async () => new Response('[]') });
+  try {
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+          return Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT });
+        }
+        if (url.endsWith(':fetchAvailableModels')) {
+          return Response.json({
+            models: {
+              chat_20706: {
+                isInternal: true,
+                apiProvider: 'API_PROVIDER_INTERNAL',
+                modelProvider: 'MODEL_PROVIDER_GOOGLE',
+              },
+              chat_23310: {
+                isInternal: true,
+                apiProvider: 'API_PROVIDER_INTERNAL',
+                modelProvider: 'MODEL_PROVIDER_GOOGLE',
+              },
+              tab_jump_flash_lite_preview: {
+                apiProvider: 'API_PROVIDER_GOOGLE_GEMINI',
+                modelProvider: 'MODEL_PROVIDER_GOOGLE',
+              },
+              'gemini-3.1-flash-image': {
+                displayName: 'Gemini 3.1 Flash Image',
+                modelProvider: 'MODEL_PROVIDER_GOOGLE',
+              },
+              'gemini-3.8-flash-tiered': {
+                modelProvider: 'MODEL_PROVIDER_GOOGLE',
+              },
+              'gemini-2.5-pro': {
+                displayName: 'Gemini 2.5 Pro',
+                modelProvider: 'MODEL_PROVIDER_GOOGLE',
+              },
+              'claude-sonnet-4-6': {
+                displayName: 'Claude Sonnet 4.6 (Thinking)',
+                modelProvider: 'MODEL_PROVIDER_ANTHROPIC',
+              },
+              'claude-opus-4-6-thinking': {
+                displayName: 'Claude Opus 4.6 (Thinking)',
+                modelProvider: 'MODEL_PROVIDER_ANTHROPIC',
+              },
+              'gpt-oss-120b-medium': {
+                displayName: 'GPT-OSS 120B (Medium)',
+                modelProvider: 'MODEL_PROVIDER_OPENAI',
+              },
+            },
+            agentModelSorts: [
+              {
+                displayName: 'Recommended',
+                groups: [
+                  {
+                    modelIds: [
+                      'claude-sonnet-4-6',
+                      'claude-opus-4-6-thinking',
+                      'gpt-oss-120b-medium',
+                    ],
+                  },
+                ],
+              },
+            ],
+            tabModelIds: ['chat_20706', 'chat_23310'],
+            imageGenerationModelIds: ['gemini-3.1-flash-image'],
+            tieredModelIds: {
+              flashLite: ['gemini-3.5-flash-lite'],
+              flash: ['gemini-3.8-flash-tiered'],
+              pro: ['gemini-3.8-flash-tiered'],
+            },
+          });
+        }
+        return Response.json({ groups: [] });
+      }),
+    );
+
+    const created = await req(s.app, 'POST', path, {
+      label: 'Personal account',
+      token: ACCESS_TOKEN,
+      expiresAt: Date.now() + 600_000,
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+
+    const upstream = await req(s.app, 'POST', `${path}/${id}/upstream-models`);
+    expect(upstream.status).toBe(200);
+    expect(await upstream.json()).toEqual({
+      status: 'ok',
+      models: [
+        { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+        { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)' },
+        { id: 'claude-opus-4-6-thinking', name: 'Claude Opus 4.6 (Thinking)' },
+        { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+      ],
+    });
+  } finally {
+    s.dispose();
+  }
+});
+
+test('verifying an OAuth subscription enables its usable models by default without overwriting custom picks', async () => {
+  const s = bootServer({ githubFetch: async () => new Response('[]') });
+  try {
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+          return Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT });
+        }
+        if (url.endsWith(':fetchAvailableModels')) {
+          return Response.json({
+            models: {
+              chat_20706: { isInternal: true, modelProvider: 'MODEL_PROVIDER_GOOGLE' },
+              'gemini-3.8-flash': {
+                displayName: 'Gemini 3.8 Flash',
+                modelProvider: 'MODEL_PROVIDER_GOOGLE',
+              },
+              'claude-sonnet-4-6': {
+                displayName: 'Claude Sonnet 4.6 (Thinking)',
+                modelProvider: 'MODEL_PROVIDER_ANTHROPIC',
+              },
+              'gpt-oss-120b-medium': {
+                displayName: 'GPT-OSS 120B (Medium)',
+                modelProvider: 'MODEL_PROVIDER_OPENAI',
+              },
+            },
+          });
+        }
+        return Response.json({ groups: [] });
+      }),
+    );
+
+    const created = await req(s.app, 'POST', path, {
+      label: 'Newcomer Antigravity',
+      token: ACCESS_TOKEN,
+      expiresAt: Date.now() + 600_000,
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+
+    const verified = await req(s.app, 'POST', `${path}/${id}/verify`);
+    expect(verified.status).toBe(200);
+    expect(await verified.json()).toMatchObject({
+      ok: true,
+      check: { via: 'api' },
+    });
+
+    const listed = (await (await req(s.app, 'GET', path)).json()) as Array<{
+      id: string;
+      models: Array<{ id: string; name: string }>;
+    }>;
+    expect(listed[0]?.models).toEqual([
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)' },
+      { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+    ]);
+
+    const custom = [{ id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' }];
+    expect((await req(s.app, 'PATCH', `${path}/${id}`, { models: custom })).status).toBe(200);
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 15_000);
+    expect((await req(s.app, 'POST', `${path}/${id}/verify`)).status).toBe(200);
+    const afterReverify = (await (await req(s.app, 'GET', path)).json()) as Array<{
+      models: Array<{ id: string; name: string }>;
+    }>;
+    expect(afterReverify[0]?.models).toEqual(custom);
+  } finally {
+    s.dispose();
+  }
+});
+
+test('probes the real agy acp catalog for OAuth subscriptions and seeds those exact models on create and verify', async () => {
+  const s = bootServer({ githubFetch: async () => new Response('[]') });
+  const binDir = makeTestTempDir('agy-oauth-catalog-');
+  const fakeBin = join(binDir, 'fake-agy.sh');
+  const refreshToken = `1//0gCatalogRefresh_${'r'.repeat(32)}`;
+  const mintedAccess = `ya29.${'m'.repeat(64)}`;
+  const cliModels = [
+    { value: 'gemini-4-neon', name: 'Gemini 4 Neon' },
+    { value: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
+    { value: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+    { value: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+    { value: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+    { value: 'chat_20706', name: 'chat_20706' },
+  ];
+  writeFileSync(
+    fakeBin,
+    [
+      '#!/bin/sh',
+      `exec "${process.execPath}" --input-type=module -e '`,
+      'import { readFileSync, writeFileSync } from "node:fs";',
+      'import { createInterface } from "node:readline";',
+      'const send = (o) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...o }) + "\\n");',
+      'const tokenPath = process.env.HOME + "/.gemini/antigravity-acp/antigravity-oauth-token";',
+      'const tok = JSON.parse(readFileSync(tokenPath, "utf8"));',
+      `const options = ${JSON.stringify(cliModels)};`,
+      'for await (const line of createInterface({ input: process.stdin })) {',
+      '  const m = JSON.parse(line);',
+      '  if (m.method === "initialize") send({ id: m.id, result: { protocolVersion: 1 } });',
+      '  if (m.method === "session/new") {',
+      `    if (tok.token?.refresh_token === "${refreshToken}") {`,
+      `      tok.token.access_token = "${mintedAccess}";`,
+      '      tok.token.expiry = new Date(Date.now() + 3600000).toISOString();',
+      '      writeFileSync(tokenPath, JSON.stringify(tok));',
+      '    }',
+      '    send({ id: m.id, result: { sessionId: "s1", configOptions: [{ id: "model", category: "model", type: "select", currentValue: "gemini-4-neon", options }] } });',
+      '  }',
+      '}',
+      "'",
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  process.env.AGY_BIN = fakeBin;
+  try {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === 'https://oauth2.googleapis.com/tokeninfo') {
+          return Response.json({ expires_in: '3600', sub: GOOGLE_SUBJECT });
+        }
+        throw new Error(`Unexpected HTTP fetch when agy CLI catalog is available: ${url}`);
+      }),
+    );
+
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const expected = [
+      { id: 'gemini-4-neon', name: 'Gemini 4 Neon' },
+      { id: 'gemini-4-hydrogen', name: 'Gemini 4 Hydrogen' },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+      { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+      { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+    ];
+
+    const createdPortable = await req(s.app, 'POST', path, {
+      label: 'Portable Antigravity',
+      refreshToken,
+      authMethod: 'consumer',
+    });
+    expect(createdPortable.status).toBe(201);
+    const portable = (await createdPortable.json()) as {
+      id: string;
+      models: Array<{ id: string; name: string }>;
+    };
+    expect(portable.models).toEqual(expected);
+
+    const portableUpstream = await req(s.app, 'POST', `${path}/${portable.id}/upstream-models`);
+    expect(portableUpstream.status).toBe(200);
+    expect(await portableUpstream.json()).toEqual({ status: 'ok', models: expected });
+
+    const createdAccess = await req(s.app, 'POST', path, {
+      label: 'Access-only Antigravity',
+      token: ACCESS_TOKEN,
+      expiresAt: Date.now() + 600_000,
+    });
+    expect(createdAccess.status).toBe(201);
+    const accessSub = (await createdAccess.json()) as { id: string };
+    const verifiedAccess = await req(s.app, 'POST', `${path}/${accessSub.id}/verify`);
+    expect(verifiedAccess.status).toBe(200);
+    expect(await verifiedAccess.json()).toMatchObject({
+      ok: true,
+      check: { via: 'cli', command: 'agy acp · Google OAuth' },
+    });
+    const accessUpstream = await req(s.app, 'POST', `${path}/${accessSub.id}/upstream-models`);
+    expect(accessUpstream.status).toBe(200);
+    expect(await accessUpstream.json()).toEqual({ status: 'ok', models: expected });
+  } finally {
+    releaseTestTempDir(binDir);
     s.dispose();
   }
 });

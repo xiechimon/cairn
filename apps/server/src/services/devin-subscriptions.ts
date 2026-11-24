@@ -290,7 +290,7 @@ export async function verifyDevinSubscriptionConnection(
       Promise.resolve()
         .then(() => verifyDevinSubscription(deps.box.open(row.tokenCipher)))
         .catch((): DevinSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
-    { check: 'sign-in', command: 'devin acp · authenticate', model: null },
+    { check: 'sign-in', command: 'devin acp · authenticate', via: 'cli', model: null },
   );
   if (!result.ok) invalidateUpstreamModels(deps.db, row.id);
   deps.db

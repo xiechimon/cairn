@@ -93,7 +93,7 @@ test('the upstream picker groups by vendor and saves the picks', async ({ page }
   await expect(picker.getByTestId('upstream-group')).toHaveText([
     'Claude · 1',
     'Gemini · 2',
-    'GPT · 1',
+    'GPT-OSS · 1',
   ]);
 
   const rows = picker.getByTestId('upstream-model');

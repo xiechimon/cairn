@@ -323,7 +323,7 @@ export function listAntigravitySources(db: Db, teamId: string): ModelSourcesEnve
             ? source.models
             : (report.models ?? []),
         ),
-        DEFAULT_ANTIGRAVITY_MODELS,
+        [...(report.models ?? []), ...DEFAULT_ANTIGRAVITY_MODELS],
       );
       return [
         {

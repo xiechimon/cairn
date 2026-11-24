@@ -499,7 +499,7 @@ export async function verifySubscriptionConnection(
           }),
         )
         .catch((): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
-    { check: 'sign-in', command: CLAUDE_CHECK_COMMAND, model: null },
+    { check: 'sign-in', command: CLAUDE_CHECK_COMMAND, via: 'api', model: null },
   );
   deps.db
     .update(claudeSubscription)
@@ -553,7 +553,7 @@ export async function testClaudeSubscriptionModel(
           }),
         )
         .catch((): ClaudeSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
-    { check: 'model-request', command: CLAUDE_MODEL_TEST_COMMAND, model },
+    { check: 'model-request', command: CLAUDE_MODEL_TEST_COMMAND, via: 'api', model },
   );
   return result.ok
     ? {

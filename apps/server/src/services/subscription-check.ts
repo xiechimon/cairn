@@ -3,7 +3,7 @@ import { nowMs } from '../lib/ids.js';
 
 export async function timedCheck<R extends { ok: boolean; reason?: string }>(
   run: () => Promise<R>,
-  meta: Pick<SubscriptionCheck, 'check' | 'command' | 'model'>,
+  meta: Pick<SubscriptionCheck, 'check' | 'command' | 'model' | 'via'>,
 ): Promise<R & { check: SubscriptionCheck }> {
   const started = performance.now();
   const result = await run();

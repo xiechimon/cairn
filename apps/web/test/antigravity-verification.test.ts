@@ -4,11 +4,13 @@ import { describe, expect, it } from 'vitest';
 import { runVerification, type Verification } from '../src/api/account-verification.js';
 import type { SubscriptionAccount } from '../src/api/claude-accounts.js';
 import { TooltipProvider } from '../src/components/ui/tooltip.js';
+import { EN } from '../src/i18n/en.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 import { type TFunc, translate } from '../src/i18n/translate.js';
 import {
   SubscriptionDetail,
   subscriptionStatusView,
+  verifyDetailFacts,
 } from '../src/resources/subscription-detail.js';
 
 const NOW = Date.UTC(2026, 10, 24, 8);
@@ -151,5 +153,131 @@ describe('antigravity verification and named-runner status', () => {
     expect(view.label).toBe('Ians-Mac-mini 无法验证 · 已在 xmonsMac 登录');
     expect(view.reason).toContain('Ians-Mac-mini');
     expect(view.reason).not.toContain('登录已失效');
+  });
+
+  it('renders plain localized check method instead of code command for account-API verification', () => {
+    const en: TFunc = (source, vars) => translate('en', EN, source, vars);
+    const agyApi = verifyDetailFacts(
+      'antigravity',
+      {
+        phase: 'passed',
+        check: {
+          at: NOW,
+          ok: true,
+          reason: null,
+          check: 'sign-in',
+          command: 'Antigravity account API',
+          via: 'api',
+          model: null,
+          durationMs: 800,
+        },
+      },
+      NOW,
+      NOW,
+      t,
+    );
+    expect(agyApi).not.toContainEqual(expect.objectContaining({ label: '验证命令' }));
+    expect(agyApi).toContainEqual({
+      label: '验证方式',
+      value: 'Antigravity 账号接口',
+    });
+
+    const agyApiEn = verifyDetailFacts(
+      'antigravity',
+      {
+        phase: 'passed',
+        check: {
+          at: NOW,
+          ok: true,
+          reason: null,
+          check: 'sign-in',
+          command: 'Antigravity account API',
+          model: null,
+          durationMs: 800,
+        },
+      },
+      NOW,
+      NOW,
+      en,
+    );
+    expect(agyApiEn).toContainEqual({
+      label: 'Checked',
+      value: 'Antigravity account API',
+    });
+
+    const claudeApi = verifyDetailFacts(
+      'claude',
+      {
+        phase: 'passed',
+        check: {
+          at: NOW,
+          ok: true,
+          reason: null,
+          check: 'sign-in',
+          command: 'GET https://api.anthropic.com/v1/models',
+          via: 'api',
+          model: null,
+          durationMs: 900,
+        },
+      },
+      NOW,
+      NOW,
+      t,
+    );
+    expect(claudeApi).not.toContainEqual(expect.objectContaining({ label: '验证命令' }));
+    expect(claudeApi).toContainEqual({
+      label: '验证方式',
+      value: 'Claude 账号接口',
+    });
+
+    const cliCheck = verifyDetailFacts(
+      'antigravity',
+      {
+        phase: 'passed',
+        check: {
+          at: NOW,
+          ok: true,
+          reason: null,
+          check: 'sign-in',
+          command: 'agy acp · xmonsMac',
+          via: 'cli',
+          model: null,
+          durationMs: 1200,
+        },
+      },
+      NOW,
+      NOW,
+      t,
+    );
+    expect(cliCheck).toContainEqual({
+      label: '验证命令',
+      value: 'agy acp · xmonsMac',
+      code: true,
+    });
+
+    const devinCli = verifyDetailFacts(
+      'devin',
+      {
+        phase: 'passed',
+        check: {
+          at: NOW,
+          ok: true,
+          reason: null,
+          check: 'sign-in',
+          command: 'devin acp · authenticate',
+          via: 'cli',
+          model: null,
+          durationMs: 1100,
+        },
+      },
+      NOW,
+      NOW,
+      en,
+    );
+    expect(devinCli).toContainEqual({
+      label: 'Command',
+      value: 'devin acp · authenticate',
+      code: true,
+    });
   });
 });

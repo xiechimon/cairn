@@ -18,6 +18,7 @@ import {
   BRAND,
   compareVersions,
   DEFAULT_ANTIGRAVITY_MODELS,
+  isInternalAntigravityModelId,
   type ThinkingLevel,
 } from '@cairn/shared';
 import {
@@ -204,7 +205,9 @@ function extractModels(
     for (const entry of modelOption.options) {
       const items = 'options' in entry ? entry.options : [entry];
       for (const item of items) {
-        if (item.value === '' || seen.has(item.value)) continue;
+        if (item.value === '' || seen.has(item.value) || isInternalAntigravityModelId(item.value)) {
+          continue;
+        }
         seen.add(item.value);
         models.push({ id: item.value, name: item.name || item.value });
       }
@@ -218,7 +221,14 @@ function extractModels(
     for (const entry of legacy) {
       if (typeof entry !== 'object' || entry === null) continue;
       const { modelId, name } = entry as { modelId?: unknown; name?: unknown };
-      if (typeof modelId !== 'string' || modelId === '' || seen.has(modelId)) continue;
+      if (
+        typeof modelId !== 'string' ||
+        modelId === '' ||
+        seen.has(modelId) ||
+        isInternalAntigravityModelId(modelId)
+      ) {
+        continue;
+      }
       seen.add(modelId);
       models.push({ id: modelId, name: typeof name === 'string' && name !== '' ? name : modelId });
     }

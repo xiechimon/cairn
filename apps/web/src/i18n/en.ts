@@ -46,6 +46,10 @@ export const EN: Record<string, string> = {
   '近 24 小时': 'Last 24 hours',
   '{vendor} 不提供剩余用量': 'Remaining usage is not reported by {vendor}',
   验证命令: 'Command',
+  验证方式: 'Checked',
+  'Antigravity 账号接口': 'Antigravity account API',
+  'Claude 账号接口': 'Claude account API',
+  账号接口: 'Account API',
   '服务器未能运行本次验证，订阅状态未改变。请重试。':
     'The server could not run this check. The subscription status is unchanged. Try again.',
   验证失败: 'Verification failed',

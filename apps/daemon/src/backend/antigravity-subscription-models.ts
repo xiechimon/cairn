@@ -13,6 +13,7 @@ import {
   type AntigravityProbedModel,
   antigravityProbedModelSchema,
   antigravitySubscriptionModelSchema,
+  isInternalAntigravityModelId,
   type MachineAntigravityModelProbeResult,
 } from '@cairn/shared';
 import { createCredentialProfile } from '@cairn/shared/credential-profile';
@@ -76,7 +77,13 @@ async function queryAntigravityModels(
           ? name.slice(0, ANTIGRAVITY_MODEL_NAME_MAX_LENGTH)
           : id,
     });
-    if (!parsed.success || parsed.data.id.includes(token)) return;
+    if (
+      !parsed.success ||
+      parsed.data.id.includes(token) ||
+      isInternalAntigravityModelId(parsed.data.id)
+    ) {
+      return;
+    }
     const label = antigravityProbedModelSchema.shape.group.safeParse(
       typeof group === 'string' ? group.trim() : undefined,
     );

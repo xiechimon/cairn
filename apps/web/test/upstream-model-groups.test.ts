@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { groupDevinUpstream } from '../src/resources/upstream-model-groups.js';
+import {
+  groupAntigravityUpstream,
+  groupDevinUpstream,
+} from '../src/resources/upstream-model-groups.js';
 import type { UpstreamOption } from '../src/resources/upstream-model-picker.js';
 
 const option = (id: string, family?: string): UpstreamOption => ({ id, name: id, family });
@@ -30,5 +33,27 @@ describe('groupDevinUpstream', () => {
   it('falls back to 其他 for empty ids', () => {
     const groups = groupDevinUpstream([option('')]);
     expect(groups.map(([label]) => label)).toEqual(['其他']);
+  });
+});
+
+describe('groupAntigravityUpstream', () => {
+  it('groups Antigravity models into Gemini, Claude, and GPT-OSS in family order', () => {
+    const groups = groupAntigravityUpstream([
+      { id: 'gpt-oss-120b-medium', name: 'GPT-OSS 120B (Medium)' },
+      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)' },
+      { id: 'gemini-3.8-flash', name: 'Gemini 3.8 Flash' },
+      { id: 'gemini-pro-orchestrator', name: 'Orchestrator (Carbon)' },
+      { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+    ]);
+    expect(groups.map(([label]) => label)).toEqual(['Claude', 'Gemini', 'GPT-OSS']);
+    expect(groups[0]?.[1].map((model) => model.id)).toEqual([
+      'claude-sonnet-4-6',
+      'claude-opus-5-5',
+    ]);
+    expect(groups[1]?.[1].map((model) => model.id)).toEqual([
+      'gemini-3.8-flash',
+      'gemini-pro-orchestrator',
+    ]);
+    expect(groups[2]?.[1].map((model) => model.id)).toEqual(['gpt-oss-120b-medium']);
   });
 });

@@ -168,9 +168,9 @@ test('a check never reflows the page: the result pops up from Verify, closes on 
   await expect(result(page)).toBeVisible();
   await expect(result(page)).toHaveAttribute('data-phase', 'passed');
   await expect(result(page)).toContainText('这个订阅的登录有效。');
-  await expect(page.getByTestId('subscription-verify-detail')).toContainText(
-    'GET https://api.anthropic.com/v1/models',
-  );
+  await expect(page.getByTestId('subscription-verify-detail')).toContainText('验证方式');
+  await expect(page.getByTestId('subscription-verify-detail')).toContainText('Claude 账号接口');
+  await expect(page.getByTestId('subscription-verify-detail')).not.toContainText('验证命令');
   expect(await top(page)).toBe(before);
   await expectNoCheckStatus(page);
   await shot(page, 'connected');

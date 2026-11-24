@@ -4,43 +4,37 @@ import { antigravityProbedCatalog } from '../src/services/antigravity-entitlemen
 const TOKEN = `AIzaSyA${'p'.repeat(28)}`;
 
 describe('antigravityProbedCatalog', () => {
-  test('labels a model with the group it was reported under', () => {
-    expect(
-      antigravityProbedCatalog(
-        [{ id: 'claude-paid', name: 'Claude Paid', group: 'External' }],
-        TOKEN,
-      ),
-    ).toEqual([{ id: 'claude-paid', name: 'Claude Paid · External' }]);
-  });
-
-  test('prefers the reported group over a guess from the model id', () => {
-    expect(
-      antigravityProbedCatalog(
-        [{ id: 'gemini-paid', name: 'Gemini Paid', group: 'Claude and GPT models' }],
-        TOKEN,
-      ),
-    ).toEqual([{ id: 'gemini-paid', name: 'Gemini Paid · Claude and GPT models' }]);
-  });
-
-  test('keeps an already labelled name and guesses from the id only without a group', () => {
+  test('preserves clean human display names without appending pool suffixes', () => {
     expect(
       antigravityProbedCatalog(
         [
-          {
-            id: 'gpt-labelled',
-            name: 'GPT · Claude and GPT models',
-            group: 'Claude and GPT models',
-          },
-          { id: 'gemini-paid', name: 'Gemini Paid' },
+          { id: 'claude-paid', name: 'Claude Paid', group: 'External' },
+          { id: 'gemini-paid', name: 'Gemini Paid', group: 'Claude and GPT models' },
           { id: 'other-model', name: 'Other Model' },
         ],
         TOKEN,
       ),
     ).toEqual([
-      { id: 'gpt-labelled', name: 'GPT · Claude and GPT models' },
-      { id: 'gemini-paid', name: 'Gemini Paid · Gemini Models' },
+      { id: 'claude-paid', name: 'Claude Paid' },
+      { id: 'gemini-paid', name: 'Gemini Paid' },
       { id: 'other-model', name: 'Other Model' },
     ]);
+  });
+
+  test('filters internal and non-chat ids at source', () => {
+    expect(
+      antigravityProbedCatalog(
+        [
+          { id: 'chat_20706', name: 'chat_20706' },
+          { id: 'chat_23310', name: 'chat_23310' },
+          { id: 'tab_jump_flash_lite_preview', name: 'Tab Jump' },
+          { id: 'gemini-3.1-flash-image', name: 'Gemini 3.1 Flash Image' },
+          { id: 'gemini-3.8-flash-tiered', name: 'Gemini 3.8 Flash Tiered' },
+          { id: 'gemini-4-neon', name: 'Gemini 4 Neon' },
+        ],
+        TOKEN,
+      ),
+    ).toEqual([{ id: 'gemini-4-neon', name: 'Gemini 4 Neon' }]);
   });
 
   test('keeps distinct ids that only differ by a level suffix and drops only exact repeats', () => {
@@ -54,12 +48,12 @@ describe('antigravityProbedCatalog', () => {
         TOKEN,
       ),
     ).toEqual([
-      { id: 'gemini-paid', name: 'Gemini Paid · Gemini Models' },
-      { id: 'gemini-paid-high', name: 'Gemini Paid High · Gemini Models' },
+      { id: 'gemini-paid', name: 'Gemini Paid' },
+      { id: 'gemini-paid-high', name: 'Gemini Paid High' },
     ]);
   });
 
-  test('never exposes the key through an id, a name or a group', () => {
+  test('never exposes the key through an id or a name', () => {
     expect(
       antigravityProbedCatalog(
         [
@@ -70,11 +64,5 @@ describe('antigravityProbedCatalog', () => {
         TOKEN,
       ),
     ).toEqual([{ id: 'other-model', name: 'Other Model' }]);
-  });
-
-  test('truncates a long display name so the group suffix fits', () => {
-    expect(
-      antigravityProbedCatalog([{ id: 'x', name: 'X'.repeat(256), group: 'External' }], TOKEN),
-    ).toEqual([{ id: 'x', name: `${'X'.repeat(245)} · External` }]);
   });
 });

@@ -14,6 +14,13 @@ const VENDOR_LABELS: [RegExp, string][] = [
   [/^grok[-\s]/, 'Grok'],
 ];
 
+const ANTIGRAVITY_FAMILY_LABELS: [RegExp, string][] = [
+  [/^gemini[-\s]|^orchestrator\b/, 'Gemini'],
+  [/^claude[-\s]/, 'Claude'],
+  [/^gpt-oss[-\s]/, 'GPT-OSS'],
+  [/^(gpt|o[0-9])[-\s]/, 'GPT'],
+];
+
 function vendorOf(model: UpstreamOption): string {
   const id = model.id.toLowerCase();
   for (const [pattern, label] of VENDOR_LABELS) {
@@ -22,6 +29,15 @@ function vendorOf(model: UpstreamOption): string {
   const family = (model.family ?? model.id).split(/[-\s(]/)[0] ?? '';
   if (family === '') return '其他';
   return family.charAt(0).toUpperCase() + family.slice(1);
+}
+
+function antigravityFamilyOf(model: UpstreamOption): string {
+  const id = model.id.toLowerCase();
+  const name = model.name.toLowerCase();
+  for (const [pattern, label] of ANTIGRAVITY_FAMILY_LABELS) {
+    if (pattern.test(id) || pattern.test(name)) return label;
+  }
+  return vendorOf(model);
 }
 
 const isFusion = (model: UpstreamOption) =>
@@ -56,12 +72,14 @@ export function groupDevinUpstream(models: UpstreamOption[]): [string, UpstreamO
 }
 
 export function groupAntigravityUpstream(models: UpstreamOption[]): [string, UpstreamOption[]][] {
-  const byVendor = new Map<string, UpstreamOption[]>();
+  const byFamily = new Map<string, UpstreamOption[]>();
   for (const model of models) {
-    const vendor = vendorOf(model);
-    const group = byVendor.get(vendor);
-    if (group === undefined) byVendor.set(vendor, [model]);
+    const family = antigravityFamilyOf(model);
+    const group = byFamily.get(family);
+    if (group === undefined) byFamily.set(family, [model]);
     else group.push(model);
   }
-  return [...byVendor.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return [...byFamily.entries()].sort(([a], [b]) =>
+    a === '其他' ? 1 : b === '其他' ? -1 : a.localeCompare(b),
+  );
 }

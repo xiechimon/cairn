@@ -1190,27 +1190,11 @@ describe('antigravity upstream models', () => {
       expect(connectionId).toBeDefined();
       const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
       for (const [label, keyChar, model, expectedName] of [
-        [
-          'Paid A',
-          'a',
-          { id: 'claude-paid', name: 'Claude Paid' },
-          'Claude Paid · Claude and GPT models',
-        ],
-        ['Paid B', 'b', { id: 'gpt-paid', name: 'GPT Paid' }, 'GPT Paid · Claude and GPT models'],
-        ['Gemini', 'c', { id: 'gemini-paid', name: 'Gemini Paid' }, 'Gemini Paid · Gemini Models'],
-        [
-          'Already labelled',
-          'e',
-          { id: 'gpt-labelled', name: 'GPT · Claude and GPT models' },
-          'GPT · Claude and GPT models',
-        ],
+        ['Paid A', 'a', { id: 'claude-paid', name: 'Claude Paid' }, 'Claude Paid'],
+        ['Paid B', 'b', { id: 'gpt-paid', name: 'GPT Paid' }, 'GPT Paid'],
+        ['Gemini', 'c', { id: 'gemini-paid', name: 'Gemini Paid' }, 'Gemini Paid'],
         ['Other', 'f', { id: 'other-model', name: 'Other Model' }, 'Other Model'],
-        [
-          'Long name',
-          'g',
-          { id: 'gpt-long', name: 'X'.repeat(256) },
-          `${'X'.repeat(232)} · Claude and GPT models`,
-        ],
+        ['Long name', 'g', { id: 'gpt-long', name: 'X'.repeat(256) }, 'X'.repeat(256)],
       ] as const) {
         event = deferred();
         const token = `AIzaSyA${keyChar.repeat(28)}`;

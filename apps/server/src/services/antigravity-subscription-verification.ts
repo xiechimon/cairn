@@ -3,8 +3,18 @@ import { accessSync, constants, statSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { AntigravityOAuth, AntigravitySubscriptionVerifyResult } from '@cairn/shared';
-import { isAntigravityOAuthAccessToken, serializeAntigravityOAuthTokenFile } from '@cairn/shared';
+import type {
+  AntigravityOAuth,
+  AntigravitySubscriptionModel,
+  AntigravitySubscriptionVerifyResult,
+} from '@cairn/shared';
+import {
+  ANTIGRAVITY_MODEL_NAME_MAX_LENGTH,
+  antigravitySubscriptionModelSchema,
+  isAntigravityOAuthAccessToken,
+  isInternalAntigravityModelId,
+  serializeAntigravityOAuthTokenFile,
+} from '@cairn/shared';
 import {
   ANTIGRAVITY_ACP_ARGS,
   currentAntigravityManagedInstall,
@@ -16,6 +26,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_OAUTH_TIMEOUT_MS = 45_000;
 const MAX_PROBE_STDERR_BYTES = 8_192;
 const MAX_PROBE_STDOUT_BUFFER_BYTES = 1_048_576;
+const MAX_PROBED_MODELS = 2000;
 const MANAGED_ROOT = join(homedir(), '.cairn', 'tools', 'antigravity');
 const DEFAULT_PROFILE_ROOT = join(homedir(), '.cairn', 'server');
 export const ANTIGRAVITY_MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -44,7 +55,7 @@ function isExecutableFile(path: string): boolean {
 
 function resolveAgyBinary(): { command: string; args: string[] } {
   const explicit = process.env.AGY_BIN ?? process.env.CAIRN_AGY_PATH;
-  if (explicit !== undefined && explicit.trim() !== '' && isExecutableFile(explicit.trim())) {
+  if (explicit !== undefined && explicit.trim() !== '') {
     return { command: explicit.trim(), args: [...ANTIGRAVITY_ACP_ARGS] };
   }
   const managed = currentAntigravityManagedInstall(MANAGED_ROOT);
@@ -76,29 +87,106 @@ function errorResult(
     : { ok: false, reason: 'failed' };
 }
 
+interface AcpSelectItem {
+  value?: unknown;
+  name?: unknown;
+  options?: unknown;
+}
+
+interface AcpConfigOption {
+  category?: unknown;
+  type?: unknown;
+  options?: unknown;
+}
+
+function extractAcpModels(
+  configOptions: unknown,
+  secrets: readonly string[],
+): AntigravitySubscriptionModel[] {
+  if (!Array.isArray(configOptions)) return [];
+  const models: AntigravitySubscriptionModel[] = [];
+  const seen = new Set<string>();
+  const add = (rawId: unknown, rawName: unknown) => {
+    if (typeof rawId !== 'string') return;
+    const id = rawId.trim();
+    if (id === '' || seen.has(id) || isInternalAntigravityModelId(id)) return;
+    const name =
+      typeof rawName === 'string' && rawName.trim() !== ''
+        ? rawName.trim().slice(0, ANTIGRAVITY_MODEL_NAME_MAX_LENGTH)
+        : id;
+    if (secrets.some((secret) => secret !== '' && (id.includes(secret) || name.includes(secret)))) {
+      return;
+    }
+    const parsed = antigravitySubscriptionModelSchema.safeParse({ id, name });
+    if (!parsed.success) return;
+    seen.add(parsed.data.id);
+    models.push(parsed.data);
+  };
+  for (const option of configOptions as AcpConfigOption[]) {
+    if (
+      option?.category !== 'model' ||
+      option.type !== 'select' ||
+      !Array.isArray(option.options)
+    ) {
+      continue;
+    }
+    for (const entry of option.options as AcpSelectItem[]) {
+      if (Array.isArray(entry?.options)) {
+        for (const nested of entry.options as AcpSelectItem[]) {
+          add(nested?.value, nested?.name);
+          if (models.length >= MAX_PROBED_MODELS) return models;
+        }
+      } else {
+        add(entry?.value, entry?.name);
+        if (models.length >= MAX_PROBED_MODELS) return models;
+      }
+    }
+  }
+  return models;
+}
+
+interface ProbeOutcome {
+  result: AntigravitySubscriptionVerifyResult;
+  models: AntigravitySubscriptionModel[];
+}
+
 function probe(
   home: string,
   timeoutMs: number,
   envOverrides: NodeJS.ProcessEnv,
   authReason: 'missing_local_login' | 'auth',
+  secrets: readonly string[],
   signal?: AbortSignal,
-): Promise<AntigravitySubscriptionVerifyResult> {
-  if (signal?.aborted) return Promise.resolve({ ok: false, reason: 'timeout' });
+): Promise<ProbeOutcome> {
+  if (signal?.aborted)
+    return Promise.resolve({ result: { ok: false, reason: 'timeout' }, models: [] });
   return new Promise((resolve) => {
     const bin = resolveAgyBinary();
     const args = [...bin.args, '--log-file', join(home, 'probe.log')];
-    const child = spawn(bin.command, args, {
-      cwd: home,
-      env: childEnv(envOverrides),
-      stdio: ['pipe', 'pipe', 'pipe'],
-      ...(process.platform !== 'win32' ? { detached: true } : {}),
-      windowsHide: true,
-    });
-    child.stdin.on('error', () => {});
+    let child: ReturnType<typeof spawn> | undefined;
+    try {
+      child = spawn(bin.command, args, {
+        cwd: home,
+        env: childEnv(envOverrides),
+        stdio: ['pipe', 'pipe', 'pipe'],
+        ...(process.platform !== 'win32' ? { detached: true } : {}),
+        windowsHide: true,
+      });
+    } catch {
+      resolve({ result: { ok: false, reason: 'unavailable' }, models: [] });
+      return;
+    }
+    if (child?.stdin == null || child.stdout == null || child.stderr == null) {
+      resolve({ result: { ok: false, reason: 'unavailable' }, models: [] });
+      return;
+    }
+    const { stdin, stdout, stderr } = child;
+    stdin.on('error', () => {});
     let settled = false;
     let closed = false;
     let output = '';
     let buffer = '';
+    let updatedModels: AntigravitySubscriptionModel[] = [];
     const killProcessGroup = () => {
       if (process.platform !== 'win32' && typeof child.pid === 'number') {
         try {
@@ -108,15 +196,15 @@ function probe(
       }
       child.kill('SIGKILL');
     };
-    const onAbort = () => finish({ ok: false, reason: 'timeout' });
-    const finish = (result: AntigravitySubscriptionVerifyResult) => {
+    const onAbort = () => finish({ result: { ok: false, reason: 'timeout' }, models: [] });
+    const finish = (outcome: ProbeOutcome) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       signal?.removeEventListener('abort', onAbort);
       if (closed || typeof child.pid !== 'number') {
         if (!closed) killProcessGroup();
-        resolve(result);
+        resolve(outcome);
         return;
       }
       let resolved = false;
@@ -124,25 +212,31 @@ function probe(
         if (resolved) return;
         resolved = true;
         clearTimeout(waitTimer);
-        resolve(result);
+        resolve(outcome);
       };
       const waitTimer = setTimeout(done, 1_000);
       waitTimer.unref();
       child.once('close', done);
       killProcessGroup();
     };
-    const timer = setTimeout(() => finish({ ok: false, reason: 'timeout' }), timeoutMs);
+    const timer = setTimeout(
+      () => finish({ result: { ok: false, reason: 'timeout' }, models: [] }),
+      timeoutMs,
+    );
     signal?.addEventListener('abort', onAbort, { once: true });
     const write = (id: number, method: string, params: unknown) => {
       try {
-        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
+        stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
       } catch {
-        finish({ ok: false, reason: 'failed' });
+        finish({ result: { ok: false, reason: 'failed' }, models: [] });
       }
     };
     const onMessage = (line: string) => {
       let message: {
         id?: number;
+        method?: string;
+        params?: { update?: { sessionUpdate?: string; configOptions?: unknown } };
+        result?: { configOptions?: unknown };
         error?: { code?: number; message?: string };
       };
       try {
@@ -150,33 +244,53 @@ function probe(
       } catch {
         return;
       }
+      if (
+        message.method === 'session/update' &&
+        message.params?.update?.sessionUpdate === 'config_option_update'
+      ) {
+        const models = extractAcpModels(message.params.update.configOptions, secrets);
+        if (models.length > 0) updatedModels = models;
+        return;
+      }
       if (message.id === 1) {
         if (message.error !== undefined) {
-          finish(errorResult(message.error.code, message.error.message ?? '', authReason));
+          finish({
+            result: errorResult(message.error.code, message.error.message ?? '', authReason),
+            models: [],
+          });
           return;
         }
         write(2, 'session/new', { cwd: home, mcpServers: [] });
         return;
       }
       if (message.id === 2) {
-        finish(
-          message.error === undefined
-            ? { ok: true }
-            : errorResult(message.error.code, message.error.message ?? '', authReason),
-        );
+        if (message.error !== undefined) {
+          finish({
+            result: errorResult(message.error.code, message.error.message ?? '', authReason),
+            models: [],
+          });
+          return;
+        }
+        const directModels = extractAcpModels(message.result?.configOptions, secrets);
+        finish({
+          result: { ok: true },
+          models: directModels.length > 0 ? directModels : updatedModels,
+        });
       }
     };
     child.on('error', (error: NodeJS.ErrnoException) => {
-      finish(
-        error.code === 'ENOENT'
-          ? { ok: false, reason: 'unavailable' }
-          : { ok: false, reason: 'failed' },
-      );
+      finish({
+        result:
+          error.code === 'ENOENT'
+            ? { ok: false, reason: 'unavailable' }
+            : { ok: false, reason: 'failed' },
+        models: [],
+      });
     });
-    child.stdout.on('data', (chunk: Buffer) => {
+    stdout.on('data', (chunk: Buffer) => {
       const next = buffer + chunk.toString('utf8');
       if (next.length > MAX_PROBE_STDOUT_BUFFER_BYTES) {
-        finish({ ok: false, reason: 'failed' });
+        finish({ result: { ok: false, reason: 'failed' }, models: [] });
         return;
       }
       const { lines, rest } = collectLines(next);
@@ -185,15 +299,17 @@ function probe(
         if (line.trim() !== '') onMessage(line);
       }
     });
-    child.stderr.on('data', (chunk: Buffer) => {
+    stderr.on('data', (chunk: Buffer) => {
       output = (output + chunk.toString('utf8')).slice(-MAX_PROBE_STDERR_BYTES);
     });
     child.on('close', (code) => {
       closed = true;
       if (settled) return;
-      finish(
-        code === 0 ? { ok: false, reason: 'failed' } : errorResult(undefined, output, authReason),
-      );
+      finish({
+        result:
+          code === 0 ? { ok: false, reason: 'failed' } : errorResult(undefined, output, authReason),
+        models: [],
+      });
     });
     write(1, 'initialize', { protocolVersion: 1, clientCapabilities: {} });
   });
@@ -221,10 +337,22 @@ export async function verifyAntigravitySubscription(
     };
   }
 }
-async function runIsolatedOAuthProbe(
-  oauth: AntigravityOAuth,
+
+export type IsolatedOAuthProbeResult = {
+  result: AntigravitySubscriptionVerifyResult;
+  accessToken?: string;
+  models: AntigravitySubscriptionModel[];
+};
+
+async function runIsolatedOAuthFileProbe(
+  input: {
+    authType: 'oauth-personal' | 'oauth-business';
+    tokenFileContent: string;
+    secrets: readonly string[];
+    readRefreshedAccessToken: boolean;
+  },
   options: { timeoutMs?: number; signal?: AbortSignal; dataDir?: string } = {},
-): Promise<{ result: AntigravitySubscriptionVerifyResult; accessToken?: string }> {
+): Promise<IsolatedOAuthProbeResult> {
   const profile = createCredentialProfile(options.dataDir ?? DEFAULT_PROFILE_ROOT);
   try {
     const acpDir = join(profile.home, '.gemini', 'antigravity-acp');
@@ -232,11 +360,11 @@ async function runIsolatedOAuthProbe(
     const tokenPath = join(acpDir, 'antigravity-oauth-token');
     await writeFile(
       join(acpDir, 'settings.json'),
-      `${JSON.stringify({ auth: { type: oauth.authMethod === 'business' ? 'oauth-business' : 'oauth-personal' } })}\n`,
+      `${JSON.stringify({ auth: { type: input.authType } })}\n`,
       { mode: 0o600 },
     );
-    await writeFile(tokenPath, serializeAntigravityOAuthTokenFile(oauth), { mode: 0o600 });
-    const result = await probe(
+    await writeFile(tokenPath, input.tokenFileContent, { mode: 0o600 });
+    const { result, models } = await probe(
       profile.home,
       options.timeoutMs ?? DEFAULT_OAUTH_TIMEOUT_MS,
       {
@@ -251,12 +379,13 @@ async function runIsolatedOAuthProbe(
         SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0',
       },
       'auth',
+      input.secrets,
       options.signal,
     );
-    if (!result.ok) return { result };
+    if (!result.ok || !input.readRefreshedAccessToken) return { result, models };
     try {
       const raw = profile.readCredential(tokenPath, true);
-      if (raw === null) return { result };
+      if (raw === null) return { result, models };
       const parsed: unknown = JSON.parse(raw);
       const candidate =
         typeof parsed === 'object' &&
@@ -265,32 +394,63 @@ async function runIsolatedOAuthProbe(
           ? (parsed as { token: { access_token: string } }).token.access_token
           : undefined;
       if (candidate !== undefined && isAntigravityOAuthAccessToken(candidate)) {
-        return { result, accessToken: candidate };
+        return { result, accessToken: candidate, models };
       }
     } catch {
-      return { result };
+      return { result, models };
     }
-    return { result };
+    return { result, models };
   } finally {
     profile.cleanup();
   }
 }
 
-export async function verifyAntigravityOAuth(
+export async function probeAntigravityOAuth(
   oauth: AntigravityOAuth,
   options: { timeoutMs?: number; signal?: AbortSignal; dataDir?: string } = {},
-): Promise<AntigravitySubscriptionVerifyResult> {
-  return (await runIsolatedOAuthProbe(oauth, options)).result;
+): Promise<IsolatedOAuthProbeResult> {
+  return runIsolatedOAuthFileProbe(
+    {
+      authType: oauth.authMethod === 'business' ? 'oauth-business' : 'oauth-personal',
+      tokenFileContent: serializeAntigravityOAuthTokenFile(oauth),
+      secrets: [oauth.refreshToken],
+      readRefreshedAccessToken: true,
+    },
+    options,
+  );
+}
+
+export async function probeAntigravityOAuthAccessToken(
+  input: { token: string; expiresAt: number },
+  options: { timeoutMs?: number; signal?: AbortSignal; dataDir?: string } = {},
+): Promise<IsolatedOAuthProbeResult> {
+  return runIsolatedOAuthFileProbe(
+    {
+      authType: 'oauth-personal',
+      tokenFileContent: `${JSON.stringify({
+        token: {
+          access_token: input.token,
+          token_type: 'Bearer',
+          expiry: new Date(input.expiresAt).toISOString(),
+        },
+        auth_method: 'consumer',
+      })}\n`,
+      secrets: [input.token],
+      readRefreshedAccessToken: false,
+    },
+    options,
+  );
 }
 
 export async function refreshAntigravityOAuthAccessToken(
   oauth: AntigravityOAuth,
   options: { timeoutMs?: number; signal?: AbortSignal; dataDir?: string } = {},
 ): Promise<
-  { status: 'ok'; token: string } | { status: 'failed'; failure: 'auth' | 'timeout' | 'upstream' }
+  | { status: 'ok'; token: string; models: AntigravitySubscriptionModel[] }
+  | { status: 'failed'; failure: 'auth' | 'timeout' | 'upstream' }
 > {
-  const { result, accessToken } = await runIsolatedOAuthProbe(oauth, options);
-  if (result.ok && accessToken !== undefined) return { status: 'ok', token: accessToken };
+  const { result, accessToken, models } = await probeAntigravityOAuth(oauth, options);
+  if (result.ok && accessToken !== undefined) return { status: 'ok', token: accessToken, models };
   if (result.reason === 'timeout') return { status: 'failed', failure: 'timeout' };
   if (result.reason === 'auth') return { status: 'failed', failure: 'auth' };
   return { status: 'failed', failure: 'upstream' };

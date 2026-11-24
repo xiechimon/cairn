@@ -11,6 +11,7 @@ import {
   type ProviderRecord,
   type ProviderTestResult,
   type RoutingConnection,
+  type SubscriptionCheck,
 } from '@cairn/shared';
 import { cn } from 'cn';
 import { Download, Play } from 'lucide-react';
@@ -581,7 +582,21 @@ function QuotaSection({ account, now }: { account: SubscriptionAccount; now: num
   );
 }
 
-function verifyDetail(
+function isApiVerificationCheck(check: SubscriptionCheck): boolean {
+  if (check.via !== undefined) return check.via === 'api';
+  return (
+    check.command === 'Antigravity account API' ||
+    /^(GET|POST|PUT|PATCH|DELETE)\s+https?:\/\//.test(check.command)
+  );
+}
+
+const ACCOUNT_API_CHECK_LABEL: Partial<Record<AccountVendor, string>> = {
+  antigravity: 'Antigravity 账号接口',
+  claude: 'Claude 账号接口',
+};
+
+export function verifyDetailFacts(
+  vendor: AccountVendor,
   verification: Exclude<Verification, { phase: 'verifying' }>,
   at: number,
   now: number,
@@ -601,13 +616,24 @@ function verifyDetail(
       verification.reason === 'unavailable' &&
       check.durationMs < 50
     );
+  const checkFact: CheckFact[] =
+    check === undefined
+      ? []
+      : isApiVerificationCheck(check)
+        ? [
+            {
+              label: t('验证方式'),
+              value: t(ACCOUNT_API_CHECK_LABEL[vendor] ?? '账号接口'),
+            },
+          ]
+        : [{ label: t('验证命令'), value: check.command, code: true }];
   return [
     { label: t('结果'), value: outcome },
     ...(showDuration
       ? [{ label: t('用时'), value: t('{s} 秒', { s: (check.durationMs / 1000).toFixed(1) }) }]
       : []),
     { label: t('时间'), value: relativeTime(check?.at ?? at, now, t) },
-    ...(check === undefined ? [] : [{ label: t('验证命令'), value: check.command, code: true }]),
+    ...checkFact,
   ];
 }
 
@@ -717,7 +743,7 @@ function VerifyResultPopover({
                         )
                       : t(failureCopy(vendor)[verification.reason]),
       )}
-      detail={verifyDetail(verification, at, Date.now(), t)}
+      detail={verifyDetailFacts(vendor, verification, at, Date.now(), t)}
       testId="subscription-verify-feedback"
       detailTestId="subscription-verify-detail"
     />

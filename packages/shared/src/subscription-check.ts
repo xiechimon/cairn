@@ -6,6 +6,7 @@ export const subscriptionCheckSchema = z.object({
   reason: z.string().nullable(),
   check: z.enum(['model-request', 'sign-in']),
   command: z.string(),
+  via: z.enum(['cli', 'api']).optional(),
   model: z.string().nullable(),
   durationMs: z.number().int().nonnegative(),
 });
