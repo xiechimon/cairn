@@ -145,6 +145,10 @@ interface PdfWord {
 
 const MATCH_CHARS = 40;
 
+function plainCjk(text: string): string {
+  return text.replace(/[\u2E80-\u2FDF]/g, (glyph) => glyph.normalize('NFKC')).replace(/\s+/g, '');
+}
+
 async function pdfWords(doc: PDFDocumentProxy): Promise<PdfWord[]> {
   const { Util } = await loadPdfJs();
   const words: PdfWord[] = [];
@@ -158,7 +162,7 @@ async function pdfWords(doc: PDFDocumentProxy): Promise<PdfWord[]> {
       const height = Math.hypot(c, d);
       words.push({
         page: number,
-        text: item.str.replace(/\s+/g, ''),
+        text: plainCjk(item.str),
         rect: {
           x: e / viewport.width,
           y: (f - height) / viewport.height,
@@ -192,7 +196,7 @@ function findText(
   words: readonly PdfWord[],
   text: string,
 ): { page: number; rect: ArtifactRect } | null {
-  const needle = text.replace(/\s+/g, '').slice(0, MATCH_CHARS);
+  const needle = plainCjk(text).slice(0, MATCH_CHARS);
   if (needle === '') return null;
   const pages = new Set(words.map((word) => word.page));
   for (const page of pages) {
