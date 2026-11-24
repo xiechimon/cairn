@@ -213,12 +213,12 @@ test('the decide step releases only a green changed untagged tip; every event fo
 
   const olderGreen = head();
   git('commit', '--quiet', '--allow-empty', '-m', 'Tip CI still running: run 45409074612');
-  for (const status of ['in_progress', 'queued']) {
+  for (const status of ['in_progress', 'queued', 'completed']) {
     const older = ciRun(olderGreen, { id: 8 });
     decide(true, {
       tags: tagsOnMid,
       page1: baseline2,
-      ci: ciRun(head(), { status, conclusion: null }),
+      ci: ciRun(head(), { status, conclusion: status === 'completed' ? 'failure' : null }),
       env: {
         OLDER_SHA: olderGreen,
         OLDER_RUNS: JSON.stringify({ workflow_runs: [older] }),
@@ -227,6 +227,19 @@ test('the decide step releases only a green changed untagged tip; every event fo
     });
     assert.match(readFileSync(output, 'utf8'), new RegExp(`^sha=${olderGreen}$`, 'm'));
   }
+
+  const baselineCi = ciRun(midSha, { id: 8 });
+  const bounded = decide(false, {
+    tags: tagsOnMid,
+    page1: baseline2,
+    ci: ciRun(head(), { status: 'in_progress', conclusion: null }),
+    env: {
+      OLDER_SHA: midSha,
+      OLDER_RUNS: JSON.stringify({ workflow_runs: [baselineCi] }),
+      OLDER_READ: JSON.stringify(baselineCi),
+    },
+  });
+  assert.doesNotMatch(bounded, new RegExp(`head_sha=${midSha}`));
 
   git('tag', 'desktop-v0.1.3');
   decide(true, {
@@ -873,10 +886,7 @@ test('run 45401517056: main advancing during packaging still publishes its green
   });
   assert.equal(run.result.status, 0, run.result.stderr);
   assert.equal(run.state, 'public');
-  assert.equal(
-    git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2').split(/\s/)[0],
-    built,
-  );
+  assert.equal(git('ls-remote', 'origin', 'refs/tags/desktop-v0.1.2').split(/\s/)[0], built);
   assert.equal(callIndex(run.calls, /-X DELETE/), -1);
 });
 

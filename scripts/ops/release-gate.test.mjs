@@ -629,7 +629,7 @@ test('the decide cli releases a green changed untagged tip and skips a released 
   );
 });
 
-test('the publish job rechecks the evidence and releases only while the commit is still the tip', () => {
+test('the publish job rechecks CI and main ancestry before releasing', () => {
   const publish = jobBlock('publish');
   assert.match(publish, /actions: read/);
   const gateThenTipThenPublish =
@@ -772,7 +772,7 @@ test('the new-task probe names its row, api and sqlite assertions', () => {
   }
 });
 
-test('the publish tip step exits without releasing when the packaged sha is not the main tip', (t) => {
+test('the publish ancestry step skips a diverged candidate and accepts the main tip', (t) => {
   const step = parsed.jobs.publish.steps.find((entry) => entry.id === 'tip');
   assert.ok(step, 'publish re-reads the main tip before staging');
   const root = makeTestTempDir('release-tip-step-');
@@ -880,6 +880,9 @@ test('an incomplete final run read never keeps an earlier green verdict', () => 
     {},
     { ...first, head_sha: undefined },
     { ...first, run_attempt: undefined },
+    { ...first, event: undefined },
+    { ...first, head_branch: undefined },
+    { ...first, head_branch: 'preflight/not-main' },
   ]) {
     const reads = [first, final];
     const evidence = fetchGateEvidence({
