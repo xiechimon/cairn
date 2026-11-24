@@ -6,8 +6,6 @@ import {
   buildMergedPrGuardNote,
   buildTaskPromptText,
   CORE_COORDINATOR_TOOLS,
-  confinementDispatchReady,
-  confinementEnforced,
   fencedTitle,
   infoCardBrief,
   isBuildStepKind,
@@ -1104,23 +1102,8 @@ export async function claimStep(
   body?: MachineClaimBody,
   authorized: () => boolean = () => true,
 ): Promise<ClaimedStep | null> {
-  const stillAuthorized = () => {
-    const capabilities = deps.db
-      .select()
-      .from(machine)
-      .where(eq(machine.id, machineId))
-      .get()?.capabilities;
-    const report = capabilities?.confinement;
-    return (
-      authorized() &&
-      !signal?.aborted &&
-      readDeployLease(deps.db).status === 'accepting' &&
-      confinementDispatchReady(capabilities) &&
-      (!confinementEnforced(capabilities?.osPlatform) ||
-        (report?.generation === body?.confinement?.generation &&
-          report?.invocation === body?.confinement?.invocation))
-    );
-  };
+  const stillAuthorized = () =>
+    authorized() && !signal?.aborted && readDeployLease(deps.db).status === 'accepting';
   if (signal?.aborted || !stillAuthorized()) return null;
   const sinceWake = deps.machineHub.wakeSeq(teamId);
   const first = await tryClaim(

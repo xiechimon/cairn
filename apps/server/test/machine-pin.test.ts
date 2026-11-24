@@ -197,29 +197,13 @@ describe('#1312 other-machine mark on a resumed session', () => {
     });
     expect(confirm2.status).toBe(202);
     w.s.db
-      .update(machineTable)
-      .set({
-        capabilities: {
-          mcpServers: [],
-          skills: [],
-          osPlatform: 'linux',
-          confinement: {
-            state: 'checking',
-            invocation: 'a6f64985-e79a-4c69-a840-5d8c0853188d',
-            generation: 1,
-            revision: 1,
-          },
-        },
-      })
-      .where(eq(machineTable.id, w.machineAId))
-      .run();
-    w.s.db
       .update(stepTable)
       .set({ createdAt: Date.now() - 6 * 60_000 })
       .where(eq(stepTable.status, 'pending'))
       .run();
-    expect(await claim(w.s.app, w.tokenA)).toBeNull();
     expect(await claim(w.s.app, w.tokenB)).toBeNull();
+    const backOnHome = await claim(w.s.app, w.tokenA);
+    expect(backOnHome?.session).toEqual({ action: 'continue', sessionId: 'sess-moved' });
   });
 });
 

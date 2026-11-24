@@ -144,10 +144,7 @@ describe('computer presence machine wiring', () => {
       idleSleepPrevention: false,
       proxyEnv: {},
       capEnv: { PATH: bin },
-      confinementPlatform: 'linux',
-      confinementPreflight: async () => {
-        throw new Error('no confinement in this test');
-      },
+      platform: 'linux',
       otel: null,
     });
     try {

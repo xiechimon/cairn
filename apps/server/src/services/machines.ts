@@ -18,7 +18,6 @@ import type {
 import {
   backgroundTaskMessageId,
   claudeLoginSchema,
-  confinementEnforced,
   isActiveStepStatus,
   machineRecordSchema,
   machineStrain,
@@ -270,30 +269,6 @@ function mergeReportedCapabilities(
   if (reported.osPlatform === undefined && previous?.osPlatform !== undefined) {
     reported = { ...reported, osPlatform: previous.osPlatform };
   }
-  const previousReport = previous?.confinement;
-  const report = reported.confinement;
-  if (
-    confinementEnforced(reported.osPlatform) &&
-    report &&
-    (report.generation === (previousReport?.generation ?? 0) + 1
-      ? report.state !== 'checking'
-      : !previousReport ||
-        report.generation !== previousReport.generation ||
-        report.invocation !== previousReport.invocation ||
-        report.revision <= previousReport.revision)
-  ) {
-    throw new HttpError(409, 'Stale confinement report');
-  }
-  if (!report && previousReport)
-    reported = {
-      ...reported,
-      confinement: {
-        invocation: previousReport.invocation,
-        generation: previousReport.generation,
-        revision: previousReport.revision,
-        state: 'checking',
-      },
-    };
   if (reported.hardware === undefined && previous?.hardware !== undefined) {
     return { ...reported, hardware: previous.hardware };
   }
@@ -525,16 +500,8 @@ export function enrollMachine(
           ...(upgradedHostKey !== undefined ? { hostKey: upgradedHostKey } : {}),
           ...(input.cliVersion !== undefined ? { latestCliVersion: input.cliVersion } : {}),
           ...(input.claudeCode !== undefined ? { claudeCodeReport: input.claudeCode } : {}),
-          ...(capabilities !== undefined || existing.capabilities?.confinement
-            ? {
-                capabilities: mergeReportedCapabilities(
-                  existing.capabilities,
-                  capabilities ?? {
-                    ...(existing.capabilities ?? { mcpServers: [], skills: [] }),
-                    confinement: undefined,
-                  },
-                ),
-              }
+          ...(capabilities !== undefined
+            ? { capabilities: mergeReportedCapabilities(existing.capabilities, capabilities) }
             : {}),
         })
         .where(eq(machine.id, existing.id))
@@ -736,13 +703,6 @@ export function authorizeEnrollmentMachine(
           retiredAt: null,
           ...(existing.kind === 'local' || isLocal ? { kind: 'local' as const } : {}),
           ...(upgradedHostKey !== undefined ? { hostKey: upgradedHostKey } : {}),
-          capabilities:
-            existing.capabilities === null
-              ? null
-              : mergeReportedCapabilities(existing.capabilities, {
-                  ...existing.capabilities,
-                  confinement: undefined,
-                }),
         })
         .where(eq(machine.id, existing.id))
         .run();
@@ -850,9 +810,7 @@ export function markPresence(
     body.claudeCode !== undefined &&
     (previousLogin?.state !== reportedLogin?.state ||
       previousLogin?.expiresAt !== reportedLogin?.expiresAt);
-  const capabilities =
-    parseCapabilitiesField(body.capabilities) ??
-    (row.capabilities?.confinement ? { ...row.capabilities, confinement: undefined } : undefined);
+  const capabilities = parseCapabilitiesField(body.capabilities);
   const merged =
     capabilities !== undefined
       ? mergeReportedCapabilities(row.capabilities, capabilities)

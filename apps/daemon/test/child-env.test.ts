@@ -9,7 +9,6 @@ import { buildClaudeSdkOptions } from '../src/backend/claude-code.js';
 import { redactingMcpTransports } from '../src/backend/mcp-log-redaction.js';
 import { runtimeChildEnv } from '../src/backend/otel.js';
 import { piBashEnv } from '../src/backend/pi.js';
-import { piHostEnv } from '../src/backend/pi-host-client.js';
 import { childEnv } from '../src/child-env.js';
 import { HostOrbProvider } from '../src/orb/provider.js';
 import { assembleStepEnv, type StepEnvInput } from '../src/step-env.js';
@@ -114,18 +113,6 @@ describe('childEnv', () => {
     for (const key of Object.keys(DAEMON_CREDENTIALS)) expect(env[key]).toBeUndefined();
   });
 
-  test('piHostEnv forwards the provided parent environment', () => {
-    const customParent = {
-      ...PARENT,
-      PATH: '/fnm/bin:/opt/homebrew/bin:/usr/bin:/bin',
-      FNM_DIR: '/home/daemon/.local/share/fnm',
-    };
-    const env = piHostEnv(customParent);
-    expect(env.PATH).toBe('/fnm/bin:/opt/homebrew/bin:/usr/bin:/bin');
-    expect(env.FNM_DIR).toBe('/home/daemon/.local/share/fnm');
-    expect(env.GH_TOKEN).toBeUndefined();
-    expect(env.SSH_AUTH_SOCK).toBe('');
-  });
 });
 
 describe('runtimeChildEnv', () => {

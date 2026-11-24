@@ -272,32 +272,16 @@ describe('D71 a pending step that no online machine can run raises one inbox ite
     const start = Date.now();
     sweepUnplaceableSteps(w.s.svc, start);
     sweepUnplaceableSteps(w.s.svc, start + 15_000);
-    const macRow = w.s.db.select().from(machineTable).where(eq(machineTable.id, mac)).get();
     w.s.db
       .update(machineTable)
-      .set({
-        capabilities: {
-          ...macRow?.capabilities,
-          mcpServers: ['figma'],
-          skills: [],
-          executor: 'host',
-          osPlatform: 'darwin',
-          confinement: {
-            state: 'unavailable',
-            revision: 1,
-            reason: 'startup-failed',
-            generation: 1,
-            invocation: '00000000-0000-4000-8000-000000000001',
-          },
-        },
-      })
+      .set({ retiredAt: start + 20_000 })
       .where(eq(machineTable.id, mac))
       .run();
     sweepUnplaceableSteps(w.s.svc, start + 30_000);
     sweepUnplaceableSteps(w.s.svc, start + 45_000);
     expect(published).toHaveLength(2);
     expect(published[0]).toContain('MCP server "figma"');
-    expect(published[1]).toContain('任务沙箱未就绪');
+    expect(published[1]).toContain('无法运行这一步');
   });
 });
 

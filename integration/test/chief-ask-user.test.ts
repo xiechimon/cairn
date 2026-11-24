@@ -14,13 +14,7 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { ASK_PARK_MS } from '../../apps/server/src/services/chief-questions.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import {
-  api,
-  bootRealServer,
-  CONFINEMENT_READY_LAUNCH,
-  type RealServer,
-  waitFor,
-} from './helpers.js';
+import { api, bootRealServer, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const ASK_ARGS = {
@@ -135,8 +129,6 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
-
-    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitForValue(() => {
     try {

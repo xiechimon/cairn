@@ -63,7 +63,6 @@ import {
 import { stepCredentialRedactor } from '../credential-output.js';
 import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { compactionCeilingFetch } from './compaction-ceiling.js';
-import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { EventQueue } from './event-queue.js';
 import { hostToolContent } from './host-tool-content.js';
@@ -72,7 +71,6 @@ import { describeImageWithModels } from './image-text.js';
 import { connectFailedLine } from './mcp-config.js';
 import { redactingMcpTransports } from './mcp-log-redaction.js';
 import { PiStepSpanSink, runtimeChildEnv } from './otel.js';
-import { openPiHostSession } from './pi-host-client.js';
 import { PI_RETRY_SETTINGS } from './pi-retry.js';
 import { pinProcessEnv } from './pinned-env.js';
 import {
@@ -947,17 +945,6 @@ export interface PiBackendOpts {
   onCompactionLog?: (msg: string) => void;
   gateRules?: readonly PermissionRule[];
   machineName?: string;
-  confine?: SessionConfiner;
-  hostLaunch?: () => Launch;
-}
-
-export function piHostLaunch(cliPath: string): Launch {
-  return cliPath.endsWith('.ts')
-    ? {
-        command: process.execPath,
-        args: ['--import', import.meta.resolve('tsx'), cliPath, 'pi-host'],
-      }
-    : { command: process.execPath, args: [cliPath, 'pi-host'] };
 }
 
 export class PiBackend implements AgentBackend {
@@ -1042,15 +1029,7 @@ export class PiBackend implements AgentBackend {
 
   private async open(opts: SessionOpts, resumeFile: string | null): Promise<AgentSessionHandle> {
     materializeProvider(join(this.opts.agentDir, 'models.json'), opts.provider);
-    const confine = this.opts.confine;
-    if (confine === undefined) return this.openInProcess(opts, resumeFile);
-    return openPiHostSession({
-      backend: this.opts,
-      confine,
-      launch: this.opts.hostLaunch?.() ?? piHostLaunch(process.argv[1] ?? ''),
-      opts,
-      resumeFile,
-    });
+    return this.openInProcess(opts, resumeFile);
   }
 
   async openInProcess(opts: SessionOpts, resumeFile: string | null): Promise<PiSessionHandle> {

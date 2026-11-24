@@ -3,7 +3,6 @@ import { buildProgram } from '../src/cli.js';
 import { type DoctorEnv, formatDoctor, runDoctor, runDoctorCommand } from '../src/doctor.js';
 
 const GIB = 1024 ** 3;
-const LINUX_TOOLS = ['systemd-run', 'bwrap'];
 
 interface Overrides {
   platform?: string;
@@ -20,9 +19,6 @@ interface Overrides {
 
 function fakeEnv(o: Overrides = {}): DoctorEnv {
   const files: Record<string, string | undefined> = {
-    '/proc/1/comm': 'systemd\n',
-    '/proc/sys/fs/protected_hardlinks': '1\n',
-    '/proc/sys/user/max_user_namespaces': '28633\n',
     '/etc/os-release': o.osRelease ?? 'ID=arch\n',
     ...o.files,
   };
@@ -42,7 +38,6 @@ function fakeEnv(o: Overrides = {}): DoctorEnv {
 function linuxEnv(o: Overrides = {}): DoctorEnv {
   return fakeEnv({
     stdout: {
-      systemctl: 'systemd 262 (262-1-arch)\n+PAM +AUDIT\n',
       uname: '7.2.0-arch1-1\n',
     },
     ...o,
@@ -56,26 +51,18 @@ function check(env: DoctorEnv, id: string) {
 }
 
 describe('runDoctor on macOS', () => {
-  it('reports runner readiness instead of failing as a non-Linux host', () => {
-    const result = runDoctor(fakeEnv({ platform: 'darwin' }));
+  it('reports runner readiness without requiring seatbelt', () => {
+    const result = runDoctor(fakeEnv({ platform: 'darwin', missing: ['sandbox-exec'] }));
     expect(result.ok).toBe(true);
     expect(check(fakeEnv({ platform: 'darwin' }), 'macos').status).toBe('pass');
     expect(result.checks.map((c) => c.id)).toEqual([
       'macos',
       'node',
       'not-root',
-      'seatbelt',
       'vm-runtime',
       'disk',
       'versions',
     ]);
-  });
-
-  it('fails when sandbox-exec is missing', () => {
-    const env = fakeEnv({ platform: 'darwin', missing: ['sandbox-exec'] });
-    const c = check(env, 'seatbelt');
-    expect(c.status).toBe('fail');
-    expect(runDoctor(env).ok).toBe(false);
   });
 
   it('reports the VM runtime as optional info when container is absent', () => {
@@ -87,90 +74,28 @@ describe('runDoctor on macOS', () => {
   });
 });
 
+describe('runDoctor on Windows', () => {
+  it('reports runner readiness on Windows hosts', () => {
+    const result = runDoctor(fakeEnv({ platform: 'win32' }));
+    expect(result.ok).toBe(true);
+    expect(result.checks.map((c) => c.id)).toEqual(['windows', 'node', 'disk']);
+  });
+});
+
 describe('runDoctor on Linux', () => {
-  it('passes every required check on a ready host and reports versions', () => {
-    const result = runDoctor(linuxEnv());
+  it('passes without systemd or bubblewrap and reports kernel version', () => {
+    const result = runDoctor(linuxEnv({ missing: ['systemd-run', 'bwrap'] }));
     expect(result.ok).toBe(true);
     expect(result.checks.filter((c) => c.status === 'fail')).toEqual([]);
     const versions = check(linuxEnv(), 'versions');
     expect(versions.status).toBe('info');
-    expect(versions.detail).toContain('systemd 262, kernel 7.2.0-arch1-1');
-    expect(versions.detail).toContain('known to work: systemd 262, kernel 7.2');
+    expect(versions.detail).toContain('kernel 7.2.0-arch1-1');
   });
 
   it('fails on unsupported platforms', () => {
-    const result = runDoctor(fakeEnv({ platform: 'win32' }));
+    const result = runDoctor(fakeEnv({ platform: 'freebsd' }));
     expect(result.ok).toBe(false);
     expect(result.checks[0]).toMatchObject({ id: 'platform', status: 'fail' });
-  });
-
-  it('fails when pid 1 is not systemd', () => {
-    const env = linuxEnv({ files: { '/proc/1/comm': 'init\n' } });
-    expect(check(env, 'systemd-pid1').status).toBe('fail');
-    expect(runDoctor(env).ok).toBe(false);
-  });
-
-  const distros: Array<[string, string, Record<string, string>]> = [
-    [
-      'arch',
-      'ID=arch\n',
-      {
-        'systemd-run': 'sudo pacman -S --needed systemd',
-        bwrap: 'sudo pacman -S --needed bubblewrap',
-      },
-    ],
-    [
-      'debian',
-      'ID=ubuntu\nID_LIKE=debian\n',
-      {
-        'systemd-run': 'sudo apt install systemd',
-        bwrap: 'sudo apt install bubblewrap',
-      },
-    ],
-    [
-      'fedora',
-      'ID=fedora\n',
-      {
-        'systemd-run': 'sudo dnf install systemd',
-        bwrap: 'sudo dnf install bubblewrap',
-      },
-    ],
-    [
-      'unknown',
-      'ID=gentoo\n',
-      Object.fromEntries(LINUX_TOOLS.map((t) => [t, `install the package that provides ${t}`])),
-    ],
-  ];
-
-  for (const [name, osRelease, fixes] of distros) {
-    it(`gives ${name} install fixes for each missing confinement tool`, () => {
-      for (const tool of LINUX_TOOLS) {
-        const env = linuxEnv({ osRelease, missing: [tool] });
-        const c = check(env, `tool:${tool}`);
-        expect(c.status).toBe('fail');
-        expect(c.fix).toBe(fixes[tool]);
-        expect(runDoctor(env).ok).toBe(false);
-      }
-    });
-  }
-
-  it('fails when unprivileged user namespaces are disabled', () => {
-    for (const knob of [
-      '/proc/sys/user/max_user_namespaces',
-      '/proc/sys/kernel/unprivileged_userns_clone',
-    ]) {
-      const env = linuxEnv({ files: { [knob]: '0\n' } });
-      expect(check(env, 'userns').status).toBe('fail');
-      expect(runDoctor(env).ok).toBe(false);
-    }
-  });
-
-  it('treats rhel-like hosts as dnf hosts', () => {
-    const env = linuxEnv({
-      osRelease: 'ID=rocky\nID_LIKE="rhel centos fedora"\n',
-      missing: ['bwrap'],
-    });
-    expect(check(env, 'tool:bwrap').fix).toBe('sudo dnf install bubblewrap');
   });
 
   it('reports optional orb backends as info, not failures', () => {
@@ -200,14 +125,6 @@ describe('runDoctor on Linux', () => {
     expect(c.fix).toBe('run cairn doctor as the account that will run tasks, without sudo');
   });
 
-  it('fails when protected_hardlinks is off', () => {
-    const env = linuxEnv({ files: { '/proc/sys/fs/protected_hardlinks': '0\n' } });
-    const c = check(env, 'protected-hardlinks');
-    expect(c.status).toBe('fail');
-    expect(c.fix).toContain('sudo sysctl -w fs.protected_hardlinks=1');
-    expect(c.fix).toContain('/etc/sysctl.d');
-  });
-
   it('warns on low disk space', () => {
     const env = linuxEnv({ free: 4 * GIB });
     const c = check(env, 'disk');
@@ -219,12 +136,12 @@ describe('runDoctor on Linux', () => {
 
 describe('doctor output', () => {
   it('renders marks, fix lines and the summary', () => {
-    const result = runDoctor(linuxEnv({ missing: ['bwrap'] }));
+    const result = runDoctor(linuxEnv({ nodeVersion: '22.18.0' }));
     const text = formatDoctor(result);
     expect(text).toMatch(/^✓ /m);
-    expect(text).toMatch(/^✗ .*bwrap/m);
+    expect(text).toMatch(/^✗ .*Node/m);
     expect(text).toMatch(/^· /m);
-    expect(text).toContain('Fix: sudo pacman -S --needed bubblewrap');
+    expect(text).toContain('Fix: install Node 22.19 or newer');
     expect(text.trimEnd().split('\n').at(-1)).toBe('1 problem(s) found.');
   });
 

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { afterAll, describe, expect, test } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
@@ -70,16 +69,6 @@ async function machineOf(
             capabilities: {
               ...enrolled.capabilities,
               osPlatform: opts.osPlatform,
-              ...(opts.osPlatform === 'darwin'
-                ? {
-                    confinement: {
-                      state: 'ready' as const,
-                      invocation: randomUUID(),
-                      generation: 1,
-                      revision: 1,
-                    },
-                  }
-                : {}),
             },
           }
         : {}),
@@ -211,8 +200,6 @@ function pendingStep(
 }
 
 function claimOn(w: World, machineId: string) {
-  const confinement = w.s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()
-    ?.capabilities?.confinement;
   return claimStep(
     {
       ...w.s.svc,
@@ -225,10 +212,6 @@ function claimOn(w: World, machineId: string) {
     w.s.team.id,
     10,
     'http://localhost',
-    undefined,
-    confinement !== undefined
-      ? { confinement: { invocation: confinement.invocation, generation: confinement.generation } }
-      : undefined,
   );
 }
 

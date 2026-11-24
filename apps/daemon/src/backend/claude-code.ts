@@ -50,7 +50,6 @@ import { ensureTeamSkillsPlugin } from '../team-skills.js';
 import { BackgroundSubagents, type FinishedSubagent } from './claude-background-subagents.js';
 import { BackgroundTaskRows } from './claude-background-tasks.js';
 import { type ClaudeTelemetryCapture, captureClaudeTelemetry } from './claude-telemetry.js';
-import type { Launch, SessionConfiner } from './confine-session.js';
 import { SessionNotResumableError } from './errors.js';
 import { hostToolContent } from './host-tool-content.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -1419,7 +1418,6 @@ export interface ClaudeSdkOptionParts {
   lockedDown: boolean;
   mcpServers: Record<string, McpServerConfig>;
   strictMcpConfig?: boolean;
-  confine?: (launch: Launch) => Launch;
   effort?: EffortLevel;
   append?: string;
   skillDenyRules?: string[];
@@ -1445,12 +1443,10 @@ const OAUTH_TOKEN_FD = 3;
 
 function spawnClaudeProcess(
   fdToken: string | undefined,
-  confine: ((launch: Launch) => Launch) | undefined,
   session: SessionProcess | undefined,
 ): (options: SpawnOptions) => SpawnedProcess {
   return ({ command, args, cwd, env, signal }) => {
-    const launch = confine?.({ command, args }) ?? { command, args };
-    const child = spawn(launch.command, launch.args, {
+    const child = spawn(command, args, {
       ...(cwd !== undefined ? { cwd } : {}),
       env: session === undefined ? env : { ...env, [SESSION_TREE_ENV]: session.marker },
       signal,
@@ -1559,8 +1555,8 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
       ? { pathToClaudeCodeExecutable: parts.executablePath }
       : {}),
     env,
-    ...(fdToken !== undefined || parts.confine !== undefined || parts.process !== undefined
-      ? { spawnClaudeCodeProcess: spawnClaudeProcess(fdToken, parts.confine, parts.process) }
+    ...(fdToken !== undefined || parts.process !== undefined
+      ? { spawnClaudeCodeProcess: spawnClaudeProcess(fdToken, parts.process) }
       : {}),
     ...(!locked && parts.plugins !== undefined && parts.plugins.length > 0
       ? { plugins: parts.plugins }
@@ -1580,7 +1576,6 @@ export interface ClaudeCodeBackendOpts {
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
   executablePath?: string;
-  confine?: SessionConfiner;
   teamSkillsCacheDir?: string;
   executableVersion?: string | null;
   resolveExecutable?: () => {
@@ -1700,12 +1695,6 @@ export class ClaudeCodeBackend implements AgentBackend {
         ...(opts.compactAt !== undefined ? { compactAt: opts.compactAt } : {}),
         ...(nativePluginDir !== null && opts.remoteToolsOnly !== true
           ? { plugins: [{ type: 'local' as const, path: nativePluginDir }] }
-          : {}),
-        ...(this.opts.confine !== undefined
-          ? {
-              confine: (launch: Launch) =>
-                (this.opts.confine as SessionConfiner)(opts, 'claude-code', launch),
-            }
           : {}),
         abortController: abort,
         process: sessionProcess,

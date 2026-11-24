@@ -16,14 +16,7 @@ import {
 } from '../../apps/server/src/db/schema.js';
 import { setCoordinatorInServer } from '../../apps/server/src/services/coordinator-context.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import {
-  api,
-  bootRealServer,
-  CONFINEMENT_READY_LAUNCH,
-  daemonLogLines,
-  type RealServer,
-  waitFor,
-} from './helpers.js';
+import { api, bootRealServer, daemonLogLines, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const FAKE = resolve(__dirname, '../../apps/daemon/test/fixtures/fake-claude.mjs');
@@ -84,7 +77,6 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
-    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(
     () => daemonLogLines(paths.daemonLog).some((l) => l.includes('[wake] push channel connected')),

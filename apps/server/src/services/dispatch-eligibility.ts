@@ -1,7 +1,6 @@
 import {
   type ClaudeCodeReport,
   capabilityMissingLabels,
-  confinementDispatchReady,
   isBackendRuntimeId,
   MACHINE_RUNTIMES,
   type MachineCapabilities,
@@ -254,7 +253,6 @@ export interface EligibilityInput {
 export type MachineIneligibility =
   | {
       kind:
-        | 'confinement'
         | 'runtime'
         | 'local-path'
         | 'claude-blocked'
@@ -289,6 +287,5 @@ export function machineEligibility(input: EligibilityInput): MachineIneligibilit
   if (runtime === 'antigravity' && input.antigravitySubscriptionMissing === true) {
     return { kind: 'antigravity-subscription' };
   }
-  if (!confinementDispatchReady(machineRow.capabilities)) return { kind: 'confinement' };
   return null;
 }

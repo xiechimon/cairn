@@ -90,7 +90,6 @@ describe('online sequence canon (02 §5.4/r3 §1.5)', () => {
       skills: ['verify-cairn'],
       executor: 'host',
       codexLogin: { state: 'absent' },
-      confinement: expect.objectContaining({ state: 'checking' }),
     });
     await handle.stop();
     await handle.done;
@@ -232,14 +231,7 @@ describe('D75 computer capability', () => {
       capabilitiesProbe: () => ({ mcpServers: [], skills: [] }),
       capEnv: options.capEnv ?? {},
       ...(options.orbComputer ? { orbComputer: options.orbComputer } : {}),
-      ...(options.platform
-        ? {
-            confinementPlatform: options.platform,
-            confinementPreflight: async () => {
-              throw new Error('no confinement in this test');
-            },
-          }
-        : {}),
+      ...(options.platform ? { platform: options.platform } : {}),
     });
     await waitFor(() => api.presenceBodies.length > 0 || api.enrollBodies.length > 0);
     const caps = (

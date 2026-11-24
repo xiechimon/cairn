@@ -116,7 +116,6 @@ function spawnDaemon(serverUrl: string, name: string, apiKey: string): ChildProc
       env: {
         ...process.env,
         [ENV_VARS.home]: home,
-        [ENV_VARS.confinementPlatform]: 'test',
         HTTP_PROXY: '',
         HTTPS_PROXY: '',
         http_proxy: '',

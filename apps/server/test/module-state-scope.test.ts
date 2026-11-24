@@ -21,7 +21,6 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/backend/command-gate.ts:COMMAND_SEPARATORS': 'constant lookup table',
   'apps/daemon/src/backend/command-gate.ts:SHELLS': 'constant lookup table',
   'apps/daemon/src/backend/command-gate.ts:COMMAND_KEYWORDS': 'constant lookup table',
-  'apps/daemon/src/backend/confine-session.ts:STATE_FILES': 'constant lookup table',
   'apps/daemon/src/backend/image-support.ts:learnedNoVision':
     'learned capability memo keyed on model id; an environment fact, not instance state',
   'apps/daemon/src/backend/pi.ts:learnedCompat':

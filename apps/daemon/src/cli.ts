@@ -17,7 +17,6 @@ import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch
 import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
-import { runPiHost } from './backend/pi-host.js';
 import { claudeInstallRoot } from './backend/runtime-channels.js';
 import { childEnv } from './child-env.js';
 import { bundledClaudeCodePath } from './claude-code-bin.js';
@@ -382,13 +381,6 @@ export function buildProgram(): Command {
       });
       if (result.error !== undefined) throw result.error;
       process.exitCode = result.status ?? 1;
-    });
-
-  program
-    .command('pi-host', { hidden: true })
-    .description('Run one confined Pi session over the JSONL host protocol')
-    .action(async () => {
-      await runPiHost();
     });
 
   program

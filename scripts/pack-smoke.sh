@@ -17,8 +17,8 @@
 # climbs the directory tree to the repo root to resolve `catalog:`; probes never
 # touch the real ~/.cairn. The cli package gets manifest + content-list assertions
 # plus a parse check of the bundle (no process boot — the enroll chain belongs to e2e /
-# first-release live runs). The parse check exists because the desktop Runner and the
-# pi-host child run dist/cli.mjs, and a bundle that fails to parse crashes them at start.
+# first-release live runs). The parse check exists because the desktop Runner runs
+# dist/cli.mjs, and a bundle that fails to parse crashes it at start.
 set -eu
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -71,7 +71,7 @@ done
 if printf '%s\n' "$LIST_CLI" | grep -q '^package/src/'; then echo "FAIL: cli src leaked into the tarball"; exit 1; fi
 echo "ok: cli bundle/LICENSE present, no src leak"
 
-echo "== cli bundle parses (the Runner and pi-host run this file) =="
+echo "== cli bundle parses (the desktop Runner runs this file) =="
 mkdir -p "$WORK/cli-bundle"
 tar -xzf "$TGZ_CLI" -C "$WORK/cli-bundle" package/dist/cli.mjs
 node --check "$WORK/cli-bundle/package/dist/cli.mjs" || { echo "FAIL: cli bundle does not parse"; exit 1; }

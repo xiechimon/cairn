@@ -38,17 +38,6 @@ interface ToolSpec {
   packages: Record<KnownFamily, string>;
 }
 
-const LINUX_REQUIRED_TOOLS: ToolSpec[] = [
-  {
-    cmd: 'systemd-run',
-    packages: { arch: 'systemd', debian: 'systemd', fedora: 'systemd' },
-  },
-  {
-    cmd: 'bwrap',
-    packages: { arch: 'bubblewrap', debian: 'bubblewrap', fedora: 'bubblewrap' },
-  },
-];
-
 const INSTALL_COMMAND: Record<KnownFamily, string> = {
   arch: 'sudo pacman -S --needed',
   debian: 'sudo apt install',
@@ -150,15 +139,6 @@ function darwinChecks(env: DoctorEnv): Check[] {
     { id: 'macos', label: 'macOS host', status: 'pass' },
     nodeCheck(env),
     notRootCheck(env),
-    env.which('sandbox-exec')
-      ? { id: 'seatbelt', label: 'seatbelt confinement (sandbox-exec)', status: 'pass' }
-      : {
-          id: 'seatbelt',
-          label: 'seatbelt confinement (sandbox-exec)',
-          status: 'fail',
-          detail: 'sandbox-exec not found; it is required to confine step runs',
-          fix: 'sandbox-exec ships with macOS; update or reinstall the OS to restore it',
-        },
     env.which('container')
       ? {
           id: 'vm-runtime',
@@ -189,71 +169,14 @@ function linuxChecks(env: DoctorEnv): Check[] {
   const checks: Check[] = [{ id: 'linux', label: 'Linux host', status: 'pass' }];
   const family = distroFamily(env.readFile('/etc/os-release'));
 
-  checks.push(nodeCheck(env), notRootCheck(env));
+  checks.push(nodeCheck(env), notRootCheck(env), diskCheck(env));
 
-  const init = env.readFile('/proc/1/comm')?.trim();
-  checks.push(
-    init === 'systemd'
-      ? { id: 'systemd-pid1', label: 'systemd is PID 1', status: 'pass' }
-      : {
-          id: 'systemd-pid1',
-          label: 'systemd is PID 1',
-          status: 'fail',
-          detail: `PID 1 is ${init ?? 'unreadable'}`,
-          fix: 'boot the host with systemd as its init system',
-        },
-  );
-
-  for (const tool of LINUX_REQUIRED_TOOLS) {
-    checks.push(
-      env.which(tool.cmd)
-        ? { id: `tool:${tool.cmd}`, label: tool.cmd, status: 'pass' }
-        : {
-            id: `tool:${tool.cmd}`,
-            label: tool.cmd,
-            status: 'fail',
-            detail: 'not found; required to confine step runs',
-            fix: installFix(tool, family),
-          },
-    );
-  }
-
-  const maxUserns = env.readFile('/proc/sys/user/max_user_namespaces')?.trim();
-  const usernsClone = env.readFile('/proc/sys/kernel/unprivileged_userns_clone')?.trim();
-  checks.push(
-    maxUserns === '0' || usernsClone === '0'
-      ? {
-          id: 'userns',
-          label: 'Unprivileged user namespaces',
-          status: 'fail',
-          detail: 'disabled; bubblewrap confinement cannot create namespaces',
-          fix: 'sudo sysctl -w user.max_user_namespaces=28633 kernel.unprivileged_userns_clone=1, and persist it in /etc/sysctl.d',
-        }
-      : { id: 'userns', label: 'Unprivileged user namespaces', status: 'pass' },
-  );
-
-  checks.push(
-    env.readFile('/proc/sys/fs/protected_hardlinks')?.trim() === '1'
-      ? { id: 'protected-hardlinks', label: 'fs.protected_hardlinks is enabled', status: 'pass' }
-      : {
-          id: 'protected-hardlinks',
-          label: 'fs.protected_hardlinks is enabled',
-          status: 'fail',
-          fix: 'sudo sysctl -w fs.protected_hardlinks=1, and persist it with a file in /etc/sysctl.d (for example fs.protected_hardlinks = 1 in /etc/sysctl.d/60-cairn.conf)',
-        },
-  );
-
-  checks.push(diskCheck(env));
-
-  const systemd = /^systemd\s+(\S+)/.exec(
-    env.run('systemctl', ['--version']).stdout.split('\n')[0] ?? '',
-  )?.[1];
   const kernel = env.run('uname', ['-r']).stdout.trim() || 'unknown';
   checks.push({
     id: 'versions',
     label: 'Versions',
     status: 'info',
-    detail: `systemd ${systemd ?? 'unknown'}, kernel ${kernel} (known to work: systemd 262, kernel 7.2)`,
+    detail: `kernel ${kernel}`,
   });
 
   checks.push(
@@ -306,20 +229,26 @@ function linuxChecks(env: DoctorEnv): Check[] {
   return checks;
 }
 
+function windowsChecks(env: DoctorEnv): Check[] {
+  return [{ id: 'windows', label: 'Windows host', status: 'pass' }, nodeCheck(env), diskCheck(env)];
+}
+
 export function runDoctor(env: DoctorEnv): DoctorResult {
   const checks =
     env.platform === 'darwin'
       ? darwinChecks(env)
       : env.platform === 'linux'
         ? linuxChecks(env)
-        : [
-            {
-              id: 'platform',
-              label: 'Supported platform',
-              status: 'fail' as const,
-              detail: `${env.platform} is unsupported; cairn runs on macOS and Linux`,
-            },
-          ];
+        : env.platform === 'win32'
+          ? windowsChecks(env)
+          : [
+              {
+                id: 'platform',
+                label: 'Supported platform',
+                status: 'fail' as const,
+                detail: `${env.platform} is unsupported; cairn runs on macOS, Linux, and Windows`,
+              },
+            ];
   return { checks, ok: checks.every((check) => check.status !== 'fail') };
 }
 

@@ -1068,8 +1068,6 @@ export const EN: Record<string, string> = {
     'Queued: no Runner meets the capability requirements (missing {missing}) — it runs on the next heartbeat once they are installed',
   '排队中：暂无 {platform} 执行机 · 需要 {platform}':
     'Queued: no {platform} Runner · needs {platform}',
-  '排队中：执行机的任务沙箱未就绪，无法接收任务':
-    'Queued: the task sandbox on the Runner is not ready, so it cannot take tasks',
   '排队中：执行机上未检测到 {runtime}，安装后重启执行机':
     'Queued: the Runner has not detected {runtime}. Install it, then restart the Runner',
   '排队中：执行机无法使用这一步的模型——在工作路由里更换模型':
@@ -1082,8 +1080,6 @@ export const EN: Record<string, string> = {
     'Queued: the team has no usable Claude subscription. Run claude setup-token in a terminal and add the token under Model routing',
   '排队中：团队暂无可用的 Devin 订阅——在已登录 Devin 的电脑上运行 cat ~/.local/share/devin/credentials.toml，把完整输出添加到模型路由':
     'Queued: the team has no usable Devin subscription. Run cat ~/.local/share/devin/credentials.toml on a computer signed in to Devin and add the whole output under Model routing',
-  '排队中：{machine} 的任务沙箱未就绪，无法接收任务':
-    'Queued: the task sandbox on {machine} is not ready, so it cannot take tasks',
   '排队中：{machine} 上未检测到 {runtime}，安装后重启执行机':
     'Queued: {machine} has not detected {runtime}. Install it, then restart the Runner',
   '排队中：{machine} 无法使用这一步的模型——在工作路由里更换模型':

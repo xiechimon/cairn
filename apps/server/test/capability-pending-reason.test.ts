@@ -338,30 +338,6 @@ describe('#1251 queue projection blocked bit (worker steps)', () => {
     );
   });
 
-  test('an online Linux Runner whose task sandbox is not ready -> sandbox-unavailable, not a plain wait', () => {
-    const w = makeWorld();
-    insertRule(w, 'session');
-    insertMachine(w, {
-      id: 'm-sandbox',
-      capabilities: {
-        mcpServers: [],
-        skills: [],
-        osPlatform: 'linux',
-        confinement: {
-          invocation: '00000000-0000-4000-8000-000000000001',
-          generation: 1,
-          revision: 3,
-          state: 'unavailable',
-          reason: 'startup-failed',
-        },
-      },
-    });
-    const target = insertPendingWorkerStep(w, { homeMachineId: 'm-sandbox' });
-    const info = stepQueueProjector(w.s.db, w.teamId).project(target);
-    expect(info?.blocked).toEqual({ kind: 'sandbox-unavailable', missing: [] });
-    expect(info?.waitingFor?.name).toBe('m-sandbox');
-  });
-
   test('failure mode 1 addendum: models dimension missing items named the same shape', () => {
     const w = makeWorld();
     insertRule(w, 'session', { models: ['glm-5.3'] });

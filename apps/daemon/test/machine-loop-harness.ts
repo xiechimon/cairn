@@ -1,5 +1,4 @@
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type {
   AgentBackend,
   AgentSessionHandle,
@@ -19,7 +18,7 @@ import type {
 import { onTestFinished } from 'vitest';
 import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { PI_CAPABILITIES, piHostLaunch } from '../src/backend/pi.js';
+import { PI_CAPABILITIES } from '../src/backend/pi.js';
 import type { ClaudeCodeAuthProbe } from '../src/claude-code-auth.js';
 import type { ScopedComputerProviders } from '../src/computer/provider.js';
 import { loadDaemonConfig } from '../src/config.js';
@@ -49,8 +48,6 @@ function captureLogger(): { logger: DaemonLogger; lines: string[] } {
   };
   return { logger, lines };
 }
-
-const cliEntry = fileURLToPath(new URL('../src/cli.ts', import.meta.url));
 
 export const CLAIMED: ClaimedStep = {
   step: { id: 's1', buildId: 'conv-1', kind: 'plan', machineId: 'm1', createdAt: 1 },
@@ -302,10 +299,7 @@ export interface BootOpts {
   capEnv?: NodeJS.ProcessEnv;
   orbProvider?: OrbProvider;
   orbComputer?: ScopedComputerProviders;
-  confinementPlatform?: string;
-  confinementPreflight?: import('../src/machine-loop.js').MachineLoopOpts['confinementPreflight'];
-  seatbeltProbe?: import('../src/machine-loop.js').MachineLoopOpts['seatbeltProbe'];
-  confinementRecheckMs?: number;
+  platform?: string;
   strandedUploadReplayMs?: number;
   strandedUploadMinAgeMs?: number;
   claudeManaged?: import('../src/backend/managed-runtime.js').ManagedRuntime;
@@ -382,13 +376,7 @@ export function startMachine(opts: BootOpts) {
       paths,
       logger,
       client: api,
-      piHostLaunch: () => piHostLaunch(cliEntry),
-      confinementPlatform: opts.confinementPlatform ?? 'darwin',
-      confinementPreflight: opts.confinementPreflight,
-      seatbeltProbe: opts.seatbeltProbe ?? (async () => {}),
-      ...(opts.confinementRecheckMs !== undefined
-        ? { confinementRecheckMs: opts.confinementRecheckMs }
-        : {}),
+      platform: opts.platform ?? 'darwin',
       ...(opts.strandedUploadReplayMs !== undefined
         ? { strandedUploadReplayMs: opts.strandedUploadReplayMs }
         : {}),

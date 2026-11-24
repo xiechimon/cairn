@@ -2,7 +2,6 @@ import { spawn } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { type BoundGitCredentials, missingSetupCommand } from '@cairn/shared';
-import type { Launch, SessionConfiner } from './backend/confine-session.js';
 import { childEnv } from './child-env.js';
 import { gitCredentialEnv } from './git.js';
 
@@ -31,7 +30,6 @@ export interface RunWorkspaceHookInput {
   name: 'setup' | 'resume';
   credentials: BoundGitCredentials | null;
   env?: NodeJS.ProcessEnv;
-  confine?: SessionConfiner;
   timeoutMs: number;
   log: (line: string) => void;
 }
@@ -60,16 +58,6 @@ export async function runWorkspaceHook(
     ...(credentials !== null ? gitCredentialEnv(credentials) : {}),
     ...input.env,
   });
-  const launch: Launch = input.confine?.(
-    {
-      cwd,
-      env: Object.fromEntries(
-        Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined),
-      ),
-    },
-    'hook',
-    { command: path, args: [] },
-  ) ?? { command: path, args: [] };
   const startedAt = Date.now();
   let kept = '';
   let total = 0;
@@ -83,7 +71,7 @@ export async function runWorkspaceHook(
   let timedOut = false;
   let spawnError: Error | null = null;
   let settled = false;
-  const child = spawn(launch.command, launch.args, {
+  const child = spawn(path, [], {
     cwd,
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],

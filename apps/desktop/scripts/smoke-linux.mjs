@@ -42,13 +42,11 @@ try {
     while (Date.now() < deadline) {
       const body = await (await fetch(`/api/teams/${teamId}/machines`)).json();
       machines = body.machines ?? body;
-      const ready = machines.find(
-        (entry) => entry.online && entry.capabilities?.confinement?.state === 'ready',
-      );
+      const ready = machines.find((entry) => entry.online);
       if (ready) return ready;
       await new Promise((wake) => setTimeout(wake, 500));
     }
-    throw new Error(`no sandbox-ready Runner: ${JSON.stringify(machines)}`);
+    throw new Error(`no online Runner: ${JSON.stringify(machines)}`);
   });
   assert.equal(machine.kind, 'local');
   assert.ok(machine.enabledRuntimes.includes('pi'));
@@ -91,7 +89,7 @@ try {
   );
   assert.notEqual(spawnSync('systemctl', ['--user', 'is-active', unit]).status, 0);
   console.log(
-    'Linux package smoke passed: fresh onboarding, owner session, pi Runner and sandbox ready, quit stopped server and Runner',
+    'Linux package smoke passed: fresh onboarding, owner session, pi Runner ready, quit stopped server and Runner',
   );
 } finally {
   await desktop?.close();

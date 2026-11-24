@@ -43,8 +43,6 @@ import { probeAntigravitySubscriptionModels } from './backend/antigravity-subscr
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { serverPortOf } from './backend/confine.js';
-import { createSessionConfiner, type Launch } from './backend/confine-session.js';
-import { ConfinementAvailability } from './backend/confinement-availability.js';
 import { createDevinUpdateNormalizer } from './backend/devin-acp.js';
 import { createHostShellConfinement } from './backend/host-shell-confinement.js';
 import type { ManagedRuntime } from './backend/managed-runtime.js';
@@ -166,11 +164,7 @@ export interface MachineLoopOpts {
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
   otel?: DaemonOtel | null;
-  piHostLaunch?: () => Launch;
-  confinementPlatform?: string;
-  confinementPreflight?: ConstructorParameters<typeof ConfinementAvailability>[0]['launch'];
-  seatbeltProbe?: ConstructorParameters<typeof ConfinementAvailability>[0]['seatbeltProbe'];
-  confinementRecheckMs?: number;
+  platform?: string;
   strandedUploadReplayMs?: number;
   strandedUploadMinAgeMs?: number;
 }
@@ -179,14 +173,11 @@ export interface MachineHandle {
   machineId: string;
   stop(cause?: string): Promise<void>;
   done: Promise<void>;
-  recheckConfinement(): Promise<void>;
 }
 
-const CONFINEMENT_RECHECK_MS = 60_000;
 const STRANDED_UPLOAD_REPLAY_MS = 30_000;
 const STRANDED_UPLOAD_MIN_AGE_MS = 30_000;
 const STRANDED_UPLOAD_MAX_ATTEMPTS = 40;
-const CONFINEMENT_STOP_WAIT_MS = 15_000;
 const STEP_REAP_GRACE_MS = 3_000;
 
 export function nextBackoffMs(current: number, cap = CLAIM_BACKOFF_CAP_MS): number {
@@ -232,17 +223,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.machine(`agent config import failed: ${failure.item}: ${failure.reason}`);
     }
   }
-  const extraDeniedRoots = (process.env[ENV_VARS.confineDeniedRoots] ?? '')
-    .split(delimiter)
-    .filter((path) => path !== '');
-  const confine = createSessionConfiner({
-    daemonHome: config.home,
-    extraDeniedRoots,
-    readable: [config.skillsDir, paths.teamSkillsCacheDir, join(paths.home, 'tools')],
-    handoffDirectories: [paths.plansDir],
-    serverUrl: config.serverUrl,
-    workspacesDir: config.workspacesDir,
-  });
   loadOrCreateDeviceJson(paths);
   const proxyHandle = setupProxy(logger, opts.proxyEnv ?? process.env, config.serverUrl);
 
@@ -259,11 +239,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }
 
   let backend: AgentBackend | undefined = opts.backend;
-  const platformOverride =
-    opts.capEnv?.[ENV_VARS.confinementPlatform] ?? process.env[ENV_VARS.confinementPlatform];
-  const platform = opts.confinementPlatform ?? platformOverride ?? process.platform;
-  let claudeSeed: ClaudeBinInfo | null = platform === 'darwin' ? await probeClaudeBin() : null;
-  let availability: ConfinementAvailability | undefined;
+  const platform = opts.platform ?? process.platform;
+  const claudeSeed: ClaudeBinInfo | null = await probeClaudeBin();
   let claudeAuth: ClaudeCodeAuthProbe | null = null;
   let claudeLogin: ClaudeLogin | null = null;
   let loginProbe: Promise<ClaudeCodeAuthProbe> | null = null;
@@ -316,9 +293,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             },
     });
   const activeClaudeBin = (): ClaudeBinInfo | null => {
-    if (platform !== 'darwin' && !availability?.ready && opts.claudeManaged === undefined) {
-      return null;
-    }
     const active = claudeManaged.current();
     if (active === null) return null;
     return {
@@ -330,8 +304,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const readExpiresAt =
     opts.readClaudeOauthExpiresAt ?? (() => readDefaultClaudeOauthExpiresAt(claudeHome));
   const probeAuthAndRemember = (): Promise<ClaudeCodeAuthProbe> => {
-    if (platform !== 'darwin' && !availability?.ready)
-      return Promise.resolve({ state: 'unknown', reason: 'confinement unavailable' });
     if (loginProbe) return loginProbe;
     const pending = (async () => {
       const currentClaude = activeClaudeBin();
@@ -368,7 +340,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     });
   };
 
-  if (platform === 'darwin') await probeAuthAndRemember();
+  await probeAuthAndRemember();
 
   const capEnv = opts.capEnv ?? process.env;
   const orbProvider = opts.orbProvider ?? createOrbProvider(capEnv, paths.home);
@@ -378,6 +350,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       mcpConfigPath: config.mcpConfigPath,
       skillsDir: config.skillsDir,
     });
+  const extraDeniedRoots = (process.env[ENV_VARS.confineDeniedRoots] ?? '')
+    .split(delimiter)
+    .filter((path) => path !== '');
   const serverPort = serverPortOf(new URL(config.serverUrl));
   const stagingRoot = defaultStagingRoot();
   const hostConfinement =
@@ -490,7 +465,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     gemini: geminiManaged,
   };
   const checkRuntimeUpdates = () => {
-    if (!availability?.ready) return;
     for (const runtime of Object.values(managedRuntimes)) {
       if (runtime.current() === null) continue;
       void trackInstall(runtime.checkForUpdate()).catch((error: unknown) => {
@@ -523,10 +497,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     return {
       ...capabilitiesProbe(),
       osPlatform: osPlatformOf(platform),
-      confinement: availability?.observation(),
-      ...(availability?.cause !== undefined && availability.report?.state === 'unavailable'
-        ? { confinementCause: availability.cause }
-        : {}),
       codexLogin: readCodexLogin(paths.agentRuntimeDir),
       devin: (() => {
         const install = devinManaged.current();
@@ -630,7 +600,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
                 else activeAntigravityVersions.delete(runtimeVersion);
               };
             },
-            ...(confine !== null && confine !== undefined ? { confine } : {}),
           }),
         };
       }
@@ -682,7 +651,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
         onSkillsLog: (msg) => logger.skills(msg),
         createUpdateNormalizer: createDevinUpdateNormalizer,
         gate: { log: (msg) => logger.gate(msg) },
-        ...(confine !== null && confine !== undefined ? { confine } : {}),
       });
       return devinBackend;
     }
@@ -715,7 +683,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           gate: { log: (msg) => logger.gate(msg) },
           skills: { skillsDir: config.skillsDir, cwd: config.home },
           onSkillsLog: (msg) => logger.skills(msg),
-          ...(confine !== null ? { confine } : {}),
         });
       return geminiBackend;
     }
@@ -737,8 +704,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           onOtelLog: (msg) => logger.prefixed('otel', msg),
           onCompactionLog: (msg) => logger.step(msg),
           machineName: config.name,
-          ...(confine !== null ? { confine } : {}),
-          ...(opts.piHostLaunch !== undefined ? { hostLaunch: opts.piHostLaunch } : {}),
         });
         logger.machine(piSessionPolicyLine(process.env));
       }
@@ -762,7 +727,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
                 release: lease.release,
               };
         },
-        ...(confine !== null ? { confine } : {}),
         teamSkillsCacheDir: paths.teamSkillsCacheDir,
       });
     }
@@ -916,7 +880,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     },
     onFailure: (err) => {
       if (err instanceof MachineApiError) {
-        if (err.status === 409) availability?.invalidate();
         networkFailures = 0;
       } else {
         networkFailures += 1;
@@ -933,19 +896,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       logger.machine(`presence failed: ${err instanceof Error ? err.message : String(err)}`);
     },
   });
-  availability = new ConfinementAvailability({
-    home: paths.home,
-    platform,
-    log: (message) => logger.machine(message),
-    launch: opts.confinementPreflight,
-    ...(opts.seatbeltProbe !== undefined ? { seatbeltProbe: opts.seatbeltProbe } : {}),
-    me: () => client.me(),
-    send: () => presenceReporter.send(),
-  });
   sendPresenceNow = () => presenceReporter.send();
   const probeHarnesses = async () => {
-    if (!availability?.ready) return;
-    if (platform !== 'darwin') claudeSeed = await probeClaudeBin();
     const claudeBin = activeClaudeBin();
     logger.machine(
       claudeBin
@@ -959,7 +911,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   try {
     for (let backoff = opts.claimBackoffBaseMs ?? 1_000; ; backoff = nextBackoffMs(backoff)) {
       try {
-        await availability.recheck();
+        await client.me();
+        await presenceReporter.send();
         break;
       } catch (error) {
         if (error instanceof MachineApiError && error.status < 500) throw error;
@@ -999,7 +952,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     logger,
     ...(opts.orphanTtlMs !== undefined ? { orphanTtlMs: opts.orphanTtlMs } : {}),
     ...(opts.hookTimeoutMs !== undefined ? { hookTimeoutMs: opts.hookTimeoutMs } : {}),
-    ...(confine !== null ? { confine } : {}),
   });
   await backfillRepositoryCaches(config.workspacesDir, (message) => logger.workspace(message));
   const sessionHandles = new Map<string, AgentSessionHandle>();
@@ -1167,7 +1119,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
 
   let recoveryPending = true;
   const recover = async () => {
-    if (!availability?.ready || !recoveryPending) return;
+    if (!recoveryPending) return;
     recoveryPending = false;
     const recovered = await client.recover();
     if (recovered.steps.length === 0) {
@@ -1620,23 +1572,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   }, opts.presenceIntervalMs ?? 30_000);
   presenceTimer.unref?.();
 
-  const recheckConfinement = async () => {
-    await availability.recheck();
-    await probeHarnesses();
-    await recover();
-    resumeClaims?.();
-  };
-  const confinementTimer = setInterval(() => {
-    if (stopping || availability.ready || !availability.recoverable) return;
-    void recheckConfinement().catch((err: unknown) => {
-      logger.machine(
-        `confinement recheck failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    });
-  }, opts.confinementRecheckMs ?? CONFINEMENT_RECHECK_MS);
-  confinementTimer.unref?.();
-
-  let resumeClaims: (() => void) | undefined;
   let stopping = false;
   const claimCtrl = new AbortController();
   const claimTimeoutMs = opts.claimTimeoutMs ?? CLAIM_POLL_INTERVAL_MS + 15_000;
@@ -1686,7 +1621,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const strandedAttempts = new Map<string, number>();
   let replayingStranded = false;
   const replayStrandedUploads = async () => {
-    if (replayingStranded || stopping || !availability?.ready) return;
+    if (replayingStranded || stopping) return;
     replayingStranded = true;
     try {
       for (const entry of journal.pending()) {
@@ -1726,12 +1661,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     const backoffBase = opts.claimBackoffBaseMs ?? 1_000;
     let backoff = backoffBase;
     while (!stopping) {
-      if (!availability?.ready) {
-        await new Promise<void>((resolve) => {
-          resumeClaims = resolve;
-        });
-        continue;
-      }
       if (orbProvider.kind === 'orb' && inFlight.size >= orbCap) {
         await Promise.race(inFlight.values());
         continue;
@@ -1740,10 +1669,7 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
       try {
         step = await client.claim(
           AbortSignal.any([claimCtrl.signal, AbortSignal.timeout(claimTimeoutMs)]),
-          {
-            ...(orbProvider.kind === 'orb' ? { maxWorkers: orbCap } : {}),
-            confinement: availability.report,
-          },
+          orbProvider.kind === 'orb' ? { maxWorkers: orbCap } : undefined,
         );
         backoff = backoffBase;
       } catch (err) {
@@ -1774,10 +1700,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   async function stop(cause?: string): Promise<void> {
     if (stopping) return;
     stopping = true;
-    resumeClaims?.();
     logger.machine(`Shutting down…${cause ? ` (${cause})` : ''}`);
     clearInterval(presenceTimer);
-    clearInterval(confinementTimer);
     clearInterval(strandedTimer);
     clearInterval(orphanTimer);
     orbCleanupStopped = true;
@@ -1791,10 +1715,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     installStop.abort();
     void screens.close();
     caffeinate?.kill();
-    await Promise.race([
-      availability?.settled(),
-      waitTimeout(CONFINEMENT_STOP_WAIT_MS, undefined, { ref: false }),
-    ]);
     await Promise.allSettled([...pendingInstalls]);
     await presenceReporter.close();
     if (connectionId !== null && client.offline) {
@@ -1813,6 +1733,5 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     machineId,
     stop,
     done,
-    recheckConfinement,
   };
 }

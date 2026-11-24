@@ -17,7 +17,6 @@ import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
   bootRealServer,
-  CONFINEMENT_READY_LAUNCH,
   daemonLogLines,
   type RealServer,
   seedWorld,
@@ -100,8 +99,6 @@ beforeAll(async () => {
       machineName: config.name,
       gateRules: [{ id: 'deny-echo', tool: 'mcp__demo__echo', action: 'reject' }],
     }),
-
-    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(() => logLines().includes('[wake] push channel connected'), 30_000);
 }, 120_000);

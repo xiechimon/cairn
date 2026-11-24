@@ -16,7 +16,6 @@ import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
 import {
   api,
   bootRealServer,
-  CONFINEMENT_READY_LAUNCH,
   daemonLogLines,
   type RealServer,
   seedWorld,
@@ -98,7 +97,6 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
-    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(
     () => daemonLogLines(paths.daemonLog).some((l) => l.includes('[wake] push channel connected')),

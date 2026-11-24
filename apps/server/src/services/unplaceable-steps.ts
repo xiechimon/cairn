@@ -14,12 +14,7 @@ import { stepQueueProjector } from './step-queue.js';
 
 export const NO_MACHINE_ALERT_MS = 10 * 60_000;
 
-type NoMachineReason =
-  | 'capability-missing'
-  | 'sandbox-unavailable'
-  | 'machine-retired'
-  | 'runner-cannot-run'
-  | 'no-runner';
+type NoMachineReason = 'capability-missing' | 'machine-retired' | 'runner-cannot-run' | 'no-runner';
 
 export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowMs()): number {
   const rows = deps.db
@@ -58,17 +53,14 @@ export function sweepUnplaceableSteps(deps: NotificationDeps, now: number = nowM
     const reason: NoMachineReason =
       queue.blocked.kind === 'capability-missing'
         ? 'capability-missing'
-        : queue.blocked.kind === 'sandbox-unavailable' && runnerName !== null
-          ? 'sandbox-unavailable'
-          : queue.blocked.kind === 'machine-retired'
-            ? 'machine-retired'
-            : preferredName !== null
-              ? 'runner-cannot-run'
-              : 'no-runner';
+        : queue.blocked.kind === 'machine-retired'
+          ? 'machine-retired'
+          : preferredName !== null
+            ? 'runner-cannot-run'
+            : 'no-runner';
     const waitedFor = `步骤已等 ${minutes} 分钟`;
     const snippet = {
       'capability-missing': `没有在线执行机满足要求（缺 ${queue.blocked.missing.join('、')}），${waitedFor}`,
-      'sandbox-unavailable': `${runnerName} 的任务沙箱未就绪，无法接收任务（原因和修法见执行机页），${waitedFor}`,
       'machine-retired': `${runnerName ?? '这一步绑定的执行机'} 已删除或注销，这一步不会改派：重新注册这台执行机，或在工作路由里改派，${waitedFor}`,
       'runner-cannot-run': `${preferredName} 无法运行这一步，不会改派到其他执行机，${waitedFor}`,
       'no-runner': `没有可运行这一步的在线执行机，${waitedFor}`,

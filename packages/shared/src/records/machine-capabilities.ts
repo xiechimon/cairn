@@ -50,55 +50,6 @@ const codexLoginSchema = z.object({
   expiresAt: z.number().int().nonnegative().optional(),
 });
 
-export const confinementIdentitySchema = z.object({
-  invocation: z.uuid(),
-  generation: z.number().int().positive(),
-});
-export const confinementReportSchema = z.discriminatedUnion('state', [
-  confinementIdentitySchema
-    .extend({
-      state: z.enum(['checking', 'ready', 'not-applicable']),
-      revision: z.number().int().positive(),
-    })
-    .strict(),
-  confinementIdentitySchema
-    .extend({
-      state: z.literal('unavailable'),
-      revision: z.number().int().positive(),
-      reason: z.enum(['startup-failed', 'cleanup-failed', 'unsupported-platform']),
-    })
-    .strict(),
-]);
-export type ConfinementReport = z.infer<typeof confinementReportSchema>;
-
-export const confinementCauseSchema = z
-  .object({
-    kind: z.enum([
-      'not-own-unit',
-      'bwrap-missing',
-      'bwrap-too-old',
-      'userns-denied',
-      'home-overlay-failed',
-      'seatbelt-missing',
-      'seatbelt-probe-failed',
-    ]),
-    mountPoint: z.string().startsWith('/').max(4096).optional(),
-  })
-  .strict();
-export type ConfinementCause = z.infer<typeof confinementCauseSchema>;
-
-export function confinementEnforced(osPlatform: string | undefined): boolean {
-  return osPlatform === 'linux' || osPlatform === 'darwin';
-}
-
-export function confinementDispatchReady(
-  capabilities: MachineCapabilities | null | undefined,
-): boolean {
-  return (
-    !confinementEnforced(capabilities?.osPlatform) || capabilities?.confinement?.state === 'ready'
-  );
-}
-
 const machineOsPlatformSchema = z.enum(['linux', 'darwin', 'windows', 'other']);
 export type MachineOsPlatform = z.infer<typeof machineOsPlatformSchema>;
 
@@ -256,8 +207,6 @@ export const machineCapabilitiesSchema = z.object({
   antigravity: antigravityReportSchema.optional(),
   antigravityOAuthProfile: z.literal(true).optional(),
   antigravitySubscriptionModels: z.literal(true).optional(),
-  confinement: confinementReportSchema.optional(),
-  confinementCause: confinementCauseSchema.optional().catch(undefined),
   agentReach: agentReachReportSchema.optional(),
   scrapling: z.object({ version: z.string().min(1).max(32) }).optional(),
   hostPermissions: hostPermissionsSchema.optional(),
@@ -280,8 +229,6 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
   const osDistribution = machineCapabilitiesSchema.shape.osDistribution.safeParse(
     rec.osDistribution,
   );
-  const confinement = confinementReportSchema.safeParse(rec.confinement);
-  const confinementCause = confinementCauseSchema.safeParse(rec.confinementCause);
   const hardware = machineHardwareSchema.safeParse(rec.hardware);
   const executor = machineExecutorSchema.safeParse(rec.executor);
   const codexLogin = codexLoginSchema.safeParse(rec.codexLogin);
@@ -307,8 +254,6 @@ export function parseReportedCapabilities(raw: unknown): MachineCapabilities | u
     ...(reportedHostname.success && reportedHostname.data !== undefined
       ? { hostname: reportedHostname.data }
       : {}),
-    ...(confinement.success ? { confinement: confinement.data } : {}),
-    ...(confinementCause.success ? { confinementCause: confinementCause.data } : {}),
     ...(codexLogin.success ? { codexLogin: codexLogin.data } : {}),
     ...(devin.success ? { devin: devin.data } : {}),
     ...(gemini.success ? { gemini: gemini.data } : {}),
@@ -365,7 +310,6 @@ export const stepQueueBlockedSchema = z.object({
     'machine-offline',
     'machine-retired',
     'capability-missing',
-    'sandbox-unavailable',
     'runtime-disabled',
     'model-unavailable',
     'local-path',

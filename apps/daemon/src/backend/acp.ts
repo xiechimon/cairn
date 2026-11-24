@@ -53,8 +53,6 @@ import {
 } from './acp-permission-gate.js';
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
 import type { PermissionRule } from './command-gate.js';
-import { SANDBOX_EXEC } from './confine-seatbelt.js';
-import { type SessionConfiner } from './confine-session.js';
 
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -568,7 +566,6 @@ export interface GeminiBackendOptions {
   executablePath?: string;
   executableArgs?: readonly string[];
   resolveLaunch?: () => AcpResolvedLaunch | null;
-  confine?: SessionConfiner;
   permissions?: 'deny' | 'allow-once';
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
@@ -696,17 +693,12 @@ class AcpBackend implements AgentBackend {
     const releaseRuntime = adapter?.acquireRuntime?.();
     let child: ReturnType<NonNullable<GeminiBackendOptions['spawnProcess']>>;
     try {
-      const launch = {
-        command,
-        args:
-          resolvedLaunch !== null
-            ? [...resolvedLaunch.args]
-            : adapter
-              ? (adapter.args ?? [])
-              : [...(this.options.executableArgs ?? ['--acp'])],
-      };
-      const confined =
-        this.options.confine?.(opts, adapter ? adapter.harness : 'gemini', launch) ?? launch;
+      const args =
+        resolvedLaunch !== null
+          ? [...resolvedLaunch.args]
+          : adapter
+            ? (adapter.args ?? [])
+            : [...(this.options.executableArgs ?? ['--acp'])];
       const sessionEnv: NodeJS.ProcessEnv = { ...opts.env };
       const geminiHome = sessionEnv.GEMINI_CLI_HOME;
       if (!adapter && opts.compactAt !== undefined && geminiHome !== undefined) {
@@ -725,14 +717,7 @@ class AcpBackend implements AgentBackend {
         sessionEnv.AGY_CLI_DISABLE_AUTO_UPDATE = '1';
       }
       const env = runtimeChildEnv(sessionEnv);
-      if (
-        adapter?.harness === 'antigravity' &&
-        confined.command === SANDBOX_EXEC &&
-        (env.SSL_CERT_FILE === undefined || env.SSL_CERT_FILE === '')
-      ) {
-        env.SSL_CERT_FILE = '/etc/ssl/cert.pem';
-      }
-      child = spawnProcess(confined.command, confined.args, {
+      child = spawnProcess(command, args, {
         cwd: opts.cwd,
         stdio: ['pipe', 'pipe', 'pipe'],
         ...(process.platform !== 'win32' ? { detached: true } : {}),
@@ -1092,7 +1077,6 @@ export interface AcpUpdateNormalization {
 }
 
 export interface AcpBackendOptions {
-  confine?: SessionConfiner;
   harness: 'claude-code' | 'devin' | 'antigravity';
   command: string;
   args?: string[];
@@ -1117,7 +1101,6 @@ export function createAcpBackend(options: AcpBackendOptions): AgentBackend {
   return new AcpBackend({
     adapter: options,
     ...(options.gate ? { gate: options.gate } : {}),
-    ...(options.confine ? { confine: options.confine } : {}),
     ...(options.spawnProcess ? { spawnProcess: options.spawnProcess } : {}),
   });
 }

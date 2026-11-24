@@ -14,7 +14,7 @@ A new Cairn user opens a task, follows a design link, or pairs a runner in their
 
 ## Threat model
 
-The boundary is between teams reached through Cairn's own interfaces: HTTP and WebSocket routes, paired devices, connectors, runner protocol messages, and data a job copies between rows. A process that runs on the server host as the installation owner's OS user (the desktop app's own runner, a host shell step) can already read the owner's files, including the database, and is outside this design; confining host processes is the job of the runner isolation work (`apps/daemon/src/backend/host-shell-confinement.ts`), not of scoped storage. A team that must not share the owner's data runs its steps on a machine it registers, never on the owner's host.
+The boundary is between teams reached through Cairn's own interfaces: HTTP and WebSocket routes, paired devices, connectors, runner protocol messages, and data a job copies between rows. A process that runs on the server host as the installation owner's OS user (the desktop app's own runner, a host shell step) can already read the owner's files, including the database, and is outside this design. A team that must not share the owner's data runs its steps on a machine it registers, never on the owner's host.
 
 ## Evidence and decision
 

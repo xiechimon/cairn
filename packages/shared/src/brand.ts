@@ -68,7 +68,6 @@ export const ENV_VARS = {
   piCacheRetention: 'CAIRN_PI_CACHE_RETENTION',
   hookTimeoutMs: 'CAIRN_HOOK_TIMEOUT_MS',
   coordinatorInServer: 'CAIRN_COORDINATOR_IN_SERVER',
-  confinementPlatform: 'CAIRN_CONFINEMENT_PLATFORM',
   confineDeniedRoots: 'CAIRN_CONFINE_DENIED_ROOTS',
   claudeBin: 'CAIRN_CLAUDE_BIN',
   agentImportHome: 'CAIRN_AGENT_IMPORT_HOME',

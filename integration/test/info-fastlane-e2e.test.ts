@@ -10,14 +10,7 @@ import { build as buildTable, todo as todoTable } from '../../apps/server/src/db
 import { systemGitOps } from '../../apps/server/src/lib/git.js';
 import { storeInfoReport } from '../../apps/server/src/services/info-handoff.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import {
-  api,
-  bootRealServer,
-  CONFINEMENT_READY_LAUNCH,
-  daemonLogLines,
-  type RealServer,
-  waitFor,
-} from './helpers.js';
+import { api, bootRealServer, daemonLogLines, type RealServer, waitFor } from './helpers.js';
 import { type StubLlm, startStubLlm } from './stub-llm.js';
 
 const REPORT_MARK = 'INFO-REPORT-1626: 结论是登录走 OAuth';
@@ -79,8 +72,6 @@ beforeAll(async () => {
     proxyEnv: {},
     claimBackoffBaseMs: 50,
     heartbeatIntervalMs: 500,
-
-    confinementPreflight: CONFINEMENT_READY_LAUNCH,
   });
   await waitFor(
     () => daemonLogLines(paths.daemonLog).includes('[wake] push channel connected'),

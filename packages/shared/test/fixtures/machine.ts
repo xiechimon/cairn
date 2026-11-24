@@ -12,12 +12,6 @@ export function readyMachine<T extends object>(machine: T) {
         : {
             mcpServers: [],
             skills: [],
-            confinement: {
-              state: 'ready' as const,
-              invocation: '11111111-1111-4111-8111-111111111111',
-              generation: 1,
-              revision: 1,
-            },
             ...capabilities,
           },
   };

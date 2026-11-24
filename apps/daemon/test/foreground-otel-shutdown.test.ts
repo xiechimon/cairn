@@ -62,7 +62,6 @@ test.each(['normal', 'control-stream', 'SIGTERM', 'SIGINT', 'failure'] as const)
       machineId: 'synthetic',
       done,
       stop,
-      recheckConfinement: vi.fn(),
     });
     let completed = false;
     const termListeners = process.listeners('SIGTERM');

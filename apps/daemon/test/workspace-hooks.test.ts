@@ -1,8 +1,7 @@
-import { chmodSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test, vi } from 'vitest';
-import { createSessionConfiner } from '../src/backend/confine-session.js';
 import { ensureDaemonShellEnv } from '../src/shell-env.js';
 import { prependFailedSetupHookContext } from '../src/step-prompt.js';
 import {
@@ -237,54 +236,6 @@ describe('workspace hook primitive (#1149)', () => {
     expect(note!.output).toContain('probe=\n');
     expect(note!.output).not.toContain('probe=kept');
   });
-
-  test.runIf(process.platform === 'darwin')(
-    'a confined setup hook cannot read a denied path but keeps its workspace',
-    async () => {
-      const root = realpathSync(tmpRoot());
-      const home = join(root, 'user');
-      const runnerHome = join(root, 'runner');
-      const serverHome = join(root, 'server');
-      const worktree = join(runnerHome, 'workspaces', 'a');
-      for (const path of [home, serverHome, worktree, join(root, 'tmp', 'T')])
-        mkdirSync(path, { recursive: true });
-      writeFileSync(join(serverHome, 'token'), 'owner-secret');
-      writeHook(
-        worktree,
-        'setup',
-        '#!/bin/sh\n' +
-          `cat '${join(serverHome, 'token')}' || echo "denied=$?"\n` +
-          'echo built > "$PWD/hook-built"\n',
-      );
-      const confine = createSessionConfiner({
-        daemonHome: runnerHome,
-        extraDeniedRoots: [serverHome],
-        readable: [],
-        handoffDirectories: [],
-        serverUrl: 'http://127.0.0.1:1',
-        platform: 'darwin',
-        home,
-        environment: {
-          TMPDIR: join(root, 'tmp', 'T'),
-        },
-      });
-      const note = await runWorkspaceHook({
-        cwd: worktree,
-        name: 'setup',
-        credentials: null,
-        env: {
-          TMPDIR: join(root, 'tmp', 'T'),
-        },
-        confine: confine ?? undefined,
-        timeoutMs: 30_000,
-        log: () => {},
-      });
-      expect(note!.output).toContain('denied=1');
-      expect(note!.output).not.toContain('owner-secret');
-      expect(readFileSync(join(worktree, 'hook-built'), 'utf8')).toBe('built\n');
-    },
-    40_000,
-  );
 
   test('the resume name runs the same (the primitive is name-agnostic)', async () => {
     const root = tmpRoot();

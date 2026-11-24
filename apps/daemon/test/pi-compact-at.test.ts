@@ -1,4 +1,3 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ProviderConfig, SessionOpts } from '@cairn/shared';
 import { COORDINATOR_COMPACT_AT } from '@cairn/shared';
@@ -8,13 +7,7 @@ import {
   shouldCompact,
 } from '@earendil-works/pi-coding-agent';
 import { expect, test, vi } from 'vitest';
-import { createPiBackend, daemonSettingsManager, piHostLaunch } from '../src/backend/pi.js';
-import { openPiHostSession } from '../src/backend/pi-host-client.js';
-import {
-  PI_HOST_PROTOCOL_VERSION,
-  parentFrameSchema,
-  parseFrame,
-} from '../src/backend/pi-host-protocol.js';
+import { createPiBackend, daemonSettingsManager } from '../src/backend/pi.js';
 import { testTempDir } from './test-temp-dir.js';
 
 vi.mock('@earendil-works/pi-coding-agent', async (importOriginal) => {
@@ -259,61 +252,4 @@ test('a worker session without compactAt keeps origin/main compaction settings',
   } finally {
     await handle.stop();
   }
-});
-
-test('compactAt survives the real host frame parsing into the session options', async () => {
-  const directory = testTempDir('pi-compact-at-host-');
-  const probe = join(directory, 'probe', 'frame.json');
-  const hostScript = join(directory, 'host.mjs');
-  mkdirSync(join(directory, 'agent'), { recursive: true });
-  mkdirSync(join(directory, 'sessions'), { recursive: true });
-  mkdirSync(join(directory, 'probe'), { recursive: true });
-  writeFileSync(
-    hostScript,
-    [
-      `import { writeFileSync } from 'node:fs';`,
-      `import { join } from 'node:path';`,
-      `let buffer = '';`,
-      `const send = (frame) => process.stdout.write(JSON.stringify(frame) + '\\n');`,
-      `process.stdin.on('data', (data) => {`,
-      `  buffer += data;`,
-      `  let index;`,
-      `  while ((index = buffer.indexOf('\\n')) !== -1) {`,
-      `    const line = buffer.slice(0, index);`,
-      `    const frame = JSON.parse(line);`,
-      `    buffer = buffer.slice(index + 1);`,
-      `    if (frame.t === 'initialize') {`,
-      `      const file = join(frame.sessionDir, 'session.jsonl');`,
-      `      writeFileSync(file, '');`,
-      `      writeFileSync(${JSON.stringify(probe)}, line);`,
-      `      send({ t: 'ready', v: ${PI_HOST_PROTOCOL_VERSION}, sessionId: 'sid', sessionFile: file });`,
-      `      send({ t: 'ended' });`,
-      `    }`,
-      `  }`,
-      `});`,
-      `process.stdin.on('end', () => process.exit(0));`,
-    ].join('\n'),
-  );
-  const handle = await openPiHostSession({
-    backend: {
-      agentDir: join(directory, 'agent'),
-      sessionDir: join(directory, 'sessions'),
-    },
-    confine: (_opts, _harness, launch) => launch,
-    launch: piHostLaunch(hostScript),
-    opts: sessionOpts(
-      directory,
-      listedProvider('synthetic', [
-        { id: 'synthetic', name: 'Synthetic', contextWindow: 1_000_000, maxTokens: 16_384 },
-      ]),
-      'synthetic',
-      COORDINATOR_COMPACT_AT,
-    ),
-    resumeFile: null,
-  });
-  await handle.stop();
-  const frame = parseFrame(readFileSync(probe, 'utf8'), parentFrameSchema);
-  if (frame.t !== 'initialize') throw new Error('expected an initialize frame');
-  const childOptions = { ...frame.session };
-  expect(childOptions.compactAt).toBe(COORDINATOR_COMPACT_AT);
 });

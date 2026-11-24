@@ -15,7 +15,7 @@ import {
 } from '../../apps/daemon/src/state.js';
 import { machine, step } from '../../apps/server/src/db/schema.js';
 import { makeTestTempDir } from '../../scripts/test-tmpdir.mjs';
-import { api, bootRealServer, CONFINEMENT_READY_LAUNCH, seedWorld, waitFor } from './helpers.js';
+import { api, bootRealServer, seedWorld, waitFor } from './helpers.js';
 import { startStubLlm } from './stub-llm.js';
 
 test('two real runners keep named tasks, workspaces and results isolated across an offline restart', async () => {
@@ -105,7 +105,6 @@ test('two real runners keep named tasks, workspaces and results isolated across 
       heartbeatIntervalMs: 200,
       presenceIntervalMs: 500,
       claimBackoffBaseMs: 50,
-      confinementPreflight: CONFINEMENT_READY_LAUNCH,
     });
     runners.push(handle);
     return { handle, paths };

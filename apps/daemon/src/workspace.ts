@@ -36,7 +36,6 @@ import {
   type WorktreeOps,
   type WorktreePrepareInput,
 } from '@cairn/shared';
-import type { SessionConfiner } from './backend/confine-session.js';
 import {
   GIT_NET_RETRY_DELAYS_MS,
   gitPrim,
@@ -110,7 +109,6 @@ export interface WorkspaceManagerOpts {
   orphanTtlMs?: number;
   hookTimeoutMs?: number;
   seedRoot?: string;
-  confine?: SessionConfiner;
 }
 
 export class WorkspaceManager implements WorktreeOps {
@@ -119,12 +117,10 @@ export class WorkspaceManager implements WorktreeOps {
   private readonly orphanTtlMs: number;
   private readonly hookTimeoutMs: number;
   private readonly seedRoot: string | undefined;
-  private readonly confine: SessionConfiner | undefined;
 
   constructor(opts: WorkspaceManagerOpts) {
     this.logger = opts.logger;
     this.seedRoot = opts.seedRoot;
-    this.confine = opts.confine;
     this.orphanTtlMs = opts.orphanTtlMs ?? ORPHAN_WORKTREE_TTL_MS;
     this.hookTimeoutMs = opts.hookTimeoutMs ?? WORKSPACE_HOOK_TIMEOUT_MS;
   }
@@ -385,7 +381,6 @@ export class WorkspaceManager implements WorktreeOps {
           name,
           credentials,
           env,
-          confine: this.confine,
           timeoutMs: this.hookTimeoutMs,
           log: (line) => this.logger.workspace(line),
         }),
@@ -522,7 +517,6 @@ export class WorkspaceManager implements WorktreeOps {
           name: 'setup',
           credentials,
           env,
-          confine: this.confine,
           timeoutMs: this.hookTimeoutMs,
           log: (line) => this.logger.workspace(line),
         }),

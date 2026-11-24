@@ -29,8 +29,7 @@ Credentials are links, not copies. A refresh by the user's own CLI rewrites the 
 
 - `assembleStepEnv` (`step-env.ts`): sets the variables above; an Orb guest (`CAIRN_ORB=1`) keeps its image config, whose Claude `settings.json` the nested sandbox needs.
 - `sdkTranscriptPath` and its callers (`continueSession`, the session handles, the TUI engine): read `CLAUDE_CONFIG_DIR` from the session env merged over `process.env`, so resume and upload follow the directory the session used.
-- `createSessionConfiner` (macOS Seatbelt): opens the isolated home and the linked credential files as state. An Antigravity API-key step gets no keyring token files.
-- `prepareAntigravityHome` / `prepareGeminiHome` (`agent-config.ts`) run unconfined on a directory the previous step could write. They never follow what that step left there: every directory on a credential path must be a real directory (anything else is removed and recreated), a non-link at a credential path is removed before relinking, and `settings.json` is written fresh from the user's file without reading the Cairn copy, so keys an agent added do not persist into later steps.
+- `prepareAntigravityHome` / `prepareGeminiHome` (`agent-config.ts`) prepare the isolated harness home before each step: every directory on a credential path must be a real directory (anything else is removed and recreated), a non-link at a credential path is removed before relinking, and `settings.json` is written fresh from the user's file without reading the Cairn copy, so keys an agent added do not persist into later steps.
 - The desktop app no longer sets `CLAUDE_CONFIG_DIR` for the Runner; the daemon derives `<home>/claude` per step.
 
 ## Failures
@@ -40,4 +39,4 @@ Credentials are links, not copies. A refresh by the user's own CLI rewrites the 
 
 ## Tests
 
-`apps/daemon/test/step-env.test.ts` (per-harness env, links follow a refresh, re-link after replacement, removal on sign-out), `apps/daemon/test/confine-session.test.ts` (Seatbelt state for the isolated Antigravity home and API-key mode), planted-link regression in `step-env.test.ts`.
+`apps/daemon/test/step-env.test.ts` (per-harness env, links follow a refresh, re-link after replacement, removal on sign-out, planted-link regression).

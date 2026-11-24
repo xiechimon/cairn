@@ -4,8 +4,6 @@ import {
   type ChiefReportContent,
   type ChiefTurnErrorContent,
   type ClaudeLogin,
-  type ConfinementCause,
-  type ConfinementReport,
   type DailyUsage,
   type GithubRepoSummary,
   type MachineExecutor,
@@ -318,8 +316,6 @@ export interface MachineRow {
     hardware?: MachineHardware;
     executor?: MachineExecutor;
     osPlatform?: MachineOsPlatform;
-    confinement?: ConfinementReport;
-    confinementCause?: ConfinementCause;
     computer?: true;
     ownComputer?: true;
     ownComputerShell?: true;

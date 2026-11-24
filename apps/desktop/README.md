@@ -47,15 +47,11 @@ tar -xzf apps/desktop/release/Cairn-0.0.0-linux-x64.tar.gz -C "$HOME/.local/opt/
 "$HOME/.local/opt/cairn/cairn"
 ```
 
-The archive bundles Electron, the server and Runner, so running it does not require Node.js. It needs a graphical Linux session, bubblewrap 0.11 or newer and a working systemd user session for task confinement, as described in `docs/getting-started.md`. It chooses a free loopback port and keeps its data under `$XDG_CONFIG_HOME/@cairn/desktop` (normally `~/.config/@cairn/desktop`). Use an independent `HOME` and `XDG_CONFIG_HOME` to test without importing existing model logins or app data. This command never publishes a release. Quit Cairn to stop its server and Runner.
-
-Extract the app outside `/tmp`, which the task sandbox deliberately hides. A source checkout and build output may still live in `/tmp`.
+The archive bundles Electron, the server and Runner, so running it does not require Node.js. It needs a graphical Linux session. It chooses a free loopback port and keeps its data under `$XDG_CONFIG_HOME/@cairn/desktop` (normally `~/.config/@cairn/desktop`). Use an independent `HOME` and `XDG_CONFIG_HOME` to test without importing existing model logins or app data. This command never publishes a release. Quit Cairn to stop its server and Runner.
 
 The bundled Runner includes pi. In **Connect models → OpenAI Codex**, follow the browser device-login prompt; no separate Codex CLI or pi install is needed. With only Codex connected on fresh data, **Confirm settings** shows GPT-6.1 Sol for Coordinator and Tasks, with pi executing tasks. Confirm, then create a local Git project and ask for a small change. See [the first-result steps](../../README.md#connect-a-model-and-get-your-first-result). Claude Code is optional and needs its own installed CLI plus a subscription token connected in Model services. Devin is downloaded only for an enabled, unexpired Devin subscription.
 
-On Linux the app runs the Runner in its own transient systemd user service and stops that service when the Runner is turned off or the app quits. It does not fall back to an unsandboxed Runner. See `docs/design/desktop-linux-runner.md` for ownership and failure behavior.
-
-Run `pnpm --filter @cairn/desktop smoke:linux /absolute/path/to/cairn-linux/cairn /absolute/path/to/smoke.png` to check an extracted archive. The single-process Playwright check creates a fresh HOME and app data directory, checks owner sign-in and the pi Runner's actual sandbox readiness, quits the app, checks that the server and Runner stopped, and removes its temporary data. It does not log in to a model or claim a first task result.
+Run `pnpm --filter @cairn/desktop smoke:linux /absolute/path/to/cairn-linux/cairn /absolute/path/to/smoke.png` to check an extracted archive. The single-process Playwright check creates a fresh HOME and app data directory, checks owner sign-in and that the Runner comes online, quits the app, checks that the server and Runner stopped, and removes its temporary data. It does not log in to a model or claim a first task result.
 
 ## Releases
 

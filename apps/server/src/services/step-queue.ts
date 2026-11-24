@@ -1,6 +1,5 @@
 import {
   type ChiefThread,
-  confinementDispatchReady,
   isBuildStepKind,
   isChiefSideThreadId,
   isInfoOutput,
@@ -51,8 +50,6 @@ function ineligibleBlocked(gap: MachineIneligibility, runtime: string): StepQueu
   switch (gap.kind) {
     case 'capability':
       return { kind: 'capability-missing', missing: gap.missing };
-    case 'confinement':
-      return { kind: 'sandbox-unavailable', missing: [] };
     case 'runtime':
       return { kind: 'runtime-disabled', missing: [runtime] };
     case 'model':
@@ -341,9 +338,6 @@ export function stepQueueProjector(db: Db, teamId: string) {
           ...extra,
         };
       }
-    }
-    if (!confinementDispatchReady(home.capabilities)) {
-      return { blocked: { kind: 'sandbox-unavailable', missing: [] }, waitingOn, ...extra };
     }
     return { blocked: undefined, waitingOn, ...extra };
   }
