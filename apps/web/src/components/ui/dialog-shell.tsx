@@ -184,6 +184,18 @@ export function DialogShell({
             initialFocus={initialFocus}
             finalFocus={restore}
             data-shell-id={shellId}
+            onKeyDown={(event) => {
+              if (
+                event.key === 'ArrowUp' ||
+                event.key === 'ArrowDown' ||
+                event.key === 'ArrowLeft' ||
+                event.key === 'ArrowRight' ||
+                event.key === 'Home' ||
+                event.key === 'End'
+              ) {
+                event.preventBaseUIHandler();
+              }
+            }}
             className={
               viewportRoot
                 ? `${VIEWPORT_MECHANISM_CLS} group/dlgvp${className != null ? ` ${className}` : ''}`

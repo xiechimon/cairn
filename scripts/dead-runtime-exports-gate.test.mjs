@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import test from 'node:test';
 import { scanDeadRuntimeExports } from './dead-runtime-exports-gate.mjs';
+import { makeTestTempDir, releaseTestTempDir } from './test-tmpdir.mjs';
 
 function makeRepo(files) {
-  const dir = mkdtempSync(join(tmpdir(), 'cairn-dead-exports-'));
+  const dir = makeTestTempDir('dead-exports-');
   for (const [rel, content] of Object.entries(files)) {
     const full = join(dir, rel);
     mkdirSync(join(full, '..'), { recursive: true });
@@ -39,7 +39,7 @@ test('flags zero-caller runtime exports and ignores used exports, types, ui regi
     );
     assert.deepEqual(result.stale, []);
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    releaseTestTempDir(dir);
   }
 });
 
@@ -64,6 +64,6 @@ test('honors valid allowlist entries and rejects stale allowlist entries', () =>
       ['apps/server/src/a.ts:nowUsed', 'apps/server/src/gone.ts:deleted'],
     );
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    releaseTestTempDir(dir);
   }
 });

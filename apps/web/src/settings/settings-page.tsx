@@ -331,7 +331,7 @@ export function SettingsDialog({
       className={
         tabs
           ? 'inset-0! top-0! left-0! max-h-none! translate-x-0! translate-y-0! animate-none! rounded-none! pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] text-foreground shadow-none! duration-0!'
-          : 'rounded-(--radius-sheet)! text-foreground shadow-(--e3)!'
+          : 'animate-none! rounded-(--radius-sheet)! text-foreground shadow-(--e3)! duration-0!'
       }
       onBackdropClick={onClose}
       onClose={(details) => {
