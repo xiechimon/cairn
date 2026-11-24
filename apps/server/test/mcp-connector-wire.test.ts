@@ -346,7 +346,9 @@ describe('MCP connectors for the Coordinator on a Runner', () => {
     expect(s.db.select().from(stepTable).where(eq(stepTable.id, 's1')).get()?.mcpGrant).toEqual([
       'files',
     ]);
-    expect((await stepToken(deps, machineId, 's1', claimed?.step.generation)).mcpConnectors).toBeUndefined();
+    expect(
+      (await stepToken(deps, machineId, 's1', claimed?.step.generation)).mcpConnectors,
+    ).toBeUndefined();
   });
 
   test('skips connector hydration for locked mail-provenance chief turns', async () => {
