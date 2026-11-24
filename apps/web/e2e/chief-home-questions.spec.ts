@@ -323,6 +323,51 @@ for (const size of [
   });
 }
 
+for (const size of [
+  { name: '1440 desktop', width: 1440, height: 900 },
+  { name: '390px phone', width: 390, height: 844 },
+]) {
+  test(`the option list stops above the card's bottom edge, and scrolled to the end the last option and the answer row sit whole inside it (${size.name})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await mockLive(page, structuredClone(LONG));
+    await page.goto('/app?chief=chief-home');
+    const question = page.getByTestId('home-c').getByTestId('chief-question');
+    await expect(question).toBeVisible();
+    const list = question.locator('fieldset');
+    const inset = () =>
+      question.evaluate((dock) =>
+        Math.round(dock.getBoundingClientRect().bottom - dock.querySelector('fieldset')!.getBoundingClientRect().bottom),
+      );
+    expect(await inset()).toBeGreaterThanOrEqual(8);
+    await list.evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
+    const geometry = await question.evaluate((dock) => {
+      const list = dock.querySelector('fieldset')!;
+      const rows = [...list.querySelectorAll('[data-dock-row]')].map(
+        (row) => (row.closest('[data-dock-row], div') as HTMLElement).getBoundingClientRect(),
+      );
+      const view = list.getBoundingClientRect();
+      const card = dock.getBoundingClientRect();
+      const last = rows.at(-1)!;
+      const lastOption = rows.at(-2)!;
+      return {
+        atEnd: Math.ceil(list.scrollTop + list.clientHeight) >= list.scrollHeight,
+        lastOptionWhole: lastOption.top >= view.top - 0.5 && lastOption.bottom <= view.bottom + 0.5,
+        answerRowWhole: last.top >= view.top - 0.5 && last.bottom <= view.bottom + 0.5,
+        bottomPadding: Math.round(card.bottom - last.bottom),
+      };
+    });
+    expect(geometry.atEnd).toBe(true);
+    expect(geometry.lastOptionWhole).toBe(true);
+    expect(geometry.answerRowWhole).toBe(true);
+    expect(geometry.bottomPadding).toBeGreaterThanOrEqual(8);
+    expect(await inset()).toBeGreaterThanOrEqual(8);
+  });
+}
+
 const MIXED = {
   threads: [THREAD],
   messages: [

@@ -497,7 +497,7 @@ export function DecisionDock({
       <fieldset
         ref={listRef}
         aria-labelledby={headId}
-        className="m-0 min-h-0 min-w-0 flex-[0_1_auto] border-0 overflow-y-auto overscroll-contain px-2 pt-1 pb-2 [scrollbar-width:thin]"
+        className="m-0 mb-2 min-h-0 min-w-0 flex-[0_1_auto] border-0 overflow-y-auto overscroll-contain px-2 pt-1 pb-1 [scrollbar-width:thin]"
       >
         {question.options.map((option, oi) => {
           const description =
