@@ -99,7 +99,7 @@ async function runExportTurn(
       skills: [],
       computer: true,
       browser: true,
-      computerKind: 'vm',
+      computerKind: 'host',
     },
   });
   createProvider(

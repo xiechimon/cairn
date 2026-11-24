@@ -1,10 +1,5 @@
 [
   {
-    "path": "apps/daemon/src/backend/command-gate.ts",
-    "name": "splitBashSegments",
-    "reason": "Security surface deferred for dedicated security-review pass."
-  },
-  {
     "path": "apps/server/src/db/schema.ts",
     "name": "memoryCandidate",
     "reason": "Drizzle schema table retained to avoid schema migration drift."

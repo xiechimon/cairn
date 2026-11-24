@@ -109,9 +109,8 @@ describe('childEnv', () => {
     expect(env.GOPATH).toBe('/home/daemon/go');
     expect(env.CARGO_HOME).toBe('/home/daemon/.cargo');
     expect(env.PYENV_ROOT).toBe('/home/daemon/.pyenv');
-    for (const key of Object.keys(DAEMON_CREDENTIALS)) expect(env[key]).toBeUndefined();
+    for (const key of Object.keys(CAIRN_INTERNAL_ENV)) expect(env[key]).toBeUndefined();
   });
-
 });
 
 describe('runtimeChildEnv', () => {

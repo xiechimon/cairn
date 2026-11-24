@@ -1039,7 +1039,6 @@ describe('antigravity upstream models', () => {
     'sole-runner-without-provider-route',
     'wrong-runner',
     'retired',
-    'confinement',
     'capability',
   ] as const)(
     'returns fallback without dispatching to a %s runner or subscription',
@@ -1081,20 +1080,6 @@ describe('antigravity upstream models', () => {
         s.db
           .update(machineTable)
           .set({ retiredAt: 1 })
-          .where(eq(machineTable.id, runner.machineId))
-          .run();
-      }
-      if (refusal === 'confinement') {
-        const row = s.db
-          .select()
-          .from(machineTable)
-          .where(eq(machineTable.id, runner.machineId))
-          .get();
-        s.db
-          .update(machineTable)
-          .set({
-            capabilities: { ...row!.capabilities!, osPlatform: 'darwin', confinement: undefined },
-          })
           .where(eq(machineTable.id, runner.machineId))
           .run();
       }

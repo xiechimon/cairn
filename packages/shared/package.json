@@ -28,7 +28,6 @@
     "./parent-watch": "./src/node/parent-watch.ts",
     "./host-identity": "./src/node/host-identity.ts",
     "./realpath-nearest": "./src/node/realpath-nearest.ts",
-    "./yaml": "./src/yaml.ts",
     "./shell-env": "./src/node/shell-env.ts"
   },
   "scripts": {

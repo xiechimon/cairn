@@ -18,15 +18,6 @@ import { claudeConfigHome, runtimeHome } from './runtime-homes.js';
 export const ANTIGRAVITY_OAUTH_SHARED_HOME = 'antigravity-oauth';
 export const ANTIGRAVITY_OAUTH_PERSISTENT_DIRS = ['conversations', 'brain'] as const;
 
-export function antigravityOAuthPersistentDirs(cairnHome: string): string[] {
-  const acpDir = join(
-    runtimeHome(cairnHome, ANTIGRAVITY_OAUTH_SHARED_HOME),
-    '.gemini',
-    'antigravity-acp',
-  );
-  return ANTIGRAVITY_OAUTH_PERSISTENT_DIRS.map((name) => join(acpDir, name));
-}
-
 export const ANTIGRAVITY_CREDENTIAL_FILES = [
   '.gemini/antigravity-cli/antigravity-oauth-token',
   '.gemini/antigravity-acp/antigravity-oauth-token',

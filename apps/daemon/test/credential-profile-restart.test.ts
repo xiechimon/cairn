@@ -36,7 +36,7 @@ test.each(['current', 'legacy'] as const)(
     import { prepareStepEnv } from ${JSON.stringify(stepEnv)};
     import { processStartTime } from ${JSON.stringify(parentWatch)};
     const prepared = prepareStepEnv({
-      git: null, appCredential: null, readonlyGit: false, runtimeId: 'antigravity',
+      git: null, readonlyGit: false, runtimeId: 'antigravity',
       agentConfig: { cairnHome: process.argv[1] },
       antigravityToken: JSON.stringify({ kind: 'oauth-personal', token: 'ya29.fixture-oauth-credential', expiresAt: Date.now() + 60000 }),
     }, []);

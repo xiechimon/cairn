@@ -10928,6 +10928,7 @@ exports[`protocol vocabulary snapshot (02 §5/§6 canonical) > executor minimum-
     "apiKey": "CAIRN_API_KEY",
     "auth": "CAIRN_AUTH",
     "claudeBin": "CAIRN_CLAUDE_BIN",
+    "confineDeniedRoots": "CAIRN_CONFINE_DENIED_ROOTS",
     "coordinatorInServer": "CAIRN_COORDINATOR_IN_SERVER",
     "customModelReasoning": "CAIRN_CUSTOM_MODEL_REASONING",
     "githubCreateHourlyCap": "CAIRN_GITHUB_CREATE_HOURLY_CAP",

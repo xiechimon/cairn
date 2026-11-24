@@ -2859,8 +2859,6 @@ export const EN: Record<string, string> = {
     'Downloading and validating the new version in the background; running sessions are not interrupted.',
   '更新未能启动，请检查执行机连接后重试。':
     'Could not start the update. Check that a Runner is online and try again.',
-  '排队中：信息卡要在 Coordinator 的电脑里运行，团队暂无可用的电脑（需要 macOS 26 以上的 Apple 芯片 Mac，并开启 Linux 虚拟机）':
-    'Queued: info cards run on the Coordinator computer, and the team has no usable computer (it needs an Apple silicon Mac on macOS 26 or later with the Linux VM turned on)',
   立即重试: 'Retry now',
   '立即重试失败，请重试。': 'Could not retry now. Try again.',
   等待重试: 'Waiting to retry',

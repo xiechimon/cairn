@@ -313,7 +313,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
       const api = new FakeMachineApi();
       const { handle } = await boot({
         api,
-        confinementPlatform: 'win32',
+        platform: 'win32',
         antigravityManaged: {
           current: () => current,
           ensure: async () => current,

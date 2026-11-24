@@ -38,9 +38,10 @@ import {
   SESSION_FILE_NAME,
   transcriptUploadSchema,
 } from '@cairn/shared';
+import { eq } from 'drizzle-orm';
 import type { Context, Hono } from 'hono';
 import type { AppContext } from './context.js';
-import type { machine as machineTable } from './db/schema.js';
+import { type machine as machineTable, step } from './db/schema.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';

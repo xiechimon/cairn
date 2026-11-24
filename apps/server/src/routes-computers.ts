@@ -1,6 +1,7 @@
 import type { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { conditionalGet } from './lib/conditional-get.js';
+import { HttpError } from './lib/errors.js';
 import { ensureCoordinatorComputer, listComputers } from './services/computer-feed.js';
 import { computerStepShot, listComputerSteps } from './services/computer-steps.js';
 
