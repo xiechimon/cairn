@@ -7,6 +7,7 @@ import type {
   RelayAccount,
   RelayDirectoryDevice,
   RelayDirectoryResponse,
+  RelayOAuthStartResponse,
   TunnelAccess,
   TunnelErrorKind,
 } from '@cairn/shared';
@@ -23,6 +24,7 @@ interface TunnelRecord {
   relayUrl: string | null;
   secret: string;
   account: RelayAccount | null;
+  clerkToken?: string | null;
 }
 
 interface RelayRequestFrame {
@@ -39,7 +41,14 @@ export interface TunnelRemote {
   status(): TunnelAccess;
   resume(): Promise<TunnelAccess>;
   setEnabled(enabled: boolean, relayUrl?: string): Promise<TunnelAccess>;
-  signIn(input: { email: string; displayName?: string; relayUrl?: string }): Promise<TunnelAccess>;
+  startOAuthLogin(input: { callbackUrl: string; relayUrl?: string }): RelayOAuthStartResponse;
+  completeOAuthLogin(input: {
+    state: string;
+    token: string;
+    email: string;
+    displayName?: string;
+    avatarUrl?: string;
+  }): Promise<boolean>;
   signOut(): Promise<TunnelAccess>;
   directory(): Promise<RelayDirectoryResponse>;
   shareDevice(targetEmail: string, role?: 'owner' | 'collaborator'): Promise<void>;
@@ -95,7 +104,13 @@ function readRecord(path: string): TunnelRecord | null {
       rawAccount !== undefined &&
       typeof rawAccount.email === 'string' &&
       typeof rawAccount.displayName === 'string'
-        ? { email: rawAccount.email, displayName: rawAccount.displayName }
+        ? {
+            email: rawAccount.email,
+            displayName: rawAccount.displayName,
+            ...(typeof rawAccount.avatarUrl === 'string'
+              ? { avatarUrl: rawAccount.avatarUrl }
+              : {}),
+          }
         : null;
     return {
       enabled: raw.enabled,
@@ -105,6 +120,7 @@ function readRecord(path: string): TunnelRecord | null {
           ? raw.secret
           : randomBytes(24).toString('hex'),
       account,
+      clerkToken: typeof raw.clerkToken === 'string' ? raw.clerkToken : null,
     };
   } catch {
     return null;
@@ -124,6 +140,8 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
   let enabled = saved?.enabled ?? false;
   let relayUrl = saved?.relayUrl ?? normalizeRelayUrl(input.defaultRelayUrl);
   let account: RelayAccount | null = saved?.account ?? null;
+  let clerkToken: string | null = saved?.clerkToken ?? null;
+  const pendingOAuthStates = new Map<string, number>();
   const secret = saved?.secret ?? randomBytes(24).toString('hex');
   let state: TunnelAccess['state'] = 'off';
   let publicUrl: string | null = null;
@@ -145,7 +163,7 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
   });
 
   const persist = (): void => {
-    writeRecord(input.recordPath, { enabled, relayUrl, secret, account });
+    writeRecord(input.recordPath, { enabled, relayUrl, secret, account, clerkToken });
   };
 
   const clearReconnect = (): void => {
@@ -302,6 +320,7 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
             type: 'hello',
             subdomain,
             secret,
+            clerkToken,
             accountEmail: account?.email ?? null,
             deviceName: hostname(),
             os: process.platform,
@@ -412,24 +431,45 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
         reconnectAttempt = 0;
         return connectOnce();
       }),
-    signIn: (creds) =>
-      enqueue(async () => {
-        const email = creds.email.trim().toLowerCase();
-        const displayName = creds.displayName?.trim() || email.split('@', 1)[0] || email;
-        if (creds.relayUrl !== undefined) {
-          const parsed = normalizeRelayUrl(creds.relayUrl);
-          if (parsed !== null) relayUrl = parsed;
+    startOAuthLogin: ({ callbackUrl, relayUrl: nextRelayUrl }) => {
+      if (nextRelayUrl !== undefined) {
+        const parsed = normalizeRelayUrl(nextRelayUrl);
+        if (parsed !== null) {
+          relayUrl = parsed;
+          persist();
         }
-        account = { email, displayName };
+      }
+      if (relayUrl === null) throw new Error('relay url is required for sign-in');
+      const nonce = randomBytes(16).toString('hex');
+      pendingOAuthStates.set(nonce, Date.now() + 600_000);
+      const url = new URL('/_auth/login', relayUrl);
+      url.searchParams.set('callback', callbackUrl);
+      url.searchParams.set('state', nonce);
+      return { loginUrl: url.toString() };
+    },
+    completeOAuthLogin: (payload) =>
+      enqueue(async () => {
+        const expires = pendingOAuthStates.get(payload.state);
+        pendingOAuthStates.delete(payload.state);
+        if (expires === undefined || expires < Date.now()) return false;
+        if (!payload.token || !payload.email.includes('@')) return false;
+        const email = payload.email.trim().toLowerCase();
+        const displayName = payload.displayName?.trim() || email.split('@', 1)[0] || email;
+        const avatarUrl = payload.avatarUrl?.startsWith('https://') ? payload.avatarUrl : null;
+        account = { email, displayName, avatarUrl };
+        clerkToken = payload.token;
         enabled = relayUrl !== null && input.authToken !== null;
         persist();
-        if (!enabled) return snapshot();
-        reconnectAttempt = 0;
-        return connectOnce();
+        if (enabled) {
+          reconnectAttempt = 0;
+          await connectOnce();
+        }
+        return true;
       }),
     signOut: () =>
       enqueue(async () => {
         account = null;
+        clerkToken = null;
         enabled = false;
         reconnectAttempt = 0;
         closeSocket();
@@ -440,12 +480,13 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
         return snapshot();
       }),
     directory: async (): Promise<RelayDirectoryResponse> => {
-      if (account === null || relayUrl === null) {
+      if (account === null || relayUrl === null || clerkToken === null) {
         return { account, selfSubdomain: subdomain, ownDevices: [], sharedDevices: [] };
       }
       try {
         const res = await fetch(
           `${relayUrl}/_directory/devices?email=${encodeURIComponent(account.email)}`,
+          { headers: { authorization: `Bearer ${clerkToken}` } },
         );
         if (!res.ok) {
           return { account, selfSubdomain: subdomain, ownDevices: [], sharedDevices: [] };
@@ -465,20 +506,26 @@ export function createTunnelRemote(input: CreateTunnelRemoteInput): TunnelRemote
       }
     },
     shareDevice: async (targetEmail: string, role: 'owner' | 'collaborator' = 'collaborator') => {
-      if (relayUrl === null) throw new Error('relay url is not configured');
+      if (relayUrl === null || clerkToken === null) throw new Error('clerk session required');
       const res = await fetch(`${relayUrl}/_directory/shares`, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ subdomain, secret, targetEmail, role }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${clerkToken}`,
+        },
+        body: JSON.stringify({ subdomain, targetEmail, role }),
       });
       if (!res.ok) throw new Error('failed to share device');
     },
     revokeShare: async (targetEmail: string) => {
-      if (relayUrl === null) throw new Error('relay url is not configured');
+      if (relayUrl === null || clerkToken === null) throw new Error('clerk session required');
       const res = await fetch(`${relayUrl}/_directory/shares`, {
         method: 'DELETE',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ subdomain, secret, targetEmail }),
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${clerkToken}`,
+        },
+        body: JSON.stringify({ subdomain, targetEmail }),
       });
       if (!res.ok) throw new Error('failed to revoke share');
     },

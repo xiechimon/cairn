@@ -34,6 +34,7 @@ export function isBrowserAuthExempt(pathname: string): boolean {
     pathname.startsWith('/api/webhook/') ||
     pathname === '/api/mcp' ||
     pathname === '/api/oauth/callback' ||
+    pathname === '/api/remote/account/callback' ||
     pathname === '/api/auth/access' ||
     isOpenRemotePath(pathname)
   );
@@ -92,6 +93,7 @@ export type TunnelErrorKind = z.infer<typeof tunnelErrorKindSchema>;
 export const relayAccountSchema = z.object({
   email: z.string().email(),
   displayName: z.string().min(1).max(80),
+  avatarUrl: z.string().url().nullable().optional(),
 });
 export type RelayAccount = z.infer<typeof relayAccountSchema>;
 
@@ -113,14 +115,17 @@ export const tunnelSetBodySchema = z
   .strict();
 export type TunnelSetBody = z.infer<typeof tunnelSetBodySchema>;
 
-export const relayAccountSignInBodySchema = z
+export const relayOAuthStartBodySchema = z
   .object({
-    email: z.string().trim().email().max(120),
-    displayName: z.string().trim().min(1).max(80).optional(),
     relayUrl: z.string().trim().min(1).max(200).optional(),
   })
   .strict();
-export type RelayAccountSignInBody = z.infer<typeof relayAccountSignInBodySchema>;
+export type RelayOAuthStartBody = z.infer<typeof relayOAuthStartBodySchema>;
+
+export const relayOAuthStartResponseSchema = z.object({
+  loginUrl: z.string().url(),
+});
+export type RelayOAuthStartResponse = z.infer<typeof relayOAuthStartResponseSchema>;
 
 export const relayDirectoryDeviceSchema = z.object({
   subdomain: z.string().min(1),

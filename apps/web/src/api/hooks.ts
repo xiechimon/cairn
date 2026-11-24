@@ -85,6 +85,7 @@ import type {
   ProviderRecord,
   PrPanelRow,
   RelayDirectoryResponse,
+  RelayOAuthStartResponse,
   RemoteRoutesResponse,
   RouteOverride,
   ScheduleRecord,
@@ -709,15 +710,10 @@ export const useRemoteDirectory = (enabled: boolean) =>
     refetchInterval: REMOTE_POLL_MS,
   });
 
-export function useSignInRelayAccount() {
-  const queryClient = useQueryClient();
+export function useStartRelayOAuth() {
   return useMutation({
-    mutationFn: (input: { email: string; displayName?: string; relayUrl?: string }) =>
-      api.post<TunnelAccess>('/api/remote/account/signin', input),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['remoteRoutes'] });
-      void queryClient.invalidateQueries({ queryKey: ['remoteDirectory'] });
-    },
+    mutationFn: (input: { relayUrl?: string }) =>
+      api.post<RelayOAuthStartResponse>('/api/remote/account/oauth/start', input),
   });
 }
 

@@ -660,9 +660,17 @@ export function BoardSidebar({
               data-testid="sidebar-footer-account"
               className="flex min-w-0 items-center gap-2 rounded-md py-1 pr-2 pl-2 text-foreground no-underline hover:bg-sidebar-hover"
             >
-              <span className="flex size-5.5 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background uppercase">
-                {relayAccount.displayName.slice(0, 1)}
-              </span>
+              {relayAccount.avatarUrl ? (
+                <img
+                  src={relayAccount.avatarUrl}
+                  alt={relayAccount.displayName}
+                  className="size-5.5 flex-none rounded-full object-cover"
+                />
+              ) : (
+                <span className="flex size-5.5 flex-none items-center justify-center rounded-full bg-foreground text-xs font-semibold text-background uppercase">
+                  {relayAccount.displayName.slice(0, 1)}
+                </span>
+              )}
               <span className="truncate text-ui font-medium">{relayAccount.displayName}</span>
             </Link>
           ) : (

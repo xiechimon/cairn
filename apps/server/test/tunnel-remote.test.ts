@@ -275,4 +275,80 @@ describe('tunnel-remote service', () => {
       await relay.close();
     }
   });
+
+  test('Clerk OAuth start/callback enforces one-time state nonce and hides clerkToken from routes', async () => {
+    const dir = tempDir();
+    const relay = await startMockRelay();
+    try {
+      const recordPath = join(dir, 'tunnel-remote.json');
+      let appRef: ReturnType<typeof bootServer>['app'] | null = null;
+      const tunnel = createTunnelRemote({
+        environmentId: '0f9d3a52-6c1e-4b7a-9d3e-5a1c2b4d6e80',
+        recordPath,
+        defaultRelayUrl: relay.url,
+        authToken: OWNER,
+        app: () => appRef!,
+      });
+      const s = bootServer({
+        authToken: OWNER,
+        reposDir: dir,
+        attachmentsDir: dir,
+        skillsDir: dir,
+        skillSourcesPath: join(dir, 'skills.json'),
+        remote: {
+          tunnelStatus: () => tunnel.status(),
+          tunnel,
+        },
+      });
+      appRef = s.app;
+
+      const startRes = await s.app.request('/api/remote/account/oauth/start', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${OWNER}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+      expect(startRes.status).toBe(200);
+      const { loginUrl } = (await startRes.json()) as { loginUrl: string };
+      const parsed = new URL(loginUrl);
+      expect(parsed.origin).toBe(relay.url);
+      expect(parsed.pathname).toBe('/_auth/login');
+      const state = parsed.searchParams.get('state');
+      expect(state).toBeTruthy();
+
+      const badRes = await s.app.request(
+        '/api/remote/account/callback?state=invalid-nonce&token=clerk-jwt-secret&email=ian@example.com',
+      );
+      expect(badRes.status).toBe(403);
+
+      const okRes = await s.app.request(
+        `/api/remote/account/callback?state=${encodeURIComponent(state!)}&token=clerk-jwt-secret&email=ian@example.com&name=Ian&avatar=${encodeURIComponent('https://img.clerk.com/avatar.png')}`,
+      );
+      expect(okRes.status).toBe(302);
+      expect(okRes.headers.get('location')).toBe('/app/settings/remote-access');
+
+      const replayRes = await s.app.request(
+        `/api/remote/account/callback?state=${encodeURIComponent(state!)}&token=clerk-jwt-secret&email=ian@example.com`,
+      );
+      expect(replayRes.status).toBe(403);
+
+      const routesRes = await s.app.request('/api/remote/routes', {
+        headers: { authorization: `Bearer ${OWNER}` },
+      });
+      expect(routesRes.status).toBe(200);
+      const routesBody = (await routesRes.json()) as RemoteRoutesResponse;
+      expect(routesBody.tunnel?.account).toEqual({
+        email: 'ian@example.com',
+        displayName: 'Ian',
+        avatarUrl: 'https://img.clerk.com/avatar.png',
+      });
+      expect(JSON.stringify(routesBody)).not.toContain('clerk-jwt-secret');
+
+      await tunnel.stop();
+    } finally {
+      await relay.close();
+    }
+  });
 });

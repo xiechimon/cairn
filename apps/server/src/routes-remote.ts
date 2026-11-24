@@ -6,7 +6,7 @@ import {
   pairRequestBodySchema,
   REMOTE_DESCRIPTOR_VERSION,
   type RemoteDescriptor,
-  relayAccountSignInBodySchema,
+  relayOAuthStartBodySchema,
   relayShareBodySchema,
   tailnetSetBodySchema,
   tunnelSetBodySchema,
@@ -16,7 +16,7 @@ import type { AppContext } from './context.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { buildRemoteRoutes } from './lib/remote-routes.js';
-import { pairRequestPeerOf } from './lib/request-origin.js';
+import { pairRequestPeerOf, requestOrigin } from './lib/request-origin.js';
 import { matchesAuthToken } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
@@ -129,12 +129,32 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     return c.json(await remote.tunnel.setEnabled(body.enabled, body.relayUrl));
   });
 
-  app.post('/api/remote/account/signin', async (c) => {
+  app.post('/api/remote/account/oauth/start', async (c) => {
     requireOwner(c);
     c.header('cache-control', 'no-store');
     if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
-    const body = parseWith(relayAccountSignInBodySchema, await jsonBody(c), 'body');
-    return c.json(await remote.tunnel.signIn(body));
+    const body = parseWith(relayOAuthStartBodySchema, await jsonBody(c), 'body');
+    const callbackUrl = `${requestOrigin(c)}/api/remote/account/callback`;
+    return c.json(remote.tunnel.startOAuthLogin({ callbackUrl, relayUrl: body.relayUrl }));
+  });
+
+  app.get('/api/remote/account/callback', async (c) => {
+    c.header('cache-control', 'no-store');
+    if (remote.tunnel === undefined) throw new HttpError(404, 'tunnel access unavailable');
+    const state = c.req.query('state') ?? '';
+    const token = c.req.query('token') ?? '';
+    const email = c.req.query('email') ?? '';
+    const name = c.req.query('name') ?? '';
+    const avatar = c.req.query('avatar') ?? '';
+    const ok = await remote.tunnel.completeOAuthLogin({
+      state,
+      token,
+      email,
+      displayName: name || undefined,
+      avatarUrl: avatar || undefined,
+    });
+    if (!ok) throw new HttpError(403, 'invalid or expired login state');
+    return c.redirect('/app/settings/remote-access', 302);
   });
 
   app.post('/api/remote/account/signout', async (c) => {

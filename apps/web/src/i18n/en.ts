@@ -2870,10 +2870,11 @@ export const EN: Record<string, string> = {
   '登录账号，多台电脑一键直连': 'Sign in to connect your computers directly',
   '在两台 Windows 或 Mac 上登录同一账号，自动发现彼此并直连，无需每次扫码。':
     'Sign in with the same account on your Windows or Mac computers to connect in one click without QR codes.',
-  账号邮箱: 'Account email',
-  登录并自动互联: 'Sign in and connect',
-  '账号已登录，正在自动互联设备': 'Signed in. Connecting this computer…',
-  '登录失败，请检查邮箱或中继地址': 'Sign-in failed. Check your email or relay URL.',
+  '使用 Clerk 登录（Google / GitHub）': 'Sign in with Clerk (Google / GitHub)',
+  '正在跳转到 Clerk 登录…': 'Redirecting to Clerk sign-in…',
+  '无法发起登录，请检查中继地址后重试':
+    'Could not start sign-in. Check the relay URL and try again.',
+  '高级：本地 Tailscale 与手动配对': 'Advanced: local Tailscale & manual pairing',
   授权给其他账号: 'Share with another account',
   退出: 'Sign out',
   本机已在线: 'This computer · online',
