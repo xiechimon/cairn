@@ -20,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/toolti
 import { ChatMarkdown, REPLY_BLOCK_CLS, REPLY_TEXT_CLS } from '../detail/chat-markdown.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { ApprovalCard } from './approval-card.js';
 import { approvalCardOf, isApprovalRequest } from './approval-card-model.js';
 import { MessageToolbar } from './message-toolbar.js';
@@ -267,12 +268,7 @@ export function QuestionChips({
       { title: t('已取消提问'), undo: t('撤销') },
       () => onCancel?.(item.requestId),
     );
-  const copyText = (text: string) => {
-    void navigator.clipboard?.writeText(text).then(
-      () => toastSuccess(t('已复制')),
-      () => {},
-    );
-  };
+  const copyText = (text: string) => copyTextWithFeedback(text, () => toastSuccess(t('已复制')));
   const showSubmitChip = multi || (question.options.length === 0 && !bound);
   const approval = isApprovalRequest(item.requestId) ? approvalCardOf(question, t) : null;
   const submittedIndex =

@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover.js';
 import { toastError, toastSuccess } from '../../components/ui/toaster.js';
 import { useI18n } from '../../i18n/provider.js';
+import { copyTextWithFeedback } from '../../lib/clipboard.js';
 import { settingsHref } from '../../settings/settings-href.js';
 import { downloadPageHtml } from './design-export.js';
 
@@ -93,9 +94,10 @@ export function SharePopover({
                 data-testid="design-share-copy"
                 className="shrink-0"
                 onClick={() =>
-                  void navigator.clipboard.writeText(link).then(
+                  copyTextWithFeedback(
+                    link,
                     () => toastSuccess(t('已复制')),
-                    (error: unknown) => toastError(t('未能复制'), error),
+                    (error) => toastError(t('未能复制'), error),
                   )
                 }
               >

@@ -258,6 +258,118 @@ for (const allowKey of STATE_SHADOW_ALLOWLIST.keys()) {
     );
 }
 
+const allTsFiles = [...tsxFiles, ...walk(WEB_SRC, '.ts')];
+
+function checkPatternGuard({ code, files, pattern, skip, allowlist, message }) {
+  const allowMatched = new Set();
+  for (const file of files) {
+    const relPath = rel(file);
+    if (skip(relPath)) continue;
+    const clean = stripJsxComments(readFileSync(file, 'utf8')).split('\n');
+    clean.forEach((line, i) => {
+      if (!pattern.test(line)) return;
+      if (allowlist.has(relPath)) {
+        allowMatched.add(relPath);
+        return;
+      }
+      failures.push(`${code} ${relPath}:${i + 1}: ${message} (${line.trim().slice(0, 120)})`);
+    });
+  }
+  for (const allowedPath of allowlist.keys()) {
+    if (!allowMatched.has(allowedPath)) {
+      failures.push(
+        `${code} STALE allowlist entry ${allowedPath}: no matching site — drop it from ui-drift-gate.mjs.`,
+      );
+    }
+  }
+}
+
+checkPatternGuard({
+  code: 'G9',
+  files: tsxFiles,
+  pattern: /<hr(?![A-Za-z0-9-])/,
+  skip: (relPath) => relPath === 'components/ui/separator.tsx',
+  allowlist: new Map([
+    [
+      'components/side-panel.tsx',
+      'interactive ARIA window-splitter handle (aria-orientation="vertical", tabIndex=0, pointer drag)',
+    ],
+  ]),
+  message: 'bare <hr> — use Separator from components/ui/separator.tsx',
+});
+
+checkPatternGuard({
+  code: 'G10',
+  files: allTsFiles,
+  pattern: /\.writeText\(/,
+  skip: (relPath) => relPath === 'lib/clipboard.ts',
+  allowlist: new Map([
+    ['chief/turn-failure.tsx', 'active-lane file; migrate to lib/clipboard.ts when lane lands'],
+    ['detail/transcript.tsx', 'active-lane file; migrate to lib/clipboard.ts when lane lands'],
+  ]),
+  message: 'direct .writeText( — route clipboard writes through lib/clipboard.ts or CopyIconButton',
+});
+
+checkPatternGuard({
+  code: 'G11',
+  files: allTsFiles,
+  pattern: /from\s+['"][^'"]*\/components\/ui\/card(?:\.js)?['"]/,
+  skip: (relPath) => relPath.startsWith('design/') || relPath.startsWith(UI_PRIMITIVES_PREFIX),
+  allowlist: new Map([
+    ['board/local-provider-import.tsx', 'legacy ui/card visual site awaiting owner design pass'],
+    ['overlay/token-gate.tsx', 'legacy ui/card visual site awaiting owner design pass'],
+    ['routes/machine-authorize-page.tsx', 'legacy ui/card visual site awaiting owner design pass'],
+    ['routes/remote-access-page.tsx', 'legacy ui/card visual site awaiting owner design pass'],
+  ]),
+  message:
+    'components/ui/card import — INVENTORY forbids ui/card as a visual primitive; use ListCard, SettingsCard, or per-face classes',
+});
+
+checkPatternGuard({
+  code: 'G12',
+  files: allTsFiles,
+  pattern: /from\s+['"][^'"]*\/components\/ui\/dialog(?:\.js)?['"]/,
+  skip: (relPath) => relPath === 'components/ui/dialog-shell.tsx' || relPath.startsWith('design/'),
+  allowlist: new Map([
+    ['board/app-sidebar.tsx', 'full-height mobile drawer sheet over Dialog primitive'],
+    ['board/file-lightbox.tsx', 'full-bleed media lightbox over Dialog primitive'],
+    ['chief/research-report.tsx', 'DialogTitle helper beside DialogShell'],
+    ['overlay/route-dialog.tsx', 'DialogClose/DialogTitle helpers beside DialogShell'],
+    ['resources/phones-panel.tsx', 'legacy direct ui/dialog site awaiting owner migration'],
+  ]),
+  message:
+    'direct components/ui/dialog import — use DialogShell from components/ui/dialog-shell.tsx',
+});
+
+checkPatternGuard({
+  code: 'G13',
+  files: allTsFiles,
+  pattern: /\banimate-spin\b/,
+  skip: (relPath) => relPath.startsWith(UI_PRIMITIVES_PREFIX) || relPath.startsWith('design/'),
+  allowlist: new Map([
+    ['components/status-glyph.tsx', 'canonical working status glyph rotation'],
+    ['detail/chat-markdown.tsx', 'legacy task-card CSS spinner awaiting owner design pass'],
+    ['resources/upstream-model-picker.tsx', 'active-lane picker refresh button spin'],
+  ]),
+  message: 'hand-rolled animate-spin — use components/ui/spinner.tsx or StatusGlyph',
+});
+
+checkPatternGuard({
+  code: 'G14',
+  files: tsxFiles,
+  pattern: /(?<!\[)\brole=\{?\s*['"]listbox['"]/,
+  skip: (relPath) => relPath === 'components/filter-picker.tsx' || relPath.startsWith('design/'),
+  allowlist: new Map([
+    [
+      'components/settings/settings-search.tsx',
+      'legacy listbox combobox awaiting FilterPicker migration',
+    ],
+    ['overlay/mention-inline.tsx', 'inline editor mention popover listbox'],
+    ['pages/project-new-page.tsx', 'legacy repo listbox awaiting owner FilterPicker migration'],
+  ]),
+  message: 'hand-written role="listbox" — compose from components/filter-picker.tsx',
+});
+
 if (failures.length === 0) {
   console.log(
     `[ui-drift-gate] PASS: no live .btn selectors, no hex escapes, no .chip--* redefinitions (${cssFiles.length} css files scanned); ${inputSites} bare <input> site(s), ${deliberateInputs} deliberate-native; no raw color in ${uiFilesScanned} components/ui file(s); ${brandInkHits} brand-ink text-role line(s), all registered (${brandInkEntries.length} ledger entries); segmented roles and registry Tabs only in ${[...SEGMENTED_ALLOWLIST.keys()].join(', ')} (${segmentedFiles} file(s) touch them).`,

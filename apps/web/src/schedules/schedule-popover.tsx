@@ -16,6 +16,7 @@ import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ScheduleRecord } from '../fixtures/records.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { scheduleWhen } from '../pages/schedule-summary.js';
 import { ScheduleFields } from './schedule-fields.js';
 import {
@@ -283,12 +284,7 @@ function ScheduleEditor({
                 variant="outline"
                 size="xs"
                 className="shrink-0 px-2 pointer-coarse:h-11 pointer-coarse:px-3.5"
-                onClick={() =>
-                  void navigator.clipboard.writeText(webhookUrl).then(
-                    () => toastSuccess(t('已复制')),
-                    () => {},
-                  )
-                }
+                onClick={() => copyTextWithFeedback(webhookUrl, () => toastSuccess(t('已复制')))}
               >
                 {t('复制')}
               </Button>

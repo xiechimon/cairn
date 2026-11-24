@@ -4,7 +4,6 @@ import {
   Fragment,
   type ReactNode,
   useContext,
-  useEffect,
   useMemo,
   useRef,
   useState,
@@ -22,6 +21,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Checkbox } from '../components/ui/checkbox.js';
 import { DIALOG_PRIMARY_BUTTON, DialogShell } from '../components/ui/dialog-shell.js';
+import { Separator } from '../components/ui/separator.js';
 import type { DocSegment } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Check, ChiefExpand } from '../icons/index.js';
@@ -354,7 +354,7 @@ function MarkdownBlock({ block, depth }: { block: ChatBlock; depth: number }) {
         </blockquote>
       );
     case 'rule':
-      return <hr className="m-0 w-full border-0 border-t border-border" />;
+      return <Separator />;
     case 'para':
       return (
         <p className="chat-para m-0">

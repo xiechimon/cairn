@@ -1,12 +1,12 @@
 import { Check, Copy, Download } from 'lucide-react';
-import { type ReactNode, useContext, useEffect, useState } from 'react';
+import { type ReactNode, useContext, useState } from 'react';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { FileGlyph } from '../components/file-glyph.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueryBoundary } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import { useEscClose } from '../overlay/use-esc.js';
 import { AudioViewer } from '../vendor-open-design/viewers/audio-viewer.js';
@@ -17,8 +17,6 @@ import { TextViewer } from '../vendor-open-design/viewers/text-viewer.js';
 import { DocumentPreviewUnavailable, fileMetaLabel, useAttachmentFiles } from './file-data.js';
 import { downloadFile } from './file-lightbox.js';
 import { type FileTarget, OpenDocumentContext } from './file-pane.js';
-
-const COPIED_MS = 1500;
 
 type MarkdownMode = 'preview' | 'source';
 
@@ -41,22 +39,9 @@ function FileDocPanelView({ target, onClose }: { target: FileTarget; onClose: ()
   const textQ = files.text;
   const documentQ = files.document;
   const download = () => downloadFile(downloadHref, target.name);
-  const [copied, setCopied] = useState(false);
   const [mode, setMode] = useState<MarkdownMode>('preview');
   useEscClose(onClose);
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), COPIED_MS);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
   const text = readsText ? textQ.data : undefined;
-  const copy = () => {
-    if (text === undefined) return;
-    navigator.clipboard.writeText(text).then(
-      () => setCopied(true),
-      (error: unknown) => toastError(t('未能复制，请重试'), error),
-    );
-  };
   const withText = (render: (value: string) => ReactNode) => (
     <QueryBoundary
       query={textQ}
@@ -135,26 +120,21 @@ function FileDocPanelView({ target, onClose }: { target: FileTarget; onClose: ()
           />
         )}
         {readsText && (
-          <IconTooltip
-            label={copied ? t('已复制') : t('复制')}
+          <CopyIconButton
+            text={text ?? ''}
+            label={t('复制')}
+            copiedLabel={t('已复制')}
             side="bottom"
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                data-testid="file-preview-copy"
-                disabled={text === undefined}
-                onClick={copy}
-                className="text-content-secondary hover:text-foreground"
-              />
-            }
-          >
-            {copied ? (
-              <Check aria-hidden strokeWidth={1.75} className="size-5" />
-            ) : (
-              <Copy aria-hidden strokeWidth={1.75} className="size-5" />
-            )}
-          </IconTooltip>
+            size="icon-sm"
+            testId="file-preview-copy"
+            disabled={text === undefined}
+            replaceClassName
+            className="text-content-secondary hover:text-foreground"
+            icons={{
+              copy: <Copy aria-hidden strokeWidth={1.75} className="size-5" />,
+              copied: <Check aria-hidden strokeWidth={1.75} className="size-5" />,
+            }}
+          />
         )}
         <IconTooltip
           label={t('下载')}

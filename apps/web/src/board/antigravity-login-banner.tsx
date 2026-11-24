@@ -1,21 +1,19 @@
-import { KeyRound } from 'lucide-react';
-import { Link } from 'react-router';
 import {
   antigravitySubscriptionLoginWarning,
   antigravitySubscriptionSignedOutWarning,
 } from '../antigravity-login-warning.js';
 import { useAntigravitySubscriptions } from '../api/antigravity-subscriptions.js';
 import { useLiveData } from '../api/provider.js';
-import { NoticeBanner, withCodeSpans } from '../components/notice-banner.js';
-import { Button } from '../components/ui/button.js';
 import { useI18n } from '../i18n/provider.js';
-import { settingsHref } from '../settings/settings-href.js';
+import {
+  expiryWarningKind,
+  SubscriptionLoginBanner,
+  type SubscriptionLoginWarning,
+} from './subscription-login-banner.js';
 
-export interface AntigravityLoginWarning {
-  key: string;
-  kind: 'expired' | 'expiring' | 'signed-out';
-  text: string;
-}
+export type AntigravityLoginWarning = SubscriptionLoginWarning<
+  'expired' | 'expiring' | 'signed-out'
+>;
 
 export function useAntigravityLoginWarnings(now: number): AntigravityLoginWarning[] {
   const { t } = useI18n();
@@ -27,10 +25,7 @@ export function useAntigravityLoginWarnings(now: number): AntigravityLoginWarnin
       return [
         {
           key: subscription.id,
-          kind:
-            subscription.expiresAt !== null && subscription.expiresAt <= now
-              ? ('expired' as const)
-              : ('expiring' as const),
+          kind: expiryWarningKind(subscription.expiresAt, now),
           text: expiringText,
         },
       ];
@@ -48,61 +43,34 @@ export function AntigravityLoginBanner({
   warnings: readonly AntigravityLoginWarning[];
 }) {
   const { t } = useI18n();
-  const [only] = warnings;
-  if (only === undefined) return null;
-  if (warnings.length === 1) {
-    return (
-      <NoticeBanner
-        data-testid="antigravity-login-banner"
-        tone="warning"
-        icon={KeyRound}
-        className="mt-4"
-        title={t('Antigravity 登录需要处理')}
-        body={
-          <span data-testid="antigravity-login-warning" data-login={only.kind}>
-            {withCodeSpans(only.text)}
-          </span>
-        }
-      />
-    );
-  }
-  const expired = warnings.filter((warning) => warning.kind === 'expired').length;
-  const signedOut = warnings.filter((warning) => warning.kind === 'signed-out').length;
-  const expiring = warnings.length - expired - signedOut;
-  const title =
-    expiring === 0 && signedOut === 0
-      ? t('{count} 处 Antigravity 登录已过期', { count: expired })
-      : expired === 0 && signedOut === 0
-        ? t('{count} 处 Antigravity 登录即将过期', { count: expiring })
-        : [
-            expired === 0 ? null : t('{count} 处已过期', { count: expired }),
-            signedOut === 0 ? null : t('{count} 处登录失效', { count: signedOut }),
-            expiring === 0 ? null : t('{count} 处即将过期', { count: expiring }),
-          ]
-            .filter((part): part is string => part !== null)
-            .join('，');
-  const body =
-    expired === 0 && signedOut === 0
-      ? t('到期前更新登录或 API key，任务才不会中断。')
-      : t('更新登录或 API key 之前，这些订阅不会接收新任务。');
   return (
-    <NoticeBanner
-      data-testid="antigravity-login-banner"
-      tone="warning"
-      icon={KeyRound}
-      className="mt-4"
-      title={title}
-      body={<span data-testid="antigravity-login-summary">{body}</span>}
-      actions={
-        <Button
-          variant="outline"
-          size="sm"
-          className="px-3"
-          render={<Link to={settingsHref('routing')} />}
-        >
-          {t('查看')}
-        </Button>
-      }
+    <SubscriptionLoginBanner
+      testIdPrefix="antigravity"
+      warnings={warnings}
+      singleTitle={t('Antigravity 登录需要处理')}
+      summary={(items) => {
+        const expired = items.filter((warning) => warning.kind === 'expired').length;
+        const signedOut = items.filter((warning) => warning.kind === 'signed-out').length;
+        const expiring = items.length - expired - signedOut;
+        return {
+          title:
+            expiring === 0 && signedOut === 0
+              ? t('{count} 处 Antigravity 登录已过期', { count: expired })
+              : expired === 0 && signedOut === 0
+                ? t('{count} 处 Antigravity 登录即将过期', { count: expiring })
+                : [
+                    expired === 0 ? null : t('{count} 处已过期', { count: expired }),
+                    signedOut === 0 ? null : t('{count} 处登录失效', { count: signedOut }),
+                    expiring === 0 ? null : t('{count} 处即将过期', { count: expiring }),
+                  ]
+                    .filter((part): part is string => part !== null)
+                    .join('，'),
+          body:
+            expired === 0 && signedOut === 0
+              ? t('到期前更新登录或 API key，任务才不会中断。')
+              : t('更新登录或 API key 之前，这些订阅不会接收新任务。'),
+        };
+      }}
     />
   );
 }
