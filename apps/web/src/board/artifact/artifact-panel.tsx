@@ -223,7 +223,7 @@ function ArtifactTabButton({
           />
         }
       >
-        <X aria-hidden className="size-3.5" />
+        <X aria-hidden className="size-4" />
       </IconTooltip>
     </div>
   );

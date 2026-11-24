@@ -73,12 +73,7 @@ describe('Coordinator owner image attachments', () => {
           .all()
           .map((row) => row.kind),
       ).toEqual(['chief', 'chief']);
-      expect(results).toEqual([
-        [
-          { type: 'image', data: imageData, mimeType: 'image/png' },
-          { type: 'text', text: expect.stringContaining(`(attachment:${grant.key})`) },
-        ],
-      ]);
+      expect(results).toEqual([[{ type: 'image', data: imageData, mimeType: 'image/png' }]]);
       expect(modelContext).toBeDefined();
       const models = createCoordinatorModels();
       const providerId = api === 'openai-codex-responses' ? 'openai-codex' : 'wire-test';
@@ -125,13 +120,13 @@ describe('Coordinator owner image attachments', () => {
             {
               type: 'function_call_output',
               call_id: expect.any(String),
-              output: expect.arrayContaining([
+              output: [
                 {
                   type: 'input_image',
                   detail: 'auto',
                   image_url: `data:image/png;base64,${imageData}`,
                 },
-              ]),
+              ],
             },
           ]),
         });

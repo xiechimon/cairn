@@ -140,10 +140,7 @@ test('a quoted answer inherits an image consumed as a steer in the real Coordina
   const stored = w.s.db.select().from(todo).where(eq(todo.id, task.id)).get();
   expect(stored?.userSpecAttachmentIds).toEqual([grant.attachmentId]);
   expect(firstRequestBound).toBe(true);
-  expect(imageContent).toEqual([
-    { type: 'image', data: imageData, mimeType: 'image/png' },
-    { type: 'text', text: expect.stringContaining(`(attachment:${grant.key})`) },
-  ]);
+  expect(imageContent).toEqual([{ type: 'image', data: imageData, mimeType: 'image/png' }]);
   expect(
     task.request?.segments[0]?.context?.messages.map((message) => message.messageId),
   ).toContain(ownerId);
