@@ -1285,7 +1285,14 @@ function failLabel(raw: string): { label: string; labelVars?: Record<string, str
 
 function failItem(reason: string): Extract<TranscriptItem, { kind: 'fail' }> {
   const raw = stripAnsiEscapes(reason);
-  return { kind: 'fail', ...failLabel(raw), body: failGuidanceBody(classifyStepFailure(raw)), raw };
+  const plain = plainFailureOf(raw);
+  return {
+    kind: 'fail',
+    ...failLabel(raw),
+    body: failGuidanceBody(raw),
+    ...(plain !== null ? { plain } : {}),
+    raw,
+  };
 }
 
 export function runtimeUpdatePlain(

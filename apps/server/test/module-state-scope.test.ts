@@ -7,8 +7,6 @@ const SCANNED = ['apps/server/src', 'apps/daemon/src'];
 const DECL = /^(?:export )?(?:const|let) ([A-Za-z_$][\w$]*) = new (Map|Set)\s*[<(]/;
 
 const ALLOWED: Record<string, string> = {
-  'apps/daemon/src/backend/acp.ts:adapterProcessGroups':
-    'OS child-process groups spawned by this daemon process; a process resource',
   'apps/daemon/src/backend/acp.ts:GEMMA_4_MODELS': 'constant lookup table',
   'apps/daemon/src/backend/acp-permission-gate.ts:PERMISSIVE_MODES': 'constant lookup table',
   'apps/daemon/src/backend/acp-permission-gate.ts:KNOWN_KINDS': 'constant lookup table',
@@ -45,6 +43,8 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/computer/guard-words.ts:EXTERNAL_ASSIGNMENT_COMMANDS': 'constant lookup table',
   'apps/daemon/src/computer/guard-words.ts:ACTIVATE_DESTINATION_COMMANDS': 'constant lookup table',
   'apps/daemon/src/computer/guard-words.ts:COPY_LONG_ARGUMENTS': 'constant lookup table',
+  'apps/daemon/src/backend/acp.ts:spawnedProcessGroups':
+    'process-wide registry of live ACP child process groups for cleanup on exit',
   'apps/daemon/src/computer/host.ts:AGENT_BROWSER_ENV': 'constant lookup table',
   'apps/daemon/src/computer/host.ts:HOST_STRIPPED_ENV': 'constant lookup table',
   'apps/daemon/src/computer/owner-chrome.ts:ACT_KINDS': 'constant lookup table',

@@ -452,7 +452,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     const { backend: claude, created: claudeCreated } = fakeBackend([{ type: 'done', usage: [] }]);
     const { handle, lines } = await boot({ api, backend: pi, claudeCodeBackend: claude });
     await waitFor(() => api.parked !== null);
-    api.parked?.(CLAIMED);
+    api.parked?.({ ...CLAIMED, step: { ...CLAIMED.step, id: 's2' } });
     await waitFor(() => api.doneBodies.length === 1);
     expect(piCreated).toHaveLength(1);
     expect(claudeCreated).toHaveLength(0);
@@ -499,7 +499,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     api.parked?.(claudeClaimed());
     await waitFor(() => api.doneBodies.length === 1);
     await waitFor(() => api.parked !== null);
-    api.parked?.(CLAIMED);
+    api.parked?.({ ...CLAIMED, step: { ...CLAIMED.step, id: 's2' } });
     await waitFor(() => api.doneBodies.length === 2);
     expect(claudeCreated).toHaveLength(1);
     expect(piCreated).toHaveLength(1);
