@@ -92,6 +92,7 @@ import {
   serverStoppedCopy,
   unsupportedUpdateCopy,
   updateCheckFailedCopy,
+  updateOfflineCopy,
   upToDateCopy,
 } from './update-copy.js';
 import {
@@ -1010,6 +1011,9 @@ function serveUpdates(origin: string, notice: UpdateNotice | null, ownerToken: s
       await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
     } else if (state.status === 'unsupported') {
       const copy = unsupportedUpdateCopy(await windowLocale(), state.blocker);
+      await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
+    } else if (state.status === 'offline') {
+      const copy = updateOfflineCopy(await windowLocale());
       await dialog.showMessageBox({ type: 'info', message: copy.title, detail: copy.detail });
     } else if (state.status === 'error') {
       const copy = updateCheckFailedCopy(await windowLocale(), state.message);

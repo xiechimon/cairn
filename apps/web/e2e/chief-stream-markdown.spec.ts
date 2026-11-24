@@ -513,7 +513,7 @@ test.describe('Coordinator user-bubble markdown face (live mock, #742)', () => {
   });
 
   test('F-R20: the in-flight call shows on the status mark and its command stays out of the stream', async ({ page }) => {
-
+    await stubEventSource(page);
     const state: Parameters<typeof mockChiefLiveApi>[1] = {
       final: false,
       messages: [
