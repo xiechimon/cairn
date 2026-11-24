@@ -61,7 +61,6 @@ import {
   SettingsManager,
 } from '@earendil-works/pi-coding-agent';
 import { stepCredentialRedactor } from '../credential-output.js';
-import { gateToolCallHandler, type PermissionRule } from './command-gate.js';
 import { compactionCeilingFetch } from './compaction-ceiling.js';
 import { SessionNotResumableError } from './errors.js';
 import { EventQueue } from './event-queue.js';
@@ -939,11 +938,9 @@ export interface PiBackendOpts {
   onMcpLog?: (msg: string) => void;
   skills?: { skillsDir: string; cwd: string };
   onSkillsLog?: (msg: string) => void;
-  onGateLog?: (msg: string) => void;
   onTrustLog?: (msg: string) => void;
   onOtelLog?: (msg: string) => void;
   onCompactionLog?: (msg: string) => void;
-  gateRules?: readonly PermissionRule[];
   machineName?: string;
 }
 
@@ -1052,7 +1049,6 @@ export class PiBackend implements AgentBackend {
       compaction: sessionLog(this.opts.onCompactionLog),
       otel: sessionLog(this.opts.onOtelLog),
       trust: sessionLog(this.opts.onTrustLog),
-      gate: sessionLog(this.opts.onGateLog),
       skills: sessionLog(this.opts.onSkillsLog),
       mcp: sessionLog(this.opts.onMcpLog),
     };
@@ -1137,18 +1133,6 @@ export class PiBackend implements AgentBackend {
         `denied: ${protectedPresent.join(', ')} present in worktree — project trust is denied by policy, protected resources are not loaded (spec 26)`,
       );
     }
-    const gateExtension: InlineExtension = {
-      name: 'cairn-command-gate',
-      factory: (pi) => {
-        pi.on(
-          'tool_call',
-          gateToolCallHandler({
-            ...(this.opts.gateRules ? { rules: this.opts.gateRules } : {}),
-            ...(log.gate ? { log: log.gate } : {}),
-          }),
-        );
-      },
-    };
     const mcpEndpoints = opts.mcpServers ?? [];
     const onMcpLog = log.mcp;
     const mcpRegisterExtension: InlineExtension = {
@@ -1185,7 +1169,6 @@ export class PiBackend implements AgentBackend {
         ? { appendSystemPromptOverride: (base) => [...base, runtimePrompt] }
         : {}),
       extensionFactories: [
-        gateExtension,
         mcpRegisterExtension,
         createMcpExtension({
           loadConfig: () => ({ servers: [], errors: [] }),

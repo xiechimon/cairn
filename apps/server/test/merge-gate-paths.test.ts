@@ -171,7 +171,6 @@ describe('protected categories: any depth, case-insensitive, one true and one fa
     'apps/daemon/src/credentials.ts',
     'apps/daemon/src/secret-channel.ts',
     'apps/daemon/src/machine-client.ts',
-    'apps/daemon/src/backend/command-gate.ts',
     'apps/server/src/services/mcp-face.ts',
     'apps/server/src/services/mcp-servers.ts',
     'apps/server/src/db/client.ts',

@@ -699,7 +699,6 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           },
           onMcpLog: (msg) => logger.mcp(msg),
           onSkillsLog: (msg) => logger.skills(msg),
-          onGateLog: (msg) => logger.gate(msg),
           onTrustLog: (msg) => logger.trust(msg),
           onOtelLog: (msg) => logger.prefixed('otel', msg),
           onCompactionLog: (msg) => logger.step(msg),

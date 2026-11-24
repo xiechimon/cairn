@@ -52,7 +52,6 @@ import {
   restrictiveAcpMode,
 } from './acp-permission-gate.js';
 import { type AcpStdioBridge, bridgeHttpMcpToStdio, openAcpTools } from './acp-tools.js';
-import type { PermissionRule } from './command-gate.js';
 
 import { SessionNotResumableError } from './errors.js';
 import { isLearnedNoVision, rememberNoVision } from './image-support.js';
@@ -551,7 +550,6 @@ class AcpSession implements AgentSessionHandle {
 }
 
 export interface AcpGateOptions {
-  rules?: readonly PermissionRule[];
   log?: (message: string) => void;
 }
 
@@ -746,8 +744,7 @@ class AcpBackend implements AgentBackend {
             normal: {
               mode: adapter
                 ? (adapter.permissions ?? 'deny')
-                : (this.options.permissions ?? 'gate'),
-              ...(gateOptions?.rules ? { rules: gateOptions.rules } : {}),
+                : (this.options.permissions ?? 'allow-once'),
             },
           })
         : {

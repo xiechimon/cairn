@@ -13,7 +13,6 @@ import {
   PACKAGES_INSTALLED_PREFIX,
 } from '@cairn/shared';
 import { z } from 'zod';
-import { phoneControlRefusal } from '../backend/command-gate.js';
 import type { HostShellConfinement } from '../backend/host-shell-confinement.js';
 import { detectHostShellSandboxDenial } from '../backend/sandbox-denial.js';
 import type { DaemonLogger } from '../log.js';
@@ -29,11 +28,6 @@ import {
 import { DesktopAccessibility } from './desktop-accessibility.js';
 import { DesktopScreen } from './desktop-screen.js';
 import { FramePoster } from './frame-poster.js';
-import {
-  desktopProtectionGuardMessage,
-  orbComputerProtectionRefusal,
-  protectedComputerLifecycleRefusal,
-} from './guard.js';
 import type { HostScreen, ScreenCall, ScreenOutcome } from './host-screen.js';
 import {
   OWNER_CHROME_NO_EXTENSION,
@@ -113,7 +107,7 @@ const BROWSER_TOOLS: ReadonlySet<ComputerTool> = new Set(COMPUTER_BROWSER_TOOLS)
 
 interface Route {
   provider: ComputerProvider;
-  refusal: (command: string) => string | undefined;
+  refusal?: (command: string) => string | undefined;
 }
 
 type ComputerClient = Pick<MachineApi, 'computerFrames'> &
@@ -239,8 +233,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       return options.host
         ? {
             provider: options.host,
-            refusal: (command) =>
-              ownComputerHardlineRefusal(command) ?? phoneControlRefusal(command) ?? undefined,
+            refusal: (command) => ownComputerHardlineRefusal(command) ?? undefined,
           }
         : NO_COMPUTER_PROVIDER_MESSAGE;
     }
@@ -252,14 +245,6 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
         call.scopeKey,
         call.browserLicense === undefined ? {} : { browserLicense: call.browserLicense },
       ),
-      refusal: (command) => {
-        const reason = options.orb?.hostRoot
-          ? protectedComputerLifecycleRefusal(command)
-          : orbComputerProtectionRefusal(command);
-        return reason === undefined
-          ? phoneControlRefusal(command)
-          : desktopProtectionGuardMessage(reason);
-      },
     };
   }
 
@@ -414,7 +399,7 @@ export function createComputerDispatcher(options: ComputerDispatcherOptions): Co
       await refuse(call, 'The call deadline had already passed, so nothing ran');
       return;
     }
-    const refusal = route.refusal(params.data.command);
+    const refusal = route.refusal?.(params.data.command);
     if (refusal !== undefined) {
       await refuse(call, refusal);
       return;

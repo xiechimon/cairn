@@ -9,18 +9,7 @@ const DECL = /^(?:export )?(?:const|let) ([A-Za-z_$][\w$]*) = new (Map|Set)\s*[<
 const ALLOWED: Record<string, string> = {
   'apps/daemon/src/backend/acp.ts:GEMMA_4_MODELS': 'constant lookup table',
   'apps/daemon/src/backend/acp-permission-gate.ts:PERMISSIVE_MODES': 'constant lookup table',
-  'apps/daemon/src/backend/acp-permission-gate.ts:KNOWN_KINDS': 'constant lookup table',
   'apps/daemon/src/backend/acp-permission-gate.ts:READ_KINDS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:ADB_SAFE_SUBCOMMANDS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:IOS_BRIDGE_HEADS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:COMMAND_OPERAND_HEADS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:ARITH_EVAL_HEADS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:RUNNER_ENV_NAMES': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:POWER_HEADS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:ADB_VALUE_FLAGS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:COMMAND_SEPARATORS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:SHELLS': 'constant lookup table',
-  'apps/daemon/src/backend/command-gate.ts:COMMAND_KEYWORDS': 'constant lookup table',
   'apps/daemon/src/backend/image-support.ts:learnedNoVision':
     'learned capability memo keyed on model id; an environment fact, not instance state',
   'apps/daemon/src/backend/pi.ts:learnedCompat':
@@ -35,13 +24,6 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/computer/browser.ts:SECRET_AUTOCOMPLETE': 'constant lookup table',
   'apps/daemon/src/computer/browser.ts:scopeTabUse':
     'tab accounting for the daemon-owned browser runtime; one browser per daemon process',
-  'apps/daemon/src/computer/guard-words.ts:SAFE_SHELL_CONTROL_OPS': 'constant lookup table',
-  'apps/daemon/src/computer/guard-words.ts:HEREDOC_INTERPRETERS': 'constant lookup table',
-  'apps/daemon/src/computer/guard-words.ts:HEREDOC_DATA_SINKS': 'constant lookup table',
-  'apps/daemon/src/computer/guard-words.ts:COMMAND_WRAPPERS': 'constant lookup table',
-  'apps/daemon/src/computer/guard-words.ts:EXTERNAL_ASSIGNMENT_COMMANDS': 'constant lookup table',
-  'apps/daemon/src/computer/guard-words.ts:ACTIVATE_DESTINATION_COMMANDS': 'constant lookup table',
-  'apps/daemon/src/computer/guard-words.ts:COPY_LONG_ARGUMENTS': 'constant lookup table',
   'apps/daemon/src/backend/acp.ts:spawnedProcessGroups':
     'process-wide registry of live ACP child process groups for cleanup on exit',
   'apps/daemon/src/computer/host.ts:AGENT_BROWSER_ENV': 'constant lookup table',

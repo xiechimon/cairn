@@ -1,5 +1,3 @@
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import {
   type ComputerCall,
   type ComputerFrame,
@@ -17,10 +15,6 @@ import {
   NO_COMPUTER_SCOPE_MESSAGE,
   NO_VM_COMPUTER_MESSAGE,
 } from '../src/computer/dispatch.js';
-import {
-  orbComputerProtectionRefusal,
-  protectedComputerLifecycleRefusal,
-} from '../src/computer/guard.js';
 import {
   type ComputerProvider,
   ComputerRefusal,
@@ -405,86 +399,6 @@ describe('orb routing', () => {
       expect(err.message.length).toBeLessThanOrEqual(4096);
       expect(err.message.endsWith('[browser output truncated]')).toBe(true);
     }
-  });
-
-  test('the Orb shell keeps the desktop-protection guard but not the cairn host rules', async () => {
-    const log: string[] = [];
-    const fake = fakeClient();
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      orb: fakeOrb(log),
-      host: fakeProvider(log, 'host'),
-      ...FAST,
-    });
-    const scoped = { scopeKey: 'chief:c1' };
-    await dispatcher.dispatch(call('shell', { command: 'pkill Xvfb' }, scoped));
-    await dispatcher.dispatch(
-      call('shell', { command: 'systemctl stop cairn-computer-desktop' }, scoped),
-    );
-    await dispatcher.dispatch(
-      call('shell', { command: 'systemctl status cairn-computer-desktop' }, scoped),
-    );
-    await dispatcher.dispatch(
-      call('shell', { command: 'machinectl poweroff cairn-orb-x' }, scoped),
-    );
-    await dispatcher.dispatch(
-      call('user_computer_shell', { command: 'machinectl poweroff cairn-orb-x' }),
-    );
-    const errors = fake.frames.filter((frame) => frame.kind === 'error');
-    expect(errors).toHaveLength(2);
-    for (const error of errors) {
-      expect(error).toMatchObject({ delivery: 'not_delivered' });
-      expect((error as { message: string }).message).toContain('desktop-protection guard');
-    }
-    expect(log).toEqual([
-      'orb[chief:c1]:execute:systemctl status cairn-computer-desktop',
-      'orb[chief:c1]:execute:machinectl poweroff cairn-orb-x',
-      'host:execute:machinectl poweroff cairn-orb-x',
-    ]);
-  });
-
-  test('a computer that runs on the host keeps the cairn host rules', async () => {
-    const log: string[] = [];
-    const fake = fakeClient();
-    const dispatcher = createComputerDispatcher({
-      client: fake.client,
-      orb: { ...fakeOrb(log), hostRoot: join(homedir(), '.cairn', 'desktops') },
-      ...FAST,
-    });
-    const scoped = { scopeKey: 'chief:c1' };
-    await dispatcher.dispatch(call('shell', { command: 'shutdown now' }, scoped));
-    await dispatcher.dispatch(call('shell', { command: 'echo ok' }, scoped));
-    const errors = fake.frames.filter((frame) => frame.kind === 'error');
-    expect(errors).toHaveLength(1);
-    expect((errors[0] as { message: string }).message).toContain('desktop-protection guard');
-    expect(log).toEqual(['orb[chief:c1]:execute:echo ok']);
-  });
-
-  test('the two guard entry points differ only by the cairn host rules', () => {
-    for (const command of [
-      'machinectl poweroff cairn-orb-x',
-      'shutdown now',
-      'nft flush ruleset',
-    ]) {
-      expect(protectedComputerLifecycleRefusal(command)).toBeTypeOf('string');
-      expect(orbComputerProtectionRefusal(command)).toBeUndefined();
-    }
-    for (const command of [
-      'pkill Xvfb',
-      'killall fluxbox',
-      'systemctl restart x11vnc',
-      'rm -f /tmp/.X1-lock',
-    ]) {
-      expect(orbComputerProtectionRefusal(command)).toBeTypeOf('string');
-      expect(orbComputerProtectionRefusal(command)).toBe(
-        protectedComputerLifecycleRefusal(command),
-      );
-    }
-    expect(
-      orbComputerProtectionRefusal('bash -c "machinectl poweroff cairn-orb-x"'),
-    ).toBeUndefined();
-    expect(orbComputerProtectionRefusal('bash -c "pkill Xvfb"')).toBe('protected command pkill');
-    expect(orbComputerProtectionRefusal('systemctl status cairn-computer-desktop')).toBeUndefined();
   });
 });
 

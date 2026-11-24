@@ -1066,7 +1066,6 @@
         "apps/web/test/machine-capabilities.test.ts",
         "apps/server/test/computer-screen-routes.test.ts",
         "apps/server/test/computer-routes.test.ts",
-        "apps/daemon/test/computer-guard.test.ts",
         "apps/daemon/test/computer-browser.test.ts",
         "apps/daemon/test/machine-boot.test.ts",
         "apps/daemon/test/computer-host-desktop.test.ts",

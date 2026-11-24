@@ -40,6 +40,5 @@ describe('retired zero-use features (#1796)', () => {
     expect(PROTECTED_PATH_GLOBS).toContain('apps/server/src/routes-machine.ts');
     expect(PROTECTED_PATH_GLOBS).toContain('apps/server/src/services/machine*.ts');
     expect(PROTECTED_PATH_GLOBS).toContain('apps/daemon/src/machine-client.ts');
-    expect(PROTECTED_PATH_GLOBS).toContain('apps/daemon/src/backend/command-gate.ts');
   });
 });

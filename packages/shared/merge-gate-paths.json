@@ -55,7 +55,6 @@
     "apps/daemon/src/credentials.ts",
     "apps/daemon/src/secret-channel.ts",
     "apps/daemon/src/machine-client.ts",
-    "apps/daemon/src/backend/command-gate.ts",
     "apps/daemon/src/backend/host-shell-confinement.ts",
     "apps/server/src/services/mcp-face.ts",
     "apps/server/src/services/mcp-servers.ts",
@@ -94,7 +93,6 @@
     "machineAndCommandBoundary": [
       "apps/server/src/routes-machine.ts",
       "apps/server/src/services/machine*.ts",
-      "apps/daemon/src/backend/command-gate.ts",
       "apps/daemon/src/backend/host-shell-confinement.ts"
     ],
     "externalEntryAuth": [

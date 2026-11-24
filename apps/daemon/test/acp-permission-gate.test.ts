@@ -153,20 +153,19 @@ describe('ACP permission gate on locked turns', () => {
     },
   );
 
-  test('a normal Gemini turn runs ordinary commands and refuses a destructive one', async () => {
+  test('a normal Gemini turn allows commands without a command gate', async () => {
     const { events, outcomes } = await run(backendFor('gemini', 'ask-gate'), {}, [
       { toolCallId: 'ok', title: 'Bash', kind: 'execute', rawInput: { command: 'ls' }, exec: true },
       {
-        toolCallId: 'bad',
+        toolCallId: 'extra',
         title: 'Bash',
         kind: 'execute',
-        rawInput: { command: 'rm -rf /' },
+        rawInput: { command: 'git status' },
         exec: true,
       },
-      { toolCallId: 'silent', title: 'Bash', kind: 'execute', rawInput: {}, exec: true },
     ]);
     expect(events.at(-1)).toMatchObject({ type: 'done' });
-    expect(outcomes).toMatchObject({ ok: 'allow', bad: 'deny', silent: 'deny' });
-    expect(outcomes.__executed).toEqual(['ok']);
+    expect(outcomes).toMatchObject({ ok: 'allow', extra: 'allow' });
+    expect(outcomes.__executed).toEqual(['ok', 'extra']);
   });
 });

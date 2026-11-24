@@ -1,14 +1,12 @@
 import type { RequestPermissionRequest } from '@agentclientprotocol/sdk';
 import { escapeRegExp, type SessionOpts } from '@cairn/shared';
-import { decideBashCommand, decideToolCall, type PermissionRule } from './command-gate.js';
 
 export type AcpTurnPolicy = 'relay-only' | 'read-only' | 'normal';
 
 export type AcpToolCall = RequestPermissionRequest['toolCall'];
 
 export interface AcpNormalGate {
-  mode: 'deny' | 'allow-once' | 'gate';
-  rules?: readonly PermissionRule[];
+  mode: 'deny' | 'allow-once';
 }
 
 export interface AcpGateDecision {
@@ -27,25 +25,7 @@ const PERMISSIVE_MODES = new Set([
   'yolo',
 ]);
 const RESTRICTIVE_MODE_ORDER = ['read-only', 'default', 'normal', 'ask', 'plan'];
-const KNOWN_KINDS = new Set([
-  'read',
-  'edit',
-  'delete',
-  'move',
-  'search',
-  'execute',
-  'think',
-  'fetch',
-  'other',
-]);
 const READ_KINDS = new Set(['read', 'search', 'think']);
-const FILE_KIND_TOOL: Record<string, string> = {
-  read: 'read',
-  search: 'grep',
-  edit: 'edit',
-  delete: 'edit',
-  move: 'edit',
-};
 const CLAUDE_BUILTIN_WRITE_TOOLS = [
   'Bash',
   'Write',
@@ -136,34 +116,6 @@ export function isHostToolCall(toolCall: AcpToolCall, hostToolNames: readonly st
   });
 }
 
-function rawRecord(toolCall: AcpToolCall): Record<string, unknown> {
-  const raw = toolCall.rawInput;
-  return typeof raw === 'object' && raw !== null && !Array.isArray(raw)
-    ? (raw as Record<string, unknown>)
-    : {};
-}
-
-function commandOf(toolCall: AcpToolCall): string | null {
-  const raw = rawRecord(toolCall);
-  for (const key of ['command', 'cmd', 'script']) {
-    const value = raw[key];
-    if (typeof value === 'string' && value.trim() !== '') return value;
-    if (Array.isArray(value) && value.every((part) => typeof part === 'string'))
-      return value.join(' ');
-  }
-  return null;
-}
-
-function pathsOf(toolCall: AcpToolCall): string[] {
-  const paths: string[] = [];
-  for (const location of toolCall.locations ?? []) paths.push(location.path);
-  const raw = rawRecord(toolCall);
-  for (const key of ['path', 'file_path', 'filepath', 'absolute_path']) {
-    if (typeof raw[key] === 'string') paths.push(raw[key]);
-  }
-  return paths;
-}
-
 export function decideAcpPermission(input: {
   policy: AcpTurnPolicy;
   toolCall: AcpToolCall;
@@ -187,39 +139,5 @@ export function decideAcpPermission(input: {
     return { allow: false, reason: `Cairn permission gate rejected ${label}: ${why}` };
   }
   if (input.normal.mode === 'allow-once') return { allow: true, reason: 'allow-once agent policy' };
-  if (input.normal.mode === 'deny') {
-    return { allow: false, reason: `Cairn permission gate rejected ${label}: agent policy denies` };
-  }
-  if (!KNOWN_KINDS.has(kind)) {
-    return { allow: false, reason: `Cairn permission gate rejected ${label}: unknown tool kind` };
-  }
-  if (kind === 'execute') {
-    const command = commandOf(toolCall);
-    if (command === null) {
-      return {
-        allow: false,
-        reason: `Cairn permission gate rejected ${label}: no command text to check`,
-      };
-    }
-    const decision = decideBashCommand(command, input.normal.rules);
-    return decision.action === 'allow'
-      ? { allow: true, reason: 'command gate allows' }
-      : {
-          allow: false,
-          reason: `Cairn permission gate rejected ${label}: command gate (${decision.ruleId ?? 'rule'}) ${decision.action}`,
-        };
-  }
-  const tool = FILE_KIND_TOOL[kind];
-  if (tool !== undefined) {
-    for (const path of pathsOf(toolCall)) {
-      const decision = decideToolCall(tool, { path }, input.normal.rules);
-      if (decision !== undefined && decision.action !== 'allow') {
-        return {
-          allow: false,
-          reason: `Cairn permission gate rejected ${label}: tool gate (${decision.ruleId ?? 'rule'}) ${decision.action}`,
-        };
-      }
-    }
-  }
-  return { allow: true, reason: 'tool gate allows' };
+  return { allow: false, reason: `Cairn permission gate rejected ${label}: agent policy denies` };
 }
