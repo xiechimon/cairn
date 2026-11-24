@@ -9,15 +9,24 @@ import type {
   TranscriptRow,
 } from '@cairn/shared';
 
-export interface TeamStreamConnection {
+export interface TeamStreamConnection<Data = object> {
   nextSeq(): number;
-  send(payload: object): Promise<void>;
+  send(payload: Data): Promise<void>;
+}
+
+type StreamSubscriber<Data> = Pick<TeamStreamConnection<Data>, 'send'>;
+interface TeamSubscriber {
+  send(payload: object, encoded: string): Promise<void>;
 }
 
 export class TeamStreamHub {
-  private readonly byTeam = new Map<string, Map<TeamStreamConnection, string | undefined>>();
+  private readonly byTeam = new Map<string, Map<TeamSubscriber, string | undefined>>();
 
-  subscribe(teamId: string, conn: TeamStreamConnection, userId?: string): () => void {
+  constructor(
+    private readonly projectOfBuildTodo?: (teamId: string, todoId: string) => string | undefined,
+  ) {}
+
+  subscribe<T extends TeamSubscriber>(teamId: string, conn: T, userId?: string): () => void {
     let set = this.byTeam.get(teamId);
     if (!set) {
       set = new Map();
@@ -35,36 +44,41 @@ export class TeamStreamHub {
   }
 
   publishTodoDoc(teamId: string, doc: TodoRecord): void {
-    this.publish(teamId, (conn) => ({ type: 'todo', seq: conn.nextSeq(), v: doc.v, doc }));
+    this.publish(teamId, () => ({ type: 'todo', v: doc.v, doc }));
   }
 
   publishBuildDoc(teamId: string, doc: BuildRecord): void {
-    this.publish(teamId, (conn) => ({ type: 'build', seq: conn.nextSeq(), v: 1, doc }));
+    this.publish(teamId, () => {
+      const projectId = this.projectOfBuildTodo?.(teamId, doc.todoId);
+      return { type: 'build', v: 1, doc, ...(projectId === undefined ? {} : { projectId }) };
+    });
   }
 
   publishNotification(teamId: string, record: NotificationRecord): void {
     this.publish(teamId, () => ({ type: 'notification', notification: record }));
   }
 
-  publishPrivate(
-    teamId: string,
-    userId: string,
-    frame: (conn: TeamStreamConnection) => object,
-  ): void {
+  publishPrivate(teamId: string, userId: string, frame: () => object): void {
     if (!userId) return;
     const set = this.byTeam.get(teamId);
     if (!set) return;
+    let publication: [object, string] | undefined;
     for (const [conn, subscriberUserId] of set) {
-      if (subscriberUserId === userId) void conn.send(frame(conn));
+      if (subscriberUserId !== userId) continue;
+      if (publication === undefined) {
+        const payload = frame();
+        publication = [payload, JSON.stringify(payload)];
+      }
+      void conn.send(...publication);
     }
   }
 
-  publish(teamId: string, frame: (conn: TeamStreamConnection) => object): void {
+  publish(teamId: string, frame: () => object): void {
     const set = this.byTeam.get(teamId);
     if (!set) return;
-    for (const conn of set.keys()) {
-      void conn.send(frame(conn));
-    }
+    const payload = frame();
+    const encoded = JSON.stringify(payload);
+    for (const conn of set.keys()) void conn.send(payload, encoded);
   }
 }
 
@@ -75,12 +89,13 @@ export interface SerialConnectionOptions {
   onOverflow?: () => void;
 }
 
-export function createSerialConnection(
-  write: (payload: object) => Promise<void>,
+export function createSerialConnection<Data = object>(
+  write: (payload: Data, seq: number) => Promise<void>,
   options: SerialConnectionOptions = {},
-): TeamStreamConnection {
+): TeamStreamConnection<Data> {
   const maxPending = options.maxPending ?? SSE_MAX_PENDING_WRITES;
   let seq = 0;
+  let frameId = 0;
   let pending = 0;
   let overflowed = false;
   let tail: Promise<void> = Promise.resolve();
@@ -95,7 +110,7 @@ export function createSerialConnection(
       }
       pending += 1;
       tail = tail
-        .then(() => write(payload))
+        .then(() => write(payload, ++frameId))
         .catch(() => {})
         .finally(() => {
           pending -= 1;
@@ -106,19 +121,31 @@ export function createSerialConnection(
 }
 
 export interface StreamSession {
-  readonly conn: TeamStreamConnection;
+  readonly conn: StreamSubscriber<string>;
   readonly teamId: string;
   readonly deviceId: string | null;
   readonly subscriptions: Map<string, () => void>;
+  revision: number | undefined;
+  closed: boolean;
 }
 
 export class StreamSessionRegistry {
   private readonly sessions = new Map<string, StreamSession>();
+  private readonly envelopes = new WeakMap<object, Map<string, string>>();
 
-  open(connectionId: string, session: Omit<StreamSession, 'subscriptions'>): () => void {
-    const entry: StreamSession = { ...session, subscriptions: new Map() };
+  open(
+    connectionId: string,
+    session: Omit<StreamSession, 'subscriptions' | 'revision' | 'closed'>,
+  ): () => void {
+    const entry: StreamSession = {
+      ...session,
+      subscriptions: new Map(),
+      revision: undefined,
+      closed: false,
+    };
     this.sessions.set(connectionId, entry);
     return () => {
+      entry.closed = true;
       this.sessions.delete(connectionId);
       for (const unsubscribe of entry.subscriptions.values()) unsubscribe();
       entry.subscriptions.clear();
@@ -133,7 +160,15 @@ export class StreamSessionRegistry {
     session: StreamSession,
     conversationIds: readonly string[],
     hub: ConversationStreamHub | undefined,
-  ): void {
+    revision?: number,
+  ): number | undefined {
+    if (
+      session.closed ||
+      (session.revision !== undefined && (revision === undefined || revision <= session.revision))
+    ) {
+      return session.revision;
+    }
+    session.revision = revision;
     const wanted = new Set(conversationIds);
     for (const [id, unsubscribe] of session.subscriptions) {
       if (wanted.has(id)) continue;
@@ -142,12 +177,31 @@ export class StreamSessionRegistry {
     }
     for (const id of wanted) {
       if (session.subscriptions.has(id)) continue;
-      const channel: TeamStreamConnection = {
-        nextSeq: () => session.conn.nextSeq(),
-        send: (event) => session.conn.send({ type: 'conversation', conversationId: id, event }),
+      const channel: StreamSubscriber<object> = {
+        send: (event) => {
+          let frames = this.envelopes.get(event);
+          if (frames === undefined) {
+            frames = new Map();
+            this.envelopes.set(event, frames);
+          }
+          let data = frames.get(id);
+          if (data === undefined) {
+            data = JSON.stringify({ type: 'conversation', conversationId: id, event });
+            frames.set(id, data);
+          }
+          return session.conn.send(data);
+        },
       };
-      session.subscriptions.set(id, hub?.subscribe(id, channel) ?? (() => {}));
+      if (revision !== undefined) void channel.send({ type: 'preview_reset' });
+      if (session.closed) break;
+      const unsubscribe = hub?.subscribe(id, channel) ?? (() => {});
+      if (session.closed) {
+        unsubscribe();
+        break;
+      }
+      session.subscriptions.set(id, unsubscribe);
     }
+    return session.revision;
   }
 }
 
@@ -156,12 +210,12 @@ export const CONV_TEXT_BUFFER_MAX_BYTES = 128 * 1024;
 export const CONV_TEXT_BUFFER_MAX_CONVS = 128;
 
 export class ConversationStreamHub {
-  private readonly byConv = new Map<string, Set<TeamStreamConnection>>();
+  private readonly byConv = new Map<string, Set<StreamSubscriber<object>>>();
   private readonly textBuffers = new Map<string, string>();
   private readonly thinkingBuffers = new Map<string, string>();
   private readonly lastActivity = new Map<string, StepActivity>();
 
-  subscribe(conversationId: string, conn: TeamStreamConnection): () => void {
+  subscribe<T extends StreamSubscriber<object>>(conversationId: string, conn: T): () => void {
     let set = this.byConv.get(conversationId);
     if (!set) {
       set = new Set();

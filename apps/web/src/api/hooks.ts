@@ -136,7 +136,11 @@ import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import { fetchWithSession, useAuth } from './auth.js';
 import { ApiError, api } from './client.js';
 import { computerQueryKeys } from './computer-query-scope.js';
-import { cacheUserMessage, moveQueueToReplacement } from './message-cache.js';
+import {
+  cacheUserMessage,
+  confirmQueuedMessageRemoval,
+  moveQueueToReplacement,
+} from './message-cache.js';
 import { keepNewerProvider, keepNewerProviders } from './provider-freshness.js';
 import { resumeRefreshDelayMs } from './resume-refresh-delay.js';
 import { cachedTodo, optimisticTodo } from './team-stream-cache.js';
@@ -184,7 +188,8 @@ export function useSearchResults(query: string, enabled: boolean) {
   const trimmed = debounced.trim();
   return useQuery({
     queryKey: ['search', trimmed],
-    queryFn: () => api.get<SearchResponse>(`/api/search?q=${encodeURIComponent(trimmed)}`),
+    queryFn: ({ signal }) =>
+      api.get<SearchResponse>(`/api/search?q=${encodeURIComponent(trimmed)}`, signal),
     enabled: enabled && trimmed !== '',
   });
 }
@@ -200,7 +205,8 @@ function useDebouncedValue(value: string, delayMs: number): string {
 
 export const todosQuery = (teamId: string | undefined) => ({
   queryKey: ['todos', teamId],
-  queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`),
+  queryFn: ({ signal }: { signal: AbortSignal }) =>
+    api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}`, signal),
   structuralSharing: keepNewerTodos,
 });
 
@@ -214,14 +220,15 @@ export const useTodos = (teamId: string | undefined, enabled: boolean) =>
 export const useArchivedTodos = (teamId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['todos', teamId, 'archived'],
-    queryFn: () => api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}&archived=1`),
+    queryFn: ({ signal }) =>
+      api.get<TodoRecord[]>(`/api/todos?teamId=${teamId}&archived=1`, signal),
     enabled: enabled && teamId !== undefined,
   });
 
 export const tasksQuery = (teamId: string | undefined) => ({
   queryKey: ['tasks', teamId],
-  queryFn: async () =>
-    tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}&sectioned=1`)),
+  queryFn: async ({ signal }: { signal: AbortSignal }) =>
+    tasksQuerySchema.parse(await api.get(`/api/tasks?teamId=${teamId}&sectioned=1`, signal)),
   structuralSharing: keepNewerTasks,
 });
 
@@ -234,7 +241,7 @@ export const useTasks = (teamId: string | undefined, enabled: boolean) =>
 
 export const todoQuery = (id: string | undefined) => ({
   queryKey: ['todo', id],
-  queryFn: () => api.get<TodoRecord>(`/api/todos/${id}`),
+  queryFn: ({ signal }: { signal: AbortSignal }) => api.get<TodoRecord>(`/api/todos/${id}`, signal),
   structuralSharing: keepNewerTodo,
 });
 
@@ -244,7 +251,7 @@ export const useTodo = (id: string | undefined, enabled: boolean) =>
 export const useBuild = (id: string | null | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['build', id],
-    queryFn: () => api.get<BuildRecord>(`/api/builds/${id}`),
+    queryFn: ({ signal }) => api.get<BuildRecord>(`/api/builds/${id}`, signal),
     enabled: enabled && id != null,
   });
 
@@ -268,25 +275,26 @@ export const usePrs = (
 export const useProjectBuilds = (projectId: string | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['projectBuilds', projectId],
-    queryFn: () => api.get<BuildRecord[]>(`/api/projects/${projectId}/builds`),
+    queryFn: ({ signal }) => api.get<BuildRecord[]>(`/api/projects/${projectId}/builds`, signal),
     enabled: enabled && projectId !== undefined,
   });
 
 export const useSteps = (buildId: string | null | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['steps', buildId],
-    queryFn: () => api.get<StepRow[]>(`/api/builds/${buildId}/steps`),
+    queryFn: ({ signal }) => api.get<StepRow[]>(`/api/builds/${buildId}/steps`, signal),
     enabled: enabled && buildId != null,
   });
 
 const conversationMessagesQuery = (conversationId: string | null | undefined) =>
   infiniteQueryOptions({
     queryKey: ['messages', conversationId, 'pages'],
-    queryFn: ({ pageParam }) =>
+    queryFn: ({ pageParam, signal }) =>
       api.get<ConversationMessagesResponse>(
         `/api/conversations/${conversationId}/messages${
           pageParam !== null ? `?before=${encodeURIComponent(pageParam)}` : ''
         }`,
+        signal,
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => (typeof last.nextCursor === 'string' ? last.nextCursor : null),
@@ -365,16 +373,17 @@ export async function keepNewestMessagesPage(
 export const usePlans = (buildId: string | null | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['plans', buildId],
-    queryFn: () => api.get<PlanRow[]>(`/api/builds/${buildId}/plans`),
+    queryFn: ({ signal }) => api.get<PlanRow[]>(`/api/builds/${buildId}/plans`, signal),
     enabled: enabled && buildId != null,
   });
 
 export const useBuildChanges = (buildId: string | null | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['changes', buildId],
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api.get<{ files: DocumentDiffFile[]; reported?: boolean; changed?: boolean }>(
         `/api/builds/${buildId}/changes`,
+        signal,
       ),
     enabled: enabled && buildId != null,
   });
@@ -426,7 +435,7 @@ export function useRunHistoryTokens(buildIds: string[], enabled: boolean) {
 export const useSchedules = (enabled: boolean) =>
   useQuery({
     queryKey: ['schedules'],
-    queryFn: () => api.get<ScheduleRecord[]>('/api/schedules'),
+    queryFn: ({ signal }) => api.get<ScheduleRecord[]>('/api/schedules', signal),
     enabled,
   });
 
@@ -1134,7 +1143,10 @@ export function useApiMutations(teamId: string | undefined) {
           ...(input.body.projectId === undefined ? {} : { projectId: input.body.projectId }),
           ...(input.body.orderIndex === undefined ? {} : { orderIndex: input.body.orderIndex }),
         }),
-      onError: (_error, _input, optimistic) => optimistic?.rollback(),
+      onError: (_error, _input, optimistic) => {
+        optimistic?.rollback();
+        invalidateAll();
+      },
       onSuccess: (_record, _input, optimistic) => {
         optimistic?.settle();
         invalidateAll();
@@ -1185,7 +1197,10 @@ export function useApiMutations(teamId: string | undefined) {
         );
         invalidateAll();
       },
-      onError: (_error, _input, optimistic) => optimistic?.rollback(),
+      onError: (_error, _input, optimistic) => {
+        optimistic?.rollback();
+        invalidateAll();
+      },
     }),
     deleteTodo: useMutation({
       mutationFn: (id: string) => api.del<void>(`/api/todos/${id}`),
@@ -1860,10 +1875,13 @@ export function useApiMutations(teamId: string | undefined) {
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
       },
       onSuccess: (data, input) => {
-        cacheUserMessage(qc, data.conversationId ?? input.conversationId, data.message, {
-          conversationId: input.conversationId,
-          messageId: input.queuedMessageId,
-        });
+        if (input.cancelQueued === true && input.queuedMessageId !== undefined)
+          confirmQueuedMessageRemoval(qc, input.conversationId, input.queuedMessageId);
+        else
+          cacheUserMessage(qc, data.conversationId ?? input.conversationId, data.message, {
+            conversationId: input.conversationId,
+            messageId: input.queuedMessageId,
+          });
         void qc.invalidateQueries({ queryKey: ['messages', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['steps', input.conversationId] });
         void qc.invalidateQueries({ queryKey: ['todo'] });

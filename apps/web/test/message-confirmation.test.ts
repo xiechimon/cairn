@@ -1,11 +1,11 @@
 import type { ConversationMessagesResponse } from '@cairn/shared';
-import { type InfiniteData, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { type InfiniteData, QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, expect, it, vi } from 'vitest';
 import { api } from '../src/api/client.js';
 import { type ApiMutations, useApiMutations } from '../src/api/hooks.js';
-import { cacheUserMessage } from '../src/api/message-cache.js';
+import { cacheUserMessage, moveQueueToReplacement } from '../src/api/message-cache.js';
 
 const message = { id: 'confirmed', role: 'user', content: 'A confirmed message', createdAt: 3 };
 const key = ['messages', 'build-1', 'pages'];
@@ -119,6 +119,61 @@ it.each([
   ]);
   expect(qc.getQueryData<InfiniteData<ConversationMessagesResponse>>(['messages', 'replacement-build', 'pages'])?.pages[0]?.messages).toEqual([message]);
   expect(newest(qc)?.messages).toEqual([]);
+});
+
+it('does not restore a capsule removed by a target GET while the source replacement GET is held', async () => {
+  const { qc } = setup();
+  const target = 'replacement-build';
+  const targetKey = ['messages', target, 'pages'];
+  const capsule = { id: 'queued-late', content: 'Still waiting', createdAt: 2, deliverAfterStop: false };
+  cacheUserMessage(qc, 'build-1', capsule);
+  cacheUserMessage(qc, target, capsule);
+  const source = qc.getQueryData<InfiniteData<ConversationMessagesResponse>>(key)!;
+  const withoutCapsule = { ...source, pages: source.pages.map((page) => ({ ...page, queuedMessages: [] })) };
+  let finishSource!: (value: typeof source) => void;
+  const held = new Promise<typeof source>((resolve) => { finishSource = resolve; });
+  const sourceRead = vi.fn<() => Promise<typeof source>>()
+    .mockReturnValueOnce(new Promise(() => {}))
+    .mockReturnValueOnce(held);
+  const observer = new QueryObserver(qc, { queryKey: key, queryFn: sourceRead, staleTime: Infinity });
+  const stop = observer.subscribe(() => {});
+  try {
+    const firstRead = observer.refetch();
+    moveQueueToReplacement(qc, 'build-1', target);
+    await qc.fetchQuery({ queryKey: targetKey, queryFn: async () => withoutCapsule });
+    expect(queue(qc, target)).toEqual([]);
+    expect(observer.getCurrentResult().fetchStatus).toBe('fetching');
+    finishSource(withoutCapsule);
+    await firstRead;
+    await vi.waitFor(() => expect(observer.getCurrentResult().fetchStatus).toBe('idle'));
+    expect(sourceRead).toHaveBeenCalledTimes(2);
+    expect(queue(qc, target)).toEqual([]);
+  } finally {
+    stop();
+  }
+});
+
+it.each(['delivered', 'cancelled', 'absent in a fresh GET'] as const)('does not move a source capsule that the target confirmed as %s', async (outcome) => {
+  const { qc, mutations } = setup();
+  const target = 'replacement-build';
+  const capsule = { id: 'already-resolved', content: 'Before rollover', createdAt: 2, deliverAfterStop: false };
+  cacheUserMessage(qc, 'build-1', capsule);
+  cacheUserMessage(qc, target, capsule);
+  if (outcome === 'delivered') {
+    cacheUserMessage(qc, target, message, { conversationId: target, messageId: capsule.id });
+  } else if (outcome === 'cancelled') {
+    vi.spyOn(api, 'post').mockResolvedValue({ conversationId: target });
+    await mutations.sendSteer.mutateAsync({ conversationId: target, content: '', queuedMessageId: capsule.id, cancelQueued: true });
+  } else {
+    const targetKey = ['messages', target, 'pages'];
+    const cached = qc.getQueryData<InfiniteData<ConversationMessagesResponse>>(targetKey)!;
+    await qc.fetchQuery({
+      queryKey: targetKey,
+      queryFn: async () => ({ ...cached, pages: cached.pages.map((page) => ({ ...page, queuedMessages: [] })) }),
+    });
+  }
+  moveQueueToReplacement(qc, 'build-1', target);
+  expect(queue(qc, target)).toEqual([]);
 });
 
 it('moves the queue when a plain steer rolls the task over to a replacement build', async () => {

@@ -50,6 +50,10 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
     stopped = true;
     todo = { ...todo, phase: 'confirm', phaseAt: Date.now(), v: todo.v + 1 };
   };
+  let titleAfterReconnect: string | undefined;
+  const renameOnReconnect = (title: string) => {
+    titleAfterReconnect = title;
+  };
   await page.route('**/api/**', (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -81,6 +85,18 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
     }
     if (path.endsWith('/stream'))
       return route.fulfill({ contentType: 'text/event-stream', body: '' });
+    if (/^\/api\/streams\/archive-\d+\/conversations$/.test(path) && request.method() === 'PUT') {
+      const { conversationIds, revision } = request.postDataJSON() as {
+        conversationIds: string[];
+        revision: number;
+      };
+      if (path === '/api/streams/archive-2/conversations' && titleAfterReconnect !== undefined) {
+        expect(conversationIds).toContain('build-archive');
+        todo = { ...todo, title: titleAfterReconnect, v: todo.v + 1 };
+        titleAfterReconnect = undefined;
+      }
+      return route.fulfill({ json: { revision } });
+    }
     if (path.startsWith('/api/teams/team-archive/drafts/'))
       return route.fulfill({ json: { content: '', updatedAt: null } });
     const responses: Record<string, unknown> = {
@@ -167,7 +183,7 @@ async function setup(page: Page, phase = 'building', archivedAt: number | null =
     unexpected.push(`${request.method()} ${path}`);
     return route.fulfill({ status: 404, json: { error: 'Unexpected archive test request' } });
   });
-  return { actions, revisions, unexpected, stopReport };
+  return { actions, revisions, unexpected, stopReport, renameOnReconnect };
 }
 
 async function continueFromComposer(page: Page, revisions: unknown[]) {
@@ -211,8 +227,43 @@ test('an archived thread locks the composer; unarchive restores it without chang
 test('archive toast Undo restores the composer immediately', async ({
   page,
 }) => {
-  const { actions, revisions, unexpected, stopReport } = await setup(page);
-  await page.goto('/app/todo/todo-archive');
+  const { actions, revisions, unexpected, stopReport, renameOnReconnect } = await setup(page);
+  const disconnectEvent = 'archive-test-disconnect';
+  await page.addInitScript((eventName) => {
+    let connections = 0;
+    class ArchiveEventSource {
+      private readonly lifetime = new AbortController();
+      readyState = 1;
+      onmessage: ((event: MessageEvent<string>) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      constructor() {
+        const connectionId = `archive-${++connections}`;
+        queueMicrotask(() => {
+          if (this.readyState !== 1) return;
+          this.onmessage?.(
+            new MessageEvent('message', {
+              data: JSON.stringify({ type: 'hello', connectionId, followRevision: true }),
+              lastEventId: '1',
+            }),
+          );
+        });
+        window.addEventListener(eventName, () => this.onerror?.(), { signal: this.lifetime.signal });
+      }
+
+      close() {
+        this.readyState = 2;
+        this.lifetime.abort();
+      }
+    }
+    Object.defineProperty(window, 'EventSource', { value: ArchiveEventSource });
+  }, disconnectEvent);
+  await Promise.all([
+    page.waitForResponse(
+      (response) => response.ok() && response.url().endsWith('/api/streams/archive-1/conversations'),
+    ),
+    page.goto('/app/todo/todo-archive'),
+  ]);
   await expect(page.locator('.side-panel textarea')).toBeVisible();
   await archive(page);
   await expect(page.locator('.side-panel textarea')).toHaveCount(0);
@@ -238,18 +289,21 @@ test('archive toast Undo restores the composer immediately', async ({
       return (box?.x ?? 0) >= (panelBox?.x ?? Number.POSITIVE_INFINITY) && (box?.y ?? 0) + (box?.height ?? 0) <= (barBox?.y ?? 0);
     })
     .toBe(true);
-  await page.getByRole('button', { name: '撤销', exact: true }).click();
-  const staleReads = (async () => {
-    for (let read = 0; read < 2; read++)
-      await page.waitForResponse(
-        (response) =>
-          response.request().method() === 'GET' &&
-          new URL(response.url()).pathname === '/api/todos/todo-archive',
-      );
-  })();
   try {
+    const unarchiveStarted = page.waitForRequest('**/api/todos/todo-archive/unarchive');
+    await page.getByRole('button', { name: '撤销', exact: true }).click();
+    await unarchiveStarted;
     await expect(page.locator('.side-panel textarea')).toBeVisible();
-    await staleReads;
+    const refreshedTitle = 'Archive probe after reconnect';
+    renameOnReconnect(refreshedTitle);
+    await Promise.all([
+      page.waitForResponse(
+        (response) => response.ok() && response.request().method() === 'PUT' &&
+          response.url().endsWith('/api/streams/archive-2/conversations'),
+      ),
+      page.evaluate((eventName) => window.dispatchEvent(new Event(eventName)), disconnectEvent),
+    ]);
+    await expect(page.getByTestId('side-chat-panel')).toHaveAttribute('aria-label', refreshedTitle);
     await expect(page.locator('.side-panel textarea')).toBeVisible();
     await expect(page.locator('[data-testid="side-chat-action"][data-action="unarchive"]')).toHaveCount(0);
   } finally {

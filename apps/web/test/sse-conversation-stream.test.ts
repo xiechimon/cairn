@@ -1,10 +1,11 @@
-import { QueryClient, QueryObserver } from '@tanstack/react-query';
+import type { ConversationMessagesResponse } from '@cairn/shared';
+import { type InfiniteData, QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { activityStore } from '../src/api/activity.js';
 import { agentTodoStore } from '../src/api/agent-todo.js';
 import { liveTextStore } from '../src/api/live-text.js';
 import { liveThinkingStore } from '../src/api/live-thinking.js';
-import { type ConvHandle, FakeEventSource, startConv, stopAllTabStreams } from './tab-stream-harness.js';
+import { type ConvHandle, FakeEventSource, startConv, stopAllTabStreams, stubTabFollow } from './tab-stream-harness.js';
 
 const CONV = 'chief-t-740';
 
@@ -23,6 +24,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   FakeEventSource.instances = [];
   vi.stubGlobal('EventSource', FakeEventSource);
+  stubTabFollow();
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => setTimeout(cb, 16));
   liveTextStore.clear(CONV);
   liveThinkingStore.clear(CONV);
@@ -100,24 +102,58 @@ describe('confirmed user message visibility', () => {
     qc.clear();
   });
 
-  it('does not let a pre-confirmation read erase a received message', async () => {
+  it.each(['pending', 'settled'])('never loses a published confirmation to a %s read', async (state) => {
     const qc = freshClient();
     const key = ['messages', CONV, 'pages'];
     const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
-    const initial = { pages: [envelope], pageParams: [null] };
-    qc.setQueryData(key, initial);
+    const initial: InfiniteData<ConversationMessagesResponse> = { pages: [envelope], pageParams: [null] };
+    const message = { id: 'new-user', role: 'user' as const, content: 'Keep my confirmation', createdAt: 3 };
+    const reply = { id: 'reply', role: 'assistant' as const, content: 'A saved reply', createdAt: 4 };
+    const fresh = { ...initial, pages: [{ ...envelope, messages: [message, reply] }] };
     let finish = (_value: typeof initial) => {};
-    const read = qc.fetchQuery({ queryKey: key, queryFn: () => new Promise<typeof initial>((resolve) => { finish = resolve; }) }).catch(() => undefined);
-    const es = startStream(qc);
-    const message = { id: 'new-user', role: 'user', content: 'Keep my confirmation', createdAt: 3 };
-    es.push({ type: 'message', message });
-    finish(initial);
-    await read;
-    expect(qc.getQueryData(key)).toEqual({ pages: [{ ...envelope, messages: [message] }], pageParams: [null] });
-    qc.clear();
+    const earlier = new Promise<typeof initial>((resolve) => { finish = resolve; });
+    let finishFollowUp = (_value: typeof initial) => {};
+    const followUp = new Promise<typeof initial>((resolve) => { finishFollowUp = resolve; });
+    const queryFn = vi.fn<() => Promise<typeof initial>>()
+      .mockResolvedValueOnce(initial)
+      .mockReturnValueOnce(earlier)
+      .mockReturnValue(followUp);
+    qc.setQueryData(key, initial);
+    const observer = new QueryObserver(qc, { queryKey: key, queryFn, staleTime: Infinity });
+    const published: (string[] | undefined)[] = [];
+    const stop = observer.subscribe(({ data }) => published.push(data?.pages[0]?.messages.map(({ id }) => id)));
+    try {
+      const es = startStream(qc);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(queryFn).toHaveBeenCalledOnce();
+      const read = qc.fetchQuery({ queryKey: key, queryFn, staleTime: 0 });
+      const confirm = () => es.push({ type: 'message', message });
+      if (state === 'pending') {
+        confirm();
+        expect(published.at(-1)).toEqual([message.id]);
+      } else {
+        void earlier.then(confirm);
+      }
+      finish(initial);
+      await read;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(published.at(-1)).toEqual([message.id]);
+      finishFollowUp(fresh);
+      await vi.advanceTimersByTimeAsync(0);
+
+      const firstConfirmed = published.findIndex((ids) => ids?.includes(message.id));
+      expect(firstConfirmed).toBeGreaterThanOrEqual(0);
+      const afterConfirmation = published.slice(firstConfirmed);
+      expect(afterConfirmation.filter((ids) => !ids?.includes(message.id))).toEqual([]);
+      expect(afterConfirmation.at(-1)).toEqual([message.id, reply.id]);
+      expect(queryFn).toHaveBeenCalledTimes(3);
+    } finally {
+      stop();
+      qc.clear();
+    }
   });
 
-  it.each(['chief-t-740', 'build-740'])('shows %s events before a transcript read and deduplicates replay', (id) => {
+  it.each(['chief-t-740', 'build-740'])('shows %s events before a transcript read and deduplicates message IDs', (id) => {
     const qc = freshClient();
     const message = { id: 'user-740', role: 'user', content: 'Show this now', createdAt: 3 };
     const envelope = { messages: [], chips: null, historyEpoch: 0, steerPending: [], activeRun: null, nextCursor: null };
@@ -140,7 +176,7 @@ describe('confirmed user message visibility', () => {
   });
 });
 
-describe('clear on entry: a replay is a snapshot (failure mode 1)', () => {
+describe('clear on entry before a live snapshot', () => {
   it('stale buffer from before the subscription is cleared before the first event can arrive', () => {
 
     liveTextStore.append(CONV, '旧缓冲');
@@ -157,10 +193,11 @@ describe('clear on entry: a replay is a snapshot (failure mode 1)', () => {
 });
 
 describe('reconnect: rebuild clears (failure mode 2)', () => {
-  it('after a watchdog rebuild the stale buffer is void, a replayed snapshot does not stack a double copy', () => {
+  it('after a watchdog rebuild the fresh snapshot does not stack on top of stale text', async () => {
     const qc = freshClient();
     const invalidate = vi.spyOn(qc, 'invalidateQueries');
     const es = startStream(qc);
+    invalidate.mockClear();
     es.push({ type: 'text_delta', text: '断线前' });
     expect(liveTextStore.get(CONV)).toBe('断线前');
 
@@ -170,6 +207,7 @@ describe('reconnect: rebuild clears (failure mode 2)', () => {
     rebuilt.fireOpen();
 
     expect(liveTextStore.get(CONV)).toBe('');
+    await vi.advanceTimersByTimeAsync(0);
     expect(invalidate).toHaveBeenCalled();
 
     rebuilt.push({ type: 'text_delta', text: '断线前后缀' });
@@ -177,8 +215,8 @@ describe('reconnect: rebuild clears (failure mode 2)', () => {
   });
 });
 
-describe('seam: replayed snapshot + live increments (failure mode 3)', () => {
-  it('one replay and the following increments splice exactly — no overlap, no break', () => {
+describe('live snapshot and increments', () => {
+  it('the snapshot and the following increments splice exactly', () => {
     const qc = freshClient();
     const es = startStream(qc);
     es.push({ type: 'text_delta', text: '前缀' });
@@ -280,7 +318,7 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
       const options = {
         queryKey: key,
         staleTime: Infinity,
-        queryFn: () => ++reads === 1 ? Promise.resolve(initial) : new Promise<typeof initial>((resolve, reject) => { finish = resolve; fail = reject; }),
+        queryFn: () => ++reads <= 2 ? Promise.resolve(initial) : new Promise<typeof initial>((resolve, reject) => { finish = resolve; fail = reject; }),
       };
       await qc.fetchQuery(options);
       const observer = new QueryObserver(qc, options);
@@ -288,12 +326,14 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
       const es = startConv(CONV, qc, {});
       const stop = es.stop;
       es.fireOpen();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads).toBe(2);
       es.push({ type: 'text_delta', text: 'Do not erase this' });
       for (let i = 0; i < 4; i++) {
         es.push({ type: 'ping' });
         await vi.advanceTimersByTimeAsync(5_000);
       }
-      expect(reads).toBe(2);
+      expect(reads).toBe(3);
       if (scenario === 'new-event') es.push({ type: 'text_delta', text: ' next turn' });
       if (scenario === 'unsubscribed') stop();
       if (scenario === 'failed-read') fail?.(new Error('Read unavailable'));
@@ -308,7 +348,10 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
 
   it('message event (assistant text row): records handoff, does not clear the buffer + messages/plans invalidated and refetched', () => {
     const qc = freshClient();
-    const invalidate = vi.spyOn(qc, 'invalidateQueries');
+    const messages = ['messages', CONV, 'pages'];
+    const plans = ['plans', CONV];
+    const otherPlans = ['plans', 'build-other'];
+    for (const key of [messages, plans, otherPlans]) qc.setQueryData(key, []);
     const es = startStream(qc);
     es.push({ type: 'text_delta', text: '段' });
     es.push({
@@ -320,22 +363,24 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
 
     expect(liveTextStore.getVisible(CONV, new Set())).toBe('段');
     expect(liveTextStore.getVisible(CONV, new Set(['m1']))).toBe('');
-    const keys = invalidate.mock.calls.map(([filters]) => filters as { queryKey?: string[] });
-    expect(keys.some((f) => f.queryKey?.[0] === 'messages')).toBe(true);
-    expect(keys.some((f) => f.queryKey?.[0] === 'plans')).toBe(true);
+    expect(qc.getQueryState(messages)?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(plans)?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(otherPlans)?.isInvalidated).toBe(true);
   });
 
   it('a Coordinator message refreshes the Tasks read, where its questions are listed', () => {
     const qc = freshClient();
-    const invalidate = vi.spyOn(qc, 'invalidateQueries');
+    const tasks = ['tasks', 'team-1'];
+    const otherTasks = ['tasks', 'team-other'];
+    for (const key of [tasks, otherTasks]) qc.setQueryData(key, { entries: [] });
     const es = startStream(qc);
     es.push({
       type: 'message',
       message: { id: 'm-q', role: 'assistant', content: 'question', createdAt: 1 },
     });
 
-    const keys = invalidate.mock.calls.map(([filters]) => filters as { queryKey?: string[] });
-    expect(keys.some((f) => f.queryKey?.[0] === 'tasks')).toBe(true);
+    expect(qc.getQueryState(tasks)?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(otherTasks)?.isInvalidated).toBe(true);
   });
 
   it('message event (tool row): does not record handoff, buffer kept', () => {
@@ -387,6 +432,7 @@ describe('existing faces unchanged (failure mode 4; #857 settle-handoff rewrote 
     const qc = freshClient();
     const invalidate = vi.spyOn(qc, 'invalidateQueries');
     const es = startStream(qc);
+    invalidate.mockClear();
     es.push({ type: 'text_delta', text: '段' });
     es.push({
       type: 'step',
@@ -460,7 +506,7 @@ describe('activity phase single slot (#905)', () => {
     expect(activityStore.get(CONV)).not.toBeNull();
   });
 
-  it('stream rebuild clears the slot: the new subscription voids the old phase first, the hub replay takes over', () => {
+  it('the new subscription clears stale activity before the live snapshot', () => {
     activityStore.set(CONV, { stepId: 's0', phase: 'thinking', at: 50 });
     const qc = freshClient();
     FakeEventSource.instances = [];
@@ -496,7 +542,7 @@ describe('thinking increments (#1308)', () => {
     expect(liveThinkingStore.get(CONV)).toBe('');
   });
 
-  it('stale thinking buffer from before the subscription is cleared before the replay', () => {
+  it('stale thinking is cleared before the live snapshot', () => {
     liveThinkingStore.append(CONV, '旧思考');
     FakeEventSource.instances = [];
     const started = startConv(CONV, freshClient(), {});
@@ -524,7 +570,7 @@ describe('thinking increments (#1308)', () => {
     expect(liveThinkingStore.get(CONV)).toBe('');
   });
 
-  it('reconnect resync voids the old thinking buffer, a replayed snapshot does not stack', () => {
+  it('the new thinking snapshot does not stack on top of the old one', () => {
     const es = startStream(freshClient());
     es.push({ type: 'thinking_delta', text: '断线前' });
     vi.advanceTimersByTime(20_000);
@@ -612,7 +658,7 @@ describe('agent todo list single slot (#1524)', () => {
     expect(agentTodoStore.get(CONV)).not.toBeNull();
   });
 
-  it('stream rebuild clears the slot: the new subscription voids the old list first, the hub replay takes over', () => {
+  it('the new subscription clears the old list before the live snapshot', () => {
     agentTodoStore.set(CONV, { stepId: 's0', at: 50, items: [{ text: '旧', state: 'todo' }] });
     FakeEventSource.instances = [];
     const started = startConv(CONV, freshClient(), {});

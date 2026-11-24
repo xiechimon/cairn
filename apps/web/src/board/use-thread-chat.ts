@@ -24,7 +24,7 @@ import {
   useSteps,
   useTodo,
 } from '../api/hooks.js';
-import { invalidateConverged } from '../api/invalidate.js';
+import { refreshQueries } from '../api/invalidate.js';
 import { liveTextStore } from '../api/live-text.js';
 import { liveThinkingStore } from '../api/live-thinking.js';
 import {
@@ -152,19 +152,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const agentTodo = useSyncExternalStore(agentTodoStore.subscribe, () =>
     buildId != null ? agentTodoStore.get(buildId) : null,
   );
-  const streamHandlers = useMemo(
-    () => ({
-      onMessage: () => {
-        void invalidateConverged(qc, { queryKey: ['todo', todoId] });
-      },
-      onStep: () => {
-        void invalidateConverged(qc, { queryKey: ['todo', todoId] });
-        if (buildId !== null) void invalidateConverged(qc, { queryKey: ['usage', buildId] });
-      },
-    }),
-    [qc, todoId, buildId],
-  );
-  useConversationStream(buildId ?? undefined, live, streamHandlers);
+  useConversationStream(buildId ?? undefined, live, { todoId });
 
   const steps = stepsQ.data ?? [];
   const running = live
@@ -250,11 +238,12 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     live && awaitingStart ? globalCoordinatorThread(chiefThreadsQ.data ?? []) : null;
   const coordinatorId = coordinator?.id ?? null;
   const { messages: coordinatorMessages } = useConversationMessages(coordinatorId, live);
+  useConversationStream(coordinatorId ?? undefined, live, {});
   const coordinatorTurn =
     coordinator === null ? null : `${coordinator.lastTurnAt}:${threadTurnInFlight(coordinator)}`;
   useEffect(() => {
     if (coordinatorId === null || coordinatorTurn === null) return;
-    void invalidateConverged(qc, { queryKey: ['messages', coordinatorId, 'pages'] });
+    void refreshQueries(qc, { queryKey: ['messages', coordinatorId, 'pages'] });
   }, [qc, coordinatorId, coordinatorTurn]);
   const orchestration = useMemo(
     () => (wire == null ? [] : mapOrchestrationFeedback(wire, coordinator, coordinatorMessages)),

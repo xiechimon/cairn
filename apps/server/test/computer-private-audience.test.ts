@@ -240,9 +240,8 @@ describe('private computer principal boundary with two server-bound AppContexts'
       ]);
       await result;
     }
-    s.hub.publish(s.team.id, (conn) => ({
+    s.hub.publish(s.team.id, () => ({
       type: 'machine_presence',
-      seq: conn.nextSeq(),
       machineId: 'presence-barrier',
       online: true,
     }));

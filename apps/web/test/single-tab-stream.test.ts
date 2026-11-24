@@ -32,8 +32,9 @@ class FakeEventSource {
 const subscriptionBodies: string[][] = [];
 const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
   if (String(input).startsWith('/api/streams/')) {
-    subscriptionBodies.push((JSON.parse(String(init?.body)) as { conversationIds: string[] }).conversationIds);
-    return new Response(null, { status: 204 });
+    const { conversationIds, revision } = JSON.parse(String(init?.body)) as { conversationIds: string[]; revision: number };
+    subscriptionBodies.push(conversationIds);
+    return Response.json({ revision });
   }
   return new Response('{}', { status: 200 });
 });
@@ -77,7 +78,7 @@ describe('one stream per browser tab', () => {
     es.open();
     await vi.advanceTimersByTimeAsync(0);
     expect(subscriptionBodies).toEqual([]);
-    es.push({ type: 'hello', connectionId: 'c1' });
+    es.push({ type: 'hello', connectionId: 'c1', followRevision: true });
     await vi.advanceTimersByTimeAsync(0);
     expect(subscriptionBodies).toEqual([['conv-a']]);
     es.push({
@@ -103,7 +104,7 @@ describe('one stream per browser tab', () => {
     const stopB = startConversationStream('conv-b', qc, {});
     const first = FakeEventSource.instances[0] as FakeEventSource;
     first.open();
-    first.push({ type: 'hello', connectionId: 'c1' });
+    first.push({ type: 'hello', connectionId: 'c1', followRevision: true });
     await vi.advanceTimersByTimeAsync(0);
     expect(subscriptionBodies.at(-1)?.sort()).toEqual(['conv-a', 'conv-b']);
     stopB();
@@ -116,7 +117,7 @@ describe('one stream per browser tab', () => {
     const before = subscriptionBodies.length;
     await vi.advanceTimersByTimeAsync(0);
     expect(subscriptionBodies).toHaveLength(before);
-    second.push({ type: 'hello', connectionId: 'c2' });
+    second.push({ type: 'hello', connectionId: 'c2', followRevision: true });
     await vi.advanceTimersByTimeAsync(0);
     expect(subscriptionBodies.at(-1)).toEqual(['conv-a']);
     stopA();
