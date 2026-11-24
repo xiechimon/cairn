@@ -9,7 +9,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { BoundGitCredentials } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { assembleStepEnv, prepareStepEnv, type StepEnvInput } from '../src/step-env.js';
@@ -193,6 +193,7 @@ describe('agent config isolation', () => {
         }),
       ).env;
 
+    expect(step().CAIRN_ANTIGRAVITY_AUTH_MODE).toBe('host');
     const home = step().HOME ?? '';
     expect(home.startsWith(join(root, 'cairn'))).toBe(true);
     const linked = join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
@@ -237,6 +238,7 @@ describe('agent config isolation', () => {
     );
     const home = env.HOME ?? '';
     expect(env.GEMINI_API_KEY).toBe('AIza-step');
+    expect(env.CAIRN_ANTIGRAVITY_AUTH_MODE).toBe('gemini-api-key');
     expect(env.GEMINI_HOME).toBeUndefined();
     expect(
       JSON.parse(readFileSync(join(home, '.gemini', 'antigravity-cli', 'settings.json'), 'utf8')),
@@ -247,6 +249,71 @@ describe('agent config isolation', () => {
     expect(existsSync(join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token'))).toBe(
       false,
     );
+  });
+
+  test('Antigravity OAuth steps keep the bound account outside ordinary task scratch and clean it up', async () => {
+    const root = realpathSync(testTempDir('antigravity-oauth-'));
+    const appData = join(root, 'daemon');
+    const cleanups: (() => void | Promise<void>)[] = [];
+    const token = 'ya29.fake-bound-account-token';
+    const expiresAt = Date.now() + 60_000;
+    const step = prepareStepEnv(
+      input({
+        runtimeId: 'antigravity',
+        agentConfig: { cairnHome: appData },
+        antigravityToken: JSON.stringify({ kind: 'oauth-personal', token, expiresAt }),
+        inherited: {
+          HOME: '/host',
+          CAIRN_ANTIGRAVITY_AUTH_MODE: 'host',
+          GEMINI_HOME: '/host/.gemini',
+          GEMINI_CLI_HOME: '/host/cli-config',
+          XDG_DATA_HOME: '/host/share',
+          CAIRN_TEST_TEMP_ROOT: join(root, 'scratch'),
+          GEMINI_API_KEY: 'host-key',
+          GOOGLE_API_KEY: 'host-google-key',
+          GOOGLE_APPLICATION_CREDENTIALS: '/host/ambient.json',
+        },
+      }),
+      cleanups,
+    );
+    if ('error' in step) throw new Error(step.error);
+    const home = step.env.HOME!;
+    const geminiHome = join(home, '.gemini');
+    expect(dirname(dirname(home))).toBe(join(appData, 'credential-profiles'));
+    expect(lstatSync(home).mode & 0o777).toBe(0o700);
+    expect(step.env).toMatchObject({
+      GEMINI_HOME: geminiHome,
+      GEMINI_CLI_HOME: home,
+      XDG_DATA_HOME: join(home, '.local', 'share'),
+      AGY_ACP_FORCE_FILE_STORAGE: '1',
+      CAIRN_ANTIGRAVITY_AUTH_MODE: 'oauth-personal',
+    });
+    expect(step.env.GEMINI_API_KEY).toBeUndefined();
+    expect(step.env.GOOGLE_API_KEY).toBeUndefined();
+    expect(step.env.GOOGLE_APPLICATION_CREDENTIALS).toBeUndefined();
+    expect(Object.values(step.env)).not.toContain(token);
+    const file = join(geminiHome, 'antigravity-acp', 'antigravity-oauth-token');
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({
+      token: { access_token: token, expiry: new Date(expiresAt).toISOString() },
+    });
+    expect(lstatSync(file).mode & 0o777).toBe(0o600);
+    expect(existsSync(join(home, 'Library', 'Keychains'))).toBe(false);
+    for (const cleanup of cleanups.reverse()) await cleanup();
+    expect(existsSync(home)).toBe(false);
+  });
+
+  test('expired Antigravity OAuth never falls back to the host login', () => {
+    const token = 'ya29.fake-expired-account-token';
+    const opts = input({
+      runtimeId: 'antigravity',
+      antigravityToken: JSON.stringify({
+        kind: 'oauth-personal',
+        token,
+        expiresAt: Date.now() - 1,
+      }),
+      temporary: { TMPDIR: testTempDir('antigravity-oauth-expired-') },
+    });
+    expect(() => assembleStepEnv(opts)).toThrow('Antigravity OAuth access token expired');
   });
 
   test('Gemini CLI gets a Cairn GEMINI_CLI_HOME with the sign-in and auth type only', () => {

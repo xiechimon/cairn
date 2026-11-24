@@ -22,6 +22,7 @@ import {
   ORPHAN_WORKTREE_TTL_MS,
   osPlatformOf,
 } from '@cairn/shared';
+import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import { probeHostKey } from '@cairn/shared/host-identity';
 import { AgentReachProbe } from './agent-reach.js';
 import { createAcpBackend, createGeminiBackend } from './backend/acp.js';
@@ -29,6 +30,7 @@ import {
   type AntigravityManaged,
   createAntigravityManaged,
 } from './backend/antigravity-managed.js';
+import { probeAntigravitySubscriptionModels } from './backend/antigravity-subscription-models.js';
 import { createClaudeCodeBackend } from './backend/claude-code.js';
 import { readCodexLogin } from './backend/codex-login.js';
 import { serverPortOf } from './backend/confine.js';
@@ -187,6 +189,11 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
   const migratedHomes = migrateRuntimeHomes(paths.home);
   for (const moved of migratedHomes) logger.machine(`runtime home moved: ${moved}`);
   ensureStateDirs(paths);
+  try {
+    reapCredentialProfiles(paths.home);
+  } catch {
+    logger.machine('Could not clean abandoned credential profiles');
+  }
   const imported = importAgentConfig({
     cairnHome: paths.home,
     realHome: process.env[ENV_VARS.agentImportHome],
@@ -440,6 +447,10 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             };
       })(),
       executor: orbProvider.kind,
+      antigravityOAuthProfile: true,
+      ...(client.claimAntigravityModelProbe && client.finishAntigravityModelProbe
+        ? { antigravitySubscriptionModels: true as const }
+        : {}),
       mcpConnectors: true,
       ...(orbComputer ? { computer: true as const } : {}),
       ...(hostDesktops?.offersBrowser()
@@ -1142,11 +1153,42 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
     cairnOrigins,
   });
   const imsgBridge = createImsgBridge({ api: client, logger, home: config.home });
+  const deliverAntigravityModelProbe = async (
+    requestId: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ) => {
+    if (!client.claimAntigravityModelProbe || !client.finishAntigravityModelProbe) return;
+    try {
+      const token = await client.claimAntigravityModelProbe(
+        requestId,
+        connectionId,
+        AbortSignal.any([signal, AbortSignal.timeout(3_000)]),
+      );
+      const install = antigravityManaged.current();
+      const result =
+        install === null
+          ? ({ status: 'failed', failure: 'not-found' } as const)
+          : await probeAntigravitySubscriptionModels(install, token, paths.home, signal).catch(
+              () => ({ status: 'failed', failure: 'upstream' }) as const,
+            );
+      await client.finishAntigravityModelProbe(
+        requestId,
+        connectionId,
+        result,
+        AbortSignal.any([signal, AbortSignal.timeout(2_000)]),
+      );
+    } catch {
+      if (!signal.aborted) logger.machine('Antigravity subscription model probe delivery failed');
+    }
+  };
   void (async () => {
     let backoff = 1_000;
     let announced = false;
     let reportedDown = false;
     while (!streamCtrl.signal.aborted) {
+      const streamSession = new AbortController();
+      const probeSignal = AbortSignal.any([streamCtrl.signal, streamSession.signal]);
       try {
         await client.stream(
           streamCtrl.signal,
@@ -1171,6 +1213,9 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
             }
             if (ev.type === 'repo.archive') {
               void performRepoArchive({ client, logger }, ev.archive);
+            }
+            if (ev.type === 'antigravity.models' && connectionId !== null) {
+              void deliverAntigravityModelProbe(ev.requestId, connectionId, probeSignal);
             }
             if (ev.type === 'computer') void computerDispatcher.dispatch(ev.call);
             if (ev.type === 'computer.screen') void screens.dispatch(ev.channel);
@@ -1197,6 +1242,8 @@ export async function runMachine(opts: MachineLoopOpts): Promise<MachineHandle> 
           announced = false;
           logger.wake(`push channel down: ${err instanceof Error ? err.message : String(err)}`);
         }
+      } finally {
+        streamSession.abort();
       }
       if (streamCtrl.signal.aborted) return;
       await sleep(backoff);

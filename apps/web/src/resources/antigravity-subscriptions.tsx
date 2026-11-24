@@ -2,6 +2,8 @@ import type {
   AntigravityLocalStatus,
   AntigravityLoginOutcome,
   AntigravityLoginPhase,
+  DesktopSubscriptionInput,
+  DesktopSubscriptionMetadata,
 } from '@cairn/shared';
 import { useEffect, useRef, useState } from 'react';
 import type { CreateAntigravitySubscription } from '../api/antigravity-subscriptions.js';
@@ -18,13 +20,16 @@ import type { TFunc } from '../i18n/translate.js';
 
 interface AntigravityBridge {
   status: () => Promise<AntigravityLocalStatus>;
-  importKey: () => Promise<{ ok: true; key: string } | { ok: false; reason: string }>;
-  login: () => Promise<AntigravityLoginOutcome>;
+  import: (input: DesktopSubscriptionInput) => Promise<AntigravityLoginOutcome>;
+  login: (
+    input: DesktopSubscriptionInput,
+    subscriptionId?: string,
+  ) => Promise<AntigravityLoginOutcome>;
   cancelLogin: () => Promise<void>;
   onLoginProgress?: (listener: (phase: AntigravityLoginPhase) => void) => () => void;
 }
 
-function antigravityBridge(): AntigravityBridge | null {
+export function antigravityBridge(): AntigravityBridge | null {
   const desktop = (window as Window & { cairnDesktop?: { antigravity?: AntigravityBridge } })
     .cairnDesktop;
   return desktop?.antigravity ?? null;
@@ -52,11 +57,16 @@ function useAntigravityLogin(bridge: AntigravityBridge | null) {
     [bridge],
   );
 
-  const start = async (): Promise<AntigravityLoginOutcome> => {
-    if (bridge === null) return { ok: false, reason: 'failed' };
+  const start = async (
+    input: DesktopSubscriptionInput,
+    subscriptionId?: string,
+  ): Promise<AntigravityLoginOutcome> => {
+    if (bridge === null || activeRef.current) return { ok: false, reason: 'busy' };
     activeRef.current = true;
     setPhase('waiting');
-    const outcome = await bridge.login();
+    const outcome = await bridge
+      .login(input, subscriptionId)
+      .catch((): AntigravityLoginOutcome => ({ ok: false, reason: 'failed' }));
     activeRef.current = false;
     if (outcome.ok) {
       setPhase('idle');
@@ -101,13 +111,17 @@ function useAntigravityLocalStatus(bridge: AntigravityBridge | null) {
 }
 
 export function AddAntigravitySubscriptionDialog({
+  teamId,
   onClose,
   onCreate,
+  onLocalCreated,
   pending,
   error,
 }: {
+  teamId: string | undefined;
   onClose: () => void;
   onCreate: (body: CreateAntigravitySubscription) => void;
+  onLocalCreated: (subscription: DesktopSubscriptionMetadata) => void;
   pending: boolean;
   error: boolean;
 }) {
@@ -118,33 +132,50 @@ export function AddAntigravitySubscriptionDialog({
   const { local } = useAntigravityLocalStatus(bridge);
   const login = useAntigravityLogin(bridge);
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [importFailed, setImportFailed] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const localActionRef = useRef(false);
   const submittedRef = useRef(false);
+  const busy = pending || importing || login.phase === 'waiting' || login.phase === 'installing';
 
   useEffect(() => {
     if (!pending) submittedRef.current = false;
   }, [pending]);
 
-  const submit = (value: string | null) => {
-    if (pending || submittedRef.current) return;
+  const submit = (body: CreateAntigravitySubscription) => {
+    if (busy || localActionRef.current || submittedRef.current) return;
     submittedRef.current = true;
-    onCreate({
-      label: label.trim(),
-      token: value,
-    });
+    onCreate(body);
   };
 
   const importLocal = async () => {
-    if (bridge === null) return;
-    const outcome = await bridge.importKey();
-    submit(outcome.ok ? outcome.key : null);
+    if (bridge === null || teamId === undefined || !label.trim() || busy || localActionRef.current)
+      return;
+    localActionRef.current = true;
+    setImporting(true);
+    try {
+      const outcome = await bridge.import({ teamId, label: label.trim() });
+      setImportFailed(!outcome.ok);
+      if (outcome.ok) onLocalCreated(outcome.subscription);
+    } catch {
+      setImportFailed(true);
+    } finally {
+      localActionRef.current = false;
+      setImporting(false);
+    }
   };
 
   const startLogin = async () => {
-    if (bridge === null) return;
-    const outcome = await login.start();
-    if (!outcome.ok) return;
-    const imported = await bridge.importKey();
-    submit(imported.ok ? imported.key : null);
+    if (bridge === null || teamId === undefined || !label.trim() || busy || localActionRef.current)
+      return;
+    localActionRef.current = true;
+    setImportFailed(false);
+    try {
+      const outcome = await login.start({ teamId, label: label.trim() });
+      if (outcome.ok) onLocalCreated(outcome.subscription);
+    } finally {
+      localActionRef.current = false;
+    }
   };
 
   const loginActive = login.phase === 'waiting' || login.phase === 'installing';
@@ -167,14 +198,14 @@ export function AddAntigravitySubscriptionDialog({
             {t('取消')}
           </Button>
         </p>
-      ) : local.loggedIn ? (
+      ) : local.loggedIn && !importFailed ? (
         <p className="m-0 flex items-center gap-2">
           <span className="min-w-0 flex-1">{t('这台 Mac 已登录 Antigravity。')}</span>
           <Button
             variant="outline"
             size="sm"
             data-testid="antigravity-local-import"
-            disabled={pending}
+            disabled={busy || !label.trim()}
             onClick={() => void importLocal()}
           >
             {t('从这台 Mac 接入')}
@@ -186,7 +217,7 @@ export function AddAntigravitySubscriptionDialog({
             variant="outline"
             size="sm"
             data-testid="antigravity-local-login"
-            disabled={pending}
+            disabled={busy || !label.trim()}
             onClick={() => void startLogin()}
           >
             {t('在这台 Mac 上登录 Antigravity')}
@@ -201,7 +232,7 @@ export function AddAntigravitySubscriptionDialog({
             variant="outline"
             size="sm"
             data-testid="antigravity-local-login"
-            disabled={pending}
+            disabled={busy || !label.trim()}
             onClick={() => void startLogin()}
           >
             {t('安装并登录 Antigravity')}
@@ -224,8 +255,17 @@ export function AddAntigravitySubscriptionDialog({
           className="pt-0"
           primary={{
             label: t('保存'),
-            disabled: pending || !label.trim() || loginActive || (pasteOpen && !token.trim()),
-            onClick: () => submit(pasteOpen ? extractAntigravityToken(token) : null),
+            disabled: busy || !label.trim() || (pasteOpen && !token.trim()),
+            onClick: () => {
+              if (!pasteOpen && bridge !== null) {
+                void importLocal();
+                return;
+              }
+              submit({
+                label: label.trim(),
+                token: pasteOpen ? extractAntigravityToken(token) : null,
+              });
+            },
           }}
           secondary={{ label: t('取消'), onClick: onClose }}
         />
@@ -238,12 +278,17 @@ export function AddAntigravitySubscriptionDialog({
             {loginFailCopy(login.failReason, t)}
           </p>
         )}
+        {importFailed && (
+          <p role="alert" className="m-0 text-meta text-content-tertiary">
+            {t('未能导入登录凭据，请在这台 Mac 上重新登录 Antigravity。')}
+          </p>
+        )}
         {!pasteOpen && (
           <p className="m-0 text-meta text-content-tertiary">
             {withCodeSpans(
-              t('默认使用执行机已登录的 Antigravity，也可以展开下方粘贴 `GEMINI_API_KEY`。'),
+              t('在这台 Mac 上登录后接入该账号，也可以展开下方粘贴 `GEMINI_API_KEY`。'),
             )}{' '}
-            <InfoTip info={t('登录信息在执行机的 OS 钥匙串里')} />
+            <InfoTip info={t('账号访问令牌加密保存，到期后需重新接入')} />
           </p>
         )}
         <FormField label={t('名称')} htmlFor="antigravity-subscription-label">
@@ -290,18 +335,23 @@ export function AddAntigravitySubscriptionDialog({
   );
 }
 
-export function AntigravityRelogin({ onLoggedIn }: { onLoggedIn: () => void }) {
+export function AntigravityRelogin({
+  teamId,
+  subscription,
+  renewOAuth,
+  onLoggedIn,
+}: {
+  teamId: string;
+  subscription: DesktopSubscriptionMetadata;
+  renewOAuth: boolean;
+  onLoggedIn: () => void;
+}) {
   const { t } = useI18n();
   const [bridge] = useState(antigravityBridge);
-  const { local, refresh } = useAntigravityLocalStatus(bridge);
+  const { local } = useAntigravityLocalStatus(bridge);
   const login = useAntigravityLogin(bridge);
 
-  if (
-    bridge === null ||
-    local === null ||
-    local.loggedIn ||
-    (!local.installed && !local.canLogin)
-  ) {
+  if (bridge === null || local === null || (!local.installed && !local.canLogin)) {
     return null;
   }
   const loginActive = login.phase === 'waiting' || login.phase === 'installing';
@@ -332,17 +382,19 @@ export function AntigravityRelogin({ onLoggedIn }: { onLoggedIn: () => void }) {
               size="sm"
               data-testid="antigravity-detail-login"
               onClick={() =>
-                void login.start().then((outcome) => {
-                  if (!outcome.ok) return;
-                  refresh();
-                  onLoggedIn();
-                })
+                void login
+                  .start({ teamId, label: subscription.label }, subscription.id)
+                  .then((outcome) => {
+                    if (outcome.ok) onLoggedIn();
+                  })
               }
             >
               {local.installed ? t('在这台 Mac 上登录 Antigravity') : t('安装并登录 Antigravity')}
             </Button>
             <span className="min-w-0 flex-1 text-meta text-content-tertiary">
-              {t('登录完成后会重新验证；如果执行机是另一台电脑，请在那台电脑上登录。')}
+              {renewOAuth
+                ? t('会打开浏览器完成 Google 账号登录。')
+                : t('登录完成后会重新验证；如果执行机是另一台电脑，请在那台电脑上登录。')}
             </span>
           </>
         )}

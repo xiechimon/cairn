@@ -1,3 +1,7 @@
+import type { DesktopSubscriptionMetadata } from './desktop-local-credentials.js';
+
+export const DEVIN_TOKEN_LIFETIME_MS = 365 * 24 * 60 * 60 * 1000;
+
 export interface DevinLocalStatus {
   loggedIn: boolean;
   canLogin: boolean;
@@ -10,10 +14,11 @@ export type DevinLoginFailure =
   | 'timeout'
   | 'cancelled'
   | 'busy'
-  | 'no-key';
+  | 'no-key'
+  | 'save';
 
 export type DevinLoginOutcome =
-  | { ok: true; key: string }
+  | { ok: true; subscription: DesktopSubscriptionMetadata }
   | { ok: false; reason: DevinLoginFailure };
 
 const DEVIN_KEY_LINE = /^windsurf_api_key\s*=\s*["']([^"']+)["']\s*$/m;

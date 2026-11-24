@@ -13,7 +13,13 @@ const shared = {
   logLevel: 'info',
 };
 
-await build({ ...shared, entryPoints: ['src/main.ts'], outfile: 'dist/main.mjs', format: 'esm' });
+await build({
+  ...shared,
+  entryPoints: ['src/main.ts', 'src/antigravity-login-worker.ts'],
+  outdir: 'dist',
+  outExtension: { '.js': '.mjs' },
+  format: 'esm',
+});
 await build({
   ...shared,
   entryPoints: ['src/preload.ts'],

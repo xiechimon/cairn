@@ -8,7 +8,10 @@ import {
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { type build, machine, step, team } from '../db/schema.js';
-import { activeAntigravitySubscriptionMode } from './antigravity-subscriptions.js';
+import {
+  activeAntigravitySubscriptionMode,
+  antigravitySubscriptionRunsOn,
+} from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 import {
@@ -52,10 +55,8 @@ export function workerIneligibility(
     devinSubscriptionMissing:
       runtime === 'devin' && !hasActiveDevinSubscription({ db }, machineRow.teamId),
     antigravitySubscriptionMissing:
-      runtime === 'antigravity' &&
-      (antigravityMode === 'none' ||
-        (antigravityMode === 'host' &&
-          machineRow.capabilities?.antigravity?.authenticated !== true)),
+      antigravityMode !== null &&
+      !antigravitySubscriptionRunsOn(antigravityMode, machineRow.capabilities),
   });
   return ineligible;
 }
@@ -77,11 +78,9 @@ export function chiefIneligibility(
     return { kind: 'devin-subscription' };
   if (runtime === 'antigravity') {
     const mode = activeAntigravitySubscriptionMode({ db }, machineRow.teamId);
-    if (
-      mode === 'none' ||
-      (mode === 'host' && machineRow.capabilities?.antigravity?.authenticated !== true)
-    )
+    if (!antigravitySubscriptionRunsOn(mode, machineRow.capabilities)) {
       return { kind: 'antigravity-subscription' };
+    }
   }
   const missing = missingCapabilities(machineRow, agentRow);
   if (missing.length > 0) return { kind: 'capability', missing };

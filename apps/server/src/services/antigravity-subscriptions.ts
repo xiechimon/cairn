@@ -1,23 +1,32 @@
 import type {
+  AntigravityOAuthStepCredential,
   AntigravitySubscription,
   AntigravitySubscriptionListEntry,
   AntigravitySubscriptionVerifyResult,
   CreateAntigravitySubscription,
+  MachineCapabilities,
   PatchAntigravitySubscription,
+  ProviderFailure,
   SecretBox,
   UpstreamModelsResult,
 } from '@cairn/shared';
-import { DEFAULT_ANTIGRAVITY_MODELS } from '@cairn/shared';
+import {
+  antigravityOAuthStepCredentialSchema,
+  DEFAULT_ANTIGRAVITY_MODELS,
+  isAntigravityOAuthAccessToken,
+} from '@cairn/shared';
 import { and, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { antigravitySubscription, build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
+import { fetchAntigravityEntitlements, labelAntigravityModel } from './antigravity-entitlements.js';
+import { dispatchAntigravityModelProbe } from './antigravity-model-probes.js';
 import {
-  ANTIGRAVITY_MODELS_URL,
   verifyAntigravityHostLogin,
   verifyAntigravitySubscription,
 } from './antigravity-subscription-verification.js';
+import type { MachineWakeHub } from './machine-wake-hub.js';
 import { timedCheck } from './subscription-check.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
@@ -39,6 +48,15 @@ type Row = typeof antigravitySubscription.$inferSelect;
 
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
 const upstreamModelsWindows = new WeakMap<Db, Map<string, number>>();
+const OAUTH_CIPHER_PREFIX = 'oauth-personal:';
+
+type SubscriptionMode = 'none' | 'host' | 'token' | 'oauth-personal';
+
+function openCredential(box: SecretBox, cipher: string): string {
+  return box.open(
+    cipher.startsWith(OAUTH_CIPHER_PREFIX) ? cipher.slice(OAUTH_CIPHER_PREFIX.length) : cipher,
+  );
+}
 
 function claimRateWindow(
   store: WeakMap<Db, Map<string, number>>,
@@ -64,6 +82,7 @@ function toRecord(row: Row): AntigravitySubscription {
     kind: 'antigravity-subscription',
     label: row.label,
     hasToken: row.tokenCipher !== null,
+    ...(row.tokenCipher?.startsWith(OAUTH_CIPHER_PREFIX) ? { oauthPersonal: true as const } : {}),
     expiresAt: row.expiresAt,
     enabled: row.enabledAt !== null,
     enabledAt: row.enabledAt,
@@ -121,7 +140,20 @@ async function verifyRowCredentials(
   if (row.tokenCipher !== null) {
     const cipher = row.tokenCipher;
     return Promise.resolve()
-      .then(() => verifyAntigravitySubscription(deps.box.open(cipher)))
+      .then(async (): Promise<AntigravitySubscriptionVerifyResult> => {
+        const token = openCredential(deps.box, cipher);
+        if (!cipher.startsWith(OAUTH_CIPHER_PREFIX)) return verifyAntigravitySubscription(token);
+        if (row.expiresAt === null || row.expiresAt <= nowMs()) {
+          return { ok: false, reason: 'auth' };
+        }
+        const result = await fetchAntigravityEntitlements(token);
+        if (result.status === 'ok') return { ok: true };
+        return {
+          ok: false,
+          reason:
+            result.failure === 'auth' || result.failure === 'timeout' ? result.failure : 'failed',
+        };
+      })
       .catch((): AntigravitySubscriptionVerifyResult => ({ ok: false, reason: 'failed' }));
   }
   const onlineMachines = deps.db
@@ -154,7 +186,10 @@ export function patchAntigravitySubscription(
 ): AntigravitySubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Antigravity subscription connection');
-  if (row.tokenCipher !== null && patch.label?.includes(deps.box.open(row.tokenCipher))) {
+  if (
+    row.tokenCipher !== null &&
+    patch.label?.includes(openCredential(deps.box, row.tokenCipher))
+  ) {
     throw new HttpError(400, 'Connection label must not contain the token');
   }
   let models: Row['models'] | undefined;
@@ -331,12 +366,76 @@ export function listAntigravitySubscriptions(
   });
 }
 
+export async function resolveAntigravitySubscriptionExpiry(
+  body: CreateAntigravitySubscription,
+): Promise<CreateAntigravitySubscription> {
+  if (!body.token || !isAntigravityOAuthAccessToken(body.token) || body.expiresAt != null) {
+    return body;
+  }
+  const startedAt = nowMs();
+  try {
+    const response = await fetch('https://oauth2.googleapis.com/tokeninfo', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${body.token}`,
+        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      },
+      redirect: 'error',
+      signal: AbortSignal.timeout(8_000),
+    });
+    if ([400, 401, 403].includes(response.status)) {
+      throw new HttpError(400, 'Google OAuth access token is invalid or expired.');
+    }
+    if (!response.ok) throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
+    const info: unknown = await response.json();
+    const remaining =
+      info !== null && typeof info === 'object' && 'expires_in' in info
+        ? info.expires_in
+        : undefined;
+    const seconds =
+      typeof remaining === 'number' || (typeof remaining === 'string' && /^-?\d+$/.test(remaining))
+        ? Number(remaining)
+        : Number.NaN;
+    if (!Number.isSafeInteger(seconds)) {
+      throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
+    }
+    const expiresAt = startedAt + seconds * 1000;
+    if (expiresAt <= nowMs()) {
+      throw new HttpError(400, 'Google OAuth access token is invalid or expired.');
+    }
+    if (
+      !antigravityOAuthStepCredentialSchema.safeParse({
+        kind: 'oauth-personal',
+        token: body.token,
+        expiresAt,
+      }).success
+    ) {
+      throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
+    }
+    return { ...body, expiresAt };
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
+    throw new HttpError(502, 'Unable to determine Google OAuth expiration.');
+  }
+}
+
 export function createAntigravitySubscription(
   deps: Deps,
   teamId: string,
   body: CreateAntigravitySubscription,
 ): AntigravitySubscription {
   const token = body.token ?? null;
+  const oauth = token !== null && isAntigravityOAuthAccessToken(token);
+  if (
+    oauth &&
+    !antigravityOAuthStepCredentialSchema.safeParse({
+      kind: 'oauth-personal',
+      token,
+      expiresAt: body.expiresAt,
+    }).success
+  ) {
+    throw new HttpError(400, 'A Google OAuth access token requires its expiration time.');
+  }
   if (token !== null && body.label.includes(token)) {
     throw new HttpError(400, 'Connection label must not contain the token');
   }
@@ -345,7 +444,8 @@ export function createAntigravitySubscription(
     id: newRecordId(),
     teamId,
     label: body.label,
-    tokenCipher: token !== null ? deps.box.seal(token) : null,
+    tokenCipher:
+      token === null ? null : `${oauth ? OAUTH_CIPHER_PREFIX : ''}${deps.box.seal(token)}`,
     expiresAt: body.expiresAt ?? null,
     enabledAt: null,
     models: [],
@@ -372,6 +472,49 @@ export function createAntigravitySubscription(
   });
 }
 
+export function attachAntigravityOAuthCredential(
+  deps: Deps,
+  teamId: string,
+  id: string,
+  credential: AntigravityOAuthStepCredential,
+): AntigravitySubscription {
+  const row = subscriptionRow(deps.db, teamId, id);
+  if (row === undefined) throw notFound('Antigravity subscription connection');
+  refuseWhileRunning(deps.db, row, 'attach a credential to');
+  const now = nowMs();
+  if (credential.expiresAt <= now || row.label.includes(credential.token)) {
+    throw new HttpError(400, 'Invalid Antigravity OAuth credential');
+  }
+  if (row.tokenCipher !== null && !row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX)) {
+    throw new HttpError(409, 'This subscription already has a credential');
+  }
+  const saved = deps.db
+    .update(antigravitySubscription)
+    .set({
+      tokenCipher: `${OAUTH_CIPHER_PREFIX}${deps.box.seal(credential.token)}`,
+      expiresAt: credential.expiresAt,
+      lastCheck: null,
+    })
+    .where(
+      and(
+        eq(antigravitySubscription.teamId, teamId),
+        eq(antigravitySubscription.id, id),
+        row.tokenCipher === null
+          ? isNull(antigravitySubscription.tokenCipher)
+          : and(
+              eq(antigravitySubscription.tokenCipher, row.tokenCipher),
+              lte(antigravitySubscription.expiresAt, now),
+            ),
+      ),
+    )
+    .returning()
+    .get();
+  if (saved === undefined) throw new HttpError(409, 'This subscription already has a credential');
+  verificationWindows.get(deps.db)?.delete(id);
+  upstreamModelsWindows.get(deps.db)?.delete(id);
+  return toRecord(saved);
+}
+
 export async function verifyAntigravitySubscriptionConnection(
   deps: Deps,
   teamId: string,
@@ -387,54 +530,107 @@ export async function verifyAntigravitySubscriptionConnection(
   claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
   const result = await timedCheck(() => verifyRowCredentials(deps, teamId, row), {
     check: 'sign-in',
-    command:
-      row.tokenCipher === null ? 'agy acp · Runner sign-in' : `GET ${ANTIGRAVITY_MODELS_URL}`,
+    command: row.tokenCipher === null ? 'agy acp · Runner sign-in' : 'Antigravity account API',
     model: null,
   });
   deps.db
     .update(antigravitySubscription)
     .set({ lastCheck: result.check })
-    .where(eq(antigravitySubscription.id, row.id))
+    .where(
+      and(
+        eq(antigravitySubscription.id, row.id),
+        row.tokenCipher === null
+          ? isNull(antigravitySubscription.tokenCipher)
+          : eq(antigravitySubscription.tokenCipher, row.tokenCipher),
+      ),
+    )
     .run();
   return result;
 }
 
 export async function antigravitySubscriptionUpstreamModels(
-  deps: Deps,
+  deps: Deps & {
+    machineHub: MachineWakeHub;
+    ownerInitiated: boolean;
+    apiKeyProbeRunnerGrant: (machineId: string) => string | null;
+  },
   teamId: string,
   id: string,
+  signal?: AbortSignal,
 ): Promise<UpstreamModelsResult> {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Antigravity subscription connection');
-  if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
-    return { status: 'failed', failure: 'auth', httpStatus: null };
-  }
-  claimRateWindow(upstreamModelsWindows, deps.db, row.id, 'model list attempts');
-  const runners = deps.db
-    .select({ capabilities: machine.capabilities })
-    .from(machine)
-    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
-    .all()
-    .flatMap((m) =>
-      m.capabilities?.antigravity?.installed === true ? [m.capabilities.antigravity] : [],
-    );
-  const seen = new Set<string>();
-  const models = runners
-    .filter((runner) => runner.authenticated === true)
-    .flatMap((runner) => runner.models ?? [])
-    .filter((model) => {
-      if (model.id === '' || seen.has(model.id)) return false;
-      seen.add(model.id);
-      return true;
-    })
-    .map((model) => ({ id: model.id, name: model.name }));
-  if (models.length > 0) return { status: 'ok', models };
-  return {
+  const fallback = (failure: ProviderFailure): UpstreamModelsResult => ({
     status: 'fallback',
-    failure: runners.length > 0 ? 'auth' : 'not-found',
+    failure,
     httpStatus: null,
     models: DEFAULT_ANTIGRAVITY_MODELS.map(({ id, name }) => ({ id, name })),
+  });
+  if (!deps.ownerInitiated) return fallback('auth');
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return fallback('auth');
+  claimRateWindow(upstreamModelsWindows, deps.db, row.id, 'model list attempts');
+  if (row.tokenCipher === null) return fallback('auth');
+
+  let token: string;
+  try {
+    token = openCredential(deps.box, row.tokenCipher);
+  } catch {
+    return fallback('auth');
+  }
+  const credentialStillAvailable = () => {
+    const current = subscriptionRow(deps.db, teamId, id);
+    return (
+      current !== undefined &&
+      current.tokenCipher === row.tokenCipher &&
+      (current.expiresAt === null || current.expiresAt > nowMs())
+    );
   };
+  if (row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX)) {
+    if (row.expiresAt === null) return fallback('auth');
+    const entitlements = await fetchAntigravityEntitlements(token, signal);
+    if (entitlements.status === 'failed') return fallback(entitlements.failure);
+    return credentialStillAvailable() ? entitlements : fallback('auth');
+  }
+
+  const grants = new Map<string, string>();
+  for (const runner of deps.db
+    .select({ id: machine.id })
+    .from(machine)
+    .where(and(eq(machine.teamId, teamId), eq(machine.online, true)))
+    .orderBy(machine.id)
+    .all()) {
+    if (!deps.machineHub.isConnected(runner.id)) continue;
+    const grant = deps.apiKeyProbeRunnerGrant(runner.id);
+    if (grant !== null) grants.set(runner.id, grant);
+  }
+  const isProbeAuthorized = (machineId: string) => {
+    const grant = grants.get(machineId);
+    try {
+      return (
+        grant !== undefined &&
+        credentialStillAvailable() &&
+        deps.apiKeyProbeRunnerGrant(machineId) === grant
+      );
+    } catch {
+      return false;
+    }
+  };
+  const probed = await dispatchAntigravityModelProbe(
+    deps.machineHub,
+    [...grants.keys()],
+    () => token,
+    isProbeAuthorized,
+    signal,
+  );
+  if (probed.status === 'failed') return fallback(probed.failure);
+  if (!isProbeAuthorized(probed.machineId)) return fallback('auth');
+  const models = new Map<string, { id: string; name: string }>();
+  for (const model of probed.models) {
+    if (!models.has(model.id) && !model.id.includes(token) && !model.name.includes(token)) {
+      models.set(model.id, { ...model, name: labelAntigravityModel(model.id, model.name) });
+    }
+  }
+  return models.size > 0 ? { status: 'ok', models: [...models.values()] } : fallback('upstream');
 }
 
 export function openAntigravitySubscription(
@@ -444,22 +640,22 @@ export function openAntigravitySubscription(
   boundSubscriptionId: string | null | undefined,
 ): string | undefined {
   if (provider !== 'antigravity' || !boundSubscriptionId) return undefined;
-  const row = deps.db
-    .select()
-    .from(antigravitySubscription)
-    .where(
-      and(
-        eq(antigravitySubscription.teamId, teamId),
-        eq(antigravitySubscription.id, boundSubscriptionId),
-        or(
-          isNull(antigravitySubscription.expiresAt),
-          gt(antigravitySubscription.expiresAt, nowMs()),
-        ),
-      ),
-    )
-    .get();
+  const row = subscriptionRow(deps.db, teamId, boundSubscriptionId);
   if (row === undefined || row.tokenCipher === null) return undefined;
-  return deps.box.open(row.tokenCipher);
+  const oauth = row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX);
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
+    if (oauth) throw new HttpError(409, 'Antigravity OAuth access token expired');
+    return undefined;
+  }
+  const token = openCredential(deps.box, row.tokenCipher);
+  if (!oauth) return token;
+  if (row.expiresAt === null) throw new HttpError(409, 'Missing Antigravity OAuth expiration');
+  const credential: AntigravityOAuthStepCredential = {
+    kind: 'oauth-personal',
+    token,
+    expiresAt: row.expiresAt,
+  };
+  return JSON.stringify(credential);
 }
 
 export function enabledAntigravitySubscriptionId(
@@ -482,10 +678,20 @@ export function enabledAntigravitySubscriptionModels(
 export function activeAntigravitySubscriptionMode(
   deps: { db: Pick<Db, 'select'> },
   teamId: string,
-): 'none' | 'host' | 'token' {
+): SubscriptionMode {
   const row = activeSubscriptionRow(deps, teamId);
-  if (row === undefined) return 'none';
-  return row.tokenCipher !== null ? 'token' : 'host';
+  if (!row) return 'none';
+  if (row.tokenCipher === null) return 'host';
+  return row.tokenCipher.startsWith(OAUTH_CIPHER_PREFIX) ? 'oauth-personal' : 'token';
+}
+
+export function antigravitySubscriptionRunsOn(
+  mode: SubscriptionMode,
+  capabilities: MachineCapabilities | null,
+): boolean {
+  if (mode === 'host') return capabilities?.antigravity?.authenticated === true;
+  if (mode === 'oauth-personal') return capabilities?.antigravityOAuthProfile === true;
+  return mode === 'token';
 }
 
 export function hasActiveAntigravitySubscription(

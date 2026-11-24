@@ -1,8 +1,9 @@
-import type { AntigravitySubscriptionListEntry } from '@cairn/shared';
+import type { AntigravityLoginOutcome, AntigravitySubscriptionListEntry, DesktopSubscriptionInput } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, PROJECT, TASK, THREAD } from './chief-home-mock';
 
 const API_KEY = 'AIzaSyAntigravityTestKey0123456789';
+const OAUTH_EXPIRES_AT = Date.now() + 3_600_000;
 
 interface AntigravityCalls {
   loginCalls: number;
@@ -20,25 +21,33 @@ interface LocalStatus {
 async function installBridge(
   page: Page,
   opts: { status: LocalStatus; importOk?: boolean },
+  save: (input: DesktopSubscriptionInput, subscriptionId?: string) => AntigravityLoginOutcome,
 ) {
+  await page.exposeFunction('saveAntigravityOnDesktop', save);
   await page.addInitScript(
-    ({ status, importOk, apiKey }) => {
+    ({ status, importOk }) => {
       const w = window as Window & {
         cairnDesktop?: unknown;
         __antigravity?: AntigravityCalls;
+        saveAntigravityOnDesktop: (input: DesktopSubscriptionInput, subscriptionId?: string) => Promise<AntigravityLoginOutcome>;
       };
       w.__antigravity = { loginCalls: 0, cancelCalls: 0, resolve: null, progress: null };
       w.cairnDesktop = {
         antigravity: {
           status: async () => status,
-          importKey: async () =>
-            importOk ? { ok: true, key: apiKey } : { ok: false, reason: 'no-key' },
-          login: () => {
+          import: async (input: DesktopSubscriptionInput) =>
+            importOk
+              ? w.saveAntigravityOnDesktop(input)
+              : { ok: false, reason: 'no-key' },
+          login: (input: DesktopSubscriptionInput, subscriptionId?: string) => {
             w.__antigravity!.loginCalls += 1;
             return new Promise((resolve) => {
               w.__antigravity!.resolve = (outcome) => {
-                if ((outcome as { ok?: boolean }).ok === true) status.loggedIn = true;
-                resolve(outcome);
+                if ((outcome as { ok?: boolean }).ok === true) {
+                  void w.saveAntigravityOnDesktop(input, subscriptionId).then(resolve);
+                } else {
+                  resolve(outcome);
+                }
               };
             });
           },
@@ -55,7 +64,10 @@ async function installBridge(
         },
       };
     },
-    { status: opts.status, importOk: opts.importOk ?? false, apiKey: API_KEY },
+    {
+      status: opts.status,
+      importOk: opts.importOk ?? true,
+    },
   );
 }
 
@@ -63,11 +75,21 @@ async function openDialog(
   page: Page,
   opts: { status: LocalStatus | null; importOk?: boolean; withSources?: boolean },
 ) {
-  const calls: { created: (string | null)[] } = { created: [] };
-  if (opts.status !== null) {
-    await installBridge(page, { status: opts.status, importOk: opts.importOk });
-  }
+  const calls = { created: [] as (string | null)[], desktopLabels: [] as string[], verified: [] as string[] };
   const subscriptions: AntigravitySubscriptionListEntry[] = [];
+  if (opts.status !== null) {
+    await installBridge(page, { status: opts.status, importOk: opts.importOk }, ({ teamId, label }, subscriptionId) => {
+      expect(teamId).toBe('t1');
+      expect(subscriptionId).toBeUndefined();
+      calls.desktopLabels.push(label);
+      const id = `ag-sub-${subscriptions.length + 1}`;
+      subscriptions.push({
+        id, kind: 'antigravity-subscription', label, hasToken: true,
+        expiresAt: OAUTH_EXPIRES_AT, enabled: subscriptions.length === 0, createdAt: Date.now(),
+      });
+      return { ok: true, subscription: { id, label } };
+    });
+  }
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/model-sources') {
       return json({
@@ -97,7 +119,7 @@ async function openDialog(
           kind: 'antigravity-subscription',
           label: body.label,
           hasToken: typeof body.token === 'string' && body.token !== '',
-          expiresAt: null,
+          expiresAt: body.expiresAt ?? null,
           enabled: true,
           createdAt: Date.now(),
         };
@@ -106,22 +128,32 @@ async function openDialog(
       }
       return json(subscriptions);
     }
-    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/verify') {
+    const catalog = /\/antigravity-subscriptions\/(ag-sub-\d+)\/upstream-models$/.exec(path);
+    if (catalog !== null) {
+      const isFirst = catalog[1] === 'ag-sub-1';
+      return json({ status: 'ok', models: [
+        isFirst ? { id: 'gemini-personal', name: 'Gemini Personal' } : { id: 'claude-work', name: 'Claude Work' },
+      ] });
+    }
+    const verify = /\/antigravity-subscriptions\/(ag-sub-\d+)\/verify$/.exec(path);
+    if (verify !== null) {
+      const id = verify[1]!;
+      expect(route.request().method()).toBe('POST');
+      expect(subscriptions.some((subscription) => subscription.id === id)).toBe(true);
+      calls.verified.push(id);
       return json({ ok: true });
     }
-    if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/steps') {
-      return json({ steps: [], hasEarlier: false });
-    }
+    if (/\/antigravity-subscriptions\/ag-sub-\d+\/steps$/.test(path)) return json({ steps: [], hasEarlier: false });
   });
   await page.goto('/app/settings/routing');
   await page.getByTestId('routing-add-provider').click();
   await page.locator('[data-preset-id="antigravity-subscription"]').click();
   const dialog = page.getByRole('dialog', { name: '添加 Antigravity 订阅' });
   await expect(dialog).toBeVisible();
-  return { dialog, calls };
+  return { dialog, calls, subscriptions };
 }
 
-test('logged-in Mac creates a host-keyring subscription with no token and shows models without quota', async ({
+test('logged-in Mac imports through the privileged bridge without posting a credential or showing Runner models', async ({
   page,
 }) => {
   const { dialog, calls } = await openDialog(page, {
@@ -133,14 +165,15 @@ test('logged-in Mac creates a host-keyring subscription with no token and shows 
   await expect(dialog).toContainText('这台 Mac 已登录 Antigravity。');
   await importButton.click();
   await expect(dialog).not.toBeVisible();
-  expect(calls.created).toEqual([null]);
+  expect(calls.desktopLabels).toEqual(['Antigravity 订阅']);
+  expect(calls.created).toEqual([]);
   const row = page.locator('[data-instance-id="subscription:ag-sub-1"]');
   await expect(row).toContainText('Antigravity 订阅');
   const detail = page.getByTestId('subscription-detail');
   await expect(detail.getByTestId('provider-rename')).toHaveText('Antigravity 订阅');
-  await expect(detail).not.toContainText('尚未勾选模型');
+  await expect(detail).toContainText('尚未勾选模型');
   await expect(detail.getByTestId('subscription-pick-upstream')).toBeVisible();
-  await expect(row).toContainText('2 个模型');
+  await expect(detail.getByTestId('subscription-model')).toHaveCount(0);
   await expect(detail).not.toContainText('额度');
 });
 
@@ -155,7 +188,51 @@ test('logged-out Mac runs browser login and continues automatically', async ({ p
     w.__antigravity?.resolve?.({ ok: true });
   });
   await expect(dialog).not.toBeVisible();
-  expect(calls.created).toEqual([null]);
+  expect(calls.desktopLabels).toEqual(['Antigravity 订阅']);
+  expect(calls.created).toEqual([]);
+});
+
+test('a second browser sign-in opens its own upstream choices while the first account stays active', async ({ page }) => {
+  const { dialog, calls, subscriptions } = await openDialog(page, {
+    status: { installed: true, loggedIn: false, canLogin: true },
+  });
+  for (const label of ['Personal', 'Work']) {
+    await dialog.getByTestId('antigravity-subscription-label').fill(label);
+    await dialog.getByTestId('antigravity-local-login').click();
+    await expect(dialog).toContainText('已在浏览器中打开 Antigravity 登录页');
+    await page.evaluate(() => {
+      const w = window as Window & { __antigravity?: AntigravityCalls };
+      w.__antigravity?.resolve?.({ ok: true });
+    });
+    await expect(dialog).not.toBeVisible();
+    if (label === 'Personal') {
+      await page.getByTestId('routing-add-provider').click();
+      await page.locator('[data-preset-id="antigravity-subscription"]').click();
+    }
+  }
+  expect(calls.desktopLabels).toEqual(['Personal', 'Work']);
+  expect(calls.created).toEqual([]);
+  expect(subscriptions.map(({ label, enabled }) => ({ label, enabled }))).toEqual([
+    { label: 'Personal', enabled: true }, { label: 'Work', enabled: false },
+  ]);
+  const detail = page.getByTestId('subscription-detail');
+  await expect(detail.getByTestId('provider-rename')).toHaveText('Work');
+  await detail.getByTestId('subscription-pick-upstream').click();
+  const picker = page.getByRole('dialog', { name: '从上游选择模型' });
+  await expect(picker.getByTestId('upstream-model')).toHaveCount(1);
+  await expect(picker.getByTestId('upstream-model')).toContainText('Claude Work');
+  await expect(picker).not.toContainText('Gemini Personal');
+});
+
+test('a missing local credential offers sign-in without creating an unattributed host row', async ({ page }) => {
+  const { dialog, calls } = await openDialog(page, {
+    status: { installed: true, loggedIn: true, canLogin: true },
+    importOk: false,
+  });
+  await dialog.getByTestId('antigravity-local-import').click();
+  await expect(dialog).toContainText('未能导入登录凭据');
+  await expect(dialog.getByTestId('antigravity-local-login')).toBeVisible();
+  expect(calls.created).toEqual([]);
 });
 
 test('cancelling browser login returns to the login button without creating anything', async ({
@@ -228,10 +305,13 @@ test('missing agy installs first, then opens the browser login and verifies gree
     w.__antigravity?.resolve?.({ ok: true });
   });
   await expect(dialog).not.toBeVisible();
-  expect(calls.created).toEqual([null]);
-  await expect(page.getByTestId('subscription-verify-feedback')).toContainText(
-    'Antigravity 接受了这个凭据',
-  );
+  expect(calls.desktopLabels).toEqual(['Antigravity 订阅']);
+  expect(calls.created).toEqual([]);
+  await expect(page.getByTestId('subscription-detail')).toHaveAttribute('data-account-id', 'ag-sub-1');
+  const feedback = page.getByTestId('subscription-verify-feedback');
+  await expect(feedback).toContainText('Antigravity 接受了这个凭据');
+  await expect(feedback).toHaveAttribute('data-phase', 'passed');
+  expect(calls.verified).toEqual(['ag-sub-1']);
 });
 
 test('a failed install says why in plain words and offers a retry', async ({ page }) => {
@@ -251,8 +331,14 @@ test('a host-keyring subscription detail offers re-login and verifies green afte
   page,
 }) => {
   test.setTimeout(60_000);
+  let attached = false;
   await installBridge(page, {
     status: { installed: true, loggedIn: false, canLogin: true },
+  }, ({ teamId, label }, subscriptionId) => {
+    expect(teamId).toBe('t1');
+    expect(subscriptionId).toBe('ag-sub-1');
+    attached = true;
+    return { ok: true, subscription: { id: subscriptionId, label } };
   });
   let verifyCalls = 0;
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
@@ -262,8 +348,8 @@ test('a host-keyring subscription detail offers re-login and verifies green afte
           id: 'ag-sub-1',
           kind: 'antigravity-subscription',
           label: 'Antigravity 订阅',
-          hasToken: false,
-          expiresAt: null,
+          hasToken: attached,
+          expiresAt: attached ? OAUTH_EXPIRES_AT : null,
           enabled: true,
           createdAt: 1,
         },
@@ -271,7 +357,7 @@ test('a host-keyring subscription detail offers re-login and verifies green afte
     }
     if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/verify') {
       verifyCalls += 1;
-      return json(verifyCalls === 1 ? { ok: false, reason: 'missing_local_login' } : { ok: true });
+      return json(attached ? { ok: true } : { ok: false, reason: 'missing_local_login' });
     }
     if (path === '/api/teams/t1/antigravity-subscriptions/ag-sub-1/steps') {
       return json({ steps: [], hasEarlier: false });
@@ -293,7 +379,8 @@ test('a host-keyring subscription detail offers re-login and verifies green afte
     'Antigravity 接受了这个凭据',
     { timeout: 30_000 },
   );
-  expect(verifyCalls).toBe(2);
+  expect(attached).toBe(true);
+  expect(verifyCalls).toBe(1);
 });
 
 test('a signed-out runner brings the login banner back on the board', async ({ page }) => {

@@ -2,6 +2,18 @@ import { z } from 'zod';
 import { subscriptionCheckSchema } from './subscription-check.js';
 
 export const ANTIGRAVITY_TOKEN_REGEX = /^[A-Za-z0-9._~$+/=-]{16,4096}$/;
+const OAUTH_ACCESS_TOKEN_REGEX = /^ya29\.[A-Za-z0-9._~-]{12,4091}$/;
+
+export function isAntigravityOAuthAccessToken(token: string): boolean {
+  return OAUTH_ACCESS_TOKEN_REGEX.test(token);
+}
+
+export const antigravityOAuthStepCredentialSchema = z.object({
+  kind: z.literal('oauth-personal'),
+  token: z.string().regex(OAUTH_ACCESS_TOKEN_REGEX),
+  expiresAt: z.number().int().positive().max(8_640_000_000_000_000),
+});
+export type AntigravityOAuthStepCredential = z.infer<typeof antigravityOAuthStepCredentialSchema>;
 
 export const antigravitySubscriptionModelSchema = z.strictObject({
   id: z.string().min(1).max(256),
@@ -15,6 +27,7 @@ export const antigravitySubscriptionSchema = z.object({
   kind: z.literal('antigravity-subscription'),
   label: z.string(),
   hasToken: z.boolean(),
+  oauthPersonal: z.literal(true).optional(),
   expiresAt: z.number().int().nullable(),
   enabled: z.boolean().optional(),
   enabledAt: z.number().int().nullable().optional(),

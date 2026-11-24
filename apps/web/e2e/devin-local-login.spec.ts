@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import type { DevinSubscriptionListEntry } from '@cairn/shared';
+import type { DesktopSubscriptionInput, DevinLoginOutcome, DevinSubscriptionListEntry } from '@cairn/shared';
 import { mockLive } from './chief-home-mock';
 
 const KEY = 'wsk-local-import-0123456789abcdef';
@@ -12,11 +12,23 @@ interface DevinCalls {
 }
 
 async function openDialog(page: Page, status: { loggedIn: boolean; canLogin: boolean }) {
-  const calls: { created: string[] } = { created: [] };
+  const calls: { created: string[]; desktopLabels: string[] } = { created: [], desktopLabels: [] };
+  const subscriptions: DevinSubscriptionListEntry[] = [];
+  await page.exposeFunction('saveDevinOnDesktop', ({ teamId, label }: DesktopSubscriptionInput): DevinLoginOutcome => {
+    expect(teamId).toBe('t1');
+    calls.desktopLabels.push(label);
+    const id = 'devin-sub-1';
+    subscriptions.push({
+      id, kind: 'devin-subscription', label,
+      expiresAt: Date.now() + 365 * 86_400_000, createdAt: Date.now(),
+    });
+    return { ok: true, subscription: { id, label } };
+  });
   await page.addInitScript(
-    ({ key, devinStatus }) => {
+    (devinStatus) => {
       const w = window as Window & {
         cairnDesktop?: unknown;
+        saveDevinOnDesktop: (input: DesktopSubscriptionInput) => Promise<DevinLoginOutcome>;
         __devin?: {
           loginCalls: number;
           cancelCalls: number;
@@ -27,11 +39,15 @@ async function openDialog(page: Page, status: { loggedIn: boolean; canLogin: boo
       w.cairnDesktop = {
         devin: {
           status: async () => devinStatus,
-          importKey: async () => ({ ok: true, key }),
-          login: () => {
+          import: (input: DesktopSubscriptionInput) => w.saveDevinOnDesktop(input),
+          login: (input: DesktopSubscriptionInput) => {
             w.__devin!.loginCalls += 1;
             return new Promise((resolve) => {
-              w.__devin!.resolve = resolve;
+              w.__devin!.resolve = (outcome) => {
+                if ((outcome as { ok?: boolean }).ok === true) {
+                  void w.saveDevinOnDesktop(input).then(resolve);
+                } else resolve(outcome);
+              };
             });
           },
           cancelLogin: async () => {
@@ -41,9 +57,8 @@ async function openDialog(page: Page, status: { loggedIn: boolean; canLogin: boo
         },
       };
     },
-    { key: KEY, devinStatus: status },
+    status,
   );
-  const subscriptions: DevinSubscriptionListEntry[] = [];
   await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
     if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
     if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
@@ -79,7 +94,8 @@ test('logged-in Mac offers one-click import that creates the subscription', asyn
   await expect(dialog).toContainText('这台 Mac 已登录 Devin。');
   await importButton.click();
   await expect(dialog).not.toBeVisible();
-  expect(calls.created).toEqual([KEY]);
+  expect(calls.desktopLabels).toEqual(['Devin 订阅']);
+  expect(calls.created).toEqual([]);
   await expect(page.locator('[data-instance-id="subscription:devin-sub-1"]')).toContainText(
     'Devin 订阅',
   );
@@ -96,10 +112,11 @@ test('a Mac with devin but no login runs the browser login and continues on its 
   await expect(dialog).toContainText('已在浏览器中打开 Devin 登录页');
   await page.evaluate(() => {
     const w = window as Window & { __devin?: DevinCalls };
-    w.__devin?.resolve?.({ ok: true, key: 'wsk-browser-login-99887766' });
+    w.__devin?.resolve?.({ ok: true });
   });
   await expect(dialog).not.toBeVisible();
-  expect(calls.created).toEqual(['wsk-browser-login-99887766']);
+  expect(calls.desktopLabels).toEqual(['Devin 订阅']);
+  expect(calls.created).toEqual([]);
 });
 
 test('cancelling the browser login returns to the button and creates nothing', async ({ page }) => {

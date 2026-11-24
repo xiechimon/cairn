@@ -182,10 +182,11 @@ function ownState(harness: SessionHarness, home: string, env: NodeJS.ProcessEnv)
       return [];
     case 'antigravity': {
       const base = isolatedHome(env.HOME, home);
-      if (base === null) return [{ path: join(home, '.gemini'), root: home }];
+      const hostLogin = env.CAIRN_ANTIGRAVITY_AUTH_MODE === 'host';
+      if (base === null) return hostLogin ? [{ path: join(home, '.gemini'), root: home }] : [];
       return [
         { path: base },
-        ...(env.GEMINI_API_KEY === undefined
+        ...(hostLogin
           ? ANTIGRAVITY_CREDENTIAL_FILES.map((file) => ({
               path: join(home, file),
               root: home,
@@ -250,6 +251,8 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
       HOME: opts.env?.HOME ?? environment.HOME,
       TMPDIR: opts.env?.TMPDIR ?? environment.TMPDIR,
     };
+    const antigravityHostLogin =
+      harness === 'antigravity' && env.CAIRN_ANTIGRAVITY_AUTH_MODE === 'host';
     const workspace = realpathSync(opts.cwd);
     const tempEnv = env.TMPDIR;
     const tempInput = resolve(
@@ -447,17 +450,14 @@ export function createSessionConfiner(options: SessionConfinerOptions): SessionC
         join(home, '.config', 'git'),
         `${daemonHome}-web-tools`,
         ...extraReadable,
-        ...(harness === 'antigravity' && env.GEMINI_API_KEY === undefined
-          ? [join(home, 'Library', 'Keychains')]
-          : []),
+        ...(antigravityHostLogin ? [join(home, 'Library', 'Keychains')] : []),
       ]
         .filter((path) => existsSync(path))
         .map((path) => grantPath(path)),
-      readableDeniedAllowed:
-        harness === 'antigravity' && env.GEMINI_API_KEY === undefined
-          ? deniedVariants(join(home, 'Library', 'Keychains'))
-          : [],
-      allowKeychainServices: harness === 'antigravity' && env.GEMINI_API_KEY === undefined,
+      readableDeniedAllowed: antigravityHostLogin
+        ? deniedVariants(join(home, 'Library', 'Keychains'))
+        : [],
+      allowKeychainServices: antigravityHostLogin,
       postReadableDenies: [join(home, '.config', 'git', 'credentials')],
       traversalLinks: [...links],
       ...(port !== null ? { serverPort: port } : {}),

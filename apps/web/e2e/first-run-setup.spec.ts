@@ -1,3 +1,4 @@
+import type { DesktopProviderImportInput, DesktopProviderImportResult } from '@cairn/shared';
 import { expect, type Page, test } from '@playwright/test';
 import { mockLive, PROJECT } from './chief-home-mock';
 
@@ -11,6 +12,7 @@ interface World {
   machines?: unknown[];
   local?: { providerId: string; state: string; models?: { id: string; name: string }[] }[];
   existing?: string[];
+  desktopImports?: string[][];
   created?: {
     providerId: string;
     label?: string;
@@ -29,34 +31,35 @@ const liveCreated = (world: World) =>
 
 const MACHINE = { id: 'm1', name: 'mac', online: true, enabledRuntimes: ['pi', 'claude-code'] };
 
-const LOCAL_PROVIDER = {
-  source: 'pi',
-  label: 'Relay',
-  api: 'openai-completions',
-  baseUrl: 'https://relay.example.com/v1',
-  authHeader: false,
-  models: [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }],
-};
-
 async function open(page: Page, world: World, path = '/app') {
   if (world.local !== undefined) {
-    await page.addInitScript(
-      ({ rows, base }) => {
-        const found = rows.map((row) => ({ ...base, ...row, label: row.providerId }));
-        Object.assign(window, {
-          cairnDesktop: {
-            localProviders: {
-              scan: async () => found,
-              read: async (ids: string[]) =>
-                found
-                  .filter((row) => row.state === 'ready' && ids.includes(row.providerId))
-                  .map((row) => ({ ...row, apiKey: `test-key-${row.providerId}` })),
-            },
+    const found = world.local;
+    await page.exposeFunction('importProvidersOnDesktop', ({ teamId, providerIds }: DesktopProviderImportInput): DesktopProviderImportResult[] => {
+      expect(teamId).toBe('t1');
+      world.desktopImports = [...(world.desktopImports ?? []), providerIds];
+      return providerIds.map((providerId) => {
+        const row = found.find((candidate) => candidate.providerId === providerId && candidate.state === 'ready');
+        if (row === undefined) return { providerId, status: 'missing' };
+        world.created = [...(world.created ?? []), {
+          providerId, label: providerId, models: row.models ?? [{ id: 'claude-opus-5-5', name: 'Claude Opus 5.5' }],
+        }];
+        world.bound = true;
+        return { providerId, status: 'saved', id: `p-${providerId}` };
+      });
+    });
+    await page.addInitScript((rows) => {
+      const desktop = window as Window & {
+        importProvidersOnDesktop: (input: DesktopProviderImportInput) => Promise<DesktopProviderImportResult[]>;
+      };
+      Object.assign(window, {
+        cairnDesktop: {
+          localProviders: {
+            scan: async () => rows,
+            import: desktop.importProvidersOnDesktop,
           },
-        });
-      },
-      { rows: world.local, base: LOCAL_PROVIDER },
-    );
+        },
+      });
+    }, found.map(({ providerId, state }) => ({ providerId, state, label: providerId })));
   }
   await mockLive(
     page,
@@ -383,9 +386,10 @@ test('Import all keeps step 1 open and checks every imported provider before ste
   const card = page.getByTestId('local-provider-import');
   await expect(card).toContainText('在这台 Mac 上找到 2 个服务商');
   await card.getByRole('button', { name: '全部导入' }).click();
-  await expect.poll(() => world.created?.map((c) => [c.providerId, c.apiKey])).toEqual([
-    ['relay', 'test-key-relay'],
-    ['gateway', 'test-key-gateway'],
+  await expect.poll(() => world.desktopImports).toEqual([['relay', 'gateway']]);
+  expect(world.created?.map((c) => [c.providerId, c.apiKey])).toEqual([
+    ['relay', undefined],
+    ['gateway', undefined],
   ]);
   const list = page.getByTestId('first-run-provider-check');
   await expect(list).toContainText('导入了 2 个服务商');

@@ -1,10 +1,31 @@
 import { homedir } from 'node:os';
-import type { BoundGitCredentials } from '@cairn/shared';
+import { antigravityOAuthStepCredentialSchema, type BoundGitCredentials } from '@cairn/shared';
+import { createCredentialProfile } from '@cairn/shared/credential-profile';
 import { createTempEnvironment } from '@cairn/shared/temp-environment';
-import { claudeConfigDir, prepareAntigravityHome, prepareGeminiHome } from './agent-config.js';
+import {
+  antigravityFileStorageEnv,
+  claudeConfigDir,
+  prepareAntigravityHome,
+  prepareGeminiHome,
+  writeAntigravityOAuthCredential,
+} from './agent-config.js';
 import { gitCredentialEnv } from './git.js';
 
 const NULL_DEVICE = process.platform === 'win32' ? 'NUL' : '/dev/null';
+const AMBIENT_GOOGLE_AUTH = new Set([
+  'GEMINI_API_KEY',
+  'GOOGLE_API_KEY',
+  'GOOGLE_APPLICATION_CREDENTIALS',
+  'GOOGLE_CLOUD_PROJECT',
+  'GOOGLE_CLOUD_LOCATION',
+  'GOOGLE_CLOUD_QUOTA_PROJECT',
+  'GOOGLE_GENAI_USE_VERTEXAI',
+  'GCLOUD_PROJECT',
+  'CLOUDSDK_CORE_PROJECT',
+  'AGY_ACP_CCPA_PROJECT',
+  'AGY_ACP_ENABLE_OAUTH',
+  'BROWSER',
+]);
 
 export const READONLY_GIT_ENV: Record<string, string> = {
   GIT_CONFIG_COUNT: '1',
@@ -38,6 +59,7 @@ export interface StepEnvInput {
 export interface StepEnv {
   env: Record<string, string>;
   dropGitCredentials: () => void;
+  cleanupProfile?: () => void;
 }
 
 export function assembleStepEnv(input: StepEnvInput): StepEnv {
@@ -78,10 +100,41 @@ export function assembleStepEnv(input: StepEnvInput): StepEnv {
     }
   }
   delete env.GEMINI_API_KEY;
-  if (input.antigravityToken !== undefined) env.GEMINI_API_KEY = input.antigravityToken;
-  if (input.inherited?.CAIRN_ORB !== '1') Object.assign(env, isolatedConfigEnv(input));
+  delete env.CAIRN_ANTIGRAVITY_AUTH_MODE;
+  let cleanupProfile: (() => void) | undefined;
+  if (input.runtimeId === 'antigravity' && input.antigravityToken?.startsWith('{')) {
+    let credential: ReturnType<typeof antigravityOAuthStepCredentialSchema.parse>;
+    try {
+      credential = antigravityOAuthStepCredentialSchema.parse(JSON.parse(input.antigravityToken));
+    } catch {
+      throw new Error('Invalid Antigravity OAuth credential');
+    }
+    for (const key of Object.keys(env)) {
+      if (AMBIENT_GOOGLE_AUTH.has(key.toUpperCase())) delete env[key];
+    }
+    if (credential.expiresAt <= Date.now())
+      throw new Error('Antigravity OAuth access token expired');
+    const profile = createCredentialProfile(input.agentConfig.cairnHome);
+    try {
+      writeAntigravityOAuthCredential(profile.home, credential);
+      Object.assign(env, profile.env, antigravityFileStorageEnv(profile.home));
+      cleanupProfile = profile.cleanup;
+    } catch (error) {
+      profile.cleanup();
+      throw error;
+    }
+    env.CAIRN_ANTIGRAVITY_AUTH_MODE = 'oauth-personal';
+  } else {
+    if (input.antigravityToken !== undefined) env.GEMINI_API_KEY = input.antigravityToken;
+    if (input.runtimeId === 'antigravity') {
+      env.CAIRN_ANTIGRAVITY_AUTH_MODE =
+        input.antigravityToken === undefined ? 'host' : 'gemini-api-key';
+    }
+    if (input.inherited?.CAIRN_ORB !== '1') Object.assign(env, isolatedConfigEnv(input));
+  }
   return {
     env,
+    cleanupProfile,
     dropGitCredentials: () => {
       for (const key of Object.keys(gitEnv)) {
         delete env[key];
@@ -135,7 +188,8 @@ export function prepareStepEnv(
       error: `Agent config directory setup failed: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
-  const { env, dropGitCredentials } = assembled;
+  const { env, dropGitCredentials, cleanupProfile } = assembled;
+  if (cleanupProfile !== undefined) cleanups.push(cleanupProfile);
   cleanups.push(dropGitCredentials);
   return { env };
 }

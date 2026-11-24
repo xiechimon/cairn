@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { modelUsageSchema, providerConfigSchema, toolCallRecordSchema } from '../agent-backend.js';
 import { agentTodoReportSchema } from '../agent-todo.js';
+import {
+  ANTIGRAVITY_TOKEN_REGEX,
+  antigravitySubscriptionModelSchema,
+} from '../antigravity-subscription.js';
 import { backgroundTaskSchema } from '../background-task.js';
 import { blockerHandoffSchema } from '../blocker-handoff-record.js';
 import { claudeRateLimitReportSchema } from '../records/claude-rate-limit.js';
@@ -311,6 +315,33 @@ export const machineRepoArchiveCommandSchema = z.object({
 });
 export type MachineRepoArchiveCommand = z.infer<typeof machineRepoArchiveCommandSchema>;
 
+export const machineAntigravityModelProbeResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('ok'),
+    models: z.array(antigravitySubscriptionModelSchema).min(1).max(2000),
+  }),
+  z.object({
+    status: z.literal('failed'),
+    failure: z.enum(['auth', 'not-found', 'timeout', 'upstream']),
+  }),
+]);
+export type MachineAntigravityModelProbeResult = z.infer<
+  typeof machineAntigravityModelProbeResultSchema
+>;
+
+const modelProbeConnectionId = z.string().min(1).max(64);
+export const machineAntigravityModelProbeBodySchema = z.discriminatedUnion('phase', [
+  z.object({ phase: z.literal('claim'), connectionId: modelProbeConnectionId }),
+  z.object({
+    phase: z.literal('result'),
+    connectionId: modelProbeConnectionId,
+    result: machineAntigravityModelProbeResultSchema,
+  }),
+]);
+export const machineAntigravityModelProbeCredentialSchema = z.object({
+  token: z.string().regex(ANTIGRAVITY_TOKEN_REGEX),
+});
+
 export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('wake') }),
   z.object({ type: z.literal('hello'), connectionId: z.string().min(1).max(64) }),
@@ -323,6 +354,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
     taskId: backgroundTaskSchema.shape.taskId,
   }),
   z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
+  z.object({ type: z.literal('antigravity.models'), requestId: z.string().uuid() }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
   z.object({ type: z.literal('im.attach'), connId: z.string().min(1).max(128) }),
@@ -614,6 +646,11 @@ export const MACHINE_WIRE_EXTENSIONS = [
     path: '/api/machine/offline',
     reason:
       '[design] #4596 Runner goodbye on clean shutdown: ends only the caller machine connection named by connectionId (docs/design/runner-offline-grace.md)',
+  },
+  {
+    method: 'POST',
+    path: '/api/machine/antigravity/model-probes/{requestId}',
+    reason: '[design] Claim and complete a subscription model probe on its assigned connection',
   },
   {
     method: 'GET',

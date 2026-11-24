@@ -17,7 +17,10 @@ import { and, eq, isNotNull, ne } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
 import type { Db } from '../db/client.js';
 import { build, machine, provider, step, todo } from '../db/schema.js';
-import { activeAntigravitySubscriptionMode } from './antigravity-subscriptions.js';
+import {
+  activeAntigravitySubscriptionMode,
+  antigravitySubscriptionRunsOn,
+} from './antigravity-subscriptions.js';
 import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import { hasActiveDevinSubscription } from './devin-subscriptions.js';
 
@@ -97,7 +100,7 @@ export function antigravityUsable(db: Pick<Db, 'select'>, teamId: string): boole
     .some(
       (row) =>
         machineRuntimeAvailable(row, 'antigravity') &&
-        (mode === 'token' || row.capabilities?.antigravity?.authenticated === true),
+        antigravitySubscriptionRunsOn(mode, row.capabilities),
     );
 }
 

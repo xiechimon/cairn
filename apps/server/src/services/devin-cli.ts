@@ -76,9 +76,11 @@ export function devinBin(args: string[]): { command: string; args: string[] } {
   if (managed === null) return { command: 'devin', args };
   const acpAt = managed.args.lastIndexOf('acp');
   const prefix = acpAt > 0 ? managed.args.slice(0, acpAt) : [];
-  return args[0] === 'acp' && acpAt >= 0
-    ? managed
-    : { command: managed.command, args: [...prefix, ...args] };
+  return {
+    command: managed.command,
+    args:
+      args[0] === 'acp' && acpAt >= 0 ? [...managed.args, ...args.slice(1)] : [...prefix, ...args],
+  };
 }
 
 export function collectLines(buffer: string): { lines: string[]; rest: string } {

@@ -1,4 +1,5 @@
 import { ANTIGRAVITY_TOKEN_REGEX } from './antigravity-subscription.js';
+import type { DesktopSubscriptionMetadata } from './desktop-local-credentials.js';
 
 export interface AntigravityLocalStatus {
   installed: boolean;
@@ -15,9 +16,13 @@ export type AntigravityLoginFailure =
   | 'timeout'
   | 'cancelled'
   | 'busy'
-  | 'failed';
+  | 'failed'
+  | 'no-key'
+  | 'save';
 
-export type AntigravityLoginOutcome = { ok: true } | { ok: false; reason: AntigravityLoginFailure };
+export type AntigravityLoginOutcome =
+  | { ok: true; subscription: DesktopSubscriptionMetadata }
+  | { ok: false; reason: AntigravityLoginFailure };
 
 export type AntigravityLoginPhase = 'installing' | 'authenticating';
 

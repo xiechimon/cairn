@@ -2,6 +2,30 @@ import type { StepEvent } from '@cairn/shared';
 import { writePrivateFile } from './private-fs.js';
 import { readSessionJsonlForUpload } from './session-jsonl.js';
 
+export function credentialSecretValues(value: string | undefined): (string | undefined)[] {
+  if (!value?.startsWith('{')) return [value];
+  try {
+    const credential: unknown = JSON.parse(value);
+    if (
+      credential === null ||
+      typeof credential !== 'object' ||
+      !('kind' in credential) ||
+      credential.kind !== 'oauth-personal'
+    )
+      return [value];
+    return [
+      value,
+      ...Object.entries(credential).flatMap(([key, secret]) =>
+        ['token', 'refreshToken', 'refresh_token'].includes(key) && typeof secret === 'string'
+          ? [secret]
+          : [],
+      ),
+    ];
+  } catch {
+    return [value];
+  }
+}
+
 export function credentialRedactor(...values: (string | undefined)[]): <T>(value: T) => T {
   const tokens = values.filter((value): value is string => Boolean(value));
   const visit = (value: unknown): unknown => {

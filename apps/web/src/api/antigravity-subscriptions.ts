@@ -76,11 +76,9 @@ const HOST_LOGIN_VERIFY_TIMEOUT_MS =
   VERIFY_TIMEOUT_MS + HOST_LOGIN_RETRY_ATTEMPTS * HOST_LOGIN_RETRY_MS + 15_000;
 
 export function useCreateAntigravitySubscription(teamId: string | undefined) {
-  const client = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateAntigravitySubscription) =>
       api.post<AntigravitySubscription>(`/api/teams/${teamId}/antigravity-subscriptions`, body),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] }),
     gcTime: 0,
   });
 }

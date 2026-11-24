@@ -222,6 +222,17 @@ export class MachineWakeHub {
     }
   }
 
+  pushAntigravityModelProbe(machineId: string, requestId: string): boolean {
+    const entry = this.streamsByMachine.get(machineId);
+    if (!entry) return false;
+    try {
+      entry.send({ type: 'antigravity.models', requestId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   isConnected(machineId: string): boolean {
     return this.streamsByMachine.has(machineId);
   }

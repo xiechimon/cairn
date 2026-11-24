@@ -101,7 +101,7 @@ const PROBE_ENV_KEYS = [
   'NODE_EXTRA_CA_CERTS',
 ];
 
-function probeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+export function antigravityProbeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = { AGY_CLI_DISABLE_AUTO_UPDATE: '1' };
   for (const key of PROBE_ENV_KEYS) {
     const value = env[key];
@@ -197,7 +197,7 @@ export async function validateAntigravityBinary(
     cwd: validationDir,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: {
-      ...probeEnv(baseEnv),
+      ...antigravityProbeEnv(baseEnv),
       HOME: validationDir,
       TMPDIR: validationDir,
     },
@@ -327,7 +327,7 @@ export function createAntigravityManaged(
   options: AntigravityManagedOptions = {},
 ): AntigravityManaged {
   const root = options.root ?? antigravityInstallRoot(join(homedir(), BRAND.homeDirName));
-  const env = probeEnv(options.env ?? process.env);
+  const env = antigravityProbeEnv(options.env ?? process.env);
   const log = options.log ?? (() => {});
   const probeImpl =
     options.probeBinary ??

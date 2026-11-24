@@ -13,7 +13,10 @@ import type { Db } from '../db/client.js';
 import { devinSubscription, step } from '../db/schema.js';
 import { HttpError, notFound } from '../lib/errors.js';
 import { newRecordId, nowMs } from '../lib/ids.js';
-import { fetchDevinSubscriptionModels } from './devin-subscription-models.js';
+import {
+  type DevinSubscriptionModelsResult,
+  fetchDevinSubscriptionModels,
+} from './devin-subscription-models.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
 import { timedCheck } from './subscription-check.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
@@ -21,8 +24,33 @@ import { subscriptionUsageStats } from './subscription-usage.js';
 type Deps = { db: Db; box: SecretBox };
 type Row = typeof devinSubscription.$inferSelect;
 
+type CachedModels = {
+  result: Extract<DevinSubscriptionModelsResult, { ok: true }>;
+  freshUntil: number;
+  staleUntil: number;
+};
+
+type ModelCacheEntry = {
+  generation: number;
+  tokenCipher: Row['tokenCipher'];
+  retryAt: number;
+  value?: CachedModels;
+  pending?: Promise<DevinSubscriptionModelsResult>;
+};
+
+const MODELS_TTL_MS = 60_000;
+const MODELS_MAX_AGE_MS = 300_000;
+const MODELS_RETRY_MS = 10_000;
 const verificationWindows = new WeakMap<Db, Map<string, number>>();
-const upstreamModelsWindows = new WeakMap<Db, Map<string, number>>();
+const upstreamModelsCache = new WeakMap<Db, Map<string, ModelCacheEntry>>();
+
+function invalidateUpstreamModels(db: Db, id: string): void {
+  const entry = upstreamModelsCache.get(db)?.get(id);
+  if (entry === undefined) return;
+  entry.generation += 1;
+  entry.value = undefined;
+  if (!entry.pending) entry.retryAt = 0;
+}
 
 function claimRateWindow(
   store: WeakMap<Db, Map<string, number>>,
@@ -137,6 +165,7 @@ export async function enableDevinSubscription(
   const target = subscriptionRow(deps.db, teamId, id);
   if (!target) throw notFound('Devin subscription connection');
   if (target.expiresAt !== null && target.expiresAt <= nowMs()) {
+    invalidateUpstreamModels(deps.db, target.id);
     throw new HttpError(409, 'This token has expired.', undefined, { code: 'expired' });
   }
   if (target.enabledAt !== null) return toRecord(target);
@@ -145,6 +174,7 @@ export async function enableDevinSubscription(
     (): DevinSubscriptionVerifyResult => ({ ok: false, reason: 'failed' }),
   );
   if (!verified.ok) {
+    invalidateUpstreamModels(deps.db, target.id);
     throw new HttpError(
       409,
       'The new account did not pass verification; the current account stays enabled.',
@@ -284,7 +314,10 @@ export async function verifyDevinSubscriptionConnection(
     .where(and(eq(devinSubscription.teamId, teamId), eq(devinSubscription.id, id)))
     .get();
   if (!row) throw notFound('Devin subscription connection');
-  if (row.expiresAt !== null && row.expiresAt <= nowMs()) return { ok: false };
+  if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
+    invalidateUpstreamModels(deps.db, row.id);
+    return { ok: false };
+  }
   claimRateWindow(verificationWindows, deps.db, row.id, 'verification attempts');
   const result = await timedCheck(
     () =>
@@ -293,6 +326,7 @@ export async function verifyDevinSubscriptionConnection(
         .catch((): DevinSubscriptionVerifyResult => ({ ok: false, reason: 'failed' })),
     { check: 'sign-in', command: 'devin acp · authenticate', model: null },
   );
+  if (!result.ok) invalidateUpstreamModels(deps.db, row.id);
   deps.db
     .update(devinSubscription)
     .set({ lastCheck: result.check })
@@ -311,6 +345,70 @@ const UPSTREAM_MODELS_FAILURE: Record<
   failed: 'upstream',
 };
 
+function refreshUpstreamModels(
+  deps: Deps,
+  row: Row,
+  entry: ModelCacheEntry,
+): Promise<DevinSubscriptionModelsResult> {
+  const generation = entry.generation;
+  entry.retryAt = nowMs() + MODELS_RETRY_MS;
+  entry.pending = Promise.resolve()
+    .then(() => fetchDevinSubscriptionModels(deps.box.open(row.tokenCipher)))
+    .catch((): DevinSubscriptionModelsResult => ({ ok: false, reason: 'failed' }))
+    .then((result): DevinSubscriptionModelsResult => {
+      if (entry.generation !== generation) return { ok: false, reason: 'auth' };
+      if (result.ok) {
+        const now = nowMs();
+        entry.value = {
+          result,
+          freshUntil: now + MODELS_TTL_MS,
+          staleUntil: now + MODELS_MAX_AGE_MS,
+        };
+      } else if (result.reason === 'auth') {
+        delete entry.value;
+      }
+      return result;
+    })
+    .finally(() => {
+      delete entry.pending;
+    });
+  return entry.pending;
+}
+
+async function cachedUpstreamModels(deps: Deps, row: Row): Promise<DevinSubscriptionModelsResult> {
+  const now = nowMs();
+  const cache = upstreamModelsCache.get(deps.db) ?? new Map<string, ModelCacheEntry>();
+  upstreamModelsCache.set(deps.db, cache);
+  for (const [id, entry] of cache) {
+    if (!entry.pending && entry.retryAt <= now && (entry.value?.staleUntil ?? 0) <= now) {
+      cache.delete(id);
+    }
+  }
+  let entry = cache.get(row.id);
+  if (entry === undefined) {
+    entry = { generation: 0, tokenCipher: row.tokenCipher, retryAt: 0 };
+    cache.set(row.id, entry);
+  } else if (entry.tokenCipher !== row.tokenCipher) {
+    invalidateUpstreamModels(deps.db, row.id);
+    entry.tokenCipher = row.tokenCipher;
+  }
+  const value = entry.value;
+  if (value && now < value.staleUntil) {
+    if (now >= value.freshUntil && !entry.pending && now >= entry.retryAt) {
+      void refreshUpstreamModels(deps, row, entry);
+    }
+    return value.result;
+  }
+  if (entry.pending) return entry.pending;
+  if (now < entry.retryAt) {
+    throw new HttpError(
+      429,
+      'Please wait 10 seconds between model list attempts for this connection.',
+    );
+  }
+  return refreshUpstreamModels(deps, row, entry);
+}
+
 export async function devinSubscriptionUpstreamModels(
   deps: Deps,
   teamId: string,
@@ -319,12 +417,10 @@ export async function devinSubscriptionUpstreamModels(
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Devin subscription connection');
   if (row.expiresAt !== null && row.expiresAt <= nowMs()) {
+    invalidateUpstreamModels(deps.db, row.id);
     return { status: 'failed', failure: 'auth', httpStatus: null };
   }
-  claimRateWindow(upstreamModelsWindows, deps.db, row.id, 'model list attempts');
-  const harvested = await fetchDevinSubscriptionModels(deps.box.open(row.tokenCipher)).catch(
-    () => ({ ok: false as const, reason: 'failed' as const }),
-  );
+  const harvested = await cachedUpstreamModels(deps, row);
   if (!harvested.ok) {
     return {
       status: 'failed',
@@ -395,7 +491,7 @@ function activeSubscriptionRow(deps: { db: Pick<Db, 'select'> }, teamId: string)
 }
 
 export function deleteDevinSubscription(deps: { db: Db }, teamId: string, id: string): boolean {
-  return deps.db.transaction((tx) => {
+  const removed = deps.db.transaction((tx) => {
     const row = subscriptionRow(tx, teamId, id);
     if (!row) return false;
     refuseWhileRunning(tx, row, 'delete');
@@ -406,4 +502,6 @@ export function deleteDevinSubscription(deps: { db: Db }, teamId: string, id: st
         .run().changes > 0
     );
   });
+  if (removed) invalidateUpstreamModels(deps.db, id);
+  return removed;
 }

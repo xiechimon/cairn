@@ -25,6 +25,7 @@ import {
   PAGE_CAPTURE_RESULT,
   parseAccessTokenFile,
 } from '@cairn/shared';
+import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import {
   app,
   BrowserWindow,
@@ -51,22 +52,15 @@ import {
 } from 'electron';
 import {
   antigravityCancelLogin,
-  antigravityImportKey,
   antigravityLocalStatus,
-  antigravityLogin,
   stopAntigravityLogin,
 } from './antigravity-auth.js';
 import { appMenuTemplate } from './app-menu.js';
 import { installContextMenu } from './context-menu.js';
-import {
-  devinCancelLogin,
-  devinImportKey,
-  devinLocalStatus,
-  devinLogin,
-  stopDevinLogin,
-} from './devin-auth.js';
+import { devinCancelLogin, devinLocalStatus, stopDevinLogin } from './devin-auth.js';
 import { createKeepAwake } from './keep-awake.js';
-import { readLocalProviders, scanLocalProviders } from './local-providers.js';
+import { desktopCredentialActions } from './local-credential-actions.js';
+import { scanLocalProviders } from './local-providers.js';
 import { type DesktopLocale, desktopLocale } from './locale.js';
 import {
   type NativeTray,
@@ -953,7 +947,7 @@ function serveNotifications(origin: string): void {
   });
 }
 
-function serveUpdates(origin: string, notice: UpdateNotice | null): void {
+function serveUpdates(origin: string, notice: UpdateNotice | null, ownerToken: string): void {
   const showMenu = (state: DesktopUpdateState): void =>
     Menu.setApplicationMenu(
       Menu.buildFromTemplate(
@@ -1048,43 +1042,70 @@ function serveUpdates(origin: string, notice: UpdateNotice | null): void {
     if (!fromOwnPage(event)) return undefined;
     return created.state().status === 'ready' ? created.apply('foreground') : created.install();
   });
-  ipcMain.handle('local-providers:scan', (event) =>
-    fromOwnPage(event) ? scanLocalProviders() : [],
+  const fromMainPage = (event: IpcMainInvokeEvent): boolean =>
+    !quitting &&
+    mainWindow?.webContents === event.sender &&
+    event.senderFrame === event.sender.mainFrame &&
+    fromOwnPage(event);
+  const workerPath = join(
+    app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'dist'),
+    'antigravity-login-worker.mjs',
   );
-  ipcMain.handle('local-providers:read', (event, providerIds: unknown) =>
-    fromOwnPage(event) ? readLocalProviders(providerIds) : [],
+  const credentials = desktopCredentialActions(
+    origin,
+    ownerToken,
+    ownerChannelKey,
+    app.getPath('userData'),
+    workerPath,
+  );
+  ipcMain.handle('local-providers:scan', (event) =>
+    fromMainPage(event) ? scanLocalProviders() : [],
+  );
+  ipcMain.handle('local-providers:import', (event, input: unknown) =>
+    fromMainPage(event) ? credentials.importProviders(input) : [],
   );
   ipcMain.handle('devin:status', (event) =>
-    fromOwnPage(event) ? devinLocalStatus() : { loggedIn: false, canLogin: false },
+    fromMainPage(event) ? devinLocalStatus() : { loggedIn: false, canLogin: false },
   );
-  ipcMain.handle('devin:import-key', (event) =>
-    fromOwnPage(event) ? devinImportKey() : { ok: false, reason: 'no-key' },
+  ipcMain.handle('devin:import', (event, input: unknown) =>
+    fromMainPage(event) ? credentials.importDevin(input) : { ok: false, reason: 'cancelled' },
   );
-  ipcMain.handle('devin:login', (event) =>
-    fromOwnPage(event) ? devinLogin() : { ok: false, reason: 'cancelled' },
+  ipcMain.handle('devin:login', (event, input: unknown) =>
+    fromMainPage(event) ? credentials.loginDevin(input) : { ok: false, reason: 'cancelled' },
   );
   ipcMain.handle('devin:cancel-login', (event) => {
-    if (fromOwnPage(event)) devinCancelLogin();
+    if (fromMainPage(event)) devinCancelLogin();
   });
   ipcMain.handle('antigravity:status', (event) =>
-    fromOwnPage(event)
+    fromMainPage(event)
       ? antigravityLocalStatus()
       : { installed: false, loggedIn: false, canLogin: false },
   );
-  ipcMain.handle('antigravity:import-key', (event) =>
-    fromOwnPage(event) ? antigravityImportKey() : { ok: false, reason: 'no-key' },
+  ipcMain.handle('antigravity:import', (event, input: unknown) =>
+    fromMainPage(event) ? credentials.importAntigravity(input) : { ok: false, reason: 'cancelled' },
   );
-  ipcMain.handle('antigravity:login', (event) =>
-    fromOwnPage(event)
-      ? antigravityLogin((phase) => {
-          if (!event.sender.isDestroyed()) {
-            event.sender.send('antigravity:login-progress', phase);
-          }
-        })
-      : { ok: false, reason: 'cancelled' },
-  );
+  ipcMain.handle('antigravity:login', async (event, input: unknown, subscriptionId?: unknown) => {
+    if (!fromMainPage(event)) return { ok: false, reason: 'cancelled' };
+    const controller = new AbortController();
+    const cancel = () => controller.abort();
+    event.sender.once('render-process-gone', cancel);
+    event.sender.once('destroyed', cancel);
+    try {
+      return await credentials.loginAntigravity(
+        input,
+        (phase) => {
+          if (!event.sender.isDestroyed()) event.sender.send('antigravity:login-progress', phase);
+        },
+        controller.signal,
+        subscriptionId,
+      );
+    } finally {
+      event.sender.removeListener('render-process-gone', cancel);
+      event.sender.removeListener('destroyed', cancel);
+    }
+  });
   ipcMain.handle('antigravity:cancel-login', (event) => {
-    if (fromOwnPage(event)) antigravityCancelLogin();
+    if (fromMainPage(event)) antigravityCancelLogin();
   });
   setTimeout(() => void check(), UPDATE_FIRST_CHECK_MS);
   setInterval(() => void check(), UPDATE_CHECK_EVERY_MS);
@@ -1247,6 +1268,11 @@ async function boot(): Promise<void> {
   let guard: VersionGuard | null = null;
   try {
     captureMainConsole();
+    try {
+      reapCredentialProfiles(userData);
+    } catch {
+      console.warn('Could not clean abandoned credential profiles');
+    }
     if (await restoreIfBundleMissing(runningBundle())) {
       console.warn('restored the previous Cairn after an install was interrupted');
     }
@@ -1316,7 +1342,7 @@ async function boot(): Promise<void> {
       return bringRunnerUp();
     });
     void removeLeftoverUpdates();
-    serveUpdates(server.origin, notice);
+    serveUpdates(server.origin, notice, ownerToken);
     serveNotifications(server.origin);
     serveOwnComputer(server.origin, agentDesktopBinary());
     watchIdleUpdate();
@@ -1363,11 +1389,9 @@ if (!app.requestSingleInstanceLock()) {
     if (quitting || server === null) return;
     quitting = true;
     globalShortcut.unregisterAll();
-    stopDevinLogin();
-    stopAntigravityLogin();
     event.preventDefault();
     const running = server;
-    void (runner?.stop() ?? Promise.resolve())
+    void Promise.all([stopAntigravityLogin(), stopDevinLogin(), runner?.stop()])
       .then(() => stopServer(running))
       .then(() => (activeGuard?.rollingBack() === true ? undefined : updater?.apply('none')))
       .catch((error: unknown) =>

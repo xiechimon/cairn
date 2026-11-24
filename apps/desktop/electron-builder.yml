@@ -11,6 +11,8 @@ files:
   - assets/trayAwakeTemplate@2x.png
   - package.json
 extraResources:
+  - from: dist/antigravity-login-worker.mjs
+    to: antigravity-login-worker.mjs
   - from: server
     to: server
   - from: runner

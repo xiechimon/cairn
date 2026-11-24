@@ -1,7 +1,12 @@
-import type { LocalProvider, LocalProviderImport } from '@cairn/shared';
+import type {
+  DesktopLocalProvider,
+  DesktopProviderImportInput,
+  DesktopProviderImportResult,
+} from '@cairn/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from 'cn';
 import { useEffect, useState } from 'react';
-import { useApiMutations, useProviders } from '../api/hooks.js';
+import { useProviders } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';
 import { Card } from '../components/ui/card.js';
 import { Checkbox } from '../components/ui/checkbox.js';
@@ -11,8 +16,8 @@ import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 
 interface LocalProviderBridge {
-  scan: () => Promise<LocalProvider[]>;
-  read: (providerIds: string[]) => Promise<LocalProviderImport[]>;
+  scan: () => Promise<DesktopLocalProvider[]>;
+  import: (input: DesktopProviderImportInput) => Promise<DesktopProviderImportResult[]>;
 }
 
 function localProviderBridge(): LocalProviderBridge | null {
@@ -21,11 +26,13 @@ function localProviderBridge(): LocalProviderBridge | null {
   return desktop?.localProviders ?? null;
 }
 
-type Row = Omit<LocalProvider, 'state'> & { state: LocalProvider['state'] | 'exists' };
+type Row = Omit<DesktopLocalProvider, 'state'> & {
+  state: DesktopLocalProvider['state'] | 'exists';
+};
 
 function useLocalProviders(teamId: string | undefined, live: boolean): Row[] {
   const providersQ = useProviders(teamId, live);
-  const [found, setFound] = useState<LocalProvider[]>([]);
+  const [found, setFound] = useState<DesktopLocalProvider[]>([]);
   useEffect(() => {
     const bridge = localProviderBridge();
     if (bridge === null) return;
@@ -67,7 +74,7 @@ export function LocalProviderImportCard({
 }) {
   const { t } = useI18n();
   const rows = useLocalProviders(teamId, live);
-  const { createProvider } = useApiMutations(teamId);
+  const client = useQueryClient();
   const [choosing, setChoosing] = useState(false);
   const [unchecked, setUnchecked] = useState<ReadonlySet<string>>(new Set());
   const [importing, setImporting] = useState(false);
@@ -77,31 +84,28 @@ export function LocalProviderImportCard({
 
   const importChosen = async () => {
     const bridge = localProviderBridge();
-    if (bridge === null || chosen.length === 0) return;
+    if (bridge === null || teamId === undefined || chosen.length === 0 || importing) return;
     setImporting(true);
     try {
-      const imports = await bridge.read(chosen.map((row) => row.providerId));
-      const missing = chosen.length - imports.length;
+      const results = await bridge.import({
+        teamId,
+        providerIds: chosen.map((row) => row.providerId),
+      });
+      const byId = new Map(results.map((result) => [result.providerId, result]));
+      const missing = chosen.filter((row) => byId.get(row.providerId)?.status === 'missing').length;
       if (missing > 0) toastError(t('有 {n} 个服务商已不在这台 Mac 上', { n: missing }), null);
       const added: string[] = [];
-      for (const row of imports) {
-        if (row.api === null) continue;
-        try {
-          const created = await createProvider.mutateAsync({
-            providerId: row.providerId,
-            label: row.label,
-            baseUrl: row.baseUrl,
-            api: row.api,
-            authHeader: row.authHeader,
-            models: row.models,
-            apiKey: row.apiKey,
-          });
-          added.push(created.id);
-        } catch (error) {
-          toastError(t('导入 {name} 失败', { name: row.label }), error);
-        }
+      for (const row of chosen) {
+        const result = byId.get(row.providerId);
+        if (result?.status === 'saved') added.push(result.id);
+        else if (result?.status !== 'missing')
+          toastError(t('导入 {name} 失败', { name: row.label }), null);
       }
-      if (added.length > 0) onImported(added);
+      if (added.length > 0) {
+        void client.invalidateQueries({ queryKey: ['providers', teamId] });
+        void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+        onImported(added);
+      }
     } catch (error) {
       toastError(t('读取本机配置失败'), error);
     } finally {

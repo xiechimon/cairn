@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { Duplex, type Readable, type Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { type AgentBackend, type AgentSessionHandle, conversationBranch } from '@cairn/shared';
+import { reapCredentialProfiles } from '@cairn/shared/credential-profile';
 import { createGeminiBackend } from '../backend/acp.js';
 import { createClaudeCodeBackend } from '../backend/claude-code.js';
 import { createPiBackend } from '../backend/pi.js';
@@ -178,6 +179,11 @@ export async function runOrbWorker(options: {
     const workspacesDir = options.workspacesRoot ?? orbWorkspacesRoot();
     const paths = statePaths(options.home ?? `${orbAgentHome()}/.cairn`, workspacesDir);
     ensureStateDirs(paths);
+    try {
+      reapCredentialProfiles(paths.home);
+    } catch {
+      logger.machine('Could not clean abandoned credential profiles');
+    }
     const backendFor =
       options.backendFor ?? orbBackendFor({ paths, machineName: input.machineName });
     await runStep(

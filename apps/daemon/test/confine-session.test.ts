@@ -74,7 +74,7 @@ describe('session confiner', () => {
         .split('\n')
         .find((line) => line.startsWith('(allow file-read* file-write*')) ?? '';
 
-    const isolated = profileFor({ HOME: agentHome });
+    const isolated = profileFor({ HOME: agentHome, CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' });
     expect(isolated).toContain(`(subpath "${realpathSync(agentHome)}")`);
     expect(isolated).toContain(`(subpath "${realpathSync(token)}")`);
     expect(isolated).not.toContain(`(subpath "${join(home, '.gemini')}")`);
@@ -83,10 +83,47 @@ describe('session confiner', () => {
     expect(apiKey).toContain(`(subpath "${realpathSync(agentHome)}")`);
     expect(apiKey).not.toContain(realpathSync(token));
 
-    const own = profileFor({ HOME: home });
+    const own = profileFor({ HOME: home, CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' });
     expect(own).toContain(`(subpath "${join(home, '.gemini')}")`);
     expect(own).not.toContain(`(subpath "${realpathSync(agentHome)}")`);
   });
+
+  test.each(['oauth-personal', 'gemini-api-key', undefined, 'invalid'])(
+    'Antigravity mode %s never grants host credentials or Keychain access without an API key',
+    (mode) => {
+      const { confine, worktree, runnerHome, root } = fixture();
+      const home = join(root, 'user');
+      const agentHome = join(runnerHome, 'homes', 'personal');
+      const token = join(home, '.gemini', 'antigravity-cli', 'antigravity-oauth-token');
+      const keychains = join(home, 'Library', 'Keychains');
+      mkdirSync(agentHome, { recursive: true });
+      mkdirSync(join(home, '.gemini', 'antigravity-cli'), { recursive: true });
+      mkdirSync(keychains, { recursive: true });
+      writeFileSync(token, 'fake-host-token');
+      for (const profileHome of [agentHome, home]) {
+        const launch = confine(
+          {
+            cwd: worktree,
+            env: {
+              HOME: profileHome,
+              ...(mode === undefined ? {} : { CAIRN_ANTIGRAVITY_AUTH_MODE: mode }),
+            },
+          },
+          'antigravity',
+          { command: '/bin/true', args: [] },
+        );
+        const profile = launch.args[1] as string;
+        const grants = profile
+          .split('\n')
+          .filter((line) => line.startsWith('(allow file-read*'))
+          .join('\n');
+        expect(grants).not.toContain(token);
+        expect(grants).not.toContain(`(subpath "${join(home, '.gemini')}")`);
+        expect(grants).not.toContain(keychains);
+        expect(profile).toContain('global-name-prefix "com.apple.secd"');
+      }
+    },
+  );
 
   test('grants only Claude Code its uid-scoped temporary directory, not the shared temp root', () => {
     const { confine, worktree } = fixture();
@@ -187,19 +224,27 @@ describe('session confiner', () => {
     mkdirSync(pivot, { recursive: true });
     symlinkSync(pivot, join(credDir, 'acp_token.json'));
     expect(() =>
-      confine({ cwd: worktree, env: { HOME: agentHome } }, 'antigravity', {
-        command: '/bin/true',
-        args: [],
-      }),
+      confine(
+        { cwd: worktree, env: { HOME: agentHome, CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' } },
+        'antigravity',
+        {
+          command: '/bin/true',
+          args: [],
+        },
+      ),
     ).toThrow('Unsafe confinement symlink');
 
     writeFileSync(join(credDir, 'acp_business_token.json'), 't');
     rmSync(join(credDir, 'acp_token.json'));
     writeFileSync(join(credDir, 'acp_token.json'), 't');
-    const launch = confine({ cwd: worktree, env: { HOME: agentHome } }, 'antigravity', {
-      command: '/bin/true',
-      args: [],
-    });
+    const launch = confine(
+      { cwd: worktree, env: { HOME: agentHome, CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' } },
+      'antigravity',
+      {
+        command: '/bin/true',
+        args: [],
+      },
+    );
     expect(launch.args[1]).toContain(`(subpath "${join(credDir, 'acp_token.json')}")`);
     expect(launch.args[1]).not.toContain(`(subpath "${pivot}")`);
   });
@@ -953,10 +998,14 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
     const readableLine = (profile: string) =>
       profile.split('\n').find((line) => line.startsWith('(allow file-read* (')) ?? '';
-    const plain = confiner({ cwd: worktree, env: {} }, 'antigravity', {
-      command: '/bin/true',
-      args: [],
-    });
+    const plain = confiner(
+      { cwd: worktree, env: { CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' } },
+      'antigravity',
+      {
+        command: '/bin/true',
+        args: [],
+      },
+    );
     expect(readableLine(plain.args[1] as string)).toContain(`(subpath "${keychains}")`);
     const keyed = confiner(
       { cwd: worktree, env: { GEMINI_API_KEY: 'session-key' } },
@@ -1045,7 +1094,7 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
   });
 
   test.runIf(process.platform === 'darwin')(
-    'antigravity grants read-only Library/Keychains only without an API key and keeps Keychains denied for all other harnesses',
+    'antigravity grants read-only Library/Keychains only in explicit host mode and denies all other harnesses',
     () => {
       const { root, runnerHome, worktree, serverHome } = fixture();
       const home = join(root, 'user');
@@ -1063,16 +1112,24 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
         environment: { TMPDIR: join(root, 'tmp-user', 'T') },
       }) as NonNullable<ReturnType<typeof createSessionConfiner>>;
 
-      const agLaunch = confine({ cwd: worktree, env: {} }, 'antigravity', {
-        command: '/bin/sh',
-        args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
-      });
+      const agLaunch = confine(
+        { cwd: worktree, env: { CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' } },
+        'antigravity',
+        {
+          command: '/bin/sh',
+          args: ['-c', `cat '${join(keychains, 'login.keychain-db')}'`],
+        },
+      );
       expect(execFileSync(agLaunch.command, agLaunch.args, { encoding: 'utf8' })).toBe('kc-secret');
 
-      const agWrite = confine({ cwd: worktree, env: {} }, 'antigravity', {
-        command: '/bin/sh',
-        args: ['-c', `echo write > '${join(keychains, 'tamper')}'`],
-      });
+      const agWrite = confine(
+        { cwd: worktree, env: { CAIRN_ANTIGRAVITY_AUTH_MODE: 'host' } },
+        'antigravity',
+        {
+          command: '/bin/sh',
+          args: ['-c', `echo write > '${join(keychains, 'tamper')}'`],
+        },
+      );
       expect(() => execFileSync(agWrite.command, agWrite.args, { stdio: 'pipe' })).toThrow();
 
       const agIsolated = confine(
@@ -1226,7 +1283,7 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     ).toThrow('Unsafe confinement symlink');
   });
 
-  test('bootstrap and keychain service lookups are denied except api-key-less antigravity', () => {
+  test('bootstrap and keychain service lookups are denied except explicit host-login antigravity', () => {
     const { confine, worktree, runnerHome, root } = fixture();
     const home = join(root, 'user');
     mkdirSync(join(home, 'Library', 'Keychains'), { recursive: true });
@@ -1239,8 +1296,11 @@ describe.runIf(process.platform === 'darwin')('claude spawn seam on macOS', () =
     expect(locked).toContain('(deny process-exec (literal "/bin/launchctl")');
     expect(locked).toContain('global-name-prefix "com.apple.secd"');
     expect(locked).toContain('global-name-prefix "com.apple.trustd"');
-    const oauth = profileFor('antigravity', { HOME: join(runnerHome, 'homes', 'antigravity') });
-    expect(oauth).not.toContain('com.apple.secd');
+    const host = profileFor('antigravity', {
+      HOME: join(runnerHome, 'homes', 'antigravity'),
+      CAIRN_ANTIGRAVITY_AUTH_MODE: 'host',
+    });
+    expect(host).not.toContain('com.apple.secd');
     const keyed = profileFor('antigravity', { GEMINI_API_KEY: 'AIza-step' });
     expect(keyed).toContain('global-name-prefix "com.apple.secd"');
   });

@@ -16,7 +16,11 @@ import { AskChannel } from './ask-channel.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
 import { composeSessionBrief } from './brief-file.js';
-import { credentialRedactor, guardCredentialOutputs } from './credential-output.js';
+import {
+  credentialRedactor,
+  credentialSecretValues,
+  guardCredentialOutputs,
+} from './credential-output.js';
 import { clearCredentials, pushCredential } from './credentials.js';
 import { commitEnv } from './git.js';
 import { type StepJournal, TranscriptBuffer } from './journal.js';
@@ -224,7 +228,7 @@ async function runClaimedStep(
   const credentialValues = [
     creds.claudeSubscriptionToken,
     creds.devinToken,
-    creds.antigravityToken,
+    ...credentialSecretValues(creds.antigravityToken),
     creds.git?.password,
     ...(tokenRes.mcpConnectors ?? []).flatMap((c) => mcpConnectorSecretValues(c.headers)),
   ];

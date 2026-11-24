@@ -57,6 +57,8 @@ const ALLOWED: Record<string, string> = {
   'apps/daemon/src/orb/relay.ts:listeningPaths':
     'socket paths already bound by relay servers in this process; prevents double-bind',
   'apps/daemon/src/orb/services-yaml.ts:RESERVED_ENV': 'constant lookup table',
+  'apps/daemon/src/step-env.ts:AMBIENT_GOOGLE_AUTH':
+    'constant environment-variable name lookup; never mutated or populated from an instance',
   'apps/daemon/src/step-pass-events.ts:CHANGE_TOOLS': 'constant lookup table',
   'apps/daemon/src/supervisor.ts:SYSTEMD_OWNED_ENV': 'constant lookup table',
   'apps/server/src/coordinator/runtime/cold-slim.ts:TOOL_RESULT_EXEMPT': 'constant lookup table',

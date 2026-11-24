@@ -56,7 +56,7 @@ function fixture(t) {
     releaseTestTempDir(root);
   });
   mkdirSync(join(root, 'scripts'));
-  for (const dir of ['apps/server', 'apps/web', 'apps/daemon', 'integration'])
+  for (const dir of ['apps/server', 'apps/web', 'apps/daemon', 'apps/desktop', 'integration'])
     mkdirSync(join(root, dir), { recursive: true });
   for (const name of [
     'heavy-slots.mjs',

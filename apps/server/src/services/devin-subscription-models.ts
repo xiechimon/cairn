@@ -11,7 +11,8 @@ import {
   errorReason,
 } from './devin-cli.js';
 
-const SETTLE_MS = 2_000;
+const MAX_MODEL_UPDATE_WAIT_MS = 2_000;
+const MODEL_OUTPUT_DRAIN_MS = 50;
 const MAX_MODELS = 2000;
 const MODELS_LIST_ARGS = ['models', 'list', '--format', 'json', '--process-model', 'in-process'];
 const SUPPORTS_IMAGES_META = 'cognition.ai/supportsImages';
@@ -39,6 +40,10 @@ interface AcpModelOption {
 
 function failure(text: string): Failure {
   return { ok: false, reason: errorReason(text).reason ?? 'failed' };
+}
+
+function acpFailure(error: { code?: number; message?: string }): Failure {
+  return error.code === -32000 ? { ok: false, reason: 'auth' } : failure(error.message ?? '');
 }
 
 function stringOf(value: unknown, max: number): string | undefined {
@@ -93,6 +98,7 @@ function listCatalog(
   home: string,
   token: string,
   timeoutMs: number,
+  signal: AbortSignal,
 ): Promise<Map<string, CatalogVariant>> {
   return new Promise((resolve) => {
     const bin = devinBin(MODELS_LIST_ARGS);
@@ -108,13 +114,17 @@ function listCatalog(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
       child.kill('SIGKILL');
       resolve(meta);
     };
-    const timer = setTimeout(() => finish(new Map()), timeoutMs);
+    const onAbort = () => finish(new Map());
+    const timer = setTimeout(onAbort, timeoutMs);
+    signal.addEventListener('abort', onAbort, { once: true });
+    if (signal.aborted) onAbort();
     child.on('error', () => finish(new Map()));
-    child.stdout.on('data', (chunk: Buffer) => {
-      stdout += chunk.toString('utf8');
+    child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+      stdout += chunk;
     });
     child.on('close', (code) => finish(code === 0 ? parseCatalog(stdout) : new Map()));
   });
@@ -161,10 +171,10 @@ function acpModelOptions(
   home: string,
   token: string,
   timeoutMs: number,
-  settleMs: number,
+  updateWaitMs: number,
 ): Promise<{ ok: true; options: AcpModelOption[] } | Failure> {
   return new Promise((resolve) => {
-    const bin = devinBin(['acp']);
+    const bin = devinBin(['acp', '--process-model', 'in-process']);
     const child = spawn(bin.command, bin.args, {
       cwd: home,
       env: childEnv(home, token),
@@ -172,13 +182,16 @@ function acpModelOptions(
       windowsHide: true,
     });
     let settled = false;
-    let sessionOpened = false;
-    let settle: ReturnType<typeof setTimeout> | undefined;
+    let sessionId: string | undefined;
+    let updateDeadline: ReturnType<typeof setTimeout> | undefined;
+    let drainDeadline: ReturnType<typeof setTimeout> | undefined;
     let output = '';
     let buffer = '';
     const byValue = new Map<string, AcpModelOption>();
-    const merge = (configOptions: unknown) => {
-      for (const option of modelOptionsOf(configOptions)) {
+    const bufferedUpdates = new Map<string, AcpModelOption[]>();
+    const merge = (options: AcpModelOption[]) => {
+      for (const option of options) {
+        if (byValue.size >= MAX_MODELS) break;
         if (!byValue.has(option.value)) byValue.set(option.value, option);
       }
     };
@@ -186,10 +199,17 @@ function acpModelOptions(
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      if (settle !== undefined) clearTimeout(settle);
+      clearTimeout(updateDeadline);
+      clearTimeout(drainDeadline);
       child.kill('SIGKILL');
       resolve(result);
     };
+    const finishOptions = () =>
+      finish(
+        byValue.size > 0
+          ? { ok: true, options: [...byValue.values()] }
+          : { ok: false, reason: 'failed' },
+      );
     const timer = setTimeout(() => finish({ ok: false, reason: 'timeout' }), timeoutMs);
     const write = (id: number, method: string, params: unknown) => {
       try {
@@ -202,8 +222,11 @@ function acpModelOptions(
       let message: {
         id?: number;
         method?: string;
-        params?: { update?: { sessionUpdate?: unknown; configOptions?: unknown } };
-        result?: { authMethods?: { id?: unknown }[]; configOptions?: unknown };
+        params?: {
+          sessionId?: unknown;
+          update?: { sessionUpdate?: unknown; configOptions?: unknown };
+        };
+        result?: { authMethods?: { id?: unknown }[]; sessionId?: unknown; configOptions?: unknown };
         error?: { code?: number; message?: string };
       };
       try {
@@ -213,12 +236,27 @@ function acpModelOptions(
       }
       if (message.method === 'session/update') {
         const update = message.params?.update;
-        if (update?.sessionUpdate === 'config_option_update') merge(update.configOptions);
+        const updateSession = message.params?.sessionId;
+        if (update?.sessionUpdate !== 'config_option_update' || typeof updateSession !== 'string') {
+          return;
+        }
+        const options = modelOptionsOf(update.configOptions);
+        if (options.length === 0) return;
+        if (sessionId === undefined) {
+          if (bufferedUpdates.has(updateSession) || bufferedUpdates.size < 16) {
+            bufferedUpdates.set(
+              updateSession,
+              [...(bufferedUpdates.get(updateSession) ?? []), ...options].slice(0, MAX_MODELS),
+            );
+          }
+        } else if (sessionId === updateSession) {
+          merge(options);
+        }
         return;
       }
       if (message.id === 1) {
         if (message.error !== undefined) {
-          finish(failure(message.error.message ?? ''));
+          finish(acpFailure(message.error));
           return;
         }
         const methods = (message.result?.authMethods ?? [])
@@ -234,7 +272,7 @@ function acpModelOptions(
       }
       if (message.id === 2) {
         if (message.error !== undefined) {
-          finish(failure(message.error.message ?? ''));
+          finish(acpFailure(message.error));
           return;
         }
         write(3, 'session/new', { cwd: home, mcpServers: [] });
@@ -242,30 +280,43 @@ function acpModelOptions(
       }
       if (message.id === 3) {
         if (message.error !== undefined) {
-          finish(failure(message.error.message ?? ''));
+          finish(acpFailure(message.error));
           return;
         }
-        sessionOpened = true;
-        merge(message.result?.configOptions);
-        settle = setTimeout(() => finish({ ok: true, options: [...byValue.values()] }), settleMs);
+        const openedSessionId = message.result?.sessionId;
+        if (typeof openedSessionId !== 'string' || openedSessionId === '') {
+          finish({ ok: false, reason: 'failed' });
+          return;
+        }
+        sessionId = openedSessionId;
+        merge(modelOptionsOf(message.result?.configOptions));
+        const earlier = bufferedUpdates.get(sessionId);
+        if (earlier !== undefined) merge(earlier);
+        if (byValue.size === 0) updateDeadline = setTimeout(finishOptions, updateWaitMs);
       }
     };
     child.on('error', (error: NodeJS.ErrnoException) => {
       finish({ ok: false, reason: error.code === 'ENOENT' ? 'unavailable' : 'failed' });
     });
-    child.stdout.on('data', (chunk: Buffer) => {
-      const { lines, rest } = collectLines(buffer + chunk.toString('utf8'));
+    child.stdin.on('error', () => finish({ ok: false, reason: 'failed' }));
+    child.stdout.setEncoding('utf8').on('data', (chunk: string) => {
+      if (settled) return;
+      const { lines, rest } = collectLines(buffer + chunk);
       buffer = rest;
       for (const line of lines) {
+        if (settled) return;
         if (line.trim() !== '') onMessage(line);
       }
+      if (settled || byValue.size === 0) return;
+      clearTimeout(updateDeadline);
+      drainDeadline ??= setTimeout(finishOptions, MODEL_OUTPUT_DRAIN_MS);
     });
     child.stderr.on('data', (chunk: Buffer) => {
       output += chunk.toString('utf8');
     });
     child.on('close', (code) => {
-      if (sessionOpened) {
-        finish({ ok: true, options: [...byValue.values()] });
+      if (sessionId !== undefined && code === 0) {
+        finishOptions();
         return;
       }
       finish(code === 0 ? { ok: false, reason: 'failed' } : failure(output));
@@ -279,9 +330,10 @@ function acpModelOptions(
 
 export async function fetchDevinSubscriptionModels(
   token: string,
-  options: { timeoutMs?: number; settleMs?: number } = {},
+  options: { timeoutMs?: number; updateWaitMs?: number } = {},
 ): Promise<DevinSubscriptionModelsResult> {
   const home = await mkdtemp(join(tmpdir(), 'cairn-devin-models-'));
+  const catalogController = new AbortController();
   try {
     const configDir = join(home, '.local', 'share', 'devin');
     await mkdir(configDir, { recursive: true });
@@ -289,11 +341,18 @@ export async function fetchDevinSubscriptionModels(
       mode: 0o600,
     });
     const timeoutMs = options.timeoutMs ?? DEFAULT_DEVIN_TIMEOUT_MS;
-    const [catalog, acp] = await Promise.all([
-      listCatalog(home, token, timeoutMs),
-      acpModelOptions(home, token, timeoutMs, options.settleMs ?? SETTLE_MS),
-    ]);
-    if (!acp.ok) return acp;
+    const catalogPromise = listCatalog(home, token, timeoutMs, catalogController.signal);
+    const acp = await acpModelOptions(
+      home,
+      token,
+      timeoutMs,
+      options.updateWaitMs ?? MAX_MODEL_UPDATE_WAIT_MS,
+    );
+    if (!acp.ok) {
+      catalogController.abort();
+      return acp;
+    }
+    const catalog = await catalogPromise;
     const models = acp.options.map((option) => {
       const variant = catalog.get(option.value);
       return {
@@ -305,6 +364,7 @@ export async function fetchDevinSubscriptionModels(
     });
     return { ok: true, models: models.slice(0, MAX_MODELS) };
   } finally {
+    catalogController.abort();
     await rm(home, { recursive: true, force: true });
   }
 }

@@ -58,11 +58,9 @@ export function hasUsableDevinSubscription(
 }
 
 export function useCreateDevinSubscription(teamId: string | undefined) {
-  const client = useQueryClient();
   return useMutation({
     mutationFn: (body: CreateDevinSubscription) =>
       api.post<DevinSubscription>(`/api/teams/${teamId}/devin-subscriptions`, body),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] }),
     gcTime: 0,
   });
 }

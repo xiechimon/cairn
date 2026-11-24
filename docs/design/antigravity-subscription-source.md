@@ -3,8 +3,14 @@
 ## Goals
 
 1. Integrate Google Antigravity (`antigravity` runtime via `agy acp`) using the T3 Runner-subscription model plus Cairn explicit subscription records (`antigravity_subscription`), working across all Cairn step kinds (`build`, `plan`, `session`, `merge`, `review`, `verify`, `chief`, `digest`, `mail`, and `info-cards`).
-2. Keep the host's native `agy` OS Keychain / SQLite login usable out of the box (`tokenCipher = null`), while also allowing optional manual token fallback (`GEMINI_API_KEY` stored sealed in `tokenCipher`).
+2. Keep the host's native `agy` login usable, while allowing a sealed Gemini API key or an explicitly supplied Google OAuth access token. Do not attribute a host's catalog to an individual subscription.
 3. Run a managed `antigravity-acp` binary downloaded from the ACP Registry under `~/.cairn/tools/antigravity` (shared install logic in `@cairn/shared/antigravity-install`); a locally installed `agy` on `PATH` is deliberately not picked up.
+
+## Desktop Sign-In Credential Handoff
+
+The default desktop flow signs in with a fresh OAuth profile and sends the access token and its expiration directly from the main process to the bundled server. See [Desktop local credential handoff](desktop-local-credential-handoff.md) for lifecycle and error handling. No access token, refresh token, or local profile data crosses into the renderer. OAuth catalog discovery does not require an API key, routing rule, or Runner.
+
+Dispatch-facing subscription helpers do not import Runner routing or the probe-authorization module. The resource route supplies the authorization grant. An account's catalog is independent of its active dispatch state: changing the active account does not change which credential its picker reads. Expired, absent, or unusable credentials give a labeled fallback. The account detail shows saved picks, not a merged Runner catalog.
 
 ## Architecture and States
 
@@ -12,10 +18,10 @@
 
 - Each team stores 0..N named `antigravity_subscription` rows with:
   - `id`, `teamId`, `label`
-  - `tokenCipher`: nullable AES-GCM encrypted string (`null` when relying on local host keyring auth; non-null when user supplies a fallback `GEMINI_API_KEY`)
+  - `tokenCipher`: nullable AES-GCM encrypted credential. `null` uses the host login. API keys retain their existing sealed format. A newly supplied Google OAuth access token with an explicit expiration is sealed with a non-secret personal OAuth format marker; existing records are not reinterpreted.
   - `enabledAt`: timestamp (`null` = disabled; partial unique index on `teamId WHERE enabledAt IS NOT NULL` guarantees at most one active Antigravity account per team)
   - `expiresAt`, `createdAt`
-- `AntigravitySubscription` wire view exposes `hasToken: boolean` (derived from `tokenCipher !== null`) and never returns decrypted secrets.
+- `AntigravitySubscription` wire view exposes `hasToken: boolean` (derived from `tokenCipher !== null`) and `oauthPersonal: true` only for personal OAuth. The latter lets Settings offer sign-in for an expired OAuth account without treating an expired API key as renewable. No decrypted secrets are returned.
 - `step.antigravitySubscriptionId` binds the enabled `antigravity_subscription` row atomically inside the `claimStep` / `claimPendingChiefStep` SQLite transaction.
 
 ### Runner Binary & Capability Lifecycle
@@ -34,20 +40,30 @@
 | --- | --- | --- | --- |
 | Host keyring (`tokenCipher = null`) | `hasToken === false` | Requires enabled subscription AND an online Runner reporting `antigravity.authenticated === true` (or explicit home override). | No `GEMINI_API_KEY` env override; `HOME` is Cairn's `agent-homes/antigravity`, which links the user's sign-in files (see `agent-config-isolation.md`). macOS `confine-session` allows `antigravity` read-only access to `~/Library/Keychains`. Keychain writes remain denied. |
 | Token fallback (`tokenCipher !== null`) | `hasToken === true` | Eligible on any Runner with `antigravity.installed === true` regardless of host Keychain login. | Server sends ephemeral `antigravityToken` on `stepToken` (`claimed` only). Daemon writes `GEMINI_API_KEY` and points `HOME` at Cairn's `agent-homes/antigravity-api-key` with `modelProvider: gemini` (`agy` ignores `GEMINI_HOME`); macOS Seatbelt omits `~/Library/Keychains` read access. |
+| Personal OAuth | The creation API receives a Google access token and `expiresAt` | Only a runner advertising isolated OAuth profiles can claim steps; the credential is rejected after expiry. | The runner writes a private file-storage profile under the step's scratch directory. It does not link the runner login or pick up Google credentials from its environment. Cairn does not request or store a refresh token. |
 | Unauthenticated & no token | Neither active | Dispatch blocks with `'antigravity-subscription'` (or `'runtime'` if `agy` missing). Step preflight refuses with Chinese setup instructions. | Not spawned. |
+
+### Account Catalog
+
+- Only a selected subscription with a usable API key can start a Runner probe. Runner eligibility uses the installation, route capabilities and confinement, not the active subscription or the Runner’s host login. A Runner can qualify through an explicit Antigravity route, or by being the team's normal default Runner when no Antigravity rule exists or an unpinned Antigravity rule applies. An ambiguous default or a rule pinned to another Runner does not grant access. The server captures grants and stream identities for the connected eligible Runners. It sends a disposable probe ID to an idle candidate or queues in arrival order when all candidates are busy. A queued request can wait up to 15 seconds; a dispatched request has its own 15-second limit. The queue exists only in memory. Aborting the request removes it; disconnection invalidates that stream identity. If no captured candidate is still available, the picker receives the labeled fallback.
+- Only the assigned Runner’s authenticated connection can claim the key once and return a result once. The selected subscription’s credential and that Runner’s route grant are rechecked at dispatch, claim, and result acceptance. Changing the active account does not revoke the probe. A changed grant rejects a result submission with HTTP 409; the picker receives the labeled fallback. The Runner uses a probe-only home and the same API-key settings as a step; it does not link native login files. It combines ACP model selects, matching-session updates and legacy model IDs, collapsing matching legacy effort variants into their selectable base model.
+- For a personal OAuth subscription, the server sends only that subscription's bearer to Google's `fetchAvailableModels` endpoint. `retrieveUserQuotaSummary` can supply labels, never extra model IDs. The provider identifier or recognized model family can label a known consumer pool where the summary has no per-model bucket. The catalog describes account entitlement, not a capability guarantee for every installed ACP version. These are internal Google endpoints; redirects are disallowed and both requests are bounded. No credential, quota balance, or upstream response is persisted by the catalog reader.
+- A host-login row has no independently attributable credential. Host login without an explicit binding, an unavailable probe, an expired credential, or an empty/unusable result returns a labelled fallback. Installation reports still serve runtime routing, not subscription discovery.
 
 ### First-Time Host Login States (Option A)
 
-The host-level Google OAuth login runs outside any confined session: the desktop app launches `agy acp` on the host and drives `initialize` + `authenticate` over stdio (`antigravity:login` IPC behind `fromOwnPage`). Confined task sessions only ever consume the resulting OS Keychain/SQLite login through the read-only `~/Library/Keychains` grant.
+The desktop Google OAuth login runs outside confined task sessions. The desktop app drives `agy acp` over stdio in a private home. The separate host-keyring mode still uses the Runner's existing native sign-in; a new desktop sign-in never writes to that profile.
 
 | State | How it is detected | What the user sees | Mechanism |
 | --- | --- | --- | --- |
 | `agy` not installed | `antigravity:status` reports `installed: false, canLogin: true` when the platform has a registry binary | Settings dialog shows “Install and sign in to Antigravity” (downloads first, then opens the browser) | `antigravityLogin` runs `ensureAntigravityManagedInstall` under `~/.cairn/tools/antigravity` before spawning, single-flight via `.install.lock`; desktop emits `antigravity:login-progress` `installing` |
 | Installed, not logged in | `installed: true, loggedIn: false` | Settings dialog and subscription detail show “Sign in to Antigravity on this Mac” | Same IPC; progress phase `authenticating` fires when `authenticate` is sent and the browser opens |
 | Login in progress | `login-progress` events | A spinner tracks installation and browser sign-in; Cancel calls `antigravity:cancel-login` | Single `flight` token on the desktop; cancellation returns `{ ok: false, reason: 'cancelled' }` |
-| Login succeeded | `authenticate` response has no error | Subscription created with `token: null` (host keyring); verification turns green and steps can run | `importKey` then create; the verify hook retries `missing_local_login` (~3 × 12 s) while the Runner heartbeat re-probes `authenticated` |
+| Login succeeded | `authenticate` succeeds and the private profile contains a valid, unexpired access token | The subscription is saved and its picker lists account entitlements | Desktop main terminates and awaits ACP, removes the profile, and sends the access token and expiry to the owner-only API; IPC returns only metadata |
 | Login cancelled / failed | `cancelled`, `no-binary`, `busy`, `timeout`, `spawn`, `exit`, `failed` | Plain-language reason plus a retry button; the API-key paste path stays available | `AntigravityLoginOutcome` reasons map to per-reason copy |
-| Login expired / lost later | Every online Runner with `antigravity.installed` reports `authenticated === false` | The board says the Runner has no usable Antigravity sign-in; subscription details offer re-login | `antigravityRunnersSignedOut` on `useMachines` capabilities; `AntigravityRelogin` re-runs the same IPC and triggers verification again |
+| Host sign-in lost later | Every online Runner with `antigravity.installed` reports `authenticated === false` | The board says the Runner has no usable Antigravity sign-in; subscription details offer re-login | `antigravityRunnersSignedOut` on `useMachines` capabilities; `AntigravityRelogin` re-runs the same IPC and triggers verification again |
+| Personal OAuth bearer expired | The existing subscription has `oauthPersonal: true` and `expiresAt` has passed | In desktop Settings, sign in again with the same Google account, then open its model picker. No new payment, key, or subscription is needed. | The same isolated sign-in and owner-only `attach-oauth` endpoint replace the expired encrypted bearer and expiry in place; the ID, enabled selection and picked models are unchanged. Verification and subsequent probes use the renewed bearer. |
+| Personal OAuth renewal fails or is cancelled | Sign-in fails, a task is still using the account, or another sign-in has already saved a fresh bearer | The existing sign-in error or cancellation state appears; a failed renewal does not change the account or picks. | The endpoint refuses a fresh existing bearer or an API key; there is no background refresh or retry. An expired bearer is never sent to the entitlement API. |
 
 ### Mode & Confinement Invariants
 

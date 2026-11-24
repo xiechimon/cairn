@@ -2,17 +2,19 @@ import type {
   AntigravityLocalStatus,
   AntigravityLoginOutcome,
   AntigravityLoginPhase,
+  DesktopLocalProvider,
   DesktopMenuCommand,
   DesktopNotifyPayload,
+  DesktopProviderImportInput,
+  DesktopProviderImportResult,
   DesktopRollbackNotice,
+  DesktopSubscriptionInput,
   DesktopTrayOpen,
   DesktopTrayState,
   DesktopUpdateState,
   DevinLocalStatus,
   DevinLoginOutcome,
   HostPermissions,
-  LocalProvider,
-  LocalProviderImport,
   NativeTrayMenu,
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
@@ -64,9 +66,9 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
     },
   },
   localProviders: {
-    scan: (): Promise<LocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),
-    read: (providerIds: string[]): Promise<LocalProviderImport[]> =>
-      ipcRenderer.invoke('local-providers:read', providerIds),
+    scan: (): Promise<DesktopLocalProvider[]> => ipcRenderer.invoke('local-providers:scan'),
+    import: (input: DesktopProviderImportInput): Promise<DesktopProviderImportResult[]> =>
+      ipcRenderer.invoke('local-providers:import', input),
   },
   ownComputer: {
     guide: (): Promise<boolean | null> => ipcRenderer.invoke('own-computer:guide'),
@@ -78,16 +80,21 @@ contextBridge.exposeInMainWorld('cairnDesktop', {
   },
   devin: {
     status: (): Promise<DevinLocalStatus> => ipcRenderer.invoke('devin:status'),
-    importKey: (): Promise<{ ok: true; key: string } | { ok: false; reason: string }> =>
-      ipcRenderer.invoke('devin:import-key'),
-    login: (): Promise<DevinLoginOutcome> => ipcRenderer.invoke('devin:login'),
+    import: (input: DesktopSubscriptionInput): Promise<DevinLoginOutcome> =>
+      ipcRenderer.invoke('devin:import', input),
+    login: (input: DesktopSubscriptionInput): Promise<DevinLoginOutcome> =>
+      ipcRenderer.invoke('devin:login', input),
     cancelLogin: (): Promise<void> => ipcRenderer.invoke('devin:cancel-login'),
   },
   antigravity: {
     status: (): Promise<AntigravityLocalStatus> => ipcRenderer.invoke('antigravity:status'),
-    importKey: (): Promise<{ ok: true; key: string } | { ok: false; reason: string }> =>
-      ipcRenderer.invoke('antigravity:import-key'),
-    login: (): Promise<AntigravityLoginOutcome> => ipcRenderer.invoke('antigravity:login'),
+    import: (input: DesktopSubscriptionInput): Promise<AntigravityLoginOutcome> =>
+      ipcRenderer.invoke('antigravity:import', input),
+    login: (
+      input: DesktopSubscriptionInput,
+      subscriptionId?: string,
+    ): Promise<AntigravityLoginOutcome> =>
+      ipcRenderer.invoke('antigravity:login', input, subscriptionId),
     cancelLogin: (): Promise<void> => ipcRenderer.invoke('antigravity:cancel-login'),
     onLoginProgress: (listener: (phase: AntigravityLoginPhase) => void): (() => void) => {
       const relay = (_event: unknown, phase: AntigravityLoginPhase) => listener(phase);

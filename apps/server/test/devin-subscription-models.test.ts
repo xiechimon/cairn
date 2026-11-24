@@ -5,7 +5,9 @@ import { eq } from 'drizzle-orm';
 import { afterAll, afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { devinSubscription } from '../src/db/schema.js';
+import * as devinModels from '../src/services/devin-subscription-models.js';
 import { fetchDevinSubscriptionModels } from '../src/services/devin-subscription-models.js';
+import * as devinVerification from '../src/services/devin-subscription-verification.js';
 import { bootServer, req } from './helpers.js';
 
 const TOKEN = `wsk-test-models-token-${'y'.repeat(64)}`;
@@ -104,9 +106,11 @@ const UPDATE_OPTIONS = [
 ];
 
 type FakeOpts = {
-  catalog?: 'ok' | 'fail' | 'garbage';
-  acp?: 'ok' | 'auth-reject' | 'session-error' | 'no-update';
+  catalog?: 'ok' | 'fail' | 'garbage' | 'hang' | 'hang-before-record';
+  acp?: 'ok' | 'auth-reject' | 'session-error' | 'no-update' | 'update-only' | 'early-update';
   authenticate?: 'ok' | 'absent';
+  extraModels?: number;
+  authErrorAt?: 'initialize' | 'authenticate' | 'session/new';
 };
 
 function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
@@ -122,39 +126,75 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
       ? `printf '%s' '${JSON.stringify(CATALOG)}'`
       : catalog === 'garbage'
         ? "printf 'not json'"
-        : 'exit 2';
+        : catalog === 'hang'
+          ? `exec node -e 'require("node:fs").writeFileSync("${join(dir, 'metadata.pid')}", String(process.pid)); setInterval(() => {}, 1000)'`
+          : 'exit 2';
   const authMethods =
     authenticate === 'absent' ? '[]' : '[{"id":"devin-browser","name":"Devin browser"}]';
+  const structuredAuthError = (id: number) =>
+    JSON.stringify({ jsonrpc: '2.0', id, error: { code: -32000, message: 'Sign-in required' } });
+  const initializeReply =
+    opts.authErrorAt === 'initialize'
+      ? structuredAuthError(1)
+      : `{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{},"authMethods":${authMethods}}}`;
   const authReply =
-    acp === 'auth-reject'
-      ? '{"jsonrpc":"2.0","id":2,"error":{"code":-32000,"message":"401 invalid api key"}}'
-      : '{"jsonrpc":"2.0","id":2,"result":null}';
+    opts.authErrorAt === 'authenticate'
+      ? structuredAuthError(2)
+      : acp === 'auth-reject'
+        ? '{"jsonrpc":"2.0","id":2,"error":{"code":-32000,"message":"401 invalid api key"}}'
+        : '{"jsonrpc":"2.0","id":2,"result":null}';
   const sessionReply =
-    acp === 'session-error'
-      ? '{"jsonrpc":"2.0","id":3,"error":{"code":-32000,"message":"session blew up"}}'
-      : `{"jsonrpc":"2.0","id":3,"result":{"sessionId":"s1","configOptions":${JSON.stringify(CONFIG_OPTIONS)}}}`;
-  const sessionUpdate =
-    acp === 'ok'
-      ? JSON.stringify({
-          jsonrpc: '2.0',
-          method: 'session/update',
-          params: {
-            sessionId: 's1',
-            update: { sessionUpdate: 'config_option_update', configOptions: UPDATE_OPTIONS },
-          },
-        })
-      : null;
-  const sessionLines = sessionUpdate === null ? [sessionReply] : [sessionReply, sessionUpdate];
-  const sessionWrite = `printf '${sessionLines.map(() => '%s\\n').join('')}' ${sessionLines
-    .map((line) => `'${line}'`)
-    .join(' ')}`;
+    opts.authErrorAt === 'session/new'
+      ? structuredAuthError(3)
+      : acp === 'session-error'
+        ? '{"jsonrpc":"2.0","id":3,"error":{"code":-32603,"message":"session blew up"}}'
+        : `{"jsonrpc":"2.0","id":3,"result":{"sessionId":"s1","configOptions":${JSON.stringify(acp === 'update-only' || acp === 'early-update' ? [] : CONFIG_OPTIONS)}}}`;
+  const modelUpdate = (configOptions: unknown) =>
+    JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'session/update',
+      params: { sessionId: 's1', update: { sessionUpdate: 'config_option_update', configOptions } },
+    });
+  const sessionLines = [sessionReply];
+  if (acp === 'ok') {
+    sessionLines.push(
+      modelUpdate(
+        UPDATE_OPTIONS.map((option) => ({
+          ...option,
+          options: [
+            ...option.options,
+            ...Array.from({ length: opts.extraModels ?? 0 }, (_, i) => ({
+              value: `fake-model-${i}`,
+              name: `Fake model ${i}`,
+            })),
+          ],
+        })),
+      ),
+    );
+  }
+  let sessionWrite = `printf '%s\\n' ${sessionLines.map((line) => `'${line}'`).join(' ')}`;
+  if (acp === 'ok') sessionWrite += '; exit 0';
+  if (acp === 'update-only') {
+    sessionWrite += `; sleep 0.1; printf '%s\\n' '${modelUpdate(UPDATE_OPTIONS)}'`;
+  }
+  if (acp === 'early-update') {
+    sessionWrite = `printf '%s\\n' '${modelUpdate(UPDATE_OPTIONS)}' '${sessionReply}'`;
+  }
   writeFileSync(
     binary,
     [
       '#!/bin/sh',
-      '[ -f "$HOME/.local/share/devin/credentials.toml" ] || { echo missing >&2; exit 3; }',
-      'find "$HOME/.local/share/devin" -name credentials.toml -perm 600 | grep -q . || { echo mode >&2; exit 4; }',
-      `grep -q 'windsurf_api_key = "${TOKEN}"' "$HOME/.local/share/devin/credentials.toml" || { echo token >&2; exit 5; }`,
+      ...(catalog === 'hang-before-record'
+        ? [
+            `if [ "$1" = "models" ]; then exec '${process.execPath}' -e 'setInterval(() => {}, 1000)'; fi`,
+          ]
+        : []),
+      'if [ -f "$HOME/.local/share/devin/credentials.toml" ]; then',
+      '  find "$HOME/.local/share/devin" -name credentials.toml -perm 600 | grep -q . || { echo mode >&2; exit 4; }',
+      `  grep -q 'windsurf_api_key = "${TOKEN}"' "$HOME/.local/share/devin/credentials.toml" || { echo token >&2; exit 5; }`,
+      'else',
+      `  [ "$WINDSURF_API_KEY" = "${TOKEN}" ] || { echo missing >&2; exit 3; }`,
+      'fi',
       `echo "$@" >> "${runs}"`,
       'if [ "$1" = "models" ]; then',
       `  ${catalogBody}`,
@@ -163,7 +203,10 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
       'while IFS= read -r line; do',
       '  case "$line" in',
       '    *initialize*)',
-      `      printf '%s\\n' '{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":1,"agentCapabilities":{},"authMethods":${authMethods}}}' ;;`,
+      ...(catalog === 'hang'
+        ? [`      while [ ! -f "${join(dir, 'metadata.pid')}" ]; do sleep 0.01; done`]
+        : []),
+      `      printf '%s\\n' '${initializeReply}' ;;`,
       '    *authenticate*)',
       `      printf '%s\\n' '${authReply}' ;;`,
       '    *session/new*)',
@@ -178,9 +221,36 @@ function fakeDevinModels(opts: FakeOpts = {}): { dir: string; runs: string } {
 }
 
 describe('fetchDevinSubscriptionModels', () => {
+  test('returns all 169 ACP choices promptly when the listing process closes cleanly', async () => {
+    fakeDevinModels({ extraModels: 165 });
+    const start = performance.now();
+    const result = await fetchDevinSubscriptionModels(TOKEN);
+    const elapsed = performance.now() - start;
+    expect(result.ok && result.models.length).toBe(169);
+    expect(elapsed, `Fake ACP cold fetch: ${elapsed.toFixed(1)} ms`).toBeLessThan(1_500);
+    console.info(`Fake ACP cold fetch: ${elapsed.toFixed(1)} ms`);
+  });
+
+  test.each([
+    ['no-update', ['swe-2-high', 'swe-2-flash-medium', 'claude-x']],
+    ['update-only', ['swe-2-high', 'gpt-5.5']],
+    ['early-update', ['swe-2-high', 'gpt-5.5']],
+  ] as const)(
+    'returns the %s catalog promptly while the ACP session stays open',
+    async (acp, ids) => {
+      fakeDevinModels({ acp });
+      const start = performance.now();
+      const result = await fetchDevinSubscriptionModels(TOKEN);
+      const elapsed = performance.now() - start;
+      expect(result.ok && result.models.map((model) => model.id)).toEqual(ids);
+      expect(elapsed, `Live fake ACP cold fetch: ${elapsed.toFixed(1)} ms`).toBeLessThan(1_500);
+      console.info(`Live fake ACP ${acp} cold fetch: ${elapsed.toFixed(1)} ms`);
+    },
+  );
+
   test('joins the ACP select set with the catalog metadata, merging session/update options', async () => {
     const { runs } = fakeDevinModels();
-    const result = await fetchDevinSubscriptionModels(TOKEN, { settleMs: 150 });
+    const result = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 150 });
     expect(result).toEqual({
       ok: true,
       models: [
@@ -210,7 +280,10 @@ describe('fetchDevinSubscriptionModels', () => {
       ],
     });
     const invocations = readFileSync(runs, 'utf8').trim().split('\n').sort();
-    expect(invocations).toEqual(['acp', 'models list --format json --process-model in-process']);
+    expect(invocations).toEqual([
+      'acp --process-model in-process',
+      'models list --format json --process-model in-process',
+    ]);
     expect(readdirSync(tmpdir()).filter((name) => name.startsWith('cairn-devin-models-'))).toEqual(
       [],
     );
@@ -218,7 +291,7 @@ describe('fetchDevinSubscriptionModels', () => {
 
   test('a failed models list degrades to bare ACP options and a missing binary reports unavailable', async () => {
     const { dir } = fakeDevinModels({ catalog: 'fail', acp: 'no-update' });
-    const degraded = await fetchDevinSubscriptionModels(TOKEN, { settleMs: 150 });
+    const degraded = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 150 });
     expect(degraded).toEqual({
       ok: true,
       models: [
@@ -228,7 +301,7 @@ describe('fetchDevinSubscriptionModels', () => {
       ],
     });
     vi.stubEnv('DEVIN_BIN', join(dir, 'missing'));
-    expect(await fetchDevinSubscriptionModels(TOKEN, { settleMs: 50 })).toEqual({
+    expect(await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 50 })).toEqual({
       ok: false,
       reason: 'unavailable',
     });
@@ -236,20 +309,42 @@ describe('fetchDevinSubscriptionModels', () => {
 
   test('ACP auth and session failures classify instead of falling back to the bare catalog', async () => {
     fakeDevinModels({ acp: 'auth-reject' });
-    expect(await fetchDevinSubscriptionModels(TOKEN, { settleMs: 50 })).toEqual({
+    expect(await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 50 })).toEqual({
       ok: false,
       reason: 'auth',
     });
     fakeDevinModels({ acp: 'session-error' });
-    expect(await fetchDevinSubscriptionModels(TOKEN, { settleMs: 50 })).toEqual({
+    expect(await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 50 })).toEqual({
       ok: false,
       reason: 'failed',
     });
   });
 
+  test.each(['initialize', 'authenticate', 'session/new'] as const)(
+    'classifies the structured auth-required code at %s without message heuristics',
+    async (authErrorAt) => {
+      fakeDevinModels({ authErrorAt });
+      expect(await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 50 })).toEqual({
+        ok: false,
+        reason: 'auth',
+      });
+    },
+  );
+
+  test.each(['initialize', 'authenticate', 'session/new'] as const)(
+    'returns an auth failure at %s immediately and cancels hanging metadata',
+    async (authErrorAt) => {
+      const { dir } = fakeDevinModels({ catalog: 'hang', authErrorAt });
+      const result = await fetchDevinSubscriptionModels(TOKEN, { timeoutMs: 30_000 });
+      expect(result).toEqual({ ok: false, reason: 'auth' });
+      const pid = Number(readFileSync(join(dir, 'metadata.pid'), 'utf8'));
+      await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
+    },
+  );
+
   test('session/new without authenticate works when no auth methods are advertised', async () => {
     fakeDevinModels({ authenticate: 'absent', acp: 'no-update' });
-    const result = await fetchDevinSubscriptionModels(TOKEN, { settleMs: 150 });
+    const result = await fetchDevinSubscriptionModels(TOKEN, { updateWaitMs: 150 });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.models).toHaveLength(3);
   });
@@ -285,6 +380,180 @@ describe('devin subscription upstream-models endpoint', () => {
     const list = await req(s.app, 'GET', path);
     expect(await list.text()).not.toContain(TOKEN);
   });
+
+  test('serves a warm catalog from the same subscription without spawning more CLI processes', async () => {
+    const s = bootServer();
+    const { path, id } = await subscription(s);
+    const { runs } = fakeDevinModels({ extraModels: 165 });
+    const url = `${path}/${id}/upstream-models`;
+    const first = await req(s.app, 'POST', url);
+    expect(first.status).toBe(200);
+    const body = await first.json();
+    const start = performance.now();
+    const second = await req(s.app, 'POST', url);
+    const elapsed = performance.now() - start;
+    expect(second.status).toBe(200);
+    expect(await second.json()).toEqual(body);
+    expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(2);
+    console.info(`Fake ACP warm fetch: ${elapsed.toFixed(1)} ms`);
+  });
+
+  test('serves a stale catalog during one refresh and keeps subscriptions separate', async () => {
+    const s = bootServer();
+    const { path, id } = await subscription(s);
+    fakeDevinModels();
+    const url = `${path}/${id}/upstream-models`;
+    const first = await req(s.app, 'POST', url);
+    const original = await first.json();
+    expect(original).toMatchObject({ status: 'ok', models: expect.any(Array) });
+
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 60_001);
+    const { runs } = fakeDevinModels({ extraModels: 1 });
+    const poll = async () => (await req(s.app, 'POST', url)).json();
+    expect(await poll()).toEqual(original);
+    await Promise.all([poll(), poll(), poll()]);
+    await vi.waitFor(async () => {
+      expect(await poll()).toMatchObject({
+        status: 'ok',
+        models: expect.arrayContaining([{ id: 'fake-model-0', name: 'Fake model 0' }]),
+      });
+    });
+    expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(2);
+
+    const other = await subscription(s);
+    const otherResponse = await req(s.app, 'POST', `${other.path}/${other.id}/upstream-models`);
+    expect(otherResponse.status).toBe(200);
+    expect(readFileSync(runs, 'utf8').trim().split('\n')).toHaveLength(4);
+  });
+
+  test.each([
+    ['verify', 'auth-reject'],
+    ['verify', 'session-error'],
+    ['enable', 'auth-reject'],
+    ['enable', 'session-error'],
+  ] as const)(
+    'an explicit %s failure (%s) evicts a warm catalog before the next lookup',
+    async (action, acp) => {
+      const s = bootServer();
+      const { path, id } = await subscription(s);
+      fakeDevinModels();
+      const url = `${path}/${id}/upstream-models`;
+      expect(await (await req(s.app, 'POST', url)).json()).toMatchObject({ status: 'ok' });
+      const other = await subscription(s);
+      const otherUrl = `${path}/${other.id}/upstream-models`;
+      expect(await (await req(s.app, 'POST', otherUrl)).json()).toMatchObject({ status: 'ok' });
+      if (action === 'enable') {
+        expect((await req(s.app, 'POST', `${path}/${id}/disable`)).status).toBe(200);
+      }
+      const { runs } = fakeDevinModels({
+        acp,
+        ...(acp === 'session-error'
+          ? { authenticate: 'absent', catalog: 'hang-before-record' }
+          : {}),
+      });
+      const checked = await req(s.app, 'POST', `${path}/${id}/${action}`);
+      expect(checked.status).toBe(action === 'verify' ? 200 : 409);
+      if (action === 'verify') {
+        expect(await checked.json()).toMatchObject({
+          ok: false,
+          reason: acp === 'auth-reject' ? 'auth' : 'failed',
+        });
+      }
+      expect(await (await req(s.app, 'POST', url)).json()).toMatchObject({
+        status: 'failed',
+        failure: acp === 'auth-reject' ? 'auth' : 'upstream',
+      });
+      expect(await (await req(s.app, 'POST', otherUrl)).json()).toMatchObject({ status: 'ok' });
+      const acpInvocations = readFileSync(runs, 'utf8')
+        .trim()
+        .split('\n')
+        .filter((line) => line.startsWith('acp'));
+      expect(acpInvocations).toEqual(['acp', 'acp --process-model in-process']);
+      s.dispose();
+    },
+  );
+
+  test('an auth failure during refresh invalidates the previously successful catalog', async () => {
+    const s = bootServer();
+    const { path, id } = await subscription(s);
+    fakeDevinModels();
+    const url = `${path}/${id}/upstream-models`;
+    expect(await (await req(s.app, 'POST', url)).json()).toMatchObject({ status: 'ok' });
+    const staleTime = Date.now() + 60_001;
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(staleTime);
+    fakeDevinModels({ authErrorAt: 'session/new', catalog: 'hang' });
+    expect(await (await req(s.app, 'POST', url)).json()).toMatchObject({ status: 'ok' });
+    await vi.waitFor(async () => expect((await req(s.app, 'POST', url)).status).toBe(429), {
+      timeout: 10_000,
+    });
+    clock.mockReturnValue(staleTime + 10_000);
+    expect(await (await req(s.app, 'POST', url)).json()).toMatchObject({
+      status: 'failed',
+      failure: 'auth',
+    });
+  });
+
+  test.each([
+    ['verify', false],
+    ['verify', true],
+    ['enable', false],
+    ['enable', true],
+  ] as const)(
+    '%s invalidation during a pending harvest (stale=%s) rejects old results and keeps one refresh',
+    async (action, stale) => {
+      const s = bootServer();
+      const { path, id } = await subscription(s);
+      const url = `${path}/${id}/upstream-models`;
+      const success = {
+        ok: true,
+        models: [{ id: 'fixture-model', name: 'Fixture Model' }],
+      } as const;
+      const harvest = vi.spyOn(devinModels, 'fetchDevinSubscriptionModels');
+      harvest.mockResolvedValue({ ...success, models: [...success.models] });
+      let now = Date.now();
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      if (stale) {
+        expect(await (await req(s.app, 'POST', url)).json()).toMatchObject({ status: 'ok' });
+        now += 60_001;
+      }
+      if (action === 'enable') {
+        expect((await req(s.app, 'POST', `${path}/${id}/disable`)).status).toBe(200);
+      }
+      let resolve!: (result: devinModels.DevinSubscriptionModelsResult) => void;
+      harvest
+        .mockImplementationOnce(
+          () =>
+            new Promise((done) => {
+              resolve = done;
+            }),
+        )
+        .mockResolvedValue({ ...success, models: [...success.models] });
+      const first = req(s.app, 'POST', url);
+      const expectedCalls = stale ? 2 : 1;
+      await vi.waitFor(() => expect(harvest).toHaveBeenCalledTimes(expectedCalls));
+      if (stale) expect(await (await first).json()).toMatchObject({ status: 'ok' });
+      vi.spyOn(devinVerification, 'verifyDevinSubscription').mockResolvedValue({
+        ok: false,
+        reason: 'auth',
+      });
+      const checked = await req(s.app, 'POST', `${path}/${id}/${action}`);
+      expect(checked.status).toBe(action === 'verify' ? 200 : 409);
+      const second = req(s.app, 'POST', url);
+      const secondResult = second.then((response) => response.json());
+      await vi.waitFor(() => expect(harvest).toHaveBeenCalledTimes(expectedCalls));
+      resolve({ ...success, models: [...success.models] });
+      expect(await secondResult).toMatchObject({ status: 'failed', failure: 'auth' });
+      if (!stale)
+        expect(await (await first).json()).toMatchObject({ status: 'failed', failure: 'auth' });
+      expect(harvest).toHaveBeenCalledTimes(expectedCalls);
+      expect((await req(s.app, 'POST', url)).status).toBe(429);
+      now += 10_000;
+      harvest.mockResolvedValue({ ...success, models: [...success.models] });
+      expect(await (await req(s.app, 'POST', url)).json()).toMatchObject({ status: 'ok' });
+      expect(harvest).toHaveBeenCalledTimes(expectedCalls + 1);
+      s.dispose();
+    },
+  );
 
   test('missing binary and rejected token map onto the existing failure enum; a second call is throttled', async () => {
     const s = bootServer();

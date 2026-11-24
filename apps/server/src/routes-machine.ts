@@ -7,6 +7,7 @@ import {
   MACHINE_ENROLL_TTL_MS,
   machineActivityBodySchema,
   machineAgentTodoBodySchema,
+  machineAntigravityModelProbeBodySchema,
   machineAskBodySchema,
   machineBackgroundTaskBodySchema,
   machineClaimBodySchema,
@@ -49,6 +50,10 @@ import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { pairedDeviceIdOf } from './lib/token-auth.js';
 import { githubAppOf, jsonBody } from './routes-helpers.js';
+import {
+  claimAntigravityModelProbe,
+  finishAntigravityModelProbe,
+} from './services/antigravity-model-probes.js';
 import { recordBuildProvenance } from './services/build-provenance.js';
 import { recordClaudeRateLimit } from './services/claude-rate-limit.js';
 import { hasActiveDevinSubscription } from './services/devin-subscriptions.js';
@@ -523,6 +528,41 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       clearInterval(pingTimer);
       unsubscribe();
     });
+  });
+
+  app.post('/api/machine/antigravity/model-probes/:requestId', async (c) => {
+    const requestId = c.req.param('requestId');
+    return executeMachineCommand(
+      c,
+      () => jsonBody(c),
+      (row, decoded) => {
+        const body = parseWith(machineAntigravityModelProbeBodySchema, decoded, 'body');
+        if (body.phase === 'claim') {
+          const token = claimAntigravityModelProbe(
+            ctx.machineHub,
+            requestId,
+            row.id,
+            body.connectionId,
+          );
+          if (token === undefined) throw new HttpError(404, 'Model probe not found');
+          return c.json({ token }, 200, { 'Cache-Control': 'no-store' });
+        }
+        const accepted = finishAntigravityModelProbe(
+          ctx.machineHub,
+          requestId,
+          row.id,
+          body.connectionId,
+          body.result,
+        );
+        if (accepted === 'not-found') throw new HttpError(404, 'Model probe not found');
+        if (accepted === 'revoked') {
+          throw new HttpError(409, 'Model probe authorization changed after claim', undefined, {
+            code: 'probe-authorization-changed',
+          });
+        }
+        return c.json({ ok: true as const });
+      },
+    );
   });
 
   app.get('/api/machine/steer', (c) => {

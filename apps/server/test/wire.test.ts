@@ -50,6 +50,7 @@ const INFERRED_ROUTES = [
   'DELETE /api/teams/{id}/antigravity-subscriptions/{cid}',
   'POST /api/teams/{id}/antigravity-subscriptions',
   'POST /api/teams/{id}/antigravity-subscriptions/{cid}/verify',
+  'POST /api/teams/{id}/antigravity-subscriptions/{cid}/attach-oauth',
   'PATCH /api/teams/{id}/antigravity-subscriptions/{cid}',
   'POST /api/teams/{id}/antigravity-subscriptions/{cid}/enable',
   'POST /api/teams/{id}/antigravity-subscriptions/{cid}/disable',

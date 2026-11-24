@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
-  type LocalProvider,
+  type DesktopLocalProvider,
   type LocalProviderImport,
   piProviderImports,
   piProviders,
@@ -21,9 +21,13 @@ function piFiles(): { models: unknown; auth: unknown } {
   return { models: readJson(join(dir, 'models.json')), auth: readJson(join(dir, 'auth.json')) };
 }
 
-export function scanLocalProviders(): LocalProvider[] {
+export function scanLocalProviders(): DesktopLocalProvider[] {
   const { models, auth } = piFiles();
-  return piProviders(models, auth);
+  return piProviders(models, auth).map(({ providerId, label, state }) => ({
+    providerId,
+    label,
+    state,
+  }));
 }
 
 export function readLocalProviders(providerIds: unknown): LocalProviderImport[] {

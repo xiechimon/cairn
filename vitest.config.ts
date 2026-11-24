@@ -7,7 +7,14 @@ const workers = await testRunWorkers();
 
 scrubGitEnv();
 
-const ALL_PROJECTS = ['packages/*', 'apps/server', 'apps/web', 'apps/daemon', 'integration'];
+const ALL_PROJECTS = [
+  'packages/*',
+  'apps/server',
+  'apps/web',
+  'apps/daemon',
+  'apps/desktop',
+  'integration',
+];
 const HEAVY_PROJECTS = ['integration'];
 const projectSet = process.env.VITEST_PROJECT_SET;
 const projects =

@@ -124,8 +124,10 @@ export const EN: Record<string, string> = {
   '{count} 处已过期': '{count} expired',
   '{count} 处登录失效': '{count} signed out',
   '{count} 处即将过期': '{count} about to expire',
-  '默认使用执行机已登录的 Antigravity，也可以展开下方粘贴 `GEMINI_API_KEY`。':
-    'Uses the Antigravity sign-in on your Runner by default. You can also expand below to paste a `GEMINI_API_KEY`.',
+  '在这台 Mac 上登录后接入该账号，也可以展开下方粘贴 `GEMINI_API_KEY`。':
+    'Connect the account you sign in to on this Mac, or expand below to paste a `GEMINI_API_KEY`.',
+  '未能导入登录凭据，请在这台 Mac 上重新登录 Antigravity。':
+    'Unable to import the sign-in credential. Sign in to Antigravity again on this Mac.',
   '也可以粘贴 API key': 'Or paste an API key',
   '粘贴 `GEMINI_API_KEY` 或 `.env` 片段。保存后无法再查看。':
     'Paste a `GEMINI_API_KEY` or `.env` snippet. It cannot be viewed after saving.',
@@ -2646,10 +2648,10 @@ export const EN: Record<string, string> = {
     'The upstream did not respond within 10 seconds, so the model list is unavailable.',
   '无法连接上游，未能获取模型清单。请检查网络后重试。':
     'Cannot connect to the upstream, so the model list is unavailable. Check the network and retry.',
-  '执行机上的 Antigravity 尚未登录，未能获取它的模型清单。请登录后重试。':
-    'Antigravity on the Runner is not signed in, so its model list is unavailable. Sign in and retry.',
-  '没有已安装 Antigravity 的在线执行机，未能获取它的模型清单。':
-    'No online Runner has Antigravity installed, so its model list is unavailable.',
+  '该订阅未启用或登录凭据不可用。请启用订阅，或重新添加账号并登录。':
+    'This subscription is disabled or its sign-in credential is unavailable. Enable it, or add the account again and sign in.',
+  '没有获准查询该订阅的在线执行机。请检查执行机连接与模型路由。':
+    'No online Runner is authorized to query this subscription. Check the Runner connection and model routing.',
   '筛选{noun}': 'Filter {noun}',
   '没有匹配「{query}」的{noun}': 'Nothing matches “{query}”',
   输入可筛选: 'Type to filter',
@@ -2866,7 +2868,8 @@ export const EN: Record<string, string> = {
   '需要你操作手机 {name}': 'The phone {name} is waiting for you',
   '在手机上完成后点“交还”，Coordinator 继续。':
     'Finish on the phone, then tap "hand back" and the Coordinator continues.',
-  '登录信息在执行机的 OS 钥匙串里': "The sign-in lives in the Runner's OS keychain",
+  '账号访问令牌加密保存，到期后需重新接入':
+    'The account access token is stored encrypted. Connect the account again after it expires.',
   'Token 加密保存': 'The token is stored encrypted',
   '不用再配 API key，Token 加密保存': 'No API key needed; the token is stored encrypted',
   '会从中取出 windsurf_api_key，Token 加密保存':

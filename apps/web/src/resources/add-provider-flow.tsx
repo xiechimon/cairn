@@ -166,6 +166,15 @@ export function AddProviderFlow({
     };
   }, []);
 
+  const finishSubscription = (created: CreatedSubscription, source: SubscriptionSource) => {
+    onViewChange('closed');
+    void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+    if (source !== 'claude') {
+      void client.invalidateQueries({ queryKey: [`${source}-subscriptions`, teamId] });
+    }
+    onSubscriptionCreated?.(created, source);
+  };
+
   return (
     <>
       {CreateProviderDialog !== null ? (
@@ -260,6 +269,8 @@ export function AddProviderFlow({
       )}
       {view === 'devin-subscription' && (
         <AddDevinSubscriptionDialog
+          teamId={teamId}
+          onLocalCreated={(created) => finishSubscription(created, 'devin')}
           onClose={() => {
             createDevinSubscription.reset();
             onViewChange('closed');
@@ -268,9 +279,7 @@ export function AddProviderFlow({
             createDevinSubscription.mutate(body, {
               onSuccess: (created) => {
                 createDevinSubscription.reset();
-                onViewChange('closed');
-                void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-                onSubscriptionCreated?.(created, 'devin');
+                finishSubscription(created, 'devin');
               },
             })
           }
@@ -280,6 +289,8 @@ export function AddProviderFlow({
       )}
       {view === 'antigravity-subscription' && (
         <AddAntigravitySubscriptionDialog
+          teamId={teamId}
+          onLocalCreated={(created) => finishSubscription(created, 'antigravity')}
           onClose={() => {
             createAntigravitySubscription.reset();
             onViewChange('closed');
@@ -288,9 +299,7 @@ export function AddProviderFlow({
             createAntigravitySubscription.mutate(body, {
               onSuccess: (created) => {
                 createAntigravitySubscription.reset();
-                onViewChange('closed');
-                void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
-                onSubscriptionCreated?.(created, 'antigravity');
+                finishSubscription(created, 'antigravity');
               },
             })
           }

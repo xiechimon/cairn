@@ -1,23 +1,20 @@
-import { type ChildProcess, spawn } from 'node:child_process';
-import { accessSync, constants, readdirSync, readFileSync, statSync } from 'node:fs';
+import { accessSync, constants, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import {
+  type DesktopSubscriptionMetadata,
   type DevinLocalStatus,
   type DevinLoginOutcome,
   devinCredentialsPath,
   devinKeyFromToml,
 } from '@cairn/shared';
 import { verifiedManagedBins } from '@cairn/shared/managed-bin';
+import { authenticateCredential } from './acp-credential-login.js';
 
-const LOGIN_TIMEOUT_MS = 600_000;
-const LOGIN_POLL_MS = 500;
-
-function credentialsFile(): { key: string | null; mtimeMs: number } {
-  const path = devinCredentialsPath(homedir());
+function hostCredential(): string | null {
   try {
-    return { key: devinKeyFromToml(readFileSync(path, 'utf8')), mtimeMs: statSync(path).mtimeMs };
+    return devinKeyFromToml(readFileSync(devinCredentialsPath(homedir()), 'utf8'));
   } catch {
-    return { key: null, mtimeMs: 0 };
+    return null;
   }
 }
 
@@ -43,139 +40,75 @@ function resolveDevinBinary(): string | null {
 }
 
 export function devinLocalStatus(): DevinLocalStatus {
-  return { loggedIn: credentialsFile().key !== null, canLogin: resolveDevinBinary() !== null };
+  return { loggedIn: hostCredential() !== null, canLogin: resolveDevinBinary() !== null };
 }
 
-export function devinImportKey(): { ok: true; key: string } | { ok: false; reason: 'no-key' } {
-  const { key } = credentialsFile();
-  return key === null ? { ok: false, reason: 'no-key' } : { ok: true, key };
+async function saveDevinCredential(
+  key: string | null,
+  save: (key: string) => Promise<DesktopSubscriptionMetadata>,
+): Promise<DevinLoginOutcome> {
+  if (key === null) return { ok: false, reason: 'no-key' };
+  try {
+    return { ok: true, subscription: await save(key) };
+  } catch {
+    return { ok: false, reason: 'save' };
+  }
 }
 
-let flight: { child: ChildProcess; cancelled: boolean } | null = null;
+export function devinImport(save: (key: string) => Promise<DesktopSubscriptionMetadata>) {
+  return saveDevinCredential(hostCredential(), save);
+}
+
+let flight: { controller: AbortController; done: Promise<DevinLoginOutcome> } | null = null;
 
 export function devinCancelLogin(): void {
-  if (flight === null) return;
-  flight.cancelled = true;
-  flight.child.kill();
+  flight?.controller.abort();
 }
 
-export function stopDevinLogin(): void {
-  devinCancelLogin();
+export async function stopDevinLogin(): Promise<void> {
+  const current = flight;
+  current?.controller.abort();
+  await current?.done;
 }
 
-export function devinLogin(): Promise<DevinLoginOutcome> {
+export function devinLogin(
+  save: (key: string) => Promise<DesktopSubscriptionMetadata>,
+  appData: string,
+  workerPath?: string,
+): Promise<DevinLoginOutcome> {
   if (flight !== null) return Promise.resolve({ ok: false, reason: 'busy' });
-  const binary = resolveDevinBinary();
-  if (binary === null) return Promise.resolve({ ok: false, reason: 'no-binary' });
-  const before = credentialsFile().mtimeMs;
-  let child: ChildProcess;
-  try {
-    child = spawn(binary, ['acp'], { stdio: ['pipe', 'pipe', 'pipe'] });
-  } catch (error) {
-    console.error('Devin login failed to spawn:', error);
-    return Promise.resolve({ ok: false, reason: 'spawn' });
-  }
-  const current = { child, cancelled: false };
-  flight = current;
-  let stderr = '';
-  child.stderr?.on('data', (chunk: Buffer) => {
-    stderr = (stderr + chunk.toString()).slice(-4000);
-  });
-  return new Promise<DevinLoginOutcome>((resolve) => {
-    const deadline = Date.now() + LOGIN_TIMEOUT_MS;
-    let exited = false;
-    let authenticated = false;
-    let authFailed = false;
-    child.on('exit', () => {
-      exited = true;
-    });
-    child.on('error', (error) => {
-      exited = true;
-      console.error('Devin login process error:', error);
-    });
-    const finish = (outcome: DevinLoginOutcome): void => {
-      if (flight !== current) return;
+  const bin = resolveDevinBinary();
+  if (bin === null) return Promise.resolve({ ok: false, reason: 'no-binary' });
+  const controller = new AbortController();
+  const done = authenticateCredential({
+    appData,
+    bin,
+    args: () => ['acp'],
+    env: () => ({
+      ...Object.fromEntries(
+        Object.keys(process.env)
+          .filter((key) => key.startsWith('CHISEL_') || key.startsWith('DEVIN_'))
+          .map((key) => [key, undefined]),
+      ),
+      WINDSURF_API_KEY: undefined,
+    }),
+    credentialPath: devinCredentialsPath,
+    pickMethod: (methods) => {
+      const method = methods?.[0]?.id;
+      return typeof method === 'string' ? method : 'devin-browser';
+    },
+    signal: controller.signal,
+    workerPath,
+  })
+    .then((auth): DevinLoginOutcome | Promise<DevinLoginOutcome> => {
+      if (!auth.ok) return { ok: false, reason: auth.reason === 'failed' ? 'exit' : auth.reason };
+      if (controller.signal.aborted) return { ok: false, reason: 'cancelled' };
+      return saveDevinCredential(auth.text === null ? null : devinKeyFromToml(auth.text), save);
+    })
+    .catch((): DevinLoginOutcome => ({ ok: false, reason: 'spawn' }))
+    .finally(() => {
       flight = null;
-      if (!exited) child.kill();
-      resolve(outcome);
-    };
-    const send = (message: Record<string, unknown>): void => {
-      try {
-        child.stdin?.write(`${JSON.stringify(message)}\n`);
-      } catch {}
-    };
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: { protocolVersion: 1, clientCapabilities: {} },
     });
-    let buffer = '';
-    child.stdout?.on('data', (chunk: Buffer) => {
-      buffer += chunk.toString();
-      let newline = buffer.indexOf('\n');
-      while (newline >= 0) {
-        const line = buffer.slice(0, newline);
-        buffer = buffer.slice(newline + 1);
-        newline = buffer.indexOf('\n');
-        if (flight !== current || line.trim() === '') continue;
-        let message: {
-          id?: unknown;
-          result?: { authMethods?: { id?: unknown }[] };
-          error?: unknown;
-        };
-        try {
-          message = JSON.parse(line);
-        } catch {
-          continue;
-        }
-        if (message.id === 1) {
-          if (message.error !== undefined) {
-            authFailed = true;
-            continue;
-          }
-          const methodId = message.result?.authMethods?.[0]?.id;
-          send({
-            jsonrpc: '2.0',
-            id: 2,
-            method: 'authenticate',
-            params: { methodId: typeof methodId === 'string' ? methodId : 'devin-browser' },
-          });
-        } else if (message.id === 2) {
-          if (message.error === undefined) {
-            authenticated = true;
-          } else {
-            authFailed = true;
-          }
-        }
-      }
-    });
-    const tick = (): void => {
-      if (flight !== current) return;
-      const file = credentialsFile();
-      if (file.key !== null && (file.mtimeMs > before || authenticated)) {
-        finish({ ok: true, key: file.key });
-        return;
-      }
-      if (current.cancelled) {
-        finish({ ok: false, reason: 'cancelled' });
-        return;
-      }
-      if (exited || authFailed) {
-        if (file.key !== null) {
-          finish({ ok: true, key: file.key });
-        } else {
-          console.error(`Devin login failed without writing credentials. stderr: ${stderr}`);
-          finish({ ok: false, reason: 'exit' });
-        }
-        return;
-      }
-      if (Date.now() >= deadline) {
-        finish({ ok: false, reason: 'timeout' });
-        return;
-      }
-      setTimeout(tick, LOGIN_POLL_MS);
-    };
-    setTimeout(tick, LOGIN_POLL_MS);
-  });
+  flight = { controller, done };
+  return done;
 }

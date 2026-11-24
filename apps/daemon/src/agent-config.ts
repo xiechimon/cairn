@@ -10,6 +10,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { dirname, join, sep } from 'node:path';
+import type { AntigravityOAuthStepCredential } from '@cairn/shared';
 import { claudeConfigHome, runtimeHome } from './runtime-homes.js';
 
 export const ANTIGRAVITY_CREDENTIAL_FILES = [
@@ -112,21 +113,57 @@ export function prepareAntigravityHome(input: {
     ...(input.apiKey ? [] : ANTIGRAVITY_CREDENTIAL_FILES),
     ...keychainFiles(input.platform ?? process.platform),
   ]);
+  writeAntigravityAuthSettings(
+    home,
+    input.apiKey ? 'gemini-api-key' : 'oauth-personal',
+    input.apiKey ? undefined : input.realHome,
+  );
+  return home;
+}
+
+export function writeAntigravityOAuthCredential(
+  home: string,
+  credential: AntigravityOAuthStepCredential,
+): void {
+  writeAntigravityAuthSettings(home, 'oauth-personal');
+  writeJsonObject(home, '.gemini/antigravity-acp/antigravity-oauth-token', {
+    token: {
+      access_token: credential.token,
+      token_type: 'Bearer',
+      expiry: new Date(credential.expiresAt).toISOString(),
+    },
+  });
+}
+
+export function antigravityFileStorageEnv(home: string): Record<string, string> {
+  return {
+    GEMINI_HOME: join(home, '.gemini'),
+    GEMINI_CLI_HOME: home,
+    AGY_ACP_FORCE_FILE_STORAGE: '1',
+    AGY_CLI_DISABLE_AUTO_UPDATE: '1',
+    SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0',
+  };
+}
+
+export function writeAntigravityAuthSettings(
+  home: string,
+  auth: 'gemini-api-key' | 'oauth-personal' = 'gemini-api-key',
+  oauthHome?: string,
+): void {
   const settingsFile = '.gemini/antigravity-cli/settings.json';
-  const userGcp = input.apiKey ? undefined : readJsonObject(join(input.realHome, settingsFile)).gcp;
+  const userGcp =
+    oauthHome === undefined ? undefined : readJsonObject(join(oauthHome, settingsFile)).gcp;
   writeJsonObject(home, settingsFile, {
-    ...(input.apiKey ? { modelProvider: 'gemini' } : {}),
+    ...(auth === 'gemini-api-key' ? { modelProvider: 'gemini' } : {}),
     ...(userGcp === undefined ? {} : { gcp: userGcp }),
   });
   const acpSettingsFile = '.gemini/antigravity-acp/settings.json';
-  const acpUserGcp = input.apiKey
-    ? undefined
-    : readJsonObject(join(input.realHome, acpSettingsFile)).gcp;
+  const acpUserGcp =
+    oauthHome === undefined ? undefined : readJsonObject(join(oauthHome, acpSettingsFile)).gcp;
   writeJsonObject(home, acpSettingsFile, {
-    auth: { type: input.apiKey ? 'gemini-api-key' : 'oauth-personal' },
+    auth: { type: auth },
     ...(acpUserGcp === undefined ? {} : { gcp: acpUserGcp }),
   });
-  return home;
 }
 
 export function prepareGeminiHome(input: {

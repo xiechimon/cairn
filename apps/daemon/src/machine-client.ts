@@ -4,6 +4,7 @@ import {
   type ClaimedStep,
   type ClaudeCodeReport,
   type ClaudeRateLimitReport,
+  type MachineAntigravityModelProbeResult,
   type MachineAskBody,
   type MachineAskResponse,
   type MachineAttachmentResponse,
@@ -31,6 +32,7 @@ import {
   type MachineStreamEvent,
   type MachineTokenResponse,
   type MachineUploadUrlsResponse,
+  machineAntigravityModelProbeCredentialSchema,
   machineAskResponseSchema,
   machineAttachmentResponseSchema,
   machineClaimResponseSchema,
@@ -162,6 +164,17 @@ export interface MachineApi {
   ): Promise<void>;
   done(stepId: string, body: MachineDoneBody): Promise<void>;
   reportClaudeRateLimit?(body: ClaudeRateLimitReport): Promise<void>;
+  claimAntigravityModelProbe?(
+    requestId: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ): Promise<string>;
+  finishAntigravityModelProbe?(
+    requestId: string,
+    connectionId: string,
+    result: MachineAntigravityModelProbeResult,
+    signal: AbortSignal,
+  ): Promise<void>;
   steer(stepId: string): Promise<MachineSteerResponse | null>;
   steerAck?(stepId: string, body?: MachineSteerAckBody): Promise<void>;
   stop(stepId: string): Promise<boolean | null>;
@@ -311,6 +324,40 @@ export class MachineClient implements MachineApi {
       },
     );
     return res.step;
+  }
+
+  async claimAntigravityModelProbe(
+    requestId: string,
+    connectionId: string,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const credential = await this.request(
+      'POST',
+      `/api/machine/antigravity/model-probes/${encodeURIComponent(requestId)}`,
+      {
+        body: { phase: 'claim', connectionId },
+        signal,
+        parse: (raw) => machineAntigravityModelProbeCredentialSchema.parse(raw),
+      },
+    );
+    return credential.token;
+  }
+
+  async finishAntigravityModelProbe(
+    requestId: string,
+    connectionId: string,
+    result: MachineAntigravityModelProbeResult,
+    signal: AbortSignal,
+  ): Promise<void> {
+    await this.request(
+      'POST',
+      `/api/machine/antigravity/model-probes/${encodeURIComponent(requestId)}`,
+      {
+        body: { phase: 'result', connectionId, result },
+        signal,
+        parse: (raw) => machineOkResponseSchema.parse(raw),
+      },
+    );
   }
 
   async heartbeat(stepId: string, body: MachineHeartbeatBody = {}): Promise<void> {

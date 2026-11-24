@@ -1,0 +1,13 @@
+# Desktop local credential handoff
+
+In Settings, a new Cairn desktop owner can sign in to an Antigravity or Devin account or import a local sign-in. First run can import configured Pi providers. These actions require the relevant upstream account or existing local configuration, not a new Cairn payment or a key copied into the page. Failed saves stay in the originating dialog or import card.
+
+| Situation | Owner sees | State and transition |
+| --- | --- | --- |
+| Import local credentials | Existing import action; the new provider or subscription appears after saving | The desktop main process reads the selected record and posts to the bundled server's fixed endpoint with the owner channel. The server encrypts the credential using the existing credential store. The page receives an ID and label or a fixed failure category. |
+| Sign in to Antigravity | Browser sign-in, then the subscription opens | Each ACP child gets an empty, private home. Main waits for authentication, terminates and awaits the child, captures a valid access token, removes the profile, and sends the token and expiry to the server. No refresh token is imported. |
+| Antigravity login fails, is cancelled, times out, or ACP crashes | The dialog remains open for retry | The child is stopped and awaited before cleanup. No subscription is created. Graceful desktop shutdown awaits the same path. The login worker stops ACP and removes the profile if its desktop IPC connection closes unexpectedly. A later launch also removes abandoned profiles if the worker itself was interrupted. |
+| Sign in from an existing credentialless subscription | The same subscription verifies with the new sign-in | An owner-only write attaches the encrypted OAuth credential only if the target still belongs to the team and is still credentialless. An in-use account cannot change credentials. A stale request cannot replace an attached credential or create a duplicate subscription. |
+| Sign in to Devin | Browser sign-in, then the subscription opens | The existing local CLI flow supplies the key only to the privileged save callback; the server encrypts it and the page receives metadata. |
+
+Only the desktop main process reads local credential files and the private login profile. Only the bundled server persists account credentials for Cairn. The renderer supplies team and selection identifiers or a label; it cannot choose request origin, method, or arbitrary path. Existing manual entry remains separate and does not read local files. Server-side reads for dispatch and catalog discovery continue to use the encrypted records; the IPC does not return the write payload or raw server errors.

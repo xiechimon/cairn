@@ -1,6 +1,7 @@
 import { writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { join } from 'node:path';
+import { processStartTime } from '@cairn/shared/parent-watch';
 import { describe, expect, it } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { buildProgram } from '../src/cli.js';
@@ -15,7 +16,6 @@ import {
   orbServiceStateDir,
   parseLsofListenPid,
   parsePsPpid,
-  processStartTime,
   readLiveServicePid,
   runOrbServicesEnsure,
   withEnsureFileLock,

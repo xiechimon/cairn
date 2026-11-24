@@ -3242,6 +3242,25 @@ exports[`AgentBackend seam + machine-wire schema snapshot (01 §5 / 02 §5 canon
     {
       "additionalProperties": false,
       "properties": {
+        "requestId": {
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "type": "string",
+        },
+        "type": {
+          "const": "antigravity.models",
+          "type": "string",
+        },
+      },
+      "required": [
+        "type",
+        "requestId",
+      ],
+      "type": "object",
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "call": {
           "additionalProperties": false,
           "properties": {
@@ -12431,6 +12450,14 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
                 "installed",
               ],
               "type": "object",
+            },
+            "antigravityOAuthProfile": {
+              "const": true,
+              "type": "boolean",
+            },
+            "antigravitySubscriptionModels": {
+              "const": true,
+              "type": "boolean",
             },
             "browser": {
               "const": true,

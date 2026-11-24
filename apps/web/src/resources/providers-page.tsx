@@ -70,7 +70,7 @@ import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { AddProviderFlow, type AddProviderView } from './add-provider-flow.js';
-import { AntigravityRelogin } from './antigravity-subscriptions.js';
+import { AntigravityRelogin, antigravityBridge } from './antigravity-subscriptions.js';
 import {
   applyListResponse,
   initialProviderRefresh,
@@ -100,8 +100,8 @@ import { groupAntigravityUpstream, groupDevinUpstream } from './upstream-model-g
 import { UpstreamModelPicker } from './upstream-model-picker.js';
 
 const ANTIGRAVITY_FALLBACK_REASONS = {
-  auth: '执行机上的 Antigravity 尚未登录，未能获取它的模型清单。请登录后重试。',
-  'not-found': '没有已安装 Antigravity 的在线执行机，未能获取它的模型清单。',
+  auth: '该订阅未启用或登录凭据不可用。请启用订阅，或重新添加账号并登录。',
+  'not-found': '没有获准查询该订阅的在线执行机。请检查执行机连接与模型路由。',
 } as const;
 
 interface Entry {
@@ -188,12 +188,13 @@ function subscriptionEntries(
 ): Entry[] {
   return accounts.map((account) => {
     const verification = deps.verifications[account.id];
+    const relogin = deps.reloginFor?.(account);
     const view = subscriptionStatusView(account, deps.now, deps.t, deps.clock);
     const runtimeLiveness = new Map(deps.models.map((model) => [model.id, model.liveness]));
     const runtimeUpdate = new Map(deps.models.map((model) => [model.id, model.updateRequired]));
     const picked = account.models ?? [];
     const shown = (
-      picked.length > 0
+      picked.length > 0 || account.vendor === 'antigravity'
         ? picked
         : deps.models.map((model): SubscriptionModel => ({ id: model.id, name: model.name }))
     ).map((model) => ({
@@ -217,10 +218,10 @@ function subscriptionEntries(
           account={account}
           models={shown}
           now={deps.now}
-          view={view}
+          view={relogin && account.state === 'expired' ? { ...view, reason: null } : view}
           verification={verification}
           actions={deps.actionsFor(account)}
-          relogin={deps.reloginFor?.(account)}
+          relogin={relogin}
         />
       ),
     };
@@ -263,6 +264,10 @@ export function ProvidersSection() {
   const verification = useSubscriptionVerification(teamId);
   const devinVerification = useDevinSubscriptionVerification(teamId);
   const antigravityVerification = useAntigravitySubscriptionVerification(teamId);
+  const [verifyAfterCreate, setVerifyAfterCreate] = useState<{
+    id: string;
+    vendor: AccountVendor;
+  } | null>(null);
   const [addView, setAddView] = useState<AddProviderView>('closed');
   const [removingSubscription, setRemovingSubscription] = useState<SubscriptionAccount | null>(
     null,
@@ -300,6 +305,11 @@ export function ProvidersSection() {
   const subscriptionApiIds = live ? (subscriptionsQ.data ?? []).map((s) => s.id) : [];
   const devinApiIds = live ? (devinSubscriptionsQ.data ?? []).map((s) => s.id) : [];
   const antigravityApiIds = live ? (antigravitySubscriptionsQ.data ?? []).map((s) => s.id) : [];
+  const antigravityOAuthIds = new Set(
+    antigravitySubscriptionsQ.data
+      ?.filter((row) => row.oauthPersonal === true)
+      .map((row) => row.id),
+  );
 
   useEffect(() => {
     if (live && teamId !== undefined) refreshQuota();
@@ -592,10 +602,23 @@ export function ProvidersSection() {
     ...subscriptionEntries(antigravitySubscriptions, {
       ...subscriptionDeps,
       models: subscriptionModels(sources, 'antigravity'),
-      reloginFor: (account) =>
-        live && account.hasToken === false ? (
-          <AntigravityRelogin onLoggedIn={() => startVerification(account)} />
-        ) : undefined,
+      reloginFor: (account) => {
+        if (!live || teamId === undefined || antigravityBridge() === null) return undefined;
+        const renewOAuth = account.state === 'expired' && antigravityOAuthIds.has(account.id);
+        if (!renewOAuth && account.hasToken !== false) return undefined;
+        return (
+          <AntigravityRelogin
+            teamId={teamId}
+            subscription={account}
+            renewOAuth={renewOAuth}
+            onLoggedIn={() => {
+              void client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] });
+              void client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] });
+              startVerification(account);
+            }}
+          />
+        );
+      },
     }),
     ...teamEntries(
       providers,
@@ -615,6 +638,14 @@ export function ProvidersSection() {
         : null;
   const itemParam = searchParams.get('item');
   const selected = entries.find((e) => e.item.id === itemParam) ?? entries[0];
+  const selectedId = selected?.item.id;
+  useEffect(() => {
+    if (verifyAfterCreate === null) return;
+    const target = `subscription:${verifyAfterCreate.id}`;
+    if (itemParam !== target || selectedId !== target) return;
+    setVerifyAfterCreate(null);
+    startVerification(verifyAfterCreate);
+  }, [itemParam, selectedId, startVerification, verifyAfterCreate]);
 
   return (
     <>
@@ -646,7 +677,10 @@ export function ProvidersSection() {
         <ProviderPanel
           items={entries.map((e) => e.item)}
           selectedId={selected?.item.id ?? null}
-          onSelect={(id) => setParams({ item: id })}
+          onSelect={(id) => {
+            setVerifyAfterCreate(null);
+            setParams({ item: id });
+          }}
           onReorder={reorder}
           empty={
             <QueryBoundary
@@ -689,7 +723,7 @@ export function ProvidersSection() {
         onConnectError={setConnectError}
         onSubscriptionCreated={(created, source) => {
           setParams({ item: `subscription:${created.id}` }, true);
-          startVerification({ id: created.id, vendor: source });
+          setVerifyAfterCreate({ id: created.id, vendor: source });
         }}
       />
       {pickingSubscription !== null && live && teamId !== undefined && (
@@ -718,7 +752,14 @@ export function ProvidersSection() {
           }
           testable={false}
           {...(pickingSubscription.vendor === 'antigravity'
-            ? { fallbackReasons: ANTIGRAVITY_FALLBACK_REASONS }
+            ? {
+                fallbackReasons: antigravityOAuthIds.has(pickingSubscription.id)
+                  ? {
+                      ...ANTIGRAVITY_FALLBACK_REASONS,
+                      auth: '上游拒绝了这个订阅的登录，未能获取模型清单。请重新登录后重试。',
+                    }
+                  : ANTIGRAVITY_FALLBACK_REASONS,
+              }
             : {})}
           load={() =>
             pickingSubscription.vendor === 'devin'

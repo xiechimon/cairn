@@ -67,6 +67,7 @@ class FakeClient implements MachineApi {
   uploads: (TranscriptUpload | string)[] = [];
   failDone = false;
   commitIdentity: CommitIdentity | undefined;
+  antigravityToken: string | undefined;
   constructor(
     private readonly tokenProvider: ProviderConfig | null,
     private readonly subscriptionToken?: string,
@@ -100,6 +101,7 @@ class FakeClient implements MachineApi {
       git: null,
       commitIdentity: this.commitIdentity,
       claudeSubscriptionToken: this.subscriptionToken,
+      antigravityToken: this.antigravityToken,
     };
   }
   async skillsManifest() {
@@ -193,6 +195,8 @@ async function setup(
     tokenProvider?: ProviderConfig | null;
     subscriptionToken?: string;
     echoToken?: boolean;
+    antigravityToken?: string;
+    output?: string;
     sessionFile?: string;
     failDone?: boolean;
     withoutSubscription?: boolean;
@@ -212,9 +216,10 @@ async function setup(
   );
   client.failDone = opts.failDone ?? false;
   client.commitIdentity = opts.commitIdentity;
+  client.antigravityToken = opts.antigravityToken;
   const journal = new StepJournal(paths.outboxDir);
   const { backend, sessions, resumed } = recordingBackend(
-    opts.echoToken ? opts.subscriptionToken : undefined,
+    opts.output ?? (opts.echoToken ? opts.subscriptionToken : undefined),
     opts.sessionFile,
   );
   const resolved: (string | null | undefined)[] = [];
@@ -481,6 +486,47 @@ describe('runner runtime-step tool surface (spec 17 A10 / after #647 T4 wiring)'
 });
 
 describe('subscription credential isolation', () => {
+  test.each(['refreshToken', 'refresh_token'])(
+    'Antigravity ACP output redacts bare OAuth bearer and %s before upload',
+    async (refreshField) => {
+      const bearer = 'ya29.fake-step-bearer';
+      const refreshToken = 'fake-step-refresh-token';
+      const credential = JSON.stringify({
+        kind: 'oauth-personal',
+        token: bearer,
+        [refreshField]: refreshToken,
+        expiresAt: Date.now() + 600_000,
+      });
+      const result = await setup(
+        claimedStep({ provider: 'antigravity', modelId: 'gemini-flash' }),
+        {
+          antigravityToken: credential,
+          output: `ACP output ${bearer} ${refreshToken}`,
+        },
+      );
+      expect(result.sessions).toHaveLength(1);
+      const output = JSON.stringify([
+        result.lines,
+        result.client.doneBodies,
+        result.client.uploads,
+      ]);
+      expect(output).toContain('[REDACTED]');
+      expect(output).not.toContain(bearer);
+      expect(output).not.toContain(refreshToken);
+      expect(result.sessions[0]?.secrets?.()).toEqual(
+        expect.arrayContaining([credential, bearer, refreshToken]),
+      );
+      for (const entry of readdirSync(result.paths.outboxDir, {
+        recursive: true,
+        withFileTypes: true,
+      })) {
+        if (!entry.isFile()) continue;
+        const content = readFileSync(join(entry.parentPath, entry.name), 'utf8');
+        expect(content).not.toContain(bearer);
+        expect(content).not.toContain(refreshToken);
+      }
+    },
+  );
   const token = 'private-subscription-token-for-step';
   test('Claude Code receives the per-step token; pi does not receive it', async () => {
     const claude = await setup(claimedStep({ provider: 'claude-code', modelId: 'sonnet' }), {

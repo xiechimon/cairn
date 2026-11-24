@@ -1,4 +1,5 @@
 import {
+  antigravityOAuthStepCredentialSchema,
   bindGithubConnectorBodySchema,
   capabilitiesResponseSchema,
   claudeSubscriptionTestSchema,
@@ -59,8 +60,10 @@ import {
   requireTeam,
   svcOf,
 } from './routes-helpers.js';
+import { apiKeyProbeRunnerGrant } from './services/antigravity-model-probe-authorization.js';
 import {
   antigravitySubscriptionUpstreamModels,
+  attachAntigravityOAuthCredential,
   createAntigravitySubscription,
   deleteAntigravitySubscription,
   disableAntigravitySubscription,
@@ -68,6 +71,7 @@ import {
   listAntigravitySubscriptionSteps,
   listAntigravitySubscriptions,
   patchAntigravitySubscription,
+  resolveAntigravitySubscriptionExpiry,
   verifyAntigravitySubscriptionConnection,
 } from './services/antigravity-subscriptions.js';
 import { createApiKey, deleteApiKey, listApiKeys } from './services/api-keys.js';
@@ -682,7 +686,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireTeam(ctx, teamId);
     requireOwnerSession(c);
     const body = parseWith(createAntigravitySubscriptionSchema, await jsonBody(c), 'body');
-    return c.json(createAntigravitySubscription(keysvc, teamId, body), 201);
+    return c.json(
+      createAntigravitySubscription(
+        keysvc,
+        teamId,
+        await resolveAntigravitySubscriptionExpiry(body),
+      ),
+      201,
+    );
   });
 
   app.delete('/api/teams/:id/antigravity-subscriptions/:cid', (c) => {
@@ -701,6 +712,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireOwnerSession(c);
     const body = parseWith(renameAntigravitySubscriptionSchema, await jsonBody(c), 'body');
     return c.json(patchAntigravitySubscription(keysvc, teamId, c.req.param('cid'), body));
+  });
+
+  app.post('/api/teams/:id/antigravity-subscriptions/:cid/attach-oauth', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c);
+    const credential = parseWith(antigravityOAuthStepCredentialSchema, await jsonBody(c), 'body');
+    return c.json(attachAntigravityOAuthCredential(keysvc, teamId, c.req.param('cid'), credential));
   });
 
   app.post('/api/teams/:id/antigravity-subscriptions/:cid/enable', async (c) => {
@@ -735,7 +754,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
   app.post('/api/teams/:id/antigravity-subscriptions/:cid/upstream-models', async (c) => {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
-    return c.json(await antigravitySubscriptionUpstreamModels(keysvc, teamId, c.req.param('cid')));
+    return c.json(
+      await antigravitySubscriptionUpstreamModels(
+        {
+          ...keysvc,
+          machineHub: ctx.machineHub,
+          ownerInitiated: isOwnerSession(c),
+          apiKeyProbeRunnerGrant: (machineId) => apiKeyProbeRunnerGrant(ctx.db, teamId, machineId),
+        },
+        teamId,
+        c.req.param('cid'),
+        c.req.raw.signal,
+      ),
+    );
   });
 
   app.get('/api/teams/:id/providers', (c) => {

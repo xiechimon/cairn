@@ -6,9 +6,12 @@ import {
   type AntigravityLocalStatus,
   type AntigravityLoginOutcome,
   type AntigravityLoginPhase,
+  type AntigravityOAuthStepCredential,
   antigravityCliDir,
   antigravityKeyFromText,
+  antigravityOAuthStepCredentialSchema,
   compareVersions,
+  type DesktopSubscriptionMetadata,
 } from '@cairn/shared';
 import {
   ANTIGRAVITY_ACP_ARGS,
@@ -18,10 +21,10 @@ import {
   currentAntigravityManagedInstall,
   ensureAntigravityManagedInstall,
 } from '@cairn/shared/antigravity-install';
+import { readRegularCredentialFile } from '@cairn/shared/credential-profile';
+import { authenticateCredential } from './acp-credential-login.js';
 
-const STATUS_TIMEOUT_MS = 20_000;
 const VALIDATE_TIMEOUT_MS = 30_000;
-const LOGIN_TIMEOUT_MS = 600_000;
 
 interface ResolvedBinary {
   binPath: string;
@@ -29,7 +32,7 @@ interface ResolvedBinary {
   source: 'local' | 'managed';
 }
 
-interface JsonRpcMessage {
+interface InitializeMessage {
   id?: unknown;
   result?: {
     protocolVersion?: unknown;
@@ -38,10 +41,11 @@ interface JsonRpcMessage {
       loadSession?: unknown;
       sessionCapabilities?: { resume?: unknown };
     };
-    authMethods?: { id?: unknown }[];
   };
   error?: unknown;
 }
+
+type AntigravityImportCredential = { token: string; expiresAt?: number };
 
 function managedToolsRoot(): string {
   return `${homedir()}/.cairn/tools/antigravity`;
@@ -72,36 +76,6 @@ function acpSpawnArgs(resolved: ResolvedBinary, logFile: string): string[] {
   return [...resolved.args, '--log-file', logFile];
 }
 
-function acpSpawnEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  return { ...process.env, ...extra, AGY_CLI_DISABLE_AUTO_UPDATE: '1' };
-}
-
-function sendJsonRpc(child: ChildProcess, message: Record<string, unknown>): void {
-  try {
-    child.stdin?.write(`${JSON.stringify(message)}\n`);
-  } catch {}
-}
-
-function attachNdjsonReader(
-  child: ChildProcess,
-  onMessage: (message: JsonRpcMessage) => void,
-): void {
-  let buffer = '';
-  child.stdout?.on('data', (chunk: Buffer) => {
-    buffer += chunk.toString();
-    let newline = buffer.indexOf('\n');
-    while (newline >= 0) {
-      const line = buffer.slice(0, newline);
-      buffer = buffer.slice(newline + 1);
-      newline = buffer.indexOf('\n');
-      if (line.trim() === '') continue;
-      try {
-        onMessage(JSON.parse(line) as JsonRpcMessage);
-      } catch {}
-    }
-  });
-}
-
 function pickAuthMethod(authMethods: { id?: unknown }[] | undefined): string {
   if (!Array.isArray(authMethods)) return 'oauth-personal';
   if (authMethods.some((method) => method?.id === 'oauth-personal')) return 'oauth-personal';
@@ -116,7 +90,12 @@ function validateCandidate(candidate: AntigravityManagedBin): Promise<boolean> {
     child = spawn(candidate.binPath, candidate.args, {
       cwd: validationDir,
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: acpSpawnEnv({ HOME: validationDir, TMPDIR: validationDir }),
+      env: {
+        ...process.env,
+        HOME: validationDir,
+        TMPDIR: validationDir,
+        AGY_CLI_DISABLE_AUTO_UPDATE: '1',
+      },
     });
   } catch {
     rmSync(validationDir, { recursive: true, force: true });
@@ -143,178 +122,144 @@ function validateCandidate(candidate: AntigravityManagedBin): Promise<boolean> {
       finish(false);
     });
     child.stdin?.on('error', () => finish(false));
-    attachNdjsonReader(child, (message) => {
-      if (message.id !== 1) return;
-      if (message.error !== undefined || message.result?.protocolVersion !== 1) {
-        finish(false);
-        return;
-      }
-      const version = message.result.agentInfo?.version;
-      const versionOk =
-        typeof version === 'string' &&
-        compareVersions(version, ANTIGRAVITY_CLI_MIN_VERSION) >= 0 &&
-        (version === candidate.version ||
-          version.startsWith(`${candidate.version}-`) ||
-          version.startsWith(`${candidate.version}+`));
-      const caps = message.result.agentCapabilities;
-      const resumeOk =
-        caps?.loadSession === true || caps?.sessionCapabilities?.resume !== undefined;
-      finish(versionOk && resumeOk);
-    });
-    sendJsonRpc(child, {
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        protocolVersion: 1,
-        clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
-      },
-    });
-  });
-}
-
-export async function antigravityLocalStatus(): Promise<AntigravityLocalStatus> {
-  const resolved = resolveAntigravityBinary();
-  if (resolved === null) {
-    return {
-      installed: false,
-      loggedIn: false,
-      canLogin: antigravityInstallSupported(process.platform, process.arch),
-    };
-  }
-  const probeDir = mkdtempSync(join(tmpdir(), 'cairn-agy-status-'));
-  let child: ChildProcess | null = null;
-  let exited = false;
-
-  try {
-    child = spawn(resolved.binPath, acpSpawnArgs(resolved, join(probeDir, 'probe.log')), {
-      cwd: probeDir,
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: acpSpawnEnv(),
-    });
-    const activeChild = child;
-    activeChild.on('exit', () => {
-      exited = true;
-    });
-
-    return await new Promise<AntigravityLocalStatus>((resolve) => {
-      let settled = false;
-      let timer: ReturnType<typeof setTimeout> | null = null;
-      let version: string | undefined;
-
-      const finish = (loggedIn: boolean): void => {
-        if (settled) return;
-        settled = true;
-        if (timer !== null) clearTimeout(timer);
-        resolve({
-          installed: true,
-          loggedIn,
-          canLogin: true,
-          ...(version !== undefined ? { version } : {}),
-          source: resolved.source,
-        });
-      };
-
-      const resetTimer = (): void => {
-        if (timer !== null) clearTimeout(timer);
-        timer = setTimeout(() => finish(false), STATUS_TIMEOUT_MS);
-      };
-
-      activeChild.on('exit', () => finish(false));
-      activeChild.on('error', () => finish(false));
-      activeChild.stdin?.on('error', () => finish(false));
-
-      attachNdjsonReader(activeChild, (message) => {
-        if (message.id === 1) {
-          if (message.error !== undefined) {
+    let buffer = '';
+    child.stdout?.on('data', (chunk: Buffer) => {
+      if (settled) return;
+      buffer += chunk.toString();
+      let newline = buffer.indexOf('\n');
+      while (!settled && newline >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        newline = buffer.indexOf('\n');
+        if (line === '') continue;
+        try {
+          const message = JSON.parse(line) as InitializeMessage;
+          if (message.id !== 1) continue;
+          if (message.error !== undefined || message.result?.protocolVersion !== 1) {
             finish(false);
             return;
           }
-          const rawVersion = message.result?.agentInfo?.version;
-          if (typeof rawVersion === 'string' && rawVersion !== '') version = rawVersion;
-          resetTimer();
-          sendJsonRpc(activeChild, {
-            jsonrpc: '2.0',
-            id: 2,
-            method: 'session/new',
-            params: { cwd: probeDir, mcpServers: [] },
-          });
-        } else if (message.id === 2) {
-          finish(message.error === undefined);
-        }
-      });
-
-      resetTimer();
-      sendJsonRpc(activeChild, {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: {
-          protocolVersion: 1,
-          clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
-        },
-      });
+          const version = message.result.agentInfo?.version;
+          const versionOk =
+            typeof version === 'string' &&
+            compareVersions(version, ANTIGRAVITY_CLI_MIN_VERSION) >= 0 &&
+            (version === candidate.version ||
+              version.startsWith(`${candidate.version}-`) ||
+              version.startsWith(`${candidate.version}+`));
+          const caps = message.result.agentCapabilities;
+          const resumeOk =
+            caps?.loadSession === true || caps?.sessionCapabilities?.resume !== undefined;
+          finish(versionOk && resumeOk);
+        } catch {}
+      }
     });
+    try {
+      child.stdin?.write(
+        `${JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: 1,
+            clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
+          },
+        })}\n`,
+      );
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+export function antigravityLocalStatus(): AntigravityLocalStatus {
+  const resolved = resolveAntigravityBinary();
+  return {
+    installed: resolved !== null,
+    loggedIn: readLocalAntigravityCredential() !== null,
+    canLogin: resolved !== null || antigravityInstallSupported(process.platform, process.arch),
+    ...(resolved !== null ? { source: resolved.source } : {}),
+  };
+}
+
+function oauthPath(home: string): string {
+  return join(home, '.gemini', 'antigravity-acp', 'antigravity-oauth-token');
+}
+
+function parseOAuthCredential(text: string | null): AntigravityOAuthStepCredential | null {
+  if (text === null) return null;
+  try {
+    const raw = JSON.parse(text) as { token?: { access_token?: unknown; expiry?: unknown } };
+    const expiresAt = typeof raw.token?.expiry === 'string' ? Date.parse(raw.token.expiry) : NaN;
+    const parsed = antigravityOAuthStepCredentialSchema.safeParse({
+      kind: 'oauth-personal',
+      token: raw.token?.access_token,
+      expiresAt,
+    });
+    return parsed.success && expiresAt > Date.now() ? parsed.data : null;
   } catch {
-    return { installed: true, loggedIn: false, canLogin: true, source: resolved.source };
-  } finally {
-    if (child !== null && !exited) child.kill();
-    rmSync(probeDir, { recursive: true, force: true });
+    return null;
   }
 }
 
-export function antigravityImportKey():
-  | { ok: true; key: string }
-  | { ok: false; reason: 'no-key' } {
+export function readLocalAntigravityCredential(): AntigravityImportCredential | null {
   const home = homedir();
+  const credential = parseOAuthCredential(readRegularCredentialFile(oauthPath(home)));
+  if (credential !== null) return { token: credential.token, expiresAt: credential.expiresAt };
   if (typeof process.env.GEMINI_API_KEY === 'string') {
-    const key = antigravityKeyFromText(process.env.GEMINI_API_KEY);
-    if (key !== null) return { ok: true, key };
+    const token = antigravityKeyFromText(process.env.GEMINI_API_KEY);
+    if (token !== null) return { token };
   }
-  const files = [
+  for (const path of [
     join(antigravityCliDir(home), 'credentials'),
     join(home, '.gemini', '.env'),
     join(home, '.gemini', 'settings.json'),
-  ];
-  for (const path of files) {
+  ]) {
     try {
-      const key = antigravityKeyFromText(readFileSync(path, 'utf8'));
-      if (key !== null) return { ok: true, key };
+      const token = antigravityKeyFromText(readFileSync(path, 'utf8'));
+      if (token !== null) return { token };
     } catch {}
   }
-  return { ok: false, reason: 'no-key' };
+  return null;
 }
 
-let flight: { cancel: () => void } | null = null;
+let flight: { cancel: () => void; done: Promise<AntigravityLoginOutcome> } | null = null;
 
 export function antigravityCancelLogin(): void {
   flight?.cancel();
 }
 
-export function stopAntigravityLogin(): void {
-  antigravityCancelLogin();
+export async function stopAntigravityLogin(): Promise<void> {
+  const current = flight;
+  current?.cancel();
+  await current?.done;
 }
 
 export function antigravityLogin(
+  save: (
+    credential: AntigravityOAuthStepCredential,
+    signal: AbortSignal,
+  ) => Promise<DesktopSubscriptionMetadata>,
+  appData: string,
   onPhase?: (phase: AntigravityLoginPhase) => void,
+  callerSignal?: AbortSignal,
+  workerPath?: string,
 ): Promise<AntigravityLoginOutcome> {
   if (flight !== null) return Promise.resolve({ ok: false, reason: 'busy' });
-
-  let cancelled = false;
-  let cancelChild: (() => void) | null = null;
-  const token = {
-    cancel: (): void => {
-      cancelled = true;
-      cancelChild?.();
-    },
-  };
-  flight = token;
-
-  return runLogin().finally(() => {
-    if (flight === token) flight = null;
-  });
+  const controller = new AbortController();
+  const signal =
+    callerSignal === undefined
+      ? controller.signal
+      : AbortSignal.any([controller.signal, callerSignal]);
+  const done = runLogin()
+    .catch((): AntigravityLoginOutcome => ({ ok: false, reason: 'failed' }))
+    .finally(() => {
+      flight = null;
+    });
+  flight = { cancel: () => controller.abort(), done };
+  return done;
 
   async function runLogin(): Promise<AntigravityLoginOutcome> {
+    if (signal.aborted) return { ok: false, reason: 'cancelled' };
     let resolved = resolveAntigravityBinary();
     if (resolved === null) {
       onPhase?.('installing');
@@ -323,95 +268,38 @@ export function antigravityLogin(
         validate: validateCandidate,
         log: (message) => console.error(`Antigravity install: ${message}`),
       });
+      if (signal.aborted) return { ok: false, reason: 'cancelled' };
       resolved = resolveAntigravityBinary();
       if (installed === null || resolved === null) return { ok: false, reason: 'no-binary' };
     }
-    if (cancelled) return { ok: false, reason: 'cancelled' };
-
-    const loginDir = mkdtempSync(join(tmpdir(), 'cairn-agy-login-'));
-    let child: ChildProcess;
+    const target = resolved;
+    const auth = await authenticateCredential({
+      appData,
+      bin: target.binPath,
+      args: (home) => acpSpawnArgs(target, join(home, 'login.log')),
+      env: (home) => ({
+        GEMINI_CLI_HOME: home,
+        GEMINI_HOME: join(home, '.gemini'),
+        GEMINI_API_KEY: undefined,
+        GOOGLE_API_KEY: undefined,
+        GOOGLE_APPLICATION_CREDENTIALS: undefined,
+        AGY_ACP_FORCE_FILE_STORAGE: '1',
+        AGY_CLI_DISABLE_AUTO_UPDATE: '1',
+      }),
+      credentialPath: oauthPath,
+      pickMethod: pickAuthMethod,
+      signal,
+      onAuthenticating: () => onPhase?.('authenticating'),
+      workerPath,
+    });
+    if (!auth.ok) return auth;
+    if (signal.aborted) return { ok: false, reason: 'cancelled' };
+    const credential = parseOAuthCredential(auth.text);
+    if (credential === null) return { ok: false, reason: 'failed' };
     try {
-      child = spawn(resolved.binPath, acpSpawnArgs(resolved, join(loginDir, 'login.log')), {
-        cwd: loginDir,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: acpSpawnEnv(),
-      });
-    } catch (error) {
-      console.error('Antigravity login failed to spawn:', error);
-      rmSync(loginDir, { recursive: true, force: true });
-      return { ok: false, reason: 'spawn' };
+      return { ok: true, subscription: await save(credential, signal) };
+    } catch {
+      return { ok: false, reason: signal.aborted ? 'cancelled' : 'save' };
     }
-
-    let stderr = '';
-    child.stderr?.on('data', (chunk: Buffer) => {
-      stderr = (stderr + chunk.toString()).slice(-4000);
-    });
-
-    return await new Promise<AntigravityLoginOutcome>((resolve) => {
-      let exited = false;
-      let settled = false;
-      let timer: ReturnType<typeof setTimeout> | null = null;
-
-      const finish = (outcome: AntigravityLoginOutcome): void => {
-        if (settled) return;
-        settled = true;
-        cancelChild = null;
-        if (timer !== null) clearTimeout(timer);
-        if (!exited) child.kill();
-        rmSync(loginDir, { recursive: true, force: true });
-        resolve(outcome);
-      };
-
-      cancelChild = () => finish({ ok: false, reason: 'cancelled' });
-      if (cancelled) {
-        finish({ ok: false, reason: 'cancelled' });
-        return;
-      }
-
-      timer = setTimeout(() => finish({ ok: false, reason: 'timeout' }), LOGIN_TIMEOUT_MS);
-
-      child.stdin?.on('error', () => finish({ ok: false, reason: 'exit' }));
-      child.on('exit', () => {
-        exited = true;
-        if (settled) return;
-        console.error(`Antigravity login exited unexpectedly. stderr: ${stderr}`);
-        finish({ ok: false, reason: 'exit' });
-      });
-      child.on('error', (error) => {
-        exited = true;
-        console.error('Antigravity login process error:', error);
-        finish({ ok: false, reason: 'spawn' });
-      });
-
-      attachNdjsonReader(child, (message) => {
-        if (message.id === 1) {
-          if (message.error !== undefined) {
-            finish({ ok: false, reason: 'failed' });
-            return;
-          }
-          onPhase?.('authenticating');
-          sendJsonRpc(child, {
-            jsonrpc: '2.0',
-            id: 2,
-            method: 'authenticate',
-            params: { methodId: pickAuthMethod(message.result?.authMethods) },
-          });
-        } else if (message.id === 2) {
-          if (message.error === undefined) {
-            finish({ ok: true });
-          } else {
-            console.error(`Antigravity authenticate failed. stderr: ${stderr}`);
-            finish({ ok: false, reason: 'failed' });
-          }
-        }
-      });
-
-      sendJsonRpc(child, {
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'initialize',
-        params: { protocolVersion: 1, clientCapabilities: {} },
-      });
-    });
   }
 }
