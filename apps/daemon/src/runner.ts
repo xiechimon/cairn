@@ -306,10 +306,9 @@ async function runClaimedStep(
   const refreshGit = async () => {
     if (appCredential !== null) return appCredential.refresh();
     if (creds.git === null) throw new Error('GitHub credential refresh unavailable');
-    const fresh = (await client.token(stepId, { refresh: true })).git;
+    const fresh = (await fetchStepToken(true)).git;
     if (fresh?.password) {
-      credentialValues.push(fresh.password);
-      redactors.push(credentialRedactor(fresh.password));
+      credentials.remember(fresh.password, fresh.expiresAt);
     }
     if (fresh === null || fresh.kind === 'app' || creds.git === null) {
       throw new Error('GitHub credential refresh unavailable');
@@ -689,7 +688,9 @@ async function runClaimedStep(
     creds,
     credentialValues: credentials.values(),
     refreshGitToken:
-      appCredential !== null && !attachmentVerify ? async () => (await refreshGit()).password : null,
+      appCredential !== null && !attachmentVerify
+        ? async () => (await refreshGit()).password
+        : null,
     transcript,
     isReview,
     attachmentVerify,

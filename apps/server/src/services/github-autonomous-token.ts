@@ -64,7 +64,9 @@ export async function githubReadTokenAccess(
           deps.githubAppTokenSocket === undefined ? null : deps.githubAppTokenSocket,
       },
       ...(deps.githubFetch ? { fetchImpl: deps.githubFetch } : {}),
-      ...(onAppReason ? { onReason: ({ reason }: { reason: AppTokenReason }) => onAppReason(reason) } : {}),
+      ...(onAppReason
+        ? { onReason: ({ reason }: { reason: AppTokenReason }) => onAppReason(reason) }
+        : {}),
     },
     repo,
     false,

@@ -374,11 +374,34 @@ export class RelayMachineServer {
         const index = method === 'relayTool' ? 3 : 2;
         args[index] = { ...(args[index] as object), signal: controller.signal };
       }
-      if (method === 'token' && args.length > 1) {
-        const opts = z.object({ refresh: z.boolean().optional() }).strict().safeParse(args[1]);
-        if (!opts.success || args.length > 2)
-          throw new RelayMachineError('Invalid relay token args');
-        args[1] = opts.data;
+      if (method === 'token') {
+        if (args.length > 3) throw new RelayMachineError('Invalid relay token args');
+        let opts: { refresh?: boolean } | undefined;
+        if (args.length === 2 && args[1] != null && typeof args[1] !== 'number') {
+          const parsed = z.object({ refresh: z.boolean().optional() }).strict().safeParse(args[1]);
+          if (!parsed.success) throw new RelayMachineError('Invalid relay token args');
+          opts = parsed.data;
+        } else {
+          if (args.length >= 2 && args[1] != null) {
+            const gen = z.number().int().nonnegative().safeParse(args[1]);
+            if (!gen.success) throw new RelayMachineError('Invalid relay token args');
+          }
+          if (args.length === 3 && args[2] != null) {
+            const parsed = z
+              .object({ refresh: z.boolean().optional() })
+              .strict()
+              .safeParse(args[2]);
+            if (!parsed.success) throw new RelayMachineError('Invalid relay token args');
+            opts = parsed.data;
+          }
+        }
+        args[1] = this.options.generation;
+        if (opts !== undefined) {
+          args[2] = opts;
+          args.length = 3;
+        } else {
+          args.length = 2;
+        }
       }
       if (method === 'done') {
         if (this.reporting) throw new RelayMachineError('Relay completion is already in flight');
@@ -387,10 +410,6 @@ export class RelayMachineServer {
         const bound = { ...body.data, generation: this.options.generation };
         args[1] = bound;
         this.options.onReporting?.(bound);
-      }
-      if (method === 'token') {
-        args[1] = this.options.generation;
-        if (args[2] == null) args.length = 2;
       }
       this.options.onActivity?.();
       const result = Promise.resolve(Reflect.apply(operation, upstream, args));

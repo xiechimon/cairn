@@ -72,7 +72,7 @@ test.each(ORB_STEP_METHODS)(
     await client.call(method, args);
     expect(forwarded).toHaveBeenLastCalledWith(
       method,
-      method === 'token' ? ['step', undefined] : args,
+      method === 'token' ? ['step', undefined, { refresh: true }] : args,
     );
   },
 );

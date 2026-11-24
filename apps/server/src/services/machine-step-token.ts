@@ -15,7 +15,6 @@ import {
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { CODEX_PROVIDER_ID } from '../coordinator/codex-login.js';
-import type { Db } from '../db/client.js';
 import { build, chiefThread, machine, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { type AppTokenReason, githubAppTokenExpiry } from '../lib/github-token.js';
@@ -39,27 +38,6 @@ import {
 import { mcpConnectorDepsOf, stepConnectorEndpoints } from './mcp-servers.js';
 import { coordinatorProfile } from './routing-rules.js';
 import { materializeXaiAccessToken } from './xai-device-login.js';
-
-const FORCE_GITHUB_REFRESH_COOLDOWN_MS = 30_000;
-const lastForceRefreshByDb = new WeakMap<Db, Map<string, number>>();
-
-function admitForceGithubRefresh(db: Db, teamId: string): boolean {
-  let byTeam = lastForceRefreshByDb.get(db);
-  if (byTeam === undefined) {
-    byTeam = new Map<string, number>();
-    lastForceRefreshByDb.set(db, byTeam);
-  }
-  const now = Date.now();
-  for (const [id, at] of byTeam) {
-    if (now - at >= FORCE_GITHUB_REFRESH_COOLDOWN_MS) byTeam.delete(id);
-  }
-  const previous = byTeam.get(teamId);
-  if (previous !== undefined && now - previous < FORCE_GITHUB_REFRESH_COOLDOWN_MS) {
-    return false;
-  }
-  byTeam.set(teamId, now);
-  return true;
-}
 
 export async function stepToken(
   deps: MachineDeps,

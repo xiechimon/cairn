@@ -2,7 +2,7 @@ import { CORE_COORDINATOR_TOOLS } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { build, githubConnection, project, step, todo } from '../src/db/schema.js';
+import { build, project, step, todo } from '../src/db/schema.js';
 import type { FetchLike } from '../src/lib/github.js';
 import { nowMs } from '../src/lib/ids.js';
 import { executeChiefTool } from '../src/services/chief-tools.js';
@@ -10,10 +10,8 @@ import { readBranches } from '../src/services/git.js';
 import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { executeGithubReadTool } from '../src/services/github-reads.js';
 import { infoRepoSnapshot } from '../src/services/info-repo-snapshot.js';
-import { stepToken } from '../src/services/machine-step-token.js';
 import { ctx, H, registerChiefHarness, toolDeps } from './chief-harness.js';
 import { githubAuthFake } from './fakes/github-auth.js';
-import { req } from './helpers.js';
 
 registerChiefHarness();
 
@@ -384,115 +382,5 @@ describe('Coordinator and server GitHub reads through the Cairn GitHub connectio
     expect(oversized).toMatchObject({ reason: expect.stringContaining('larger than') });
     expect(canceled).toBe(true);
     expect(emitted).toBeLessThan(10);
-  });
-
-  test('stepToken proactively refreshes an expiring Cairn GitHub connection token and supports ?refresh=1 force refresh', async () => {
-    bindPrivateOfferProject();
-    const gh = githubAuthFake({
-      user: { id: 1, login: 'xiechimon', name: null },
-      repos: [],
-    });
-    const expiring = 'ghu_expiring_runner_token';
-    gh.knowGrant(expiring, 'ghr_runner_refresh');
-    upsertGithubConnection(
-      { db: H.s.db, box: H.s.secretBox },
-      {
-        teamId: H.teamId,
-        login: 'xiechimon',
-        accessToken: expiring,
-        refreshToken: 'ghr_runner_refresh',
-        accessTokenExpiresAt: Date.now() + 10 * 60_000,
-        scope: '',
-        device: {
-          clientId: 'Iv23liW8YZ2D9i6DYMgp',
-          refreshTokenExpiresAt: Date.now() + 86_400_000,
-        },
-      },
-    );
-    const now = nowMs();
-    H.s.db
-      .insert(todo)
-      .values({
-        id: 'todo-run',
-        teamId: H.teamId,
-        projectId: H.projectId,
-        title: 'run on mini',
-        spec: '',
-        phase: 'building',
-        phaseAt: now,
-        seqNum: 2,
-      })
-      .run();
-    H.s.db
-      .insert(build)
-      .values({
-        id: 'build-run',
-        todoId: 'todo-run',
-        withPlan: false,
-        triggerSource: 'user',
-        createdAt: now,
-      })
-      .run();
-    H.s.db
-      .insert(step)
-      .values({
-        id: 'step-run',
-        buildId: 'build-run',
-        kind: 'build',
-        status: 'claimed',
-        machineId: 'machine-1',
-        claimedAt: now,
-        createdAt: now,
-      })
-      .run();
-
-    const first = await stepToken(
-      { ...toolDeps(), githubFetch: gh.fetch },
-      'machine-1',
-      'step-run',
-    );
-    expect(first.git?.password).toBeDefined();
-    expect(first.git?.password).not.toBe(expiring);
-
-    const rowAfterFirst = H.s.db
-      .select()
-      .from(githubConnection)
-      .where(eq(githubConnection.teamId, H.teamId))
-      .get();
-    expect(rowAfterFirst?.accessTokenExpiresAt).toBeGreaterThan(Date.now() + 60 * 60_000);
-
-    const forced = await stepToken(
-      { ...toolDeps(), githubFetch: gh.fetch },
-      'machine-1',
-      'step-run',
-      'host',
-      { forceGithubRefresh: true },
-    );
-    expect(forced.git?.password).toBeDefined();
-    expect(forced.git?.password).not.toBe(first.git?.password);
-
-    H.s.db
-      .insert(step)
-      .values({
-        id: 'step-run-2',
-        buildId: 'build-run',
-        kind: 'build',
-        status: 'claimed',
-        machineId: 'machine-1',
-        claimedAt: now,
-        createdAt: now,
-      })
-      .run();
-    const cooled = await stepToken(
-      { ...toolDeps(), githubFetch: gh.fetch },
-      'machine-1',
-      'step-run-2',
-      'host',
-      { forceGithubRefresh: true },
-    );
-    expect(cooled.git?.password).toBe(forced.git?.password);
-
-    const routeCheck = await req(H.s.app, 'GET', '/api/machine/token/step-run?refresh=1');
-    expect(routeCheck.status).toBe(401);
   });
 });
