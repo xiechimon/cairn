@@ -46,24 +46,3 @@ export function buildSkillLoadTool(opts: SkillLoadToolOpts): LocalToolDef {
     },
   };
 }
-
-export function scanSkillFileMap(
-  dirs: string[],
-  loadSkills: typeof import('@earendil-works/pi-coding-agent').loadSkills,
-  opts: { cwd: string; agentDir: string; log?: (msg: string) => void },
-): Map<string, string> {
-  try {
-    const result = loadSkills({
-      cwd: opts.cwd,
-      agentDir: opts.agentDir,
-      skillPaths: dirs,
-      includeDefaults: false,
-    });
-    return new Map(result.skills.map((s) => [s.name, s.filePath]));
-  } catch (err) {
-    opts.log?.(
-      `invalid: skill tool pre-scan failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
-    return new Map();
-  }
-}

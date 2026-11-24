@@ -360,8 +360,6 @@ export const startMcpConnectorOAuthBodySchema = z.discriminatedUnion('kind', [
 ]);
 export type StartMcpConnectorOAuthBody = z.infer<typeof startMcpConnectorOAuthBodySchema>;
 
-export const startMcpConnectorOAuthResponseSchema = z.object({ authorizationUrl: z.string() });
-
 export const githubConnectorAvailabilitySchema = z.object({
   available: z.boolean(),
   installUrl: z.string().nullable(),
@@ -394,5 +392,3 @@ export const githubConnectorDevicePollSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('failed') }),
 ]);
 export type GithubConnectorDevicePoll = z.infer<typeof githubConnectorDevicePollSchema>;
-
-export const githubConnectorInstallationsSchema = z.object({ installed: z.boolean() });

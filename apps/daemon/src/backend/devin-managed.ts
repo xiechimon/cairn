@@ -321,11 +321,3 @@ export function createDevinManaged(options: DevinManagedOptions = {}): DevinMana
     ensure: () => (pending ??= ensure().finally(() => (pending = null))),
   };
 }
-
-export function devinHomeDirs(home: string): string[] {
-  return [
-    join(home, '.local', 'share', 'devin'),
-    join(home, '.cache', 'devin'),
-    join(home, '.config', 'devin'),
-  ];
-}

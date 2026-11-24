@@ -20,8 +20,6 @@ export const SETTINGS_ROW_CLS =
 
 export const SETTINGS_HINT_CLS = 'text-meta text-balance text-content-tertiary';
 
-export const SETTINGS_VALUE_EDITOR_CLS = 'min-w-0 flex-auto flex-col items-stretch gap-2';
-
 export const SETTINGS_SELECT_TRIGGER_CLS = FORM_CONTROL_CLS;
 
 interface SettingsHeaderProps {
@@ -149,10 +147,6 @@ interface SettingsRowProps {
 }
 
 const SettingsRowLabelContext = createContext<string | null>(null);
-
-export function useSettingsRowLabelId(): string | null {
-  return useContext(SettingsRowLabelContext);
-}
 
 export function SettingsSelectTrigger({
   'aria-label': ariaLabel,

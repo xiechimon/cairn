@@ -10,7 +10,6 @@ type StepRow = typeof step.$inferSelect;
 
 export const COORDINATOR_SNAPSHOT_SCHEMA_VERSION = 2;
 export const COORDINATOR_SNAPSHOT_PAYLOAD_MAX_BYTES = 2 * 1024 * 1024;
-export const COORDINATOR_SNAPSHOT_MAX_RECORDS = 10_000;
 export const COORDINATOR_SNAPSHOT_MAX_CALL_VIEWS = 128;
 
 export const CAPTURE_TOOLS = ['projects', 'create_todo'] as const;

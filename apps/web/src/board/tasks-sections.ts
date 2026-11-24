@@ -212,8 +212,6 @@ export interface TasksView {
   questions: StandaloneQuestion[];
 }
 
-export const NO_TASKS: TasksView = { entries: [], questions: [] };
-
 export function tasksFromQuery(query: TasksQuery | undefined): TasksView {
   const view: TasksView = { entries: [], questions: [] };
   for (const entry of query?.entries ?? []) {

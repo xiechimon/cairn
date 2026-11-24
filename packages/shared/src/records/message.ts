@@ -46,7 +46,6 @@ export const GATE_ANNOUNCEMENTS: readonly string[] = [
   SPLIT_ANNOUNCEMENT,
 ];
 
-export const REVIEW_COMPLETE_PLACEHOLDER = 'AI 审核已完成';
 export const REVIEW_VERDICT_KIND = 'review_verdict';
 
 export const VERIFY_VERDICT_KIND = 'verify_verdict';

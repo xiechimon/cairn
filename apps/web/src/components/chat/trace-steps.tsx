@@ -67,10 +67,6 @@ export function traceCounts(steps: TraceStep[]): TraceCounts {
   return counts;
 }
 
-export function TraceCode({ children }: { children: ReactNode }) {
-  return <span className="font-medium text-(--foreground)">{children}</span>;
-}
-
 function Secs({ secs }: { secs: number | undefined }) {
   if (secs == null || secs <= 0) return null;
   return <span className="text-caption text-(--text-tertiary)">{secs}s</span>;

@@ -178,13 +178,6 @@ function compact(entries: Record<string, AttributeValue | null | undefined>): At
   );
 }
 
-export function splitModelId(qualified: string): ProviderModelRef {
-  const slash = qualified.indexOf('/');
-  return slash < 0
-    ? { model: qualified }
-    : { provider: qualified.slice(0, slash), model: qualified.slice(slash + 1) };
-}
-
 export function invokeAgentAttributes(build: {
   buildId: string;
   baseSha: string;

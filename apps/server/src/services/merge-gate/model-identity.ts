@@ -12,16 +12,6 @@ export function modelVendor(model: string): string | null {
   return MODEL_VENDORS[canonicalModelId(model)] ?? null;
 }
 
-export function modelsAreIndependent(authorModel: string, reviewerModel: string): boolean {
-  const authorId = canonicalModelId(authorModel);
-  const reviewerId = canonicalModelId(reviewerModel);
-  if (authorId === reviewerId) return false;
-  const authorVendor = MODEL_VENDORS[authorId] ?? null;
-  const reviewerVendor = MODEL_VENDORS[reviewerId] ?? null;
-  if (authorVendor === null || reviewerVendor === null) return false;
-  return authorVendor !== reviewerVendor;
-}
-
 const CODE_REVIEW_VENDOR = 'OpenAI';
 
 export function isCodexReviewModel(reviewerModel: string): boolean {

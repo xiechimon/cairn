@@ -36,9 +36,6 @@ import { ContextMeterLine, ContextMeterRing, contextPercentOf } from './context-
 export const TOOL_BTN_CLS =
   "size-7 cursor-pointer rounded-(--radius-control) text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-foreground dark:hover:bg-(--menu-hover) dark:hover:text-foreground [&_svg:not([class*='size-'])]:size-auto";
 
-export const PROJECT_CHIP_CLS =
-  "h-7 max-w-48 cursor-pointer gap-1.5 rounded-lg border-none bg-transparent px-2 text-meta font-normal text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--foreground) dark:hover:bg-(--menu-hover) aria-expanded:bg-(--menu-hover) data-[set]:bg-(--menu-hover) data-[set]:text-(--foreground) [&_svg:not([class*='size-'])]:size-auto";
-
 export const SEND_BTN_CLS =
   'ml-auto size-7 cursor-pointer rounded-(--radius-control) border-0 bg-transparent text-(--text-tertiary) hover:bg-(--menu-hover) hover:text-(--text-secondary) dark:hover:bg-(--menu-hover) aria-expanded:bg-transparent';
 export const SEND_ON_CLS = 'text-foreground hover:text-foreground dark:hover:text-foreground';

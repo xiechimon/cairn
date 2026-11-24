@@ -46,17 +46,6 @@ export function useDevinSubscriptions(teamId: string | undefined, live: boolean)
   });
 }
 
-export function hasUsableDevinSubscription(
-  subscriptions: readonly Pick<DevinSubscription, 'enabled' | 'expiresAt'>[] | undefined,
-  now: number,
-): boolean {
-  return (subscriptions ?? []).some(
-    (subscription) =>
-      subscription.enabled !== false &&
-      (subscription.expiresAt === null || subscription.expiresAt > now),
-  );
-}
-
 export function useCreateDevinSubscription(teamId: string | undefined) {
   return useMutation({
     mutationFn: (body: CreateDevinSubscription) =>

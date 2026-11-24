@@ -59,7 +59,6 @@ export * from './task-meta.js';
 export * from './text.js';
 export * from './thinking-binding.js';
 export * from './thinking-levels.js';
-export * from './token-estimate.js';
 export * from './tool-result.js';
 export * from './turn-context.js';
 export * from './web-research.js';

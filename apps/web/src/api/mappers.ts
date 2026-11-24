@@ -11,7 +11,6 @@ import type {
   McpServerRecord,
   ModelSource,
   ModelSourceRuntime,
-  SecretRecord,
   SkillRecord,
   StepActivity,
   StepQueueBlocked,
@@ -25,7 +24,6 @@ import {
   ASK_USER_QUESTION_KIND,
   askUserQuestionContentSchema,
   type BackgroundTask,
-  BRAND,
   BUILD_FAILURE_ROW_KIND,
   backgroundTaskSchema,
   CHIEF_TURN_ERROR_KIND,
@@ -39,7 +37,6 @@ import {
   chiefTurnStoppedContentSchema,
   classifySkillFact,
   classifyStepFailure,
-  conversationBranch,
   DONE_ROW,
   derivePlaceholderTitle,
   failureReasonKey,
@@ -100,7 +97,6 @@ import {
 } from '../board/retry-copy.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type {
-  BranchInfoContent,
   ChiefContent,
   ChiefContextUsage,
   ChiefStreamItem,
@@ -359,8 +355,6 @@ export function formatTokens(n: number): string {
   if (n < 1000) return String(n);
   return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}k`;
 }
-
-export const NO_PRICE_REASON = '无价格来源：模型未声明费率，或该运行未上报费用';
 
 export function formatUsd(n: number): string {
   return n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`;
@@ -1452,22 +1446,6 @@ export function mapTokenUsage(usage: TokenUsage[]): TokenUsageContent {
   };
 }
 
-export function mapBranchInfo(
-  buildId: string,
-  steps: StepRow[],
-  machines: MachineRecord[],
-): BranchInfoContent {
-  const lastCheckpoint = [...steps].reverse().find((s) => s.checkpointCommit !== null);
-  const machineId = [...steps].reverse().find((s) => s.machineId !== null)?.machineId ?? null;
-  const machine = machines.find((m) => m.id === machineId);
-  return {
-    branch: conversationBranch(buildId),
-    commit: lastCheckpoint?.checkpointCommit?.slice(0, 7) ?? '—',
-    machine: machine?.name ?? '—',
-    directory: `~/${BRAND.homeDirName}/workspaces/${buildId}`,
-  };
-}
-
 export function mapRunHistory(
   todo: WireTodo,
   builds: BuildRecord[],
@@ -1550,10 +1528,6 @@ export function mapMachines(
 
 export function mapSkills(rows: SkillRecord[]): SkillRow[] {
   return rows.map((s) => ({ name: s.name, description: s.description ?? '' }));
-}
-
-export function mapSecrets(rows: SecretRecord[]): { name: string; description: string | null }[] {
-  return rows.map((s) => ({ name: s.name, description: s.description }));
 }
 
 export function mapMcpServers(rows: McpServerRecord[], now: number): McpRow[] {

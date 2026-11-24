@@ -2,7 +2,6 @@ import { and, desc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import { build, gateState, message, step, todo } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
-import { nowMs } from '../lib/ids.js';
 import { CORRECTION_GUARD_MISSING } from './merge-gate/correction.js';
 
 export function isCorrectionTask(db: Db, todoId: string): boolean {
@@ -10,27 +9,6 @@ export function isCorrectionTask(db: Db, todoId: string): boolean {
     db.select({ required: todo.correctionRequired }).from(todo).where(eq(todo.id, todoId)).get()
       ?.required === true
   );
-}
-
-export function recordCorrectionGuard(
-  db: Db,
-  buildId: string,
-  headSha: string,
-  passed: boolean | null,
-): void {
-  if (passed === null) return;
-  const content = { kind: 'correction_guard', headSha, passed };
-  const createdAt = nowMs();
-  db.insert(message)
-    .values({
-      id: `correction-guard:${buildId}:${headSha}`,
-      conversationId: buildId,
-      role: 'system',
-      content,
-      createdAt,
-    })
-    .onConflictDoUpdate({ target: message.id, set: { content, createdAt } })
-    .run();
 }
 
 export function assertCorrectionDone(

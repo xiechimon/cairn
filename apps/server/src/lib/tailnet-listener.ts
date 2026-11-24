@@ -11,7 +11,6 @@ const TAILNET_LISTENER = 'tailnet';
 const TAILNET_SCHEME = 'https';
 const IDENTITY_LOGIN_HEADER = 'tailscale-user-login';
 const IDENTITY_NAME_HEADER = 'tailscale-user-name';
-const FORWARDED_FOR_HEADER = 'x-forwarded-for';
 const MAX_IDENTITY_CHARS = 254;
 const SOCKET_MODE = 0o600;
 
@@ -73,25 +72,6 @@ export function tailnetIdentityOf(c: Context): TailnetIdentity | null {
   const login = identityValue(c.req.header(IDENTITY_LOGIN_HEADER));
   if (login === null) return null;
   return { login, name: identityValue(c.req.header(IDENTITY_NAME_HEADER)) };
-}
-
-export function tailnetOwnerIdentityOf(c: Context): TailnetIdentity | null {
-  const listener = tailnetListenerOf(c);
-  if (listener === null) return null;
-  const identity = tailnetIdentityOf(c);
-  if (identity === null) return null;
-  const policy = listener.ownerPolicy();
-  const source = c.req.header(FORWARDED_FOR_HEADER)?.split(',')[0]?.trim();
-  if (
-    source !== undefined &&
-    (policy.selfAddresses === null || policy.selfAddresses.includes(source))
-  )
-    return null;
-  const allowed =
-    !policy.selfTagged && policy.ownerLogin !== null
-      ? identity.login === policy.ownerLogin
-      : policy.allowedLogins.includes(identity.login);
-  return allowed ? identity : null;
 }
 
 async function removeStaleSocket(socketPath: string): Promise<void> {

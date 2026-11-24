@@ -53,6 +53,7 @@ export const selfTests = [
   'scripts/agent-rules.test.mjs',
   'scripts/test-changed.test.mjs',
   'scripts/design-rules-for.test.mjs',
+  'scripts/dead-runtime-exports-gate.test.mjs',
 ];
 
 const selfTest = ['node', '--test', ...selfTests];
@@ -162,6 +163,7 @@ export function prepushPlan(paths, mode = 'local', forceFull = false) {
     ['node', 'scripts/ui-page-style-gate.mjs'],
     ['node', 'scripts/test-tmp-ratchet-gate.mjs'],
     ['node', 'scripts/import-cycle-gate.mjs'],
+    ['node', 'scripts/dead-runtime-exports-gate.mjs'],
     ['pnpm', 'lint'],
     ['pnpm', 'typecheck'],
     ['pnpm', 'spec:parse'],

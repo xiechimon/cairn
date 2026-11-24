@@ -399,15 +399,6 @@ export function cancelScopeEffects(
     .run().changes;
 }
 
-export function effectsForScope(db: Db, scopeKind: EffectScopeKind, scopeId: string): EffectRow[] {
-  return db
-    .select()
-    .from(externalEffect)
-    .where(and(eq(externalEffect.scopeKind, scopeKind), eq(externalEffect.scopeId, scopeId)))
-    .orderBy(asc(externalEffect.createdAt), asc(externalEffect.id))
-    .all();
-}
-
 export function effectRow(db: Db, id: string): EffectRow | undefined {
   return db.select().from(externalEffect).where(eq(externalEffect.id, id)).get();
 }

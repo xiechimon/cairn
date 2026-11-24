@@ -98,12 +98,10 @@ import type {
   StepJournalRow,
   TailnetAccess,
   TailscaleAccess,
-  TeamMember,
   TeamProviderTestResult,
   TeamRecord,
   ThreadMessageResult,
   TodoRecord,
-  TokenUsage,
   TranscriptRow,
   UpdateSkillBody,
   UpstreamModelsResult,
@@ -127,7 +125,6 @@ import {
   type QueryClient,
   useInfiniteQuery,
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
@@ -265,13 +262,6 @@ export const usePrs = (
     refetchInterval: PR_POLL_MS,
   });
 
-export const useProjectBuilds = (projectId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['projectBuilds', projectId],
-    queryFn: () => api.get<BuildRecord[]>(`/api/projects/${projectId}/builds`),
-    enabled: enabled && projectId !== undefined,
-  });
-
 export const useSteps = (buildId: string | null | undefined, enabled: boolean) =>
   useQuery({
     queryKey: ['steps', buildId],
@@ -393,36 +383,6 @@ export const useBuildChangeFile = (
     enabled: enabled && buildId != null && path != null,
   });
 
-export const useBuildUsage = (buildId: string | null | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['usage', buildId],
-    queryFn: () => api.get<TokenUsage[]>(`/api/builds/${buildId}/usage`),
-    enabled: enabled && buildId != null,
-  });
-
-export function useRunHistoryTokens(buildIds: string[], enabled: boolean) {
-  const queries = useQueries({
-    queries: buildIds.map((id) => ({
-      queryKey: ['usage', id],
-      queryFn: () => api.get<TokenUsage[]>(`/api/builds/${id}/usage`),
-      enabled,
-      staleTime: 60_000,
-    })),
-  });
-  return useMemo(() => {
-    const byBuild = new Map<string, number>();
-    buildIds.forEach((id, index) => {
-      const rows = queries[index]?.data;
-      if (!rows || rows.length === 0) return;
-      byBuild.set(
-        id,
-        rows.reduce((sum, row) => sum + row.input + row.output + row.cacheRead + row.cacheWrite, 0),
-      );
-    });
-    return byBuild;
-  }, [buildIds, queries]);
-}
-
 export const useSchedules = (enabled: boolean) =>
   useQuery({
     queryKey: ['schedules'],
@@ -512,13 +472,6 @@ export const useBackupNotice = (enabled: boolean) =>
       ),
     enabled,
     refetchInterval: BACKUP_HEALTH_POLL_MS,
-  });
-
-export const useMembers = (teamId: string | undefined, enabled: boolean) =>
-  useQuery({
-    queryKey: ['members', teamId],
-    queryFn: () => api.get<TeamMember[]>(`/api/teams/${teamId}/members`),
-    enabled: enabled && teamId !== undefined,
   });
 
 export const useProviders = (teamId: string | undefined, enabled: boolean) =>
