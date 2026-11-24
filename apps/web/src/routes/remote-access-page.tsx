@@ -294,7 +294,7 @@ export function RemoteAccessPage() {
           )}
         </SettingsCard>
       )}
-      {pairingBlocked && (
+      {pairingBlocked && requestsQ.data !== undefined && requests.length === 0 && (
         <p className="m-0 mt-3 text-meta text-content-secondary" data-testid="pairing-blocked">
           {t(
             '配对已关闭：当前页面的地址只在这台电脑上有效，手机扫码后会连到它自己。请打开上面的远程访问开关，或用局域网或 Tailscale 地址打开本页。',
