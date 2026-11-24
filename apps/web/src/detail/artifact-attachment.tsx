@@ -64,7 +64,9 @@ export function ArtifactAttachment({
           preload="metadata"
           aria-label={name}
           className={MEDIA_FRAME}
-        />
+        >
+          <track kind="captions" />
+        </video>
         {open !== undefined && (
           <IconTooltip
             label={t('在面板打开')}
