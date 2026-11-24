@@ -29,6 +29,7 @@ export function teamEventInvalidations(
         ['machines', teamId],
         ['computers', teamId],
         ['model-routing', teamId],
+        ['model-sources', teamId],
       ];
     default:
       return [];

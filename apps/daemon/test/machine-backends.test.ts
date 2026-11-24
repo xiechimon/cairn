@@ -3,7 +3,14 @@ import { join } from 'node:path';
 import type { ClaimedStep, MachinePresenceResponse } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { makeTestTempDir, releaseTestTempDir } from '../../../scripts/test-tmpdir.mjs';
-import { boot, CLAIMED, FakeMachineApi, fakeBackend, waitFor } from './machine-loop-harness.js';
+import {
+  boot,
+  CLAIMED,
+  FakeMachineApi,
+  fakeBackend,
+  stubManagedRuntime,
+  waitFor,
+} from './machine-loop-harness.js';
 
 describe('per-step backend resolution (spec 17 A3: backendFor is the only branch point)', () => {
   test('pi startup never installs Devin; opting in installs once and reports readiness', async () => {
@@ -17,23 +24,29 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     let attempts = 0;
     let installed = false;
     let finish: (() => void) | undefined;
+    const testDevinInstall = {
+      version: 'test',
+      command: '/devin',
+      binPath: '/devin',
+      args: ['acp'],
+      versionDir: null,
+      source: 'managed' as const,
+      home: '/devin-home',
+    };
     const { handle } = await boot({
       api,
       presenceIntervalMs: 20,
-      devinManaged: {
-        current: () =>
-          installed
-            ? { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' }
-            : null,
+      devinManaged: stubManagedRuntime({
+        current: () => (installed ? testDevinInstall : null),
         ensure: async () => {
           attempts += 1;
           await new Promise<void>((resolve) => {
             finish = resolve;
           });
           installed = true;
-          return { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' };
+          return testDevinInstall;
         },
-      },
+      }),
     });
     await waitFor(() => api.presenceBodies.length >= 3);
     expect(attempts).toBe(0);
@@ -68,20 +81,26 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
     });
     let attempts = 0;
     let installed = true;
+    const testDevinInstall = {
+      version: 'test',
+      command: '/devin',
+      binPath: '/devin',
+      args: ['acp'],
+      versionDir: null,
+      source: 'managed' as const,
+      home: '/devin-home',
+    };
     const { handle } = await boot({
       api,
       presenceIntervalMs: 20,
-      devinManaged: {
-        current: () =>
-          installed
-            ? { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' }
-            : null,
+      devinManaged: stubManagedRuntime({
+        current: () => (installed ? testDevinInstall : null),
         ensure: async () => {
           attempts += 1;
           installed = true;
-          return { version: 'test', binPath: '/devin', args: ['acp'], home: '/devin-home' };
+          return testDevinInstall;
         },
-      },
+      }),
     });
     await waitFor(() => api.presenceBodies.length >= 3);
     const settled = attempts;
@@ -345,13 +364,13 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
       api,
       presenceIntervalMs: 20,
       devinEnsureRetryMs: 10_000,
-      devinManaged: {
+      devinManaged: stubManagedRuntime({
         current: () => null,
         ensure: async () => {
           attempts += 1;
           return null;
         },
-      },
+      }),
     });
     await waitFor(() => attempts === 1);
     await waitFor(() => api.presenceBodies.length >= 5);
@@ -376,7 +395,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
         api,
         presenceIntervalMs: 20,
         devinEnsureRetryMs: 0,
-        devinManaged: {
+        devinManaged: stubManagedRuntime({
           current: () => null,
           ensure: async () => {
             attempts += 1;
@@ -386,7 +405,7 @@ describe('per-step backend resolution (spec 17 A3: backendFor is the only branch
             if (failure === 'rejected') throw new Error('download unavailable');
             return null;
           },
-        },
+        }),
       });
       await waitFor(() => finish !== undefined);
       requested = false;

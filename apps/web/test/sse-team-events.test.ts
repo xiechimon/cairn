@@ -70,6 +70,7 @@ describe('team event → invalidation keys', () => {
       `machines/${TEAM}`,
       `computers/${TEAM}`,
       `model-routing/${TEAM}`,
+      `model-sources/${TEAM}`,
     ]);
   });
 

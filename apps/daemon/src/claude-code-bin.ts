@@ -7,7 +7,7 @@ import { arch, platform } from 'node:process';
 export interface ClaudeBinInfo {
   path: string;
   version: string | null;
-  source: 'override' | 'bundled';
+  source: 'override' | 'bundled' | 'managed';
 }
 
 export type ClaudeBinRun = (

@@ -52,6 +52,7 @@ import type {
   MailAccountRecord,
   MailRuleCreateBody,
   MailWakeMode,
+  ManagedUpdateRuntime,
   McpConnectorRecord,
   McpServerRecord,
   MemoryEditBody,
@@ -596,6 +597,19 @@ export const useModelSources = (teamId: string | undefined, enabled: boolean) =>
     enabled: enabled && teamId !== undefined,
     staleTime: 0,
   });
+
+export function useUpdateRuntime(teamId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (runtime: ManagedUpdateRuntime) =>
+      api.post<{ ok: true; machines: string[] }>(
+        `/api/teams/${teamId}/providers/runtimes/${runtime}/update`,
+      ),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
+  });
+}
 
 export const useCapabilities = (enabled: boolean) =>
   useQuery({

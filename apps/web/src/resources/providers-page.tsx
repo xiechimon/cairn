@@ -1,4 +1,5 @@
 import {
+  type ManagedUpdateRuntime,
   type ModelSource,
   type ModelSourceModel,
   orderByKeys,
@@ -52,6 +53,7 @@ import {
   useModelSources,
   useProviders,
   useSaveProviderOrder,
+  useUpdateRuntime,
 } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY, useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
@@ -86,6 +88,8 @@ import {
 import {
   providerRowStatus,
   QuotaMark,
+  type RuntimeUpdateSummary,
+  runtimeUpdateSummary,
   type SubscriptionActions,
   SubscriptionDetail,
   subscriptionModels,
@@ -135,6 +139,7 @@ function teamEntries(
   dead: ReadonlyMap<string, ReadonlySet<string>>,
   connections: readonly RoutingConnection[],
   checks: ProviderRowChecks,
+  geminiUpdate: RuntimeUpdateSummary | null,
   actionsFor: (record: ProviderRecord) => ProviderEditActions,
   t: TFunc,
 ): Entry[] {
@@ -162,6 +167,7 @@ function teamEntries(
           key={record.id}
           record={record}
           deadModels={deadModels}
+          runtimeUpdate={record.providerId === 'gemini' ? geminiUpdate : null}
           actions={actionsFor(record)}
         />
       ),
@@ -172,6 +178,7 @@ function teamEntries(
 interface SubscriptionEntryDeps {
   now: number;
   models: readonly ModelSourceModel[];
+  runtimeUpdate?: RuntimeUpdateSummary | null;
   verifications: Record<string, Verification>;
   actionsFor: (account: SubscriptionAccount) => SubscriptionActions;
   reloginFor?: (account: SubscriptionAccount) => ReactNode;
@@ -216,6 +223,7 @@ function subscriptionEntries(
           now={deps.now}
           view={view}
           verification={verification}
+          runtimeUpdate={deps.runtimeUpdate ?? null}
           actions={deps.actionsFor(account)}
           relogin={deps.reloginFor?.(account)}
         />
@@ -268,6 +276,23 @@ export function ProvidersSection() {
   const upstreamCatalogRef = useRef<ReadonlyMap<string, SubscriptionModel>>(new Map());
   const [connectError, setConnectError] = useState<string | null>(null);
   const saveOrder = useSaveProviderOrder(teamId);
+  const updateRuntime = useUpdateRuntime(teamId);
+  const [updatingRuntimes, setUpdatingRuntimes] = useState<ReadonlySet<ManagedUpdateRuntime>>(
+    () => new Set(),
+  );
+  const triggerRuntimeUpdate = (runtime: ManagedUpdateRuntime) => {
+    if (!live) return;
+    setUpdatingRuntimes((prev) => new Set(prev).add(runtime));
+    updateRuntime.mutate(runtime, {
+      onError: (error) => toastError(t('更新未能启动，请检查执行机连接后重试。'), error),
+      onSettled: () =>
+        setUpdatingRuntimes((prev) => {
+          const next = new Set(prev);
+          next.delete(runtime);
+          return next;
+        }),
+    });
+  };
   const [fixtureOrder, setFixtureOrder] = useState<string[] | null>(null);
   const [providerChecks, setProviderChecks] = useState<ProviderRowChecks>({});
   const refreshStates = useRef(new Map<string, ProviderRefreshState>());
@@ -433,6 +458,12 @@ export function ProvidersSection() {
                 listUpstream: () => mutations.upstreamModels.mutateAsync(record.id),
               }
             : {}),
+          ...(record.providerId === 'gemini' && providersQ.data?.canTestConnection === true
+            ? {
+                onUpdateRuntime: () => triggerRuntimeUpdate('gemini'),
+                updatingRuntime: updatingRuntimes.has('gemini'),
+              }
+            : {}),
           remove: () =>
             mutations.deleteProvider.mutate(record.id, {
               onError: (error) => toastError(t('移除失败，请重试。'), error),
@@ -493,8 +524,16 @@ export function ProvidersSection() {
   const subscriptionActionsFor = (account: SubscriptionAccount): SubscriptionActions => {
     const rename = renameByVendor[account.vendor] ?? renameSubscription;
     const apiIds = apiIdsByVendor[account.vendor] ?? subscriptionApiIds;
+    const managedRuntime: ManagedUpdateRuntime | null =
+      account.vendor === 'claude' ? 'claude-code' : account.vendor === 'devin' ? 'devin' : null;
     return {
       onRemove: () => setRemovingSubscription(account),
+      ...(managedRuntime !== null && (!live || providersQ.data?.canTestConnection === true)
+        ? {
+            onUpdateRuntime: () => triggerRuntimeUpdate(managedRuntime),
+            updatingRuntime: updatingRuntimes.has(managedRuntime),
+          }
+        : {}),
       ...(live
         ? {
             onVerify: () => startVerification(account),
@@ -572,14 +611,19 @@ export function ProvidersSection() {
       onError: (error) => toastError(t('顺序未能保存，已恢复原来的顺序。'), error),
     });
   };
+  const claudeUpdate = runtimeUpdateSummary(sources, 'claude-code');
+  const devinUpdate = runtimeUpdateSummary(sources, 'devin');
+  const geminiUpdate = runtimeUpdateSummary(sources, 'gemini');
   const defaultEntries = [
     ...subscriptionEntries(subscriptions, {
       ...subscriptionDeps,
       models: claudeModels,
+      runtimeUpdate: claudeUpdate,
     }),
     ...subscriptionEntries(devinSubscriptions, {
       ...subscriptionDeps,
       models: subscriptionModels(sources, 'devin'),
+      runtimeUpdate: devinUpdate,
     }),
     ...subscriptionEntries(antigravitySubscriptions, {
       ...subscriptionDeps,
@@ -594,6 +638,7 @@ export function ProvidersSection() {
       deadModelIds(sources),
       live ? (routingQ.data?.connections ?? []) : (fixtureAccounts?.routing.connections ?? []),
       providerChecks,
+      geminiUpdate,
       actionsFor,
       t,
     ),

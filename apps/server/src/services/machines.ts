@@ -633,11 +633,28 @@ export function markPresence(
     })
     .where(eq(machine.id, machineId))
     .run();
+  const runtimeFingerprint = (
+    claude: ClaudeCodeReport | null | undefined,
+    caps: MachineCapabilities | null | undefined,
+  ) =>
+    JSON.stringify([
+      claude?.bin?.version ?? null,
+      claude?.update ?? null,
+      caps?.devin?.version ?? null,
+      caps?.devin?.update ?? null,
+      caps?.gemini ?? null,
+    ]);
+  const runtimeUpdateChanged =
+    runtimeFingerprint(row.claudeCodeReport, row.capabilities) !==
+    runtimeFingerprint(
+      body.claudeCode !== undefined ? body.claudeCode : row.claudeCodeReport,
+      merged !== undefined ? merged : row.capabilities,
+    );
   const strainChanged =
     merged !== undefined &&
     machineStrain(row.capabilities?.hardware).join() !== machineStrain(merged.hardware).join();
   const computerChanged = applyComputerPresence(db, machineId, row.teamId, body.computers, nowMs());
-  if (becameOnline || loginChanged || computerChanged || strainChanged) {
+  if (becameOnline || loginChanged || computerChanged || strainChanged || runtimeUpdateChanged) {
     const online = admitOnline || row.online;
     hub.publish(row.teamId, () => ({ type: 'machine_presence', machineId, online }));
   }

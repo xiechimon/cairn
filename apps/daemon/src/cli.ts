@@ -12,11 +12,13 @@ import { join } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { BRAND, ENV_VARS, PROVIDER_COMMAND_NOTICE } from '@cairn/shared';
+import { activeManagedBin } from '@cairn/shared/managed-bin';
 import { parentPidFromEnv, watchParentProcess } from '@cairn/shared/parent-watch';
 import { runTokenCommand } from '@cairn/shared/token-command';
 import { Command } from 'commander';
 import { shutdownDaemonOtel } from './backend/otel.js';
 import { runPiHost } from './backend/pi-host.js';
+import { claudeInstallRoot } from './backend/runtime-channels.js';
 import { childEnv } from './child-env.js';
 import { bundledClaudeCodePath } from './claude-code-bin.js';
 import {
@@ -353,7 +355,10 @@ export function buildProgram(): Command {
     )
     .action(() => {
       const config = loadDaemonConfig({});
-      const command = process.env[ENV_VARS.claudeBin] ?? bundledClaudeCodePath();
+      const command =
+        process.env[ENV_VARS.claudeBin] ??
+        activeManagedBin(claudeInstallRoot(config.home))?.command ??
+        bundledClaudeCodePath();
       if (command === null) {
         process.stderr.write(
           'No managed claude binary is installed (SDK platform package missing).\n',

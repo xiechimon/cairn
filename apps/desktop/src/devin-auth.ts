@@ -1,13 +1,14 @@
 import { type ChildProcess, spawn } from 'node:child_process';
-import { accessSync, constants, readdirSync, readFileSync, statSync } from 'node:fs';
+import { accessSync, constants, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
+import { join } from 'node:path';
 import {
   type DevinLocalStatus,
   type DevinLoginOutcome,
   devinCredentialsPath,
   devinKeyFromToml,
 } from '@cairn/shared';
-import { verifiedManagedBins } from '@cairn/shared/managed-bin';
+import { activeManagedBin } from '@cairn/shared/managed-bin';
 
 const LOGIN_TIMEOUT_MS = 600_000;
 const LOGIN_POLL_MS = 500;
@@ -21,25 +22,15 @@ function credentialsFile(): { key: string | null; mtimeMs: number } {
   }
 }
 
-function managedVersions(): string[] {
-  try {
-    return readdirSync(`${homedir()}/.cairn/tools/devin/versions`, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => entry.name);
-  } catch {
-    return [];
-  }
-}
-
 function resolveDevinBinary(): string | null {
-  const root = `${homedir()}/.cairn/tools/devin/versions`;
-  for (const bin of verifiedManagedBins(root, managedVersions())) {
-    try {
-      accessSync(bin.command, constants.X_OK);
-      return bin.command;
-    } catch {}
+  const active = activeManagedBin(join(homedir(), '.cairn', 'tools', 'devin'));
+  if (active === null) return null;
+  try {
+    accessSync(active.command, constants.X_OK);
+    return active.command;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export function devinLocalStatus(): DevinLocalStatus {

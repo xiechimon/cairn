@@ -12,7 +12,7 @@ import {
   messageRoleSchema,
   transcriptRowSchema,
 } from '../records/message.js';
-import { claudeCodeReportSchema } from '../records/model-source.js';
+import { claudeCodeReportSchema, managedUpdateRuntimeSchema } from '../records/model-source.js';
 import { PROJECT_REPO_KINDS } from '../records/project.js';
 import { reviewVerdictSchema } from '../records/review.js';
 import { stepActivityReportSchema, stepRecordSchema } from '../records/step.js';
@@ -325,6 +325,7 @@ export const machineStreamEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('repo.archive'), archive: machineRepoArchiveCommandSchema }),
   z.object({ type: z.literal('computer'), call: computerCallSchema }),
   z.object({ type: z.literal('computer.screen'), channel: computerScreenRequestSchema }),
+  z.object({ type: z.literal('runtime.update'), runtime: managedUpdateRuntimeSchema }),
   z.object({ type: z.literal('im.attach'), connId: z.string().min(1).max(128) }),
   z.object({ type: z.literal('im.detach'), connId: z.string().min(1).max(128) }),
   z.object({

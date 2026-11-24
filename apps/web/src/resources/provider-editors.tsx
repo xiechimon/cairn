@@ -164,6 +164,8 @@ export interface ProviderEditActions {
   latest?: () => ProviderRecord | undefined;
   test?: (model: string) => Promise<ProviderTestResult>;
   listUpstream?: () => Promise<UpstreamModelsResult>;
+  onUpdateRuntime?: () => void;
+  updatingRuntime?: boolean;
   remove?: () => void;
 }
 
@@ -587,10 +589,16 @@ function modelsEndpoint(record: ProviderRecord): string {
 export function TeamProviderEditor({
   record,
   deadModels,
+  runtimeUpdate,
   actions,
 }: {
   record: ProviderRecord;
   deadModels: ReadonlySet<string>;
+  runtimeUpdate?: {
+    installedVersion: string | null;
+    availableVersion: string | null;
+    phase: 'idle' | 'updating' | 'failed';
+  } | null;
   actions: ProviderEditActions;
 }) {
   const { t } = useI18n();
@@ -673,13 +681,54 @@ export function TeamProviderEditor({
           t('{n} 个', { n: ids.length }),
           ...(retired === 0 ? [] : [`${t('已下架')} · ${t('{n} 个模型', { n: retired })}`]),
         ].join(' · ');
+  const runtimeUpdating = actions.updatingRuntime === true || runtimeUpdate?.phase === 'updating';
+  const showRuntimeUpdate =
+    actions.onUpdateRuntime !== undefined &&
+    runtimeUpdate != null &&
+    (runtimeUpdate.availableVersion !== null ||
+      runtimeUpdating ||
+      runtimeUpdate.phase === 'failed');
   return (
     <>
       <ProviderEditorHead
         Mark={providerMark(record)}
         name={record.label}
+        version={runtimeUpdate?.installedVersion ?? null}
         kind={t(providerKind(record))}
+        aside={
+          showRuntimeUpdate && (
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="runtime-update"
+              disabled={runtimeUpdating}
+              aria-label={
+                runtimeUpdate.availableVersion !== null
+                  ? t('更新到 {version}', { version: `v${runtimeUpdate.availableVersion}` })
+                  : t('更新')
+              }
+              onClick={actions.onUpdateRuntime}
+            >
+              {runtimeUpdating ? t('更新中…') : t('更新')}
+            </Button>
+          )
+        }
       />
+      {showRuntimeUpdate && (
+        <p
+          data-testid="runtime-update-status"
+          className={cn(
+            '-mt-3 m-0 text-meta tabular-nums',
+            runtimeUpdate.phase === 'failed' ? 'text-destructive' : 'text-content-tertiary',
+          )}
+        >
+          {runtimeUpdating
+            ? t('正在后台下载并验证新版本，运行中的会话不受影响。')
+            : runtimeUpdate.phase === 'failed'
+              ? t('更新未能通过验证，仍在使用当前版本。')
+              : t('有新版本 v{version} 可用', { version: runtimeUpdate.availableVersion ?? '' })}
+        </p>
+      )}
       <div className="@container">
         <div
           data-testid="provider-connection"

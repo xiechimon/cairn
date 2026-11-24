@@ -53,6 +53,7 @@ vi.mock('../src/api/hooks.js', () => ({
   useModelSources: () => ({ data: { sources: requests.sources } }),
   useProviders: () => ({ data: { providers: requests.providers, canTestConnection: true } }),
   useSaveProviderOrder: () => ({}),
+  useUpdateRuntime: () => ({ mutateAsync: vi.fn() }),
   useApiMutations: () => ({
     patchProvider: { mutateAsync: requests.patch },
     testProvider: { mutateAsync: requests.test },
