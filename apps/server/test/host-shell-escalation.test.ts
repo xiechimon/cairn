@@ -31,6 +31,7 @@ import {
   receiveComputerFrames,
 } from '../src/services/machine-computer.js';
 import type { MachineDeps } from '../src/services/machine-deps.js';
+import { newestMessagePage } from '../src/services/message-page.js';
 import { bootServer, seedRoute, type TestServer } from './helpers.js';
 
 const THREAD = 'chief-escalate-thread';
@@ -558,5 +559,128 @@ describe('host shell sandbox denial and escalation state machine', () => {
       .where(eq(stepTable.id, `wake:${cwdProposal.id}:${THREAD}`))
       .get();
     expect(staleWake?.prompt).toContain('dispatch window elapsed');
+  });
+
+  test('settled approval row stays after requesting assistant message and before wake result', async () => {
+    const { s, deps } = boot();
+    const t0 = Date.now() - 5000;
+    s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'user-req-1',
+        threadId: THREAD,
+        role: 'user',
+        content: 'Run qlmanage for me',
+        createdAt: t0,
+      })
+      .run();
+
+    await forwardComputerCall(deps, 'mac-owner', 'step-turn-1', {
+      computer: true,
+      name: 'user_computer_shell',
+      toolCallId: 'tc-order-allow',
+      params: { command: 'qlmanage -t -s 400 -o /tmp/o /tmp/a.pdf', escalate: true },
+    });
+    const proposal = s.db
+      .select()
+      .from(actionProposal)
+      .where(eq(actionProposal.actionId, HOST_SHELL_ESCALATION_ACTION))
+      .get()!;
+    const cardId = proposalCardId(proposal.id);
+    const cardCreatedAt = s.db
+      .select({ createdAt: chiefMessage.createdAt })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, cardId))
+      .get()!.createdAt;
+
+    s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'assistant-explain-1',
+        threadId: THREAD,
+        role: 'assistant',
+        content: [{ type: 'text', text: 'This step needs qlmanage; approve below.' }],
+        createdAt: cardCreatedAt + 50,
+      })
+      .run();
+
+    answerProposal(deps, {
+      proposalId: proposal.id,
+      teamId: s.team.id,
+      decision: 'allow-once',
+      decidedBy: s.user.id,
+      viaCard: true,
+      interactive: 'page',
+      now: cardCreatedAt + 50,
+    });
+
+    s.db
+      .insert(chiefMessage)
+      .values({
+        id: 'assistant-wake-1',
+        threadId: THREAD,
+        role: 'assistant',
+        content: [{ type: 'text', text: 'Ran qlmanage after your approval.' }],
+        createdAt: cardCreatedAt + 200,
+      })
+      .run();
+
+    const orderedIds = newestMessagePage(s.db, chiefMessage, THREAD, { limit: 20 }).messages.map(
+      (row) => row.id,
+    );
+    expect(orderedIds.indexOf('user-req-1')).toBeLessThan(
+      orderedIds.indexOf('assistant-explain-1'),
+    );
+    expect(orderedIds.indexOf('assistant-explain-1')).toBeLessThan(orderedIds.indexOf(cardId));
+    expect(orderedIds.indexOf(cardId)).toBeLessThan(orderedIds.indexOf('assistant-wake-1'));
+
+    await forwardComputerCall(deps, 'mac-owner', 'step-turn-1', {
+      computer: true,
+      name: 'user_computer_shell',
+      toolCallId: 'tc-order-expire',
+      params: { command: 'qlmanage -t -s 300 -o /tmp/o2 /tmp/a.pdf', escalate: true },
+    });
+    const expiring = s.db
+      .select()
+      .from(actionProposal)
+      .where(eq(actionProposal.status, 'pending'))
+      .get()!;
+    const expCardId = proposalCardId(expiring.id);
+    const expCardAt = s.db
+      .select({ createdAt: chiefMessage.createdAt })
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, expCardId))
+      .get()!.createdAt;
+
+    s.db
+      .insert(chiefMessage)
+      .values([
+        {
+          id: 'assistant-explain-2',
+          threadId: THREAD,
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Waiting for approval on second command.' }],
+          createdAt: expCardAt + 40,
+        },
+        {
+          id: 'user-later-unrelated',
+          threadId: THREAD,
+          role: 'user',
+          content: 'Something else later',
+          createdAt: expCardAt + 500,
+        },
+      ])
+      .run();
+
+    sweepExpiredActionProposals(s.db, expiring.expiresAt + 1);
+    const afterExpireIds = newestMessagePage(s.db, chiefMessage, THREAD, {
+      limit: 20,
+    }).messages.map((row) => row.id);
+    expect(afterExpireIds.indexOf('assistant-explain-2')).toBeLessThan(
+      afterExpireIds.indexOf(expCardId),
+    );
+    expect(afterExpireIds.indexOf(expCardId)).toBeLessThan(
+      afterExpireIds.indexOf('user-later-unrelated'),
+    );
   });
 });

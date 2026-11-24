@@ -11,7 +11,7 @@ import {
   SLICE1_ACTIONS,
   type UserRecord,
 } from '@cairn/shared';
-import { and, eq, inArray, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, lte, ne } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
 import {
   actionJournal,
@@ -236,6 +236,54 @@ function choiceOf(actionId: string, decision: Decision): string {
   return REFUSE_CHOICE;
 }
 
+function settledCardCreatedAt(
+  tx: ProjectTx,
+  row: typeof chiefMessage.$inferSelect,
+  decision: Decision | null,
+  now: number,
+): number {
+  if (decision !== null) {
+    const latest = tx
+      .select({ createdAt: chiefMessage.createdAt })
+      .from(chiefMessage)
+      .where(and(eq(chiefMessage.threadId, row.threadId), ne(chiefMessage.id, row.id)))
+      .orderBy(desc(chiefMessage.createdAt))
+      .limit(1)
+      .get();
+    return Math.max(now, row.createdAt, latest === undefined ? 0 : latest.createdAt + 1);
+  }
+  const nextUser = tx
+    .select({ createdAt: chiefMessage.createdAt })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, row.threadId),
+        eq(chiefMessage.role, 'user'),
+        gt(chiefMessage.createdAt, row.createdAt),
+      ),
+    )
+    .orderBy(asc(chiefMessage.createdAt))
+    .limit(1)
+    .get();
+  const turnEnd = tx
+    .select({ createdAt: chiefMessage.createdAt })
+    .from(chiefMessage)
+    .where(
+      and(
+        eq(chiefMessage.threadId, row.threadId),
+        ne(chiefMessage.id, row.id),
+        eq(chiefMessage.role, 'assistant'),
+        gte(chiefMessage.createdAt, row.createdAt),
+        nextUser === undefined ? undefined : lt(chiefMessage.createdAt, nextUser.createdAt),
+      ),
+    )
+    .orderBy(desc(chiefMessage.createdAt))
+    .limit(1)
+    .get();
+  if (turnEnd === undefined) return row.createdAt;
+  return turnEnd.createdAt + 1;
+}
+
 function settleCard(
   tx: ProjectTx,
   proposalId: string,
@@ -261,8 +309,9 @@ function settleCard(
           answeredBy: 'person',
           cancelReason: CARD_ENDINGS[status],
         };
+  const createdAt = settledCardCreatedAt(tx, row, decision, now);
   tx.update(chiefMessage)
-    .set({ content: JSON.stringify(next) })
+    .set({ content: JSON.stringify(next), createdAt })
     .where(eq(chiefMessage.id, row.id))
     .run();
 }
