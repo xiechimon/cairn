@@ -1,3 +1,4 @@
+import semver from 'semver';
 import { ANTIGRAVITY_TOKEN_REGEX } from './antigravity-subscription.js';
 import type { DesktopSubscriptionMetadata } from './desktop-local-credentials.js';
 
@@ -59,14 +60,15 @@ export function antigravityCliDir(home: string): string {
   return `${home}/.gemini/antigravity-cli`;
 }
 
+function toSemver(version: string): semver.SemVer | null {
+  const parsed = semver.parse(version);
+  if (parsed !== null) return parsed;
+  return /^\d+(?:\.\d+){0,2}$/.test(version) ? semver.coerce(version) : null;
+}
+
 export function compareVersions(a: string, b: string): number {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0 || Number.isNaN(pa[i]) || Number.isNaN(pb[i])) {
-      return Number.isNaN(diff) ? a.localeCompare(b) : diff;
-    }
-  }
-  return 0;
+  const sa = toSemver(a);
+  const sb = toSemver(b);
+  if (sa !== null && sb !== null) return semver.compare(sa, sb);
+  return a.localeCompare(b);
 }

@@ -27,7 +27,8 @@
     "./antigravity-install": "./src/node/antigravity-install.ts",
     "./parent-watch": "./src/node/parent-watch.ts",
     "./host-identity": "./src/node/host-identity.ts",
-    "./realpath-nearest": "./src/node/realpath-nearest.ts"
+    "./realpath-nearest": "./src/node/realpath-nearest.ts",
+    "./yaml": "./src/yaml.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
