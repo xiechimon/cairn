@@ -100,6 +100,8 @@ export interface CoordinatorOptions {
 
 export interface Coordinator {
   wake(threadId: string): void;
+  signalSteer(threadId: string): void;
+  signalStop(threadId: string): void;
   tick(): void;
   idle(): Promise<void>;
   close(): Promise<void>;
@@ -781,6 +783,8 @@ export function startCoordinator(options: CoordinatorOptions): Coordinator {
 
   return {
     wake,
+    signalSteer: (threadId: string) => runtime.signalSteer(threadId),
+    signalStop: (threadId: string) => runtime.signalStop(threadId),
     tick,
     idle: async () => {
       await Promise.resolve();

@@ -442,6 +442,7 @@ export function coordinatorToolsExtension(
     loaded?: ReadonlySet<string>;
     shuttingDown?: () => boolean;
     beforeTool?: (signal?: AbortSignal, conversationId?: string) => Promise<void>;
+    onToolRound?: (conversationId: string, active: boolean) => void;
     storeId?: () => string | undefined;
     ocrRunner?: OcrRunner;
     imageTextCache?: Map<string, ImageTextCacheEntry>;
@@ -459,9 +460,21 @@ export function coordinatorToolsExtension(
       createCutOffRecovery(COORDINATOR_CUT_OFF_MESSAGE).hook,
       createToolArgsRepair(),
       hook(GenerationTask, {
-        beforeRequest: async ({ messages }, _api, context) => {
-          await options.beforeTool?.(context.abortSignal, String(_api.conversationId));
+        beforeRequest: async ({ messages }, api, context) => {
+          options.onToolRound?.(String(api.conversationId), false);
+          await options.beforeTool?.(context.abortSignal, String(api.conversationId));
           return { messages: boundCoordinatorImages(messages) };
+        },
+        afterResponse: (message, api) => {
+          if (
+            message.stopReason === 'toolUse' &&
+            message.content.some((block) => block.type === 'toolCall')
+          ) {
+            options.onToolRound?.(String(api.conversationId), true);
+          }
+        },
+        afterTools: (_assistant, _results, api) => {
+          options.onToolRound?.(String(api.conversationId), false);
         },
       }),
     ],

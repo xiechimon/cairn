@@ -42,6 +42,7 @@ export interface MachineApi {
   transcriptRow(stepId: string, row: TranscriptRow, entryId?: string): Promise<void>;
   mapUserEntry?(stepId: string, entryId: string): Promise<void>;
   transcriptDelta(stepId: string, text: string): Promise<void>;
+  resetLive?(stepId: string): Promise<void>;
   done(stepId: string, body: MachineDoneBody, observation?: OtelObservation): Promise<void>;
   canSuggestReplies?(stepId: string): Promise<boolean>;
   suggestReplies?(stepId: string, replies: readonly string[]): Promise<void>;

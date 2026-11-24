@@ -71,7 +71,6 @@ export interface ComposerSurfaceProps {
   binding: ComposerBinding;
   editable: boolean;
   onSend?: ((text: string) => void | Promise<void>) | undefined;
-  onQueue?: ((text: string) => void | Promise<void>) | undefined;
   onAttachment?: ((files: File[]) => string[] | Promise<string[]>) | undefined;
   mentionGroups?: MentionGroups | undefined;
   onPickProject?: ((project: { id: string }) => void) | undefined;
@@ -82,7 +81,6 @@ export interface ComposerSurfaceProps {
   onFocusEnter?: (() => void) | undefined;
   onFocusLeave?: (() => void) | undefined;
   onCancelReply?: (() => void) | undefined;
-  onCancelEdit?: (() => void) | undefined;
   placeholder: string;
   composerRef?: ((node: HTMLTextAreaElement | null) => void) | undefined;
   tab?: ReactNode;
@@ -100,7 +98,6 @@ export function ComposerSurface({
   binding,
   editable,
   onSend,
-  onQueue,
   onAttachment,
   mentionGroups,
   onPickProject,
@@ -111,7 +108,6 @@ export function ComposerSurface({
   onFocusEnter,
   onFocusLeave,
   onCancelReply,
-  onCancelEdit,
   placeholder,
   composerRef,
   tab,
@@ -138,7 +134,6 @@ export function ComposerSurface({
     onDraftChange: binding.setDraft,
     ...(binding.readDraft !== undefined ? { readDraft: binding.readDraft } : {}),
     onSend,
-    onQueue,
     onAttachment,
     ...(mentionGroups !== undefined ? { mentionGroups } : {}),
     ...(onPickProject !== undefined ? { onPickProject } : {}),
@@ -194,15 +189,6 @@ export function ComposerSurface({
         pendingAttachments.some((entry) => !entry.failed);
   const showMeter =
     !live || contextPercent != null || shownUsage != null || contextLoading || running;
-  const sendRef = useRef<HTMLButtonElement | null>(null);
-  const pressTimer = useRef<number | null>(null);
-  const longPressed = useRef(false);
-  const [queueMenuOpen, setQueueMenuOpen] = useState(false);
-  const holdToQueue = narrow && onQueue !== undefined && send === undefined;
-  const clearPress = () => {
-    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
-    pressTimer.current = null;
-  };
   const plusMenu = (
     <DropdownMenu>
       <Tooltip>
@@ -317,15 +303,6 @@ export function ComposerSurface({
                   return;
                 }
                 if (
-                  onCancelEdit !== undefined &&
-                  event.key === 'Escape' &&
-                  !event.nativeEvent.isComposing
-                ) {
-                  event.preventDefault();
-                  onCancelEdit();
-                  return;
-                }
-                if (
                   onCancelReply !== undefined &&
                   event.key === 'Escape' &&
                   wire.draft === '' &&
@@ -391,7 +368,6 @@ export function ComposerSurface({
             label={send?.label ?? t('发送')}
             trigger={
               <Button
-                ref={sendRef}
                 variant="ghost"
                 size={send?.text !== undefined ? 'sm' : 'icon'}
                 data-testid={send?.testId}
@@ -406,30 +382,7 @@ export function ComposerSurface({
                       ? cn(ROUND_HIT_CLS, 'ml-auto')
                       : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
                 }
-                onPointerDown={
-                  holdToQueue
-                    ? (event) => {
-                        if (event.pointerType === 'mouse' || !hasDraft) return;
-                        longPressed.current = false;
-                        clearPress();
-                        pressTimer.current = window.setTimeout(() => {
-                          longPressed.current = true;
-                          setQueueMenuOpen(true);
-                        }, 450);
-                      }
-                    : undefined
-                }
-                onPointerUp={holdToQueue ? clearPress : undefined}
-                onPointerLeave={holdToQueue ? clearPress : undefined}
-                onPointerCancel={holdToQueue ? clearPress : undefined}
-                onContextMenu={holdToQueue ? (event) => event.preventDefault() : undefined}
-                onClick={() => {
-                  if (longPressed.current) {
-                    longPressed.current = false;
-                    return;
-                  }
-                  (send?.onClick ?? wire.send)();
-                }}
+                onClick={() => (send?.onClick ?? wire.send)()}
               />
             }
           >
@@ -453,26 +406,6 @@ export function ComposerSurface({
             )}
           </IconTooltip>
         </div>
-        {holdToQueue && (
-          <DropdownMenu open={queueMenuOpen} onOpenChange={setQueueMenuOpen}>
-            <KeyedMenuContent
-              side="top"
-              align="end"
-              sideOffset={8}
-              anchor={sendRef}
-              aria-label={t('发送方式')}
-              finalFocus={textareaRef}
-              className="w-auto min-w-32"
-            >
-              <KeyedMenuItem data-testid="chief-send-steer" onClick={wire.send}>
-                {t('插话')}
-              </KeyedMenuItem>
-              <KeyedMenuItem data-testid="chief-send-queue" onClick={wire.queue}>
-                {t('排队')}
-              </KeyedMenuItem>
-            </KeyedMenuContent>
-          </DropdownMenu>
-        )}
         {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
         {onAttachment != null && (
           <input

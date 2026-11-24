@@ -106,6 +106,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const lastUsed = new Map<string, number>();
   const closing = new Map<string, Promise<void>>();
   const suggestionYields = new Map<string, AbortController>();
+  const turnSignals = new Map<string, { onSteer(): void; onStop(): void }>();
+  const toolRounds = new Set<string>();
   const setup = createSetupTiming();
 
   const stateOf = (threadId: string, forceReseed = false): ThreadState => {
@@ -142,6 +144,11 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         ownComputer: config.ownComputer?.(threadId) === true,
         phoneComputer: config.phoneComputer?.(threadId) ?? [],
         shuttingDown: () => shuttingDown,
+        onToolRound: (conversationId, active) => {
+          const key = `${threadId}:${conversationId}`;
+          if (active) toolRounds.add(key);
+          else toolRounds.delete(key);
+        },
         ...(inputs === undefined
           ? {}
           : {
@@ -267,6 +274,14 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     closeThread,
     isOpen: (threadId: string) => open.has(threadId),
     yieldSuggestions: (threadId: string) => suggestionYields.get(threadId)?.abort(),
+    signalSteer: (threadId: string) => {
+      suggestionYields.get(threadId)?.abort();
+      turnSignals.get(threadId)?.onSteer();
+    },
+    signalStop: (threadId: string) => {
+      suggestionYields.get(threadId)?.abort();
+      turnSignals.get(threadId)?.onStop();
+    },
     runTurn: async (turn: ServerTurn): Promise<MachineDoneBody> => {
       const { claimed } = turn;
       const threadId = claimed.chief?.threadId ?? '';
@@ -346,6 +361,13 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
               volatileText: turn.volatileText,
               suggestionYield: suggestionYield.signal,
               setupPhase: (name) => setup.mark(threadId, name),
+              registerSignals: (handlers) => {
+                turnSignals.set(threadId, handlers);
+                return () => {
+                  if (turnSignals.get(threadId) === handlers) turnSignals.delete(threadId);
+                };
+              },
+              isInToolRound: (id) => toolRounds.has(`${threadId}:${id}`),
             },
             turn.claimed,
           );

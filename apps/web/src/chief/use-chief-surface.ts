@@ -71,7 +71,6 @@ export interface ChiefSurface {
   onSend?: (
     text: string,
     projectId: string | null,
-    mode?: 'queue',
     designCommentIds?: readonly string[],
   ) => void | Promise<void>;
   onRewind?: (messageId: string) => void;
@@ -84,11 +83,6 @@ export interface ChiefSurface {
   onCancelQuestion?: (requestId: string, threadId?: string) => void;
   onWithdraw?: (messageId: string) => Promise<void>;
   unsent?: UnsentSends;
-  onSteer?: (messageId: string) => void;
-  onEditQueued?: (
-    messageId: string,
-    change: { content: string } | { editing: boolean },
-  ) => Promise<void>;
   onStop?: () => void;
 }
 
@@ -368,23 +362,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
           });
       }
     : undefined;
-  const onSteer = live
-    ? (messageId: string) => {
-        if (activeThread === null) return;
-        mutations.chiefSteer.mutate(
-          { threadId: activeThread.id, messageId },
-          { onError: (e) => toastError(t('插话失败，请重试。'), e) },
-        );
-      }
-    : undefined;
-  const onEditQueued = live
-    ? (messageId: string, change: { content: string } | { editing: boolean }) => {
-        if (activeThread === null) return Promise.resolve();
-        return mutations.chiefEditMessage
-          .mutateAsync({ threadId: activeThread.id, messageId, ...change })
-          .then(() => undefined);
-      }
-    : undefined;
   const onStop = live
     ? () => {
         if (activeThread === null) return;
@@ -402,7 +379,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
         content: entry.text,
         projectId: entry.projectId,
         clientMessageId: entry.key,
-        ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
         ...(entry.designCommentIds !== undefined
           ? { designCommentIds: entry.designCommentIds }
           : {}),
@@ -437,12 +413,7 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     [live, outbox],
   );
   const onSend = live
-    ? (
-        text: string,
-        projectId: string | null,
-        mode?: 'queue',
-        designCommentIds?: readonly string[],
-      ) => {
+    ? (text: string, projectId: string | null, designCommentIds?: readonly string[]) => {
         const sessionMachineId = routingRules?.find((rule) => rule.use === 'session')?.machineId;
         if (activeThread == null && needsMachineName(machines, sessionMachineId)) {
           toast.warning(t('先选择执行机'), {
@@ -461,7 +432,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
             globalThreadId,
             projectId,
             text,
-            ...(mode !== undefined ? { mode } : {}),
             ...(designCommentIds !== undefined && designCommentIds.length > 0
               ? { designCommentIds }
               : {}),
@@ -517,8 +487,6 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     onCancelQuestion,
     onWithdraw,
     ...(unsent !== undefined ? { unsent } : {}),
-    onSteer,
-    onEditQueued,
     onStop,
   };
 }

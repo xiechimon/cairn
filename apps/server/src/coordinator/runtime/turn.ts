@@ -15,9 +15,12 @@ import {
   type ConversationId,
   ConversationIdle,
   type Cursor,
+  type EntryId,
   type EntryRecord,
   type Harness,
+  LiveDoc,
   type SettledSubmissionRecord,
+  type Submission,
 } from '@earendil-works/pi-durable';
 import { steerWithdrawals } from '../steer-withdrawals.js';
 import { compactionWindow, type ModelRef } from './compaction.js';
@@ -52,6 +55,8 @@ export interface TurnDeps {
   onModel?: (ref: ModelRef) => void;
   suggestionYield?: AbortSignal;
   setupPhase?: (name: string) => void;
+  registerSignals?: (handlers: { onSteer(): void; onStop(): void }) => () => void;
+  isInToolRound?: (conversationId: string) => boolean;
 }
 
 function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): ModelUsage {
@@ -108,6 +113,7 @@ export async function runCoordinatorTurn(
   deps.onModel?.({ provider, modelId });
   let stopPoll: ReturnType<typeof setInterval> | undefined;
   let steerPoll: ReturnType<typeof setInterval> | undefined;
+  let unregisterSignals: (() => void) | undefined;
   let rootKey: string | null = null;
   let watch: Awaited<ReturnType<Conversation['watch']>> | undefined;
   const suggestionAbort = new AbortController();
@@ -122,6 +128,7 @@ export async function runCoordinatorTurn(
       return done({ status: 'failed', errorMessage: 'Coordinator conversation is missing' });
     }
     rootKey = String(root.id);
+    const activeRootKey = rootKey;
     const conversationKey = deps.inputs?.key(rootKey) ?? rootKey;
     deps.conversationGate?.set(rootKey, stepId);
     const storedInstruction = mailTurn
@@ -135,7 +142,7 @@ export async function runCoordinatorTurn(
     deps.volatile?.setStep(rootKey, stepId);
     let stopping: Promise<void> | null = null;
     let polling = false;
-    stopPoll = setInterval(() => {
+    const checkStop = () => {
       if (polling || stopping !== null) return;
       polling = true;
       void api
@@ -150,10 +157,17 @@ export async function runCoordinatorTurn(
         .finally(() => {
           polling = false;
         });
-    }, deps.stopPollMs ?? STOP_POLL_MS);
+    };
+    stopPoll = setInterval(checkStop, deps.stopPollMs ?? STOP_POLL_MS);
     let inFlight = false;
     let steerTask: Promise<void> | null = null;
+    let steerDirty = false;
     const admitted = new Set<string>();
+    const admittedRequests = new Map<string, string>();
+    const superseded = new Set<string>();
+    let activeSubmission: Submission | undefined;
+    let activeRequestId = stepId;
+    let lastBargeInEntryId: EntryId | undefined;
     if (!mailTurn && api.inputs !== undefined) {
       for (const input of await api.inputs.list(claimed.chief.threadId)) {
         if (
@@ -167,67 +181,13 @@ export async function runCoordinatorTurn(
           (tx) => tx.submissionByRequest(root.id, input.id),
           context,
         );
-        if (record !== undefined) admitted.add(input.id);
+        if (record !== undefined) {
+          admitted.add(input.id);
+          admittedRequests.set(input.id, input.id);
+        }
       }
     }
     deps.setupPhase?.('conversation');
-    const drainSteers = async () => {
-      if (mailTurn) return;
-      while (inFlight && stopping === null && api.steer !== undefined) {
-        const steer = await api.steer(stepId, api.inputs === undefined ? undefined : [...admitted]);
-        if (steer === null) return;
-        const requestId = api.inputs === undefined ? `steer-${stepId}-${steer.key}` : steer.key;
-        try {
-          await root.submit(
-            {
-              type: 'input',
-              content: steer.content,
-              whenBusy: 'steer',
-              whenIdle: 'reject',
-              requestId,
-            },
-            context,
-          );
-        } catch (error) {
-          if (error instanceof ConversationIdle && api.inputs !== undefined) {
-            const record = await harness.commit(
-              (tx) => tx.submissionByRequest(root.id, requestId),
-              context,
-            );
-            if (record === undefined) await api.inputs.release(requestId, conversationKey);
-          }
-          throw error;
-        }
-        admitted.add(steer.key);
-        if (api.inputs === undefined) await api.ackSteer?.(stepId);
-        await deps.inputs?.barrier();
-      }
-    };
-    if (!mailTurn && api.inputs !== undefined) {
-      steerWithdrawals.set(stepId, async (requestId) => {
-        await steerTask;
-        const record = await harness.commit(
-          (tx) => tx.submissionByRequest(root.id, requestId),
-          context,
-        );
-        const submission =
-          record === undefined ? undefined : await harness.submission(record.id, context);
-        if (submission === undefined) return 'not_found';
-        const result = await submission.abort(context);
-        if (result === 'aborted') admitted.delete(requestId);
-        return result;
-      });
-    }
-    if (!mailTurn) {
-      steerPoll = setInterval(() => {
-        if (!inFlight || steerTask !== null || stopping !== null) return;
-        steerTask = drainSteers()
-          .catch(() => {})
-          .finally(() => {
-            steerTask = null;
-          });
-      }, deps.stopPollMs ?? STOP_POLL_MS);
-    }
     await root.configure(
       {
         model: { provider, modelId },
@@ -260,6 +220,128 @@ export async function runCoordinatorTurn(
       newest,
       deps.inputs?.storeId(),
     );
+    const drainSteers = async () => {
+      if (mailTurn) return;
+      do {
+        steerDirty = false;
+        while (inFlight && stopping === null && api.steer !== undefined) {
+          const steer = await api.steer(
+            stepId,
+            api.inputs === undefined ? undefined : [...admitted],
+          );
+          if (steer === null) break;
+          const requestId = api.inputs === undefined ? `steer-${stepId}-${steer.key}` : steer.key;
+          const live = await harness.snapshot(LiveDoc, root.id, context);
+          const toolFree = (snapshot: typeof live) =>
+            stopping === null &&
+            deps.isInToolRound?.(activeRootKey) !== true &&
+            (snapshot?.tools === undefined || snapshot.tools.length === 0);
+          const canBargeIn =
+            live?.run !== undefined && live.run.afterRun === undefined && toolFree(live);
+          if (canBargeIn) {
+            await deps.inputs?.barrier();
+            const currentLive = await harness.snapshot(LiveDoc, root.id, context);
+            if (toolFree(currentLive)) {
+              if (currentLive?.run !== undefined && currentLive.run.afterRun === undefined) {
+                superseded.add(activeRequestId);
+                mirror.suppressTask(currentLive.run.taskId);
+                await mirror.drain();
+                await api.resetLive?.(stepId);
+                await root.abort(context);
+              }
+              if (stopping !== null) {
+                if (api.inputs !== undefined) await api.inputs.release(steer.key, conversationKey);
+                return;
+              }
+              const nextSubmission = await root.submit(
+                {
+                  type: 'input',
+                  content: steer.content,
+                  whenBusy: 'steer',
+                  requestId,
+                },
+                context,
+              );
+              admitted.add(steer.key);
+              admittedRequests.set(steer.key, requestId);
+              if (api.inputs === undefined) await api.ackSteer?.(stepId);
+              const status = await nextSubmission.status(context);
+              if (status.entry !== undefined) lastBargeInEntryId = status.entry;
+              activeRequestId = requestId;
+              activeSubmission = nextSubmission;
+              await deps.inputs?.barrier();
+              continue;
+            }
+          }
+          if (stopping !== null) {
+            if (api.inputs !== undefined) await api.inputs.release(steer.key, conversationKey);
+            return;
+          }
+          try {
+            await root.submit(
+              {
+                type: 'input',
+                content: steer.content,
+                whenBusy: 'steer',
+                whenIdle: 'reject',
+                requestId,
+              },
+              context,
+            );
+          } catch (error) {
+            if (error instanceof ConversationIdle && api.inputs !== undefined) {
+              const record = await harness.commit(
+                (tx) => tx.submissionByRequest(root.id, requestId),
+                context,
+              );
+              if (record === undefined) await api.inputs.release(requestId, conversationKey);
+            }
+            throw error;
+          }
+          admitted.add(steer.key);
+          admittedRequests.set(steer.key, requestId);
+          if (api.inputs === undefined) await api.ackSteer?.(stepId);
+          await deps.inputs?.barrier();
+        }
+      } while (steerDirty && inFlight && stopping === null);
+    };
+    const scheduleSteerDrain = () => {
+      if (mailTurn || !inFlight || stopping !== null) return;
+      if (steerTask !== null) {
+        steerDirty = true;
+        return;
+      }
+      steerTask = drainSteers()
+        .catch(() => {})
+        .finally(() => {
+          steerTask = null;
+        });
+    };
+    unregisterSignals = deps.registerSignals?.({
+      onSteer: scheduleSteerDrain,
+      onStop: checkStop,
+    });
+    if (!mailTurn && api.inputs !== undefined) {
+      steerWithdrawals.set(stepId, async (requestId) => {
+        await steerTask;
+        const record = await harness.commit(
+          (tx) => tx.submissionByRequest(root.id, requestId),
+          context,
+        );
+        const submission =
+          record === undefined ? undefined : await harness.submission(record.id, context);
+        if (submission === undefined) return 'not_found';
+        const result = await submission.abort(context);
+        if (result === 'aborted') {
+          admitted.delete(requestId);
+          admittedRequests.delete(requestId);
+        }
+        return result;
+      });
+    }
+    if (!mailTurn) {
+      steerPoll = setInterval(scheduleSteerDrain, deps.stopPollMs ?? STOP_POLL_MS);
+    }
     watch = await root.watch(context);
     watch.start(async (call) => {
       if (call.kind !== 'value') return;
@@ -299,42 +381,76 @@ export async function runCoordinatorTurn(
       previousInitial !== undefined && (prior === undefined || prior.status === 'unanswered'),
     );
     deps.setupPhase?.('input prepare');
+    const initialRequestId = initial?.id ?? stepId;
     const submission = await root.submit(
       {
         type: 'input',
         content: initial?.content ?? storedInstruction ?? '',
-        requestId: initial?.id ?? stepId,
+        requestId: initialRequestId,
       },
       context,
     );
     deps.setupPhase?.('submit');
+    activeSubmission = submission;
+    activeRequestId = initialRequestId;
     inFlight = true;
-    let settled = await submission.wait(context);
-    const firstEntry = settled.entry;
+    scheduleSteerDrain();
     const settledInputs = new Map<string, SettledSubmissionRecord>();
-    settledInputs.set(stepId, settled);
+    let firstEntry: EntryId | undefined;
+    {
+      const awaitedId = activeRequestId;
+      const initialSettled = await submission.wait(context);
+      firstEntry = initialSettled.entry;
+      settledInputs.set(awaitedId, initialSettled);
+    }
     for (;;) {
       await steerTask;
-      const remaining = [...admitted].filter((id) => !settledInputs.has(id));
+      if (activeSubmission !== undefined && !settledInputs.has(activeRequestId)) {
+        const awaitedId = activeRequestId;
+        const awaitedSubmission = activeSubmission;
+        settledInputs.set(awaitedId, await awaitedSubmission.wait(context));
+        continue;
+      }
+      const remaining = [...admitted].filter(
+        (key) => !settledInputs.has(admittedRequests.get(key) ?? key),
+      );
       if (api.inputs === undefined || remaining.length === 0) {
         inFlight = false;
         clearInterval(steerPoll);
         await steerTask;
-        if ([...admitted].every((id) => settledInputs.has(id)) || api.inputs === undefined) break;
+        if (
+          settledInputs.has(activeRequestId) &&
+          ([...admitted].every((key) => settledInputs.has(admittedRequests.get(key) ?? key)) ||
+            api.inputs === undefined)
+        )
+          break;
+        inFlight = true;
         continue;
       }
       await Promise.all(
-        remaining.map(async (id) => {
-          const record = await harness.commit((tx) => tx.submissionByRequest(root.id, id), context);
-          if (record === undefined) throw new Error(`Admitted Coordinator input ${id} is missing`);
+        remaining.map(async (key) => {
+          const requestId = admittedRequests.get(key) ?? key;
+          const record = await harness.commit(
+            (tx) => tx.submissionByRequest(root.id, requestId),
+            context,
+          );
+          if (record === undefined)
+            throw new Error(`Admitted Coordinator input ${requestId} is missing`);
           const handle = await harness.submission(record.id, context);
           if (handle === undefined)
-            throw new Error(`Admitted Coordinator submission ${id} is missing`);
-          settledInputs.set(id, await handle.wait(context));
+            throw new Error(`Admitted Coordinator submission ${requestId} is missing`);
+          settledInputs.set(requestId, await handle.wait(context));
         }),
       );
     }
-    for (const record of settledInputs.values()) {
+    const baseSettled =
+      settledInputs.get(activeRequestId) ??
+      settledInputs.get(initialRequestId) ??
+      [...settledInputs.values()].at(-1);
+    if (baseSettled === undefined) throw new Error('Settled Coordinator input is missing');
+    let settled: SettledSubmissionRecord = baseSettled;
+    for (const [id, record] of settledInputs) {
+      if (superseded.has(id)) continue;
       if (
         record.status === 'unanswered' ||
         (record.status === 'done' &&
@@ -342,9 +458,11 @@ export async function runCoordinatorTurn(
       )
         settled = record;
     }
+    const answerId =
+      settled.status === 'done' && settled.type === 'input' ? settled.answer : undefined;
     const answerEntry =
-      settled.status === 'done' && settled.type === 'input'
-        ? await root.commit((tx) => tx.entry(AssistantEntry, settled.answer), context)
+      answerId !== undefined
+        ? await root.commit((tx) => tx.entry(AssistantEntry, answerId), context)
         : undefined;
     const answer = answerEntry?.model?.[0];
     const suggesting =
@@ -387,7 +505,7 @@ export async function runCoordinatorTurn(
         cursor = page.next;
       } while (cursor !== undefined);
     }
-    await mirror.flush(turnEntries, stopping !== null);
+    await mirror.flush(turnEntries, stopping !== null, lastBargeInEntryId);
     if (!mailTurn) await deps.afterMirror?.();
     const ordered = [...turnEntries].sort((a, b) => Number(a.id) - Number(b.id));
     observation = {
@@ -455,6 +573,7 @@ export async function runCoordinatorTurn(
     }
     return finished;
   } finally {
+    unregisterSignals?.();
     suggestionAbort.abort();
     void watch?.stop();
     steerWithdrawals.delete(stepId);

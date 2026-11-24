@@ -1383,14 +1383,12 @@ export function useApiMutations(teamId: string | undefined) {
         content: string;
         projectId?: string | null;
         clientMessageId?: string;
-        mode?: 'queue';
         designCommentIds?: readonly string[];
       }) => {
         const body = {
           content: input.content,
           ...(input.projectId != null ? { projectId: input.projectId } : {}),
           ...(input.clientMessageId ? { clientMessageId: input.clientMessageId } : {}),
-          ...(input.mode !== undefined ? { mode: input.mode } : {}),
           ...(input.designCommentIds !== undefined && input.designCommentIds.length > 0
             ? { designCommentIds: input.designCommentIds }
             : {}),
@@ -1458,29 +1456,6 @@ export function useApiMutations(teamId: string | undefined) {
       mutationFn: (input: { threadId: string; messageId: string }) =>
         api.del<{ ok: boolean }>(
           `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}`,
-        ),
-      onSuccess: invalidateAll,
-    }),
-    chiefEditMessage: useMutation({
-      mutationFn: (
-        input: { threadId: string; messageId: string } & (
-          | { content: string }
-          | { editing: boolean }
-        ),
-      ) => {
-        const { threadId, messageId, ...body } = input;
-        return api.patch<{ ok: boolean }>(
-          `/api/teams/${teamId}/chief/threads/${threadId}/messages/${messageId}`,
-          body,
-        );
-      },
-      onSuccess: invalidateAll,
-    }),
-    chiefSteer: useMutation({
-      mutationFn: (input: { threadId: string; messageId: string }) =>
-        api.post<{ steered: boolean }>(
-          `/api/teams/${teamId}/chief/threads/${input.threadId}/messages/${input.messageId}/steer`,
-          {},
         ),
       onSuccess: invalidateAll,
     }),

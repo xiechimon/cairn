@@ -8,7 +8,6 @@ export interface OutboxEntry {
   threadId: string | null;
   projectId: string | null;
   text: string;
-  mode?: 'queue';
   designCommentIds?: readonly string[];
   state: OutboxState;
   messageId: string | null;
@@ -22,7 +21,6 @@ export interface StoredOutboxEntry {
   threadId: string | null;
   projectId: string | null;
   text: string;
-  mode?: 'queue';
   designCommentIds?: readonly string[];
   state: 'sending' | 'failed' | 'returned';
   createdAt: number;
@@ -62,7 +60,6 @@ export interface Outbox {
       globalThreadId: string | null;
       projectId: string | null;
       text: string;
-      mode?: 'queue';
       designCommentIds?: readonly string[];
     },
     deliver: Deliver,
@@ -188,7 +185,6 @@ export function createOutbox({
           threadId: entry.threadId,
           projectId: entry.projectId,
           text: entry.text,
-          ...(entry.mode !== undefined ? { mode: entry.mode } : {}),
           ...(entry.designCommentIds !== undefined
             ? { designCommentIds: entry.designCommentIds }
             : {}),
@@ -337,7 +333,6 @@ export function createOutbox({
           threadId: row.threadId,
           projectId: row.projectId,
           text: row.text,
-          ...(row.mode !== undefined ? { mode: row.mode } : {}),
           ...(row.designCommentIds !== undefined ? { designCommentIds: row.designCommentIds } : {}),
           state,
           messageId: null,
@@ -379,7 +374,6 @@ export function unlandedItems(
             createdAt: entry.createdAt,
             ...(entry.projectId !== null ? { projectId: entry.projectId } : {}),
             ...(entry.state === 'sending' ? { delivery: 'sending' as const } : {}),
-            ...(entry.mode === 'queue' ? { pending: 'queued' as const } : {}),
           },
         ],
   );

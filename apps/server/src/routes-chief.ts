@@ -1,7 +1,6 @@
 import {
   buildSteerBodySchema,
   type ChiefSendMessageBody,
-  chiefMessageEditBodySchema,
   chiefRewindBodySchema,
   chiefSendMessageBodySchema,
 } from '@cairn/shared';
@@ -25,7 +24,6 @@ import {
 import { sendBuildSteer } from './services/builds.js';
 import {
   answerChiefQuestion,
-  editChiefMessage,
   getChiefEnvelope,
   getChiefThread,
   listChiefThreads,
@@ -130,7 +128,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       content?: unknown;
       projectId?: unknown;
       clientMessageId?: unknown;
-      mode?: unknown;
       designCommentIds?: unknown;
     };
     const body = parseWith(
@@ -140,7 +137,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         content: raw?.content,
         projectId: raw?.projectId,
         clientMessageId: raw?.clientMessageId,
-        mode: raw?.mode,
         designCommentIds: raw?.designCommentIds,
       },
       'body',
@@ -183,13 +179,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
     const teamId = c.req.param('id');
     requireTeam(ctx, teamId);
     return c.json(await withdrawChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid')));
-  });
-
-  app.patch('/api/teams/:id/chief/threads/:tid/messages/:mid', async (c) => {
-    const teamId = c.req.param('id');
-    requireTeam(ctx, teamId);
-    const body = parseWith(chiefMessageEditBodySchema, await jsonBody(c), 'body');
-    return c.json(editChiefMessage(svc, teamId, c.req.param('tid'), c.req.param('mid'), body));
   });
 
   app.post('/api/teams/:id/chief/threads/:tid/messages/:mid/steer', (c) => {
@@ -294,7 +283,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
       content?: unknown;
       projectId?: unknown;
       clientMessageId?: unknown;
-      mode?: unknown;
       designCommentIds?: unknown;
     };
     const thread = getChiefThread(svc, conversationId);
@@ -306,7 +294,6 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
         content: raw?.content,
         projectId: raw?.projectId,
         clientMessageId: raw?.clientMessageId,
-        mode: raw?.mode,
         designCommentIds: raw?.designCommentIds,
       },
       'body',

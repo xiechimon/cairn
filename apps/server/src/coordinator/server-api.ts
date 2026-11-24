@@ -47,6 +47,7 @@ import {
 } from '../services/machines.js';
 import { ranModel, recordProviderOutcome } from '../services/model-fallback.js';
 import { publishStepRow } from '../services/quota-wait.js';
+import { discardShield } from '../services/terminal-claims.js';
 import { InputAuthorityError } from './runtime/input-channel.js';
 import type { MachineApi } from './runtime/machine-api.js';
 import { parseWatermark } from './watermark.js';
@@ -285,6 +286,17 @@ export function createCoordinatorServerApi(deps: MachineDeps): MachineApi {
       } catch (error) {
         if (!(error instanceof NotFoundError)) throw error;
       }
+    },
+    resetLive: async (stepId) => {
+      const owned = deps.db.select().from(step).where(eq(step.id, stepId)).get();
+      if (owned === undefined || owned.status !== 'claimed') return;
+      discardShield(deps.db, stepId);
+      deps.convHub?.publishActivity(owned.buildId, {
+        phase: 'thinking',
+        stepId,
+        at: Date.now(),
+        resetLive: true,
+      });
     },
     canSuggestReplies: async (stepId) => canSuggestReplies(stepId),
     suggestReplies: async (stepId, replies) => {

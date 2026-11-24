@@ -7,7 +7,6 @@ import {
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
-  CHIEF_INPUT_PLACEHOLDER_STEERING_TOUCH,
   CHIEF_REBIND_CONFIRM_COPY,
   FS_PICK_ERROR_COPY,
   GATE_ANNOUNCEMENTS,
@@ -44,7 +43,6 @@ const ALLOWLIST: Record<string, string> = {
 const LATIN_ALLOWLIST: Record<string, string> = {
   'board/first-run-setup.tsx::Cairn': 'product name',
   'chief/memory-edit-composer.tsx::MEMORY.md': 'memory file name fallback',
-  'chief/queue-tabs.tsx::Esc': 'keycap label inside <Kbd>',
   'components/thread/pr-card.tsx::PR #': 'PR is a kept term; the issue number follows',
   'components/thread/pr-link.tsx::PR #': 'PR is a kept term; the issue number follows',
   'pages/dir-browser.tsx::git': 'tool name badge',
@@ -109,7 +107,6 @@ const COMPUTED_KEYS = new Set<string>([
   CHIEF_INPUT_PLACEHOLDER,
   CHIEF_INPUT_PLACEHOLDER_QUEUED,
   CHIEF_INPUT_PLACEHOLDER_STEERING,
-  CHIEF_INPUT_PLACEHOLDER_STEERING_TOUCH,
 
   SKILL_PAGE_COPY.empty,
   SKILL_PAGE_COPY.hint,

@@ -103,12 +103,6 @@ export type ChiefPendingMessage = z.infer<typeof chiefPendingMessageSchema>;
 export const chiefMessageDeliverySchema = z.enum(['steer', 'queue', 'steer_missed']);
 export type ChiefMessageDelivery = z.infer<typeof chiefMessageDeliverySchema>;
 
-export const chiefMessageEditBodySchema = z.union([
-  z.object({ content: z.string().refine((s) => s.trim() !== '', 'content is blank') }),
-  z.object({ editing: z.boolean() }),
-]);
-export type ChiefMessageEditBody = z.infer<typeof chiefMessageEditBodySchema>;
-
 export const chiefChannelUsageSchema = z.object({
   rows: z.array(tokenUsageSchema),
   durationSeconds: z.number().nonnegative().nullable(),
@@ -202,7 +196,6 @@ export const chiefSendMessageBodySchema = z.object({
   content: z.string().min(1),
   projectId: z.string().min(1).nullish(),
   clientMessageId: z.string().min(1).max(200),
-  mode: z.literal('queue').optional(),
   designCommentIds: designCommentIdsSchema.optional(),
 });
 export type ChiefSendMessageBody = z.infer<typeof chiefSendMessageBodySchema>;
@@ -256,8 +249,7 @@ export const CHIEF_REBIND_CONFIRM_COPY =
   '更换 Coordinator 的 Agent？Coordinator 的记忆保存在其运行所用的 Agent 上。切换至 <agent> 后，记忆将变为 <agent> 的记忆，当前记忆不会迁移。';
 
 export const CHIEF_INPUT_PLACEHOLDER = '有什么可以帮你的？';
-export const CHIEF_INPUT_PLACEHOLDER_STEERING = '插进这一轮 · ⌘↵ 排队';
-export const CHIEF_INPUT_PLACEHOLDER_STEERING_TOUCH = '插进这一轮 · 长按排队';
+export const CHIEF_INPUT_PLACEHOLDER_STEERING = '继续说，会直接打断';
 export const CHIEF_INPUT_PLACEHOLDER_QUEUED = '尚未开始，新消息会排在后面';
 
 export const COORDINATOR_SUMMARY_MAX_CHARS = 20_000;

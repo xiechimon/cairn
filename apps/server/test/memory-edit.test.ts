@@ -10,12 +10,7 @@ import {
   step,
 } from '../src/db/schema.js';
 import { nowMs } from '../src/lib/ids.js';
-import {
-  editChiefMessage,
-  listChiefThreads,
-  rewindChiefThread,
-  submitChiefMessage,
-} from '../src/services/chief.js';
+import { listChiefThreads, rewindChiefThread, submitChiefMessage } from '../src/services/chief.js';
 import { memoryDocumentVersion } from '../src/services/memory.js';
 import { executeMemoryDocumentTool } from '../src/services/memory-documents.js';
 import {
@@ -104,9 +99,6 @@ test('ordinary thread verbs cannot touch the memory side thread', () => {
     }),
   ).toThrow(`chief thread ${tid}`);
   expect(() => rewindChiefThread(deps(), H.teamId, tid, { messageId: 'm' })).toThrow(
-    `chief thread ${tid}`,
-  );
-  expect(() => editChiefMessage(deps(), H.teamId, tid, 'm', { content: 'x' })).toThrow(
     `chief thread ${tid}`,
   );
 });

@@ -89,15 +89,29 @@ export function entryRowSources(
   return rows;
 }
 
-function streamingText(view: ConversationView): string {
-  const live = view.docs['pi.live'] as { generation?: { message?: AssistantMessage } } | undefined;
+function liveStateOf(view: ConversationView): {
+  taskId?: number | string;
+  text: string;
+} {
+  const live = view.docs['pi.live'] as
+    | { run?: { taskId?: number | string }; generation?: { message?: AssistantMessage } }
+    | undefined;
   const message = live?.generation?.message;
-  return message === undefined ? '' : textBlocks(message);
+  return {
+    ...(live?.run?.taskId === undefined ? {} : { taskId: live.run.taskId }),
+    text: message === undefined ? '' : textBlocks(message),
+  };
 }
 
 export interface TurnMirror {
   onView(view: ConversationView): Promise<void>;
-  flush(entries: readonly EntryRecord[], stopped?: boolean): Promise<void>;
+  suppressTask(taskId: number | string | undefined): void;
+  drain(): Promise<void>;
+  flush(
+    entries: readonly EntryRecord[],
+    stopped?: boolean,
+    minStoppedEntryId?: EntryId,
+  ): Promise<void>;
 }
 
 export function createTurnMirror(
@@ -107,7 +121,9 @@ export function createTurnMirror(
   storeId?: string,
 ): TurnMirror {
   const posted = new Map<string, string>();
+  const suppressedTasks = new Set<string>();
   let streamed = '';
+  let activeView: Promise<void> = Promise.resolve();
   const post = async (entries: readonly EntryRecord[], stoppedEntry?: EntryId) => {
     for (const { row, entryId } of entryRowSources(stepId, entries, storeId, stoppedEntry)) {
       const body = JSON.stringify(row.content);
@@ -117,19 +133,37 @@ export function createTurnMirror(
     }
   };
   return {
-    onView: async (view) => {
-      await post(
-        view.entries.filter((entry) => afterEntryId === undefined || entry.id > afterEntryId),
-      );
-      const text = streamingText(view);
-      const delta = text.startsWith(streamed) ? text.slice(streamed.length) : text;
-      if (delta !== '') await api.transcriptDelta(stepId, delta);
-      streamed = text;
+    onView: (view) => {
+      const run = activeView.then(async () => {
+        await post(
+          view.entries.filter((entry) => afterEntryId === undefined || entry.id > afterEntryId),
+        );
+        const live = liveStateOf(view);
+        if (live.taskId !== undefined && suppressedTasks.has(String(live.taskId))) return;
+        const delta = live.text.startsWith(streamed) ? live.text.slice(streamed.length) : live.text;
+        if (delta !== '') await api.transcriptDelta(stepId, delta);
+        streamed = live.text;
+      });
+      activeView = run.catch(() => {});
+      return run;
     },
-    flush: (entries, stopped = false) =>
+    suppressTask: (taskId) => {
+      if (taskId !== undefined) suppressedTasks.add(String(taskId));
+      streamed = '';
+    },
+    drain: async () => {
+      await activeView;
+    },
+    flush: (entries, stopped = false, minStoppedEntryId?: EntryId) =>
       post(
         entries,
-        stopped ? entries.findLast((entry) => AssistantEntry.is(entry))?.id : undefined,
+        stopped
+          ? entries.findLast(
+              (entry) =>
+                AssistantEntry.is(entry) &&
+                (minStoppedEntryId === undefined || Number(entry.id) > Number(minStoppedEntryId)),
+            )?.id
+          : undefined,
       ),
   };
 }

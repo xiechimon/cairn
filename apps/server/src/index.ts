@@ -37,6 +37,7 @@ import { createStreamTicketBook } from './services/browser-session.js';
 import { sweepComputerHandoffs } from './services/computer-handoff.js';
 import { computerScreensOf } from './services/computer-screen.js';
 import { setCoordinatorInServer, setCoordinatorWake } from './services/coordinator-context.js';
+import { setCoordinatorSignal } from './services/coordinator-signal.js';
 import { runDataMigrationOnce } from './services/data-migrations.js';
 
 import { ConversationStreamHub, TeamStreamHub } from './services/events.js';
@@ -363,7 +364,12 @@ const coordinator = config.coordinatorInServer
       logger,
     })
   : null;
-if (coordinator !== null) setCoordinatorWake((threadId) => coordinator.wake(threadId));
+if (coordinator !== null) {
+  setCoordinatorWake((threadId) => coordinator.wake(threadId));
+  setCoordinatorSignal((threadId, kind) =>
+    kind === 'steer' ? coordinator.signalSteer(threadId) : coordinator.signalStop(threadId),
+  );
+}
 scheduler.start();
 mail.resume();
 void im.resume().catch((error: unknown) => {

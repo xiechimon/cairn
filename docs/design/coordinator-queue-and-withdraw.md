@@ -1,5 +1,7 @@
 # Coordinator queue, steer state and withdraw
 
+> Superseded in part by `docs/design/coordinator-interrupt.md`: explicit Coordinator `Cmd+Enter` queuing (`mode: 'queue'`) and queued-message editing (`PATCH .../messages/:mid`) were removed when instant mid-generation barge-in replaced queuing as the single path. Outage `held` tabs, tool-round steer withdrawal, and claim-time folding remain.
+
 Owner decision (2026-11-17): while the Coordinator is busy, Enter steers the running turn and ⌘/Ctrl+Enter queues the message for the turn after it. Queued messages show in a tab bar above the composer (prototype direction 1), can be edited in the composer, deleted, or steered now. A steered message the model has not read yet can be withdrawn. Messages queued during one turn are sent together and answered once.
 
 ## State

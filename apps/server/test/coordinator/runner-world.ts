@@ -12,6 +12,7 @@ import {
   setCoordinatorInServer,
   setCoordinatorWake,
 } from '../../src/services/coordinator-context.js';
+import { setCoordinatorSignal } from '../../src/services/coordinator-signal.js';
 import { createProvider } from '../../src/services/providers.js';
 import { bootServer, insertMachine, req, type TestServer } from '../helpers.js';
 
@@ -24,6 +25,7 @@ afterEach(async () => {
   for (const d of dirs.splice(0)) releaseTestTempDir(d);
   setCoordinatorInServer(false);
   setCoordinatorWake(() => {});
+  setCoordinatorSignal(() => {});
 });
 
 beforeEach(() => {
@@ -136,6 +138,9 @@ export function boot(
     ],
     ...extra,
   });
+  setCoordinatorSignal((threadId, kind) =>
+    kind === 'steer' ? coordinator.signalSteer(threadId) : coordinator.signalStop(threadId),
+  );
   closers.push(() => coordinator.close());
   return coordinator;
 }

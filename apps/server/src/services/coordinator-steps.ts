@@ -49,7 +49,7 @@ import {
 } from './chief.js';
 import { announcePrimaryRestored } from './chief-model-switch.js';
 import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
-import { QUEUED_HOLD, recordChiefStop, steeredMessageScopes } from './chief-turns.js';
+import { recordChiefStop, steeredMessageScopes } from './chief-turns.js';
 import { coordinatorRunsOnPi } from './coordinator-context.js';
 import { openTurnCapture, sealCoordinatorTurnSnapshot } from './coordinator-turn-capture.js';
 import { stepRuntimeFor } from './dispatch-eligibility.js';
@@ -182,7 +182,7 @@ function foldQueuedChiefSteps(db: MachineDeps['db'], head: StepRow, now: number)
       row.status === 'pending' &&
       row.prompt !== null &&
       (row.ownerMessageIds ?? []).length > 0 &&
-      (row.holdReason === null || row.holdReason === QUEUED_HOLD) &&
+      row.holdReason === null &&
       (row.holdUntil === null || row.holdUntil <= now) &&
       row.scopeProjectId === head.scopeProjectId &&
       row.freshSession !== true &&

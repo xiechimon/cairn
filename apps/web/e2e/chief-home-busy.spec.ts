@@ -381,27 +381,25 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await expect(home.getByTestId('chief-composer-input')).toHaveValue('再顺便看下空列提示');
   });
 
-  test('Cmd+Enter during a running turn queues the message for after the turn', async ({
+  test('Cmd+Enter and Enter during a running turn both send immediately with no queue mode', async ({
     page,
   }) => {
     const state = { ...busyState(), pending: [], messages: [FIRST], bodies: [] as unknown[] };
     await mockLive(page, state);
     await page.goto('/app');
     const input = page.getByTestId('home-c').getByTestId('chief-composer-input');
-    await input.fill('跑完再看下性能');
+    await input.fill('说错了，明天是星期几');
     await input.press('ControlOrMeta+Enter');
-    await expect.poll(() => state.bodies).toContainEqual(
-      expect.objectContaining({ content: '跑完再看下性能', mode: 'queue' }),
-    );
+    await expect.poll(() => state.bodies.length).toBe(1);
+    expect(state.bodies[0]).toEqual(expect.objectContaining({ content: '说错了，明天是星期几' }));
+    expect(state.bodies[0]).not.toHaveProperty('mode');
     await input.fill('顺便看下空列');
     await input.press('Enter');
     await expect.poll(() => state.bodies.length).toBe(2);
     expect(state.bodies[1]).not.toHaveProperty('mode');
   });
 
-  test('queued messages sit above the composer, and editing one saves through the composer', async ({
-    page,
-  }) => {
+  test('queued messages sit above the composer and can be removed', async ({ page }) => {
     const state: State = {
       ...busyState(),
       pending: [
@@ -417,33 +415,9 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await expect(rows).toHaveCount(2);
     await expect(home.getByTestId('chief-stream').getByText('只看 cairn 项目就行')).toHaveCount(0);
     await expect(home.getByTestId('chief-queue')).not.toContainText('这一轮后发出');
-    const input = home.getByTestId('chief-composer-input');
-    await input.fill('还没写完的话');
-    await rows.first().getByTestId('chief-queued-message-text').click();
-    await expect(home.getByTestId('chief-queue')).toHaveAttribute('data-state', 'editing');
-    await expect(home.getByTestId('chief-queue')).not.toContainText('编辑排队消息');
-    await expect(rows.first()).toHaveAttribute('aria-current', 'true');
-    await expect(rows.last()).not.toHaveAttribute('aria-current', 'true');
     await expect(rows.last().getByTestId('chief-queued-steer')).toHaveCount(0);
-    await expect(rows.first().getByTestId('chief-queue-cancel-edit')).toContainText('取消');
-    await expect(input).toHaveValue('只看 cairn 项目就行');
-    await expect.poll(() => state.bodies).toContainEqual({ editing: true });
-    await input.fill('只看 cairn 和 site 两个项目');
-    await home.getByTestId('chief-queue-save').click();
-    await expect.poll(() => state.bodies).toContainEqual({ content: '只看 cairn 和 site 两个项目' });
-    await expect(input).toHaveValue('还没写完的话');
-    await rows.first().getByTestId('chief-queued-message-text').click();
-    await input.press('Escape');
-    await expect(input).toHaveValue('还没写完的话');
-    await expect.poll(() => state.bodies).toContainEqual({ editing: false });
-    await expect(home.getByTestId('chief-queue')).toHaveAttribute('data-state', 'queued');
-    await rows.first().getByTestId('chief-queued-message-text').click();
-    await rows.first().getByTestId('chief-queue-cancel-edit').click();
-    await expect(input).toHaveValue('还没写完的话');
-    await expect(home.getByTestId('chief-queue')).toHaveAttribute('data-state', 'queued');
     await rows.last().getByRole('button', { name: '删除' }).click();
     await expect.poll(() => calls).toContain('DELETE /messages/m4');
-    await expect(input).toHaveValue('还没写完的话');
   });
 
   test('a busy Coordinator keeps the send button and never shows a stop square', async ({ page }) => {
@@ -534,7 +508,7 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     const home = page.getByTestId('home-c');
     await expect(home.getByTestId('chief-composer-input')).toHaveAttribute(
       'placeholder',
-      '插进这一轮 · ⌘↵ 排队',
+      '继续说，会直接打断',
     );
     await expect(home.getByTestId('chief-queue')).toHaveCount(0);
   });

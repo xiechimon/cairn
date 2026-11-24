@@ -196,7 +196,7 @@ export function HomeC({
   const sendDesignComments =
     archived === null && surface.onSend != null
       ? (ids: readonly string[]) =>
-          Promise.resolve(surface.onSend?.(t('按下面的设计评论改。'), projectId, undefined, ids))
+          Promise.resolve(surface.onSend?.(t('按下面的设计评论改。'), projectId, ids))
       : undefined;
   const designSplit = useDesignSplit(design, sendDesignComments);
   const designComposer = useDesignComposer(design);
@@ -596,23 +596,15 @@ export function HomeC({
                 archived !== null
                   ? undefined
                   : surface.onSend != null
-                    ? (text: string) =>
-                        surface.onSend?.(text, projectId, undefined, designComposer?.ids)
+                    ? (text: string) => surface.onSend?.(text, projectId, designComposer?.ids)
                     : live
                       ? undefined
                       : () => Promise.resolve()
               }
-              onQueue={
-                archived === null && surface.onSend != null
-                  ? (text: string) => surface.onSend?.(text, projectId, 'queue')
-                  : undefined
-              }
-              onEditQueued={archived === null ? surface.onEditQueued : undefined}
               onRewind={archived === null ? surface.onRewind : undefined}
               onRetryGreeting={archived === null ? surface.onRetryGreeting : undefined}
               onWithdraw={archived === null ? surface.onWithdraw : undefined}
               unsent={archived === null ? surface.unsent : undefined}
-              onSteer={archived === null ? surface.onSteer : undefined}
               onStop={archived === null ? surface.onStop : undefined}
               composerReplacement={archivedBar}
               pendingComments={archived === null ? designComposer : null}

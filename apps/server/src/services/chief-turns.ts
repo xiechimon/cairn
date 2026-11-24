@@ -25,6 +25,7 @@ import { HttpError } from '../lib/errors.js';
 import { nowMs } from '../lib/ids.js';
 import { CHIEF_TURN_END_REASON, cancelPendingQuestions } from './chief-question-store.js';
 import { queueCoordinatorInput, STEER_WITHDRAW_HOLD } from './coordinator-inputs.js';
+import { signalCoordinator } from './coordinator-signal.js';
 import type { ConversationStreamHub } from './events.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { settleMemoryEditTurn } from './memory-edit-turns.js';
@@ -39,7 +40,6 @@ type StepRow = typeof step.$inferSelect;
 const STEERED_HOLD = 'steer';
 const STEER_SENT_HOLD = 'steer_sent';
 export const STEER_HOLDS = [STEERED_HOLD, STEER_SENT_HOLD, STEER_WITHDRAW_HOLD];
-export const QUEUED_HOLD = 'queued';
 
 export { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
@@ -374,6 +374,7 @@ export function steerChiefMessage(
       markSteered();
     });
     deps.machineHub?.steerSignal(thread.teamId, running.id);
+    signalCoordinator(threadId, 'steer');
     publishStepRow(deps, waiting);
     return { steered: true };
   }
@@ -406,23 +407,6 @@ export function steerChiefMessage(
   deps.machineHub?.steerSignal(thread.teamId, running.id);
   publishStepRow(deps, waiting);
   return { steered: true };
-}
-
-export function queueChiefMessage(deps: ChiefTurnDeps, threadId: string, messageId: string): void {
-  const running = liveChiefSteps(deps.db, threadId).some((row) => row.status === 'claimed');
-  if (!running) return;
-  deps.db.transaction(() => {
-    deps.db
-      .update(step)
-      .set({ holdReason: QUEUED_HOLD })
-      .where(and(eq(step.id, messageId), eq(step.status, 'pending')))
-      .run();
-    deps.db
-      .update(chiefMessage)
-      .set({ delivery: 'queue' })
-      .where(eq(chiefMessage.id, messageId))
-      .run();
-  });
 }
 
 export function addTurnOwnerMessage(db: Db, threadId: string, messageId: string): void {
@@ -656,6 +640,7 @@ function stopClaimedChiefStep(
       })
       .run();
     deps.machineHub?.stopSignal(thread.teamId, head.id);
+    signalCoordinator(threadId, 'stop');
     return { delegated: true };
   }
   deps.db
@@ -667,6 +652,7 @@ function stopClaimedChiefStep(
   releaseUnconsumedSteer(deps.db, head);
   settleMemoryEditTurn(deps.db, head, 'stopped', 'executor lost');
   deps.machineHub?.stopSignal(thread.teamId, head.id);
+  signalCoordinator(threadId, 'stop');
   settleChiefActiveRun(deps.db, threadId);
   const stopped = deps.db.select().from(step).where(eq(step.id, head.id)).get();
   if (stopped) publishStepRow(deps, stopped);

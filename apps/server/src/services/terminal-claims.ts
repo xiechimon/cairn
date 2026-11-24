@@ -251,3 +251,7 @@ export function flushShield(db: Db, stepId: string): string {
   shields.delete(stepId);
   return shield.flush();
 }
+
+export function discardShield(db: Db, stepId: string): void {
+  shieldsOf(db).delete(stepId);
+}

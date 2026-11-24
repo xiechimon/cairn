@@ -5,7 +5,6 @@ import type {
   AskUserAnswer,
   AskUserQuestionContent,
   ChiefGetResponse,
-  ChiefMessageEditBody,
   ChiefOrchestration,
   ChiefThread,
   ChiefWakeKind,
@@ -93,13 +92,8 @@ import {
   chiefOutage,
   chiefPendingMessages,
   chiefThreadFallbackModel,
-  QUEUED_HOLD,
-  queueChiefMessage,
-  STEER_HOLDS,
   settleChiefActiveRun,
   steerChiefMessage,
-  stepOwners,
-  waitingStepOf,
 } from './chief-turns.js';
 import {
   claimClientMessage,
@@ -124,7 +118,6 @@ import { ownershipOf, rescheduleOwnershipHandoff } from './owner.js';
 import { listedProjects } from './personal-space.js';
 import { PICKED_PROJECT_OPEN, stepScopeProjectId } from './picked-project.js';
 import { researchProjectId } from './projects.js';
-import { publishStepRow } from './quota-wait.js';
 import {
   type ReportRef,
   reportAnsweredIn,
@@ -992,79 +985,12 @@ export function sendChiefMessage(
 export function sendChiefMessageFromComposer(
   deps: ChiefDeps,
   teamId: string,
-  body: ChiefSendBody & { mode?: 'queue' | undefined },
+  body: ChiefSendBody,
 ): { result: ChiefSendResult; replayed: boolean } {
   const sent = submitChiefMessage(deps, teamId, body);
   if (sent.replayed) return sent;
-  if (body.mode === 'queue') queueChiefMessage(deps, sent.result.thread.id, sent.result.message.id);
-  else steerChiefMessage(deps, teamId, sent.result.thread.id, sent.result.message.id);
+  steerChiefMessage(deps, teamId, sent.result.thread.id, sent.result.message.id);
   return sent;
-}
-
-const CHIEF_EDIT_LOCK_MS = 120_000;
-
-export function editChiefMessage(
-  deps: ChiefDeps,
-  teamId: string,
-  threadId: string,
-  messageId: string,
-  body: ChiefMessageEditBody,
-): { ok: true } {
-  const threadRow = getChiefThread(deps, threadId);
-  if (!threadRow || threadRow.teamId !== teamId || isChiefSideThreadId(threadRow.id))
-    throw new HttpError(404, `chief thread ${threadId}`);
-  const message = deps.db
-    .select()
-    .from(chiefMessage)
-    .where(and(eq(chiefMessage.id, messageId), eq(chiefMessage.threadId, threadId)))
-    .get();
-  if (message?.role !== 'user') throw new HttpError(404, `chief message ${messageId}`);
-  const waiting = waitingStepOf(deps.db, threadId, messageId);
-  if (
-    waiting.id !== messageId ||
-    stepOwners(waiting).length > 1 ||
-    STEER_HOLDS.includes(waiting.holdReason ?? '')
-  ) {
-    throw new HttpError(409, 'chief turn already started (Coordinator 已经开始处理这条了)');
-  }
-  const released = {
-    holdReason: message.delivery === 'queue' ? QUEUED_HOLD : null,
-    holdUntil: null,
-  };
-  const pendingStep = and(eq(step.id, waiting.id), eq(step.status, 'pending'));
-  const changed = deps.db.transaction(() => {
-    if ('editing' in body) {
-      return deps.db
-        .update(step)
-        .set(
-          body.editing
-            ? { holdReason: 'editing', holdUntil: nowMs() + CHIEF_EDIT_LOCK_MS }
-            : released,
-        )
-        .where(pendingStep)
-        .run().changes;
-    }
-    const picked = pickedProjectOf(deps.db, teamId, waiting.scopeProjectId);
-    const changes = deps.db
-      .update(step)
-      .set({ ...released, prompt: promptWithPickedProject(picked, body.content) })
-      .where(pendingStep)
-      .run().changes;
-    if (changes > 0)
-      deps.db
-        .update(chiefMessage)
-        .set({ content: body.content })
-        .where(eq(chiefMessage.id, messageId))
-        .run();
-    return changes;
-  });
-  if (changed === 0)
-    throw new HttpError(409, 'chief turn already started (Coordinator 已经开始处理这条了)');
-  const after = deps.db.select().from(chiefMessage).where(eq(chiefMessage.id, messageId)).get();
-  if (after) deps.convHub?.publishMessage(threadId, after);
-  publishStepRow(deps, waiting);
-  deps.machineHub?.wake(teamId);
-  return { ok: true };
 }
 
 export function answerChiefQuestion(
@@ -1983,7 +1909,7 @@ Ask only when the need itself is ambiguous, or when the user has to choose a dir
 </asking>
 
 <talking>
-Reply in the language of the user's latest message, which the turn notes record as Reply language — never the language of notes, tool results, task text or your earlier replies. Use plain short sentences, and say nothing when there is nothing new. Each paragraph shows as its own bubble, so keep one matter in one paragraph. Mention a task with the link its tool result gives, not by number.
+Reply in the language of the user's latest message, which the turn notes record as Reply language — never the language of notes, tool results, task text or your earlier replies. Use plain short sentences, and say nothing when there is nothing new. Each paragraph shows as its own bubble, so keep one matter in one paragraph. Mention a task with the link its tool result gives, not by number. When several consecutive user messages arrive before your reply, read them together as one turn: if a later message corrects or replaces an earlier one, answer only the updated request without answering the withdrawn one; if they ask separate things, address each in one reply.
 </talking>
 
 <events>
