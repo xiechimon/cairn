@@ -1,5 +1,6 @@
 import type {
   ApiKeyRow,
+  ArtifactOfAttachment,
   AskUserAnswer,
   AskUserQuestionContent,
   BrowserPasswordGrantsResponse,
@@ -27,7 +28,6 @@ import type {
   DesignCommentCreate,
   DesignCommentPatch,
   DesignCommentRecord,
-  ArtifactOfAttachment,
   DesignPageRecord,
   DesignShareRecord,
   DesignVersionRecord,
@@ -1936,6 +1936,14 @@ export function useDesignMutations(todoId: string, fileName: string) {
       mutationFn: (versionId: string) =>
         api.post<DesignVersionRecord>(
           `${designPath(todoId)}/versions/${encodeURIComponent(versionId)}/restore`,
+        ),
+      onSuccess: refresh,
+    }),
+    saveVersion: useMutation({
+      mutationFn: (content: string) =>
+        api.post<DesignVersionRecord>(
+          `${designPath(todoId)}/${encodeURIComponent(fileName)}/versions`,
+          { content },
         ),
       onSuccess: refresh,
     }),

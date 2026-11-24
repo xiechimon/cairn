@@ -1,6 +1,8 @@
-import type { ArtifactOfAttachment } from '@cairn/shared';
-import { Check, Copy, Download, Globe } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ArtifactOfAttachment, artifactKindOf } from '@cairn/shared';
+import { Check, Copy, Download, Globe, Pencil } from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useDesignMutations } from '../../api/hooks.js';
+import { useLiveData } from '../../api/provider.js';
 import { IconTooltip } from '../../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../../components/menu-keys.js';
 import { QueryBoundary } from '../../components/query-state.js';
@@ -8,12 +10,12 @@ import { SegmentedTabs } from '../../components/segmented.js';
 import { Button } from '../../components/ui/button.js';
 import { DropdownMenu, DropdownMenuTrigger } from '../../components/ui/dropdown-menu.js';
 import { toastError } from '../../components/ui/toaster.js';
+import { DiagramView } from '../../detail/mermaid-block.js';
 import { useI18n } from '../../i18n/provider.js';
 import { ChevronDown } from '../../icons/index.js';
 import { AudioViewer } from '../../vendor-open-design/viewers/audio-viewer.js';
 import { BinaryViewer } from '../../vendor-open-design/viewers/binary-viewer.js';
 import { DocumentPreviewViewer } from '../../vendor-open-design/viewers/document-preview-viewer.js';
-import { ImageViewer } from '../../vendor-open-design/viewers/image-viewer.js';
 import { MarkdownViewer } from '../../vendor-open-design/viewers/markdown-viewer.js';
 import { SvgViewer } from '../../vendor-open-design/viewers/svg-viewer.js';
 import { TextViewer } from '../../vendor-open-design/viewers/text-viewer.js';
@@ -23,9 +25,17 @@ import { downloadFile, type FileTarget } from '../file-pane.js';
 import { artifactKey } from './artifact-route.js';
 import { ArtifactToolbar, OldVersionBar, TOOL_BUTTON, VersionHistory } from './artifact-toolbar.js';
 import { useArtifactVersions } from './use-artifact-versions.js';
+import { DocxViewer } from './viewers/docx-viewer.js';
+import { PdfViewer } from './viewers/pdf-viewer.js';
+import { SheetViewer } from './viewers/sheet-viewer.js';
+import type { SceneReader } from './viewers/whiteboard-canvas.js';
+import { WhiteboardViewer } from './viewers/whiteboard-viewer.js';
+import { type Zoom, ZoomControl } from './viewers/zoom.js';
+import { ZoomImage } from './viewers/zoom-image.js';
 
 const COPIED_MS = 1500;
-const INLINE_KINDS = new Set(['image', 'svg', 'video', 'audio']);
+const INLINE_KINDS = new Set(['image', 'svg', 'video', 'audio', 'pdf']);
+const SOURCE_KINDS = new Set(['sheet', 'diagram', 'whiteboard']);
 
 type Mode = 'preview' | 'source';
 
@@ -51,9 +61,13 @@ function VersionedFile({
   artifact: ArtifactOfAttachment;
   readOnly: boolean;
 }) {
+  const { t } = useI18n();
+  const { live } = useLiveData();
   const versions = useArtifactVersions(artifact.todoId, artifact.fileName, artifact.versionId);
   const [historyOpen, setHistoryOpen] = useState(false);
   const { shown, page } = versions;
+  const { saveVersion } = useDesignMutations(artifact.todoId, artifact.fileName);
+  const editable = live && !readOnly && !versions.viewingOld;
   const fileKey =
     shown === undefined ? target.key : artifactKey(shown.attachmentId, artifact.fileName);
   return (
@@ -62,6 +76,18 @@ function VersionedFile({
       fileKey={fileKey}
       name={artifact.fileName}
       history={{ open: historyOpen, toggle: () => setHistoryOpen((open) => !open) }}
+      save={
+        editable
+          ? {
+              busy: saveVersion.isPending,
+              run: (content, done) =>
+                saveVersion.mutate(content, {
+                  onSuccess: done,
+                  onError: (error) => toastError(t('白板未能保存'), error),
+                }),
+            }
+          : null
+      }
       banner={
         versions.viewingOld && shown !== undefined && page !== undefined ? (
           <OldVersionBar
@@ -93,12 +119,14 @@ function FileView({
   fileKey,
   name,
   history = null,
+  save = null,
   banner = null,
   aside = null,
 }: {
   fileKey: string;
   name: string;
   history?: { open: boolean; toggle: () => void } | null;
+  save?: { busy: boolean; run: (content: string, done: () => void) => void } | null;
   banner?: ReactNode;
   aside?: ReactNode;
 }) {
@@ -108,7 +136,15 @@ function FileView({
   const textQ = files.text;
   const documentQ = files.document;
   const download = () => downloadFile(downloadHref, name);
+  const artifactKind = artifactKindOf(name);
   const [mode, setMode] = useState<Mode>('preview');
+  const [zoom, setZoom] = useState<Zoom>('fit');
+  const [fitScale, setFitScale] = useState(1);
+  const [editing, setEditing] = useState(false);
+  const sceneReader = useRef<SceneReader | null>(null);
+  const keepReader = useCallback((read: SceneReader | null) => {
+    sceneReader.current = read;
+  }, []);
   const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (!copied) return;
@@ -137,11 +173,47 @@ function FileView({
     </QueryBoundary>
   );
   const binary = <BinaryViewer size={size} onDownload={download} />;
+  const source = withText((value) => <TextViewer name={fileKey} text={value} />);
+  const extracted = readsDocument ? (
+    documentQ.error instanceof DocumentPreviewUnavailable ? (
+      binary
+    ) : (
+      <QueryBoundary
+        query={documentQ}
+        isEmpty={false}
+        errorWins
+        empty={null}
+        loadingLabel={t('正在加载文件')}
+        errorTitle={t('文件未能加载')}
+        className="px-2"
+      >
+        {documentQ.data !== undefined && (
+          <DocumentPreviewViewer preview={documentQ.data} size={size} />
+        )}
+      </QueryBoundary>
+    )
+  ) : (
+    binary
+  );
   const body =
-    kind === 'markdown' ? (
+    SOURCE_KINDS.has(artifactKind) && mode === 'source' ? (
+      source
+    ) : artifactKind === 'sheet' ? (
+      withText((value) => <SheetViewer name={name} text={value} />)
+    ) : artifactKind === 'diagram' ? (
+      withText((value) => (
+        <DiagramView text={value} source={<TextViewer name={fileKey} text={value} />} />
+      ))
+    ) : artifactKind === 'whiteboard' ? (
+      withText((value) => <WhiteboardViewer text={value} editing={editing} onReader={keepReader} />)
+    ) : kind === 'pdf' ? (
+      <PdfViewer src={src} zoom={zoom} onFitScale={setFitScale} />
+    ) : artifactKind === 'docx' ? (
+      <DocxViewer src={src} fallback={extracted} />
+    ) : kind === 'markdown' ? (
       withText((value) => <MarkdownViewer text={value} mode={mode} />)
     ) : kind === 'text' ? (
-      withText((value) => <TextViewer name={fileKey} text={value} />)
+      source
     ) : kind === 'svg' ? (
       mode === 'source' ? (
         withText((value) => (
@@ -151,35 +223,41 @@ function FileView({
         <SvgViewer name={name} src={src} mode="preview" source="" onDownload={download} />
       )
     ) : kind === 'image' ? (
-      <ImageViewer name={name} src={src} onDownload={download} />
+      <ZoomImage name={name} src={src} zoom={zoom} onFitScale={setFitScale} onDownload={download} />
     ) : kind === 'video' ? (
       <VideoViewer name={name} src={src} onDownload={download} />
     ) : kind === 'audio' ? (
       <AudioViewer name={name} src={src} onDownload={download} />
-    ) : kind === 'document' && readsDocument ? (
-      documentQ.error instanceof DocumentPreviewUnavailable ? (
-        binary
-      ) : (
-        <QueryBoundary
-          query={documentQ}
-          isEmpty={false}
-          errorWins
-          empty={null}
-          loadingLabel={t('正在加载文件')}
-          errorTitle={t('文件未能加载')}
-          className="px-2"
-        >
-          {documentQ.data !== undefined && (
-            <DocumentPreviewViewer preview={documentQ.data} size={size} />
-          )}
-        </QueryBoundary>
-      )
+    ) : kind === 'document' ? (
+      extracted
     ) : (
       binary
     );
   const controls = (
     <>
-      {(kind === 'markdown' || kind === 'svg') && (
+      {(kind === 'image' || kind === 'pdf') && (
+        <ZoomControl zoom={zoom} fitScale={fitScale} onChange={setZoom} />
+      )}
+      {artifactKind === 'whiteboard' && save !== null && mode === 'preview' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          data-testid="artifact-whiteboard-edit"
+          aria-pressed={editing}
+          disabled={save.busy}
+          onClick={() => {
+            if (!editing) return setEditing(true);
+            const read = sceneReader.current;
+            if (read === null) return setEditing(false);
+            save.run(read(), () => setEditing(false));
+          }}
+          className={TOOL_BUTTON}
+        >
+          <Pencil aria-hidden className="size-4" />
+          {editing ? t('保存') : t('编辑')}
+        </Button>
+      )}
+      {(kind === 'markdown' || kind === 'svg' || SOURCE_KINDS.has(artifactKind)) && (
         <SegmentedTabs
           value={mode}
           label={t('显示方式')}

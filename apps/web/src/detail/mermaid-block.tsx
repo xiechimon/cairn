@@ -126,3 +126,36 @@ export function MermaidBlock({
     </div>
   );
 }
+
+export function DiagramView({ text, source }: { text: string; source: ReactNode }) {
+  const { t } = useI18n();
+  const { host, outcome } = useDiagram(text, true);
+  const failure: Failure | null = outcome !== null && outcome !== 'drawn' ? outcome : null;
+  const drawn = outcome === 'drawn';
+  return (
+    <div
+      data-testid="artifact-diagram"
+      data-state={failure ?? (drawn ? 'drawn' : 'pending')}
+      className="relative flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain"
+    >
+      {failure !== null && (
+        <p
+          data-testid="artifact-diagram-notice"
+          role="status"
+          className="m-0 flex-none border-b border-border bg-(--surface-1) px-4 py-2 text-ui text-content-secondary"
+        >
+          {t(FAILURE_NOTICE[failure])}
+        </p>
+      )}
+      <div
+        ref={host}
+        role="img"
+        aria-label={t('图表')}
+        hidden={failure !== null}
+        className="chat-md-diagram m-auto max-w-full p-6 data-[pending]:invisible"
+        {...(drawn ? {} : { 'data-pending': '' })}
+      />
+      {failure !== null && source}
+    </div>
+  );
+}

@@ -58,6 +58,9 @@ const TEXT_EXTS = new Set([
   'log',
   'diff',
   'patch',
+  'mmd',
+  'mermaid',
+  'excalidraw',
 ]);
 
 const VIDEO_EXTS = new Set(['mp4', 'mov', 'webm']);

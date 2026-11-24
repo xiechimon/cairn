@@ -1,3 +1,5 @@
+import { cpSync, createReadStream, existsSync, statSync } from 'node:fs';
+import { join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
@@ -29,8 +31,47 @@ function previewApiReject(): Plugin {
   };
 }
 
+const WHITEBOARD_FONTS_URL = '/whiteboard-assets/fonts';
+const WHITEBOARD_FONTS_SKIPPED = 'Xiaolai';
+
+function whiteboardFonts(): Plugin {
+  const fontsDir = fileURLToPath(
+    new URL('./node_modules/@excalidraw/excalidraw/dist/prod/fonts', import.meta.url),
+  );
+  const shipped = (path: string) =>
+    !path.slice(fontsDir.length).includes(`/${WHITEBOARD_FONTS_SKIPPED}`);
+  return {
+    name: 'whiteboard-fonts',
+    configureServer(server) {
+      server.middlewares.use(WHITEBOARD_FONTS_URL, (req, res, next) => {
+        const file = normalize(
+          join(fontsDir, decodeURIComponent((req.url ?? '').split('?')[0] ?? '')),
+        );
+        if (
+          !file.startsWith(fontsDir) ||
+          !shipped(file) ||
+          !existsSync(file) ||
+          !statSync(file).isFile()
+        ) {
+          next();
+          return;
+        }
+        res.setHeader('content-type', 'font/woff2');
+        createReadStream(file).pipe(res);
+      });
+    },
+    writeBundle(options) {
+      if (options.dir === undefined) return;
+      cpSync(fontsDir, join(options.dir, WHITEBOARD_FONTS_URL), {
+        recursive: true,
+        filter: shipped,
+      });
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => ({
-  plugins: [react(), previewApiReject()],
+  plugins: [react(), previewApiReject(), whiteboardFonts()],
   build:
     mode === 'fixture'
       ? { rollupOptions: { input: { main: 'index.html', design: 'design.html' } } }
