@@ -21,7 +21,7 @@ const RULES: readonly [TurnErrorKind, RegExp][] = [
   ['no-model', /\bno_model\b|no keyed provider|has no model or chief context/i],
   [
     'interrupted',
-    /\b(interrupted|restart_limit|faulted|orphaned|reset)\b|journal lost|server restarted|stream disconnected/i,
+    /\b(interrupted|restart_limit|faulted|orphaned|reset)\b|journal lost|server restarted|stream disconnected|executor lost/i,
   ],
   ['turn-limit', /\bturn_limit\b/i],
   ['runtime-update', RUNTIME_UPDATE_REQUIRED_RE],

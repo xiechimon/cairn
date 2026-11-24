@@ -176,6 +176,25 @@ describe('#684 chief lost-contact timeout fallback (sweepAbandonedChiefSteps)', 
     await expect(woken).resolves.toBe(true);
   });
 
+  test('claimed + machine offline + no heartbeat yet (lastHeartbeatAt null) past age -> released back to pending', async () => {
+    const w = await sendChiefTurn();
+    const token = await enrollMachine(w.s, w.teamId);
+    bindChiefAgent(w.s, w.s.db.select().from(machineTable).limit(1).all()[0]!.id);
+    const claimed = await claimStep(w.s, token);
+    const claimedAt = stepRowOf(w).claimedAt ?? stepRowOf(w).createdAt;
+    w.s.db
+      .update(stepTable)
+      .set({ lastHeartbeatAt: null, claimedAt })
+      .where(eq(stepTable.id, w.stepId))
+      .run();
+    setMachineOnline(w.s, claimed.step.machineId!, false);
+
+    sweepAbandonedChiefSteps(w.s.svc, claimedAt + CHIEF_ABANDONED_STEP_MS + 1);
+
+    expect(stepRowOf(w).status).toBe('pending');
+    expect(stepRowOf(w).machineId).toBeNull();
+  });
+
   test('claimed + machine offline but fresh heartbeat -> untouched (reconnect window)', async () => {
     const w = await sendChiefTurn();
     const token = await enrollMachine(w.s, w.teamId);

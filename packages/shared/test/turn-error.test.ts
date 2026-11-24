@@ -20,6 +20,7 @@ describe('turnErrorKind names the failure from the stored raw text', () => {
     ['Coordinator route resolves to no keyed provider', 'no-model'],
     ['Coordinator turn ended: interrupted "generation, 3 times"', 'interrupted'],
     ['daemon journal lost across restart', 'interrupted'],
+    ['executor lost', 'interrupted'],
     ['Coordinator turn ended: turn_limit "40 turns"', 'turn-limit'],
     ['Coordinator turn ended: model_error "Connection error."', 'connect'],
     ['Coordinator turn ended: model_error "401: {\\"message\\":\\"Invalid API key\\"}"', 'key'],
