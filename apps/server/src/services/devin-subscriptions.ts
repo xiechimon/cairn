@@ -19,6 +19,12 @@ import {
 } from './devin-subscription-models.js';
 import { verifyDevinSubscription } from './devin-subscription-verification.js';
 import { timedCheck } from './subscription-check.js';
+import {
+  assertLabelHidesToken,
+  claimRateWindow,
+  dedupeSubscriptionModels,
+  refuseWhileRunning,
+} from './subscription-helpers.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
 type Deps = { db: Db; box: SecretBox };
@@ -50,24 +56,6 @@ function invalidateUpstreamModels(db: Db, id: string): void {
   entry.generation += 1;
   entry.value = undefined;
   if (!entry.pending) entry.retryAt = 0;
-}
-
-function claimRateWindow(
-  store: WeakMap<Db, Map<string, number>>,
-  db: Db,
-  connectionId: string,
-  action: string,
-): void {
-  const now = nowMs();
-  const windows = store.get(db) ?? new Map<string, number>();
-  for (const [id, retryAt] of windows) {
-    if (retryAt <= now) windows.delete(id);
-  }
-  if (windows.has(connectionId)) {
-    throw new HttpError(429, `Please wait 10 seconds between ${action} for this connection.`);
-  }
-  windows.set(connectionId, now + 10_000);
-  store.set(db, windows);
 }
 
 function toRecord(row: Row): DevinSubscription {
@@ -109,19 +97,6 @@ function runningStepCount(db: Pick<Db, 'select'>, subscriptionId: string): numbe
   );
 }
 
-function refuseWhileRunning(db: Pick<Db, 'select'>, row: Row, action: string): void {
-  if (row.enabledAt === null) return;
-  const running = runningStepCount(db, row.id);
-  if (running > 0) {
-    throw new HttpError(
-      409,
-      `Cannot ${action} this account while ${running} task(s) are running on it; finish or stop them first.`,
-      undefined,
-      { code: 'running-tasks', running },
-    );
-  }
-}
-
 export function updateDevinSubscription(
   deps: Deps,
   teamId: string,
@@ -130,18 +105,8 @@ export function updateDevinSubscription(
 ): DevinSubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Devin subscription connection');
-  if (patch.label?.includes(deps.box.open(row.tokenCipher))) {
-    throw new HttpError(400, 'Connection label must not contain the token');
-  }
-  let models: Row['models'] | undefined;
-  if (patch.models !== undefined) {
-    const seen = new Set<string>();
-    models = patch.models.filter((model) => {
-      if (seen.has(model.id)) return false;
-      seen.add(model.id);
-      return true;
-    });
-  }
+  assertLabelHidesToken(patch.label, deps.box.open(row.tokenCipher));
+  const models = patch.models === undefined ? undefined : dedupeSubscriptionModels(patch.models);
   deps.db
     .update(devinSubscription)
     .set({
@@ -203,7 +168,9 @@ export async function enableDevinSubscription(
         );
       }
       if (current) {
-        refuseWhileRunning(tx, current, 'switch away from');
+        if (current.enabledAt !== null) {
+          refuseWhileRunning(() => runningStepCount(tx, current.id), 'switch away from');
+        }
         tx.update(devinSubscription)
           .set({ enabledAt: null })
           .where(eq(devinSubscription.id, current.id))
@@ -234,7 +201,7 @@ export function disableDevinSubscription(
     const row = subscriptionRow(tx, teamId, id);
     if (!row) throw notFound('Devin subscription connection');
     if (row.enabledAt === null) return toRecord(row);
-    refuseWhileRunning(tx, row, 'disable');
+    refuseWhileRunning(() => runningStepCount(tx, row.id), 'disable');
     tx.update(devinSubscription).set({ enabledAt: null }).where(eq(devinSubscription.id, id)).run();
     return toRecord({ ...row, enabledAt: null });
   });
@@ -271,8 +238,7 @@ export function createDevinSubscription(
   teamId: string,
   body: CreateDevinSubscription,
 ): DevinSubscription {
-  if (body.label.includes(body.token))
-    throw new HttpError(400, 'Connection label must not contain the token');
+  assertLabelHidesToken(body.label, body.token);
   const now = nowMs();
   const row = {
     id: newRecordId(),
@@ -494,7 +460,7 @@ export function deleteDevinSubscription(deps: { db: Db }, teamId: string, id: st
   const removed = deps.db.transaction((tx) => {
     const row = subscriptionRow(tx, teamId, id);
     if (!row) return false;
-    refuseWhileRunning(tx, row, 'delete');
+    if (row.enabledAt !== null) refuseWhileRunning(() => runningStepCount(tx, row.id), 'delete');
     return (
       tx
         .delete(devinSubscription)

@@ -32,6 +32,12 @@ import { verifyAntigravitySubscription } from './antigravity-subscription-verifi
 import { requestAntigravityVerify } from './machine-antigravity-verify.js';
 import type { MachineWakeHub } from './machine-wake-hub.js';
 import { timedCheck } from './subscription-check.js';
+import {
+  assertLabelHidesToken,
+  claimRateWindow,
+  dedupeSubscriptionModels,
+  refuseWhileRunning,
+} from './subscription-helpers.js';
 import { subscriptionUsageStats } from './subscription-usage.js';
 
 export type AntigravityAccountStepsPage = {
@@ -105,24 +111,6 @@ function openCredential(box: SecretBox, cipher: string): string {
   );
 }
 
-function claimRateWindow(
-  store: WeakMap<Db, Map<string, number>>,
-  db: Db,
-  connectionId: string,
-  action: string,
-): void {
-  const now = nowMs();
-  const windows = store.get(db) ?? new Map<string, number>();
-  for (const [id, retryAt] of windows) {
-    if (retryAt <= now) windows.delete(id);
-  }
-  if (windows.has(connectionId)) {
-    throw new HttpError(429, `Please wait 10 seconds between ${action} for this connection.`);
-  }
-  windows.set(connectionId, now + 10_000);
-  store.set(db, windows);
-}
-
 function toRecord(row: Row): AntigravitySubscription {
   return {
     id: row.id,
@@ -165,18 +153,6 @@ function runningStepCount(db: Pick<Db, 'select'>, subscriptionId: string): numbe
       .where(and(eq(step.status, 'claimed'), eq(step.antigravitySubscriptionId, subscriptionId)))
       .get()?.n ?? 0
   );
-}
-
-function refuseWhileRunning(db: Pick<Db, 'select'>, row: Row, action: string): void {
-  const running = runningStepCount(db, row.id);
-  if (running > 0) {
-    throw new HttpError(
-      409,
-      `Cannot ${action} this account while ${running} task(s) are running on it; finish or stop them first.`,
-      undefined,
-      { code: 'running-tasks', running },
-    );
-  }
 }
 
 function registeredRunners(db: Pick<Db, 'select'>, teamId: string): Runner[] {
@@ -271,7 +247,6 @@ function runnerLogin(db: Pick<Db, 'select'>, row: Row) {
     models: report.models ?? [],
   } as const;
 }
-
 async function verifyRowCredentials(
   deps: Deps,
   row: Row,
@@ -322,21 +297,12 @@ export function patchAntigravitySubscription(
 ): AntigravitySubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Antigravity subscription connection');
-  if (
-    row.tokenCipher !== null &&
-    patch.label?.includes(openCredential(deps.box, row.tokenCipher))
-  ) {
-    throw new HttpError(400, 'Connection label must not contain the token');
-  }
-  let models: Row['models'] | undefined;
-  if (patch.models !== undefined) {
-    const seen = new Set<string>();
-    models = patch.models.filter((model) => {
-      if (model.id === '' || seen.has(model.id)) return false;
-      seen.add(model.id);
-      return true;
-    });
-  }
+  assertLabelHidesToken(
+    patch.label,
+    row.tokenCipher === null ? null : openCredential(deps.box, row.tokenCipher),
+  );
+  const models =
+    patch.models === undefined ? undefined : dedupeSubscriptionModels(patch.models, true);
   const updated = deps.db.transaction((tx) => {
     let runnerId = row.runnerId;
     if (row.tokenCipher === null && runnerId === null && patch.runnerId !== undefined) {
@@ -406,7 +372,7 @@ export async function enableAntigravitySubscription(
         });
       }
       if (current) {
-        refuseWhileRunning(tx, current, 'switch away from');
+        refuseWhileRunning(() => runningStepCount(tx, current.id), 'switch away from');
         tx.update(antigravitySubscription)
           .set({ enabledAt: null })
           .where(
@@ -442,7 +408,7 @@ export function disableAntigravitySubscription(
     const row = subscriptionRow(tx, teamId, id);
     if (!row) throw notFound('Antigravity subscription connection');
     if (row.enabledAt === null) return toRecord(row);
-    refuseWhileRunning(tx, row, 'disable');
+    refuseWhileRunning(() => runningStepCount(tx, row.id), 'disable');
     tx.update(antigravitySubscription)
       .set({ enabledAt: null })
       .where(and(eq(antigravitySubscription.teamId, teamId), eq(antigravitySubscription.id, id)))
@@ -590,12 +556,10 @@ export function createAntigravitySubscription(
   body: ResolvedSubscription,
 ): AntigravitySubscription {
   const token = body.token ?? null;
+  assertLabelHidesToken(body.label, token);
   const now = nowMs();
   let tokenCipher: string | null = null;
   if (token !== null) {
-    if (body.label.includes(token)) {
-      throw new HttpError(400, 'Connection label must not contain the token');
-    }
     if (isAntigravityOAuthAccessToken(token)) {
       if (body.googleSubject === undefined || body.expiresAt == null || body.expiresAt <= now) {
         throw new HttpError(400, 'A valid, verified Google OAuth access token is required.');
@@ -654,7 +618,7 @@ export async function attachAntigravityOAuthCredential(
 ): Promise<AntigravitySubscription> {
   const row = subscriptionRow(deps.db, teamId, id);
   if (row === undefined) throw notFound('Antigravity subscription connection');
-  refuseWhileRunning(deps.db, row, 'attach a credential to');
+  refuseWhileRunning(() => runningStepCount(deps.db, row.id), 'attach a credential to');
   const now = nowMs();
   if (credential.expiresAt <= now || row.label.includes(credential.token)) {
     throw new HttpError(400, 'Invalid Antigravity OAuth credential');
@@ -689,7 +653,7 @@ export async function attachAntigravityOAuthCredential(
     if (fresh.tokenCipher !== row.tokenCipher || fresh.expiresAt !== row.expiresAt) {
       throw new HttpError(409, 'This subscription credential changed; try again.');
     }
-    refuseWhileRunning(tx, fresh, 'attach a credential to');
+    refuseWhileRunning(() => runningStepCount(tx, fresh.id), 'attach a credential to');
     if (resolved.expiresAt <= nowMs() || fresh.label.includes(credential.token)) {
       throw new HttpError(400, 'Invalid Antigravity OAuth credential');
     }
@@ -947,7 +911,7 @@ export function deleteAntigravitySubscription(
   return deps.db.transaction((tx) => {
     const row = subscriptionRow(tx, teamId, id);
     if (!row) return false;
-    refuseWhileRunning(tx, row, 'delete');
+    refuseWhileRunning(() => runningStepCount(tx, row.id), 'delete');
     return (
       tx
         .delete(antigravitySubscription)

@@ -19,10 +19,10 @@ import { OWNED_CANDIDATE, ownershipOf } from './owner.js';
 import { isPersonalSpace } from './personal-space.js';
 import { PhaseTransitionError } from './phase.js';
 import { answerTaskQuestion, messageThreadAsUser, startThreadBuild } from './thread-message.js';
+import { json, optStr, requireTeamTodo, str } from './tool-guards.js';
 import { pendingWorkerQuestions } from './worker-question-store.js';
 
 type Params = Record<string, unknown>;
-type TodoRow = typeof todo.$inferSelect;
 
 const TITLE_MAX = 160;
 const LINE_MAX = 200;
@@ -46,42 +46,13 @@ export function assertToolNotRemoved(name: string): void {
   }
 }
 
-function json(result: unknown): string {
-  return JSON.stringify(result ?? null);
-}
-
-function str(params: Params, key: string): string {
-  const v = params[key];
-  if (typeof v !== 'string' || v === '') {
-    throw new HttpError(400, `invalid params.${key}: expected non-empty string`);
-  }
-  return v;
-}
-
-function optStr(params: Params, key: string): string | undefined {
-  const v = params[key];
-  if (v === undefined || v === null) return undefined;
-  if (typeof v !== 'string') throw new HttpError(400, `invalid params.${key}: expected string`);
-  return v;
-}
-
-function teamTodo(db: Db, todoId: string, teamId: string): TodoRow {
-  const row = db
-    .select()
-    .from(todo)
-    .where(and(eq(todo.id, todoId), eq(todo.teamId, teamId)))
-    .get();
-  if (!row) throw new HttpError(404, `todo ${todoId}`);
-  return row;
-}
-
 function tidy(text: string, max: number): string {
   const clean = tidyText(redactSecrets(text).value as string);
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
 function openThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
-  const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
+  const row = requireTeamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
   if (row.latestBuildId !== null && row.phase !== 'stopped') {
     throw new HttpError(
       409,
@@ -139,7 +110,7 @@ async function answerQuestion(
 }
 
 function stopThread(deps: ChiefToolDeps, ctx: ChiefToolCtx, params: Params): string {
-  const row = teamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
+  const row = requireTeamTodo(deps.db, str(params, 'todoId'), ctx.teamId);
   str(params, 'reason');
   if (row.latestBuildId === null) {
     throw new HttpError(409, `thread #${row.seqNum} has not started yet`);
