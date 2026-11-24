@@ -111,20 +111,16 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
     await expect(input).toHaveValue('看板拖完卡片计数不对');
   });
 
-  test('a reply carries a live task reference, a hand-off row and no steps view; reload keeps it', async ({
+  test('a reply names its task as a live task word, a hand-off row and no steps view; reload keeps it', async ({
     page,
   }) => {
     await mockLive(page, { threads: [THREAD], messages: HISTORY });
     await page.goto('/app');
     const stream = page.getByTestId('home-c').getByTestId('chief-stream');
-    const ref = stream.getByTestId('chief-task-ref').first();
-    await expect(ref).toHaveAttribute('data-phase', 'building');
-    await expect(ref.getByRole('img', { name: '执行中' })).toBeVisible();
-    await expect(stream.locator('a[data-slot="task-mention"]').first()).toHaveAttribute(
-      'data-phase',
-      'building',
-    );
-    await expect(stream.locator('a[data-slot="task-mention"]').first()).toHaveClass(/mention-chip--todo/);
+    const word = stream.locator('a[data-slot="task-mention"]').first();
+    await expect(word).toHaveAttribute('data-phase', 'building');
+    await expect(word).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(word).toHaveAccessibleName(/执行中/);
     const handoff = stream.getByTestId('chief-handoff');
     await expect(handoff).toContainText('已转给任务');
     await expect(handoff).toContainText('修复看板拖拽后计数不刷新');
@@ -138,7 +134,7 @@ test.describe('home is one continuous Coordinator chat (T1)', () => {
       fill: getComputedStyle(el).backgroundColor,
       left: el.getBoundingClientRect().left,
       rule: getComputedStyle(el, '::before').content,
-      chips: el.querySelectorAll('.mention-chip--todo').length,
+      chips: el.querySelectorAll('a[data-slot="task-mention"]').length,
     }));
     expect(handoffLine).toEqual({ ...replyLook, rule: 'none', chips: 1 });
     await expect(handoff.getByRole('link', { name: '修复看板拖拽后计数不刷新' })).toHaveAttribute('data-phase', 'building');

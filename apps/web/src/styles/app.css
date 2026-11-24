@@ -543,12 +543,17 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 }
 
-@keyframes task-ref-draw {
+@keyframes dock-enter {
   from {
-    stroke-dashoffset: 1;
+    opacity: 0;
+    transform: translateY(4px);
   }
-  to {
-    stroke-dashoffset: 0;
+}
+
+@utility dock-enter {
+  animation: dock-enter 180ms cubic-bezier(0.2, 0, 0, 1) both;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 }
 
@@ -582,12 +587,6 @@ html:has([data-slot="demo-banner"]) .app-drawer {
 @keyframes grow-flash {
   20% {
     color: var(--tint-working-ink);
-  }
-}
-
-@keyframes task-ref-echo {
-  25% {
-    stroke: var(--tint-working-ink);
   }
 }
 
@@ -637,43 +636,6 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   ):active {
     transition-duration: 0s, 0s, 0s, 0s, 0s, 0s, 0s, var(--dur-fast);
     scale: 0.97;
-  }
-}
-
-[data-slot="task-ref-guide"] {
-  transition: color var(--dur-fast) var(--ease-standard);
-}
-
-[data-slot="task-ref-line"][data-hl] [data-slot="task-ref-guide"] {
-  color: var(--tint-working-ink);
-}
-
-[data-slot="task-mention"][data-hl] {
-  text-decoration: underline;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-trunk"],
-  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-elbow"] {
-    stroke-dasharray: 1 2;
-    animation: task-ref-draw 220ms var(--ease-standard) both;
-    animation-delay: calc(var(--grow-delay, 0ms) + 110ms);
-  }
-
-  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-trunk"] {
-    animation-duration: 150ms;
-    animation-timing-function: linear;
-    animation-delay: var(--grow-delay, 0ms);
-  }
-
-  [data-slot="task-ref-line"][data-grow] [data-slot="task-ref-elbow"][data-end] {
-    animation-duration: 320ms;
-    animation-delay: var(--grow-delay, 0ms);
-  }
-
-  [data-slot="task-ref-line"][data-echo] [data-slot="task-ref-elbow"],
-  [data-slot="task-ref-line"][data-echo] [data-slot="task-ref-trunk"] {
-    animation: task-ref-echo 900ms var(--ease-standard);
   }
 }
 
@@ -1121,7 +1083,7 @@ html:not(.light)
 }
 
 :is([data-slot="message-scroller"], [data-trace-card], [data-slot="trace"], .chat-interactions)
-  :is(button, a, [role="button"]):not(.mention-chip--todo),
+  :is(button, a, [role="button"]),
 .chat-interaction {
   box-shadow: none;
   transition-duration: 0s;

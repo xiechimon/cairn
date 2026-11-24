@@ -146,17 +146,6 @@ test('a plan waiting for approval shows its chips like the suggested replies, 24
     leftOfComposer: 0,
     aboveComposer: 24,
   });
-  const main = await page.getByTestId('home-c').evaluate((el) => {
-    const chips = [...el.querySelectorAll('[data-testid="chief-question-chips"] button')]
-      .map((node) => node.getBoundingClientRect())
-      .filter((box) => box.height === 28);
-    const card = el.querySelector('.chief-composer')!.getBoundingClientRect();
-    return {
-      between: Math.round((chips[1]?.left ?? 0) - (chips[0]?.right ?? 0)),
-      aboveComposer: Math.round(card.top - (chips[0]?.bottom ?? 0)),
-    };
-  });
-  expect(main).toEqual({ between: face.between, aboveComposer: face.aboveComposer });
 });
 
 test('the thread composer is the main composer: the field, then a tool row with plus under it', async ({
@@ -211,26 +200,6 @@ test('back returns to the tasks list and close leaves the panel area empty', asy
   await panel(page).getByRole('button', { name: '关闭' }).click();
   await expect(panel(page)).toHaveCount(0);
   await expect(page.getByRole('complementary', { name: '任务' })).toHaveCount(0);
-});
-
-test('an unread thread shows a dot on its task reference, and opening the thread clears it', async ({
-  page,
-}) => {
-  await page.goto('/app?scenario=home-c-unread');
-  const stream = page.getByTestId('chief-stream');
-  const ref = stream.getByTestId('chief-task-ref').filter({ hasText: 'Orb canary round 7' });
-  await expect(ref).toHaveCount(1);
-  await expect(ref.locator('[data-slot="task-ref-unread"]')).toBeVisible();
-  await expect(ref.locator('[data-slot="task-ref-unread"]')).toHaveAccessibleName('有新动态');
-  await expect(
-    stream
-      .getByTestId('chief-task-ref')
-      .filter({ hasText: 'Fold finished turns' })
-      .locator('[data-slot="task-ref-unread"]'),
-  ).toHaveCount(0);
-  await ref.click();
-  await expect(page.getByTestId('side-chat')).toBeVisible();
-  await expect(ref.locator('[data-slot="task-ref-unread"]')).toHaveCount(0);
 });
 
 test('the panel width is resizable and remembered', async ({ page }) => {

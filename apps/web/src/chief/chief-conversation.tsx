@@ -64,8 +64,7 @@ import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-questio
 import {
   foldTaskCards,
   placeReportCards,
-  placeTaskRefs,
-  type TaskRef,
+  placeUnmentionedTasks,
   todoGlanceOf,
 } from './chief-task-refs.js';
 import { serverDraftBinding } from './composer-binding.js';
@@ -96,7 +95,7 @@ interface StreamLayout {
   grouped: GroupedRow[];
   keys: (string | number)[];
   runs: BubbleRun[];
-  taskRefs: ReadonlyMap<GroupedRow['item'], readonly TaskRef[]>;
+  unmentioned: ReadonlyMap<GroupedRow['item'], readonly string[]>;
   reports: ReadonlyMap<GroupedRow['item'], readonly string[]>;
   dividers: (number | null)[];
   lastAt: number | null;
@@ -106,7 +105,6 @@ function layoutStream(
   list: readonly StreamRow[],
   glances: ReadonlyMap<string, TodoGlance>,
   previousAt: number | null,
-  seen: Set<string>,
   reportSeen: Set<string>,
 ): StreamLayout {
   const { rows: grouped, startedBy } = foldTaskCards(groupThreadEvents(list), glances);
@@ -121,7 +119,7 @@ function layoutStream(
     grouped,
     keys: chiefStreamRowKeys(grouped),
     runs: bubbleRuns(grouped, previousAt),
-    taskRefs: placeTaskRefs(grouped, startedBy, glances, seen),
+    unmentioned: placeUnmentionedTasks(grouped, startedBy, glances),
     reports: placeReportCards(grouped, startedBy, glances, reportSeen),
     dividers,
     lastAt,
@@ -546,12 +544,11 @@ export function ChiefConversation({
   const clock = useMinuteClock();
   const dayEarlier = day?.earlier ?? 0;
   const [earlierLayout, streamLayout] = useMemo(() => {
-    const seen = new Set<string>();
     const reportSeen = new Set<string>();
-    const before = layoutStream(rows.slice(0, dayEarlier), glances, null, seen, reportSeen);
+    const before = layoutStream(rows.slice(0, dayEarlier), glances, null, reportSeen);
     return [
       before,
-      layoutStream(rows.slice(dayEarlier), glances, before.lastAt, seen, reportSeen),
+      layoutStream(rows.slice(dayEarlier), glances, before.lastAt, reportSeen),
     ] as const;
   }, [rows, glances, dayEarlier]);
   const addQuote = (draft: ReplyQuoteDraft, text: string) => {
@@ -565,7 +562,7 @@ export function ChiefConversation({
     item: GroupedRow['item'],
     i: number,
     run: BubbleRun | undefined,
-    taskRefs: readonly TaskRef[] | undefined,
+    unmentioned: readonly string[] | undefined,
     reports: readonly string[] | undefined,
   ) => (
     <ChiefStreamRow
@@ -577,7 +574,7 @@ export function ChiefConversation({
       onWithdraw={onWithdraw != null ? withdrawSteer : undefined}
       joinsPrev={run?.joinsPrev === true}
       joinsNext={run?.joinsNext === true}
-      {...(taskRefs !== undefined ? { taskRefs } : {})}
+      {...(unmentioned !== undefined ? { unmentioned } : {})}
       {...(reports !== undefined ? { reports } : {})}
     />
   );
@@ -626,7 +623,7 @@ export function ChiefConversation({
           entry.item,
           entry.i,
           layout.runs[n],
-          layout.taskRefs.get(entry.item),
+          layout.unmentioned.get(entry.item),
           layout.reports.get(entry.item),
         )}
         {quickAfter !== undefined && entry.item === quickAfter && quickReplies}
@@ -692,7 +689,6 @@ export function ChiefConversation({
                           {renderRows(streamLayout)}
                         </>
                       )}
-                      <ChiefQuestion key={chief.threadId ?? ''} />
                     </CardFailureContext.Provider>
                   </ReplySourceHighlightContext.Provider>
                 </TodoGlanceContext.Provider>
@@ -750,6 +746,7 @@ export function ChiefConversation({
       >
         {composerReplacement ?? (
           <>
+            <ChiefQuestion key={chief.threadId ?? ''} />
             <ComposerSurface
               key="thread"
               handleRef={surfaceRef}

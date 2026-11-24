@@ -2,7 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
 import { ApprovalAnswered } from '../src/chief/question-answered-line.js';
-import { type ChiefQuestionItem, QuestionChips } from '../src/chief/question-chips.js';
+import { DecisionDock } from '../src/chief/decision-dock.js';
+import type { ChiefQuestionItem } from '../src/chief/question-item.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
 const MAIL_CARD = [
@@ -46,7 +47,7 @@ function inI18n(child: ReturnType<typeof createElement>): string {
 }
 
 const render = (item: ChiefQuestionItem) =>
-  inI18n(createElement(QuestionChips, { item, onAnswer: () => {}, onCancel: () => {} }));
+  inI18n(createElement(DecisionDock, { item, onAnswer: () => {}, onCancel: () => {} }));
 
 const textOf = (html: string) =>
   html

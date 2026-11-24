@@ -74,18 +74,17 @@ async function focusQuestion(page: Page, header: string) {
 }
 const NONE = { ...TWO, messages: TWO.messages.slice(0, 1) };
 
-const exchange = (page: Page) =>
+const receipts = (page: Page) =>
   page
     .getByTestId('chief-stream')
-    .locator('[data-testid="chief-question-asked"] [data-slot="reply-bubble"], [data-question-answer]')
+    .getByTestId('chief-question-receipt')
     .evaluateAll((nodes) =>
-      nodes.map(
-        (node) =>
-          `${node.hasAttribute('data-question-answer') ? 'answer' : 'asked'}:${(node as HTMLElement).innerText}`,
+      nodes.map((node) =>
+        [...node.querySelectorAll('[data-testid^="chief-question-receipt-"]')].map((part) => part.textContent ?? ''),
       ),
     );
 
-test('a pending question is its text and outlined chips at the end of the conversation, with nothing docked above the composer (D119)', async ({
+test('C11: a pending question is one card docked above the composer: the question in the reply serif, numbered rows with their descriptions, the first tagged 推荐 and none picked', async ({
   page,
 }) => {
   const posts: string[] = [];
@@ -94,48 +93,35 @@ test('a pending question is its text and outlined chips at the end of the conver
     return undefined;
   });
   await page.goto('/app');
-  const question = page.getByTestId('chief-stream').getByTestId('chief-question');
-  await expect(question.getByTestId('chief-question-chips')).toBeVisible();
-  await expect(question.getByTestId('chief-question-text')).toHaveText(
-    'relay-186 cannot run glm-5.3-flash. Which model?',
-  );
-  await expect(question.getByTestId('chief-question-header')).toHaveCount(0);
-  await expect(question.getByText('Model · #74')).toBeHidden();
-  await expect(question).toHaveAccessibleDescription('Model · #74');
-  await question.getByTestId('chief-question-text').hover();
-  await expect(page.locator('[data-slot="tooltip-content"]')).toHaveText('Model · #74');
-  await page.mouse.move(0, 0);
-  await expect(page.getByTestId('chief-composer-block').getByTestId('chief-question')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-position')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
-  const text = (await question.getByTestId('chief-question-text').boundingBox())!;
-  const chip = (await question.getByTestId('chief-question-option-0-0').boundingBox())!;
+  const question = page.getByTestId('chief-composer-block').getByTestId('chief-question');
+  await expect(question).toBeVisible();
+  await expect(page.getByTestId('chief-stream').getByTestId('chief-question')).toHaveCount(0);
+  const text = question.getByTestId('chief-question-text');
+  await expect(text).toHaveText('relay-186 cannot run glm-5.3-flash. Which model?');
+  await expect(text).toHaveAttribute('title', 'Model · #74');
+  await expect(text).toHaveCSS('font-family', /Songti|serif/i);
+  await expect(question.getByTestId('chief-question-prev')).toHaveCount(0);
+  const card = (await question.boundingBox())!;
   const composer = (await page.getByTestId('home-c').locator('.chief-composer').boundingBox())!;
-  expect(chip.y).toBeGreaterThan(text.y + text.height);
-  expect(chip.y + chip.height).toBeLessThan(composer.y);
-  await expect(question.getByTestId('chief-question-option-0-0')).toContainText('Claude subscription');
-  const recommended = question.getByTestId('chief-question-option-0-0');
-  await expect(recommended).toHaveAttribute('data-recommended', '');
-  await expect(recommended).not.toContainText('推荐');
-  await expect(recommended).not.toContainText('Verified');
-  await expect(recommended).toHaveAccessibleDescription('推荐 · Verified');
-  const other = question.getByTestId('chief-question-option-0-1');
-  await page.mouse.move(0, 0);
-  for (const chip of [recommended, other]) {
-    await expect(chip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await expect(chip).toHaveCSS('box-shadow', 'none');
-    await expect(chip).toHaveCSS('border-top-width', '1px');
-  }
-  const [firstBorder, otherBorder] = await Promise.all(
-    [recommended, other].map((chip) => chip.evaluate((el) => getComputedStyle(el).borderTopColor)),
+  expect(Math.round(composer.y - (card.y + card.height))).toBe(8);
+  expect(Math.round(card.x)).toBe(Math.round(composer.x));
+  expect(Math.round(card.width)).toBe(Math.round(composer.width));
+  await expect(question).toHaveCSS('border-top-left-radius', '14px');
+  const first = question.getByTestId('chief-question-option-0-0');
+  const second = question.getByTestId('chief-question-option-0-1');
+  await expect(first).toHaveText('1Claude subscription推荐Verified');
+  await expect(second).toHaveText('2wokey · deepseek-v4.1-flashMetered');
+  await expect(question.getByTestId('chief-question-recommended')).toHaveCount(1);
+  await expect(first).toHaveAttribute('aria-pressed', 'false');
+  await expect(second).toHaveAttribute('aria-pressed', 'false');
+  expect(Math.round((await first.boundingBox())!.height)).toBeGreaterThanOrEqual(40);
+  await expect(question.getByTestId('chief-question-other-0')).toHaveAttribute(
+    'placeholder',
+    '输入你自己的回答…',
   );
-  expect(firstBorder).toBe(otherBorder);
-  await recommended.hover();
-  await expect(page.locator('[data-slot="tooltip-content"]')).toContainText('推荐 · Verified');
-  await expect(page.locator('[data-slot="tooltip-content"] kbd')).toHaveCount(0);
-  await expect(page.getByTestId('chief-question-descriptions')).toHaveCount(0);
-  await expect(question.getByRole('button', { name: '取消提问' })).toHaveCount(0);
-  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '输入你自己的回答…');
+  await expect(question.getByTestId('chief-question-skip')).toHaveText('跳过');
+  await expect(question.getByTestId('chief-question-minimize')).toHaveAccessibleName('收起');
+  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
   await expect.poll(() => posts.some((path) => path.includes('/questions/'))).toBe(false);
 });
 
@@ -155,7 +141,7 @@ test('the header carries no question pill on any page', async ({ page }) => {
   await expect(page.getByTestId('chief-question-entry')).toHaveCount(0);
 });
 
-test('a chip answers at once and the badge drops; the next question takes its place', async ({
+test('a row answers at once and the badge drops; the next question takes its place, and each answer leaves one receipt', async ({
   page,
 }) => {
   const answered: { path: string; body: unknown }[] = [];
@@ -176,19 +162,16 @@ test('a chip answers at once and the badge drops; the next question takes its pl
   await question.getByTestId('chief-question-option-0-0').click();
   await expect.poll(() => answered.length).toBe(2);
   await expect(question).toHaveCount(0);
-  const answers = page.getByTestId('chief-stream').locator('[data-question-answer]');
-  await expect(answers).toHaveText(['Claude subscription', 'Send it to ian']);
-  await expect(page.getByTestId('chief-stream').getByTestId('chief-question-line')).toHaveCount(0);
-  expect(await exchange(page)).toEqual([
-    'asked:relay-186 cannot run glm-5.3-flash. Which model?',
-    'answer:Claude subscription',
-    'asked:This touches a protected path. Who merges it?',
-    'answer:Send it to ian',
+  await expect(page.getByTestId('chief-stream').locator('[data-question-answer]')).toHaveCount(0);
+  await expect.poll(() => receipts(page)).toEqual([
+    ['relay-186 cannot run glm-5.3-flash. Which model?', 'Claude subscription'],
+    ['This touches a protected path. Who merges it?', 'Send it to ian'],
   ]);
+  await expect(page.getByTestId('chief-question-receipt').last()).toBeInViewport();
   await expect(page).toHaveTitle('Cairn');
 });
 
-test('a failed chip answer keeps the chips and says so', async ({ page }) => {
+test('a failed answer keeps the card and says so', async ({ page }) => {
   await mockLive(page, structuredClone(ONE), (path, route, json) => {
     if (!path.endsWith('/answer') || route.request().method() !== 'POST') return undefined;
     return json({ error: 'boom' }, 500);
@@ -231,7 +214,7 @@ test('the tab title counts pending questions and the Coordinator row opens the q
   await page.getByRole('complementary').getByRole('button', { name: /Coordinator/ }).first().click();
   await expect(page).toHaveURL(/\/app(\?|$)/);
   await expect(page).not.toHaveURL(/tab=scheduled/);
-  await expect(page.getByTestId('chief-question').getByTestId('chief-question-chips')).toBeInViewport();
+  await expect(page.getByTestId('chief-question')).toBeInViewport();
   await expect(shown(page)).toContainText('Which model?');
 });
 
@@ -259,7 +242,7 @@ test('moving between questions from the tasks panel keeps a typed draft, and a f
   await expect(shown(page)).toContainText('Which model?');
 });
 
-test('at 375px the question and its chips sit at the end of the conversation above the composer', async ({
+test('at 375px the card sits under the conversation, above the composer, inside the window', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 375, height: 667 });
@@ -314,7 +297,7 @@ for (const size of [
   { name: '1440 desktop', width: 1440, height: 900 },
   { name: '375px phone', width: 375, height: 667 },
 ]) {
-  test(`six long options wrap as chips and every chip, the composer and send stay reachable (${size.name})`, async ({
+  test(`six long options with descriptions scroll inside the card and every row, the composer and send stay reachable (${size.name})`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
@@ -323,7 +306,8 @@ for (const size of [
     const coordinator = page.getByTestId('home-c');
     await expect(coordinator).toBeVisible();
     const question = coordinator.getByTestId('chief-question');
-    await expect(question.getByTestId('chief-question-chips')).toBeVisible();
+    await expect(question).toBeVisible();
+    expect((await question.boundingBox())!.height).toBeLessThanOrEqual(Math.min(size.height * 0.6, 560) + 1);
     const input = coordinator.getByTestId('chief-composer-input');
     await expect(input).toBeInViewport({ ratio: 1 });
     const send = coordinator.getByTestId('chief-question-primary');
@@ -331,7 +315,7 @@ for (const size of [
     for (let n = 0; n < 6; n += 1) {
       const chip = question.getByTestId(`chief-question-option-0-${n}`);
       await chip.scrollIntoViewIfNeeded();
-      await expect(chip).toBeInViewport({ ratio: 1 });
+      await expect(chip).toBeInViewport({ ratio: 0.95 });
       const box = (await chip.boundingBox())!;
       expect(box.x + box.width).toBeLessThanOrEqual(size.width);
     }
@@ -363,7 +347,7 @@ const MIXED = {
   todos: [],
 };
 
-test('one question at a time, the oldest first, with nothing above the bubble; a chip on an early step moves on; the tasks panel focuses another request', async ({
+test('one card at a time, the oldest first; the 1/N pager walks every question and step; a row on an early step moves on; the tasks panel focuses another request', async ({
   page,
 }) => {
   await mockLive(page, structuredClone(MIXED));
@@ -371,12 +355,19 @@ test('one question at a time, the oldest first, with nothing above the bubble; a
   const block = page.getByTestId('chief-question');
   await expect(block.getByTestId('chief-question-text')).toHaveCount(1);
   await expect(block.getByTestId('chief-question-text')).toContainText('Which theme?');
-  await expect(block.getByTestId('chief-question-position')).toHaveCount(0);
-  await expect(block.getByTestId('chief-question-prev')).toHaveCount(0);
-  await expect(block.getByTestId('chief-question-next')).toHaveCount(0);
-  const bubble = (await block.getByTestId('chief-question-text').boundingBox())!;
-  const section = (await block.boundingBox())!;
-  expect(bubble.y - section.y).toBeLessThanOrEqual(1);
+  const pager = block.getByTestId('chief-question-pager');
+  await expect(pager).toHaveText('1/3');
+  await expect(block.getByTestId('chief-question-prev')).toBeDisabled();
+  await block.getByTestId('chief-question-next').click();
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
+  await expect(pager).toHaveText('2/3');
+  await block.getByTestId('chief-question-next').click();
+  await expect(block.getByTestId('chief-question-text')).toContainText('Who merges it?');
+  await expect(pager).toHaveText('3/3');
+  await expect(block.getByTestId('chief-question-next')).toBeDisabled();
+  await block.getByTestId('chief-question-prev').click();
+  await block.getByTestId('chief-question-prev').click();
+  await expect(block.getByTestId('chief-question-text')).toContainText('Which theme?');
   await block.getByTestId('chief-question-option-0-0').click();
   await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
   await focusQuestion(page, 'Merge · #2271');
@@ -407,12 +398,11 @@ test('a multi-question request sends nothing and starts no turn until its last q
   await expect(block.getByTestId('chief-question-text')).toContainText('Which sections?');
   await block.getByTestId('chief-question-option-1-1').click();
   await expect(block.getByTestId('chief-question-option-1-1')).toHaveAttribute('aria-pressed', 'true');
+  await expect(block.getByTestId('chief-question-count')).toHaveText('已选 1 个');
   await page.waitForTimeout(500);
   expect(posts.map((post) => post.path)).toEqual([]);
   await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
-  await expect(stream.locator('[data-question-answer]')).toHaveCount(0);
-  await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
-  await expect(stream.getByTestId('chief-question-asked')).toHaveCount(0);
+  await expect(stream.getByTestId('chief-question-receipt')).toHaveCount(0);
   await page.getByTestId('chief-question-submit').click();
   await expect.poll(() => posts.length).toBe(1);
   expect(posts[0]?.path).toContain('/questions/ask-0000000a/answer');
@@ -422,68 +412,26 @@ test('a multi-question request sends nothing and starts no turn until its last q
       { header: 'Sections', choices: ['Details'] },
     ],
   });
-  const answerBubble = stream.locator('[data-question-answer]');
-  await expect(answerBubble).toHaveCount(1);
-  await expect(answerBubble).toHaveAttribute('data-question-answer', 'ask-0000000a');
-  expect(await answerBubble.evaluate((el) => (el as HTMLElement).innerText)).toBe('Dark\nDetails');
-  await expect(stream.getByTestId('chief-question-line')).toHaveCount(0);
-  await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore + 1);
-  const looks = await stream.getByTestId('chief-bubble').evaluateAll((bubbles) =>
-    bubbles.map((bubble) => {
-      const cs = getComputedStyle(bubble);
-      const column = bubble.closest('[data-testid="chief-msg"]')!.getBoundingClientRect();
-      return {
-        slot: bubble.getAttribute('data-slot'),
-        fill: cs.backgroundColor,
-        ink: cs.color,
-        radius: cs.borderTopLeftRadius,
-        padding: cs.padding,
-        font: `${cs.fontSize}/${cs.lineHeight}`,
-        right: Math.round(column.right - bubble.getBoundingClientRect().right),
-      };
-    }),
-  );
-  expect(looks).toHaveLength(2);
-  expect(looks[1]).toEqual(looks[0]);
-  expect(looks[1]?.slot).toBe('user-bubble');
-  expect(looks[1]?.right).toBe(0);
+  await expect.poll(() => receipts(page)).toEqual([
+    ['Which theme?', 'Dark', 'Which sections?', 'Details'],
+  ]);
+  await expect(stream.getByTestId('chief-bubble')).toHaveCount(bubblesBefore);
   expect(posts).toHaveLength(1);
-  expect(await exchange(page)).toEqual(['asked:Which theme?', 'asked:Which sections?', 'answer:Dark\nDetails']);
-  const asked = stream.locator('[data-testid="chief-question-asked"][data-request-id="ask-0000000a"]');
-  await expect(asked).toHaveCount(1);
-  const kept = await asked.evaluate((block) => {
-    const bubbles = [...block.querySelectorAll<HTMLElement>('[data-testid="chief-reply-bubble"]')];
-    const boxes = bubbles.map((bubble) => bubble.getBoundingClientRect());
-    const answer = document.querySelector('[data-question-answer="ask-0000000a"]')!.getBoundingClientRect();
-    const column = block.closest('[data-testid="chief-msg"]')!.getBoundingClientRect();
+  const receipt = stream.getByTestId('chief-question-receipt');
+  await expect(receipt).toHaveCSS('border-top-left-radius', '14px');
+  const look = await receipt.evaluate((el) => {
+    const [question, answer] = [...el.querySelectorAll<HTMLElement>('[data-testid^="chief-question-receipt-"]')];
     return {
-      fills: bubbles.map((bubble) => getComputedStyle(bubble).backgroundColor === 'rgba(0, 0, 0, 0)'),
-      heights: boxes.map((box) => Math.round(box.height)),
-      left: boxes.map((box) => Math.round(box.left - column.left)),
-      between: Math.round(boxes[1]!.top - boxes[0]!.bottom),
-      toAnswer: Math.round(answer.top - boxes[1]!.bottom),
-      chips: block.querySelectorAll('button[data-testid^="chief-question-option"]').length,
+      question: getComputedStyle(question!).fontSize,
+      answer: getComputedStyle(answer!).fontSize,
+      chips: el.querySelectorAll('button').length,
     };
   });
-  expect(kept).toEqual({ fills: [true, true], heights: [28, 28], left: [0, 0], between: 4, toAnswer: 24, chips: 0 });
+  expect(look).toEqual({ question: '13px', answer: '14px', chips: 0 });
   await page.screenshot({ path: test.info().outputPath('answered-request.png') });
 });
 
-test('question chips look like suggested-reply chips: outlined 28px pills with regular ink and no fill', async ({
-  page,
-}) => {
-  await mockLive(page, structuredClone(ONE));
-  await page.goto('/app');
-  const chip = page.getByTestId('chief-question-option-0-1');
-  await expect(chip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(chip).toHaveCSS('border-top-width', '1px');
-  await expect(chip).toHaveCSS('font-weight', '400');
-  await expect(chip).toHaveCSS('height', '28px');
-  await expect(chip).toHaveCSS('border-radius', /e\+\d+px$/);
-  await expect(chip).toHaveAttribute('aria-pressed', 'false');
-});
-
-test('the send button answers with what is typed, and Ctrl+Enter submits it from a focused chip', async ({
+test('the send button answers with what is typed, and Ctrl+Enter submits it from a focused row', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -529,7 +477,7 @@ test('a clicked option answers at once, and an empty composer with nothing picke
   ]);
 });
 
-test('a multi-step request: a chip moves on with the composer cleared, multi-select chips toggle, and send submits every answer', async ({
+test('a multi-step request: a row moves on with the composer cleared, multi-select rows check, and send submits every answer', async ({
   page,
 }) => {
   const answered: unknown[] = [];
@@ -554,10 +502,6 @@ test('a multi-step request: a chip moves on with the composer cleared, multi-sel
   await page.getByTestId('chief-question-option-1-1').click();
   await page.mouse.move(0, 0);
   await expect(page.getByTestId('chief-question-option-1-1')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByTestId('chief-question-option-1-1')).not.toHaveCSS(
-    'background-color',
-    'rgba(0, 0, 0, 0)',
-  );
   await expect(submit).toBeEnabled();
   expect(answered).toEqual([]);
   await composer.fill('a custom section');
@@ -589,12 +533,12 @@ for (const locale of ['zh', 'en'] as const) {
       await mockLive(page, structuredClone(LONG));
       await page.goto('/app?chief=chief-home');
       const coordinator = page.getByTestId('home-c');
-      await expect(coordinator.getByTestId('chief-question-chips')).toBeVisible();
+      await expect(coordinator.getByTestId('chief-question')).toBeVisible();
       await expect(coordinator.getByTestId('chief-composer-input')).toBeVisible();
       const defects = await coordinator.evaluate((root) => {
         const found: string[] = [];
         const scopes = [
-          root.querySelector('[data-testid="chief-question-chips"]'),
+          root.querySelector('[data-testid="chief-question"]'),
           root.querySelector('.chief-composer'),
         ];
         for (const scope of scopes) {
@@ -625,11 +569,7 @@ for (const locale of ['zh', 'en'] as const) {
         return found;
       });
       expect(defects).toEqual([]);
-      const bubble = coordinator.getByTestId('chief-question-text');
-      await bubble.scrollIntoViewIfNeeded();
-      await bubble.hover();
-      const more = coordinator.getByTestId('chief-question-tools').getByTestId('chief-msg-more');
-      await expect(more).toBeInViewport({ ratio: 1 });
+      await expect(coordinator.getByTestId('chief-question-minimize')).toBeInViewport({ ratio: 1 });
       await expect(coordinator.getByTestId('chief-question-primary')).toBeInViewport({ ratio: 1 });
     });
   }
@@ -666,31 +606,54 @@ for (const theme of ['light', 'dark'] as const) {
   });
 }
 
-test('Escape on the chips or the question bubble menu dismisses with a five-second undo; undo keeps the question, waiting cancels it', async ({
+test('Escape or 收起 minimizes the card: the composer shows the question and a restore chevron brings it back', async ({
   page,
 }) => {
-  const cancelled: string[] = [];
-  await mockLive(page, structuredClone(ONE), (path, route, json) => {
-    if (!path.endsWith('/cancel') || route.request().method() !== 'POST') return undefined;
-    cancelled.push(path);
-    return json({});
-  });
+  await mockLive(page, structuredClone(ONE));
   await page.goto('/app');
-  const card = page.getByTestId('chief-question-chips');
+  const card = page.getByTestId('chief-question');
   await page.getByTestId('chief-question-option-0-0').focus();
   await page.keyboard.press('Escape');
   await expect(card).toHaveCount(0);
-  const toast = page.locator('[data-sonner-toast]').filter({ hasText: '已取消提问' });
+  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', 'relay-186 cannot run glm-5.3-flash. Which model?');
+  await page.getByTestId('chief-question-restore').click();
+  await expect(card).toBeVisible();
+  await card.getByTestId('chief-question-minimize').click();
+  await expect(card).toHaveCount(0);
+  await page.getByTestId('chief-question-restore').click();
+  await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
+});
+
+test('Skip takes the card away with a five-second undo; undo keeps the question, waiting skips it and leaves 已跳过', async ({
+  page,
+}) => {
+  const cancelled: string[] = [];
+  const state = structuredClone(ONE);
+  await mockLive(page, state, (path, route, json) => {
+    if (!path.endsWith('/cancel') || route.request().method() !== 'POST') return undefined;
+    cancelled.push(path);
+    state.messages = state.messages.map((row) =>
+      row.id === 'row-ask-0000000a'
+        ? { ...row, content: JSON.stringify({ ...JSON.parse(row.content as string), status: 'cancelled' }) }
+        : row,
+    );
+    return json({});
+  });
+  await page.goto('/app');
+  const card = page.getByTestId('chief-question');
+  await page.getByTestId('chief-question-skip').click();
+  await expect(card).toHaveCount(0);
+  const toast = page.locator('[data-sonner-toast]').filter({ hasText: '已跳过提问' });
   await expect(toast).toBeVisible();
   await toast.getByRole('button', { name: '撤销' }).click();
   await expect(card).toBeVisible();
   expect(cancelled).toEqual([]);
-  await page.getByTestId('chief-question-text').hover();
-  await page.getByTestId('chief-question-tools').getByTestId('chief-msg-more').click();
-  await expect(page.getByTestId('chief-question-dismiss')).toHaveText(/^取消提问/);
-  await page.getByTestId('chief-question-dismiss').click();
+  await page.getByTestId('chief-question-skip').click();
   await expect(card).toHaveCount(0);
   await expect.poll(() => cancelled.length, { timeout: 8000 }).toBe(1);
+  await expect.poll(() => receipts(page), { timeout: 8000 }).toEqual([
+    ['relay-186 cannot run glm-5.3-flash. Which model?', '已跳过'],
+  ]);
 });
 
 const VERY_LONG = {
@@ -711,16 +674,15 @@ for (const size of [
   { name: '1440 desktop', url: '/app?chief=chief-home', width: 1440, height: 900 },
   { name: '375px phone', url: '/app?chief=chief-home', width: 375, height: 667 },
 ]) {
-  test(`a very long prompt wraps in the conversation and keeps the chips, Escape-dismiss and send working (${size.name})`, async ({
+  test(`a very long prompt wraps in the card and keeps the rows, Escape-minimize and send working (${size.name})`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: size.width, height: size.height });
     await mockLive(page, structuredClone(VERY_LONG));
     await page.goto(size.url);
     const coordinator = page.getByTestId('home-c');
-    const card = coordinator.getByTestId('chief-question-chips');
+    const card = coordinator.getByTestId('chief-question');
     await expect(card).toBeVisible();
-    await expect(coordinator.getByTestId('chief-question-header')).toHaveCount(0);
     const text = (await coordinator.getByTestId('chief-question-text').boundingBox())!;
     expect(text.x + text.width).toBeLessThanOrEqual(size.width);
     await coordinator.getByTestId('chief-question-option-0-0').scrollIntoViewIfNeeded();
@@ -751,7 +713,7 @@ test('each pending request keeps its own composer draft when moving A, B, A, B',
   await expect(composer).toHaveValue('draft for A');
 });
 
-test('an answer upload in flight still blocks a chip answer and moving to another question after a withdraw switches to the thread composer', async ({
+test('an answer upload in flight still blocks a row answer and moving to another question after a withdraw switches to the thread composer', async ({
   page,
 }) => {
   const answered: { path: string; body: unknown }[] = [];
@@ -908,7 +870,7 @@ test('answer drafts per request and the thread draft stay separate through every
       composer: '',
       extra: async () => {
         await expect(page.getByTestId('chief-question-primary')).toBeVisible();
-        await expect(page.getByTestId('chief-composer-placeholder')).toHaveText('输入你自己的回答…');
+        await expect(page.getByTestId('chief-composer-input')).toHaveAttribute('placeholder', '或者直接回复…');
       },
     },
     {
@@ -1171,7 +1133,7 @@ test('answer drafts per request and the thread draft stay separate through every
   expect(failed).toEqual([]);
 });
 
-test('a question that arrives while you watch grows its options in one after another; a reload shows them still', async ({
+test('a question that arrives while you watch rises into its card; a reload shows it still', async ({
   page,
 }) => {
   const state = structuredClone({ ...TWO, messages: TWO.messages.slice(0, 1) });
@@ -1186,12 +1148,11 @@ test('a question that arrives while you watch grows its options in one after ano
       window.__es.find((es) => es.url.includes(u as string))?.emit({ type: 'message', message }),
     [`/api/conversations/${THREAD.id}/stream`, late] as const,
   );
-  const options = page.getByTestId('chief-question').locator('[data-grow]');
-  await expect(options).toHaveCount(2);
-  const delays = await options.evaluateAll((els) => els.map((el) => getComputedStyle(el).animationDelay));
-  expect(delays).toEqual(['0.12s', '0.2s']);
+  const card = page.getByTestId('chief-question');
+  await expect(card).toHaveClass(/dock-enter/);
+  await expect(card).toHaveCSS('animation-duration', '0.18s');
 
   await page.reload();
   await expect(page.getByTestId('chief-question-option-0-0')).toBeVisible();
-  await expect(page.getByTestId('chief-question').locator('[data-grow]')).toHaveCount(0);
+  await expect(page.getByTestId('chief-question')).not.toHaveClass(/dock-enter/);
 });

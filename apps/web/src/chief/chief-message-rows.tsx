@@ -1,13 +1,5 @@
 import { parseReplyQuote, type RunnerOfflineContent, type StepQueueBlocked } from '@cairn/shared';
-import {
-  type ComponentProps,
-  type CSSProperties,
-  memo,
-  type ReactNode,
-  useContext,
-  useEffect,
-  useState,
-} from 'react';
+import { type CSSProperties, memo, type ReactNode, useContext, useState } from 'react';
 import { Link } from 'react-router';
 import { useApiMutations } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
@@ -38,13 +30,10 @@ import { settingsHref } from '../settings/settings-href.js';
 import { isApprovalRequest } from './approval-card-model.js';
 import { ChiefReportMessage } from './chief-report-row.js';
 import { chiefRowRenders } from './chief-row-kinds.js';
-import { TaskRefRow } from './chief-task-ref-row.js';
-import type { TaskRef } from './chief-task-refs.js';
 import { isLiveNotice } from './live-notice.js';
 import { MessageToolbar } from './message-toolbar.js';
 import { PackageInstallCard } from './package-install-card.js';
-import { ApprovalAnswered, QuestionAnsweredLine, QuestionAsked } from './question-answered-line.js';
-import { answerLines } from './question-lifecycle.js';
+import { ApprovalAnswered, QuestionReceipt } from './question-answered-line.js';
 import { ReplyQuoteBlock } from './reply-quote-block.js';
 import {
   REPLY_HIGHLIGHT_ATTR,
@@ -57,7 +46,6 @@ import { ResearchReportLine, ResearchReportRow } from './research-report.js';
 import { SecretRequestCard } from './secret-request-card.js';
 import { SentAttachments } from './sent-attachments.js';
 import { TakeoverCard } from './takeover-card.js';
-import { growDelays, hoverTaskRef, markGrown, useTaskRefSignal } from './task-ref-signal.js';
 import type { ChannelMirror } from './thread-activity.js';
 import { messageStampLabel } from './time-dividers.js';
 import { CardFailureContext } from './turn-failure.js';
@@ -164,23 +152,17 @@ function TaskChip({ todoId, label }: { todoId: string; label: string }) {
   );
 }
 
-function TaskRefRows({ refs, live = false }: { refs: readonly TaskRef[]; live?: boolean }) {
-  const [present] = useState(() => new Set(refs.map((ref) => ref.todoId)));
-  if (refs.length === 0) return null;
-  const delays = growDelays(
-    refs.map((ref) => ref.todoId).filter((id) => !present.has(id)),
-    live,
-  );
+function StartedTasksLine({ todoIds }: { todoIds: readonly string[] }) {
+  const { t } = useI18n();
+  const glances = useContext(TodoGlanceContext);
   return (
-    <div className="mb-1.5 flex flex-col" data-testid="chief-task-refs">
-      {refs.map((ref, index) => (
-        <TaskRefLine
-          key={ref.todoId}
-          taskRef={ref}
-          first={index === 0}
-          live={live}
-          growDelay={delays.get(ref.todoId)}
-        />
+    <div className={`${SAID_CLS} mt-2`} data-testid="chief-task-started-said">
+      {t('已建任务')}
+      {todoIds.map((todoId, n) => (
+        <span key={todoId}>
+          {n > 0 && t('、')}
+          <TaskChip todoId={todoId} label={glances?.get(todoId)?.title ?? t('任务')} />
+        </span>
       ))}
     </div>
   );
@@ -195,129 +177,6 @@ function BubbleReports({ todoIds }: { todoIds: readonly string[] }) {
         <ResearchReportLine key={todoId} todoId={todoId} grow={arrived.has(todoId)} />
       ))}
     </div>
-  );
-}
-
-const TOP_X = 18.75;
-const ROW_MID = 14;
-const ROW_H = 28;
-const BEND = 6;
-
-interface GuideBranch {
-  x: number;
-  end: boolean;
-  to: number;
-  rise?: boolean;
-}
-
-function TreeGuideSvg({
-  rails,
-  branch,
-  grow = false,
-}: {
-  rails: readonly number[];
-  branch?: GuideBranch;
-  grow?: boolean;
-}) {
-  const through = branch !== undefined && !branch.end ? [...rails, branch.x] : rails;
-  const drawn = grow ? { pathLength: 1 } : {};
-  const into = branch?.rise === true ? ROW_MID + BEND : ROW_MID - BEND;
-  return (
-    <svg
-      aria-hidden="true"
-      data-slot="task-ref-guide"
-      className="pointer-events-none absolute inset-y-0 left-0 h-full w-16 overflow-visible text-(--task-ref-line)"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      {through.map((x) => (
-        <line
-          key={x}
-          data-slot="task-ref-trunk"
-          x1={x}
-          x2={x}
-          {...(grow ? { y1: '100%', y2: '0', ...drawn } : { y1: '0', y2: '100%' })}
-        />
-      ))}
-      {branch !== undefined && (
-        <path
-          data-slot="task-ref-elbow"
-          data-end={branch.end ? '' : undefined}
-          {...drawn}
-          strokeLinecap="round"
-          d={`${branch.end ? `M${branch.x} ${branch.rise === true ? ROW_H : 0}V${into}` : `M${branch.x} ${into}`}A${BEND} ${BEND} 0 0 ${branch.rise === true ? 1 : 0} ${branch.x + BEND} ${ROW_MID}H${branch.to}`}
-        />
-      )}
-    </svg>
-  );
-}
-
-function GuidedRow({
-  rails,
-  branch,
-  grow = false,
-  children,
-  ...rest
-}: {
-  rails: readonly number[];
-  branch?: GuideBranch;
-  grow?: boolean;
-  children: ReactNode;
-} & Omit<ComponentProps<'div'>, 'children'>) {
-  return (
-    <div className="group/line relative flex flex-col" {...rest}>
-      {(rails.length > 0 || branch !== undefined) && (
-        <TreeGuideSvg rails={rails} grow={grow} {...(branch !== undefined ? { branch } : {})} />
-      )}
-      {children}
-    </div>
-  );
-}
-
-function TaskRefLine({
-  taskRef,
-  elbow = true,
-  first = true,
-  reportsBelow = false,
-  live = false,
-  growDelay,
-}: {
-  taskRef: TaskRef;
-  elbow?: boolean;
-  first?: boolean;
-  reportsBelow?: boolean;
-  live?: boolean;
-  growDelay?: number | undefined;
-}) {
-  const [delay] = useState(growDelay);
-  const grow = delay !== undefined;
-  const signal = useTaskRefSignal(taskRef.todoId);
-  useEffect(() => {
-    if (live) markGrown(taskRef.todoId);
-  }, [live, taskRef.todoId]);
-  return (
-    <>
-      <GuidedRow
-        rails={[]}
-        grow={grow}
-        data-slot="task-ref-line"
-        data-grow={grow ? '' : undefined}
-        data-hl={signal.hovered ? '' : undefined}
-        data-echo={live && signal.echo ? '' : undefined}
-        style={grow ? ({ '--grow-delay': `${delay}ms` } as CSSProperties) : undefined}
-        onPointerEnter={() => hoverTaskRef(taskRef.todoId)}
-        onPointerLeave={() => hoverTaskRef(null)}
-        {...(elbow ? { branch: { x: TOP_X, end: first, to: 28, rise: true } } : {})}
-      >
-        <TaskRefRow taskRef={taskRef} elbow={elbow} guide={false} grow={grow} />
-      </GuidedRow>
-      {reportsBelow && (
-        <GuidedRow rails={elbow ? [TOP_X] : []}>
-          <ResearchReportRow todoId={taskRef.todoId} indent={elbow ? 'ml-8' : 'ml-0'} />
-        </GuidedRow>
-      )}
-    </>
   );
 }
 
@@ -381,45 +240,21 @@ function Segments({ segments }: { segments: ChiefSegment[] }) {
   );
 }
 
-function TaskStartedRow({
-  todoId,
-  seq,
-  title,
-}: {
-  todoId: string;
-  seq: number | null;
-  title: string | null;
-}) {
+function TaskStartedRow({ todoId, title }: { todoId: string; title: string | null }) {
   const { t } = useI18n();
   const glance = useContext(TodoGlanceContext)?.get(todoId);
-  if (glance !== undefined) {
-    return (
-      <MessageScrollerItem
-        style={SCROLLER_ITEM_STYLE}
-        data-testid="chief-task-started"
-        className={EVENT_ROW_CLS}
-      >
-        <div className="mb-1.5 flex flex-col">
-          <TaskRefLine
-            reportsBelow
-            taskRef={{
-              todoId,
-              seq: glance.seq ?? seq,
-              title: glance.title ?? title,
-              phase: glance.phase,
-            }}
-          />
-        </div>
-        <div className={SAID_CLS} data-testid="chief-task-started-said">
-          {t('已建任务')}
-        </div>
-      </MessageScrollerItem>
-    );
-  }
   return (
-    <CoordinatorSaid testId="chief-task-created">
-      {t('已建任务')} <TaskChip todoId={todoId} label={title ?? t('任务')} />
-    </CoordinatorSaid>
+    <MessageScrollerItem
+      style={SCROLLER_ITEM_STYLE}
+      data-testid="chief-task-started"
+      className={EVENT_ROW_CLS}
+    >
+      <div className={SAID_CLS} data-testid="chief-task-started-said">
+        {t('已建任务')}
+        <TaskChip todoId={todoId} label={glance?.title ?? title ?? t('任务')} />
+      </div>
+      {glance !== undefined && <ResearchReportRow todoId={todoId} indent="mt-2" />}
+    </MessageScrollerItem>
   );
 }
 
@@ -491,13 +326,13 @@ interface ChiefStreamRowProps {
   entering?: boolean;
   joinsPrev?: boolean;
   joinsNext?: boolean;
-  taskRefs?: readonly TaskRef[];
+  unmentioned?: readonly string[];
   reports?: readonly string[];
 }
 
 const STEERING_BUBBLE_CLS =
   'bg-transparent text-(--text-secondary) inset-ring-1 inset-ring-(--input)';
-const NO_TASK_REFS: readonly TaskRef[] = [];
+const NO_TASKS: readonly string[] = [];
 const NO_REPORTS: readonly string[] = [];
 
 function StoppedRow({ todos }: { todos: { id: string; seq: number; title: string }[] }) {
@@ -702,7 +537,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   entering = false,
   joinsPrev = false,
   joinsNext = false,
-  taskRefs = NO_TASK_REFS,
+  unmentioned = NO_TASKS,
   reports = NO_REPORTS,
 }: ChiefStreamRowProps) {
   const { t } = useI18n();
@@ -727,8 +562,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'takeover') return <TakeoverCard item={item} />;
   if (item.kind === 'secret-request') return <SecretRequestCard item={item} />;
   if (item.kind === 'package-install') return <PackageInstallCard item={item} />;
-  if (item.kind === 'task-card')
-    return <TaskStartedRow todoId={item.todoId} seq={item.seq} title={item.title} />;
+  if (item.kind === 'task-card') return <TaskStartedRow todoId={item.todoId} title={item.title} />;
   if (item.kind === 'daily-report')
     return (
       <CoordinatorSaid testId="chief-report">
@@ -837,74 +671,25 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       </MessageScrollerItem>
     );
   if (item.kind === 'question' && item.status === 'pending') return null;
-  if (item.kind === 'question') {
-    if (item.status === 'cancelled')
-      return (
-        <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-          <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
-            <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-              <QuestionAnsweredLine item={item} />
-            </MessageContent>
-          </Message>
-        </MessageScrollerItem>
-      );
-    if (isApprovalRequest(item.requestId))
-      return (
-        <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-          <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
-            <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-              <ApprovalAnswered item={item} />
-            </MessageContent>
-          </Message>
-        </MessageScrollerItem>
-      );
-    const answers = answerLines(item);
+  if (item.kind === 'question')
     return (
       <MessageScrollerItem messageId={item.id} style={SCROLLER_ITEM_STYLE}>
-        <Message
-          className={joinsPrev ? RUN_ROW_CLS : REPLY_ROW_CLS}
-          data-testid="chief-msg"
-          data-run={joinsPrev ? 'last' : undefined}
-        >
+        <Message className={`chief-msg ${REPLY_ROW_CLS}`}>
           <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-            <QuestionAsked item={item} onCopy={onCopy} />
-            {answers.length === 0 && (
-              <div className="mt-2">
-                <QuestionAnsweredLine item={item} />
-              </div>
+            {isApprovalRequest(item.requestId) ? (
+              <ApprovalAnswered item={item} />
+            ) : (
+              <QuestionReceipt item={item} />
             )}
           </MessageContent>
         </Message>
-        {answers.length > 0 && (
-          <Message
-            className={`${USER_ROW_CLS} justify-end`}
-            data-testid="chief-msg"
-            data-run={joinsNext ? 'first' : undefined}
-          >
-            <MessageContent
-              className="relative max-w-[min(85%,42rem)] flex-none items-end gap-2"
-              data-testid="chief-msg-col"
-            >
-              <UserMessageBubble
-                data-testid="chief-bubble"
-                data-question-answer={item.requestId}
-                tail={!joinsNext}
-                className="w-fit max-w-full [overflow-wrap:anywhere] whitespace-pre-line"
-              >
-                {answers.join('\n')}
-              </UserMessageBubble>
-            </MessageContent>
-          </Message>
-        )}
       </MessageScrollerItem>
     );
-  }
   if (item.kind === 'streaming')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE}>
         <Message className={REPLY_ROW_CLS} data-testid="chief-msg">
           <MessageContent className={MSG_COL_LIVE_CLS}>
-            <TaskRefRows refs={taskRefs} live />
             <LiveRow
               variant="chief"
               label={item.label}
@@ -943,7 +728,6 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
         data-run={runAttr(joinsPrev, joinsNext)}
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
-          <TaskRefRows refs={taskRefs} live={!settled} />
           <div
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"
@@ -1005,6 +789,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             )}
           </div>
           {item.typing === true && <TypingDots className="mt-1" />}
+          {unmentioned.length > 0 && <StartedTasksLine todoIds={unmentioned} />}
           {settled && (
             <ChiefMessageTools
               {...assistantToolProps}

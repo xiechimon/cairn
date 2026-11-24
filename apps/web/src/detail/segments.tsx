@@ -1,12 +1,11 @@
 import { cn } from 'cn';
-import { Eye } from 'lucide-react';
-import { createContext, Fragment, type ReactNode, useContext, useEffect, useRef } from 'react';
+import { createContext, Fragment, type ReactNode, useContext, useRef } from 'react';
 import { Link } from 'react-router';
 import { OpenFileContext } from '../board/file-pane.js';
 import { useThreadHref } from '../board/thread-link.js';
-import { echoTaskRef, hoverTaskRef, useTaskRefSignal } from '../chief/task-ref-signal.js';
 import { MachineName } from '../components/machine-label.js';
 import { type GlyphKind, StatusGlyph } from '../components/status-glyph.js';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import type { DocSegment, Phase } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { mentionChipClass } from '../overlay/mention-chip.js';
@@ -97,93 +96,67 @@ export function linkTaskNumbers(
 
 type StatusTone = 'working' | 'wait' | 'quiet' | 'fail';
 
-const TONE_CLASS: Record<StatusTone, { ink: string; tile: string; chip: string }> = {
-  working: { ink: 'text-tint-working-ink', tile: 'bg-tint-working', chip: 'text-tint-working-ink' },
-  wait: {
-    ink: 'text-(--task-wait-ink)',
-    tile: 'bg-(--task-wait-tint)',
-    chip: 'text-foreground',
-  },
-  quiet: {
-    ink: 'text-tint-quiet-ink',
-    tile: 'bg-tint-quiet',
-    chip: 'text-(color:--task-chip-quiet-ink)',
-  },
-  fail: { ink: 'text-tint-fail-ink', tile: 'bg-tint-fail', chip: 'text-tint-fail-ink' },
+const TONE_INK: Record<StatusTone, string> = {
+  working: 'text-tint-working-ink',
+  wait: 'text-(--task-wait-ink)',
+  quiet: 'text-tint-quiet-ink',
+  fail: 'text-tint-fail-ink',
 };
 
-const CONVERSATION_STATUS: Record<Phase, { glyph: GlyphKind; tone: StatusTone }> = {
-  todo: { glyph: 'todo', tone: 'quiet' },
-  queued: { glyph: 'queued', tone: 'quiet' },
-  planning: { glyph: 'progress', tone: 'working' },
-  building: { glyph: 'progress', tone: 'working' },
-  confirm: { glyph: 'attention', tone: 'wait' },
-  needs_input: { glyph: 'attention', tone: 'wait' },
-  review: { glyph: 'attention', tone: 'wait' },
-  failed: { glyph: 'failed', tone: 'fail' },
-  done: { glyph: 'done', tone: 'quiet' },
-  stopped: { glyph: 'closed', tone: 'quiet' },
-  closed: { glyph: 'closed', tone: 'quiet' },
+const PHASE_TONE: Record<Phase, StatusTone> = {
+  todo: 'quiet',
+  queued: 'quiet',
+  planning: 'working',
+  building: 'working',
+  confirm: 'wait',
+  needs_input: 'wait',
+  review: 'wait',
+  failed: 'fail',
+  done: 'quiet',
+  stopped: 'quiet',
+  closed: 'quiet',
 };
-
-const TASK_CHIP_CLS =
-  'mr-1 ml-0 inline cursor-pointer rounded-sm bg-(color:--task-chip-fill) px-1.5 py-0 align-baseline font-sans text-ui leading-[inherit] font-normal text-popover-foreground break-keep no-underline shadow-(--e1-lift) [overflow-wrap:anywhere]';
-const TASK_CHIP_WHOLE_MAX = 16;
-
-export function taskChipClass(phase: Phase | undefined): string {
-  return cn(
-    TASK_CHIP_CLS,
-    TONE_CLASS[phase === undefined ? 'quiet' : CONVERSATION_STATUS[phase].tone].chip,
-  );
-}
 
 export function taskStatusInk(phase: Phase): string {
-  return TONE_CLASS[CONVERSATION_STATUS[phase].tone].ink;
+  return TONE_INK[PHASE_TONE[phase]];
 }
 
-export function TodoStatus({ phase, draw = false }: { phase: Phase; draw?: boolean }) {
-  const { t } = useI18n();
-  const { glyph, tone } = CONVERSATION_STATUS[phase];
-  if (tone === 'wait')
-    return (
-      <span
-        role="img"
-        aria-label={t(PHASE_UI[phase].chip)}
-        data-glyph="eye"
-        className="grid size-3 flex-none place-items-center text-(--task-wait-ink)"
-      >
-        <Eye width={12} height={12} />
-      </span>
-    );
-  return (
-    <StatusGlyph
-      kind={glyph}
-      label={t(PHASE_UI[phase].chip)}
-      className={cn('size-3', TONE_CLASS[tone].ink)}
-      draw={draw}
-    />
-  );
-}
+const QUIET_GLYPH = 'text-content-tertiary';
+const WAIT_GLYPH = { glyph: 'attention', ink: 'text-tint-wait-ink' } as const;
+const RUN_GLYPH = { glyph: 'working', ink: 'text-running' } as const;
 
-export function TodoStatusTile({
+const TASK_GLYPH: Record<Phase, { glyph: GlyphKind; ink: string }> = {
+  todo: { glyph: 'todo', ink: QUIET_GLYPH },
+  queued: { glyph: 'todo', ink: QUIET_GLYPH },
+  planning: RUN_GLYPH,
+  building: RUN_GLYPH,
+  confirm: WAIT_GLYPH,
+  needs_input: WAIT_GLYPH,
+  review: WAIT_GLYPH,
+  failed: { glyph: 'failed', ink: 'text-tint-fail-ink' },
+  done: { glyph: 'done', ink: QUIET_GLYPH },
+  stopped: { glyph: 'closed', ink: QUIET_GLYPH },
+  closed: { glyph: 'closed', ink: QUIET_GLYPH },
+};
+
+export function TaskGlyph({
   phase,
+  label,
   className,
 }: {
   phase: Phase;
-  className?: string | undefined;
+  label?: string;
+  className?: string;
 }) {
+  const { glyph, ink } = TASK_GLYPH[phase];
   const sealed = useJustSealed(phase);
   return (
-    <span
-      data-sealed={sealed ? '' : undefined}
-      className={cn(
-        'grid size-5 flex-none place-items-center rounded-sm transition-colors duration-(--dur-overlay)',
-        TONE_CLASS[CONVERSATION_STATUS[phase].tone].tile,
-        className,
-      )}
-    >
-      <TodoStatus phase={phase} draw={sealed} />
-    </span>
+    <StatusGlyph
+      kind={glyph}
+      {...(label === undefined ? {} : { label })}
+      className={cn('size-3.5 transition-colors duration-(--dur-fast)', ink, className)}
+      draw={sealed}
+    />
   );
 }
 
@@ -192,60 +165,84 @@ const SEAL_MS = 1500;
 function useJustSealed(phase: Phase): boolean {
   const seen = useRef(phase);
   const sealedAt = useRef<number | null>(null);
-  const done = CONVERSATION_STATUS[phase].glyph === 'done';
+  const done = phase === 'done';
   if (seen.current !== phase) {
-    sealedAt.current =
-      done && CONVERSATION_STATUS[seen.current].glyph !== 'done' ? Date.now() : null;
+    sealedAt.current = done && seen.current !== 'done' ? Date.now() : null;
     seen.current = phase;
   }
   return done && sealedAt.current !== null && Date.now() - sealedAt.current < SEAL_MS;
+}
+
+function useStartsAfter(todoId: string, phase: Phase | undefined): string | undefined {
+  const { t } = useI18n();
+  const glances = useContext(TodoGlanceContext);
+  if (phase === undefined || phase === 'done' || phase === 'failed') return undefined;
+  const waitingFor = (glances?.get(todoId)?.blockedBy ?? []).filter(
+    (id) => glances?.get(id)?.phase !== 'done',
+  );
+  if (waitingFor.length === 0) return undefined;
+  return waitingFor.length === 1
+    ? t('等「{title}」', { title: glances?.get(waitingFor[0] ?? '')?.title ?? t('任务') })
+    : t('等 {n} 个任务', { n: waitingFor.length });
+}
+
+const TASK_WORD_CLS =
+  'mx-0.5 inline-flex max-w-[min(22em,calc(100%-20px))] cursor-pointer items-baseline rounded-sm pr-px align-baseline font-sans text-ui font-medium text-foreground no-underline decoration-current/40 underline-offset-3 hover:bg-(--menu-hover) hover:underline focus-visible:underline';
+
+function TaskWord({ todoId, label, href }: { todoId: string; label: string; href: string }) {
+  const { t } = useI18n();
+  const phase = useContext(TodoGlanceContext)?.get(todoId)?.phase;
+  const startsAfter = useStartsAfter(todoId, phase);
+  const lines = [
+    label,
+    phase === undefined ? null : t(PHASE_UI[phase].chip),
+    startsAfter ?? null,
+  ].filter((line): line is string => line !== null);
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Link
+            to={href}
+            data-phase={phase}
+            data-slot="task-mention"
+            data-testid="task-mention"
+            aria-label={lines.join(t('，'))}
+            className={TASK_WORD_CLS}
+          />
+        }
+      >
+        {phase !== undefined && <TaskGlyph phase={phase} className="mr-1 self-center" />}
+        <span className="min-w-0 truncate">{label}</span>
+      </TooltipTrigger>
+      <TooltipContent
+        side="top"
+        data-testid="task-mention-tip"
+        className="max-w-80 flex-col items-start gap-0"
+      >
+        {lines.map((line, n) => (
+          <span key={line} className={cn(n === 0 ? 'font-medium' : 'opacity-70')}>
+            {line}
+          </span>
+        ))}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 function MentionChip({ seg }: { seg: DocSegment }) {
   const { t } = useI18n();
   const glances = useContext(TodoGlanceContext);
   const href = mentionHref(seg, useThreadHref());
-  const chipClass = mentionChipClass(seg.mentionKind);
   const todoId = seg.mentionKind === 'todo' ? seg.mentionId : undefined;
-  const glance = todoId != null ? glances?.get(todoId) : undefined;
-  const phase = glance?.phase;
   const label =
-    todoId != null && TASK_NUMBER_LABEL.test(seg.text) ? (glance?.title ?? t('任务')) : seg.text;
-  const signal = useTaskRefSignal(todoId);
-  useEffect(() => {
-    if (todoId != null) echoTaskRef(todoId);
-  }, [todoId]);
+    todoId != null && TASK_NUMBER_LABEL.test(seg.text)
+      ? (glances?.get(todoId)?.title ?? t('任务'))
+      : seg.text;
   if (seg.mentionKind === 'agent') return <span data-slot="agent-mention">{label}</span>;
-  return href != null ? (
-    <>
-      {' '}
-      <Link
-        className={cn(
-          chipClass,
-          taskChipClass(phase),
-          label.length <= TASK_CHIP_WHOLE_MAX && 'whitespace-nowrap',
-        )}
-        to={href}
-        data-phase={phase}
-        data-slot="task-mention"
-        data-hl={signal.hovered ? '' : undefined}
-        {...(todoId != null
-          ? {
-              onPointerEnter: () => hoverTaskRef(todoId),
-              onPointerLeave: () => hoverTaskRef(null),
-            }
-          : {})}
-      >
-        {phase != null && (
-          <span className="mr-1.5 inline-flex align-[-0.125em]">
-            <TodoStatus phase={phase} />
-          </span>
-        )}
-        {label}
-      </Link>
-    </>
-  ) : (
-    <span className={chipClass}>
+  if (todoId != null && href != null) return <TaskWord todoId={todoId} label={label} href={href} />;
+  return (
+    <span className={mentionChipClass(seg.mentionKind)}>
       {seg.mentionKind === 'machine' ? (
         <MachineName machine={{ id: seg.mentionId, name: label }} compact />
       ) : (

@@ -18,6 +18,7 @@ let primary: QuestionPrimary | null = null;
 let focusIndex = 0;
 let uploads = 0;
 let reveals = 0;
+let minimized = false;
 const answers = new Map<string, string>();
 const closed = new Set<string>();
 
@@ -107,6 +108,15 @@ export const questionDockState = {
   },
   reveal(): void {
     reveals += 1;
+    minimized = false;
+    emit();
+  },
+  minimized(): boolean {
+    return minimized;
+  },
+  minimize(): void {
+    if (minimized) return;
+    minimized = true;
     emit();
   },
   isDismissing(requestId: string): boolean {

@@ -39,7 +39,7 @@ export interface ScheduleCandidate {
 const RUN_STATUS: Record<string, string> = {
   completed: '成功',
   failed: '失败',
-  skipped: '跳过',
+  skipped: '已跳过',
 };
 
 export function SchedulePopover({

@@ -1,4 +1,4 @@
-import type { ChiefQuestionItem } from '../chief/question-chips.js';
+import type { ChiefQuestionItem } from '../chief/question-item.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 
 export function pendingQuestions(stream: readonly ChiefStreamItem[]): ChiefQuestionItem[] {
