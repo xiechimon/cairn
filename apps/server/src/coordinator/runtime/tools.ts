@@ -5,6 +5,7 @@ import {
   type MachineAskBody,
   OWN_COMPUTER_TOOLS,
   type RemoteToolDef,
+  SUBAGENT_TOOL_NAME,
 } from '@cairn/shared';
 import type { ImageContent, TextContent } from '@earendil-works/pi-ai';
 import {
@@ -484,7 +485,10 @@ export function coordinatorToolsExtension(
   const defs =
     options.remoteTools !== undefined
       ? [...options.remoteTools]
-      : [...coordinatorToolDefs(options), ...(options.connectorTools ?? [])];
+      : [
+          ...coordinatorToolDefs({ ...options, includeSubagent: false }),
+          ...(options.connectorTools ?? []),
+        ];
   const loaded = options.loaded;
   const deferred = loaded === undefined ? [] : defs.filter((def) => !loaded.has(def.name));
   return defineExtension({
@@ -501,7 +505,9 @@ export function coordinatorToolsExtension(
         afterResponse: (message, api) => {
           if (
             message.stopReason === 'toolUse' &&
-            message.content.some((block) => block.type === 'toolCall')
+            message.content.some(
+              (block) => block.type === 'toolCall' && block.name !== SUBAGENT_TOOL_NAME,
+            )
           ) {
             options.onToolRound?.(String(api.conversationId), true);
           }

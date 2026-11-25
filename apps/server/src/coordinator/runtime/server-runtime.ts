@@ -25,6 +25,7 @@ import { type CoordinatorModels, createCoordinatorModels } from './models.js';
 import { openReconciledHarness, type ReconcileFacts, type ReconcileOutcome } from './reconcile.js';
 import { syncToRewind } from './rewind-sync.js';
 import { coordinatorStoreId } from './store-identity.js';
+import { coordinatorSubagentExtension, SubagentTurnLimiter } from './subagent.js';
 import { threadStorePath } from './thread-harnesses.js';
 import {
   CORE_COORDINATOR_TOOLS,
@@ -107,6 +108,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
   const suggestionYields = new Map<string, AbortController>();
   const turnSignals = new Map<string, { onSteer(): void; onStop(): void }>();
   const toolRounds = new Set<string>();
+  const subagentLimiter = new SubagentTurnLimiter();
+  const untrustedSteps = new Set<string>();
   const setup = createSetupTiming();
 
   const stateOf = (threadId: string, forceReseed = false): ThreadState => {
@@ -121,6 +124,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
       models.useProvider(binding.config, binding.resolveKey, binding.observe);
     }
     const gate = createConversationGate();
+    const childParents = new Map<string, string>();
     const inputs =
       api.inputs === undefined
         ? undefined
@@ -156,7 +160,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
                 await inputs.barrier(signal);
                 setup.mark(threadId, 'input barrier');
                 if (conversationId !== undefined) {
-                  await api.inputs?.assertConversation(threadId, inputs.key(conversationId));
+                  const authorityId = childParents.get(conversationId) ?? conversationId;
+                  await api.inputs?.assertConversation(threadId, inputs.key(authorityId));
                   setup.mark(threadId, 'conversation check');
                 }
               },
@@ -180,6 +185,28 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
     };
     const extensions = [
       buildToolsExtension(initialConnectorTools),
+      ...(!memoryThread
+        ? [
+            coordinatorSubagentExtension({
+              gate,
+              models,
+              api,
+              ...(inputs === undefined ? {} : { storeId: inputs.storeId }),
+              isUntrustedTurn: (stepId) => untrustedSteps.has(stepId),
+              readOnlyConnectorNames: () =>
+                new Set(
+                  (config.connectorTools?.(threadId) ?? [])
+                    .filter((def) => def.replaySafe === true)
+                    .map((def) => def.name),
+                ),
+              onChildLifecycle: (childId, parentId) => {
+                if (parentId === null) childParents.delete(childId);
+                else childParents.set(childId, parentId);
+              },
+              limiter: subagentLimiter,
+            }),
+          ]
+        : []),
       volatileContextExtension(volatile),
       coordinatorCompactionExtension(
         () => summary.ref,
@@ -326,6 +353,7 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
         const prior = config.factsFor(threadId);
         const mailTurn =
           config.setConversation !== undefined && isMailWakeText(turn.claimed.instruction ?? '');
+        if (mailTurn) untrustedSteps.add(claimed.step.id);
         const run = async (conversationId: string | null) =>
           runCoordinatorTurn(
             {
@@ -379,6 +407,8 @@ export function createServerRuntime(config: ServerRuntimeConfig, api: MachineApi
           run,
         );
       } finally {
+        subagentLimiter.clearStep(claimed.step.id);
+        untrustedSteps.delete(claimed.step.id);
         if (suggestionYields.get(threadId) === suggestionYield) suggestionYields.delete(threadId);
         setup.end(threadId);
         const left = (busy.get(threadId) ?? 1) - 1;

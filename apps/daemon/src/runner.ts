@@ -15,6 +15,7 @@ import { isBuildStepKind, mcpConnectorSecretValues, PLAN_FILE_NAME } from '@cair
 import { AskChannel } from './ask-channel.js';
 import type { DaemonOtel } from './backend/otel.js';
 import { RETRY_STORM_MAX } from './backend/pi-retry.js';
+import { createDaemonSubagentExecutor } from './backend/subagent.js';
 import { composeSessionBrief } from './brief-file.js';
 import {
   CredentialRegistry,
@@ -452,6 +453,10 @@ async function runClaimedStep(
     await failStep(deps, heartbeat, stepId, stepEnv.error, reapTree);
     return;
   }
+  const subagentAbort = new AbortController();
+  stepCleanups.push(() => subagentAbort.abort());
+  let resolvedSessionOpts: ReturnType<typeof composeStepSessionOpts> | null = null;
+  let daemonSubagent: ((params: Record<string, unknown>) => Promise<string>) | null = null;
   const sessionOpts = composeStepSessionOpts({
     provider,
     modelId: agent.modelId,
@@ -470,6 +475,24 @@ async function runClaimedStep(
       verifyEvidence: attachmentVerify
         ? { directory: verifyEvidenceDirectory, uploaded: uploadedVerifyEvidence }
         : null,
+      ...(isChief
+        ? {
+            executeSubagent: (params) => {
+              if (daemonSubagent === null) {
+                daemonSubagent = createDaemonSubagentExecutor({
+                  backend,
+                  parentSessionOpts: resolvedSessionOpts as ReturnType<
+                    typeof composeStepSessionOpts
+                  >,
+                  parentSignal: subagentAbort.signal,
+                  untrustedTurn: claimed.remoteToolsOnly === true,
+                  scrubError: redact,
+                });
+              }
+              return daemonSubagent(params);
+            },
+          }
+        : {}),
     },
     mcpServers: claimedMcp !== undefined ? mcpEndpoints : null,
     skillsAllowlist: agent.skillsAllowlist,
@@ -485,6 +508,7 @@ async function runClaimedStep(
     env: stepEnv.env,
     secrets: () => credentials.values(),
   });
+  resolvedSessionOpts = sessionOpts;
 
   const transcript = guardCredentialOutputs(
     new TranscriptBuffer(deps.paths.outboxDir, stepId),

@@ -8,6 +8,7 @@ import {
   CHIEF_TOOLS_REMOVED_UNDER_D60,
   COMPUTER_REMOTE_TOOLS,
   REQUEST_SECRET_TOOL,
+  SUBAGENT_TOOL_NAME,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test, vi } from 'vitest';
@@ -128,6 +129,7 @@ describe('router tool vocabulary', () => {
       'archive_project',
       'unarchive_project',
       'delete_project',
+      SUBAGENT_TOOL_NAME,
     ]);
     expect(Object.keys(chiefToolDefHashes())).toHaveLength(
       CHIEF_TOOL_COUNT +
@@ -135,7 +137,8 @@ describe('router tool vocabulary', () => {
         CHIEF_REPLY_TOOLS.length +
         1 +
         COMPUTER_REMOTE_TOOLS.length +
-        3,
+        3 +
+        1,
     );
   });
 });

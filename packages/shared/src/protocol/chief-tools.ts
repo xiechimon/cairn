@@ -35,6 +35,7 @@ export const remoteToolDefSchema = z.object({
 export type RemoteToolDef = z.infer<typeof remoteToolDefSchema>;
 
 export const CORE_COORDINATOR_TOOLS: ReadonlySet<string> = new Set([
+  'subagent',
   'create_todo',
   'complete_todos',
   'todos',

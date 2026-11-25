@@ -11,6 +11,7 @@ import {
   REQUEST_SECRET_TOOL_DEF,
   type RemoteToolDef,
   SLICE1_ACTIONS,
+  SUBAGENT_TOOL_DEF,
 } from '@cairn/shared';
 
 const ACTION_COPY: Record<string, string> = {
@@ -110,6 +111,7 @@ export function coordinatorToolDefs(
     ownComputer?: boolean;
     ownerChrome?: boolean;
     phoneComputer?: readonly string[];
+    includeSubagent?: boolean;
   } = {},
 ): RemoteToolDef[] {
   const browserTools =
@@ -132,5 +134,6 @@ export function coordinatorToolDefs(
       ? phoneToolDefs(options.phoneComputer)
       : []),
     ...actionToolDefs(),
+    ...(options.includeSubagent === false ? [] : [SUBAGENT_TOOL_DEF]),
   ];
 }

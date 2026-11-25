@@ -7,6 +7,7 @@ import {
   isOwnComputerTool,
   REQUEST_SECRET_TOOL,
   type RemoteToolDef,
+  SUBAGENT_TOOL_NAME,
 } from '@cairn/shared';
 import { z } from 'zod';
 import type { AskChannel } from './ask-channel.js';
@@ -29,9 +30,21 @@ export function stepRemoteToolExecutor(input: {
   askChannel: Pick<AskChannel, 'available' | 'ask'>;
   attachFiles: boolean;
   verifyEvidence: VerifyEvidenceUploads | null;
+  executeSubagent?: (params: Record<string, unknown>) => Promise<string>;
 }): (name: string, params: Record<string, unknown>) => Promise<string> {
-  const { client, stepId, cwd, remoteTools, askChannel, attachFiles, verifyEvidence } = input;
+  const {
+    client,
+    stepId,
+    cwd,
+    remoteTools,
+    askChannel,
+    attachFiles,
+    verifyEvidence,
+    executeSubagent,
+  } = input;
   return (name, params) => {
+    if (name === SUBAGENT_TOOL_NAME && executeSubagent !== undefined)
+      return executeSubagent(params);
     if (name === 'ask_user' && askChannel.available) return askChannel.ask(params);
     if (name === 'attach_file' && attachFiles) {
       const prepared = prepareFileAttachment(cwd, params, verifyEvidence?.directory);

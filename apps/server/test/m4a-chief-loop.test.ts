@@ -6,6 +6,7 @@ import {
   COMPUTER_REMOTE_TOOLS,
   claimedStepSchema,
   REQUEST_SECRET_TOOL_DEF,
+  SUBAGENT_TOOL_DEF,
 } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import type { Hono } from 'hono';
@@ -164,7 +165,8 @@ describe('M4a Chief machine protocol full loop (02 section 4.3/5.4 + r5 sections
         CHIEF_REPLY_TOOLS.length +
         [REQUEST_SECRET_TOOL_DEF].length +
         COMPUTER_REMOTE_TOOLS.length +
-        ['archive_project', 'unarchive_project', 'delete_project'].length,
+        ['archive_project', 'unarchive_project', 'delete_project'].length +
+        [SUBAGENT_TOOL_DEF].length,
     );
     expect(claimed.agent?.id).toBe(w.coordinatorRouteId);
     expect(claimed.agent?.modelId).toBe('stub-model');
@@ -413,7 +415,8 @@ describe('Coordinator router tools over the machine protocol (D60)', () => {
         CHIEF_REPLY_TOOLS.length +
         [REQUEST_SECRET_TOOL_DEF].length +
         COMPUTER_REMOTE_TOOLS.length +
-        ['archive_project', 'unarchive_project', 'delete_project'].length,
+        ['archive_project', 'unarchive_project', 'delete_project'].length +
+        [SUBAGENT_TOOL_DEF].length,
     );
     const names = claimed.remoteTools?.map((t) => t.name) ?? [];
     for (const name of CHIEF_ROUTER_TOOL_NAMES) expect(names).toContain(name);

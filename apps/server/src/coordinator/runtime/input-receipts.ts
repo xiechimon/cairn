@@ -1,4 +1,9 @@
-import { coordinatorConversationKey, parseCoordinatorConversationKey, sleep } from '@cairn/shared';
+import {
+  coordinatorConversationKey,
+  isSubagentRequestId,
+  parseCoordinatorConversationKey,
+  sleep,
+} from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import {
   type ConversationId,
@@ -27,6 +32,7 @@ export function createInputReceipts(
   const pending: Work[] = [];
   const submissions = new Map<SubmissionId, SubmissionRecord>();
   const queuedRuns = new Set<string>();
+  const taskOwnedConversations = new Set<ConversationId>();
   let currentHarness: Harness | null = null;
   let storeId: string | undefined;
   const key = (conversationId: string) => {
@@ -65,7 +71,11 @@ export function createInputReceipts(
       if (work === undefined) break;
       if (work.kind === 'receipt') {
         const record = work.record;
-        if (record.requestId !== undefined && record.type === 'input') {
+        if (
+          record.requestId !== undefined &&
+          record.type === 'input' &&
+          !isSubagentRequestId(record.requestId)
+        ) {
           if (record.entry !== undefined)
             await channel.consume(
               record.requestId,
@@ -89,6 +99,13 @@ export function createInputReceipts(
             return record;
           }),
         );
+        if (
+          records.length > 0 &&
+          records.every((record) => record !== undefined && isSubagentRequestId(record.requestId))
+        ) {
+          pending.shift();
+          continue;
+        }
         const requests = records.flatMap((record) =>
           record?.type === 'input' &&
           record.requestId !== undefined &&
@@ -180,6 +197,7 @@ export function createInputReceipts(
           throw new InputAuthorityError('Cannot replace a store with pending receipts');
         submissions.clear();
         queuedRuns.clear();
+        taskOwnedConversations.clear();
       }
       storeId = identity;
       detach?.();
@@ -187,6 +205,9 @@ export function createInputReceipts(
       const observer = harness.observeCommits({
         advance(publication) {
           for (const change of publication.changes) {
+            if (change.type === 'conversation' && change.value.owner !== undefined) {
+              taskOwnedConversations.add(change.value.id);
+            }
             if (change.type === 'submission') submissions.set(change.value.id, change.value);
           }
           const placedAt = new Map(
@@ -200,7 +221,9 @@ export function createInputReceipts(
             if (
               change.type === 'submission' &&
               change.value.type === 'input' &&
-              change.value.status !== 'queued'
+              change.value.status !== 'queued' &&
+              !taskOwnedConversations.has(change.value.conversationId) &&
+              !isSubagentRequestId(change.value.requestId)
             )
               pending.push({
                 kind: 'receipt',
@@ -214,7 +237,8 @@ export function createInputReceipts(
               change.type === 'document' &&
               change.kind === 'change' &&
               change.record.kind === 'pi.live' &&
-              change.conversationId !== undefined
+              change.conversationId !== undefined &&
+              !taskOwnedConversations.has(change.conversationId)
             )
               enqueueRun(change.conversationId, change.value as LiveState);
           }

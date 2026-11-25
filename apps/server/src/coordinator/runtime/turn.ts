@@ -7,6 +7,8 @@ import {
   mailFenceBlock,
   mailSharedTranscript,
   type OtelObservation,
+  SUBAGENT_TOOL_NAME,
+  subagentToolResultSchema,
 } from '@cairn/shared';
 import type { Context } from '@earendil-works/chord/context';
 import type { AssistantMessage, ModelThinkingLevel } from '@earendil-works/pi-ai';
@@ -21,6 +23,7 @@ import {
   LiveDoc,
   type SettledSubmissionRecord,
   type Submission,
+  ToolResultEntry,
 } from '@earendil-works/pi-durable';
 import { steerWithdrawals } from '../steer-withdrawals.js';
 import { compactionWindow, type ModelRef } from './compaction.js';
@@ -71,11 +74,31 @@ function turnUsage(answer: AssistantMessage, entries: readonly EntryRecord[]): M
   };
   for (const entry of entries) {
     const message = entry.model?.[0];
-    if (!AssistantEntry.is(entry) || message?.role !== 'assistant') continue;
-    usage.input += message.usage.input;
-    usage.output += message.usage.output;
-    usage.cacheRead += message.usage.cacheRead;
-    usage.cacheWrite += message.usage.cacheWrite;
+    if (AssistantEntry.is(entry) && message?.role === 'assistant') {
+      usage.input += message.usage.input;
+      usage.output += message.usage.output;
+      usage.cacheRead += message.usage.cacheRead;
+      usage.cacheWrite += message.usage.cacheWrite;
+      continue;
+    }
+    if (
+      ToolResultEntry.is(entry) &&
+      message?.role === 'toolResult' &&
+      message.toolName === SUBAGENT_TOOL_NAME
+    ) {
+      const text = message.content
+        .flatMap((block) => (block.type === 'text' ? [block.text] : []))
+        .join('');
+      try {
+        const parsed = subagentToolResultSchema.safeParse(JSON.parse(text));
+        if (parsed.success) {
+          usage.input += parsed.data.usage.inputTokens;
+          usage.output += parsed.data.usage.outputTokens;
+          usage.cacheRead += parsed.data.usage.cacheReadTokens;
+          usage.cacheWrite += parsed.data.usage.cacheWriteTokens;
+        }
+      } catch {}
+    }
   }
   return usage;
 }
@@ -235,7 +258,8 @@ export async function runCoordinatorTurn(
           const toolFree = (snapshot: typeof live) =>
             stopping === null &&
             deps.isInToolRound?.(activeRootKey) !== true &&
-            (snapshot?.tools === undefined || snapshot.tools.length === 0);
+            (snapshot?.tools === undefined ||
+              snapshot.tools.every((tool) => tool.name === SUBAGENT_TOOL_NAME));
           const canBargeIn =
             live?.run !== undefined && live.run.afterRun === undefined && toolFree(live);
           if (canBargeIn) {

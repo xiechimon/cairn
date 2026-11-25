@@ -1,6 +1,11 @@
 import type { ClaudeCodeReport } from '@cairn/shared';
 import { afterEach, describe, expect, test } from 'vitest';
-import { coordinatorToolsExtension, createStepGate } from '../src/coordinator/runtime/tools.js';
+import { createCoordinatorModels } from '../src/coordinator/runtime/models.js';
+import { coordinatorSubagentExtension } from '../src/coordinator/runtime/subagent.js';
+import {
+  coordinatorToolsExtension,
+  createConversationGate,
+} from '../src/coordinator/runtime/tools.js';
 import {
   chief as chiefTable,
   chiefThread as chiefThreadTable,
@@ -77,9 +82,13 @@ describe('the Coordinator tool table is the same on the in-server runtime and on
     }));
     expect(offered.length).toBeGreaterThan(0);
 
-    const registered = (
-      coordinatorToolsExtension(fakeMachineApi(), createStepGate()).tools ?? []
-    ).map((tool) => ({
+    const api = fakeMachineApi();
+    const gate = createConversationGate();
+    const registered = [
+      ...(coordinatorToolsExtension(api, gate).tools ?? []),
+      ...(coordinatorSubagentExtension({ gate, models: createCoordinatorModels(), api }).tools ??
+        []),
+    ].map((tool) => ({
       name: tool.name,
       description: tool.description,
       parameters: tool.parameters,

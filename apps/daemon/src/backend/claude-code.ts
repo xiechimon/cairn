@@ -1486,7 +1486,7 @@ export function buildClaudeSdkOptions(parts: ClaudeSdkOptionParts): Options {
           ],
         }
       : { permissionMode: 'bypassPermissions' as const }),
-    disallowedTools: locked ? [...parts.disallowedTools, 'Bash'] : parts.disallowedTools,
+    disallowedTools: locked ? [...parts.disallowedTools, 'Bash', 'Agent'] : parts.disallowedTools,
     ...(locked
       ? {
           tools:
