@@ -31,14 +31,18 @@ export function readStoredLocale(
       const parsed = parseLocaleValue(storage?.getItem(key));
       if (parsed !== null) return parsed;
     }
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   return browserLanguage?.toLowerCase().startsWith('zh') ? 'zh' : 'en';
 }
 
 export function persistLocale(locale: Locale, storage: Pick<Storage, 'setItem'> | null): void {
   try {
     for (const key of LOCALE_STORAGE_KEYS) storage?.setItem(key, locale);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 export function subscribeLocaleStorage(

@@ -90,7 +90,9 @@ export function refreshQueries(
             (!query.isActive() || query.isStatic()) && cache.get(query.queryHash) === query,
         )
         .map((query) => {
-          const read = query.fetch(undefined, withoutCancellation).catch(() => {});
+          const read = query.fetch(undefined, withoutCancellation).catch((error) => {
+            console.debug('cairn: recoverable operation failed', error);
+          });
           return query.state.fetchStatus === 'paused' ? undefined : read;
         });
       return Promise.all([active, ...unobserved]).then(() => {});

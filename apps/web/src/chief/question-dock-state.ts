@@ -156,7 +156,9 @@ export const questionDockState = {
       committing.add(requestId);
       emit();
       Promise.resolve(commit())
-        .catch(() => {})
+        .catch((error) => {
+          console.debug('cairn: recoverable operation failed', error);
+        })
         .finally(() => {
           committing.delete(requestId);
           emit();

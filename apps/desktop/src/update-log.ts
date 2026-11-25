@@ -10,5 +10,7 @@ export function appendUpdateLog(userData: string, line: string, at: Date = new D
   try {
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     appendFileSync(path, `${at.toISOString()} ${line}\n`, { mode: 0o600 });
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }

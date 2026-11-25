@@ -15,7 +15,9 @@ async function consumePendingNav(route: (href: string) => void): Promise<void> {
     const payload: unknown = await response.json();
     const href = (payload as { href?: unknown }).href;
     if (typeof href === 'string' && href !== '') route(href);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 export function PwaBridge() {
@@ -23,7 +25,9 @@ export function PwaBridge() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
     void syncPushAuthToken(readStoredToken());
-    navigator.serviceWorker.register(SW_URL).catch(() => {});
+    navigator.serviceWorker.register(SW_URL).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     const onMessage = (event: MessageEvent) => {
       const data = event.data as { type?: unknown; href?: unknown } | null;
       if (data?.type === 'notificationclick' && typeof data.href === 'string') {
@@ -31,7 +35,9 @@ export function PwaBridge() {
         void caches
           .open(NAV_CACHE)
           .then((cache) => cache.delete(NAV_SLOT))
-          .catch(() => {});
+          .catch((error) => {
+            console.debug('cairn: recoverable operation failed', error);
+          });
       }
     };
     navigator.serviceWorker.addEventListener('message', onMessage);

@@ -175,7 +175,9 @@ function readStoredMachine(home: string, rejectSymlinkDir = false): MachineJson 
     if (fd !== undefined) {
       try {
         closeSync(fd);
-      } catch {}
+      } catch (error) {
+        console.debug('cairn: recoverable operation failed', error);
+      }
     }
   }
 }

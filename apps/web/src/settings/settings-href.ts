@@ -36,6 +36,8 @@ export function storedSettingsSection(): SettingsSectionId {
   let stored: string | null = null;
   try {
     stored = safeLocalStorage()?.getItem(SETTINGS_SECTION_STORAGE_KEY) ?? null;
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   return isSettingsSectionId(stored) ? stored : 'account';
 }

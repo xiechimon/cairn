@@ -82,7 +82,7 @@ export function buildCommentBridgeScript(): string {
   }
   function find(data){
     var el = null;
-    try { el = data.selector ? document.querySelector(String(data.selector)) : null; } catch (_) {}
+    try { el = data.selector ? document.querySelector(String(data.selector)) : null; } catch (_) { console.debug('cairn: recoverable operation failed', _); }
     if (!el && data.elementId) {
       var id = esc(data.elementId);
       el = document.querySelector('[data-od-id="' + id + '"], [data-cairn-id="' + id + '"], [data-screen-label="' + id + '"]');

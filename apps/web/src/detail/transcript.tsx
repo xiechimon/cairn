@@ -5,10 +5,9 @@ import { CoordinatorFixLinks } from '../chief/chief-message-rows.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { TranscriptReportCard } from '../chief/research-report.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { FailureMarker, RawTextDialog } from '../components/chat/failure-marker.js';
 import { liveTokensLabel, TaskBlockedRow, TaskLiveRow } from '../components/chat/live-row.js';
-import { StatusLine } from '../components/chat/status-line.js';
-import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { ChatMessageBody } from '../components/chat/message-body.js';
+import { NoticeLine, RawTextDialog } from '../components/chat/notice-line.js';
 import { MachineIcon } from '../components/machine-label.js';
 import { Button } from '../components/ui/button.js';
 import {
@@ -217,9 +216,9 @@ function Row({
       );
     case 'note':
       return (
-        <StatusLine className="mt-5" testId="transcript-note">
+        <NoticeLine layout="plain" className="mt-5" testId="transcript-note">
           {t(item.text, item.vars)}
-        </StatusLine>
+        </NoticeLine>
       );
     case 'step-prompt':
       return <StepPromptRow item={item} t={t} />;
@@ -256,7 +255,9 @@ function Row({
     case 'chief':
       return (
         <div className={`${ROW_BASE} ${margin}`}>
-          <StatusLine className="w-full">{t('由 Coordinator 发起')}</StatusLine>
+          <NoticeLine layout="plain" className="w-full">
+            {t('由 Coordinator 发起')}
+          </NoticeLine>
         </div>
       );
     case 'user': {
@@ -272,7 +273,8 @@ function Row({
             className="group/reply-block relative max-w-[min(85%,42rem)]"
             data-slot="reply-block"
           >
-            <UserMessageBubble
+            <ChatMessageBody
+              speaker="user"
               className={`chat-bubble w-fit max-w-full break-words ${
                 item.markdown != null
                   ? 'whitespace-normal [&>:first-child]:mt-0 [&>:last-child]:mb-0'
@@ -283,7 +285,7 @@ function Row({
               {...(item.markdown != null ? { 'data-md': 'true' } : {})}
             >
               {item.markdown != null ? <ChatMarkdown text={item.markdown} /> : item.text}
-            </UserMessageBubble>
+            </ChatMessageBody>
             {!sending && <RowTools placement="left" copy={copy} stamp={item.at} />}
           </div>
           {sending ? (
@@ -301,7 +303,8 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
           <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
-            <div
+            <ChatMessageBody
+              speaker="assistant"
               className="chat-text agent-measure min-w-0 font-sans text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
@@ -312,7 +315,7 @@ function Row({
                   <Para key={i} para={Array.isArray(raw) ? { segments: raw } : raw} gap={i > 0} />
                 ))
               )}
-            </div>
+            </ChatMessageBody>
             <RowTools placement="below-start-hover" copy={copy} />
           </div>
           <RowTools placement="below-start" copy={copy} />
@@ -357,9 +360,10 @@ function Row({
       if (item.quotaHeld === true)
         return (
           <div className="my-3" data-row="fail">
-            <FailureMarker
+            <NoticeLine
               label={t(item.label, item.labelVars)}
               testId="transcript-quota-wait"
+              tone="waiting"
               waiting
             />
           </div>
@@ -388,18 +392,19 @@ function Row({
       return <WorkTrace item={item} defaultExpanded={defaultExpanded} entering={entering} t={t} />;
     case 'skills':
       return (
-        <StatusLine className="mt-5" testId="skills-summary">
+        <NoticeLine layout="plain" className="mt-5" testId="skills-summary">
           {[
             ...(item.read.length > 0 ? [t('技能：{n}', { n: item.read.join(', ') })] : []),
             ...(item.denied.length > 0 ? [t('挡下：{n}', { n: item.denied.join(', ') })] : []),
           ].join(' · ')}
-        </StatusLine>
+        </NoticeLine>
       );
     case 'review':
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
           <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
-            <div
+            <ChatMessageBody
+              speaker="assistant"
               className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
@@ -459,7 +464,7 @@ function Row({
                   )}
                 </div>
               ))}
-            </div>
+            </ChatMessageBody>
             <RowTools placement="below-start-hover" copy={reviewCopyText(item)} />
           </div>
           <RowTools placement="below-start" copy={reviewCopyText(item)} />
@@ -469,7 +474,8 @@ function Row({
       return (
         <div className={`${AGENT_ROW} ${TOOLS_ROW} ${margin}`} data-row="agent" data-tools-root="">
           <div className="group/reply-block relative w-fit max-w-full" data-slot="reply-block">
-            <div
+            <ChatMessageBody
+              speaker="assistant"
               className="chat-text agent-measure min-w-0 text-ui leading-5.5 break-words text-(--foreground)"
               data-testid="agent-text"
             >
@@ -508,7 +514,7 @@ function Row({
                   />
                 </p>
               ))}
-            </div>
+            </ChatMessageBody>
             <RowTools placement="below-start-hover" copy={verifyCopyText(item)} />
           </div>
           <RowTools placement="below-start" copy={verifyCopyText(item)} />
@@ -525,13 +531,14 @@ function FailRow({ item, t }: { item: Extract<TranscriptItem, { kind: 'fail' }>;
   const reason = t(item.label, item.labelVars);
   return (
     <div className="my-3" data-row="fail">
-      <FailureMarker
+      <NoticeLine
         label={
           item.schedule === undefined
             ? reason
             : joinMeta([reason, t(item.schedule.key, item.schedule.vars)])
         }
         testId="transcript-fail"
+        tone={item.schedule === undefined ? 'danger' : 'waiting'}
         waiting={item.schedule !== undefined}
         detail={{ lines, raw: item.raw }}
       />
@@ -588,7 +595,7 @@ function StepPromptRow({
   const [rawOpen, setRawOpen] = useState(false);
   const log = item.origin.kind === 'ci-fix';
   return (
-    <StatusLine className="mt-5" testId="transcript-step-prompt">
+    <NoticeLine layout="plain" className="mt-5" testId="transcript-step-prompt">
       {stepPromptLine(item.origin, t)}
       <Button
         variant="ghost"
@@ -604,7 +611,7 @@ function StepPromptRow({
         onClose={() => setRawOpen(false)}
         testId="step-prompt-raw"
       />
-    </StatusLine>
+    </NoticeLine>
   );
 }
 

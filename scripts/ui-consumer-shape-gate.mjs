@@ -114,6 +114,89 @@ for (const hit of hits) {
   }
 }
 
+const NOTICE_MODULE = 'apps/web/src/components/chat/notice-line.tsx';
+const MESSAGE_BODY_MODULE = 'apps/web/src/components/chat/message-body.tsx';
+const SHARED_NOTICE_MODULES = new Set([NOTICE_MODULE]);
+const SHARED_MESSAGE_MODULES = new Set([MESSAGE_BODY_MODULE]);
+const CONVERSATION_TERRITORY =
+  /^(apps\/web\/src\/(chief|detail|components\/chat)\/|apps\/web\/src\/board\/(quota-notice|side-chat|thread-pr-panel|thread-actions|tasks-panel)\.tsx$|apps\/web\/src\/routes\/board-page\.tsx$)/;
+const FORBIDDEN_NOTICE_NAME =
+  /(?:export\s+)?(?:function|const)\s+(?:Failure|Retry|Quota|Status)(?:Card|Block|Banner)\b/;
+const FORBIDDEN_MESSAGE_NAME =
+  /(?:export\s+)?(?:function|const)\s+(?:User|Assistant|Agent|Coordinator)(?:Message|Reply)(?:Bubble|Body)\b/;
+const NOTICE_ICON = /<(?:CircleAlert|Clock|Hourglass|Info|WifiOff)\b/;
+
+for (const path of files) {
+  const file = rel(path);
+  const code = stripCodeComments(readFileSync(path, 'utf8'));
+  const base = file.split('/').at(-1) ?? '';
+  if (
+    [
+      'failure-marker.tsx',
+      'status-line.tsx',
+      'user-message-bubble.tsx',
+      'quota-banner.tsx',
+    ].includes(base)
+  ) {
+    failures.push(
+      `[ui-consumer-shape-gate] C3 ${file}: forked notice/message module was resurrected; use ${NOTICE_MODULE} and ${MESSAGE_BODY_MODULE}.`,
+    );
+  }
+  if (!SHARED_NOTICE_MODULES.has(file) && FORBIDDEN_NOTICE_NAME.test(code)) {
+    failures.push(
+      `[ui-consumer-shape-gate] C3 ${file}: status/failure/quota/retry notice block is declared outside ${NOTICE_MODULE}; extend the shared notice-line API instead.`,
+    );
+  }
+  if (!SHARED_MESSAGE_MODULES.has(file) && FORBIDDEN_MESSAGE_NAME.test(code)) {
+    failures.push(
+      `[ui-consumer-shape-gate] C3 ${file}: role-specific message body is declared outside ${MESSAGE_BODY_MODULE}; use ChatMessageBody role variants instead.`,
+    );
+  }
+  if (
+    !SHARED_NOTICE_MODULES.has(file) &&
+    /components\/ui\/marker\.js|['"]\.\/marker\.js['"]/.test(code) &&
+    /<CircleAlert\b/.test(code)
+  ) {
+    failures.push(
+      `[ui-consumer-shape-gate] C3 ${file}: hand-composed alert marker; render NoticeLine instead.`,
+    );
+  }
+  if (!SHARED_NOTICE_MODULES.has(file) && CONVERSATION_TERRITORY.test(file)) {
+    for (const match of code.matchAll(/role=["']status["']/g)) {
+      const snippet = code.slice(Math.max(0, match.index - 500), match.index + 1000);
+      if (snippet.includes('sr-only') || !NOTICE_ICON.test(snippet)) continue;
+      failures.push(
+        `[ui-consumer-shape-gate] C3 ${file}: icon-bearing conversation status is composed outside NoticeLine.`,
+      );
+      break;
+    }
+  }
+  if (
+    !SHARED_NOTICE_MODULES.has(file) &&
+    code.includes('data-testid="fail-raw-error"') &&
+    !/<RawError\b/.test(code)
+  ) {
+    failures.push(
+      `[ui-consumer-shape-gate] C3 ${file}: raw failure detail is rendered outside the shared notice-line path.`,
+    );
+  }
+  if (!SHARED_MESSAGE_MODULES.has(file) && code.includes('data-slot="user-bubble"')) {
+    failures.push(
+      `[ui-consumer-shape-gate] C3 ${file}: user message bubble is rendered outside ChatMessageBody.`,
+    );
+  }
+  if (
+    !SHARED_MESSAGE_MODULES.has(file) &&
+    /rounded-\(--radius-bubble\)[^\n]*bg-\(--bubble-fill\)|bg-\(--bubble-fill\)[^\n]*rounded-\(--radius-bubble\)/.test(
+      code,
+    )
+  ) {
+    failures.push(
+      `[ui-consumer-shape-gate] C3 ${file}: user bubble shape/fill pair is forked outside ChatMessageBody.`,
+    );
+  }
+}
+
 for (const entry of boxEntries) {
   const key = `${entry.file}\u0000${entry.anchor}`;
   if (!hitKeys.has(key)) {

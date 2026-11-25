@@ -37,7 +37,9 @@ export function createServerLog(
   let size = 0;
   try {
     size = statSync(path).size;
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   let pending = '';
 
   function append(text: string): void {
@@ -53,7 +55,9 @@ export function createServerLog(
   function emit(line: string): void {
     try {
       append(`${redactSecrets(line, secrets())}\n`);
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   }
 
   return {

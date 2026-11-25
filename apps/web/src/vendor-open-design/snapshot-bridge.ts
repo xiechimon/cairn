@@ -36,7 +36,7 @@ export function buildSnapshotBridgeScript(): string {
         img.setAttribute('src', source.toDataURL('image/png'));
         img.setAttribute('style', target.getAttribute('style') || '');
         target.parentNode && target.parentNode.replaceChild(img, target);
-      } catch (_) {}
+      } catch (_) { console.debug('cairn: recoverable operation failed', _); }
     }
   }
   function inlineSnapshotStyles(originalRoot, cloneRoot){

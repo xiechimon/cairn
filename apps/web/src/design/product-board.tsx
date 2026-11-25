@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { BackupBanner } from '../board/backup-banner.js';
 import { NotificationBanner } from '../board/notify-banner.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
-import { QuotaBanner, quotaBannerInfo } from '../board/quota-banner.js';
+import { QuotaNotice, quotaNoticeInfo } from '../board/quota-notice.js';
 import { NOW, todo } from './product-fixtures.js';
 import { Cell, Labeled, Section, Specimen } from './specimen.js';
 
@@ -20,9 +20,9 @@ const quotaTodo = (providerId: string, kind: 'quota' | 'capacity', minutes: numb
   });
 
 const QUOTA_ONE =
-  quotaBannerInfo([quotaTodo('Claude', 'quota', 30), quotaTodo('Claude', 'quota', 45)]) ?? [];
+  quotaNoticeInfo([quotaTodo('Claude', 'quota', 30), quotaTodo('Claude', 'quota', 45)]) ?? [];
 const QUOTA_MANY =
-  quotaBannerInfo([quotaTodo('Claude', 'quota', 30), quotaTodo('Codex', 'capacity', 10)]) ?? [];
+  quotaNoticeInfo([quotaTodo('Claude', 'quota', 30), quotaTodo('Codex', 'capacity', 10)]) ?? [];
 
 const AVATAR_ICONS = [
   'folder',
@@ -53,11 +53,11 @@ export function ProductBoardSection() {
         <Labeled label="NotificationBanner">
           <NotificationBanner onEnable={() => setLastAction('enable notifications')} />
         </Labeled>
-        <Labeled label="QuotaBanner, one lane">
-          <QuotaBanner infos={QUOTA_ONE} />
+        <Labeled label="QuotaNotice, one lane">
+          <QuotaNotice infos={QUOTA_ONE} />
         </Labeled>
-        <Labeled label="QuotaBanner, several lanes">
-          <QuotaBanner infos={QUOTA_MANY} />
+        <Labeled label="QuotaNotice, several lanes">
+          <QuotaNotice infos={QUOTA_MANY} />
         </Labeled>
         <Labeled label="BackupBanner, stale">
           <BackupBanner notice={{ kind: 'stale', host: 'cairn-server', hours: 52 }} />

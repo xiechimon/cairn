@@ -55,7 +55,9 @@ export function clearServerOwner(cairnHome: string, pid: number): void {
   if (current === null || current.pid !== pid) return;
   try {
     unlinkSync(ownerPath(cairnHome));
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 function pidAlive(pid: number): boolean {
@@ -79,7 +81,9 @@ export async function probeResidentServer(
       signal: AbortSignal.timeout(1_500),
     });
     if (res.ok) return record;
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   return null;
 }
 
@@ -224,7 +228,9 @@ export async function installResidentHost(opts: {
     });
   try {
     await run(['bootout', `${domain}/${RESIDENT_LABEL}`]);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   await run(['bootstrap', domain, plistPath]);
   return { ok: true, plistPath, port };
 }
@@ -243,10 +249,14 @@ export async function uninstallResidentHost(opts: {
     });
   try {
     await run(['bootout', `${domain}/${RESIDENT_LABEL}`]);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   try {
     if (existsSync(plistPath)) unlinkSync(plistPath);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
   return { ok: true };
 }
 
@@ -381,7 +391,9 @@ export async function handoffToResidentHost(opts: {
   try {
     installed = await opts.install();
   } catch (error) {
-    await opts.uninstall().catch(() => {});
+    await opts.uninstall().catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     if (stoppedEmbedded) await opts.restoreEmbeddedServer();
     throw error;
   }
@@ -391,7 +403,9 @@ export async function handoffToResidentHost(opts: {
   }
   const resident = await opts.waitForHealthy();
   if (resident === null) {
-    await opts.uninstall().catch(() => {});
+    await opts.uninstall().catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     if (stoppedEmbedded) await opts.restoreEmbeddedServer();
     throw new Error('The resident host did not become healthy in time.');
   }

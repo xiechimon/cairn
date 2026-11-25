@@ -9,8 +9,8 @@ import {
 import { cn } from 'cn';
 import { Link } from 'react-router';
 import { ReplyQuoteBlock } from '../chief/reply-quote-block.js';
-import { StatusLine } from '../components/chat/status-line.js';
-import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { ChatMessageBody } from '../components/chat/message-body.js';
+import { NoticeLine } from '../components/chat/notice-line.js';
 import { Message, MessageContent } from '../components/ui/message.js';
 import { useI18n } from '../i18n/provider.js';
 import { ChatMarkdown } from './chat-markdown.js';
@@ -78,10 +78,10 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
       aria-label={`${t('来源：')}${t('Coordinator')}`}
       className={cn('spec-block mt-4 flex min-w-0 flex-col gap-4', className)}
     >
-      <StatusLine>
+      <NoticeLine layout="plain">
         {t('来源：')}
         {t('Coordinator')}
-      </StatusLine>
+      </NoticeLine>
       {request?.segments.some((segment) => segment.context?.incomplete) && (
         <p role="status" className="m-0 text-meta text-content-secondary">
           {t('来源未通过校验。')}{' '}
@@ -98,7 +98,6 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
           (candidate) =>
             candidate.messageId === reply?.sourceMessageId && candidate.threadId === row.threadId,
         );
-        const MessageBody = row.role === 'owner' ? UserMessageBubble : 'div';
         return (
           <Message
             key={row.id}
@@ -111,7 +110,8 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
               {row.role === 'coordinator' && (
                 <span className="text-meta text-content-tertiary">{t('Coordinator')}</span>
               )}
-              <MessageBody
+              <ChatMessageBody
+                speaker={row.role === 'owner' ? 'user' : 'assistant'}
                 className={cn(
                   row.role === 'owner'
                     ? 'chat-bubble max-w-[min(85%,42rem)] break-words'
@@ -127,7 +127,7 @@ export function SpecBlock({ spec, className, request }: SpecBlockProps) {
                   />
                 )}
                 <ChatMarkdown text={reply?.body ?? text} />
-              </MessageBody>
+              </ChatMessageBody>
             </MessageContent>
           </Message>
         );

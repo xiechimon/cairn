@@ -239,7 +239,9 @@ export function useAntigravitySubscriptionVerification(teamId: string | undefine
       client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] }),
       client.invalidateQueries({ queryKey: ['model-sources', teamId] }),
       client.invalidateQueries({ queryKey: [MODEL_ROUTING_KEY, teamId] }),
-    ]).catch(() => {});
+    ]).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     if (!isCurrent()) return null;
     active.current.delete(id);
     setStates((current) => {

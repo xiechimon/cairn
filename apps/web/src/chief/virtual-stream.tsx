@@ -60,7 +60,9 @@ function saveSnapshot(cacheKey: string, snapshot: StreamSnapshot): void {
       storageKey(cacheKey),
       JSON.stringify({ ...snapshot, items: snapshot.items.slice(-STORED_ROWS) }),
     );
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 export function VirtualStream({

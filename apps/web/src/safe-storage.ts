@@ -19,5 +19,7 @@ export function safeSessionStorage(): Storage | null {
 export function safeSetItem(key: string, value: string): void {
   try {
     safeLocalStorage()?.setItem(key, value);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }

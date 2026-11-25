@@ -14,10 +14,9 @@ import { MemoryRouter } from 'react-router';
 import { ProjectNotFound, ProjectsFailed } from '../board/project-not-found.js';
 import { MessageToolbar } from '../chief/message-toolbar.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { FailureMarker } from '../components/chat/failure-marker.js';
-import { StatusLine } from '../components/chat/status-line.js';
+import { ChatMessageBody } from '../components/chat/message-body.js';
+import { NoticeLine } from '../components/chat/notice-line.js';
 import { TraceGroup, type TraceStep, TraceSteps } from '../components/chat/trace-steps.js';
-import { UserMessageBubble } from '../components/chat/user-message-bubble.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import {
@@ -289,7 +288,7 @@ export function ConversationSection() {
       <Specimen
         id="turns"
         title="Turns"
-        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <UserMessageBubble>…</UserMessageBubble>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles /><MessageToolbar placement="below-start-hover" … /></MessageContent></Message>\n<StatusLine>Plan approved</StatusLine>\n<FailureMarker label="This step ended abnormally" detail={{ lines, raw }} />`}
+        code={`<Message className="justify-end">\n  <MessageContent className="max-w-[min(85%,42rem)] items-end">\n    <ChatMessageBody speaker="user">…</ChatMessageBody>\n  </MessageContent>\n</Message>\n<Message><MessageContent><TraceGroup … /><ChatMarkdown bubbles /><MessageToolbar placement="below-start-hover" … /></MessageContent></Message>\n<NoticeLine layout="plain">Plan approved</NoticeLine>\n<NoticeLine label="This step ended abnormally" detail={{ lines, raw }} />`}
       >
         <div className="mx-auto flex w-full max-w-170 flex-col gap-4">
           <Message className="justify-end">
@@ -297,9 +296,9 @@ export function ConversationSection() {
               className="max-w-[min(85%,42rem)] flex-none items-end gap-0"
               data-testid="turn-user"
             >
-              <UserMessageBubble className="w-fit max-w-full">
+              <ChatMessageBody speaker="user" className="w-fit max-w-full">
                 Why does pnpm install fail in CI?
-              </UserMessageBubble>
+              </ChatMessageBody>
             </MessageContent>
           </Message>
           <Message>
@@ -340,8 +339,8 @@ export function ConversationSection() {
               </Bubble>
             </MessageContent>
           </Message>
-          <StatusLine>Plan approved · 3 steps</StatusLine>
-          <FailureMarker
+          <NoticeLine layout="plain">Plan approved · 3 steps</NoticeLine>
+          <NoticeLine
             label="This step ended abnormally"
             testId="turn-failure"
             detail={{

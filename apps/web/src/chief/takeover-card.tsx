@@ -38,7 +38,9 @@ function useDevicePushOff(teamId: string | undefined, active: boolean) {
       .then((subscription) => {
         if (!cancelled) setOff(subscription === null);
       })
-      .catch(() => {});
+      .catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      });
     return () => {
       cancelled = true;
     };

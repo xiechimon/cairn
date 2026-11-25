@@ -1,15 +1,15 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, test } from 'vitest';
-import { QuotaBanner } from '../src/board/quota-banner.js';
+import { QuotaNotice } from '../src/board/quota-notice.js';
 import { I18nProvider } from '../src/i18n/provider.js';
 
-describe('QuotaBanner', () => {
+describe('QuotaNotice', () => {
   test('sums counts across multiple groups instead of reporting group count', () => {
     const html = renderToStaticMarkup(
       createElement(I18nProvider, {
         initialLocale: 'zh',
-        children: createElement(QuotaBanner, {
+        children: createElement(QuotaNotice, {
           infos: [
             {
               lane: 'anthropic',

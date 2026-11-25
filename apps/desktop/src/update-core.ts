@@ -120,7 +120,9 @@ export async function stageBundle(
       at: now(),
     };
   } catch (error) {
-    await removeFolder(staging).catch(() => {});
+    await removeFolder(staging).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     throw error;
   }
 }

@@ -101,7 +101,9 @@ export function defaultLocalServerHomes(opts: {
     let key = resolved;
     try {
       key = realpathSync(resolved);
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
     if (seen.has(key)) continue;
     seen.add(key);
     homes.push(resolved);
@@ -153,7 +155,9 @@ function readOwnedFile(path: string): string | null {
     if (fd !== undefined) {
       try {
         closeSync(fd);
-      } catch {}
+      } catch (error) {
+        console.debug('cairn: recoverable operation failed', error);
+      }
     }
   }
 }

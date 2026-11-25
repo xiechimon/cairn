@@ -8,10 +8,9 @@ import { isUsableTimestamp, relativeTime } from '../board/rel-time.js';
 import { reportStatusWord } from '../board/status-words.js';
 import { ThreadLink } from '../board/thread-link.js';
 import { ThinkingRow } from '../components/chat/agent-rows.js';
-import { FailureMarker } from '../components/chat/failure-marker.js';
 import { LiveRow, TypingDots } from '../components/chat/live-row.js';
-import { StatusLine } from '../components/chat/status-line.js';
-import { CHAT_BODY_CLS, UserMessageBubble } from '../components/chat/user-message-bubble.js';
+import { CHAT_BODY_CLS, ChatMessageBody } from '../components/chat/message-body.js';
+import { NoticeLine } from '../components/chat/notice-line.js';
 import { useArrivals } from '../components/growth.js';
 import { MachineName } from '../components/machine-label.js';
 import { ModelMark, resolveModelClientEntry } from '../components/model-identity.js';
@@ -644,7 +643,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
     if (item.id !== undefined && item.id === cardFailure) return null;
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
-        <FailureMarker label={t('未完成')} testId="chief-turn-error" />
+        <NoticeLine label={t('未完成')} testId="chief-turn-error" tone="danger" />
       </MessageScrollerItem>
     );
   }
@@ -664,7 +663,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'note')
     return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className={EVENT_ROW_CLS}>
-        <StatusLine testId="chief-note">
+        <NoticeLine layout="plain" testId="chief-note">
           {t(item.text, item.vars)}
           {item.machineName && (
             <>
@@ -674,7 +673,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
               {t(' 上')}
             </>
           )}
-        </StatusLine>
+        </NoticeLine>
       </MessageScrollerItem>
     );
   if (item.kind === 'user') {
@@ -724,7 +723,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             )}
             {showBubble && (
               <div className="group/reply-block relative max-w-full" data-slot="reply-block">
-                <UserMessageBubble
+                <ChatMessageBody
+                  speaker="user"
                   data-testid="chief-bubble"
                   tail={!joinsNext}
                   data-md={shown != null ? '' : undefined}
@@ -736,7 +736,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
                 >
                   {reply != null && <ReplyQuoteBlock quote={reply.quote} />}
                   {shown != null ? <ChatMarkdown text={bubbleText} /> : bubbleText}
-                </UserMessageBubble>
+                </ChatMessageBody>
                 {!sending && <ChiefMessageTools {...userToolProps} testId="chief-msg-tools" />}
               </div>
             )}
@@ -833,7 +833,8 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
       >
         <MessageContent className={MSG_COL_MID_CLS} data-testid="chief-msg-col">
           {subagents.length > 0 && <SubagentProgressList items={subagents} />}
-          <div
+          <ChatMessageBody
+            speaker="assistant"
             className={BUBBLE_WRAP_CLS}
             data-testid="chief-reply"
             {...(item.id != null && settled ? { [REPLY_SOURCE_ATTR]: item.id } : {})}
@@ -879,7 +880,7 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
             {settled && (
               <ChiefMessageTools {...assistantToolProps} copyText={whole} testId="chief-msg-foot" />
             )}
-          </div>
+          </ChatMessageBody>
           {item.typing === true && <TypingDots className="mt-1" />}
           {unmentioned.length > 0 && <StartedTasksLine todoIds={unmentioned} />}
           {settled && (

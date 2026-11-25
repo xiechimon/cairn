@@ -77,7 +77,9 @@ export async function authenticateCredential(
 function send(child: ChildProcess, id: number, method: string, params: object): void {
   try {
     child.stdin?.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
 
 async function authenticate(child: ChildProcess, options: LoginOptions, closed: Promise<void>) {
@@ -152,7 +154,9 @@ async function authenticate(child: ChildProcess, options: LoginOptions, closed: 
                   : 'failed',
               );
             }
-          } catch {}
+          } catch (error) {
+            console.debug('cairn: recoverable operation failed', error);
+          }
         }
       });
       send(child, 1, 'initialize', { protocolVersion: 1, clientCapabilities: {} });

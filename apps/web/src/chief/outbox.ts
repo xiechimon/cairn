@@ -146,7 +146,11 @@ export function pageLockOwner(): OutboxOwner {
   const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
   if (locks === undefined) return solitary;
   const id = crypto.randomUUID();
-  void locks.request(`${OWNER_LOCK}${id}`, () => new Promise<never>(() => {})).catch(() => {});
+  void locks
+    .request(`${OWNER_LOCK}${id}`, () => new Promise<never>(() => {}))
+    .catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
   return {
     id,
     live: async () =>
@@ -196,7 +200,9 @@ export function createOutbox({
         };
   const bounded = (write: Promise<void>) =>
     Promise.race([
-      write.catch(() => {}),
+      write.catch((error) => {
+        console.debug('cairn: recoverable operation failed', error);
+      }),
       new Promise<void>((resolve) => setTimeout(resolve, writeTimeoutMs)),
     ]);
   const keep = (entry: OutboxEntry, state: StoredOutboxEntry['state']) => {
@@ -208,7 +214,9 @@ export function createOutbox({
     return row === null ? Promise.resolve() : bounded(store.putIfPresent(row));
   };
   const forget = (key: string) => {
-    void store.remove(key).catch(() => {});
+    void store.remove(key).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
   };
   const replace = (next: readonly OutboxEntry[]) => {
     list = next;
@@ -253,7 +261,9 @@ export function createOutbox({
     }
   };
   const after = (work: () => Promise<void>) => {
-    const run = tail.then(work).catch(() => {});
+    const run = tail.then(work).catch((error) => {
+      console.debug('cairn: recoverable operation failed', error);
+    });
     tail = run;
     return run;
   };

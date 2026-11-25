@@ -1,0 +1,3 @@
+`$promise.catch(($error) => {})` where {
+  register_diagnostic(span=$promise, message="silent promise catch is banned: log, recover, rethrow, or surface the failure", severity="error")
+}

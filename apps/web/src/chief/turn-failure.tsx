@@ -1,5 +1,5 @@
-import { CircleAlert, X } from 'lucide-react';
-import { createContext, type KeyboardEvent, type ReactNode, useId, useState } from 'react';
+import { X } from 'lucide-react';
+import { createContext, type KeyboardEvent, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import {
   type TurnErrorCopy,
@@ -9,7 +9,7 @@ import {
 } from '../api/mappers.js';
 import { canUpdateDesktop, updateDesktopNow } from '../board/desktop-update.js';
 import { PANE_PARAM } from '../board/work-panel.js';
-import { FailureDetailToggle, RawError } from '../components/chat/failure-marker.js';
+import { NoticeLine } from '../components/chat/notice-line.js';
 import { Button } from '../components/ui/button.js';
 import type { QueueWait } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
@@ -17,9 +17,6 @@ import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { settingsHref } from '../settings/settings-href.js';
 
 export const ON_MAC = typeof navigator !== 'undefined' && /Macintosh/.test(navigator.userAgent);
-
-const FAIL_ICON_CLS = 'mt-0.5 size-5.5 flex-none text-(--destructive)';
-const WAIT_ICON_CLS = 'mt-0.5 size-5.5 flex-none text-(--card-button)';
 
 const ACTION_LABELS: Record<TurnFailureAction, string> = {
   update: '更新 Cairn',
@@ -60,6 +57,8 @@ function NoticeCard({
   why,
   className,
   onDismiss,
+  detail,
+  detailTestId,
   children,
 }: {
   testId: string;
@@ -69,6 +68,8 @@ function NoticeCard({
   why: string;
   className: string;
   onDismiss: () => void;
+  detail?: { lines: string[]; raw: string } | undefined;
+  detailTestId?: string | undefined;
   children: ReactNode;
 }) {
   const { t } = useI18n();
@@ -78,31 +79,36 @@ function NoticeCard({
     onDismiss();
   };
   return (
-    <div
-      role="status"
-      aria-live={tone === 'fail' ? 'assertive' : 'polite'}
-      data-testid={testId}
-      data-kind={kind}
-      onKeyDown={onKeyDown}
-      className={`${className} relative pr-12`}
-    >
-      <CircleAlert aria-hidden="true" className={tone === 'fail' ? FAIL_ICON_CLS : WAIT_ICON_CLS} />
-      <span className="min-w-0 flex-1">
-        <b className="block text-ui font-semibold text-(--foreground)">{title}</b>
-        <span className="block text-pretty">{why}</span>
-        {children}
-      </span>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={t('收起')}
-        title={t('收起')}
-        data-testid={`${testId}-dismiss`}
-        className="absolute top-1.5 right-1.5 text-content-tertiary pointer-coarse:size-11"
-        onClick={onDismiss}
-      >
-        <X />
-      </Button>
+    <div data-kind={kind} className={className}>
+      <NoticeLine
+        testId={testId}
+        tone={tone === 'fail' ? 'danger' : 'waiting'}
+        waiting={tone === 'wait'}
+        detail={detail}
+        detailTestId={detailTestId}
+        onKeyDown={onKeyDown}
+        label={
+          <>
+            <b className="font-semibold text-foreground">{title}</b> <span>{why}</span>
+          </>
+        }
+        actions={
+          <>
+            {children}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t('收起')}
+              title={t('收起')}
+              data-testid={`${testId}-dismiss`}
+              className="size-6 text-content-tertiary pointer-coarse:size-11"
+              onClick={onDismiss}
+            >
+              <X />
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }
@@ -121,8 +127,6 @@ export function TurnFailureCard({
   const { t } = useI18n();
   const copy = turnErrorCopy(error, ON_MAC);
   const text = useCopyText()(copy);
-  const [open, setOpen] = useState(false);
-  const detailId = useId();
   const actions = copy.actions.filter((action) =>
     action === 'update'
       ? canUpdateDesktop()
@@ -137,6 +141,8 @@ export function TurnFailureCard({
       why={text.why}
       className={className}
       onDismiss={onDismiss}
+      detail={{ lines: [], raw: error.message }}
+      detailTestId="chief-turn-error-raw"
     >
       <span className="mt-2 flex flex-wrap items-center gap-2">
         {actions.map((action, n) => {
@@ -166,9 +172,7 @@ export function TurnFailureCard({
             </Button>
           );
         })}
-        <FailureDetailToggle open={open} controls={detailId} onToggle={() => setOpen((v) => !v)} />
       </span>
-      {open && <RawError id={detailId} text={error.message} testId="chief-turn-error-raw" />}
     </NoticeCard>
   );
 }

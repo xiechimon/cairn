@@ -209,7 +209,9 @@ function fireDesktopNotification(record: NotificationRecord): void {
         window.focus();
         window.location.assign(href);
       };
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   });
 }
 

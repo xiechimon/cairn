@@ -1,6 +1,13 @@
 import { cn } from 'cn';
 import { ChevronDown, CircleAlert, Clock, Copy } from 'lucide-react';
-import { useId, useState } from 'react';
+import {
+  type ComponentProps,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+  useId,
+  useState,
+} from 'react';
 import { useI18n } from '../../i18n/provider.js';
 import { copyTextWithFeedback } from '../../lib/clipboard.js';
 import { Disclosure } from '../disclosure.js';
@@ -9,12 +16,12 @@ import { DialogShell } from '../ui/dialog-shell.js';
 import { Marker, MarkerContent, MarkerIcon } from '../ui/marker.js';
 import { toastSuccess } from '../ui/toaster.js';
 
-export interface FailureDetail {
+export interface NoticeDetail {
   lines: string[];
   raw: string;
 }
 
-export function FailureDetailToggle({
+export function NoticeDetailToggle({
   open,
   controls,
   onToggle,
@@ -86,47 +93,124 @@ export function RawError({
   );
 }
 
-export function FailureMarker({
+export type NoticeTone = 'neutral' | 'waiting' | 'danger';
+
+const TONE_INK: Record<NoticeTone, string> = {
+  neutral: 'text-content-tertiary',
+  waiting: 'text-content-tertiary',
+  danger: 'text-destructive',
+};
+
+const DEFAULT_ICON: Record<NoticeTone, ComponentType<SVGProps<SVGSVGElement>> | null> = {
+  neutral: null,
+  waiting: Clock,
+  danger: CircleAlert,
+};
+
+export const NOTICE_LINE_PLAIN_CLS =
+  'flex min-h-6 min-w-0 items-center gap-2 text-left font-sans text-meta tabular-nums text-(--text-tertiary)';
+
+export function NoticeLine({
   label,
+  children,
   testId,
   detail,
+  detailTestId,
+  onKeyDown,
+  tone = 'neutral',
+  layout = 'separator',
   waiting = false,
+  live = false,
+  icon,
+  actions,
+  className,
+  contentClassName,
 }: {
-  label: string;
-  testId: string;
-  detail?: FailureDetail | undefined;
+  label?: ReactNode;
+  children?: ReactNode;
+  testId?: string | undefined;
+  detail?: NoticeDetail | undefined;
+  detailTestId?: string | undefined;
+  onKeyDown?: ComponentProps<'div'>['onKeyDown'] | undefined;
+  tone?: NoticeTone;
+  layout?: 'plain' | 'separator';
   waiting?: boolean;
+  live?: boolean;
+  icon?: ComponentType<SVGProps<SVGSVGElement>> | null;
+  actions?: ReactNode;
+  className?: string;
+  contentClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
   const detailId = useId();
-  return (
-    <div>
+  const Icon = icon === undefined ? DEFAULT_ICON[tone] : icon;
+  const announced = live || waiting;
+  const detailToggle = detail !== undefined && (
+    <NoticeDetailToggle
+      open={open}
+      controls={detailId}
+      onToggle={() => setOpen((value) => !value)}
+      className="h-6 flex-none text-meta hover:text-foreground"
+    />
+  );
+  const body =
+    layout === 'separator' ? (
       <Marker
         variant="separator"
-        role={waiting ? 'status' : 'note'}
+        role={announced ? 'status' : 'note'}
         data-testid={testId}
         data-waiting={waiting ? '' : undefined}
-        className="gap-1.5 text-meta text-content-tertiary"
+        onKeyDown={onKeyDown}
+        className={cn('gap-1.5 text-meta text-content-tertiary', className)}
       >
-        <MarkerIcon>{waiting ? <Clock /> : <CircleAlert />}</MarkerIcon>
+        {Icon !== null && (
+          <MarkerIcon className={TONE_INK[tone]}>
+            <Icon />
+          </MarkerIcon>
+        )}
         <MarkerContent
           data-testid="failure-marker-label"
-          className="text-pretty tabular-nums group-data-[variant=separator]/marker:flex-initial"
+          className={cn(
+            'text-pretty tabular-nums group-data-[variant=separator]/marker:flex-initial',
+            contentClassName,
+          )}
         >
-          {label}
+          {label ?? children}
         </MarkerContent>
-        {detail !== undefined && (
-          <FailureDetailToggle
-            open={open}
-            controls={detailId}
-            onToggle={() => setOpen((v) => !v)}
-            className="h-6 flex-none text-meta hover:text-foreground"
-          />
-        )}
+        {detailToggle}
+        {actions}
       </Marker>
+    ) : (
+      <div
+        role={announced ? 'status' : undefined}
+        data-testid={testId}
+        data-waiting={waiting ? '' : undefined}
+        className={cn(NOTICE_LINE_PLAIN_CLS, className)}
+      >
+        {Icon !== null && (
+          <Icon aria-hidden="true" className={cn('size-4 flex-none', TONE_INK[tone])} />
+        )}
+        <span
+          data-testid="failure-marker-label"
+          className={cn('max-w-[68ch] min-w-0 [overflow-wrap:anywhere]', contentClassName)}
+        >
+          {label ?? children}
+        </span>
+        {detailToggle}
+        {actions}
+      </div>
+    );
+  return (
+    <div>
+      {body}
       {detail !== undefined && (
         <Disclosure open={open}>
-          <RawError id={detailId} text={detail.raw} lines={detail.lines} testId="fail-raw-error" />
+          <RawError
+            id={detailId}
+            text={detail.raw}
+            lines={detail.lines}
+            testId={detailTestId ?? 'fail-raw-error'}
+          />
         </Disclosure>
       )}
     </div>

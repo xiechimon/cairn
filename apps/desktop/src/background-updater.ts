@@ -78,7 +78,9 @@ async function main(): Promise<void> {
         handledRequestId: request?.id ?? null,
         updatedAt: Date.now(),
       });
-    } catch {}
+    } catch (error) {
+      console.debug('cairn: recoverable operation failed', error);
+    }
   };
   writeStatus('checking', request?.requestedVersion ?? null);
   const outcome = await runBackgroundUpdate({

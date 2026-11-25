@@ -20,5 +20,7 @@ export function persistNotifyPref(
 ): void {
   try {
     storage?.setItem(NOTIFY_PREF_KEY, pref === 'on' ? '1' : '0');
-  } catch {}
+  } catch (error) {
+    console.debug('cairn: recoverable operation failed', error);
+  }
 }
