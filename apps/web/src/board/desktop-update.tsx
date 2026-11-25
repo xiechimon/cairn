@@ -30,7 +30,7 @@ const REFUSAL_HINTS: Record<string, string> = {
 };
 
 export function updateInstallRefusalCopy(reason: string, t: TFunc): string {
-  const mapped = REFUSAL_HINTS[reason];
+  const mapped = Object.hasOwn(REFUSAL_HINTS, reason) ? REFUSAL_HINTS[reason] : undefined;
   if (mapped !== undefined) return t(mapped);
   return t('未能安装更新，点击重试');
 }
@@ -38,8 +38,7 @@ export function updateInstallRefusalCopy(reason: string, t: TFunc): string {
 export async function updateDesktopNow(): Promise<void> {
   const bridge = desktopUpdates();
   if (bridge === null) return;
-  const t: TFunc = (source, vars) =>
-    translate(activeLocale(safeLocalStorage()), EN, source, vars);
+  const t: TFunc = (source, vars) => translate(activeLocale(safeLocalStorage()), EN, source, vars);
   try {
     if (!installable(await bridge.state())) await bridge.check();
     const current = await bridge.state();
