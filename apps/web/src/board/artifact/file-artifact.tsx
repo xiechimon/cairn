@@ -389,7 +389,7 @@ function FileView({
       {readsText && (
         <CopyIconButton
           text={text ?? ''}
-          label={t('复制')}
+          label={kind === 'markdown' && mode === 'preview' ? t('复制为 Markdown') : t('复制')}
           copiedLabel={t('已复制')}
           side="bottom"
           size="icon-sm"

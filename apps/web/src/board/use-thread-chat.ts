@@ -47,6 +47,7 @@ import type { NamedMachine } from '../components/machine-label.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
 import { toastError } from '../components/ui/toaster.js';
 import { blockDemoWrite, DEMO_MODE } from '../demo/demo-gate.js';
+import { docBlocksToMarkdown } from '../detail/docpane.js';
 import { isTranscriptSettled } from '../detail/scroll-anchor.js';
 import type { DocBlock, TodoRecord, TranscriptItem } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -82,6 +83,7 @@ export interface ThreadChat {
   transcriptSettled: boolean;
   infoOutput: boolean;
   planDoc: DocBlock[] | undefined;
+  planMarkdown: string | null;
   changes: ThreadChanges;
   engineRun?: EngineRun;
   engineStage?: EngineRunStage;
@@ -492,6 +494,13 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
         ? mapPlanDoc(latestPlan.content)
         : undefined
       : fixtureDetail?.doc,
+    planMarkdown: live
+      ? latestPlan !== undefined && latestPlan.content.trim() !== ''
+        ? latestPlan.content
+        : null
+      : fixtureDetail?.doc !== undefined && fixtureDetail.doc.length > 0
+        ? docBlocksToMarkdown(fixtureDetail.doc)
+        : null,
     changes,
     ...(live
       ? { ...(liveRun !== null ? { engineRun: liveRun } : {}) }

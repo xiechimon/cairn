@@ -17,6 +17,7 @@ import { contextPercentOf } from '../chief/context-meter-ring.js';
 import { REPLY_SOURCE_ATTR } from '../chief/reply-source-highlight.js';
 import { isFinalReportPhase, ReportThreadContext } from '../chief/research-report.js';
 import { TraceCard } from '../components/chat/trace-parts.js';
+import { CopyIconButton } from '../components/copy-icon-button.js';
 import { RollNumber, useArrivals } from '../components/growth.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { QueuedCapsules } from '../components/queued-capsules.js';
@@ -835,6 +836,17 @@ function ReadyThread({
         size="l"
         title={t('计划')}
         subtitle={todo.title}
+        headerAction={
+          chat.planMarkdown !== null ? (
+            <CopyIconButton
+              text={chat.planMarkdown}
+              label={t('复制为 Markdown')}
+              copiedLabel={t('已复制')}
+              testId="plan-copy-markdown"
+              className="text-content-tertiary hover:text-foreground pointer-coarse:size-11"
+            />
+          ) : undefined
+        }
       >
         <div data-testid="side-chat-plan" className="flex h-[min(70vh,720px)] min-h-0 flex-col">
           {updates !== null && (

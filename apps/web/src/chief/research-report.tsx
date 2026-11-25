@@ -206,6 +206,7 @@ export function ResearchReportDialog({
         <CopyIconButton
           text={report.content}
           label={t('复制为 Markdown')}
+          copiedLabel={t('已复制')}
           testId="copy-markdown"
           className="text-content-tertiary hover:text-foreground pointer-coarse:size-11"
         />

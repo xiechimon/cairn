@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useBuildChangeFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { Button } from '../components/ui/button.js';
-import type { DiffFile, DocBlock } from '../fixtures/records.js';
+import type { DiffFile, DocBlock, DocSegment } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Segments } from './segments.js';
 import { computeHunkWordDiff } from './word-diff.js';
@@ -227,6 +227,49 @@ function docBlockClass(kind: string, first: boolean): string {
   if (kind === 'para') return `${base}${first ? '' : ' mt-2'}`;
   if (kind === 'bullet') return `${base} relative mt-1 pl-4`;
   return `${base} ${first ? 'mt-0' : 'mt-6'} mb-1.5 text-meta font-medium text-(--text-tertiary)`;
+}
+
+function inlineCodeMarkdown(text: string): string {
+  if (!text.includes('`')) return `\`${text}\``;
+  return `\`\` ${text} \`\``;
+}
+
+function docSegmentToMarkdown(seg: DocSegment): string {
+  let out: string;
+  if (seg.style === 'break') return '\n';
+  if (seg.style === 'code' || seg.style === 'link') out = inlineCodeMarkdown(seg.text);
+  else if (seg.style === 'strong') out = `**${seg.text}**`;
+  else if (seg.style === 'anchor') {
+    const label = seg.strong === true ? `**${seg.text}**` : seg.text;
+    out = seg.href !== undefined ? `[${label}](${seg.href})` : label;
+  } else if (seg.style === 'attachment') {
+    out = seg.attachmentKey != null ? `[${seg.text}](${seg.attachmentKey})` : seg.text;
+  } else out = seg.text;
+  if (seg.del === true) out = `~~${out}~~`;
+  if (seg.em === true) out = `*${out}*`;
+  return out;
+}
+
+export function docBlocksToMarkdown(doc: readonly DocBlock[]): string {
+  if (doc.length === 0) return '';
+  const parts: string[] = [];
+  for (let i = 0; i < doc.length; i++) {
+    const block = doc[i];
+    if (block === undefined) continue;
+    const text = block.segments.map(docSegmentToMarkdown).join('');
+    const rendered =
+      block.kind === 'head'
+        ? `## ${text}`
+        : block.kind === 'bullet'
+          ? `- ${text.replaceAll('\n', '\n  ')}`
+          : text;
+    if (i > 0) {
+      const prev = doc[i - 1];
+      parts.push(prev?.kind === 'bullet' && block.kind === 'bullet' ? '\n' : '\n\n');
+    }
+    parts.push(rendered);
+  }
+  return parts.join('');
 }
 
 export function DocPane({ doc }: { doc: DocBlock[] | undefined }) {

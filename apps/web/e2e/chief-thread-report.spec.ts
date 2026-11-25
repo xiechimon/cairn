@@ -581,10 +581,11 @@ test('C27: a research report copies as its Markdown source from an icon button b
   await page.goto('/app?pane=made');
   await page.getByRole('complementary', { name: '成果' }).getByRole('button', { name: 'Research export formats' }).click();
   const dialog = page.getByRole('dialog', { name: 'Research export formats' });
-  const copy = dialog.getByRole('button', { name: '复制为 Markdown', exact: true });
+  const copy = dialog.getByTestId('copy-markdown');
   await expect(copy, 'C27: one copy action on the report').toHaveCount(1);
+  await expect(copy, 'C27: the copy button names itself').toHaveAccessibleName('复制为 Markdown');
   await expect(
-    dialog.locator('[data-slot="dialog-head-action"]').getByRole('button', { name: '复制为 Markdown' }),
+    dialog.locator('[data-slot="dialog-head-action"]').getByTestId('copy-markdown'),
     'C27: the document action sits in the dialog head beside close',
   ).toBeVisible();
   await expect(copy, 'C27: the document action is icon-only').toHaveText('');
@@ -595,5 +596,6 @@ test('C27: a research report copies as its Markdown source from an icon button b
   await expect(page.locator('[data-slot="tooltip-content"]'), 'C4: the icon button names itself').toHaveText('复制为 Markdown');
   await copy.click();
   await expect(copy).toHaveAttribute('data-copied', '');
+  await expect(copy).toHaveAccessibleName('已复制');
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(source);
 });
