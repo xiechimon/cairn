@@ -2104,7 +2104,7 @@ async function verifyRemoteUpdate({ appRoot: sourceApp, screenshotPath: baseShot
 
       await updateButton.click();
 
-      const deadline = Date.now() + OPEN_TIMEOUT_MS * 12;
+      const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
       let lastStatus = null;
       while (Date.now() < deadline) {
         lastStatus = await updateButton.getAttribute('data-status');
