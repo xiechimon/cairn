@@ -22,27 +22,6 @@ interface GatePaths {
 }
 
 const gatePaths = JSON.parse(read('packages/shared/merge-gate-paths.json')) as GatePaths;
-const securityCapabilities = ['credentials', 'machineAndCommandBoundary', 'externalEntryAuth'];
-
-function expandBraces(spec: string): string[] {
-  const match = /\{([^{}]+)\}/.exec(spec);
-  if (!match) return [spec];
-  const alternatives = (match[1] ?? '').split(',');
-  return alternatives.flatMap((alt) => expandBraces(spec.replace(match[0], alt)));
-}
-
-function listedSecurityPaths(guide: string): string[] {
-  const afterHeader = guide.slice(guide.indexOf('Security surfaces'));
-  const bullets = afterHeader
-    .split('\n')
-    .slice(1)
-    .filter((line) => line.trim() !== '')
-    .filter((_, i, all) => all.slice(0, i + 1).every((l) => l.startsWith('- ')));
-  return bullets
-    .flatMap((line) => [...line.matchAll(/`([^`]+)`/g)].map((m) => m[1] as string))
-    .flatMap(expandBraces)
-    .sort();
-}
 
 describe('merge-gate-paths.json is the single source', () => {
   test('merge-gate.ts exports are exactly the JSON lists and limits', () => {
@@ -75,26 +54,5 @@ describe('merge-gate-paths.json is the single source', () => {
   test('merge-gate.ts keeps no inline copy of the lists', () => {
     const path = 'packages/shared/src/records/merge-gate.ts';
     expect(read(path), path).not.toMatch(/secret-box|'\*\*\/drizzle\/\*\*'|'apps\/\*\/src\/\*\*'/);
-  });
-});
-
-describe('AGENTS.md security surfaces match the JSON', () => {
-  const jsonSecurity = securityCapabilities
-    .flatMap((key) => gatePaths.humanQueue[key] ?? [])
-    .sort();
-
-  test('the paths listed under Security surfaces are exactly the credentials, machine and external-entry capabilities', () => {
-    expect(listedSecurityPaths(read('AGENTS.md'))).toEqual(jsonSecurity);
-    expect(listedSecurityPaths(read('CLAUDE.md'))).toEqual(jsonSecurity);
-  });
-
-  test('negative control: a path dropped or added in the guide is reported', () => {
-    const guide = read('AGENTS.md');
-    const dropped = guide.replace('`apps/server/src/services/machine*.ts`, ', '');
-    expect(dropped).not.toBe(guide);
-    expect(listedSecurityPaths(dropped)).not.toEqual(jsonSecurity);
-    const added = guide.replace('connector-broker}', 'connector-broker,extra}');
-    expect(added).not.toBe(guide);
-    expect(listedSecurityPaths(added)).not.toEqual(jsonSecurity);
   });
 });

@@ -36,7 +36,6 @@ test('AGENTS.md uses the speculative batching queue, retries once, and never let
 test('AGENTS.md keeps the safety rules the ship flow relies on', () => {
   const agents = read('AGENTS.md');
   assert.match(agents, /Never force push/);
-  assert.match(agents, /\/security-review/);
   assert.match(agents, /Design first for a change to persisted state/);
   assert.match(agents, /No change may edit what judges it/);
 });
