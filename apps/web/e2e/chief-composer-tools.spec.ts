@@ -313,7 +313,7 @@ test('a mid-line image paste becomes a tile and leaves the text alone (FM6)', as
   await evidenceShot(page, 'chief-paste-token-at-caret.png');
 });
 
-test('Enter during the upload does not send; after it lands Enter sends the token inside (FM6/FM10)', async ({
+test('Enter during the upload waits and sends with the token once the upload lands (FM6/FM10)', async ({
   page,
 }) => {
   await stubBoot(page);
@@ -328,7 +328,6 @@ test('Enter during the upload does not send; after it lands Enter sends the toke
   await setCaret(page, COMPOSER, 12);
   await pasteFiles(page, COMPOSER, [{ name: 'image.png', type: 'image/png' }]);
 
-  // The grant is still held — Enter must not send a tokenless message.
   await input.press('Enter');
   expect(sent).toHaveLength(0);
   await expect(input).toHaveValue('look at this');
@@ -337,12 +336,9 @@ test('Enter during the upload does not send; after it lands Enter sends the toke
   await deferred.releaseAll();
   await expect.poll(() => deferred.held.length).toBe(1);
   await deferred.releaseAll();
-  await expect(input).toHaveValue('look at this');
-  await expect(page.getByTestId('composer-attachments').locator('[data-state="ready"]')).toHaveCount(1);
-
-  await input.press('Enter');
   await expect.poll(() => sent.length).toBe(1);
   expect(sent[0]).toBe(`${TOKEN_1}\nlook at this`);
+  await expect(input).toHaveValue('');
 });
 
 // —— transcript rendering (FM7) ——
