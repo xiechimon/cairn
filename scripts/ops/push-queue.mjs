@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename, join } from 'node:path';
 import { RELEASE_MARKER } from './guard-queue.mjs';
-import { closeIssuesAfterLanding, landingState, ownerOf, pushToMain } from './promote-queue.mjs';
+import { ownerOf } from './promote-queue.mjs';
 import { ENQUEUE_PREFIX, makeEnqueueId, sortEnqueueEntries } from './speculative-queue.mjs';
 
 export const DEFAULT_POLL_SECONDS = 15;
@@ -14,16 +14,7 @@ export function planPush({ live, queueHead }) {
   return { action: 'wait', sha: live, restoring: queueHead === null };
 }
 
-export function planEnqueueOrLand({
-  activeEnqueueCount,
-  hasLegacyLive = false,
-  pushedSha,
-  evidenceSha,
-  containsMain,
-}) {
-  if (!hasLegacyLive && activeEnqueueCount === 0 && containsMain && evidenceSha === pushedSha) {
-    return { action: 'fast-forward-main', sha: pushedSha };
-  }
+export function planEnqueueOrLand({ pushedSha }) {
   return { action: 'enqueue', sha: pushedSha };
 }
 
@@ -167,12 +158,6 @@ export function nextWaitAction({
   return { action: 'push' };
 }
 
-export function landingTarget({ pushedSha, evidenceSha, containsMain }) {
-  if (!containsMain) return { action: 'reject-stale' };
-  if (evidenceSha === pushedSha) return { action: 'fast-forward-main', sha: pushedSha };
-  return { action: 'queue', sha: pushedSha };
-}
-
 export function unownedCommits(commits) {
   return commits.filter((commit) => ownerOf(commit.body) === null).map((commit) => commit.sha);
 }
@@ -214,7 +199,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   const repo = process.env.CAIRN_REPO ?? 'xiechimon/cairn';
   const git = (args) => execFileSync('git', args, { encoding: 'utf8' }).trim();
   const wait = process.argv.includes('--wait');
-  const enqueueOnly = process.argv.includes('--enqueue');
   const POLL_SECONDS = Number(process.env.PUSH_QUEUE_POLL_SECONDS ?? DEFAULT_POLL_SECONDS);
   const waitMinutes = Number(process.env.PUSH_QUEUE_WAIT_MINUTES ?? 120);
   const deadline = Date.now() + waitMinutes * 60_000;
@@ -332,49 +316,6 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
         'Run node scripts/ops/preflight.mjs --wait — it pushes HEAD to refs/heads/preflight/<lane> and waits for the ci run.',
     );
     process.exit(1);
-  }
-
-  const { entries, legacyLive } = listRemoteQueue();
-  const plan = enqueueOnly
-    ? { action: 'enqueue', sha: pushedSha }
-    : planEnqueueOrLand({
-        activeEnqueueCount: entries.length,
-        hasLegacyLive: legacyLive !== null,
-        pushedSha,
-        evidenceSha: evidence.sha,
-        containsMain: ancestor('origin/main', pushedSha),
-      });
-
-  if (plan.action === 'fast-forward-main') {
-    const before = git(['rev-parse', 'origin/main']);
-    const ff = spawnSync('git', ['push', 'origin', `${plan.sha}:refs/heads/main`], {
-      encoding: 'utf8',
-    });
-    process.stdout.write(ff.stdout ?? '');
-    process.stderr.write(ff.stderr ?? '');
-    if (ff.status === 0) {
-      console.log(
-        `[push-queue] fast-forwarded main to ${plan.sha.slice(0, 9)} (empty queue, preflight-green)`,
-      );
-      closeIssuesAfterLanding({ repo, before, after: plan.sha, logPrefix: '[push-queue]' });
-      process.exit(0);
-    }
-    const output = `${ff.stdout ?? ''}\n${ff.stderr ?? ''}`;
-    if (/GH013/i.test(output)) {
-      pushToMain({
-        sha: plan.sha,
-        mainTip: before,
-        expectedQueueHead: null,
-        push: () =>
-          spawnSync('git', ['push', 'origin', `${plan.sha}:refs/heads/main`], { encoding: 'utf8' }),
-        recheck: () => landingState(repo, plan.sha),
-        sleep,
-      });
-      console.log(`[push-queue] fast-forwarded main to ${plan.sha.slice(0, 9)}`);
-      closeIssuesAfterLanding({ repo, before, after: plan.sha, logPrefix: '[push-queue]' });
-      process.exit(0);
-    }
-    console.log('[push-queue] main moved concurrently; enqueueing into speculative queue');
   }
 
   spawnSync('git', ['fetch', '--quiet', 'origin', 'main'], { stdio: 'inherit' });

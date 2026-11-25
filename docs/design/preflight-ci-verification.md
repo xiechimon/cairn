@@ -31,24 +31,29 @@ A lane verifies on GitHub before it occupies `queue/main`:
   (whitespace-split command prefix) combines that plan into a single
   `<wrapper...> sh -c "..."` call so hosts can offload the gate to a dedicated
   test runner without hardcoding host-specific paths in the repository.
+- `scripts/ops/preflight.mjs` admits at most two active (`queued` or
+  `in_progress`) preflight `ci` runs. While two are active it waits before
+  pushing; `CAIRN_PREFLIGHT_CONCURRENCY_BYPASS=1` skips only this efficiency
+  wait, never the fast gate. If the GitHub run-count API is unreadable the
+  script proceeds after the fast gate because capacity is an efficiency gate,
+  while the safety evidence remains the required checks on the exact SHA.
 - `scripts/ops/push-queue.mjs` refuses to land a head with no green
   pre-flight evidence; local `pnpm prepush` / `pnpm test:changed` stay
-  recommended but are no longer the gate. When the queue is empty and HEAD
-  contains `origin/main` with exact-SHA preflight checks, it fast-forwards
-  `main` in 0s; otherwise it enqueues `HEAD` into `refs/heads/enqueue/*` for
-  parallel `scripts/ops/speculative-queue.mjs` promotion.
+  recommended but are no longer the gate. It always enqueues `HEAD` into
+  `refs/heads/enqueue/*` for parallel `scripts/ops/speculative-queue.mjs`
+  promotion, so the merge train is the single landing path.
 
 ## Gate predicate
 
 Because `preflight.mjs` stamps unowned commits before pushing `preflight/<lane>`,
 `push-queue.mjs` finds nothing left to stamp: `S = HEAD` is the exact SHA that
-already passed pre-flight, so `push-queue.mjs` can fast-forward `main` directly
-without a second CI run on `queue/main`. If a lane still has an unowned commit
-at push time, `push-queue.mjs` runs the same stamping step and requires the
-three contexts (`check`, `pack-smoke` and `e2e-gate`) with `conclusion: success`
-on `S` (or on the pre-stamp SHA, which shares `S`'s tree). A green run on a
-tree-identical SHA counts as pre-flight evidence, while `fast-forward-main`
-requires the green checks on `S` itself.
+already passed pre-flight, so the train can admit `S` without a second CI run
+on a queue try branch when it is the first entry on current `main`. If a lane
+still has an unowned commit at push time, `push-queue.mjs` runs the same
+stamping step and requires the three contexts (`check`, `pack-smoke` and
+`e2e-gate`) with `conclusion: success` on `S` (or on the pre-stamp SHA, which
+shares `S`'s tree). A green run on a tree-identical SHA counts as pre-flight
+evidence, while train admission requires the green checks on `S` itself.
 
 ## States and failure behaviour
 

@@ -183,6 +183,9 @@ jobs:
             exit 1
           fi
 
+      - name: CI runner capacity gate
+        run: node scripts/ops/ci-capacity-gate.mjs
+
       - name: UI registry gate (#989)
         env:
           UI_REGISTRY_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -562,7 +565,7 @@ jobs:
 
       - name: Workflow concurrency, scalars and queue promotion
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}
-        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-workflows -- node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/speculative-queue.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/ci-reuse-verified.test.mjs scripts/ops/ci-failed-only.test.mjs scripts/ops/merge-queue-invariants.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
+        run: node scripts/ops/ci-failed-only.mjs node-test --key gates-workflows -- node --test scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ops/speculative-queue.test.mjs scripts/ops/promote-queue.test.mjs scripts/ops/guard-queue.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/ci-reuse-verified.test.mjs scripts/ops/ci-failed-only.test.mjs scripts/ops/ci-capacity-gate.test.mjs scripts/ops/merge-queue-invariants.test.mjs scripts/ops/release-gate.test.mjs scripts/ops/release-plan.test.mjs scripts/desktop-release.test.mjs
 
       - name: Commit identity allowlist and hooks (#2289)
         if: ${{ !cancelled() && needs.changes.outputs.ops-selftests == 'true' }}

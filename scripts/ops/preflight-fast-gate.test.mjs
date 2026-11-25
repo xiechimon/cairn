@@ -55,6 +55,21 @@ test('fast gate plan is biome, touched package typechecks, then changed tests', 
   ]);
 });
 
+test('fast gate runs capacity and merge-queue checks for CI scheduling changes', () => {
+  const plan = fastGatePlan(['scripts/ops/push-queue.mjs', '.github/workflows/ci.yml']);
+  const rendered = plan.map((step) => step.join(' '));
+  assert.ok(rendered.includes('node scripts/ops/ci-capacity-gate.mjs'));
+  assert.ok(
+    rendered.includes(
+      'node --test scripts/ops/merge-queue-invariants.test.mjs scripts/ops/ci-capacity-gate.test.mjs scripts/ops/push-queue.test.mjs scripts/ops/speculative-queue.test.mjs scripts/workflow-concurrency.test.mjs scripts/workflow-scalars.test.mjs scripts/ci-tiers.test.mjs',
+    ),
+  );
+  assert.ok(
+    rendered.indexOf('node scripts/ops/ci-capacity-gate.mjs') <
+      rendered.indexOf('pnpm test:changed'),
+  );
+});
+
 test('exact tree and committed path helpers read only the committed candidate', () => {
   const root = makeTestTempDir('preflight-fast-gate-');
   try {

@@ -36,6 +36,7 @@ test('safety invariant: ci workflow keeps green-main contexts, non-cancelling qu
   assert.match(ci, /GITHUB_REF"\s*=\s*"refs\/heads\/main"/);
   assert.match(ci, /scripts\/ops\/ci-reuse-verified\.mjs/);
   assert.match(ci, /scripts\/ops\/merge-queue-invariants\.test\.mjs/);
+  assert.match(ci, /node scripts\/ops\/ci-capacity-gate\.mjs/);
 });
 
 test('safety invariant: speculative queue verifies admission checks and never force-pushes main', () => {

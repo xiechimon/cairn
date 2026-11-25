@@ -3,6 +3,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { hostname } from 'node:os';
 import { basename } from 'node:path';
+import { MAX_CONCURRENT_PREFLIGHT_RUNS } from './ci-capacity-gate.mjs';
 import { laneName, stampUnownedCommits } from './push-queue.mjs';
 
 export function preflightRef(lane) {
@@ -28,6 +29,87 @@ export function runFastGateBeforePush({
   invocation = fastGateInvocation(),
 }) {
   return spawn(invocation.command, invocation.args, { cwd: root, stdio: 'inherit' });
+}
+
+export { MAX_CONCURRENT_PREFLIGHT_RUNS };
+
+const ACTIVE_PREFLIGHT_STATUSES = new Set(['queued', 'in_progress', 'waiting', 'requested']);
+
+export function isActivePreflightRun(run) {
+  return (
+    ACTIVE_PREFLIGHT_STATUSES.has(run?.status) &&
+    typeof run?.head_branch === 'string' &&
+    run.head_branch.startsWith('preflight/')
+  );
+}
+
+export function preflightCapacityDecision({
+  activeCount,
+  maxRuns = MAX_CONCURRENT_PREFLIGHT_RUNS,
+  bypass = false,
+}) {
+  if (bypass || activeCount < maxRuns) return { action: 'push' };
+  return { action: 'wait', activeCount, maxRuns };
+}
+
+export function collectActivePreflightRuns({
+  repo,
+  gh,
+  statuses = ['queued', 'in_progress', 'waiting', 'requested'],
+}) {
+  const runs = [];
+  try {
+    for (const status of statuses) {
+      const page = gh([
+        'api',
+        `repos/${repo}/actions/workflows/ci.yml/runs?status=${status}&per_page=100`,
+      ]);
+      runs.push(...(page?.workflow_runs ?? []));
+    }
+  } catch (error) {
+    return { ok: false, error };
+  }
+  const unique = new Map();
+  for (const run of runs.filter(isActivePreflightRun))
+    unique.set(run.id ?? `${run.head_branch}:${run.head_sha}`, run);
+  return { ok: true, runs: [...unique.values()] };
+}
+
+export function waitForPreflightCapacity({
+  repo,
+  gh,
+  sleep,
+  log = console.log,
+  bypass = false,
+  pollSeconds = 20,
+  waitMinutes = 60,
+  now = () => Date.now(),
+}) {
+  const deadline = now() + waitMinutes * 60_000;
+  for (;;) {
+    const active = collectActivePreflightRuns({ repo, gh });
+    if (!active.ok) {
+      log(
+        `[preflight] could not count active preflight runs (${active.error.message}); proceeding after the mandatory fast gate`,
+      );
+      return { ok: true, degraded: true };
+    }
+    const decision = preflightCapacityDecision({
+      activeCount: active.runs.length,
+      bypass,
+    });
+    if (decision.action === 'push') return { ok: true, activeCount: active.runs.length };
+    if (now() > deadline) {
+      return {
+        ok: false,
+        error: `${active.runs.length} preflight ci runs are still active after ${waitMinutes} minutes; rerun later or set CAIRN_PREFLIGHT_CONCURRENCY_BYPASS=1`,
+      };
+    }
+    log(
+      `[preflight] ${active.runs.length}/${MAX_CONCURRENT_PREFLIGHT_RUNS} preflight ci runs active; waiting ${pollSeconds}s before pushing`,
+    );
+    sleep(pollSeconds);
+  }
 }
 
 export function watchVerdict(status, conclusion, watchStatus) {
@@ -60,6 +142,18 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
     console.error('[preflight] fast gate failed on the exact HEAD tree; nothing was pushed.');
     process.exit(gate.status ?? 1);
   }
+  const ghJson = (args) => JSON.parse(execFileSync('gh', args, { encoding: 'utf8' }));
+  const sleep = (seconds) => spawnSync('sleep', [String(seconds)]);
+  const capacity = waitForPreflightCapacity({
+    repo,
+    gh: ghJson,
+    sleep,
+    bypass: process.env.CAIRN_PREFLIGHT_CONCURRENCY_BYPASS === '1',
+  });
+  if (!capacity.ok) {
+    console.error(`[preflight] ${capacity.error}`);
+    process.exit(1);
+  }
   const push = spawnSync(
     'git',
     ['push', `--force-with-lease=${preflightRef(lane)}`, 'origin', `HEAD:${preflightRef(lane)}`],
@@ -67,13 +161,11 @@ if (process.argv[1] && import.meta.filename === process.argv[1]) {
   );
   if (push.status !== 0) process.exit(push.status ?? 1);
   console.log(`[preflight] pushed ${sha.slice(0, 9)} to ${preflightRef(lane)}`);
-  const sleep = (seconds) => spawnSync('sleep', [String(seconds)]);
   const readRun = () => {
-    const { workflow_runs: runs } = JSON.parse(
-      execFileSync('gh', ['api', `repos/${repo}/actions/runs?head_sha=${sha}&per_page=20`], {
-        encoding: 'utf8',
-      }),
-    );
+    const { workflow_runs: runs } = ghJson([
+      'api',
+      `repos/${repo}/actions/runs?head_sha=${sha}&per_page=20`,
+    ]);
     return preflightRun(runs, sha, ref);
   };
   let run = null;

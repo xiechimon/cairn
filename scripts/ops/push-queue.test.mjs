@@ -7,9 +7,13 @@ import { fileURLToPath } from 'node:url';
 import { makeTestTempDir, releaseTestTempDir } from '../test-tmpdir.mjs';
 import {
   fastGateInvocation,
+  isActivePreflightRun,
+  MAX_CONCURRENT_PREFLIGHT_RUNS,
+  preflightCapacityDecision,
   preflightRef,
   preflightRun,
   runFastGateBeforePush,
+  waitForPreflightCapacity,
   watchVerdict,
 } from './preflight.mjs';
 import {
@@ -19,7 +23,6 @@ import {
   failedGreenContexts,
   fetchCheckRuns,
   isTransientGitNetworkError,
-  landingTarget,
   laneName,
   missingGreenContexts,
   nextWaitAction,
@@ -274,23 +277,6 @@ test('fetchCheckRuns returns null when the commit is unknown to GitHub', () => {
   );
 });
 
-test('landingTarget fast-forwards main when exact SHA is preflight-green and contains origin/main', () => {
-  assert.deepEqual(landingTarget({ pushedSha: X, evidenceSha: X, containsMain: true }), {
-    action: 'fast-forward-main',
-    sha: X,
-  });
-  assert.deepEqual(
-    landingTarget({ pushedSha: X, evidenceSha: 'b'.repeat(40), containsMain: true }),
-    {
-      action: 'queue',
-      sha: X,
-    },
-  );
-  assert.deepEqual(landingTarget({ pushedSha: X, evidenceSha: X, containsMain: false }), {
-    action: 'reject-stale',
-  });
-});
-
 test('--wait rebases onto origin/main when main moved ahead of HEAD while queue/main is free', () => {
   assert.deepEqual(
     nextWaitAction({
@@ -373,7 +359,7 @@ console.log(JSON.stringify({ workflow_runs: [{ name: 'ci', head_sha: sha, head_b
   }
 });
 
-test('stamp-then-preflight produces evidence on pushedSha so landingTarget fast-forwards main', () => {
+test('stamp-then-preflight produces exact-SHA evidence for train admission', () => {
   const stampedSha = 'c'.repeat(40);
   const tree = 't'.repeat(40);
   const evidence = preflightEvidence({
@@ -390,13 +376,9 @@ test('stamp-then-preflight produces evidence on pushedSha so landingTarget fast-
         : null,
   });
   assert.deepEqual(evidence, { ok: true, sha: stampedSha });
-  assert.deepEqual(
-    landingTarget({ pushedSha: stampedSha, evidenceSha: evidence.sha, containsMain: true }),
-    { action: 'fast-forward-main', sha: stampedSha },
-  );
 });
 
-test('planEnqueueOrLand fast-forwards only when queue is empty and HEAD is directly green on main', () => {
+test('planEnqueueOrLand uses the merge train even when queue is empty and HEAD is directly green on main', () => {
   assert.equal(DEFAULT_POLL_SECONDS, 15);
   assert.deepEqual(
     planEnqueueOrLand({
@@ -406,7 +388,7 @@ test('planEnqueueOrLand fast-forwards only when queue is empty and HEAD is direc
       evidenceSha: X,
       containsMain: true,
     }),
-    { action: 'fast-forward-main', sha: X },
+    { action: 'enqueue', sha: X },
   );
   assert.deepEqual(
     planEnqueueOrLand({
@@ -540,6 +522,60 @@ test('isTransientGitNetworkError and pollWaitStep retry transient TLS or network
       initialMainSha: X,
     }),
   );
+});
+
+test('preflight capacity counts only active preflight runs and admits below two', () => {
+  assert.equal(MAX_CONCURRENT_PREFLIGHT_RUNS, 2);
+  for (const status of ['queued', 'in_progress', 'waiting', 'requested']) {
+    assert.equal(isActivePreflightRun({ status, head_branch: 'preflight/a' }), true);
+  }
+  assert.equal(isActivePreflightRun({ status: 'completed', head_branch: 'preflight/a' }), false);
+  assert.equal(isActivePreflightRun({ status: 'queued', head_branch: 'queue/try/a' }), false);
+  assert.equal(isActivePreflightRun({ status: 'in_progress', head_branch: 'main' }), false);
+
+  assert.deepEqual(preflightCapacityDecision({ activeCount: 0 }), { action: 'push' });
+  assert.deepEqual(preflightCapacityDecision({ activeCount: 1 }), { action: 'push' });
+  assert.deepEqual(preflightCapacityDecision({ activeCount: 2 }), {
+    action: 'wait',
+    activeCount: 2,
+    maxRuns: 2,
+  });
+  assert.deepEqual(preflightCapacityDecision({ activeCount: 3, bypass: true }), { action: 'push' });
+});
+
+test('waitForPreflightCapacity waits for a free slot and degrades open when the count API fails', () => {
+  const pages = [
+    [
+      { status: 'queued', head_branch: 'preflight/a' },
+      { status: 'in_progress', head_branch: 'preflight/b' },
+    ],
+    [{ status: 'in_progress', head_branch: 'preflight/a' }],
+  ];
+  const sleeps = [];
+  let calls = 0;
+  const waited = waitForPreflightCapacity({
+    repo: 'o/r',
+    gh: () => {
+      calls += 1;
+      return { workflow_runs: pages[Math.floor((calls - 1) / 4) === 0 ? 0 : 1] ?? [] };
+    },
+    sleep: (seconds) => sleeps.push(seconds),
+    log: () => {},
+    pollSeconds: 1,
+  });
+  assert.equal(waited.ok, true);
+  assert.equal(waited.activeCount, 1);
+  assert.deepEqual(sleeps, [1]);
+
+  const degraded = waitForPreflightCapacity({
+    repo: 'o/r',
+    gh: () => {
+      throw new Error('api down');
+    },
+    sleep: () => {},
+    log: () => {},
+  });
+  assert.deepEqual(degraded, { ok: true, degraded: true });
 });
 
 test('preflight fast gate invokes preflight-fast-gate locally or via CAIRN_PREFLIGHT_GATE_WRAPPER', () => {

@@ -40,9 +40,37 @@ export function typecheckPackagesForPaths(paths) {
   return PACKAGE_ORDER.filter((name) => selected.has(name));
 }
 
+const CI_SCHEDULING_TEST_STEP = [
+  'node',
+  '--test',
+  'scripts/ops/merge-queue-invariants.test.mjs',
+  'scripts/ops/ci-capacity-gate.test.mjs',
+  'scripts/ops/push-queue.test.mjs',
+  'scripts/ops/speculative-queue.test.mjs',
+  'scripts/workflow-concurrency.test.mjs',
+  'scripts/workflow-scalars.test.mjs',
+  'scripts/ci-tiers.test.mjs',
+];
+
+function touchesCiScheduling(paths) {
+  return paths.some(
+    (path) =>
+      path === '.github/workflows/ci.yml' ||
+      path.startsWith('scripts/ops/') ||
+      path.startsWith('scripts/workflow-') ||
+      path === 'scripts/ci-tiers.test.mjs',
+  );
+}
+
+export function ciSchedulingGateSteps(paths) {
+  if (!touchesCiScheduling(paths)) return [];
+  return [['node', 'scripts/ops/ci-capacity-gate.mjs'], CI_SCHEDULING_TEST_STEP];
+}
+
 export function fastGatePlan(paths, lastFailedTests = []) {
   const plan = [
     ['pnpm', 'lint'],
+    ...ciSchedulingGateSteps(paths),
     ...typecheckPackagesForPaths(paths).map((name) => ['pnpm', '--filter', name, 'typecheck']),
     ['pnpm', 'test:changed'],
   ];
