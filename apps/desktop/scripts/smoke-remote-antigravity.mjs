@@ -278,8 +278,17 @@ export async function runAntigravityRemoteAndSkewSmoke({
   try {
     const win = await mainWindow(remoteApp, launchTimeoutMs);
     await win.waitForLoadState('load');
-    const shell = await win.evaluate(() => window.cairnDesktop?.shell ?? null);
-    assert.ok(shell !== null, 'cairnDesktop.shell descriptor missing in packaged remote mode');
+    const shellDiag = await win.evaluate(() => ({
+      href: location.href,
+      hasBridge: typeof window.cairnDesktop,
+      keys: window.cairnDesktop ? Object.keys(window.cairnDesktop) : null,
+      shell: window.cairnDesktop?.shell ?? null,
+    }));
+    const shell = shellDiag.shell;
+    assert.ok(
+      shell !== null,
+      `cairnDesktop.shell descriptor missing in packaged remote mode: ${JSON.stringify(shellDiag)}`,
+    );
     assert.equal(shell.bridgeVersion, 1, `unexpected bridgeVersion: ${JSON.stringify(shell)}`);
     assert.equal(shell.capabilities?.antigravitySignIn, true);
     const banner = win.getByTestId('antigravity-login-banner');
