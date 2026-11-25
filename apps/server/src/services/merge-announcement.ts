@@ -34,7 +34,7 @@ export function announceMergeStepOutcome(
     role: 'system' as const,
     content: JSON.stringify({
       kind: CHIEF_NOTICE_KIND,
-      message: `任务 #${todoRow.seqNum}「${todoRow.title}」：${input.text}`,
+      message: `任务「${todoRow.title}」：${input.text}`,
       provenance: `merge:${todoRow.id}`,
     }),
     projectId: todoRow.projectId,

@@ -375,7 +375,7 @@ export async function sendDesignComments(
   );
   const records = recordsOf(deps.db, rows);
   const block = renderDesignCommentBlock({
-    todoRef: `#${todoRow.seqNum} ${todoRow.title}`,
+    todoRef: todoRow.title,
     comments: records,
     markTokens,
   });
@@ -390,7 +390,7 @@ export async function sendDesignComments(
   );
   const sent = sendChiefMessageFromComposer(deps, teamId, {
     ...body,
-    content: `${note === '' ? '' : `${note}\n\n`}${summary}\n\n（Cairn 已把这些批注转给任务 #${todoRow.seqNum}。）`,
+    content: `${note === '' ? '' : `${note}\n\n`}${summary}\n\n（Cairn 已把这些批注转给任务「${todoRow.title}」。）`,
   });
   deps.db
     .update(designComment)

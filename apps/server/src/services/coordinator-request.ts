@@ -110,7 +110,13 @@ function citedMessages(db: Db, ctx: RequestCtx, messageIds: readonly string[]): 
       };
       return { segment: { source, author: 'owner', sourceRef: null, text }, quoteSource: source };
     }
-    if (row === undefined || row.role !== 'user' || typeof row.content !== 'string') {
+    if (
+      row === undefined ||
+      row.role !== 'user' ||
+      row.origin === 'synthetic' ||
+      row.origin === 'task-prompt' ||
+      typeof row.content !== 'string'
+    ) {
       throw new HttpError(400, `message ${id} is not an owner message of this thread`);
     }
     const orchestrated = orchestratedTodoIdOf(row.content);

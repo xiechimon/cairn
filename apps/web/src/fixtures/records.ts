@@ -2,6 +2,7 @@ import {
   type AgentTodoItem,
   type BackgroundTask,
   type ChatBlockResult,
+  type ChiefOutage,
   type ChiefReportContent,
   type ChiefTurnErrorContent,
   type ClaudeLogin,
@@ -778,7 +779,7 @@ export interface ChiefContent {
   running?: boolean;
   runningTool?: string;
   waitingTurn?: { messageId: string; text: string };
-  outage?: { reason: 'quota' | 'capacity'; model: string | null; retryAt: number | null };
+  outage?: ChiefOutage;
   fallbackModel?: string;
   hasEarlier?: boolean;
   quickReplies?: string[];

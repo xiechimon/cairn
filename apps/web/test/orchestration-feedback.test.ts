@@ -2,7 +2,7 @@ import { buildOrchestratePrompt, CHIEF_TURN_ERROR_KIND, type ChiefThread } from 
 import { expect, test } from 'vitest';
 import { type MessageRow, mapOrchestrationFeedback } from '../src/api/mappers.js';
 
-const todo = { id: 'todo-7', phase: 'todo' as const, phaseAt: 100 };
+const todo = { id: 'todo-7', title: 'Add a NEWCOMER.md file', phase: 'todo' as const, phaseAt: 100 };
 const thread: ChiefThread = {
   id: 'chief-global', title: 'Coordinator', createdAt: 1,
   chiefId: 'chief-u-t', userId: 'u', teamId: 't', updatedAt: 1, lastTurnAt: 1,
@@ -11,11 +11,11 @@ const thread: ChiefThread = {
 };
 const running = { ...thread, activeRun: { phase: 'chief' as const } };
 const request = (id: string, at: number, todoId = todo.id): MessageRow => ({
-  id, role: 'user', createdAt: at,
+  id, role: 'user', origin: 'synthetic', createdAt: at,
   content: `【输入框选定项目：Demo（id: p1）】\n${buildOrchestratePrompt({ id: todoId, seqNum: 7, spec: 'Add a NEWCOMER.md file' })}`,
 });
 const reply = (id: string, at: number, text: string): MessageRow => ({ id, role: 'assistant', createdAt: at, content: text });
-const owner = (id: string, at: number): MessageRow => ({ id, role: 'user', createdAt: at, content: 'something else' });
+const owner = (id: string, at: number): MessageRow => ({ id, role: 'user', origin: 'user', createdAt: at, content: 'something else' });
 
 const kinds = (items: ReturnType<typeof mapOrchestrationFeedback>) =>
   items.map((item) => (item.kind === 'note' ? `note:${item.text}` : item.kind));
@@ -33,10 +33,25 @@ test('a dispatched task shows nothing even when the turn replied', () => {
   expect(mapOrchestrationFeedback({ ...todo, phase: 'queued' }, thread, [request('m1', 150), reply('m2', 160, 'ok')])).toEqual([]);
 });
 
-test('while the turn runs the pane says the Coordinator is arranging it', () => {
-  const items = mapOrchestrationFeedback(todo, running, [request('m1', 150)]);
-  expect(kinds(items)).toEqual(['note:已交给 Coordinator 安排', 'streaming']);
+test('while the turn runs the pane says handed to Coordinator with task title and no seqNum', () => {
+  const items = mapOrchestrationFeedback(todo, running, [
+    request('m1', 150),
+    { id: 'user-m1', role: 'user', origin: 'task-prompt', createdAt: 155, content: 'echo' },
+  ]);
+  expect(kinds(items)).toEqual(['note:已交给 Coordinator：{title}', 'streaming']);
+  expect(items[0]).toMatchObject({ vars: { title: 'Add a NEWCOMER.md file' } });
   expect(items[1]).toMatchObject({ label: 'Coordinator 正在安排这个任务...', startedAt: 150 });
+});
+
+test('when Coordinator has an outage, orchestration feedback does not spin', () => {
+  const items = mapOrchestrationFeedback(
+    todo,
+    running,
+    [request('m1', 150)],
+    { reason: 'quota', model: 'relay-a/claude-opus', retryAt: null },
+  );
+  expect(items.some((item) => item.kind === 'streaming')).toBe(false);
+  expect(kinds(items)).toEqual(['note:已交给 Coordinator：{title}']);
 });
 
 test('a blocked turn shows the queue reason, not a spinner', () => {
@@ -54,7 +69,7 @@ test('a blocked turn shows the queue reason, not a spinner', () => {
 test('a finished turn that did not dispatch shows the reply and says it was not dispatched', () => {
   const items = mapOrchestrationFeedback(todo, thread, [owner('m0', 120), request('m1', 150), reply('m2', 160, '这个任务需要先选一个仓库。')]);
   expect(kinds(items)).toEqual([
-    'note:已交给 Coordinator 安排',
+    'note:已交给 Coordinator：{title}',
     'robot',
     'note:Coordinator 没有派发这个任务，原因见上方的回复。点击「开始」重试。',
   ]);
@@ -69,13 +84,13 @@ test('a finished turn with no text says no reason was given', () => {
 
 test('a later owner message ends the turn even while another turn runs', () => {
   const items = mapOrchestrationFeedback(todo, running, [request('m1', 150), reply('m2', 160, '先等等'), owner('m3', 170), reply('m4', 180, 'unrelated')]);
-  expect(kinds(items)).toEqual(['note:已交给 Coordinator 安排', 'robot', expect.stringContaining('没有派发')]);
+  expect(kinds(items)).toEqual(['note:已交给 Coordinator：{title}', 'robot', expect.stringContaining('没有派发')]);
 });
 
 test('a queued owner message does not end the running turn', () => {
   const queued = { ...running, pending: [{ messageId: 'm3', state: 'queued' as const }] } as ChiefThread;
   const items = mapOrchestrationFeedback(todo, queued, [request('m1', 150), owner('m3', 170)]);
-  expect(kinds(items)).toEqual(['note:已交给 Coordinator 安排', 'streaming']);
+  expect(kinds(items)).toEqual(['note:已交给 Coordinator：{title}', 'streaming']);
 });
 
 test('a failed turn shows its error', () => {

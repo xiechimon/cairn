@@ -1,4 +1,8 @@
-import { type ChiefThread, orchestrateThreadTitle } from '@cairn/shared';
+import {
+  type ChiefThread,
+  legacyOrchestrateThreadTitle,
+  orchestrateThreadTitle,
+} from '@cairn/shared';
 
 export function threadTurnInFlight(thread: ChiefThread): boolean {
   return thread.turnQueue != null || thread.activeRun != null;
@@ -14,7 +18,8 @@ type OrchestratedThread = ChiefThread & { orchestration?: ThreadOrchestration | 
 
 interface OrchestrationTarget {
   id: string;
-  seqNum: number;
+  title?: string;
+  seqNum?: number;
 }
 
 function reportsOrchestration(thread: OrchestratedThread): boolean {
@@ -33,12 +38,14 @@ export function inflightOrchestrationFor(
   todo: OrchestrationTarget,
 ): ChiefThread | null {
   if (threads === undefined) return null;
-  const title = orchestrateThreadTitle(todo.seqNum);
+  const title = todo.title !== undefined ? orchestrateThreadTitle(todo.title) : null;
+  const legacyTitle = todo.seqNum !== undefined ? legacyOrchestrateThreadTitle(todo.seqNum) : null;
   return newest(
     threads.filter((thread) =>
       reportsOrchestration(thread)
         ? thread.orchestration?.todoId === todo.id && thread.orchestration.state !== 'failed'
-        : thread.title === title && threadTurnInFlight(thread),
+        : (title !== null && thread.title === title && threadTurnInFlight(thread)) ||
+          (legacyTitle !== null && thread.title === legacyTitle && threadTurnInFlight(thread)),
     ),
   );
 }

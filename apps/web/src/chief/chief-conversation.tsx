@@ -185,7 +185,7 @@ export function useMentionGroups(): MentionGroups {
   return {
     todo: (todosQ.data ?? []).map((td) => ({
       id: td.id,
-      label: `#${td.seqNum} ${td.title}`,
+      label: td.title,
       seq: td.seqNum,
       subtitle: td.phase,
     })),

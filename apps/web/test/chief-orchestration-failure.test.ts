@@ -5,7 +5,7 @@ import type { TodoRecord } from '../src/fixtures/records.js';
 
 const reason = '400 context_length_exceeded: maximum context length is 200000 tokens';
 const failed: ChiefThread = {
-  id: 'chief-failed', title: orchestrateThreadTitle(1586), createdAt: 2,
+  id: 'chief-failed', title: orchestrateThreadTitle('修复编排'), createdAt: 2,
   chiefId: 'chief-u-t', userId: 'u', teamId: 't', updatedAt: 2, lastTurnAt: 2,
   session: { runtime: 'pi', id: '', openedAt: 2 }, pendingSessionResumeAt: null,
   toolDefHashes: {}, toolResultHashes: {},
@@ -22,7 +22,7 @@ test('a failed round is no longer in flight, and a newer round is', () => {
   expect(inflightOrchestrationFor([failed], todo)).toBeNull();
   const retry = { ...failed, id: 'chief-retry', createdAt: 3, activeRun: { phase: 'chief' as const }, lastTurnError: undefined };
   expect(inflightOrchestrationFor([failed, retry], todo)?.id).toBe('chief-retry');
-  expect(inflightOrchestrationFor([failed, retry], { id: 'todo-1587', seqNum: 1587 })).toBeNull();
+  expect(inflightOrchestrationFor([failed, retry], { id: 'todo-1587', seqNum: 1587, title: '其他任务' })).toBeNull();
 });
 
 const global = { ...failed, id: 'chief-global', title: 'Coordinator', lastTurnError: null };

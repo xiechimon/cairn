@@ -1591,6 +1591,12 @@ export const EN: Record<string, string> = {
     'Main model {model} is back, and replies use it again from this turn',
   'Coordinator 用的模型 {model} 额度已用完': "The Coordinator's model {model} is out of quota",
   'Coordinator 用的模型 {model} 暂时过载': "The Coordinator's model {model} is overloaded",
+  'Coordinator 用的模型 {model} 订阅已过期或未授权':
+    "The subscription for the Coordinator's model {model} is expired or unauthorized",
+  'Coordinator 使用的订阅已过期或未授权':
+    "The Coordinator's subscription is expired or unauthorized",
+  '运行 Coordinator 的执行机当前离线': 'The Runner for the Coordinator is offline',
+  恢复后会自动继续: 'it will resume automatically once back',
   '{time} 会自动再试': 'it retries automatically at {time}',
   恢复时间还不确定: 'no recovery time yet',
   'Coordinator 暂时不可用': 'The Coordinator is unavailable',
@@ -1628,6 +1634,7 @@ export const EN: Record<string, string> = {
   '缺 {missing}': 'missing {missing}',
   排队中: 'Queued',
   '已交给 Coordinator 安排': 'Handed to the Coordinator',
+  '已交给 Coordinator：{title}': 'Handed to the Coordinator: {title}',
   'Coordinator 正在安排这个任务...': 'The Coordinator is arranging this task...',
   'Coordinator 没有派发这个任务，原因见上方的回复。点击「开始」重试。':
     'The Coordinator did not dispatch this task; its reply above says why. Press Start to try again.',

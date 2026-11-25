@@ -88,7 +88,7 @@ export const chiefOrchestrationActivitySchema = z.object({
 export type ChiefOrchestrationActivity = z.infer<typeof chiefOrchestrationActivitySchema>;
 
 export const chiefOutageSchema = z.object({
-  reason: z.enum(['quota', 'capacity']),
+  reason: z.enum(['quota', 'capacity', 'subscription', 'runner-offline']),
   model: z.string().nullable(),
   retryAt: epochMs.nullable(),
 });

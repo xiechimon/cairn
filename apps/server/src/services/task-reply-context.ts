@@ -41,6 +41,8 @@ export function resolveTaskReplyContext(
     if (
       row === undefined ||
       row.role === 'system' ||
+      row.origin === 'synthetic' ||
+      row.origin === 'task-prompt' ||
       body === null ||
       (typeof row.content === 'string' && orchestratedTodoIdOf(row.content) !== null)
     ) {

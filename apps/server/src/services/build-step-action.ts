@@ -103,7 +103,7 @@ export async function applyBuildStepAction(
         role: 'user',
         content: body.feedback,
         createdAt: nowMs(),
-        origin: 'user',
+        origin: origin === 'person' ? 'user' : 'synthetic',
       },
       undefined,
       sseClientMessageId,

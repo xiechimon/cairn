@@ -38,6 +38,7 @@ const BOARD = [
   'chief-project-pick',
   'first-run-',
   'task-panel',
+  'start-task-echo',
   'thread-route-override',
   'route-override-capabilities',
   'task-send-dead-turn',
@@ -114,6 +115,7 @@ const DETAIL = [
   'hotkeys-ready',
   'mobile-narrow',
   'task-panel',
+  'start-task-echo',
   'thread-route-override',
   'route-override-capabilities',
   'task-send-dead-turn',
@@ -122,6 +124,7 @@ const DETAIL = [
 const CHIEF = [
   'composer-tool-tips',
   'chief-',
+  'start-task-echo',
   'home-composer',
   'composer-wire-reject',
   'elevation-',

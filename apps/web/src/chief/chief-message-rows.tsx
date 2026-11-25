@@ -141,7 +141,7 @@ function TodoSegmentLink({ seq }: { seq: number }) {
   return known === undefined ? (
     <span>{t('任务')}</span>
   ) : (
-    <TaskChip todoId={known[0]} label={`#${seq}`} />
+    <TaskChip todoId={known[0]} label={known[1].title ?? t('任务')} />
   );
 }
 

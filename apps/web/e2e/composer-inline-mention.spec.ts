@@ -190,7 +190,7 @@ test('filter: fuzzy subsequence, smart case, empty-state row', async ({ page }) 
 
   await input.fill('@');
   await expect(rows).toHaveCount(5);
-  await expect(rows.nth(0)).toContainText('#9 内联提及探针');
+  await expect(rows.nth(0)).toContainText('内联提及探针');
   await expect(rows.nth(1)).toContainText('builder');
   await expect(rows.nth(2)).toContainText('reviewer');
   await expect(rows.nth(3)).toContainText('deploy-bot');
@@ -516,7 +516,7 @@ test('files: empty query lists entities then files in roster order', async ({ pa
   await input.fill('@');
 
   await expect(rows).toHaveCount(8);
-  await expect(rows.nth(0)).toContainText('#9 内联提及探针');
+  await expect(rows.nth(0)).toContainText('内联提及探针');
   await expect(rows.nth(1)).toContainText('builder');
   await expect(rows.nth(3)).toContainText('deploy-bot');
   await expect(rows.nth(4)).toContainText('cairn');
@@ -705,7 +705,7 @@ test('four-kind: bare @ lists todo, skill, project, machine in roster order', as
   await input.fill('@');
 
   await expect(rows).toHaveCount(4);
-  await expect(rows.nth(0)).toContainText('#9 内联提及探针');
+  await expect(rows.nth(0)).toContainText('内联提及探针');
   await expect(rows.nth(1)).toContainText('code-review');
   await expect(rows.nth(2)).toContainText('cairn');
   await expect(rows.nth(3)).toContainText('mea');
@@ -731,7 +731,7 @@ test('four-kind: todo Enter-inserts the plain #seq token without sending', async
   const { input, rows, sent } = await openDetail(page, FOUR_KIND);
   await input.fill('@内联');
   await expect(rows).toHaveCount(1);
-  await expect(rows.first()).toContainText('#9 内联提及探针');
+  await expect(rows.first()).toContainText('内联提及探针');
   await input.press('ArrowDown');
   await input.press('Enter');
 

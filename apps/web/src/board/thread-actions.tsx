@@ -2,8 +2,12 @@ import { canOrchestrate } from '@cairn/shared';
 import { cn } from 'cn';
 import { Ellipsis } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { useApiMutations, useChiefThreads } from '../api/hooks.js';
+import { useNavigate } from 'react-router';
+import { useApiMutations, useChief, useChiefThreads } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { ChiefOutageBanner } from '../chief/chief-outage-banner.js';
+import { globalCoordinatorThread } from '../chief/coordinator-load.js';
+import { resolveCoordinatorOutage } from '../chief/coordinator-outage.js';
 import { inflightOrchestrationFor } from '../chief/orchestration-inflight.js';
 import { REPLY_CHIP_CLS } from '../chief/quick-replies.js';
 import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
@@ -19,6 +23,7 @@ import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { MoreMenu } from '../overlay/more-menu.js';
+import { COORDINATOR_ROUTING_HREF } from '../resources/hrefs.js';
 import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import { MoveToProjectSub } from './task-move-menu.js';
@@ -74,10 +79,12 @@ export function useThreadActions({
   engine?: EngineMenu | undefined;
 }): ThreadActions {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const { markDone, dialogs: markDoneDialogs } = useMarkDone(todo);
   const orchestrateStart = useOrchestrateStart();
+  const chiefQ = useChief(teamId, live);
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<'delete' | 'stop' | 'route-override' | 'rename' | null>(
@@ -92,10 +99,10 @@ export function useThreadActions({
     if (live) run();
     else blockDemoWrite();
   };
-  const orchestrate = guard(() => orchestrateStart.orchestrate(todo));
+  const orchestrate = guard(() => orchestrateStart.orchestrate(todo, { inThread: true }));
   const retryNow = guard(() => {
     if (buildId == null) {
-      orchestrateStart.orchestrate(todo);
+      orchestrateStart.orchestrate(todo, { inThread: true });
       return;
     }
     mutations.retryBuildNow.mutate(
@@ -151,11 +158,18 @@ export function useThreadActions({
     })();
 
   const kind = threadActionOf(todo, running);
-  const orchestrating =
+  const coordinatorOutage = live
+    ? resolveCoordinatorOutage(
+        chiefQ.data?.outage ?? null,
+        globalCoordinatorThread(chiefThreadsQ.data ?? []),
+      )
+    : null;
+  const orchestrationQueued =
     kind === 'start' &&
     live &&
     canOrchestrate(phase) &&
     inflightOrchestrationFor(chiefThreadsQ.data, todo) !== null;
+  const orchestrating = orchestrationQueued && coordinatorOutage === null;
   const pending =
     orchestrateStart.pendingId === todo.id ||
     mutations.stepAction.isPending ||
@@ -188,37 +202,48 @@ export function useThreadActions({
         </Button>
       </div>
     ) : (
-      <div
-        data-testid="side-chat-action"
-        data-action={kind}
-        className="mx-auto mb-4 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap gap-3"
-      >
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Button
-                variant="ghost"
-                onClick={runPrimary[kind]}
-                disabled={pending || orchestrating}
-                data-orchestrating={orchestrating ? 'true' : undefined}
-                aria-description={t(ACTION_COPY[kind].reason)}
-                className={cn(REPLY_CHIP_CLS, 'w-auto')}
-              />
-            }
-          >
-            {(pending || orchestrating) && <RingSpinner data-icon="inline-start" />}
-            {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={6}>
-            {t(ACTION_COPY[kind].reason)}
-          </TooltipContent>
-        </Tooltip>
-        {kind === 'approve' && onViewPlan !== undefined && (
-          <Button variant="ghost" onClick={onViewPlan} className={cn(REPLY_CHIP_CLS, 'w-auto')}>
-            {t('查看计划')}
-          </Button>
+      <>
+        {kind === 'start' && coordinatorOutage !== null && (
+          <ChiefOutageBanner
+            outage={coordinatorOutage}
+            onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
+            className="mx-auto mb-3 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none items-start gap-2.5 rounded-(--radius-card) bg-card px-3 py-2.5 text-meta leading-5 text-(--text-secondary) inset-ring-1 inset-ring-border"
+          />
         )}
-      </div>
+        {!(kind === 'start' && coordinatorOutage !== null && orchestrationQueued) && (
+          <div
+            data-testid="side-chat-action"
+            data-action={kind}
+            className="mx-auto mb-4 flex w-[calc(100%-2rem)] max-w-(--chat-max-w) flex-none flex-wrap gap-3"
+          >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    onClick={runPrimary[kind]}
+                    disabled={pending || orchestrating}
+                    data-orchestrating={orchestrating ? 'true' : undefined}
+                    aria-description={t(ACTION_COPY[kind].reason)}
+                    className={cn(REPLY_CHIP_CLS, 'w-auto')}
+                  />
+                }
+              >
+                {(pending || orchestrating) && <RingSpinner data-icon="inline-start" />}
+                {orchestrating ? t('编排中') : t(ACTION_COPY[kind].primary)}
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={6}>
+                {t(ACTION_COPY[kind].reason)}
+              </TooltipContent>
+            </Tooltip>
+            {kind === 'approve' && onViewPlan !== undefined && (
+              <Button variant="ghost" onClick={onViewPlan} className={cn(REPLY_CHIP_CLS, 'w-auto')}>
+                {t('查看计划')}
+              </Button>
+            )}
+          </div>
+        )}
+      </>
     );
 
   const canComplete = canMarkDone(todo);

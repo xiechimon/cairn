@@ -248,7 +248,7 @@ function notifyOwner(deps: OwnerDeps, row: TodoRow, reason: NeedsYouReason): voi
     row.teamId,
     {
       title: PUSH_TITLE[reason],
-      body: `#${row.seqNum} ${row.title}`,
+      body: row.title,
       href: `/app/todo/${row.id}`,
       tag: `${deps.user.id}:${row.id}`,
     },

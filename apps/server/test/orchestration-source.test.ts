@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises';
 import {
   CHIEF_REMOTE_TOOLS,
+  orchestrateThreadTitle,
   orchestrationSourceRef,
   parseOrchestrationSourceRef,
 } from '@cairn/shared';
@@ -9,8 +10,11 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from 'vit
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import {
   build as buildTable,
+  chiefMessage,
   chief as chiefTable,
   chiefThread,
+  claudeSubscription,
+  machine as machineTable,
   routingRule,
   step as stepTable,
   todo as todoTable,
@@ -382,14 +386,24 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     return ((await res.json()) as { id: string }).id;
   }
 
-  test('D1 todo phase -> 201: a new chief thread + the orchestration request message (spec verbatim) + the chief step queued', async () => {
+  test('D1 todo phase -> 201: a new chief thread + synthetic orchestration request + the chief step queued', async () => {
     const todoId = await makeTodo();
     const res = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
     expect(res.status).toBe(201);
-    const body = (await res.json()) as { thread: { id: string }; message: { content: string } };
+    const body = (await res.json()) as {
+      thread: { id: string };
+      message: { id: string; content: string; origin?: string };
+    };
     expect(body.thread.id.startsWith('chief-')).toBe(true);
+    expect(body.message.origin).toBe('synthetic');
     expect(body.message.content).toContain('> 把登录页改成邮箱登录');
     expect(body.message.content).toContain(`(todo:${todoId})`);
+    const storedMsg = s.db
+      .select()
+      .from(chiefMessage)
+      .where(eq(chiefMessage.id, body.message.id))
+      .get();
+    expect(storedMsg?.origin).toBe('synthetic');
     const steps = s.db.select().from(stepTable).where(eq(stepTable.buildId, body.thread.id)).all();
     expect(steps).toHaveLength(1);
     expect(steps[0]!.kind).toBe('chief');
@@ -462,6 +476,59 @@ describe('D entry surface: POST /todos/:id/orchestrate is the single start-task 
     s.db.delete(routingRule).where(eq(routingRule.id, AGENT_ID)).run();
     const res = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
     expect(res.status).toBe(409);
+  });
+
+  test('D5 orchestrateThreadTitle uses the task title without seqNum and getChiefEnvelope reports subscription and runner-offline outages while keeping step queued', async () => {
+    expect(orchestrateThreadTitle('修复登录页')).toBe('修复登录页');
+    expect(orchestrateThreadTitle('修复登录页')).not.toContain('开始任务 #');
+
+    s.db.delete(routingRule).where(eq(routingRule.id, AGENT_ID)).run();
+    seedRoute(s, 'coordinator', {
+      id: AGENT_ID,
+      provider: 'claude-code',
+      modelId: 'claude-sonnet-4-5',
+    });
+    s.db
+      .insert(claudeSubscription)
+      .values({
+        id: 'sub-expired',
+        teamId,
+        label: 'Expired Claude',
+        tokenCipher: 'cipher',
+        expiresAt: nowMs() - 60_000,
+        enabledAt: nowMs() - 120_000,
+        models: [],
+        createdAt: nowMs() - 120_000,
+      })
+      .run();
+
+    const todoId = await makeTodo();
+    const res = await req(s.app, 'POST', `/api/todos/${todoId}/orchestrate`);
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as { thread: { id: string } };
+    const queuedSteps = s.db
+      .select()
+      .from(stepTable)
+      .where(eq(stepTable.buildId, body.thread.id))
+      .all();
+    expect(queuedSteps).toHaveLength(1);
+    expect(queuedSteps[0]?.status).toBe('pending');
+
+    const subEnv = (await (await req(s.app, 'GET', `/api/teams/${teamId}/chief`)).json()) as {
+      outage: { reason: string; model: string | null } | null;
+    };
+    expect(subEnv.outage?.reason).toBe('subscription');
+
+    s.db
+      .update(claudeSubscription)
+      .set({ expiresAt: nowMs() + 3_600_000 })
+      .where(eq(claudeSubscription.id, 'sub-expired'))
+      .run();
+    s.db.update(machineTable).set({ online: false }).where(eq(machineTable.teamId, teamId)).run();
+    const offlineEnv = (await (await req(s.app, 'GET', `/api/teams/${teamId}/chief`)).json()) as {
+      outage: { reason: string } | null;
+    };
+    expect(offlineEnv.outage?.reason).toBe('runner-offline');
   });
 });
 

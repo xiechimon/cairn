@@ -525,14 +525,6 @@ export const BLOCKER_HANDOFF_OPEN = '【前置卡交付';
 const BLOCKER_HANDOFF_CLOSE_PREFIX = `${BLOCKER_HANDOFF_OPEN}结束`;
 export const BLOCKER_HANDOFF_CLOSE = `${BLOCKER_HANDOFF_CLOSE_PREFIX}】`;
 
-export function orchestratePromptHead(seqNum: number): string {
-  return `开始任务 #${seqNum}`;
-}
-
-export function orchestratePromptHeadOf(text: string): string | null {
-  return /^(开始任务 #\d+)\n\n编排请求：/.exec(text)?.[1] ?? null;
-}
-
 export function buildOrchestratePrompt(
   todo: {
     id: string;
@@ -561,17 +553,19 @@ export function buildOrchestratePrompt(
     todo.pinnedMachineName !== undefined
       ? `\n\n机器：${todo.pinnedMachineName}（用户指定本任务在该机器执行，派发时保持钉选）`
       : '';
-  return `${orchestratePromptHead(todo.seqNum)}\n\n编排请求：[#${todo.seqNum}](todo:${todo.id}) —— ${intent}\n\n${source}${verification}${machine}`;
+  return `开始任务 #${todo.seqNum}\n\n编排请求：[#${todo.seqNum}](todo:${todo.id}) —— ${intent}\n\n${source}${verification}${machine}`;
 }
 
 export function orchestratedTodoIdOf(prompt: string | null): string | null {
-  return (
-    /(?:^|\n)开始任务 #(\d+)\n\n编排请求：\[#\1\]\(todo:([^)\s]+)\)/.exec(prompt ?? '')?.[2] ?? null
-  );
+  return /(?:^|\n)编排请求：\[[^\]]+\]\(todo:([^)\s]+)\)/.exec(prompt ?? '')?.[1] ?? null;
 }
 
-export function orchestrateThreadTitle(seqNum: number): string {
-  return chiefThreadTitle(orchestratePromptHead(seqNum));
+export function orchestrateThreadTitle(title: string): string {
+  return chiefThreadTitle(title);
+}
+
+export function legacyOrchestrateThreadTitle(seqNum: number): string {
+  return chiefThreadTitle(`开始任务 #${seqNum}`);
 }
 
 export function wrappedBy(text: string, head: string, tail: string): boolean {

@@ -3,6 +3,7 @@ import type {
   AgentTodoItem,
   BuildRecord,
   ChiefGetResponse,
+  ChiefOutage,
   ChiefPendingMessage,
   ChiefThread,
   ChiefTurnErrorContent,
@@ -49,7 +50,6 @@ import {
   MODEL_SOURCE_RUNTIME_LABELS,
   missingSetupCommand,
   orchestratedTodoIdOf,
-  orchestratePromptHeadOf,
   PLACEHOLDER_TITLE_FALLBACK,
   PLAN_SECTIONS,
   parseAgentTodoText,
@@ -814,6 +814,7 @@ export function mapTranscript(input: TranscriptInput): TranscriptItem[] {
         continue;
       }
       if (m.origin === 'task-prompt' || m.origin === 'synthetic') continue;
+      if (orchestratedTodoIdOf(text) !== null) continue;
       const outboxKey = sentKey?.(m.id) ?? null;
       entries.push({
         at: m.createdAt,
@@ -2384,31 +2385,20 @@ function collectChiefStream(
       continue;
     }
     if (m.role === 'user') {
+      if (orchestratedTodoIdOf(rawText) !== null) continue;
       const text = chiefUserText(rawText);
       if (text === '') continue;
       pendingTools = [];
       flushCards();
-      const head = orchestratePromptHeadOf(text);
-      items.push(
-        head === null
-          ? {
-              kind: 'user',
-              text,
-              id: m.id,
-              markdown: text,
-              at: clockTime(m.createdAt),
-              createdAt: m.createdAt,
-              ...rowProject(m),
-            }
-          : {
-              kind: 'user',
-              text: head,
-              id: m.id,
-              at: clockTime(m.createdAt),
-              createdAt: m.createdAt,
-              ...rowProject(m),
-            },
-      );
+      items.push({
+        kind: 'user',
+        text,
+        id: m.id,
+        markdown: text,
+        at: clockTime(m.createdAt),
+        createdAt: m.createdAt,
+        ...rowProject(m),
+      });
       continue;
     }
     if (m.role === 'system') continue;
@@ -2605,25 +2595,47 @@ export function mapChief(
   };
 }
 
+function isOrchestrationEchoRow(m: MessageRow): boolean {
+  return m.origin === 'task-prompt' || m.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX);
+}
+
 export function mapOrchestrationFeedback(
-  todo: Pick<WireTodo, 'id' | 'phase' | 'phaseAt'>,
+  todo: Pick<WireTodo, 'id' | 'phase' | 'phaseAt'> & { title?: string },
   thread: ChiefThread | null,
   messages: readonly MessageRow[],
+  outage: ChiefOutage | null = null,
 ): TranscriptItem[] {
   if (thread === null || (todo.phase !== 'todo' && todo.phase !== 'failed')) return [];
   const start = messages.findLastIndex(
     (m) =>
       m.role === 'user' &&
       m.createdAt >= todo.phaseAt &&
+      !isOrchestrationEchoRow(m) &&
       orchestratedTodoIdOf(textOfContent(m.content)) === todo.id,
   );
-  const request = messages[start];
+  const resolvedStart =
+    start !== -1
+      ? start
+      : messages.findLastIndex(
+          (m) =>
+            m.role === 'user' &&
+            m.createdAt >= todo.phaseAt &&
+            orchestratedTodoIdOf(textOfContent(m.content)) === todo.id,
+        );
+  const request = messages[resolvedStart];
   if (request === undefined) return [];
   const pending = new Set((thread.pending ?? []).map((p) => p.messageId));
-  const rest = messages.slice(start + 1);
-  const next = rest.findIndex((m) => m.role === 'user' && !pending.has(m.id));
+  const rest = messages.slice(resolvedStart + 1);
+  const next = rest.findIndex(
+    (m) => m.role === 'user' && !pending.has(m.id) && !isOrchestrationEchoRow(m),
+  );
   const turn = next === -1 ? rest : rest.slice(0, next);
-  const items: TranscriptItem[] = [{ kind: 'note', text: '已交给 Coordinator 安排' }];
+  const title = todo.title?.trim() ?? '';
+  const items: TranscriptItem[] = [
+    title !== ''
+      ? { kind: 'note', text: '已交给 Coordinator：{title}', vars: { title } }
+      : { kind: 'note', text: '已交给 Coordinator 安排' },
+  ];
   for (const m of turn) {
     const error = m.role === 'system' ? chiefTurnErrorOfContent(m.content) : null;
     if (error !== null) {
@@ -2637,6 +2649,7 @@ export function mapOrchestrationFeedback(
   }
   const replied = items.length > 1;
   if (next === -1 && threadTurnInFlight(thread)) {
+    if (outage !== null) return items;
     if (thread.turnQueue != null) {
       const queued = connectingLine(thread.turnQueue);
       items.push({

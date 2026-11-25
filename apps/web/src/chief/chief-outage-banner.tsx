@@ -9,45 +9,62 @@ export const BANNER_CLS =
 const LINK_BTN_CLS =
   'h-auto cursor-pointer border-none bg-transparent p-0 text-meta font-normal text-(--text-secondary) underline-offset-2 hover:bg-transparent hover:text-(--foreground) hover:underline dark:hover:bg-transparent';
 
+function outageWhy(
+  outage: NonNullable<ChiefContent['outage']>,
+  t: ReturnType<typeof useI18n>['t'],
+): string {
+  const model = outage.model;
+  switch (outage.reason) {
+    case 'quota':
+      return model == null
+        ? t('Coordinator 用的模型额度已用完')
+        : t('Coordinator 用的模型 {model} 额度已用完', { model });
+    case 'capacity':
+      return model == null
+        ? t('Coordinator 用的模型暂时过载')
+        : t('Coordinator 用的模型 {model} 暂时过载', { model });
+    case 'subscription':
+      return model == null
+        ? t('Coordinator 使用的订阅已过期或未授权')
+        : t('Coordinator 用的模型 {model} 订阅已过期或未授权', { model });
+    case 'runner-offline':
+      return t('运行 Coordinator 的执行机当前离线');
+  }
+}
+
 export function ChiefOutageBanner({
   outage,
   onSettings,
+  className,
 }: {
   outage: NonNullable<ChiefContent['outage']>;
   onSettings?: (() => void) | undefined;
+  className?: string | undefined;
 }) {
   const { t, locale } = useI18n();
   const [open, setOpen] = useState(false);
-  const model = outage.model;
-  const why =
-    model == null
-      ? t(
-          outage.reason === 'quota'
-            ? 'Coordinator 用的模型额度已用完'
-            : 'Coordinator 用的模型暂时过载',
-        )
-      : outage.reason === 'quota'
-        ? t('Coordinator 用的模型 {model} 额度已用完', { model })
-        : t('Coordinator 用的模型 {model} 暂时过载', { model });
+  const why = outageWhy(outage, t);
   const retryAt = outage.retryAt != null ? new Date(outage.retryAt) : null;
   const when =
-    retryAt !== null
-      ? t('{time} 会自动再试', {
-          time: new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', {
-            ...(retryAt.toDateString() === new Date().toDateString()
-              ? {}
-              : { month: 'short', day: 'numeric' }),
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          }).format(retryAt),
-        })
-      : t('恢复时间还不确定');
+    outage.reason === 'subscription' || outage.reason === 'runner-offline'
+      ? t('恢复后会自动继续')
+      : retryAt !== null
+        ? t('{time} 会自动再试', {
+            time: new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'zh-CN', {
+              ...(retryAt.toDateString() === new Date().toDateString()
+                ? {}
+                : { month: 'short', day: 'numeric' }),
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+            }).format(retryAt),
+          })
+        : t('恢复时间还不确定');
   return (
     <div
       role="status"
       data-testid="chief-outage"
-      className={`${BANNER_CLS} ${open ? 'max-sm:flex-wrap' : 'max-sm:items-center'}`}
+      className={`${className ?? BANNER_CLS} ${open ? 'max-sm:flex-wrap' : 'max-sm:items-center'}`}
     >
       <CircleAlert aria-hidden="true" className="mt-0.5 size-5.5 flex-none text-(--card-button)" />
       <span className={`min-w-0 flex-1 ${open ? 'max-sm:basis-full' : ''}`}>

@@ -293,7 +293,7 @@ export function parkFailedBuild(deps: BuildDeps, buildId: string, now = nowMs())
       role: 'system' as const,
       content: JSON.stringify({
         kind: CHIEF_NOTICE_KIND,
-        message: `Task #${owner.seqNum} (${owner.title}): ${noticeReason}`,
+        message: `${owner.title}: ${noticeReason}`,
         provenance: `retry-parking:${owner.id}`,
         ...(runtimeUpdate !== null
           ? { runtimeUpdate: { task: owner.title, ...runtimeUpdate } }

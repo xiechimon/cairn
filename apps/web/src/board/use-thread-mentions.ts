@@ -21,7 +21,7 @@ export function useThreadMentions(projectId: string | undefined): {
       groups: {
         todo: (todosQ.data ?? []).map((t) => ({
           id: t.id,
-          label: `#${t.seqNum} ${t.title}`,
+          label: t.title,
           seq: t.seqNum,
           subtitle: t.phase,
         })),
@@ -46,7 +46,7 @@ export function useThreadMentions(projectId: string | undefined): {
     groups: {
       todo: withoutClosed(fixture.todos).map((t) => ({
         id: t.id,
-        label: `#${t.seqNum} ${t.title}`,
+        label: t.title,
         seq: t.seqNum,
         subtitle: t.phase,
       })),

@@ -328,6 +328,7 @@ function latestOwnerRow(db: Db, threadId: string) {
       and(
         eq(chiefMessage.threadId, threadId),
         eq(chiefMessage.role, 'user'),
+        or(isNull(chiefMessage.origin), eq(chiefMessage.origin, 'user')),
         notLike(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`),
       ),
     )

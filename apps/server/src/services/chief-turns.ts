@@ -1,18 +1,15 @@
 import {
   ACTIVE_STEP_STATUSES,
   CHIEF_TURN_STOPPED_KIND,
-  type ChiefOutage,
   type ChiefPendingMessage,
   type ChiefTurnStoppedContent,
   isChiefSideThreadId,
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
-  UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
-import { and, asc, eq, gt, inArray, lt, lte, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, lt, lte, notInArray, or, sql } from 'drizzle-orm';
 import { steerWithdrawals } from '../coordinator/steer-withdrawals.js';
 import type { Db } from '../db/client.js';
 import {
-  chief,
   chiefMessage,
   chiefThread,
   coordinatorInput,
@@ -33,7 +30,8 @@ import { settleMemoryEditTurn } from './memory-edit-turns.js';
 import { stepScopeProjectId } from './picked-project.js';
 import { projectTurnContext } from './project-instructions.js';
 import { publishStepRow } from './quota-wait.js';
-import { coordinatorMemoryOwner, coordinatorProfile } from './routing-rules.js';
+import { coordinatorMemoryOwner } from './routing-rules.js';
+import { CHIEF_ABANDONED_STEP_MS } from './turn-provenance.js';
 
 type StepRow = typeof step.$inferSelect;
 
@@ -67,7 +65,7 @@ function liveChiefSteps(db: Db, threadId: string): StepRow[] {
     .all();
 }
 
-function isParked(row: StepRow, now: number): boolean {
+export function isParkedChiefStep(row: StepRow, now: number): boolean {
   if (row.status === 'waiting_quota') return true;
   return (
     row.status === 'pending' &&
@@ -94,7 +92,7 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
   live.forEach((row, index) => {
     if (row.status === 'claimed') return;
     const steered = STEER_HOLDS.includes(row.holdReason ?? '');
-    if (!steered) parked = parked || isParked(row, now);
+    if (!steered) parked = parked || isParkedChiefStep(row, now);
     for (const messageId of stepOwners(row)) {
       const userRow = db
         .select({ id: chiefMessage.id })
@@ -116,7 +114,10 @@ export function chiefPendingMessages(db: Db, threadId: string): ChiefPendingMess
   return out;
 }
 
-function modelLabel(model: { provider: string | null; modelId: string | null }): string | null {
+export function chiefModelLabel(model: {
+  provider: string | null;
+  modelId: string | null;
+}): string | null {
   return model.provider !== null && model.modelId !== null
     ? `${model.provider}/${model.modelId}`
     : null;
@@ -124,43 +125,7 @@ function modelLabel(model: { provider: string | null; modelId: string | null }):
 
 export function chiefThreadFallbackModel(db: Db, threadId: string): string | null {
   const model = liveChiefSteps(db, threadId)[0]?.fallback?.model;
-  return model == null ? null : modelLabel(model);
-}
-
-export function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
-  const now = nowMs();
-  const rows = db
-    .select({ stepRow: step, projectId: chiefThread.projectId })
-    .from(step)
-    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
-    .where(
-      and(
-        eq(chiefThread.chiefId, chiefId),
-        eq(step.kind, 'chief'),
-        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
-      ),
-    )
-    .orderBy(sql`${step.createdAt} desc`)
-    .all()
-    .filter((row) => isParked(row.stepRow, now));
-  const parked = rows[0];
-  if (parked === undefined) return null;
-  const latest = parked.stepRow;
-  const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
-  const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId, parked.projectId) : null;
-  const ran = latest.ranModel ??
-    latest.fallback?.model ?? {
-      provider: agentRow?.provider ?? null,
-      modelId: agentRow?.modelId ?? null,
-    };
-  return {
-    reason: latest.status === 'waiting_quota' ? (latest.quotaBlock?.kind ?? 'quota') : 'quota',
-    model: modelLabel(ran),
-    retryAt:
-      latest.status === 'waiting_quota'
-        ? (latest.quotaBlock?.probeAt ?? null)
-        : (latest.holdUntil ?? null),
-  };
+  return model == null ? null : chiefModelLabel(model);
 }
 
 export function settleChiefActiveRun(db: Db, threadId: string): void {
@@ -501,6 +466,7 @@ function steeredMessages(db: Db, running: StepRow): { id: string; projectId: str
       and(
         eq(chiefMessage.threadId, running.buildId),
         eq(chiefMessage.role, 'user'),
+        or(isNull(chiefMessage.origin), eq(chiefMessage.origin, 'user')),
         gt(chiefMessage.createdAt, claimedAt),
       ),
     )

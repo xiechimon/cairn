@@ -2,7 +2,6 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { orchestratePromptHead } from '@cairn/shared';
 import { type Browser, chromium, type Page, expect as pexpect } from '@playwright/test';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
@@ -25,7 +24,7 @@ const SPECS = {
 };
 
 function orchestrationTurns(seqNum: number) {
-  const request = `${orchestratePromptHead(seqNum)}\n\n编排请求：`;
+  const request = `编排请求：[#${seqNum}](todo:`;
   return server.db
     .select()
     .from(stepTable)
@@ -218,6 +217,7 @@ beforeAll(async () => {
   };
   const [e1, e2, e3] = [await enroll('trio-m1'), await enroll('trio-m2'), await enroll('trio-m3')];
   tokens = { m1: e1.token, m2: e2.token, m3: e3.token };
+  await machineFetch(e1.token, 'POST', '/api/machine/presence', {});
   browser = await chromium.launch();
   page = await browser.newPage({ viewport: { width: 1440, height: 732 }, locale: 'zh-CN' });
 }, 300_000);

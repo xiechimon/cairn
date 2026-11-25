@@ -1,4 +1,4 @@
-import { type ChiefThread, orchestrateThreadTitle } from '@cairn/shared';
+import type { ChiefThread } from '@cairn/shared';
 
 export type CoordinatorLoad = 'loading' | 'error' | 'ready';
 
@@ -23,11 +23,13 @@ export function coordinatorLoad(input: {
   return 'ready';
 }
 
-type ProjectBoundThread = ChiefThread & { projectId?: string | null };
+type ProjectBoundThread = ChiefThread & {
+  projectId?: string | null;
+  orchestration?: { todoId: string } | null;
+};
 
-function isOrchestrationThread(thread: ChiefThread): boolean {
-  const seq = thread.title.match(/\d+/)?.[0];
-  return seq !== undefined && thread.title === orchestrateThreadTitle(Number(seq));
+function isOrchestrationThread(thread: ProjectBoundThread): boolean {
+  return thread.orchestration != null || /^开始任务 #\d+$/.test(thread.title);
 }
 
 export function globalCoordinatorThread(

@@ -6,6 +6,7 @@ import type {
   AskUserQuestionContent,
   ChiefGetResponse,
   ChiefOrchestration,
+  ChiefOutage,
   ChiefThread,
   ChiefWakeKind,
   ChiefWatch,
@@ -30,6 +31,7 @@ import {
   isChiefMemoryThreadId,
   isChiefSideThreadId,
   isInfoOutput,
+  isRegisteredMachine,
   mailSharedTranscript,
   neutralizeIssueAttachmentTokens,
   newChiefThreadId,
@@ -41,6 +43,7 @@ import {
   TRANSCRIPT_PROMPT_ROW_ID_PREFIX,
   threadMessageContentSchema,
   titleAuthor,
+  UNSTARTED_STEP_STATUSES,
 } from '@cairn/shared';
 import {
   and,
@@ -60,12 +63,15 @@ import {
 import { rewindWatermark } from '../coordinator/watermark.js';
 import type { Db } from '../db/client.js';
 import {
+  antigravitySubscription,
   build,
   chief,
   chiefMessage,
   chiefThread,
+  claudeSubscription,
   coordinatorConversation,
   coordinatorEntry,
+  devinSubscription,
   machine,
   message,
   project,
@@ -77,6 +83,7 @@ import { sha256Hex } from '../lib/crypto.js';
 import { HttpError } from '../lib/errors.js';
 import { newRecordId, newUuidv7, nowMs } from '../lib/ids.js';
 import { tidyText } from '../lib/tidy-text.js';
+import { activeAntigravitySource } from './antigravity-subscriptions.js';
 import { deadEndBlocker } from './blockers.js';
 import {
   APPROVAL_CARD_ID_PREFIX,
@@ -89,7 +96,6 @@ import { chiefRowOf, existingCoordinatorThread } from './chief-rows.js';
 import {
   addTurnOwnerMessage,
   CHIEF_ABANDONED_STEP_MS,
-  chiefOutage,
   chiefPendingMessages,
   chiefThreadFallbackModel,
   endDeadChiefTurn,
@@ -97,6 +103,7 @@ import {
   steerChiefMessage,
   stopAbandonedChiefTurn,
 } from './chief-turns.js';
+import { hasActiveClaudeSubscription } from './claude-subscriptions.js';
 import {
   claimClientMessage,
   completeClientMessage,
@@ -105,11 +112,13 @@ import {
 } from './client-message.js';
 import {
   channelUsageSummary,
+  coordinatorInServerEnabled,
   coordinatorRunsOnPi,
   lastTurnContext,
   wakeCoordinator,
 } from './coordinator-context.js';
-import { runtimeGatePasses } from './dispatch-eligibility.js';
+import { hasActiveDevinSubscription } from './devin-subscriptions.js';
+import { runtimeGatePasses, stepRuntimeFor } from './dispatch-eligibility.js';
 import { ABANDONED_CLAIM_QUARANTINE_LIMIT, stepActivityAt } from './dispatch-timeouts.js';
 import type { ConversationStreamHub, TeamStreamHub } from './events.js';
 import { type ProjectReadmeResult, type RepoReadCtx, readProjectReadme } from './git.js';
@@ -263,6 +272,161 @@ function chiefOrchestration(deps: ChiefDeps, teamId: string): ChiefGetResponse['
       waiting,
     })),
   };
+}
+
+function outageModelLabel(model: {
+  provider: string | null;
+  modelId: string | null;
+}): string | null {
+  return model.provider !== null && model.modelId !== null
+    ? `${model.provider}/${model.modelId}`
+    : null;
+}
+
+function isParkedChiefStep(row: typeof step.$inferSelect, now: number): boolean {
+  if (row.status === 'waiting_quota') return true;
+  return (
+    row.status === 'pending' &&
+    row.holdReason === 'quota' &&
+    row.holdUntil !== null &&
+    row.holdUntil > now
+  );
+}
+
+function outageReasonFromQueue(
+  queue: ReturnType<ReturnType<typeof stepQueueProjector>['chiefTurnQueueOf']>,
+  needsRunner: boolean,
+): { reason: ChiefOutage['reason']; retryAt: number | null } | null {
+  if (queue == null) return null;
+  const blocked = queue.blocked?.kind;
+  if (blocked === 'claude-rate-limited') return { reason: 'quota', retryAt: null };
+  if (
+    blocked === 'claude-logged-out' ||
+    blocked === 'devin-subscription' ||
+    blocked === 'antigravity-subscription'
+  ) {
+    return { reason: 'subscription', retryAt: null };
+  }
+  if (needsRunner && (blocked === 'machine-offline' || blocked === 'no-computer')) {
+    return { reason: 'runner-offline', retryAt: null };
+  }
+  return null;
+}
+
+function chiefOutage(db: Db, chiefId: string): ChiefOutage | null {
+  const now = nowMs();
+  const unstarted = db
+    .select({ stepRow: step, projectId: chiefThread.projectId })
+    .from(step)
+    .innerJoin(chiefThread, eq(step.buildId, chiefThread.id))
+    .where(
+      and(
+        eq(chiefThread.chiefId, chiefId),
+        eq(step.kind, 'chief'),
+        inArray(step.status, [...UNSTARTED_STEP_STATUSES]),
+      ),
+    )
+    .orderBy(sql`${step.createdAt} desc`)
+    .all();
+  const chiefRow = db.select().from(chief).where(eq(chief.id, chiefId)).get();
+  const parked = unstarted.find((row) => isParkedChiefStep(row.stepRow, now));
+  if (parked !== undefined) {
+    const latest = parked.stepRow;
+    const agentRow = chiefRow ? coordinatorProfile(db, chiefRow.teamId, parked.projectId) : null;
+    const ran = latest.ranModel ??
+      latest.fallback?.model ?? {
+        provider: agentRow?.provider ?? null,
+        modelId: agentRow?.modelId ?? null,
+      };
+    return {
+      reason: latest.status === 'waiting_quota' ? (latest.quotaBlock?.kind ?? 'quota') : 'quota',
+      model: outageModelLabel(ran),
+      retryAt:
+        latest.status === 'waiting_quota'
+          ? (latest.quotaBlock?.probeAt ?? null)
+          : (latest.holdUntil ?? null),
+    };
+  }
+  if (!chiefRow) return null;
+  const projector = stepQueueProjector(db, chiefRow.teamId);
+  const seenThreads = new Set<string>();
+  for (const row of unstarted) {
+    if (seenThreads.has(row.stepRow.buildId)) continue;
+    seenThreads.add(row.stepRow.buildId);
+    const threadAgent = coordinatorProfile(db, chiefRow.teamId, row.projectId);
+    const needsRunner =
+      threadAgent == null ||
+      !coordinatorInServerEnabled() ||
+      stepRuntimeFor(threadAgent.provider) !== 'pi' ||
+      threadAgent.machineId !== null;
+    const queued = outageReasonFromQueue(
+      projector.chiefTurnQueueOf(row.stepRow.buildId),
+      needsRunner,
+    );
+    if (queued !== null) {
+      return {
+        reason: queued.reason,
+        model: threadAgent
+          ? outageModelLabel({ provider: threadAgent.provider, modelId: threadAgent.modelId })
+          : null,
+        retryAt: queued.retryAt,
+      };
+    }
+  }
+  const agentRow = coordinatorProfile(db, chiefRow.teamId, null);
+  if (!agentRow) return null;
+  const model = outageModelLabel({ provider: agentRow.provider, modelId: agentRow.modelId });
+  const runtime = stepRuntimeFor(agentRow.provider);
+  if (
+    runtime === 'claude-code' &&
+    !hasActiveClaudeSubscription({ db }, chiefRow.teamId) &&
+    db
+      .select({ id: claudeSubscription.id })
+      .from(claudeSubscription)
+      .where(eq(claudeSubscription.teamId, chiefRow.teamId))
+      .get() !== undefined
+  ) {
+    return { reason: 'subscription', model, retryAt: null };
+  }
+  if (
+    runtime === 'devin' &&
+    !hasActiveDevinSubscription({ db }, chiefRow.teamId) &&
+    db
+      .select({ id: devinSubscription.id })
+      .from(devinSubscription)
+      .where(eq(devinSubscription.teamId, chiefRow.teamId))
+      .get() !== undefined
+  ) {
+    return { reason: 'subscription', model, retryAt: null };
+  }
+  if (
+    runtime === 'antigravity' &&
+    activeAntigravitySource(db, chiefRow.teamId).kind === 'none' &&
+    db
+      .select({ id: antigravitySubscription.id })
+      .from(antigravitySubscription)
+      .where(eq(antigravitySubscription.teamId, chiefRow.teamId))
+      .get() !== undefined
+  ) {
+    return { reason: 'subscription', model, retryAt: null };
+  }
+  if (!coordinatorInServerEnabled() || runtime !== 'pi') {
+    const runners = db
+      .select({
+        online: machine.online,
+        kind: machine.kind,
+        lastSeenAt: machine.lastSeenAt,
+        tokenHash: machine.tokenHash,
+      })
+      .from(machine)
+      .where(and(eq(machine.teamId, chiefRow.teamId), isNull(machine.retiredAt)))
+      .all()
+      .filter((row) => isRegisteredMachine(row));
+    if (runners.length > 0 && !runners.some((row) => row.online)) {
+      return { reason: 'runner-offline', model, retryAt: null };
+    }
+  }
+  return null;
 }
 
 export function getChiefEnvelope(
@@ -516,7 +680,7 @@ function retryableGreetingStep(
   if (picked === undefined || picked.teamId !== thread.teamId || picked.archivedAt !== null)
     return undefined;
   const messages = deps.db
-    .select({ id: chiefMessage.id, role: chiefMessage.role })
+    .select({ id: chiefMessage.id, role: chiefMessage.role, origin: chiefMessage.origin })
     .from(chiefMessage)
     .where(eq(chiefMessage.threadId, thread.id))
     .all();
@@ -524,7 +688,9 @@ function retryableGreetingStep(
     messages.some(
       (row) =>
         row.role === 'assistant' ||
-        (row.role === 'user' && !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)),
+        (row.role === 'user' &&
+          (row.origin === null || row.origin === 'user') &&
+          !row.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)),
     )
   )
     return undefined;
@@ -657,7 +823,7 @@ const ORCHESTRATION_STATE_OF_STATUS: Partial<
   stopped: 'failed',
 };
 
-const ORCHESTRATE_REQUEST_MARK = '\n\n编排请求：[#';
+const ORCHESTRATE_REQUEST_MARK = '\n\n编排请求：[';
 
 function orchestrationOf(
   db: Db,
@@ -809,6 +975,7 @@ function directThreadMessagesSinceLastTurn(db: Db, threadId: string): string | n
       and(
         eq(chiefMessage.threadId, threadId),
         eq(chiefMessage.role, 'user'),
+        or(isNull(chiefMessage.origin), eq(chiefMessage.origin, 'user')),
         notLike(chiefMessage.id, `${TRANSCRIPT_PROMPT_ROW_ID_PREFIX}%`),
       ),
     )
@@ -927,12 +1094,13 @@ export function submitChiefMessage(
   const now = nowMs();
   const directNote = directThreadMessagesSinceLastTurn(deps.db, threadRow.id);
 
+  const origin = opts.ownerWords === false ? ('synthetic' as const) : ('user' as const);
   const message = {
     id: newRecordId(),
     role: 'user' as const,
     content: body.content,
     projectId: picked?.id ?? null,
-    origin: 'user' as const,
+    origin,
     createdAt: now,
   };
   try {
@@ -947,7 +1115,7 @@ export function submitChiefMessage(
           role: 'user',
           content: body.content,
           projectId: message.projectId,
-          origin: 'user',
+          origin,
           createdAt: now,
         })
         .run();
@@ -1182,7 +1350,11 @@ export function rewindChiefThread(
       .where(and(eq(chiefMessage.id, body.messageId), eq(chiefMessage.threadId, threadId)))
       .get();
     if (!anchor) throw new HttpError(404, `chief message ${body.messageId}`);
-    if (anchor.role !== 'user' || anchor.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)) {
+    if (
+      anchor.role !== 'user' ||
+      anchor.origin === 'task-prompt' ||
+      anchor.id.startsWith(TRANSCRIPT_PROMPT_ROW_ID_PREFIX)
+    ) {
       throw new HttpError(400, 'rewind anchor must be a user message');
     }
     if (anchor.projectId !== null) requireUnarchivedProject(tx, anchor.projectId);
@@ -1200,6 +1372,9 @@ export function rewindChiefThread(
       .map((row) => row.id);
     requireNoWaitingQuestion(tx, doomedIds);
     requireRewindStaysInProject(tx, anchor, doomedIds);
+    if (anchor.origin === 'synthetic') {
+      throw new HttpError(400, 'rewind anchor must be a user message');
+    }
     markStoreRewind(tx, threadId, anchor.id, doomedIds);
     if (doomedIds.length > 0) {
       tx.delete(chiefMessage).where(inArray(chiefMessage.id, doomedIds)).run();

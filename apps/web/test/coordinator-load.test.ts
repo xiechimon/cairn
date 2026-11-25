@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { orchestrateThreadTitle } from '@cairn/shared';
 import { coordinatorLoad, globalCoordinatorThread } from '../src/chief/coordinator-load.js';
 
 const ok = (data: unknown = {}) => ({ isLoading: false, isError: false, data });
@@ -86,16 +85,17 @@ const thread = (id: string, title: string, createdAt: number, projectId: string 
 describe('globalCoordinatorThread', () => {
   it('stays on the oldest plain conversation when an orchestration or project thread is more recent', () => {
     const global = thread('chief-global', 'Plan the week', 1);
-    const orchestration = thread('chief-orch', orchestrateThreadTitle(42), 9);
+    const orchestration = { ...thread('chief-orch', 'Fix login flow', 9), orchestration: { todoId: 't1', state: 'running' as const, error: null } };
+    const legacyOrch = thread('chief-orch-legacy', '开始任务 #42', 10);
     const project = thread('chief-project', 'Fold turns', 8, 'proj-1');
-    expect(globalCoordinatorThread([orchestration, project, global])?.id).toBe('chief-global');
+    expect(globalCoordinatorThread([orchestration, legacyOrch, project, global])?.id).toBe('chief-global');
   });
 
   it('falls back to the oldest thread when only orchestration threads exist, and to none when empty', () => {
     expect(
       globalCoordinatorThread([
-        thread('b', orchestrateThreadTitle(2), 5),
-        thread('a', orchestrateThreadTitle(1), 3),
+        thread('b', '开始任务 #2', 5),
+        thread('a', '开始任务 #1', 3),
       ])?.id,
     ).toBe('a');
     expect(globalCoordinatorThread([])).toBeNull();

@@ -18,6 +18,7 @@ import {
   useApiMutations,
   useBuild,
   useBuildChanges,
+  useChief,
   useChiefThreads,
   useConversationMessages,
   useMachines,
@@ -38,6 +39,7 @@ import { useLiveData } from '../api/provider.js';
 import { useRoutingSettings } from '../api/routing-settings.js';
 import { useConversationStream } from '../api/sse.js';
 import { globalCoordinatorThread } from '../chief/coordinator-load.js';
+import { resolveCoordinatorOutage } from '../chief/coordinator-outage.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
 import type { UnsentSends } from '../chief/outbox.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
@@ -298,9 +300,17 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
 
   const awaitingStart =
     wire?.phase === 'todo' || wire?.phase === 'stopped' || wire?.phase === 'failed';
+  const chiefQ = useChief(teamId, live && awaitingStart);
   const chiefThreadsQ = useChiefThreads(teamId, live && awaitingStart);
+  const threads = chiefThreadsQ.data ?? [];
   const coordinator =
-    live && awaitingStart ? globalCoordinatorThread(chiefThreadsQ.data ?? []) : null;
+    live && awaitingStart
+      ? (threads.find((thread) => thread.orchestration?.todoId === wire?.id) ??
+        globalCoordinatorThread(threads))
+      : null;
+  const coordinatorOutage = live
+    ? resolveCoordinatorOutage(chiefQ.data?.outage ?? null, coordinator)
+    : null;
   const coordinatorId = coordinator?.id ?? null;
   const { messages: coordinatorMessages } = useConversationMessages(coordinatorId, live);
   useConversationStream(coordinatorId ?? undefined, live, {});
@@ -311,8 +321,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     void refreshQueries(qc, { queryKey: ['messages', coordinatorId, 'pages'] });
   }, [qc, coordinatorId, coordinatorTurn]);
   const orchestration = useMemo(
-    () => (wire == null ? [] : mapOrchestrationFeedback(wire, coordinator, coordinatorMessages)),
-    [wire, coordinator, coordinatorMessages],
+    () =>
+      wire == null
+        ? []
+        : mapOrchestrationFeedback(wire, coordinator, coordinatorMessages, coordinatorOutage),
+    [wire, coordinator, coordinatorMessages, coordinatorOutage],
   );
   const shownTranscript = useMemo(
     () => (orchestration.length === 0 ? transcript : [...transcript, ...orchestration]),

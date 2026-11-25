@@ -13,7 +13,10 @@ import { needsMachineName } from './needs-machine-name.js';
 import { inflightOrchestrationFor } from './orchestration-inflight.js';
 
 export interface OrchestrateStart {
-  orchestrate: (todo: { id: string; seqNum: number }, opts?: { savedTitle?: string }) => void;
+  orchestrate: (
+    todo: { id: string; seqNum?: number; title?: string },
+    opts?: { savedTitle?: string; inThread?: boolean },
+  ) => void;
   pendingId: string | null;
 }
 
@@ -32,10 +35,11 @@ export function useOrchestrateStart(): OrchestrateStart {
     (
       todo: {
         id: string;
-        seqNum: number;
+        seqNum?: number;
+        title?: string;
         routeOverride?: { machineId?: string | null } | null;
       },
-      opts?: { savedTitle?: string },
+      opts?: { savedTitle?: string; inThread?: boolean },
     ) => {
       if (!live || inFlight.current) return;
       const sessionMachineId = routingQ.data?.rules?.find(
@@ -75,13 +79,15 @@ export function useOrchestrateStart(): OrchestrateStart {
               : [res.thread, ...old.filter((x) => x.id !== res.thread.id)],
           );
           const threadId = res.thread.id;
-          toast.success(opts?.savedTitle ?? t('已交给 Coordinator 编排'), {
-            description: t('Coordinator 将直接规划，并按活的类型派发执行。'),
-            action: {
-              label: t('查看会话'),
-              onClick: () => navigate(`/app?chief=${encodeURIComponent(threadId)}`),
-            },
-          });
+          if (opts?.inThread !== true) {
+            toast.success(opts?.savedTitle ?? t('已交给 Coordinator 编排'), {
+              description: t('Coordinator 将直接规划，并按活的类型派发执行。'),
+              action: {
+                label: t('查看会话'),
+                onClick: () => navigate(`/app?chief=${encodeURIComponent(threadId)}`),
+              },
+            });
+          }
         },
         onError: (error) => toastError(t('未能开始编排'), error),
         onSettled: () => {
