@@ -1025,8 +1025,6 @@ export const machine = sqliteTable(
     capabilities: json<MachineCapabilities | null>('capabilities'),
     hostKey: text('hostKey'),
     retiredAt: epochMs('retiredAt'),
-    maxConcurrency: integer('maxConcurrency'),
-    autoDispatch: bool('autoDispatch').notNull().default(true),
   },
   (t) => [
     index('machine_online_lastSeenAt_idx').on(t.online, t.lastSeenAt),

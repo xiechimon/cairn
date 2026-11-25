@@ -12844,9 +12844,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
-    "autoDispatch": {
-      "type": "boolean",
-    },
     "capabilities": {
       "anyOf": [
         {
@@ -13501,18 +13498,6 @@ exports[`record shapes, 24-table projection -- zod -> JSON Schema snapshot > mac
       "type": [
         "string",
         "null",
-      ],
-    },
-    "maxConcurrency": {
-      "anyOf": [
-        {
-          "maximum": 32,
-          "minimum": 1,
-          "type": "integer",
-        },
-        {
-          "type": "null",
-        },
       ],
     },
     "name": {

@@ -407,11 +407,10 @@ describe('a worker step runs only on its named machine', () => {
     expect(queue?.blocked).toBeUndefined();
   });
 
-  test('the queue keeps waiting for the named machine when it is offline and no auto-dispatch backup exists', async () => {
+  test('the queue keeps waiting for the named machine when it is offline and no backup is online', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
-    const mac = await machineOf(w, 'mac');
-    w.s.db.update(machineTable).set({ autoDispatch: false }).where(eq(machineTable.id, mac)).run();
+    const mac = await machineOf(w, 'mac', { online: false });
     routeOf(w, omarchy);
     occupy(w, mac, 1);
     const stepId = pendingStep(w);
@@ -509,35 +508,16 @@ describe('the default Runner', () => {
     expect((await claimOn(w, linux))?.step.id).toBe(stepId);
   });
 
-  test('an offline default Runner fails over to an online auto-dispatch backup past grace, and waits when backups disable autoDispatch', async () => {
+  test('an offline default Runner past grace fails over to any online backup', async () => {
     const w = await world();
     const linux = await machineOf(w, 'linux', { online: false });
     const mac = await machineOf(w, 'mac');
-    w.s.db.update(machineTable).set({ autoDispatch: false }).where(eq(machineTable.id, mac)).run();
     routeOf(w, null);
     const stepId = pendingStep(w, { ageMs: 60 * 60_000 });
-    expect(await claimOn(w, mac)).toBeNull();
-    expect(statusOf(w, stepId)).toBe('pending');
+    expect((await claimOn(w, mac))?.step.id).toBe(stepId);
     const row = w.s.db.select().from(stepTable).where(eq(stepTable.id, stepId)).get()!;
-    const queue = stepQueueProjector(w.s.db, w.s.team.id).project({
-      id: stepId,
-      createdAt: row.createdAt,
-      homeMachineId: null,
-    });
-    expect(queue?.waitingFor?.machineId).toBe(linux);
-    expect(queue?.blocked).toEqual({ kind: 'machine-offline', missing: [] });
-    const todoId = w.s.db
-      .select()
-      .from(buildTable)
-      .where(eq(buildTable.id, row.buildId))
-      .get()!.todoId;
-    w.s.db
-      .update(todoTable)
-      .set({ latestBuildId: row.buildId })
-      .where(eq(todoTable.id, todoId))
-      .run();
-    const todoRow = w.s.db.select().from(todoTable).where(eq(todoTable.id, todoId)).get()!;
-    expect(toTodoRecord(w.s.svc, todoRow).waitingOn).toEqual({ on: 'machine', retryAt: null });
+    expect(row.routedFromMachineId).toBe(linux);
+    expect(row.routedReason).toBe('offline');
   });
 
   test('a rule machine and a task pick both outrank the default Runner', async () => {

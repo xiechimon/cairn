@@ -24,7 +24,7 @@ A Runner that predates these fields reports neither, and is never strained on CP
 
 ## No claim gate
 
-Strain is shown, never enforced. A strained computer claims task steps like a calm one; computers have no concurrency cap (`no-machine-concurrency-cap.md`). An earlier gate held a second task while a computer was strained and busy; it was removed on 2026-11-19 because on a busy Mac the 5-minute load stays above the core count for hours, so tasks ran one at a time with a queue label that gave no reason.
+Strain never holds a task. Since 2026-11-25 it redirects one: when the preferred Runner is strained and another eligible Runner is not, the next pool task goes to the calm one (`runner-auto-dispatch.md`); with no calm alternative the strained Runner claims it as before. Computers have no concurrency cap (`no-machine-concurrency-cap.md`). An earlier gate held a second task while a computer was strained and busy; it was removed on 2026-11-19 because on a busy Mac the 5-minute load stays above the core count for hours, so tasks ran one at a time with a queue label that gave no reason.
 
 ## Queue reasons
 

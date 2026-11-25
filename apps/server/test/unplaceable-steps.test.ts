@@ -498,13 +498,17 @@ describe('an offline Runner with waiting tasks keeps one Coordinator status row 
     expect(all[0]?.id).toBe(first?.id);
   });
 
-  test('another online Runner is offered, and the action routes the task there', async () => {
+  test('another online Runner is offered for a task picked onto the offline one, and the action routes the task there', async () => {
     const w = await world();
     const omarchy = await machineOf(w, 'omarchy', { online: false });
     const mac = await machineOf(w, 'mac');
-    w.s.db.update(machineTable).set({ autoDispatch: false }).where(eq(machineTable.id, mac)).run();
     routeOf(w, omarchy);
     const stepId = pendingStep(w);
+    w.s.db
+      .update(todoTable)
+      .set({ routeOverride: { machineId: omarchy } })
+      .where(eq(todoTable.id, `todo-${stepId.slice('step-'.length)}`))
+      .run();
     const now = Date.now();
     lastSeen(w, omarchy, now - RUNNER_OFFLINE_NOTICE_MS - 1_000);
     lastSeen(w, mac, now, true);

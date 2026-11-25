@@ -46,34 +46,6 @@ export function MachineRowView({
     );
   };
 
-  const autoDispatch = machine.autoDispatch !== false;
-  const maxConcurrency = machine.maxConcurrency ?? null;
-
-  const toggleAutoDispatch = () => {
-    if (!live) {
-      blockDemoWrite();
-      return;
-    }
-    mutations.patchMachine.mutate(
-      { id: machineId, body: { autoDispatch: !autoDispatch } },
-      { onError: (error) => toastError(t('更新自动接单设置失败，请重试。'), error) },
-    );
-  };
-
-  const cycleConcurrency = () => {
-    if (!live) {
-      blockDemoWrite();
-      return;
-    }
-    const order: Array<number | null> = [null, 1, 2, 3, 4];
-    const currentIndex = order.indexOf(maxConcurrency);
-    const next = order[(currentIndex + 1) % order.length] ?? null;
-    mutations.patchMachine.mutate(
-      { id: machineId, body: { maxConcurrency: next } },
-      { onError: (error) => toastError(t('更新并发上限失败，请重试。'), error) },
-    );
-  };
-
   const remove = () => {
     setConfirmOpen(false);
     if (!live) {
@@ -143,32 +115,6 @@ export function MachineRowView({
             >
               {online ? t('在线') : t('离线')}
             </span>
-            {!autoDispatch && (
-              <>
-                <span aria-hidden className="text-content-dim">
-                  ·
-                </span>
-                <span
-                  data-testid="machine-manual-only"
-                  className="whitespace-nowrap text-content-secondary"
-                >
-                  {t('仅手动指定')}
-                </span>
-              </>
-            )}
-            {maxConcurrency !== null && (
-              <>
-                <span aria-hidden className="text-content-dim">
-                  ·
-                </span>
-                <span
-                  data-testid="machine-concurrency"
-                  className="whitespace-nowrap text-content-secondary tabular-nums"
-                >
-                  {t('并发上限 {count}', { count: maxConcurrency })}
-                </span>
-              </>
-            )}
             {ownComputer.meta}
           </div>
         </div>
@@ -198,24 +144,6 @@ export function MachineRowView({
               onClick={makeDefault}
             >
               {isDefault ? t('已是默认执行机') : t('设为默认执行机')}
-            </KeyedMenuItem>
-            <KeyedMenuItem
-              shortcut="A"
-              data-testid="machine-menu-auto-dispatch"
-              disabled={machine.id == null || mutations.patchMachine.isPending}
-              onClick={toggleAutoDispatch}
-            >
-              {autoDispatch ? t('关闭自动接单') : t('开启自动接单')}
-            </KeyedMenuItem>
-            <KeyedMenuItem
-              shortcut="C"
-              data-testid="machine-menu-concurrency"
-              disabled={machine.id == null || mutations.patchMachine.isPending}
-              onClick={cycleConcurrency}
-            >
-              {maxConcurrency === null
-                ? t('并发上限：不限')
-                : t('并发上限：{count}', { count: maxConcurrency })}
             </KeyedMenuItem>
             <KeyedMenuItem
               shortcut="D"

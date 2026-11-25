@@ -334,8 +334,6 @@ export interface MachineRow {
   claudeLogin?: ClaudeLogin;
   providers?: MachineProvider[];
   phonesFixture?: PhonesFixture;
-  maxConcurrency?: number | null;
-  autoDispatch?: boolean;
 }
 
 export interface PhonesFixture {

@@ -1751,6 +1751,13 @@
       "when": 1795533600000,
       "tag": "0254_machine_failover_overflow",
       "breakpoints": true
+    },
+    {
+      "idx": 255,
+      "version": "6",
+      "when": 1795600000000,
+      "tag": "0255_runner_auto_dispatch",
+      "breakpoints": true
     }
   ]
 }

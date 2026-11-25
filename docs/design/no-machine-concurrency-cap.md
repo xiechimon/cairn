@@ -14,7 +14,7 @@ mon X, 2026-11-19: a computer runs as many tasks at once as are ready for it. Th
 
 - The project cap (`project.maxConcurrent`, unset by default) still holds a project's steps. It is a per-project choice, not a property of the computer.
 - An orb Runner still limits how many sandboxes it starts at once (`resolveOrbCap`: `CAIRN_ORB_MAX` or the CPU-count default). It sends that number as `maxWorkers` on claim and the server still honours `maxWorkers`, so the limit stays on the computer that owns the sandboxes.
-- Strain is shown, never enforced (`runner-strain-and-progress.md`).
+- Strain never holds a task; it only moves pool work to a calm Runner when one exists (`runner-auto-dispatch.md`).
 
 ## Removed
 

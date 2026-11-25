@@ -1,4 +1,4 @@
-import type { ClaimedStep } from '@cairn/shared';
+import type { ClaimedStep, MachineHardware } from '@cairn/shared';
 import { claimedStepSchema } from '@cairn/shared';
 import { eq } from 'drizzle-orm';
 import { describe, expect, test } from 'vitest';
@@ -99,22 +99,26 @@ async function setupPair() {
   return { s, mini, laptop, projectId };
 }
 
+const CALM: MachineHardware = {
+  cpuCores: 8,
+  memoryTotalMb: 16_384,
+  memoryAvailableMb: 8_000,
+  loadAvg1: 12.4,
+  cpuUtilization: 0.05,
+  memoryPressure: 0.5,
+  diskFreeMb: 100_000,
+};
+
+function setHardware(s: TestServer, machineId: string, hardware: MachineHardware): void {
+  const row = s.db.select().from(machineTable).where(eq(machineTable.id, machineId)).get()!;
+  s.db
+    .update(machineTable)
+    .set({ capabilities: { ...row.capabilities!, hardware } })
+    .where(eq(machineTable.id, machineId))
+    .run();
+}
+
 describe('multi-machine failover and overflow', () => {
-  test('PATCH /api/machines/:id updates maxConcurrency and autoDispatch and rejects invalid input', async () => {
-    const { s, mini } = await setupPair();
-    const ok = await req(s.app, 'PATCH', `/api/machines/${mini.id}`, {
-      maxConcurrency: 2,
-      autoDispatch: false,
-    });
-    expect(ok.status).toBe(200);
-    const body = (await ok.json()) as { maxConcurrency: number | null; autoDispatch: boolean };
-    expect(body.maxConcurrency).toBe(2);
-    expect(body.autoDispatch).toBe(false);
-
-    const bad = await req(s.app, 'PATCH', `/api/machines/${mini.id}`, { maxConcurrency: 0 });
-    expect(bad.status).toBe(400);
-  });
-
   test('worker step fails over to online backup after preferred machine is offline past grace window', async () => {
     const { s, mini, laptop, projectId } = await setupPair();
     const pastGrace = Date.now() - OFFLINE_FAILOVER_GRACE_MS - 5_000;
@@ -156,29 +160,26 @@ describe('multi-machine failover and overflow', () => {
     expect(queue?.alternateMachines).toEqual([{ machineId: laptop.id, name: 'macbook' }]);
   });
 
-  test('worker step overflows to backup when preferred machine reaches maxConcurrency', async () => {
+  test('a preferred Runner under load overflows the next task to a calm one, and keeps it when every Runner is under load', async () => {
     const { s, mini, laptop, projectId } = await setupPair();
-    await req(s.app, 'PATCH', `/api/machines/${mini.id}`, { maxConcurrency: 1 });
+    setHardware(s, mini.id, { ...CALM, cpuUtilization: 0.97 });
+    setHardware(s, laptop.id, CALM);
 
-    const first = await createAndStartTodo(s, projectId, 'first');
-    const second = await createAndStartTodo(s, projectId, 'second');
-
-    const claimedFirst = await claim(s.app, mini.token);
-    expect(claimedFirst?.step.id).toBe(first.stepId);
-
-    const miniSecond = await claim(s.app, mini.token);
-    expect(miniSecond).toBeNull();
-
-    const laptopSecond = await claim(s.app, laptop.token);
-    expect(laptopSecond?.step.id).toBe(second.stepId);
-    const row = s.db.select().from(stepTable).where(eq(stepTable.id, second.stepId)).get()!;
+    const overflow = await createAndStartTodo(s, projectId, 'overflow');
+    expect(await claim(s.app, mini.token)).toBeNull();
+    expect((await claim(s.app, laptop.token))?.step.id).toBe(overflow.stepId);
+    const row = s.db.select().from(stepTable).where(eq(stepTable.id, overflow.stepId)).get()!;
     expect(row.routedFromMachineId).toBe(mini.id);
     expect(row.routedReason).toBe('busy');
+
+    setHardware(s, laptop.id, { ...CALM, memoryPressure: 0.95 });
+    const kept = await createAndStartTodo(s, projectId, 'kept');
+    expect(await claim(s.app, laptop.token)).toBeNull();
+    expect((await claim(s.app, mini.token))?.step.id).toBe(kept.stepId);
   });
 
-  test('backup with autoDispatch=false does not claim overflow or offline failover', async () => {
+  test('a Runner that was manual-only takes offline failover work', async () => {
     const { s, mini, laptop, projectId } = await setupPair();
-    await req(s.app, 'PATCH', `/api/machines/${laptop.id}`, { autoDispatch: false });
     const pastGrace = Date.now() - OFFLINE_FAILOVER_GRACE_MS - 5_000;
     s.db
       .update(machineTable)
@@ -186,8 +187,8 @@ describe('multi-machine failover and overflow', () => {
       .where(eq(machineTable.id, mini.id))
       .run();
 
-    await createAndStartTodo(s, projectId);
-    expect(await claim(s.app, laptop.token)).toBeNull();
+    const { stepId } = await createAndStartTodo(s, projectId);
+    expect((await claim(s.app, laptop.token))?.step.id).toBe(stepId);
   });
 
   test('local-path project never auto-fails over to another machine', async () => {

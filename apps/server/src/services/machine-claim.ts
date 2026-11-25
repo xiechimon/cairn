@@ -468,15 +468,10 @@ function chiefClaimPayload(
 
 function runnerFull(
   db: MachineDeps['db'],
-  machineRow: Pick<typeof machine.$inferSelect, 'id' | 'maxConcurrency'>,
+  machineId: string,
   maxWorkers: number | undefined,
 ): boolean {
-  const configured = machineRow.maxConcurrency;
-  const cap =
-    maxWorkers !== undefined && configured != null
-      ? Math.min(maxWorkers, configured)
-      : (maxWorkers ?? (configured != null ? configured : undefined));
-  return cap !== undefined && machineRunningCount(db, machineRow.id) >= cap;
+  return maxWorkers !== undefined && machineRunningCount(db, machineId) >= maxWorkers;
 }
 
 async function claimChiefTurn(
@@ -493,7 +488,7 @@ async function claimChiefTurn(
   const initialMachine = db.select().from(machine).where(eq(machine.id, machineId)).get();
   if (!initialMachine) return null;
   let machineRow = initialMachine;
-  if (runnerFull(db, machineRow, maxWorkers)) return null;
+  if (runnerFull(db, machineRow.id, maxWorkers)) return null;
   let cands = claimChiefCandidates(deps, machineId, teamId).filter(
     (cand) => cand.stepRow.createdAt <= createdUpTo,
   );
@@ -527,7 +522,7 @@ async function claimChiefTurn(
     const freshMachine = db.select().from(machine).where(eq(machine.id, machineId)).get();
     if (!freshMachine) return null;
     machineRow = freshMachine;
-    if (runnerFull(db, machineRow, maxWorkers)) return null;
+    if (runnerFull(db, machineRow.id, maxWorkers)) return null;
     cands = claimChiefCandidates(deps, machineId, teamId).filter(
       (cand) => cand.stepRow.createdAt <= createdUpTo,
     );
@@ -625,7 +620,7 @@ async function tryClaim(
   if (!machineRow) return null;
   refreshClaudeRateParks(deps, teamId);
   const catalog = mergedCatalogModels(teamId);
-  const queued = runnerFull(db, machineRow, maxWorkers)
+  const queued = runnerFull(db, machineRow.id, maxWorkers)
     ? []
     : claimCandidates(deps, machineId, teamId);
   const earliestWorker = queued[0]?.stepRow.createdAt ?? Number.POSITIVE_INFINITY;
@@ -645,7 +640,7 @@ async function tryClaim(
   if (chiefAhead) return chiefAhead;
   if (!stillAuthorized()) return null;
   machineRow = db.select().from(machine).where(eq(machine.id, machineId)).get();
-  if (!machineRow || runnerFull(db, machineRow, maxWorkers)) return null;
+  if (!machineRow || runnerFull(db, machineRow.id, maxWorkers)) return null;
 
   for (const cand of workerCands) {
     if (
