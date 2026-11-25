@@ -1,6 +1,10 @@
+import { createHmac } from 'node:crypto';
 import { networkInterfaces } from 'node:os';
 import {
   feedbackSubmitBodySchema,
+  LOCAL_PROOF_PATH,
+  LOCAL_PROOF_PREFIX,
+  localProofBodySchema,
   pairBodySchema,
   pairClaimBodySchema,
   pairRequestBodySchema,
@@ -13,7 +17,8 @@ import type { AppContext } from './context.js';
 import { conditionalGet } from './lib/conditional-get.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { buildRemoteRoutes } from './lib/remote-routes.js';
-import { pairRequestPeerOf } from './lib/request-origin.js';
+import { hasProxyForwardingHeaders, pairRequestPeerOf } from './lib/request-origin.js';
+import { tailnetListenerOf } from './lib/tailnet-listener.js';
 import { matchesAuthToken, pairedDeviceIdOf } from './lib/token-auth.js';
 import { jsonBody } from './routes-helpers.js';
 import { requestIsSecure, setAuthCookie } from './services/browser-session.js';
@@ -60,6 +65,26 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     };
     c.header('cache-control', 'no-store');
     return c.json(descriptor);
+  });
+
+  app.post(LOCAL_PROOF_PATH, async (c) => {
+    if (
+      c.req.header('content-type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json'
+    ) {
+      return c.json({ error: 'application/json required' }, 415);
+    }
+    if (ctx.authToken === null) {
+      throw new HttpError(409, 'token auth is turned off');
+    }
+    if (hasProxyForwardingHeaders(c) || tailnetListenerOf(c) !== null) {
+      return c.body(null, 403);
+    }
+    const body = parseWith(localProofBodySchema, await jsonBody(c), 'body');
+    const proof = createHmac('sha256', ctx.authToken)
+      .update(`${LOCAL_PROOF_PREFIX}${remote.environmentId}:${body.nonce}`)
+      .digest('hex');
+    c.header('cache-control', 'no-store');
+    return c.json({ proof });
   });
 
   app.get('/api/remote/routes', (c) => {
@@ -160,7 +185,7 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     requireTokenAuth();
     c.header('cache-control', 'no-store');
     const body = parseWith(pairRequestBodySchema, await jsonBody(c), 'body');
-    const { source, peer } = pairRequestPeerOf(c);
+    const { source, peer } = pairRequestPeerOf(c, ctx.trustedProxies);
     const issued = createPairRequest(ctx.db, {
       name: body.name,
       detail: body.detail,
@@ -186,7 +211,12 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     });
     if (outcome.status === 'missing') throw new HttpError(404, 'pairing request not found');
     if (outcome.status !== 'approved') return c.json({ status: outcome.status });
-    setAuthCookie(c, outcome.sessionToken, requestIsSecure(c), outcome.sessionExpiresAt);
+    setAuthCookie(
+      c,
+      outcome.sessionToken,
+      requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies),
+      outcome.sessionExpiresAt,
+    );
     return c.json({
       status: 'approved',
       token: outcome.token,
@@ -241,7 +271,12 @@ export function registerRemoteRoutes(app: Hono, ctx: AppContext): void {
     if (paired === null) {
       throw new HttpError(401, 'pairing code is invalid or expired');
     }
-    setAuthCookie(c, paired.sessionToken, requestIsSecure(c));
+    setAuthCookie(
+      c,
+      paired.sessionToken,
+      requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies),
+      paired.sessionExpiresAt,
+    );
     return c.json(
       { token: paired.token, deviceId: paired.device.id, environmentId: remote.environmentId },
       201,

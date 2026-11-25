@@ -240,7 +240,9 @@ export function registerProjectRoutes(app: Hono, ctx: AppContext): void {
           teamId: ctx.team.id,
           decision,
           decidedBy: deviceId === null ? ctx.user.id : `device:${deviceId}`,
-          interactive: sameOriginPageWrite(c) ? 'page' : undefined,
+          interactive: sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies)
+            ? 'page'
+            : undefined,
         },
       ),
     );

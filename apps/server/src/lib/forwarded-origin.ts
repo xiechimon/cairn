@@ -15,12 +15,12 @@ function validHost(host: string): boolean {
 
 export function forwardedOrigin(input: {
   url: string;
-  loopbackPeer: boolean;
+  trustedProxy: boolean;
   proto?: string | undefined;
   host?: string | undefined;
 }): string {
   const requestUrl = new URL(input.url);
-  if (!input.loopbackPeer) return requestUrl.origin;
+  if (!input.trustedProxy) return requestUrl.origin;
   const proto = firstListValue(input.proto);
   if (proto === undefined || !FORWARDED_PROTOCOLS.has(proto)) return requestUrl.origin;
   const host = firstListValue(input.host) ?? requestUrl.host;

@@ -95,8 +95,12 @@ export function setAuthCookie(
   });
 }
 
-export function requestIsSecure(c: Context, trustedWebOrigin?: string): boolean {
-  return new URL(requestOrigin(c, trustedWebOrigin)).protocol === 'https:';
+export function requestIsSecure(
+  c: Context,
+  trustedWebOrigin?: string,
+  trustedProxies?: ReadonlySet<string>,
+): boolean {
+  return new URL(requestOrigin(c, trustedWebOrigin, trustedProxies)).protocol === 'https:';
 }
 
 interface Ticket {

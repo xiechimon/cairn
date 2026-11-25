@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { isIP } from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ import {
 } from '@cairn/shared';
 import { isLoopbackHost } from '@cairn/shared/loopback';
 import { z } from 'zod';
+import { normalizePeerAddress } from './lib/request-origin.js';
 
 const TSNET_HOSTNAME_PATTERN = /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
 
@@ -107,6 +109,7 @@ export const serverConfigSchema = z.object({
   requireToken: z.boolean(),
   authOff: z.boolean(),
   host: z.string().min(1),
+  trustedProxies: z.array(z.string().min(1)).default([]),
   tsnet: tsnetSettingsSchema,
   mcpConfigPath: z.string(),
   coordinatorInServer: z.boolean(),
@@ -156,6 +159,19 @@ function splitCsv(raw: string | null): string[] {
     .split(',')
     .map((entry) => entry.trim())
     .filter((entry) => entry !== '');
+}
+
+function envTrustedProxies(): string[] {
+  const entries = splitCsv(envStr('CAIRN_TRUSTED_PROXIES'));
+  const normalized: string[] = [];
+  for (const entry of entries) {
+    const ip = normalizePeerAddress(entry);
+    if (isIP(ip) === 0) {
+      throw new Error(`CAIRN_TRUSTED_PROXIES contains an invalid IP address: "${entry}"`);
+    }
+    normalized.push(ip);
+  }
+  return normalized;
 }
 
 function envClerkAuth(explicitWebOrigin: string | null): {
@@ -362,6 +378,7 @@ export function loadConfig(overrides: Partial<ServerConfig> = {}): ServerConfig 
     requireToken: envFlag(ENV_VARS.requireToken),
     authOff,
     host: envStr('HOST') ?? DEFAULT_HOST,
+    trustedProxies: envTrustedProxies(),
     tsnet: {
       enabled: envFlag(ENV_VARS.tsnet) || envStr(ENV_VARS.tsnet) === 'socket',
       ...(envStr(ENV_VARS.tsnet) === 'socket' ? { mode: 'socket' } : {}),

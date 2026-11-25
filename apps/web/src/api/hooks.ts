@@ -785,6 +785,26 @@ export function useApproveMachineEnrollment(teamId: string | undefined) {
   });
 }
 
+export function applyOptimisticPairDecision(
+  queryClient: QueryClient,
+  id: string,
+): PairingRequestView[] | undefined {
+  const previous = queryClient.getQueryData<PairingRequestView[]>(['pairingRequests']);
+  queryClient.setQueryData<PairingRequestView[]>(['pairingRequests'], (current) =>
+    current?.filter((item) => item.id !== id),
+  );
+  return previous;
+}
+
+export function restoreOptimisticPairDecision(
+  queryClient: QueryClient,
+  previous: PairingRequestView[] | undefined,
+): void {
+  if (previous !== undefined) {
+    queryClient.setQueryData(['pairingRequests'], previous);
+  }
+}
+
 export function useRemoteMutations() {
   const queryClient = useQueryClient();
   return {
@@ -803,7 +823,14 @@ export function useRemoteMutations() {
     decidePairRequest: useMutation({
       mutationFn: ({ id, decision }: { id: string; decision: 'approve' | 'deny' }) =>
         api.post<void>(`/api/remote/pairing-requests/${encodeURIComponent(id)}/${decision}`, {}),
-      onSuccess: () => {
+      onMutate: async ({ id }) => {
+        await queryClient.cancelQueries({ queryKey: ['pairingRequests'] });
+        return { previous: applyOptimisticPairDecision(queryClient, id) };
+      },
+      onError: (_error, _variables, context) => {
+        restoreOptimisticPairDecision(queryClient, context?.previous);
+      },
+      onSettled: () => {
         void queryClient.invalidateQueries({ queryKey: ['pairingRequests'] });
         void queryClient.invalidateQueries({ queryKey: ['remoteDevices'] });
       },

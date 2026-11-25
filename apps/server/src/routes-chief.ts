@@ -80,7 +80,9 @@ export function registerChiefRoutes(app: Hono, ctx: AppContext): void {
   ) => {
     if (requestId !== proposalCardId(proposalId)) throw notFound(`question ${requestId}`);
     const deviceId = pairedDeviceIdOf(c);
-    const interactive = sameOriginPageWrite(c) ? ('page' as const) : undefined;
+    const interactive = sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies)
+      ? ('page' as const)
+      : undefined;
     ctx.logger?.info(
       {
         proposalId,

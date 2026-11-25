@@ -15,10 +15,13 @@ export const PAIR_FRAGMENT_ENVIRONMENT_KEY = 'env';
 export const DEVICE_TOKEN_PREFIX = 'cairn_dev_';
 export const BROWSER_AUTH_HEADER = 'x-cairn-browser-auth';
 export const BROWSER_SESSION_PATH = '/api/auth/session';
+export const LOCAL_PROOF_PATH = '/api/remote/local-proof';
+export const LOCAL_PROOF_PREFIX = 'cairn-local-owner:';
 
 export function isOpenRemotePath(pathname: string): boolean {
   return (
     pathname === '/api/remote/descriptor' ||
+    pathname === LOCAL_PROOF_PATH ||
     pathname === '/api/remote/pair' ||
     pathname === '/api/remote/pair/request' ||
     pathname === '/api/remote/pair/claim'
@@ -55,6 +58,20 @@ export const remoteDescriptorSchema = z
   })
   .strict();
 export type RemoteDescriptor = z.infer<typeof remoteDescriptorSchema>;
+
+export const localProofBodySchema = z
+  .object({
+    nonce: z.string().regex(/^[0-9a-f]{32,64}$/),
+  })
+  .strict();
+export type LocalProofBody = z.infer<typeof localProofBodySchema>;
+
+export const localProofResponseSchema = z
+  .object({
+    proof: z.string().regex(/^[0-9a-f]{64}$/),
+  })
+  .strict();
+export type LocalProofResponse = z.infer<typeof localProofResponseSchema>;
 
 export const remoteRouteKindSchema = z.enum(['lan', 'tailnet']);
 export type RemoteRouteKind = z.infer<typeof remoteRouteKindSchema>;

@@ -1,4 +1,4 @@
-import { type PairingCodeResponse, type PairRequestSource, pairingLink } from '@cairn/shared';
+import { type PairingCodeResponse, pairingLink } from '@cairn/shared';
 import { Smartphone } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
@@ -36,6 +36,7 @@ import { loadClerkScript } from '../lib/clerk-loader.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
 import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { pairRequestSourceLabel } from '../overlay/pairing-request-banner.js';
 import { PageShell } from '../pages/shell.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
@@ -44,21 +45,6 @@ export const REMOTE_ACCESS_ROUTE = 'remote-access';
 function sourceName(source: PairingCandidate['source'], t: (key: string) => string): string {
   if (source === 'page') return t('当前页面地址');
   return source === 'tailnet' ? t('Tailscale') : t('局域网');
-}
-
-function pairRequestSourceName(source: PairRequestSource, t: (key: string) => string): string {
-  switch (source) {
-    case 'loopback':
-      return t('这台电脑');
-    case 'lan':
-      return t('局域网');
-    case 'tailnet':
-      return t('Tailscale');
-    case 'public':
-      return t('外部网络');
-    default:
-      return t('不明');
-  }
 }
 
 function displayPairCode(code: string): string {
@@ -268,7 +254,7 @@ export function RemoteAccessPage() {
               {joinMeta([
                 request.name,
                 request.detail,
-                pairRequestSourceName(request.source, t),
+                pairRequestSourceLabel(request.source, t),
                 relativeTime(request.createdAt, Date.now(), t),
               ])}
             </p>

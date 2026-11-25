@@ -94,6 +94,7 @@ export function createApp(ctx: AppContext, logger?: Logger): Hono {
     ownerChannel: ctx.ownerChannel,
     accessExchange: ctx.accessVerifier != null || ctx.clerkAuth != null,
     webOrigin: ctx.webOrigin,
+    trustedProxies: ctx.trustedProxies,
     resolveDeviceId: (provided) => pairedDeviceIdOfToken(ctx.db, provided),
     resolveSession: (cookie) => {
       const resolved = resolveBrowserSession(ctx.db, cookie);

@@ -81,6 +81,12 @@ import { createIdleWatch } from './idle-update.js';
 import { createKeepAwake } from './keep-awake.js';
 import { LAUNCH_SETTLED_FLAG, type LaunchVerdict, settleBundleAtLaunch } from './launch-update.js';
 import { desktopCredentialActions } from './local-credential-actions.js';
+import {
+  defaultLocalServerHomes,
+  matchesSigningTarget,
+  ownerSigningUrls,
+  resolveLocalHostOwner,
+} from './local-host-owner.js';
 import { scanLocalProviders } from './local-providers.js';
 import { type DesktopLocale, desktopLocale } from './locale.js';
 import {
@@ -474,12 +480,11 @@ function readOwnerToken(): string {
   return token;
 }
 
-function signOwnPagesIn(origin: string, token: string): void {
-  const { host } = new URL(origin);
+function signOwnPagesIn(origin: string, token: string, includeOwnerChannel = true): void {
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: [`http://${host}/*`, `ws://${host}/*`] },
+    { urls: ownerSigningUrls(origin) },
     (details, callback) => {
-      if (details.initiatorOrigin !== origin) {
+      if (details.initiatorOrigin !== origin || !matchesSigningTarget(details.url, origin)) {
         callback({});
         return;
       }
@@ -493,7 +498,7 @@ function signOwnPagesIn(origin: string, token: string): void {
         requestHeaders: {
           ...requestHeaders,
           Authorization: `Bearer ${token}`,
-          [OWNER_CHANNEL_HEADER]: ownerChannelKey,
+          ...(includeOwnerChannel ? { [OWNER_CHANNEL_HEADER]: ownerChannelKey } : {}),
         },
       });
     },
@@ -1711,11 +1716,32 @@ async function boot(): Promise<void> {
       } catch {}
     };
 
+    let localHostOwned = false;
+    let localOwnerHome: string | null = null;
+    const localCandidateHomes = () =>
+      defaultLocalServerHomes({
+        env: process.env,
+        desktopCairnHome: cairnHome(),
+        homeDir: homedir(),
+      });
+
     if (activeConn.kind === 'remote') {
-      origin = activeConn.url;
       activeRemoteHostName = activeConn.name;
       remoteClerkIssuer = null;
-      await refreshRemoteClerkIssuer(origin);
+      const localOwner = await resolveLocalHostOwner({
+        origin: activeConn.url,
+        candidateHomes: localCandidateHomes(),
+      });
+      if (localOwner !== null) {
+        origin = localOwner.origin;
+        ownerToken = localOwner.token;
+        localOwnerHome = localOwner.home;
+        localHostOwned = true;
+        signOwnPagesIn(origin, ownerToken, false);
+      } else {
+        origin = activeConn.url;
+        await refreshRemoteClerkIssuer(origin);
+      }
     } else {
       activeRemoteHostName = null;
       remoteClerkIssuer = null;
@@ -1748,7 +1774,7 @@ async function boot(): Promise<void> {
         origin = resident.origin;
         attachedToResident = true;
         ownerToken = readOwnerToken();
-        if (ownerToken !== '') signOwnPagesIn(origin, ownerToken);
+        if (ownerToken !== '') signOwnPagesIn(origin, ownerToken, false);
       } else {
         const port = await serverPort();
         server = startServer(port, otelFile, serverExited, desktopShellEnv);
@@ -1762,7 +1788,7 @@ async function boot(): Promise<void> {
         });
         startHealthWatch(server, guard);
         ownerToken = readOwnerToken();
-        signOwnPagesIn(server.origin, ownerToken);
+        signOwnPagesIn(server.origin, ownerToken, true);
         origin = server.origin;
       }
     }
@@ -1779,6 +1805,7 @@ async function boot(): Promise<void> {
       if (activeConn.id === LOCAL_CONNECTION_ID) {
         migrateRunnerHome(legacyRunnerDir, activeRunnerHome);
       }
+      const useTokenAuth = activeConn.kind === 'local' || localHostOwned;
       runnerStarting ??= startLocalRunner({
         root: bundledRoot('runner'),
         home: activeRunnerHome,
@@ -1787,11 +1814,15 @@ async function boot(): Promise<void> {
             ? [legacyRunnerDir, join(app.getPath('userData'), 'runner-home')]
             : [],
         serverHome: cairnHome(),
+        deniedServerHomes: [
+          ...localCandidateHomes(),
+          ...(localOwnerHome === null ? [] : [localOwnerHome]),
+        ],
         origin,
         ownerToken,
-        ownerChannelKey: activeConn.kind === 'local' ? ownerChannelKey : '',
-        authMode: activeConn.kind === 'remote' ? 'session' : 'token',
-        ...(activeConn.kind === 'remote'
+        ownerChannelKey: server !== null ? ownerChannelKey : '',
+        authMode: useTokenAuth ? 'token' : 'session',
+        ...(!useTokenAuth
           ? {
               fetchImpl: ((input, init) =>
                 session.defaultSession.fetch(input as string, init as RequestInit)) as typeof fetch,
@@ -1819,7 +1850,7 @@ async function boot(): Promise<void> {
         });
       return runnerStarting;
     };
-    if (activeConn.kind === 'remote') {
+    if (activeConn.kind === 'remote' && !localHostOwned) {
       const originHost = new URL(origin).hostname.toLowerCase();
       session.defaultSession.cookies.on('changed', (_event, cookie, _cause, removed) => {
         if (
@@ -1931,7 +1962,15 @@ async function boot(): Promise<void> {
       if (!fromHostMainPage(event) && !fromOfflinePage(event)) return;
       showingOfflinePage = false;
       expectedOfflineUrl = null;
-      if (activeRemoteHostName !== null) {
+      if (activeConn.kind === 'remote' && !localHostOwned) {
+        const localOwner = await resolveLocalHostOwner({
+          origin: activeConn.url,
+          candidateHomes: localCandidateHomes(),
+        });
+        if (localOwner !== null) {
+          relaunchForHostTransition();
+          return;
+        }
         await refreshRemoteClerkIssuer(origin);
       }
       void mainWindow?.loadURL(origin);

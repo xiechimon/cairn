@@ -42,6 +42,7 @@ export interface RunnerOptions {
   home: string;
   legacyHomes?: readonly string[];
   serverHome: string;
+  deniedServerHomes?: readonly string[];
   origin: string;
   ownerToken: string;
   ownerChannelKey: string;
@@ -194,9 +195,13 @@ function runnerEnv(options: RunnerOptions): NodeJS.ProcessEnv {
       ELECTRON_RUN_AS_NODE: '1',
       [ENV_VARS.home]: options.home,
       [ENV_VARS.parentPid]: String(process.pid),
-      [ENV_VARS.confineDeniedRoots]: [options.serverHome, ...(options.legacyHomes ?? [])].join(
-        delimiter,
-      ),
+      [ENV_VARS.confineDeniedRoots]: [
+        ...new Set([
+          options.serverHome,
+          ...(options.deniedServerHomes ?? []),
+          ...(options.legacyHomes ?? []),
+        ]),
+      ].join(delimiter),
       [ENV_VARS.server]: options.origin,
       [ENV_VARS.skillsDir]: join(options.home, 'skills'),
       [ENV_VARS.mcpConfig]: join(options.home, 'mcp.json'),

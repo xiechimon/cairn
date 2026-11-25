@@ -334,6 +334,7 @@ const app = createApp(
     dataDir: config.dataDir,
     webDir: config.webDir,
     webOrigin: config.webOrigin,
+    trustedProxies: new Set(config.trustedProxies),
     authToken: config.authToken,
     ownerChannel,
     accessVerifier:
@@ -472,7 +473,12 @@ const server = serve(
 backupService?.start();
 
 const drainHttp = createHttpDrain(server);
-const computerScreens = computerScreensOf({ db, machineHub, secretBox });
+const computerScreens = computerScreensOf({
+  db,
+  machineHub,
+  secretBox,
+  trustedProxies: new Set(config.trustedProxies),
+});
 computerScreens.recover();
 sweepComputerHandoffs(db, Date.now());
 void reconcileEffects(db, effectRegistry)

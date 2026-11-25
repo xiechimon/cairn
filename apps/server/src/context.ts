@@ -94,6 +94,7 @@ export interface AppContext {
   skillImportTimeoutMs?: number;
   webDir?: string | null;
   webOrigin?: string;
+  trustedProxies?: ReadonlySet<string>;
   githubFetch?: FetchLike;
   githubBaseFetch?: FetchLike;
   oauthStates: Map<string, OAuthStateEntry>;

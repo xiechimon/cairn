@@ -129,6 +129,7 @@ const INFERRED_ROUTES = [
   'POST /api/teams/{id}/api-keys',
   'DELETE /api/teams/{id}/api-keys/{keyId}',
   'GET /api/remote/descriptor',
+  'POST /api/remote/local-proof',
   'GET /api/remote/tailscale',
   'POST /api/remote/tailscale',
   'POST /api/remote/tailnet',

@@ -9,7 +9,7 @@ describe('forwardedOrigin', () => {
     expect(
       forwardedOrigin({
         url: viaServe,
-        loopbackPeer: true,
+        trustedProxy: true,
         proto: 'https',
         host: 'box.example.ts.net',
       }),
@@ -17,7 +17,7 @@ describe('forwardedOrigin', () => {
   });
 
   test('without a forwarded host the request host is kept', () => {
-    expect(forwardedOrigin({ url: viaServe, loopbackPeer: true, proto: 'https' })).toBe(
+    expect(forwardedOrigin({ url: viaServe, trustedProxy: true, proto: 'https' })).toBe(
       'https://box.example.ts.net',
     );
   });
@@ -26,21 +26,21 @@ describe('forwardedOrigin', () => {
     expect(
       forwardedOrigin({
         url: viaServe,
-        loopbackPeer: true,
+        trustedProxy: true,
         proto: 'https',
         host: 'box.example:8443',
       }),
     ).toBe('https://box.example:8443');
   });
 
-  test('headers from a non-loopback peer are ignored', () => {
+  test('headers from a non-trusted peer are ignored', () => {
     expect(
-      forwardedOrigin({ url: direct, loopbackPeer: false, proto: 'https', host: 'evil.example' }),
+      forwardedOrigin({ url: direct, trustedProxy: false, proto: 'https', host: 'evil.example' }),
     ).toBe('http://127.0.0.1:8787');
   });
 
   test('without a forwarded proto the request origin is kept', () => {
-    expect(forwardedOrigin({ url: viaServe, loopbackPeer: true, host: 'evil.example' })).toBe(
+    expect(forwardedOrigin({ url: viaServe, trustedProxy: true, host: 'evil.example' })).toBe(
       'http://box.example.ts.net',
     );
   });
@@ -48,7 +48,7 @@ describe('forwardedOrigin', () => {
   test.each(['javascript', 'ftp', 'HTTPS ', ''])(
     'an unknown proto %j keeps the request origin',
     (proto) => {
-      expect(forwardedOrigin({ url: direct, loopbackPeer: true, proto })).toBe(
+      expect(forwardedOrigin({ url: direct, trustedProxy: true, proto })).toBe(
         'http://127.0.0.1:8787',
       );
     },
@@ -58,7 +58,7 @@ describe('forwardedOrigin', () => {
     expect(
       forwardedOrigin({
         url: direct,
-        loopbackPeer: true,
+        trustedProxy: true,
         proto: 'https, http',
         host: 'box.example, other.example',
       }),
@@ -76,14 +76,14 @@ describe('forwardedOrigin', () => {
     '[.]',
     '999.999.999.999',
   ])('a malformed forwarded host %j keeps the request origin', (host) => {
-    expect(forwardedOrigin({ url: direct, loopbackPeer: true, proto: 'https', host })).toBe(
+    expect(forwardedOrigin({ url: direct, trustedProxy: true, proto: 'https', host })).toBe(
       'http://127.0.0.1:8787',
     );
   });
 
   test('a bracketed IPv6 forwarded host is accepted', () => {
     expect(
-      forwardedOrigin({ url: direct, loopbackPeer: true, proto: 'https', host: '[fd7a::1]:8443' }),
+      forwardedOrigin({ url: direct, trustedProxy: true, proto: 'https', host: '[fd7a::1]:8443' }),
     ).toBe('https://[fd7a::1]:8443');
   });
 });

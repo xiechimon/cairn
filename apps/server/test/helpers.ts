@@ -104,6 +104,7 @@ export function bootServer(
     clerkAuth?: AppContext['clerkAuth'];
     vapidKeys?: VapidKeys | null;
     webOrigin?: string;
+    trustedProxies?: AppContext['trustedProxies'];
     pushEndpointHosts?: ReadonlySet<string>;
     mcpConfigPath?: string;
     mcpFetch?: AppContext['mcpFetch'];
@@ -239,6 +240,7 @@ export function bootServer(
       },
       ...(opts.webDir !== undefined ? { webDir: opts.webDir } : {}),
       ...(opts.webOrigin !== undefined ? { webOrigin: opts.webOrigin } : {}),
+      ...(opts.trustedProxies !== undefined ? { trustedProxies: opts.trustedProxies } : {}),
       authToken: opts.authToken ?? null,
       ownerChannel: opts.ownerChannel,
       accessVerifier: opts.accessVerifier ?? null,

@@ -100,13 +100,23 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     if (matchesAuthToken(ctx.authToken, provided)) {
       const session = issueBrowserSession(ctx.db, 'owner', null);
-      setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
+      setAuthCookie(
+        c,
+        session.token,
+        requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies),
+        session.expiresAt,
+      );
       return c.body(null, 204);
     }
     const deviceId = pairedDeviceIdOfToken(ctx.db, provided);
     if (deviceId !== null) {
       const session = issueBrowserSession(ctx.db, 'device', deviceId);
-      setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
+      setAuthCookie(
+        c,
+        session.token,
+        requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies),
+        session.expiresAt,
+      );
       return c.body(null, 204);
     }
     return c.json({ error: 'access token required' }, 403);
@@ -137,7 +147,12 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'access exchange');
     const session = issueBrowserSession(ctx.db, 'external', null, undefined, verdict.expiresAt);
-    setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
+    setAuthCookie(
+      c,
+      session.token,
+      requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies),
+      session.expiresAt,
+    );
     return c.json({ ok: true });
   });
 
@@ -165,7 +180,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
       return c.json({ error: 'same-origin proof required' }, 403);
     }
     const origin = c.req.header('origin');
-    if (origin !== undefined && origin !== requestOrigin(c, ctx.webOrigin)) {
+    if (origin !== undefined && origin !== requestOrigin(c, ctx.webOrigin, ctx.trustedProxies)) {
       return c.json({ error: 'same-origin proof required' }, 403);
     }
     const match = /^Bearer\s+(.+)$/i.exec(c.req.header('authorization') ?? '');
@@ -177,7 +192,12 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     }
     ctx.logger?.info({ outcome: verdict.kind, status: 200 }, 'clerk auth exchange');
     const session = issueBrowserSession(ctx.db, 'external', null);
-    setAuthCookie(c, session.token, requestIsSecure(c, ctx.webOrigin), session.expiresAt);
+    setAuthCookie(
+      c,
+      session.token,
+      requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies),
+      session.expiresAt,
+    );
     return c.json({ ok: true });
   });
 
@@ -195,7 +215,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (c.req.query('all') === '1' && c.get('ownerIdentity') !== undefined) {
       revokeAllExternalBrowserSessions(ctx.db);
     }
-    clearAuthCookie(c, requestIsSecure(c, ctx.webOrigin));
+    clearAuthCookie(c, requestIsSecure(c, ctx.webOrigin, ctx.trustedProxies));
     return c.body(null, 204);
   });
 
@@ -242,7 +262,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (ctx.backupService === undefined) {
       throw new HttpError(503, 'Built-in backup is not enabled on this server.');
     }
-    if (getCookie(c, AUTH_COOKIE) !== undefined && !sameOriginPageWrite(c, ctx.webOrigin)) {
+    if (
+      getCookie(c, AUTH_COOKIE) !== undefined &&
+      !sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies)
+    ) {
       return c.body(null, 403);
     }
     try {
@@ -262,7 +285,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (ctx.backupService === undefined) {
       throw new HttpError(503, 'Built-in backup is not enabled on this server.');
     }
-    if (getCookie(c, AUTH_COOKIE) !== undefined && !sameOriginPageWrite(c, ctx.webOrigin)) {
+    if (
+      getCookie(c, AUTH_COOKIE) !== undefined &&
+      !sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies)
+    ) {
       return c.body(null, 403);
     }
     try {
@@ -288,7 +314,10 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     if (ctx.backupService === undefined) {
       throw new HttpError(503, 'Built-in backup is not enabled on this server.');
     }
-    if (getCookie(c, AUTH_COOKIE) !== undefined && !sameOriginPageWrite(c, ctx.webOrigin)) {
+    if (
+      getCookie(c, AUTH_COOKIE) !== undefined &&
+      !sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies)
+    ) {
       return c.body(null, 403);
     }
     const id = c.req.param('id');
@@ -348,7 +377,7 @@ export function registerCoreRoutes(app: Hono, ctx: AppContext): void {
     const ownerPage =
       (ctx.authToken === null || c.get('ownerIdentity') !== undefined) &&
       isOwner(ctx.db, ctx.user.id) &&
-      sameOriginPageWrite(c);
+      sameOriginPageWrite(c, ctx.webOrigin, ctx.trustedProxies);
     if (!ownerPage) {
       throw new HttpError(
         403,

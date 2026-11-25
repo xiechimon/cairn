@@ -56,7 +56,6 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/lib/local-source.ts:caseFoldingCache':
     'whether a volume folds case is a filesystem fact shared by every instance',
   'apps/server/src/lib/remote-routes.ts:WILDCARD_HOSTS': 'constant lookup table',
-  'apps/server/src/lib/request-origin.ts:LOOPBACK_PEER_ADDRESSES': 'constant lookup table',
   'apps/server/src/lib/token-auth.ts:READ_METHODS': 'constant lookup table',
   'apps/server/src/lib/tsnet-sidecar.ts:INHERITED_ENV_NAMES': 'constant lookup table',
   'apps/server/src/services/apns.ts:DEAD_TOKEN_REASONS': 'constant lookup table',
@@ -70,7 +69,6 @@ const ALLOWED: Record<string, string> = {
   'apps/server/src/services/ci-check-verdict.ts:BLOCKING_UNREQUIRED': 'constant lookup table',
   'apps/server/src/services/computer-call-store.ts:pendingCalls':
     'in-flight computer calls keyed on unique callIds; dropComputerWaiters is the process-wide test cleanup seam',
-  'apps/server/src/services/computer-screen.ts:LOOPBACK_ADDRESSES': 'constant lookup table',
   'apps/server/src/services/coordinator-turn-capture.ts:liveCaptures':
     'in-server coordinator capture registry keyed on unique stepIds; the coordinator is a process-level singleton',
   'apps/server/src/services/im/slack.ts:AUTH_ERRORS': 'constant lookup table',

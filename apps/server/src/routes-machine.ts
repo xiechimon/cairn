@@ -46,7 +46,12 @@ import { sha256Hex } from './lib/crypto.js';
 import { HttpError, parseWith } from './lib/errors.js';
 import { forwardedOrigin } from './lib/forwarded-origin.js';
 import { newRecordId } from './lib/ids.js';
-import { isDirectLoopbackPeer, isLoopbackPeer, pairRequestPeerOf } from './lib/request-origin.js';
+import {
+  forwardedHostFor,
+  isDirectLoopbackPeer,
+  isTrustedProxyPeer,
+  pairRequestPeerOf,
+} from './lib/request-origin.js';
 import { openSseStream } from './lib/sse-headers.js';
 import { tailnetOriginOf } from './lib/tailnet-listener.js';
 import { githubAppOf, jsonBody } from './routes-helpers.js';
@@ -205,24 +210,24 @@ function newEnrollCode(taken: ReadonlySet<string>): string {
   }
 }
 
-function enrollOrigin(c: Context): string {
+function enrollOrigin(c: Context, trustedProxies?: ReadonlySet<string>): string {
   const configured = process.env.CAIRN_WEB_ORIGIN?.trim();
   if (configured !== undefined && configured !== '') {
     try {
       return new URL(configured).origin;
     } catch {}
   }
-  return originOf(c);
+  return originOf(c, trustedProxies);
 }
 
-function originOf(c: Context): string {
+function originOf(c: Context, trustedProxies?: ReadonlySet<string>): string {
   return (
     tailnetOriginOf(c) ??
     forwardedOrigin({
       url: c.req.url,
-      loopbackPeer: isLoopbackPeer(c),
+      trustedProxy: isTrustedProxyPeer(c, trustedProxies),
       proto: c.req.header('x-forwarded-proto'),
-      host: c.req.header('x-forwarded-host'),
+      host: forwardedHostFor(c.req.header('host'), c.req.header('x-forwarded-host')),
     })
   );
 }
@@ -329,7 +334,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
       ...(body.capabilities !== undefined ? { capabilities: body.capabilities } : {}),
       ...(body.hostKey !== undefined ? { hostKey: body.hostKey } : {}),
       ...(body.legacyHostKeys !== undefined ? { legacyHostKeys: body.legacyHostKeys } : {}),
-      serverUrl: originOf(c),
+      serverUrl: originOf(c, ctx.trustedProxies),
     });
     if (body.claudeCode !== undefined) await resumeRuntimeHeldBuilds(deps, body.teamId);
     return c.json(result);
@@ -349,7 +354,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
 
   app.post('/api/machine/enroll/start', async (c) => {
     const now = Date.now();
-    const { peer } = pairRequestPeerOf(c);
+    const { peer } = pairRequestPeerOf(c, ctx.trustedProxies);
     const cutoff = now - ENROLL_START_RATE_WINDOW_MS;
     if (enrollStartRates.size >= ENROLL_START_PEER_CAP && !enrollStartRates.has(peer)) {
       for (const [trackedPeer, timestamps] of enrollStartRates) {
@@ -401,7 +406,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     c.header('cache-control', 'no-store');
     return c.json({
       enrollId,
-      url: `${enrollOrigin(c)}/app/machines/authorize?enroll=${enrollId}`,
+      url: `${enrollOrigin(c, ctx.trustedProxies)}/app/machines/authorize?enroll=${enrollId}`,
       code: `${code.slice(0, 4)}-${code.slice(4)}`,
       pollSecret,
     });
@@ -456,7 +461,7 @@ export function registerMachineRoutes(app: Hono, ctx: AppContext): void {
     const machineJson = authorizeEnrollmentMachine(deps, {
       teamId: entry.teamId,
       name: entry.name ?? 'machine',
-      serverUrl: originOf(c),
+      serverUrl: originOf(c, ctx.trustedProxies),
       ownerApproved: ctx.authToken === null || c.get('ownerIdentity') !== undefined,
       fromLocalHost: entry.fromLocalHost === true,
       ...(entry.hostKey !== undefined ? { hostKey: entry.hostKey } : {}),

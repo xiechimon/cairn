@@ -17,6 +17,7 @@ import type { AppContext } from '../context.js';
 import { computer, machine as machineTable, step } from '../db/schema.js';
 import { HttpError } from '../lib/errors.js';
 import { forwardedOrigin } from '../lib/forwarded-origin.js';
+import { forwardedHostFor, isTrustedProxyAddress } from '../lib/request-origin.js';
 import { ownedPrivateComputer } from './computer-access.js';
 import {
   acquireComputerControl,
@@ -33,7 +34,6 @@ import { screenUpgradePath } from './screen-upgrade-paths.js';
 const MAX_CHANNELS = 128;
 const MAX_COMPUTER_CHANNELS = 8;
 const PAIR_TIMEOUT_MS = 15_000;
-const LOOPBACK_ADDRESSES = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const CAP_PROTOCOL_PREFIX = 'cairn-screen.';
 const CAP_PURPOSE = 'cairn-computer-screen-v1';
 const viewerCapabilitySchema = z
@@ -50,7 +50,7 @@ interface UpgradeServer {
   ): unknown;
 }
 
-type ScreenDependencies = Pick<AppContext, 'db' | 'machineHub' | 'secretBox'>;
+type ScreenDependencies = Pick<AppContext, 'db' | 'machineHub' | 'secretBox' | 'trustedProxies'>;
 interface Channel {
   request: ComputerScreenRequest;
   machineId: string;
@@ -424,17 +424,21 @@ export class ComputerScreenGateway {
     try {
       const scheme =
         request.socket instanceof TLSSocket && request.socket.encrypted ? 'https' : 'http';
+      const remoteAddress = request.socket.remoteAddress ?? '';
       const expected = forwardedOrigin({
         url: `${scheme}://${host}/`,
-        loopbackPeer: LOOPBACK_ADDRESSES.has(request.socket.remoteAddress ?? ''),
+        trustedProxy:
+          remoteAddress !== '' && isTrustedProxyAddress(remoteAddress, this.deps.trustedProxies),
         proto:
           typeof request.headers['x-forwarded-proto'] === 'string'
             ? request.headers['x-forwarded-proto']
             : undefined,
-        host:
+        host: forwardedHostFor(
+          host,
           typeof request.headers['x-forwarded-host'] === 'string'
             ? request.headers['x-forwarded-host']
             : undefined,
+        ),
       });
       return origin === expected;
     } catch {

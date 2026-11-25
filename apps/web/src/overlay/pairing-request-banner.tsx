@@ -1,4 +1,6 @@
+import type { PairRequestSource } from '@cairn/shared';
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../api/auth.js';
 import { usePairingRequests, useRemoteMutations } from '../api/hooks.js';
 import { Button } from '../components/ui/button.js';
@@ -10,6 +12,24 @@ const APPROVE_ARM_DELAY_MS = 1_500;
 
 function formatCode(code: string): string {
   return code.length > 4 ? `${code.slice(0, 4)}-${code.slice(4)}` : code;
+}
+
+export function pairRequestSourceLabel(
+  source: PairRequestSource,
+  t: (key: string) => string,
+): string {
+  switch (source) {
+    case 'loopback':
+      return t('这台电脑');
+    case 'lan':
+      return t('局域网');
+    case 'tailnet':
+      return t('Tailscale');
+    case 'public':
+      return t('外部网络');
+    default:
+      return t('不明');
+  }
 }
 
 export function PairingRequestBanner() {
@@ -50,17 +70,17 @@ export function PairingRequestBanner() {
     );
   };
 
-  return (
+  const banner = (
     <div
       data-testid="pairing-request-banner"
       role="status"
-      className="fixed top-4 right-4 z-(--z-gate) flex w-80 max-w-[calc(100vw-32px)] flex-col gap-2.5 rounded-(--radius-card) bg-popover p-4 shadow-(--e2) ring-1 ring-border"
+      className="pointer-events-auto fixed top-4 right-4 z-(--z-gate) flex w-80 max-w-[calc(100vw-32px)] flex-col gap-2.5 rounded-(--radius-card) bg-popover p-4 shadow-(--e2) ring-1 ring-border"
     >
       <div className="flex flex-col gap-0.5">
         <p className="m-0 text-ui font-medium text-foreground">{t('有新设备请求配对')}</p>
         <p className="m-0 text-meta text-content-secondary">
           {pending.name}
-          {pending.source ? ` · ${pending.source}` : ''}
+          {pending.source ? ` · ${pairRequestSourceLabel(pending.source, t)}` : ''}
           {pending.detail ? ` · ${pending.detail}` : ''}
         </p>
       </div>
@@ -93,4 +113,9 @@ export function PairingRequestBanner() {
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body !== null) {
+    return createPortal(banner, document.body);
+  }
+  return banner;
 }
