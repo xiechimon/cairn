@@ -31,6 +31,7 @@ export interface SubscriptionAccount {
   stepsLast24h: number | null;
   models?: SubscriptionModel[];
   hasToken?: boolean;
+  oauthPersonal?: boolean;
   runnerId?: string | null;
   runnerName?: string | null;
   runnerLogin?: AntigravitySubscriptionListEntry['runnerLogin'];

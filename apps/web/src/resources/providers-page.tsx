@@ -1,6 +1,7 @@
 import {
   antigravitySubscriptionModelSchema,
   claudeSubscriptionModelSchema,
+  DEVIN_TOKEN_LIFETIME_MS,
   devinSubscriptionModelSchema,
   type ManagedUpdateRuntime,
   type ModelSource,
@@ -17,6 +18,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import type { Verification } from '../api/account-verification.js';
 import {
+  extractAntigravityToken,
   fetchAntigravityUpstreamModels,
   toAntigravityAccount,
   useAntigravitySubscriptions,
@@ -24,6 +26,7 @@ import {
   useDeleteAntigravitySubscription,
   useRenameAntigravitySubscription,
   useUpdateAntigravitySubscriptionModels,
+  useUpdateAntigravitySubscriptionToken,
 } from '../api/antigravity-subscriptions.js';
 import {
   type AccountVendor,
@@ -40,8 +43,10 @@ import {
   useRenameClaudeSubscription,
   useSubscriptionVerification,
   useUpdateClaudeSubscriptionModels,
+  useUpdateClaudeSubscriptionToken,
 } from '../api/claude-subscriptions.js';
 import {
+  extractDevinToken,
   fetchDevinUpstreamModels,
   toDevinAccount,
   useDeleteDevinSubscription,
@@ -49,6 +54,7 @@ import {
   useDevinSubscriptionVerification,
   useRenameDevinSubscription,
   useUpdateDevinSubscriptionModels,
+  useUpdateDevinSubscriptionToken,
 } from '../api/devin-subscriptions.js';
 import {
   type ProvidersEnvelope,
@@ -66,7 +72,8 @@ import { type ProviderItem, ProviderPanel } from '../components/providers/provid
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { oauthReasonCopy } from '../i18n/oauth-reason.js';
 import { useI18n } from '../i18n/provider.js';
@@ -279,6 +286,9 @@ export function ProvidersSection() {
   const updateAntigravityModels = useUpdateAntigravitySubscriptionModels(teamId);
   const updateClaudeModels = useUpdateClaudeSubscriptionModels(teamId);
   const renameAntigravitySubscription = useRenameAntigravitySubscription(teamId);
+  const updateClaudeToken = useUpdateClaudeSubscriptionToken(teamId);
+  const updateDevinToken = useUpdateDevinSubscriptionToken(teamId);
+  const updateAntigravityToken = useUpdateAntigravitySubscriptionToken(teamId);
   const verification = useSubscriptionVerification(teamId);
   const devinVerification = useDevinSubscriptionVerification(teamId);
   const antigravityVerification = useAntigravitySubscriptionVerification(teamId);
@@ -563,6 +573,42 @@ export function ProvidersSection() {
     const apiIds = apiIdsByVendor[account.vendor] ?? subscriptionApiIds;
     const managedRuntime: ManagedUpdateRuntime | null =
       account.vendor === 'claude' ? 'claude-code' : account.vendor === 'devin' ? 'devin' : null;
+    const supportsTokenReplace =
+      account.vendor === 'claude' ||
+      account.vendor === 'devin' ||
+      (account.vendor === 'antigravity' &&
+        account.hasToken === true &&
+        !antigravityOAuthIds.has(account.id));
+    const replaceToken = async (raw: string): Promise<boolean> => {
+      try {
+        if (account.vendor === 'claude') {
+          await updateClaudeToken.mutateAsync({
+            id: account.id,
+            token: raw.trim(),
+            expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+          });
+        } else if (account.vendor === 'devin') {
+          await updateDevinToken.mutateAsync({
+            id: account.id,
+            token: extractDevinToken(raw),
+            expiresAt: Date.now() + DEVIN_TOKEN_LIFETIME_MS,
+          });
+        } else if (account.vendor === 'antigravity') {
+          await updateAntigravityToken.mutateAsync({
+            id: account.id,
+            token: extractAntigravityToken(raw),
+          });
+        } else {
+          return false;
+        }
+        toastSuccess(t('已更新凭据'));
+        startVerification(account);
+        return true;
+      } catch (error) {
+        toastError(t('更新凭据失败，请重试。'), error);
+        return false;
+      }
+    };
     return {
       onRemove: () => setRemovingSubscription(account),
       ...(managedRuntime !== null && (!live || providersQ.data?.canTestConnection === true)
@@ -581,6 +627,7 @@ export function ProvidersSection() {
                       { id: account.id, label },
                       { onError: (error) => toastError(t('重命名失败，请重试。'), error) },
                     ),
+                  ...(supportsTokenReplace ? { onReplaceToken: replaceToken } : {}),
                   ...(account.vendor === 'devin' ||
                   account.vendor === 'antigravity' ||
                   account.vendor === 'claude'
@@ -613,6 +660,14 @@ export function ProvidersSection() {
         : {
             onVerify: () => undefined,
             onRename: () => undefined,
+            ...(supportsTokenReplace
+              ? {
+                  onReplaceToken: () => {
+                    blockDemoWrite();
+                    return false;
+                  },
+                }
+              : {}),
             ...(account.vendor === 'devin' ||
             account.vendor === 'antigravity' ||
             account.vendor === 'claude'

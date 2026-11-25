@@ -39,6 +39,7 @@ import { useConversationStream } from '../api/sse.js';
 import { useSendKey } from '../api/use-send-key.js';
 import { globalCoordinatorThread } from '../chief/coordinator-load.js';
 import { threadTurnInFlight } from '../chief/orchestration-inflight.js';
+import { useOrchestrateStart } from '../chief/use-orchestrate-start.js';
 import type { EarlierPages } from '../components/chat/earlier-loader.js';
 import type { NamedMachine } from '../components/machine-label.js';
 import type { QueuedCapsule } from '../components/queued-capsules.js';
@@ -119,6 +120,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
   const qc = useQueryClient();
   const [searchParams] = useSearchParams();
   const mutations = useApiMutations(teamId);
+  const orchestrateStart = useOrchestrateStart();
   const sendKey = useSendKey();
   const [stopping, setStopping] = useState(false);
   const stopRequested = useRef(false);
@@ -283,8 +285,9 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
           : 'missing';
 
   const started = buildId != null;
+  const canDraftTodo = !started && todo?.phase === 'todo' && todo?.archivedAt == null;
   const open = started && todo?.archivedAt == null && todo?.phase !== 'closed';
-  const writable = live && open;
+  const writable = live && (open || canDraftTodo);
   const fixtureSend = DEMO_MODE
     ? async () => {
         blockDemoWrite();
@@ -293,7 +296,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
 
   const queueReply = todo != null && replyRouteOf(todo.phase, steps) === 'queue';
   const postQueued =
-    writable && buildId != null
+    live && open && buildId != null
       ? (text: string, deliverAfterStop: boolean, clientMessageId: string) =>
           mutations.sendSteer.mutateAsync({
             conversationId: buildId,
@@ -313,6 +316,13 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       : undefined;
   const send = writable
     ? async (text: string) => {
+        if (canDraftTodo && todo != null) {
+          const nextSpec = todo.spec.trim() === '' ? text : `${todo.spec.trimEnd()}\n\n${text}`;
+          await mutations.patchTodo.mutateAsync({ id: todoId, body: { spec: nextSpec } });
+          orchestrateStart.orchestrate(todo);
+          return;
+        }
+        if (buildId == null) return;
         const { key, route } = sendKey.attempt(
           [todoId, false, text].join('\n'),
           queueReply && postQueued !== undefined ? 'queue' : 'thread',
@@ -327,11 +337,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
           });
         sendKey.settle();
       }
-    : !live && open
+    : !live && (open || canDraftTodo)
       ? fixtureSend
       : undefined;
   const stop =
-    writable && buildId != null && running
+    live && open && buildId != null && running
       ? () => {
           if (stopRequested.current) return;
           stopRequested.current = true;
@@ -408,7 +418,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
       messagesPending: messagesQ.isPending,
     }),
     started,
-    locked: !open,
+    locked: !(open || canDraftTodo),
     running,
     stopping,
     waitingOnChecks:
@@ -419,13 +429,16 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     machine,
     platformWait,
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
-    sendError: mutations.messageThread.isError
-      ? (describeError(mutations.messageThread.error, t) ?? t('发送失败，请重试。'))
-      : mutations.sendSteer.isError &&
-          mutations.sendSteer.variables?.cancelQueued !== true &&
-          mutations.sendSteer.variables?.editQueued !== true
-        ? (describeError(mutations.sendSteer.error, t) ?? t('发送失败，请重试。'))
-        : null,
+    sendError:
+      canDraftTodo && mutations.patchTodo.isError
+        ? (describeError(mutations.patchTodo.error, t) ?? t('发送失败，请重试。'))
+        : mutations.messageThread.isError
+          ? (describeError(mutations.messageThread.error, t) ?? t('发送失败，请重试。'))
+          : mutations.sendSteer.isError &&
+              mutations.sendSteer.variables?.cancelQueued !== true &&
+              mutations.sendSteer.variables?.editQueued !== true
+            ? (describeError(mutations.sendSteer.error, t) ?? t('发送失败，请重试。'))
+            : null,
     queuedMessages: live ? newest?.queuedMessages : undefined,
     retry: () => {
       void todoQ.refetch();

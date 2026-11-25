@@ -59,6 +59,22 @@ export function useRenameClaudeSubscription(teamId: string | undefined) {
   });
 }
 
+export function useUpdateClaudeSubscriptionToken(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; token: string; expiresAt?: number | null }) =>
+      api.patch<ClaudeSubscription>(`/api/teams/${teamId}/claude-subscriptions/${input.id}`, {
+        token: input.token,
+        ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['claude-subscriptions', teamId] });
+      void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
+    gcTime: 0,
+  });
+}
+
 export function useUpdateClaudeSubscriptionModels(teamId: string | undefined) {
   const client = useQueryClient();
   return useMutation({

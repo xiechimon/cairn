@@ -65,10 +65,18 @@ async function stubSkillStore(page: Page, seed: SkillRow[] = []) {
     return route.fulfill({ json: { fileName: 'SKILL.md', content } });
   });
   await page.route('**/api/teams/*/skills/*', async (route, request) => {
-    if (request.method() !== 'PUT') return route.fallback();
     const sid = decodeURIComponent(
       request.url().split('/skills/')[1]?.split('?')[0]?.replace(/\/$/, '') ?? '',
     );
+    if (request.method() === 'DELETE') {
+      calls.push({ method: 'DELETE', url: request.url() });
+      const idx = store.findIndex((s) => s.id === sid);
+      if (idx === -1) return route.fulfill({ status: 404, json: { error: `skill ${sid} not found` } });
+      store.splice(idx, 1);
+      files.delete(sid);
+      return route.fulfill({ status: 204 });
+    }
+    if (request.method() !== 'PUT') return route.fallback();
     const body = request.postDataJSON() as {
       name: string;
       description: string;
@@ -234,4 +242,26 @@ test('client-side preflight: illegal names are refused and quoted descriptions r
     description: '"quoted: # literal"',
     files: [{ path: 'SKILL.md', content: '---\nname: ok-name\ndescription: \'"quoted: # literal"\'\n---\n' }],
   });
+});
+
+test('deletes an existing skill after alertdialog confirmation', async ({ page }) => {
+  await stubBoot(page);
+  const { calls, files } = await stubSkillStore(page, [
+    { id: 'deploy', teamId: 'team-1', name: 'deploy', description: '部署技能' },
+  ]);
+  files.set('deploy', '---\nname: deploy\ndescription: 部署技能\n---\n');
+
+  await page.goto(SKILLS);
+  const row = page.getByTestId('resource-row').filter({ hasText: 'deploy' });
+  await expect(row).toBeVisible();
+  await row.click();
+
+  const dialog = page.getByRole('dialog', { name: '编辑技能' });
+  await dialog.getByTestId('skill-delete').click();
+  const confirm = page.getByRole('alertdialog');
+  await expect(confirm).toContainText('deploy');
+  await confirm.getByRole('button', { name: '删除', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByTestId('resource-row')).toHaveCount(0);
+  expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('/skills/deploy'))).toBe(true);
 });

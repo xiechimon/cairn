@@ -2058,4 +2058,41 @@ describe('antigravity upstream models', () => {
     });
     expect(earlyExit.status).toBe(502);
   });
+
+  test('PATCH rotates non-OAuth Antigravity token in place and rejects raw OAuth access tokens', async () => {
+    const s = bootServer({ githubFetch: async () => new Response('[]') });
+    disposables.push(() => s.dispose());
+    const path = `/api/teams/${s.team.id}/antigravity-subscriptions`;
+    const initialKey = `AIzaSyA${'a'.repeat(28)}`;
+    const created = await req(s.app, 'POST', path, {
+      label: 'Gemini Key Account',
+      token: initialKey,
+    });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    const beforeRow = s.db
+      .select()
+      .from(antigravitySubscription)
+      .where(eq(antigravitySubscription.id, id))
+      .get();
+
+    const rejectOauth = await req(s.app, 'PATCH', `${path}/${id}`, {
+      token: `ya29.${'x'.repeat(40)}`,
+    });
+    expect(rejectOauth.status).toBe(400);
+    expect(await rejectOauth.text()).toContain('Use Google sign-in to refresh OAuth credentials');
+
+    const rotatedKey = `AIzaSyB${'b'.repeat(28)}`;
+    const patched = await req(s.app, 'PATCH', `${path}/${id}`, { token: rotatedKey });
+    expect(patched.status).toBe(200);
+    const rawBody = await patched.text();
+    expect(rawBody).not.toContain(rotatedKey);
+    expect(rawBody).not.toContain(initialKey);
+    const afterRow = s.db
+      .select()
+      .from(antigravitySubscription)
+      .where(eq(antigravitySubscription.id, id))
+      .get();
+    expect(afterRow?.tokenCipher).not.toBe(beforeRow?.tokenCipher);
+  });
 });

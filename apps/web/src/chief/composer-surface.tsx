@@ -268,6 +268,7 @@ export function ComposerSurface({
       </KeyedMenuContent>
     </DropdownMenu>
   );
+  const showStop = stop?.available === true && send === undefined && !hasDraft;
   return (
     <div
       hidden={!active}
@@ -383,47 +384,71 @@ export function ComposerSurface({
             />
           </div>
           {trailing}
-          <IconTooltip
-            label={send?.label ?? t('发送')}
-            trigger={
-              <Button
-                variant="ghost"
-                size={send?.text !== undefined ? 'sm' : 'icon'}
-                data-testid={send?.testId}
-                disabled={send !== undefined && !send.enabled}
-                className={
-                  send?.text !== undefined
-                    ? cn(
-                        'ml-auto h-7 flex-none cursor-pointer gap-1 px-2 text-meta font-normal pointer-coarse:h-11',
-                        hasDraft ? 'text-foreground' : 'text-content-tertiary',
-                      )
-                    : narrow
-                      ? cn(ROUND_HIT_CLS, 'ml-auto')
-                      : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
-                }
-                onClick={() => (send?.onClick ?? wire.send)()}
-              />
-            }
-          >
-            {send?.text !== undefined ? (
-              <>
-                {send.icon}
-                {send.text}
-              </>
-            ) : narrow ? (
-              <span
-                className={cn(
-                  ROUND_FACE_CLS,
-                  'bg-(--hover-1)',
-                  hasDraft ? 'text-foreground' : 'text-content-tertiary',
-                )}
-              >
-                <ArrowUp width={20} height={20} />
-              </span>
-            ) : (
-              <CornerDownLeft width={20} height={20} />
-            )}
-          </IconTooltip>
+          {showStop ? (
+            <IconTooltip
+              label={t('停止 Coordinator 这次回复')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  data-testid="chief-composer-stop"
+                  aria-label={t('停止 Coordinator 这次回复')}
+                  className={cn(narrow ? cn(ROUND_HIT_CLS, 'ml-auto') : cn(SEND_BTN_CLS, STOP_CLS))}
+                  onClick={stop?.onStop}
+                />
+              }
+            >
+              {narrow ? (
+                <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
+                  <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                </span>
+              ) : (
+                <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+              )}
+            </IconTooltip>
+          ) : (
+            <IconTooltip
+              label={send?.label ?? t('发送')}
+              trigger={
+                <Button
+                  variant="ghost"
+                  size={send?.text !== undefined ? 'sm' : 'icon'}
+                  data-testid={send?.testId}
+                  disabled={send !== undefined && !send.enabled}
+                  className={
+                    send?.text !== undefined
+                      ? cn(
+                          'ml-auto h-7 flex-none cursor-pointer gap-1 px-2 text-meta font-normal pointer-coarse:h-11',
+                          hasDraft ? 'text-foreground' : 'text-content-tertiary',
+                        )
+                      : narrow
+                        ? cn(ROUND_HIT_CLS, 'ml-auto')
+                        : cn(SEND_BTN_CLS, hasDraft && SEND_ON_CLS)
+                  }
+                  onClick={() => (send?.onClick ?? wire.send)()}
+                />
+              }
+            >
+              {send?.text !== undefined ? (
+                <>
+                  {send.icon}
+                  {send.text}
+                </>
+              ) : narrow ? (
+                <span
+                  className={cn(
+                    ROUND_FACE_CLS,
+                    'bg-(--hover-1)',
+                    hasDraft ? 'text-foreground' : 'text-content-tertiary',
+                  )}
+                >
+                  <ArrowUp width={20} height={20} />
+                </span>
+              ) : (
+                <CornerDownLeft width={20} height={20} />
+              )}
+            </IconTooltip>
+          )}
         </div>
         {/* deliberate-native: hidden file picker trigger (display:none, opened programmatically); the visible skin is the attachment Button */}
         {onAttachment != null && (

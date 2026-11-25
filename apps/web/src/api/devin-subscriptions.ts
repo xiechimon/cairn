@@ -73,6 +73,22 @@ export function useRenameDevinSubscription(teamId: string | undefined) {
   });
 }
 
+export function useUpdateDevinSubscriptionToken(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; token: string; expiresAt?: number | null }) =>
+      api.patch<DevinSubscription>(`/api/teams/${teamId}/devin-subscriptions/${input.id}`, {
+        token: input.token,
+        ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['devin-subscriptions', teamId] });
+      void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
+    gcTime: 0,
+  });
+}
+
 export type DevinUpstreamModelsResult =
   | { status: 'ok'; models: SubscriptionModel[] }
   | { status: 'failed'; failure: ProviderFailure; httpStatus: number | null };

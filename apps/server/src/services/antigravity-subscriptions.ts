@@ -430,7 +430,16 @@ export function patchAntigravitySubscription(
 ): AntigravitySubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Antigravity subscription connection');
-  if (row.tokenCipher !== null) {
+  const effectiveLabel = patch.label ?? row.label;
+  if (patch.token !== undefined) {
+    if (isAntigravityOAuthAccessToken(patch.token)) {
+      throw new HttpError(400, 'Use Google sign-in to refresh OAuth credentials');
+    }
+    if (row.tokenCipher?.startsWith(OAUTH_CIPHER_PREFIX)) {
+      throw new HttpError(400, 'Use Google sign-in to refresh OAuth credentials');
+    }
+    assertLabelHidesToken(effectiveLabel, patch.token);
+  } else if (row.tokenCipher !== null) {
     for (const secret of secretValuesOfCipher(deps.box, row.tokenCipher)) {
       assertLabelHidesToken(patch.label, secret);
     }
@@ -447,6 +456,14 @@ export function patchAntigravitySubscription(
     const changes = {
       ...(patch.label !== undefined ? { label: patch.label } : {}),
       ...(models !== undefined ? { models } : {}),
+      ...(patch.token !== undefined
+        ? { tokenCipher: deps.box.seal(patch.token), lastCheck: null }
+        : {}),
+      ...(patch.expiresAt !== undefined
+        ? { expiresAt: patch.expiresAt }
+        : patch.token !== undefined
+          ? { expiresAt: null }
+          : {}),
     };
     if (Object.keys(changes).length > 0) {
       tx.update(antigravitySubscription)
@@ -456,7 +473,7 @@ export function patchAntigravitySubscription(
     }
     return toRecord({ ...row, ...changes, runnerId });
   });
-  if (row.runnerId === null && updated.runnerId != null) {
+  if (patch.token !== undefined || (row.runnerId === null && updated.runnerId != null)) {
     verificationWindows.get(deps.db)?.delete(id);
     upstreamModelsWindows.get(deps.db)?.delete(id);
   }

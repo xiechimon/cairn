@@ -1280,4 +1280,77 @@ describe('opening the tray refreshes the Claude quota from upstream', () => {
     ]);
     s.dispose();
   });
+
+  test('PATCH rotates the Claude token, updates cipher, clears stale checks/windows, and never returns plaintext', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/claude-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Primary', token: TOKEN });
+    expect(created.status).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    const beforeRow = s.db
+      .select()
+      .from(claudeSubscription)
+      .where(eq(claudeSubscription.id, id))
+      .get();
+    expect(beforeRow).toBeDefined();
+    s.db
+      .update(claudeSubscription)
+      .set({
+        lastCheck: {
+          at: Date.now(),
+          ok: false,
+          reason: 'auth',
+          check: 'sign-in',
+          command: 'claude',
+          model: null,
+          durationMs: 12,
+        },
+        quotaWindows: [
+          {
+            subscription: 'seven_day',
+            status: 'allowed',
+            utilization: 0.5,
+            resetsAt: null,
+            reportedAt: Date.now(),
+          },
+        ],
+      })
+      .where(eq(claudeSubscription.id, id))
+      .run();
+
+    const bad = await req(s.app, 'PATCH', `${path}/${id}`, { token: 'bad-token' });
+    expect(bad.status).toBe(400);
+
+    const newToken = `sk-ant-oat01-${'y'.repeat(90)}`;
+    const nextExpiry = Date.now() + 90 * 86_400_000;
+    const patched = await req(s.app, 'PATCH', `${path}/${id}`, {
+      token: newToken,
+      expiresAt: nextExpiry,
+    });
+    expect(patched.status).toBe(200);
+    const rawBody = await patched.text();
+    expect(rawBody).not.toContain(newToken);
+    expect(rawBody).not.toContain(TOKEN);
+    const parsed = JSON.parse(rawBody) as {
+      expiresAt: number;
+    };
+    expect(parsed.expiresAt).toBe(nextExpiry);
+
+    const listedAfter = (await (await req(s.app, 'GET', path)).json()) as {
+      windows: unknown[];
+      lastCheck: unknown;
+    }[];
+    expect(listedAfter[0]?.windows).toEqual([]);
+    expect(listedAfter[0]?.lastCheck).toBeNull();
+
+    const afterRow = s.db
+      .select()
+      .from(claudeSubscription)
+      .where(eq(claudeSubscription.id, id))
+      .get();
+    expect(afterRow?.tokenCipher).not.toBe(beforeRow?.tokenCipher);
+    expect(afterRow?.lastCheck).toBeNull();
+    expect(afterRow?.quotaWindows).toBeNull();
+    s.dispose();
+  });
 });

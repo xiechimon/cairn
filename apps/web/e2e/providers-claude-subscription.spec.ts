@@ -294,3 +294,46 @@ test('the owner always sees Verify, Choose from upstream, Test all and each pick
     await expect(detail.getByRole('button', { name: `移除 ${id}` })).toBeVisible();
   }
 });
+
+test('replaces an existing Claude subscription token in place via Credential row', async ({ page }) => {
+  const newToken = `sk-ant-oat01-${'r'.repeat(64)}`;
+  const record: ClaudeSubscriptionListEntry = {
+    id: 'subscription-1',
+    kind: 'claude-subscription',
+    label: 'Personal Claude',
+    expiresAt: Date.now() + 300 * 24 * 60 * 60 * 1000,
+    createdAt: Date.now(),
+    models: null,
+  };
+  const patches: Record<string, unknown>[] = [];
+  let verified = 0;
+  await mockLive(page, { threads: [], messages: [] }, (path, route, json) => {
+    if (path === '/api/teams/t1/model-sources') return json({ sources: [] });
+    if (path === '/api/teams/t1/providers') return json({ presets: [], providers: [] });
+    if (path === '/api/teams/t1/claude-subscriptions') return json([record]);
+    if (path === '/api/teams/t1/claude-subscriptions/subscription-1/verify') {
+      verified += 1;
+      return json({ ok: true });
+    }
+    if (path === '/api/teams/t1/claude-subscriptions/subscription-1' && route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      patches.push(body);
+      record.expiresAt = typeof body.expiresAt === 'number' ? body.expiresAt : record.expiresAt;
+      return json(record);
+    }
+  });
+
+  await page.goto('/app/resources/providers');
+  const card = page.getByTestId('subscription-credential-card');
+  await expect(card).toBeVisible();
+  await card.getByTestId('key-replace-button').click();
+  await card.getByTestId('key-replace-input').fill(newToken);
+  await card.getByTestId('key-replace-save').click();
+
+  await expect(page.getByText('已更新凭据')).toBeVisible();
+  await expect(page.locator('body')).not.toContainText(newToken);
+  expect(patches).toHaveLength(1);
+  expect(patches[0]?.token).toBe(newToken);
+  expect(typeof patches[0]?.expiresAt).toBe('number');
+  expect(verified).toBe(1);
+});

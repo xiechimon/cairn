@@ -119,9 +119,16 @@ export const renameAntigravitySubscriptionSchema = z
     label: z.string().trim().min(1).max(100).optional(),
     models: z.array(antigravitySubscriptionModelSchema).max(2000).optional(),
     runnerId: z.string().min(1).max(256).optional(),
+    token: z.string().trim().regex(ANTIGRAVITY_TOKEN_REGEX, 'Invalid credential format').optional(),
+    expiresAt: z.number().int().positive().nullable().optional(),
   })
   .refine(
-    (body) => body.label !== undefined || body.models !== undefined || body.runnerId !== undefined,
+    (body) =>
+      body.label !== undefined ||
+      body.models !== undefined ||
+      body.runnerId !== undefined ||
+      body.token !== undefined ||
+      body.expiresAt !== undefined,
     { message: 'Nothing to update' },
   );
 

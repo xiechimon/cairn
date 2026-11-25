@@ -16,6 +16,8 @@ import {
   SKILL_DIR_NAME_RE,
   SKILL_ENTRY_FILE,
   type SkillFileBody,
+  type SkillGithubCandidate,
+  type SkillGithubCandidatesResponse,
   type SkillImportCandidate,
   type SkillImportCandidatesResponse,
   type SkillRecord,
@@ -85,6 +87,7 @@ export interface SkillImportOpts {
   teamId: string;
   actor: SkillAuditActor;
   fetch: SkillImportFetch;
+  githubToken?: () => Promise<string | null>;
   timeoutMs?: number;
 }
 
@@ -265,6 +268,16 @@ function isPrivateOrLoopbackHost(host: string): boolean {
 const GH_SEGMENT_RE = /^[A-Za-z0-9._-]+$/;
 const GH_REF_RE = /^[A-Za-z0-9._/-]+$/;
 
+function isValidGithubSegment(segment: string): boolean {
+  return segment !== '.' && segment !== '..' && GH_SEGMENT_RE.test(segment);
+}
+
+function isValidGithubRef(ref: string): boolean {
+  return (
+    GH_REF_RE.test(ref) && !ref.split('/').some((seg) => seg === '' || seg === '.' || seg === '..')
+  );
+}
+
 function parseGithubUrl(raw: string): GithubTarget {
   let u: URL;
   try {
@@ -304,7 +317,7 @@ function parseGithubUrl(raw: string): GithubTarget {
   }
   // biome-ignore lint/style/noNonNullAssertion: segments.length < 2 throws above; [0] and [1] are defined here
   const [owner, repo] = [segments[0]!, segments[1]!];
-  if (!GH_SEGMENT_RE.test(owner) || !GH_SEGMENT_RE.test(repo)) {
+  if (!isValidGithubSegment(owner) || !isValidGithubSegment(repo)) {
     throw new HttpError(400, `invalid GitHub owner/repo in url: ${raw}`);
   }
   let ref: string | undefined;
@@ -318,7 +331,7 @@ function parseGithubUrl(raw: string): GithubTarget {
     }
     // biome-ignore lint/style/noNonNullAssertion: segments.length < 4 throws above; [3] is defined
     ref = segments[3]!;
-    if (!GH_REF_RE.test(ref) || ref.split('/').some((seg) => seg === '.' || seg === '..')) {
+    if (!isValidGithubRef(ref)) {
       throw new HttpError(400, `invalid GitHub ref in url: ${raw}`);
     }
     subSegments = segments.slice(4);
@@ -355,6 +368,17 @@ function mapFetchError(url: string, err: unknown): HttpError {
   );
 }
 
+async function githubAuthHeaders(
+  opts: SkillImportOpts,
+  url: string,
+): Promise<Record<string, string>> {
+  if (opts.githubToken === undefined) return {};
+  const apiBase = githubApiBaseUrl().replace(/\/+$/, '');
+  if (!url.startsWith(`${apiBase}/`)) return {};
+  const token = await opts.githubToken().catch(() => null);
+  return token !== null && token !== '' ? { authorization: `Bearer ${token}` } : {};
+}
+
 async function fetchBytes(
   opts: SkillImportOpts,
   url: string,
@@ -362,10 +386,11 @@ async function fetchBytes(
   headers: Record<string, string> = {},
 ): Promise<{ ok: boolean; status: number; bytes: Buffer | null }> {
   const timeoutMs = opts.timeoutMs ?? SKILL_IMPORT_FETCH_TIMEOUT_MS;
+  const auth = await githubAuthHeaders(opts, url);
   let res: Awaited<ReturnType<SkillImportFetch>>;
   try {
     res = await opts.fetch(url, {
-      headers: { ...GH_HEADERS, ...headers },
+      headers: { ...GH_HEADERS, ...auth, ...headers },
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (err) {
@@ -400,9 +425,13 @@ async function fetchGithubJson<T>(
   url: string,
 ): Promise<{ status: number; body: T | null }> {
   const timeoutMs = opts.timeoutMs ?? SKILL_IMPORT_FETCH_TIMEOUT_MS;
+  const auth = await githubAuthHeaders(opts, url);
   let res: Awaited<ReturnType<SkillImportFetch>>;
   try {
-    res = await opts.fetch(url, { headers: GH_HEADERS, signal: AbortSignal.timeout(timeoutMs) });
+    res = await opts.fetch(url, {
+      headers: { ...GH_HEADERS, ...auth },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   } catch (err) {
     throw mapFetchError(url, err);
   }
@@ -429,19 +458,24 @@ interface GhTreeEntry {
 
 async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Promise<Collected> {
   const target = parseGithubUrl(rawUrl);
+  const encodedOwner = encodeURIComponent(target.owner);
+  const encodedRepo = encodeURIComponent(target.repo);
   const meta = await fetchGithubJson<{ default_branch?: unknown }>(
     opts,
-    `${githubApiBaseUrl()}/repos/${target.owner}/${target.repo}`,
+    `${githubApiBaseUrl()}/repos/${encodedOwner}/${encodedRepo}`,
   );
   if (meta.status !== 200) throw githubApiError(`repo ${target.owner}/${target.repo}`, meta.status);
-  const defaultBranch =
+  const rawDefaultBranch =
     typeof meta.body?.default_branch === 'string' && meta.body.default_branch !== ''
       ? meta.body.default_branch
       : 'main';
-  const ref = target.ref ?? defaultBranch;
+  const ref = target.ref ?? rawDefaultBranch;
+  if (!isValidGithubRef(ref)) {
+    throw new HttpError(400, `invalid GitHub ref for ${target.owner}/${target.repo}`);
+  }
   const tree = await fetchGithubJson<{ truncated?: boolean; tree?: GhTreeEntry[] }>(
     opts,
-    `${githubApiBaseUrl()}/repos/${target.owner}/${target.repo}/git/trees/${ref}?recursive=1`,
+    `${githubApiBaseUrl()}/repos/${encodedOwner}/${encodedRepo}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
   );
   if (tree.status !== 200)
     throw githubApiError(`ref ${ref} of ${target.owner}/${target.repo}`, tree.status);
@@ -506,6 +540,113 @@ async function collectFromGithubUrl(rawUrl: string, opts: SkillImportOpts): Prom
     files.push({ path: entry.path, content: decodeUtf8Strict(res.bytes!, entry.path) });
   }
   return { sourceRef: target.canonicalUrl, files };
+}
+
+const GITHUB_SKILL_DISCOVERY_LIMIT = 50;
+
+function parseGithubRepoParam(rawRepo: string): { owner: string; repo: string } {
+  const trimmed = rawRepo.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    const parsed = parseGithubUrl(trimmed);
+    return { owner: parsed.owner, repo: parsed.repo };
+  }
+  const segments = trimmed.split('/').filter((seg) => seg !== '');
+  if (segments.length !== 2) {
+    throw new HttpError(400, `invalid GitHub repository: expected <owner>/<repo>, got ${rawRepo}`);
+  }
+  const owner = segments[0] ?? '';
+  const repo = segments[1] ?? '';
+  if (!isValidGithubSegment(owner) || !isValidGithubSegment(repo)) {
+    throw new HttpError(400, `invalid GitHub repository: ${rawRepo}`);
+  }
+  return { owner, repo };
+}
+
+function skillProblemFromFrontmatter(fm: {
+  name?: string;
+  description?: string;
+}): SkillImportCandidate['problem'] {
+  if (!fm.name) return 'missing-name';
+  if (!SKILL_DIR_NAME_RE.test(fm.name)) return 'invalid-name';
+  if (!fm.description) return 'missing-description';
+  return null;
+}
+
+export async function listGithubSkillCandidates(
+  opts: SkillImportOpts,
+  rawRepo: string,
+): Promise<SkillGithubCandidatesResponse> {
+  const { owner, repo } = parseGithubRepoParam(rawRepo);
+  const encodedOwner = encodeURIComponent(owner);
+  const encodedRepo = encodeURIComponent(repo);
+  const meta = await fetchGithubJson<{ default_branch?: unknown }>(
+    opts,
+    `${githubApiBaseUrl()}/repos/${encodedOwner}/${encodedRepo}`,
+  );
+  if (meta.status !== 200) throw githubApiError(`repo ${owner}/${repo}`, meta.status);
+  const defaultBranch =
+    typeof meta.body?.default_branch === 'string' && meta.body.default_branch !== ''
+      ? meta.body.default_branch
+      : 'main';
+  if (!isValidGithubRef(defaultBranch)) {
+    throw new HttpError(400, `invalid GitHub ref for ${owner}/${repo}`);
+  }
+  const tree = await fetchGithubJson<{ truncated?: boolean; tree?: GhTreeEntry[] }>(
+    opts,
+    `${githubApiBaseUrl()}/repos/${encodedOwner}/${encodedRepo}/git/trees/${encodeURIComponent(defaultBranch)}?recursive=1`,
+  );
+  if (tree.status !== 200)
+    throw githubApiError(`ref ${defaultBranch} of ${owner}/${repo}`, tree.status);
+  const skillEntries = (tree.body?.tree ?? [])
+    .filter(
+      (e) =>
+        e.type === 'blob' &&
+        (e.path === SKILL_ENTRY_FILE || e.path.endsWith(`/${SKILL_ENTRY_FILE}`)),
+    )
+    .sort((a, b) => a.path.localeCompare(b.path));
+  const capped = skillEntries.slice(0, GITHUB_SKILL_DISCOVERY_LIMIT);
+  const truncated =
+    tree.body?.truncated === true || skillEntries.length > GITHUB_SKILL_DISCOVERY_LIMIT;
+  const taken = new Set(scanLocalSkills(opts.skillsDir).map((s) => s.id));
+  const candidates: SkillGithubCandidate[] = [];
+  for (const entry of capped) {
+    const dir =
+      entry.path === SKILL_ENTRY_FILE ? '' : entry.path.slice(0, -SKILL_ENTRY_FILE.length - 1);
+    const encoded = entry.path.split('/').map(encodeURIComponent).join('/');
+    const contentsUrl = `${githubApiBaseUrl()}/repos/${owner}/${repo}/contents/${encoded}?ref=${encodeURIComponent(defaultBranch)}`;
+    const res = await fetchBytes(opts, contentsUrl, MAX_SKILL_FILE_BYTES, {
+      accept: 'application/vnd.github.raw',
+    });
+    if (!res.ok || res.bytes === null) continue;
+    let content: string;
+    try {
+      content = decodeUtf8Strict(res.bytes, entry.path);
+    } catch {
+      continue;
+    }
+    const fm = parseSkillFrontmatter(content);
+    const fallbackName = dir === '' ? repo : (dir.split('/').pop() ?? dir);
+    const id = fm.name ?? fallbackName;
+    const encodedDir = dir === '' ? '' : `/${dir.split('/').map(encodeURIComponent).join('/')}`;
+    const canonicalUrl =
+      dir === ''
+        ? `https://github.com/${owner}/${repo}`
+        : `https://github.com/${owner}/${repo}/tree/${encodeURIComponent(defaultBranch)}${encodedDir}`;
+    candidates.push({
+      id,
+      description: fm.description ?? null,
+      path: dir,
+      url: canonicalUrl,
+      alreadyImported: taken.has(id),
+      problem: skillProblemFromFrontmatter(fm),
+    });
+  }
+  return {
+    repo: `${owner}/${repo}`,
+    defaultBranch,
+    candidates,
+    truncated,
+  };
 }
 
 export async function importSkill(

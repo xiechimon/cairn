@@ -220,6 +220,8 @@ const INFERRED_ROUTES = [
   'PATCH /api/teams/{teamId}/engine-runs/{stepId}/takeover',
   'DELETE /api/teams/{teamId}/engine-runs/{stepId}/takeover',
   'GET /api/teams/{teamId}/engine-runs/{stepId}/pty-log',
+  'GET /api/teams/{id}/skills/github-candidates',
+  'DELETE /api/teams/{id}/skills/{sid}',
 ];
 
 const CORE_ROUTES = [

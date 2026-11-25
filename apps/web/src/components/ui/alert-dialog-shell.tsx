@@ -63,7 +63,7 @@ export function AlertDialogShell({
         <AlertDialogPrimitive.Backdrop
           forceRender
           data-slot="alert-dialog-overlay"
-          className="overlay-backdrop fixed inset-0 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+          className="overlay-backdrop fixed inset-0 z-(--z-dialog) duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
           onClick={dismissible ? onClose : undefined}
         />
         <AlertDialogPrimitive.Popup
@@ -72,7 +72,7 @@ export function AlertDialogShell({
           data-slot="alert-dialog-content"
           data-size={size}
           className={cn(
-            'delete-confirm fixed top-1/2 left-1/2 z-(--z-dialog) grid-rows-[auto_minmax(0,1fr)_auto] -translate-x-1/2 -translate-y-1/2 outline-none [transition:visibility_0s_linear_var(--dur-overlay)] duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[ending-style]:invisible',
+            'delete-confirm fixed top-1/2 left-1/2 z-(--z-gate) grid-rows-[auto_minmax(0,1fr)_auto] -translate-x-1/2 -translate-y-1/2 outline-none [transition:visibility_0s_linear_var(--dur-overlay)] duration-200 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-[ending-style]:invisible',
             DIALOG_PANEL_CLS,
             className,
           )}

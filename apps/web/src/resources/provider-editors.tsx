@@ -116,7 +116,13 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-function KeyField({ onReplace }: { onReplace?: (key: string) => unknown }) {
+export function KeyField({
+  onReplace,
+  ariaLabel,
+}: {
+  onReplace?: (key: string) => unknown;
+  ariaLabel?: string;
+}) {
   const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
   const submit = (next: string) => {
@@ -131,7 +137,12 @@ function KeyField({ onReplace }: { onReplace?: (key: string) => unknown }) {
     return (
       <span className="flex h-8 min-w-0 items-center justify-between gap-2 rounded-md px-2.5 ring-1 ring-input ring-inset">
         <span className="truncate text-meta text-content-tertiary">{t('已加密保存')}</span>
-        <Button variant="ghost" size="xs" onClick={() => setDraft('')}>
+        <Button
+          variant="ghost"
+          size="xs"
+          data-testid="key-replace-button"
+          onClick={() => setDraft('')}
+        >
           {t('更换')}
         </Button>
       </span>
@@ -140,7 +151,8 @@ function KeyField({ onReplace }: { onReplace?: (key: string) => unknown }) {
   return (
     <span className="flex min-w-0 items-center gap-1.5">
       <Input
-        aria-label={t('新的 API key')}
+        aria-label={ariaLabel ?? t('新的 API key')}
+        data-testid="key-replace-input"
         type="password"
         autoComplete="off"
         autoFocus
@@ -157,7 +169,12 @@ function KeyField({ onReplace }: { onReplace?: (key: string) => unknown }) {
       <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
         {t('取消')}
       </Button>
-      <Button size="sm" disabled={draft.trim() === ''} onClick={() => submit(draft.trim())}>
+      <Button
+        size="sm"
+        data-testid="key-replace-save"
+        disabled={draft.trim() === ''}
+        onClick={() => submit(draft.trim())}
+      >
         {t('保存')}
       </Button>
     </span>

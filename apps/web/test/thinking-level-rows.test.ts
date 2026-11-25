@@ -85,4 +85,28 @@ describe('frequently used model rows', () => {
     );
     expect(html).toBe('');
   });
+
+  test('localizes thinking levels into Chinese when locale is zh', () => {
+    const cases: Array<[string | null, string]> = [
+      [null, '默认（高）'],
+      ['xhigh', '极高'],
+      ['max', '最高'],
+    ];
+    for (const [value, expected] of cases) {
+      const html = renderToStaticMarkup(
+        createElement(I18nProvider, {
+          initialLocale: 'zh',
+          children: createElement(ThinkingLevelSelect, {
+            levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+            resolvesTo: 'high',
+            value,
+            onChange: () => {},
+            label: '思考强度',
+            className: '',
+          }),
+        }),
+      );
+      expect(html).toContain(expected);
+    }
+  });
 });

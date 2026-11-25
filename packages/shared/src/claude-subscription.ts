@@ -39,10 +39,17 @@ export const renameClaudeSubscriptionSchema = z
   .object({
     label: z.string().trim().min(1).max(100).optional(),
     models: z.array(claudeSubscriptionModelSchema).max(2000).nullable().optional(),
+    token: createClaudeSubscriptionSchema.shape.token.optional(),
+    expiresAt: z.number().int().positive().nullable().optional(),
   })
-  .refine((body) => body.label !== undefined || body.models !== undefined, {
-    message: 'Nothing to update',
-  });
+  .refine(
+    (body) =>
+      body.label !== undefined ||
+      body.models !== undefined ||
+      body.token !== undefined ||
+      body.expiresAt !== undefined,
+    { message: 'Nothing to update' },
+  );
 
 export type PatchClaudeSubscription = z.infer<typeof renameClaudeSubscriptionSchema>;
 

@@ -34,7 +34,12 @@ import {
   TONE_DOT,
 } from '../components/providers/provider-panel.js';
 import { isLowQuota } from '../components/settings/quota-row.js';
-import { SettingsCard, SettingsDangerZone, SettingsSection } from '../components/settings-list.js';
+import {
+  SettingsCard,
+  SettingsDangerZone,
+  SettingsRow,
+  SettingsSection,
+} from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
@@ -45,6 +50,7 @@ import {
   CheckResultPopover,
   FAILURE_SENTENCE,
   FAILURE_SHORT,
+  KeyField,
   ModelChip,
   ModelTestReport,
   useModelTests,
@@ -755,6 +761,7 @@ export interface SubscriptionActions {
   onUpdateRuntime?: () => void;
   updatingRuntime?: boolean;
   onRename?: (label: string) => void;
+  onReplaceToken?: (token: string) => unknown;
   onRemove: () => void;
   onPickUpstream?: (opener: HTMLButtonElement) => void;
   onRemoveModel?: (id: string) => void;
@@ -923,6 +930,17 @@ export function SubscriptionDetail({
         </div>
       )}
       {relogin}
+      {actions.onReplaceToken !== undefined && (
+        <div data-testid="subscription-credential-card">
+          <SettingsCard>
+            <SettingsRow label={t('凭据')}>
+              <div className="w-full sm:w-72">
+                <KeyField ariaLabel={t('新的 Token')} onReplace={actions.onReplaceToken} />
+              </div>
+            </SettingsRow>
+          </SettingsCard>
+        </div>
+      )}
       <QuotaSection account={account} now={now} />
       <VerifyResultPopover
         vendor={account.vendor}

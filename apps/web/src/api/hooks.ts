@@ -93,6 +93,7 @@ import type {
   SecretRequestAnswer,
   SecretRequestAnswered,
   SetSecretBody,
+  SkillGithubCandidatesResponse,
   SkillImportCandidatesResponse,
   SkillRecord,
   StartMcpConnectorOAuthBody,
@@ -984,6 +985,21 @@ export const useSkillImportCandidates = (teamId: string | undefined, enabled: bo
     retry: false,
   });
 
+export const useSkillGithubCandidates = (
+  teamId: string | undefined,
+  repo: string,
+  enabled: boolean,
+) =>
+  useQuery({
+    queryKey: ['skillGithubCandidates', teamId, repo],
+    queryFn: () =>
+      api.get<SkillGithubCandidatesResponse>(
+        `/api/teams/${teamId}/skills/github-candidates?repo=${encodeURIComponent(repo)}`,
+      ),
+    enabled: enabled && teamId !== undefined && repo.trim() !== '',
+    retry: false,
+  });
+
 export const useSkillFile = (
   teamId: string | undefined,
   skillId: string | undefined,
@@ -1780,6 +1796,11 @@ export function useApiMutations(teamId: string | undefined) {
     importSkill: useMutation({
       mutationFn: (body: ImportSkillBody) =>
         api.post<SkillRecord>(`/api/teams/${teamId}/skills/import`, body),
+      onSuccess: invalidateAll,
+    }),
+    deleteSkill: useMutation({
+      mutationFn: (id: string) =>
+        api.del<void>(`/api/teams/${teamId}/skills/${encodeURIComponent(id)}`),
       onSuccess: invalidateAll,
     }),
     deleteMemory: useMutation({

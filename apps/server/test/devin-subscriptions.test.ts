@@ -397,4 +397,53 @@ describe('the devin subscription list wire carries usage stats', () => {
     expect(row.cooldownUntil).toBeUndefined();
     s.dispose();
   });
+
+  test('PATCH rotates the Devin token in place, updates cipher, clears stale checks, and never leaks plaintext', async () => {
+    const s = bootServer();
+    const path = `/api/teams/${s.team.id}/devin-subscriptions`;
+    const created = await req(s.app, 'POST', path, { label: 'Devin', token: TOKEN });
+    const { id } = (await created.json()) as { id: string };
+    const beforeRow = s.db
+      .select()
+      .from(devinSubscription)
+      .where(eq(devinSubscription.id, id))
+      .get();
+    s.db
+      .update(devinSubscription)
+      .set({
+        lastCheck: {
+          at: Date.now(),
+          ok: false,
+          reason: 'auth',
+          check: 'sign-in',
+          command: 'devin',
+          model: null,
+          durationMs: 12,
+        },
+      })
+      .where(eq(devinSubscription.id, id))
+      .run();
+
+    const bad = await req(s.app, 'PATCH', `${path}/${id}`, { token: 'too-short' });
+    expect(bad.status).toBe(400);
+
+    const newToken = `wsk-rotated-${'q'.repeat(64)}`;
+    const nextExpiry = Date.now() + 60 * 86_400_000;
+    const patched = await req(s.app, 'PATCH', `${path}/${id}`, {
+      token: newToken,
+      expiresAt: nextExpiry,
+    });
+    expect(patched.status).toBe(200);
+    const rawBody = await patched.text();
+    expect(rawBody).not.toContain(newToken);
+    expect(rawBody).not.toContain(TOKEN);
+    const afterRow = s.db
+      .select()
+      .from(devinSubscription)
+      .where(eq(devinSubscription.id, id))
+      .get();
+    expect(afterRow?.tokenCipher).not.toBe(beforeRow?.tokenCipher);
+    expect(afterRow?.lastCheck).toBeNull();
+    s.dispose();
+  });
 });

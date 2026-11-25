@@ -123,6 +123,7 @@ import {
   readGithubConnectionStatus,
   refreshingGithubFetch,
   teamGithubToken,
+  userTokenOrNull,
 } from './services/github-connection.js';
 import {
   cancelGithubConnectionDevice,
@@ -203,12 +204,15 @@ import {
 } from './services/secrets.js';
 import {
   importSkill,
+  listGithubSkillCandidates,
   listImportCandidates,
   refreshSkill,
   type SkillImportOpts,
 } from './services/skill-import.js';
+import { deleteSkillSource } from './services/skill-source-store.js';
 import {
   createLocalSkill,
+  deleteLocalSkill,
   listSkillFiles,
   readSkillFile,
   resolveLocalSkill,
@@ -247,6 +251,7 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     teamId,
     actor: { type: 'member', id: ctx.user.id },
     fetch: ctx.skillImportFetch ?? globalThis.fetch,
+    githubToken: () => userTokenOrNull({ db: ctx.db, box: ctx.secretBox }, teamId),
     ...(ctx.skillImportTimeoutMs !== undefined ? { timeoutMs: ctx.skillImportTimeoutMs } : {}),
   });
 
@@ -497,6 +502,14 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     return c.json(listImportCandidates(ctx.skillsDir));
   });
 
+  app.get('/api/teams/:id/skills/github-candidates', async (c) => {
+    const teamId = c.req.param('id');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'discover skills in a GitHub repository');
+    const repo = c.req.query('repo') ?? '';
+    return c.json(await listGithubSkillCandidates(importOpts(teamId), repo));
+  });
+
   app.post('/api/skills', async (c) => {
     const teamId = c.req.query('teamId') ?? ctx.team.id;
     requireTeam(ctx, teamId);
@@ -567,6 +580,19 @@ export function registerResourceRoutes(app: Hono, ctx: AppContext): void {
     requireOwnerSession(c, 'refresh skills on this machine');
     const record = await refreshSkill(importOpts(teamId), c.req.param('sid'));
     return c.json(record);
+  });
+
+  app.delete('/api/teams/:id/skills/:sid', async (c) => {
+    const teamId = c.req.param('id');
+    const sid = c.req.param('sid');
+    requireTeam(ctx, teamId);
+    requireOwnerSession(c, 'delete skills on this machine');
+    deleteLocalSkill(
+      { db: ctx.db, skillsDir: ctx.skillsDir, actor: { type: 'member', id: ctx.user.id } },
+      sid,
+    );
+    await deleteSkillSource(ctx.skillSourcesPath, sid);
+    return c.body(null, 204);
   });
 
   const keysvc = { db: ctx.db, box: ctx.secretBox };

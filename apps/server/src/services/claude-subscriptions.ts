@@ -104,18 +104,38 @@ export function updateClaudeSubscription(
 ): ClaudeSubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Claude subscription connection');
-  const token = deps.box.open(row.tokenCipher);
-  assertLabelHidesToken(patch.label, token);
-  if (patch.models?.some((model) => model.id.includes(token) || model.name.includes(token))) {
+  const nextToken = patch.token ?? deps.box.open(row.tokenCipher);
+  const effectiveLabel = patch.label ?? row.label;
+  assertLabelHidesToken(effectiveLabel, nextToken);
+  if (
+    patch.models?.some((model) => model.id.includes(nextToken) || model.name.includes(nextToken))
+  ) {
+    throw new HttpError(400, 'Model names must not contain the token');
+  }
+  const existingModels = savedModels(row.models);
+  if (
+    patch.token !== undefined &&
+    existingModels?.some((model) => model.id.includes(nextToken) || model.name.includes(nextToken))
+  ) {
     throw new HttpError(400, 'Model names must not contain the token');
   }
   const models =
     patch.models === undefined || patch.models === null
       ? patch.models
       : canonicalClaudeModels(patch.models);
+  const expiresPatch =
+    patch.expiresAt !== undefined
+      ? { expiresAt: patch.expiresAt }
+      : patch.token !== undefined
+        ? { expiresAt: null }
+        : {};
   const changes = {
     ...(patch.label !== undefined ? { label: patch.label } : {}),
     ...(models !== undefined ? { models } : {}),
+    ...(patch.token !== undefined
+      ? { tokenCipher: deps.box.seal(patch.token), lastCheck: null, quotaWindows: null }
+      : {}),
+    ...expiresPatch,
   };
   deps.db.update(claudeSubscription).set(changes).where(eq(claudeSubscription.id, id)).run();
   return toRecord({ ...row, ...changes });

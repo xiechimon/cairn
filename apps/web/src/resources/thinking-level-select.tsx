@@ -11,7 +11,15 @@ import { useI18n } from '../i18n/provider.js';
 
 const DEFAULT_LEVEL = 'default';
 
-const levelLabel = (level: string) => level.charAt(0).toUpperCase() + level.slice(1);
+const LEVEL_COPY: Record<ThinkingLevel, string> = {
+  off: '关闭',
+  minimal: '极低',
+  low: '低',
+  medium: '中',
+  high: '高',
+  xhigh: '极高',
+  max: '最高',
+};
 
 export function ThinkingLevelSelect({
   levels,
@@ -31,12 +39,13 @@ export function ThinkingLevelSelect({
   const { t } = useI18n();
   const offered = levels ?? [];
   if (new Set<string>([resolvesTo ?? DEFAULT_LEVEL, ...offered]).size < 2) return null;
+  const levelLabel = (level: ThinkingLevel) => t(LEVEL_COPY[level]);
   const nameOf = (level: string) =>
     level !== DEFAULT_LEVEL
-      ? levelLabel(level)
+      ? levelLabel(level as ThinkingLevel)
       : resolvesTo === undefined
-        ? 'Default'
-        : `Default (${levelLabel(resolvesTo)})`;
+        ? t('默认')
+        : t('默认（{level}）', { level: levelLabel(resolvesTo) });
   const shown = offered.find((level) => level === value) ?? DEFAULT_LEVEL;
   return (
     <Select

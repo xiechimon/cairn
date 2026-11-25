@@ -145,12 +145,14 @@ test('the panel is resizable by keyboard and by drag, shared with Tasks, and rem
   await expect(handle(page)).toHaveAttribute('aria-valuenow', '360');
 });
 
-test('a thread that has not started says so and takes no message', async ({ page }) => {
+test('a thread that has not started yet allows drafting a spec and starting on send', async ({
+  page,
+}) => {
   await page.goto(`${HOME}&thread=home-c-idle`);
-  await expect(page.locator('.side-panel').getByTestId('composer-placeholder')).toHaveText(
-    '开始后才能回复',
+  await expect(page.locator('.side-panel textarea')).toHaveAttribute(
+    'placeholder',
+    '补充需求，发送后直接开始',
   );
-  await expect(page.locator('.side-panel textarea')).toHaveCount(0);
 });
 
 test('an unknown thread id shows a not-found state', async ({ page }) => {

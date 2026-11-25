@@ -1,12 +1,13 @@
-import type {
-  CreateDevinSubscription,
-  DevinSubscription,
-  DevinSubscriptionListEntry,
-  DevinSubscriptionVerifyResult,
-  PatchDevinSubscription,
-  ProviderFailure,
-  SecretBox,
-  UpstreamModelsResult,
+import {
+  type CreateDevinSubscription,
+  DEVIN_TOKEN_LIFETIME_MS,
+  type DevinSubscription,
+  type DevinSubscriptionListEntry,
+  type DevinSubscriptionVerifyResult,
+  type PatchDevinSubscription,
+  type ProviderFailure,
+  type SecretBox,
+  type UpstreamModelsResult,
 } from '@cairn/shared';
 import { and, count, desc, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
 import type { Db } from '../db/client.js';
@@ -105,21 +106,26 @@ export function updateDevinSubscription(
 ): DevinSubscription {
   const row = subscriptionRow(deps.db, teamId, id);
   if (!row) throw notFound('Devin subscription connection');
-  assertLabelHidesToken(patch.label, deps.box.open(row.tokenCipher));
+  const nextToken = patch.token ?? deps.box.open(row.tokenCipher);
+  assertLabelHidesToken(patch.label ?? row.label, nextToken);
   const models = patch.models === undefined ? undefined : dedupeSubscriptionModels(patch.models);
-  deps.db
-    .update(devinSubscription)
-    .set({
-      ...(patch.label !== undefined ? { label: patch.label } : {}),
-      ...(models !== undefined ? { models } : {}),
-    })
-    .where(eq(devinSubscription.id, id))
-    .run();
-  return toRecord({
-    ...row,
+  const expiresPatch =
+    patch.expiresAt !== undefined
+      ? { expiresAt: patch.expiresAt }
+      : patch.token !== undefined
+        ? { expiresAt: nowMs() + DEVIN_TOKEN_LIFETIME_MS }
+        : {};
+  const changes = {
     ...(patch.label !== undefined ? { label: patch.label } : {}),
     ...(models !== undefined ? { models } : {}),
-  });
+    ...(patch.token !== undefined
+      ? { tokenCipher: deps.box.seal(patch.token), lastCheck: null }
+      : {}),
+    ...expiresPatch,
+  };
+  deps.db.update(devinSubscription).set(changes).where(eq(devinSubscription.id, id)).run();
+  if (patch.token !== undefined) invalidateUpstreamModels(deps.db, id);
+  return toRecord({ ...row, ...changes });
 }
 
 export async function enableDevinSubscription(

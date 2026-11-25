@@ -376,7 +376,7 @@ function insertSkillAudit(
   row: {
     skillId: string;
     actor: SkillAuditActor;
-    action: 'create' | 'update';
+    action: 'create' | 'update' | 'delete';
     bytes: number;
   },
 ): void {
@@ -500,5 +500,29 @@ export function updateLocalSkill(
     teamId: opts.teamId,
     name,
     description,
+  });
+}
+
+export function deleteLocalSkill(
+  opts: { db: Db; skillsDir: string; actor: SkillAuditActor },
+  skillId: string,
+): void {
+  const resolved = resolveLocalSkill(opts.skillsDir, skillId);
+  if (!resolved) throw new NotFoundError(`skill ${skillId}`);
+  if (lstatSync(resolved.dir).isSymbolicLink()) {
+    throw new HttpError(409, `skill ${skillId} is a symlink; remove it at its source`);
+  }
+  assertCairnWritable(resolved.dir);
+  const rootReal = realpathSync(opts.skillsDir);
+  const dirReal = realpathSync(resolved.dir);
+  if (dirReal === rootReal || !samePathOrInside(dirReal, rootReal)) {
+    throw new NotFoundError(`skill ${skillId}`);
+  }
+  rmSync(resolved.dir, { recursive: true, force: false });
+  insertSkillAudit(opts.db, {
+    skillId: resolved.skill.id,
+    actor: opts.actor,
+    action: 'delete',
+    bytes: 0,
   });
 }

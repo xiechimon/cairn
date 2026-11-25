@@ -8,6 +8,8 @@ import type {
   SetStateAction,
 } from 'react';
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { useI18n } from '../i18n/provider.js';
 import {
   createPastedNameCounter,
   filesFromClipboardData,
@@ -116,6 +118,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     onPickProject,
   } = options;
 
+  const { t } = useI18n();
   const [internalDraft, setInternalDraft] = useState('');
   const controlled = draftProp !== undefined && onDraftChange !== undefined;
   const staticFace = draftProp !== undefined && onDraftChange === undefined;
@@ -458,19 +461,30 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     }
     if (event.key === 'Escape' && !isComposing && !event.repeat) {
       const now = Date.now();
-      const secondEscape = escapeAt.current !== null && now - escapeAt.current <= 500;
+      const hasDraft = draft.trim() !== '' || tokens.length > 0;
+      const secondEscape = escapeAt.current !== null && now - escapeAt.current <= 1500;
+      if (stopOptions?.available && stopOptions.onStop !== undefined) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (!hasDraft || secondEscape) {
+          escapeAt.current = null;
+          stopOptions.onStop();
+          if (secondEscape && onStopAndSend !== undefined) submit(onStopAndSend);
+          return;
+        }
+        escapeAt.current = now;
+        toast(
+          onStopAndSend !== undefined
+            ? t('再按一次 Esc 停止并发送当前草稿')
+            : t('再按一次 Esc 停止当前回复'),
+        );
+        return;
+      }
       if (secondEscape && onStopAndSend !== undefined) {
         event.preventDefault();
         event.stopPropagation();
         escapeAt.current = null;
         submit(onStopAndSend);
-        return;
-      }
-      if (stopOptions?.available && stopOptions.onStop !== undefined) {
-        event.preventDefault();
-        event.stopPropagation();
-        escapeAt.current = now;
-        stopOptions.onStop();
         return;
       }
     } else if (event.key !== 'Escape') {

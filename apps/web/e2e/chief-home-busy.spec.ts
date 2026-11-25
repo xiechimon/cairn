@@ -422,14 +422,21 @@ test.describe('send and stop while the Coordinator is replying (T5)', () => {
     await expect.poll(() => calls).toContain('DELETE /messages/m4');
   });
 
-  test('a busy Coordinator keeps the send button and never shows a stop square', async ({ page }) => {
-    await mockLive(page, busyState());
+  test('a busy Coordinator shows a stop button when empty, stops on click, and switches to send when typing', async ({
+    page,
+  }) => {
+    const calls = await mockLive(page, busyState());
     await page.goto('/app');
     const home = page.getByTestId('home-c');
-    await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
-    await expect(home.getByRole('button', { name: '停止 Coordinator 这次回复' })).toHaveCount(0);
+    const stop = home.getByRole('button', { name: '停止 Coordinator 这次回复' });
+    await expect(stop).toBeVisible();
     await home.getByTestId('chief-composer-input').fill('再加一句');
+    await expect(stop).toHaveCount(0);
     await expect(home.getByRole('button', { name: '发送' })).toBeVisible();
+    await home.getByTestId('chief-composer-input').fill('');
+    await expect(stop).toBeVisible();
+    await stop.click();
+    await expect.poll(() => calls.filter((c) => c === 'POST /stop').length).toBe(1);
   });
 
   test('Esc in the composer stops the running reply', async ({ page }) => {

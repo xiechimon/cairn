@@ -55,6 +55,7 @@ export function toAntigravityAccount(
     ...(wire.runnerModels !== undefined ? { runnerModels: wire.runnerModels } : {}),
     ...(wire.runnerLogins !== undefined ? { runnerLogins: wire.runnerLogins } : {}),
     ...(wire.runnerOffline === true ? { runnerOffline: true } : {}),
+    ...(wire.oauthPersonal === true ? { oauthPersonal: true } : {}),
   };
 }
 
@@ -113,6 +114,25 @@ export function useRenameAntigravitySubscription(teamId: string | undefined) {
         { label: input.label },
       ),
     onSuccess: () => client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] }),
+  });
+}
+
+export function useUpdateAntigravitySubscriptionToken(teamId: string | undefined) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; token: string; expiresAt?: number | null }) =>
+      api.patch<AntigravitySubscription>(
+        `/api/teams/${teamId}/antigravity-subscriptions/${input.id}`,
+        {
+          token: input.token,
+          ...(input.expiresAt !== undefined ? { expiresAt: input.expiresAt } : {}),
+        },
+      ),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: ['antigravity-subscriptions', teamId] });
+      void client.invalidateQueries({ queryKey: ['model-sources', teamId] });
+    },
+    gcTime: 0,
   });
 }
 

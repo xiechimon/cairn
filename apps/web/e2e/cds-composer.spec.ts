@@ -155,7 +155,10 @@ test('CDS composer: one line at rest, like the main composer', async ({ page }) 
   await page.goto(`/app/todo/${CARD_ID}`);
   const card = page.locator('.side-panel [data-testid="composer-card"]');
   await expect(card.locator('textarea')).toBeVisible();
-  await expect(card.locator('textarea')).toHaveAttribute('placeholder', /回复这个任务|开始后才能回复/);
+  await expect(card.locator('textarea')).toHaveAttribute(
+    'placeholder',
+    /回复这个任务|开始后才能回复|补充需求，发送后直接开始/,
+  );
   const geom = await geometry(page);
   expect(Math.round(geom.cardHeight)).toBe(46);
   expect(geom).toMatchObject({

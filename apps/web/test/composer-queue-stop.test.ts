@@ -11,19 +11,22 @@ vi.mock('react', () => ({
   useRef: (current: unknown) => ({ current }),
   useState: (value: unknown) => [value, vi.fn()],
 }));
+const { toastSpy } = vi.hoisted(() => ({
+  toastSpy: Object.assign(vi.fn(), { success: vi.fn(), info: vi.fn() }),
+}));
 vi.mock('../src/i18n/provider.js', () => ({ useI18n: () => ({ t: (text: string) => text }) }));
-vi.mock('sonner', () => ({ toast: { success: vi.fn() } }));
+vi.mock('sonner', () => ({ toast: toastSpy }));
 
 function keyboard(key: string, modifiers: Partial<KeyboardEvent<HTMLTextAreaElement>> = {}) {
   return { key, shiftKey: false, metaKey: false, ctrlKey: false, altKey: false, repeat: false, nativeEvent: { isComposing: false }, preventDefault: vi.fn(), stopPropagation: vi.fn(), ...modifiers } as unknown as KeyboardEvent<HTMLTextAreaElement>;
 }
 
-function composer() {
+function composer(draft = 'Next message') {
   const onSend = vi.fn();
   const onQueue = vi.fn();
   const onStop = vi.fn();
   const onDraftChange = vi.fn();
-  const wire = useComposerWire({ editable: true, draft: 'Next message', onDraftChange, onSend, onQueue, onStopAndSend: onQueue, stop: { available: true, onStop } });
+  const wire = useComposerWire({ editable: true, draft, onDraftChange, onSend, onQueue, onStopAndSend: onQueue, stop: { available: true, onStop } });
   return { ...wire, onSend, onQueue, onStop, onDraftChange };
 }
 
@@ -44,18 +47,27 @@ test('plain Enter steers and Shift Enter retains the draft', () => {
   expect(wire.onSend).toHaveBeenCalledExactlyOnceWith('Next message');
 });
 
-test('Escape stops without clearing; a second Escape sends the draft without a second stop', () => {
-  const wire = composer();
+test('empty draft: first Escape stops immediately; non-empty draft: requires second Escape to stop and submit', () => {
+  toastSpy.mockClear();
+  const emptyWire = composer('');
+  const emptyFirst = keyboard('Escape');
+  emptyWire.handleKeyDown(emptyFirst);
+  expect(emptyWire.onStop).toHaveBeenCalledOnce();
+  expect(emptyFirst.preventDefault).toHaveBeenCalled();
+
+  const wire = composer('Next message');
   const first = keyboard('Escape');
   wire.handleKeyDown(first);
-  expect(wire.onStop).toHaveBeenCalledOnce();
+  expect(wire.onStop).not.toHaveBeenCalled();
+  expect(wire.onQueue).not.toHaveBeenCalled();
   expect(wire.onDraftChange).not.toHaveBeenCalled();
+  expect(toastSpy).toHaveBeenCalledWith('再按一次 Esc 停止并发送当前草稿');
   expect(first.preventDefault).toHaveBeenCalled();
   expect(first.stopPropagation).toHaveBeenCalled();
   wire.handleKeyDown(keyboard('Escape'));
+  expect(wire.onStop).toHaveBeenCalledOnce();
   expect(wire.onQueue).toHaveBeenCalledExactlyOnceWith('Next message');
   expect(wire.onDraftChange).toHaveBeenCalledWith('');
-  expect(wire.onStop).toHaveBeenCalledOnce();
 });
 
 test('IME composition and repeated Escape never stop or send', () => {

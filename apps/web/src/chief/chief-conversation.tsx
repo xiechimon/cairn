@@ -426,7 +426,7 @@ export function ChiefConversation({
   const empty = (chief.stream?.length ?? 0) === 0;
   const heroLayout = empty && !heroCollapsed && !questionPending;
   const viewportRef = useRef<HTMLDivElement | null>(null);
-  const canStop = chief.running === true && onStop != null;
+  const canStop = chief.running === true && chief.outage == null && onStop != null;
   const connected = useConnected();
   const restoreSent = (text: string) => {
     followSentRef.current = false;
@@ -826,7 +826,7 @@ export function ChiefConversation({
               onAttachment={onAttachment}
               mentionGroups={mentionGroups}
               stop={{
-                available: canStop,
+                available: canStop && stopTurn !== undefined,
                 onStop: () => stopTurnRef.current?.(),
               }}
               active={!answerActive}

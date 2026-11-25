@@ -534,7 +534,13 @@ function ThreadBody({
       )}
       {!archived && (
         <Composer
-          placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
+          placeholder={
+            chat.started
+              ? t('回复这个任务')
+              : chat.locked
+                ? t('开始后才能回复')
+                : t('补充需求，发送后直接开始')
+          }
           streaming={chat.running}
           stopping={chat.stopping}
           editable={chat.send !== undefined}

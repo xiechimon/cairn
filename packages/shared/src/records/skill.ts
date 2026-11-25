@@ -63,6 +63,24 @@ export const skillImportCandidatesResponseSchema = z.object({
 });
 export type SkillImportCandidatesResponse = z.infer<typeof skillImportCandidatesResponseSchema>;
 
+export const skillGithubCandidateSchema = z.object({
+  id: z.string(),
+  description: z.string().nullable(),
+  path: z.string(),
+  url: z.string(),
+  alreadyImported: z.boolean(),
+  problem: skillImportCandidateSchema.shape.problem,
+});
+export type SkillGithubCandidate = z.infer<typeof skillGithubCandidateSchema>;
+
+export const skillGithubCandidatesResponseSchema = z.object({
+  repo: z.string(),
+  defaultBranch: z.string(),
+  candidates: z.array(skillGithubCandidateSchema),
+  truncated: z.boolean(),
+});
+export type SkillGithubCandidatesResponse = z.infer<typeof skillGithubCandidatesResponseSchema>;
+
 export const SKILL_DIR_NAME_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 export const SKILL_PAGE_COPY = {

@@ -10,12 +10,15 @@ import { ApiError } from '../api/client.js';
 import { useApiMutations, useSkillFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import { FORM_CONTROL_CLS, FormActions, FormField, FormStack } from '../components/form-layout.js';
+import { Button } from '../components/ui/button.js';
 import { DialogShell } from '../components/ui/dialog-shell.js';
 import { FieldDescription, FieldError } from '../components/ui/field.js';
 import { Input } from '../components/ui/input.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { FORM_TEXTAREA_CLS } from './parts.js';
 
 export interface SkillEditTarget {
@@ -68,6 +71,7 @@ export function SkillDialog({
   const editing = skill !== undefined;
   const [fields, setFields] = useState<Fields | null>(null);
   const [error, setError] = useState<{ headline: string; detail: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const fileQ = useSkillFile(teamId, skill?.id, open && live && editing);
 
@@ -75,6 +79,7 @@ export function SkillDialog({
     if (!open) {
       setFields(null);
       setError(null);
+      setConfirmDelete(false);
       return;
     }
     if (!editing) {
@@ -121,6 +126,10 @@ export function SkillDialog({
       const fm = parseSkillFrontmatter(entry);
       return fm.name !== fields.name.trim() || fm.description !== fields.description.trim();
     })();
+  const busy =
+    mutations.createSkill.isPending ||
+    mutations.updateSkill.isPending ||
+    mutations.deleteSkill.isPending;
   const submittable =
     fields !== null &&
     fields.name.trim() !== '' &&
@@ -128,8 +137,24 @@ export function SkillDialog({
     fields.description.trim() !== '' &&
     !tooLarge &&
     !roundTripBad &&
-    !mutations.createSkill.isPending &&
-    !mutations.updateSkill.isPending;
+    !busy;
+
+  const confirmRemove = () => {
+    if (!editing) return;
+    setConfirmDelete(false);
+    if (!live) {
+      blockDemoWrite();
+      onClose();
+      return;
+    }
+    mutations.deleteSkill.mutate(skill.id, {
+      onSuccess: () => {
+        toastSuccess(t('已删除技能'));
+        onClose();
+      },
+      onError: (err) => toastError(t('删除技能失败，请重试。'), err),
+    });
+  };
 
   const submit = () => {
     if (fields === null || !submittable) return;
@@ -158,96 +183,134 @@ export function SkillDialog({
   };
 
   return (
-    <DialogShell
-      title={editing ? t('编辑技能') : t('新建技能')}
-      open={open}
-      onClose={onClose}
-      size="m"
-      footer={
-        <FormActions
-          className="pt-0"
-          primary={{
-            label: editing ? t('保存') : t('新建技能'),
-            onClick: submit,
-            disabled: !submittable,
-          }}
-          secondary={{ label: t('取消'), onClick: onClose }}
-        />
-      }
-    >
-      {error !== null && fields === null ? (
-        <FormStack className="max-w-none">
-          <FieldError>
-            {error.headline}
-            {error.detail !== '' && (
-              <span className="mt-0.5 block text-content-tertiary">{error.detail}</span>
-            )}
-          </FieldError>
-        </FormStack>
-      ) : fields === null ? (
-        <FormStack className="max-w-none">
-          <FieldDescription>{t('正在读取 SKILL.md…')}</FieldDescription>
-        </FormStack>
-      ) : (
-        <FormStack className="max-w-none">
-          <FormField label={t('名称')} htmlFor="dlg-skill-name">
-            <Input
-              id="dlg-skill-name"
-              className={FORM_CONTROL_CLS}
-              value={fields?.name ?? ''}
-              onChange={(event) => setFields((f) => f && { ...f, name: event.target.value })}
-              placeholder="deploy-to-prod"
+    <>
+      <DialogShell
+        title={editing ? t('编辑技能') : t('新建技能')}
+        open={open}
+        onClose={onClose}
+        size="m"
+        footer={
+          editing ? (
+            <div className="flex w-full items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                data-testid="skill-delete"
+                disabled={busy}
+                onClick={() => setConfirmDelete(true)}
+                className="text-destructive hover:text-destructive"
+              >
+                {t('删除')}
+              </Button>
+              <FormActions
+                className="pt-0"
+                primary={{
+                  label: t('保存'),
+                  onClick: submit,
+                  disabled: !submittable,
+                }}
+                secondary={{ label: t('取消'), onClick: onClose, disabled: busy }}
+              />
+            </div>
+          ) : (
+            <FormActions
+              className="pt-0"
+              primary={{
+                label: t('新建技能'),
+                onClick: submit,
+                disabled: !submittable,
+              }}
+              secondary={{ label: t('取消'), onClick: onClose }}
             />
-            {nameBad && (
-              <FieldError>
-                {t('名称须以字母或数字开头，只能含字母、数字、点、横杠、下划线，最长 64 字符。')}
-              </FieldError>
-            )}
-          </FormField>
-          <FormField label={t('描述')} htmlFor="dlg-skill-desc">
-            <Input
-              id="dlg-skill-desc"
-              className={FORM_CONTROL_CLS}
-              value={fields?.description ?? ''}
-              onChange={(event) => setFields((f) => f && { ...f, description: event.target.value })}
-              placeholder={t('这个技能做什么、什么时候用它。')}
-            />
-            {roundTripBad && (
-              <FieldError>
-                {t('描述不要用引号整体包裹——保存时引号会被剥去，与表单值不一致。')}
-              </FieldError>
-            )}
-          </FormField>
-          <FormField label={t('SKILL.md 正文')} htmlFor="dlg-skill-body">
-            <Textarea
-              id="dlg-skill-body"
-              className={`min-h-40 font-mono ${FORM_TEXTAREA_CLS}`}
-              value={fields?.body ?? ''}
-              onChange={(event) => setFields((f) => f && { ...f, body: event.target.value })}
-            />
-            <FieldDescription className="text-meta text-content-tertiary">
-              {editing
-                ? t('名称和描述由上方表单自动写入；未在此编辑的文件保持原样。')
-                : t('名称和描述由上方表单自动写入，这里只写正文。')}
-            </FieldDescription>
-            {tooLarge && (
-              <FieldError>
-                {t('内容超出单文件上限（{limit} KB）。', {
-                  limit: Math.round(MAX_SKILL_FILE_BYTES / 1000),
-                })}
-              </FieldError>
-            )}
-          </FormField>
-          {error !== null && (
+          )
+        }
+      >
+        {error !== null && fields === null ? (
+          <FormStack className="max-w-none">
             <FieldError>
               {error.headline}
               {error.detail !== '' && (
                 <span className="mt-0.5 block text-content-tertiary">{error.detail}</span>
               )}
             </FieldError>
-          )}
-        </FormStack>
+          </FormStack>
+        ) : fields === null ? (
+          <FormStack className="max-w-none">
+            <FieldDescription>{t('正在读取 SKILL.md…')}</FieldDescription>
+          </FormStack>
+        ) : (
+          <FormStack className="max-w-none">
+            <FormField label={t('名称')} htmlFor="dlg-skill-name">
+              <Input
+                id="dlg-skill-name"
+                className={FORM_CONTROL_CLS}
+                value={fields?.name ?? ''}
+                onChange={(event) => setFields((f) => f && { ...f, name: event.target.value })}
+                placeholder="deploy-to-prod"
+              />
+              {nameBad && (
+                <FieldError>
+                  {t('名称须以字母或数字开头，只能含字母、数字、点、横杠、下划线，最长 64 字符。')}
+                </FieldError>
+              )}
+            </FormField>
+            <FormField label={t('描述')} htmlFor="dlg-skill-desc">
+              <Input
+                id="dlg-skill-desc"
+                className={FORM_CONTROL_CLS}
+                value={fields?.description ?? ''}
+                onChange={(event) =>
+                  setFields((f) => f && { ...f, description: event.target.value })
+                }
+                placeholder={t('这个技能做什么、什么时候用它。')}
+              />
+              {roundTripBad && (
+                <FieldError>
+                  {t('描述不要用引号整体包裹——保存时引号会被剥去，与表单值不一致。')}
+                </FieldError>
+              )}
+            </FormField>
+            <FormField label={t('SKILL.md 正文')} htmlFor="dlg-skill-body">
+              <Textarea
+                id="dlg-skill-body"
+                className={`min-h-40 font-mono ${FORM_TEXTAREA_CLS}`}
+                value={fields?.body ?? ''}
+                onChange={(event) => setFields((f) => f && { ...f, body: event.target.value })}
+              />
+              <FieldDescription className="text-meta text-content-tertiary">
+                {editing
+                  ? t('名称和描述由上方表单自动写入；未在此编辑的文件保持原样。')
+                  : t('名称和描述由上方表单自动写入，这里只写正文。')}
+              </FieldDescription>
+              {tooLarge && (
+                <FieldError>
+                  {t('内容超出单文件上限（{limit} KB）。', {
+                    limit: Math.round(MAX_SKILL_FILE_BYTES / 1000),
+                  })}
+                </FieldError>
+              )}
+            </FormField>
+            {error !== null && (
+              <FieldError>
+                {error.headline}
+                {error.detail !== '' && (
+                  <span className="mt-0.5 block text-content-tertiary">{error.detail}</span>
+                )}
+              </FieldError>
+            )}
+          </FormStack>
+        )}
+      </DialogShell>
+      {editing && (
+        <DeleteConfirm
+          open={confirmDelete}
+          title={t('确定删除技能「{name}」？此操作不可撤销。', { name: skill.name })}
+          summary={skill.name}
+          ariaLabel={t('删除技能')}
+          onClose={() => setConfirmDelete(false)}
+          onConfirm={confirmRemove}
+        />
       )}
-    </DialogShell>
+    </>
   );
 }

@@ -16,6 +16,7 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { skillAudit } from '../src/db/schema.js';
 import { type ChiefToolCtx, executeChiefTool } from '../src/services/chief-tools.js';
+import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
 import {
   bootServer,
   issueApiKey,
@@ -933,6 +934,51 @@ describe('machine-wire skill listing and on-demand fetch (GET /api/machine/skill
         await (await pkg(s.app, token, step.step.id)).json(),
       );
       expect(body.skills.map((sk) => sk.id)).toEqual(['alpha']);
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('DELETE removes local skill directory, cleans source record, audits delete, and refuses symlinks', async () => {
+    const root = makeRoot();
+    const skillsDir = join(root, 'skills');
+    const outsideTarget = join(root, 'outside-skill');
+    mkdirSync(skillsDir, { recursive: true });
+    mkdirSync(outsideTarget, { recursive: true });
+    writeFileSync(join(outsideTarget, 'SKILL.md'), skillMd('linked', 'external target'));
+    const skillSourcesPath = join(root, 'skill-sources.json');
+    const s = bootServer({ skillsDir, skillSourcesPath });
+    try {
+      const created = await req(s.app, 'POST', '/api/skills', createBody('deploy', '部署'));
+      expect(created.status).toBe(201);
+      await writeSkillSource(skillSourcesPath, {
+        skillId: 'deploy',
+        kind: 'localPath',
+        ref: '/tmp/origin-deploy',
+        importedAt: 1,
+        refreshedAt: null,
+        teamId: s.team.id,
+      });
+
+      const delRes = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/skills/deploy`);
+      expect(delRes.status).toBe(204);
+      expect(existsSync(join(skillsDir, 'deploy'))).toBe(false);
+      expect(await readSkillSource(skillSourcesPath, 'deploy')).toBeNull();
+      const audits = s.db.select().from(skillAudit).all();
+      expect(audits.some((row) => row.skillId === 'deploy' && row.action === 'delete')).toBe(true);
+      const afterGet = await req(s.app, 'GET', `/api/teams/${s.team.id}/skills/deploy/file`);
+      expect(afterGet.status).toBe(404);
+
+      symlinkSync(outsideTarget, join(skillsDir, 'linked'));
+      const symDel = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/skills/linked`);
+      expect(symDel.status).toBe(404);
+      expect(existsSync(join(outsideTarget, 'SKILL.md'))).toBe(true);
+
+      await req(s.app, 'POST', '/api/skills', createBody('z-target', '内部真实技能'));
+      symlinkSync(join(skillsDir, 'z-target'), join(skillsDir, 'a-link'));
+      const insideSymDel = await req(s.app, 'DELETE', `/api/teams/${s.team.id}/skills/z-target`);
+      expect(insideSymDel.status).toBe(409);
+      expect(existsSync(join(skillsDir, 'z-target', 'SKILL.md'))).toBe(true);
     } finally {
       s.dispose();
     }

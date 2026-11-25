@@ -35,7 +35,7 @@ test('model selector lists the frequently used models in place of the task row, 
   const rows = settings.getByTestId('frequent-model-row');
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toContainText('claude-sonnet-5');
-  await expect(rows.nth(0).locator('.frequent-model-level')).toContainText('High');
+  await expect(rows.nth(0).locator('.frequent-model-level')).toContainText('高');
   await expect(rows.nth(2)).toHaveAttribute('data-unavailable', '');
   await expect(settings.getByTestId('routing-rule-review')).toHaveCount(0);
   await expect(settings.getByTestId('routing-rule-new-coordinator')).toBeVisible();
@@ -242,8 +242,8 @@ test('adding, tuning and removing a frequently used model saves the whole list',
   );
   await expect(card.locator('h2 ~ p')).toHaveCount(0);
   await row.locator('.frequent-model-level').click();
-  await expect(page.getByRole('option')).toHaveText(['Default', 'Low', 'High', 'Max']);
-  await page.getByRole('option', { name: 'High', exact: true }).click();
+  await expect(page.getByRole('option')).toHaveText(['默认', '低', '高', '最高']);
+  await page.getByRole('option', { name: '高', exact: true }).click();
   await expect
     .poll(() => puts.at(-1))
     .toEqual([{ provider: 'relay', modelId: 'glm-5.3', thinkingLevel: 'high' }]);
@@ -298,7 +298,7 @@ test('a stored Devin model shows available and the picker offers the Devin group
   await expect(row).toContainText('SWE-2');
   await expect(row).not.toHaveAttribute('data-unavailable', '');
   await row.locator('.frequent-model-level').click();
-  await expect(page.getByRole('option')).toHaveText(['Default (High)', 'Medium', 'High', 'Max']);
+  await expect(page.getByRole('option')).toHaveText(['默认（高）', '中', '高', '最高']);
   await page.keyboard.press('Escape');
   await card.getByTestId('frequent-models-add').click();
   const menu = page.locator('[data-slot="select-content"][aria-label="添加模型"]');

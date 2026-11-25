@@ -46,10 +46,17 @@ export const renameDevinSubscriptionSchema = z
   .object({
     label: z.string().trim().min(1).max(100).optional(),
     models: z.array(devinSubscriptionModelSchema).max(2000).optional(),
+    token: createDevinSubscriptionSchema.shape.token.optional(),
+    expiresAt: z.number().int().positive().nullable().optional(),
   })
-  .refine((body) => body.label !== undefined || body.models !== undefined, {
-    message: 'Nothing to update',
-  });
+  .refine(
+    (body) =>
+      body.label !== undefined ||
+      body.models !== undefined ||
+      body.token !== undefined ||
+      body.expiresAt !== undefined,
+    { message: 'Nothing to update' },
+  );
 
 export type PatchDevinSubscription = z.infer<typeof renameDevinSubscriptionSchema>;
 

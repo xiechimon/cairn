@@ -17,6 +17,7 @@ import {
   type ClaimedStep,
   MAX_SKILL_FILE_BYTES,
   machineSkillsManifestResponseSchema,
+  skillGithubCandidatesResponseSchema,
   skillImportCandidatesResponseSchema,
   skillRecordSchema,
 } from '@cairn/shared';
@@ -26,6 +27,7 @@ import { readyMachine } from '../../../packages/shared/test/fixtures/machine.js'
 import { makeTestTempDir } from '../../../scripts/test-tmpdir.mjs';
 import { pairedDevice, skillAudit } from '../src/db/schema.js';
 import { issueBrowserSession } from '../src/services/browser-session.js';
+import { upsertGithubConnection } from '../src/services/github-connection.js';
 import { readSkillSource, writeSkillSource } from '../src/services/skill-source-store.js';
 import {
   bootServer,
@@ -1562,6 +1564,116 @@ describe('local-directory import authorization (the source is owner data)', () =
       expect(res.status).toBe(400);
       expect(await errorText(res)).toContain('cannot refresh');
       expect(readFileSync(join(skillsDir, 'inside-src', 'SKILL.md'), 'utf8')).toContain('v1');
+    } finally {
+      s.dispose();
+    }
+  });
+
+  test('github-candidates discovers repo SKILL.md files with connected token and rejects bad repo params', async () => {
+    const skillsDir = makeRoot();
+    mkdirSync(join(skillsDir, 'root-skill'));
+    writeFileSync(join(skillsDir, 'root-skill', 'SKILL.md'), skillMd('root-skill', '已安装'));
+    const seenHeaders: { url: string; auth: string | null }[] = [];
+    const s = bootServer({
+      skillsDir,
+      skillImportFetch: async (url, init) => {
+        seenHeaders.push({
+          url: String(url),
+          auth: new Headers(init?.headers).get('authorization'),
+        });
+        if (String(url) === 'https://api.github.com/repos/octo/private-skills') {
+          return new Response(JSON.stringify({ default_branch: 'main' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
+        if (
+          String(url) ===
+          'https://api.github.com/repos/octo/private-skills/git/trees/main?recursive=1'
+        ) {
+          return new Response(
+            JSON.stringify({
+              truncated: false,
+              tree: [
+                { path: 'SKILL.md', type: 'blob', size: 80 },
+                { path: 'nested/beta/SKILL.md', type: 'blob', size: 90 },
+                { path: 'README.md', type: 'blob', size: 20 },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          );
+        }
+        if (
+          String(url) ===
+          'https://api.github.com/repos/octo/private-skills/contents/SKILL.md?ref=main'
+        ) {
+          return new Response(skillMd('root-skill', '根技能'), { status: 200 });
+        }
+        if (
+          String(url) ===
+          'https://api.github.com/repos/octo/private-skills/contents/nested/beta/SKILL.md?ref=main'
+        ) {
+          return new Response(skillMd('beta-skill', '子目录技能'), { status: 200 });
+        }
+        return new Response('not found', { status: 404 });
+      },
+    });
+    upsertGithubConnection(
+      { db: s.db, box: s.secretBox },
+      {
+        teamId: s.team.id,
+        login: 'octo-user',
+        accessToken: 'gho_private_skills_test_token',
+        scope: 'repo',
+      },
+    );
+    try {
+      for (const badRef of ['not-a-repo', '../user', './repo', 'octo/..']) {
+        const bad = await req(
+          s.app,
+          'GET',
+          `/api/teams/${s.team.id}/skills/github-candidates?repo=${encodeURIComponent(badRef)}`,
+        );
+        expect(bad.status).toBe(400);
+      }
+      const badEncodedUrl = await req(s.app, 'POST', `/api/teams/${s.team.id}/skills/import`, {
+        url: 'https://github.com/..%2Fuser/repos',
+      });
+      expect(badEncodedUrl.status).toBe(400);
+      expect(seenHeaders).toHaveLength(0);
+
+      const res = await req(
+        s.app,
+        'GET',
+        `/api/teams/${s.team.id}/skills/github-candidates?repo=octo/private-skills`,
+      );
+      expect(res.status).toBe(200);
+      const body = skillGithubCandidatesResponseSchema.parse(await res.json());
+      expect(body.repo).toBe('octo/private-skills');
+      expect(body.defaultBranch).toBe('main');
+      expect(body.truncated).toBe(false);
+      expect(body.candidates).toEqual([
+        {
+          id: 'beta-skill',
+          description: '子目录技能',
+          path: 'nested/beta',
+          url: 'https://github.com/octo/private-skills/tree/main/nested/beta',
+          alreadyImported: false,
+          problem: null,
+        },
+        {
+          id: 'root-skill',
+          description: '根技能',
+          path: '',
+          url: 'https://github.com/octo/private-skills',
+          alreadyImported: true,
+          problem: null,
+        },
+      ]);
+      expect(seenHeaders.length).toBeGreaterThanOrEqual(4);
+      expect(
+        seenHeaders.every((entry) => entry.auth === 'Bearer gho_private_skills_test_token'),
+      ).toBe(true);
     } finally {
       s.dispose();
     }

@@ -229,3 +229,71 @@ test('pick from this machine: three picks with one failure keep the two that wor
   await dialog.getByRole('button', { name: '取消' }).click();
   await expect(page.getByTestId('resource-row')).toHaveCount(2);
 });
+
+test('pick from GitHub: shows connect gate when disconnected, lists repo skills and imports selected URLs when connected', async ({ page }) => {
+  await stubBoot(page);
+  await stubCandidates(page, []);
+  const { importCalls } = await stubImport(page);
+  let connected = false;
+  await page.route('**/api/capabilities', (route) =>
+    route.fulfill({ json: { githubOAuth: true, githubDeviceInstallUrl: null } }),
+  );
+  await page.route('**/api/teams/*/github/connection', (route) =>
+    route.fulfill({
+      json: connected ? { connected: true, login: 'octo-user' } : { connected: false },
+    }),
+  );
+  await page.route('**/api/github/repos', (route) =>
+    route.fulfill({
+      json: {
+        repos: [{ full_name: 'octo/team-skills', default_branch: 'main', private: true }],
+        grantReposUrl: null,
+      },
+    }),
+  );
+  await page.route('**/api/teams/*/skills/github-candidates*', (route) =>
+    route.fulfill({
+      json: {
+        repo: 'octo/team-skills',
+        defaultBranch: 'main',
+        truncated: false,
+        candidates: [
+          {
+            id: 'deploy-flow',
+            description: 'GitHub 发布流程',
+            path: 'skills/deploy-flow',
+            url: 'https://github.com/octo/team-skills/tree/main/skills/deploy-flow',
+            alreadyImported: false,
+            problem: null,
+          },
+        ],
+      },
+    }),
+  );
+
+  await page.goto(SKILLS);
+  await page.getByTestId('resource-import').click();
+  const dialog = page.getByRole('dialog', { name: '导入技能' });
+  await dialog.getByTestId('skill-import-tab-github').click();
+  await expect(dialog.getByTestId('skill-github-connect')).toBeVisible();
+
+  connected = true;
+  await page.reload();
+  await page.getByTestId('resource-import').click();
+  const reDialog = page.getByRole('dialog', { name: '导入技能' });
+  await reDialog.getByTestId('skill-import-tab-github').click();
+  const picker = reDialog.getByTestId('skill-github-repo-picker');
+  await expect(picker).toBeVisible();
+  await picker.click();
+  await page.getByTestId('github-picker').getByText('octo/team-skills').click();
+
+  const candidateRow = reDialog.getByTestId('skill-candidate').filter({ hasText: 'deploy-flow' });
+  await expect(candidateRow).toBeVisible();
+  await candidateRow.getByRole('checkbox').click();
+  await reDialog.getByRole('button', { name: '导入 1 个' }).click();
+  await expect(reDialog).toBeHidden();
+  expect(importCalls.map((c) => c.body)).toEqual([
+    { url: 'https://github.com/octo/team-skills/tree/main/skills/deploy-flow' },
+  ]);
+  await expect(page.getByTestId('resource-row')).toHaveCount(1);
+});
