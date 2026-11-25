@@ -34,6 +34,7 @@ import { Button } from '../components/ui/button.js';
 import {
   DropdownMenu,
   DropdownMenuRadioGroup,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
@@ -314,7 +315,7 @@ export function ProjectNewPage() {
           >
             {blockedStep === 'models'
               ? t('建项目前要先把模型配好，还差第 1 步：接入模型。')
-              : t('建项目前要先把模型配好，还差第 2 步：确认模型。')}
+              : t('建项目前要先把模型配好，还差第 2 步：确认设置。')}
           </p>
           <FormActions primary={{ label: t('去完成设置'), onClick: () => navigate(SETUP_HREF) }} />
         </FormStack>
@@ -324,282 +325,305 @@ export function ProjectNewPage() {
 
   return (
     <RouteDialog title={t('新建项目')} size="form" initialFocus={nameRef}>
-      <FormStack>
-        <span className="flex size-14 flex-none overflow-hidden rounded-full bg-card text-content-tertiary ring-1 ring-border">
-          <ProjectIconPicker
-            icon={icon}
-            color={null}
-            onChange={(patch) => setIcon(patch.icon ?? null)}
-            triggerClassName="grid place-items-center rounded-full"
-            trigger={<NewProjectIcon icon={icon} name={name} />}
-          />
-        </span>
-        <FormField label={t('项目名称')} htmlFor="prj-new-name">
-          <Input
-            ref={nameRef}
-            id="prj-new-name"
-            type="text"
-            className={FORM_CONTROL_CLS}
-            placeholder={t('例如：我的应用')}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </FormField>
-        <FormField label={t('仓库')} htmlFor="prj-new-repo">
-          <DropdownMenu
-            open={repoOpen}
-            onOpenChange={(next) => {
-              setRepoOpen(next);
-              if (next) setPickerOpen(false);
-            }}
-          >
-            <div className="relative flex" ref={repoFieldRef}>
-              {repoSel === 'github' ? (
-                manualEntry ? (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (live && name.trim() !== '' && formOk && !mutations.createProject.isPending) submit();
+        }}
+      >
+        <FormStack>
+          <span className="flex size-14 flex-none overflow-hidden rounded-full bg-card text-content-tertiary ring-1 ring-border">
+            <ProjectIconPicker
+              icon={icon}
+              color={null}
+              onChange={(patch) => setIcon(patch.icon ?? null)}
+              triggerClassName="grid place-items-center rounded-full"
+              trigger={<NewProjectIcon icon={icon} name={name} />}
+            />
+          </span>
+          <FormField label={t('项目名称')} htmlFor="prj-new-name">
+            <Input
+              ref={nameRef}
+              id="prj-new-name"
+              type="text"
+              className={FORM_CONTROL_CLS}
+              placeholder={t('例如：我的应用')}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </FormField>
+          <FormField label={t('仓库')} htmlFor="prj-new-repo">
+            <DropdownMenu
+              open={repoOpen}
+              onOpenChange={(next) => {
+                setRepoOpen(next);
+                if (next) setPickerOpen(false);
+              }}
+            >
+              <div className="relative flex" ref={repoFieldRef}>
+                {repoSel === 'github' ? (
+                  manualEntry ? (
+                    <>
+                      <Input
+                        id="prj-new-repo"
+                        className={REPO_INPUT_CLS}
+                        type="text"
+                        placeholder="owner/repo"
+                        aria-label={t('GitHub 仓库')}
+                        value={githubRepo}
+                        onChange={(e) => onGithubRepoChange(e.target.value)}
+                      />
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
+                    </>
+                  ) : connectionPending ? (
+                    <>
+                      <Button
+                        variant="outline"
+                        id="prj-new-repo"
+                        className={REPO_TRIGGER_CLS}
+                        disabled
+                      >
+                        <span className="text-content-tertiary">{t('选择仓库')}</span>
+                      </Button>
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
+                    </>
+                  ) : connected ? (
+                    <>
+                      <FilterPicker
+                        open={pickerVisible}
+                        onOpenChange={(next) => {
+                          if (next) setRepoOpen(false);
+                          setPickerOpen(next);
+                        }}
+                        alwaysFilter
+                        loading={live && (reposQ.isPending || reposQ.isError)}
+                        options={repos.map((repo) => ({
+                          value: repo.full_name,
+                          label: repo.full_name,
+                        }))}
+                        value={githubRepo === '' ? null : githubRepo}
+                        onPick={(fullName) => {
+                          const repo = repos.find((item) => item.full_name === fullName);
+                          if (repo !== undefined) pickRepo(repo);
+                        }}
+                        label={t('GitHub 仓库')}
+                        placeholder={t('搜索仓库')}
+                        filterLabel={t('搜索仓库')}
+                        noun={t('仓库')}
+                        emptyText={t('没有匹配的仓库')}
+                        popupTestId="github-picker"
+                        triggerId="prj-new-repo"
+                        trigger={<Button variant="outline" className={REPO_TRIGGER_CLS} />}
+                        triggerContent={
+                          <>
+                            {githubRepo === '' ? (
+                              <span className="text-content-tertiary">{t('选择 GitHub 仓库')}</span>
+                            ) : (
+                              <span className="truncate">{githubRepo}</span>
+                            )}
+                            <ChevronDown className="size-4 flex-none" />
+                          </>
+                        }
+                        header={
+                          <>
+                            <span>
+                              {login === undefined || login === ''
+                                ? t('已连接')
+                                : `${t('已连接')} · ${login}`}
+                            </span>
+                            <Button
+                              variant="link"
+                              className="h-auto p-0 text-caption"
+                              onClick={disconnect}
+                            >
+                              {t('断开连接')}
+                            </Button>
+                          </>
+                        }
+                        footer={
+                          (live && reposQ.isError) || grantReposUrl !== null ? (
+                            <>
+                              {live && reposQ.isError && (
+                                <div className="text-meta text-destructive" role="alert">
+                                  {t('暂时无法加载 GitHub 仓库列表，请稍后重试。')}
+                                </div>
+                              )}
+                              {grantReposUrl !== null && (
+                                <div>
+                                  {t('只显示已授权给 Cairn 的仓库')}
+                                  {' · '}
+                                  <a
+                                    href={grantReposUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-foreground underline underline-offset-2"
+                                  >
+                                    {t('去 GitHub 授权更多仓库')}
+                                  </a>
+                                </div>
+                              )}
+                            </>
+                          ) : undefined
+                        }
+                      />
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        id="prj-new-repo"
+                        className={`${FORM_CONTROL_CLS} flex-1`}
+                        onClick={startAuth}
+                      >
+                        {t('认证 GitHub')}
+                      </Button>
+                      <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
+                    </>
+                  )
+                ) : repoSel === 'local' ? (
                   <>
                     <Input
                       id="prj-new-repo"
                       className={REPO_INPUT_CLS}
                       type="text"
-                      placeholder="owner/repo"
-                      aria-label={t('GitHub 仓库')}
-                      value={githubRepo}
-                      onChange={(e) => onGithubRepoChange(e.target.value)}
+                      placeholder="/path/to/repo"
+                      aria-label={t('本地文件夹')}
+                      value={localPath}
+                      onChange={(e) => onLocalPathChange(e.target.value)}
                     />
-                    <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
-                  </>
-                ) : connectionPending ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      id="prj-new-repo"
-                      className={REPO_TRIGGER_CLS}
-                      disabled
+                    <Popover
+                      open={browseOpen}
+                      onOpenChange={(next: boolean) => {
+                        if (next) browseFolder();
+                        else setBrowseOpen(false);
+                      }}
                     >
-                      <span className="text-content-tertiary">{t('选择仓库')}</span>
-                    </Button>
-                    <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
-                  </>
-                ) : connected ? (
-                  <>
-                    <FilterPicker
-                      open={pickerVisible}
-                      onOpenChange={(next) => {
-                        if (next) setRepoOpen(false);
-                        setPickerOpen(next);
-                      }}
-                      alwaysFilter
-                      loading={live && (reposQ.isPending || reposQ.isError)}
-                      options={repos.map((repo) => ({
-                        value: repo.full_name,
-                        label: repo.full_name,
-                      }))}
-                      value={githubRepo === '' ? null : githubRepo}
-                      onPick={(fullName) => {
-                        const repo = repos.find((item) => item.full_name === fullName);
-                        if (repo !== undefined) pickRepo(repo);
-                      }}
-                      label={t('GitHub 仓库')}
-                      placeholder={t('搜索仓库')}
-                      filterLabel={t('搜索仓库')}
-                      noun={t('仓库')}
-                      emptyText={t('没有匹配的仓库')}
-                      popupTestId="github-picker"
-                      triggerId="prj-new-repo"
-                      trigger={<Button variant="outline" className={REPO_TRIGGER_CLS} />}
-                      triggerContent={
-                        <>
-                          {githubRepo === '' ? (
-                            <span className="text-content-tertiary">{t('选择 GitHub 仓库')}</span>
-                          ) : (
-                            <span className="truncate">{githubRepo}</span>
-                          )}
-                          <ChevronDown className="size-4 flex-none" />
-                        </>
-                      }
-                      header={
-                        <>
-                          <span>
-                            {login === undefined || login === ''
-                              ? t('已连接')
-                              : `${t('已连接')} · ${login}`}
-                          </span>
+                      <PopoverTrigger
+                        render={
                           <Button
-                            variant="link"
-                            className="h-auto p-0 text-caption"
-                            onClick={disconnect}
-                          >
-                            {t('断开连接')}
-                          </Button>
-                        </>
-                      }
-                      footer={
-                        (live && reposQ.isError) || grantReposUrl !== null ? (
-                          <>
-                            {live && reposQ.isError && (
-                              <div className="text-meta text-destructive" role="alert">
-                                {t('暂时无法加载 GitHub 仓库列表，请稍后重试。')}
-                              </div>
-                            )}
-                            {grantReposUrl !== null && (
-                              <div>
-                                {t('只显示已授权给 Cairn 的仓库')}
-                                {' · '}
-                                <a
-                                  href={grantReposUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-foreground underline underline-offset-2"
-                                >
-                                  {t('去 GitHub 授权更多仓库')}
-                                </a>
-                              </div>
-                            )}
-                          </>
-                        ) : undefined
-                      }
-                    />
+                            variant="outline"
+                            className={`${FORM_CONTROL_CLS} ml-2 shrink-0 px-3`}
+                            aria-label={t('浏览')}
+                            disabled={pickBusy}
+                          />
+                        }
+                      >
+                        {t('浏览')}
+                      </PopoverTrigger>
+                      {browseOpen && (
+                        <DirBrowser
+                          onPick={(path) => {
+                            setBrowseOpen(false);
+                            onLocalPathChange(path);
+                          }}
+                        />
+                      )}
+                    </Popover>
                     <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
                   </>
                 ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      id="prj-new-repo"
-                      className={`${FORM_CONTROL_CLS} flex-1`}
-                      onClick={startAuth}
-                    >
-                      {t('认证 GitHub')}
-                    </Button>
-                    <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
-                  </>
-                )
-              ) : repoSel === 'local' ? (
-                <>
-                  <Input
-                    id="prj-new-repo"
-                    className={REPO_INPUT_CLS}
-                    type="text"
-                    placeholder="/path/to/repo"
-                    aria-label={t('本地文件夹')}
-                    value={localPath}
-                    onChange={(e) => onLocalPathChange(e.target.value)}
-                  />
-                  <Popover
-                    open={browseOpen}
-                    onOpenChange={(next: boolean) => {
-                      if (next) browseFolder();
-                      else setBrowseOpen(false);
+                  <DropdownMenuTrigger
+                    render={
+                      <Button variant="outline" id="prj-new-repo" className={REPO_TRIGGER_CLS} />
+                    }
+                  >
+                    <span className="text-content-tertiary">{t('选择仓库')}</span>
+                    <ChevronDown className="size-4" />
+                  </DropdownMenuTrigger>
+                )}
+                <KeyedMenuContent
+                  anchor={repoFieldRef}
+                  align={repoSel === 'none' ? 'start' : 'end'}
+                  sideOffset={6}
+                  aria-label={t('仓库')}
+                  className="w-auto min-w-[200px]"
+                >
+                  <DropdownMenuRadioGroup
+                    value={
+                      repoSel === 'none'
+                        ? null
+                        : repoSel === 'github' && manualRepo && !signInOff
+                          ? 'manual'
+                          : repoSel
+                    }
+                    onValueChange={(next) => {
+                      const sel = next as 'none' | 'github' | 'manual' | 'local';
+                      pendingSwapFocus.current = true;
+                      if (sel === 'none') {
+                        setRepoSel('none');
+                        setManualRepo(false);
+                        setPickerOpen(false);
+                        return;
+                      }
+                      setRepoSel(sel === 'local' ? 'local' : 'github');
+                      setManualRepo(sel === 'manual');
+                      setPickerOpen(false);
                     }}
                   >
-                    <PopoverTrigger
-                      render={
-                        <Button
-                          variant="outline"
-                          className={`${FORM_CONTROL_CLS} ml-2 shrink-0 px-3`}
-                          aria-label={t('浏览')}
-                          disabled={pickBusy}
-                        />
-                      }
-                    >
-                      {t('浏览')}
-                    </PopoverTrigger>
-                    {browseOpen && (
-                      <DirBrowser
-                        onPick={(path) => {
-                          setBrowseOpen(false);
-                          onLocalPathChange(path);
-                        }}
-                      />
-                    )}
-                  </Popover>
-                  <RepoSwapButton label={t('切换仓库来源')} buttonRef={swapBtnRef} />
-                </>
-              ) : (
-                <DropdownMenuTrigger
-                  render={
-                    <Button variant="outline" id="prj-new-repo" className={REPO_TRIGGER_CLS} />
-                  }
-                >
-                  <span className="text-content-tertiary">{t('选择仓库')}</span>
-                  <ChevronDown className="size-4" />
-                </DropdownMenuTrigger>
-              )}
-              <KeyedMenuContent
-                anchor={repoFieldRef}
-                align={repoSel === 'none' ? 'start' : 'end'}
-                sideOffset={6}
-                aria-label={t('仓库')}
-                className="w-auto min-w-[200px]"
-              >
-                <DropdownMenuRadioGroup
-                  value={
-                    repoSel === 'none'
-                      ? null
-                      : repoSel === 'github' && manualRepo && !signInOff
-                        ? 'manual'
-                        : repoSel
-                  }
-                  onValueChange={(next) => {
-                    const sel = next as 'github' | 'manual' | 'local';
-                    pendingSwapFocus.current = true;
-                    setRepoSel(sel === 'local' ? 'local' : 'github');
-                    setManualRepo(sel === 'manual');
-                    setPickerOpen(false);
-                  }}
-                >
-                  <KeyedMenuRadioItem value="github" shortcut="G" closeOnClick>
-                    {t('GitHub 仓库')}
-                  </KeyedMenuRadioItem>
-                  {!signInOff && (
-                    <KeyedMenuRadioItem value="manual" shortcut="M" closeOnClick>
-                      {t('手动输入 owner/repo')}
+                    <KeyedMenuRadioItem value="github" shortcut="G" closeOnClick>
+                      {t('GitHub 仓库')}
                     </KeyedMenuRadioItem>
-                  )}
-                  <KeyedMenuRadioItem value="local" shortcut="L" closeOnClick>
-                    {t('本地文件夹')}
-                  </KeyedMenuRadioItem>
-                </DropdownMenuRadioGroup>
-              </KeyedMenuContent>
-            </div>
-          </DropdownMenu>
-          {showGithubField && oauthError !== null && (
-            <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
-              {oauthError}
-            </div>
-          )}
-          {showGithubField && disconnectReason !== null && (
-            <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
-              {t('GitHub 连接已断开')}：{disconnectReason}
-            </div>
-          )}
-          {localErrorText !== null && (
-            <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
-              {localErrorText}
-            </div>
-          )}
-          {repoSel === 'local' && pickHint !== null && (
-            <div className={`${FIELD_NOTE_CLS} text-content-tertiary`} role="status">
-              {pickHint}
-            </div>
-          )}
-          {repoSel === 'local' && (
-            <div className={`${FIELD_NOTE_CLS} text-content-tertiary`}>
-              {t(
-                '单执行机形态：这台执行机损坏时进度随之丢失。需要在任意执行机上继续运行，请用 GitHub 接入。',
-              )}
-            </div>
-          )}
-        </FormField>
-        <FormActions
-          hint={live ? undefined : t('演示数据不能新建项目')}
-          primary={{
-            label: t('创建项目'),
-            disabled: live ? name.trim() === '' || !formOk : true,
-            onClick: live ? submit : undefined,
-          }}
-        />
-      </FormStack>
+                    {!signInOff && (
+                      <KeyedMenuRadioItem value="manual" shortcut="M" closeOnClick>
+                        {t('手动输入 owner/repo')}
+                      </KeyedMenuRadioItem>
+                    )}
+                    <KeyedMenuRadioItem value="local" shortcut="L" closeOnClick>
+                      {t('本地文件夹')}
+                    </KeyedMenuRadioItem>
+                    {repoSel !== 'none' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <KeyedMenuRadioItem value="none" shortcut="N" closeOnClick>
+                          {t('暂不关联仓库')}
+                        </KeyedMenuRadioItem>
+                      </>
+                    )}
+                  </DropdownMenuRadioGroup>
+                </KeyedMenuContent>
+              </div>
+            </DropdownMenu>
+            {showGithubField && oauthError !== null && (
+              <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
+                {oauthError}
+              </div>
+            )}
+            {showGithubField && disconnectReason !== null && (
+              <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
+                {t('GitHub 连接已断开')}：{disconnectReason}
+              </div>
+            )}
+            {localErrorText !== null && (
+              <div className={`${FIELD_NOTE_CLS} text-destructive`} role="alert">
+                {localErrorText}
+              </div>
+            )}
+            {repoSel === 'local' && pickHint !== null && (
+              <div className={`${FIELD_NOTE_CLS} text-content-tertiary`} role="status">
+                {pickHint}
+              </div>
+            )}
+            {repoSel === 'local' && (
+              <div className={`${FIELD_NOTE_CLS} text-content-tertiary`}>
+                {t(
+                  '单执行机形态：这台执行机损坏时进度随之丢失。需要在任意执行机上继续运行，请用 GitHub 接入。',
+                )}
+              </div>
+            )}
+          </FormField>
+          <FormActions
+            hint={live ? undefined : t('演示数据不能新建项目')}
+            primary={{
+              label: mutations.createProject.isPending ? t('正在创建…') : t('创建项目'),
+              disabled: live
+                ? name.trim() === '' || !formOk || mutations.createProject.isPending
+                : true,
+              onClick: live ? submit : undefined,
+            }}
+          />
+        </FormStack>
+      </form>
       {deviceOpen && deviceInstallUrl !== null && (
         <GithubConnectionDeviceDialog
           teamId={teamId}

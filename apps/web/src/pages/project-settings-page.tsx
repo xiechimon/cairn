@@ -29,6 +29,7 @@ import { MemoryPanel } from '../chief/memory-panel.js';
 import { EmptyState } from '../components/empty-state.js';
 import { FORM_CONTROL_CLS } from '../components/form-layout.js';
 import { InfoTip } from '../components/info-tip.js';
+import { NoticeBanner } from '../components/notice-banner.js';
 import {
   SettingsNav,
   type SettingsNavGroup,
@@ -41,11 +42,12 @@ import {
   SettingsRow,
   SettingsRows,
 } from '../components/settings-list.js';
+import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
 import { DIALOG_PRIMARY_BUTTON } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { RingSpinner } from '../components/ui/ring-spinner.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { blockDemoWrite } from '../demo/demo-gate.js';
 import type { ModelOption, ProjectContent } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
@@ -154,6 +156,7 @@ export function ProjectSettingsPage() {
   const [nameDraft, setNameDraft] = useState<string | null>(null);
   const [convRepo, setConvRepo] = useState('');
   const [convError, setConvError] = useState<string | null>(null);
+  const [convConfirmRepo, setConvConfirmRepo] = useState<string | null>(null);
   const [repoDraft, setRepoDraft] = useState<string | null>(null);
   const [repoError, setRepoError] = useState<string | null>(null);
   const { live, teamId } = useLiveData();
@@ -186,7 +189,10 @@ export function ProjectSettingsPage() {
   const memoryProject = live ? wireProject : { id: id ?? '', name: project?.name ?? '' };
   const repoKind = live ? wireProject?.repoKind : project?.hosted ? 'hosted' : project?.repoKind;
   const archived = wireProject?.archivedAt != null;
-  const patch = (body: Parameters<typeof mutations.patchProject.mutate>[0]['body']) => {
+  const patch = (
+    body: Parameters<typeof mutations.patchProject.mutate>[0]['body'],
+    options?: { onSuccess?: () => void },
+  ) => {
     if (id === undefined) return;
     if (!live) {
       blockDemoWrite();
@@ -194,14 +200,23 @@ export function ProjectSettingsPage() {
     }
     mutations.patchProject.mutate(
       { id, body },
-      { onError: (error) => toastError(t('保存失败，请重试。'), error) },
+      {
+        onSuccess: () => {
+          toastSuccess(t('已保存'));
+          options?.onSuccess?.();
+        },
+        onError: (error) => toastError(t('保存失败，请重试。'), error),
+      },
     );
   };
   const saveName = () => {
-    const next = (nameDraft ?? '').trim();
-    setNameDraft(null);
-    if (nameDraft === null || next === '' || next === project?.name) return;
-    patch({ name: next });
+    if (nameDraft === null) return;
+    const next = nameDraft.trim();
+    if (next === '' || next === project?.name) {
+      setNameDraft(null);
+      return;
+    }
+    patch({ name: next }, { onSuccess: () => setNameDraft(null) });
   };
   const setArchived = (next: boolean) => {
     if (id === undefined) return;
@@ -217,6 +232,7 @@ export function ProjectSettingsPage() {
             toastArchived(t, project?.name ?? '', (handlers) =>
               mutations.setProjectArchived.mutate({ id, archived: false }, handlers),
             );
+          else toastSuccess(t('已取消归档'));
         },
         onError: (error) =>
           toastError(next ? t('无法归档项目。') : t('取消归档失败，请重试。'), error),
@@ -250,6 +266,14 @@ export function ProjectSettingsPage() {
   const general = (
     <SettingsRows>
       <div className={cn('flex flex-col gap-5', NARROW_ROWS_CLS)}>
+        {archived && (
+          <NoticeBanner
+            tone="info"
+            icon={Archive}
+            title={t('这个项目已归档')}
+            body={t('取消归档后才能修改或运行任务。')}
+          />
+        )}
         <Section>
           <SettingsRow label={t('名称和图标')}>
             <div className="flex min-w-0 items-center gap-2 max-sm:w-full">
@@ -340,6 +364,7 @@ export function ProjectSettingsPage() {
                           onSuccess: () => {
                             setRepoDraft(null);
                             setRepoError(null);
+                            toastSuccess(t('已保存'));
                           },
                           onError: (error) => toastError(t('仓库保存失败，请重试。'), error),
                         },
@@ -409,27 +434,59 @@ export function ProjectSettingsPage() {
                           setConvError(t('GitHub 仓库格式应为 owner/repo。'));
                           return;
                         }
-                        mutations.patchProject.mutate(
-                          {
-                            id,
-                            body: {
-                              repoKind: 'github',
-                              githubRepo: repo,
-                            },
-                          },
-                          {
-                            onSuccess: () => {
-                              setConvRepo('');
-                              setConvError(null);
-                            },
-                            onError: (error) => toastError(t('转换失败，请重试。'), error),
-                          },
-                        );
+                        setConvConfirmRepo(repo);
                       }}
                     >
                       {mutations.patchProject.isPending && <RingSpinner data-icon="inline-start" />}
                       {t('转换')}
                     </Button>
+                    <AlertDialogShell
+                      open={convConfirmRepo !== null}
+                      title={t('确定转换为 GitHub 仓库？')}
+                      ariaLabel={t('转换为 GitHub 仓库')}
+                      onClose={() => {
+                        if (!mutations.patchProject.isPending) setConvConfirmRepo(null);
+                      }}
+                      footer={
+                        <AlertDialogActions
+                          cancelLabel={t('取消')}
+                          confirmLabel={t('确认转换')}
+                          confirmDisabled={mutations.patchProject.isPending}
+                          onCancel={() => {
+                            if (!mutations.patchProject.isPending) setConvConfirmRepo(null);
+                          }}
+                          onConfirm={() => {
+                            if (id === undefined || convConfirmRepo === null) return;
+                            const repo = convConfirmRepo;
+                            setConvConfirmRepo(null);
+                            mutations.patchProject.mutate(
+                              {
+                                id,
+                                body: {
+                                  repoKind: 'github',
+                                  githubRepo: repo,
+                                },
+                              },
+                              {
+                                onSuccess: () => {
+                                  setConvRepo('');
+                                  setConvError(null);
+                                  toastSuccess(t('已转换为 GitHub 仓库'));
+                                },
+                                onError: (error) => toastError(t('转换失败，请重试。'), error),
+                              },
+                            );
+                          }}
+                        />
+                      }
+                    >
+                      <p className="m-0 text-ui text-content-secondary">
+                        {t(
+                          '转换后将改为从 GitHub 仓库（{repo}）克隆执行，不再使用本机文件夹，且不能转回本地形态。',
+                          { repo: convConfirmRepo ?? '' },
+                        )}
+                      </p>
+                    </AlertDialogShell>
                     {convError !== null && (
                       <span role="alert" className="text-meta text-destructive">
                         {convError}

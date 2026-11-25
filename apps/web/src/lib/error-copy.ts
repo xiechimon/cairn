@@ -1,0 +1,94 @@
+import { ApiError } from '../api/client.js';
+import { EN } from '../i18n/en.js';
+import { activeLocale } from '../i18n/locale.js';
+import { type TFunc, translate } from '../i18n/translate.js';
+import { safeLocalStorage } from '../safe-storage.js';
+
+const REASON_COPY: Record<string, string> = {
+  'already-started': '这个任务已经开始过，无法退回待开始。',
+  'build-not-delivered': '本轮运行尚未产生交付结果，请重新运行后再合并。',
+  'missing-delivery-artifact': '本轮运行没有产生分支或 PR，请重新运行后再合并。',
+  duplicate: '存在同名记录，请更换名称后重试。',
+  offline: '当前未连接到服务，请稍后重试。',
+  unauthorized: '登录状态已失效，请重新登录后重试。',
+  forbidden: '没有操作权限，请联系团队管理员。',
+  not_found: '目标已不存在，请刷新后重试。',
+  conflict: '当前状态已变化，请刷新后重试。',
+  rate_limited: '请求过于频繁，请稍后重试。',
+  timeout: '请求超时，请检查网络后重试。',
+};
+
+const NETWORK_ERROR_RE = /failed to fetch|networkerror|load failed|network request failed/i;
+const STACK_FRAME_RE = /\bat\s+\S+\s*\(/;
+const HTML_BODY_RE = /<(?:!doctype|html|head|body)\b/i;
+const RAW_NOISE_RE =
+  /\b(?:sqlite|syntaxerror|typeerror|referenceerror|econnrefused|enotfound|etimedout|invalid body|unexpected token)\b/i;
+const GENERIC_HTTP_PHRASES = new Set([
+  'bad request',
+  'unauthorized',
+  'forbidden',
+  'not found',
+  'conflict',
+  'too many requests',
+  'internal server error',
+  'bad gateway',
+  'service unavailable',
+  'gateway timeout',
+  'request failed',
+]);
+const STATUS_ONLY_RE = /^http\s*\d+(?:\s*[:-]\s*.*)?$/i;
+const MASKED_GATEWAY_STATUSES = new Set([408, 429, 502, 503, 504]);
+
+function isSafeServerMessage(message: string): boolean {
+  const trimmed = message.trim();
+  if (trimmed === '' || trimmed.length > 200 || trimmed.includes('\n')) return false;
+  if (STACK_FRAME_RE.test(trimmed) || HTML_BODY_RE.test(trimmed) || RAW_NOISE_RE.test(trimmed))
+    return false;
+  const lower = trimmed.toLowerCase();
+  if (GENERIC_HTTP_PHRASES.has(lower) || STATUS_ONLY_RE.test(lower)) return false;
+  return true;
+}
+
+function isNetworkFailure(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  return error instanceof Error && NETWORK_ERROR_RE.test(error.message);
+}
+
+export function describeError(error: unknown, t: TFunc): string | null {
+  if (error == null) return null;
+  if (error instanceof ApiError) {
+    const byReason = error.reason !== undefined ? REASON_COPY[error.reason] : undefined;
+    if (byReason !== undefined) return t(byReason);
+    if (!MASKED_GATEWAY_STATUSES.has(error.status) && isSafeServerMessage(error.message)) {
+      return error.message.trim();
+    }
+    if (error.status === 401 || error.status === 403) {
+      return t('没有操作权限，请重新登录后重试。');
+    }
+    if (error.status === 404) {
+      return t('目标已不存在，请刷新后重试。');
+    }
+    if (error.status === 408 || error.status === 504) {
+      return t('请求超时，请检查网络后重试。');
+    }
+    if (error.status === 409) {
+      return t('当前状态已变化，请刷新后重试。');
+    }
+    if (error.status === 429) {
+      return t('请求过于频繁，请稍后重试。');
+    }
+    if (error.status >= 500) {
+      return t('服务暂时异常，请稍后重试。');
+    }
+    return t('请求未通过，请检查填写内容后重试。');
+  }
+  if (isNetworkFailure(error)) {
+    return t('网络连接异常，请检查网络后重试。');
+  }
+  return null;
+}
+
+export function describeErrorDefault(error: unknown): string | null {
+  const locale = activeLocale(safeLocalStorage());
+  return describeError(error, (source, vars) => translate(locale, EN, source, vars));
+}

@@ -111,7 +111,7 @@ test('a computer groups its tasks: stalled first, then running oldest first, the
     ['hung', '{n} 分钟无进展', 16, true],
     ['old', '{n} 分', 30, false],
     ['fresh', '{n} 分', 2, false],
-    ['full', '运行中', undefined, false],
+    ['full', '排队中', undefined, false],
   ]);
   expect(groups[3]?.rows.map((r) => r.title)).toEqual(['loose']);
 });

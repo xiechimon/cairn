@@ -107,7 +107,7 @@ test('the server flags a person it cannot find, and the chip shows its reason', 
   await field(page).fill('by:ghost ');
   await expect(panel(page).locator('[data-testid="query-chip"][data-invalid]')).toHaveText(['by:ghost']);
   await expect(panel(page).getByTestId('chip-problems')).toContainText(
-    'No agent or person has that name',
+    'No member has that name',
   );
 });
 

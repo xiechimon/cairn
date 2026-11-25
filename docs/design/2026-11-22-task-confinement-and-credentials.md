@@ -1,7 +1,7 @@
 # Task confinement and credential isolation
 
 Date: 2026-11-22
-Status: proposed. Issues: #5006 (macOS Seatbelt confinement for task harnesses), #5393 (credential isolation for lane sessions), #5395 (dispatch ticket for #5006). Related: #4948, #4986, #5398, #2344, #4543, #4604.
+Status: retired (OS task confinement removed in commit `0b0d06261`). Issues: #5006 (macOS Seatbelt confinement for task harnesses), #5393 (credential isolation for lane sessions), #5395 (dispatch ticket for #5006). Related: #4948, #4986, #5398, #2344, #4543, #4604.
 Prior art: [mac-session-confinement-2026-11-17](../research/mac-session-confinement-2026-11-17.md), [user-computer-model-2026-11-08](../research/user-computer-model-2026-11-08.md) §4.2, [owner-approval-channel-2026-11-22](../research/owner-approval-channel-2026-11-22.md), [2026-11-22-task-confinement-prior-art](../research/2026-11-22-task-confinement-prior-art.md).
 Marks: `实测` = read or run first-hand this session (this worktree at `90d925df4`, or a command on the owner's Mac `xmonsMac-3574`, macOS 27.2); `推断` = derived from `实测`; `猜测` = the rest. Partial work from the failed 2026-11-21 Cairn tasks is mined at `origin/cairn/conv-01a1fa64` and `origin/cairn/conv-01a1fa87`.
 

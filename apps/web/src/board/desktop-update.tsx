@@ -63,7 +63,7 @@ export function desktopUpdateView(state: DesktopUpdateState, t: TFunc): DesktopU
                     : state.status === 'offline'
                       ? t('无法连接网络，未能检查更新')
                       : state.status === 'error'
-                        ? t('更新失败：{message}', { message: state.message })
+                        ? t('更新失败，点击重试')
                         : t('检查更新');
   const busy =
     state.status === 'checking' ||
@@ -196,6 +196,7 @@ export function DesktopUpdateButton({
             data-testid="desktop-update"
             data-status={state.status}
             aria-label={label}
+            title={state.status === 'error' ? state.message : undefined}
             aria-disabled={busy || undefined}
             className={cn(idleClassName, busy && 'cursor-default')}
             onClick={() => {

@@ -1,12 +1,13 @@
 import { ArrowUp, Check, Clock, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { ApiError } from '../api/client.js';
 import { useI18n } from '../i18n/provider.js';
 import { useArrivals } from './growth.js';
 import { IconTooltip } from './icon-tooltip.js';
 import { Button } from './ui/button.js';
 import { Input } from './ui/input.js';
-import { toastError, toastSuccess } from './ui/toaster.js';
+import { toastError } from './ui/toaster.js';
 
 export interface QueuedCapsule {
   id: string;
@@ -44,10 +45,15 @@ export function QueuedCapsules({
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; original: string } | null>(null);
   const [draft, setDraft] = useState('');
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const editingId = editing?.id;
+  useEffect(() => {
+    if (editingId !== undefined) editInputRef.current?.focus({ preventScroll: true });
+  }, [editingId]);
   const editingGone = editing !== null && !messages.some((message) => message.id === editing.id);
   const keepAfterSent = (content: string) => {
     setEditing(null);
-    toastSuccess(t('这条排队消息已经发出，改动没有生效'));
+    toast(t('这条排队消息已经发出，改动没有生效'));
     if (content !== '' && content !== editing?.original) onEditSent?.(content);
   };
   useEffect(() => {
@@ -107,7 +113,7 @@ export function QueuedCapsules({
               <div className={`${CAPSULE_CLS} w-full bg-card inset-ring-(--focus-ring)`}>
                 <Clock className="size-4 flex-none text-content-tertiary" />
                 <Input
-                  ref={(node) => node?.focus({ preventScroll: true })}
+                  ref={editInputRef}
                   aria-label={t('编辑排队消息')}
                   data-testid="queued-message-input"
                   value={draft}

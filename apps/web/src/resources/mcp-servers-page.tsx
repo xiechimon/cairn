@@ -24,6 +24,7 @@ import { NoticeBanner } from '../components/notice-banner.js';
 import { mergeQueries, QueryBoundary } from '../components/query-state.js';
 import { SettingsCard, SettingsSection } from '../components/settings-list.js';
 import { Button } from '../components/ui/button.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { GithubDeviceFixtureStep } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -372,12 +373,15 @@ export function McpServersPage() {
     }
     if (entry.auth.includes('oauth')) return startSignIn(catalogAttempt(entry));
     if (entry.auth.includes('none')) {
-      if (live)
-        mutations.createMcpConnector.mutate({
-          kind: 'catalog',
-          catalogId: entry.id,
-          slug: entry.id,
-        });
+      if (live && !mutations.createMcpConnector.isPending)
+        mutations.createMcpConnector.mutate(
+          {
+            kind: 'catalog',
+            catalogId: entry.id,
+            slug: entry.id,
+          },
+          { onError: (error) => toastError(t('接入失败，请重试。'), error) },
+        );
       return;
     }
     setDialog({ kind: 'catalog', entry });
@@ -404,8 +408,8 @@ export function McpServersPage() {
         query={live ? mergeQueries(connectorsQ, mcpQ, composioQ) : undefined}
         isEmpty={false}
         errorWins
-        loadingLabel={t('正在加载 MCP 服务器')}
-        errorTitle={t('MCP 服务器未能加载')}
+        loadingLabel={t('正在加载应用')}
+        errorTitle={t('应用未能加载')}
         className="mt-6"
         empty={null}
       >

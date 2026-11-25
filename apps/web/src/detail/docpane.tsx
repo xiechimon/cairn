@@ -3,6 +3,7 @@ import { cn } from 'cn';
 import { useMemo } from 'react';
 import { useBuildChangeFile } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { Button } from '../components/ui/button.js';
 import type { DiffFile, DocBlock } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import { Segments } from './segments.js';
@@ -197,12 +198,24 @@ export function DiffFileBody({
         </div>
       )}
       {(full.kind === 'loading' || full.kind === 'error' || full.kind === 'binary') && (
-        <div className="py-2 pr-3 pl-18 font-mono text-code leading-4 text-(--text-tertiary)">
-          {full.kind === 'loading'
-            ? t('加载中…')
-            : full.kind === 'error'
-              ? t('文件加载失败')
-              : t('二进制文件暂不支持预览')}
+        <div className="flex items-center gap-2 py-2 pr-3 pl-18 font-mono text-code leading-4 text-(--text-tertiary)">
+          <span>
+            {full.kind === 'loading'
+              ? t('加载中…')
+              : full.kind === 'error'
+                ? t('文件加载失败')
+                : t('二进制文件暂不支持预览')}
+          </span>
+          {full.kind === 'error' && (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="h-6 px-2 text-meta"
+              onClick={() => void fullQ.refetch()}
+            >
+              {t('重试')}
+            </Button>
+          )}
         </div>
       )}
     </>

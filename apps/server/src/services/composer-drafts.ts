@@ -5,7 +5,7 @@ import { newRecordId, nowMs } from '../lib/ids.js';
 
 export const COMPOSER_DRAFT_MAX_CHARS = 100_000;
 export const COMPOSER_DRAFT_IDLE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-export const COMPOSER_DRAFT_SCOPE_RE = /^(chief|todo:[A-Za-z0-9_-]{1,64})$/;
+export const COMPOSER_DRAFT_SCOPE_RE = /^(chief(:[A-Za-z0-9_-]{1,64})?|todo:[A-Za-z0-9_-]{1,64})$/;
 
 export interface DraftOwner {
   teamId: string;

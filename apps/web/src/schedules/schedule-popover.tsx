@@ -17,6 +17,7 @@ import type { ScheduleRecord } from '../fixtures/records.js';
 import { scrollFadeClassName, useScrollFade } from '../hooks/use-scroll-fade.js';
 import { useI18n } from '../i18n/provider.js';
 import { copyTextWithFeedback } from '../lib/clipboard.js';
+import { describeError } from '../lib/error-copy.js';
 import { scheduleWhen } from '../pages/schedule-summary.js';
 import { ScheduleFields } from './schedule-fields.js';
 import {
@@ -42,6 +43,12 @@ const RUN_STATUS: Record<string, string> = {
   skipped: '已跳过',
 };
 
+const SCHEDULE_VALIDATION_KEYS: Record<string, true> = {
+  'Cron 需要 5 段：分 时 日 月 周。': true,
+  '请选择这个时区里有效的日期和时间。': true,
+  '单次定时要选一个将来的时间。': true,
+};
+
 export function SchedulePopover({
   schedule,
   candidates = [],
@@ -64,8 +71,15 @@ export function SchedulePopover({
   children: ReactNode;
 }) {
   const narrow = useNarrow();
+  const [locked, setLocked] = useState(false);
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        if (!next && locked) return;
+        onOpenChange(next);
+      }}
+    >
       <PopoverTrigger render={trigger}>{children}</PopoverTrigger>
       <PopoverContent
         data-testid="schedule-popover"
@@ -100,7 +114,11 @@ export function SchedulePopover({
             candidates={candidates}
             deleted={deleted}
             now={now}
-            onDone={() => onOpenChange(false)}
+            onLockChange={setLocked}
+            onDone={() => {
+              setLocked(false);
+              onOpenChange(false);
+            }}
           />
         )}
       </PopoverContent>
@@ -113,12 +131,14 @@ function ScheduleEditor({
   candidates,
   deleted,
   now,
+  onLockChange,
   onDone,
 }: {
   schedule: ScheduleRecord | null;
   candidates: readonly ScheduleCandidate[];
   deleted: boolean;
   now: number;
+  onLockChange: (locked: boolean) => void;
   onDone: () => void;
 }) {
   const { t } = useI18n();
@@ -164,9 +184,17 @@ function ScheduleEditor({
         ),
       );
       if (created.webhookUrl === undefined) onDone();
-      else setWebhookUrl(created.webhookUrl);
+      else {
+        onLockChange(true);
+        setWebhookUrl(created.webhookUrl);
+      }
     } catch (failure) {
-      setError(failure instanceof Error ? t(failure.message) : t('定时未能保存，请重试。'));
+      setError(
+        describeError(failure, t) ??
+          (failure instanceof Error && failure.message in SCHEDULE_VALIDATION_KEYS
+            ? t(failure.message)
+            : t('定时未能保存，请重试。')),
+      );
     }
   };
   const state = record === null ? null : scheduleViewState(record);

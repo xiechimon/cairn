@@ -148,7 +148,7 @@ test.describe('read-only historical daily reports', () => {
     await expect(lists.locator(':scope > li')).toHaveCount(1);
     await expect(doc).not.toContainText('第 1 条不用了');
     await expect(doc.getByRole('link', { name: '复盘 1' })).toHaveAttribute('href', '/app?thread=todo-1');
-    await expect(doc).toContainText('已建成线程');
+    await expect(doc).toContainText('已建成任务');
     await expect(doc).not.toContainText('外部动态');
     await expect(doc.getByRole('link', { name: 'example.com' })).toHaveCount(0);
     await evidencePanelShot(page, 'daily-report-retired-intake.png', page.getByRole('dialog'));

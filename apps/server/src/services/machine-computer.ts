@@ -61,7 +61,6 @@ import {
 import { NotFoundError } from './builds.js';
 import { parseChiefTrigger } from './chief.js';
 import { announceQuestion } from './chief-questions.js';
-import { ownedPrivateComputer } from './computer-access.js';
 import {
   COMPUTER_CANCELLED,
   COMPUTER_INTERRUPTED,
@@ -82,7 +81,6 @@ import {
   isFinalComputerCallState,
   openPendingComputerCall,
   type PendingComputerCall,
-  type PendingComputerDeps,
   publishComputerCallChanged,
   resultOfComputerCallRow,
   settleComputerCall,
@@ -526,7 +524,7 @@ function assertMachineGrant(db: Db, machineId: string, tool: ComputerTool): void
     if (host?.capabilities?.browser !== true)
       throw new HttpError(403, COMPUTER_BROWSER_UNAVAILABLE);
   } else if (host?.capabilities?.computer !== true) {
-    throw new HttpError(403, 'Orb desktop tools are unavailable for this machine');
+    throw new HttpError(403, 'Computer tools are unavailable for this machine');
   }
 }
 

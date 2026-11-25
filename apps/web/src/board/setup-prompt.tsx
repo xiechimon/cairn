@@ -7,6 +7,7 @@ import { useModelRouting } from '../api/model-routing.js';
 import { useLiveData } from '../api/provider.js';
 import { BANNER_CLS } from '../chief/chief-outage-banner.js';
 import { Button } from '../components/ui/button.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { settingsHref } from '../settings/settings-href.js';
@@ -192,7 +193,7 @@ function MachinePrompt() {
         <span data-testid="setup-prompt-label" className="text-foreground">
           {label}
         </span>
-        <span data-testid="setup-prompt-hint" className="min-w-0 truncate">
+        <span data-testid="setup-prompt-hint" className="min-w-0 break-words">
           {hint}
         </span>
       </span>
@@ -205,7 +206,10 @@ function MachinePrompt() {
           disabled={reconnecting}
           onClick={() => {
             setReconnecting(true);
-            void bridge.reconnect().finally(() => setReconnecting(false));
+            void bridge
+              .reconnect()
+              .catch((error) => toastError(t('未能重新连接，请重试。'), error))
+              .finally(() => setReconnecting(false));
           }}
         >
           {t(reconnecting ? '正在重新连接…' : '重新连接')}

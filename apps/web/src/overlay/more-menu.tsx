@@ -14,8 +14,9 @@ import {
 import type { ReactElement, ReactNode } from 'react';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { DropdownMenu, DropdownMenuSeparator } from '../components/ui/dropdown-menu.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
-import { writeClipboard } from '../lib/clipboard.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 
 interface MoreMenuProps {
   open: boolean;
@@ -56,7 +57,11 @@ export function MoreMenu({
 }: MoreMenuProps) {
   const { t } = useI18n();
   const copyLink = () => {
-    void writeClipboard(window.location.href);
+    copyTextWithFeedback(
+      window.location.href,
+      () => toastSuccess(t('已复制链接')),
+      (error) => toastError(t('复制失败，请重试。'), error),
+    );
     onOpenChange(false);
   };
   const rows = [

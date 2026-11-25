@@ -16,10 +16,12 @@ import {
   CollapsibleTrigger,
 } from '../components/ui/collapsible.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import type { RobotPara, TranscriptItem } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
 import { Clock } from '../icons/index.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { inlineSegments } from '../lib/markdown.js';
 import { BackgroundTasks } from './background-tasks.js';
 import { ChatMarkdown, TaskCard } from './chat-markdown.js';
@@ -81,6 +83,7 @@ function RowTools({
   copy: string;
   stamp?: string | undefined;
 }) {
+  const { t } = useI18n();
   return (
     <MessageToolbar
       placement={placement}
@@ -93,7 +96,11 @@ function RowTools({
         )
       }
       onCopy={() => {
-        void navigator.clipboard.writeText(copy);
+        copyTextWithFeedback(
+          copy,
+          () => toastSuccess(t('已复制')),
+          (error) => toastError(t('复制失败，请重试。'), error),
+        );
       }}
     />
   );

@@ -133,7 +133,7 @@ describe('D71 machineEligibility: hard constraints for a worker step on a machin
 
   test('an Orb-required agent on a host executor never qualifies', () => {
     const gap = machineEligibility(input({ agent: { requiredCapabilities: { executor: 'orb' } } }));
-    expect(gap).toEqual({ kind: 'capability', missing: ['Orb sandbox executor'] });
+    expect(gap).toEqual({ kind: 'capability', missing: ['Container executor'] });
   });
 
   test('an Orb-required agent on an Orb executor qualifies', () => {

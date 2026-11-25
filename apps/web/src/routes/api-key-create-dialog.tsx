@@ -25,24 +25,33 @@ export const API_KEY_ACCESS: Omit<ApiKeyCreateBody, 'name'> = {
 
 interface ApiKeyCreateDialogProps {
   open: boolean;
+  pending?: boolean;
   onClose: () => void;
-  onCreate: (body: ApiKeyCreateBody) => void;
+  onCreate: (body: ApiKeyCreateBody, onDone: () => void) => void;
 }
 
-export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDialogProps) {
+export function ApiKeyCreateDialog({
+  open,
+  pending = false,
+  onClose,
+  onCreate,
+}: ApiKeyCreateDialogProps) {
   const { t } = useI18n();
   const [name, setName] = useState('');
   const trimmed = name.trim();
   const badName = trimmed !== '' && !KEY_NAME_PATTERN.test(trimmed);
   const ready = trimmed !== '' && !badName;
   const close = () => {
+    if (pending) return;
     setName('');
     onClose();
   };
   const submit = () => {
-    if (!ready) return;
-    onCreate({ name: trimmed, ...API_KEY_ACCESS });
-    close();
+    if (!ready || pending) return;
+    onCreate({ name: trimmed, ...API_KEY_ACCESS }, () => {
+      setName('');
+      onClose();
+    });
   };
 
   return (
@@ -54,8 +63,12 @@ export function ApiKeyCreateDialog({ open, onClose, onCreate }: ApiKeyCreateDial
       footer={
         <FormActions
           className="pt-0"
-          primary={{ label: t('创建'), onClick: submit, disabled: !ready }}
-          secondary={{ label: t('取消'), onClick: close }}
+          primary={{
+            label: pending ? t('正在创建…') : t('创建'),
+            onClick: submit,
+            disabled: !ready || pending,
+          }}
+          secondary={{ label: t('取消'), onClick: close, disabled: pending }}
         />
       }
     >

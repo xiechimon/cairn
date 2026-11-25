@@ -225,8 +225,8 @@
     },
     "toaster.tsx": {
       "kind": "adapter",
-      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer. Motion pick: the dormant loading icon is the shared RingSpinner (ring-spinner.tsx), not a lucide loader.",
-      "hash": "a1495224e07809a2f932c2b1160bd41de06c632347cdac9f68f29a731a69ff00"
+      "reason": "#631: sonner official recipe adapted to the repo theme inversion (MutationObserver on the root class; dark is the :root default) + popover-family token skin, zero new color values. #1236: toastSuccess helper next to toastError (delegated-action receipts). Foundation C5: toastError maps errors through lib/error-copy.ts so raw server/network strings do not leak to users. The official recipe's lucide status icons, tinted with the status tokens, and the popover radius. #2565: toasts anchor top-center (below the narrow menu button on phones), so they never cover navigation or the composer. Motion pick: the dormant loading icon is the shared RingSpinner (ring-spinner.tsx), not a lucide loader.",
+      "hash": "fb383ab6d80f85dcf7a07bf82cc4d821e070b27f8d8f5102b3c5ac6bad7e0ec0"
     },
     "tooltip.tsx": {
       "kind": "registry",

@@ -138,6 +138,14 @@ const matchesQuery = (label: string, query: string) =>
 
 const BASE_URL_PLACEHOLDER = /\{[A-Za-z_]+\}/;
 
+function slugFromLabel(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 function MonoMark({ mark }: { mark: { viewBox: string; paths: readonly string[] } }) {
   return (
     <svg
@@ -246,6 +254,7 @@ export function CreateProviderDialog({
   const [query, setQuery] = useState('');
   const [preset, setPreset] = useState<{ id: string; label: string } | null>(null);
   const [providerId, setProviderId] = useState('');
+  const [idEdited, setIdEdited] = useState(false);
   const [label, setLabel] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
   const [api, setApi] = useState<ProviderApi>('openai-completions');
@@ -269,6 +278,7 @@ export function CreateProviderDialog({
     setQuery('');
     setPreset(null);
     setProviderId('');
+    setIdEdited(false);
     setLabel('');
     setBaseUrl('');
     setApi('openai-completions');
@@ -294,6 +304,7 @@ export function CreateProviderDialog({
     const defaults = entry === null ? undefined : PROVIDER_PRESET_DEFAULTS[entry.id];
     setPreset(entry);
     setProviderId(entry?.id ?? '');
+    setIdEdited(entry !== null);
     setLabel(entry?.label ?? '');
     setBaseUrl(defaults?.baseUrl ?? '');
     setApi(defaults?.api ?? 'openai-completions');
@@ -495,7 +506,11 @@ export function CreateProviderDialog({
             id="dlg-provider-label"
             className={FORM_CONTROL_CLS}
             value={label}
-            onChange={(event) => setLabel(event.target.value)}
+            onChange={(event) => {
+              const next = event.target.value;
+              setLabel(next);
+              if (preset === null && !idEdited) setProviderId(slugFromLabel(next));
+            }}
           />
         </FormField>
         <FormField
@@ -522,7 +537,10 @@ export function CreateProviderDialog({
               id="dlg-provider-id"
               className={FORM_CONTROL_CLS}
               value={providerId}
-              onChange={(event) => setProviderId(event.target.value)}
+              onChange={(event) => {
+                setIdEdited(true);
+                setProviderId(event.target.value);
+              }}
               placeholder={t('例如 my-relay')}
             />
           </FormField>
@@ -567,10 +585,10 @@ export function CreateProviderDialog({
                 id="dlg-provider-authheader"
                 checked={authHeader}
                 onCheckedChange={setAuthHeader}
-                aria-label={t('以 Authorization: Bearer 请求头发送 API 密钥')}
+                aria-label={t('使用 Bearer 认证头（关闭时使用服务商默认认证方式）')}
               />
               <span className="text-ui text-foreground">
-                {t('以 Authorization: Bearer 请求头发送 API 密钥')}
+                {t('使用 Bearer 认证头（关闭时使用服务商默认认证方式）')}
               </span>
             </label>
           </div>

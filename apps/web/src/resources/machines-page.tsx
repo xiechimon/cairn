@@ -1,5 +1,5 @@
 import { Monitor, Plus } from 'lucide-react';
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useMachines, useTeams } from '../api/hooks.js';
 import { mapMachines } from '../api/mappers.js';
@@ -35,6 +35,14 @@ export function MachinesPage() {
     : (rawMachines.find((machine) => machine.isDefault === true)?.id ?? null);
   const machines = orderMachines(rawMachines, defaultMachineId);
   const [addOpen, setAddOpen] = useState(false);
+  const targetMachineId = searchParams.get('machine');
+  useEffect(() => {
+    if (targetMachineId === null || targetMachineId === '') return;
+    const node = document.querySelector<HTMLElement>(
+      `[data-machine-id="${CSS.escape(targetMachineId)}"]`,
+    );
+    node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [targetMachineId, machines.length]);
   const phoneHost =
     machines.find(
       (machine) =>
@@ -99,6 +107,7 @@ export function MachinesPage() {
                     machine={machine}
                     machines={machines}
                     isDefault={machine.id != null && machine.id === defaultMachineId}
+                    highlighted={machine.id != null && machine.id === targetMachineId}
                   />
                   <MachinePhoneRows machine={machine} />
                 </Fragment>

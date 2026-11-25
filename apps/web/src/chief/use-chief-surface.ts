@@ -80,7 +80,7 @@ export interface ChiefSurface {
     answers: AskUserAnswer[];
     threadId?: string;
   }) => void;
-  onCancelQuestion?: (requestId: string, threadId?: string) => void;
+  onCancelQuestion?: (requestId: string, threadId?: string) => Promise<void>;
   onWithdraw?: (messageId: string) => Promise<void>;
   unsent?: UnsentSends;
   onStop?: () => void;
@@ -342,11 +342,14 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
   const onCancelQuestion = live
     ? (requestId: string, threadId?: string) => {
         const id = questionActionThread(threadId, activeThread?.id ?? null);
-        if (id === null) return;
-        mutations.chiefCancelQuestion.mutate(
-          { threadId: id, requestId },
-          { onError: (e) => toastError(t('取消提问失败，请重试。'), e) },
-        );
+        if (id === null) return Promise.resolve();
+        return mutations.chiefCancelQuestion
+          .mutateAsync({ threadId: id, requestId })
+          .then(() => undefined)
+          .catch((e) => {
+            toastError(t('取消提问失败，请重试。'), e);
+            throw e;
+          });
       }
     : undefined;
 
@@ -406,11 +409,16 @@ export function useChiefSurface(fixture: FixtureSet, deepLink: ChiefDeepLink): C
     () =>
       live
         ? {
-            failed: outbox.filter((entry) => entry.state === 'failed'),
+            failed: outbox.filter(
+              (entry) =>
+                entry.state === 'failed' &&
+                (entry.threadId === activeThreadId ||
+                  (entry.threadId === null && entry.projectId === channel)),
+            ),
             discard: (outboxKey) => chiefOutbox.discard(outboxKey)?.text ?? null,
           }
         : undefined,
-    [live, outbox],
+    [live, outbox, activeThreadId, channel],
   );
   const onSend = live
     ? (text: string, projectId: string | null, designCommentIds?: readonly string[]) => {

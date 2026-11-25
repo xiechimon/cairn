@@ -337,7 +337,7 @@ function CatalogConnectDialog({
         title={t('连接 {name}', { name: entry.name })}
         subtitle={t(entry.description)}
         info={t(
-          'Chrome 未打开、扩展未连接或被暂停时，Agent 会改用 Cairn 自带的浏览器，并在结果里说明原因。',
+          'Chrome 未打开、扩展未连接或被暂停时，Coordinator 会改用其他可用浏览器，并在结果里说明原因。',
         )}
         size="s"
         onClose={onClose}
@@ -473,7 +473,7 @@ function CustomServerDialog({
         <FormField
           label={t('标识')}
           htmlFor="mcp-slug"
-          help={t('Agent 用这个名字调用它。只能用小写字母、数字和连字符（-）。')}
+          help={t('执行任务时用这个名字调用它。只能用小写字母、数字和连字符（-）。')}
         >
           <Input
             id="mcp-slug"
@@ -653,7 +653,7 @@ function ManageConnectorDialog({
       <DeleteConfirm
         open
         title={t('确定删除这个连接？此操作不可撤销。')}
-        summary={t('{name}：删除后 Agent 不能再用它的工具。', { name: current.label })}
+        summary={t('{name}：删除后任务不能再用它的工具。', { name: current.label })}
         ariaLabel={t('删除连接')}
         onClose={() => setConfirmDelete(false)}
         onConfirm={remove}

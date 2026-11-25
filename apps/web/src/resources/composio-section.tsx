@@ -13,6 +13,7 @@ import {
 import { Input } from '../components/ui/input.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { McpConnectorIcon } from './mcp-connector-icon.js';
 import { type IntegrationItem, RowNote } from './parts.js';
 
@@ -70,6 +71,7 @@ export function useComposioRows({
   const all = configured ? (data?.apps ?? []) : [];
   const [busy, setBusy] = useState<string | null>(null);
   const [authorizingId, setAuthorizingId] = useState<string | null>(null);
+  const [disconnecting, setDisconnecting] = useState<McpConnectorRecord | null>(null);
   const [keyDialog, setKeyDialog] = useState(false);
 
   useEffect(() => {
@@ -191,7 +193,7 @@ export function useComposioRows({
         variant="outline"
         size="sm"
         disabled={deleteMcpConnector.isPending}
-        onClick={() => remove(connector)}
+        onClick={() => setDisconnecting(connector)}
         data-testid={`composio-remove-${app.slug}`}
       >
         {t('断开')}
@@ -271,14 +273,31 @@ export function useComposioRows({
 
   return {
     items,
-    dialog: keyDialog ? (
-      <ComposioKeyDialog
-        live={live}
-        teamId={teamId}
-        configured={configured}
-        onClose={() => setKeyDialog(false)}
-      />
-    ) : null,
+    dialog: (
+      <>
+        {keyDialog && (
+          <ComposioKeyDialog
+            live={live}
+            teamId={teamId}
+            configured={configured}
+            onClose={() => setKeyDialog(false)}
+          />
+        )}
+        <DeleteConfirm
+          open={disconnecting !== null}
+          title={t('断开后需要重新授权才能使用')}
+          summary={disconnecting?.label ?? ''}
+          ariaLabel={t('断开 {name}', { name: disconnecting?.label ?? '' })}
+          onClose={() => setDisconnecting(null)}
+          onConfirm={() => {
+            if (disconnecting === null) return;
+            const target = disconnecting;
+            setDisconnecting(null);
+            remove(target);
+          }}
+        />
+      </>
+    ),
   };
 }
 
@@ -297,6 +316,7 @@ function ComposioKeyDialog({
   const { saveComposioKey, deleteComposioKey } = useApiMutations(teamId);
   const [key, setKey] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const save = () => {
     setError(null);
     saveComposioKey.mutate(
@@ -312,6 +332,21 @@ function ComposioKeyDialog({
       onError: () => setError(t('未能移除，请稍后重试。')),
     });
   };
+  if (confirmRemove) {
+    return (
+      <DeleteConfirm
+        open
+        title={t('移除后，经 Composio 接入的所有应用都会断开连接')}
+        summary="Composio API key"
+        ariaLabel={t('移除 API key')}
+        onClose={() => setConfirmRemove(false)}
+        onConfirm={() => {
+          setConfirmRemove(false);
+          removeKey();
+        }}
+      />
+    );
+  }
   return (
     <DialogShell
       title={configured ? 'Composio' : t('用 Composio 接入更多应用')}
@@ -334,7 +369,7 @@ function ComposioKeyDialog({
             <Button
               variant="ghost"
               className={`${DIALOG_TEXT_BUTTON} text-destructive`}
-              onClick={removeKey}
+              onClick={() => setConfirmRemove(true)}
               disabled={deleteComposioKey.isPending}
               data-testid="composio-key-remove"
             >

@@ -23,6 +23,7 @@ import { toastArchived } from './archive-toast.js';
 import { RouteOverrideDialog } from './route-override-dialog.js';
 import { MoveToProjectSub } from './task-move-menu.js';
 import { RenameDialog } from './task-row-menu.js';
+import { canMarkDone, useMarkDone } from './use-mark-done.js';
 import type { ThreadChat } from './use-thread-chat.js';
 
 export type ThreadActionKind = 'start' | 'approve' | 'retry' | 'unarchive';
@@ -75,6 +76,7 @@ export function useThreadActions({
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
+  const { markDone, dialogs: markDoneDialogs } = useMarkDone(todo);
   const orchestrateStart = useOrchestrateStart();
   const chiefThreadsQ = useChiefThreads(teamId, live);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -219,7 +221,7 @@ export function useThreadActions({
       </div>
     );
 
-  const canComplete = phase === 'review' || phase === 'confirm';
+  const canComplete = canMarkDone(todo);
   const menu = (
     <>
       <MoreMenu
@@ -248,8 +250,13 @@ export function useThreadActions({
           setMenuOpen(false);
           setDialog('delete');
         }}
-        onComplete={phase === 'confirm' ? approve : complete}
-        canComplete={!archived && canComplete}
+        onComplete={() => {
+          setMenuOpen(false);
+          if (phase === 'confirm') approve();
+          else if (phase === 'review') complete();
+          else markDone();
+        }}
+        canComplete={canComplete}
         {...(!archived ? { onArchive: setArchived(true) } : {})}
         {...(!archived && running && buildId != null
           ? {
@@ -259,10 +266,14 @@ export function useThreadActions({
               },
             }
           : {})}
-        onRouteOverride={() => {
-          setMenuOpen(false);
-          setDialog('route-override');
-        }}
+        {...(!archived && phase !== 'closed'
+          ? {
+              onRouteOverride: () => {
+                setMenuOpen(false);
+                setDialog('route-override');
+              },
+            }
+          : {})}
         onRename={() => {
           setMenuOpen(false);
           setDialog('rename');
@@ -307,6 +318,7 @@ export function useThreadActions({
         initial={todo.routeOverride}
         platformLocked={todo.phase !== 'todo' && todo.phase !== 'queued'}
       />
+      {markDoneDialogs}
     </>
   );
 

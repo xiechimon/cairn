@@ -62,3 +62,20 @@ test('a staged update waits for the user to step away and still offers to update
   item.click();
   assert.equal(installed, 1);
 });
+
+test('localizes the menu bar into Chinese when requested', () => {
+  const template = appMenuTemplate(
+    { status: 'ready', version: '0.1.536' },
+    { check: () => {}, install: () => {} },
+    { send: () => {}, back: () => {}, forward: () => {} },
+    'zh',
+  );
+  const updateEntry = template[0].submenu.find((entry) => entry.label?.includes('0.1.536'));
+  assert.equal(updateEntry.label, '立即更新到 0.1.536');
+  const settingsEntry = template[0].submenu.find(
+    (entry) => entry.accelerator === 'CommandOrControl+,',
+  );
+  assert.equal(settingsEntry.label, '设置…');
+  assert.equal(template[1].label, '文件');
+  assert.equal(template[1].submenu[0].label, '新建任务');
+});

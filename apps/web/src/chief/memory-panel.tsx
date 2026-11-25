@@ -17,12 +17,14 @@ import {
 import { ProjectInstructionsField } from '../board/project-instructions-field.js';
 import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Button } from '../components/ui/button.js';
-import { DialogFootRow, DialogShell } from '../components/ui/dialog-shell.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
 import { Input } from '../components/ui/input.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
+import { safeLocalStorage } from '../safe-storage.js';
 import { MemoryEditComposer, memoryEditTouchedFiles } from './memory-edit-composer.js';
 import { isAutoInjected, memoriesByLayer, splitMemoryContent } from './memory-list.js';
 
@@ -43,12 +45,14 @@ function MemoryImportCard({
   const { t } = useI18n();
   const mutations = useApiMutations(teamId);
   const [dismissed, setDismissed] = useState(
-    () => localStorage.getItem(importDismissKey(teamId)) === '1',
+    () => safeLocalStorage()?.getItem(importDismissKey(teamId)) === '1',
   );
   const pending = candidates.filter((c) => !c.imported);
   if (dismissed || pending.length === 0) return null;
   const dismiss = () => {
-    localStorage.setItem(importDismissKey(teamId), '1');
+    try {
+      safeLocalStorage()?.setItem(importDismissKey(teamId), '1');
+    } catch {}
     setDismissed(true);
   };
   return (
@@ -60,7 +64,7 @@ function MemoryImportCard({
         </Button>
       </div>
       <p className="mt-1 text-meta text-content-secondary">
-        {t('这些仓库里有给代理看的说明文件，可以导入成可检索记忆；导入后不会自动注入。')}
+        {t('这些仓库里有给 Coordinator 看的说明文件，可以导入成可检索记忆；导入后不会自动注入。')}
       </p>
       <ul className="mt-2 divide-y divide-border">
         {pending.map((c) => (
@@ -73,7 +77,10 @@ function MemoryImportCard({
               size="sm"
               disabled={mutations.importMemoryFile.isPending}
               onClick={() =>
-                mutations.importMemoryFile.mutate({ projectId: c.projectId, file: c.file })
+                mutations.importMemoryFile.mutate(
+                  { projectId: c.projectId, file: c.file },
+                  { onError: (error) => toastError(t('导入失败，请重试。'), error) },
+                )
               }
             >
               {t('导入')}
@@ -112,6 +119,7 @@ export function MemoryPanel({
   const mutations = useApiMutations(teamId);
   const [openId, setOpenId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  const [discardConfirm, setDiscardConfirm] = useState(false);
   const [editing, setEditing] = useState<{ title: string; content: string } | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const autoHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -165,8 +173,10 @@ export function MemoryPanel({
     editing !== null &&
     editing.content === open.content &&
     editing.title === open.title;
+  const blankTitle =
+    open !== null && editing !== null && !isAutoInjected(open.layer) && editing.title.trim() === '';
   const saveEdit = () => {
-    if (open === null || editing === null || updating.isPending) return;
+    if (open === null || editing === null || updating.isPending || blankTitle) return;
     const body: PatchMemoryBody = {};
     if (editing.content !== open.content) body.content = editing.content;
     if (!isAutoInjected(open.layer) && editing.title !== open.title) body.title = editing.title;
@@ -387,12 +397,16 @@ export function MemoryPanel({
         />
       )}
       <DialogShell
-        open={open !== null && !confirming}
+        open={open !== null && !confirming && !discardConfirm}
         title={open?.title ?? ''}
         subtitle={open === null ? undefined : `${scopeLabel} · ${layerLabel(open)}`}
         initialFocus={editing === null ? detailBodyRef : editContentRef}
         onClose={() => {
           if (updating.isPending) return;
+          if (editing !== null && !editUnchanged) {
+            setDiscardConfirm(true);
+            return;
+          }
           setEditing(null);
           setOpenId(null);
         }}
@@ -410,14 +424,17 @@ export function MemoryPanel({
         }
         footer={
           editing !== null ? (
-            <DialogFootRow>
+            <>
               <Button variant="outline" disabled={updating.isPending} onClick={cancelEdit}>
                 {t('取消')}
               </Button>
-              <Button disabled={updating.isPending || editUnchanged} onClick={saveEdit}>
+              <Button
+                disabled={updating.isPending || editUnchanged || blankTitle}
+                onClick={saveEdit}
+              >
                 {updating.isPending ? t('保存中…') : t('保存')}
               </Button>
-            </DialogFootRow>
+            </>
           ) : live && open !== null ? (
             <MemoryEditComposer
               embedded
@@ -534,6 +551,26 @@ export function MemoryPanel({
             )}
           </>
         )}
+      </AlertDialogShell>
+      <AlertDialogShell
+        open={discardConfirm}
+        title={t('放弃未保存的修改？')}
+        ariaLabel={t('放弃修改')}
+        onClose={() => setDiscardConfirm(false)}
+        footer={
+          <AlertDialogActions
+            cancelLabel={t('继续编辑')}
+            confirmLabel={t('放弃修改')}
+            onCancel={() => setDiscardConfirm(false)}
+            onConfirm={() => {
+              setDiscardConfirm(false);
+              setEditing(null);
+              setOpenId(null);
+            }}
+          />
+        }
+      >
+        <p className="m-0 text-ui text-content-secondary">{t('关闭后，未保存的修改会丢失。')}</p>
       </AlertDialogShell>
     </div>
   );

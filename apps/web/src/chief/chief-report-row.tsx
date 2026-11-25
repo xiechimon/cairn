@@ -18,7 +18,7 @@ function todoLinks(refs: readonly ChiefReportTodoRef[]): string {
 }
 
 function statusLabel(status: RetroProposalStatus, t: Translate): string {
-  if (status === 'accepted') return t('已建成线程');
+  if (status === 'accepted') return t('已建成任务');
   if (status === 'dismissed') return t('已忽略');
   return t('未处理（只读）');
 }
@@ -32,7 +32,7 @@ function suggestionLines(p: RetroProposal, n: number, t: Translate): string[] {
       : mdText(p.title);
   const source =
     p.source.todoId === null
-      ? t('协调者对话')
+      ? t('Coordinator 对话')
       : `[${mdText(p.source.label)}](todo:${p.source.todoId})`;
   return [
     `${n}. **${title}** · ${state}`,

@@ -89,6 +89,16 @@ describe('composer drafts: persistence across reloads and devices', () => {
     expect(await read(s, 'chief')).toEqual({ content: '', updatedAt: null });
   });
 
+  test('isolates channel drafts under chief:<projectId> and rejects invalid chief scopes', async () => {
+    const s = boot();
+    await write(s, 'chief', 'global draft');
+    await write(s, 'chief:proj-1', 'channel draft');
+    expect(await read(s, 'chief')).toMatchObject({ content: 'global draft' });
+    expect(await read(s, 'chief:proj-1')).toMatchObject({ content: 'channel draft' });
+    const bad = await req(s.app, 'GET', draftPath(s, 'chief:'));
+    expect(bad.status).toBe(400);
+  });
+
   test('text and attachment tokens written by one device are read back by another', async () => {
     const s = boot();
     const content = '![shot.png](attachment:team/abc.png)\nlook at this\n第二行';

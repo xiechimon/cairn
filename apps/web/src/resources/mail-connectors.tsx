@@ -16,6 +16,7 @@ import { Input } from '../components/ui/input.js';
 import { StatusChip, type StatusTone } from '../components/ui/status-chip.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from './parts.js';
 
 type MailProvider = 'qq' | 'gmail' | 'other';
@@ -114,6 +115,7 @@ function AddMailboxDialog({
     smtpPort: String(initialPreset?.smtpPort ?? 465),
   });
   const [serversEdited, setServersEdited] = useState(false);
+  const [serversOpen, setServersOpen] = useState(provider === 'other');
   const changeAddress = (next: string) => {
     setAddress(next);
     const preset = mailServerPreset(next);
@@ -183,46 +185,65 @@ function AddMailboxDialog({
             data-testid="mail-password-input"
           />
         </FormField>
-        <FormField label={t('收信服务器（IMAP）')} htmlFor="mail-imap-host">
-          <div className="flex gap-2">
-            <Input
-              id="mail-imap-host"
-              value={servers.imapHost}
-              onChange={(event) => editServer('imapHost', event.target.value)}
-              placeholder="imap.example.com"
-              autoComplete="off"
-              data-testid="mail-imap-host-input"
-            />
-            <Input
-              aria-label={t('IMAP 端口')}
-              className="w-24 flex-none"
-              inputMode="numeric"
-              value={servers.imapPort}
-              onChange={(event) => editServer('imapPort', event.target.value)}
-              data-testid="mail-imap-port-input"
-            />
+        {provider !== 'other' && !serversOpen ? (
+          <div className="flex items-center justify-between gap-2 text-meta text-content-tertiary">
+            <span className="min-w-0 truncate font-mono">
+              {servers.imapHost}:{servers.imapPort} · {servers.smtpHost}:{servers.smtpPort}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              className="flex-none text-content-secondary"
+              onClick={() => setServersOpen(true)}
+            >
+              {t('自定义服务器和端口')}
+            </Button>
           </div>
-        </FormField>
-        <FormField label={t('发信服务器（SMTP）')} htmlFor="mail-smtp-host">
-          <div className="flex gap-2">
-            <Input
-              id="mail-smtp-host"
-              value={servers.smtpHost}
-              onChange={(event) => editServer('smtpHost', event.target.value)}
-              placeholder="smtp.example.com"
-              autoComplete="off"
-              data-testid="mail-smtp-host-input"
-            />
-            <Input
-              aria-label={t('SMTP 端口')}
-              className="w-24 flex-none"
-              inputMode="numeric"
-              value={servers.smtpPort}
-              onChange={(event) => editServer('smtpPort', event.target.value)}
-              data-testid="mail-smtp-port-input"
-            />
-          </div>
-        </FormField>
+        ) : (
+          <>
+            <FormField label={t('收信服务器（IMAP）')} htmlFor="mail-imap-host">
+              <div className="flex gap-2">
+                <Input
+                  id="mail-imap-host"
+                  value={servers.imapHost}
+                  onChange={(event) => editServer('imapHost', event.target.value)}
+                  placeholder="imap.example.com"
+                  autoComplete="off"
+                  data-testid="mail-imap-host-input"
+                />
+                <Input
+                  aria-label={t('IMAP 端口')}
+                  className="w-24 flex-none"
+                  inputMode="numeric"
+                  value={servers.imapPort}
+                  onChange={(event) => editServer('imapPort', event.target.value)}
+                  data-testid="mail-imap-port-input"
+                />
+              </div>
+            </FormField>
+            <FormField label={t('发信服务器（SMTP）')} htmlFor="mail-smtp-host">
+              <div className="flex gap-2">
+                <Input
+                  id="mail-smtp-host"
+                  value={servers.smtpHost}
+                  onChange={(event) => editServer('smtpHost', event.target.value)}
+                  placeholder="smtp.example.com"
+                  autoComplete="off"
+                  data-testid="mail-smtp-host-input"
+                />
+                <Input
+                  aria-label={t('SMTP 端口')}
+                  className="w-24 flex-none"
+                  inputMode="numeric"
+                  value={servers.smtpPort}
+                  onChange={(event) => editServer('smtpPort', event.target.value)}
+                  data-testid="mail-smtp-port-input"
+                />
+              </div>
+            </FormField>
+          </>
+        )}
       </FormStack>
     </DialogShell>
   );
@@ -240,7 +261,7 @@ function RulesDialog({
   onClose: () => void;
   busy: boolean;
   onWakeMode: (mode: MailWakeMode) => void;
-  onAddRule: (kind: MailRuleKind, pattern: string) => void;
+  onAddRule: (kind: MailRuleKind, pattern: string) => Promise<void>;
   onRemoveRule: (ruleId: string) => void;
 }) {
   const { t } = useI18n();
@@ -307,7 +328,18 @@ function RulesDialog({
                     { value: 'subject_contains', label: t('主题包含') },
                   ]}
                 />
-                <div className="flex gap-2">
+                <form
+                  className="flex gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    const trimmed = pattern.trim();
+                    if (busy || trimmed === '') return;
+                    void onAddRule(kind, trimmed).then(
+                      () => setPattern(''),
+                      () => {},
+                    );
+                  }}
+                >
                   <Input
                     id="mail-rule-pattern"
                     value={pattern}
@@ -317,17 +349,14 @@ function RulesDialog({
                     data-testid="mail-rule-pattern-input"
                   />
                   <Button
+                    type="submit"
                     variant="outline"
                     disabled={busy || pattern.trim() === ''}
-                    onClick={() => {
-                      onAddRule(kind, pattern.trim());
-                      setPattern('');
-                    }}
                     data-testid="mail-rule-add"
                   >
                     {t('添加')}
                   </Button>
-                </div>
+                </form>
               </div>
             </FormField>
           </>
@@ -529,6 +558,7 @@ export function useMailConnectors({
   const [managing, setManaging] = useState<MailProvider | null>(null);
   const [adding, setAdding] = useState<MailProvider | null>(null);
   const [rulesFor, setRulesFor] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<MailAccountRecord | null>(null);
   const failed = (message: string) => (error: unknown) => toastError(t(message), error);
   const byProvider = (provider: MailProvider) =>
     accounts.filter((account) => mailProviderOf(account.address) === provider);
@@ -564,12 +594,10 @@ export function useMailConnectors({
               onError: failed('立即重试失败，请重试。'),
             })
           }
-          onRemove={(id) =>
-            mutations.remove.mutate(id, {
-              onSuccess: () => managedAccounts.length === 1 && setManaging(null),
-              onError: failed('删除失败，请重试。'),
-            })
-          }
+          onRemove={(id) => {
+            const target = managedAccounts.find((account) => account.id === id) ?? null;
+            if (target !== null) setDeleting(target);
+          }}
         />
       )}
       {adding !== null && (
@@ -601,10 +629,15 @@ export function useMailConnectors({
             )
           }
           onAddRule={(matchKind, pattern) =>
-            mutations.addRule.mutate(
-              { id: ruleAccount.id, rule: { matchKind, pattern } },
-              { onError: failed('添加规则失败，请重试。') },
-            )
+            mutations.addRule
+              .mutateAsync({ id: ruleAccount.id, rule: { matchKind, pattern } })
+              .then(
+                () => undefined,
+                (error: unknown) => {
+                  failed('添加规则失败，请重试。')(error);
+                  throw error;
+                },
+              )
           }
           onRemoveRule={(ruleId) =>
             mutations.removeRule.mutate(
@@ -614,6 +647,22 @@ export function useMailConnectors({
           }
         />
       )}
+      <DeleteConfirm
+        open={deleting !== null}
+        title={t('删除后，该邮箱的凭据与唤醒规则都会移除，此操作无法撤销')}
+        summary={deleting?.address ?? ''}
+        ariaLabel={t('删除 {name}', { name: deleting?.address ?? '' })}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => {
+          if (deleting === null) return;
+          const target = deleting;
+          setDeleting(null);
+          mutations.remove.mutate(target.id, {
+            onSuccess: () => managedAccounts.length === 1 && setManaging(null),
+            onError: failed('删除失败，请重试。'),
+          });
+        }}
+      />
     </>
   );
 

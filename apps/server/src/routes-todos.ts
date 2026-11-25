@@ -137,7 +137,7 @@ export function registerTodoRoutes(app: Hono, ctx: AppContext): void {
       prior.phase !== 'closed' &&
       isStartedTodo(prior)
     ) {
-      throw conflict(`这张卡已经开始过，不能挪回待开始。`);
+      throw new HttpError(409, 'started task cannot be moved back to todo', 'already-started');
     }
     let record: TodoRecord | null;
     try {

@@ -298,9 +298,7 @@ checkPatternGuard({
   files: allTsFiles,
   pattern: /\.writeText\(/,
   skip: (relPath) => relPath === 'lib/clipboard.ts',
-  allowlist: new Map([
-    ['detail/transcript.tsx', 'active-lane file; migrate to lib/clipboard.ts when lane lands'],
-  ]),
+  allowlist: new Map(),
   message: 'direct .writeText( — route clipboard writes through lib/clipboard.ts or CopyIconButton',
 });
 

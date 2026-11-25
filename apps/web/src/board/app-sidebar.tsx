@@ -8,7 +8,7 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { queryPhase, withTeamsFailure } from '../components/query-state.js';
 import { Button } from '../components/ui/button.js';
 import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog.js';
-import { toastError } from '../components/ui/toaster.js';
+import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import {
   fixtureProjects,
   setFixtureProjectArchived,
@@ -228,11 +228,22 @@ export function AppSidebar({
       }
     },
     ungroup: (group) => {
+      const ids = inGroup(group).map((p) => p.id);
+      if (ids.length === 0) return;
       Promise.all(
-        inGroup(group).map((project) =>
-          mutations.patchProject.mutateAsync({ id: project.id, body: { group: null } }),
-        ),
-      ).catch((error: unknown) => toastError(t('无法移动项目。'), error));
+        ids.map((id) => mutations.patchProject.mutateAsync({ id, body: { group: null } })),
+      )
+        .then(() => {
+          toastSuccess(t('已解散分组「{group}」', { group }), {
+            label: t('撤销'),
+            onClick: () => {
+              void Promise.all(
+                ids.map((id) => mutations.patchProject.mutateAsync({ id, body: { group } })),
+              ).catch((error: unknown) => toastError(t('无法撤销解散分组。'), error));
+            },
+          });
+        })
+        .catch((error: unknown) => toastError(t('无法移动项目。'), error));
     },
   };
   const fixtureActions: SidebarProjectActions = {
@@ -249,7 +260,15 @@ export function AppSidebar({
       for (const project of inGroup(from)) editFixture(project.id, { group: to });
     },
     ungroup: (group) => {
-      for (const project of inGroup(group)) editFixture(project.id, { group: null });
+      const ids = inGroup(group).map((p) => p.id);
+      if (ids.length === 0) return;
+      for (const id of ids) editFixture(id, { group: null });
+      toastSuccess(t('已解散分组「{group}」', { group }), {
+        label: t('撤销'),
+        onClick: () => {
+          for (const id of ids) editFixture(id, { group });
+        },
+      });
     },
   };
   const sidebarProps = {

@@ -12,7 +12,7 @@ Scope: `apps/web/src/tray/` `apps/web/src/board/machines-` `apps/web/src/board/c
 
 ## Entry
 
-The one entry to the computers panel is the laptop button at the top right of the Coordinator home (the round button on the phone); the sidebar footer carries no computers link. The button carries the fleet state as an 8px badge on its icon's corner (`board/fleet-status.ts`): `running` green when all listed machines are online, `destructive` when some are offline, a hollow ring when none are online — never a colour alone (L2): the tooltip and accessible name name any offline computer. The Coordinator machine's state is in the button's tooltip and accessible name; it dims only while the connection is down. An empty fleet shows no dot and `还没有电脑，点这里添加` points at the button itself.
+The one entry to the computers panel is the laptop button at the top right of the Coordinator home (the round button on the phone); the sidebar footer carries no computers link. The button carries the fleet state as an 8px badge on its icon's corner (`board/fleet-status.ts`): `running` green when all listed machines are online, `destructive` when some are offline, a hollow ring when none are online — never a colour alone (L2): the tooltip and accessible name name any offline computer. The Coordinator machine's state is in the button's tooltip and accessible name; it dims only while the connection is down. An empty fleet shows no dot and `暂无执行机` points at the button itself.
 
 ## Panel
 

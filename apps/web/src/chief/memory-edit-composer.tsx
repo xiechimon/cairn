@@ -10,6 +10,7 @@ import { formatClock } from '../components/chat/live-row.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
 import { Textarea } from '../components/ui/textarea.js';
+import { toastError } from '../components/ui/toaster.js';
 import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
 import type { TFunc } from '../i18n/translate.js';
@@ -34,9 +35,7 @@ function receiptDiffLines(receipt: MemoryEditReceiptRecord): DiffLine[] {
 }
 
 function scopeTag(receipt: MemoryEditReceiptRecord, projectName: string | null, t: TFunc) {
-  return receipt.scope === 'team' || receipt.scope === null
-    ? (projectName ?? t('团队'))
-    : projectName;
+  return receipt.scope === 'team' || receipt.scope === null ? t('团队') : projectName;
 }
 
 function ReceiptDiff({
@@ -155,9 +154,9 @@ export function MemoryEditComposer({
   useEffect(() => {
     if (edit !== null && edit.status === 'failed' && restoredFor.current !== edit.id) {
       restoredFor.current = edit.id;
-      setDraft(edit.instruction);
+      if (draft === '') setDraft(edit.instruction);
     }
-  }, [edit]);
+  }, [draft, edit]);
 
   const continuable =
     edit !== null && (edit.status === 'awaiting_input' || edit.status === 'partial');
@@ -186,7 +185,10 @@ export function MemoryEditComposer({
   };
   const stop = () => {
     if (edit === null || stopping) return;
-    mutations.stopMemoryEdit.mutate({ editId: edit.id, attempt: edit.attempt });
+    mutations.stopMemoryEdit.mutate(
+      { editId: edit.id, attempt: edit.attempt },
+      { onError: (error) => toastError(t('停止失败，请重试。'), error) },
+    );
   };
 
   return (
@@ -284,7 +286,7 @@ export function MemoryEditComposer({
           )}
         </div>
         {mutations.submitMemoryEdit.isError && (
-          <p role="alert" className="mt-1.5 text-meta text-content-secondary">
+          <p role="alert" className="mt-1.5 text-meta text-destructive">
             {t('未能发送，内容仍在输入框里，请重试。')}
           </p>
         )}

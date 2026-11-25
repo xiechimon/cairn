@@ -44,8 +44,8 @@ describe('the PATCH phase=todo gate for started cards (#1486)', () => {
     const before = row(s, id);
     const res = await req(s.app, 'PATCH', `/api/todos/${id}`, { phase: 'todo' });
     expect(res.status).toBe(409);
-    const body = (await res.json()) as { error: string };
-    expect(body.error).toContain('已经开始过');
+    const body = (await res.json()) as { error: string; reason?: string };
+    expect(body.reason).toBe('already-started');
     expect(row(s, id)).toEqual(before);
   });
 

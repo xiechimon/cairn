@@ -406,14 +406,20 @@ export function ProviderPanel({
   );
 }
 
-function RenameTitle({ name, onRename }: { name: string; onRename: (next: string) => void }) {
+function RenameTitle({ name, onRename }: { name: string; onRename: (next: string) => unknown }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
   if (draft !== null) {
     const commit = () => {
       const next = draft.trim();
-      if (next !== '' && next !== name) onRename(next);
-      setDraft(null);
+      if (next === '' || next === name) {
+        setDraft(null);
+        return;
+      }
+      Promise.resolve(onRename(next)).then(
+        () => setDraft(null),
+        () => {},
+      );
     };
     return (
       <Input
@@ -471,7 +477,7 @@ export function ProviderEditorHead({
   kind: string;
   version?: string | null;
   aside?: ReactNode;
-  onRename?: (next: string) => void;
+  onRename?: (next: string) => unknown;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">

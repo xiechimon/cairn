@@ -193,7 +193,13 @@ export function BoardPage() {
       ? [
           {
             kind: 'notify' as const,
-            node: <NotificationBanner key="notify" onEnable={notifyBanner.enable} />,
+            node: (
+              <NotificationBanner
+                key="notify"
+                onEnable={notifyBanner.enable}
+                onDismiss={notifyBanner.dismiss}
+              />
+            ),
           },
         ]
       : []),

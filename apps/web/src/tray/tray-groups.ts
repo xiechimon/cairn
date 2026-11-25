@@ -141,7 +141,7 @@ function queuedRow(thread: MachineQueuedThread): TrayRow {
       ? thread.retryAt === null
         ? { key: '等额度' }
         : { key: '等额度 · {at}', vars: { at: clockTime(thread.retryAt) } }
-      : { key: '运行中' };
+      : { key: '排队中' };
   return {
     key: thread.threadId,
     title: thread.title,

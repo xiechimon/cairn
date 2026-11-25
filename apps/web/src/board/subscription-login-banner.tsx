@@ -29,6 +29,16 @@ export function SubscriptionLoginBanner<Kind extends string>({
   const { t } = useI18n();
   const [only] = warnings;
   if (only === undefined) return null;
+  const action = (
+    <Button
+      variant="outline"
+      size="sm"
+      className="px-3"
+      render={<Link to={settingsHref('routing')} />}
+    >
+      {t('查看')}
+    </Button>
+  );
   if (warnings.length === 1) {
     return (
       <NoticeBanner
@@ -42,6 +52,7 @@ export function SubscriptionLoginBanner<Kind extends string>({
             {withCodeSpans(only.text)}
           </span>
         }
+        actions={action}
       />
     );
   }
@@ -54,16 +65,7 @@ export function SubscriptionLoginBanner<Kind extends string>({
       className="mt-4"
       title={title}
       body={<span data-testid={`${testIdPrefix}-login-summary`}>{body}</span>}
-      actions={
-        <Button
-          variant="outline"
-          size="sm"
-          className="px-3"
-          render={<Link to={settingsHref('routing')} />}
-        >
-          {t('查看')}
-        </Button>
-      }
+      actions={action}
     />
   );
 }

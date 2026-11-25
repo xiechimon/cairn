@@ -49,6 +49,7 @@ export function PhonePairDialog({
   machineName,
   phoneId,
   prefillEndpoint,
+  prefillName = '',
   onClose,
 }: {
   open: boolean;
@@ -56,12 +57,13 @@ export function PhonePairDialog({
   machineName: string;
   phoneId: string | null;
   prefillEndpoint: string;
+  prefillName?: string;
   onClose: () => void;
 }) {
   const { t } = useI18n();
   const { teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(prefillName);
   const [endpoint, setEndpoint] = useState(prefillEndpoint);
   const [code, setCode] = useState('');
   const [consent, setConsent] = useState(false);
@@ -186,9 +188,11 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
   const rows = live ? (phonesQ.data ?? []) : (machine.phonesFixture?.phones ?? []);
   const reported = machine.online === false ? [] : (machine.capabilities?.phones ?? []);
   const views = mergePhoneViews(reported, rows);
-  const [pairOpen, setPairOpen] = useState<{ phoneId: string | null; endpoint: string } | null>(
-    null,
-  );
+  const [pairOpen, setPairOpen] = useState<{
+    phoneId: string | null;
+    endpoint: string;
+    name: string;
+  } | null>(null);
   const [forgetTarget, setForgetTarget] = useState<PhoneView | null>(null);
 
   const forget = (view: PhoneView) => {
@@ -246,7 +250,7 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
                   const prefill = ENDPOINT_RE.test(view.deviceId)
                     ? `${view.deviceId.slice(0, view.deviceId.lastIndexOf(':'))}:`
                     : '';
-                  setPairOpen({ phoneId: null, endpoint: prefill });
+                  setPairOpen({ phoneId: null, endpoint: prefill, name: '' });
                 }}
               >
                 {t('配对')}
@@ -263,7 +267,7 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
                     return;
                   }
                   if (view.row === null) return;
-                  setPairOpen({ phoneId: view.row.id, endpoint: '' });
+                  setPairOpen({ phoneId: view.row.id, endpoint: '', name: view.name });
                 }}
               >
                 {t('重试')}
@@ -290,6 +294,7 @@ export function MachinePhoneRows({ machine }: { machine: MachineRow }) {
           machineName={machineName}
           phoneId={pairOpen.phoneId}
           prefillEndpoint={pairOpen.endpoint}
+          prefillName={pairOpen.name}
           onClose={() => setPairOpen(null)}
         />
       )}

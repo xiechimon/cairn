@@ -75,7 +75,7 @@ export function ApiKeysPage() {
     >
       <QueryBoundary
         query={live ? keysQ : undefined}
-        isEmpty={keys.length === 0}
+        isEmpty={listed.length === 0}
         loadingLabel={t('正在加载 API 密钥')}
         errorTitle={t('API 密钥未能加载')}
         className="mt-6"
@@ -104,10 +104,12 @@ export function ApiKeysPage() {
       </QueryBoundary>
       <ApiKeyCreateDialog
         open={createOpen}
+        pending={mutations.createApiKey.isPending}
         onClose={() => setCreateOpen(false)}
-        onCreate={(body) => {
+        onCreate={(body, onDone) => {
           if (!live) {
             blockDemoWrite();
+            onDone();
             return;
           }
           mutations.createApiKey.mutate(body, {
@@ -115,6 +117,7 @@ export function ApiKeysPage() {
               const [row] = mapApiKeys([res]);
               if (row !== undefined) setCreated(row);
               if (typeof res.plaintext === 'string') setRevealed(res.plaintext);
+              onDone();
             },
             onError: (error) => toastError(t('新建 API 密钥失败，请重试。'), error),
           });

@@ -12,6 +12,8 @@ import { QueryBoundary, type QueryLike } from '../components/query-state.js';
 import { SegmentedTabs } from '../components/segmented.js';
 import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-panel.js';
 import { Button } from '../components/ui/button.js';
+import { DialogShell } from '../components/ui/dialog-shell.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
@@ -76,7 +78,17 @@ function MadeReport({
       onOpenThread(todo.id);
     }
   }, [settled, report, onClose, onOpenThread, todo.id]);
-  if (report === null) return null;
+  if (report === null) {
+    if (settled) return null;
+    return (
+      <DialogShell title={todo.title} open onClose={onClose} size="m">
+        <div className="flex items-center justify-center gap-2 py-12 text-ui text-content-secondary">
+          <RingSpinner className="size-4" />
+          {t('正在加载成果…')}
+        </div>
+      </DialogShell>
+    );
+  }
   const kind =
     todo.madeKind === 'slides'
       ? t('PPT')
@@ -246,22 +258,24 @@ export function WorkPanel({
       )}
       <SidePanelHead closeLabel={t('关闭')} onClose={onClose}>
         <SidePanelTitle>{title}</SidePanelTitle>
-        <IconTooltip
-          label={t('搜索成果')}
-          side="bottom"
-          trigger={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              data-testid="made-search-toggle"
-              aria-pressed={searching}
-              onClick={toggleSearch}
-              className="text-content-secondary hover:text-foreground pointer-coarse:size-11 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
-            />
-          }
-        >
-          <Search aria-hidden className="size-5.5" strokeWidth={1.75} />
-        </IconTooltip>
+        {(source.length > 0 || searching) && (
+          <IconTooltip
+            label={t('搜索成果')}
+            side="bottom"
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                data-testid="made-search-toggle"
+                aria-pressed={searching}
+                onClick={toggleSearch}
+                className="text-content-secondary hover:text-foreground pointer-coarse:size-11 aria-pressed:bg-(--hover-1) aria-pressed:text-foreground"
+              />
+            }
+          >
+            <Search aria-hidden className="size-5.5" strokeWidth={1.75} />
+          </IconTooltip>
+        )}
       </SidePanelHead>
       {searching && <MadeSearch value={query} onChange={setQuery} onClose={closeSearch} />}
       <div className="flex flex-none px-4">

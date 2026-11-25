@@ -83,6 +83,17 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
 
 function Stats({ summary, days }: { summary: UsageSummary; days: number }) {
   const { t } = useI18n();
+  const splitNote =
+    summary.total > 0
+      ? t('Coordinator {a} · 任务 {b}', {
+          a: percent(summary.coordinator / summary.total),
+          b: percent(summary.tasks / summary.total),
+        })
+      : t('没有用量');
+  const totalNote =
+    summary.cost === null
+      ? splitNote
+      : `${splitNote} · ${t('按标价 {cost}', { cost: usd(summary.cost) })}`;
   return (
     <div
       data-testid="usage-stats"
@@ -91,18 +102,7 @@ function Stats({ summary, days }: { summary: UsageSummary; days: number }) {
         CARD_CLS,
       )}
     >
-      <Stat
-        label={t('过去一年')}
-        value={`${formatTokens(summary.total)} token`}
-        note={
-          summary.total > 0
-            ? t('Coordinator {a} · 任务 {b}', {
-                a: percent(summary.coordinator / summary.total),
-                b: percent(summary.tasks / summary.total),
-              })
-            : t('没有用量')
-        }
-      />
+      <Stat label={t('过去一年')} value={`${formatTokens(summary.total)} token`} note={totalNote} />
       <Stat
         label={t('用了')}
         value={t('{n} 天', { n: summary.usedDays })}
@@ -118,11 +118,7 @@ function Stats({ summary, days }: { summary: UsageSummary; days: number }) {
       <Stat
         label={t('缓存命中')}
         value={summary.cacheHit === null ? '0%' : percent(summary.cacheHit)}
-        note={
-          summary.cost === null
-            ? t('缓存读取 {n}', { n: formatTokens(summary.cacheRead) })
-            : t('按标价 {cost}', { cost: usd(summary.cost) })
-        }
+        note={t('缓存读取 {n}', { n: formatTokens(summary.cacheRead) })}
       />
     </div>
   );
@@ -547,6 +543,7 @@ function Ranking({
 
 function UsageBody({ usage, today }: { usage: DailyUsage; today: string }) {
   const { t } = useI18n();
+  const labels = useDateLabels();
   const narrow = useNarrow();
   const [selected, setSelected] = useState<string | null>(null);
   const year = usageGrid(usage.days, today, USAGE_WEEKS);
@@ -568,6 +565,22 @@ function UsageBody({ usage, today }: { usage: DailyUsage; today: string }) {
         onSelect={setSelected}
       />
       <Stats summary={yearSummary} days={year.days} />
+      {selected !== null && (
+        <div
+          data-testid="usage-date-filter"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-(--radius-control) bg-muted/60 px-3 py-1.5 text-meta text-content-secondary"
+        >
+          <span>{t('已筛选：{date}', { date: labels.day(selected) })}</span>
+          <Button
+            variant="ghost"
+            size="xs"
+            className="h-6 px-2 text-meta"
+            onClick={() => setSelected(null)}
+          >
+            {t('查看全年')}
+          </Button>
+        </div>
+      )}
       <TokenMix summary={scoped} />
       <div className="grid grid-cols-2 gap-8 max-sm:grid-cols-1 max-sm:gap-6">
         <Ranking

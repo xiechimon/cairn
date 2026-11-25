@@ -135,6 +135,7 @@ test('delete removes only the matching automation after success', async ({ page 
   await expect(badge(page)).toHaveText('1');
   await badge(page).click();
   await popover(page).getByRole('button', { name: 'Delete schedule' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   await expect(badge(page)).toHaveCount(0);
   expect(state.deleted).toEqual(['schedule-1']);
   expect(state.rows.map((row) => row.id)).toEqual(['other']);
@@ -146,10 +147,12 @@ test('a failed delete retains the chip and lets the user retry', async ({ page }
   await page.goto('/app?thread=todo-1');
   await badge(page).click();
   await popover(page).getByRole('button', { name: 'Delete schedule' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   await expect(popover(page).getByRole('alert')).toContainText('Delete failed');
   await expect(badge(page)).toHaveText('1');
   options.rejectDelete = false;
   await popover(page).getByRole('button', { name: 'Delete schedule' }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete' }).click();
   await expect(badge(page)).toHaveCount(0);
 });
 

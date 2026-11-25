@@ -14,11 +14,6 @@ import { useI18n } from '../i18n/provider.js';
 
 type Tab = 'local' | 'source';
 
-interface Fields {
-  localPath: string;
-  url: string;
-}
-
 interface ErrorCopy {
   headline: string;
   detail: string;
@@ -43,7 +38,7 @@ function serverErrorCopy(err: unknown, t: (s: string) => string): ErrorCopy {
     }
     return { headline: t('导入失败，请重试。'), detail: err.message };
   }
-  return { headline: t('导入失败，请重试。'), detail: String(err) };
+  return { headline: t('导入失败，请重试。'), detail: '' };
 }
 
 function ErrorLine({ error }: { error: ErrorCopy }) {
@@ -51,7 +46,7 @@ function ErrorLine({ error }: { error: ErrorCopy }) {
     <FieldError>
       {error.headline}
       {error.detail !== '' && (
-        <span className="mt-0.5 block text-muted-foreground">{error.detail}</span>
+        <span className="mt-0.5 block text-content-tertiary">{error.detail}</span>
       )}
     </FieldError>
   );
@@ -167,7 +162,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
   const { live, teamId } = useLiveData();
   const mutations = useApiMutations(teamId);
   const [tab, setTab] = useState<Tab>('local');
-  const [fields, setFields] = useState<Fields | null>(null);
+  const [source, setSource] = useState<string | null>(null);
   const [error, setError] = useState<ErrorCopy | null>(null);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -177,7 +172,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
 
   useEffect(() => {
     if (!open) {
-      setFields(null);
+      setSource(null);
       setError(null);
       setQuery('');
       setSelected(new Set());
@@ -185,8 +180,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
       setTab('local');
       return;
     }
-    setFields({ localPath: '', url: '' });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize fields only on the open/close edge
+    setSource('');
   }, [open]);
 
   const candidates = candidatesQ.data?.candidates ?? [];
@@ -200,11 +194,10 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
             (c.description ?? '').toLowerCase().includes(needle),
         );
 
-  const localFilled = fields !== null && fields.localPath.trim() !== '';
-  const urlFilled = fields !== null && fields.url.trim() !== '';
+  const trimmedSource = source?.trim() ?? '';
+  const sourceFilled = trimmedSource !== '';
   const busy = importing || mutations.importSkill.isPending;
-  const submittable =
-    !busy && (tab === 'local' ? selected.size > 0 : fields !== null && localFilled !== urlFilled);
+  const submittable = !busy && (tab === 'local' ? selected.size > 0 : sourceFilled);
 
   const toggle = (c: SkillImportCandidate) =>
     setSelected((prev) => {
@@ -253,8 +246,10 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
       void importPicked();
       return;
     }
-    if (fields === null) return;
-    const body = localFilled ? { localPath: fields.localPath.trim() } : { url: fields.url.trim() };
+    if (!sourceFilled) return;
+    const body = /^https?:\/\//i.test(trimmedSource)
+      ? { url: trimmedSource }
+      : { localPath: trimmedSource };
     mutations.importSkill.mutate(body, {
       onSuccess: onClose,
       onError: (err) => setError(serverErrorCopy(err, t)),
@@ -280,7 +275,7 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
         />
       }
     >
-      {fields === null ? null : (
+      {source === null ? null : (
         <FormStack className="max-w-none">
           <SegmentedTabs
             slide
@@ -322,36 +317,23 @@ export function SkillImportDialog({ open, onClose }: { open: boolean; onClose: (
           ) : (
             <>
               <FormField
-                label={t('本地路径')}
-                htmlFor="dlg-skill-import-path"
-                help={t('服务器本机上的技能目录路径，目录里要有 SKILL.md。')}
+                label={t('本地路径或 GitHub 地址')}
+                htmlFor="dlg-skill-import-source"
+                help={t(
+                  '填入服务器本机目录路径（需包含 SKILL.md），或以 https:// 开头的 GitHub 公共仓库地址；导入后可刷新。',
+                )}
               >
                 <Input
-                  id="dlg-skill-import-path"
+                  id="dlg-skill-import-source"
+                  data-testid="skill-import-source"
                   className={FORM_CONTROL_CLS}
-                  value={fields.localPath}
-                  onChange={(event) =>
-                    setFields((f) => f && { ...f, localPath: event.target.value })
-                  }
-                  placeholder="/Users/you/skills/deploy-to-prod"
+                  value={source}
+                  onChange={(event) => setSource(event.target.value)}
+                  placeholder={t(
+                    '例如 /Users/you/skills/deploy-to-prod 或 https://github.com/owner/repo',
+                  )}
                 />
               </FormField>
-              <FormField
-                label={t('GitHub 地址')}
-                htmlFor="dlg-skill-import-url"
-                help={t('GitHub 公共仓库或其中子目录的地址；导入后可刷新，重新拉取。')}
-              >
-                <Input
-                  id="dlg-skill-import-url"
-                  className={FORM_CONTROL_CLS}
-                  value={fields.url}
-                  onChange={(event) => setFields((f) => f && { ...f, url: event.target.value })}
-                  placeholder="https://github.com/anthropics/skills/tree/main/document-skills/pdf"
-                />
-              </FormField>
-              {localFilled && urlFilled ? (
-                <FieldError>{t('两字段二选一：填其中一个，另一个留空。')}</FieldError>
-              ) : null}
               {error !== null && <ErrorLine error={error} />}
             </>
           )}

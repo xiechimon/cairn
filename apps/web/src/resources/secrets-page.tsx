@@ -326,6 +326,7 @@ export function SecretsPage() {
       <SecretDialog
         key={`${dialog?.opened ?? 0}:${searchParams.get('project') ?? ''}`}
         open={dialog !== null}
+        pending={mutations.createSecret.isPending || mutations.updateSecret.isPending}
         editing={dialog?.editing ?? null}
         startSecret={dialog?.startSecret ?? false}
         projects={projects}

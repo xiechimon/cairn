@@ -67,7 +67,7 @@ export function ApprovalAnswered({ item }: { item: ChiefQuestionItem }) {
       : declined
         ? t('已拒绝')
         : choice !== null && index > 0
-          ? choice
+          ? t(choice)
           : t('已回答');
   const Icon = declined ? Ban : CircleCheck;
   return (

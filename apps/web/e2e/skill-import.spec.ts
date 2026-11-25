@@ -89,31 +89,25 @@ async function stubImport(page: Page, seed: SkillRow[] = []) {
   };
 }
 
-test('fixture import dialog: field set + xor submit gate + accept-law submit closes instantly', async ({ page }) => {
+test('fixture import dialog: unified source input gates empty and closes on submit', async ({ page }) => {
   await page.goto(`${SKILLS}?scenario=01`);
 
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
   await expect(dialog).toHaveAccessibleName('导入技能');
   await dialog.getByTestId('skill-import-tab-source').click();
-  await expect(dialog.locator('#dlg-skill-import-path')).toBeVisible();
-  await expect(dialog.locator('#dlg-skill-import-url')).toBeVisible();
+  const input = dialog.locator('#dlg-skill-import-source');
+  await expect(input).toBeVisible();
 
   const submit = dialog.getByRole('button', { name: '导入', exact: true });
   await expect(submit).toBeDisabled();
-  await dialog.locator('#dlg-skill-import-path').fill('/tmp/some-skill');
-  await expect(submit).toBeEnabled();
-  await dialog.locator('#dlg-skill-import-url').fill('https://github.com/acme/repo');
-  await expect(submit).toBeDisabled();
-  await expect(dialog.getByRole('alert')).toContainText('二选一');
-
-  await dialog.locator('#dlg-skill-import-path').fill('');
+  await input.fill('https://github.com/acme/repo');
   await expect(submit).toBeEnabled();
   await submit.click();
   await expect(page.getByRole('dialog', { name: '导入技能' })).toBeHidden();
 });
 
-test('live import: dialog closes after 201, list appears immediately, request body = the single filled field verbatim', async ({ page }) => {
+test('live import: dialog closes after 201, list appears immediately, request body = the trimmed local path', async ({ page }) => {
   await stubBoot(page);
   const { importCalls } = await stubImport(page);
   await page.goto(SKILLS);
@@ -121,7 +115,7 @@ test('live import: dialog closes after 201, list appears immediately, request bo
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
   await dialog.getByTestId('skill-import-tab-source').click();
-  await dialog.locator('#dlg-skill-import-path').fill('  /Users/you/skills/deploy-to-prod  ');
+  await dialog.locator('#dlg-skill-import-source').fill('  /Users/you/skills/deploy-to-prod  ');
   await dialog.getByRole('button', { name: '导入', exact: true }).click();
 
   await expect(dialog).toBeHidden();
@@ -141,7 +135,7 @@ test('live import 400: dialog stays open, error row headline + server verbatim d
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
   await dialog.getByTestId('skill-import-tab-source').click();
-  await dialog.locator('#dlg-skill-import-path').fill('/Users/you/skills/broken');
+  await dialog.locator('#dlg-skill-import-source').fill('/Users/you/skills/broken');
   await dialog.getByRole('button', { name: '导入', exact: true }).click();
 
   await expect(dialog).toBeVisible();
@@ -159,7 +153,7 @@ test('live import 409 same name: headline translated readably', async ({ page })
   await page.getByTestId('resource-import').click();
   const dialog = page.getByRole('dialog', { name: '导入技能' });
   await dialog.getByTestId('skill-import-tab-source').click();
-  await dialog.locator('#dlg-skill-import-url').fill('https://github.com/acme/repo');
+  await dialog.locator('#dlg-skill-import-source').fill('https://github.com/acme/repo');
   await dialog.getByRole('button', { name: '导入', exact: true }).click();
 
   await expect(dialog).toBeVisible();

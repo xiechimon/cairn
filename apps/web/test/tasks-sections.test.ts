@@ -13,6 +13,7 @@ import {
   type TaskSection,
   taskRowCopy,
   titlesNeedingProject,
+  unfinishableLead,
 } from '../src/board/tasks-sections.js';
 import { threadCopy } from '../src/board/thread-copy.js';
 import type { TodoRecord } from '../src/fixtures/records.js';
@@ -420,5 +421,21 @@ describe('C10 the all-projects view names a project only where it tells two task
       entry(4, 'todo', 'up_next', { title: 'Fix the login loop', projectId: 'pay' }),
     ];
     expect([...titlesNeedingProject(rows)]).toEqual(['Update the README']);
+  });
+});
+
+describe('unfinishableLead', () => {
+  test('gives stopped tasks an explicit stopped explanation instead of archived copy', () => {
+    expect(unfinishableLead(todo(1, 'stopped'))).toEqual({
+      glyph: 'failed',
+      why: '已停止，重新运行后才能完成',
+    });
+  });
+
+  test('keeps archived copy for non-closed archived todos', () => {
+    expect(unfinishableLead({ ...todo(1, 'todo'), archivedAt: 123 })).toEqual({
+      glyph: 'todo',
+      why: '已归档，不能标记完成',
+    });
   });
 });

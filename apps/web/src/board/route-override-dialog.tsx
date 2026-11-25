@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from '../components/ui/select.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
 
@@ -117,6 +118,7 @@ export function RouteOverrideDialog({
 
   const save = () => {
     if (!live) {
+      blockDemoWrite();
       onClose();
       return;
     }
@@ -166,7 +168,9 @@ export function RouteOverrideDialog({
         <SettingsCard>
           <SettingsRow
             label={t('运行平台')}
-            hint={platformLocked ? t('运行中不能改，换平台请新开任务') : t('不限时用默认执行机')}
+            hint={
+              platformLocked ? t('任务开始后不能改，换平台请新开任务') : t('不限时用默认执行机')
+            }
           >
             <Select
               value={platform}
@@ -210,7 +214,7 @@ export function RouteOverrideDialog({
                 </SelectValue>
               </SelectTrigger>
               <SelectContent className="w-max min-w-0 max-w-(--available-width)">
-                {machines.length > 1 && !sessionHasMachine ? null : (
+                {machines.length > 1 && !sessionHasMachine && machineId === null ? null : (
                   <SelectItem value={null}>{t('不固定')}</SelectItem>
                 )}
                 {machines.map((machine) => (

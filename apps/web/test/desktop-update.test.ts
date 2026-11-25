@@ -25,7 +25,7 @@ describe('desktop update button presentation', () => {
     const viewZh = desktopUpdateView({ status: 'error', message: '下载中断' }, zh);
     expect(viewZh.mark).toBe('failed');
     expect(viewZh.busy).toBe(false);
-    expect(viewZh.label).toBe('更新失败：下载中断');
+    expect(viewZh.label).toBe('更新失败，点击重试');
   });
 
   it('a downloaded update waits quietly for the user to step away, and a click still updates now', () => {

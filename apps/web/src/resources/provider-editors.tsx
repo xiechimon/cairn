@@ -74,14 +74,23 @@ export function CommitInput({
 }: {
   label: string;
   value: string;
-  onCommit?: (next: string) => void;
+  onCommit?: (next: string) => unknown;
   className?: string;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
   const commit = () => {
-    const next = draft?.trim() ?? '';
-    if (draft !== null && next !== '' && next !== value) onCommit?.(next);
-    setDraft(null);
+    if (draft === null) return;
+    const next = draft.trim();
+    if (next === '' || next === value) {
+      setDraft(null);
+      return;
+    }
+    Promise.resolve(onCommit?.(next)).then(
+      (ok) => {
+        if (ok !== false) setDraft(null);
+      },
+      () => {},
+    );
   };
   return (
     <Input
@@ -107,9 +116,17 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-function KeyField({ onReplace }: { onReplace?: (key: string) => void }) {
+function KeyField({ onReplace }: { onReplace?: (key: string) => unknown }) {
   const { t } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
+  const submit = (next: string) => {
+    Promise.resolve(onReplace?.(next)).then(
+      (ok) => {
+        if (ok !== false) setDraft(null);
+      },
+      () => {},
+    );
+  };
   if (draft === null) {
     return (
       <span className="flex h-8 min-w-0 items-center justify-between gap-2 rounded-md px-2.5 ring-1 ring-input ring-inset">
@@ -133,22 +150,14 @@ function KeyField({ onReplace }: { onReplace?: (key: string) => void }) {
         onKeyDown={(event) => {
           if (event.key === 'Escape') setDraft(null);
           if (event.key === 'Enter' && draft.trim() !== '') {
-            onReplace?.(draft.trim());
-            setDraft(null);
+            submit(draft.trim());
           }
         }}
       />
       <Button variant="ghost" size="sm" onClick={() => setDraft(null)}>
         {t('取消')}
       </Button>
-      <Button
-        size="sm"
-        disabled={draft.trim() === ''}
-        onClick={() => {
-          onReplace?.(draft.trim());
-          setDraft(null);
-        }}
-      >
+      <Button size="sm" disabled={draft.trim() === ''} onClick={() => submit(draft.trim())}>
         {t('保存')}
       </Button>
     </span>
@@ -630,11 +639,14 @@ export function TeamProviderEditor({
   const oauth = isOAuthPreset(record.providerId);
   const fire = (body: Parameters<NonNullable<ProviderEditActions['patch']>>[0]) => {
     const reconnect = body.baseUrl !== undefined || body.apiKey !== undefined;
-    void actions.patch?.(body).then(
+    const req = actions.patch?.(body);
+    if (req === undefined) return undefined;
+    return req.then(
       (saved) => {
         if (reconnect && saved.configurationFingerprint === undefined) tests.reset();
+        return true;
       },
-      () => undefined,
+      () => false,
     );
   };
   const saveModels = (edit: (saved: ProviderRecord['models']) => ProviderRecord['models']) => {

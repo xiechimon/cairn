@@ -1,11 +1,14 @@
-import { createContext, useContext, useSyncExternalStore } from 'react';
+import { createContext, useContext, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useArrivals } from '../components/growth.js';
+import { useI18n } from '../i18n/provider.js';
+import { approvalCardOf, isApprovalRequest } from './approval-card-model.js';
 import { useOptionalChiefRoot } from './chief-root.js';
 import { DecisionDock, type DockPager } from './decision-dock.js';
 import { clampQuestionIndex } from './question-dock-index.js';
 import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
   emptyQuestionDrafts,
+  questionDraftComplete,
   questionDraftKey,
   questionDraftStore,
   questionSubmitStore,
@@ -65,9 +68,14 @@ export function useAnswerKey(): string | null {
 }
 
 export function useMinimizedQuestion(): string | null {
+  const { t } = useI18n();
   const shown = useShownQuestion();
   if (shown === undefined || !questionDockState.minimized()) return null;
-  return shown.item.questions[stepOf(shown)]?.question ?? null;
+  const current = shown.item.questions[stepOf(shown)] ?? shown.item.questions[0];
+  if (current === undefined) return null;
+  return isApprovalRequest(shown.item.requestId)
+    ? approvalCardOf(current, t).title
+    : current.question;
 }
 
 function QuestionError({ draftKey }: { draftKey: string }) {
@@ -118,7 +126,10 @@ export function ChiefQuestion() {
   const pending = useShownQuestions();
   useSyncExternalStore(
     questionDraftStore.subscribe,
-    () => pending.map(stepOf).join(','),
+    () =>
+      pending
+        .map((r) => `${stepOf(r)}:${questionSubmitStore.get(draftKeyOf(r)).submitting}`)
+        .join(','),
     () => '',
   );
   const arrived = useArrivals(
@@ -127,7 +138,83 @@ export function ChiefQuestion() {
   );
   const at = clampQuestionIndex(questionDockState.focus(), pending.length);
   const shown = pending[at];
-  if (shown === undefined || questionDockState.minimized()) return null;
+  const minimized = questionDockState.minimized();
+  useSyncExternalStore(
+    questionDockState.subscribe,
+    () =>
+      shown === undefined
+        ? ''
+        : questionDockState.answerText(answerKeyOf(draftKeyOf(shown), stepOf(shown))),
+    () => '',
+  );
+  const submitRef = useRef<() => void>(() => {});
+  const minimizedSubmitState = (() => {
+    if (
+      !minimized ||
+      shown === undefined ||
+      shown.item.status !== 'pending' ||
+      root?.surface.onAnswerQuestion === undefined
+    )
+      return null;
+    const key = draftKeyOf(shown);
+    const step = stepOf(shown);
+    const questions = shown.item.questions;
+    const stored = questionDraftStore.get(key)?.drafts;
+    const drafts =
+      stored !== undefined && stored.length === questions.length
+        ? stored
+        : emptyQuestionDrafts(questions);
+    const effective = drafts.map((d, i) => {
+      const prompt = questions[i];
+      const text = questionDockState.answerText(answerKeyOf(key, i));
+      if (prompt === undefined || text.trim() === '') return d;
+      if (d.kind === 'text') return { kind: 'text' as const, value: text };
+      if (prompt.multiSelect === true) return { ...d, other: true, otherText: text };
+      return { kind: 'choices' as const, picked: [], other: true, otherText: text };
+    });
+    const uploading = questionDockState.uploading();
+    const submitting = questionSubmitStore.get(key).submitting;
+    const last = step === questions.length - 1;
+    const stepOk = questionDraftComplete(effective[step], questions[step]);
+    const allOk = questions.every((q, i) => questionDraftComplete(effective[i], q));
+    submitRef.current = () => {
+      if (submitting || uploading || !stepOk) return;
+      if (!allOk) {
+        const open = questions.findIndex((q, i) => !questionDraftComplete(effective[i], q));
+        if (open >= 0) {
+          questionDraftStore.set(key, { drafts: effective, step: open });
+          questionDockState.reveal();
+        }
+        return;
+      }
+      root.surface.onAnswerQuestion?.({
+        requestId: shown.item.requestId,
+        threadId: shown.conversationId,
+        answers: effective.map((d, i) => {
+          const header = questions[i]?.header ?? '';
+          if (d.kind === 'text') return { header, text: d.value.trim() };
+          const choices = [...d.picked];
+          if (d.other && d.otherText.trim() !== '') choices.push(d.otherText.trim());
+          return { header, choices };
+        }),
+      });
+    };
+    return {
+      requestId: shown.item.requestId,
+      last,
+      enabled: !submitting && !uploading && stepOk,
+    };
+  })();
+  useEffect(() => {
+    if (minimizedSubmitState === null) return;
+    questionDockState.setPrimary({
+      ...minimizedSubmitState,
+      advance: () => submitRef.current(),
+    });
+    const id = minimizedSubmitState.requestId;
+    return () => questionDockState.clearPrimary(id);
+  }, [minimizedSubmitState?.requestId, minimizedSubmitState?.last, minimizedSubmitState?.enabled]);
+  if (shown === undefined || minimized) return null;
   const key = draftKeyOf(shown);
   return (
     <div

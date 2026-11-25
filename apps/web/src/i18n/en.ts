@@ -424,8 +424,8 @@ export const EN: Record<string, string> = {
   '来自 Pi': 'from Pi',
   '建项目前要先把模型配好，还差第 1 步：接入模型。':
     'Set up your models before creating a project. Step 1 is still open: connect models.',
-  '建项目前要先把模型配好，还差第 2 步：确认模型。':
-    'Set up your models before creating a project. Step 2 is still open: confirm models.',
+  '建项目前要先把模型配好，还差第 2 步：确认设置。':
+    'Set up your models before creating a project. Step 2 is still open: confirm settings.',
   '保存中…': 'Saving…',
   '{label}（{use} 的模型）': '{label} ({use} model)',
   接入模型: 'Connect models',
@@ -501,8 +501,7 @@ export const EN: Record<string, string> = {
   开始: 'Start',
   完成: 'Complete',
   重开: 'Reopen',
-  '向 Agent 补充说明，执行过程中即可送达':
-    'Add details for the Agent — delivered while the run is in progress',
+  '补充说明，执行过程中即可送达': 'Add details — delivered while the run is in progress',
   '发送消息以继续这个任务…': 'Send a message to continue this task…',
   '发送消息以重新开始…': 'Send a message to start it again…',
   '请求修改…': 'Request changes…',
@@ -575,7 +574,7 @@ export const EN: Record<string, string> = {
   '丢弃本轮修改——方案和代码回到上一个版本':
     'Discard this round’s changes — plan and code revert to the previous version',
   '正在停止…': 'Stopping…',
-  已取消: 'Canceled',
+  已取消: 'Cancelled',
   '子 agent': 'Subagent',
   '{n} 次工具调用': '{n## tool use|# tool uses}',
   已中断: 'Interrupted',
@@ -649,7 +648,7 @@ export const EN: Record<string, string> = {
   周日: 'Sun',
   运行一次: 'Runs once',
   '任务已归档，定时随之停用': 'The task was archived, so the schedule stopped',
-  '执行任务的 Agent 暂停了它': 'The agent working on the task paused it',
+  执行任务的步骤暂停了它: 'The step working on the task paused it',
   '连续 10 次定时运行均无人回复，已自动暂停':
     'Paused after 10 scheduled runs with no reply from a person',
   '提交代码时被仓库检查拦下，本轮未能完成': "The repository's commit check stopped this run",
@@ -755,14 +754,14 @@ export const EN: Record<string, string> = {
   'SKILL.md 正文': 'SKILL.md body',
   '这个技能做什么、什么时候用它。': 'What this skill does and when to reach for it.',
   '正在读取 SKILL.md…': 'Loading SKILL.md…',
-  'frontmatter（name/description）由上方表单生成，这里只写正文。':
-    'The frontmatter (name/description) is generated from the form above — only the body is written here.',
-  'frontmatter（name/description）由上方表单生成；未在此编辑的文件保持原样。':
-    'The frontmatter (name/description) is generated from the form above; files not edited here stay untouched.',
+  '名称和描述由上方表单自动写入，这里只写正文。':
+    'Name and description are written automatically from the form above — only the body is written here.',
+  '名称和描述由上方表单自动写入；未在此编辑的文件保持原样。':
+    'Name and description are written automatically from the form above; files not edited here stay untouched.',
   '名称须以字母或数字开头，只能含字母、数字、点、横杠、下划线，最长 64 字符。':
     'The name must start with a letter or digit and may only contain letters, digits, dots, dashes and underscores (64 chars max).',
-  '描述不要用引号整体包裹——写进 frontmatter 后引号会被剥去，与表单值不一致。':
-    'Do not wrap the description in quotes — they are stripped when written to frontmatter and would no longer match the form value.',
+  '描述不要用引号整体包裹——保存时引号会被剥去，与表单值不一致。':
+    'Do not wrap the description in quotes — they are stripped on save and would no longer match the form value.',
   '内容超出单文件上限（{limit} KB）。': 'Content exceeds the per-file limit ({limit} KB).',
   '同名技能已存在——请更换名称，或从列表打开它编辑。':
     'A skill with this name already exists — pick another name, or open the existing one from the list to edit it.',
@@ -773,12 +772,6 @@ export const EN: Record<string, string> = {
   导入技能: 'Import skill',
   本地路径: 'Local path',
   'GitHub 地址': 'GitHub URL',
-  '服务器本机上的技能目录路径，目录里要有 SKILL.md。':
-    'Path to a skill directory on the computer running the Cairn server — it must contain a SKILL.md.',
-  'GitHub 公共仓库或其中子目录的地址；导入后可刷新，重新拉取。':
-    'Address of a public GitHub repository or a subdirectory of one; after importing you can refresh to re-pull it.',
-  '两字段二选一：填其中一个，另一个留空。':
-    'Fill in exactly one of the two fields and leave the other empty.',
   '同名技能已存在——先处理现有技能，再重新导入。':
     'A skill with this name already exists — resolve the existing one first, then import again.',
   '来源未通过校验。': 'The source failed validation.',
@@ -1057,8 +1050,6 @@ export const EN: Record<string, string> = {
   '需要 {platform}': 'needs {platform}',
   '暂无 {platform} 执行机': 'No {platform} Runner',
   '不限（默认执行机）': 'Any (default Runner)',
-  '运行中不能改，换平台请新开任务':
-    'Locked once the task has run. Start a new task to change the platform.',
   手动: 'Manual',
   推荐: 'Recommended',
   '正在连接模型...': 'Connecting to the model...',
@@ -1091,7 +1082,6 @@ export const EN: Record<string, string> = {
   负责人: 'Owner',
   'Coordinator 用的模型额度已用完': "The Coordinator's model is out of quota",
   'Coordinator 用的模型暂时过载': "The Coordinator's model is overloaded",
-  '完成请求未送出，请重试。': 'The completion request was not sent. Try again.',
   输入: 'Input',
   输出: 'Output',
   花费: 'Cost',
@@ -1152,8 +1142,6 @@ export const EN: Record<string, string> = {
   '例如 my-relay': 'e.g. my-relay',
   'API 协议': 'API protocol',
   无密钥网关可留空: 'Leave empty for keyless gateways',
-  '以 Authorization: Bearer 请求头发送 API 密钥':
-    'Send the API key as an Authorization: Bearer header',
   '密钥将加密存储，保存后无法再次查看。':
     'The key is stored encrypted and cannot be viewed again after saving.',
   '模型（至少一个）': 'Models (at least one)',
@@ -1380,8 +1368,8 @@ export const EN: Record<string, string> = {
   刚刚更新: 'Updated just now',
   未验证导入: 'Imported, unverified',
   从仓库导入记忆: 'Import memory from repositories',
-  '这些仓库里有给代理看的说明文件，可以导入成可检索记忆；导入后不会自动注入。':
-    'These repositories contain instruction files for agents. Import them as searchable memory; they will not auto-inject.',
+  '这些仓库里有给 Coordinator 看的说明文件，可以导入成可检索记忆；导入后不会自动注入。':
+    'These repositories contain instruction files for the Coordinator. Import them as searchable memory; they will not auto-inject.',
   以后再说: 'Not now',
 
   '搜索记忆…': 'Search memories…',
@@ -1443,7 +1431,7 @@ export const EN: Record<string, string> = {
   'Coordinator 连续执行了很多步仍未完成，已暂停。点击「继续」让它继续执行。':
     'The Coordinator took many steps without finishing and paused. Click Continue to let it carry on.',
   '未能识别具体原因。通常重试即可；持续出现时，点击「详情」查看原始错误。':
-    'The exact cause was not recognised. A retry usually works; if it keeps happening, open Details for the original error.',
+    'The exact cause was not recognized. A retry usually works; if it keeps happening, open Details for the original error.',
   继续: 'Continue',
   '选 Coordinator 模型': 'Choose Coordinator model',
   '检查 {provider}': 'Check {provider}',
@@ -1616,8 +1604,8 @@ export const EN: Record<string, string> = {
   '未能拦截的原因：{why}': 'Why it was not stopped: {why}',
   '防护：{safeguard}': 'Safeguard: {safeguard}',
   '出处：': 'Source: ',
-  协调者对话: 'Coordinator chat',
-  已建成线程: 'Made into a thread',
+  'Coordinator 对话': 'Coordinator chat',
+  已建成任务: 'Made into a task',
   已忽略: 'Dismissed',
   '{n} 件等你': '{n## item|# items} waiting on you',
   '创建于 {time}': 'created {time}',
@@ -1750,7 +1738,6 @@ export const EN: Record<string, string> = {
   确认设置: 'Confirm settings',
   正在加载模型: 'Loading models',
   模型未能加载: 'Models did not load',
-  'Coordinator 和其他 Agent': 'Coordinator and other agents',
   '所有 Claude 模型': 'All Claude models',
   '所有 Devin 模型': 'All Devin models',
   '{model} · 默认': '{model} · default',
@@ -1872,7 +1859,7 @@ export const EN: Record<string, string> = {
   '状态：failed、waiting、review、running、done': 'State: failed, waiting, review, running, done',
   项目名: 'A project name',
   'PR 编号，或 any': 'A pull request number, or any',
-  '发起它的 Agent 或成员': 'The agent or person who started it',
+  发起它的成员: 'The member who started it',
   '日期，或距今的时间段': 'A date or a span back from now',
   '花费，用 > 或 <': 'Spend, with > or <',
   这个筛选暂无值: 'This filter has no value',
@@ -1882,7 +1869,7 @@ export const EN: Record<string, string> = {
   '请写日期如 2026-11-01，或时间段如 7d': 'Use a date like 2026-11-01, or a span like 7d',
   '请写 > 或 < 加数字，如 >5': 'Use > or < with a number, like >5',
   没有这个名字的项目: 'No project has that name',
-  '没有这个名字的 Agent 或成员': 'No agent or person has that name',
+  没有这个名字的成员: 'No member has that name',
   再加一个筛选或词: 'Add a filter or a word',
   没有同时满足这些筛选的任务: 'No threads match all of these filters',
   清除全部筛选: 'Clear all filters',
@@ -1992,8 +1979,8 @@ export const EN: Record<string, string> = {
   '最近使用 {ago}': 'Last used {ago}',
   尚未使用: 'Not used',
   额度: 'Quota',
-  '正在加载 MCP 服务器': 'Loading MCP servers',
-  'MCP 服务器未能加载': 'MCP servers did not load',
+  正在加载应用: 'Loading apps',
+  应用未能加载: 'Apps did not load',
   正在加载技能: 'Loading skills',
   技能未能加载: 'Skills did not load',
   正在加载密钥: 'Loading secrets',
@@ -2247,15 +2234,15 @@ export const EN: Record<string, string> = {
     'Continues once you authorize · the code is valid for 15 minutes',
   '1 · 打开': '1 · Open',
   '2 · 输入': '2 · Enter',
-  右边这个码: 'the code below',
+  下面这个码: 'the code below',
   复制验证码: 'Copy code',
   重新开始: 'Start again',
   '选择 Cairn 能用的仓库': 'Choose the repositories Cairn can use',
   仍然完成: 'Finish anyway',
-  '在 GitHub 上选好 Agent 能读写的仓库，以后也能改。':
-    'On GitHub, pick the repositories agents can read and write. You can change this later.',
-  '在 GitHub 上选好 Agent 能读写的仓库。':
-    'On GitHub, pick the repositories agents can read and write.',
+  '在 GitHub 上选好 Cairn 能读写的仓库，以后也能改。':
+    'On GitHub, pick the repositories Cairn can read and write. You can change this later.',
+  '在 GitHub 上选好 Cairn 能读写的仓库。':
+    'On GitHub, pick the repositories Cairn can read and write.',
   '尚未选择仓库；组织仓库可能需要组织管理员批准。':
     'No repositories chosen; organization repositories may need an admin to approve.',
   'GitHub 拒绝了访问。组织可能要求先做 SSO 授权，或等管理员批准 Cairn 应用。':
@@ -2299,8 +2286,8 @@ export const EN: Record<string, string> = {
   '有字段格式有误。地址需以 https:// 开头，标识只能使用小写字母、数字和连字符（-）。':
     'A field is not valid. The URL must start with https://, and the identifier may use only lowercase letters, digits and hyphens (-).',
   '例如：团队知识库': 'For example: Team wiki',
-  'Agent 用这个名字调用它。只能用小写字母、数字和连字符（-）。':
-    'Agents call it by this name. Use only lowercase letters, digits and hyphens (-).',
+  '执行任务时用这个名字调用它。只能用小写字母、数字和连字符（-）。':
+    'Tasks call it by this name. Use only lowercase letters, digits and hyphens (-).',
   '例如：team-wiki': 'For example: team-wiki',
   '必须以 https:// 开头。支持浏览器登录的服务器不用填请求头。':
     'Must start with https://. A server that supports browser sign-in needs no headers.',
@@ -2345,14 +2332,14 @@ export const EN: Record<string, string> = {
   两步用起来: 'Two steps to get going',
   启用: 'Enable',
   '正在启用…': 'Enabling…',
-  'Chrome 未打开、扩展未连接或被暂停时，Agent 会改用 Cairn 自带的浏览器，并在结果里说明原因。':
-    'When Chrome is closed, the extension is not connected, or it is paused, the agent falls back to the browser Cairn runs and says why in the result.',
+  'Chrome 未打开、扩展未连接或被暂停时，Coordinator 会改用其他可用浏览器，并在结果里说明原因。':
+    'When Chrome is closed, the extension is not connected, or it is paused, the Coordinator falls back to another available browser and says why in the result.',
   '这个连接在你的电脑上启动，不用填地址，也不用令牌。':
     'This connector starts on your computer. No address or token is needed.',
   '在你的 Chrome 里': 'In your Chrome',
   未能完成登录: 'Could not finish the sign-in',
-  '{name}：删除后 Agent 不能再用它的工具。':
-    '{name}: Agents can no longer use its tools after deletion.',
+  '{name}：删除后任务不能再用它的工具。':
+    '{name}: Tasks can no longer use its tools after deletion.',
   '加密保存在本机，保存后看不到原文。':
     'Encrypted on this computer; it cannot be viewed after saving.',
   '确定删除这个连接？此操作不可撤销。': 'Delete this connection? This cannot be undone.',
@@ -2367,7 +2354,6 @@ export const EN: Record<string, string> = {
   '正在重启…': 'Restarting…',
   '离开时自动更新到 {version}': 'Updates to {version} when you step away',
   '无法连接网络，未能检查更新': 'Cannot connect to the network to check for updates',
-  '更新失败：{message}': 'Update failed: {message}',
   'Cairn 回滚了更新': 'Cairn rolled back an update',
   '{failed} 未能启动，Cairn 已恢复到 {restored}。':
     '{failed} did not start. Cairn restored {restored}.',
@@ -2525,9 +2511,9 @@ export const EN: Record<string, string> = {
     'Create one under Basic Information → App-Level Tokens with the connections:write scope.',
   '先把 Slack App 安装到工作区，再复制 OAuth & Permissions 里的 Bot User OAuth Token。':
     'Click Install to Workspace to install the Slack app first, then copy the Bot User OAuth Token under OAuth & Permissions.',
-  'Socket Mode 直连': 'Direct Socket Mode connection',
+  使用应用凭据直连: 'Connect with app credentials',
   待处理: 'Needs attention',
-  '官方 Bot API': 'Official Bot API',
+  '使用机器人 Token 连接': 'Connect with a bot token',
   扫码登录: 'Scan to sign in',
   'Telegram 机器人': 'Telegram bot',
   连接中: 'Connecting',
@@ -2547,8 +2533,8 @@ export const EN: Record<string, string> = {
   '拒绝失败，请重试。': 'Could not reject. Try again.',
   聊天: 'Chat',
   微信: 'WeChat',
-  '连接 WeChat': 'Connect WeChat',
-  'WeChat 账号': 'WeChat account',
+  连接微信: 'Connect WeChat',
+  微信账号: 'WeChat account',
   '用微信扫描二维码，5 分钟内有效。': 'Scan this QR code in WeChat. It stays valid for 5 minutes.',
   '等待微信确认…': 'Waiting for WeChat to confirm…',
   微信登录二维码: 'WeChat sign-in QR code',
@@ -2691,7 +2677,7 @@ export const EN: Record<string, string> = {
   '确定移除这台手机？Coordinator 会立刻失去对它的访问。':
     'Remove this phone? The Coordinator loses access to it right away.',
   移除手机: 'Remove phone',
-  '我已操作完，交还': "I'm done, hand it back",
+  '我已操作完，交还': 'I am done, hand it back',
   '正在连接手机状态…': 'Checking the phone state…',
   '需要你操作手机 {name}': 'The phone {name} is waiting for you',
   '在手机上完成后点“交还”，Coordinator 继续。':
@@ -2700,8 +2686,7 @@ export const EN: Record<string, string> = {
     'The account access token is stored encrypted. Connect the account again after it expires.',
   'Token 加密保存': 'The token is stored encrypted',
   '不用再配 API key，Token 加密保存': 'No API key needed; the token is stored encrypted',
-  '会从中取出 windsurf_api_key，Token 加密保存':
-    'Cairn picks out windsurf_api_key; the token is stored encrypted',
+  仅提取所需的访问凭据并加密保存: 'Only the needed credential is extracted and stored encrypted',
   本任务的执行机与执行要求: 'Per-task Runner and capability requirements',
   'Coordinator 的长期记忆': "The Coordinator's long-term memory",
   '经 Composio 接入的应用都用它授权': 'Apps connected through Composio authorize with it',
@@ -2731,8 +2716,8 @@ export const EN: Record<string, string> = {
   '按钮和回复都支持。': 'Buttons and replies are supported.',
   '在私聊里和 Coordinator 对话。': 'Talk to the Coordinator in DMs.',
   '在平时的聊天里和 Coordinator 对话。': 'Talk to the Coordinator in your usual chat.',
-  '连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。':
-    'Connect a Telegram bot, WeChat or Slack and talk to the Coordinator from your phone.',
+  '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。':
+    'Connect a Telegram bot, Slack, iMessage or WeChat and talk to the Coordinator from your phone.',
   桌面: 'Desktop',
   平板: 'Tablet',
   网页未能加载: 'The page did not load',
@@ -2757,7 +2742,7 @@ export const EN: Record<string, string> = {
   评论这个元素: 'Comment on this element',
   评论内容: 'Comment',
   对这个元素说点什么: 'Say something about this element',
-  '发给 agent': 'Send to agent',
+  '发给 Coordinator': 'Send to Coordinator',
   '评论 {n}': 'Comment {n}',
   '在 v{n} 上提出，这一版中未找到': 'Made on v{n}; not found in this version',
   '元素位置变了，已重新对上': 'The element moved; matched again',
@@ -2803,8 +2788,8 @@ export const EN: Record<string, string> = {
   '登录账号，多台电脑一键直连': 'Sign in to connect your computers directly',
   '在两台 Windows 或 Mac 上登录同一账号，自动发现彼此并直连，无需每次扫码。':
     'Sign in with the same account on your Windows or Mac computers to connect in one click without QR codes.',
-  '使用 Clerk 登录（Google / GitHub）': 'Sign in with Clerk (Google / GitHub)',
-  '正在跳转到 Clerk 登录…': 'Redirecting to Clerk sign-in…',
+  '登录账号（Google / GitHub）': 'Sign in (Google / GitHub)',
+  '正在跳转登录…': 'Redirecting to sign-in…',
   '无法发起登录，请检查中继地址后重试':
     'Could not start sign-in. Check the relay URL and try again.',
   '高级：本地 Tailscale 与手动配对': 'Advanced: local Tailscale & manual pairing',
@@ -3014,4 +2999,110 @@ export const EN: Record<string, string> = {
   已批准配对: 'Device pairing approved',
   已拒绝配对: 'Device pairing denied',
   '处理配对请求失败，请重试。': 'Could not update pairing request. Try again.',
+  '这个任务已经开始过，无法退回待开始。':
+    'This task has already started and cannot return to To start.',
+  '本轮运行尚未产生交付结果，请重新运行后再合并。':
+    'This run did not finish delivering results. Rerun the task before merging.',
+  '本轮运行没有产生分支或 PR，请重新运行后再合并。':
+    'This run produced no branch or pull request. Rerun the task before merging.',
+  '存在同名记录，请更换名称后重试。':
+    'An entry with this name already exists. Choose another name and try again.',
+  '当前未连接到服务，请稍后重试。': 'Not connected to the service right now. Try again later.',
+  '登录状态已失效，请重新登录后重试。': 'Your sign-in expired. Sign in again and try again.',
+  '没有操作权限，请联系团队管理员。': 'Permission denied. Contact a team admin.',
+  '没有操作权限，请重新登录后重试。': 'Permission denied. Sign in again and try again.',
+  '目标已不存在，请刷新后重试。': 'This item no longer exists. Refresh and try again.',
+  '请求超时，请检查网络后重试。': 'The request timed out. Check your network and try again.',
+  '当前状态已变化，请刷新后重试。': 'The state changed elsewhere. Refresh and try again.',
+  '请求过于频繁，请稍后重试。': 'Too many requests. Try again later.',
+  '服务暂时异常，请稍后重试。': 'The service hit a temporary error. Try again later.',
+  '请求未通过，请检查填写内容后重试。':
+    'The request was not accepted. Check your input and try again.',
+  '网络连接异常，请检查网络后重试。': 'Network error. Check your connection and try again.',
+  批准执行: 'Approve',
+  不执行: 'Decline',
+  以后都允许: 'Always allow',
+  不发: 'Do not send',
+  '定时更新失败，请重试。': 'Could not update the schedule. Try again.',
+  '未能加载目录内容，请重试。': 'Could not load folder contents. Try again.',
+  '更新失败，点击重试': 'Update failed; click to retry',
+  '无法发起登录，请重试。': 'Could not start sign-in. Try again.',
+  '有效期至 {time}': 'Valid until {time}',
+  '作废配对码失败，请重试。': 'Could not revoke the pairing code. Try again.',
+  'Tailscale 远程访问': 'Tailscale remote access',
+  'Coordinator 与任务': 'Coordinator and tasks',
+  '已解散分组「{group}」': 'Ungrouped {group}',
+  '无法撤销解散分组。': 'Could not restore the group.',
+  '未能重新连接，请重试。': 'Could not reconnect. Try again.',
+  '确定删除这条定时？此操作不可撤销。': 'Delete this schedule? This cannot be undone.',
+  已删除定时: 'Schedule deleted',
+  '放弃未保存的修改？': 'Discard unsaved changes?',
+  放弃修改: 'Discard changes',
+  继续编辑: 'Keep editing',
+  '关闭后，未保存的修改会丢失。': 'Closing now discards your unsaved changes.',
+  '开启通知失败，请重试。': 'Could not turn on notifications. Try again.',
+  '交还失败，请重试。': 'Could not hand back control. Try again.',
+  '复制失败，请重试。': 'Could not copy. Try again.',
+  '停止后台任务失败，请重试。': 'Could not stop background task. Try again.',
+  选择当前文件夹: 'Select current folder',
+  暂不关联仓库: 'No repository for now',
+  '正在创建…': 'Creating…',
+  已取消归档: 'Unarchived',
+  这个项目已归档: 'This project is archived',
+  '取消归档后才能修改或运行任务。': 'Unarchive it before editing or running tasks.',
+  '确定转换为 GitHub 仓库？': 'Convert to a GitHub repository?',
+  '转换为 GitHub 仓库': 'Convert to GitHub repository',
+  确认转换: 'Convert',
+  '已转换为 GitHub 仓库': 'Converted to GitHub repository',
+  '转换后将改为从 GitHub 仓库（{repo}）克隆执行，不再使用本机文件夹，且不能转回本地形态。':
+    'Tasks will clone from {repo} on GitHub instead of the local folder, and this cannot be switched back.',
+  断开后需要重新授权才能使用: 'Reconnect required after disconnecting',
+  '断开 {name}': 'Disconnect {name}',
+  '移除后，经 Composio 接入的所有应用都会断开连接':
+    'Removing this disconnects every app connected through Composio',
+  '切换到 {name}？': 'Switch to {name}?',
+  切换主机: 'Switch host',
+  切换并重启: 'Switch and restart',
+  '切换后应用会立即重启并连接到选定主机。':
+    'The app will restart immediately and connect to the selected host.',
+  '移除这台远程主机配置？此操作不会关闭远端服务。':
+    'Remove this remote host? The remote server itself will stay running.',
+  '删除后，该邮箱的凭据与唤醒规则都会移除，此操作无法撤销':
+    'Credentials and wake rules for this mailbox will be removed and cannot be undone',
+  '接入失败，请重试。': 'Could not connect. Try again.',
+  '开启公网隧道失败，请重试。': 'Could not enable public tunnel. Try again.',
+  '退出失败，请重试。': 'Could not sign out. Try again.',
+  '撤销后，这台已配对设备需要重新扫码配对才能访问':
+    'This paired device will need a new QR code scan to reconnect',
+  返回确认设置: 'Back to confirmation',
+  更换或添加服务商: 'Switch or add provider',
+  '完成请求未送出，请重试。': 'Could not mark task complete. Try again.',
+  '任务开始后不能改，换平台请新开任务':
+    'Locked once the task starts. Start a new task to change the platform.',
+  '已通知停止，执行端确认后这 {n} 个任务会标记为完成。':
+    'Stop requested; {n#1 task|# tasks} will be marked done after runner confirmation.',
+  '已停止，重新运行后才能完成': 'Stopped; rerun before marking complete',
+  '正在加载成果…': 'Loading deliverables…',
+  跳到未回答的问题: 'Jump to unanswered question',
+  '将保存 {secrets} 条机密，{envs} 条环境变量':
+    'Will save {secrets#1 secret|# secrets} and {envs#1 env var|# env vars}',
+  '使用 Bearer 认证头（关闭时使用服务商默认认证方式）':
+    'Use Bearer auth header (off uses provider default auth)',
+  不限: 'Unlimited',
+  自定义服务器和端口: 'Custom server and port',
+  '请在这台 Mac 的 Cairn 桌面应用里完成权限授权与检查。':
+    'Open the Cairn desktop app on this Mac to grant permissions and recheck.',
+  '本地路径或 GitHub 地址': 'Local path or GitHub URL',
+  '填入服务器本机目录路径（需包含 SKILL.md），或以 https:// 开头的 GitHub 公共仓库地址；导入后可刷新。':
+    'Enter a local directory containing SKILL.md or a public https:// GitHub repository URL; imported skills can be refreshed.',
+  '例如 /Users/you/skills/deploy-to-prod 或 https://github.com/owner/repo':
+    'e.g. /Users/you/skills/deploy-to-prod or https://github.com/owner/repo',
+  '已筛选：{date}': 'Filtered: {date}',
+  查看全年: 'View full year',
+  本机常驻: 'resident host',
+  环境变量: 'environment variable',
+  代填: 'autofill',
+  二维码: 'qr code',
+  机器人: 'bot',
+  远程: 'remote',
 };

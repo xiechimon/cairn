@@ -17,7 +17,7 @@ export function parseAssignments(text: string): { entries: Assignment[]; badLine
   const entries: Assignment[] = [];
   const badLines: number[] = [];
   text.split('\n').forEach((raw, index) => {
-    const line = raw.trim();
+    const line = raw.trim().replace(/^export\s+/, '');
     if (line === '' || line.startsWith('#')) return;
     const eq = line.indexOf('=');
     const name = eq < 0 ? '' : line.slice(0, eq).trim();
@@ -138,6 +138,14 @@ export function BulkSecretDialog({
             </span>
           </span>
         </label>
+        {badLines.length === 0 && entries.length > 0 && (
+          <p data-testid="bulk-secret-preview" className="m-0 text-meta text-content-tertiary">
+            {t('将保存 {secrets} 条机密，{envs} 条环境变量', {
+              secrets: entries.filter((entry) => storesSecret(entry.name)).length,
+              envs: entries.filter((entry) => !storesSecret(entry.name)).length,
+            })}
+          </p>
+        )}
         {badLines.length > 0 && (
           <p role="alert" className="m-0 text-meta text-destructive">
             {t('第 {lines} 行要写成 NAME=VALUE', { lines: badLines.join('、') })}

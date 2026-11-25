@@ -8,8 +8,12 @@ import { IconTooltip } from '../components/icon-tooltip.js';
 import { ToggleSwitch } from '../components/toggle-switch.js';
 import { Button } from '../components/ui/button.js';
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../components/ui/popover.js';
+import { toastSuccess } from '../components/ui/toaster.js';
 import type { TodoRecord } from '../fixtures/records.js';
 import { useI18n } from '../i18n/provider.js';
+import { describeError } from '../lib/error-copy.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
+import { schedulePauseReason } from '../schedules/schedule-model.js';
 import {
   automationCadence,
   automationFinished,
@@ -179,6 +183,7 @@ function AutomationItem({
 }) {
   const { t, locale } = useI18n();
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const finished = automationFinished(schedule);
   const change = async (action: () => Promise<void>) => {
@@ -188,7 +193,7 @@ function AutomationItem({
     try {
       await action();
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : t('定时更新失败'));
+      setError(describeError(failure, t) ?? t('定时更新失败，请重试。'));
     } finally {
       setBusy(false);
     }
@@ -237,7 +242,7 @@ function AutomationItem({
               size="icon-xs"
               data-testid="automation-delete"
               disabled={busy}
-              onClick={() => void change(() => onDelete(schedule.id))}
+              onClick={() => setConfirmDelete(true)}
             />
           }
         >
@@ -251,7 +256,12 @@ function AutomationItem({
         {schedule.prompt.trim() === '' ? t('使用任务描述') : schedule.prompt}
       </p>
       {schedule.pausedReason !== null && (
-        <p className="m-0 break-words text-meta text-content-tertiary">{schedule.pausedReason}</p>
+        <p
+          className="m-0 break-words text-meta text-content-tertiary"
+          title={schedule.pausedReason}
+        >
+          {schedulePauseReason(schedule.pausedReason, t)}
+        </p>
       )}
       {!finished && (
         <div className="flex items-center justify-between gap-3">
@@ -272,6 +282,20 @@ function AutomationItem({
           {error}
         </p>
       )}
+      <DeleteConfirm
+        open={confirmDelete}
+        title={t('确定删除这条定时？此操作不可撤销。')}
+        summary={automationCadence(schedule, locale, t)}
+        ariaLabel={t('删除定时')}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={() => {
+          setConfirmDelete(false);
+          void change(async () => {
+            await onDelete(schedule.id);
+            toastSuccess(t('已删除定时'));
+          });
+        }}
+      />
     </section>
   );
 }

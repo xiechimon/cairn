@@ -166,7 +166,7 @@ export function CommentPopover({
                 disabled={trimmed === '' || busy}
                 onClick={() => onSend(trimmed)}
               >
-                {t('发给 agent')}
+                {t('发给 Coordinator')}
               </Button>
             )}
           </div>

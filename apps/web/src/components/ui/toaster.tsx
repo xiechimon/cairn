@@ -5,11 +5,12 @@ import type { CSSProperties } from 'react';
 import { useEffect, useState } from 'react';
 import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
 import { useI18n } from '../../i18n/provider.js';
+import { describeErrorDefault } from '../../lib/error-copy.js';
 import { RingSpinner } from './ring-spinner.js';
 
 export function toastError(title: string, error: unknown): void {
-  const reason = error instanceof Error && error.message !== '' ? error.message : null;
-  toast.error(title, reason !== null ? { description: reason } : undefined);
+  const reason = describeErrorDefault(error);
+  toast.error(title, reason !== null && reason !== title ? { description: reason } : undefined);
 }
 
 export function toastSuccess(title: string, action?: { label: string; onClick: () => void }): void {

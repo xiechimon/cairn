@@ -659,6 +659,7 @@ function openFromTray(target: unknown): void {
 }
 
 interface TrayControls {
+  connectionLabel: string | null;
   runner: () => DesktopRunnerState;
   setRunner: (on: boolean) => Promise<void>;
   nextRunAt?: () => Promise<number | null>;
@@ -738,7 +739,8 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   const idleIcon = trayIcon('trayTemplate.png');
   const awakeIcon = trayIcon('trayAwakeTemplate.png');
   const keepAwake = createKeepAwake(powerSaveBlocker, join(app.getPath('userData'), 'keep-awake'));
-  const tooltip = `Cairn · ${new URL(origin).host}`;
+  const tooltip =
+    controls.connectionLabel === null ? 'Cairn' : `Cairn · ${controls.connectionLabel}`;
   let created: Tray | null = null;
   let native: NativeTray | null = null;
   let pageMenu: NativeTrayMenu | null = null;
@@ -765,28 +767,35 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   };
   const fallbackMenu = (): Menu =>
     Menu.buildFromTemplate(
-      trayMenuTemplate(new URL(origin).host, keepAwake.isOn(), {
-        open: focusWindow,
-        setKeepAwake,
-        quit: () => app.quit(),
-      }),
+      trayMenuTemplate(
+        controls.connectionLabel,
+        keepAwake.isOn(),
+        {
+          open: focusWindow,
+          setKeepAwake,
+          quit: () => app.quit(),
+        },
+        desktopLocale(app.getLocale()),
+      ),
     );
   const setKeepAwake = (on: boolean): void => {
     keepAwake.set(on);
     refreshIcon();
     if (!IS_MAC) created?.setContextMenu(fallbackMenu());
   };
+  let wakeAhead: ReturnType<typeof createWakeAhead> | null = null;
   if (controls.nextRunAt !== undefined) {
     const nextRunAt = controls.nextRunAt;
-    const wakeAhead = createWakeAhead({
+    const monitor = createWakeAhead({
       nextRunAt,
       onWindow: (active) => {
         keepAwake.setWakeAhead(active);
         refreshIcon();
       },
     });
-    wakeAhead.start();
-    powerMonitor.on('resume', () => void wakeAhead.pollNow());
+    wakeAhead = monitor;
+    monitor.start();
+    powerMonitor.on('resume', () => void monitor.pollNow());
   }
   globalShortcut.register(NEW_TASK_SHORTCUT, () => sendToWindow('desktop-menu', 'new-task'));
   const popover = createTrayPopover();
@@ -980,7 +989,7 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
       },
     });
   }
-  setInterval(publish, TRAY_REFRESH_MS);
+  const refreshTimer = setInterval(publish, TRAY_REFRESH_MS);
   const fromPopover = (event: IpcMainInvokeEvent | IpcMainEvent): boolean =>
     event.sender === popover.webContents && event.senderFrame?.origin === origin;
   ipcMain.handle('desktop-tray:state', (event) => (fromPopover(event) ? state() : null));
@@ -1024,6 +1033,9 @@ function showTray(origin: string, controls: TrayControls): { destroy: () => void
   loadTray();
   return {
     destroy: () => {
+      clearInterval(refreshTimer);
+      wakeAhead?.stop();
+      wakeAhead = null;
       native?.stop();
       native = null;
       created?.destroy();
@@ -1102,6 +1114,7 @@ function serveUpdates(
             forward: () =>
               BrowserWindow.getFocusedWindow()?.webContents.navigationHistory.goForward(),
           },
+          desktopLocale(app.getLocale()),
         ),
       ),
     );
@@ -1517,6 +1530,7 @@ async function boot(): Promise<void> {
         origin = server.origin;
       }
     }
+    appOrigin = origin;
 
     const activeRunnerHome = runnerHomeForConnection(runnerHome(), userData, activeConn.id);
     let runnerWanted = true;
@@ -1558,6 +1572,7 @@ async function boot(): Promise<void> {
     };
     void bringRunnerUp();
     tray = showTray(origin, {
+      connectionLabel: activeConn.kind === 'local' ? null : activeConn.name || new URL(origin).host,
       runner: () => {
         if (runner === null) return runnerStarting !== null ? 'starting' : 'failed';
         if (runner.isRunning()) return 'on';
@@ -1632,7 +1647,8 @@ async function boot(): Promise<void> {
       if (typeof id !== 'string' || id === '') throw new Error('Invalid connection id');
       setActiveConnection(userData, id);
       app.relaunch({ args: relaunchArgs(false) });
-      app.exit(0);
+      setTimeout(() => app.exit(0), STOP_TIMEOUT_MS + 3_000).unref();
+      app.quit();
       return hostStatus();
     });
     ipcMain.handle('desktop-host:set-resident', async (event, enabled: unknown) => {
@@ -1657,7 +1673,6 @@ async function boot(): Promise<void> {
     servePageActivity(origin);
     serveOwnComputer(origin, agentDesktopBinary());
     watchIdleUpdate(activeRunnerHome);
-    appOrigin = origin;
     const restore = takeRelaunchWindow();
     if (restore !== null || !BACKGROUND_LAUNCH) openWindow(origin, restore);
     if (server === null) confirmAfterBoot(guard);
@@ -1700,14 +1715,18 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on('will-quit', () => windowState?.flush());
   app.on('before-quit', (event) => {
-    if (quitting || server === null) return;
+    if (quitting) return;
     quitting = true;
     globalShortcut.unregisterAll();
     event.preventDefault();
     const running = server;
-    void Promise.all([stopAntigravityLogin(), stopDevinLogin(), runner?.stop()])
-      .then(() => stopServer(running))
-      .then(() => clearServerOwner(cairnHome(), process.pid))
+    void Promise.all([
+      stopAntigravityLogin(),
+      stopDevinLogin(),
+      runner?.stop(),
+      running === null ? undefined : stopServer(running),
+    ])
+      .then(() => (running === null ? undefined : clearServerOwner(cairnHome(), process.pid)))
       .then(() => (activeGuard?.rollingBack() === true ? undefined : updater?.apply('none')))
       .catch((error: unknown) =>
         console.error('finishing the pending update on quit failed:', messageOf(error)),

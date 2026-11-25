@@ -17,7 +17,7 @@ import {
   useMachines,
 } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
-import { FormField, FormStack } from '../components/form-layout.js';
+import { FormActions, FormField, FormStack } from '../components/form-layout.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../components/menu-keys.js';
 import { QrCode } from '../components/qr-code.js';
@@ -63,13 +63,13 @@ const PLATFORM_COPY: Record<
 > = {
   telegram: {
     name: 'Telegram 机器人',
-    description: '官方 Bot API',
+    description: '使用机器人 Token 连接',
     info: '按钮和回复都支持。',
     connect: '连接 Telegram',
   },
   slack: {
     name: 'Slack',
-    description: 'Socket Mode 直连',
+    description: '使用应用凭据直连',
     info: '在私聊里和 Coordinator 对话。',
     connect: '连接 Slack',
   },
@@ -83,7 +83,7 @@ const PLATFORM_COPY: Record<
     name: '微信',
     description: '扫码登录',
     info: '在平时的聊天里和 Coordinator 对话。',
-    connect: '连接 WeChat',
+    connect: '连接微信',
   },
 };
 
@@ -107,29 +107,43 @@ function ConnectDialog({
 }) {
   const { t } = useI18n();
   const [token, setToken] = useState('');
+  const submit = () => {
+    if (pending || token.trim() === '') return;
+    onSubmit(token.trim());
+  };
   return (
     <DialogShell
       title={t('连接 Telegram 机器人')}
       subtitle={t('在 @BotFather 里创建机器人，把 bot token 粘贴到这里。')}
       onClose={onClose}
       footer={
-        <Button
-          className={DIALOG_PRIMARY_BUTTON}
-          disabled={pending || token.trim() === ''}
-          onClick={() => onSubmit(token.trim())}
-          data-testid="im-connect-submit"
-        >
-          {t('连接 Telegram')}
-        </Button>
+        <FormActions
+          className="pt-0"
+          primary={{
+            label: t('连接 Telegram'),
+            onClick: submit,
+            disabled: pending || token.trim() === '',
+            testId: 'im-connect-submit',
+          }}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
       }
     >
-      <Input
-        value={token}
-        onChange={(event) => setToken(event.target.value)}
-        placeholder="123456:ABC…"
-        autoComplete="off"
-        data-testid="im-token-input"
-      />
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <Input
+          type="password"
+          value={token}
+          onChange={(event) => setToken(event.target.value)}
+          placeholder="123456:ABC…"
+          autoComplete="off"
+          data-testid="im-token-input"
+        />
+      </form>
     </DialogShell>
   );
 }
@@ -148,6 +162,10 @@ function SlackConnectDialog({
   const [botToken, setBotToken] = useState('');
   const appTokenRef = useRef<HTMLInputElement>(null);
   const ready = appToken.trim() !== '' && botToken.trim() !== '';
+  const submit = () => {
+    if (pending || !ready) return;
+    onSubmit(appToken.trim(), botToken.trim());
+  };
   return (
     <DialogShell
       title={t('连接 Slack')}
@@ -167,49 +185,60 @@ function SlackConnectDialog({
       onClose={onClose}
       initialFocus={appTokenRef}
       footer={
-        <Button
-          className={DIALOG_PRIMARY_BUTTON}
-          disabled={pending || !ready}
-          onClick={() => onSubmit(appToken.trim(), botToken.trim())}
-          data-testid="im-connect-submit"
-        >
-          {t('连接 Slack')}
-        </Button>
+        <FormActions
+          className="pt-0"
+          primary={{
+            label: t('连接 Slack'),
+            onClick: submit,
+            disabled: pending || !ready,
+            testId: 'im-connect-submit',
+          }}
+          secondary={{ label: t('取消'), onClick: onClose }}
+        />
       }
     >
-      <FormStack>
-        <FormField
-          label="App-Level Token"
-          htmlFor="im-app-token"
-          help={t('Basic Information → App-Level Tokens 里生成，scope 选 connections:write。')}
-        >
-          <Input
-            ref={appTokenRef}
-            id="im-app-token"
-            value={appToken}
-            onChange={(event) => setAppToken(event.target.value)}
-            placeholder="xapp-…"
-            autoComplete="off"
-            data-testid="im-app-token-input"
-          />
-        </FormField>
-        <FormField
-          label="Bot Token"
-          htmlFor="im-bot-token"
-          help={t(
-            '先把 Slack App 安装到工作区，再复制 OAuth & Permissions 里的 Bot User OAuth Token。',
-          )}
-        >
-          <Input
-            id="im-bot-token"
-            value={botToken}
-            onChange={(event) => setBotToken(event.target.value)}
-            placeholder="xoxb-…"
-            autoComplete="off"
-            data-testid="im-bot-token-input"
-          />
-        </FormField>
-      </FormStack>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <FormStack>
+          <FormField
+            label="App-Level Token"
+            htmlFor="im-app-token"
+            help={t('Basic Information → App-Level Tokens 里生成，scope 选 connections:write。')}
+          >
+            <Input
+              ref={appTokenRef}
+              id="im-app-token"
+              type="password"
+              value={appToken}
+              onChange={(event) => setAppToken(event.target.value)}
+              placeholder="xapp-…"
+              autoComplete="off"
+              data-testid="im-app-token-input"
+            />
+          </FormField>
+          <FormField
+            label="Bot Token"
+            htmlFor="im-bot-token"
+            help={t(
+              '先把 Slack App 安装到工作区，再复制 OAuth & Permissions 里的 Bot User OAuth Token。',
+            )}
+          >
+            <Input
+              id="im-bot-token"
+              type="password"
+              value={botToken}
+              onChange={(event) => setBotToken(event.target.value)}
+              placeholder="xoxb-…"
+              autoComplete="off"
+              data-testid="im-bot-token-input"
+            />
+          </FormField>
+        </FormStack>
+      </form>
     </DialogShell>
   );
 }
@@ -317,7 +346,7 @@ function WechatLoginDialog({
   }, [poll.data, onDone]);
   return (
     <DialogShell
-      title={t('连接 WeChat')}
+      title={t('连接微信')}
       subtitle={failed ? failedText : t('用微信扫描二维码，5 分钟内有效。')}
       onClose={onClose}
       footer={
@@ -377,7 +406,12 @@ export function ImConnectionsPage() {
   const [wechatLogin, setWechatLogin] = useState<ImWechatLoginStart | null>(null);
   const [deleting, setDeleting] = useState<ImConnectionRecord | null>(null);
   const machinesQ = useMachines(teamId, live && connectingImessage);
-  const machines = registeredMachines(machinesQ.data ?? []);
+  const allMachines = registeredMachines(machinesQ.data ?? []);
+  const macMachines = allMachines.filter((m) => m.capabilities?.osPlatform === 'darwin');
+  const machines =
+    macMachines.length > 0 || allMachines.some((m) => m.capabilities?.osPlatform !== undefined)
+      ? macMachines
+      : allMachines;
   const connections = connectionsQ.data?.connections ?? [];
   const requests = (requestsQ.data?.requests ?? []).filter((row) => row.status === 'pending');
   const connectionIds = new Set(connections.map((conn) => conn.id));
@@ -397,7 +431,7 @@ export function ImConnectionsPage() {
   const connectionName = (conn: ImConnectionRecord) =>
     conn.accountLabel ??
     (conn.platform === 'wechat'
-      ? t('WeChat 账号')
+      ? t('微信账号')
       : conn.platform === 'slack'
         ? 'Slack'
         : conn.platform === 'imessage'
@@ -599,7 +633,9 @@ export function ImConnectionsPage() {
       <SettingsSection
         className="mt-6"
         title={t('聊天应用')}
-        info={t('连接 Telegram 机器人、微信或 Slack 后，就能直接用手机和 Coordinator 对话。')}
+        info={t(
+          '连接 Telegram 机器人、Slack、iMessage 或微信后，就能直接用手机和 Coordinator 对话。',
+        )}
         testId="im-platforms"
       >
         <SettingsCard>{PLATFORM_ORDER.flatMap(platformRows)}</SettingsCard>

@@ -36,12 +36,19 @@ export function normalizedSite(site: string): string {
 
 interface VaultPairDialogProps {
   open?: boolean;
+  pending?: boolean;
   onClose: () => void;
   onSave?: (draft: PairDraft) => void;
   editing?: SecretListEntry | null;
 }
 
-export function VaultPairDialog({ open, onClose, onSave, editing = null }: VaultPairDialogProps) {
+export function VaultPairDialog({
+  open,
+  pending = false,
+  onClose,
+  onSave,
+  editing = null,
+}: VaultPairDialogProps) {
   const { t } = useI18n();
   const [site, setSite] = useState(editing?.description ?? '');
   const [name, setName] = useState(editing?.name ?? '');
@@ -59,7 +66,7 @@ export function VaultPairDialog({ open, onClose, onSave, editing = null }: Vault
     !nameInvalid &&
     (editing !== null || (username.trim() !== '' && password !== ''));
   const submit = () => {
-    if (!canSave) return;
+    if (!canSave || pending) return;
     if (onSave === undefined) {
       onClose();
       return;
@@ -76,18 +83,20 @@ export function VaultPairDialog({ open, onClose, onSave, editing = null }: Vault
     <DialogShell
       title={title}
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!pending) onClose();
+      }}
       size="s"
       initialFocus={siteRef}
       footer={
         <FormActions
           className="pt-0"
           primary={{
-            label: editing === null ? t('添加') : t('保存'),
+            label: pending ? t('保存中…') : editing === null ? t('添加') : t('保存'),
             onClick: submit,
-            disabled: !canSave,
+            disabled: !canSave || pending,
           }}
-          secondary={{ label: t('取消'), onClick: onClose }}
+          secondary={{ label: t('取消'), onClick: onClose, disabled: pending }}
         />
       }
     >

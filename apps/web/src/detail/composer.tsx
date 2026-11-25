@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu.js';
 import { Input } from '../components/ui/input.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { Textarea } from '../components/ui/textarea.js';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../components/ui/tooltip.js';
 import { useI18n } from '../i18n/provider.js';
@@ -43,6 +44,7 @@ const COMPOSER_INPUT =
 interface ComposerProps {
   placeholder: string;
   streaming: boolean;
+  stopping?: boolean;
   onSend?: (text: string) => void | Promise<void>;
   onQueue?: (text: string) => void | Promise<void>;
   onStopAndSend?: (text: string) => void | Promise<void>;
@@ -65,6 +67,7 @@ interface ComposerProps {
 export function Composer({
   placeholder,
   streaming,
+  stopping = false,
   onSend,
   onQueue,
   onStopAndSend,
@@ -282,11 +285,12 @@ export function Composer({
           {!readOnly &&
             (streaming && !hasContent ? (
               <IconTooltip
-                label={t('停止')}
+                label={stopping ? t('正在停止…') : t('停止')}
                 trigger={
                   <Button
                     variant="ghost"
                     size="icon"
+                    disabled={stopping}
                     className={cn(
                       'composer-stop',
                       narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, STOP_CLS),
@@ -297,8 +301,14 @@ export function Composer({
               >
                 {narrow ? (
                   <span className={`${ROUND_FACE_CLS} bg-(--hover-1)`}>
-                    <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                    {stopping ? (
+                      <RingSpinner className="size-3.5" />
+                    ) : (
+                      <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
+                    )}
                   </span>
+                ) : stopping ? (
+                  <RingSpinner className="size-3.5" />
                 ) : (
                   <span className="size-3 rounded-(--cds-radius-xs) bg-current" />
                 )}
@@ -310,6 +320,7 @@ export function Composer({
                   <Button
                     variant="ghost"
                     size="icon"
+                    disabled={!hasContent}
                     className={cn(
                       'composer-send',
                       narrow ? ROUND_HIT_CLS : cn(SEND_BTN_CLS, hasContent && SEND_ON_CLS),

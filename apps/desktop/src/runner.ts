@@ -269,14 +269,14 @@ export async function startLocalRunner(options: RunnerOptions): Promise<LocalRun
       pending = setTimeout(launch, RESTART_DELAY_MS);
     });
   };
-  launch();
+  if (!options.isQuitting()) launch();
   return {
     ensureRunning: () => {
       halted = false;
       if (child !== null || options.isQuitting()) return;
       if (pending !== null) clearTimeout(pending);
       budget.reset();
-      launch();
+      if (!options.isQuitting()) launch();
     },
     isRunning: () => child !== null || pending !== null,
     stop: () => {

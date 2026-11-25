@@ -1,4 +1,4 @@
-import type { PrPanelRow } from '@cairn/shared';
+import { IN_PROGRESS_PHASES, type PrPanelRow } from '@cairn/shared';
 import { cn } from 'cn';
 import { CircleCheck, Plus, X } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -15,8 +15,10 @@ import { SidePanel, SidePanelHead, SidePanelTitle } from '../components/side-pan
 import { TaskPrLine, TaskPrLineSkeleton } from '../components/thread/task-pr-line.js';
 import { TaskRow } from '../components/thread/task-row.js';
 import { Button } from '../components/ui/button.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
 import { Skeleton } from '../components/ui/skeleton.js';
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
+import { blockDemoWrite } from '../demo/demo-gate.js';
 import { useI18n } from '../i18n/provider.js';
 import { safeLocalStorage, safeSetItem } from '../safe-storage.js';
 import { newTaskRequest } from './open-composer.js';
@@ -144,25 +146,53 @@ function SectionHeader({
 function SelectionBar({
   todos,
   onClear,
+  onKeepFailed,
 }: {
   todos: readonly TaskEntry['todo'][];
   onClear: () => void;
+  onKeepFailed: (ids: string[]) => void;
 }) {
   const { t } = useI18n();
-  const { teamId } = useLiveData();
+  const { live, teamId } = useLiveData();
   const { stopAndDoneTodo } = useApiMutations(teamId);
   const [confirming, setConfirming] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const resolve = async () => {
     setConfirming(false);
-    const results = await Promise.allSettled(
-      todos.map((todo) => stopAndDoneTodo.mutateAsync(todo.id)),
-    );
-    const failed = results.filter((result) => result.status === 'rejected').length;
-    if (failed > 0) toastError(t('{n} 个任务未能标记完成，请重试。', { n: failed }), null);
-    else toastSuccess(t('{n} 个任务已标记完成。', { n: todos.length }));
-    onClear();
+    if (!live) {
+      blockDemoWrite();
+      return;
+    }
+    if (resolving) return;
+    setResolving(true);
+    try {
+      const results = await Promise.allSettled(
+        todos.map((todo) => stopAndDoneTodo.mutateAsync(todo.id)),
+      );
+      const failedIds = todos
+        .filter((_, index) => results[index]?.status === 'rejected')
+        .map((todo) => todo.id);
+      if (failedIds.length > 0) {
+        toastError(t('{n} 个任务未能标记完成，请重试。', { n: failedIds.length }), null);
+        onKeepFailed(failedIds);
+        return;
+      }
+      const anyStopping = results.some(
+        (result) => result.status === 'fulfilled' && result.value.state === 'stopping',
+      );
+      toastSuccess(
+        anyStopping
+          ? t('已通知停止，执行端确认后这 {n} 个任务会标记为完成。', { n: todos.length })
+          : t('{n} 个任务已标记完成。', { n: todos.length }),
+      );
+      onClear();
+    } finally {
+      setResolving(false);
+    }
   };
-  const running = todos.some((todo) => todo.phase !== 'todo' && todo.phase !== 'review');
+  const running = todos.some((todo) =>
+    (IN_PROGRESS_PHASES as readonly string[]).includes(todo.phase),
+  );
   const selectedParts = t('已选 {n} 个', { n: '__COUNT__' }).split('__COUNT__');
   return (
     <div
@@ -178,10 +208,15 @@ function SelectionBar({
       <Button
         variant="ghost"
         data-testid="tasks-selection-resolve"
+        disabled={resolving}
         onClick={() => (running ? setConfirming(true) : void resolve())}
         className="h-8 gap-2 px-3 text-ui text-background hover:bg-background/12 hover:text-background dark:hover:bg-background/12"
       >
-        <CircleCheck aria-hidden className="size-5" />
+        {resolving ? (
+          <RingSpinner className="size-4" />
+        ) : (
+          <CircleCheck aria-hidden className="size-5" />
+        )}
         {t('完成')}
       </Button>
       <span aria-hidden className="h-5 w-px bg-background/20" />
@@ -587,7 +622,17 @@ export function TasksPanel({
           onSubmit={async (text) => {
             const choicesAtSubmit = tabChoices.current;
             if ((await onAddTask(text)) !== 'saved') setAdding(false);
-            else if (tabChoices.current === choicesAtSubmit) setChosenTab('next');
+            else if (tabChoices.current === choicesAtSubmit) {
+              setChosenTab('next');
+              if (linkedToScheduled)
+                setSearchParams(
+                  (params) => {
+                    params.delete(TASKS_TAB_PARAM);
+                    return params;
+                  },
+                  { replace: true },
+                );
+            }
           }}
         />
       )}
@@ -621,7 +666,11 @@ export function TasksPanel({
           </QueryBoundary>
         )}
         {tab !== 'scheduled' && selectedTodos.length > 0 && (
-          <SelectionBar todos={selectedTodos} onClear={clearPicked} />
+          <SelectionBar
+            todos={selectedTodos}
+            onClear={clearPicked}
+            onKeepFailed={(ids) => setPicked(new Set(ids))}
+          />
         )}
       </div>
     </SidePanel>

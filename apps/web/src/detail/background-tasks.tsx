@@ -9,6 +9,8 @@ import {
 } from '../components/chat/trace-parts.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
 import { Button } from '../components/ui/button.js';
+import { RingSpinner } from '../components/ui/ring-spinner.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { BackgroundTaskView, TranscriptItem } from '../fixtures/records.js';
 import type { TFunc } from '../i18n/translate.js';
 import { WorkTrace } from './work-trace.js';
@@ -80,11 +82,20 @@ function BackgroundTaskRow({
                 className="size-7 flex-none text-(--text-tertiary) hover:text-(--foreground)"
                 data-testid="bg-task-stop"
                 disabled={stop.isPending}
-                onClick={() => stop.mutate({ buildId, taskId: task.taskId })}
+                onClick={() =>
+                  stop.mutate(
+                    { buildId, taskId: task.taskId },
+                    { onError: (error) => toastError(t('停止后台任务失败，请重试。'), error) },
+                  )
+                }
               />
             }
           >
-            <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
+            {stop.isPending ? (
+              <RingSpinner className="size-3.5" />
+            ) : (
+              <span className="size-2.5 rounded-(--cds-radius-xs) bg-current" />
+            )}
           </IconTooltip>
         )}
       </div>

@@ -1,11 +1,11 @@
 import { Ellipsis } from 'lucide-react';
 import { useI18n } from '../../i18n/provider.js';
-import { writeClipboard } from '../../lib/clipboard.js';
+import { copyTextWithFeedback } from '../../lib/clipboard.js';
 import { IconTooltip } from '../icon-tooltip.js';
 import { KeyedMenuContent, KeyedMenuItem } from '../menu-keys.js';
 import { Button } from '../ui/button.js';
 import { DropdownMenu, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu.js';
-import { toastSuccess } from '../ui/toaster.js';
+import { toastError, toastSuccess } from '../ui/toaster.js';
 
 export interface PrRowMenuProps {
   number: number;
@@ -39,8 +39,11 @@ export function PrRowMenu({ number, url, onViewChanges, onResolve }: PrRowMenuPr
         <KeyedMenuItem
           shortcut="L"
           onClick={() => {
-            void writeClipboard(url);
-            toastSuccess(t('已复制链接'));
+            copyTextWithFeedback(
+              url,
+              () => toastSuccess(t('已复制链接')),
+              (error) => toastError(t('复制失败，请重试。'), error),
+            );
           }}
         >
           {t('复制链接')}

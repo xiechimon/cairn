@@ -23,6 +23,18 @@ interface ApprovalQuestion {
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 const APPROVAL_REQUEST_PREFIX = 'approval-';
+const APPROVAL_CHOICE_LABELS: Record<string, string> = {
+  批准执行: '批准执行',
+  不执行: '不执行',
+  以后都允许: '以后都允许',
+  发送: '发送',
+  不发: '不发',
+};
+
+export function approvalChoiceLabel(label: string, t: Translate): string {
+  const key = APPROVAL_CHOICE_LABELS[label];
+  return key === undefined ? label : t(key);
+}
 const GENERIC_HEADER = '审批';
 const OUTBOUND_OPEN = '对外发送：';
 const PARAMETER_LABEL = '参数';

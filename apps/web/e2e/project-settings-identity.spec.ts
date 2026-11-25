@@ -162,6 +162,7 @@ test('settings: local project shows conversion card; submit carries repoKind/git
     (r) => r.url().includes('/api/projects') && r.request().method() === 'GET',
   );
   await convert.click();
+  await page.getByRole('alertdialog').getByRole('button', { name: '确认转换' }).click();
   await refetched;
   expect(stub.patches[0]?.body).toEqual({
     repoKind: 'github',

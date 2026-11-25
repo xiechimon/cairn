@@ -1,29 +1,71 @@
 import type { DesktopMenuCommand, DesktopUpdateState } from '@cairn/shared';
 import type { MenuItemConstructorOptions } from 'electron';
+import type { DesktopLocale } from './locale.js';
 
 export interface UpdateMenuActions {
   check: () => void;
   install: () => void;
 }
 
+const LABELS = {
+  zh: {
+    checkingUpdates: '正在检查更新…',
+    installUpdate: (version: string) => `安装更新 ${version}…`,
+    restartUpdate: (version: string) => `立即更新到 ${version}`,
+    downloadingUpdate: (version: string, percent: number) =>
+      `正在下载更新 ${version} (${percent}%)`,
+    installingUpdate: (version: string) => `正在安装更新 ${version}…`,
+    checkUpdates: '检查更新…',
+    settings: '设置…',
+    file: '文件',
+    newTask: '新建任务',
+    edit: '编辑',
+    find: '查找…',
+    view: '视图',
+    history: '历史记录',
+    back: '后退',
+    forward: '前进',
+  },
+  en: {
+    checkingUpdates: 'Checking for Updates…',
+    installUpdate: (version: string) => `Install Update ${version}…`,
+    restartUpdate: (version: string) => `Update to ${version} Now`,
+    downloadingUpdate: (version: string, percent: number) =>
+      `Downloading Update ${version} (${percent}%)`,
+    installingUpdate: (version: string) => `Installing Update ${version}…`,
+    checkUpdates: 'Check for Updates…',
+    settings: 'Settings…',
+    file: 'File',
+    newTask: 'New Task',
+    edit: 'Edit',
+    find: 'Find…',
+    view: 'View',
+    history: 'History',
+    back: 'Back',
+    forward: 'Forward',
+  },
+} as const;
+
 function updateItem(
   state: DesktopUpdateState,
   actions: UpdateMenuActions,
+  locale: DesktopLocale,
 ): MenuItemConstructorOptions {
+  const copy = LABELS[locale];
   switch (state.status) {
     case 'checking':
-      return { label: 'Checking for Updates…', enabled: false };
+      return { label: copy.checkingUpdates, enabled: false };
     case 'available':
-      return { label: `Install Update ${state.version}…`, click: actions.install };
+      return { label: copy.installUpdate(state.version), click: actions.install };
     case 'ready':
-      return { label: `Update to ${state.version} Now`, click: actions.install };
+      return { label: copy.restartUpdate(state.version), click: actions.install };
     case 'downloading':
-      return { label: `Downloading Update ${state.version} (${state.percent}%)`, enabled: false };
+      return { label: copy.downloadingUpdate(state.version, state.percent), enabled: false };
     case 'installing':
     case 'restarting':
-      return { label: `Installing Update ${state.version}…`, enabled: false };
+      return { label: copy.installingUpdate(state.version), enabled: false };
     default:
-      return { label: 'Check for Updates…', click: actions.check };
+      return { label: copy.checkUpdates, click: actions.check };
   }
 }
 
@@ -37,16 +79,18 @@ export function appMenuTemplate(
   state: DesktopUpdateState,
   actions: UpdateMenuActions,
   page: PageMenuActions,
+  locale: DesktopLocale = 'en',
 ): MenuItemConstructorOptions[] {
+  const copy = LABELS[locale];
   return [
     {
       role: 'appMenu',
       submenu: [
         { role: 'about' },
-        updateItem(state, actions),
+        updateItem(state, actions, locale),
         { type: 'separator' },
         {
-          label: 'Settings…',
+          label: copy.settings,
           accelerator: 'CommandOrControl+,',
           click: () => page.send('settings'),
         },
@@ -61,10 +105,10 @@ export function appMenuTemplate(
       ],
     },
     {
-      label: 'File',
+      label: copy.file,
       submenu: [
         {
-          label: 'New Task',
+          label: copy.newTask,
           accelerator: 'CommandOrControl+N',
           click: () => page.send('new-task'),
         },
@@ -73,7 +117,7 @@ export function appMenuTemplate(
       ],
     },
     {
-      label: 'Edit',
+      label: copy.edit,
       submenu: [
         { role: 'undo' },
         { role: 'redo' },
@@ -85,11 +129,11 @@ export function appMenuTemplate(
         { role: 'delete' },
         { role: 'selectAll' },
         { type: 'separator' },
-        { label: 'Find…', accelerator: 'CommandOrControl+F', click: () => page.send('search') },
+        { label: copy.find, accelerator: 'CommandOrControl+F', click: () => page.send('search') },
       ],
     },
     {
-      label: 'View',
+      label: copy.view,
       submenu: [
         { role: 'reload' },
         { role: 'forceReload' },
@@ -103,10 +147,10 @@ export function appMenuTemplate(
       ],
     },
     {
-      label: 'History',
+      label: copy.history,
       submenu: [
-        { label: 'Back', accelerator: 'CommandOrControl+[', click: page.back },
-        { label: 'Forward', accelerator: 'CommandOrControl+]', click: page.forward },
+        { label: copy.back, accelerator: 'CommandOrControl+[', click: page.back },
+        { label: copy.forward, accelerator: 'CommandOrControl+]', click: page.forward },
       ],
     },
     { role: 'windowMenu' },

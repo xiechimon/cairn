@@ -39,6 +39,7 @@ export function quotaBannerInfo(todos: readonly TodoRecord[]): QuotaBannerInfo[]
 export function QuotaBanner({ infos }: { infos: QuotaBannerInfo[] }) {
   const { t } = useI18n();
   const single = infos.length === 1 ? infos[0] : null;
+  const totalCount = infos.reduce((sum, item) => sum + item.count, 0);
   const earliest =
     infos.length === 0
       ? null
@@ -57,7 +58,7 @@ export function QuotaBanner({ infos }: { infos: QuotaBannerInfo[] }) {
               kind: t(single.kindText),
               count: single.count,
             })
-          : t('{count} 个任务因额度/限流挂起', { count: infos.length })
+          : t('{count} 个任务因额度/限流挂起', { count: totalCount })
       }
       body={
         singleLine != null

@@ -41,7 +41,7 @@ Boundary rulings:
 |---|---|---|---|
 | `执行机` | Runner | `machine` | A registered execution host (`cairn` daemon + embedded pi runtime) that claims and runs build steps. The Chinese UI says `执行机` and the English UI says `Runner` (owner, 2026-11-15); code, tables and the wire keep `machine`. One Runner is the default Runner (`team.defaultMachineId`). |
 | `Agent` | Agent | `agent` | Retired (#5347). The configured execution role is replaced by two team-level records: `routing_rule` (per route use: provider, modelId, thinkingLevel, fallbackModels, home `machineId`, requiredCapabilities) picks model and machine, and `work_policy` (per route use: tools, mcpServers, skillsAllowlist, defaultSkill, secrets) grants capabilities; `GET /api/teams/:id/routing-settings` is the surface, and every `/api/teams/:id/agents` route returns 410. Do not reintroduce per-agent configuration. |
-| `电脑` | Computer | `computer` | The Coordinator's own computer (a Linux virtual machine; its maintenance actions say `虚拟机` / VM), and any physical computer named in setup steps (`在你的电脑上运行…`). A registered host is never called `电脑` or `机器`: it is `执行机`. |
+| `电脑` | Computer | `computer` | An execution host computer and any physical computer named in setup steps (`在你的电脑上运行…`). A registered host is called `执行机`. |
 | `Coordinator` | Coordinator | `chief` | The dispatch-and-conversation agent, one per "user × team", responsible for assigning tasks; domain-wise distinct from the builds it dispatches. |
 | `主力机` | Primary machine | `chief.machineId` | Retired with agents and pinning: the `chief` row carries no `machineId`, and Coordinator steps route through routing rules like any other step. |
 | `记忆` | Memory | `memory` | Experience entries written by the Coordinator while working and injected into later turns. Direct in-place edits of memory files are planned in `docs/design/memory-inplace-edit.md`. |
@@ -139,6 +139,6 @@ Copy is neutral and precise: written Chinese, no spoken softeners, no slang, no 
 | `API key` (a provider or app key) | `/API Key\b/`, `/(?<!API )\bkey\b(?=[^A-Za-z]*[\u4e00-\u9fff])/` |
 | `执行机` / Runner, `this computer` for `本机` | `/机器(?!人)/`, `/(?<!\{)\b[Mm]achines?\b(?![}：:])/` |
 | `服务商` / provider | `模型服务`, `模型提供方` |
-| `cannot`, `did not`, `it is` | `/\b[A-Za-z]+n['’]t\b/`, `/\b[Ii]t['’]s\b/`, `/\b[Yy]ou['’]re\b/`, `/\b[Ww]e['’]re\b/`, `/\b[Tt]hat['’]s\b/`, `/\b[Tt]here['’]s\b/`, `/\b[Ll]et['’]s\b/` |
+| `cannot`, `did not`, `it is` | `/\b[A-Za-z]+n['’]t\b/`, `/\bI['’]m\b/`, `/\b[Ii]t['’]s\b/`, `/\b[Yy]ou['’]re\b/`, `/\b[Ww]e['’]re\b/`, `/\b[Tt]hat['’]s\b/`, `/\b[Tt]here['’]s\b/`, `/\b[Ll]et['’]s\b/` |
 | (drop the filler) | `/\bjust\b(?! now)/` |
 

@@ -48,6 +48,7 @@ import { isTranscriptSettled } from '../detail/scroll-anchor.js';
 import type { DocBlock, TodoRecord, TranscriptItem } from '../fixtures/records.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
+import { describeError } from '../lib/error-copy.js';
 import { uploadMessageAttachments } from '../overlay/attachment-paste.js';
 import { useThreadPresence } from '../pwa/thread-presence.js';
 import type { EngineRun, EngineRunStage } from './engine-run.js';
@@ -76,6 +77,7 @@ export interface ThreadChat {
   started: boolean;
   locked: boolean;
   running: boolean;
+  stopping: boolean;
   waitingOnChecks: boolean;
   machine: NamedMachine | null;
   platformWait: { machine: string | null; platform: RunnerOs } | null;
@@ -408,6 +410,7 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     started,
     locked: !open,
     running,
+    stopping,
     waitingOnChecks:
       todo?.phase === 'building' &&
       !running &&
@@ -417,11 +420,11 @@ export function useThreadChat(todoId: string, listed: TodoRecord | undefined): T
     platformWait,
     stopped: buildQ.data?.errorMessage === STOP_MESSAGE,
     sendError: mutations.messageThread.isError
-      ? mutations.messageThread.error?.message || t('发送失败，请重试。')
+      ? (describeError(mutations.messageThread.error, t) ?? t('发送失败，请重试。'))
       : mutations.sendSteer.isError &&
           mutations.sendSteer.variables?.cancelQueued !== true &&
           mutations.sendSteer.variables?.editQueued !== true
-        ? mutations.sendSteer.error?.message || t('发送失败，请重试。')
+        ? (describeError(mutations.sendSteer.error, t) ?? t('发送失败，请重试。'))
         : null,
     queuedMessages: live ? newest?.queuedMessages : undefined,
     retry: () => {

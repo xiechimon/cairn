@@ -153,29 +153,37 @@ export function useOwnComputerRow(machine: MachineRow): {
       >
         {stateText(state, t)}
       </p>
-      {NEEDS_ACTION.has(state) && (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="own-computer-guide"
-            disabled={bridge === undefined}
-            onClick={() => void bridge?.guide()}
+      {NEEDS_ACTION.has(state) &&
+        (live && bridge === undefined ? (
+          <p
+            data-testid="own-computer-browser-hint"
+            className="m-0 text-meta text-content-tertiary"
           >
-            {t('打开系统设置')}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            data-testid="own-computer-recheck"
-            disabled={bridge === undefined || checking}
-            aria-busy={checking}
-            onClick={() => void recheck()}
-          >
-            {t('再检查一次')}
-          </Button>
-        </div>
-      )}
+            {t('请在这台 Mac 的 Cairn 桌面应用里完成权限授权与检查。')}
+          </p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="own-computer-guide"
+              disabled={bridge === undefined}
+              onClick={() => void bridge?.guide()}
+            >
+              {t('打开系统设置')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              data-testid="own-computer-recheck"
+              disabled={bridge === undefined || checking}
+              aria-busy={checking}
+              onClick={() => void recheck()}
+            >
+              {t('再检查一次')}
+            </Button>
+          </div>
+        ))}
     </div>
   );
 

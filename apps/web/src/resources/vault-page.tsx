@@ -339,6 +339,7 @@ export function VaultPage() {
       <VaultPairDialog
         key={dialog?.opened ?? 0}
         open={dialog !== null}
+        pending={mutations.createSecret.isPending || mutations.updateSecret.isPending}
         editing={dialog?.editing ?? null}
         onClose={() => setDialog(null)}
         onSave={save}

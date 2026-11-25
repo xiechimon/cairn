@@ -65,9 +65,6 @@ const LATIN_ALLOWLIST: Record<string, string> = {
   'resources/mcp-connector-dialog.tsx::Bearer …': 'HTTP auth scheme',
   'resources/secret-dialog.tsx::MY_VAR': 'env var example',
   'resources/skill-dialog.tsx::deploy-to-prod': 'skill name example',
-  'resources/skill-import-dialog.tsx::/Users/you/skills/deploy-to-prod': 'path placeholder',
-  'resources/skill-import-dialog.tsx::https://github.com/anthropics/skills/tree/main/document-skills/pdf':
-    'URL placeholder',
   'resources/upstream-model-picker.tsx::HTTP ': 'protocol literal in the `HTTP ${status}` tooltip',
   'resources/vault-pair-dialog.tsx::github.com': 'hostname placeholder',
   'resources/vault-pair-dialog.tsx::GITHUB_COM': 'env var example',

@@ -9,6 +9,7 @@ import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { PopoverContent } from '../components/ui/popover.js';
 import { useI18n } from '../i18n/provider.js';
+import { describeError } from '../lib/error-copy.js';
 import { baseName } from '../lib/path-name.js';
 
 const LAST_DIR_KEY = 'cairn.dirBrowser.lastDir';
@@ -27,7 +28,7 @@ const ROW_NAME_CLS =
   'h-auto min-w-0 flex-1 cursor-pointer justify-start gap-0 px-0 py-1 text-ui font-normal hover:bg-transparent dark:hover:bg-transparent';
 
 const PICK_CLS =
-  'flex-none cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100';
+  'flex-none cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100';
 
 function readLastDir(): string | null {
   try {
@@ -312,8 +313,14 @@ function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack
       </div>
       <ul className="flex max-h-72 flex-col overflow-y-auto">
         {listQ.isError ? (
-          <div className="px-3 py-2 text-xs leading-4 text-destructive" role="alert">
-            {(listQ.error as Error).message}
+          <div
+            className="flex items-center justify-between gap-2 px-3 py-2 text-xs leading-4 text-destructive"
+            role="alert"
+          >
+            <span>{describeError(listQ.error, t) ?? t('未能加载目录内容，请重试。')}</span>
+            <Button variant="ghost" size="xs" onClick={() => void listQ.refetch()}>
+              {t('重试')}
+            </Button>
           </div>
         ) : (
           visible.map((entry) => {
@@ -369,7 +376,7 @@ function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack
           {t('目录条目过多，只列出前 {n} 条', { n: FS_LIST_MAX_ENTRIES })}
         </div>
       )}
-      <div className="border-t border-border pt-1">
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-1">
         <Button
           variant="ghost"
           size="xs"
@@ -379,6 +386,16 @@ function FolderTree({ onPick, onBack }: { onPick: (path: string) => void; onBack
         >
           {t('显示隐藏文件')}
         </Button>
+        {currentPath !== null && (
+          <Button
+            variant="outline"
+            size="xs"
+            className="h-7 px-2 text-meta"
+            onClick={() => onPick(currentPath)}
+          >
+            {t('选择当前文件夹')}
+          </Button>
+        )}
       </div>
     </>
   );

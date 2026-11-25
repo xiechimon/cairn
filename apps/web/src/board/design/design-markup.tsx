@@ -195,7 +195,7 @@ export function MarkBar({
           disabled={!ready}
           onClick={() => onSend(trimmed)}
         >
-          {t('发给 agent')}
+          {t('发给 Coordinator')}
         </Button>
       )}
     </div>

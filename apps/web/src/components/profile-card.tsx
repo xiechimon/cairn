@@ -19,7 +19,7 @@ interface ProfileHeaderProps {
   avatar: ReactNode;
   name: string;
   sub?: string;
-  onRename: (next: string) => void;
+  onRename: (next: string) => unknown;
   className?: string;
   avatarClassName?: string;
   nameClassName?: string;
@@ -49,9 +49,16 @@ export function ProfileHeader({
     wasEditing.current = editing;
   }, [editing]);
   const save = () => {
-    const next = (draft ?? '').trim();
-    if (next !== '' && next !== name) onRename(next);
-    setDraft(null);
+    if (draft === null) return;
+    const next = draft.trim();
+    if (next === '' || next === name) {
+      setDraft(null);
+      return;
+    }
+    Promise.resolve(onRename(next)).then(
+      () => setDraft(null),
+      () => {},
+    );
   };
   return (
     <SettingsHeader

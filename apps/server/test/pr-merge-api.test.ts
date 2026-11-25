@@ -734,7 +734,11 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
         .run();
       const err = await refusal(requestMerge(w.deps, w.buildId));
       expect(err.status).toBe(409);
-      expect(err.message).toContain(kind === 'build' ? '执行步未完成交付' : label);
+      if (kind === 'build') {
+        expect(err.reason).toBe('build-not-delivered');
+      } else {
+        expect(err.message).toContain(label);
+      }
       expect(w.fake.requests).toEqual([]);
       expect(w.systemRows()).toEqual([]);
       expect(w.userRows()).toEqual([]);
@@ -1293,7 +1297,7 @@ describe('#1403 segment 2b: the server merges the PR through the GitHub API', ()
     const w = makeWorld({ phase: 'failed', buildStepStatus: 'failed' });
     const err = await refusal(requestMerge(w.deps, w.buildId));
     expect(err.status).toBe(409);
-    expect(err.message).toContain('合并仅对本轮已交付的 build 开放');
+    expect(err.reason).toBe('build-not-delivered');
     expect(w.fake.requests).toEqual([]);
     expectUntouched(w, 'failed');
   });

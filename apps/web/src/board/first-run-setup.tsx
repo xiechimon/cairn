@@ -182,10 +182,16 @@ function SourceRow({
 function ModelsBody({
   setup,
   progress,
+  allowManage = false,
+  onRemoveProvider,
+  onBackToConfirm,
   onImported,
 }: {
   setup: Setup;
   progress: SetupProgress;
+  allowManage?: boolean;
+  onRemoveProvider?: (record: ProviderRecord) => void;
+  onBackToConfirm?: () => void;
   onImported: (recordIds: string[]) => void;
 }) {
   const { t } = useI18n();
@@ -203,7 +209,7 @@ function ModelsBody({
           '订阅已保存，这台电脑安装 Claude\u00a0Code 后会自动使用。现在先添加一个服务商，Coordinator 即可开始工作。',
         )
       : t('Claude 订阅、API key 或本地模型');
-  if (hasProvider) {
+  if (hasProvider && !allowManage) {
     return (
       <SettingsCard>
         <SourceRow
@@ -217,6 +223,28 @@ function ModelsBody({
   }
   return (
     <>
+      {hasProvider && setup.providers.length > 0 && (
+        <SettingsCard className="mb-4 divide-y divide-border">
+          {setup.providers.map((record) => (
+            <div key={record.id} className="flex items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="m-0 truncate text-ui font-medium text-foreground">{record.label}</p>
+                <p className="m-0 truncate text-meta text-content-tertiary">{record.providerId}</p>
+              </div>
+              {onRemoveProvider !== undefined && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  data-testid={`first-run-remove-provider-${record.providerId}`}
+                  onClick={() => onRemoveProvider(record)}
+                >
+                  {t('移除')}
+                </Button>
+              )}
+            </div>
+          ))}
+        </SettingsCard>
+      )}
       {subscriptionSaved && !setup.claudeCodeFound && (
         <p className="m-0 mb-4 text-pretty break-keep text-meta text-content-secondary">{status}</p>
       )}
@@ -231,6 +259,18 @@ function ModelsBody({
         onConnectError={setConnectError}
         lead={<LocalProviderImportCard teamId={setup.teamId} live={live} onImported={onImported} />}
       />
+      {hasProvider && onBackToConfirm !== undefined && (
+        <div className="mt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="first-run-back-to-confirm"
+            onClick={onBackToConfirm}
+          >
+            {t('返回确认设置')}
+          </Button>
+        </div>
+      )}
     </>
   );
 }
@@ -294,7 +334,15 @@ function recordFor(setup: Setup, pick: Pick): ProviderRecord | undefined {
   return setup.providers.find((record) => record.providerId === pick.provider);
 }
 
-function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
+function ConfirmBody({
+  setup,
+  checks,
+  onBackToModels,
+}: {
+  setup: Setup;
+  checks: ModelChecks;
+  onBackToModels: () => void;
+}) {
   const { t } = useI18n();
   const { patchRule } = useRoutingSettingsMutations(setup.teamId);
   const [checking, setChecking] = useState(false);
@@ -391,7 +439,7 @@ function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
           '任务默认用 Coordinator 的模型。以后可以在设置里添加常用模型，让 Coordinator 按任务挑。',
         )}
       </p>
-      <div className="mt-6">
+      <div className="mt-6 flex flex-wrap items-center gap-3">
         <Button
           data-testid="first-run-confirm"
           size="lg"
@@ -401,6 +449,16 @@ function ConfirmBody({ setup, checks }: { setup: Setup; checks: ModelChecks }) {
         >
           {(checking || patchRule.isPending) && <RingSpinner data-icon="inline-start" />}
           {checking ? t('正在试模型…') : patchRule.isPending ? t('保存中…') : t('确认并开始对话')}
+        </Button>
+        <Button
+          variant="ghost"
+          size="lg"
+          data-testid="first-run-back-to-models"
+          className="px-3 text-content-secondary pointer-coarse:h-11 max-lg:h-11 max-lg:w-full"
+          disabled={checking || patchRule.isPending}
+          onClick={onBackToModels}
+        >
+          {t('更换或添加服务商')}
         </Button>
       </div>
     </>
@@ -429,7 +487,13 @@ function stateOf(step: SetupStepId, open: SetupStepId): StepState {
   return open === step ? 'now' : step === 'models' ? 'done' : 'open';
 }
 
-function Rail({ open }: { open: SetupStepId }) {
+function Rail({
+  open,
+  onSelectStep,
+}: {
+  open: SetupStepId;
+  onSelectStep?: (step: SetupStepId) => void;
+}) {
   const { t } = useI18n();
   const steps = [
     { n: 1, id: 'models' as const, title: t('接入模型') },
@@ -439,6 +503,7 @@ function Rail({ open }: { open: SetupStepId }) {
     <ol className="m-0 mt-10 list-none p-0 max-lg:hidden">
       {steps.map(({ n, id, title }) => {
         const state = stateOf(id, open);
+        const clickable = id === 'models' && open === 'confirm' && onSelectStep !== undefined;
         return (
           <li
             key={id}
@@ -447,15 +512,28 @@ function Rail({ open }: { open: SetupStepId }) {
             aria-current={state === 'now' ? 'step' : undefined}
             className="flex items-center gap-4 py-2"
           >
-            <StepMark n={n} state={state} />
-            <span
-              className={cn(
-                'text-card-title font-title',
-                state === 'open' ? 'text-content-secondary' : 'text-foreground',
-              )}
-            >
-              {title}
-            </span>
+            {clickable ? (
+              <Button
+                variant="ghost"
+                className="h-auto justify-start gap-4 p-0 text-left font-normal hover:bg-transparent hover:opacity-80"
+                onClick={() => onSelectStep('models')}
+              >
+                <StepMark n={n} state={state} />
+                <span className="text-card-title font-title text-foreground">{title}</span>
+              </Button>
+            ) : (
+              <>
+                <StepMark n={n} state={state} />
+                <span
+                  className={cn(
+                    'text-card-title font-title',
+                    state === 'open' ? 'text-content-secondary' : 'text-foreground',
+                  )}
+                >
+                  {title}
+                </span>
+              </>
+            )}
           </li>
         );
       })}
@@ -495,6 +573,7 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
   const checks = useModelChecks(setup.teamId);
   const { deleteProvider } = useApiMutations(setup.teamId);
   const [imported, setImported] = useState<readonly string[]>([]);
+  const [reopenedStep1, setReopenedStep1] = useState(false);
   const reviewed = setup.providers.filter((record) => imported.includes(record.id));
   const { checkProvider } = checks;
   useEffect(() => {
@@ -514,7 +593,7 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
   const progress = setup.progress;
   if (progress === undefined) return null;
   const reviewing = reviewed.length > 0;
-  const open = reviewing ? 'models' : setupOpenStep(progress);
+  const open = reviewing ? 'models' : reopenedStep1 ? 'models' : setupOpenStep(progress);
   if (open === null) return null;
   return (
     <main
@@ -543,7 +622,12 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
             {t('欢迎使用 Cairn')}
           </h1>
           <div className="first-run-enter" style={{ '--enter-delay': '100ms' } as CSSProperties}>
-            <Rail open={open} />
+            <Rail
+              open={open}
+              onSelectStep={(step) => {
+                if (step === 'models') setReopenedStep1(true);
+              }}
+            />
           </div>
           <div className="first-run-enter" style={{ '--enter-delay': '200ms' } as CSSProperties}>
             <Segments open={open} />
@@ -578,15 +662,29 @@ export function FirstRunSetup({ setup }: { setup: Setup }) {
                     if (done) setImported([]);
                   })
                 }
-                onNext={() => setImported([])}
+                onNext={() => {
+                  setImported([]);
+                  setReopenedStep1(false);
+                }}
               />
             </div>
           ) : open === 'models' ? (
             <div className="mt-5 lg:mt-0">
-              <ModelsBody setup={setup} progress={progress} onImported={setImported} />
+              <ModelsBody
+                setup={setup}
+                progress={progress}
+                allowManage={reopenedStep1}
+                onRemoveProvider={(record) => void remove([record])}
+                onBackToConfirm={() => setReopenedStep1(false)}
+                onImported={setImported}
+              />
             </div>
           ) : (
-            <ConfirmBody setup={setup} checks={checks} />
+            <ConfirmBody
+              setup={setup}
+              checks={checks}
+              onBackToModels={() => setReopenedStep1(true)}
+            />
           )}
         </section>
       </div>

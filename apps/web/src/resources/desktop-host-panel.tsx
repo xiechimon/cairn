@@ -1,12 +1,14 @@
 import { type FormEvent, useEffect, useState } from 'react';
 import { SettingsPanel } from '../components/settings-list.js';
+import { ToggleSwitch } from '../components/toggle-switch.js';
+import { AlertDialogActions, AlertDialogShell } from '../components/ui/alert-dialog-shell.js';
 import { Badge } from '../components/ui/badge.js';
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
-import { Switch } from '../components/ui/switch.js';
 import { toastError } from '../components/ui/toaster.js';
 import { type DesktopHostStatus, desktopHost } from '../desktop-shell.js';
 import { useI18n } from '../i18n/provider.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 
 export function DesktopHostPanel() {
   const { t } = useI18n();
@@ -14,6 +16,8 @@ export function DesktopHostPanel() {
   const [status, setStatus] = useState<DesktopHostStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [switching, setSwitching] = useState<{ id: string; label: string } | null>(null);
+  const [removing, setRemoving] = useState<{ id: string; label: string } | null>(null);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 
@@ -112,7 +116,7 @@ export function DesktopHostPanel() {
                 {t('退出应用后保持服务在线，随应用自动更新')}
               </span>
             </div>
-            <Switch
+            <ToggleSwitch
               checked={status.residentInstalled}
               disabled={busy}
               aria-label={t('本机常驻主机')}
@@ -149,7 +153,12 @@ export function DesktopHostPanel() {
                     variant="outline"
                     disabled={busy}
                     className="pointer-coarse:h-11"
-                    onClick={() => void handleSwitch(conn.id)}
+                    onClick={() =>
+                      setSwitching({
+                        id: conn.id,
+                        label: conn.kind === 'local' ? t('本机') : conn.name,
+                      })
+                    }
                   >
                     {t('切换')}
                   </Button>
@@ -160,7 +169,7 @@ export function DesktopHostPanel() {
                     variant="ghost"
                     disabled={busy}
                     className="pointer-coarse:h-11"
-                    onClick={() => void handleRemove(conn.id)}
+                    onClick={() => setRemoving({ id: conn.id, label: conn.name })}
                   >
                     {t('移除')}
                   </Button>
@@ -210,6 +219,49 @@ export function DesktopHostPanel() {
           </form>
         )}
       </div>
+      <AlertDialogShell
+        open={switching !== null}
+        title={t('切换到 {name}？', { name: switching?.label ?? '' })}
+        ariaLabel={t('切换主机')}
+        onClose={() => {
+          if (!busy) setSwitching(null);
+        }}
+        footer={
+          <AlertDialogActions
+            cancelLabel={t('取消')}
+            confirmLabel={t('切换并重启')}
+            confirmDisabled={busy}
+            onCancel={() => {
+              if (!busy) setSwitching(null);
+            }}
+            onConfirm={() => {
+              if (switching === null) return;
+              const target = switching.id;
+              setSwitching(null);
+              void handleSwitch(target);
+            }}
+          />
+        }
+      >
+        <p className="m-0 text-ui text-content-secondary">
+          {t('切换后应用会立即重启并连接到选定主机。')}
+        </p>
+      </AlertDialogShell>
+      <DeleteConfirm
+        open={removing !== null}
+        title={t('移除这台远程主机配置？此操作不会关闭远端服务。')}
+        summary={removing?.label ?? ''}
+        ariaLabel={t('移除 {name}', { name: removing?.label ?? '' })}
+        onClose={() => {
+          if (!busy) setRemoving(null);
+        }}
+        onConfirm={() => {
+          if (removing === null) return;
+          const target = removing.id;
+          setRemoving(null);
+          void handleRemove(target);
+        }}
+      />
     </SettingsPanel>
   );
 }

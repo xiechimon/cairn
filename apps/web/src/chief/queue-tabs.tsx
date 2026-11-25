@@ -1,4 +1,4 @@
-import { ChevronUp, Clock, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Clock, X } from 'lucide-react';
 import { useState } from 'react';
 import { useNarrow } from '../board/use-narrow.js';
 import { IconTooltip } from '../components/icon-tooltip.js';
@@ -68,16 +68,25 @@ export function QueueTabs({
           </li>
         ))}
       </ul>
-      {rest > 0 && (
+      {messages.length > cap && (
         <Button
           variant="ghost"
           size="xs"
           data-testid="chief-queue-more"
           className={`${ROW_CLS} h-auto justify-start gap-1 rounded-none font-normal text-(--text-secondary) hover:bg-(--menu-hover) hover:text-foreground`}
-          onClick={() => setExpanded(true)}
+          onClick={() => setExpanded((prev) => !prev)}
         >
-          {t('还有 {n} 条', { n: rest })}
-          <ChevronUp className="size-4" />
+          {expanded ? (
+            <>
+              {t('收起')}
+              <ChevronDown className="size-4" />
+            </>
+          ) : (
+            <>
+              {t('还有 {n} 条', { n: rest })}
+              <ChevronUp className="size-4" />
+            </>
+          )}
         </Button>
       )}
     </section>

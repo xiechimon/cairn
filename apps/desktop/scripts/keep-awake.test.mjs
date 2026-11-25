@@ -185,3 +185,14 @@ test('the tray item is a checkbox that shows the state and asks for the opposite
   }
   assert.deepEqual(asked, [true, false]);
 });
+
+test('localizes the tray menu and omits local host jargon when host is null', () => {
+  const actions = { open() {}, quit() {}, setKeepAwake() {} };
+  const zhLocal = trayMenuTemplate(null, false, actions, 'zh');
+  assert.deepEqual(
+    zhLocal.filter((entry) => 'label' in entry).map((entry) => entry.label),
+    ['正在运行', '打开 Cairn', '保持屏幕常亮', '退出 Cairn'],
+  );
+  const zhRemote = trayMenuTemplate('mac-mini.local', true, actions, 'zh');
+  assert.equal(zhRemote[0].label, '已连接 mac-mini.local');
+});

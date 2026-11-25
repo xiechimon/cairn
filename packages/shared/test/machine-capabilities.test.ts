@@ -279,7 +279,7 @@ describe('D71 executor kind (Orb sandbox vs plain host)', () => {
   });
 
   it('a missing Orb executor is labelled for the queue and fit views', () => {
-    expect(capabilityMissingLabels({ executor: 'orb' })).toEqual(['Orb sandbox executor']);
+    expect(capabilityMissingLabels({ executor: 'orb' })).toEqual(['Container executor']);
   });
 });
 

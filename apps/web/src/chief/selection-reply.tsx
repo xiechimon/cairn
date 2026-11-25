@@ -248,16 +248,41 @@ export function SelectionReply({
           onKeyDown={onBoxKey}
           className="max-h-30 min-h-6 resize-none border-0 bg-transparent p-0 outline-hidden text-ui text-foreground placeholder:text-content-tertiary focus-visible:ring-0 md:text-ui dark:bg-transparent"
         />
-        <p
+        <div
           data-testid="selection-quote-hint"
-          className="m-0 flex items-center gap-1.5 text-caption text-content-tertiary"
+          className="flex flex-wrap items-center gap-1 text-caption text-content-tertiary"
         >
-          <ShortcutHint keys={['enter']} />
-          {t('加到输入框')}
-          <span aria-hidden>·</span>
-          <ShortcutHint keys={['mod', 'enter']} />
-          {t('直接发送')}
-        </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            data-testid="selection-quote-add"
+            className="h-6 gap-1.5 px-1.5 text-caption font-normal text-content-secondary hover:text-foreground"
+            onClick={() => {
+              onAddQuote(draft, text.trim());
+              dismiss();
+            }}
+          >
+            <ShortcutHint keys={['enter']} />
+            {t('加到输入框')}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            data-testid="selection-quote-send"
+            disabled={text.trim() === ''}
+            className="h-6 gap-1.5 px-1.5 text-caption font-normal text-content-secondary hover:text-foreground"
+            onClick={() => {
+              if (text.trim() === '') return;
+              onSendQuote(draft, text.trim());
+              dismiss();
+            }}
+          >
+            <ShortcutHint keys={['mod', 'enter']} />
+            {t('直接发送')}
+          </Button>
+        </div>
       </div>
     ) : (
       <div

@@ -34,3 +34,14 @@ export function htmlLangFor(locale: Locale): string {
 export function applyLocaleLang(locale: Locale): void {
   document.documentElement.lang = htmlLangFor(locale);
 }
+
+let mountedLocale: Locale | null = null;
+
+export function setActiveLocale(locale: Locale): void {
+  mountedLocale = locale;
+}
+
+export function activeLocale(storage: Pick<Storage, 'getItem'> | null = null): Locale {
+  if (mountedLocale !== null) return mountedLocale;
+  return readStoredLocale(storage);
+}

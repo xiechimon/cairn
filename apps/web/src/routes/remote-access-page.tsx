@@ -37,8 +37,9 @@ import {
 import { toastError, toastSuccess } from '../components/ui/toaster.js';
 import { resolveScenario } from '../fixtures/scenario.js';
 import { useI18n } from '../i18n/provider.js';
-import { copyTextWithFeedback, writeClipboard } from '../lib/clipboard.js';
+import { copyTextWithFeedback } from '../lib/clipboard.js';
 import { type PairingCandidate, pairingCandidates } from '../lib/pairing-origin.js';
+import { DeleteConfirm } from '../overlay/delete-confirm.js';
 import { PageShell } from '../pages/shell.js';
 import { ResourceList, ResourceRow, RowDesc, RowText, RowTitle } from '../resources/parts.js';
 
@@ -91,6 +92,7 @@ function PairingDialog({
 }) {
   const { t } = useI18n();
   const [chosen, setChosen] = useState<string>(candidates[0]?.origin ?? '');
+  const [copied, setCopied] = useState(false);
   const origin = candidates.some((candidate) => candidate.origin === chosen)
     ? chosen
     : (candidates[0]?.origin ?? '');
@@ -104,16 +106,31 @@ function PairingDialog({
         <Button
           variant="outline"
           className={DIALOG_PRIMARY_BUTTON}
-          onClick={() => void writeClipboard(link)}
+          onClick={() =>
+            copyTextWithFeedback(
+              link,
+              () => {
+                setCopied(true);
+                toastSuccess(t('已复制链接'));
+              },
+              (error) => toastError(t('复制失败，请重试。'), error),
+            )
+          }
         >
-          {t('复制链接')}
+          {copied ? t('已复制') : t('复制链接')}
         </Button>
       }
     >
       <div className="flex flex-col items-center gap-3">
         <QrCode text={link} label={t('配对二维码')} />
         {candidates.length > 1 && (
-          <Select value={origin} onValueChange={(next) => setChosen(next ?? origin)}>
+          <Select
+            value={origin}
+            onValueChange={(next) => {
+              setChosen(next ?? origin);
+              setCopied(false);
+            }}
+          >
             <SelectTrigger className="w-full max-w-72" data-testid="pairing-route-select">
               <SelectValue>{sourceLabel(candidates, origin, t)}</SelectValue>
             </SelectTrigger>
@@ -230,6 +247,7 @@ export function RemoteAccessPage() {
   const devices = devicesQ.data ?? [];
   const grants = grantsQ.data ?? [];
   const requests = requestsQ.data ?? [];
+  const [revokingDevice, setRevokingDevice] = useState<{ id: string; name: string } | null>(null);
   const startPairing = () =>
     mutations.createPairingCode.mutate(undefined, {
       onSuccess: setPairing,
@@ -309,7 +327,13 @@ export function RemoteAccessPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setTunnel.mutate({ enabled: true })}
+                    disabled={setTunnel.isPending}
+                    onClick={() =>
+                      setTunnel.mutate(
+                        { enabled: true },
+                        { onError: (error) => toastError(t('开启公网隧道失败，请重试。'), error) },
+                      )
+                    }
                   >
                     {t('重试')}
                   </Button>
@@ -360,9 +384,7 @@ export function RemoteAccessPage() {
                     });
                   }}
                 >
-                  {startOAuth.isPending
-                    ? t('正在跳转到 Clerk 登录…')
-                    : t('使用 Clerk 登录（Google / GitHub）')}
+                  {startOAuth.isPending ? t('正在跳转登录…') : t('登录账号（Google / GitHub）')}
                 </Button>
               </div>
             </Card>
@@ -404,7 +426,11 @@ export function RemoteAccessPage() {
                       size="sm"
                       variant="ghost"
                       disabled={signOutAccount.isPending}
-                      onClick={() => signOutAccount.mutate()}
+                      onClick={() =>
+                        signOutAccount.mutate(undefined, {
+                          onError: (error) => toastError(t('退出失败，请重试。'), error),
+                        })
+                      }
                     >
                       {t('退出')}
                     </Button>
@@ -480,14 +506,14 @@ export function RemoteAccessPage() {
         {(live || routesQ.data !== undefined) && (
           <SettingsCard className="mt-3">
             <SettingsRow
-              label={t('远程访问')}
+              label={t('Tailscale 远程访问')}
               hint={tailnetHint}
               hintClassName={tailnetFailed ? 'text-destructive' : undefined}
             >
               <ToggleSwitch
                 checked={tailnetOn}
                 disabled={!live || setTailnet.isPending}
-                aria-label={t('远程访问')}
+                aria-label={t('Tailscale 远程访问')}
                 data-testid="remote-access-switch"
                 onCheckedChange={(checked) => {
                   setToggleFailed(false);
@@ -617,7 +643,13 @@ export function RemoteAccessPage() {
               <ResourceRow key={route.url}>
                 <RowText>
                   <RowTitle className="font-mono">{route.url}</RowTitle>
-                  <RowDesc>{route.kind === 'tailnet' ? t('Tailscale') : t('局域网')}</RowDesc>
+                  <RowDesc>
+                    {route.kind === 'tunnel'
+                      ? t('公网隧道')
+                      : route.kind === 'tailnet'
+                        ? t('Tailscale')
+                        : t('局域网')}
+                  </RowDesc>
                 </RowText>
               </ResourceRow>
             ))}
@@ -629,7 +661,14 @@ export function RemoteAccessPage() {
               <ResourceRow key={grant.id}>
                 <RowText>
                   <RowTitle>{t('未使用的配对码')}</RowTitle>
-                  <RowDesc>{new Date(grant.expiresAt).toISOString()}</RowDesc>
+                  <RowDesc>
+                    {t('有效期至 {time}', {
+                      time: new Date(grant.expiresAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }),
+                    })}
+                  </RowDesc>
                 </RowText>
                 <Button
                   variant="ghost"
@@ -637,7 +676,7 @@ export function RemoteAccessPage() {
                   disabled={mutations.revokePairingCode.isPending}
                   onClick={() =>
                     mutations.revokePairingCode.mutate(grant.id, {
-                      onError: (error) => toastError(t('撤销设备失败，请重试。'), error),
+                      onError: (error) => toastError(t('作废配对码失败，请重试。'), error),
                     })
                   }
                 >
@@ -659,11 +698,7 @@ export function RemoteAccessPage() {
                   variant="ghost"
                   className={DIALOG_PRIMARY_BUTTON}
                   disabled={mutations.revokeDevice.isPending}
-                  onClick={() =>
-                    mutations.revokeDevice.mutate(device.id, {
-                      onError: (error) => toastError(t('撤销设备失败，请重试。'), error),
-                    })
-                  }
+                  onClick={() => setRevokingDevice({ id: device.id, name: device.name })}
                 >
                   {t('撤销设备')}
                 </Button>
@@ -725,6 +760,21 @@ export function RemoteAccessPage() {
         onClose={() => setFeedbackOpen(false)}
         route="/app/settings/remote-access"
         errorSummary={tunnelFailed ? `tunnel:${tunnel?.error ?? 'failed'}` : undefined}
+      />
+      <DeleteConfirm
+        open={revokingDevice !== null}
+        title={t('撤销后，这台已配对设备需要重新扫码配对才能访问')}
+        summary={revokingDevice?.name ?? ''}
+        ariaLabel={t('撤销设备')}
+        onClose={() => setRevokingDevice(null)}
+        onConfirm={() => {
+          if (revokingDevice === null) return;
+          const target = revokingDevice;
+          setRevokingDevice(null);
+          mutations.revokeDevice.mutate(target.id, {
+            onError: (error) => toastError(t('撤销设备失败，请重试。'), error),
+          });
+        }}
       />
     </PageShell>
   );

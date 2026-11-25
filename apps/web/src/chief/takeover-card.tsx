@@ -8,6 +8,7 @@ import { ComputerScreenDialog } from '../board/computer-screen-dialog.js';
 import { useScreenControl } from '../board/screen-control.js';
 import { Button } from '../components/ui/button.js';
 import { MessageScrollerItem } from '../components/ui/message-scroller.js';
+import { toastError } from '../components/ui/toaster.js';
 import type { ChiefStreamItem } from '../fixtures/records.js';
 import { useIntervalNow } from '../hooks/use-interval-now.js';
 import { useI18n } from '../i18n/provider.js';
@@ -28,6 +29,7 @@ function minutesLeft(startedAt: number | null, now: number): number | null {
 }
 
 function useDevicePushOff(teamId: string | undefined, active: boolean) {
+  const { t } = useI18n();
   const [off, setOff] = useState(false);
   useEffect(() => {
     if (!active || !pushDeviceSupported()) return;
@@ -45,7 +47,7 @@ function useDevicePushOff(teamId: string | undefined, active: boolean) {
     if (teamId === undefined) return;
     void subscribeDevicePush(teamId)
       .then(() => setOff(false))
-      .catch(() => {});
+      .catch((error) => toastError(t('开启通知失败，请重试。'), error));
   };
   return { off, turnOn };
 }
@@ -58,7 +60,10 @@ function PhoneTakeoverButtons({ item, waiting }: { item: TakeoverItem; waiting: 
   const target = handoffsQ.data?.find((row) => row.name === item.phone) ?? null;
   const handback = () => {
     if (target === null) return;
-    mutations.handbackPhone.mutate({ machineId: target.machineId, phoneId: target.phoneId });
+    mutations.handbackPhone.mutate(
+      { machineId: target.machineId, phoneId: target.phoneId },
+      { onError: (error) => toastError(t('交还失败，请重试。'), error) },
+    );
   };
   if (!waiting) return null;
   return (

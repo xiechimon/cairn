@@ -140,7 +140,7 @@ export function GithubConnectionDeviceDialog({
           </div>
           <div className="rounded-(--radius-control) bg-card px-3 py-2.5">
             <div className="text-ui font-medium text-foreground">{t('2 · 输入')}</div>
-            <div className="mt-0.5 text-meta text-content-tertiary">{t('右边这个码')}</div>
+            <div className="mt-0.5 text-meta text-content-tertiary">{t('下面这个码')}</div>
           </div>
         </div>
         <DeviceCode code={step.userCode} cells />
@@ -164,7 +164,7 @@ export function GithubConnectionDeviceDialog({
     title = t('选择 Cairn 能用的仓库');
     body = (
       <p className="m-0 text-pretty text-ui text-foreground">
-        {t('在 GitHub 上选好 Agent 能读写的仓库。')}
+        {t('在 GitHub 上选好 Cairn 能读写的仓库。')}
       </p>
     );
     const choose = {

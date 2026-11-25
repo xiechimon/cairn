@@ -1,6 +1,6 @@
 # Download the Mac Linux VM only after the owner asks
 
-Status: approved (mon X, 2026-11-17). Prototype: the optional Linux VM download prototype artifact in the thread that built it. Builds on [`mac-vm-computer.md`](mac-vm-computer.md).
+Status: retired (Linux VM removed in commits `cc0f17c79`, `b605b2b51`, `faa4b65e3`). Formerly: approved (mon X, 2026-11-17). Prototype: the optional Linux VM download prototype artifact in the thread that built it. Builds on [`mac-vm-computer.md`](mac-vm-computer.md).
 
 ## Problem
 

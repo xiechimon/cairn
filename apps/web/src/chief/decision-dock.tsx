@@ -17,7 +17,7 @@ import { Input } from '../components/ui/input.js';
 import { ChatMarkdown } from '../detail/chat-markdown.js';
 import { useI18n } from '../i18n/provider.js';
 import { ApprovalCard } from './approval-card.js';
-import { approvalCardOf, isApprovalRequest } from './approval-card-model.js';
+import { approvalCardOf, approvalChoiceLabel, isApprovalRequest } from './approval-card-model.js';
 import { answerKeyOf, questionDockState } from './question-dock-state.js';
 import {
   applyQuestionPick,
@@ -44,7 +44,7 @@ export interface DockPager {
 export interface DecisionDockProps {
   item: ChiefQuestionItem;
   onAnswer?: (input: { requestId: string; answers: AskUserAnswer[] }) => void;
-  onCancel?: (requestId: string) => void;
+  onCancel?: (requestId: string) => unknown;
   onMinimize?: () => void;
   draftKey?: string;
   bound?: boolean;
@@ -299,7 +299,7 @@ export function DecisionDock({
   };
 
   const blockedByUpload = bound && questionDockState.uploading();
-  const canAdvance = pending && (last ? allComplete : stepComplete) && !blockedByUpload;
+  const canAdvance = pending && stepComplete && !blockedByUpload;
   const advance = () => {
     if (!canAdvance || (bound && questionDockState.uploading())) return;
     if (last) {
@@ -434,7 +434,7 @@ export function DecisionDock({
           disabled={!pending || blockedByUpload}
           busy={submittedIndex < 0 ? null : `chief-question-option-${step}-${submittedIndex}`}
           actions={question.options.map((option, oi) => ({
-            label: option.label,
+            label: approvalChoiceLabel(option.label, t),
             testId: `chief-question-option-${step}-${oi}`,
             onClick: () => choose(oi),
           }))}
@@ -446,10 +446,11 @@ export function DecisionDock({
 
   const multi = question.multiSelect === true;
   const typed = otherText.trim() !== '';
+  const hasTyped = typed || (bound && typedAt(step).trim() !== '');
   const picked = draft?.kind === 'choices' ? draft.picked : [];
-  const count = picked.length + (typed ? 1 : 0);
+  const count = picked.length + (hasTyped ? 1 : 0);
   const disabled = !pending || blockedByUpload;
-  const submitLabel = last ? t('提交回答') : t('下一步');
+  const submitLabel = last ? (allComplete ? t('提交回答') : t('跳到未回答的问题')) : t('下一步');
   const go = (testId: string, enabled: boolean) => (
     <IconTooltip
       label={submitLabel}

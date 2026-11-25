@@ -2,7 +2,13 @@ import type { ReactNode } from 'react';
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import { safeLocalStorage } from '../safe-storage.js';
 import { EN } from './en.js';
-import { applyLocaleLang, type Locale, persistLocale, readStoredLocale } from './locale.js';
+import {
+  applyLocaleLang,
+  type Locale,
+  persistLocale,
+  readStoredLocale,
+  setActiveLocale,
+} from './locale.js';
 import { type TFunc, type TVars, translate } from './translate.js';
 
 interface I18nValue {
@@ -23,9 +29,11 @@ export function I18nProvider({
   const [locale, setLocaleState] = useState<Locale>(
     () => initialLocale ?? readStoredLocale(safeLocalStorage()),
   );
+  setActiveLocale(locale);
   const setLocale = useCallback((next: Locale) => {
     persistLocale(next, safeLocalStorage());
     applyLocaleLang(next);
+    setActiveLocale(next);
     setLocaleState(next);
   }, []);
   const t = useMemo<TFunc>(

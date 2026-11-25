@@ -553,12 +553,14 @@ export const ChiefStreamRow = memo(function ChiefStreamRow({
   if (item.kind === 'channel-mirror') return <ChannelMirrorRow mirror={item} />;
   if (item.kind === 'thread-report' || item.kind === 'thread-message' || item.kind === 'report-ack')
     return null;
-  if (item.kind === 'error')
-    return item.id !== undefined && item.id === cardFailure ? null : (
+  if (item.kind === 'error') {
+    if (item.id !== undefined && item.id === cardFailure) return null;
+    return (
       <MessageScrollerItem style={SCROLLER_ITEM_STYLE} className="my-3">
         <FailureMarker label={t('未完成')} testId="chief-turn-error" />
       </MessageScrollerItem>
     );
+  }
   if (item.kind === 'chat-block')
     return <ChatBlockRow item={item} joinsPrev={joinsPrev} joinsNext={joinsNext} />;
   if (item.kind === 'handoff') return <HandoffRow todoId={item.todoId} />;

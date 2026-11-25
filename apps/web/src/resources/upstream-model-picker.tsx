@@ -397,7 +397,9 @@ export function UpstreamModelPicker<Model extends UpstreamOption = UpstreamOptio
   };
 
   const number = new Intl.NumberFormat(locale);
-  const added = draft.some((id) => !opening.selected.has(id));
+  const saveIds =
+    typedId !== '' && !typedInvalid && !draft.includes(typedId) ? [...draft, typedId] : draft;
+  const added = saveIds.some((id) => !opening.selected.has(id));
   const initialLoading = attempt === 0 && pending;
   const canRetry = notices.some(({ status }) => status !== 'ok');
   const filter = query.trim().toLowerCase();
@@ -426,7 +428,7 @@ export function UpstreamModelPicker<Model extends UpstreamOption = UpstreamOptio
             className={DIALOG_PRIMARY_BUTTON}
             data-testid="upstream-save"
             disabled={draft.length === 0 && typedInvalid}
-            onClick={() => onSave(draft, catalog, opening.base)}
+            onClick={() => onSave(saveIds, catalog, opening.base)}
           >
             {testable && added ? t('保存并测试新选的') : t('保存')}
           </Button>
@@ -510,18 +512,30 @@ export function UpstreamModelPicker<Model extends UpstreamOption = UpstreamOptio
         <div className="flex flex-col gap-2">
           <div className="flex w-full flex-none flex-col gap-1.5 border-t border-border pt-3">
             <span className="text-meta text-content-tertiary">{t('输入模型 ID，按回车添加')}</span>
-            <Input
-              aria-label={t('模型 ID')}
-              placeholder={t('模型 ID')}
-              aria-invalid={typedInvalid || undefined}
-              aria-describedby={typedInvalid ? typedErrorId : undefined}
-              className={cn(FORM_CONTROL_CLS, 'w-full')}
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') addTyped();
-              }}
-            />
+            <div className="flex items-center gap-2">
+              <Input
+                aria-label={t('模型 ID')}
+                placeholder={t('模型 ID')}
+                aria-invalid={typedInvalid || undefined}
+                aria-describedby={typedInvalid ? typedErrorId : undefined}
+                className={cn(FORM_CONTROL_CLS, 'min-w-0 flex-1')}
+                value={typed}
+                onChange={(event) => setTyped(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') addTyped();
+                }}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid="upstream-add-typed"
+                disabled={typedId === '' || typedInvalid}
+                onClick={addTyped}
+              >
+                {t('添加')}
+              </Button>
+            </div>
             {typedInvalid && (
               <FieldError id={typedErrorId}>{t('请输入服务商提供的有效模型 ID。')}</FieldError>
             )}

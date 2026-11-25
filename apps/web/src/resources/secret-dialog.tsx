@@ -25,6 +25,7 @@ export interface SecretDraft {
 
 interface SecretDialogProps {
   open?: boolean;
+  pending?: boolean;
   onClose: () => void;
   onSave?: (draft: SecretDraft) => void;
   editing?: SecretListEntry | null;
@@ -35,6 +36,7 @@ interface SecretDialogProps {
 
 export function SecretDialog({
   open,
+  pending = false,
   onClose,
   onSave,
   editing = null,
@@ -66,7 +68,7 @@ export function SecretDialog({
       ? t('机密的值不能为空')
       : null;
   const submit = () => {
-    if (!canSave) return;
+    if (!canSave || pending) return;
     if (onSave === undefined) {
       onClose();
       return;
@@ -84,18 +86,26 @@ export function SecretDialog({
     <DialogShell
       title={title}
       open={open}
-      onClose={onClose}
+      onClose={() => {
+        if (!pending) onClose();
+      }}
       size="s"
       initialFocus={startSecret ? valueRef : undefined}
       footer={
         <FormActions
           className="pt-0"
           primary={{
-            label: editing === null ? t('添加') : converting ? t('保存并转为机密') : t('保存'),
+            label: pending
+              ? t('保存中…')
+              : editing === null
+                ? t('添加')
+                : converting
+                  ? t('保存并转为机密')
+                  : t('保存'),
             onClick: submit,
-            disabled: !canSave,
+            disabled: !canSave || pending,
           }}
-          secondary={{ label: t('取消'), onClick: onClose }}
+          secondary={{ label: t('取消'), onClick: onClose, disabled: pending }}
         />
       }
     >

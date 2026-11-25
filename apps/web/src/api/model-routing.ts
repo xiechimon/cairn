@@ -161,7 +161,7 @@ export function ruleGraphGroups(
     });
   }
   const groups: RoutingSourceGroup[] = [];
-  if (agents.length > 0) groups.push({ label: t('Coordinator 和其他 Agent'), nodes: agents });
+  if (agents.length > 0) groups.push({ label: t('Coordinator 与任务'), nodes: agents });
   if (projects.length > 0) groups.push({ label: t('项目单独设置'), nodes: projects });
   const projectRuntimes = new Set(projectChoices.map(({ choice }) => choice.provider));
   for (const { runtime, label, id, name } of [

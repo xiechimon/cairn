@@ -36,7 +36,12 @@ export function assertDeliveredBuild(deps: BuildDeps, row: BuildRow): void {
   const artifactIn =
     (buildStep?.checkpointCommit ?? null) !== null || row.prUrl !== null || row.prNumber !== null;
   if (!legDone || !artifactIn) {
-    const reason = !legDone ? '执行步未完成交付' : '执行步无交付产物（分支/PR 不在）';
-    throw new HttpError(409, `合并仅对本轮已交付的 build 开放（${reason}），请重新运行任务`);
+    const reason = !legDone ? 'build-not-delivered' : 'missing-delivery-artifact';
+    const detail = !legDone ? 'build step did not finish' : 'missing delivery branch or PR';
+    throw new HttpError(
+      409,
+      `merge is only available for a delivered build (${detail}); rerun the task`,
+      reason,
+    );
   }
 }

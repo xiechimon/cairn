@@ -26,7 +26,7 @@ const INFO_FILE_TOOLS: readonly RemoteToolDef[] = [
   {
     name: 'shell',
     description:
-      'Run a shell command in your own Debian computer (not the owner Mac). Use it for downloads, scripts and data work. Work under your task folder.',
+      'Run a shell command in the assigned task directory. Use it for downloads, scripts and data work. Work under your task folder.',
     parameters: SHELL_TOOL_PARAMETERS,
   },
   {
@@ -85,11 +85,9 @@ export function infoCardBrief(conversationId: string, hasRepo: boolean, relayOnl
   return [
     '## 信息卡工作方式',
     ...(relayOnly
-      ? [
-          `你在自己的电脑（一台 Debian 虚拟机）里工作，不是主人的 Mac。工作目录是 ${dir}/ ，所有文件放在这里。`,
-        ]
+      ? [`你的任务工作目录是 ${dir}/ ，所有文件放在这里。`]
       : [
-          `你有两套工具。你自带的工具（读写文件、执行命令）作用在主人的 Mac 上的临时任务目录里，只用来读写草稿，不要碰这个目录以外的东西。名为 shell、list_files、read_file、write_file、browser_*、${INFO_SUBMIT_REPORT_TOOL} 的 Cairn 工具作用在你自己的电脑（一台 Debian 虚拟机）里。报告、网页和 PPT 必须用 Cairn 的 write_file 写进虚拟机的 ${dir}/ ，不能写在你自带工具的目录里，否则交不出去。`,
+          `你有两套工具。你自带的工具（读写文件、执行命令）只用来读写本地草稿，不要碰任务目录以外的东西。名为 shell、list_files、read_file、write_file、browser_*、${INFO_SUBMIT_REPORT_TOOL} 的 Cairn 工具作用在任务的运行目录里。报告、网页和 PPT 必须用 Cairn 的 write_file 写进 ${dir}/ ，不能写在你自带工具的目录里，否则交不出去。`,
         ]),
     ...(hasRepo ? [`项目默认分支的只读快照在 ${dir}/${INFO_REPO_DIR}/ ，只读它，不要改。`] : []),
     `本步的交付物是一份 markdown 报告：把完整报告写成 ${dir}/report.md （报告长时分段写：每次几千字，第一段用 write_file 写入，后面每段用 write_file 加 append: true 追加，一次写太长会被截断），然后调用 \`${INFO_SUBMIT_REPORT_TOOL}\` 工具并传入该路径。报告不超过 512 KiB。工具报错时按原因修正后再交。没有成功交出报告就结束，本步会失败。`,

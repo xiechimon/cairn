@@ -225,7 +225,7 @@ export function GithubDeviceDialog({
           <ConnectorStatus record={step.connector} />
         )}
         <p className="m-0 text-ui text-foreground">
-          {t('在 GitHub 上选好 Agent 能读写的仓库，以后也能改。')}
+          {t('在 GitHub 上选好 Cairn 能读写的仓库，以后也能改。')}
         </p>
       </>
     );

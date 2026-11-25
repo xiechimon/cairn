@@ -279,7 +279,7 @@ export function capabilityMissingLabels(missing: {
     ...(missing.os !== undefined ? [RUNNER_OS_LABELS[missing.os]] : []),
     ...(missing.mcpServers ?? []).map((slug) => `MCP server "${slug}"`),
     ...(missing.models ?? []).map((id) => `model "${id}"`),
-    ...(missing.executor === 'orb' ? ['Orb sandbox executor'] : []),
+    ...(missing.executor === 'orb' ? ['Container executor'] : []),
   ];
 }
 

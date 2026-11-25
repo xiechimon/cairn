@@ -98,14 +98,19 @@ export function ScheduleRowMenu({
           <KeyedMenuItem
             shortcut="N"
             data-action="run"
-            disabled={!enabled || running || queued}
+            disabled={state === 'finished' || !enabled || running || queued}
             onClick={runNow}
           >
             <Play />
             {t('立即运行')}
           </KeyedMenuItem>
           {state !== 'finished' && (
-            <KeyedMenuItem shortcut="P" data-action="toggle" onClick={setEnabled}>
+            <KeyedMenuItem
+              shortcut="P"
+              data-action="toggle"
+              disabled={!enabled && schedule.todo.phase === 'closed'}
+              onClick={setEnabled}
+            >
               {enabled ? <Pause /> : <RotateCw />}
               {enabled ? t('暂停定时') : t('恢复定时')}
             </KeyedMenuItem>

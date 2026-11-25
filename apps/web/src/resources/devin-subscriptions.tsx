@@ -247,7 +247,7 @@ export function AddDevinSubscriptionDialog({
                   '在登录过的电脑上 `cat ~/.local/share/devin/credentials.toml`，输出整段粘贴。保存后无法再查看。',
                 ),
               )}{' '}
-              <InfoTip info={t('会从中取出 windsurf_api_key，Token 加密保存')} />
+              <InfoTip info={t('仅提取所需的访问凭据并加密保存')} />
             </p>
             <FormField label="Token" htmlFor="devin-subscription-token">
               <Input

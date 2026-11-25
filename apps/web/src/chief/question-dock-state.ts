@@ -12,6 +12,7 @@ export type QuestionPrimary = {
 const DISMISS_UNDO_MS = 5000;
 
 const dismissing = new Map<string, ReturnType<typeof setTimeout>>();
+const committing = new Set<string>();
 const listeners = new Set<Listener>();
 let version = 0;
 let primary: QuestionPrimary | null = null;
@@ -120,18 +121,24 @@ export const questionDockState = {
     emit();
   },
   isDismissing(requestId: string): boolean {
-    return dismissing.has(requestId);
+    return dismissing.has(requestId) || committing.has(requestId);
   },
   dismissWithUndo(
     requestId: string,
     copy: { title: string; undo: string },
-    commit: () => void,
+    commit: () => unknown,
   ): void {
-    if (dismissing.has(requestId)) return;
+    if (dismissing.has(requestId) || committing.has(requestId)) return;
     const timer = setTimeout(() => {
       dismissing.delete(requestId);
+      committing.add(requestId);
       emit();
-      commit();
+      Promise.resolve(commit())
+        .catch(() => {})
+        .finally(() => {
+          committing.delete(requestId);
+          emit();
+        });
     }, DISMISS_UNDO_MS);
     dismissing.set(requestId, timer);
     emit();

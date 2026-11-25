@@ -1,6 +1,6 @@
 # Mac agent computer in a Linux VM
 
-Status: approved direction (ian, 2026-11-17), design for implementation. Research: [`agent-computer-cross-platform-2026-11-17.md`](../research/agent-computer-cross-platform-2026-11-17.md). Prior art followed: Rakazo `docs/desktop-mac-without-docker.md`.
+Status: retired (Linux VM removed in commits `cc0f17c79`, `b605b2b51`, `faa4b65e3`). Formerly: approved direction (ian, 2026-11-17), design for implementation. Research: [`agent-computer-cross-platform-2026-11-17.md`](../research/agent-computer-cross-platform-2026-11-17.md). Prior art followed: Rakazo `docs/desktop-mac-without-docker.md`.
 
 ## Goal
 

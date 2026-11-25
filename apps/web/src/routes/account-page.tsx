@@ -68,7 +68,8 @@ export function AccountPage() {
   const [askedPermission, setAskedPermission] = useState<NotificationPermission | null>(null);
   const notifyPermission = askedPermission ?? permission;
   const desktopShell = desktopNotify() !== null;
-  const notifyPrefOn = notifyPref === null ? notifyPermission === 'granted' : notifyPref === 'on';
+  const notifyPrefOn =
+    notifyPref === null ? desktopShell || notifyPermission === 'granted' : notifyPref === 'on';
   const notifyBlocked = !desktopShell && notifyPrefOn && notifyPermission === 'denied';
   const devicePushLive = live && teamId !== undefined && !desktopShell && pushDeviceSupported();
   const [theme, setTheme] = useState<ThemePreference>(() => readStoredTheme(safeLocalStorage()));
@@ -200,7 +201,7 @@ export function AccountPage() {
                   wantDevice(checked);
                   return;
                 }
-                if (checked && permission !== 'granted') request();
+                if (checked && permission !== 'granted') void request();
               }}
             />
           </SettingsRow>

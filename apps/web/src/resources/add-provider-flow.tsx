@@ -7,6 +7,7 @@ import { useApiMutations, useCapabilities } from '../api/hooks.js';
 import { MODEL_ROUTING_KEY } from '../api/model-routing.js';
 import { toastError } from '../components/ui/toaster.js';
 import { useI18n } from '../i18n/provider.js';
+import { describeError } from '../lib/error-copy.js';
 import { AddAntigravitySubscriptionDialog } from './antigravity-subscriptions.js';
 import { AddClaudeSubscriptionDialog } from './claude-subscriptions.js';
 import type { CreateProviderDialog as CreateProviderDialogModule } from './create-provider-dialog.js';
@@ -213,7 +214,8 @@ export function AddProviderFlow({
                   onConnectError(null);
                   mutations.startProviderOAuth.mutate(presetId, {
                     onSuccess: (data) => window.location.assign(data.authorizationUrl),
-                    onError: (err) => onConnectError(err.message),
+                    onError: (err) =>
+                      onConnectError(describeError(err, t) ?? t('无法发起登录，请重试。')),
                   });
                 }
               : undefined

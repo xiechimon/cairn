@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useSta
 import { useLocation, useNavigate } from 'react-router';
 import { useProjects } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
+import { coordinatorSearch } from '../board/open-composer.js';
 import { ProjectAvatar } from '../board/project-avatar.js';
 import { useProjectMark } from '../board/project-mark.js';
 import { threadHrefFrom } from '../board/thread-copy.js';
@@ -169,11 +170,16 @@ export function SearchPanel({
   const listRef = useRef<HTMLDivElement | null>(null);
   const pointerRef = useRef<{ x: number; y: number } | null>(null);
   useEffect(() => {
-    if (open) inputRef.current?.focus({ preventScroll: true });
+    if (!open) return;
+    inputRef.current?.focus({ preventScroll: true });
+    inputRef.current?.select();
   }, [open]);
   const attachInput = useCallback((node: HTMLInputElement | null) => {
     inputRef.current = node;
-    if (node && openRef.current) node.focus({ preventScroll: true });
+    if (node && openRef.current) {
+      node.focus({ preventScroll: true });
+      node.select();
+    }
   }, []);
   useSingleLitSurface(open);
   const q = query.trim().toLowerCase();
@@ -239,14 +245,24 @@ export function SearchPanel({
     activeContext?.commands.filter(
       (command) => q === '' || command.label.toLowerCase().includes(q),
     ) ?? [];
-  const hitCount = commands.length + todos.length + projects.length;
+  const navMatches =
+    hasFilters || q === ''
+      ? []
+      : NAV_ROWS.filter(
+          (row) => row.label.toLowerCase().includes(q) || t(row.label).toLowerCase().includes(q),
+        );
+  const hitCount = commands.length + navMatches.length + todos.length + projects.length;
 
   const go = (pathname: string) => {
+    const nextSearch =
+      pathname === '/app' || pathname === '/app/schedules' || pathname.startsWith('/app/project/')
+        ? coordinatorSearch(search)
+        : search;
     if (
       pathname !== SETTINGS_HREF ||
       !isSettingsSectionId(settingsSectionOf(window.location.pathname))
     )
-      navigate({ pathname, search });
+      navigate({ pathname, search: nextSearch });
     onClose();
   };
   const [helpOpen, setHelpOpen] = useState(false);
@@ -268,6 +284,7 @@ export function SearchPanel({
       : [
           ...todos.map((todo) => () => goThread(todo.id)),
           ...projects.map((project) => () => go(`/app/project/${project.id}`)),
+          ...navMatches.map((row) => () => go(row.href)),
         ]),
   ];
   const base = commands.length;
@@ -299,6 +316,14 @@ export function SearchPanel({
         className={`search-panel fixed top-36.5 left-1/2 z-(--z-modal) flex max-h-110 w-160 max-w-[calc(100vw-2rem)] -translate-x-1/2 flex-col overflow-hidden ${DIALOG_FACE} origin-top transition-[opacity,scale] group-data-closed/dlgvp:scale-[0.98] group-data-closed/dlgvp:opacity-0 motion-reduce:transition-none ${VIEWPORT_POP_ANIM}`}
         role="dialog"
         aria-label={t('搜索')}
+        onKeyDown={(event) => {
+          if (event.nativeEvent.isComposing) return;
+          if (event.key === 'Escape' && helpOpen) {
+            event.preventDefault();
+            event.stopPropagation();
+            setHelpOpen(false);
+          }
+        }}
         onMouseEnter={releaseCursor}
         onMouseMove={(event) => {
           const prev = pointerRef.current;
@@ -353,6 +378,13 @@ export function SearchPanel({
             )}
             onChange={(event) => onQuery(joinQuery(chips, event.target.value))}
             onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return;
+              if (event.key === 'Escape' && helpOpen) {
+                event.preventDefault();
+                event.stopPropagation();
+                setHelpOpen(false);
+                return;
+              }
               const lastChip = chips.at(-1);
               if (event.key === 'Backspace' && text === '' && lastChip !== undefined) {
                 event.preventDefault();
@@ -512,6 +544,28 @@ export function SearchPanel({
                     })}
                   </>
                 )}
+                {navMatches.length > 0 && (
+                  <>
+                    <div className={GROUP_LABEL}>{t('前往')}</div>
+                    {navMatches.map(({ label, Icon, href }, index) => {
+                      const rowIndex = base + todos.length + projects.length + index;
+                      return (
+                        <Button
+                          variant="ghost"
+                          key={label}
+                          data-row-kind="nav"
+                          data-row-index={rowIndex}
+                          data-selected={cursor === rowIndex ? '' : undefined}
+                          className={`${ROW_BASE} ${rowLitClasses(cursor === rowIndex, kbd)}`}
+                          onClick={() => go(href)}
+                        >
+                          <Icon className="size-4" />
+                          {t(label)}
+                        </Button>
+                      );
+                    })}
+                  </>
+                )}
               </>
             )}
           </div>
@@ -567,10 +621,11 @@ export function useSearchState(initialOpen: boolean, initialQuery: string) {
   const openSearch = useCallback(() => setOpen(true), []);
   useLayoutEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (event.isComposing || event.keyCode === 229) return;
       if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         setOpen((value) => !value);
-      } else if (event.key === 'Escape') {
+      } else if (event.key === 'Escape' && !event.defaultPrevented) {
         setOpen(false);
       }
     };

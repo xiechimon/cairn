@@ -20,10 +20,12 @@ export function MachineRowView({
   machine,
   machines,
   isDefault,
+  highlighted = false,
 }: {
   machine: MachineRow;
   machines: MachineRow[];
   isDefault: boolean;
+  highlighted?: boolean;
 }) {
   const { t } = useI18n();
   const { live, teamId } = useLiveData();
@@ -64,7 +66,10 @@ export function MachineRowView({
       data-machine-id={machine.id}
       data-kind={machine.kind ?? 'remote'}
       data-oc-state={ownComputer.state ?? undefined}
-      className="flex min-w-0 flex-col border-b border-border last:border-b-0"
+      className={cn(
+        'flex min-w-0 flex-col border-b border-border last:border-b-0',
+        highlighted && 'bg-(--menu-hover)/60 ring-2 ring-inset ring-(--focus-ring)',
+      )}
     >
       <div className="flex min-w-0 items-center gap-3 px-4 py-2 pointer-coarse:pb-3">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">

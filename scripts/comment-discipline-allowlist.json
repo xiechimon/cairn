@@ -50,11 +50,6 @@
     "reason": "external quirk: Node fetch ignores proxy environment variables unless NODE_USE_ENV_PROXY=1"
   },
   {
-    "path": "apps/server/src/routes-machine.ts",
-    "line": "      // undici's default 300s body timeout (measured per received chunk) silently drops an idle SSE stream.",
-    "reason": "external quirk: undici drops idle SSE streams via its default 300s per-chunk body timeout"
-  },
-  {
     "path": "apps/server/src/services/skill-import.ts",
     "line": "// GitHub rejects API requests without a User-Agent (403).",
     "reason": "external quirk: GitHub API rejects requests without a User-Agent"
@@ -87,11 +82,6 @@
   {
     "path": "apps/web/src/resources/skill-dialog.tsx",
     "line": "    // eslint-disable-next-line react-hooks/exhaustive-deps -- recompute only when the error object identity changes",
-    "reason": "tool directive: eslint-disable for react-hooks/exhaustive-deps kept, explanation in English"
-  },
-  {
-    "path": "apps/web/src/resources/skill-import-dialog.tsx",
-    "line": "    // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize fields only on the open/close edge",
     "reason": "tool directive: eslint-disable for react-hooks/exhaustive-deps kept, explanation in English"
   },
   {

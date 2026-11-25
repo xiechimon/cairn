@@ -37,8 +37,14 @@ export function FormField({ label, htmlFor, help, className, disabled, children 
 }
 
 interface FormActionsProps {
-  primary: { label: string; type?: 'submit' | 'button'; onClick?: () => void; disabled?: boolean };
-  secondary?: { label: string; onClick: () => void };
+  primary: {
+    label: string;
+    type?: 'submit' | 'button';
+    onClick?: () => void;
+    disabled?: boolean;
+    testId?: string;
+  };
+  secondary?: { label: string; onClick: () => void; disabled?: boolean };
   hint?: ReactNode;
   className?: string;
 }
@@ -58,6 +64,7 @@ export function FormActions({ primary, secondary, hint, className }: FormActions
         <Button
           variant="ghost"
           className={cn(DIALOG_TEXT_BUTTON, 'pointer-coarse:h-11')}
+          disabled={secondary.disabled}
           onClick={secondary.onClick}
         >
           {secondary.label}
@@ -67,6 +74,7 @@ export function FormActions({ primary, secondary, hint, className }: FormActions
         type={primary.type ?? 'button'}
         className={cn(DIALOG_PRIMARY_BUTTON, 'flex-none pointer-coarse:h-11')}
         disabled={primary.disabled}
+        data-testid={primary.testId}
         onClick={primary.onClick}
       >
         {primary.label}

@@ -536,6 +536,7 @@ function ThreadBody({
         <Composer
           placeholder={chat.started ? t('回复这个任务') : t('开始后才能回复')}
           streaming={chat.running}
+          stopping={chat.stopping}
           editable={chat.send !== undefined}
           readOnly={chat.locked}
           draft={draft}

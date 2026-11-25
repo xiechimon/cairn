@@ -69,6 +69,7 @@ import {
   ChiefOutageBanner,
 } from './chief-outage-banner.js';
 import { ChiefQuestion, useAnswerKey, useQuestionPending } from './chief-question.js';
+import { chiefRowRenders } from './chief-row-kinds.js';
 import {
   foldTaskCards,
   placeReportCards,
@@ -216,9 +217,10 @@ export interface ChiefConversationProps {
   composerRef?: (node: HTMLTextAreaElement | null) => void;
   day?: { earlier: number; today: ReactNode };
   lead?: ReactNode;
+  draftScope?: string;
   draftStorageKey?: string;
   initialDraft?: string;
-  prefill?: { text: string; key: number } | null;
+  prefill?: { text: string; key: number; merge?: boolean } | null;
   placeholder?: string;
   composerReplacement?: ReactNode;
   notice?: ReactNode;
@@ -244,6 +246,7 @@ export function ChiefConversation({
   composerRef,
   day,
   lead,
+  draftScope = 'chief',
   draftStorageKey = CHIEF_DRAFT_STORAGE_KEY,
   initialDraft = '',
   prefill = null,
@@ -311,11 +314,16 @@ export function ChiefConversation({
   const [typing, setTyping] = useState(false);
   const [liveDraft, setLiveDraft] = useServerDraft({
     teamId,
-    scope: 'chief',
+    scope: draftScope,
     localKey: draftStorageKey,
     enabled: live,
     initial: initialDraft,
   });
+  useEffect(() => {
+    if (liveDraft.trim() === '') setTyping(false);
+  }, [liveDraft]);
+  const liveDraftRef = useRef(liveDraft);
+  liveDraftRef.current = liveDraft;
   const stopTurnRef = useRef<(() => void) | undefined>(undefined);
   const surfaceRef = useRef<ComposerSurfaceHandle | null>(null);
   const answerSurfaceRef = useRef<ComposerSurfaceHandle | null>(null);
@@ -386,10 +394,17 @@ export function ChiefConversation({
   }, []);
   const prefillKey = prefill?.key;
   const prefillText = prefill?.text;
+  const prefillMerge = prefill?.merge === true;
   useEffect(() => {
     if (prefillKey == null || prefillText == null) return;
-    restoreToThread(() => prefillText);
-  }, [prefillKey, prefillText]);
+    restoreToThread((cur) =>
+      prefillMerge
+        ? cur.trim() === ''
+          ? prefillText
+          : `${cur.trimEnd()}\n${prefillText}`
+        : prefillText,
+    );
+  }, [prefillKey, prefillText, prefillMerge]);
   const archivedQ = useArchivedTodos(teamId, live);
   const glances = useMemo(() => {
     const active =
@@ -510,11 +525,17 @@ export function ChiefConversation({
         onWithdraw === undefined
           ? undefined
           : (message) => {
+              const raw = rawQueuedText(message);
               if (message.held) {
-                withdraw?.(message.id, rawQueuedText(message));
+                withdraw?.(message.id, raw);
                 return;
               }
-              onWithdraw(message.id).catch(() => {});
+              onWithdraw(message.id).then(
+                () => {
+                  if (liveDraftRef.current.trim() === '') restoreSent(raw);
+                },
+                () => {},
+              );
             }
       }
     />
@@ -860,7 +881,7 @@ export function ChiefConversation({
               {t('取消')}
             </Button>
             <Button
-              className={DIALOG_PRIMARY_BUTTON}
+              variant="destructive"
               onClick={() => {
                 const anchor = rewindConfirm;
                 setRewindConfirm(null);
@@ -875,7 +896,12 @@ export function ChiefConversation({
         <div className="flex flex-col gap-4">
           <p className="m-0 text-ui text-foreground">
             {t('恢复到此处？该条之后的 {n} 条消息会移除，Coordinator 从这条重发开新回合。', {
-              n: Math.max(0, (chief.stream?.length ?? 0) - (rewindConfirm?.index ?? 0) - 1),
+              n:
+                rewindConfirm === null
+                  ? 0
+                  : [...earlierLayout.grouped, ...streamLayout.grouped].filter(
+                      (entry) => entry.i > rewindConfirm.index && chiefRowRenders(entry.item.kind),
+                    ).length,
             })}
           </p>
         </div>

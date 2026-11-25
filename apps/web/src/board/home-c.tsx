@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { useApiMutations, useProjects, usePrs } from '../api/hooks.js';
 import { useLiveData } from '../api/provider.js';
 import {
+  CHIEF_DRAFT_STORAGE_KEY,
   ChiefConversation,
   ChiefScrollProvider,
   useMentionGroups,
@@ -52,7 +53,7 @@ import {
 } from './tasks-sections.js';
 import { THREAD_PARAM, VIEW_PARAM } from './thread-copy.js';
 import { useCloseThread, useOpenThread } from './thread-link.js';
-import { useNarrow } from './use-narrow.js';
+import { useMediaQuery, useNarrow } from './use-narrow.js';
 import { PANE_PARAM, paneOf, TASKS_TAB_PARAM, type WorkPane, WorkPanel } from './work-panel.js';
 
 const CHIEF_PARAM = 'chief';
@@ -199,6 +200,7 @@ export function HomeC({
   const designComposer = useDesignComposer(useActiveArtifact());
   const paneShown = threadId === null || docked;
   const narrow = useNarrow();
+  const shortViewport = useMediaQuery('(max-height: 700px)');
   const { createTodo } = useApiMutations(teamId);
   const projectsQuery = useProjects(teamId, live);
   const mentionGroups = useMentionGroups();
@@ -225,7 +227,9 @@ export function HomeC({
   };
   const openThread = useOpenThread();
   const closeThread = useCloseThread();
-  const [prefill, setPrefill] = useState<{ text: string; key: number } | null>(null);
+  const [prefill, setPrefill] = useState<{ text: string; key: number; merge?: boolean } | null>(
+    null,
+  );
   const [loadingDraft, setLoadingDraft] = useState('');
   const { chiefData } = surface;
   const conversationResetKey = conversationBoundaryKey({
@@ -502,7 +506,7 @@ export function HomeC({
   const handedOver = load === 'ready' && loadingDraft !== '';
   useEffect(() => {
     if (!handedOver) return;
-    setPrefill({ text: loadingDraft, key: Date.now() });
+    setPrefill({ text: loadingDraft, key: Date.now(), merge: true });
     setLoadingDraft('');
   }, [handedOver, loadingDraft]);
   if (load !== 'ready') {
@@ -567,7 +571,7 @@ export function HomeC({
           {!narrow && (
             <ChiefStatusMark
               chief={{ ...chiefData, stream }}
-              hiddenWhenIdle={homeSpiral || setupEmpty}
+              hiddenWhenIdle={(homeSpiral && !shortViewport) || setupEmpty}
             />
           )}
           {homeSpiral && (
@@ -609,6 +613,12 @@ export function HomeC({
               onSettings={() => navigate(COORDINATOR_ROUTING_HREF)}
               showBindGate={!live}
               todoGlances={todoGlances}
+              draftScope={projectId === null ? 'chief' : `chief:${projectId}`}
+              draftStorageKey={
+                projectId === null
+                  ? CHIEF_DRAFT_STORAGE_KEY
+                  : `${CHIEF_DRAFT_STORAGE_KEY}.${projectId}`
+              }
               prefill={prefill}
               placeholder={composerPlaceholder}
               notice={setupStep !== null && <SetupPrompt step={setupStep} empty={setupEmpty} />}

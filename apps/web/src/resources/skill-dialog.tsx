@@ -49,7 +49,7 @@ function serverErrorCopy(
     }
     return { headline: t('保存失败，请重试。'), detail: err.message };
   }
-  return { headline: t('保存失败，请重试。'), detail: String(err) };
+  return { headline: t('保存失败，请重试。'), detail: '' };
 }
 
 export function SkillDialog({
@@ -180,7 +180,7 @@ export function SkillDialog({
           <FieldError>
             {error.headline}
             {error.detail !== '' && (
-              <span className="mt-0.5 block text-muted-foreground">{error.detail}</span>
+              <span className="mt-0.5 block text-content-tertiary">{error.detail}</span>
             )}
           </FieldError>
         </FormStack>
@@ -214,7 +214,7 @@ export function SkillDialog({
             />
             {roundTripBad && (
               <FieldError>
-                {t('描述不要用引号整体包裹——写进 frontmatter 后引号会被剥去，与表单值不一致。')}
+                {t('描述不要用引号整体包裹——保存时引号会被剥去，与表单值不一致。')}
               </FieldError>
             )}
           </FormField>
@@ -227,8 +227,8 @@ export function SkillDialog({
             />
             <FieldDescription className="text-meta text-content-tertiary">
               {editing
-                ? t('frontmatter（name/description）由上方表单生成；未在此编辑的文件保持原样。')
-                : t('frontmatter（name/description）由上方表单生成，这里只写正文。')}
+                ? t('名称和描述由上方表单自动写入；未在此编辑的文件保持原样。')
+                : t('名称和描述由上方表单自动写入，这里只写正文。')}
             </FieldDescription>
             {tooLarge && (
               <FieldError>
@@ -242,7 +242,7 @@ export function SkillDialog({
             <FieldError>
               {error.headline}
               {error.detail !== '' && (
-                <span className="mt-0.5 block text-muted-foreground">{error.detail}</span>
+                <span className="mt-0.5 block text-content-tertiary">{error.detail}</span>
               )}
             </FieldError>
           )}

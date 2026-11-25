@@ -95,7 +95,7 @@ describe('routing targets and the rule graph', () => {
       ['review', 'provider:rec-codex', false, 'GPT-6.1 Sol'],
       ['compaction', null, true, 'glm-5.3'],
     ]);
-    expect(groups.map((group) => group.label)).toEqual(['Coordinator 和其他 Agent']);
+    expect(groups.map((group) => group.label)).toEqual(['Coordinator 与任务']);
   });
 
   test('the all-Claude-models node is drawn only while a project runs on Claude Code', () => {
@@ -195,7 +195,7 @@ describe('devin subscription targets', () => {
       policies: [],
     };
     const groups = ruleGraphGroups(settings, targets, [], t);
-    const agents = groups.find((group) => group.label === 'Coordinator 和其他 Agent');
+    const agents = groups.find((group) => group.label === 'Coordinator 与任务');
     expect(
       agents?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
     ).toEqual([['session', 'subscription:d-main', false, 'devin-swe-2']]);
@@ -275,7 +275,7 @@ describe('antigravity subscription targets', () => {
         choice: { provider: 'antigravity', modelId: 'gemini-4-carbon', thinkingLevel: null },
       },
     ]);
-    const agents = groups.find((group) => group.label === 'Coordinator 和其他 Agent');
+    const agents = groups.find((group) => group.label === 'Coordinator 与任务');
     const antigravity = groups.find((group) => group.label === 'Antigravity');
     expect(
       agents?.nodes.map((node) => [node.id, node.target ?? null, node.broken, node.tag]),
