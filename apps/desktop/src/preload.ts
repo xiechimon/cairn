@@ -23,7 +23,6 @@ import type {
 } from '@cairn/shared';
 import { contextBridge, ipcRenderer } from 'electron';
 
-<<<<<<< HEAD
 type RemoteFallbackCopy = { message: string; action: string | null; quiet: boolean };
 
 function remoteFallbackCopy(state: RemoteVersionState, zh: boolean): RemoteFallbackCopy | null {
@@ -184,9 +183,13 @@ ipcRenderer.on('desktop-update:prepare-reload', (_event, token: number) => {
 });
 startRemoteUpdateFallback();
 
+const SHELL_DESCRIPTOR_ARG_PREFIX = '--cairn-shell=';
+
 function readShellDescriptor(): DesktopShellDescriptor | undefined {
   try {
-    const raw = ipcRenderer.sendSync('desktop-shell:descriptor') as
+    const arg = process.argv.find((entry) => entry.startsWith(SHELL_DESCRIPTOR_ARG_PREFIX));
+    if (arg === undefined) return undefined;
+    const raw = JSON.parse(arg.slice(SHELL_DESCRIPTOR_ARG_PREFIX.length)) as
       | DesktopShellDescriptor
       | null
       | undefined;

@@ -1,7 +1,7 @@
 # Edge-Case Matrix: Page ↔ Desktop Shell Capability Negotiation (`page-shell-capability`)
 
 > Parent contract: [`docs/design/version-skew.md`](../version-skew.md)
-> Scope: `apps/web` (`desktop-shell.ts`, `desktop-update.tsx`, `antigravity-subscriptions.tsx`, `devin-subscriptions.tsx`, `local-provider-import.tsx`, `setup-prompt.tsx`, `own-computer-panel.tsx`, `subscription-login-banner.tsx`, `notice-banner.tsx`, `home-c.tsx`) and `apps/desktop/src/preload.ts` / `scripts/smoke-remote-antigravity.mjs`.
+> Scope: `apps/web` (`desktop-shell.ts`, `desktop-update.tsx`, `antigravity-subscriptions.tsx`, `devin-subscriptions.tsx`, `local-provider-import.tsx`, `setup-prompt.tsx`, `own-computer-panel.tsx`, `subscription-login-banner.tsx`, `notice-banner.tsx`, `home-c.tsx`) and `apps/desktop/src/preload.ts` / `apps/desktop/scripts/smoke-remote-antigravity.mjs`.
 
 ## Conflict Resolution with Owner 19:30 Directive
 

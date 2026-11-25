@@ -717,6 +717,18 @@ function showOfflineFallback(window: BrowserWindow, origin: string): void {
   if (!window.isVisible() && !BACKGROUND_LAUNCH) window.show();
 }
 
+function shellDescriptorArg(): string {
+  const localMode =
+    activeConnectionOf(readConnectionCatalog(app.getPath('userData'))).kind === 'local';
+  return `--cairn-shell=${JSON.stringify(
+    createDesktopShellDescriptor({
+      shellVersion: app.getVersion(),
+      localMode,
+      isMac: IS_MAC,
+    }),
+  )}`;
+}
+
 function openWindow(origin: string, restore: RelaunchWindow | null = null): BrowserWindow {
   const store = windowStateStore();
   const window = new BrowserWindow({
@@ -732,6 +744,7 @@ function openWindow(origin: string, restore: RelaunchWindow | null = null): Brow
       sandbox: true,
       nodeIntegration: false,
       preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
+      additionalArguments: [shellDescriptorArg()],
     },
   });
   window.webContents.setUserAgent(
@@ -913,6 +926,7 @@ function createTrayPopover(): BrowserWindow {
       nodeIntegration: false,
       backgroundThrottling: false,
       preload: join(app.getAppPath(), 'dist', 'preload.cjs'),
+      additionalArguments: [shellDescriptorArg()],
     },
   });
   if (IS_MAC) {
@@ -2107,14 +2121,6 @@ async function boot(): Promise<void> {
       mainWindow?.webContents === event.sender &&
       event.senderFrame === event.sender.mainFrame &&
       event.senderFrame?.origin === origin;
-    ipcMain.on('desktop-shell:descriptor', (event) => {
-      const localMode = activeConnectionOf(readConnectionCatalog(userData)).kind === 'local';
-      event.returnValue = createDesktopShellDescriptor({
-        shellVersion: app.getVersion(),
-        localMode,
-        isMac: IS_MAC,
-      });
-    });
     const hostStatus = () => {
       const current = readConnectionCatalog(userData);
       return {
