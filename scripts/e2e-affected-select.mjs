@@ -39,6 +39,7 @@ const BOARD = [
   'thread-route-override',
   'route-override-capabilities',
   'task-send-dead-turn',
+  'card-corner-clipping',
 ];
 const SIDEBAR = [
   'usage-page',
@@ -114,6 +115,7 @@ const DETAIL = [
   'thread-route-override',
   'route-override-capabilities',
   'task-send-dead-turn',
+  'card-corner-clipping',
 ];
 const CHIEF = [
   'composer-tool-tips',
@@ -128,6 +130,7 @@ const CHIEF = [
   'hotkeys-ready',
   'mobile-narrow',
   'task-panel',
+  'card-corner-clipping',
 ];
 const AGENT = [
   'menu-keys',
@@ -168,6 +171,7 @@ const OVERLAY = [
   'thread-route-override',
   'route-override-capabilities',
   'task-send-dead-turn',
+  'chief-composer-',
 ];
 const OVERLAYS = [
   'chip-',
@@ -311,7 +315,10 @@ export const FILE_RULES = new Map([
 export const DIR_RULES = [
   { prefix: 'apps/web/src/usage/', specs: ['usage-page'] },
   { prefix: 'apps/web/src/search/', specs: ['search-'] },
-  { prefix: 'apps/web/src/board/artifact/', specs: ['artifact-', 'design-view'] },
+  {
+    prefix: 'apps/web/src/board/artifact/',
+    specs: ['artifact-', 'design-view', 'card-corner-clipping'],
+  },
   { prefix: 'apps/web/src/board/design/', specs: ['design-view'] },
   { prefix: 'apps/web/src/board/', specs: BOARD },
   {

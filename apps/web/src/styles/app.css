@@ -450,12 +450,6 @@ html:has([data-slot="demo-banner"]) .app-drawer {
   }
 }
 
-@supports (corner-shape: superellipse(1.5)) {
-  .board-notify-banner {
-    corner-shape: superellipse(1.5);
-  }
-}
-
 @utility voice-greeting {
   font-family: var(--font-serif);
   font-weight: var(--voice-greeting-weight);

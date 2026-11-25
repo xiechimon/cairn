@@ -23,7 +23,7 @@ export function withCodeSpans(text: string): ReactNode[] {
   );
 }
 
-const BANNER_CLS = 'board-notify-banner rounded-(--radius-card) bg-card px-4 py-3 shadow-(--e1)';
+const BANNER_CLS = 'rounded-(--radius-card) bg-card px-4 py-3 inset-ring-1 inset-ring-border';
 
 export function NoticeBanner({
   tone,

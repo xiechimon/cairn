@@ -1,39 +1,110 @@
+export type ListMarkerKind = 'ordered' | 'bullet';
+
+export interface ListMarkerSpan {
+  kind: ListMarkerKind;
+  lineStart: number;
+  start: number;
+  end: number;
+  text: string;
+}
+
+interface ParsedListLine {
+  kind: ListMarkerKind;
+  indent: string;
+  token: string;
+  number: number | null;
+  markerLength: number;
+}
+
 interface ListMarker {
+  kind: ListMarkerKind;
   lineStart: number;
   indent: string;
-  number: number;
+  number: number | null;
   markerEnd: number;
   lineEnd: number;
 }
 
-function markerAtCaret(value: string, caret: number): ListMarker | null {
-  const clamped = Math.max(0, Math.min(caret, value.length));
-  const lineStart = value.lastIndexOf('\n', clamped - 1) + 1;
-  const nl = value.indexOf('\n', clamped);
-  const lineEnd = nl === -1 ? value.length : nl;
-  const line = value.slice(lineStart, lineEnd);
-  const match = /^([ \t]*)(\d+)\. +/.exec(line);
-  if (match === null) return null;
-  const indent = match[1] ?? '';
-  const number = Number.parseInt(match[2] ?? '0', 10);
-  if (!Number.isSafeInteger(number)) return null;
-  const markerEnd = lineStart + (match[0]?.length ?? 0);
-  if (clamped < markerEnd) return null;
-  return { lineStart, indent, number, markerEnd, lineEnd };
+function parseListLine(line: string): ParsedListLine | null {
+  const ordered = /^([ \t]*)(\d+)\. +(.*)$/.exec(line);
+  if (ordered !== null) {
+    const indent = ordered[1] ?? '';
+    const digits = ordered[2] ?? '0';
+    const number = Number.parseInt(digits, 10);
+    if (!Number.isSafeInteger(number)) return null;
+    const token = `${digits}.`;
+    return {
+      kind: 'ordered',
+      indent,
+      token,
+      number,
+      markerLength: ordered[0].length - (ordered[3] ?? '').length,
+    };
+  }
+  const bullet = /^([ \t]*)- +(.*)$/.exec(line);
+  if (bullet !== null) {
+    return {
+      kind: 'bullet',
+      indent: bullet[1] ?? '',
+      token: '-',
+      number: null,
+      markerLength: bullet[0].length - (bullet[2] ?? '').length,
+    };
+  }
+  return null;
 }
 
-function sameIndentMarker(
-  line: string,
-  indent: string,
-): { number: number; contentStart: number; markerLength: number } | null {
-  const match = /^([ \t]*)(\d+)\. +(.*)$/.exec(line);
-  if (match === null) return null;
-  if ((match[1] ?? '') !== indent) return null;
+export function lineStartAt(value: string, caret: number): number {
+  const clamped = Math.max(0, Math.min(caret, value.length));
+  return value.lastIndexOf('\n', clamped - 1) + 1;
+}
+
+function markerAtCaret(value: string, caret: number): ListMarker | null {
+  const clamped = Math.max(0, Math.min(caret, value.length));
+  const lineStart = lineStartAt(value, clamped);
+  const nl = value.indexOf('\n', clamped);
+  const lineEnd = nl === -1 ? value.length : nl;
+  const parsed = parseListLine(value.slice(lineStart, lineEnd));
+  if (parsed === null) return null;
+  const markerEnd = lineStart + parsed.markerLength;
+  if (clamped < markerEnd) return null;
   return {
-    number: Number.parseInt(match[2] ?? '0', 10),
-    contentStart: (match[1] ?? '').length + (match[2] ?? '').length + 2,
-    markerLength: match[0].length - (match[3] ?? '').length,
+    kind: parsed.kind,
+    lineStart,
+    indent: parsed.indent,
+    number: parsed.number,
+    markerEnd,
+    lineEnd,
   };
+}
+
+export function findListMarkers(
+  text: string,
+  suppressedLineStarts?: ReadonlySet<number> | null,
+): ListMarkerSpan[] {
+  if (text === '') return [];
+  const out: ListMarkerSpan[] = [];
+  let lineStart = 0;
+  while (lineStart <= text.length) {
+    const nl = text.indexOf('\n', lineStart);
+    const lineEnd = nl === -1 ? text.length : nl;
+    if (suppressedLineStarts == null || !suppressedLineStarts.has(lineStart)) {
+      const parsed = parseListLine(text.slice(lineStart, lineEnd));
+      if (parsed !== null) {
+        const start = lineStart + parsed.indent.length;
+        out.push({
+          kind: parsed.kind,
+          lineStart,
+          start,
+          end: start + parsed.token.length,
+          text: parsed.token,
+        });
+      }
+    }
+    if (nl === -1) break;
+    lineStart = nl + 1;
+  }
+  return out;
 }
 
 export interface OrderedListEnter {
@@ -65,10 +136,16 @@ export function applyOrderedListEnter(value: string, caret: number): OrderedList
     return { value: next, caret: marker.lineStart + marker.indent.length };
   }
 
-  const nextNumber = marker.number + 1;
-  const insert = `\n${marker.indent}${nextNumber}. `;
   const head = value.slice(0, clamped);
   let tail = value.slice(clamped);
+
+  if (marker.kind === 'bullet' || marker.number === null) {
+    const insert = `\n${marker.indent}- `;
+    return { value: head + insert + tail, caret: clamped + insert.length };
+  }
+
+  const nextNumber = marker.number + 1;
+  const insert = `\n${marker.indent}${nextNumber}. `;
   const nextCaret = clamped + insert.length;
 
   const tailLines = tail.split('\n');
@@ -76,9 +153,16 @@ export function applyOrderedListEnter(value: string, caret: number): OrderedList
   for (let i = 1; i < tailLines.length; i += 1) {
     const line = tailLines[i];
     if (line === undefined || line.trim() === '') break;
-    const sibling = sameIndentMarker(line, marker.indent);
-    if (sibling === null || !Number.isSafeInteger(sibling.number)) break;
-    tailLines[i] = `${marker.indent}${renumber}. ${line.slice(sibling.contentStart)}`;
+    const sibling = parseListLine(line);
+    if (
+      sibling === null ||
+      sibling.kind !== 'ordered' ||
+      sibling.indent !== marker.indent ||
+      sibling.number === null
+    ) {
+      break;
+    }
+    tailLines[i] = `${marker.indent}${renumber}. ${line.slice(sibling.markerLength)}`;
     renumber += 1;
   }
   tail = tailLines.join('\n');

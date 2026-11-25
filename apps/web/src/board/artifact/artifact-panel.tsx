@@ -123,7 +123,10 @@ function ArtifactPanel({
     >
       <div className="flex h-12 flex-none items-center gap-1 pr-2 pl-3">
         {switcher}
-        <nav aria-label={t('打开的文件')} className="flex min-w-0 flex-1 gap-0.5 overflow-hidden">
+        <nav
+          aria-label={t('打开的文件')}
+          className="-m-px flex min-w-0 flex-1 gap-0.5 overflow-hidden p-px"
+        >
           {panel.tabs.map((tab) => (
             <ArtifactTabButton
               key={tab.key}
@@ -198,7 +201,7 @@ function ArtifactTabButton({
       className={cn(
         'group/tab relative flex h-7.5 max-w-44 min-w-14 items-center rounded-(--radius-control) text-ui text-content-tertiary hover:bg-(--hover-1) hover:text-content-secondary',
         active
-          ? 'flex-none bg-popover text-foreground shadow-(--e1) max-[760px]:max-w-none max-[760px]:flex-1'
+          ? 'flex-none bg-popover text-foreground inset-ring-1 inset-ring-border max-[760px]:max-w-none max-[760px]:flex-1'
           : 'flex-[0_1_auto] max-[760px]:hidden',
       )}
     >

@@ -99,7 +99,9 @@ export function Composer({
     handleChange,
     handleKeyDown,
     handleCaretMoved,
+    handleCompositionStart,
     handleCompositionEnd,
+    suppressedListLines,
     handleBlur,
     textareaRef,
     fileInputRef,
@@ -253,6 +255,7 @@ export function Composer({
                 onKeyUp={handleCaretMoved}
                 onClick={handleCaretMoved}
                 onSelect={handleCaretMoved}
+                onCompositionStart={handleCompositionStart}
                 onCompositionEnd={handleCompositionEnd}
                 onBlur={handleBlur}
                 {...(inlineOpen
@@ -267,7 +270,12 @@ export function Composer({
                   ? { 'aria-activedescendant': `${inlineListboxId}-opt-${inlineHighlight}` }
                   : {})}
               />
-              <MentionHighlight text={draft} registry={mentionRegistry} textareaRef={textareaRef} />
+              <MentionHighlight
+                text={draft}
+                registry={mentionRegistry}
+                textareaRef={textareaRef}
+                suppressedListLines={suppressedListLines}
+              />
               <MentionInline
                 open={inlineOpen}
                 rows={inlineRows}

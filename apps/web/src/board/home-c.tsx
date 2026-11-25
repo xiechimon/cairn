@@ -587,7 +587,7 @@ export function HomeC({
           {banner != null && (
             <div
               data-home-banner=""
-              className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-chat flex-none overflow-y-auto pt-3"
+              className="mx-auto max-h-[40dvh] w-[calc(100%-2rem)] max-w-chat flex-none overflow-y-auto pt-3 pb-px"
             >
               {banner}
             </div>

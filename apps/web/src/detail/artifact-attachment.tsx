@@ -141,9 +141,9 @@ function ArtifactCard({
     </>
   );
   const frame = cn(
-    'flex w-128 max-w-full items-center gap-3 rounded-(--radius-card) bg-card px-4 text-left shadow-(--e1) transition-colors duration-(--dur-fast) ease-(--ease-standard)',
+    'flex w-128 max-w-full items-center gap-3 rounded-(--radius-card) bg-card px-4 text-left inset-ring-1 inset-ring-border transition-colors duration-(--dur-fast) ease-(--ease-standard)',
     pdf ? 'h-auto py-3' : 'h-16',
-    active && 'shadow-[0_0_0_1px_var(--text-tertiary)]',
+    active && 'inset-ring-(--text-tertiary)',
   );
   if (onOpen === undefined) {
     return (

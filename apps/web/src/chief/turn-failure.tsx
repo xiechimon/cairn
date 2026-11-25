@@ -84,7 +84,7 @@ function NoticeCard({
       data-testid={testId}
       data-kind={kind}
       onKeyDown={onKeyDown}
-      className={`${className} relative pr-12 shadow-(--e1)`}
+      className={`${className} relative pr-12`}
     >
       <CircleAlert aria-hidden="true" className={tone === 'fail' ? FAIL_ICON_CLS : WAIT_ICON_CLS} />
       <span className="min-w-0 flex-1">

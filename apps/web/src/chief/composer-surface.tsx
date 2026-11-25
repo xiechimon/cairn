@@ -154,7 +154,9 @@ export function ComposerSurface({
   const {
     handlePaste,
     handleCaretMoved,
+    handleCompositionStart,
     handleCompositionEnd,
+    suppressedListLines,
     handleBlur,
     fileInputRef,
     openFilePicker,
@@ -336,6 +338,7 @@ export function ComposerSurface({
               onKeyUp={handleCaretMoved}
               onClick={handleCaretMoved}
               onSelect={handleCaretMoved}
+              onCompositionStart={handleCompositionStart}
               onCompositionEnd={handleCompositionEnd}
               onFocus={onFocusEnter}
               onBlur={(event) => {
@@ -369,6 +372,7 @@ export function ComposerSurface({
               text={wire.draft}
               registry={wire.mentionRegistry}
               textareaRef={wire.textareaRef}
+              suppressedListLines={suppressedListLines}
             />
             <MentionInline
               open={inlineOpen}

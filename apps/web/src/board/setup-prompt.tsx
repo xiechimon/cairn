@@ -151,7 +151,7 @@ function ModelsPrompt({ models, empty }: { models: ModelSides; empty: boolean })
       data-testid="setup-prompt"
       data-step="models"
       data-variant="line"
-      className={`${BANNER_CLS} items-center shadow-(--e1)`}
+      className={`${BANNER_CLS} items-center`}
     >
       <Key aria-hidden="true" className="size-5 flex-none text-(--waiting-ink)" />
       <span className="min-w-0 flex-1">{t('Coordinator 现在没有模型可用')}</span>
@@ -186,7 +186,7 @@ function MachinePrompt() {
       data-testid="setup-prompt"
       data-step="machine"
       data-variant="line"
-      className={`${BANNER_CLS} items-center shadow-(--e1)`}
+      className={`${BANNER_CLS} items-center`}
     >
       <Monitor aria-hidden="true" className="size-5 flex-none text-icon" />
       <span className="flex min-w-0 flex-1 flex-col">

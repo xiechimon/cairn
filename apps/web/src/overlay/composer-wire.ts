@@ -39,7 +39,12 @@ import {
   type MentionGroups,
   type MentionToken,
 } from './mention-token.js';
-import { applyOrderedListBackspace, applyOrderedListEnter } from './ordered-list.js';
+import {
+  applyOrderedListBackspace,
+  applyOrderedListEnter,
+  findListMarkers,
+  lineStartAt,
+} from './ordered-list.js';
 import { usePendingAttachments } from './pending-attachments.js';
 
 export interface ComposerWireOptions {
@@ -72,7 +77,9 @@ export interface ComposerWire {
   handleChange: (event: ChangeEvent<HTMLTextAreaElement>) => void;
   handleKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>) => void;
   handleCaretMoved: () => void;
+  handleCompositionStart: () => void;
   handleCompositionEnd: () => void;
+  suppressedListLines: ReadonlySet<number> | null;
   handleBlur: () => void;
   textareaRef: MutableRefObject<HTMLTextAreaElement | null>;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -222,6 +229,8 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   }, [inlineRange, mentionGroups, mentionFiles]);
 
   const escapeAt = useRef<number | null>(null);
+  const composingRef = useRef(false);
+  const [suppressedListLines, setSuppressedListLines] = useState<ReadonlySet<number> | null>(null);
   const sending = useRef(false);
   const sendAfterUploadRef = useRef<typeof onSend>(undefined);
   const uploadFailedRef = useRef(false);
@@ -443,7 +452,7 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    const isComposing = event.nativeEvent.isComposing;
+    const isComposing = event.nativeEvent.isComposing || composingRef.current;
     const intent = completionKeyIntent(
       { key: event.key, shiftKey: event.shiftKey, isComposing },
       { open: inlineOpen, highlight: inlineHighlight, matchCount: inlineRows.length },
@@ -552,6 +561,21 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     return () => document.removeEventListener('pointerdown', onPointerDown, true);
   }, [inlineOpen, closeInline]);
 
+  const handleCompositionStart = useCallback(() => {
+    composingRef.current = true;
+    const ta = textareaRef.current;
+    if (ta == null) return;
+    const start = lineStartAt(ta.value, ta.selectionStart ?? ta.value.length);
+    const hasMarker = findListMarkers(ta.value).some((marker) => marker.lineStart === start);
+    if (!hasMarker) setSuppressedListLines(new Set([start]));
+  }, []);
+
+  const handleCompositionEnd = useCallback(() => {
+    composingRef.current = false;
+    setSuppressedListLines(null);
+    reevaluate();
+  }, [reevaluate]);
+
   return {
     draft,
     setDraft,
@@ -562,7 +586,9 @@ export function useComposerWire(options: ComposerWireOptions): ComposerWire {
     handleChange,
     handleKeyDown,
     handleCaretMoved: reevaluate,
-    handleCompositionEnd: reevaluate,
+    handleCompositionStart,
+    handleCompositionEnd,
+    suppressedListLines,
     handleBlur: closeInline,
     textareaRef,
     fileInputRef,
