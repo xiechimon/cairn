@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import type { AgentBackend, SessionOpts, StepEvent } from '@cairn/shared';
 import { describe, expect, test } from 'vitest';
 import { createAcpBackend, createGeminiBackend } from '../src/backend/acp.js';
+import { decideAcpPermission } from '../src/backend/acp-permission-gate.js';
 
 const fixture = fileURLToPath(new URL('./fixtures/acp-agent.mjs', import.meta.url));
 const opts: SessionOpts = {
@@ -168,4 +169,76 @@ describe('ACP permission gate on locked turns', () => {
     expect(outcomes).toMatchObject({ ok: 'allow', extra: 'allow' });
     expect(outcomes.__executed).toEqual(['ok', 'extra']);
   });
+
+  test.each(['read-only', 'relay-only'] as const)(
+    '%s: Devin "Calling <tool> from cairn" format allows host tools and rejects non-cairn or unknown tools',
+    (policy) => {
+      const hostToolNames = ['todos', 'open_thread', 'send_message'];
+      const normal = { mode: 'deny' } as const;
+
+      for (const title of [
+        'Calling todos from cairn',
+        'Calling todos from cairn MCP',
+        'Calling todos from cairn MCP Server',
+      ]) {
+        expect(
+          decideAcpPermission({
+            policy,
+            toolCall: { toolCallId: 'c1', title, kind: 'other' },
+            hostToolNames,
+            normal,
+          }),
+        ).toEqual({ allow: true, reason: 'Cairn relay tool' });
+      }
+
+      for (const denied of [
+        { toolCallId: 'd1', title: 'Calling todos from other-server', kind: 'other' as const },
+        { toolCallId: 'd2', title: 'Calling todos from evil', kind: 'other' as const },
+        { toolCallId: 'd3', title: 'Calling bash from cairn', kind: 'other' as const },
+        { toolCallId: 'd4', title: 'Calling todos from cairn', kind: 'execute' as const },
+      ]) {
+        const decision = decideAcpPermission({ policy, toolCall: denied, hostToolNames, normal });
+        expect(decision.allow).toBe(false);
+        expect(decision.reason).toContain('Cairn permission gate rejected');
+      }
+    },
+  );
+
+  test.each([
+    ['relay-only', mailTurn],
+    ['read-only', { ...relay, readOnly: true, lockedDown: true }],
+  ] as const)(
+    'devin (%s): allows Calling <hostTool> from cairn over ACP while rejecting other servers and non-host tools',
+    async (_label, policy) => {
+      const calls: Call[] = [
+        {
+          toolCallId: 'r-devin',
+          title: 'Calling mail_reply from cairn',
+          kind: 'other',
+          hostTool: 'mail_reply',
+        },
+        {
+          toolCallId: 'x-other-server',
+          title: 'Calling mail_reply from other-server',
+          kind: 'other',
+          exec: true,
+        },
+        {
+          toolCallId: 'x-non-host',
+          title: 'Calling bash from cairn',
+          kind: 'other',
+          exec: true,
+        },
+      ];
+      const { events, outcomes } = await run(backendFor('devin'), policy, calls);
+      expect(events.at(-1)).toMatchObject({ type: 'done' });
+      expect(outcomes).toMatchObject({
+        'r-devin': 'allow',
+        'r-devin:tool': 'mail sent',
+        'x-other-server': 'deny',
+        'x-non-host': 'deny',
+      });
+      expect(outcomes.__executed).toEqual([]);
+    },
+  );
 });

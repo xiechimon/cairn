@@ -109,7 +109,7 @@ export function isHostToolCall(toolCall: AcpToolCall, hostToolNames: readonly st
   return hostToolNames.some((name) => {
     const escaped = escapeRegExp(name);
     const qualified = new RegExp(
-      `^(?:mcp__cairn__${escaped}|mcp_cairn_${escaped}|cairn(?:__|[:/. -]+)${escaped}|${escaped} \\(cairn(?: MCP(?: Server)?)?\\))$`,
+      `^(?:mcp__cairn__${escaped}|mcp_cairn_${escaped}|cairn(?:__|[:/. -]+)${escaped}|${escaped} \\(cairn(?: MCP(?: Server)?)?\\)|Calling ${escaped} from cairn(?: MCP(?: Server)?)?)$`,
       'i',
     );
     return candidates.some((candidate) => qualified.test(candidate) || candidate === name);
