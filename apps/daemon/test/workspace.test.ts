@@ -377,6 +377,110 @@ describe('worktree contract (02 §5.5 / r3 §1.4)', () => {
     expect(await gitPrim.hasLocalBranch(fresh.baseRepoDir, fresh.branch)).toBe(true);
   }, 30_000);
 
+  test('orphan reclamation preserves expired worktree with uncommitted file in a nested subdirectory', async () => {
+    const dirty = await ws.prepare(prepareInput(CONV_A));
+    const clean = await ws.prepare(prepareInput(CONV_B));
+    mkdirSync(join(dirty.cwd, 'src'), { recursive: true });
+    writeFileSync(join(dirty.cwd, 'src', 'wip.ts'), 'export const wip = true;\n');
+    const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    utimesSync(dirty.cwd, old, old);
+
+    const removed = await ws.cleanupOrphans({
+      workspacesRoot: root,
+      ttlMs: ORPHAN_WORKTREE_TTL_MS,
+      now: Date.now() + 8 * 24 * 60 * 60 * 1000,
+      activeConversationIds: [],
+    });
+
+    expect(removed).not.toContain(CONV_A);
+    expect(removed).toContain(CONV_B);
+    expect(existsSync(join(dirty.cwd, 'src', 'wip.ts'))).toBe(true);
+    expect(existsSync(clean.cwd)).toBe(false);
+    expect(await gitPrim.hasLocalBranch(dirty.baseRepoDir, dirty.branch)).toBe(true);
+    expect(logger.lines).toContain(
+      `[workspace] skipping orphan cleanup for ${CONV_A}: worktree has uncommitted changes`,
+    );
+  }, 30_000);
+
+  test('orphan reclamation preserves expired worktree with unpushed local commits', async () => {
+    const unpushed = await ws.prepare(prepareInput(CONV_A));
+    writeFileSync(join(unpushed.cwd, 'local-only.txt'), 'unpushed work\n');
+    const committed = await ws.commitAll(unpushed.cwd, 'wip: local only', IDENTITY);
+    expect(committed.committed).toBe(true);
+
+    const removed = await ws.cleanupOrphans({
+      workspacesRoot: root,
+      ttlMs: ORPHAN_WORKTREE_TTL_MS,
+      now: Date.now() + 8 * 24 * 60 * 60 * 1000,
+      activeConversationIds: [],
+    });
+
+    expect(removed).not.toContain(CONV_A);
+    expect(existsSync(unpushed.cwd)).toBe(true);
+    expect(await gitPrim.hasLocalBranch(unpushed.baseRepoDir, unpushed.branch)).toBe(true);
+    expect(
+      logger.lines.some(
+        (line) =>
+          line.includes(`skipping orphan cleanup for ${CONV_A}`) && line.includes('unpushed'),
+      ),
+    ).toBe(true);
+  }, 30_000);
+
+  test('orphan reclamation removes clean expired worktree once local commits are pushed', async () => {
+    const pushed = await ws.prepare(prepareInput(CONV_A));
+    writeFileSync(join(pushed.cwd, 'pushed.txt'), 'saved remotely\n');
+    const committed = await ws.commitAll(pushed.cwd, 'feat: pushed work', IDENTITY);
+    expect(committed.committed).toBe(true);
+    await ws.push(pushed.cwd, pushed.branch, null, NO_PUBLICATION);
+
+    const removed = await ws.cleanupOrphans({
+      workspacesRoot: root,
+      ttlMs: ORPHAN_WORKTREE_TTL_MS,
+      now: Date.now() + 8 * 24 * 60 * 60 * 1000,
+      activeConversationIds: [],
+    });
+
+    expect(removed).toContain(CONV_A);
+    expect(existsSync(pushed.cwd)).toBe(false);
+    expect(await gitPrim.hasLocalBranch(pushed.baseRepoDir, pushed.branch)).toBe(false);
+  }, 30_000);
+
+  test('orphan reclamation handles local-only repos without remotes safely', async () => {
+    const localBase = join(root, 'local-proj', 'repo');
+    mkdirSync(localBase, { recursive: true });
+    await runGit(['init', '-b', 'main'], { cwd: localBase });
+    writeFileSync(join(localBase, 'README.md'), '# local\n');
+    await runGit(['add', '-A'], { cwd: localBase });
+    await runGit(['commit', '-m', 'init'], { cwd: localBase, env: commitEnv(IDENTITY) });
+
+    const unmergedDir = join(root, CONV_A);
+    const cleanDir = join(root, CONV_B);
+    await runGit(['worktree', 'add', '-b', conversationBranch(CONV_A), unmergedDir, 'main'], {
+      cwd: localBase,
+    });
+    await runGit(['worktree', 'add', '-b', conversationBranch(CONV_B), cleanDir, 'main'], {
+      cwd: localBase,
+    });
+    writeFileSync(join(unmergedDir, 'feature.txt'), 'unmerged commit\n');
+    await runGit(['add', '-A'], { cwd: unmergedDir });
+    await runGit(['commit', '-m', 'local feature'], {
+      cwd: unmergedDir,
+      env: commitEnv(IDENTITY),
+    });
+
+    const removed = await ws.cleanupOrphans({
+      workspacesRoot: root,
+      ttlMs: ORPHAN_WORKTREE_TTL_MS,
+      now: Date.now() + 8 * 24 * 60 * 60 * 1000,
+      activeConversationIds: [],
+    });
+
+    expect(removed).not.toContain(CONV_A);
+    expect(removed).toContain(CONV_B);
+    expect(existsSync(unmergedDir)).toBe(true);
+    expect(existsSync(cleanDir)).toBe(false);
+  }, 30_000);
+
   test('projectLock: concurrent prepares on the same project serialized (clone race guardrail)', async () => {
     const [a, b] = await Promise.all([
       ws.prepare(prepareInput(CONV_A)),

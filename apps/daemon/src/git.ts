@@ -1153,7 +1153,62 @@ export const gitPrim = {
     });
     return r.code === 0 && r.stdout.trim() !== '' ? r.stdout.trim() : null;
   },
+
+  async unpushedCommitCount(dir: string): Promise<number> {
+    const head = await gitPrim.head(dir);
+    if (head === null) return 0;
+    const remotes = await runGit(
+      ['for-each-ref', '--count=1', '--format=%(refname)', 'refs/remotes/'],
+      { cwd: dir, timeoutMs: META_TIMEOUT_MS },
+    );
+    if (remotes.code !== 0) {
+      throw new Error(gitFailureMessage('for-each-ref', remotes, META_TIMEOUT_MS));
+    }
+    let excludeArgs: string[];
+    if (remotes.stdout.trim() !== '') {
+      excludeArgs = ['--remotes'];
+    } else {
+      const baseRefs = await localBaseRefs(dir);
+      if (baseRefs.length === 0) return 1;
+      excludeArgs = baseRefs;
+    }
+    const r = await runGit(['rev-list', '--count', 'HEAD', '--not', ...excludeArgs], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    if (r.code !== 0) throw new Error(gitFailureMessage('rev-list', r, META_TIMEOUT_MS));
+    const n = Number.parseInt(r.stdout.trim(), 10);
+    if (Number.isNaN(n)) {
+      throw new Error(`git rev-list returned non-numeric count: ${r.stdout.trim()}`);
+    }
+    return n;
+  },
 };
+
+async function localBaseRefs(dir: string): Promise<string[]> {
+  const refs: string[] = [];
+  const gitDirRes = await runGit(['rev-parse', '--path-format=absolute', '--git-dir'], {
+    cwd: dir,
+    timeoutMs: META_TIMEOUT_MS,
+  });
+  const commonDir = await gitPrim.commonGitDir(dir);
+  const gitDir = gitDirRes.code === 0 ? gitDirRes.stdout.trim() : '';
+  if (commonDir !== null && commonDir !== gitDir) {
+    const baseHead = await runGit(['--git-dir', commonDir, 'rev-parse', '--verify', 'HEAD'], {
+      cwd: dir,
+      timeoutMs: META_TIMEOUT_MS,
+    });
+    const sha = baseHead.stdout.trim();
+    if (baseHead.code === 0 && /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(sha)) {
+      refs.push(sha);
+    }
+  }
+  for (const candidate of ['refs/heads/main', 'refs/heads/master']) {
+    const resolved = await gitPrim.resolveRef(dir, candidate);
+    if (resolved !== null) refs.push(resolved);
+  }
+  return refs;
+}
 
 export const GIT_NET_RETRY_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
 

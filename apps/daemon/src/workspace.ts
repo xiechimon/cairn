@@ -588,6 +588,20 @@ export class WorkspaceManager implements WorktreeOps {
       const age = input.now - (await this.lastActivity(dir));
       if (age < ttlMs) continue;
       try {
+        const dirty = await gitPrim.dirtyPaths(dir);
+        if (dirty.length > 0) {
+          this.logger.workspace(
+            `skipping orphan cleanup for ${name}: worktree has uncommitted changes`,
+          );
+          continue;
+        }
+        const unpushed = await gitPrim.unpushedCommitCount(dir);
+        if (unpushed > 0) {
+          this.logger.workspace(
+            `skipping orphan cleanup for ${name}: worktree has ${unpushed} unpushed commit(s)`,
+          );
+          continue;
+        }
         await this.removeStale(dir);
         removed.push(name);
       } catch (err) {
